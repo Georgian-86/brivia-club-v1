@@ -1,0 +1,422 @@
+ .app-view[data-view="chat"][hidden]{display:none!important}
+
+body.app-subview .app-wrap{padding-bottom:0}
+body.app-subview .app-view.is-active{min-height:calc(100svh - 76px);padding-bottom:48px}
+
+.app-topbar{
+  display:grid;
+  grid-template-columns:minmax(0,1fr) auto minmax(0,1fr);
+  gap:24px;
+  height:76px;
+}
+.app-brand{min-width:0;white-space:nowrap}
+.app-avatar-button{justify-self:end}
+.app-logout-button{position:absolute;top:50%;right:calc(clamp(20px,5vw,72px) + 50px);display:none;width:30px;height:30px;place-items:center;padding:0;border:1px solid rgba(90,6,31,.24);border-radius:50%;background:transparent;color:#5a061f;cursor:pointer;transform:translateY(-50%);transition:background .2s,color .2s,transform .2s}
+.app-logout-button svg{width:15px;height:15px;fill:none;stroke:currentColor;stroke-linecap:round;stroke-linejoin:round;stroke-width:1.6}
+.app-logout-button:hover{background:#5a061f;color:#fffaf1;transform:translateY(-50%) scale(1.05)}
+body.app-body[data-app-view="explore"] .app-logout-button,
+body.app-body[data-app-view="posts"] .app-logout-button,
+body.app-body[data-app-view="chat"] .app-logout-button{display:grid}
+.app-header-nav{position:absolute;top:50%;left:50%;display:flex;align-items:center;justify-content:center;gap:clamp(18px,3vw,44px);transform:translate(-50%,-50%);white-space:nowrap}
+.app-header-nav .app-nav-button{
+  position:relative;
+  display:flex;
+  min-width:72px;
+  align-items:center;
+  justify-content:center;
+  flex-direction:column;
+  gap:3px;
+  border:0;
+  border-radius:12px;
+  background:transparent;
+  color:rgba(90,6,31,.58);
+  font-family:Georgia,'Times New Roman',serif;
+  font-size:8px;
+  font-weight:700;
+  letter-spacing:.14em;
+  text-decoration:none;
+  transition:background .2s,color .2s,transform .2s;
+}
+.app-header-nav .app-nav-button span{font-size:19px;line-height:20px}
+.app-header-nav .app-nav-button:hover{color:var(--app-violet);transform:translateY(-2px)}
+.app-header-nav .app-nav-button.is-active{color:var(--app-violet)}
+.app-header-nav .app-nav-button.is-active span{color:var(--app-violet)}
+.app-header-nav .app-nav-button i{position:absolute;top:-3px;right:5px;display:grid;place-items:center;width:15px;height:15px;border-radius:50%;background:#b94b67;color:#fffaf1;font-size:8px;font-style:normal}
+
+/* Keep the header navigation identical on every route. */
+body .app-header-nav{
+  gap:5px;
+  padding:5px;
+  border:1px solid rgba(90,6,31,.16);
+  border-radius:999px;
+  background:rgba(255,250,241,.58);
+  box-shadow:0 8px 22px rgba(64,37,30,.08);
+}
+body .app-header-nav .app-nav-button,
+body:not(.app-subview) .app-header-nav .app-nav-button{
+  width:82px;
+  min-width:82px;
+  height:50px;
+  flex:0 0 82px;
+  padding:4px 7px;
+  border-radius:999px;
+  color:rgba(90,6,31,.62);
+  font-size:8px;
+  line-height:1;
+}
+body .app-header-nav .app-nav-button span,
+body:not(.app-subview) .app-header-nav .app-nav-button span{
+  display:grid;
+  width:24px;
+  height:24px;
+  place-items:center;
+  border:1px solid rgba(90,6,31,.45);
+  border-radius:50%;
+  color:inherit;
+  font-size:17px;
+  line-height:1;
+}
+body .app-header-nav .app-nav-button:hover,
+body:not(.app-subview) .app-header-nav .app-nav-button:hover{
+  background:rgba(90,6,31,.08);
+  color:#5a061f;
+  transform:translateY(-1px);
+}
+body .app-header-nav .app-nav-button.is-active,
+body:not(.app-subview) .app-header-nav .app-nav-button.is-active{
+  background:#5a061f;
+  color:#fffaf1;
+  box-shadow:0 6px 14px rgba(90,6,31,.2);
+}
+body .app-header-nav .app-nav-button.is-active span,
+body:not(.app-subview) .app-header-nav .app-nav-button.is-active span{
+  border-color:rgba(255,250,241,.55);
+  color:#fffaf1;
+}
+body .app-header-nav .app-nav-button i,
+body:not(.app-subview) .app-header-nav .app-nav-button i{
+  top:1px;
+  right:10px;
+  width:15px;
+  height:15px;
+  background:#c74d6b;
+  color:#fffaf1;
+}
+
+html{scrollbar-gutter:stable}
+
+body:not(.app-subview) .app-bottom-nav{
+  right:auto;
+  bottom:10px;
+  left:50%;
+  width:min(570px,calc(100% - 32px));
+  height:60px;
+  padding:5px 7px;
+  transform:translateX(-50%);
+  border:1px solid rgba(90,6,31,.2);
+  border-radius:21px;
+  background:rgba(247,239,229,.93);
+  box-shadow:0 14px 35px rgba(64,37,30,.16),0 2px 8px rgba(64,37,30,.08);
+  backdrop-filter:blur(18px);
+}
+
+body:not(.app-subview) .app-nav-button{
+  min-width:0;
+  flex:1;
+  justify-content:center;
+  gap:3px;
+  border-radius:17px;
+  color:rgba(90,6,31,.56);
+  font-family:Georgia,'Times New Roman',serif;
+  font-size:8px;
+  letter-spacing:.14em;
+  transition:background .2s,color .2s,transform .2s;
+}
+
+body:not(.app-subview) .app-nav-button span{
+  display:grid;
+  width:27px;
+  height:25px;
+  place-items:center;
+  border:1px solid transparent;
+  border-radius:50%;
+  font-size:19px;
+  line-height:1;
+}
+
+body:not(.app-subview) .app-nav-button:hover{color:var(--app-violet);transform:translateY(-2px)}
+body:not(.app-subview) .app-nav-button.is-active{background:var(--app-violet);color:#fffaf1;box-shadow:0 6px 14px rgba(90,6,31,.2)}
+body:not(.app-subview) .app-nav-button.is-active span{border-color:rgba(255,250,241,.35)}
+body:not(.app-subview) .app-nav-button i{top:4px;right:calc(50% - 23px);background:#b94b67;color:#fffaf1}
+
+@media(max-width:700px){
+  body.app-subview .app-view.is-active{min-height:calc(100svh - 62px)}
+  .app-topbar{height:62px;gap:8px;padding:0 12px}
+  .app-brand{font-size:13px}
+  .app-header-nav{gap:2px;padding:3px}
+  body .app-header-nav .app-nav-button,
+  body:not(.app-subview) .app-header-nav .app-nav-button{width:42px;min-width:42px;height:48px;flex-basis:42px;padding:3px 2px;font-size:6px;letter-spacing:.04em}
+  body .app-header-nav .app-nav-button span,
+  body:not(.app-subview) .app-header-nav .app-nav-button span{width:20px;height:20px;font-size:14px}
+  body .app-header-nav .app-nav-button i,
+  body:not(.app-subview) .app-header-nav .app-nav-button i{top:0;right:0;width:12px;height:12px;font-size:7px}
+  .app-avatar-button{width:30px;height:30px;font-size:8px}
+  .app-logout-button{right:50px;width:27px;height:27px}
+  .app-logout-button svg{width:13px;height:13px}
+}
+
+/* Keep the header geometry identical while switching into the full chat view. */
+#chat-badge{display:none!important}
+body.app-body[data-app-view="chat"]{width:auto!important;min-width:320px!important}
+body.app-body[data-app-view="chat"] .app-topbar{width:100%;}
+
+/* Chat readability and circular member photos. */
+.app-view[data-view="chat"] .mini-avatar,
+.app-view[data-view="chat"] .empty-chat-avatar,
+.app-view[data-view="chat"] .reference-avatar{
+  overflow:hidden;
+  border-radius:50%;
+}
+.app-view[data-view="chat"] .mini-avatar img,
+.app-view[data-view="chat"] .empty-chat-avatar img,
+.app-view[data-view="chat"] .reference-avatar img{
+  display:block;
+  width:100%;
+  height:100%;
+  border-radius:inherit;
+  object-fit:cover;
+}
+.app-view[data-view="chat"] .chat-layout .chat-row-copy strong,
+.app-view[data-view="chat"] #chat-list .chat-row-copy strong{font-size:15px!important;line-height:1.2}
+.app-view[data-view="chat"] .chat-layout .chat-row-copy span,
+.app-view[data-view="chat"] #chat-list .chat-row-copy span{font-size:12px!important;line-height:1.35}
+.app-view[data-view="chat"] .chat-layout .chat-row-meta time{font-size:10px!important}
+.app-view[data-view="chat"] .chat-window-head strong{font-size:18px!important}
+.app-view[data-view="chat"] .chat-window-head span{font-size:10px!important}
+.app-view[data-view="chat"] .chat-window-head small{font-size:11px!important}
+.app-view[data-view="chat"] .chat-layout .chat-messages{
+  position:relative;
+  isolation:isolate;
+  background:#f8f0e7!important;
+}
+.app-view[data-view="chat"] .chat-layout .chat-messages::before{
+  position:absolute;
+  z-index:-1;
+  inset:-12px;
+  content:"";
+  background:url('./assets/chat-reference-room.png') center/cover no-repeat;
+  filter:blur(3px);
+  opacity:.8;
+  transform:scale(1.03);
+}
+.app-view[data-view="chat"] .chat-layout .chat-messages > *{position:relative;z-index:1}
+.app-view[data-view="chat"] .chat-layout .message{
+  font-size:14px!important;
+  line-height:1.55!important;
+}
+.app-view[data-view="chat"] .chat-compose input{font-size:14px!important}
+
+@media(min-width:701px){
+  body.app-body[data-app-view="chat"]{
+    width:100vw!important;
+    min-width:100vw!important;
+    max-width:none!important;
+    overflow-x:hidden!important;
+  }
+  body.app-body[data-app-view="chat"] .app-view[data-view="chat"].is-active{
+    position:fixed!important;
+    top:76px!important;
+    right:0!important;
+    bottom:0!important;
+    left:0!important;
+    width:100vw!important;
+    height:auto!important;
+    min-height:0!important;
+    max-width:none!important;
+    z-index:100!important;
+    padding:6px!important;
+  }
+  body.app-body[data-app-view="chat"] .app-wrap,
+  body.app-body[data-app-view="chat"] .app-main{
+    width:100vw!important;
+    max-width:none!important;
+    margin:0!important;
+  }
+  body.app-body[data-app-view="chat"] .app-view[data-view="chat"].is-active .chat-layout{
+    flex:1 1 auto!important;
+    width:100%!important;
+    height:auto!important;
+    min-height:0!important;
+  }
+  body.app-body[data-app-view="chat"] .app-view[data-view="chat"].is-active{padding-bottom:6px!important}
+}
+
+/* Minimal editorial navigation: typography-led, spacious and pill-free. */
+body .app-header-nav{
+  gap:clamp(12px,2.6vw,38px);
+  padding:0;
+  border:0;
+  border-radius:0;
+  background:transparent;
+  box-shadow:none;
+  backdrop-filter:none;
+}
+body .app-header-nav .app-nav-button,
+body:not(.app-subview) .app-header-nav .app-nav-button{
+  width:auto;
+  min-width:0;
+  height:auto;
+  flex:0 0 auto;
+  padding:8px 3px;
+  border-radius:0;
+  background:transparent;
+  color:rgba(52,31,28,.68);
+  font-family:'Instrument Sans',Arial,sans-serif;
+  font-size:10px;
+  font-weight:600;
+  letter-spacing:.2em;
+  line-height:1;
+  transition:color .2s,opacity .2s,transform .2s;
+}
+body .app-header-nav .app-nav-button span,
+body:not(.app-subview) .app-header-nav .app-nav-button span{
+  display:none;
+}
+body .app-header-nav .app-nav-button:hover,
+body:not(.app-subview) .app-header-nav .app-nav-button:hover{
+  background:transparent;
+  color:#5a061f;
+  transform:translateY(-1px);
+}
+body .app-header-nav .app-nav-button.is-active,
+body:not(.app-subview) .app-header-nav .app-nav-button.is-active{
+  background:transparent;
+  color:#5a061f;
+  box-shadow:none;
+}
+body .app-header-nav .app-nav-button i,
+body:not(.app-subview) .app-header-nav .app-nav-button i{
+  top:0;
+  right:-9px;
+  width:6px;
+  height:6px;
+  font-size:0;
+  background:#9b351f;
+  color:transparent;
+}
+
+/* Keep the member avatar out of the nav flow on every view. */
+body .app-topbar .app-avatar-button{
+  position:absolute;
+  top:50%;
+  right:clamp(20px,5vw,72px);
+  transform:translateY(-50%);
+  justify-self:initial;
+}
+
+body:not(.app-subview) .app-bottom-nav{
+  gap:clamp(12px,4vw,44px);
+  width:min(560px,calc(100% - 32px));
+  height:58px;
+  padding:0 22px;
+  border:1px solid rgba(90,6,31,.13);
+  border-radius:999px;
+  background:rgba(247,239,229,.8);
+  box-shadow:0 12px 30px rgba(64,37,30,.1);
+  backdrop-filter:blur(18px);
+}
+body:not(.app-subview) .app-bottom-nav .app-nav-button{
+  min-width:0;
+  flex:0 0 auto;
+  gap:0;
+  padding:8px 3px;
+  border-radius:0;
+  background:transparent;
+  color:rgba(52,31,28,.68);
+  font-family:'Instrument Sans',Arial,sans-serif;
+  font-size:9px;
+  font-weight:600;
+  letter-spacing:.18em;
+}
+body:not(.app-subview) .app-bottom-nav .app-nav-button span{display:none}
+body:not(.app-subview) .app-bottom-nav .app-nav-button:hover,
+body:not(.app-subview) .app-bottom-nav .app-nav-button.is-active{
+  background:transparent;
+  color:#5a061f;
+  box-shadow:none;
+  transform:translateY(-1px);
+}
+body:not(.app-subview) .app-bottom-nav .app-nav-button i{top:2px;right:-8px;width:6px;height:6px;font-size:0}
+
+@media(max-width:700px){
+  body .app-topbar .app-avatar-button{right:12px}
+  body .app-header-nav{gap:clamp(7px,2vw,16px)}
+  body .app-header-nav .app-nav-button,
+  body:not(.app-subview) .app-header-nav .app-nav-button{padding:7px 1px;font-size:8px;letter-spacing:.12em}
+  body:not(.app-subview) .app-bottom-nav{gap:clamp(8px,3vw,18px);padding:0 15px}
+  body:not(.app-subview) .app-bottom-nav .app-nav-button{font-size:8px;letter-spacing:.12em}
+}
+
+/* Header notifications sit immediately to the left of logout and persist
+   unread message alerts per signed-in member. */
+body .app-topbar{position:relative}
+body .app-topbar .app-notification-button{position:absolute;top:50%;right:calc(clamp(20px,5vw,72px) + 90px);display:none;width:30px;height:30px;place-items:center;padding:0;border:1px solid rgba(90,6,31,.24);border-radius:50%;background:transparent;color:#5a061f;cursor:pointer;transform:translateY(-50%);transition:background .2s,color .2s,transform .2s}
+body.app-body[data-app-view="explore"] .app-notification-button,
+body.app-body[data-app-view="posts"] .app-notification-button,
+body.app-body[data-app-view="chat"] .app-notification-button{display:grid}
+body .app-notification-button svg{width:15px;height:15px;fill:none;stroke:currentColor;stroke-linecap:round;stroke-linejoin:round;stroke-width:1.5}
+body .app-notification-button:hover,
+body .app-notification-button[aria-expanded="true"]{background:#5a061f;color:#fffaf1;transform:translateY(-50%) scale(1.05)}
+body .app-notification-button.has-unread{border-color:#9b351f}
+body .app-notification-button>i{position:absolute;top:-6px;right:-5px;display:grid;min-width:15px;height:15px;place-items:center;padding:0 3px;border-radius:999px;background:#b94b67;color:#fffaf1;font-family:Arial,sans-serif;font-size:8px;font-style:normal;font-weight:700;line-height:1}
+body .app-notification-button>i[hidden]{display:none}
+body .notification-panel{position:absolute;z-index:80;top:calc(100% - 5px);right:clamp(20px,5vw,72px);display:block;width:min(360px,calc(100vw - 28px));overflow:hidden;border:1px solid rgba(90,6,31,.16);border-radius:16px;background:#fffaf1;box-shadow:0 20px 55px rgba(45,20,25,.2);color:#291d1b}
+body .notification-panel[hidden]{display:none!important}
+.notification-panel-head{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:15px 16px 12px;border-bottom:1px solid rgba(90,6,31,.12)}
+.notification-panel-head strong{color:#5a061f;font-size:10px;letter-spacing:.13em}
+.notification-panel-head button{padding:0;border:0;background:transparent;color:#9b351f;font-size:8px;font-weight:700;letter-spacing:.08em;cursor:pointer}
+.notification-panel-head button:hover{text-decoration:underline}
+.notification-list{display:grid;max-height:min(420px,calc(100svh - 130px));overflow:auto}
+.notification-item{display:grid;grid-template-columns:34px minmax(0,1fr) auto;align-items:center;gap:10px;width:100%;padding:12px 15px;border:0;border-bottom:1px solid rgba(90,6,31,.08);background:transparent;color:inherit;text-align:left;cursor:pointer}
+.notification-item:hover{background:#f5e9dc}
+.notification-item.is-unread{background:#fdf0e5}
+.notification-avatar{width:34px;height:34px;display:grid;place-items:center;overflow:hidden;border:1px solid rgba(90,6,31,.15);border-radius:50%;background:#ead5c5;color:#5a061f;font-size:9px;font-weight:700}
+.notification-avatar img{width:100%;height:100%;object-fit:cover}
+.notification-copy{min-width:0;display:grid;gap:3px}
+.notification-copy strong{overflow:hidden;color:#5a061f;font-family:Georgia,'Times New Roman',serif;font-size:15px;font-weight:400;text-overflow:ellipsis;white-space:nowrap}
+.notification-copy span{overflow:hidden;color:#896f6b;font-size:10px;line-height:1.3;text-overflow:ellipsis;white-space:nowrap}
+.notification-item time{align-self:start;padding-top:2px;color:#a0847d;font-size:9px;white-space:nowrap}
+.notification-empty{margin:0;padding:28px 16px;color:#957b77;font-size:11px;text-align:center}
+@media(max-width:700px){
+  body .app-topbar .app-notification-button{right:85px;width:27px;height:27px}
+  body .app-notification-button svg{width:13px;height:13px}
+  body .notification-panel{top:calc(100% - 3px);right:8px;width:min(360px,calc(100vw - 16px))}
+}
+.app-view[data-view="home"] .home-heading {
+  transform: translate(-128px, 200px);
+}
+
+@media (max-width: 849px) {
+  .app-view[data-view="home"] .home-heading {
+    transform: none;
+    margin-top: 52px;
+  }
+}
+
+/* Increase chat typography for easier reading. */
+.app-view[data-view="chat"] .chat-row-copy strong{font-size:18px!important;line-height:1.25}
+.app-view[data-view="chat"] .chat-row-copy span{font-size:14px!important;line-height:1.45}
+.app-view[data-view="chat"] .chat-row time{font-size:11px!important}
+.app-view[data-view="chat"] .chat-window-head strong{font-size:21px!important}
+.app-view[data-view="chat"] .chat-window-head span{font-size:12px!important}
+.app-view[data-view="chat"] .chat-window-head small{font-size:13px!important}
+.app-view[data-view="chat"] .message{font-size:16px!important;line-height:1.5}
+.app-view[data-view="chat"] .chat-compose input{font-size:16px!important}
+
+@media(min-width:850px){
+  .app-view[data-view="home"] .home-heading{
+    position:relative;
+    top:20px;
+    transform:translateX(-128px)!important;
+  }
+}

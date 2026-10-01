@@ -1,0 +1,66 @@
+:root {
+  --brivia-deep-wine: #430416;
+  --brivia-wine: #5e0b28;
+  --brivia-wine-soft: #76243f;
+}
+
+/* Shared member-area accent: deeper cherry wine, with cream text preserved. */
+body.app-body { --app-violet: var(--brivia-deep-wine); }
+.swipe-card { border-color: var(--brivia-deep-wine) !important; }
+.app-view[data-view="profile"] .profile-hero {
+  border-color: rgba(67, 4, 22, .22);
+  background: linear-gradient(132deg, var(--brivia-deep-wine) 0%, var(--brivia-wine) 62%, #6b1837 100%);
+  box-shadow: 0 24px 54px rgba(67, 4, 22, .2);
+}
+.profile-kicker,
+.profile-quick-stats strong,
+.profile-content-grid .profile-section-heading span,
+.profile-login-card>div>span { color: var(--brivia-deep-wine) !important; }
+.profile-content-grid .profile-pills span,
+.profile-looking span { color: var(--brivia-deep-wine); border-color: rgba(67, 4, 22, .2); }
+.profile-login-card { border-color: rgba(67, 4, 22, .2); background: rgba(67, 4, 22, .065); }
+
+/* Login / signup. */
+.auth-visual {
+  background: radial-gradient(circle at 70% 42%, rgba(67, 4, 22, .55), transparent 22%), radial-gradient(circle at 20% 90%, rgba(67, 4, 22, .58), transparent 30%), var(--brivia-deep-wine);
+}
+.auth-scrollbar span,
+.signup-progress-track span { background: var(--brivia-deep-wine); }
+.auth-step,
+.auth-eyebrow,
+.auth-note,
+.auth-welcome h1 em { color: var(--brivia-deep-wine); }
+.auth-form input:focus,
+.auth-form select:focus { border-color: var(--brivia-deep-wine); box-shadow: 0 0 0 3px rgba(67, 4, 22, .14); }
+.auth-submit:hover,
+.auth-choice-button:hover { background: var(--brivia-deep-wine); border-color: var(--brivia-deep-wine); }
+.auth-back-trigger:hover,
+.auth-google-trigger:hover { border-color: var(--brivia-deep-wine); color: var(--brivia-deep-wine); }
+.auth-panel { scrollbar-color: var(--brivia-deep-wine) #e8e1d8; }
+.auth-panel::-webkit-scrollbar-thumb { background: var(--brivia-deep-wine); border-color: #e8e1d8; }
+.auth-choice-card,
+.community-preview { background: var(--brivia-deep-wine); }
+.auth-choice-button { color: var(--brivia-deep-wine); }
+.auth-google-trigger:hover { background: #fbf7f2; }
+
+/* Inbox / chat. */
+.inbox-tab.is-active,
+.inbox-empty-action,
+.chat-compose button { background: var(--brivia-deep-wine); }
+.inbox-panel-head strong,
+.inbox-panel-head > b,
+.inbox-empty-window h2,
+.chat-start-note strong { color: var(--brivia-deep-wine); }
+.app-view[data-view="chat"] .view-heading .app-eyebrow,
+.inbox-search,
+.chat-window-head span,
+.chat-back { color: var(--brivia-wine); }
+.chat-row.is-selected { box-shadow: inset 3px 0 var(--brivia-deep-wine); }
+.chat-row-meta b { background: var(--brivia-deep-wine); }
+.inbox-empty-action:hover,
+.chat-compose button:hover { background: var(--brivia-wine); }
+.chat-layout .chat-messages { scrollbar-color: var(--brivia-deep-wine) rgba(67, 4, 22, .09); }
+.chat-layout .chat-messages::-webkit-scrollbar-thumb { background: var(--brivia-deep-wine); }
+
+/* Shared landing CTA accent; the video-style intro remains black. */
+.cta-button::after { background: var(--brivia-deep-wine); }

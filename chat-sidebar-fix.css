@@ -1,0 +1,44 @@
+/* Always keep the search inside the sidebar layout so it cannot overlay a chat row. */
+.app-view[data-view="chat"] #chat-list>.inbox-toolbar{
+  position:static!important;
+  width:auto!important;
+  margin:0!important;
+}
+
+@media(min-width:701px){
+  /* The search belongs to the sidebar flow. Keeping it in normal flow
+     prevents it from covering the first selected conversation. */
+  .app-view[data-view="chat"] #chat-list>.inbox-toolbar{
+    position:static!important;
+    z-index:auto;
+    flex:0 0 auto;
+    width:auto!important;
+    margin:0!important;
+    padding:10px 14px 8px!important;
+    border-radius:0;
+    background:transparent;
+  }
+  .app-view[data-view="chat"] #chat-list>.inbox-toolbar .inbox-search{width:100%;}
+  .app-view[data-view="chat"] #chat-list{display:flex!important;flex-direction:column!important;padding:18px 0 0!important;overflow:hidden!important}
+  .app-view[data-view="chat"] #chat-list:before{display:none!important}
+  .app-view[data-view="chat"] #chat-list .chat-sidebar-brand{display:block;flex:0 0 106px;padding:3px 24px 0;color:var(--brivia-ink)}
+  .app-view[data-view="chat"] #chat-list .chat-sidebar-brand strong{display:block;font-family:Georgia,'Times New Roman',serif;font-size:31px;font-weight:400;letter-spacing:-1.5px;line-height:1}
+  .app-view[data-view="chat"] #chat-list .chat-sidebar-brand span{display:block;width:19px;height:1px;margin:11px 0 7px;background:var(--brivia-line)}
+  .app-view[data-view="chat"] #chat-list .chat-sidebar-brand small{display:block;color:rgba(90,6,31,.67);font-family:Georgia,'Times New Roman',serif;font-size:7px;letter-spacing:.22em;line-height:1.55}
+  .app-view[data-view="chat"] #chat-list .chat-sidebar-brand small i{display:block;font-style:normal}
+  .app-view[data-view="chat"] #chat-list .chat-inbox-scroll{display:block;flex:1;min-height:0;overflow-y:scroll;overflow-x:hidden;padding:22px 0 88px;scrollbar-width:thin;scrollbar-color:var(--brivia-wine) rgba(90,6,31,.08)}
+  .app-view[data-view="chat"] #chat-list .chat-inbox-scroll::-webkit-scrollbar{width:7px}
+  .app-view[data-view="chat"] #chat-list .chat-inbox-scroll::-webkit-scrollbar-track{background:rgba(90,6,31,.08)}
+  .app-view[data-view="chat"] #chat-list .chat-inbox-scroll::-webkit-scrollbar-thumb{border-radius:99px;background:rgba(90,6,31,.55)}
+  .app-view[data-view="chat"] #chat-list .chat-inbox-scroll .inbox-panel-head{display:none}
+  .app-view[data-view="chat"] #chat-list .chat-inbox-scroll .chat-row{display:flex;min-height:69px;margin:0;padding:10px 15px;border-bottom:1px solid rgba(90,6,31,.12);background:transparent}
+  .app-view[data-view="chat"] #chat-list .chat-inbox-scroll .brivia-reference-row{min-height:48px;margin-top:58px!important;padding:6px 13px;background:var(--brivia-wine)}
+  .app-view[data-view="chat"] #chat-list .chat-inbox-scroll .chat-row.is-selected{background:var(--brivia-wine);box-shadow:none;color:#fffaf1}
+  .app-view[data-view="chat"] #chat-list .chat-inbox-scroll .chat-row.is-selected .chat-row-copy strong,.app-view[data-view="chat"] #chat-list .chat-inbox-scroll .chat-row.is-selected .chat-row-copy span,.app-view[data-view="chat"] #chat-list .chat-inbox-scroll .chat-row.is-selected .chat-row-meta time{color:#fffaf1}
+  .app-view[data-view="chat"] #chat-list .chat-inbox-scroll .chat-row .mini-avatar{width:38px;height:38px;flex:0 0 38px;font-size:11px;box-shadow:none}
+  .app-view[data-view="chat"] #chat-list .chat-inbox-scroll .brivia-reference-row .reference-avatar{width:34px;height:34px;flex-basis:34px;background:#fffaf1;color:var(--brivia-wine);font-size:17px}
+  .app-view[data-view="chat"] #chat-list .chat-inbox-scroll .chat-row-copy strong{font-family:Georgia,'Times New Roman',serif;font-size:12px;font-weight:400}
+  .app-view[data-view="chat"] #chat-list .chat-inbox-scroll .chat-row-copy span{margin-top:3px;color:rgba(51,37,34,.62);font-family:Georgia,'Times New Roman',serif;font-size:9px}
+  .app-view[data-view="chat"] #chat-list .chat-inbox-scroll .chat-row-meta time{font-family:Georgia,'Times New Roman',serif;font-size:8px}
+  .app-view[data-view="chat"] #chat-list .chat-inbox-scroll .chat-delete{display:none}
+}

@@ -1,0 +1,41 @@
+node_modules/
+dist/
+Images/*
+!Images/Cover images
+!Images/Cover images/**
+!Images/13DB55C5-4630-4EDC-8094-56FD22BD6331.PNG
+!Images/CONNECT.PNG
+!Images/CONNECTIONS1.PNG
+!Images/CONNECTIONS2.PNG
+!Images/CONNECTIONS3.PNG
+!Images/CONTEXT1.png
+!Images/CONVERSATION..png
+!Images/MATCHING1.PNG
+!Images/MATCHING2.jpeg
+!Images/MATCHING3.PNG
+!Images/MATCHING4.PNG
+!Images/MATCHING5.PNG
+!Images/MATCHING6.PNG
+!Images/MATCHING7.PNG
+!Images/MATCHING8.png
+!Images/PILLARS1.PNG
+!Images/PILLARS2.PNG
+!Images/PILLARS3.PNG
+!Images/PILLARS4.PNG
+!Images/POSSIBILITY1.PNG
+!Images/Swipe.PNG
+!Images/SWIPE1.PNG
+!Images/after login bg.jpeg
+!Images/Videos/
+!Images/Videos/Men_playing_badminton_with_guitar_clean.mp4
+!Images/Videos/Vintage_camera_takes_photo_1080p_20260919230149.mp4
+.chrome-*/
+.intro-*/
+.auth-*/
+card-local*.png
+chat-local*.png
+home-*.png
+live-*.png
+overlap-*.png
+video-*-contact.png
+Brivia_Club_Product_Documentation.docx

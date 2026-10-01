@@ -1,0 +1,199 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <script>
+      (() => {
+        const params = new URLSearchParams(window.location.search);
+        const hasCode = params.has('code');
+        const hasTokens = /(?:^|#|&)access_token=|(?:^|#|&)refresh_token=/.test(window.location.hash);
+        if (!hasCode && !hasTokens) return;
+        const target = new URL('/app.html', window.location.origin);
+        target.searchParams.set('oauth', '1');
+        if (hasCode) target.searchParams.set('code', params.get('code'));
+        if (hasTokens) target.hash = window.location.hash;
+        window.location.replace(target.toString());
+      })();
+    </script>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#f5f1e9" />
+    <meta name="description" content="Join the Brivia Club community." />
+    <title>Join the Brivia Club</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:ital,wght@0,500;0,600;0,700;1,700&display=swap" rel="stylesheet" />
+  </head>
+  <body class="auth-page auth-open">
+    <div class="auth-modal is-open" id="auth-modal">
+      <div class="auth-backdrop" data-auth-close></div>
+      <section class="auth-shell" role="dialog" aria-modal="true" aria-labelledby="auth-welcome-title">
+        <aside class="auth-story" aria-hidden="true"><p>BRAND<br />BUILDS<br />PEOPLE</p><h2>Good<br />to see<br /><em>you here.</em></h2><span>SAME PEOPLE.<br />BIGGER<br />IDEAS.</span><small>A space to create,<br />collaborate and<br />build what’s next.</small></aside>
+        <div class="auth-envelope-transition" aria-hidden="true">
+          <div class="auth-envelope-scene">
+            <div class="auth-envelope" aria-hidden="true">
+              <div class="auth-envelope-back"></div>
+              <div class="auth-envelope-letter"><span>WELCOME TO</span><strong>THE BRIVIA CLUB</strong></div>
+              <div class="auth-envelope-front"></div>
+              <div class="auth-envelope-flap"></div>
+              <div class="auth-envelope-seal">B</div>
+            </div>
+            <p>OPENING YOUR ROOM</p>
+          </div>
+        </div>
+        <button class="auth-close" type="button" aria-label="Go back to Brivia Club">×</button>
+        <div class="auth-phone" aria-hidden="true"></div>
+        <div class="auth-visual">
+          <div class="auth-visual-top"><span>IDEAS<br />PEOPLE<br />OPPORTUNITIES</span><span></span></div>
+          <div class="auth-visual-copy"><p>THE BRIVIA CLUB</p><h2>FIND<br />YOUR<br /><em>KIND.</em></h2><span>THOUGHTFUL PEOPLE.<br />REAL MOMENTUM.</span></div>
+          <div class="auth-constellation" aria-hidden="true"><i></i><i></i><i></i><i></i><b></b></div>
+          <div class="auth-visual-bottom"><span>BRIVIA / 2026</span><span>SWIPE WITH INTENT</span></div>
+        </div>
+        <div class="auth-panel">
+          <span class="auth-scrollbar" aria-hidden="true"><span></span></span>
+          <div class="auth-panel-top"><span class="auth-panel-kicker">THE BRIVIA CLUB</span><span class="auth-step">01 / 02</span><button class="auth-top-signup" type="button">NEW HERE? <b>CREATE ACCOUNT</b></button></div>
+          <div class="auth-view auth-welcome" data-auth-view="welcome" hidden>
+            <p class="auth-eyebrow">A PRIVATE NETWORK FOR OPEN MINDS</p>
+            <h1 id="auth-welcome-title">Enter the<br /><em>room.</em></h1>
+            <p class="auth-intro">Thoughtful people, real momentum, and introductions worth having.</p>
+            <div class="auth-choice-card">
+              <p>YOUR PLACE IN THE CLUB</p>
+              <button class="auth-choice-button auth-welcome-login" type="button">LOG IN <span>→</span></button>
+              <button class="auth-choice-button auth-welcome-signup" type="button">SIGN UP <span>→</span></button>
+            </div>
+          </div>
+          <div class="auth-view auth-login is-active" data-auth-view="login">
+            <p class="auth-eyebrow">RETURNING MEMBER</p>
+            <h1 id="auth-title">JOIN THE CLUB</h1>
+            <p class="auth-intro">THOUGHTFUL PEOPLE. REAL MOMENTUM.</p>
+            <form class="auth-form" id="login-form" autocomplete="off">
+              <label>Email address<span class="auth-input-shell"><span class="auth-field-icon" aria-hidden="true">✉</span><input type="email" name="email" autocomplete="off" placeholder="you@yourdomain.com" required /></span></label>
+              <label>Password<span class="auth-input-shell"><span class="auth-field-icon" aria-hidden="true">♙</span><input type="password" name="password" autocomplete="off" placeholder="Enter your password" required /><span class="auth-field-eye" aria-hidden="true">◉</span></span></label>
+              <button class="auth-submit" type="submit">LOG IN <span>→</span></button>
+              <button class="auth-forgot" type="button">Forgot password?</button>
+            </form>
+            <p class="auth-note" id="login-note" aria-live="polite"></p>
+            <div class="auth-divider"><span>OR CONTINUE WITH</span></div>
+            <div class="auth-socials" aria-label="Continue with a social account"><button class="auth-google-trigger" type="button" aria-label="Continue with Google"><span class="auth-google-mark" aria-hidden="true">G</span></button></div>
+            <button class="auth-secondary auth-create-trigger" type="button">CREATE AN ACCOUNT <span>↗</span></button>
+          </div>
+
+          <div class="auth-view auth-signup" data-auth-view="signup" hidden>
+            <p class="auth-eyebrow">YOUR PLACE IN THE ROOM</p>
+            <h1 id="signup-title">FIND YOUR PEOPLE</h1>
+            <p class="auth-intro">THOUGHTFUL PEOPLE. REAL MOMENTUM.</p>
+            <form class="auth-form auth-signup-form" id="signup-form">
+              <div class="signup-progress"><span data-signup-step-label aria-live="polite">STEP 1 OF 3 · THE BASICS</span><div class="signup-progress-track" role="progressbar" aria-label="Profile form progress" aria-valuemin="1" aria-valuemax="3" aria-valuenow="1"><span data-signup-progress-fill></span></div></div>
+              <div class="signup-step" data-signup-step="1">
+              <div class="auth-field-grid">
+                <label>Full name<input type="text" name="name" autocomplete="name" placeholder="Your name" required /></label>
+                <label>Email address<input type="email" name="email" autocomplete="email" placeholder="you@example.com" required /></label>
+                <label class="phone-field">Phone number<div class="phone-input-group"><select name="phoneCountryCode" autocomplete="tel-country-code" aria-label="Country code" required><option value="+91" selected>+91</option><option value="+1">+1</option><option value="+7">+7</option><option value="+20">+20</option><option value="+27">+27</option><option value="+30">+30</option><option value="+31">+31</option><option value="+32">+32</option><option value="+33">+33</option><option value="+34">+34</option><option value="+36">+36</option><option value="+39">+39</option><option value="+40">+40</option><option value="+41">+41</option><option value="+43">+43</option><option value="+44">+44</option><option value="+45">+45</option><option value="+46">+46</option><option value="+47">+47</option><option value="+48">+48</option><option value="+49">+49</option><option value="+52">+52</option><option value="+55">+55</option><option value="+60">+60</option><option value="+61">+61</option><option value="+62">+62</option><option value="+63">+63</option><option value="+64">+64</option><option value="+65">+65</option><option value="+66">+66</option><option value="+81">+81</option><option value="+82">+82</option><option value="+84">+84</option><option value="+86">+86</option><option value="+90">+90</option><option value="+92">+92</option><option value="+93">+93</option><option value="+94">+94</option><option value="+95">+95</option><option value="+98">+98</option><option value="+212">+212</option><option value="+213">+213</option><option value="+216">+216</option><option value="+218">+218</option><option value="+234">+234</option><option value="+254">+254</option><option value="+255">+255</option><option value="+256">+256</option><option value="+351">+351</option><option value="+352">+352</option><option value="+353">+353</option><option value="+354">+354</option><option value="+358">+358</option><option value="+359">+359</option><option value="+370">+370</option><option value="+371">+371</option><option value="+372">+372</option><option value="+375">+375</option><option value="+380">+380</option><option value="+381">+381</option><option value="+385">+385</option><option value="+386">+386</option><option value="+420">+420</option><option value="+421">+421</option><option value="+852">+852</option><option value="+853">+853</option><option value="+855">+855</option><option value="+880">+880</option><option value="+886">+886</option><option value="+960">+960</option><option value="+961">+961</option><option value="+962">+962</option><option value="+963">+963</option><option value="+964">+964</option><option value="+965">+965</option><option value="+966">+966</option><option value="+967">+967</option><option value="+968">+968</option><option value="+970">+970</option><option value="+971">+971</option><option value="+972">+972</option><option value="+973">+973</option><option value="+974">+974</option><option value="+975">+975</option><option value="+976">+976</option><option value="+977">+977</option><option value="+992">+992</option><option value="+993">+993</option><option value="+994">+994</option><option value="+995">+995</option><option value="+996">+996</option><option value="+998">+998</option></select><input type="tel" name="phoneNumber" autocomplete="tel-national" inputmode="tel" placeholder="98765 43210" pattern="[0-9 ()-]{7,20}" aria-label="Mobile number" required /></div><input type="hidden" name="phone" /></label>
+                <label>City<input type="text" name="city" autocomplete="address-level2" placeholder="Bengaluru" required /></label>
+                <label>State<input type="text" name="state" autocomplete="address-level1" placeholder="Karnataka" required /></label>
+              </div>
+              <button class="auth-submit signup-next" data-next-step="2" type="button">NEXT: YOUR SIGNALS <span>&rarr;</span></button>
+              </div>
+              <div class="signup-step" data-signup-step="2" hidden>
+              <div class="signup-step-heading"><span>STEP 02 · YOUR SIGNALS</span><h2>Find your people.</h2><p>Tell the club what you know and what kind of momentum you are open to.</p></div>
+              <div class="signals-identity-grid">
+                <fieldset class="gender-picker"><legend>GENDER</legend><div class="gender-options"><label class="gender-option"><input type="radio" name="gender" value="Male" required /><span>MALE</span></label><label class="gender-option"><input type="radio" name="gender" value="Female" /><span>FEMALE</span></label><label class="gender-option"><input type="radio" name="gender" value="Prefer not to say" /><span>PREFER NOT TO SAY</span></label></div></fieldset>
+                <label>Experience<select name="experience" required><option value="" disabled selected>Choose one</option><option>Student / just starting</option><option>1–3 years</option><option>3–7 years</option><option>7–12 years</option><option>12+ years</option></select></label>
+              </div>
+              <div class="auth-field-grid">
+              </div>
+              <div class="photo-upload" data-photo-upload>
+                <label for="profile-photo">PROFILE PHOTO · CIRCULAR AVATAR</label>
+                <input class="photo-input" id="profile-photo" type="file" accept="image/*,.jpg,.jpeg,.png,.webp,.gif,.svg,.avif,.heic,.heif,.bmp,.tif,.tiff" aria-label="Upload profile photo" />
+                <label class="photo-drop" for="profile-photo"><span class="photo-preview" aria-hidden="true">+</span><span class="photo-copy"><strong>ADD YOUR PROFILE PHOTO</strong><small class="photo-file-name">Optional · This becomes your circular member photo.</small></span><b>↗</b></label>
+                <button class="photo-remove" type="button" aria-label="Remove profile photo" hidden>REMOVE PHOTO <span>×</span></button>
+              </div>
+              <div class="signup-step-actions"><button class="auth-secondary signup-step-prev" data-prev-step="1" type="button">← BACK TO DETAILS</button><button class="auth-submit signup-next" data-next-step="3" type="button">NEXT: SECURITY &amp; COVER <span>&rarr;</span></button></div>
+              </div>
+              <div class="signup-step" data-signup-step="3" hidden>
+              <div class="signup-step-heading"><span>STEP 03 · SECURITY &amp; PRESENCE</span><h2>Make it yours.</h2><p>Set your private password, add your circular photo, then choose the scene behind your profile.</p></div>
+              <div class="signup-password-fields"><p class="signup-password-hint">Set a password here and confirm it below. Use this email and password to log in later.</p><label>Password<input type="password" name="password" autocomplete="new-password" minlength="8" placeholder="At least 8 characters" required /></label><label>Confirm password<input type="password" name="passwordConfirm" autocomplete="new-password" minlength="8" placeholder="Re-enter your password" required /></label></div>
+              <div class="cover-picker" data-cover-picker>
+                <div class="cover-picker-label"><span>COVER IMAGE</span><small>WIDE CARD BACKDROP</small></div>
+                <div class="cover-preview" data-cover-preview><span>Choose a cover below</span></div>
+                <input class="cover-value" type="hidden" name="coverUrl" value="/Images/Cover%20images/163BDB0C-64AC-44E7-8663-55C323ADB4FE.PNG" />
+                <div class="cover-picker-section"><div class="cover-section-heading"><h3>OUR SUGGESTIONS</h3><span>SCROLL TO EXPLORE</span></div><div class="cover-suggestions" role="listbox" aria-label="Suggested cover images">
+                  <button class="cover-choice is-selected" type="button" data-cover-option="/Images/Cover%20images/163BDB0C-64AC-44E7-8663-55C323ADB4FE.PNG" aria-label="Choose cover image 1"><img src="/Images/Cover%20images/163BDB0C-64AC-44E7-8663-55C323ADB4FE.PNG" alt="Cover image 1" /><span>THE THOUGHTFUL ROOM</span></button>
+                  <button class="cover-choice" type="button" data-cover-option="/Images/Cover%20images/2257522A-04B9-4E3E-AB1A-A73D7BB8CCBF.PNG" aria-label="Choose cover image 2"><img src="/Images/Cover%20images/2257522A-04B9-4E3E-AB1A-A73D7BB8CCBF.PNG" alt="Cover image 2" /><span>MAKE SOMETHING</span></button>
+                  <button class="cover-choice" type="button" data-cover-option="/Images/Cover%20images/2da16686-88d5-49d6-8ac7-afbf37ec69d9.jpg.jpeg" aria-label="Choose cover image 3"><img src="/Images/Cover%20images/2da16686-88d5-49d6-8ac7-afbf37ec69d9.jpg.jpeg" alt="Cover image 3" /><span>CREATIVE ENERGY</span></button>
+                  <button class="cover-choice" type="button" data-cover-option="/Images/Cover%20images/3157077F-6C3B-4D85-BC8B-4646C85B33D1.PNG" aria-label="Choose cover image 4"><img src="/Images/Cover%20images/3157077F-6C3B-4D85-BC8B-4646C85B33D1.PNG" alt="Cover image 4" /><span>FIND YOUR MOMENTUM</span></button>
+                  <button class="cover-choice" type="button" data-cover-option="/Images/Cover%20images/3453059c-4864-46f7-ae45-6f7049939b9f.png" aria-label="Choose cover image 5"><img src="/Images/Cover%20images/3453059c-4864-46f7-ae45-6f7049939b9f.png" alt="Cover image 5" /><span>OPEN HORIZONS</span></button>
+                  <button class="cover-choice" type="button" data-cover-option="/Images/Cover%20images/3EBA748D-DAD8-4128-97A0-047E251FDAF4.PNG" aria-label="Choose cover image 6"><img src="/Images/Cover%20images/3EBA748D-DAD8-4128-97A0-047E251FDAF4.PNG" alt="Cover image 6" /><span>THE NEXT CHAPTER</span></button>
+                  <button class="cover-choice" type="button" data-cover-option="/Images/Cover%20images/5ae622b1-88f5-481b-8856-eb2eba35e606.png" aria-label="Choose cover image 7"><img src="/Images/Cover%20images/5ae622b1-88f5-481b-8856-eb2eba35e606.png" alt="Cover image 7" /><span>QUIETLY BOLD</span></button>
+                  <button class="cover-choice" type="button" data-cover-option="/Images/Cover%20images/71EFFB34-6301-4196-A085-967D12BF30CE.PNG" aria-label="Choose cover image 8"><img src="/Images/Cover%20images/71EFFB34-6301-4196-A085-967D12BF30CE.PNG" alt="Cover image 8" /><span>GOOD ENERGY</span></button>
+                  <button class="cover-choice" type="button" data-cover-option="/Images/Cover%20images/7423007B-E17D-4D46-A19F-499CC9A8DB99.PNG" aria-label="Choose cover image 9"><img src="/Images/Cover%20images/7423007B-E17D-4D46-A19F-499CC9A8DB99.PNG" alt="Cover image 9" /><span>OPEN MINDS</span></button>
+                  <button class="cover-choice" type="button" data-cover-option="/Images/Cover%20images/9358893B-8EAB-4FD2-8E2E-A4812398D008.PNG" aria-label="Choose cover image 10"><img src="/Images/Cover%20images/9358893B-8EAB-4FD2-8E2E-A4812398D008.PNG" alt="Cover image 10" /><span>MAKE ROOM</span></button>
+                  <button class="cover-choice" type="button" data-cover-option="/Images/Cover%20images/95DC81FA-C91B-46AE-BAF3-9EE71551A8D7.PNG" aria-label="Choose cover image 11"><img src="/Images/Cover%20images/95DC81FA-C91B-46AE-BAF3-9EE71551A8D7.PNG" alt="Cover image 11" /><span>STAY CURIOUS</span></button>
+                  <button class="cover-choice" type="button" data-cover-option="/Images/Cover%20images/9dc8500a-2dcf-47e6-a6b9-02e441edff68.png" aria-label="Choose cover image 12"><img src="/Images/Cover%20images/9dc8500a-2dcf-47e6-a6b9-02e441edff68.png" alt="Cover image 12" /><span>NEW PERSPECTIVES</span></button>
+                  <button class="cover-choice" type="button" data-cover-option="/Images/Cover%20images/AE983BB0-AF28-41D3-AA72-B03B4C7F7D8C.PNG" aria-label="Choose cover image 13"><img src="/Images/Cover%20images/AE983BB0-AF28-41D3-AA72-B03B4C7F7D8C.PNG" alt="Cover image 13" /><span>THE LONG VIEW</span></button>
+                  <button class="cover-choice" type="button" data-cover-option="/Images/Cover%20images/b66eff76-068e-4f2a-b789-a27051a11f5a.png" aria-label="Choose cover image 14"><img src="/Images/Cover%20images/b66eff76-068e-4f2a-b789-a27051a11f5a.png" alt="Cover image 14" /><span>BUILD TOGETHER</span></button>
+                  <button class="cover-choice" type="button" data-cover-option="/Images/Cover%20images/BDADEBC8-0C14-4E36-806F-9D23E61E3BD4.PNG" aria-label="Choose cover image 15"><img src="/Images/Cover%20images/BDADEBC8-0C14-4E36-806F-9D23E61E3BD4.PNG" alt="Cover image 15" /><span>FRESH START</span></button>
+                  <button class="cover-choice" type="button" data-cover-option="/Images/Cover%20images/DEB7869C-E852-450F-A371-65E2BF6167A2.PNG" aria-label="Choose cover image 16"><img src="/Images/Cover%20images/DEB7869C-E852-450F-A371-65E2BF6167A2.PNG" alt="Cover image 16" /><span>FIND YOUR PACE</span></button>
+                  <button class="cover-choice" type="button" data-cover-option="/Images/Cover%20images/E7E0AFAA-B547-4228-97C0-88E527151123.PNG" aria-label="Choose cover image 17"><img src="/Images/Cover%20images/E7E0AFAA-B547-4228-97C0-88E527151123.PNG" alt="Cover image 17" /><span>BETTER TOGETHER</span></button>
+                  <button class="cover-choice" type="button" data-cover-option="/Images/Cover%20images/F28EA63E-1BEB-49E9-BA01-F62127017DB1.PNG" aria-label="Choose cover image 18"><img src="/Images/Cover%20images/F28EA63E-1BEB-49E9-BA01-F62127017DB1.PNG" alt="Cover image 18" /><span>MAKE IT MATTER</span></button>
+                </div></div>
+              </div>
+              <div class="skills-picker" data-skills-picker>
+                <label for="skills-search">Skills / interests</label>
+                <input class="skills-search" id="skills-search" type="search" placeholder="Search and select skills..." autocomplete="off" role="combobox" aria-controls="skills-results" aria-expanded="false" aria-label="Search skills" />
+                <input class="skills-other-input" type="text" placeholder="Write your own skill and press Enter..." autocomplete="off" aria-label="Write your own skill" hidden />
+                <div class="skills-results" id="skills-results" role="listbox" aria-label="Available skills"></div>
+                <div class="skills-selected" aria-live="polite"></div>
+                <input class="skills-value" type="hidden" name="skills" aria-required="true" />
+                <p class="skills-helper">Choose one or more · Select Other to write your own.</p>
+              </div>
+              <div class="looking-picker" data-looking-picker>
+                <label for="looking-search">What are you looking for?</label>
+                <input class="looking-search" id="looking-search" type="search" placeholder="Search what brings you here..." autocomplete="off" role="combobox" aria-controls="looking-results" aria-expanded="false" aria-label="Search what you are looking for" />
+                <input class="looking-other-input" type="text" placeholder="Write your own option and press Enter..." autocomplete="off" aria-label="Write your own option" hidden />
+                <div class="looking-results" id="looking-results" role="listbox" aria-label="What people are looking for"></div>
+                <div class="looking-selected" aria-live="polite"></div>
+                <input class="looking-value" type="hidden" name="lookingFor" aria-required="true" />
+                <p class="looking-helper">Choose one or more · Select Other to write your own.</p>
+              </div>
+              <div class="signup-step-actions"><button class="auth-secondary signup-step-prev" data-prev-step="2" type="button">← BACK TO PHOTO</button><button class="auth-submit" type="submit">CREATE MY PROFILE <span>→</span></button></div>
+              </div>
+            </form>
+            <div class="auth-success" id="auth-success" hidden><span class="auth-success-mark">✓</span><h2 data-auth-success-title>Check your email.</h2><p data-auth-success-message>We sent a verification link. Your email is your login ID; your password stays private and is never shown here.</p><div class="credential-list"><div class="credential-row"><span>LOGIN ID</span><code data-credential="account-email">you@example.com</code><button type="button" data-copy-credential="account-email">COPY</button></div></div><button class="auth-secondary auth-close-success" type="button">BACK TO BRIVIA <span>↗</span></button></div>
+            <button class="auth-back-trigger" type="button">← BACK TO LOGIN</button>
+          </div>
+        </div>
+      </section>
+    </div>
+    <section class="community-preview" aria-labelledby="community-preview-title">
+      <div class="community-preview-heading"><div><p class="auth-eyebrow">A FEW PEOPLE IN THE ROOM</p><h2 id="community-preview-title">YOUR KIND<br /><em>IS ALREADY HERE.</em></h2></div><span>SWIPE / DISCOVER / CONNECT</span></div>
+      <div class="community-marquee" aria-label="Brivia member profiles">
+        <div class="community-track">
+          <article class="community-card"><div class="community-member-photo"><img src="./assets/Yashika-Bansal.jpeg" alt="Yashika Bansal" /></div><div class="community-card-copy"><strong>Looking for a team mate</strong><span>@yashika</span><small>◉ React, Next.js, Fast API</small><small>♧ Remote</small></div><b aria-hidden="true">↗</b></article>
+          <article class="community-card community-card--siddharth"><div class="community-member-photo"><img src="./assets/Siddharth-Kapoor.PNG" alt="Siddharth Kapoor" /></div><div class="community-card-copy"><strong>Looking for a songwriter</strong><span>@siddharth</span><small>◉ Guitar, Singing, Piano</small><small>♧ Remote</small></div><b aria-hidden="true">↗</b></article>
+          <article class="community-card community-card--nishchay"><div class="community-member-photo"><img src="./assets/Nishchay-Aswal.PNG" alt="Nishchay Aswal" /></div><div class="community-card-copy"><strong>Looking for a band</strong><span>@nishchay</span><small>◉ Vocals, Guitar, Songwriting</small><small>♧ Remote</small></div><b aria-hidden="true">↗</b></article>
+          <article class="community-card"><div class="community-member-photo"><img src="./assets/Raman-Sehrawat.jpeg" alt="Raman Sehrawat" /></div><div class="community-card-copy"><strong>Looking for an internship</strong><span>@raman</span><small>◉ Python, ML</small><small>♧ Remote</small></div><b aria-hidden="true">↗</b></article>
+          <article class="community-card"><div class="community-member-photo"><img src="./assets/Krish-Aggarwal.PNG" alt="Krish Aggarwal" /></div><div class="community-card-copy"><strong>Looking for a chess mate</strong><span>@krish</span><small>◉ Power BI, Tableau</small><small>♧ Remote</small></div><b aria-hidden="true">↗</b></article>
+          <article class="community-card"><div class="community-member-photo"><img src="./assets/Yugansh-Tyagi.PNG" alt="Yugansh Tyagi" /></div><div class="community-card-copy"><strong>Looking for a founder</strong><span>@yugansh</span><small>◉ Gen AI, Agentic AI</small><small>♧ Remote</small></div><b aria-hidden="true">↗</b></article>
+          <article class="community-card"><div class="community-member-photo"><img src="./assets/Keshav-Jha.jpeg" alt="Keshav Jha" /></div><div class="community-card-copy"><strong>Looking for Male lead</strong><span>@keshav</span><small>◉ Film Director</small><small>♧ Remote</small></div><b aria-hidden="true">↗</b></article>
+          <article class="community-card"><div class="community-member-photo"><img src="./assets/Jaspreet-Kaur.jpeg" alt="Jaspreet Kaur" /></div><div class="community-card-copy"><strong>Looking for brand collaborations</strong><span>@jaspreet</span><small>◉ Marketing</small><small>♧ Remote</small></div><b aria-hidden="true">↗</b></article>
+          <article class="community-card community-card--dhruv"><div class="community-member-photo"><img src="./assets/Dhruv-Verma.jpeg" alt="Dhruv Verma" /></div><div class="community-card-copy"><strong>Looking for a travelling buddy</strong><span>@dhruv</span><small>◉ Java</small><small>♧ Remote</small></div><b aria-hidden="true">↗</b></article>
+          <article class="community-card"><div class="community-member-photo"><img src="./assets/Medhita-Gowda.PNG" alt="Medhita Gowda" /></div><div class="community-card-copy"><strong>Looking for Event Managers</strong><span>@medhita</span><small>◉ Community Head</small><small>♧ Remote</small></div><b aria-hidden="true">↗</b></article>
+          <article class="community-card"><div class="community-member-photo"><img src="./assets/Harsh-Rawat.PNG" alt="Harsh Rawat" /></div><div class="community-card-copy"><strong>Looking for a vocalist</strong><span>@harsh</span><small>◉ Mixing, Mastering</small><small>♧ Remote</small></div><b aria-hidden="true">↗</b></article>
+          <article class="community-card" aria-hidden="true"><div class="community-member-photo"><img src="./assets/Yashika-Bansal.jpeg" alt="" /></div><div class="community-card-copy"><strong>Looking for a team mate</strong><span>@yashika</span><small>◉ React, Next.js, Fast API</small><small>♧ Remote</small></div><b aria-hidden="true">↗</b></article>
+          <article class="community-card community-card--siddharth" aria-hidden="true"><div class="community-member-photo"><img src="./assets/Siddharth-Kapoor.PNG" alt="" /></div><div class="community-card-copy"><strong>Looking for a songwriter</strong><span>@siddharth</span><small>◉ Guitar, Singing, Piano</small><small>♧ Remote</small></div><b aria-hidden="true">↗</b></article>
+          <article class="community-card community-card--nishchay" aria-hidden="true"><div class="community-member-photo"><img src="./assets/Nishchay-Aswal.PNG" alt="" /></div><div class="community-card-copy"><strong>Looking for a band</strong><span>@nishchay</span><small>◉ Vocals, Guitar, Songwriting</small><small>♧ Remote</small></div><b aria-hidden="true">↗</b></article>
+          <article class="community-card" aria-hidden="true"><div class="community-member-photo"><img src="./assets/Raman-Sehrawat.jpeg" alt="" /></div><div class="community-card-copy"><strong>Looking for an internship</strong><span>@raman</span><small>◉ Python, ML</small><small>♧ Remote</small></div><b aria-hidden="true">↗</b></article>
+          <article class="community-card" aria-hidden="true"><div class="community-member-photo"><img src="./assets/Krish-Aggarwal.PNG" alt="" /></div><div class="community-card-copy"><strong>Looking for a chess mate</strong><span>@krish</span><small>◉ Power BI, Tableau</small><small>♧ Remote</small></div><b aria-hidden="true">↗</b></article>
+          <article class="community-card" aria-hidden="true"><div class="community-member-photo"><img src="./assets/Yugansh-Tyagi.PNG" alt="" /></div><div class="community-card-copy"><strong>Looking for a founder</strong><span>@yugansh</span><small>◉ Gen AI, Agentic AI</small><small>♧ Remote</small></div><b aria-hidden="true">↗</b></article>
+          <article class="community-card" aria-hidden="true"><div class="community-member-photo"><img src="./assets/Keshav-Jha.jpeg" alt="" /></div><div class="community-card-copy"><strong>Looking for Male lead</strong><span>@keshav</span><small>◉ Film Director</small><small>♧ Remote</small></div><b aria-hidden="true">↗</b></article>
+          <article class="community-card" aria-hidden="true"><div class="community-member-photo"><img src="./assets/Jaspreet-Kaur.jpeg" alt="" /></div><div class="community-card-copy"><strong>Looking for brand collaborations</strong><span>@jaspreet</span><small>◉ Marketing</small><small>♧ Remote</small></div><b aria-hidden="true">↗</b></article>
+          <article class="community-card community-card--dhruv" aria-hidden="true"><div class="community-member-photo"><img src="./assets/Dhruv-Verma.jpeg" alt="" /></div><div class="community-card-copy"><strong>Looking for a travelling buddy</strong><span>@dhruv</span><small>◉ Java</small><small>♧ Remote</small></div><b aria-hidden="true">↗</b></article>
+          <article class="community-card" aria-hidden="true"><div class="community-member-photo"><img src="./assets/Medhita-Gowda.PNG" alt="" /></div><div class="community-card-copy"><strong>Looking for Event Managers</strong><span>@medhita</span><small>◉ Community Head</small><small>♧ Remote</small></div><b aria-hidden="true">↗</b></article>
+          <article class="community-card" aria-hidden="true"><div class="community-member-photo"><img src="./assets/Harsh-Rawat.PNG" alt="" /></div><div class="community-card-copy"><strong>Looking for a vocalist</strong><span>@harsh</span><small>◉ Mixing, Mastering</small><small>♧ Remote</small></div><b aria-hidden="true">↗</b></article>
+        </div>
+      </div>
+      <p class="community-preview-note">THREE PEOPLE · OPEN POSSIBILITIES</p>
+    </section>
+    <script type="module" src="/script.js"></script>
+  </body>
+</html>

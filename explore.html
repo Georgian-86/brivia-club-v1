@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <script>window.location.replace('/app.html?view=explore');</script>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#101016" />
+    <title>Brivia Club · Connect</title>
+    <script type="module">import './app.css';</script>
+    <style>.app-nav-button{text-decoration:none}.static-note{color:var(--app-muted);font-size:12px;line-height:1.5}.static-explore-row{display:flex;align-items:center;gap:16px;padding:17px 0;border-bottom:1px solid var(--app-line)}.static-explore-row[hidden]{display:none}.static-explore-row .mini-avatar{flex:0 0 55px}.static-copy{min-width:0;flex:1}.static-copy strong,.static-copy span{display:block}.static-copy strong{font-size:16px}.static-copy span{margin-top:4px;color:var(--app-muted);font-size:10px}.static-copy small{display:inline-block;margin-top:8px;padding:4px 7px;border:1px solid var(--app-line);border-radius:99px;color:var(--app-muted);font-size:8px}</style>
+  </head>
+  <body class="app-body">
+    <div class="app-wrap">
+      <header class="app-topbar"><a class="app-brand" href="/"><span class="app-brand-prefix">the</span><strong>Brivia Club</strong></a><a class="app-avatar-button" href="/profile.html" aria-label="Open profile">YU</a></header>
+      <main class="app-main"><section class="app-view is-active">
+        <div class="view-topline"><span>CONNECT / COMMUNITY</span><span id="explore-count">06 PEOPLE</span></div>
+        <div class="view-heading"><p class="app-eyebrow">FIND YOUR PEOPLE</p><h1>Everyone<br /><em>has a story.</em></h1></div>
+        <p class="static-note">Search by name, role, city or interest. Use a filter to find the right kind of connection.</p>
+        <label class="explore-search"><span>⌕</span><input id="explore-search-input" type="search" placeholder="Search people, skills, cities..." /></label>
+        <div class="explore-filters" role="group" aria-label="Filter people"><button class="filter-button is-active" data-filter="all">ALL</button><button class="filter-button" data-filter="design">DESIGN</button><button class="filter-button" data-filter="ai">AI / TECH</button><button class="filter-button" data-filter="founder">FOUNDERS</button><button class="filter-button" data-filter="study">STUDY</button><button class="filter-button" data-filter="travel">TRAVEL</button></div>
+        <div class="explore-list" id="explore-list">
+          <article class="static-explore-row" data-search="priya product designer bengaluru design startups collaboration" data-filters="design founder"><div class="mini-avatar">P</div><div class="static-copy"><strong>Priya, 24</strong><span>Product designer · Bengaluru</span><small>DESIGN · STARTUPS</small></div></article>
+          <article class="static-explore-row" data-search="arjun full stack builder delhi ai developer project partner" data-filters="ai founder"><div class="mini-avatar">A</div><div class="static-copy"><strong>Arjun, 27</strong><span>Full-stack builder · Delhi</span><small>AI · PROJECT PARTNER</small></div></article>
+          <article class="static-explore-row" data-search="meera research associate mumbai study travel climate" data-filters="study travel"><div class="mini-avatar">M</div><div class="static-copy"><strong>Meera, 22</strong><span>Research associate · Mumbai</span><small>STUDY · TRAVEL</small></div></article>
+          <article class="static-explore-row" data-search="rohan founder operator hyderabad startup mentor" data-filters="founder"><div class="mini-avatar">R</div><div class="static-copy"><strong>Rohan, 29</strong><span>Founder / operator · Hyderabad</span><small>FOUNDER · MENTOR</small></div></article>
+          <article class="static-explore-row" data-search="neha visual designer pune photography creative travel" data-filters="design travel"><div class="mini-avatar">N</div><div class="static-copy"><strong>Neha, 25</strong><span>Visual designer · Pune</span><small>PHOTOGRAPHY · CREATIVE</small></div></article>
+          <article class="static-explore-row" data-search="kabir ai engineer chennai generative ai rag coding" data-filters="ai"><div class="mini-avatar">K</div><div class="static-copy"><strong>Kabir, 26</strong><span>AI engineer · Chennai</span><small>GENERATIVE AI · CODING</small></div></article>
+        </div>
+      </section></main>
+      <nav class="app-bottom-nav" aria-label="Member navigation"><a class="app-nav-button" href="/app.html?view=home"><span>⌂</span>HOME</a><a class="app-nav-button is-active" href="/explore.html"><span>◎</span>CONNECT</a><a class="app-nav-button" href="/chat.html"><span>◌</span>CHAT<i>2</i></a><a class="app-nav-button" href="/profile.html"><span>◉</span>PROFILE</a></nav>
+    </div>
+    <script>
+      const rows=[...document.querySelectorAll('.static-explore-row')];const buttons=[...document.querySelectorAll('[data-filter]')];const search=document.querySelector('#explore-search-input');
+      function filterRows(){const q=(search.value||'').toLowerCase().trim();const active=document.querySelector('.filter-button.is-active').dataset.filter;let visible=0;rows.forEach(row=>{const ok=(active==='all'||row.dataset.filters.includes(active))&&row.dataset.search.includes(q);row.hidden=!ok;if(ok)visible++});document.querySelector('#explore-count').textContent=String(visible).padStart(2,'0')+' PEOPLE'}
+      buttons.forEach(button=>button.addEventListener('click',()=>{buttons.forEach(item=>item.classList.remove('is-active'));button.classList.add('is-active');filterRows()}));search.addEventListener('input',filterRows);
+    </script>
+  </body>
+</html>

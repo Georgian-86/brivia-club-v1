@@ -1,0 +1,32 @@
+.chat-row{gap:8px;padding:10px 10px 10px 16px;cursor:default}
+.chat-row-open{
+  display:flex;
+  flex:1;
+  min-width:0;
+  align-items:center;
+  gap:12px;
+  padding:5px 0;
+  border:0;
+  background:transparent;
+  color:inherit;
+  text-align:left;
+  cursor:pointer;
+}
+.chat-row-open:hover{background:transparent}
+.chat-delete{
+  display:grid;
+  flex:0 0 34px;
+  place-items:center;
+  width:34px;
+  height:34px;
+  padding:0;
+  border:1px solid transparent;
+  border-radius:8px;
+  background:transparent;
+  color:#876c70;
+  cursor:pointer;
+  transition:background .15s,border-color .15s,color .15s;
+}
+.chat-delete svg{width:17px;height:17px;fill:none;stroke:currentColor;stroke-linecap:round;stroke-linejoin:round;stroke-width:1.5}
+.chat-delete:hover{border-color:rgba(90,6,31,.18);background:rgba(90,6,31,.08);color:#5a061f}
+.chat-delete:focus-visible,.chat-row-open:focus-visible{outline:2px solid #5a061f;outline-offset:2px}

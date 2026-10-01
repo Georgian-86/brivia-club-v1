@@ -1,0 +1,281 @@
+/* Explore polish: clearer discovery controls and profile rows with a quiet editorial hierarchy. */
+.app-view[data-view="explore"] .view-heading{margin:42px 0 27px}
+.app-view[data-view="explore"] .view-heading h1{font-size:clamp(44px,5.4vw,76px);letter-spacing:-3.5px}
+.app-view[data-view="explore"] .view-heading h1 em{color:#5a061f}
+.app-view[data-view="explore"] .explore-search{min-height:48px;margin-bottom:14px;padding:0 16px;border:1px solid rgba(52,31,28,.16);border-radius:999px;background:rgba(255,253,249,.9);box-shadow:0 2px 12px rgba(65,38,31,.04)}
+.app-view[data-view="explore"] .explore-search:focus-within{border-color:rgba(90,6,31,.45);box-shadow:0 0 0 4px rgba(90,6,31,.07)}
+.app-view[data-view="explore"] .explore-search span{font-size:20px;line-height:1}
+.app-view[data-view="explore"] .explore-search input{height:46px;font-size:13px}
+.app-view[data-view="explore"] .explore-filters{gap:7px;padding:2px 0 22px;scrollbar-width:none}
+.app-view[data-view="explore"] .explore-filters::-webkit-scrollbar{display:none}
+.app-view[data-view="explore"] .filter-button{padding:9px 13px;border-radius:999px;background:rgba(255,253,249,.56);transition:background .18s,border-color .18s,color .18s,transform .18s}
+.app-view[data-view="explore"] .filter-button:hover{transform:translateY(-1px)}
+.app-view[data-view="explore"] .explore-list{overflow:hidden;border:1px solid rgba(52,31,28,.14);border-radius:15px;background:rgba(255,253,249,.72);box-shadow:0 15px 36px rgba(69,41,34,.07)}
+.app-view[data-view="explore"] .explore-row{position:relative;min-height:102px;gap:16px;padding:18px 20px;border-bottom-color:rgba(52,31,28,.1);transition:background .18s,transform .18s}
+.app-view[data-view="explore"] .explore-row:last-child{border-bottom:0}
+.app-view[data-view="explore"] .explore-row:hover{z-index:1;background:rgba(90,6,31,.045)}
+.app-view[data-view="explore"] .explore-row-avatar{position:relative;flex-basis:68px;width:68px;height:68px}
+.app-view[data-view="explore"] .explore-row-avatar::after{position:absolute;right:1px;bottom:1px;width:10px;height:10px;border:2px solid #fffdf9;border-radius:50%;background:#287654;box-shadow:0 2px 5px rgba(40,118,84,.2);content:''}
+.app-view[data-view="explore"] .explore-row-avatar .mini-avatar{flex-basis:68px;width:68px;height:68px;border:2px solid rgba(90,6,31,.14);box-shadow:0 4px 12px rgba(90,6,31,.12)}
+.app-view[data-view="explore"] .explore-row-copy{align-self:center}
+.explore-row-name{display:flex;align-items:center;gap:7px}
+.explore-row-name strong{font-size:15px;letter-spacing:-.2px}
+.explore-row-verified{display:grid;width:15px;height:15px;place-items:center;border-radius:50%;background:#5a061f;color:#fffaf1;font-size:9px;font-weight:700}
+.app-view[data-view="explore"] .explore-row-role{margin-top:4px;color:rgba(52,31,28,.62);font-size:11px}
+.explore-row-intent{display:-webkit-box;margin:6px 0 0;overflow:hidden;color:rgba(52,31,28,.78);font-size:11px;line-height:1.35;-webkit-box-orient:vertical;-webkit-line-clamp:1}
+.app-view[data-view="explore"] .explore-row-tags{gap:5px;margin-top:8px}
+.app-view[data-view="explore"] .explore-row-tags span{padding:4px 8px;border:1px solid rgba(90,6,31,.16);border-radius:999px;background:rgba(90,6,31,.035);color:#5a061f;font-size:8px}
+.app-view[data-view="explore"] .row-action{display:inline-flex;flex:0 0 auto;align-items:center;gap:7px;padding:10px 0 10px 12px;color:#5a061f;font-size:9px;letter-spacing:.08em;transition:color .18s,transform .18s}
+.app-view[data-view="explore"] .row-action b{font-size:15px;font-weight:400}
+.app-view[data-view="explore"] .row-action:hover{color:#430416;transform:translateX(2px)}
+.app-view[data-view="explore"] .row-action:focus-visible,.app-view[data-view="explore"] .filter-button:focus-visible,.app-view[data-view="explore"] .explore-search input:focus-visible{outline:2px solid #5a061f;outline-offset:3px}
+.app-view[data-view="explore"] .empty-state{margin:0;padding:55px 24px;color:rgba(52,31,28,.62);text-align:center}
+@media(max-width:700px){
+  .app-view[data-view="explore"] .view-heading{margin:30px 0 22px}
+  .app-view[data-view="explore"] .explore-row{gap:12px;padding:15px 13px}
+  .app-view[data-view="explore"] .explore-row-avatar,.app-view[data-view="explore"] .explore-row-avatar .mini-avatar{flex-basis:56px;width:56px;height:56px;min-width:56px;min-height:56px}
+  .app-view[data-view="explore"] .explore-row-avatar::after{right:0;bottom:0;width:8px;height:8px}
+  .app-view[data-view="explore"] .explore-row-name strong{font-size:14px}
+  .app-view[data-view="explore"] .row-action span{display:none}
+  .app-view[data-view="explore"] .row-action{padding-left:5px}
+}
+
+/* Keep every Explore portrait circular, centered, and clear of the name. */
+body .app-view[data-view="explore"] .explore-card-avatar{
+  left:50%;
+  width:96px;
+  height:96px;
+  aspect-ratio:1 / 1;
+  overflow:visible;
+  transform:translateX(-50%);
+}
+body .app-view[data-view="explore"] .explore-card-avatar .mini-avatar{
+  display:block;
+  width:100%;
+  height:100%;
+  min-width:0!important;
+  min-height:0!important;
+  flex:0 0 auto!important;
+  aspect-ratio:1 / 1;
+  overflow:hidden;
+  border-radius:50%;
+}
+body .app-view[data-view="explore"] .explore-card-avatar .mini-avatar img{
+  display:block;
+  width:100%;
+  height:100%;
+  min-width:0;
+  min-height:0;
+  border-radius:50%;
+  object-fit:cover;
+  object-position:center;
+}
+body .app-view[data-view="explore"] .explore-card-body{padding-top:58px}
+
+/* Tighten the cover-to-portrait transition so the portrait sits closer to the header. */
+body .app-view[data-view="explore"] .explore-card-media{height:150px}
+body .app-view[data-view="explore"] .explore-card-avatar{bottom:-40px}
+@media(max-width:700px){
+body .app.view[data-view="explore"] .explore-card-media,
+  body .app-view[data-view="explore"] .explore-card-media{height:145px}
+}
+
+/* Final compact portrait lock: the cover is intentionally short and the portrait is centered. */
+body .app-view[data-view="explore"] .explore-card-media{
+  flex:0 0 110px!important;
+  height:110px!important;
+  min-height:110px!important;
+}
+body .app-view[data-view="explore"] .explore-card-avatar{
+  left:50%!important;
+  bottom:-48px!important;
+  transform:translateX(-50%)!important;
+}
+
+/* Let each card end after its content instead of stretching into empty space. */
+body .app-view[data-view="explore"] .explore-list{align-items:start}
+body .app-view[data-view="explore"] .explore-card{
+  align-self:start;
+  min-height:0;
+}
+body .app.view[data-view="explore"] .explore-card-body,
+body .app-view[data-view="explore"] .explore-card-body{
+  min-height:0;
+  padding-bottom:64px;
+}
+
+/* Editorial discovery grid. */
+body.app-body[data-app-view="explore"]{
+  background:
+    radial-gradient(circle at 12% 20%, rgba(177,94,85,.10), transparent 28%),
+    radial-gradient(circle at 88% 72%, rgba(90,6,31,.07), transparent 30%),
+    #f4ede4;
+}
+
+body .app-view[data-view="explore"] .view-heading h1{
+  color:#2f211f;
+  font-family:Georgia,'Times New Roman',serif;
+  font-weight:400;
+  letter-spacing:-4px;
+}
+body .app-view[data-view="explore"] .view-heading h1 em{
+  color:#5a061f;
+  font-style:italic;
+}
+body .app-view[data-view="explore"] .explore-list{
+  display:grid;
+  grid-template-columns:repeat(3,minmax(0,1fr));
+  gap:18px;
+  overflow:visible;
+  border:0;
+  border-radius:0;
+  background:transparent;
+  box-shadow:none;
+}
+body .app-view[data-view="explore"] .explore-card{
+  position:relative;
+  display:flex;
+  min-width:0;
+  min-height:430px;
+  flex-direction:column;
+  overflow:visible;
+  border:1px solid rgba(90,6,31,.22);
+  border-radius:18px;
+  background:rgba(253,251,248,.88);
+  box-shadow:0 12px 28px rgba(68,39,31,.08),0 2px 0 rgba(255,255,255,.72) inset;
+  transition:transform .24s ease,box-shadow .24s ease,border-color .24s ease;
+}
+body .app-view[data-view="explore"] .explore-card:hover{
+  z-index:2;
+  border-color:rgba(90,6,31,.5);
+  box-shadow:0 22px 42px rgba(68,39,31,.16),0 0 0 3px rgba(90,6,31,.045);
+  transform:translateY(-7px);
+}
+body .app-view[data-view="explore"] .explore-card-media{
+  position:relative;
+  height:188px;
+  margin:9px 9px 0;
+  overflow:visible;
+  border-radius:12px;
+  background:#6c5047;
+}
+body .app-view[data-view="explore"] .explore-card-cover{
+  display:block;
+  width:100%;
+  height:100%;
+  border-radius:12px;
+  object-fit:cover;
+  object-position:center;
+  filter:saturate(.78) contrast(.96);
+}
+body .app-view[data-view="explore"] .explore-card-media::after{
+  position:absolute;
+  inset:0;
+  border-radius:12px;
+  background:linear-gradient(180deg,rgba(34,13,16,.12),transparent 54%,rgba(34,13,16,.26));
+  content:'';
+  pointer-events:none;
+}
+body .app-view[data-view="explore"] .explore-card-topline{
+  position:absolute;
+  z-index:1;
+  top:0;
+  right:0;
+  left:0;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  height:40px;
+  padding:0 14px;
+  border-radius:12px 12px 0 0;
+  background:rgba(90,6,31,.94);
+  color:#fffaf1;
+  font-family:Georgia,'Times New Roman',serif;
+}
+body .app-view[data-view="explore"] .explore-card-topline span{font-size:9px;letter-spacing:.19em}
+body .app-view[data-view="explore"] .explore-card-topline b{font-size:13px;font-weight:400;letter-spacing:2px}
+body .app-view[data-view="explore"] .explore-card-avatar{
+  position:absolute;
+  z-index:3;
+  bottom:-42px;
+  left:18px;
+  width:91px;
+  height:91px;
+  padding:4px;
+  border:1px solid rgba(90,6,31,.16);
+  border-radius:50%;
+  background:#fdfbf8;
+  box-shadow:0 8px 17px rgba(51,37,34,.18);
+}
+body .app-view[data-view="explore"] .explore-card-avatar .mini-avatar{
+  width:100%;
+  height:100%;
+  border:0;
+  border-radius:50%;
+  box-shadow:none;
+}
+body .app-view[data-view="explore"] .explore-card-body{
+  position:relative;
+  display:flex;
+  min-height:231px;
+  flex:1;
+  flex-direction:column;
+  padding:51px 18px 18px;
+}
+body .app-view[data-view="explore"] .explore-card-name{display:flex;align-items:baseline;gap:7px;padding-right:36px}
+body .app.view[data-view="explore"] .explore-card-name h2,
+body .app-view[data-view="explore"] .explore-card-name h2{
+  margin:0;
+  color:#5a061f;
+  font-family:Georgia,'Times New Roman',serif;
+  font-size:24px;
+  font-weight:400;
+  letter-spacing:-.5px;
+  line-height:1.05;
+}
+body .app-view[data-view="explore"] .explore-card-name > span{color:rgba(51,37,34,.55);font-family:Georgia,'Times New Roman',serif;font-size:11px}
+body .app-view[data-view="explore"] .explore-card-name .explore-row-verified{width:14px;height:14px;flex:0 0 14px;background:#5a061f;color:#fffaf1;font-size:8px}
+body .app-view[data-view="explore"] .explore-card-meta{margin:7px 0 0;color:rgba(51,37,34,.62);font-family:Georgia,'Times New Roman',serif;font-size:11px;font-style:italic}
+body .app-view[data-view="explore"] .explore-card-meta em{padding:0 3px;color:#5a061f;font-style:normal}
+body .app-view[data-view="explore"] .explore-card-intent{display:-webkit-box;margin:14px 0 0;overflow:hidden;color:rgba(51,37,34,.75);font-family:Georgia,'Times New Roman',serif;font-size:12px;line-height:1.42;-webkit-box-orient:vertical;-webkit-line-clamp:2}
+body .app-view[data-view="explore"] .explore-card-tags{display:flex;flex-wrap:wrap;gap:6px;margin-top:15px;padding-top:13px;border-top:1px solid rgba(90,6,31,.14)}
+body .app-view[data-view="explore"] .explore-card-tags span{padding:7px 10px;border:1px solid rgba(90,6,31,.13);border-radius:999px;background:rgba(90,6,31,.045);color:#5a061f;font-family:Georgia,'Times New Roman',serif;font-size:9px}
+body .app-view[data-view="explore"] .explore-card-action{
+  position:absolute;
+  right:17px;
+  bottom:17px;
+  display:grid;
+  width:34px;
+  height:34px;
+  place-items:center;
+  padding:0;
+  border:0;
+  border-radius:50%;
+  background:#5a061f;
+  color:#fffaf1;
+  transition:transform .2s,background .2s;
+}
+body .app-view[data-view="explore"] .explore-card-action b{font-size:17px;font-weight:400;line-height:1}
+body .app-view[data-view="explore"] .explore-card-action:hover{background:#430416;transform:translate(2px,-2px) rotate(4deg)}
+.sr-only{position:absolute!important;width:1px!important;height:1px!important;padding:0!important;overflow:hidden!important;clip:rect(0,0,0,0)!important;white-space:nowrap!important;border:0!important}
+
+@media(max-width:1050px) and (min-width:701px){
+  body .app-view[data-view="explore"] .explore-list{grid-template-columns:repeat(2,minmax(0,1fr))}
+}
+@media(max-width:700px){
+  body .app-view[data-view="explore"] .explore-list{grid-template-columns:1fr;gap:15px}
+  body .app-view[data-view="explore"] .explore-card{min-height:400px}
+  body .app-view[data-view="explore"] .explore-card-media{height:180px}
+  body .app-view[data-view="explore"] .explore-card-body{min-height:215px;padding-right:16px;padding-left:16px}
+}
+
+/* Final overrides: keep the portrait card compact on every viewport. */
+body .app-view[data-view="explore"] .explore-list{align-items:start;grid-auto-rows:auto}
+body .app-view[data-view="explore"] .explore-card{align-self:start;min-height:0!important;height:auto!important}
+body .app-view[data-view="explore"] .explore-card-media{flex:0 0 110px!important;height:110px!important;min-height:110px!important}
+body .app-view[data-view="explore"] .explore-card-avatar{left:50%!important;bottom:-48px!important;transform:translateX(-50%)!important}
+body .app-view[data-view="explore"] .explore-card-body{min-height:0!important;height:auto!important;padding-top:58px;padding-bottom:64px}
+@media(max-width:700px){
+  body .app-view[data-view="explore"] .explore-card-media{flex-basis:110px!important;height:110px!important;min-height:110px!important}
+  body .app-view[data-view="explore"] .explore-card-body{min-height:0!important;padding-top:58px;padding-bottom:60px}
+}

@@ -1,0 +1,124 @@
+/* Full-screen Brivia AI room based on the supplied desktop reference. */
+@media(min-width:701px){
+  :root{--brivia-cream:#efe5d9;--brivia-paper:#f7efe5;--brivia-wine:#5a061f;--brivia-ink:#332522;--brivia-line:rgba(90,6,31,.27)}
+  body.app-body[data-app-view="chat"]{min-height:100svh;overflow:hidden;background:var(--brivia-cream);color:var(--brivia-ink)}
+  body.app-body[data-app-view="chat"] .app-wrap{height:100svh;min-height:100svh;padding:0}
+  body.app-body[data-app-view="chat"] .app-topbar{display:grid}
+  body.app-body[data-app-view="chat"] .app-main{width:100%;height:100svh;max-width:none}
+  .app-view[data-view="chat"]{position:relative;display:flex!important;height:100%;min-height:0;padding:6px;background:var(--brivia-cream)}
+  .app-view[data-view="chat"]>.view-topline,.app-view[data-view="chat"]>.view-heading{display:none}
+  .app-view[data-view="chat"]>.inbox-toolbar{position:absolute;z-index:5;top:clamp(112px,15vh,135px);left:21px;width:calc(25% - 42px);margin:0;display:block}
+  .app-view[data-view="chat"] .inbox-search{height:34px;min-height:34px;padding:0 12px;border:0;border-radius:18px;background:rgba(255,255,255,.52);box-shadow:none}
+  .app-view[data-view="chat"] .inbox-search span{font-size:15px;color:var(--brivia-wine)}
+  .app-view[data-view="chat"] .inbox-search input{height:34px;font-family:Georgia,'Times New Roman',serif;font-size:11px}
+  .app-view[data-view="chat"] .inbox-tabs{display:none}
+  .app-view[data-view="chat"] .chat-layout{position:relative;display:grid!important;grid-template-columns:25% 75%;flex:1;width:100%;height:100%;min-height:0;border:1px solid var(--brivia-line);border-radius:12px;background:var(--brivia-paper);box-shadow:0 11px 32px rgba(64,37,30,.08);overflow:hidden}
+  .app-view[data-view="chat"] .chat-layout>.chat-list{position:relative;height:100%;min-height:0;padding:18px 0 0;border-right:1px solid var(--brivia-line);background:rgba(247,239,229,.82);color:var(--brivia-ink);overflow:hidden}
+  .app-view[data-view="chat"] .chat-list:before{display:block;height:89px;padding:3px 24px 0;color:var(--brivia-ink);content:'Brivia\A\A  —\A  P E O P L E\A  I D E A S\A  O P P O R T U N I T I E S';white-space:pre;font-family:Georgia,'Times New Roman',serif;font-size:31px;letter-spacing:-1.5px;line-height:1.05}
+  .app-view[data-view="chat"] .chat-list:after{position:absolute;right:24px;bottom:22px;left:24px;padding-top:17px;border-top:1px solid var(--brivia-line);color:rgba(90,6,31,.75);content:'BRIVIA AI  ·  THOUGHTFUL CONNECTIONS';font-family:Georgia,'Times New Roman',serif;font-size:8px;letter-spacing:.16em;line-height:1.8;white-space:nowrap}
+  .app-view[data-view="chat"] #chat-list .inbox-panel-head{display:none}
+  .app-view[data-view="chat"] #chat-list>.chat-row:first-of-type{margin-top:42px}
+  .app-view[data-view="chat"] #chat-list>.chat-row{min-height:69px;padding:10px 15px;border-bottom:1px solid rgba(90,6,31,.12);background:transparent}
+  .app-view[data-view="chat"] #chat-list>.chat-row.is-selected{background:var(--brivia-wine);box-shadow:none;color:#fffaf1}
+  .app-view[data-view="chat"] #chat-list>.chat-row.is-selected .chat-row-copy strong,.app-view[data-view="chat"] #chat-list>.chat-row.is-selected .chat-row-copy span,.app-view[data-view="chat"] #chat-list>.chat-row.is-selected .chat-row-meta time{color:#fffaf1}
+  .app-view[data-view="chat"] #chat-list>.brivia-reference-row{min-height:48px;margin-top:68px!important;padding:6px 13px;background:var(--brivia-wine)}
+  .app-view[data-view="chat"] #chat-list>.brivia-reference-row .reference-avatar{width:34px;height:34px;flex-basis:34px;background:#fffaf1;color:var(--brivia-wine);font-size:17px}
+  .app-view[data-view="chat"] #chat-list>.brivia-reference-row .chat-row-copy strong{font-size:12px}
+  .app-view[data-view="chat"] #chat-list>.brivia-reference-row .chat-row-copy span{font-size:9px}
+  .app-view[data-view="chat"] .chat-row-open{gap:10px}
+  .app-view[data-view="chat"] .chat-row .mini-avatar{width:38px;height:38px;flex-basis:38px;font-size:11px;box-shadow:none}
+  .app-view[data-view="chat"] .chat-row-copy strong{font-family:Georgia,'Times New Roman',serif;font-size:12px;font-weight:400}
+  .app-view[data-view="chat"] .chat-row-copy span{margin-top:3px;color:rgba(51,37,34,.62);font-family:Georgia,'Times New Roman',serif;font-size:9px}
+  .app-view[data-view="chat"] .chat-row-meta time{font-family:Georgia,'Times New Roman',serif;font-size:8px}
+  .app-view[data-view="chat"] .chat-delete{display:none}
+  .app-view[data-view="chat"] .chat-layout>.chat-window,.app-view[data-view="chat"] .chat-layout>.inbox-empty-window{grid-column:2;height:100%;min-height:0;border:0;border-radius:0;background:var(--brivia-paper)}
+  .app-view[data-view="chat"] .chat-layout>.chat-window{display:flex!important;flex-direction:column}
+  .app-view[data-view="chat"] .chat-window-head{flex:0 0 64px;min-height:64px;padding:10px 17px;border-bottom:1px solid var(--brivia-line);background:rgba(247,239,229,.93)}
+  .app-view[data-view="chat"] .chat-window-head .mini-avatar{width:40px;height:40px;flex-basis:40px}
+  .app-view[data-view="chat"] .chat-window-head strong{font-family:Georgia,'Times New Roman',serif;font-size:16px;font-weight:400}
+  .app-view[data-view="chat"] .chat-window-head span{margin-top:2px;color:rgba(51,37,34,.58);font-family:Georgia,'Times New Roman',serif;font-size:10px;letter-spacing:0}
+  .app-view[data-view="chat"] .chat-window-head small{color:rgba(51,37,34,.58);font-family:Georgia,'Times New Roman',serif;font-size:9px}
+  .app-view[data-view="chat"] .chat-window-head:after{margin-left:auto;color:var(--brivia-wine);content:'•••';font-size:16px;letter-spacing:2px}
+  .app-view[data-view="chat"] .chat-back{display:none}
+  .app-view[data-view="chat"] .chat-messages{flex:1;min-height:0;padding:30px 9%;background-color:#6d5548;background-image:linear-gradient(rgba(55,30,25,.12),rgba(55,30,25,.12)),url('./assets/chat-bg-soft.png');background-position:center;background-size:cover}
+  .app-view[data-view="chat"] .message{max-width:min(58%,380px);padding:12px 14px;border-radius:14px;font-family:Georgia,'Times New Roman',serif;font-size:12px;line-height:1.35;box-shadow:0 4px 15px rgba(45,25,21,.14)}
+  .app-view[data-view="chat"] .message.them{border:0;border-bottom-left-radius:5px;background:#f4eee6;color:var(--brivia-ink)}
+  .app-view[data-view="chat"] .message.me{border-bottom-right-radius:5px;background:var(--brivia-wine);color:#fffaf1}
+  .app-view[data-view="chat"] .chat-start-note{max-width:230px;margin:auto;padding:14px 16px;border:0;background:rgba(247,239,229,.9);font-family:Georgia,'Times New Roman',serif}
+  .app-view[data-view="chat"] .chat-start-note strong{font-size:17px}
+  .app-view[data-view="chat"] .chat-compose{flex:0 0 70px;align-items:center;padding:10px 16px;border-top:1px solid var(--brivia-line);background:rgba(247,239,229,.96)}
+  .app-view[data-view="chat"] .chat-compose input{height:42px;border:0;background:#f4eee6;font-family:Georgia,'Times New Roman',serif;font-size:11px}
+  .app-view[data-view="chat"] .chat-compose button{width:34px;height:34px;flex-basis:34px;background:var(--brivia-wine);font-size:18px}
+  .app-view[data-view="chat"] .inbox-empty-window{position:relative;display:flex!important;align-items:stretch;justify-content:space-between;flex-direction:column;padding:0;background-color:#72594b;background-image:linear-gradient(rgba(55,30,25,.1),rgba(55,30,25,.1)),url('./assets/chat-bg-soft.png');background-position:center;background-size:cover;color:var(--brivia-ink);text-align:left}
+  .app-view[data-view="chat"] .inbox-empty-window>*{display:none}
+  .app-view[data-view="chat"] .inbox-empty-window:before{display:block;flex:1;padding:24px 9%;white-space:pre-wrap;color:var(--brivia-ink);content:'✦  Brivia AI\A     Online\A\A Hi! I’m Brivia AI.\A How can I help you today?\A\A                     I’m looking for a co-founder';font-family:Georgia,'Times New Roman',serif;font-size:12px;line-height:2.4;background:linear-gradient(180deg,rgba(247,239,229,.92) 0 64px,transparent 64px)}
+  .app-view[data-view="chat"] .inbox-empty-window:after{display:block;flex:0 0 70px;margin:0 16px 12px;padding:25px 14px;border-radius:16px;color:rgba(51,37,34,.58);content:'⌕   Message Brivia AI...                         Press Enter to send     →';font-family:Georgia,'Times New Roman',serif;font-size:10px;background:rgba(247,239,229,.94)}
+}
+
+@media(min-width:701px){
+  .app-view[data-view="chat"] .chat-messages,.app-view[data-view="chat"] .inbox-empty-window .empty-chat-messages{background-image:linear-gradient(rgba(45,25,20,.08),rgba(45,25,20,.08)),url('./assets/chat-reference-room.png')!important;background-position:center center!important;background-size:cover!important}
+}
+
+@media(min-width:701px){
+  .app-view[data-view="chat"] .empty-chat-messages{justify-content:flex-start!important;gap:0!important;padding:105px 13% 30px!important}
+  .app-view[data-view="chat"] .empty-chat-line{display:flex!important;align-items:flex-start;gap:12px;position:relative}
+  .app-view[data-view="chat"] .empty-chat-line-them:first-child{margin-top:0}
+  .app-view[data-view="chat"] .empty-chat-line-me{justify-content:flex-end;margin-top:14px}
+  .app-view[data-view="chat"] .empty-chat-line .empty-chat-avatar{width:34px;height:34px;flex:0 0 34px;font-size:16px}
+  .app-view[data-view="chat"] .empty-chat-line .empty-chat-bubble{max-width:320px;padding:12px 14px;border-radius:14px;font-size:12px;line-height:1.35}
+  .app-view[data-view="chat"] .empty-chat-line-me .empty-chat-bubble{background:var(--brivia-wine);color:#fffaf1;border-bottom-right-radius:5px}
+  .app-view[data-view="chat"] .empty-chat-line-them .empty-chat-bubble{background:#f4eee6;color:var(--brivia-ink);border-bottom-left-radius:5px}
+  .app-view[data-view="chat"] .empty-chat-line .empty-chat-bubble small{display:block;margin-top:7px;text-align:right;font-size:8px;opacity:.58}
+  .app-view[data-view="chat"] .empty-chat-typing{margin-top:58px}
+  .app-view[data-view="chat"] .empty-chat-typing .empty-chat-bubble{padding:8px 14px;letter-spacing:2px;font-size:16px;line-height:1}
+}
+@media(max-width:700px){.app-view[data-view="chat"] .inbox-empty-window:before,.app-view[data-view="chat"] .inbox-empty-window:after{display:none}}
+
+@media(min-width:701px){
+  .app-view[data-view="chat"] .chat-window-head{margin-bottom:8px}
+}
+
+/* Keep the desktop search control below the sidebar masthead instead of
+   floating over the first conversation on shorter MacBook viewports. */
+@media(min-width:701px){
+  .app-view[data-view="chat"]>.inbox-toolbar{
+    top:clamp(124px,16vh,148px);
+    left:26px;
+    width:calc(25% - 52px);
+    padding:0 2px;
+    border-radius:20px;
+    background:rgba(247,239,229,.96);
+  }
+  .app-view[data-view="chat"] #chat-list .chat-inbox-scroll{
+    padding-top:64px;
+  }
+}
+
+/* Keep the two panes in one row and respect the hidden state of the real chat window. */
+@media(min-width:701px){
+  .app-view[data-view="chat"] .chat-layout{grid-template-columns:minmax(0,25%) minmax(0,75%)!important;grid-template-rows:minmax(0,1fr)!important}
+  .app-view[data-view="chat"] .chat-layout>.chat-list{grid-column:1!important;grid-row:1!important;min-width:0!important}
+  .app-view[data-view="chat"] .chat-layout>.chat-window{grid-column:2!important;grid-row:1!important}
+  .app-view[data-view="chat"] .chat-layout>.chat-window[hidden]{display:none!important}
+  .app-view[data-view="chat"] .chat-layout>.inbox-empty-window{grid-column:2!important;grid-row:1!important}
+  .app-view[data-view="chat"] .chat-layout:has(>.chat-window:not([hidden]))>.inbox-empty-window{display:none!important}
+  .app-view[data-view="chat"] .chat-layout:has(>.chat-window[hidden])>.inbox-empty-window{display:flex!important}
+  .app-view[data-view="chat"] .inbox-empty-window>*{display:flex}
+  .app-view[data-view="chat"] .inbox-empty-window:before,.app-view[data-view="chat"] .inbox-empty-window:after{display:none}
+  .app-view[data-view="chat"] .empty-chat-head{align-items:center;gap:11px;flex:0 0 64px;padding:10px 17px;background:rgba(247,239,229,.93);border-bottom:1px solid var(--brivia-line)}
+  .app-view[data-view="chat"] .empty-chat-avatar{display:grid;width:40px;height:40px;place-items:center;border-radius:50%;background:var(--brivia-wine);color:#fffaf1;font-size:19px}
+  .app-view[data-view="chat"] .empty-chat-head strong,.app-view[data-view="chat"] .empty-chat-head span{display:block;font-family:Georgia,'Times New Roman',serif;font-weight:400}
+  .app-view[data-view="chat"] .empty-chat-head strong{font-size:16px}
+  .app-view[data-view="chat"] .empty-chat-head span{margin-top:2px;color:rgba(51,37,34,.58);font-size:10px}
+  .app-view[data-view="chat"] .empty-chat-head b{margin-left:auto;color:var(--brivia-wine);font-size:15px;letter-spacing:2px}
+  .app-view[data-view="chat"] .empty-chat-messages{display:flex!important;flex:1;flex-direction:column;justify-content:flex-end;gap:13px;padding:30px 9%;background-color:#72594b;background-image:linear-gradient(rgba(55,30,25,.1),rgba(55,30,25,.1)),url('./assets/chat-bg-soft.png');background-position:center;background-size:cover}
+  .app-view[data-view="chat"] .empty-chat-bubble{display:block!important;width:max-content;max-width:58%;padding:12px 14px;border-radius:14px;font-family:Georgia,'Times New Roman',serif;font-size:12px;line-height:1.35;box-shadow:0 4px 15px rgba(45,25,21,.14)}
+  .app-view[data-view="chat"] .empty-chat-bubble small{display:block;margin-top:7px;text-align:right;font-size:8px;opacity:.6}
+  .app-view[data-view="chat"] .empty-chat-bubble span{display:block}
+  .app-view[data-view="chat"] .empty-chat-bubble-them{border-bottom-left-radius:5px;background:#f4eee6;color:var(--brivia-ink)}
+  .app-view[data-view="chat"] .empty-chat-bubble-me{align-self:flex-end;border-bottom-right-radius:5px;background:var(--brivia-wine);color:#fffaf1}
+  .app-view[data-view="chat"] .empty-chat-compose{display:flex!important;align-items:center;gap:12px;flex:0 0 70px;margin:0 16px 12px;padding:0 13px;border-radius:16px;background:rgba(247,239,229,.94);font-family:Georgia,'Times New Roman',serif;font-size:10px;color:rgba(51,37,34,.58)}
+  .app-view[data-view="chat"] .empty-chat-compose>span:first-child{font-size:18px;color:var(--brivia-wine)}
+  .app-view[data-view="chat"] .empty-chat-compose small{margin-left:auto;font-size:8px;color:rgba(51,37,34,.45)}
+  .app-view[data-view="chat"] .empty-chat-compose b{display:grid;width:32px;height:32px;place-items:center;border-radius:50%;background:var(--brivia-wine);color:#fffaf1;font-size:17px;font-weight:400}
+}

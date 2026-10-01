@@ -1,0 +1,174 @@
+/* Home member card: structured like the supplied three-card reference while keeping the active swipe flow. */
+.app-view[data-view="home"] .home-layout-spacer { visibility: hidden; }
+
+@media(min-width: 850px) {
+  body.app-body[data-app-view="home"] { overflow: hidden; }
+  body.app-body[data-app-view="home"] .app-wrap { height: 100svh; min-height: 100svh; padding-bottom: 0; }
+  body.app-body[data-app-view="home"] .app-view[data-view="home"] { height: calc(100svh - 94px); min-height: 0; }
+
+  body.app-body[data-app-view="home"] .app-topbar { height: 94px; }
+  body.app-body[data-app-view="home"] .app-main { width: min(1500px, 100%); }
+
+  .app-view[data-view="home"] {
+    gap: 20px;
+    padding-top: 12px;
+    padding-bottom: 20px;
+  }
+
+  .app-view[data-view="home"] .home-heading {
+    align-self: start;
+    margin-top: 15px;
+  }
+
+  .app-view[data-view="home"] .swipe-card {
+    width: min(100%, 475px);
+    height: min(calc(100svh - 220px), 680px);
+    min-height: 0;
+  }
+}
+
+.app-view[data-view="home"] .swipe-card {
+  width: min(100%, 380px);
+  height: min(72svh, 670px);
+  min-height: 560px;
+  overflow: hidden;
+  border: 2px solid #5a061f;
+  border-radius: 18px;
+  background: #f7efe5;
+  box-shadow: 0 16px 32px rgba(90, 6, 31, .16), 0 2px 0 rgba(255, 250, 241, .9);
+}
+
+.app-view[data-view="home"] .swipe-card-topline {
+  position: absolute;
+  z-index: 3;
+  top: 11px;
+  right: 10px;
+  left: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 42px;
+  padding: 0 18px;
+  border-radius: 11px 11px 0 0;
+  background: #5a061f;
+  color: #fffaf1;
+  font-family: Georgia, 'Times New Roman', serif;
+}
+
+.app-view[data-view="home"] .swipe-card-topline span { font-size: 10px; letter-spacing: .22em; }
+.app-view[data-view="home"] .swipe-card-topline b { font-size: 13px; font-weight: 400; letter-spacing: 2px; }
+
+.app-view[data-view="home"] .swipe-card-image {
+  position: absolute;
+  top: 53px;
+  right: 10px;
+  left: 10px;
+  height: 49%;
+  overflow: hidden;
+  border-radius: 0;
+}
+
+.app-view[data-view="home"] .swipe-card-image img { object-position: center center; filter: saturate(.78) contrast(.96); }
+.app-view[data-view="home"] .swipe-card-shade,
+.app-view[data-view="home"] .member-active,
+.app-view[data-view="home"] #swipe-role { display: none; }
+
+.app-view[data-view="home"] .swipe-card-info {
+  position: absolute;
+  right: 10px;
+  bottom: 10px;
+  left: 10px;
+  height: calc(51% - 53px);
+  padding: 50px 22px 15px;
+  background: #f7efe5;
+  color: #332522;
+}
+
+.app-view[data-view="home"] .swipe-card-info::before {
+  position: absolute;
+  top: -55px;
+  left: 18px;
+  width: 110px;
+  height: 110px;
+  border: 4px solid #f7efe5;
+  border-radius: 50%;
+  background: #5a061f var(--card-avatar-image) center / cover no-repeat;
+  box-shadow: 0 2px 9px rgba(51, 37, 34, .12);
+  content: '';
+}
+
+.app-view[data-view="home"] .member-name-row h2 {
+  color: #5a061f;
+  font-family: Georgia, 'Times New Roman', serif;
+  font-size: clamp(25px, 2.2vw, 31px);
+  font-weight: 400;
+  letter-spacing: -.8px;
+  line-height: 1.05;
+}
+
+.app-view[data-view="home"] .member-name-row { margin-top: 10px; }
+
+.app-view[data-view="home"] .member-name-row > span { display: none; }
+.app-view[data-view="home"] #swipe-location {
+  margin: 6px 0 0;
+  color: rgba(51, 37, 34, .62);
+  font-family: Georgia, 'Times New Roman', serif;
+  font-size: 11px;
+}
+
+.app-view[data-view="home"] .member-tags { gap: 8px; margin-top: 17px; }
+.app-view[data-view="home"] .member-tags span {
+  padding: 8px 13px;
+  border: 1px solid rgba(90, 6, 31, .08);
+  border-radius: 999px;
+  background: #eadfd2;
+  color: #5a061f;
+  font-family: Georgia, 'Times New Roman', serif;
+  font-size: 10px;
+  font-weight: 400;
+}
+
+.app-view[data-view="home"] .view-info-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  min-height: 44px;
+  margin-top: 17px;
+  padding: 0 14px;
+  border: 0;
+  border-radius: 12px;
+  background: #5a061f;
+  color: #fffaf1;
+  font-family: Georgia, 'Times New Roman', serif;
+  font-size: 0;
+  font-weight: 400;
+  letter-spacing: .19em;
+}
+
+.app-view[data-view="home"] .view-info-button::before { content: 'VIEW PROFILE'; font-size: 10px; }
+.app-view[data-view="home"] .view-info-button span { margin-left: 9px; color: #fffaf1; font-size: 15px; }
+.app-view[data-view="home"] .view-info-button:hover { transform: translateY(-2px); background: #430416; }
+
+@media(max-width: 560px) {
+  .app-view[data-view="home"] .swipe-card { width: min(100%, 345px); height: min(70svh, 610px); min-height: 505px; }
+  .app-view[data-view="home"] .swipe-card-info { padding-right: 17px; padding-left: 17px; }
+  .app-view[data-view="home"] .swipe-card-info::before { left: 14px; width: 96px; height: 96px; top: -48px; }
+}
+
+@media(min-width: 850px) {
+  .app-view[data-view="home"] {
+    gap: 10px;
+    padding-top: 0;
+  }
+  .app-view[data-view="home"] .home-heading { position: relative; top: -76px; left: clamp(180px, 15vw, 280px); }
+  .app-view[data-view="home"] .home-heading > p:last-child { max-width: none; white-space: nowrap; }
+  .app-view[data-view="home"] .swipe-card {
+    position: relative;
+    top: -76px;
+    width: min(100%, 475px);
+    height: min(calc(100svh - 250px), 650px);
+  }
+  .app-view[data-view="home"] .swipe-actions,
+  .app-view[data-view="home"] .swipe-hint { position: relative; top: -56px; }
+}

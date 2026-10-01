@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Careers · The Brivia Club</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="/careers.css" />
+    <link rel="stylesheet" href="/mobile-final-fixes.css" />
+  </head>
+  <body class="careers-page">
+    <header class="careers-hero">
+      <a class="careers-brand" href="/">the <strong>Brivia Club</strong></a>
+      <a class="careers-back" href="/">BACK TO HOME <span>↗</span></a>
+      <div class="careers-hero-copy">
+        <p class="careers-eyebrow">THE BRIVIA CLUB / OPPORTUNITIES</p>
+        <h1>Careers at <em>BRIVIA</em></h1>
+        <p>From first hello to meaningful work. Grow with us.</p>
+      </div>
+    </header>
+
+    <main class="careers-main">
+      <section class="careers-roles" aria-labelledby="open-roles-title">
+        <div class="careers-section-heading">
+          <div><p class="careers-eyebrow">JOIN THE CLUB</p><h2 id="open-roles-title">Open Roles <span>(2)</span></h2></div>
+          <p>Bring your curiosity, your craft,<br />and your point of view.</p>
+        </div>
+        <p class="careers-intro">Explore our current openings and apply in one click.</p>
+        <div class="career-list">
+          <article class="career-card"><div><p class="career-number">01 / 02</p><h3>Software Developer Intern</h3><p class="career-meta">Remote <span>•</span> Internship</p></div><button class="career-apply" type="button" data-apply-role="Software Developer Intern">APPLY NOW <span>↗</span></button></article>
+          <article class="career-card"><div><p class="career-number">02 / 02</p><h3>Community &amp; Partnerships Intern</h3><p class="career-meta">Remote <span>•</span> Internship</p></div><button class="career-apply" type="button" data-apply-role="Community &amp; Partnerships Intern">APPLY NOW <span>↗</span></button></article>
+        </div>
+      </section>
+    </main>
+
+    <div class="career-apply-modal" id="career-apply-modal" aria-hidden="true">
+      <div class="career-modal-backdrop" data-apply-close></div>
+      <section class="career-modal-dialog" role="dialog" aria-modal="true" aria-labelledby="career-modal-title">
+        <header class="career-modal-header"><div class="career-modal-tabs" role="tablist"><button class="career-modal-tab is-active" type="button" data-apply-tab="overview">Overview</button><button class="career-modal-tab" type="button" data-apply-tab="application">Application</button></div><button class="career-modal-close" type="button" data-apply-close aria-label="Close">×</button></header>
+        <div class="career-modal-body">
+          <aside class="career-modal-aside"><div class="career-aside-item"><span>Role</span><strong id="career-role-title">—</strong></div><div class="career-aside-item"><span>Location Type</span><strong>Remote</strong></div><div class="career-aside-item"><span>Employment type</span><strong>Internship</strong></div><div class="career-aside-item"><span>Department</span><strong id="career-role-department">—</strong></div></aside>
+          <div class="career-modal-panel">
+            <section class="career-modal-page is-active" data-apply-page="overview"><p class="careers-eyebrow">THE OPPORTUNITY</p><h2 id="career-modal-title">Overview</h2><div class="career-overview"><h3>We’re hiring: <em id="career-overview-role">—</em></h3><p>Remote · Internship</p><div id="career-overview-copy"></div><h4>What you’ll do</h4><ul id="career-overview-do"></ul><h4>What we’re looking for</h4><ul id="career-overview-looking"></ul><h4>Why join The Brivia Club</h4><ul id="career-overview-why"></ul></div></section>
+            <section class="career-modal-page" data-apply-page="application"><p class="careers-eyebrow">TAKE THE NEXT STEP</p><h2>Application</h2><form id="career-application-form"><input type="hidden" name="role" id="career-form-role" /><label><span>NAME <b>*</b></span><input name="name" type="text" placeholder="Type here…" required /></label><label><span>EMAIL <b>*</b></span><input name="email" type="email" placeholder="hello@example.com" required /></label><label><span>LINKEDIN</span><input name="linkedin" type="url" placeholder="https://linkedin.com/in/…" /></label><label><span>RESUME <b>*</b></span><input id="career-resume" name="resume" type="file" accept=".pdf,.doc,.docx" required /><small>PDF (Max 3MB)</small><strong id="career-resume-name">No file selected</strong></label><p class="career-form-status" id="career-form-status" role="status"></p><button class="career-form-submit" type="submit">SUBMIT <span>↗</span></button></form></section>
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <footer class="careers-footer"><span>© 2026 THE BRIVIA CLUB</span><a href="mailto:careers@brivia.club">CAREERS@BRIVIA.CLUB <span>↗</span></a></footer>
+    <script type="module" src="/careers.js"></script>
+  </body>
+</html>

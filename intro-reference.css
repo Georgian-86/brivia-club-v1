@@ -1,0 +1,35 @@
+.intro-burst {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  background: #020304;
+}
+
+.intro-video {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  background: #020304;
+}
+
+.intro-burst.is-skipped {
+  animation: intro-video-exit .45s cubic-bezier(.76, 0, .24, 1) forwards;
+}
+
+@keyframes intro-video-exit {
+  to {
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .intro-burst {
+    animation: intro-video-exit .2s ease .3s forwards;
+  }
+}

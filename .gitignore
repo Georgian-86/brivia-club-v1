@@ -1,0 +1,13 @@
+.vercel
+node_modules/
+dist/
+.env
+.env.*
+!.env.example
+
+# local browser/test debris
+.chrome-*/
+.tmp-*/
+tmp-video-frames/
+*.log
+chrome-out.txt
