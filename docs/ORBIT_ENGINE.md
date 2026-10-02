@@ -283,7 +283,8 @@ learning cannot override it.
 and its load is released, when:
 - both mark *Met* (at most 3 *Met* marks per member per week);
 - either side marks *Let go*;
-- or 21 days pass without a message.
+- or 21 days pass without a message, counted from the later of the last message and the moment the orbit opened
+  (so an orbit where nobody ever writes also closes).
 
 A **mutual Met** is the strongest positive label for taste learning (§8). It is also the in-product measure of the
 north-star metric (people who actually meet).

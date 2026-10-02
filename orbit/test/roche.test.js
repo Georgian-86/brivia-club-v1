@@ -84,3 +84,26 @@ test('minor: effectiveK(undefined) -> kDefault (and gaming step-down from there)
   assert.equal(effectiveK(NaN, {}, cfg), 5);
   assert.equal(effectiveK(undefined, { qualifiedInbound: 20, likeBacks: 0 }, cfg), 3);
 });
+
+test('I5: ISO-string timestamps are parsed (orbits close when idle)', () => {
+  const now = Date.UTC(2026, 9, 2);
+  const day = 86400000;
+  const iso = (t) => new Date(t).toISOString();
+  assert.equal(resolveOrbit({ mine: null, theirs: null, lastMessageAt: iso(now - 22 * day) }, iso(now), cfg), 'closed-idle');
+  assert.equal(resolveOrbit({ mine: null, theirs: null, lastMessageAt: iso(now - 22 * day) }, now, cfg), 'closed-idle');
+  assert.equal(resolveOrbit({ mine: null, theirs: null, lastMessageAt: iso(now - 2 * day) }, new Date(now), cfg), 'open');
+});
+
+test('I5: an orbit with no message idles from openedAt; idle counts from the later of the two', () => {
+  const now = Date.UTC(2026, 9, 2);
+  const day = 86400000;
+  assert.equal(resolveOrbit({ mine: null, theirs: null, lastMessageAt: null, openedAt: now - 22 * day }, now, cfg), 'closed-idle');
+  assert.equal(resolveOrbit({ mine: null, theirs: null, openedAt: new Date(now - 5 * day).toISOString() }, now, cfg), 'open');
+  // reopened/recently opened orbit with an old message is still open (later of the two)
+  assert.equal(resolveOrbit({ mine: null, theirs: null, lastMessageAt: now - 40 * day, openedAt: now - 2 * day }, now, cfg), 'open');
+  assert.equal(resolveOrbit({ mine: null, theirs: null, lastMessageAt: now - 2 * day, openedAt: now - 40 * day }, now, cfg), 'open');
+  assert.equal(resolveOrbit({ mine: null, theirs: null, lastMessageAt: now - 25 * day, openedAt: now - 40 * day }, now, cfg), 'closed-idle');
+  // no usable timestamp at all: cannot judge idleness, stays open; garbage strings are ignored
+  assert.equal(resolveOrbit({ mine: null, theirs: null }, now, cfg), 'open');
+  assert.equal(resolveOrbit({ mine: null, theirs: null, lastMessageAt: 'not a date', openedAt: now - 30 * day }, now, cfg), 'closed-idle');
+});

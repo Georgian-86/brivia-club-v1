@@ -3,7 +3,8 @@
 
 const DAY_MS = 86400000;
 const clamp = (x, lo, hi) => Math.min(hi, Math.max(lo, x));
-const ms = (t) => (t instanceof Date ? t.getTime() : t);
+/** Epoch ms from a Date, an epoch-ms number or an ISO string; NaN when missing or unparseable. */
+const ms = (t) => (t instanceof Date ? t.getTime() : typeof t === 'string' ? Date.parse(t) : typeof t === 'number' ? t : NaN);
 const finiteOr = (x, d) => (Number.isFinite(x) ? x : d);
 
 /** load_u = Σ likeWeight·q_l (each liker once) + orbitWeight · openOrbits. */
@@ -43,11 +44,16 @@ export function deckSize(hViewer, cfg) {
   return Math.max(d.min, Math.round(d.base * (d.hFloor + (1 - d.hFloor) * h)));
 }
 
-/** Precedence: letgo > both met > idle > open. */
-export function resolveOrbit({ mine, theirs, lastMessageAt }, now, cfg) {
+/**
+ * Precedence: letgo > both met > idle > open. Timestamps may be Date, epoch ms or ISO strings.
+ * Idle time counts from the later of lastMessageAt and openedAt (an orbit with no message yet idles from
+ * when it opened). With neither usable, the orbit cannot be judged idle and stays open.
+ */
+export function resolveOrbit({ mine, theirs, lastMessageAt, openedAt }, now, cfg) {
   if (mine === 'letgo' || theirs === 'letgo') return 'closed-letgo';
   if (mine === 'met' && theirs === 'met') return 'closed-met';
-  if (lastMessageAt != null && ms(now) - ms(lastMessageAt) > cfg.roche.orbitIdleDays * DAY_MS) return 'closed-idle';
+  const since = Math.max(...[ms(lastMessageAt), ms(openedAt)].filter(Number.isFinite));
+  if (Number.isFinite(since) && ms(now) - since > cfg.roche.orbitIdleDays * DAY_MS) return 'closed-idle';
   return 'open';
 }
 
