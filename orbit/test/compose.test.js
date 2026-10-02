@@ -1,0 +1,154 @@
+// © 2026 The Brivia Club. ORBIT engine. All rights reserved. See docs/IP_NOTES.md.
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { loadConfig } from '../src/config.js';
+import { buildTopology } from '../src/topology.js';
+import { toCell } from '../src/rings.js';
+import { deckSize } from '../src/roche.js';
+import { orbitScore, rankCandidates, composeDeck, toCard } from '../src/compose.js';
+import * as api from '../src/index.js';
+
+const cfg = loadConfig();
+const topology = buildTopology(['X', 'Y', 'Z', 'W'].map((id) => ({ id, parentId: null, level: 'domain' })));
+const ctx = { topology, rarityOf: () => 0.5, cfg, L: 40 };
+const pune = toCell(18.5204, 73.8567, cfg);
+const mumbai = toCell(19.076, 72.8777, cfg); // ring 3
+const mk = (id, extra = {}) => ({
+  id, name: `Name ${id}`, photoUrl: `p/${id}.jpg`,
+  interests: [{ id: 'X', points: 10, mode: 'play' }, { id: 'Y', points: 10, mode: 'play' }], ...extra,
+});
+const viewer = { member: mk('V'), cell: pune, availability: ['sat-am', 'sun-am'] };
+const cand = (id, o = {}) => ({ member: mk(id), cell: pune, headroom: 1, availability: ['sat-am'], ...o });
+
+test('Golden 7: saturated candidates are absent from deck, present with includeSaturated', () => {
+  const cs = [cand('a'), cand('sat', { headroom: 0 })];
+  const ranked = rankCandidates(viewer, cs, ctx);
+  assert.deepEqual(ranked.map((s) => s.candidate.member.id), ['a']);
+  const all = rankCandidates(viewer, cs, { ...ctx, includeSaturated: true });
+  assert.equal(all.length, 2);
+  const deck = composeDeck(viewer, all, { L: 40, hViewer: 1, seed: 's' }, cfg);
+  assert.ok(!deck.some((s) => s.candidate.member.id === 'sat'));
+});
+
+test('Golden 9: higher headroom ranks first at equal R/ring/factors', () => {
+  const ranked = rankCandidates(viewer, [cand('low', { headroom: 0.3 }), cand('high', { headroom: 0.9 })], ctx);
+  assert.deepEqual(ranked.map((s) => s.candidate.member.id), ['high', 'low']);
+});
+
+test('ties keep input order', () => {
+  const ranked = rankCandidates(viewer, [cand('a'), cand('b'), cand('c')], ctx);
+  assert.deepEqual(ranked.map((s) => s.candidate.member.id), ['a', 'b', 'c']);
+});
+
+test('ineligible (gate) candidates are dropped', () => {
+  const weak = { ...cand('far', { cell: mumbai }), member: mk('far', { interests: [{ id: 'X', points: 2, mode: 'play' }, { id: 'W', points: 18, mode: 'play' }] }) };
+  assert.equal(rankCandidates(viewer, [weak], ctx).length, 0);
+});
+
+test('orbitScore = R^gamma * phi * C * B * T * E', () => {
+  const g = orbitScore({ R: 0.5, ring: 0, coPresence: 1, behaviour: {}, taste: 1, exposure: 0.5 }, cfg);
+  assert.ok(Math.abs(g - Math.pow(0.5, 1.3) * 0.5) < 1e-12);
+  const g2 = orbitScore({ R: 0.5, ring: 3, coPresence: 0, behaviour: { activity: 1, reciprocity: 0 }, taste: 5, exposure: 1 }, cfg);
+  assert.ok(Math.abs(g2 - Math.pow(0.5, 1.3) * 0.62 * 1 * 0.9 * 1.3 * 1) < 1e-12);
+});
+
+test('matchPercent is round(100R); coPresence 0 when availability empty', () => {
+  const [s] = rankCandidates(viewer, [cand('a', { availability: [] })], ctx);
+  assert.equal(s.coPresence, 0);
+  assert.equal(toCard(s).matchPercent, Math.round(100 * s.R));
+});
+
+// ---- synthetic scored cards for deck rules ----
+const interestsFor = (i) => [{ id: `I${i % 7}`, points: 10, mode: 'play' }, { id: `J${i % 3}`, points: 10, mode: 'play' }];
+const fake = (i, { ring = 0, wtd = false, G } = {}) => ({
+  candidate: { member: mk(`m${i}`, { interests: interestsFor(i) }), headroom: 1, cell: pune },
+  R: 0.6, ring, km: 1, G: G ?? 1 - i * 0.001, hits: [], coPresence: 0, worthTheDistance: wtd,
+});
+const ids = (d) => d.map((s) => s.candidate.member.id);
+
+test('deck length equals deckSize with enough supply', () => {
+  const sc = Array.from({ length: 40 }, (_, i) => fake(i));
+  for (const h of [1, 0.5, 0]) {
+    const d = composeDeck(viewer, sc, { L: 40, hViewer: h, seed: 'x' }, cfg);
+    assert.equal(d.length, deckSize(h, cfg));
+    assert.ok(d.every(Boolean));
+    assert.equal(new Set(ids(d)).size, d.length);
+  }
+});
+
+test('WtD lane: at most 2, at indices 3 and 8', () => {
+  const sc = [
+    ...Array.from({ length: 30 }, (_, i) => fake(i)),
+    fake(100, { ring: 4, wtd: true, G: 0.5 }), fake(101, { ring: 4, wtd: true, G: 0.4 }), fake(102, { ring: 5, wtd: true, G: 0.3 }),
+  ];
+  for (const seed of ['a', 'b', 'c', 'd', 'e', 'f']) {
+    const d = composeDeck(viewer, sc, { L: 40, hViewer: 1, seed }, cfg);
+    const w = d.map((s, i) => (s.worthTheDistance ? i : -1)).filter((i) => i >= 0);
+    assert.deepEqual(w, [3, 8]);
+    assert.equal(d[3].candidate.member.id, 'm100');
+    assert.equal(d[8].candidate.member.id, 'm101');
+  }
+});
+
+test('WtD slot beyond deck length is not used (short deck)', () => {
+  const sc = Array.from({ length: 20 }, (_, i) => fake(i));
+  sc.push(fake(100, { ring: 4, wtd: true }));
+  const d = composeDeck(viewer, sc, { L: 40, hViewer: 0, seed: 'x' }, cfg); // size 8
+  assert.equal(d.length, 8);
+  assert.deepEqual(d.map((s, i) => (s.worthTheDistance ? i : -1)).filter((i) => i >= 0), [3]);
+});
+
+test('local share: >= 70% of non-WtD cards from rings 0-2 when supply allows', () => {
+  // far cards have higher G, so a pure G sort would fail the share
+  const far = Array.from({ length: 20 }, (_, i) => fake(i, { ring: 3, G: 2 - i * 0.001 }));
+  const near = Array.from({ length: 20 }, (_, i) => fake(50 + i, { ring: 1, G: 1 - i * 0.001 }));
+  for (const seed of ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h']) {
+    const d = composeDeck(viewer, [...far, ...near], { L: 40, hViewer: 1, seed }, cfg);
+    const local = d.filter((s) => s.ring <= 2).length;
+    assert.ok(local >= Math.ceil(0.7 * d.length), `seed ${seed}: ${local}/${d.length}`);
+  }
+});
+
+test('3 candidates give a deck of 3 with no undefined (Review Focus 3)', () => {
+  const sc = [fake(1), fake(2, { ring: 4, wtd: true }), fake(3)];
+  const d = composeDeck(viewer, sc, { L: 40, hViewer: 1, seed: 'x' }, cfg);
+  assert.equal(d.length, 3);
+  assert.ok(d.every((s) => s && s.candidate));
+  assert.deepEqual(composeDeck(viewer, [], { L: 40, hViewer: 1, seed: 'x' }, cfg), []);
+});
+
+test('headroom 0 excluded even if passed in', () => {
+  const sc = [fake(1), { ...fake(2), candidate: { ...fake(2).candidate, headroom: 0 } }];
+  assert.deepEqual(ids(composeDeck(viewer, sc, { L: 40, hViewer: 1, seed: 'x' }, cfg)), ['m1']);
+});
+
+test('same seed gives the same deck; some seed explores', () => {
+  const sc = Array.from({ length: 60 }, (_, i) => fake(i));
+  const run = (seed) => ids(composeDeck(viewer, sc, { L: 40, hViewer: 1, seed }, cfg));
+  assert.deepEqual(run('s1'), run('s1'));
+  const decks = new Set(Array.from({ length: 40 }, (_, i) => run(`seed${i}`).join()));
+  assert.ok(decks.size > 1, 'epsilon exploration changes some decks');
+});
+
+test('MMR spreads identical-interest cards', () => {
+  const same = (i, G) => ({ ...fake(i, { G }), candidate: { ...fake(i).candidate, member: mk(`s${i}`, { interests: [{ id: 'I0', points: 20, mode: 'play' }] }) } });
+  const sc = [...Array.from({ length: 12 }, (_, i) => same(i, 1 - i * 0.001)), ...Array.from({ length: 12 }, (_, i) => fake(i, { G: 0.9 - i * 0.001 }))];
+  const d = composeDeck(viewer, sc, { L: 40, hViewer: 1, seed: 'zz' }, { ...cfg });
+  assert.ok(d.filter((s) => s.candidate.member.id.startsWith('s')).length < 12);
+});
+
+test('Golden 6: toCard is a whitelist and leaks nothing', () => {
+  const leaky = mk('L', { email: 'x@y.com', phone: '+919999999999', lat: 18.5204, lng: 73.8567, cell: pune });
+  const [s] = rankCandidates(viewer, [{ member: leaky, cell: pune, headroom: 1, availability: ['sat-am'] }], ctx);
+  const card = toCard(s);
+  assert.deepEqual(Object.keys(card), ['id', 'name', 'photoUrl', 'distanceBand', 'matchPercent', 'chips', 'worthTheDistance']);
+  const json = JSON.stringify(card);
+  for (const bad of ['x@y.com', '+919999999999', 'lat', 'lng', 'cell', pune, 'email', 'phone']) assert.ok(!json.includes(bad), bad);
+  assert.equal(card.distanceBand, '< 3 km');
+});
+
+test('index re-exports the public API', () => {
+  for (const k of ['loadConfig', 'resonance', 'buildTopology', 'distanceKm', 'isEligible', 'deckSize', 'orbitScore', 'rankCandidates', 'composeDeck', 'explain', 'toCard']) {
+    assert.equal(typeof api[k], 'function', k);
+  }
+});
