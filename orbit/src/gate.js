@@ -16,7 +16,7 @@ export function isEligible(R, ring, L, cfg) {
   return R >= thresholds(L, cfg)[ring];
 }
 
-/** Worth-the-Distance lane: ring >= 3 and R >= fixed θ_far (never relaxed). */
+/** Worth-the-Distance lane: ring >= wtdMinRing (3) and R >= fixed θ_far (never relaxed). */
 export function isWorthTheDistance(R, ring, cfg) {
-  return ring >= 3 && R >= cfg.thetaFar;
+  return ring >= cfg.wtdMinRing && R >= cfg.thetaFar;
 }

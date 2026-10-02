@@ -282,3 +282,31 @@ test('I3/R11: a WtD card is never placed before local cards, even when it out-sc
     assert.equal(d[3].candidate.member.id, 'm100'); // slot 3 is inside a deck of 4
   }
 });
+
+test('I4: orbitScore factors read config (C, B, T clip, co-presence ring cut-off)', () => {
+  const c2 = loadConfig({ score: { coPresenceBase: 0.5, coPresenceSpan: 0.5, behaviourBase: 0.5, behaviourSpan: 0.5, tasteMax: 2, coPresenceMaxRing: 3 } });
+  const base = { R: 1, ring: 3, coPresence: 0, behaviour: { activity: 0 }, taste: 5, exposure: 1 };
+  assert.ok(Math.abs(orbitScore(base, c2) - 0.62 * 0.5 * 0.5 * 2) < 1e-12);
+  assert.ok(Math.abs(orbitScore(base, cfg) - 0.62 * 1 * 0.8 * 1.3) < 1e-12); // defaults unchanged
+});
+
+test('I4: deck local cut-off reads cfg.deck.localMaxRing', () => {
+  const far = Array.from({ length: 20 }, (_, i) => fake(i, { ring: 2, G: 2 - i * 0.001 }));
+  const near = Array.from({ length: 20 }, (_, i) => fake(50 + i, { ring: 1, G: 1 - i * 0.001 }));
+  const c2 = loadConfig({ deck: { localMaxRing: 1, epsilon: 0 } });
+  const d = composeDeck(viewer, [...far, ...near], { hViewer: 1, seed: 'a' }, c2);
+  assert.ok(d.filter((s) => s.ring <= 1).length >= Math.ceil(0.7 * d.length));
+  const d0 = composeDeck(viewer, [...far, ...near], { hViewer: 1, seed: 'a' }, loadConfig({ deck: { epsilon: 0 } }));
+  assert.equal(d0.filter((s) => s.ring === 2).length, 12); // default: ring 2 counts as local
+});
+
+test('I4: toCard/explain take cfg (rare threshold, distance label from rings[0])', () => {
+  const c2 = loadConfig({ rings: [5, 15, 60, 350, 2500, Infinity], explain: { rareMinRarity: 0.95 } });
+  const [s] = rankCandidates(viewer, [cand('a')], ctx);
+  assert.equal(toCard(s).distanceBand, '< 3 km');
+  assert.equal(toCard(s, c2).distanceBand, '< 5 km');
+  const h = { mine: { id: 'x', points: 6, mode: 'play' }, theirs: { id: 'x', points: 6, mode: 'play' }, topo: 1, rarity: 0.8, score: 1 };
+  const sc2 = { ...s, hits: [h], coPresence: 0 };
+  assert.deepEqual(explain(sc2), ['Both deep into x, rare nearby']);
+  assert.deepEqual(explain(sc2, c2), []);
+});

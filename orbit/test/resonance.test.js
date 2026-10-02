@@ -83,3 +83,12 @@ test('hits shape (R2)', () => {
   assert.ok(Math.abs(h.score - 1.15) < 1e-12);
   assert.ok(Math.abs(d.value - 1.15) < 1e-12);
 });
+
+test('I4: semScale reads cfg.semantic (defaults unchanged)', () => {
+  assert.ok(Math.abs(semScale(0.375, cfg) - 0.5) < 1e-12);
+  const c2 = loadConfig({ semantic: { cosFloor: 0, cosSpan: 1 } });
+  assert.ok(Math.abs(semScale(0.375, c2) - 0.375) < 1e-12);
+  const a = mem('A', { X: 10, Y: 10 }), b = mem('B', { X: 10, W: 10 });
+  const r = resonance(a, b, { topology, rarityOf: () => 1, cfg: c2, aboutCos: 0.375 });
+  assert.ok(Math.abs(r.R - (0.75 * (1 - Math.exp(-3 * r.Rstruct)) + 0.25 * 0.375)) < 1e-12);
+});

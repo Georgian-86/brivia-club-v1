@@ -1,5 +1,6 @@
 // © 2026 The Brivia Club. ORBIT engine. All rights reserved. See docs/IP_NOTES.md.
 import { topo } from './topology.js';
+import { loadConfig } from './config.js';
 
 const modeOf = (x) => x?.mode ?? 'play';
 
@@ -20,9 +21,10 @@ export function rarity(n, N, cfg) {
   return floor + (span * Math.log(1 + N / (1 + n))) / Math.log(1 + N);
 }
 
-/** Semantic gap-filler scale (spec §3.6). */
-export function semScale(cos) {
-  return Math.min(1, Math.max(0, (cos - 0.1) / 0.55));
+/** Semantic gap-filler scale (spec §3.6): clamp((cos − cosFloor) / cosSpan, 0, 1). */
+export function semScale(cos, cfg = loadConfig()) {
+  const { cosFloor, cosSpan } = cfg.semantic;
+  return Math.min(1, Math.max(0, (cos - cosFloor) / cosSpan));
 }
 
 const squash = (x, cfg) => 1 - Math.exp(-cfg.squashK * x);
@@ -77,7 +79,7 @@ export function resonance(a, b, ctx) {
   const { cfg, aboutCos } = ctx;
   let R = squash(Rstruct, cfg);
   if (aboutCos != null && Rstruct > 0) {
-    R = (1 - cfg.semanticShare) * R + cfg.semanticShare * semScale(aboutCos);
+    R = (1 - cfg.semanticShare) * R + cfg.semanticShare * semScale(aboutCos, cfg);
   }
   return { R, Rstruct, hits: ab.hits };
 }

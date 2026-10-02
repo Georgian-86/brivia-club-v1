@@ -34,3 +34,13 @@ test('ORBIT_CONFIG_PATH file overrides defaults, overrides override file', () =>
   }
   assert.equal(loadConfig().thetaFar, 0.86);
 });
+
+test('I4: every scoring/explain/ring cut-off constant lives in config with the spec defaults', () => {
+  const c = loadConfig();
+  assert.deepEqual(c.score, { coPresenceBase: 0.85, coPresenceSpan: 0.15, coPresenceMaxRing: 2, behaviourBase: 0.8, behaviourSpan: 0.2, tasteMin: 0.75, tasteMax: 1.3 });
+  assert.deepEqual(c.semantic, { cosFloor: 0.1, cosSpan: 0.55 });
+  assert.deepEqual(c.explain, { rareMinRarity: 0.7, rareMinPoints: 4, coPresenceChipMaxRing: 1, maxChips: 3 });
+  assert.equal(c.wtdMinRing, 3);
+  assert.equal(c.deck.localMaxRing, 2);
+  assert.equal(c.deck.exploreTailFactor, 4);
+});

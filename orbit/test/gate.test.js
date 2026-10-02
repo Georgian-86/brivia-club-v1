@@ -61,3 +61,8 @@ test('I2/R12: non-finite L is treated as 0', () => {
   for (const L of [undefined, NaN, null, Infinity * 0]) assert.deepEqual(thresholds(L, cfg), thresholds(0, cfg), String(L));
   assert.equal(isEligible(0.3, 2, undefined, cfg), isEligible(0.3, 2, 0, cfg));
 });
+
+test('I4: WtD ring cut-off reads cfg.wtdMinRing', () => {
+  assert.equal(isWorthTheDistance(0.9, 2, loadConfig({ wtdMinRing: 2 })), true);
+  assert.equal(isWorthTheDistance(0.9, 2, cfg), false);
+});

@@ -35,3 +35,8 @@ test('distanceBand per ring', () => {
   assert.equal(distanceBand(800, 4, 'Karnataka'), 'Karnataka');
   assert.equal(distanceBand(3000, 5), 'Abroad');
 });
+
+test('I4: ring-0 band label derives from cfg.rings[0]', () => {
+  assert.equal(distanceBand(1, 0, undefined, loadConfig({ rings: [2, 15, 60, 350, 2500, Infinity] })), '< 2 km');
+  assert.equal(distanceBand(1, 0, undefined, cfg), '< 3 km');
+});

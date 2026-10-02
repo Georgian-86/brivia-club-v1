@@ -5,6 +5,7 @@ import { isEligible, isWorthTheDistance } from './gate.js';
 import { exposure, deckSize } from './roche.js';
 import { mmrPick, seededFloat } from './diversity.js';
 import { explain } from './explain.js';
+import { loadConfig } from './config.js';
 
 export { explain };
 
@@ -22,14 +23,16 @@ function jaccard(a = [], b = []) {
 /**
  * G = R^gamma · phi(ring) · C · B · T · E   (spec §6.1)
  * behaviour = {activity?, reciprocity?} (B = 1 if neither present); coPresence is the raw
- * Jaccard (C applied for rings <= 2 only); taste is clipped to [0.75, 1.3]; exposure is E.
+ * Jaccard (C applied for rings <= cfg.score.coPresenceMaxRing only); taste is clipped to
+ * [tasteMin, tasteMax]; exposure is E. All factor constants come from cfg.score.
  * R12: non-finite taste → 1; non-finite activity/reciprocity are treated as absent.
  */
 export function orbitScore({ R, ring, coPresence = 0, behaviour = {}, taste = 1, exposure: E }, cfg) {
-  const C = ring <= 2 ? 0.85 + 0.15 * coPresence : 1;
+  const k = cfg.score;
+  const C = ring <= k.coPresenceMaxRing ? k.coPresenceBase + k.coPresenceSpan * coPresence : 1;
   const vals = [behaviour?.activity, behaviour?.reciprocity].filter(Number.isFinite);
-  const B = vals.length ? 0.8 + 0.2 * (vals.reduce((s, v) => s + v, 0) / vals.length) : 1;
-  const T = clamp(finiteOr(taste, 1), 0.75, 1.3);
+  const B = vals.length ? k.behaviourBase + k.behaviourSpan * (vals.reduce((s, v) => s + v, 0) / vals.length) : 1;
+  const T = clamp(finiteOr(taste, 1), k.tasteMin, k.tasteMax);
   return Math.pow(R, cfg.gamma) * cfg.phi[ring] * C * B * T * E;
 }
 
@@ -67,6 +70,7 @@ export function rankCandidates(viewer, candidates, ctx) {
  */
 export function composeDeck(viewer, scored, { hViewer, seed } = {}, cfg) {
   const d = cfg.deck;
+  const isLocal = (s) => s.ring <= d.localMaxRing;
   const pool = scored.filter((s) => s && s.candidate && s.candidate.headroom !== 0 && Number.isFinite(s.G));
   const byG = (a, b) => b.G - a.G;
   const wtdAll = pool.filter((s) => s.worthTheDistance).sort(byG).slice(0, d.wtdMax);
@@ -85,10 +89,10 @@ export function composeDeck(viewer, scored, { hViewer, seed } = {}, cfg) {
   const taken = new Set([...placed.values()]);
   const others = pool.filter((s) => !s.worthTheDistance);
   const m = n - placed.size;
-  const nLocal = others.filter((s) => s.ring <= 2).length;
+  const nLocal = others.filter(isLocal).length;
   const needLocal = Math.min(Math.ceil(d.localShare * Math.min(m, others.length)), nLocal);
   const items = others.sort(byG).map((s) => ({
-    item: s, g: s.G, vec: passionWeights(s.candidate.member.interests), local: s.ring <= 2,
+    item: s, g: s.G, vec: passionWeights(s.candidate.member.interests), local: isLocal(s),
   }));
   const fill = mmrPick(items, m, d.mmrLambda, needLocal).map((x) => x.item);
 
@@ -100,14 +104,14 @@ export function composeDeck(viewer, scored, { hViewer, seed } = {}, cfg) {
   if (seededFloat(seed, 'eps') <= d.epsilon) {
     const inDeck = new Set(deck);
     const rank = pool.slice().sort(byG);
-    const tail = rank.filter((s) => !inDeck.has(s) && !s.worthTheDistance && !taken.has(s)).slice(0, n * 4);
+    const tail = rank.filter((s) => !inDeck.has(s) && !s.worthTheDistance && !taken.has(s)).slice(0, n * d.exploreTailFactor);
     if (tail.length) {
       const wild = tail[Math.floor(seededFloat(seed, 'pick') * tail.length)];
-      const localCount = deck.filter((s) => s.ring <= 2).length;
+      const localCount = deck.filter(isLocal).length;
       const slots = [];
       for (let i = 1; i < n; i++) {
         if (placed.has(i)) continue;
-        const after = localCount - (deck[i].ring <= 2 ? 1 : 0) + (wild.ring <= 2 ? 1 : 0);
+        const after = localCount - (isLocal(deck[i]) ? 1 : 0) + (isLocal(wild) ? 1 : 0);
         if (after >= Math.min(needLocal, localCount)) slots.push(i);
       }
       if (slots.length) deck[slots[Math.floor(seededFloat(seed, 'slot') * slots.length)]] = { ...wild, explore: true };
@@ -116,16 +120,19 @@ export function composeDeck(viewer, scored, { hViewer, seed } = {}, cfg) {
   return deck.filter(Boolean);
 }
 
-/** Whitelisted, privacy-safe card. Built field by field; G is never exposed. */
-export function toCard(scored) {
+/**
+ * Whitelisted, privacy-safe card. Built field by field; G is never exposed. This is the only
+ * object that may reach a client: a Scored object carries candidate.cell and the exact km.
+ */
+export function toCard(scored, cfg = loadConfig()) {
   const m = scored.candidate.member;
   return {
     id: m.id,
     name: m.name,
     photoUrl: m.photoUrl,
-    distanceBand: distanceBand(scored.km, scored.ring, scored.candidate.placeLabel),
+    distanceBand: distanceBand(scored.km, scored.ring, scored.candidate.placeLabel, cfg),
     matchPercent: Math.round(100 * scored.R),
-    chips: explain(scored),
+    chips: explain(scored, cfg),
     worthTheDistance: scored.worthTheDistance,
   };
 }
