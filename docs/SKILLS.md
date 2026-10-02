@@ -1,8 +1,10 @@
 # Required Claude Code skills
 
-**Status: NOT INSTALLED YET.** On 2026-10-02 the automated install was blocked by the session's permission policy,
-because copying third-party skill code into the repo and running the GSD installer counts as integrating untrusted
-code. A human must approve it. Every session should check for the skills and **ask the user** before installing them.
+**Status: INSTALLED and committed (2026-10-02, approved by the founder).** Every skill below lives in
+`.claude/skills/`, and GSD lives in `.claude/{commands,agents,get-shit-done}` (installed with `--profile=standard`;
+its optional hooks were skipped because the installer ran from a git checkout without built hooks). New sessions get
+them from git with no re-download. If `.claude/skills/` is ever missing, ask the user before re-running the install
+below.
 
 ## Why install into the repo
 

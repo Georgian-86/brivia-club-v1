@@ -44,9 +44,11 @@ in `docs/`.
   coarse cell (see the spec) and show rounded distances ("~3 km"). Never send email or phone to other clients.
 - Matching must be mutual-consent: a connection exists only after both people agree (mutual like or accepted request).
 - Record every significant product or architecture decision in `docs/DECISIONS.md`.
-- **Skills:** check `docs/SKILLS.md` at session start. If the listed skills are not present
-  under `.claude/skills/`, **ask the user** for approval to install them. Installing
-  third-party skill code needs the user's explicit OK; don't do it silently.
+- **Skills are vendored in `.claude/skills/`** (manifest: `docs/SKILLS.md`). Workflow the founder asked for:
+  superpowers for process (brainstorming → writing-plans → execution, TDD, verification),
+  **agent-arena for every significant decision** (record the outcome in `docs/DECISIONS.md`),
+  ui-ux-pro-max for UX rules (keep the existing deep-wine brand, see `docs/UX_SPEC.md`), and webapp-testing for UI checks.
+  If `.claude/skills/` is missing, ask the user before reinstalling.
 
 ## Commands
 
