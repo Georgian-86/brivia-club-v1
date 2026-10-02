@@ -11,6 +11,9 @@
 -- Secure by default: profiles are owner-only (others read public.public_profiles, no contact
 -- fields), clients cannot insert matches, storage cannot be listed beyond your own folder, and the
 -- block check answers only the two members involved. Re-run all migrations in order.
+--
+-- WARNING (Ruling P5): apply this ONLY together with the client change that reads public_profiles
+-- and uses connection_requests (0002). Applied alone, the deck is empty and matches can't be created.
 
 -- ---------------------------------------------------------------------------------------------
 -- profiles: one row per member, owned by the auth user.
