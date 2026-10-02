@@ -24,7 +24,8 @@ export function cosine(a, b) {
 export function mmrPick(items, limit, lambda, needLocal = 0) {
   const rest = [...items];
   const picked = [];
-  const maxG = Math.max(1e-12, ...rest.map((x) => x.g));
+  const gOf = (x) => (Number.isFinite(x.g) ? x.g : 0); // R12: a bad score never makes the pick fail
+  const maxG = Math.max(1e-12, ...rest.map(gOf));
   let localPicked = 0;
   while (picked.length < limit && rest.length) {
     const forceLocal = needLocal - localPicked >= limit - picked.length;
@@ -33,7 +34,7 @@ export function mmrPick(items, limit, lambda, needLocal = 0) {
       if (forceLocal && !rest[i].local) continue;
       let maxSim = 0;
       for (const p of picked) maxSim = Math.max(maxSim, cosine(rest[i].vec, p.vec));
-      const val = lambda * (rest[i].g / maxG) - (1 - lambda) * maxSim;
+      const val = lambda * (gOf(rest[i]) / maxG) - (1 - lambda) * maxSim;
       if (val > bestVal) { bestVal = val; bestIdx = i; }
     }
     if (bestIdx < 0) break;

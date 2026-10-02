@@ -63,3 +63,24 @@ test('effectiveK capacity gaming', () => {
   assert.equal(effectiveK(3, { qualifiedInbound: 30, likeBacks: 0 }, cfg), 2);
   assert.equal(effectiveK(6, { qualifiedInbound: 5, likeBacks: 0 }, cfg), 5);
 });
+
+test('I2/R12: headroom with K <= 0 is 0; non-finite K -> kDefault; non-finite load -> h 1', () => {
+  assert.equal(headroom(0, 0, cfg), 0);
+  assert.equal(headroom(3, -2, cfg), 0);
+  assert.equal(headroom(5, undefined, cfg), headroom(5, cfg.roche.kDefault, cfg));
+  assert.equal(headroom(5, NaN, cfg), 0.5);
+  assert.equal(headroom(NaN, 5, cfg), 1);
+});
+
+test('I2/R12: exposure and deckSize treat non-finite h as 1', () => {
+  assert.equal(exposure(NaN, cfg), 1);
+  assert.equal(exposure(undefined, cfg), 1);
+  assert.equal(deckSize(undefined, cfg), 12);
+  assert.equal(deckSize(NaN, cfg), 12);
+});
+
+test('minor: effectiveK(undefined) -> kDefault (and gaming step-down from there)', () => {
+  assert.equal(effectiveK(undefined, { qualifiedInbound: 0, likeBacks: 0 }, cfg), 5);
+  assert.equal(effectiveK(NaN, {}, cfg), 5);
+  assert.equal(effectiveK(undefined, { qualifiedInbound: 20, likeBacks: 0 }, cfg), 3);
+});

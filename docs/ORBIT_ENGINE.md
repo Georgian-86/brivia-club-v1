@@ -182,6 +182,9 @@ When `L < L*`, the outer thresholds relax smoothly:
 θ'_r = max( θ_0 , θ_r − α_r · (1 − L / L*) )      α = [0, 0, 0.12, 0.18, 0.18, 0.15]
 ```
 
+The relaxation factor `(1 − L / L*)` is clamped to [0, 1]: a missing or negative `L` counts as 0, so the
+thresholds can never fall below their L = 0 values.
+
 A small town widens its circle automatically. A dense city keeps a tight, local feed. Ring 0–1 thresholds never
 relax, and a far card can never clear on less resonance than a neighbour needs.
 

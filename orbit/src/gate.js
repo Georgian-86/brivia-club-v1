@@ -1,9 +1,13 @@
 // © 2026 The Brivia Club. ORBIT engine. All rights reserved. See docs/IP_NOTES.md.
 // Escape-Velocity Gate (spec §5): per-ring resonance thresholds, liquidity-adaptive, plus Worth-the-Distance.
 
-/** θ'_r = max(θ_0, θ_r − α_r · max(0, 1 − L/L*)) for every ring. */
+/**
+ * θ'_r = max(θ_0, θ_r − α_r · slack), slack = min(1, max(0, 1 − L/L*)), for every ring.
+ * R12: a non-finite L (missing liquidity) is treated as 0; L < 0 never relaxes beyond L = 0.
+ */
 export function thresholds(L, cfg) {
-  const slack = Math.max(0, 1 - L / cfg.lTarget);
+  const liq = Number.isFinite(L) ? L : 0;
+  const slack = Math.min(1, Math.max(0, 1 - liq / cfg.lTarget));
   return cfg.theta.map((t, r) => Math.max(cfg.theta[0], t - (cfg.alpha[r] ?? 0) * slack));
 }
 

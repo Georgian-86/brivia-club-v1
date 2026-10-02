@@ -204,3 +204,51 @@ test('C1/R13: real ranking — related (not identical) interests produce no rare
   assert.equal(s.hits[0].theirs.id, 'bass');
   assert.deepEqual(explain(s), []);
 });
+
+// ---- I2 / R12: non-finite inputs fall back to safe defaults; a bad row never empties a deck ----
+test('I2/R12: missing or NaN headroom is treated as 1 (finite G, same as headroom 1)', () => {
+  const base = rankCandidates(viewer, [cand('a')], ctx)[0].G;
+  for (const h of [undefined, null, NaN, 'x']) {
+    const r = rankCandidates(viewer, [cand('a', { headroom: h })], ctx);
+    assert.equal(r.length, 1, String(h));
+    assert.equal(r[0].G, base, String(h));
+  }
+});
+
+test('I2/R12: NaN taste -> 1; NaN activity/reciprocity -> absent', () => {
+  const g = (o) => orbitScore({ R: 0.5, ring: 0, coPresence: 1, behaviour: {}, taste: 1, exposure: 1, ...o }, cfg);
+  assert.equal(g({ taste: NaN }), g({}));
+  assert.equal(g({ taste: undefined }), g({}));
+  assert.equal(g({ behaviour: { activity: NaN, reciprocity: Infinity } }), g({}));
+  assert.equal(g({ behaviour: { activity: NaN, reciprocity: 1 } }), g({ behaviour: { reciprocity: 1 } }));
+  const r = rankCandidates(viewer, [cand('a', { taste: NaN, activity: NaN, reciprocity: 'z' })], ctx);
+  assert.ok(Number.isFinite(r[0].G));
+});
+
+test('I2/R12: ctx.L missing or NaN is treated as 0, not "nobody is eligible"', () => {
+  const { L, ...noL } = ctx; void L;
+  const r0 = rankCandidates(viewer, [cand('a')], { ...ctx, L: 0 });
+  assert.equal(rankCandidates(viewer, [cand('a')], noL).length, r0.length);
+  assert.equal(rankCandidates(viewer, [cand('a')], { ...ctx, L: NaN }).length, r0.length);
+  assert.equal(r0.length, 1);
+});
+
+test('I2/R12: one NaN-G row never empties or corrupts a deck', () => {
+  const sc = Array.from({ length: 20 }, (_, i) => fake(i));
+  sc.splice(5, 0, { ...fake(99), G: NaN }, { ...fake(98), candidate: { ...fake(98).candidate, headroom: undefined } });
+  for (const seed of ['a', 'b', 'c', 'd']) {
+    const d = composeDeck(viewer, sc, { hViewer: 1, seed }, cfg);
+    assert.equal(d.length, 12, seed);
+    assert.ok(d.every((s) => s && s.candidate), seed);
+    assert.equal(new Set(ids(d)).size, d.length);
+  }
+});
+
+test('I2/R12: hViewer missing/NaN -> 1 (full deck), never []', () => {
+  const sc = Array.from({ length: 20 }, (_, i) => fake(i));
+  for (const hViewer of [undefined, NaN, null]) {
+    const d = composeDeck(viewer, sc, { hViewer, seed: 'x' }, cfg);
+    assert.equal(d.length, deckSize(1, cfg), String(hViewer));
+    assert.ok(d.every(Boolean));
+  }
+});

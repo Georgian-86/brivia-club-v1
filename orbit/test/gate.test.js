@@ -51,3 +51,13 @@ test('Golden 5: thin local supply widens the circle', () => {
   assert.equal(isEligible(0.55, 3, 5, cfg), true);
   assert.equal(isEligible(0.55, 3, 40, cfg), false);
 });
+
+test('minor: L < 0 never over-relaxes (slack capped at 1)', () => {
+  assert.deepEqual(thresholds(-40, cfg), thresholds(0, cfg));
+  assert.deepEqual(thresholds(-1e9, cfg), thresholds(0, cfg));
+});
+
+test('I2/R12: non-finite L is treated as 0', () => {
+  for (const L of [undefined, NaN, null, Infinity * 0]) assert.deepEqual(thresholds(L, cfg), thresholds(0, cfg), String(L));
+  assert.equal(isEligible(0.3, 2, undefined, cfg), isEligible(0.3, 2, 0, cfg));
+});
