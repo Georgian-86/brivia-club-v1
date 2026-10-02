@@ -1,0 +1,8 @@
+{
+  "name": "orbit-engine",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": { "test": "node --test" },
+  "dependencies": { "h3-js": "^4.5.0" }
+}
