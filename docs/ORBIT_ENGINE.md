@@ -219,7 +219,9 @@ you see, never *how good* we claim the fit is.
    gets fewer new cards, plus a "close an orbit" prompt.
 1. Sort eligible candidates by `G`.
 2. Fill the deck **ring-ordered**: at least 70% of cards come from rings 0–2 when the supply allows.
-3. Insert up to 2 Worth-the-Distance cards (§5.3) at slots 4 and 9.
+3. Insert up to 2 Worth-the-Distance cards (§5.3) at slots 4 and 9. When the deck is shorter than a slot, that card goes to the
+   last deck position instead (or the nearest free position before it). A far card is never placed ahead of the local
+   cards, and never competes with them in the ordering below.
 4. Apply MMR diversity over interest vectors (λ = 0.8), reused from engine v1 `diversify()`, so a deck isn't twelve badminton players.
 5. Add one exploration card from the eligible set outside the top ranks (ε = 0.15), as in engine v1 `withExploration()`.
 6. Log every served card with its full feature vector to the interaction log.

@@ -60,7 +60,7 @@ export function rankCandidates(viewer, candidates, ctx) {
 }
 
 /**
- * Deck (spec §6.2): size by viewer headroom; WtD lane at fixed slots; rest by MMR with a
+ * Deck (spec §6.2): size by viewer headroom; WtD lane at fixed slots (R11: last position if a slot is beyond the deck); rest by MMR with a
  * local-share floor; then a deterministic epsilon exploration swap. Pure in (inputs, seed).
  * R12: a row whose G is not finite is dropped (never emitted, never breaks MMR); hViewer
  * non-finite → 1 (in deckSize). The returned deck never contains undefined.
@@ -73,15 +73,20 @@ export function composeDeck(viewer, scored, { hViewer, seed } = {}, cfg) {
   const usable = pool.filter((s) => !s.worthTheDistance).length + wtdAll.length;
   const n = Math.min(deckSize(hViewer, cfg), usable);
   if (n === 0) return [];
+  // R11: each WtD card takes its fixed slot, or the last deck position when that slot is beyond the
+  // deck (walking back past positions already taken). WtD cards never enter the MMR fill, so a far
+  // card can never be placed before the local cards.
   const placed = new Map();
-  const spill = [];
-  wtdAll.forEach((s, i) => (d.wtdSlots[i] < n ? placed.set(d.wtdSlots[i], s) : spill.push(s)));
+  wtdAll.forEach((s, i) => {
+    let slot = Math.min(d.wtdSlots[i] ?? n - 1, n - 1);
+    while (slot >= 0 && placed.has(slot)) slot--;
+    if (slot >= 0) placed.set(slot, s);
+  });
   const taken = new Set([...placed.values()]);
-  const others = [...pool.filter((s) => !s.worthTheDistance), ...spill];
+  const others = pool.filter((s) => !s.worthTheDistance);
   const m = n - placed.size;
-  const nonWtd = others.filter((s) => !s.worthTheDistance);
-  const nLocal = nonWtd.filter((s) => s.ring <= 2).length;
-  const needLocal = Math.min(Math.ceil(d.localShare * Math.min(m, nonWtd.length)), nLocal);
+  const nLocal = others.filter((s) => s.ring <= 2).length;
+  const needLocal = Math.min(Math.ceil(d.localShare * Math.min(m, others.length)), nLocal);
   const items = others.sort(byG).map((s) => ({
     item: s, g: s.G, vec: passionWeights(s.candidate.member.interests), local: s.ring <= 2,
   }));

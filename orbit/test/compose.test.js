@@ -91,7 +91,7 @@ test('WtD lane: at most 2, at indices 3 and 8', () => {
   }
 });
 
-test('WtD slot beyond deck length is not used (short deck)', () => {
+test('short deck with one WtD: its fixed slot 3 is used (R11, was R9)', () => {
   const sc = Array.from({ length: 20 }, (_, i) => fake(i));
   sc.push(fake(100, { ring: 4, wtd: true }));
   const d = composeDeck(viewer, sc, { L: 40, hViewer: 0, seed: 'x' }, cfg); // size 8
@@ -250,5 +250,35 @@ test('I2/R12: hViewer missing/NaN -> 1 (full deck), never []', () => {
     const d = composeDeck(viewer, sc, { hViewer, seed: 'x' }, cfg);
     assert.equal(d.length, deckSize(1, cfg), String(hViewer));
     assert.ok(d.every(Boolean));
+  }
+});
+
+// ---- I3 / R11: WtD at its fixed slot, or the last position when the slot is beyond the deck ----
+test('I3/R11: 2 WtD cards with hViewer=0 (deck of 8) land at indices 3 and 7', () => {
+  const sc = [
+    ...Array.from({ length: 20 }, (_, i) => fake(i)),
+    fake(100, { ring: 4, wtd: true, G: 0.5 }), fake(101, { ring: 4, wtd: true, G: 0.4 }),
+  ];
+  for (const seed of ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h']) {
+    const d = composeDeck(viewer, sc, { hViewer: 0, seed }, cfg);
+    assert.equal(d.length, 8);
+    assert.deepEqual(d.map((s, i) => (s.worthTheDistance ? i : -1)).filter((i) => i >= 0), [3, 7], seed);
+    assert.equal(d[3].candidate.member.id, 'm100');
+    assert.equal(d[7].candidate.member.id, 'm101');
+  }
+});
+
+test('I3/R11: a WtD card is never placed before local cards, even when it out-scores them', () => {
+  const sc = [
+    ...Array.from({ length: 2 }, (_, i) => fake(i, { G: 0.1 - i * 0.001 })),
+    fake(100, { ring: 4, wtd: true, G: 5 }), fake(101, { ring: 5, wtd: true, G: 4 }),
+  ];
+  for (let k = 0; k < 30; k++) {
+    const d = composeDeck(viewer, sc, { hViewer: 1, seed: `r${k}` }, cfg);
+    assert.equal(d.length, 4);
+    const firstWtd = d.findIndex((s) => s.worthTheDistance);
+    const lastLocal = d.map((s) => s.ring <= 2).lastIndexOf(true);
+    assert.ok(firstWtd > lastLocal, `seed r${k}: ${ids(d)}`);
+    assert.equal(d[3].candidate.member.id, 'm100'); // slot 3 is inside a deck of 4
   }
 });
