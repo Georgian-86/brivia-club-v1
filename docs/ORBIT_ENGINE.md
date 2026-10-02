@@ -1,6 +1,6 @@
 # ORBIT: the Brivia matching engine (specification v0.2)
 
-*Status: design spec, not yet implemented. © 2026 The Brivia Club. All rights reserved. Original work, intended for
+*Status: design spec; core library implemented in `orbit/` (service and UI pending). © 2026 The Brivia Club. All rights reserved. Original work, intended for
 copyright registration (see `IP_NOTES.md`). Any implementation must follow this document; behaviour changes must
 update it in the same commit.*
 
