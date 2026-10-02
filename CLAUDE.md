@@ -58,4 +58,4 @@ npm run dev      # vite dev server
 npm run build    # production build → dist/
 cd orbit && npm test   # ORBIT engine unit tests (node --test)
 ```
-Env: `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY` (see `.env.example`). SQL migrations live in `supabase/*.sql` and are run manually in the Supabase SQL editor.
+Env: `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY` (see `.env.example`). SQL migrations live in `supabase/migrations/*.sql` (run manually in the Supabase SQL editor, in order; `supabase/legacy/` is archive only). Verify locally with `bash supabase/tests/run.sh`.

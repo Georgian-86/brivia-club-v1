@@ -31,3 +31,7 @@ grant execute on function auth.uid() to anon, authenticated;
 grant usage on schema storage to anon, authenticated;
 alter default privileges in schema public grant all on tables to anon, authenticated;
 alter default privileges in schema public grant all on functions to anon, authenticated;
+
+create or replace function storage.extension(name text) returns text language sql immutable as $$
+  select reverse(split_part(reverse(name), '.', 1))
+$$;

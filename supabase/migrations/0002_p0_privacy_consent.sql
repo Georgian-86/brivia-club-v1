@@ -6,7 +6,7 @@
 -- profiles never having FORCE ROW LEVEL SECURITY, and on the view owner owning profiles.
 --
 -- P0 privacy: members must never read each other's email/phone.
--- Run once in the Supabase SQL editor, after schema.sql and the other migrations. Idempotent.
+-- Run once in the Supabase SQL editor, after 0001_baseline.sql. Idempotent.
 --
 -- Other members read profiles only through public.public_profiles (no contact fields).
 -- The base table becomes owner-only, so email/phone/phone_country_code/phone_number

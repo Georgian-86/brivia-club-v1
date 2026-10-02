@@ -17,16 +17,16 @@ as_pg "$BIN/pg_ctl" -D "$DATA" -o "-p $PORT -k /tmp -c listen_addresses=''" -w -
 "${PSQL[@]}" -d postgres -c "create database $DB"
 
 # Files are copied to /tmp so the postgres OS user can read them.
-STAGE=$(mktemp -d /tmp/brivia-sql.XXXX); cp -r "$SQL"/*.sql "$STAGE"/; mkdir "$STAGE/tests"; cp "$HERE"/*.sql "$STAGE/tests/"; # KNOWN CONFLICT: schema.sql/blocking.sql declare text columns with an FK to profiles(id uuid), which
-# PostgreSQL rejects. Staged copies (never the repo files) drop just that FK; see Ruling P2.
-sed -i -E 's/(text not null) references public\.profiles\(id\) on delete cascade/\1/' "$STAGE"/schema.sql "$STAGE"/blocking.sql
+STAGE=$(mktemp -d /tmp/brivia-sql.XXXX); trap 'cleanup; rm -rf "$STAGE"' EXIT
+mkdir "$STAGE/migrations" "$STAGE/tests"
+cp "$SQL"/migrations/*.sql "$STAGE/migrations/"; cp "$HERE"/*.sql "$STAGE/tests/"
 chmod -R a+rX "$STAGE"
-trap 'cleanup; rm -rf "$STAGE"' EXIT
 
 run() { echo "== $1"; "${PSQL[@]}" -d $DB -f "$STAGE/$1"; }
 run tests/supabase-stub.sql
-# Fixed migration order. storage statements load against the stub, so nothing is skipped.
-for f in schema.sql auth-hardening.sql blocking.sql gender-phone-fields.sql add-cover-support.sql connection-removal.sql; do run "$f"; done
-if [ -f "$SQL/p0-privacy-consent.sql" ]; then run p0-privacy-consent.sql; else echo "== (p0-privacy-consent.sql missing)"; fi
+# Migrations in lexical order, applied twice: the second pass proves every file is idempotent.
+for pass in 1 2; do
+  for m in "$STAGE"/migrations/*.sql; do run "migrations/$(basename "$m")"; done
+done
 for t in "$STAGE"/tests/*.test.sql; do run "tests/$(basename "$t")"; done
 echo "ALL PASSED"
