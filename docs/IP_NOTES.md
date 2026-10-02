@@ -36,6 +36,15 @@ original contribution of ORBIT is the **combination and its rules**:
 4. **Region-local rarity** of interests over a topology tree.
 5. A **mode complementarity matrix** (learn/play/teach/build).
 6. **Separating the displayed score from the ranking score**: resonance is shown, distance only reorders.
+7. **The Roche Limit** (§6.4, the signature mechanism, chosen by arena run 2026-10-02). It combines four things:
+   - an exposure multiplier driven by **receiver-declared** capacity;
+   - load that counts only likes that clear the receiver's own escape gate;
+   - removal at zero headroom that preserves searchability;
+   - an orbit-resolution state machine (Met / Ongoing / Let go) that releases capacity and supplies learning labels.
+
+   Prior art (Lunchclub's matches-per-week setting, Hinge's like limits, Bumble's expiry, and the congestion research of
+   Arnosti, Johari and Kanoria, MSOM 2021) covers pieces of this idea. That is why the claim is on the specific,
+   expressed rules, not on the idea itself.
 
 **Do not claim** that no platform anywhere does anything similar. Commission a prior-art search before you make any
 public "first and only" statement.

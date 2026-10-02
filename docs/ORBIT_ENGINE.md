@@ -1,11 +1,15 @@
-# ORBIT: the Brivia matching engine (specification v0.1)
+# ORBIT: the Brivia matching engine (specification v0.2)
 
 *Status: design spec, not yet implemented. © 2026 The Brivia Club. All rights reserved. Original work, intended for
 copyright registration (see `IP_NOTES.md`). Any implementation must follow this document; behaviour changes must
 update it in the same commit.*
 
 **ORBIT** stands for **O**rdered proximity **R**ings, **B**udgeted interests, **I**nterest-topology resonance and
-an escape-velocity **T**hreshold.
+an escape-velocity **T**hreshold. Its signature mechanism is the **Roche Limit** (§6.4): receiver-declared capacity
+that controls how much each member is exposed.
+
+*Constants in this document are reference defaults. Calibrated production values live in private server config and
+are a trade secret (`IP_NOTES.md`).*
 
 The governing metaphor, which is also the product language:
 
@@ -26,6 +30,7 @@ The governing metaphor, which is also the product language:
 | Learns each member's taste | §8 Taste learning (reused from engine v1) |
 | Every match explainable | §6.3 Evidence-only explanations |
 | Location privacy | §4.1 Coarse cells, rounded distances |
+| Nobody is flooded; replies stay likely | §6.4 Roche Limit (receiver-declared capacity) |
 
 ---
 
@@ -38,6 +43,7 @@ The governing metaphor, which is also the product language:
 | `mode` | `learn \| play \| teach \| build` | How they relate to the interest. Defaults to `play` |
 | `home_cell` | H3 index, resolution 7 (~5 km² hexagon) | Derived from a city pick or browser geolocation. **Raw coordinates are discarded after snapping.** |
 | `travel_cell`, `travel_until` | H3 r7, timestamp | Optional temporary origin for travel ("Transit mode") |
+| `capacity_k` | `2 \| 3 \| 5 \| 8` | Roche Limit capacity: "new people I can realistically meet per fortnight". Default **5** (§6.4) |
 | `availability[]` | set of `{weekday \| weekend} × {morning \| afternoon \| evening \| night}` | Used for local co-presence |
 | `about` | free text | Embedded (MiniLM, as in engine v1) as a secondary signal |
 
@@ -190,18 +196,21 @@ At most **2 per member per day** are shown, in fixed deck slots, labelled with t
 For eligible candidates:
 
 ```
-G = R^γ · Φ(r) · C · B · T        γ = 1.3
+G = R^γ · Φ(r) · C · B · T · E        γ = 1.3
 ```
 
 - `C`, the co-presence factor for rings 0–2 = `0.85 + 0.15 · jaccard(availability_A, availability_B)` (1 for rings ≥ 3)
 - `B`, the behaviour factor = `0.8 + 0.2 · mean(activity, reciprocity)` (reuses the engine v1 `stats.js` signals)
 - `T`, the taste factor = `exp( Σ_k w_k(user) · f_k )`, clipped to [0.75, 1.3]. Its features are learned per member (§8)
+- `E`, the Roche exposure factor of the candidate (§6.4)
 
 The displayed match percentage is `round(100 · R)`. **Resonance, not G, is what we show.** Distance changes *who*
 you see, never *how good* we claim the fit is.
 
-### 6.2 Deck composition (12 cards)
+### 6.2 Deck composition (8–12 cards)
 
+0. Deck size for viewer A = `max(8, round(12 · (0.4 + 0.6 · h_A)))` (§6.4). A member with many unresolved orbits
+   gets fewer new cards, plus a "close an orbit" prompt.
 1. Sort eligible candidates by `G`.
 2. Fill the deck **ring-ordered**: at least 70% of cards come from rings 0–2 when the supply allows.
 3. Insert up to 2 Worth-the-Distance cards (§5.3) at slots 4 and 9.
@@ -219,6 +228,66 @@ Each card gets up to three chips, chosen from the largest real contributions:
 - "**Worth the distance:** 91% resonance across Chess, Go and Game theory"
 
 A chip can only cite a contribution that actually exists for that pair. Nothing is invented.
+
+### 6.4 The Roche Limit (signature mechanism)
+
+> A moon that comes too close to a planet is pulled apart at the Roche limit. A member who receives more attention
+> than they can return gets the same treatment. ORBIT withdraws them from recommendations before the attention breaks
+> them, and returns them as their orbits resolve.
+
+**The problem it solves.** Location-first markets are small. The one bouldering teacher in Kothrud gets flooded with
+likes, stops replying, and everyone else's like-back rate collapses. Incumbents cap what members *send*. ORBIT caps
+what a member *receives*, at a level the receiver declares, and releases capacity when real-world outcomes happen.
+
+**Capacity.** Each member declares `K_u ∈ {2, 3, 5, 8}` new people per fortnight (default 5, editable any time).
+
+**Load.** Recomputed nightly and on every relevant event:
+
+```
+load_u = Σ_{l ∈ pending inbound likes/requests to u, ≤ 10 days old}  0.5 · q_l
+       + Σ_{o ∈ open orbits of u}  1.0
+
+q_l = 1  if liker l clears u's escape gate (R(u,l) ≥ θ'_ring(u,l)) and l's account is ≥ 3 days old
+    = 0  otherwise                        (anti-brigading: unwanted or throwaway likes add no load)
+```
+
+Each liker counts at most once. An **open orbit** is a connection that is not yet resolved (see below).
+
+**Headroom and exposure.**
+
+```
+h_u = clamp(1 − load_u / (2 · K_u), 0, 1)
+E_u = 0.35 + 0.65 · h_u^0.7
+```
+
+**The limit itself.** When `h_u = 0`, member u is removed from every recommended deck and from the Worth-the-Distance
+lane. Three things still hold:
+- u stays fully **searchable**;
+- requests to u still work but **queue**, and the sender sees only a boolean "at capacity, your request will wait";
+- the flag appears with jitter (±12 h) and never shows counts, so popularity can't be read from it.
+
+Like the escape gate, the Roche Limit only **removes or reorders** candidates. It never admits anyone, and taste
+learning cannot override it.
+
+**Orbit resolution.** Each side of a connection can privately mark it *Met*, *Ongoing* or *Let go*. The orbit closes,
+and its load is released, when:
+- both mark *Met* (at most 3 *Met* marks per member per week);
+- either side marks *Let go*;
+- or 21 days pass without a message.
+
+A **mutual Met** is the strongest positive label for taste learning (§8). It is also the in-product measure of the
+north-star metric (people who actually meet).
+
+**Expiry.** Inbound likes left unanswered for 10 days expire silently, with no notification to either side.
+
+**Interaction with liquidity.** Liquidity `L` (§5.2) counts only candidates with `h > 0`. So when local members are
+saturated, the outer rings relax first, instead of the deck repeating saturated people.
+
+**Abuse controls.**
+- *Capacity gaming* (declaring K = 8 and never replying): if like-back stays below 10% over 20 or more qualified
+  inbound likes, the effective K steps down one level.
+- *Brigading*: handled by `q_l`.
+- *Fake Met*: Met requires both sides and is rate-limited.
 
 ---
 
@@ -242,6 +311,8 @@ A chip can only cite a contribution that actually exists for that pair. Nothing 
 - The per-member taste weights `w_k` are trained by online logistic SGD with an L2 pull toward the prior (`learn.js`
   pattern). The features are: shared-interest count, max rarity hit, mode-pair indicators, ring, co-presence,
   semantic similarity and recency.
+- A **mutual Met** (§6.4) is the strongest positive label (weight 3× a like). *Let go* after chatting is a weak
+  negative (0.5× a pass).
 - **Taste never overrides the gate.** Learning reorders the eligible set. It cannot make an ineligible far
   candidate appear. This is what keeps "location first" a guarantee rather than a default.
 - Fix from audit E8: the update must be atomic (row lock, or `UPDATE … SET weights = f(weights)` in SQL).
@@ -258,8 +329,9 @@ ORBIT service  ── reuse: brivia-club/server/src/engine/{embeddings,store,sta
    │                new:  topology.js  resonance.js  rings.js  gate.js  compose.js  explain.js
    ▼
 Supabase Postgres  (+ PostGIS or h3-pg, + pgvector)
-   tables: interest_node, member_interest, member_location(cell), interaction, taste_profile,
-           long_range_request, rarity_cache(region, interest, rarity)
+   tables: interest_node, member_interest, member_orbit(home_cell, travel_cell, travel_until, capacity_k,
+           load, headroom: engine-private, never client-readable), orbit_resolution(pair, member, state, at),
+           interaction, taste_profile, long_range_request, rarity_cache(region, interest, rarity)
 ```
 
 **Candidate retrieval** (replaces the geography-blind ANN of audit E6):
@@ -281,7 +353,8 @@ Supabase Postgres  (+ PostGIS or h3-pg, + pgvector)
 | 2 | ORBIT service with resonance, rings, gate and composition, plus unit tests on every formula in this doc | Golden-pair tests pass (see below) |
 | 3 | Wire the v1 deck, explore and search to the service; add the Worth-the-Distance card style and the Long-Range Request flow | v1 no longer loads the full member table |
 | 4 | Taste learning, interaction log, and nightly rarity and liquidity jobs | A member's deck changes after about 15 swipes |
-| 5 | Calibration from real data: tune θ, Φ and γ with an offline replay of interactions | Far-card like-back rate ≥ ring-1 like-back rate |
+| 5 | Calibration from real data: tune θ, Φ, γ and the Roche constants with an offline replay of interactions. Add a per-region Gini of 7-day impressions as a fairness monitor | Far-card like-back rate ≥ ring-1 like-back rate; impression Gini ≤ 0.55 |
+| 6 | Draft: Constellations (Appendix A), only in regions where L ≥ 2·L* for 4 consecutive weeks | Arena re-review passes |
 
 **Golden-pair tests (must hold):**
 
@@ -291,3 +364,21 @@ Supabase Postgres  (+ PostGIS or h3-pg, + pgvector)
 4. A learn↔teach pair beats a play↔play pair with identical interests.
 5. In a town with L = 5, ring-3 candidates with R = 0.55 become eligible. In a city with L ≥ 40 they do not.
 6. No API response contains coordinates, a cell id, an email or a phone number of another member.
+7. A member with `h = 0` is absent from every deck and the Worth-the-Distance lane, but appears in search.
+8. 50 pending likes from accounts that fail the target's gate, or are under 3 days old, leave `E` unchanged.
+9. Two candidates with equal `R`, ring and other factors rank in order of headroom.
+10. Deck size is never below 8 or above 12.
+
+---
+
+## Appendix A (DRAFT, not scheduled): Constellations
+
+These are quorum-consented local micro-groups (3–5 members in ring ≤ 1) around one anchor interest:
+- every pair must clear a weakest-link resonance floor `min R ≥ 0.35`;
+- the members must share an availability slot;
+- the group reveals itself only if at least 3 accept within 36 h, and dissolves silently otherwise;
+- meetings are at public venues only;
+- reliability comes from mutual-Met labels (§6.4), not from peer attestation.
+
+**Status:** deferred by arena run 2026-10-02 (`docs/arena/2026-10-02-signature-mechanism.md`). Close prior art
+(Timeleft, Pie, 222) already ships, and it needs liquidity we don't have yet. Revisit at Phase 6.
