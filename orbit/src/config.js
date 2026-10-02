@@ -25,7 +25,7 @@ export const DEFAULTS = {
   roche: {
     kChoices: [2, 3, 5, 8], kDefault: 5, likeWeight: 0.5, orbitWeight: 1,
     eFloor: 0.35, eSpan: 0.65, eExp: 0.7, likeTtlDays: 10, orbitIdleDays: 21,
-    metPerWeek: 3, minLikerAgeDays: 3,
+    metPerWeek: 3, minLikerAgeDays: 3, gamingMinInbound: 20, gamingLikeBack: 0.10,
   },
   h3Res: 7,
 };

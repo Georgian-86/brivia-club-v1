@@ -50,7 +50,7 @@ export function effectiveK(K, { qualifiedInbound, likeBacks }, cfg) {
   const choices = [...cfg.roche.kChoices].sort((a, b) => a - b);
   const floor = choices[0];
   let snapped = choices.filter((c) => c <= K).pop() ?? floor;
-  if (qualifiedInbound >= 20 && likeBacks / qualifiedInbound < 0.10) {
+  if (qualifiedInbound >= cfg.roche.gamingMinInbound && likeBacks / qualifiedInbound < cfg.roche.gamingLikeBack) {
     const i = choices.indexOf(snapped);
     snapped = choices[Math.max(0, i - 1)];
   }
