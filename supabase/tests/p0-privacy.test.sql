@@ -49,4 +49,32 @@ begin
   end;
 end $$;
 rollback;
+-- Read-only view: authenticated must not write through it.
+begin;
+set local role authenticated;
+set local request.jwt.claims = '{"sub":"aaaaaaaa-0000-0000-0000-00000000000a"}';
+do $$
+begin
+  begin
+    update public.public_profiles set name = 'PWNED' where id = 'bbbbbbbb-0000-0000-0000-00000000000b';
+    raise exception 'FAIL: update through public_profiles allowed';
+  exception when insufficient_privilege then null; end;
+  begin
+    delete from public.public_profiles where id = 'bbbbbbbb-0000-0000-0000-00000000000b';
+    raise exception 'FAIL: delete through public_profiles allowed';
+  exception when insufficient_privilege then null; end;
+  begin
+    insert into public.public_profiles(id, name) values ('cccccccc-0000-0000-0000-00000000000c','X');
+    raise exception 'FAIL: insert through public_profiles allowed';
+  exception when insufficient_privilege then null; end;
+end $$;
+rollback;
+
+do $$
+declare p text;
+begin
+  select string_agg(privilege_type, ',' order by privilege_type) into p from information_schema.role_table_grants
+   where table_schema='public' and table_name='public_profiles' and grantee='authenticated';
+  if p is distinct from 'SELECT' then raise exception 'FAIL: authenticated privileges on view = %', p; end if;
+end $$;
 select 'p0-privacy.test.sql OK' as result;

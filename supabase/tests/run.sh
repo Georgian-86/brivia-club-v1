@@ -27,6 +27,6 @@ run() { echo "== $1"; "${PSQL[@]}" -d $DB -f "$STAGE/$1"; }
 run tests/supabase-stub.sql
 # Fixed migration order. storage statements load against the stub, so nothing is skipped.
 for f in schema.sql auth-hardening.sql blocking.sql gender-phone-fields.sql add-cover-support.sql connection-removal.sql; do run "$f"; done
-[ -f "$SQL/p0-privacy-consent.sql" ] && run p0-privacy-consent.sql || echo "== (p0-privacy-consent.sql missing)"
+if [ -f "$SQL/p0-privacy-consent.sql" ]; then run p0-privacy-consent.sql; else echo "== (p0-privacy-consent.sql missing)"; fi
 for t in "$STAGE"/tests/*.test.sql; do run "tests/$(basename "$t")"; done
 echo "ALL PASSED"

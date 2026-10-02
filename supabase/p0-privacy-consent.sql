@@ -1,3 +1,10 @@
+-- Apply this ONLY together with the client change that reads public_profiles
+-- (Ruling P5). Applied alone, the deck shows only the member's own row.
+--
+-- public_profiles is intentionally an owner-run (security-definer) view, so the Supabase
+-- advisor lint 0010 is expected; do NOT switch it to security_invoker. It depends on
+-- profiles never having FORCE ROW LEVEL SECURITY, and on the view owner owning profiles.
+--
 -- P0 privacy: members must never read each other's email/phone.
 -- Run once in the Supabase SQL editor, after schema.sql and the other migrations. Idempotent.
 --
@@ -13,7 +20,9 @@ create or replace view public.public_profiles as
   from public.profiles
   where public.brivia_has_completed_profile();
 
-revoke all on public.public_profiles from anon, public;
+-- Supabase default privileges grant authenticated ALL on new public objects; the view is
+-- auto-updatable and owner-run, so writes would bypass RLS. Make it strictly read-only.
+revoke all on public.public_profiles from public, anon, authenticated;
 grant select on public.public_profiles to authenticated;
 
 drop policy if exists "Completed members can view profiles" on public.profiles;
