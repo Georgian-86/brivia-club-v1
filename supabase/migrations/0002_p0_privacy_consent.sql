@@ -42,9 +42,12 @@ notify pgrst, 'reload schema';
 -- A member sends a connection request. The match is created server-side, never by the client:
 --   * by the trigger below, when the other member has already requested them (mutual request), or
 --   * by respond_connection_request(), when the recipient accepts.
--- Blocked pairs can neither request nor match. Messages require a match.
--- A request is final: there is no client update or delete, so after a decline the sender cannot
--- re-request (the primary key conflicts and an upsert has no update policy to use).
+-- Blocked pairs can neither request nor match, and do not see each other's requests. Messages
+-- require a match.
+-- A request is final for its sender: there is no client update or delete, so after a decline the
+-- sender cannot re-request (the primary key conflicts and an upsert has no update policy to use).
+-- The member who declined can change their mind by requesting back (Ruling P11). Deleting a match
+-- clears the pair's requests, so they can reconnect only by mutual consent again (Ruling P10).
 
 create table if not exists public.connection_requests (
   from_id uuid not null references public.profiles(id) on delete cascade,
@@ -67,7 +70,11 @@ grant select, insert on public.connection_requests to authenticated;
 drop policy if exists "Members can view their connection requests" on public.connection_requests;
 create policy "Members can view their connection requests"
   on public.connection_requests for select to authenticated
-  using (public.brivia_has_completed_profile() and auth.uid() in (from_id, to_id));
+  using (
+    public.brivia_has_completed_profile()
+    and auth.uid() in (from_id, to_id)
+    and not public.brivia_is_blocked_between(from_id, to_id)  -- caller is a party, so this answers
+  );
 
 drop policy if exists "Members can send connection requests" on public.connection_requests;
 create policy "Members can send connection requests"
@@ -126,7 +133,9 @@ as $$
 $$;
 revoke all on function public.brivia_create_match(uuid, uuid) from public, anon, authenticated;
 
--- A request to someone who already requested you completes the match.
+-- A request to someone who already requested you completes the match: their request is pending,
+-- or you declined it earlier and have changed your mind (Ruling P11). An 'accepted' reverse row
+-- never counts: it belongs to a match that exists or was deleted (and then cleared, Ruling P10).
 create or replace function public.brivia_on_connection_request()
 returns trigger
 language plpgsql
@@ -140,7 +149,8 @@ begin
   end if;
   if exists (
     select 1 from public.connection_requests
-    where from_id = new.to_id and to_id = new.from_id and status in ('pending', 'accepted')
+    where from_id = new.to_id and to_id = new.from_id
+      and (status = 'pending' or (status = 'declined' and to_id = new.from_id))
   ) then
     update public.connection_requests set status = 'accepted'
      where (from_id = new.from_id and to_id = new.to_id)
@@ -159,6 +169,7 @@ create trigger brivia_on_connection_request
 
 -- The recipient accepts or declines a pending request from p_from. Anyone else (the sender, a
 -- third party) gets no_data_found, the same answer as for a request that does not exist.
+-- Accepting on a blocked pair silently records 'declined' and creates no match (Ruling P12).
 create or replace function public.respond_connection_request(p_from uuid, p_accept boolean)
 returns void
 language plpgsql
@@ -178,12 +189,9 @@ begin
   ) then
     raise exception 'no pending connection request' using errcode = 'no_data_found';
   end if;
-  if not p_accept then
+  if not p_accept or public.brivia_pair_is_blocked(p_from, me) then
     update public.connection_requests set status = 'declined' where from_id = p_from and to_id = me;
     return;
-  end if;
-  if public.brivia_pair_is_blocked(p_from, me) then
-    raise exception 'cannot connect with a blocked member' using errcode = 'insufficient_privilege';
   end if;
   update public.connection_requests set status = 'accepted'
    where (from_id = p_from and to_id = me) or (from_id = me and to_id = p_from and status = 'pending');
@@ -192,6 +200,29 @@ end;
 $$;
 revoke all on function public.respond_connection_request(uuid, boolean) from public, anon;
 grant execute on function public.respond_connection_request(uuid, boolean) to authenticated;
+
+-- Deleting a match (either side may, see 0001) clears the pair's requests in both directions, so
+-- an old 'accepted' row can never re-create the match without fresh consent (Ruling P10).
+create or replace function public.brivia_on_match_deleted()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  perform public.brivia_lock_pair(old.user1_id, old.user2_id);
+  delete from public.connection_requests
+   where (from_id = old.user1_id and to_id = old.user2_id)
+      or (from_id = old.user2_id and to_id = old.user1_id);
+  return null;
+end;
+$$;
+revoke all on function public.brivia_on_match_deleted() from public, anon, authenticated;
+
+drop trigger if exists brivia_on_match_deleted on public.matches;
+create trigger brivia_on_match_deleted
+  after delete on public.matches
+  for each row execute function public.brivia_on_match_deleted();
 
 -- Clients never create matches directly (already true in 0001; kept so this file stands alone).
 drop policy if exists "Members can create their matches" on public.matches;

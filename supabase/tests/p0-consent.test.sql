@@ -278,14 +278,29 @@ values ('d0000000-0000-0000-0000-00000000000d', 'a0000000-0000-0000-0000-0000000
 do $$
 declare n int;
 begin
-  begin
-    perform public.respond_connection_request('a0000000-0000-0000-0000-00000000000a', true);
-    raise exception 'FAIL: blocked pair accepted a request';
-  exception when insufficient_privilege then null; end;
+  -- the block hides the pending request from both parties
+  select count(*) into n from public.connection_requests;
+  if n <> 0 then raise exception 'FAIL: blocker sees % requests from the blocked member', n; end if;
+  -- Ruling P12: accepting on a blocked pair silently records 'declined', no error, no match
+  perform public.respond_connection_request('a0000000-0000-0000-0000-00000000000a', true);
   select count(*) into n from public.matches;
   if n <> 0 then raise exception 'FAIL: blocked accept created % matches', n; end if;
 end $$;
+set local request.jwt.claims = '{"sub":"a0000000-0000-0000-0000-00000000000a"}';
+do $$
+declare n int;
+begin
+  select count(*) into n from public.connection_requests;
+  if n <> 0 then raise exception 'FAIL: blocked member sees % requests with the blocker', n; end if;
+end $$;
 reset role;
+do $$
+declare n int;
+begin
+  select count(*) into n from public.connection_requests
+   where from_id = 'a0000000-0000-0000-0000-00000000000a' and to_id = 'd0000000-0000-0000-0000-00000000000d' and status = 'declined';
+  if n <> 1 then raise exception 'FAIL: blocked accept did not record declined (P12)'; end if;
+end $$;
 insert into public.connection_requests(from_id, to_id)
 values ('d0000000-0000-0000-0000-00000000000d', 'a0000000-0000-0000-0000-00000000000a');
 do $$
@@ -313,6 +328,109 @@ declare n int;
 begin
   select count(*) into n from public.matches;
   if n <> 1 then raise exception 'FAIL: % matches with a legacy reversed row (want 1)', n; end if;
+end $$;
+rollback;
+
+-- 6a. Ruling P10: deleting a match clears the pair's requests. Accept, unmatch, then the old
+-- 'accepted' row must not let a one-sided reverse request re-create the match (consent bypass).
+begin;
+set local role authenticated;
+set local request.jwt.claims = '{"sub":"a0000000-0000-0000-0000-00000000000a"}';
+insert into public.connection_requests(from_id, to_id)
+values ('a0000000-0000-0000-0000-00000000000a', 'b0000000-0000-0000-0000-00000000000b');
+set local request.jwt.claims = '{"sub":"b0000000-0000-0000-0000-00000000000b"}';
+select public.respond_connection_request('a0000000-0000-0000-0000-00000000000a', true);
+set local request.jwt.claims = '{"sub":"a0000000-0000-0000-0000-00000000000a"}';
+do $$
+declare n int;
+begin
+  delete from public.matches;
+  get diagnostics n = row_count;
+  if n <> 1 then raise exception 'FAIL: unmatch removed % matches', n; end if;
+  select count(*) into n from public.connection_requests;
+  if n <> 0 then raise exception 'FAIL: unmatch left % requests (P10)', n; end if;
+end $$;
+set local request.jwt.claims = '{"sub":"b0000000-0000-0000-0000-00000000000b"}';
+do $$
+declare n int;
+begin
+  insert into public.connection_requests(from_id, to_id)
+  values ('b0000000-0000-0000-0000-00000000000b', 'a0000000-0000-0000-0000-00000000000a');
+  select count(*) into n from public.matches;
+  if n <> 0 then raise exception 'FAIL: one-sided request after unmatch re-created % matches', n; end if;
+  begin
+    insert into public.brivia_messages(sender_id, recipient_id, body)
+    values ('b0000000-0000-0000-0000-00000000000b', 'a0000000-0000-0000-0000-00000000000a', 'back?');
+    raise exception 'FAIL: message after unmatch allowed';
+  exception when insufficient_privilege then null; end;
+end $$;
+-- both re-request: matched again
+set local request.jwt.claims = '{"sub":"a0000000-0000-0000-0000-00000000000a"}';
+do $$
+declare n int;
+begin
+  insert into public.connection_requests(from_id, to_id)
+  values ('a0000000-0000-0000-0000-00000000000a', 'b0000000-0000-0000-0000-00000000000b');
+  select count(*) into n from public.matches;
+  if n <> 1 then raise exception 'FAIL: mutual re-request after unmatch created % matches (want 1)', n; end if;
+end $$;
+rollback;
+
+-- 6b. Ruling P11: B declines A, then changes their mind and requests A: match.
+-- The declined sender (A) cannot re-insert at all (primary key), so a decline is never overridden by A.
+begin;
+set local role authenticated;
+set local request.jwt.claims = '{"sub":"a0000000-0000-0000-0000-00000000000a"}';
+insert into public.connection_requests(from_id, to_id)
+values ('a0000000-0000-0000-0000-00000000000a', 'b0000000-0000-0000-0000-00000000000b');
+set local request.jwt.claims = '{"sub":"b0000000-0000-0000-0000-00000000000b"}';
+select public.respond_connection_request('a0000000-0000-0000-0000-00000000000a', false);
+set local request.jwt.claims = '{"sub":"a0000000-0000-0000-0000-00000000000a"}';
+do $$
+declare n int;
+begin
+  begin
+    insert into public.connection_requests(from_id, to_id)
+    values ('a0000000-0000-0000-0000-00000000000a', 'b0000000-0000-0000-0000-00000000000b');
+    raise exception 'FAIL: declined sender re-inserted their request';
+  exception when unique_violation then null; end;
+  select count(*) into n from public.matches;
+  if n <> 0 then raise exception 'FAIL: declined sender got % matches', n; end if;
+end $$;
+set local request.jwt.claims = '{"sub":"b0000000-0000-0000-0000-00000000000b"}';
+do $$
+declare n int;
+begin
+  insert into public.connection_requests(from_id, to_id)
+  values ('b0000000-0000-0000-0000-00000000000b', 'a0000000-0000-0000-0000-00000000000a');
+  select count(*) into n from public.matches;
+  if n <> 1 then raise exception 'FAIL: change of mind after decline created % matches (want 1, P11)', n; end if;
+  select count(*) into n from public.connection_requests where status = 'accepted';
+  if n <> 2 then raise exception 'FAIL: % of 2 requests accepted after change of mind', n; end if;
+end $$;
+rollback;
+
+-- 6c. A block added while a request is pending hides it from both parties (the note is not readable).
+begin;
+set local role authenticated;
+set local request.jwt.claims = '{"sub":"a0000000-0000-0000-0000-00000000000a"}';
+insert into public.connection_requests(from_id, to_id, note)
+values ('a0000000-0000-0000-0000-00000000000a', 'b0000000-0000-0000-0000-00000000000b', 'secret note');
+set local request.jwt.claims = '{"sub":"b0000000-0000-0000-0000-00000000000b"}';
+insert into public.brivia_blocks(blocker_id, blocked_id)
+values ('b0000000-0000-0000-0000-00000000000b', 'a0000000-0000-0000-0000-00000000000a');
+do $$
+declare n int;
+begin
+  select count(*) into n from public.connection_requests;
+  if n <> 0 then raise exception 'FAIL: blocker still sees % requests', n; end if;
+end $$;
+set local request.jwt.claims = '{"sub":"a0000000-0000-0000-0000-00000000000a"}';
+do $$
+declare n int;
+begin
+  select count(*) into n from public.connection_requests;
+  if n <> 0 then raise exception 'FAIL: blocked sender still sees % requests', n; end if;
 end $$;
 rollback;
 
