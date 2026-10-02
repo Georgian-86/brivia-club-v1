@@ -23,6 +23,14 @@ cp "$SQL"/migrations/*.sql "$STAGE/migrations/"; cp "$HERE"/*.sql "$STAGE/tests/
 chmod -R a+rX "$STAGE"
 
 run() { echo "== $1"; "${PSQL[@]}" -d $DB -f "$STAGE/$1"; }
+
+# 1) The baseline alone must be secure by default: stub + 0001 only, then the baseline test.
+"${PSQL[@]}" -d postgres -c "create database ${DB}_0001"
+( DB=${DB}_0001; echo "## database $DB (0001 only)"
+  run tests/supabase-stub.sql; run migrations/0001_baseline.sql; run tests/baseline.test.sql )
+
+# 2) Full chain.
+echo "## database $DB (all migrations)"
 run tests/supabase-stub.sql
 # Migrations in lexical order, applied twice: the second pass proves every file is idempotent.
 for pass in 1 2; do

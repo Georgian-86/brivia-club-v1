@@ -35,3 +35,5 @@ alter default privileges in schema public grant all on functions to anon, authen
 create or replace function storage.extension(name text) returns text language sql immutable as $$
   select reverse(split_part(reverse(name), '.', 1))
 $$;
+-- Supabase grants the API roles table access on storage; RLS decides what they see.
+grant all on storage.objects, storage.buckets to anon, authenticated;

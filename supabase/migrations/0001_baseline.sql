@@ -4,12 +4,13 @@
 -- blocking.sql, chat-attachments.sql, community-posts.sql, careers.sql, add-cover-support.sql,
 -- gender-phone-fields.sql, connection-removal.sql, fix-profile-columns.sql, fix-auth-trigger.sql)
 -- into one consistent schema. Where the legacy files disagreed, the latest definition wins;
--- see supabase/legacy/README.md for the choices made.
+-- see supabase/legacy/README.md for the choices made and what was dropped.
 --
 -- Every member id is uuid (auth.users ids are uuid), so policies compare auth.uid() directly.
 -- Run in the Supabase SQL editor, then each later migrations/NNNN_*.sql file in order. Idempotent.
--- Re-running: always re-run ALL migrations in order. Re-running this file alone after 0002+
--- would restore the legacy policies those migrations deliberately replace.
+-- Secure by default: profiles are owner-only (others read public.public_profiles, no contact
+-- fields), clients cannot insert matches, storage cannot be listed beyond your own folder, and the
+-- block check answers only the two members involved. Re-run all migrations in order.
 
 -- ---------------------------------------------------------------------------------------------
 -- profiles: one row per member, owned by the auth user.
@@ -51,11 +52,28 @@ $$;
 revoke all on function public.brivia_has_completed_profile() from public, anon;
 grant execute on function public.brivia_has_completed_profile() to authenticated;
 
+-- Secure by default: the base table is owner-only, so email and phone are visible only to the
+-- member who owns the row. Other members read public.public_profiles (no contact fields).
 drop policy if exists "Members can view profiles" on public.profiles;
 drop policy if exists "Completed members can view profiles" on public.profiles;
-create policy "Completed members can view profiles"
+drop policy if exists "Members can view their own profile" on public.profiles;
+create policy "Members can view their own profile"
   on public.profiles for select to authenticated
-  using (id = auth.uid() or public.brivia_has_completed_profile());
+  using (id = auth.uid());
+
+-- Owner-run (security-definer) view, NOT security_invoker: it reads rows the base-table policy
+-- hides, and the where clause keeps it members-only. Supabase advisor lint 0010 is expected.
+-- Depends on profiles never having FORCE ROW LEVEL SECURITY and on the view owner owning profiles.
+-- 0002_p0_privacy_consent.sql defines the same view and policy; re-applying it is a no-op.
+create or replace view public.public_profiles as
+  select id, name, full_name, gender, city, state, experience, skills, looking_for,
+         photo_url, cover_url, created_at
+  from public.profiles
+  where public.brivia_has_completed_profile();
+-- Strictly read-only for clients (default privileges would grant ALL, and writes through an
+-- owner-run view would bypass RLS).
+revoke all on public.public_profiles from public, anon, authenticated;
+grant select on public.public_profiles to authenticated;
 
 drop policy if exists "Members can create their profile" on public.profiles;
 create policy "Members can create their profile"
@@ -71,21 +89,6 @@ create policy "Members can update their profile"
 -- Profiles are created by the client after sign-up, never by an auth trigger.
 drop trigger if exists on_auth_user_created on auth.users;
 drop function if exists public.handle_new_user();
-
--- ---------------------------------------------------------------------------------------------
--- profile_credentials: legacy table kept for compatibility. The app never reads or writes it;
--- RLS is on with no policies, so clients cannot reach it.
--- ---------------------------------------------------------------------------------------------
-create table if not exists public.profile_credentials (
-  user_id uuid primary key references auth.users(id) on delete cascade,
-  email text not null default '',
-  login_password text not null,
-  updated_at timestamptz not null default now()
-);
-alter table public.profile_credentials enable row level security;
-drop policy if exists "Members can view their own login credential" on public.profile_credentials;
-drop policy if exists "Members can save their own login credential" on public.profile_credentials;
-drop policy if exists "Members can update their own login credential" on public.profile_credentials;
 
 -- ---------------------------------------------------------------------------------------------
 -- matches: a connection between two members (unordered legacy rows; see Ruling P3).
@@ -105,11 +108,10 @@ create policy "Completed members can view their matches"
   on public.matches for select to authenticated
   using (public.brivia_has_completed_profile() and auth.uid() in (user1_id, user2_id));
 
+-- No client insert policy: a connection exists only after mutual consent, created server-side
+-- (Task 2: connection_requests + respond_connection_request). Clients cannot insert matches.
 drop policy if exists "Members can create their matches" on public.matches;
 drop policy if exists "Completed members can create their matches" on public.matches;
-create policy "Completed members can create their matches"
-  on public.matches for insert to authenticated
-  with check (public.brivia_has_completed_profile() and user1_id = auth.uid());
 
 -- Either side may remove a connection, in either orientation.
 drop policy if exists "Members can remove their matches" on public.matches;
@@ -145,8 +147,9 @@ create policy "Members can remove their own blocks"
   on public.brivia_blocks for delete to authenticated
   using (blocker_id = auth.uid());
 
--- True when either member has blocked the other. The uuid form is canonical; the text form
--- keeps callers that pass ::text ids (Ruling P2, Task 2) working.
+-- True when either member has blocked the other. Only answers for a caller who is one of the
+-- two members; a third party always gets false, so it cannot probe who blocked whom.
+-- The uuid form is canonical; the text form keeps callers that pass ::text ids (Task 2) working.
 create or replace function public.brivia_is_blocked_between(first_user uuid, second_user uuid)
 returns boolean
 language sql
@@ -156,8 +159,9 @@ set search_path = public
 as $$
   select exists (
     select 1 from public.brivia_blocks
-    where (blocker_id = first_user and blocked_id = second_user)
-       or (blocker_id = second_user and blocked_id = first_user)
+    where auth.uid() in (first_user, second_user)
+      and ((blocker_id = first_user and blocked_id = second_user)
+        or (blocker_id = second_user and blocked_id = first_user))
   );
 $$;
 revoke all on function public.brivia_is_blocked_between(uuid, uuid) from public, anon;
@@ -172,8 +176,9 @@ set search_path = public
 as $$
   select exists (
     select 1 from public.brivia_blocks
-    where (blocker_id::text = first_user and blocked_id::text = second_user)
-       or (blocker_id::text = second_user and blocked_id::text = first_user)
+    where auth.uid()::text in (first_user, second_user)
+      and ((blocker_id::text = first_user and blocked_id::text = second_user)
+        or (blocker_id::text = second_user and blocked_id::text = first_user))
   );
 $$;
 revoke all on function public.brivia_is_blocked_between(text, text) from public, anon;
@@ -285,6 +290,9 @@ create policy "Anyone can submit career applications"
 
 -- ---------------------------------------------------------------------------------------------
 -- Storage buckets and object policies. Member uploads live under "<auth uid>/...".
+-- Public buckets serve files by public URL without any select policy. Select policies only gate
+-- the Storage list/search API, so they are owner-folder only: nobody can enumerate other
+-- members' uuids or chat media paths (Ruling P9). Upsert/remove need select on own objects.
 -- ---------------------------------------------------------------------------------------------
 insert into storage.buckets (id, name, public) values
   ('profile-photos', 'profile-photos', true),
@@ -294,15 +302,21 @@ insert into storage.buckets (id, name, public) values
   ('career-resumes', 'career-resumes', false)
 on conflict (id) do update set public = excluded.public;
 
+-- Legacy list-everything policies (removed).
+drop policy if exists "Anyone can view profile photos" on storage.objects;
+drop policy if exists "Anyone can view profile covers" on storage.objects;
+drop policy if exists "Anyone can view message attachments" on storage.objects;
+drop policy if exists "Anyone can view community post images" on storage.objects;
+
 -- profile-photos
 drop policy if exists "Members can upload their profile photo" on storage.objects;
 create policy "Members can upload their profile photo"
   on storage.objects for insert to authenticated
   with check (bucket_id = 'profile-photos' and (storage.foldername(name))[1] = (select auth.uid()::text));
-drop policy if exists "Anyone can view profile photos" on storage.objects;
-create policy "Anyone can view profile photos"
-  on storage.objects for select to public
-  using (bucket_id = 'profile-photos');
+drop policy if exists "Members can view their own profile photos" on storage.objects;
+create policy "Members can view their own profile photos"
+  on storage.objects for select to authenticated
+  using (bucket_id = 'profile-photos' and (storage.foldername(name))[1] = (select auth.uid()::text));
 drop policy if exists "Members can update their profile photo" on storage.objects;
 create policy "Members can update their profile photo"
   on storage.objects for update to authenticated
@@ -314,25 +328,25 @@ drop policy if exists "Members can upload their profile cover" on storage.object
 create policy "Members can upload their profile cover"
   on storage.objects for insert to authenticated
   with check (bucket_id = 'profile-covers' and (storage.foldername(name))[1] = (select auth.uid()::text));
-drop policy if exists "Anyone can view profile covers" on storage.objects;
-create policy "Anyone can view profile covers"
-  on storage.objects for select to public
-  using (bucket_id = 'profile-covers');
+drop policy if exists "Members can view their own profile covers" on storage.objects;
+create policy "Members can view their own profile covers"
+  on storage.objects for select to authenticated
+  using (bucket_id = 'profile-covers' and (storage.foldername(name))[1] = (select auth.uid()::text));
 drop policy if exists "Members can update their profile cover" on storage.objects;
 create policy "Members can update their profile cover"
   on storage.objects for update to authenticated
   using (bucket_id = 'profile-covers' and (storage.foldername(name))[1] = (select auth.uid()::text))
   with check (bucket_id = 'profile-covers' and (storage.foldername(name))[1] = (select auth.uid()::text));
 
--- message-attachments
+-- message-attachments (still a public bucket so public URLs work; private bucket is a later task)
 drop policy if exists "Members can upload message attachments" on storage.objects;
 create policy "Members can upload message attachments"
   on storage.objects for insert to authenticated
   with check (bucket_id = 'message-attachments' and (storage.foldername(name))[1] = (select auth.uid()::text));
-drop policy if exists "Anyone can view message attachments" on storage.objects;
-create policy "Anyone can view message attachments"
-  on storage.objects for select to public
-  using (bucket_id = 'message-attachments');
+drop policy if exists "Members can view their own message attachments" on storage.objects;
+create policy "Members can view their own message attachments"
+  on storage.objects for select to authenticated
+  using (bucket_id = 'message-attachments' and (storage.foldername(name))[1] = (select auth.uid()::text));
 drop policy if exists "Members can delete their message attachments" on storage.objects;
 create policy "Members can delete their message attachments"
   on storage.objects for delete to authenticated
@@ -343,10 +357,10 @@ drop policy if exists "Members can upload community post images" on storage.obje
 create policy "Members can upload community post images"
   on storage.objects for insert to authenticated
   with check (bucket_id = 'community-posts' and (storage.foldername(name))[1] = (select auth.uid()::text));
-drop policy if exists "Anyone can view community post images" on storage.objects;
-create policy "Anyone can view community post images"
-  on storage.objects for select to public
-  using (bucket_id = 'community-posts');
+drop policy if exists "Members can view their own community post images" on storage.objects;
+create policy "Members can view their own community post images"
+  on storage.objects for select to authenticated
+  using (bucket_id = 'community-posts' and (storage.foldername(name))[1] = (select auth.uid()::text));
 drop policy if exists "Members can delete their community post images" on storage.objects;
 create policy "Members can delete their community post images"
   on storage.objects for delete to authenticated

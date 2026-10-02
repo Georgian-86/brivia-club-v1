@@ -1,4 +1,5 @@
--- Baseline schema (supabase/migrations/0001_baseline.sql): shape, uuid ids, RLS, buckets, block rule.
+-- Baseline schema (supabase/migrations/0001_baseline.sql): shape, uuid ids, RLS, buckets, block rule,
+-- secure-by-default policies. run.sh runs this file twice: against 0001 alone, and after all migrations.
 -- Every data-touching block runs in a transaction that is rolled back.
 
 -- 1. Every table the client uses exists, with the columns the client reads/writes.
@@ -21,7 +22,7 @@ declare
     ['career_applications','id'],['career_applications','role'],['career_applications','name'],
     ['career_applications','email'],['career_applications','linkedin_url'],['career_applications','resume_path'],
     ['career_applications','resume_name'],['career_applications','resume_size'],['career_applications','created_at'],
-    ['profile_credentials','user_id']
+    ['public_profiles','id']
   ];
   i int;
 begin
@@ -41,8 +42,7 @@ declare
     ['matches','user1_id','public.profiles'],['matches','user2_id','public.profiles'],
     ['brivia_messages','sender_id','public.profiles'],['brivia_messages','recipient_id','public.profiles'],
     ['brivia_blocks','blocker_id','public.profiles'],['brivia_blocks','blocked_id','public.profiles'],
-    ['community_posts','author_id','public.profiles'],
-    ['profile_credentials','user_id','auth.users']
+    ['community_posts','author_id','public.profiles']
   ];
   i int; t text; n int;
 begin
@@ -112,27 +112,74 @@ begin
   if n <> 1 then raise exception 'FAIL: brivia_messages has % insert policies (want 1)', n; end if;
 end $$;
 
--- 8. Behaviour: block function, block rule on messages, own-row writes.
+-- 8. Secure-by-default policy shape.
+do $$
+declare n int;
+begin
+  if to_regclass('public.profile_credentials') is not null then
+    raise exception 'FAIL: legacy profile_credentials (login_password) table exists';
+  end if;
+  select count(*) into n from pg_policies where schemaname = 'public' and tablename = 'matches' and cmd in ('INSERT', 'ALL');
+  if n <> 0 then raise exception 'FAIL: matches has % client insert policies (want 0)', n; end if;
+  select count(*) into n from pg_policies where schemaname = 'public' and tablename = 'profiles' and cmd = 'SELECT';
+  if n <> 1 then raise exception 'FAIL: profiles has % select policies (want 1, owner-only)', n; end if;
+  select count(*) into n from pg_policies
+   where schemaname = 'storage' and tablename = 'objects' and cmd in ('SELECT', 'ALL')
+     and (roles && array['public', 'anon']::name[]);
+  if n <> 0 then raise exception 'FAIL: % storage select policies open to public/anon', n; end if;
+end $$;
+
+-- 9. Behaviour: privacy, consent, block function, block rule on messages, own-row writes, storage.
 begin;
 insert into auth.users(id) values
   ('11111111-0000-0000-0000-000000000001'), ('22222222-0000-0000-0000-000000000002'),
   ('33333333-0000-0000-0000-000000000003'), ('44444444-0000-0000-0000-000000000004');
-insert into public.profiles(id, name, full_name, email) values
-  ('11111111-0000-0000-0000-000000000001', 'One', 'One', 'one@test.brivia.club'),
-  ('22222222-0000-0000-0000-000000000002', 'Two', 'Two', 'two@test.brivia.club'),
-  ('33333333-0000-0000-0000-000000000003', 'Three', 'Three', 'three@test.brivia.club');
+insert into public.profiles(id, name, full_name, email, phone, phone_number) values
+  ('11111111-0000-0000-0000-000000000001', 'One', 'One', 'one@test.brivia.club', '+1 1', '1'),
+  ('22222222-0000-0000-0000-000000000002', 'Two', 'Two', 'two@test.brivia.club', '+1 2', '2'),
+  ('33333333-0000-0000-0000-000000000003', 'Three', 'Three', 'three@test.brivia.club', '+1 3', '3');
 -- user 4 is authenticated but has no profile (not a member yet).
+-- A server-created (consented) match, and objects in every member bucket for One and Three.
+insert into public.matches(user1_id, user2_id)
+values ('11111111-0000-0000-0000-000000000001', '33333333-0000-0000-0000-000000000003');
+insert into storage.objects(bucket_id, name)
+select b, u || '/f.jpg'
+from unnest(array['profile-photos', 'profile-covers', 'message-attachments', 'community-posts']) b,
+     unnest(array['11111111-0000-0000-0000-000000000001', '33333333-0000-0000-0000-000000000003']) u;
 
 set local role authenticated;
 set local request.jwt.claims = '{"sub":"11111111-0000-0000-0000-000000000001"}';
 do $$
-declare n int; ok boolean;
+declare n int;
 begin
+  -- privacy: One reads only their own base row; others only via public_profiles (no contact fields)
+  select count(*) into n from public.profiles where id <> '11111111-0000-0000-0000-000000000001';
+  if n <> 0 then raise exception 'FAIL: member reads % other base profile rows', n; end if;
+  select count(*) into n from public.profiles where email = 'three@test.brivia.club' or phone_number = '3';
+  if n <> 0 then raise exception 'FAIL: member reads another member email/phone'; end if;
+  select count(*) into n from public.public_profiles where id = '33333333-0000-0000-0000-000000000003';
+  if n <> 1 then raise exception 'FAIL: public_profiles missing another member (% rows)', n; end if;
+  select count(*) into n from public.profiles where id = '11111111-0000-0000-0000-000000000001' and email = 'one@test.brivia.club';
+  if n <> 1 then raise exception 'FAIL: member cannot read own full row'; end if;
+
+  -- consent: clients cannot create matches, in either orientation
+  begin
+    insert into public.matches(user1_id, user2_id)
+    values ('11111111-0000-0000-0000-000000000001', '22222222-0000-0000-0000-000000000002');
+    raise exception 'FAIL: client inserted a match';
+  exception when insufficient_privilege then null; end;
+
+  -- storage: One lists only their own folder in every member bucket
+  select count(*) into n from storage.objects;
+  if n <> 4 then raise exception 'FAIL: member lists % storage objects (want own 4)', n; end if;
+  select count(*) into n from storage.objects where name like '33333333-%';
+  if n <> 0 then raise exception 'FAIL: member lists another member''s storage objects'; end if;
+
   -- block: One blocks Two
   insert into public.brivia_blocks(blocker_id, blocked_id)
   values ('11111111-0000-0000-0000-000000000001', '22222222-0000-0000-0000-000000000002');
 
-  -- function works for uuid and text arguments, in both orders
+  -- the blocker gets correct answers for uuid and text arguments, in both orders
   if not public.brivia_is_blocked_between('11111111-0000-0000-0000-000000000001'::uuid, '22222222-0000-0000-0000-000000000002'::uuid)
      then raise exception 'FAIL: uuid block check (1,2) false'; end if;
   if not public.brivia_is_blocked_between('22222222-0000-0000-0000-000000000002'::text, '11111111-0000-0000-0000-000000000001'::text)
@@ -161,31 +208,47 @@ begin
     raise exception 'FAIL: spoofed sender allowed';
   exception when insufficient_privilege then null; end;
 
-  -- normal message, match, community post
+  -- normal message and community post
   insert into public.brivia_messages(sender_id, recipient_id, body, message_type)
   values ('11111111-0000-0000-0000-000000000001', '33333333-0000-0000-0000-000000000003', 'hello', 'text');
-  insert into public.matches(user1_id, user2_id)
-  values ('11111111-0000-0000-0000-000000000001', '33333333-0000-0000-0000-000000000003');
   insert into public.community_posts(author_id, image_url, image_path, caption)
   values ('11111111-0000-0000-0000-000000000001', 'https://x/y.jpg', '1/y.jpg', 'c');
   select count(*) into n from public.community_posts;
   if n <> 1 then raise exception 'FAIL: member sees % community posts', n; end if;
 
-  -- own profile update works
+  -- own profile update works; someone else's cannot be updated
   update public.profiles set city = 'Austin' where id = '11111111-0000-0000-0000-000000000001';
   get diagnostics n = row_count;
   if n <> 1 then raise exception 'FAIL: own profile update touched % rows', n; end if;
-  -- someone else's profile cannot be updated
   update public.profiles set city = 'X' where id = '33333333-0000-0000-0000-000000000003';
   get diagnostics n = row_count;
   if n <> 0 then raise exception 'FAIL: updated another member profile'; end if;
 end $$;
 
--- Three sees the message and the match; the legacy credentials table is closed to clients.
+-- Two (the blocked party) also gets the correct answer, and cannot message One.
+set local request.jwt.claims = '{"sub":"22222222-0000-0000-0000-000000000002"}';
+do $$
+begin
+  if not public.brivia_is_blocked_between('22222222-0000-0000-0000-000000000002'::uuid, '11111111-0000-0000-0000-000000000001'::uuid)
+     then raise exception 'FAIL: blocked party gets false'; end if;
+  begin
+    insert into public.brivia_messages(sender_id, recipient_id, body)
+    values ('22222222-0000-0000-0000-000000000002', '11111111-0000-0000-0000-000000000001', 'hi');
+    raise exception 'FAIL: blocked member can message the blocker';
+  exception when insufficient_privilege then null; end;
+end $$;
+
+-- Three is a third party to the One/Two block: no information. Three sees the message and match.
 set local request.jwt.claims = '{"sub":"33333333-0000-0000-0000-000000000003"}';
 do $$
 declare n int;
 begin
+  if public.brivia_is_blocked_between('11111111-0000-0000-0000-000000000001'::uuid, '22222222-0000-0000-0000-000000000002'::uuid)
+     or public.brivia_is_blocked_between('22222222-0000-0000-0000-000000000002'::text, '11111111-0000-0000-0000-000000000001'::text)
+     or public.brivia_is_blocked_between('11111111-0000-0000-0000-000000000001', '22222222-0000-0000-0000-000000000002')
+  then raise exception 'FAIL: third party learns the One/Two block status'; end if;
+  select count(*) into n from public.brivia_blocks;
+  if n <> 0 then raise exception 'FAIL: third party sees % blocks', n; end if;
   select count(*) into n from public.brivia_messages where recipient_id = '33333333-0000-0000-0000-000000000003';
   if n <> 1 then raise exception 'FAIL: recipient sees % messages', n; end if;
   select count(*) into n from public.matches;
@@ -193,8 +256,6 @@ begin
   delete from public.matches;  -- either side may remove the connection
   get diagnostics n = row_count;
   if n <> 1 then raise exception 'FAIL: matched member removed % matches', n; end if;
-  select count(*) into n from public.profile_credentials;
-  if n <> 0 then raise exception 'FAIL: profile_credentials readable'; end if;
 end $$;
 
 -- An authenticated user without a profile is not a member: no messages, no posts.
@@ -204,6 +265,8 @@ declare n int;
 begin
   select count(*) into n from public.community_posts;
   if n <> 0 then raise exception 'FAIL: non-member sees % community posts', n; end if;
+  select count(*) into n from public.public_profiles;
+  if n <> 0 then raise exception 'FAIL: non-member sees % public_profiles rows', n; end if;
   begin
     insert into public.brivia_messages(sender_id, recipient_id, body)
     values ('44444444-0000-0000-0000-000000000004', '11111111-0000-0000-0000-000000000001', 'x');
@@ -214,8 +277,11 @@ begin
 end $$;
 rollback;
 
--- 9. Anonymous visitors can submit a career application, and nothing else.
+-- 10. Anonymous visitors can submit a career application, and nothing else.
 begin;
+insert into storage.objects(bucket_id, name)
+select b, '11111111-0000-0000-0000-000000000001/f.jpg'
+from unnest(array['profile-photos', 'profile-covers', 'message-attachments', 'community-posts']) b;
 set local role anon;
 do $$
 declare n int;
@@ -224,6 +290,8 @@ begin
   values ('Engineer', 'Ann', 'ann@test.brivia.club', 'r.pdf', 'r.pdf', 10);
   select count(*) into n from public.profiles;
   if n <> 0 then raise exception 'FAIL: anon reads % profiles', n; end if;
+  select count(*) into n from storage.objects;
+  if n <> 0 then raise exception 'FAIL: anon lists % storage objects', n; end if;
   begin
     perform public.brivia_is_blocked_between('11111111-0000-0000-0000-000000000001'::uuid, '22222222-0000-0000-0000-000000000002'::uuid);
     raise exception 'FAIL: anon can call brivia_is_blocked_between';
