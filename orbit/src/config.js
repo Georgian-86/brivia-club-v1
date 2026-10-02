@@ -21,7 +21,7 @@ export const DEFAULTS = {
   lTarget: 40,
   thetaFar: 0.86,
   gamma: 1.3,
-  deck: { base: 12, min: 8, wtdSlots: [3, 8], wtdMax: 2, localShare: 0.7, mmrLambda: 0.8, epsilon: 0.15 },
+  deck: { base: 12, min: 8, hFloor: 0.4, wtdSlots: [3, 8], wtdMax: 2, localShare: 0.7, mmrLambda: 0.8, epsilon: 0.15 },
   roche: {
     kChoices: [2, 3, 5, 8], kDefault: 5, likeWeight: 0.5, orbitWeight: 1,
     eFloor: 0.35, eSpan: 0.65, eExp: 0.7, likeTtlDays: 10, orbitIdleDays: 21,
