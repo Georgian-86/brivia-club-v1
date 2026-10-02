@@ -225,12 +225,14 @@ you see, never *how good* we claim the fit is.
 
 Each card gets up to three chips, chosen from the largest real contributions:
 
-- "Both deep into **Bouldering**, rare in Pune" (shared interest with rarity ≥ 0.7, both with ≥ 4 points)
-- "You teach **Guitar**, they want to learn it" (mode complementarity)
+- "Both deep into **Bouldering**, rare in Pune" (the same interest on both sides, rarity ≥ 0.7, both with ≥ 4 points)
+- "You teach **Guitar**, they want to learn it" (mode complementarity on the same interest)
 - "**~3 km away**, both free weekend mornings" (ring plus co-presence)
 - "**Worth the distance:** 91% resonance across Chess, Go and Game theory"
 
-A chip can only cite a contribution that actually exists for that pair. Nothing is invented.
+A chip can only cite a contribution that actually exists for that pair. Nothing is invented. A match through a
+*related* interest (parent/child, sibling or same domain, §3.1) still counts towards R, but never produces a rare or
+teach/learn chip, because that chip would name an interest the other member does not hold.
 
 ### 6.4 The Roche Limit (signature mechanism)
 

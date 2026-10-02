@@ -187,3 +187,20 @@ test('Fix: chip labels come from ctx.labelOf via real rankCandidates', () => {
   const [s2] = rankCandidates(v, [{ member: t('a', 'learn'), cell: pune, headroom: 1, availability: [] }], ctx);
   assert.ok(explain(s2).includes('You teach X, they want to learn it'));
 });
+
+test('C1/R13: real ranking — related (not identical) interests produce no rare or teach/learn chip', () => {
+  const topo2 = buildTopology([
+    { id: 'music', parentId: null, level: 'domain' },
+    { id: 'strings', parentId: 'music', level: 'category' },
+    { id: 'guitar', parentId: 'strings', level: 'interest' },
+    { id: 'bass', parentId: 'strings', level: 'interest' },
+    { id: 'sports', parentId: null, level: 'domain' },
+    { id: 'football', parentId: 'sports', level: 'interest' },
+  ]);
+  const v = { member: { id: 'V', interests: [{ id: 'guitar', points: 20, mode: 'teach' }] }, cell: pune, availability: [] };
+  const c = { member: { id: 'c', name: 'C', interests: [{ id: 'bass', points: 10, mode: 'learn' }, { id: 'football', points: 10, mode: 'play' }] }, cell: pune, headroom: 1, availability: [] };
+  const [s] = rankCandidates(v, [c], { topology: topo2, rarityOf: () => 1, cfg, L: 40, labelOf: (id) => id[0].toUpperCase() + id.slice(1) });
+  assert.ok(s, 'sibling resonance is still eligible');
+  assert.equal(s.hits[0].theirs.id, 'bass');
+  assert.deepEqual(explain(s), []);
+});

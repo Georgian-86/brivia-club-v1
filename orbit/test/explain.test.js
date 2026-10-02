@@ -24,7 +24,7 @@ test('rare chip needs rarity >= 0.7 and both points >= 4', () => {
 });
 
 test('label falls back to id', () => {
-  const h = hit({ mine: { id: 'chess', points: 6, mode: 'play' } });
+  const h = hit({ mine: { id: 'chess', points: 6, mode: 'play' }, theirs: { id: 'chess', points: 6, mode: 'play' } }); // R13: identical interest
   assert.deepEqual(explain(sc({ hits: [h] })), ['Both deep into chess, rare nearby']);
 });
 
@@ -49,4 +49,20 @@ test('worth the distance chip first; at most 3 chips', () => {
   assert.equal(chips.length, 3);
   assert.equal(chips[0], 'Worth the distance: 91% resonance');
   assert.equal(chips[1], 'Both deep into Bouldering, rare nearby');
+});
+
+test('C1/R13: rare chip needs the identical interest on both sides', () => {
+  const sib = hit({ topo: 0.55, theirs: { id: 'lead-climbing', points: 6, mode: 'play' } });
+  assert.deepEqual(explain(sc({ hits: [sib] })), []);
+  const dom = hit({ topo: 0.2, theirs: { id: 'football', points: 6, mode: 'play' } });
+  assert.deepEqual(explain(sc({ hits: [dom] })), []);
+  const pc = hit({ topo: 0.85, theirs: { id: 'bouldering-indoor', points: 6, mode: 'play' } });
+  assert.deepEqual(explain(sc({ hits: [pc] })), []);
+});
+
+test('C1/R13: teach/learn chips need the identical interest on both sides', () => {
+  const t = hit({ rarity: 0.1, topo: 0.55, mine: { id: 'guitar', label: 'Guitar', points: 5, mode: 'teach' }, theirs: { id: 'bass', points: 5, mode: 'learn' } });
+  assert.deepEqual(explain(sc({ hits: [t] })), []);
+  const l = hit({ rarity: 0.1, topo: 0.2, mine: { id: 'guitar', label: 'Guitar', points: 5, mode: 'learn' }, theirs: { id: 'drums', points: 5, mode: 'teach' } });
+  assert.deepEqual(explain(sc({ hits: [l] })), []);
 });
