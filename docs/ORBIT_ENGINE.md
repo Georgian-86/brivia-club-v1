@@ -125,6 +125,9 @@ When both members have an `about` embedding:
 R = 0.75 · squash(R_struct) + 0.25 · semScale(cos(about_A, about_B))
 ```
 
+When `R_struct = 0`, `R = 0` regardless of the embedding: the semantic term only fills gaps on top of real shared
+interests and never creates a match by itself.
+
 Otherwise `R = squash(R_struct)`, where `squash(x) = 1 − e^(−3x)` maps raw resonance to [0, 1). The semantic share
 is **capped at 25%**, so every strong match can still be explained by named, shared interests.
 

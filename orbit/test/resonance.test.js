@@ -44,6 +44,7 @@ test('harmonic: zero in one direction gives R 0', () => {
   assert.equal(directedResonance(b, a, ctx()).value, 0);
   assert.equal(resonance(a, b, ctx({ aboutCos: 1 })).Rstruct, 0);
   assert.equal(resonance(a, b, ctx()).R, 0);
+  assert.equal(resonance(a, b, ctx({ aboutCos: 1 })).R, 0); // R8
 });
 
 test('semantic cap', () => {
@@ -66,6 +67,7 @@ test('semScale clamps', () => {
 test('empty interests: R 0, no throw', () => {
   const r = resonance({ id: 'A', interests: [] }, mem('B', { X: 20 }), ctx());
   assert.equal(r.R, 0);
+  assert.equal(resonance({ id: 'A', interests: [] }, mem('B', { X: 20 }), ctx({ aboutCos: 1 })).R, 0);
   assert.equal(r.Rstruct, 0);
   assert.deepEqual(r.hits, []);
 });

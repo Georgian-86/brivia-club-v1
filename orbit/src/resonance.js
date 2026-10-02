@@ -76,7 +76,7 @@ export function resonance(a, b, ctx) {
   const Rstruct = ab.value > 0 && ba.value > 0 ? (2 * ab.value * ba.value) / (ab.value + ba.value) : 0;
   const { cfg, aboutCos } = ctx;
   let R = squash(Rstruct, cfg);
-  if (aboutCos != null) {
+  if (aboutCos != null && Rstruct > 0) {
     R = (1 - cfg.semanticShare) * R + cfg.semanticShare * semScale(aboutCos);
   }
   return { R, Rstruct, hits: ab.hits };
