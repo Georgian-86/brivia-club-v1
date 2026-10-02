@@ -7,6 +7,7 @@ import { toCell } from '../src/rings.js';
 import { deckSize } from '../src/roche.js';
 import { orbitScore, rankCandidates, composeDeck, toCard } from '../src/compose.js';
 import * as api from '../src/index.js';
+import { explain } from '../src/explain.js';
 
 const cfg = loadConfig();
 const topology = buildTopology(['X', 'Y', 'Z', 'W'].map((id) => ({ id, parentId: null, level: 'domain' })));
@@ -151,4 +152,38 @@ test('index re-exports the public API', () => {
   for (const k of ['loadConfig', 'resonance', 'buildTopology', 'distanceKm', 'isEligible', 'deckSize', 'orbitScore', 'rankCandidates', 'composeDeck', 'explain', 'toCard']) {
     assert.equal(typeof api[k], 'function', k);
   }
+});
+
+test('Fix: more than wtdMax WtD cards and little local supply never yields undefined', () => {
+  const cases = [[1, 3], [3, 4], [0, 5], [2, 6]];
+  for (const [nl, nw] of cases) {
+    const sc = [
+      ...Array.from({ length: nl }, (_, i) => fake(i)),
+      ...Array.from({ length: nw }, (_, i) => fake(100 + i, { ring: 4, wtd: true, G: 0.5 - i * 0.01 })),
+    ];
+    for (let k = 0; k < 40; k++) {
+      const d = composeDeck(viewer, sc, { L: 40, hViewer: 1, seed: `u${k}` }, cfg);
+      assert.ok(d.every(Boolean), `${nl}/${nw} seed ${k}`);
+      assert.equal(d.length, nl + Math.min(nw, 2));
+      assert.equal(new Set(ids(d)).size, d.length);
+    }
+  }
+});
+
+test('Fix: exploration fires without crashing on thin supply', () => {
+  const sc = [...Array.from({ length: 12 }, (_, i) => fake(i)), ...Array.from({ length: 4 }, (_, i) => fake(100 + i, { ring: 4, wtd: true }))];
+  const eager = { ...cfg, deck: { ...cfg.deck, epsilon: 1 } };
+  for (let k = 0; k < 30; k++) {
+    const d = composeDeck(viewer, sc, { L: 40, hViewer: 1, seed: `e${k}` }, eager);
+    assert.ok(d.every(Boolean));
+  }
+});
+
+test('Fix: chip labels come from ctx.labelOf via real rankCandidates', () => {
+  const t = (id, mode) => ({ ...mk(id), interests: [{ id: 'X', points: 10, mode }, { id: 'Y', points: 10, mode: 'play' }] });
+  const v = { ...viewer, member: t('V', 'teach') };
+  const [s] = rankCandidates(v, [{ member: t('a', 'learn'), cell: pune, headroom: 1, availability: [] }], { ...ctx, labelOf: (id) => ({ X: 'Guitar' })[id] });
+  assert.ok(explain(s).includes('You teach Guitar, they want to learn it'), explain(s).join('|'));
+  const [s2] = rankCandidates(v, [{ member: t('a', 'learn'), cell: pune, headroom: 1, availability: [] }], ctx);
+  assert.ok(explain(s2).includes('You teach X, they want to learn it'));
 });

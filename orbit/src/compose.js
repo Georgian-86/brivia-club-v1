@@ -31,7 +31,7 @@ export function orbitScore({ R, ring, coPresence = 0, behaviour = {}, taste = 1,
   return Math.pow(R, cfg.gamma) * cfg.phi[ring] * C * B * T * E;
 }
 
-/** Gate + saturation filter + score + stable sort by G desc. ctx = {topology, rarityOf, cfg, L, includeSaturated?} */
+/** Gate + saturation filter + score + stable sort by G desc. ctx = {topology, rarityOf, cfg, L, includeSaturated?, labelOf?(id)} */
 export function rankCandidates(viewer, candidates, ctx) {
   const { cfg, L } = ctx;
   const out = [];
@@ -46,7 +46,9 @@ export function rankCandidates(viewer, candidates, ctx) {
       R, ring, coPresence, behaviour: { activity: c.activity, reciprocity: c.reciprocity },
       taste: c.taste, exposure: exposure(c.headroom, cfg),
     }, cfg);
-    out.push({ candidate: c, R, ring, km, G, hits, coPresence, worthTheDistance: isWorthTheDistance(R, ring, cfg) });
+    const lab = (x) => ({ ...x, label: ctx.labelOf?.(x.id) ?? x.id });
+    const labelled = hits.map((h) => ({ ...h, mine: lab(h.mine), theirs: lab(h.theirs) }));
+    out.push({ candidate: c, R, ring, km, G, hits: labelled, coPresence, worthTheDistance: isWorthTheDistance(R, ring, cfg) });
   }
   return out.map((s, i) => [s, i]).sort((a, b) => b[0].G - a[0].G || a[1] - b[1]).map(([s]) => s);
 }
@@ -58,10 +60,11 @@ export function rankCandidates(viewer, candidates, ctx) {
 export function composeDeck(viewer, scored, { hViewer, seed }, cfg) {
   const d = cfg.deck;
   const pool = scored.filter((s) => s.candidate.headroom !== 0);
-  const n = Math.min(deckSize(hViewer, cfg), pool.length);
-  if (n === 0) return [];
   const byG = (a, b) => b.G - a.G;
   const wtdAll = pool.filter((s) => s.worthTheDistance).sort(byG).slice(0, d.wtdMax);
+  const usable = pool.filter((s) => !s.worthTheDistance).length + wtdAll.length;
+  const n = Math.min(deckSize(hViewer, cfg), usable);
+  if (n === 0) return [];
   const placed = new Map();
   const spill = [];
   wtdAll.forEach((s, i) => (d.wtdSlots[i] < n ? placed.set(d.wtdSlots[i], s) : spill.push(s)));
