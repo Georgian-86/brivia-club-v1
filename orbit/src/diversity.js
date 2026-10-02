@@ -1,9 +1,9 @@
 // © 2026 The Brivia Club. ORBIT engine. All rights reserved. See docs/IP_NOTES.md.
 import { createHash } from 'node:crypto';
 
-/** Deterministic float in [0,1) from md5 of the parts (engine v1 seededFloat). */
+/** Deterministic float in [0,1) from md5 of the parts (engine v1 seededFloat); divides by 2**32 so it is never 1.0. */
 export function seededFloat(...parts) {
-  return createHash('md5').update(parts.join('|')).digest().readUInt32BE(0) / 0xffffffff;
+  return createHash('md5').update(parts.join('|')).digest().readUInt32BE(0) / 2 ** 32;
 }
 
 /** Cosine of two sparse weight Maps; 0 if either is empty. */
