@@ -5,7 +5,8 @@ create schema if not exists storage;
 create table if not exists auth.users (id uuid primary key);
 
 create or replace function auth.uid() returns uuid language sql stable as $$
-  select nullif(current_setting('request.jwt.claims', true)::json->>'sub', '')::uuid
+  -- Like Supabase's auth.uid(): an empty claims setting (left behind by an earlier SET LOCAL) means no user.
+  select nullif(nullif(current_setting('request.jwt.claims', true), '')::json->>'sub', '')::uuid
 $$;
 
 do $$ begin

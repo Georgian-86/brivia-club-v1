@@ -256,3 +256,169 @@ create policy "Completed members can send messages"
          or (m.user1_id = recipient_id and m.user2_id = sender_id)
     )
   );
+
+-- ---------------------------------------------------------------------------------------------
+-- Task 3: abuse caps on connection requests, 30-day expiry, purge.
+-- NOTE: this section redefines brivia_on_connection_request() and respond_connection_request() from 0002
+-- (adding the expiry rule). Re-running 0002 alone would restore the old versions: re-run 0003 afterwards.
+-- ---------------------------------------------------------------------------------------------
+-- A note is at most 500 characters (the pitch sheet enforces the same limit). Longer legacy notes are cut
+-- first, so adding the constraint cannot fail at apply time.
+do $$ begin
+  if not exists (select 1 from pg_constraint where conname = 'connection_requests_note_length'
+                 and conrelid = 'public.connection_requests'::regclass) then
+    update public.connection_requests set note = left(note, 500) where char_length(note) > 500;
+    alter table public.connection_requests
+      add constraint connection_requests_note_length check (note is null or char_length(note) <= 500);
+  end if;
+end $$;
+
+-- Expiry: a request that is not accepted (pending, or declined: the sender cannot tell them apart) expires
+-- 30 days after it was sent. An expired request is hidden from the recipient, cannot be accepted, does not
+-- complete a match, does not count toward the caps, and is replaced if its sender requests again.
+create or replace function public.brivia_request_is_live(p_status text, p_created_at timestamptz)
+returns boolean
+language sql
+stable
+set search_path = public
+as $$
+  select p_status = 'accepted' or p_created_at > now() - interval '30 days';
+$$;
+revoke all on function public.brivia_request_is_live(text, timestamptz) from public, anon;
+grant execute on function public.brivia_request_is_live(text, timestamptz) to authenticated;
+
+-- Caps (Review Focus 5): at most 30 requests per sender in 24 hours and at most 100 live unanswered
+-- (pending or declined) requests. A capped insert is dropped SILENTLY (the trigger returns NULL): no error,
+-- no row, and the client shows the usual "Signal sent", so the cap is never revealed. A request that
+-- completes a match (the other member already asked) is never capped. Owner sessions (no auth.uid()) and
+-- spoofed senders are left to RLS, which refuses the spoof; this trigger never acts for another member.
+create or replace function public.brivia_before_connection_request()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  if auth.uid() is null or new.from_id is distinct from auth.uid() then
+    return new;
+  end if;
+  -- One sender at a time, so parallel inserts cannot overshoot the caps.
+  perform pg_advisory_xact_lock(hashtextextended('brivia_request_caps:' || new.from_id::text, 0));
+  -- The sender's own expired request to this member is replaced by the new one.
+  delete from public.connection_requests
+   where from_id = new.from_id and to_id = new.to_id
+     and not public.brivia_request_is_live(status, created_at);
+  if exists (
+    select 1 from public.connection_requests
+    where from_id = new.to_id and to_id = new.from_id
+      and public.brivia_request_is_live(status, created_at)
+      and (status = 'pending' or status = 'declined')
+  ) then
+    return new;  -- completes a match: never capped
+  end if;
+  if (select count(*) from public.connection_requests
+       where from_id = new.from_id and created_at > now() - interval '24 hours') >= 30
+     or (select count(*) from public.connection_requests
+          where from_id = new.from_id and status in ('pending', 'declined')
+            and public.brivia_request_is_live(status, created_at)) >= 100 then
+    return null;
+  end if;
+  return new;
+end;
+$$;
+revoke all on function public.brivia_before_connection_request() from public, anon, authenticated;
+
+drop trigger if exists brivia_before_connection_request on public.connection_requests;
+create trigger brivia_before_connection_request
+  before insert on public.connection_requests
+  for each row execute function public.brivia_before_connection_request();
+
+-- Completion (0002, Ruling P11) with the expiry rule: an expired reverse request never completes a match.
+create or replace function public.brivia_on_connection_request()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  perform public.brivia_lock_pair(new.from_id, new.to_id);
+  if public.brivia_pair_is_blocked(new.from_id, new.to_id) then
+    return null;
+  end if;
+  if exists (
+    select 1 from public.connection_requests
+    where from_id = new.to_id and to_id = new.from_id
+      and (status = 'pending' or (status = 'declined' and to_id = new.from_id))
+      and public.brivia_request_is_live(status, created_at)
+  ) then
+    update public.connection_requests set status = 'accepted'
+     where (from_id = new.from_id and to_id = new.to_id)
+        or (from_id = new.to_id and to_id = new.from_id);
+    perform public.brivia_create_match(new.from_id, new.to_id);
+  end if;
+  return null;
+end;
+$$;
+revoke all on function public.brivia_on_connection_request() from public, anon, authenticated;
+
+-- respond_connection_request (0002, Ruling P12) with the expiry rule: an expired request answers
+-- no_data_found, exactly like one that does not exist.
+create or replace function public.respond_connection_request(p_from uuid, p_accept boolean)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  me uuid := auth.uid();
+begin
+  if me is null or p_from is null or p_accept is null then
+    raise exception 'no pending connection request' using errcode = 'no_data_found';
+  end if;
+  perform public.brivia_lock_pair(p_from, me);
+  if not exists (
+    select 1 from public.connection_requests
+    where from_id = p_from and to_id = me and status = 'pending'
+      and public.brivia_request_is_live(status, created_at)
+  ) then
+    raise exception 'no pending connection request' using errcode = 'no_data_found';
+  end if;
+  if not p_accept or public.brivia_pair_is_blocked(p_from, me) then
+    update public.connection_requests set status = 'declined' where from_id = p_from and to_id = me;
+    return;
+  end if;
+  update public.connection_requests set status = 'accepted'
+   where (from_id = p_from and to_id = me) or (from_id = me and to_id = p_from and status = 'pending');
+  perform public.brivia_create_match(p_from, me);
+end;
+$$;
+revoke all on function public.respond_connection_request(uuid, boolean) from public, anon;
+grant execute on function public.respond_connection_request(uuid, boolean) to authenticated;
+
+-- Deletes expired requests (pending or declined, older than 30 days). Owner-only: run it from the SQL
+-- editor or a scheduled job (pg_cron) as postgres. Returns the number of rows deleted.
+create or replace function public.purge_expired_requests()
+returns integer
+language sql
+volatile
+set search_path = public
+as $$
+  with gone as (
+    delete from public.connection_requests
+     where not public.brivia_request_is_live(status, created_at)
+    returning 1
+  )
+  select count(*)::integer from gone;
+$$;
+revoke all on function public.purge_expired_requests() from public, anon, authenticated;
+
+-- The Requests list hides expired requests.
+drop policy if exists "Members can view their connection requests" on public.connection_requests;
+create policy "Members can view their connection requests"
+  on public.connection_requests for select to authenticated
+  using (
+    public.brivia_has_completed_profile()
+    and auth.uid() in (from_id, to_id)
+    and not public.brivia_is_blocked_between(from_id, to_id)  -- caller is a party, so this answers
+    and public.brivia_request_is_live(status, created_at)
+  );

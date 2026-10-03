@@ -571,4 +571,204 @@ delete from public.brivia_blocks where blocker_id::text like '70000000-%';
 delete from public.profiles where id::text like '70000000-%' or id::text like '71000000-%';
 delete from auth.users where id::text like '70000000-%' or id::text like '71000000-%';
 
+-- ---------------------------------------------------------------------------------------------
+-- Task 3: abuse caps on requests (silent caps, Review Focus 5), 30-day expiry, purge.
+-- Fixtures (owner): S = 72..0001 sends; R1..R110 = 72..0101..72..0210 receive; all completed, real world.
+-- ---------------------------------------------------------------------------------------------
+insert into auth.users(id)
+select ('72000000-0000-0000-0000-' || lpad(n::text, 12, '0'))::uuid from generate_series(1, 210) n
+on conflict do nothing;
+insert into public.profiles (id, name, full_name, email, city)
+select ('72000000-0000-0000-0000-' || lpad(n::text, 12, '0'))::uuid, 'Cap ' || n, 'Cap ' || n, 'cap' || n || '@example.com', 'Pune'
+from generate_series(1, 210) n
+on conflict (id) do nothing;
+create or replace function pg_temp.t3(n int) returns uuid language sql immutable as $$
+  select ('72000000-0000-0000-0000-' || lpad(n::text, 12, '0'))::uuid $$;
+
+-- 3.1 A note over 500 characters is rejected; exactly 500 is accepted.
+begin;
+set local role authenticated;
+set local request.jwt.claims = '{"sub":"72000000-0000-0000-0000-000000000001"}';
+do $$
+declare failed boolean := false;
+begin
+  insert into public.connection_requests (from_id, to_id, note) values (pg_temp.t3(1), pg_temp.t3(101), repeat('x', 500));
+  begin
+    insert into public.connection_requests (from_id, to_id, note) values (pg_temp.t3(1), pg_temp.t3(102), repeat('x', 501));
+  exception when check_violation then failed := true;
+  end;
+  if not failed then raise exception 'FAIL T3: a 501-character note was accepted'; end if;
+end $$;
+rollback;
+
+-- 3.2 The 31st request in 24 h is silently not inserted: no error, no row.
+begin;
+set local role authenticated;
+set local request.jwt.claims = '{"sub":"72000000-0000-0000-0000-000000000001"}';
+do $$
+declare i int; n int;
+begin
+  for i in 101..131 loop  -- 31 inserts; the last must be dropped silently (an error here fails the test)
+    insert into public.connection_requests (from_id, to_id) values (pg_temp.t3(1), pg_temp.t3(i));
+    get diagnostics n = row_count;
+    if i <= 130 and n <> 1 then raise exception 'FAIL T3: request % of 30 not inserted', i - 100; end if;
+    if i = 131 and n <> 0 then raise exception 'FAIL T3: 31st request in 24 h reported % rows', n; end if;
+  end loop;
+end $$;
+reset role;
+do $$ begin
+  if (select count(*) from public.connection_requests where from_id = pg_temp.t3(1)) <> 30 then
+    raise exception 'FAIL T3: daily cap wrote % rows (want 30)', (select count(*) from public.connection_requests where from_id = pg_temp.t3(1));
+  end if;
+end $$;
+rollback;
+
+-- 3.2b A request that completes a match is never capped (it needs the other member's consent anyway).
+begin;
+insert into public.connection_requests (from_id, to_id) values (pg_temp.t3(140), pg_temp.t3(1));
+insert into public.connection_requests (from_id, to_id)
+select pg_temp.t3(1), pg_temp.t3(i) from generate_series(101, 130) i;  -- 30 today: at the daily cap
+set local role authenticated;
+set local request.jwt.claims = '{"sub":"72000000-0000-0000-0000-000000000001"}';
+insert into public.connection_requests (from_id, to_id) values (pg_temp.t3(1), pg_temp.t3(140));
+reset role;
+do $$ begin
+  if not exists (select 1 from public.matches where user1_id = least(pg_temp.t3(1), pg_temp.t3(140)) and user2_id = greatest(pg_temp.t3(1), pg_temp.t3(140))) then
+    raise exception 'FAIL T3: a completing request at the daily cap did not create the match';
+  end if;
+end $$;
+rollback;
+
+-- 3.3 The 101st pending request (older than 24 h, within 30 days) is silently not inserted. A declined
+-- request counts as pending (the sender cannot tell them apart); expired requests do not count.
+begin;
+insert into public.connection_requests (from_id, to_id, status, created_at)
+select pg_temp.t3(1), pg_temp.t3(i), case when i = 101 then 'declined' else 'pending' end, now() - interval '2 days'
+from generate_series(101, 200) i;
+set local role authenticated;
+set local request.jwt.claims = '{"sub":"72000000-0000-0000-0000-000000000001"}';
+do $$
+declare n int;
+begin
+  insert into public.connection_requests (from_id, to_id) values (pg_temp.t3(1), pg_temp.t3(201));
+  get diagnostics n = row_count;
+  if n <> 0 then raise exception 'FAIL T3: 101st pending request reported % rows', n; end if;
+end $$;
+reset role;
+do $$ begin
+  if exists (select 1 from public.connection_requests where from_id = pg_temp.t3(1) and to_id = pg_temp.t3(201)) then
+    raise exception 'FAIL T3: 101st pending request was written';
+  end if;
+end $$;
+-- Once those 100 are expired (older than 30 days), they no longer count.
+update public.connection_requests set created_at = now() - interval '31 days' where from_id = pg_temp.t3(1);
+set local role authenticated;
+insert into public.connection_requests (from_id, to_id) values (pg_temp.t3(1), pg_temp.t3(201));
+reset role;
+do $$ begin
+  if not exists (select 1 from public.connection_requests where from_id = pg_temp.t3(1) and to_id = pg_temp.t3(201)) then
+    raise exception 'FAIL T3: expired requests still count toward the pending cap';
+  end if;
+end $$;
+rollback;
+
+-- 3.4 A pending request older than 30 days is expired: hidden from the recipient's list, cannot be
+-- accepted, and does not complete a match. A 29-day-old one still does.
+begin;
+insert into public.connection_requests (from_id, to_id, note, created_at) values
+  (pg_temp.t3(102), pg_temp.t3(1), 'old', now() - interval '31 days'),
+  (pg_temp.t3(103), pg_temp.t3(1), 'old', now() - interval '31 days'),
+  (pg_temp.t3(104), pg_temp.t3(1), 'recent', now() - interval '29 days');
+set local role authenticated;
+set local request.jwt.claims = '{"sub":"72000000-0000-0000-0000-000000000001"}';
+do $$
+declare n int; failed boolean := false;
+begin
+  select count(*) into n from public.connection_requests where to_id = auth.uid() and status = 'pending';
+  if n <> 1 then raise exception 'FAIL T3: recipient sees % pending requests (want 1, expired hidden)', n; end if;
+  begin
+    perform public.respond_connection_request(pg_temp.t3(103), true);
+  exception when no_data_found then failed := true;
+  end;
+  if not failed then raise exception 'FAIL T3: an expired request was accepted'; end if;
+  insert into public.connection_requests (from_id, to_id) values (pg_temp.t3(1), pg_temp.t3(102));
+  insert into public.connection_requests (from_id, to_id) values (pg_temp.t3(1), pg_temp.t3(104));
+end $$;
+reset role;
+do $$ begin
+  if exists (select 1 from public.matches where pg_temp.t3(1) in (user1_id, user2_id) and pg_temp.t3(102) in (user1_id, user2_id))
+     or exists (select 1 from public.matches where pg_temp.t3(1) in (user1_id, user2_id) and pg_temp.t3(103) in (user1_id, user2_id)) then
+    raise exception 'FAIL T3: an expired request completed a match';
+  end if;
+  if not exists (select 1 from public.matches where pg_temp.t3(1) in (user1_id, user2_id) and pg_temp.t3(104) in (user1_id, user2_id)) then
+    raise exception 'FAIL T3: a 29-day-old request did not complete the match';
+  end if;
+end $$;
+rollback;
+
+-- 3.4b The sender's own expired request (pending or declined) is replaced by a fresh one; a live declined
+-- request conflicts exactly like a live pending one, so a decline is never revealed.
+begin;
+insert into public.connection_requests (from_id, to_id, status, created_at) values
+  (pg_temp.t3(1), pg_temp.t3(105), 'pending', now() - interval '31 days'),
+  (pg_temp.t3(1), pg_temp.t3(106), 'declined', now() - interval '31 days'),
+  (pg_temp.t3(1), pg_temp.t3(107), 'pending', now() - interval '3 days'),
+  (pg_temp.t3(1), pg_temp.t3(108), 'declined', now() - interval '3 days');
+set local role authenticated;
+set local request.jwt.claims = '{"sub":"72000000-0000-0000-0000-000000000001"}';
+do $$
+declare i int; code text; codes text := '';
+begin
+  insert into public.connection_requests (from_id, to_id) values (pg_temp.t3(1), pg_temp.t3(105));
+  insert into public.connection_requests (from_id, to_id) values (pg_temp.t3(1), pg_temp.t3(106));
+  foreach i in array array[107, 108] loop
+    code := 'none';
+    begin
+      insert into public.connection_requests (from_id, to_id) values (pg_temp.t3(1), pg_temp.t3(i));
+    exception when others then code := sqlstate;
+    end;
+    codes := codes || code || ',';
+  end loop;
+  if codes <> '23505,23505,' then raise exception 'FAIL T3: live pending/declined re-request answers differ: %', codes; end if;
+end $$;
+reset role;
+do $$ begin
+  if (select count(*) from public.connection_requests where from_id = pg_temp.t3(1) and to_id in (pg_temp.t3(105), pg_temp.t3(106))
+        and status = 'pending' and created_at > now() - interval '1 minute') <> 2 then
+    raise exception 'FAIL T3: an expired own request was not replaced by a fresh one';
+  end if;
+end $$;
+rollback;
+
+-- 3.5 purge_expired_requests() deletes expired pending/declined requests, keeps live and accepted ones,
+-- and is owner-only.
+begin;
+insert into public.connection_requests (from_id, to_id, status, created_at) values
+  (pg_temp.t3(1), pg_temp.t3(101), 'pending', now() - interval '31 days'),
+  (pg_temp.t3(1), pg_temp.t3(102), 'declined', now() - interval '45 days'),
+  (pg_temp.t3(1), pg_temp.t3(103), 'pending', now() - interval '29 days'),
+  (pg_temp.t3(1), pg_temp.t3(104), 'accepted', now() - interval '90 days');
+do $$
+declare n int;
+begin
+  if to_regprocedure('public.purge_expired_requests()') is null then raise exception 'FAIL T3: purge_expired_requests missing'; end if;
+  if has_function_privilege('authenticated', 'public.purge_expired_requests()', 'execute')
+     or has_function_privilege('anon', 'public.purge_expired_requests()', 'execute') then
+    raise exception 'FAIL T3: purge_expired_requests is executable by API roles';
+  end if;
+  select public.purge_expired_requests() into n;
+  if n <> 2 then raise exception 'FAIL T3: purge deleted % rows (want 2)', n; end if;
+  if (select string_agg(right(to_id::text, 3), ',' order by to_id) from public.connection_requests where from_id = pg_temp.t3(1)) <> '103,104' then
+    raise exception 'FAIL T3: purge kept the wrong rows';
+  end if;
+end $$;
+rollback;
+
+-- Clean up Task 3 fixtures.
+delete from public.connection_requests where from_id::text like '72000000-%' or to_id::text like '72000000-%';
+delete from public.matches where user1_id::text like '72000000-%' or user2_id::text like '72000000-%';
+delete from public.brivia_blocks where blocker_id::text like '72000000-%' or blocked_id::text like '72000000-%';
+delete from public.profiles where id::text like '72000000-%';
+delete from auth.users where id::text like '72000000-%';
+
 select 'trust.test OK';
