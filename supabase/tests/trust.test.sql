@@ -17,7 +17,8 @@ declare n int;
 begin
   update public.profiles set name='A2', full_name='A2', phone='1', phone_country_code='+1', phone_number='1',
     gender='Male', city='Houston', state='TX', experience='x', skills='{a,b}', looking_for='{c}',
-    photo_url='p', cover_url='c', updated_at=now()
+    photo_url='https://proj.supabase.co/storage/v1/object/public/profile-photos/a1a1a1a1-0000-0000-0000-0000000000a1/p.jpg',
+    cover_url='/assets/c.png', updated_at=now()
   where id = auth.uid();
   get diagnostics n = row_count;
   if n <> 1 then raise exception 'FAIL: editable update touched % rows', n; end if;
@@ -466,8 +467,8 @@ end $$;
 -- Owner fixtures: posts by R1, R2, R3 (blocked R1), R4 (blocked by R1), T1, T2, RN (no city);
 -- matches R1-R2 (same world) and R1-T1 (a legacy cross-world row).
 insert into public.community_posts (author_id, image_url, image_path, caption)
-select ('70000000-0000-0000-0000-0000000000' || lpad(n::text, 2, '0'))::uuid, 'u', 'p', 'post ' || n
-from unnest(array[1, 2, 3, 4, 6, 8, 9]) n;
+select a, 'https://proj.supabase.co/storage/v1/object/public/community-posts/' || a || '/p.jpg', a || '/p.jpg', 'post ' || n
+from unnest(array[1, 2, 3, 4, 6, 8, 9]) n, lateral (select ('70000000-0000-0000-0000-0000000000' || lpad(n::text, 2, '0'))::uuid) x(a);
 insert into public.matches (user1_id, user2_id) values
   ('70000000-0000-0000-0000-000000000001', '70000000-0000-0000-0000-000000000002'),
   ('70000000-0000-0000-0000-000000000001', '70000000-0000-0000-0000-000000000008')
@@ -476,8 +477,9 @@ on conflict do nothing;
 do $$
 declare who text; want text; got text; n int;
 begin
-  -- caller => the post authors (last two digits) they must see, exactly.
-  foreach who in array array['01:01,02,06', '03:02,03,04,06', '04:02,03,04,06', '08:08,09', '09:08,09', '06:06', '15:01,02,03,04,06'] loop
+  -- caller => the post authors (last two digits) they must see, exactly. 06 is not completed (no city): only
+  -- 06 sees its own post (final review M4: the author must be completed too).
+  foreach who in array array['01:01,02', '03:02,03,04', '04:02,03,04', '08:08,09', '09:08,09', '06:06', '15:01,02,03,04'] loop
     want := split_part(who, ':', 2);
     set local role authenticated;
     perform set_config('request.jwt.claims', json_build_object('sub', '70000000-0000-0000-0000-0000000000' || split_part(who, ':', 1))::text, true);
@@ -884,7 +886,12 @@ set local request.jwt.claims = '{"sub":"72000000-0000-0000-0000-000000000001"}';
 do $$
 declare col text; failed boolean;
 begin
-  update public.profiles set photo_url = 'https://x/' || repeat('a', 2038), cover_url = 'https://x/' || repeat('a', 2038) where id = auth.uid();
+  -- exactly 2048 characters, valid storage URLs of the own folder: accepted
+  update public.profiles
+     set photo_url = rpad('https://proj.supabase.co/storage/v1/object/public/profile-photos/' || auth.uid() || '/', 2048, 'a'),
+         cover_url = rpad('https://proj.supabase.co/storage/v1/object/public/profile-covers/' || auth.uid() || '/', 2048, 'a')
+   where id = auth.uid();
+  if (select char_length(photo_url) from public.profiles where id = auth.uid()) <> 2048 then raise exception 'FAIL T3b: 2048-character photo_url not stored'; end if;
   foreach col in array array['photo_url', 'cover_url'] loop
     failed := false;
     begin
@@ -1293,3 +1300,215 @@ begin
 end $$;
 
 select 'trust.test T6 impressions hidden OK';
+
+-- =============================================================================================
+-- Final-review fix wave (Ruling I11): server-owned created_at, storage-only image URLs, 0001 re-run keeps
+-- chat media private, post visibility needs a completed author.
+-- Fixtures: F1 and F2 completed (Pune), matched; F3 incomplete (no city). All in the real world.
+-- =============================================================================================
+insert into auth.users(id) values ('f1000000-0000-4000-8000-000000000001'), ('f1000000-0000-4000-8000-000000000002'),
+  ('f1000000-0000-4000-8000-000000000003'), ('f1000000-0000-4000-8000-000000000004') on conflict do nothing;
+insert into public.profiles (id, name, full_name, email, city) values
+  ('f1000000-0000-4000-8000-000000000001', 'Fay One', 'Fay One', 'f1@example.com', 'Pune'),
+  ('f1000000-0000-4000-8000-000000000002', 'Fin Two', 'Fin Two', 'f2@example.com', 'Pune'),
+  ('f1000000-0000-4000-8000-000000000003', 'Fox Three', 'Fox Three', 'f3@example.com', null);
+insert into public.matches (user1_id, user2_id) values ('f1000000-0000-4000-8000-000000000001', 'f1000000-0000-4000-8000-000000000002');
+
+-- FF1. created_at is the server clock for member and anon sessions (insert), and posts keep it on update.
+do $$
+declare
+  f1 uuid := 'f1000000-0000-4000-8000-000000000001'; f2 uuid := 'f1000000-0000-4000-8000-000000000002';
+  f4 uuid := 'f1000000-0000-4000-8000-000000000004';
+  base text := 'https://proj.supabase.co/storage/v1/object/public/';
+  t timestamptz; post_id uuid; failed boolean; p text; u text;
+begin
+  -- profiles: a member's own insert with a forged created_at (future and past)
+  set local role authenticated;
+  perform set_config('request.jwt.claims', json_build_object('sub', f4)::text, true);
+  insert into public.profiles (id, name, full_name, email, city, created_at) values (f4, 'Flo Four', 'Flo Four', 'f4@example.com', 'Pune', '2099-01-01');
+  reset role;
+  select created_at into t from public.profiles where id = f4;
+  if t > now() + interval '1 minute' or t < now() - interval '1 minute' then raise exception 'FAIL FF1: member profile insert kept created_at %', t; end if;
+  delete from public.profiles where id = f4;
+  set local role authenticated;
+  perform set_config('request.jwt.claims', json_build_object('sub', f4)::text, true);
+  insert into public.profiles (id, name, full_name, email, city, created_at) values (f4, 'Flo Four', 'Flo Four', 'f4@example.com', 'Pune', '2001-01-01');
+  reset role;
+  select created_at into t from public.profiles where id = f4;
+  if t < now() - interval '1 minute' then raise exception 'FAIL FF1: member profile insert kept created_at %', t; end if;
+  delete from public.profiles where id = f4;
+
+end $$;
+do $$
+declare
+  f1 uuid := 'f1000000-0000-4000-8000-000000000001'; f2 uuid := 'f1000000-0000-4000-8000-000000000002';
+  f4 uuid := 'f1000000-0000-4000-8000-000000000004';
+  base text := 'https://proj.supabase.co/storage/v1/object/public/';
+  t timestamptz; post_id uuid; failed boolean; p text; u text;
+begin
+  -- community_posts: insert with created_at 2099, then try to rewrite created_at / image / author on update
+  p := f1 || '/a.jpg'; u := base || 'community-posts/' || p;
+  set local role authenticated;
+  perform set_config('request.jwt.claims', json_build_object('sub', f1)::text, true);
+  insert into public.community_posts (author_id, image_url, image_path, caption, created_at) values (f1, u, p, 'hi', '2099-01-01') returning id into post_id;
+  reset role;
+  select created_at into t from public.community_posts where id = post_id;
+  if t > now() + interval '1 minute' then raise exception 'FAIL FF1: member post insert kept created_at %', t; end if;
+  update public.community_posts set created_at = now() - interval '1 hour' where id = post_id;  -- owner may still fix data
+  set local role authenticated;
+  perform set_config('request.jwt.claims', json_build_object('sub', f1)::text, true);
+  update public.community_posts set created_at = '2001-01-01', caption = 'edited',
+    image_path = f1 || '/b.jpg', image_url = base || 'community-posts/' || f1 || '/b.jpg' where id = post_id;
+  reset role;
+  if (select created_at < now() - interval '2 hours' or created_at > now() - interval '30 minutes' from public.community_posts where id = post_id) then
+    raise exception 'FAIL FF1: member post update changed created_at';
+  end if;
+  if (select image_path from public.community_posts where id = post_id) <> p or (select image_url from public.community_posts where id = post_id) <> u then
+    raise exception 'FAIL FF1: member post update changed the image';
+  end if;
+  if (select caption from public.community_posts where id = post_id) <> 'edited' then raise exception 'FAIL FF1: caption edit lost'; end if;
+  delete from public.community_posts where id = post_id;
+
+end $$;
+do $$
+declare
+  f1 uuid := 'f1000000-0000-4000-8000-000000000001'; f2 uuid := 'f1000000-0000-4000-8000-000000000002';
+  f4 uuid := 'f1000000-0000-4000-8000-000000000004';
+  base text := 'https://proj.supabase.co/storage/v1/object/public/';
+  t timestamptz; post_id uuid; failed boolean; p text; u text;
+begin
+  -- brivia_messages: a forged 2001 timestamp would sort the message into the past
+  set local role authenticated;
+  perform set_config('request.jwt.claims', json_build_object('sub', f1)::text, true);
+  insert into public.brivia_messages (sender_id, recipient_id, body, created_at) values (f1, f2, 'backdated', '2001-01-01');
+  reset role;
+  select created_at into t from public.brivia_messages where sender_id = f1 and body = 'backdated';
+  if t < now() - interval '1 minute' then raise exception 'FAIL FF1: member message insert kept created_at %', t; end if;
+  delete from public.brivia_messages where sender_id = f1;
+
+end $$;
+do $$
+declare
+  f1 uuid := 'f1000000-0000-4000-8000-000000000001'; f2 uuid := 'f1000000-0000-4000-8000-000000000002';
+  f4 uuid := 'f1000000-0000-4000-8000-000000000004';
+  base text := 'https://proj.supabase.co/storage/v1/object/public/';
+  t timestamptz; post_id uuid; failed boolean; p text; u text;
+begin
+  -- owner sessions (seed, SQL editor) still choose created_at on profiles, posts and messages
+  insert into public.profiles (id, name, full_name, email, city, created_at) values (f4, 'Flo Four', 'Flo Four', 'f4@example.com', 'Pune', '2001-01-01');
+  if (select created_at from public.profiles where id = f4) <> '2001-01-01'::timestamptz then raise exception 'FAIL FF1: owner profile created_at overwritten'; end if;
+  delete from public.profiles where id = f4;
+
+end $$;
+do $$
+declare
+  f1 uuid := 'f1000000-0000-4000-8000-000000000001'; f2 uuid := 'f1000000-0000-4000-8000-000000000002';
+  f4 uuid := 'f1000000-0000-4000-8000-000000000004';
+  base text := 'https://proj.supabase.co/storage/v1/object/public/';
+  t timestamptz; post_id uuid; failed boolean; p text; u text;
+begin
+  -- career_applications: always the server clock, so a backdated application still counts toward the cap
+  delete from public.career_applications;
+  set local role anon;
+  insert into public.career_applications (role, name, email, resume_path, resume_name, resume_size, created_at)
+    select 'r', 'n', 'old@example.com', 'o' || g, 'cv.pdf', 1, '2001-01-01' from generate_series(1, 3) g;
+  failed := false;
+  begin
+    insert into public.career_applications (role, name, email, resume_path, resume_name, resume_size) values ('r', 'n', 'old@example.com', 'o4', 'cv.pdf', 1);
+  exception when others then failed := true;
+  end;
+  reset role;
+  if not failed then raise exception 'FAIL FF1: backdated career applications dodged the per-email cap'; end if;
+  insert into public.career_applications (role, name, email, resume_path, resume_name, resume_size, created_at) values ('r', 'n', 'own@example.com', 'x', 'cv.pdf', 1, '2001-01-01');
+  if (select created_at from public.career_applications where email = 'own@example.com') < now() - interval '1 minute' then
+    raise exception 'FAIL FF1: career created_at is not unconditional';
+  end if;
+  delete from public.career_applications;
+end $$;
+select 'trust.test FF1 created_at OK';
+
+-- FF2. Image URLs must be this project's public storage URL for the right bucket and the owner's folder.
+do $$
+declare
+  f1 uuid := 'f1000000-0000-4000-8000-000000000001'; f2 uuid := 'f1000000-0000-4000-8000-000000000002';
+  base text := 'https://proj.supabase.co/storage/v1/object/public/';
+  stmt text; failed boolean;
+begin
+  set local role authenticated;
+  perform set_config('request.jwt.claims', json_build_object('sub', f1)::text, true);
+  -- accepted: own folder in the right bucket; preset covers are same-site paths
+  update public.profiles set photo_url = base || 'profile-photos/' || f1 || '/9f2c.jpg', cover_url = base || 'profile-covers/' || f1 || '/c.png' where id = f1;
+  update public.profiles set cover_url = '/assets/163BDB0C-64AC-Bx1a.PNG' where id = f1;
+  update public.profiles set cover_url = '/Images/Cover%20images/2257522A.PNG' where id = f1;
+  update public.profiles set photo_url = null, cover_url = null where id = f1;
+  insert into public.community_posts (author_id, image_url, image_path) values (f1, base || 'community-posts/' || f1 || '/ok.jpg', f1 || '/ok.jpg');
+  delete from public.community_posts where author_id = f1;
+  reset role;
+  foreach stmt in array array[
+    format('update public.profiles set photo_url = %L where id = %L', 'https://tracker.example/pixel.png', f1),
+    format('update public.profiles set photo_url = %L where id = %L', 'http://tracker.example/storage/v1/object/public/profile-photos/' || f1 || '/x.jpg?u=1', f1),
+    format('update public.profiles set photo_url = %L where id = %L', base || 'profile-photos/' || f2 || '/x.jpg', f1),
+    format('update public.profiles set photo_url = %L where id = %L', base || 'profile-covers/' || f1 || '/x.jpg', f1),
+    format('update public.profiles set photo_url = %L where id = %L', base || 'profile-photos/' || f1 || '/../' || f2 || '/x.jpg', f1),
+    format('update public.profiles set photo_url = %L where id = %L', base || 'profile-photos/' || f1 || '/%2e%2e/x.jpg', f1),
+    format('update public.profiles set photo_url = %L where id = %L', 'https://user@evil.example/storage/v1/object/public/profile-photos/' || f1 || '/x.jpg', f1),
+    format('update public.profiles set photo_url = %L where id = %L', 'data:image/png;base64,AAAA', f1),
+    format('update public.profiles set cover_url = %L where id = %L', 'https://tracker.example/cover.png', f1),
+    format('update public.profiles set cover_url = %L where id = %L', '//tracker.example/cover.png', f1),
+    format('update public.profiles set cover_url = %L where id = %L', '/assets/../../x.png', f1),
+    format('update public.profiles set cover_url = %L where id = %L', base || 'profile-photos/' || f1 || '/x.jpg', f1),
+    format('insert into public.community_posts (author_id, image_url, image_path) values (%L, %L, %L)', f1, 'https://tracker.example/p.jpg', f1 || '/p.jpg'),
+    format('insert into public.community_posts (author_id, image_url, image_path) values (%L, %L, %L)', f1, base || 'community-posts/' || f2 || '/p.jpg', f2 || '/p.jpg'),
+    format('insert into public.community_posts (author_id, image_url, image_path) values (%L, %L, %L)', f1, base || 'community-posts/' || f1 || '/p.jpg', f1 || '/q.jpg'),
+    format('insert into public.community_posts (author_id, image_url, image_path) values (%L, %L, %L)', f1, base || 'profile-photos/' || f1 || '/p.jpg', f1 || '/p.jpg')
+  ] loop
+    failed := false;
+    set local role authenticated;
+    perform set_config('request.jwt.claims', json_build_object('sub', f1)::text, true);
+    begin execute stmt; exception when check_violation then failed := true; end;
+    reset role;
+    if not failed then raise exception 'FAIL FF2: accepted %', stmt; end if;
+  end loop;
+end $$;
+select 'trust.test FF2 storage URLs OK';
+
+-- FF3. Re-running 0001 alone keeps chat media private (and private buckets private).
+begin;
+update storage.buckets set public = true where id = 'career-resumes';
+\ir ../migrations/0001_baseline.sql
+do $$ begin
+  if (select public from storage.buckets where id = 'message-attachments') then raise exception 'FAIL FF3: re-running 0001 made message-attachments public'; end if;
+  if (select public from storage.buckets where id = 'career-resumes') then raise exception 'FAIL FF3: 0001 left career-resumes public'; end if;
+  if not (select bool_and(public) from storage.buckets where id in ('profile-photos', 'profile-covers', 'community-posts')) then
+    raise exception 'FAIL FF3: 0001 must keep the photo, cover and post buckets public';
+  end if;
+end $$;
+rollback;
+select 'trust.test FF3 0001 re-run OK';
+
+-- FF4. Posts by an author whose profile is not completed are hidden from others (the author still sees them).
+insert into public.community_posts (author_id, image_url, image_path) values
+  ('f1000000-0000-4000-8000-000000000003', 'https://proj.supabase.co/storage/v1/object/public/community-posts/f1000000-0000-4000-8000-000000000003/i.jpg',
+   'f1000000-0000-4000-8000-000000000003/i.jpg');
+do $$
+declare n int;
+begin
+  set local role authenticated;
+  perform set_config('request.jwt.claims', '{"sub":"f1000000-0000-4000-8000-000000000001"}', true);
+  select count(*) into n from public.community_posts where author_id = 'f1000000-0000-4000-8000-000000000003';
+  if public.brivia_can_see_author('f1000000-0000-4000-8000-000000000003') or n <> 0 then
+    reset role; raise exception 'FAIL FF4: a completed member sees % posts by an incomplete author', n;
+  end if;
+  perform set_config('request.jwt.claims', '{"sub":"f1000000-0000-4000-8000-000000000003"}', true);
+  select count(*) into n from public.community_posts where author_id = 'f1000000-0000-4000-8000-000000000003';
+  reset role;
+  if n <> 1 then raise exception 'FAIL FF4: the incomplete author no longer sees the own post'; end if;
+end $$;
+select 'trust.test FF4 author completed OK';
+
+-- Clean up final-wave fixtures.
+delete from public.community_posts where author_id::text like 'f1000000-%';
+delete from public.brivia_messages where sender_id::text like 'f1000000-%';
+delete from public.matches where user1_id::text like 'f1000000-%' or user2_id::text like 'f1000000-%';
+delete from public.profiles where id::text like 'f1000000-%';
+delete from auth.users where id::text like 'f1000000-%';

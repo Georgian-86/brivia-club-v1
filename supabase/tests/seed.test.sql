@@ -124,7 +124,9 @@ declare f text := 'a7e57000-0000-4000-8000-'; a uuid := (f || '000000000001')::u
 begin
   insert into public.brivia_blocks(blocker_id, blocked_id) values (a, (f || '000000000007')::uuid);
   insert into public.brivia_messages(sender_id, recipient_id, body) values (a, b, 'test hello');  -- owner session: no RLS
-  insert into public.community_posts(author_id, image_url, image_path) values (a, 'u', a || '/p.jpg'), (r, 'u', r || '/p.jpg');
+  insert into public.community_posts(author_id, image_url, image_path) values
+    (a, 'https://proj.supabase.co/storage/v1/object/public/community-posts/' || a || '/p.jpg', a || '/p.jpg'),
+    (r, 'https://proj.supabase.co/storage/v1/object/public/community-posts/' || r || '/p.jpg', r || '/p.jpg');
   insert into public.interaction(viewer_id, target_id, event) values (a, b, 'like'), (b, a, 'impression');
   insert into storage.objects(bucket_id, name, owner) values
     ('profile-photos', a || '/avatar.jpg', null), ('community-posts', 'x/y.jpg', b), ('profile-photos', r || '/avatar.jpg', r);

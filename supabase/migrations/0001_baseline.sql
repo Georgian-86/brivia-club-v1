@@ -303,7 +303,11 @@ insert into storage.buckets (id, name, public) values
   ('message-attachments', 'message-attachments', true),
   ('community-posts', 'community-posts', true),
   ('career-resumes', 'career-resumes', false)
-on conflict (id) do update set public = excluded.public;
+on conflict (id) do nothing;
+-- Visibility of the buckets this file owns. message-attachments is NOT touched on a re-run: 0003 makes it
+-- private, and re-running 0001 must never make chat media public again.
+update storage.buckets set public = true where id in ('profile-photos', 'profile-covers', 'community-posts');
+update storage.buckets set public = false where id = 'career-resumes';
 
 -- Legacy list-everything policies (removed).
 drop policy if exists "Anyone can view profile photos" on storage.objects;
@@ -341,7 +345,7 @@ create policy "Members can update their profile cover"
   using (bucket_id = 'profile-covers' and (storage.foldername(name))[1] = (select auth.uid()::text))
   with check (bucket_id = 'profile-covers' and (storage.foldername(name))[1] = (select auth.uid()::text));
 
--- message-attachments (still a public bucket so public URLs work; private bucket is a later task)
+-- message-attachments (created public on a fresh install; 0003 makes it private and owns its visibility)
 drop policy if exists "Members can upload message attachments" on storage.objects;
 create policy "Members can upload message attachments"
   on storage.objects for insert to authenticated

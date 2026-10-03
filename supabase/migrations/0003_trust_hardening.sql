@@ -6,8 +6,14 @@
 -- supabase.js no longer stores data: URLs in photo_url/cover_url, which Task 3b caps at 2048 characters).
 -- Senders can no longer select their own outgoing connection_requests rows (Task 3b): any client view of
 -- outgoing requests must call my_outgoing_requests().
--- Re-running 0002 alone reverts objects that 0003 redefines (public_profiles grant, the request triggers,
--- respond_connection_request, the request/profile select policies): always re-run 0003 after it.
+-- RE-RUN ORDER: any re-run of 0001 or 0002 must be followed by a re-run of 0003. Re-running 0001 alone reverts
+-- the community_posts select policy, the message insert policy and the public_profiles grant; re-running 0002
+-- alone reverts objects that 0003 redefines (public_profiles grant, the request triggers,
+-- respond_connection_request, the request/profile select policies). 0001 no longer changes the visibility of
+-- an existing message-attachments bucket (0003 owns it: private).
+-- DATA CHANGES on a populated project (take a backup first): over-long and non-storage photo_url/cover_url
+-- values are cleared to null; over-long request notes are cut to 500 characters; message-attachments
+-- becomes private. Pre-flight counts are next to each step below.
 -- Idempotent: safe to re-run.
 
 -- ---------------------------------------------------------------------------------------------
@@ -203,8 +209,8 @@ $$;
 revoke all on function public.brivia_same_world(uuid, uuid) from public, anon;
 grant execute on function public.brivia_same_world(uuid, uuid) to authenticated;
 
--- May the caller see posts by p_author? Own posts always; otherwise the caller must be completed
--- (Ruling I3), not blocked with the author in either direction, and in the author's world (Ruling I4).
+-- May the caller see posts by p_author? Own posts always; otherwise the caller AND the author must be
+-- completed (Ruling I3), not blocked with the author in either direction, and in the author's world (Ruling I4).
 create or replace function public.brivia_can_see_author(p_author uuid)
 returns boolean
 language sql
@@ -217,6 +223,7 @@ as $$
         select 1 from public.profiles me
         join public.profiles a on a.id = p_author and a.is_test = me.is_test
         where me.id = auth.uid() and public.brivia_is_completed(me.name, me.city)
+          and public.brivia_is_completed(a.name, a.city)  -- the author must be completed too (final review M4)
           and not exists (
             select 1 from public.brivia_blocks b
             where (b.blocker_id = me.id and b.blocked_id = a.id) or (b.blocker_id = a.id and b.blocked_id = me.id)
@@ -572,6 +579,7 @@ create index if not exists career_applications_created_idx on public.career_appl
 create or replace function public.brivia_career_application_throttle() returns trigger
 language plpgsql security definer set search_path = public as $$
 begin
+  new.created_at := now();  -- always the server clock, even for the owner: a backdated row still counts (Ruling I11)
   new.email := lower(btrim(new.email));
   perform pg_advisory_xact_lock(hashtext('career_applications_throttle'));
   if (select count(*) from public.career_applications
@@ -647,5 +655,121 @@ create policy interaction_insert_own on public.interaction for insert to authent
     and public.brivia_same_world(viewer_id, target_id)
     and public.brivia_interaction_allowed(viewer_id, target_id, event)
   );
+
+-- =============================================================================================
+-- Final-review fix wave (Ruling I11)
+-- =============================================================================================
+-- Server-owned created_at. Member and anon sessions cannot choose created_at on insert: a forged date
+-- would sort a profile to the top of the deck, a post to the top of the feed, a message into the past, or
+-- dodge the careers throttle. Owner sessions (the seed script and the SQL editor: current_user AND
+-- session_user are the table owner, the same rule as brivia_guard_is_test) may still set it.
+-- career_applications ignores any supplied created_at, even from the owner (set in its throttle trigger).
+-- Not SECURITY DEFINER on purpose: current_user must be the caller's role. The owner test is inlined (no
+-- helper function), so member sessions need no execute grant for these triggers to run.
+create or replace function public.brivia_server_created_at()
+returns trigger
+language plpgsql
+set search_path = public, pg_catalog
+as $$
+begin
+  if not (current_user = (select pg_get_userbyid(c.relowner) from pg_class c where c.oid = tg_relid)
+          and session_user = (select pg_get_userbyid(c.relowner) from pg_class c where c.oid = tg_relid)) then
+    new.created_at := now();
+  end if;
+  return new;
+end;
+$$;
+revoke all on function public.brivia_server_created_at() from public, anon, authenticated;
+
+drop trigger if exists brivia_profiles_server_created_at on public.profiles;
+create trigger brivia_profiles_server_created_at before insert on public.profiles
+  for each row execute function public.brivia_server_created_at();
+drop trigger if exists brivia_posts_server_created_at on public.community_posts;
+create trigger brivia_posts_server_created_at before insert on public.community_posts
+  for each row execute function public.brivia_server_created_at();
+drop trigger if exists brivia_messages_server_created_at on public.brivia_messages;
+create trigger brivia_messages_server_created_at before insert on public.brivia_messages
+  for each row execute function public.brivia_server_created_at();
+
+-- A member may edit only the caption of a post: author, image and created_at stay as inserted.
+create or replace function public.brivia_posts_keep_immutable()
+returns trigger
+language plpgsql
+set search_path = public, pg_catalog
+as $$
+begin
+  if not (current_user = (select pg_get_userbyid(c.relowner) from pg_class c where c.oid = tg_relid)
+          and session_user = (select pg_get_userbyid(c.relowner) from pg_class c where c.oid = tg_relid)) then
+    new.id := old.id;
+    new.author_id := old.author_id;
+    new.image_path := old.image_path;
+    new.image_url := old.image_url;
+    new.created_at := old.created_at;
+  end if;
+  return new;
+end;
+$$;
+revoke all on function public.brivia_posts_keep_immutable() from public, anon, authenticated;
+drop trigger if exists brivia_posts_keep_immutable on public.community_posts;
+create trigger brivia_posts_keep_immutable before update on public.community_posts
+  for each row execute function public.brivia_posts_keep_immutable();
+
+-- Careers: created_at is stamped unconditionally in brivia_career_application_throttle() (Task 4 section).
+
+-- Storage-only image URLs. photo_url, cover_url and community_posts.image_url are shown to other members
+-- and auto-load in their browsers, so an arbitrary URL would be a tracking pixel (viewer IP, time, who looked
+-- at whom). They must be a public URL of this project's Storage for the right bucket AND the owner's own
+-- folder. The project host is not hard-coded: the path must be exactly
+--   /storage/v1/object/public/<bucket>/<owner uid>/<one file name>
+-- (no '..', no query string, no userinfo). The client additionally renders these only from the Supabase
+-- origin (VITE_SUPABASE_URL), so a foreign host that copies the path still never loads.
+-- Preset covers (cover-assets.js) are same-site paths under /assets/ or /Images/Cover images/.
+create or replace function public.brivia_is_storage_url(p_url text, p_bucket text, p_owner uuid)
+returns boolean
+language sql
+immutable
+set search_path = public
+as $$
+  select coalesce(
+    p_url ~ ('^https?://[A-Za-z0-9.-]+(:[0-9]{1,5})?/storage/v1/object/public/' || p_bucket || '/'
+             || p_owner::text || '/[A-Za-z0-9][A-Za-z0-9._-]*$')
+    and p_url !~ '\.\.', false);
+$$;
+create or replace function public.brivia_is_preset_cover(p_url text)
+returns boolean
+language sql
+immutable
+set search_path = public
+as $$
+  select coalesce(p_url ~ '^/(assets/|Images/Cover(%20| )images/)[A-Za-z0-9][A-Za-z0-9._ -]*$' and p_url !~ '\.\.', false);
+$$;
+
+-- DATA CLEANUP (profiles): photo/cover values that are not storage URLs of the member's own folder (external
+-- links, OAuth avatars, other members' files, old data: URLs) are cleared to null before the constraints are
+-- added; those members show initials / the default cover until they upload again. Pre-flight count:
+--   select count(*) from public.profiles where photo_url is not null
+--     and not public.brivia_is_storage_url(photo_url, 'profile-photos', id);
+update public.profiles set photo_url = null
+ where photo_url is not null and not public.brivia_is_storage_url(photo_url, 'profile-photos', id);
+update public.profiles set cover_url = null
+ where cover_url is not null and not public.brivia_is_storage_url(cover_url, 'profile-covers', id)
+   and not public.brivia_is_preset_cover(cover_url);
+alter table public.profiles drop constraint if exists profiles_photo_url_storage;
+alter table public.profiles add constraint profiles_photo_url_storage
+  check (photo_url is null or public.brivia_is_storage_url(photo_url, 'profile-photos', id));
+alter table public.profiles drop constraint if exists profiles_cover_url_storage;
+alter table public.profiles add constraint profiles_cover_url_storage
+  check (cover_url is null or public.brivia_is_storage_url(cover_url, 'profile-covers', id)
+         or public.brivia_is_preset_cover(cover_url));
+
+-- Posts: image_url is the public URL of image_path, and image_path is in the author's folder. Added NOT VALID:
+-- existing posts are not deleted or rewritten (the client already refuses to render a non-storage image);
+-- every new or edited post is checked. Pre-flight count of legacy posts that would fail:
+--   select count(*) from public.community_posts where not (public.brivia_is_storage_url(image_url,
+--     'community-posts', author_id) and image_path = author_id::text || '/' || regexp_replace(image_url, '^.*/', ''));
+alter table public.community_posts drop constraint if exists community_posts_image_storage;
+alter table public.community_posts add constraint community_posts_image_storage
+  check (public.brivia_is_storage_url(image_url, 'community-posts', author_id)
+         and image_path = author_id::text || '/' || regexp_replace(image_url, '^.*/', '')) not valid;
 
 notify pgrst, 'reload schema';

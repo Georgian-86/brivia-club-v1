@@ -338,8 +338,14 @@ saturated, the outer rings relax first, instead of the deck repeating saturated 
   incomplete profiles (`brivia_is_completed`: trimmed name not empty and not 'New Member', trimmed city not empty),
   blocked pairs in both directions, and the other test world (test and real members never see, request or message
   each other); a caller who is not completed gets nothing. Community posts follow the same block, world and
-  completed-caller rules (own posts always visible). ORBIT's deck and search replace `list_members` and `search_members`
-  in phase 3 and must keep these exclusions.
+  completed rules for both the caller and the author (own posts always visible). ORBIT's deck and search replace
+  `list_members` and `search_members` in phase 3 and must keep these exclusions.
+- **Card data members cannot forge (Iteration 2 final review, Ruling I11).** `created_at` on profiles, posts and
+  messages is the server clock for every member session (only the owner/seed may set it), so "newest first" cannot
+  be gamed by a backdated or future-dated row; members edit only a post's caption. `photo_url`, `cover_url` and post
+  `image_url` must be this project's public Storage URL for the right bucket and the owner's own folder (or a
+  bundled preset cover), and the client renders them only from the Supabase origin, so a card image can never be a
+  third-party tracking pixel. ORBIT's `orbit_cards` returns the same `photo_url` and relies on the same rule.
 - **Long-Range Request:** to request someone in ring ≥ 3 who has not liked you, you spend one of **5 weekly long-range
   signals**. The request must include a note. The recipient sees the resonance chips and can accept or decline.
   Declines are private.

@@ -217,7 +217,9 @@ begin
   insert into public.brivia_messages(sender_id, recipient_id, body, message_type)
   values ('11111111-0000-0000-0000-000000000001', '33333333-0000-0000-0000-000000000003', 'hello', 'text');
   insert into public.community_posts(author_id, image_url, image_path, caption)
-  values ('11111111-0000-0000-0000-000000000001', 'https://x/y.jpg', '1/y.jpg', 'c');
+  values ('11111111-0000-0000-0000-000000000001',
+          'https://proj.supabase.co/storage/v1/object/public/community-posts/11111111-0000-0000-0000-000000000001/y.jpg',
+          '11111111-0000-0000-0000-000000000001/y.jpg', 'c');
   select count(*) into n from public.community_posts;
   if n <> 1 then raise exception 'FAIL: member sees % community posts', n; end if;
 
