@@ -309,7 +309,12 @@ begin
   end if;
   -- One sender at a time, so parallel inserts cannot overshoot the caps.
   perform pg_advisory_xact_lock(hashtextextended('brivia_request_caps:' || new.from_id::text, 0));
-  -- The sender's own expired request to this member is replaced by the new one.
+  -- Pair lock (same as the completion trigger, re-entrant in this transaction) BEFORE the completion check,
+  -- so a concurrent reverse insert is seen and a completing request is never capped by mistake.
+  -- Lock order is always caps(sender) then pair, so two senders cannot deadlock.
+  perform public.brivia_lock_pair(new.from_id, new.to_id);
+  -- An expired own row would otherwise block this insert (primary key); expired requests are dead, so the
+  -- new request replaces it (and a decline stays indistinguishable from an unanswered request).
   delete from public.connection_requests
    where from_id = new.from_id and to_id = new.to_id
      and not public.brivia_request_is_live(status, created_at);

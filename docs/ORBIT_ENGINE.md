@@ -289,7 +289,27 @@ and its load is released, when:
 A **mutual Met** is the strongest positive label for taste learning (§8). It is also the in-product measure of the
 north-star metric (people who actually meet).
 
-**Expiry.** Inbound likes left unanswered for 10 days expire silently, with no notification to either side.
+**Expiry (Ruling I8).** Two clocks, both silent (no notification to either side):
+- *Roche load* counts only inbound likes/requests at most 10 days old (see **Load** above). An older like stops
+  adding load but is still a live request.
+- *The request itself* expires 30 days after it was sent, if it is not accepted. An expired request is hidden from
+  the recipient's Requests list, cannot be accepted, never completes a match, and does not count toward the caps.
+  Expiry applies to declined requests too. If the sender requests the same person again, the expired request is
+  replaced by a fresh one. The owner-only `purge_expired_requests()` deletes expired rows.
+
+**Request caps and consent rules (database, `0003_trust_hardening.sql`).**
+- A sender may send at most **30 requests per 24 hours** and hold at most **100 live unanswered** (pending or
+  declined) requests. A request over a cap is **dropped silently**: no error and no row are written, and the
+  client shows the usual "Signal sent", so the cap is never revealed.
+- A request that **completes a match** (the other member has already asked) is never capped.
+- **The sender never sees a decline.** Senders read their outgoing requests only through
+  `my_outgoing_requests()`, which shows a declined request as pending. A re-request of a live declined request
+  gives the same conflict as one that is still pending, and both expire at 30 days. One consequence: the
+  change-of-mind path of Ruling P11 (the member who declined requests back) completes a match only within 30
+  days of the original request. After that, their request is a new pending request.
+- **A block withdraws the blocker's own pending and declined requests** to the blocked member. So
+  block → unblock → reverse request never completes a match on consent given before the block. Requests from
+  the blocked member stay hidden while the block lasts, and the blocker must still accept them after an unblock.
 
 **Interaction with liquidity.** Liquidity `L` (§5.2) counts only candidates with `h > 0`. So when local members are
 saturated, the outer rings relax first, instead of the deck repeating saturated people.
