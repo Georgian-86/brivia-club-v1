@@ -488,6 +488,8 @@ try {
     { id: 'm2', sender_id: KIT, recipient_id: ME, body: '', created_at: ago(40000), message_type: 'document', attachment_url: 'javascript:window.__xss=3', attachment_name: 'evil.pdf', attachment_mime: 'application/pdf', attachment_size: 10 },
     { id: 'm3', sender_id: KIT, recipient_id: ME, body: '', created_at: ago(30000), message_type: 'video', attachment_url: 'http://insecure.example/v.mp4', attachment_name: 'v.mp4', attachment_mime: 'video/mp4', attachment_size: 10 },
     { id: 'm4', sender_id: KIT, recipient_id: ME, body: '', created_at: ago(20000), message_type: 'image', attachment_url: null, attachment_path: `${KIT}/ok.png`, attachment_name: 'ok.png', attachment_mime: 'image/png', attachment_size: 10 },
+    { id: 'm6', sender_id: KIT, recipient_id: ME, body: '', created_at: ago(9000), message_type: 'gif', attachment_url: 'https://tracker.example/pixel.gif', attachment_path: null, attachment_name: 'track.gif', attachment_mime: 'image/gif', attachment_size: 0 },
+    { id: 'm7', sender_id: KIT, recipient_id: ME, body: '', created_at: ago(8000), message_type: 'gif', attachment_url: 'https://media.giphy.com/media/ok/giphy.gif', attachment_path: null, attachment_name: 'good.gif', attachment_mime: 'image/gif', attachment_size: 0 },
     // Legacy row: only a (formerly public) URL, no path -> "Attachment unavailable".
     { id: 'm5', sender_id: KIT, recipient_id: ME, body: '', created_at: ago(10000), message_type: 'image', attachment_url: 'https://cdn.example/legacy.png', attachment_path: null, attachment_name: 'legacy.png', attachment_mime: 'image/png', attachment_size: 10 },
   ];
@@ -667,6 +669,16 @@ try {
     assert.equal(signCalls.length, 1);
     assert.equal(JSON.parse(signCalls[0].body).expiresIn, 3600);
     assert.equal(decodeURIComponent(signCalls[0].path), `/storage/v1/object/sign/message-attachments/${KIT}/ok.png`);
+  });
+  const gifState = await hardPage.evaluate(() => ({
+    trackerImg: [...document.querySelectorAll('#chat-messages img')].some((i) => /tracker\.example/.test(i.getAttribute('src') || '')),
+    trackerLink: [...document.querySelectorAll('#chat-messages a')].find((a) => /tracker\.example/.test(a.getAttribute('href') || ''))?.getAttribute('rel') || null,
+    giphyImg: [...document.querySelectorAll('#chat-messages img')].some((i) => /^https:\/\/media\.giphy\.com\//.test(i.getAttribute('src') || '')),
+  }));
+  check(`external GIF: allowlisted host auto-loads, other host is a noopener link only (${JSON.stringify(gifState)})`, () => {
+    assert.equal(gifState.trackerImg, false);
+    assert.equal(gifState.trackerLink, 'noopener noreferrer');
+    assert.equal(gifState.giphyImg, true);
   });
   check('chat media never uses a public URL', () => assert.equal(hard.calls.filter((c) => c.path.includes('/object/public/message-attachments')).length, 0));
 

@@ -536,10 +536,17 @@ create policy "Participants can view message attachments"
       or exists (
         select 1 from public.brivia_messages m
          where m.attachment_path = storage.objects.name
+           -- the object must sit in the SENDER's folder: a message cannot claim someone else's file
+           and (storage.foldername(storage.objects.name))[1] = m.sender_id::text
            and (select auth.uid()) in (m.sender_id, m.recipient_id)
       )
     )
   );
+
+-- Defence in depth: a message may only reference a file in its own sender's folder.
+alter table public.brivia_messages drop constraint if exists brivia_messages_attachment_path_owner;
+alter table public.brivia_messages add constraint brivia_messages_attachment_path_owner
+  check (attachment_path is null or split_part(attachment_path, '/', 1) = sender_id::text);
 
 -- Size and type limits on every bucket (enforced by Storage itself).
 update storage.buckets set file_size_limit = 5242880,
@@ -565,9 +572,10 @@ create index if not exists career_applications_created_idx on public.career_appl
 create or replace function public.brivia_career_application_throttle() returns trigger
 language plpgsql security definer set search_path = public as $$
 begin
+  new.email := lower(btrim(new.email));
   perform pg_advisory_xact_lock(hashtext('career_applications_throttle'));
   if (select count(*) from public.career_applications
-       where lower(email) = lower(new.email) and created_at > now() - interval '24 hours') >= 3
+       where lower(btrim(email)) = new.email and created_at > now() - interval '24 hours') >= 3
      or (select count(*) from public.career_applications where created_at > now() - interval '1 hour') >= 200 then
     raise exception 'Could not submit the application. Please try again later.' using errcode = 'P0001';
   end if;

@@ -976,6 +976,44 @@ begin
   if (select count(*) from storage.objects where bucket_id = 'message-attachments') <> 0 then raise exception 'FAIL T4: anon selects chat media'; end if;
   reset role;
 end $$;
+-- 4.2b Forged reference: a message may not point at another member's object.
+insert into storage.objects (bucket_id, name, owner) values
+  ('message-attachments', '73000000-0000-0000-0000-000000000003/secret.jpg', '73000000-0000-0000-0000-000000000003');
+do $$
+declare failed boolean := false;
+begin
+  perform set_config('request.jwt.claims', '{"sub":"73000000-0000-0000-0000-000000000001"}', true);
+  set local role authenticated;
+  begin
+    insert into public.brivia_messages (sender_id, recipient_id, body, message_type, attachment_path, attachment_name)
+      values ('73000000-0000-0000-0000-000000000001','73000000-0000-0000-0000-000000000002','', 'image',
+              '73000000-0000-0000-0000-000000000003/secret.jpg', 's.jpg');
+  exception when check_violation or insufficient_privilege then failed := true;
+  end;
+  reset role;
+  if not failed then raise exception 'FAIL T4: a forged attachment_path was accepted at insert'; end if;
+  -- the CHECK itself (owner bypasses RLS) refuses the forged path
+  failed := false;
+  begin
+    insert into public.brivia_messages (sender_id, recipient_id, body, message_type, attachment_path, attachment_name)
+      values ('73000000-0000-0000-0000-000000000001','73000000-0000-0000-0000-000000000002','', 'image',
+              '73000000-0000-0000-0000-000000000003/secret.jpg', 's.jpg');
+  exception when check_violation then failed := true;
+  end;
+  if not failed then raise exception 'FAIL T4: the attachment_path CHECK did not fire'; end if;
+  -- forced in as owner (bypassing the check): the policy still must not expose the object
+  alter table public.brivia_messages disable trigger user;
+  alter table public.brivia_messages drop constraint brivia_messages_attachment_path_owner;
+  insert into public.brivia_messages (sender_id, recipient_id, body, message_type, attachment_path, attachment_name)
+    values ('73000000-0000-0000-0000-000000000001','73000000-0000-0000-0000-000000000002','', 'image',
+            '73000000-0000-0000-0000-000000000003/secret.jpg', 's.jpg');
+  if pg_temp.t4_sees('73000000-0000-0000-0000-000000000001', '73000000-0000-0000-0000-000000000003/secret.jpg') <> 0 then raise exception 'FAIL T4: forged row lets the sender select a third member''s object'; end if;
+  if pg_temp.t4_sees('73000000-0000-0000-0000-000000000002', '73000000-0000-0000-0000-000000000003/secret.jpg') <> 0 then raise exception 'FAIL T4: forged row lets the recipient select a third member''s object'; end if;
+  delete from public.brivia_messages where attachment_path like '73000000-0000-0000-0000-000000000003/%';
+  alter table public.brivia_messages add constraint brivia_messages_attachment_path_owner
+    check (attachment_path is null or split_part(attachment_path, '/', 1) = sender_id::text);
+  alter table public.brivia_messages enable trigger user;
+end $$;
 delete from storage.objects where name like '73000000-%';
 delete from public.brivia_messages where sender_id::text like '73000000-%';
 delete from public.profiles where id::text like '73000000-%';
@@ -995,6 +1033,13 @@ begin
   exception when others then failed := true; if sqlerrm !~* 'try again later' or sqlerrm ~* 'email|dup' then raise exception 'FAIL T4: error is not generic: %', sqlerrm; end if;
   end;
   if not failed then raise exception 'FAIL T4: a 4th application in 24h for one email was accepted'; end if;
+  -- whitespace / case variants are the same email
+  failed := false;
+  begin
+    insert into public.career_applications (role, name, email, resume_path, resume_name, resume_size) values ('r', 'n', '  DUP@example.com ', 'p4b', 'cv.pdf', 1);
+  exception when others then failed := true;
+  end;
+  if not failed then raise exception 'FAIL T4: a padded email bypassed the per-email cap'; end if;
   insert into public.career_applications (role, name, email, resume_path, resume_name, resume_size) values ('r', 'n', 'other@example.com', 'p5', 'cv.pdf', 1);
   reset role;
   -- the email window slides: old rows do not count

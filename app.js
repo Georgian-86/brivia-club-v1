@@ -146,6 +146,9 @@ const safeAttachmentUrl = (value) => {
   } catch { /* not a URL */ }
   return '';
 };
+// External GIF links auto-load only from the hosts of the built-in GIF picker (Ruling I9); any other https
+// URL becomes a click-to-open link, so a crafted row cannot make every viewer's browser fetch a tracker.
+const GIF_AUTOLOAD_HOSTS = new Set(chatGifCatalog.map((gif) => { try { return new URL(gif.url).hostname; } catch { return ''; } }).filter(Boolean));
 const attachmentFromRow = (message) => (message.attachment_path || message.attachment_url ? {
   // New rows carry only attachment_path (private bucket, rendered through a signed URL). attachment_url is
   // kept for external GIF links and for legacy rows, which have no path and show as unavailable.
@@ -1197,6 +1200,11 @@ const renderMessages = () => {
     const safeUrl = safeAttachmentUrl(rawUrl);
     if (!safeUrl) return unavailable();
     const url = escapeHtml(safeUrl);
+    if (!attachment.path && attachment.kind === 'gif') {
+      let host = ''; try { host = new URL(safeUrl).hostname; } catch { /* ignore */ }
+      if (!GIF_AUTOLOAD_HOSTS.has(host) || new URL(safeUrl).protocol !== 'https:') return `<a class="message-attachment message-attachment-document" href="${url}" target="_blank" rel="noopener noreferrer"><span class="message-document-icon">↗</span><span><strong>${name}</strong><small>OPEN LINK</small></span></a>`;
+      return `<a class="message-attachment message-attachment-image-link" href="${url}" target="_blank" rel="noopener noreferrer"><img class="message-attachment-image" src="${url}" alt="${name}" loading="lazy" referrerpolicy="no-referrer" /></a>`;
+    }
     if (attachment.kind === 'image' || attachment.kind === 'gif') return `<a class="message-attachment message-attachment-image-link" href="${url}" target="_blank" rel="noreferrer"><img class="message-attachment-image" src="${url}" alt="${name}" loading="lazy" /></a>`;
     if (attachment.kind === 'video') return `<video class="message-attachment-video" controls playsinline preload="metadata" src="${url}"></video>`;
     return `<a class="message-attachment message-attachment-document" href="${url}" target="_blank" rel="noreferrer"><span class="message-document-icon">↗</span><span><strong>${name}</strong><small>OPEN DOCUMENT</small></span></a>`;
