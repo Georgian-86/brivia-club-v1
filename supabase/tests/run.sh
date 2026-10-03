@@ -18,8 +18,9 @@ as_pg "$BIN/pg_ctl" -D "$DATA" -o "-p $PORT -k /tmp -c listen_addresses=''" -w -
 
 # Files are copied to /tmp so the postgres OS user can read them.
 STAGE=$(mktemp -d /tmp/brivia-sql.XXXX); trap 'cleanup; rm -rf "$STAGE"' EXIT
-mkdir "$STAGE/migrations" "$STAGE/tests"
+mkdir "$STAGE/migrations" "$STAGE/tests" "$STAGE/seed"
 cp "$SQL"/migrations/*.sql "$STAGE/migrations/"; cp "$HERE"/*.sql "$STAGE/tests/"
+cp "$SQL"/seed/*.sql "$STAGE/seed/"
 chmod -R a+rX "$STAGE"
 
 run() { echo "== $1"; "${PSQL[@]}" -d $DB -f "$STAGE/$1"; }
@@ -36,5 +37,21 @@ run tests/supabase-stub.sql
 for pass in 1 2; do
   for m in "$STAGE"/migrations/*.sql; do run "migrations/$(basename "$m")"; done
 done
-for t in "$STAGE"/tests/*.test.sql; do run "tests/$(basename "$t")"; done
+for t in "$STAGE"/tests/*.test.sql; do
+  [ "$(basename "$t")" = seed.test.sql ] && continue   # needs the seed: runs in its own database below
+  run "tests/$(basename "$t")"
+done
+
+# 3) Seed + purge (Task 7): own database so the other suites never see test members. The seed runs as the
+#    owner (here postgres, session_user = current_user), exactly like the SQL editor; it is run twice (idempotent).
+"${PSQL[@]}" -d postgres -c "create database ${DB}_seed"
+( DB=${DB}_seed; echo "## database $DB (seed and purge)"
+  run tests/supabase-stub.sql
+  for m in "$STAGE"/migrations/*.sql; do run "migrations/$(basename "$m")"; done
+  run seed/purge-test-members.sql   # safe when nothing is seeded
+  run seed/test-members.sql; run seed/test-members.sql
+  "${PSQL[@]}" -d $DB -v phase=seeded -f "$STAGE/tests/seed.test.sql"
+  "${PSQL[@]}" -d $DB -v phase=extras -f "$STAGE/tests/seed.test.sql"
+  run seed/purge-test-members.sql; run seed/purge-test-members.sql
+  "${PSQL[@]}" -d $DB -v phase=purged -f "$STAGE/tests/seed.test.sql" )
 echo "ALL PASSED"

@@ -3,6 +3,16 @@ create schema if not exists auth;
 create schema if not exists storage;
 
 create table if not exists auth.users (id uuid primary key);
+-- Minimal real-Supabase columns the seed script writes (Ruling I2); all nullable so other tests insert only id.
+alter table auth.users
+  add column if not exists instance_id uuid, add column if not exists aud text, add column if not exists role text,
+  add column if not exists email text, add column if not exists encrypted_password text,
+  add column if not exists email_confirmed_at timestamptz, add column if not exists raw_app_meta_data jsonb,
+  add column if not exists raw_user_meta_data jsonb, add column if not exists created_at timestamptz,
+  add column if not exists updated_at timestamptz;
+-- Supabase keeps pgcrypto (crypt, gen_salt) in the "extensions" schema.
+create schema if not exists extensions;
+create extension if not exists pgcrypto schema extensions;
 
 create or replace function auth.uid() returns uuid language sql stable as $$
   -- Like Supabase's auth.uid(): an empty claims setting (left behind by an earlier SET LOCAL) means no user.

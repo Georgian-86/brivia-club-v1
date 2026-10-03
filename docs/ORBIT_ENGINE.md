@@ -397,7 +397,7 @@ profiles never enter the pool.
 
 ### 9.1 Trust boundary
 
-*Design accepted in Iteration 2 (D-021, Ruling I10); built in Iteration 4. Nothing in this section exists in code
+*Design accepted in Iteration 2 (D-025, Ruling I10); built in Iteration 4. Nothing in this section exists in code
 yet, except the member-side `interaction` restrictions in `0003_trust_hardening.sql`.* The service is the only
 process that sees cells, exact cell-to-cell km, `G`, headroom and served features. Its job at the boundary is to make
 sure none of that leaves, and that it never acts for a member it has not verified.
