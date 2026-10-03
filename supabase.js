@@ -166,10 +166,19 @@ export const saveProfile = async (userId, profile, photoFile, coverFile = null) 
   const photoUrl = await uploadProfilePhoto(userId, photoFile);
   const coverUrl = coverFile ? await uploadProfileCover(userId, coverFile) : (profile.coverUrl || profile.cover_url || '');
   const row = profileToRow({ ...profile, coverUrl }, userId, photoUrl);
-  let result = await supabase.from('profiles').upsert(row, { onConflict: 'id' }).select().single();
+  // Members may update only editable columns (0003_trust_hardening.sql): id, email and created_at
+  // are insert-only, so an upsert (which rewrites every column) would be denied. Update first,
+  // insert the full row only when this member has no profile yet.
+  const write = async (payload) => {
+    const { id: ignoredId, email: ignoredEmail, created_at: ignoredCreatedAt, ...editable } = payload;
+    const updated = await supabase.from('profiles').update(editable).eq('id', userId).select().maybeSingle();
+    if (updated.error || updated.data) return updated;
+    return supabase.from('profiles').insert(payload).select().single();
+  };
+  let result = await write(row);
   if (result.error && /cover_url|column/i.test(result.error.message || '')) {
     const { cover_url: ignoredCoverUrl, ...legacyRow } = row;
-    result = await supabase.from('profiles').upsert(legacyRow, { onConflict: 'id' }).select().single();
+    result = await write(legacyRow);
   }
   return result;
 };
