@@ -3,11 +3,12 @@
 //
 //   PLAYWRIGHT_MODULE=/path/to/node_modules/playwright/index.mjs node tests/e2e/consent.spec.mjs
 //
-// Asserts: a like POSTs /rest/v1/connection_requests and never /rest/v1/matches; a pitch never POSTs
-// /rest/v1/brivia_messages; other members are read from /rest/v1/public_profiles only; a stubbed match
-// row shows the "It's mutual" toast; the Requests list renders (escaped note, 44px equal-weight
-// buttons) and Accept calls /rest/v1/rpc/respond_connection_request; no email/phone field reaches
-// the page from another member's data.
+// Asserts: a like opens the pitch sheet and sends exactly ONE /rest/v1/connection_requests POST when the
+// sheet resolves (Ruling P13): submit carries the note; close / Escape / backdrop / next card send note
+// null; nothing is POSTed before. Never /rest/v1/matches or /rest/v1/brivia_messages. Other members are
+// read from /rest/v1/public_profiles only; a stubbed match row shows "It's mutual"; the Requests list
+// renders (escaped note, 44px equal-weight buttons), Accept calls /rest/v1/rpc/respond_connection_request
+// and opens chat only if a match exists; crafted photo_url values cannot inject markup.
 import { spawn } from 'node:child_process';
 import assert from 'node:assert/strict';
 import { fileURLToPath } from 'node:url';
@@ -24,13 +25,16 @@ const ME = '11111111-1111-4111-8111-111111111111';
 const BOB = '22222222-2222-4222-8222-222222222222';
 const CARA = '33333333-3333-4333-8333-333333333333';
 const DEV = '44444444-4444-4444-8444-444444444444';
+const EVE = '55555555-5555-4555-8555-555555555555'; // not in the deck: loaded via public_profiles?id=in.(…)
 const ago = (ms) => new Date(Date.now() - ms).toISOString();
 // public_profiles rows: no email / phone columns, exactly like the view.
 const publicRows = [
-  { id: BOB, name: 'Bob Lane', city: 'Pune', experience: 'Designer', skills: ['Design'], looking_for: ['Cofounder'], photo_url: '', created_at: ago(1000) },
+  { id: BOB, name: 'Bob Lane', city: 'Pune', experience: 'Designer', skills: ['Design'], looking_for: ['Cofounder'], photo_url: 'javascript:window.__xss=1', created_at: ago(1000) },
   { id: CARA, name: 'Cara Moss', city: 'Pune', experience: 'Engineer', skills: ['Climbing'], looking_for: ['Friends'], photo_url: '', created_at: ago(2000) },
   { id: DEV, name: 'Dev Rao', city: 'Pune', experience: 'Writer', skills: ['Poetry'], looking_for: ['Friends'], photo_url: '', created_at: ago(3000) },
 ];
+// A stranger whose photo_url tries to break out of the src attribute.
+const eveRow = { id: EVE, name: 'Eve Stone', city: 'Delhi', experience: 'Analyst', skills: ['Chess'], looking_for: ['Friends'], photo_url: 'x" onerror="window.__xss=1', created_at: ago(4000) };
 const ownRow = { id: ME, name: 'Alex Me', full_name: 'Alex Me', email: 'alex@test.brivia.club', phone: '+910000000000', city: 'Pune', experience: 'Founder', skills: ['Design'], looking_for: ['Cofounder'], gender: 'Prefer not to say', created_at: ago(9000) };
 
 const b64url = (value) => Buffer.from(JSON.stringify(value)).toString('base64url');
@@ -63,7 +67,7 @@ try {
   const context = await browser.newContext({ viewport: { width: 1280, height: 900 } });
   await context.addInitScript(([key, value]) => { window.localStorage.setItem(key, value); }, ['sb-stub-auth-token', JSON.stringify(session)]);
 
-  const state = { matchedWith: new Set(), insertedRequests: new Set(), holdInsert: null, holdRpc: null };
+  const state = { matchedWith: new Set(), insertedRequests: new Set(), answered: new Set(), holdInsert: null, holdRpc: null };
   const calls = [];
   const bodies = [];
   await context.route(`${ORIGIN}/**`, async (route) => {
@@ -86,7 +90,7 @@ try {
     }
     if (pathName === '/rest/v1/public_profiles') {
       const ids = (url.searchParams.get('id') || '').match(/in\.\((.*)\)/)?.[1]?.split(',');
-      return json(200, ids ? publicRows.filter((row) => ids.includes(row.id)) : publicRows);
+      return json(200, ids ? [...publicRows, eveRow].filter((row) => ids.includes(row.id)) : publicRows);
     }
     if (pathName === '/rest/v1/matches') {
       if (method !== 'GET') return json(403, { code: '42501', message: 'clients cannot write matches' });
@@ -103,12 +107,17 @@ try {
         state.insertedRequests.add(key);
         return route.fulfill({ status: 201, body: '', headers: { 'access-control-allow-origin': '*' } });
       }
-      return json(200, state.requestsAnswered ? [] : [{ from_id: DEV, note: '<b>climb</b> with me?', created_at: ago(60000) }]);
+      return json(200, [
+        { from_id: DEV, note: '<b>climb</b> with me?', created_at: ago(60000) },
+        { from_id: EVE, note: null, created_at: ago(120000) },
+      ].filter((row) => !state.answered.has(row.from_id)));
     }
     if (pathName === '/rest/v1/rpc/respond_connection_request') {
       if (state.holdRpc) await state.holdRpc;
-      state.requestsAnswered = true;
-      state.matchedWith.add(DEV);
+      const { p_from: from, p_accept: acceptIt } = JSON.parse(postData || '{}');
+      state.answered.add(from);
+      // EVE stands for a blocked pair: the server records a silent decline and creates no match (Ruling P12).
+      if (acceptIt && from !== EVE) state.matchedWith.add(from);
       return route.fulfill({ status: 204, body: '', headers: { 'access-control-allow-origin': '*' } });
     }
     if (pathName.startsWith('/rest/v1/')) return json(200, []);
@@ -131,59 +140,103 @@ try {
   const toast = () => page.locator('#app-toast').textContent();
   const posts = (p) => calls.filter((call) => call.method === 'POST' && call.path === p);
 
-  // 1. Like: request only, never a match write.
-  const firstName = (await page.locator('#swipe-name').textContent()).trim();
-  await page.locator('[data-action="like"]').click();
-  await page.waitForFunction(() => document.querySelector('#app-toast')?.classList.contains('show'));
-  check('like POSTs /rest/v1/connection_requests', () => {
-    const likes = posts('/rest/v1/connection_requests');
-    assert.equal(likes.length, 1);
-    const body = JSON.parse(likes[0].body);
-    assert.equal(body.from_id, ME);
-    assert.ok(publicRows.some((row) => row.id === body.to_id && firstName.startsWith(row.name.split(' ')[0])), `to_id ${body.to_id} vs card ${firstName}`);
-  });
-  check('like never writes /rest/v1/matches', () => assert.equal(calls.filter((c) => c.path === '/rest/v1/matches' && c.method !== 'GET').length, 0));
-  check('like checks matches in both orders', () => assert.ok(calls.some((c) => c.path === '/rest/v1/matches' && /and\(user1_id\.eq\.[^,]+,user2_id\.eq\.[^)]+\),and\(/.test(c.search))));
-  const likeToast = await toast();
-  check(`like toast is "Signal sent" (got "${likeToast}")`, () => assert.equal(likeToast, 'Signal sent'));
-  const pitchOpen = await page.locator('#pitch-modal').isVisible();
-  check('pitch modal opened after like', () => assert.equal(pitchOpen, true));
+  const requestPosts = () => posts('/rest/v1/connection_requests');
+  const matchWrites = () => calls.filter((c) => c.path === '/rest/v1/matches' && c.method !== 'GET');
+  const cardRow = async () => { const name = (await page.locator('#swipe-name').textContent()).trim(); return publicRows.find((row) => name.startsWith(row.name.split(' ')[0])); };
+  const waitForToast = (re) => page.waitForFunction((src) => new RegExp(src).test(document.querySelector('#app-toast')?.textContent || ''), re.source, { timeout: 5000 });
+  const likeAndOpenSheet = async () => {
+    await page.waitForFunction(() => document.querySelector('#pitch-modal')?.hidden);
+    const row = await cardRow();
+    await page.locator('[data-action="like"]').click();
+    await page.waitForSelector('#pitch-modal:not([hidden])');
+    await page.waitForTimeout(500); // past the 280 ms card advance
+    return row;
+  };
+  const resetToast = () => page.evaluate(() => { const t = document.querySelector('#app-toast'); if (t) t.textContent = ''; });
 
-  // 2. Pitch after a like: duplicate (23505) is silent; button disabled in flight; no message insert.
-  let releaseInsert;
-  state.holdInsert = new Promise((resolve) => { releaseInsert = resolve; });
-  const requestsBeforeArrows = posts('/rest/v1/connection_requests').length;
+  // 1. Like + submit: nothing before the sheet resolves, then exactly ONE POST carrying the note.
+  let before = requestPosts().length;
+  const bob = await likeAndOpenSheet();
+  check('no request POST while the pitch sheet is open (P13)', () => assert.equal(requestPosts().length, before));
   await page.locator('#pitch-message').focus();
   await page.keyboard.press('ArrowRight');
   await page.keyboard.press('ArrowLeft');
   await page.waitForTimeout(300);
-  check('arrow keys while typing a pitch do not send a like', () => assert.equal(posts('/rest/v1/connection_requests').length, requestsBeforeArrows));
+  check('arrow keys while typing a pitch do not like/advance', () => { assert.equal(requestPosts().length, before); });
+  let releaseInsert;
+  state.holdInsert = new Promise((resolve) => { releaseInsert = resolve; });
   await page.locator('#pitch-message').fill('Hello, shall we talk design?');
+  await resetToast();
   await page.locator('.pitch-submit').click();
   await page.waitForTimeout(150);
   const disabledInFlight = await page.locator('.pitch-submit').isDisabled();
+  await page.locator('.pitch-submit').click({ force: true }).catch(() => {}); // double submit attempt
+  await page.evaluate(() => document.querySelector('#pitch-form').requestSubmit());
   releaseInsert(); state.holdInsert = null;
   await page.waitForFunction(() => document.querySelector('#pitch-modal')?.hidden);
-  const pitchToast = await toast();
+  await waitForToast(/Request sent to/);
+  await page.waitForTimeout(300);
+  const submitPosts = requestPosts().slice(before);
   check('pitch submit disabled while in flight', () => assert.equal(disabledInFlight, true));
-  check('pitch POSTs connection_requests with the note', () => {
-    const last = posts('/rest/v1/connection_requests').at(-1);
-    assert.equal(JSON.parse(last.body).note, 'Hello, shall we talk design?');
+  check(`like + submit = exactly one POST (got ${submitPosts.length})`, () => assert.equal(submitPosts.length, 1));
+  check('that one POST carries the note and the liked person', () => {
+    const body = JSON.parse(submitPosts[0].body);
+    assert.deepEqual({ from: body.from_id, to: body.to_id, note: body.note }, { from: ME, to: bob.id, note: 'Hello, shall we talk design?' });
   });
-  check(`duplicate pitch shows "Request sent to …" (got "${pitchToast}")`, () => assert.match(pitchToast, /^Request sent to /));
+  const submitToast = await toast();
+  check(`submit toast is "Request sent to ${bob.name}" (got "${submitToast}")`, () => assert.equal(submitToast, `Request sent to ${bob.name}`));
   check('pitch never POSTs /rest/v1/brivia_messages', () => assert.equal(posts('/rest/v1/brivia_messages').length, 0));
 
-  // 3. Mutual: the matches lookup returns a row -> "It's mutual" toast, and the person appears in chats.
-  await page.waitForTimeout(400);
-  const secondName = (await page.locator('#swipe-name').textContent()).trim();
-  const secondRow = publicRows.find((row) => secondName.startsWith(row.name.split(' ')[0]));
-  state.matchedWith.add(secondRow.id);
-  await page.locator('[data-action="like"]').click();
-  await page.waitForFunction(() => /It's mutual/.test(document.querySelector('#app-toast')?.textContent || ''));
+  // 2. Like + close (×): one POST, note null. The stubbed matches lookup returns a row -> "It's mutual".
+  before = requestPosts().length;
+  const cara = await likeAndOpenSheet();
+  state.matchedWith.add(cara.id);
+  check(`no POST before the sheet resolves (${cara.name})`, () => assert.equal(requestPosts().length, before));
+  await resetToast();
+  await page.locator('#pitch-modal .overlay-close').click();
+  await waitForToast(/It's mutual/);
+  await page.waitForTimeout(300);
+  let resolved = requestPosts().slice(before);
+  check(`like + close = one POST with note null (got ${resolved.length})`, () => { assert.equal(resolved.length, 1); const b = JSON.parse(resolved[0].body); assert.equal(b.to_id, cara.id); assert.equal(b.note, null); });
   const mutualToast = await toast();
-  check(`mutual toast (got "${mutualToast}")`, () => assert.equal(mutualToast, `It's mutual. Say hi to ${secondRow.name}.`));
-  check('still no match writes after mutual like', () => assert.equal(calls.filter((c) => c.path === '/rest/v1/matches' && c.method !== 'GET').length, 0));
+  check(`mutual toast (got "${mutualToast}")`, () => assert.equal(mutualToast, `It's mutual. Say hi to ${cara.name}.`));
+
+  // 3. Like + Escape: one POST, note null, "Signal sent".
+  before = requestPosts().length;
+  const dev = await likeAndOpenSheet();
+  await resetToast();
   await page.keyboard.press('Escape');
+  await waitForToast(/Signal sent/);
+  await page.waitForTimeout(300);
+  resolved = requestPosts().slice(before);
+  check(`like + Escape = one POST with note null (got ${resolved.length})`, () => { assert.equal(resolved.length, 1); const b = JSON.parse(resolved[0].body); assert.equal(b.to_id, dev.id); assert.equal(b.note, null); });
+  const escToast = await toast();
+  check(`plain like toast is "Signal sent" (got "${escToast}")`, () => assert.equal(escToast, 'Signal sent'));
+
+  // 4. Like + backdrop: one POST, note null (a repeat like of the same person gets 23505 -> same "Signal sent").
+  before = requestPosts().length;
+  const again = await likeAndOpenSheet();
+  await resetToast();
+  await page.locator('#pitch-modal .app-overlay-backdrop').click({ position: { x: 5, y: 5 } });
+  await waitForToast(/Signal sent|It's mutual/);
+  await page.waitForTimeout(300);
+  resolved = requestPosts().slice(before);
+  check(`like + backdrop = one POST with note null (got ${resolved.length})`, () => { assert.equal(resolved.length, 1); const b = JSON.parse(resolved[0].body); assert.equal(b.to_id, again.id); assert.equal(b.note, null); });
+  const dupToast = await toast();
+  check(`duplicate (23505) like still reads "Signal sent" (got "${dupToast}")`, () => assert.equal(dupToast, 'Signal sent'));
+
+  // 5. Like, then move to the next card with the sheet open: one POST for the liked person, note null.
+  before = requestPosts().length;
+  const liked = await likeAndOpenSheet();
+  await page.evaluate(() => document.querySelector('[data-action="pass"]').click());
+  await page.waitForTimeout(600);
+  resolved = requestPosts().slice(before);
+  check(`like + next card = one POST with note null (got ${resolved.length})`, () => { assert.equal(resolved.length, 1); const b = JSON.parse(resolved[0].body); assert.equal(b.to_id, liked.id); assert.equal(b.note, null); });
+  const sheetHidden = await page.locator('#pitch-modal').isHidden();
+  check('moving to the next card closes the pitch sheet', () => assert.equal(sheetHidden, true));
+  check('no writes to /rest/v1/matches at any point', () => assert.equal(matchWrites().length, 0));
+  check('like checks matches in both orders', () => assert.ok(calls.some((c) => c.path === '/rest/v1/matches' && /and\(user1_id\.eq\.[^,]+,user2_id\.eq\.[^)]+\),and\(/.test(c.search))));
+  await page.waitForTimeout(3000); // let the last toast clear
 
   // 4. Requests list in the notifications panel.
   // Opening the panel refetches requests and re-renders the list; wait for that before measuring.
@@ -227,12 +280,40 @@ try {
   check(`accept toast (got "${acceptToast}")`, () => assert.equal(acceptToast, "It's mutual. Say hi to Dev Rao."));
   check('accept refreshed connections from matches', () => assert.ok(calls.filter((c) => c.path === '/rest/v1/matches' && c.method === 'GET' && !c.search.includes('and(')).length >= 2));
 
+  // 4b. A stranger's request: sender loaded via public_profiles?id=in.(…); a crafted photo_url cannot inject markup.
+  const eveItem = page.locator(`[data-request-from="${EVE}"]`);
+  const eveName = await eveItem.locator('strong').textContent();
+  check(`unknown sender loaded from public_profiles (got "${eveName}")`, () => {
+    assert.equal(eveName, 'Eve Stone');
+    assert.ok(calls.some((c) => c.path === '/rest/v1/public_profiles' && c.search.includes(`id=in.(${EVE})`)));
+  });
+  const injected = await page.evaluate(() => ({
+    xss: window.__xss,
+    onerrorImgs: document.querySelectorAll('img[onerror]').length,
+    jsSrcImgs: [...document.querySelectorAll('img')].filter((img) => /^javascript:/i.test(img.getAttribute('src') || '')).length,
+    eveImgSrc: document.querySelector(`[data-request-from="${'55555555-5555-4555-8555-555555555555'}"] img`)?.getAttribute('src') || null,
+  }));
+  check(`crafted photo_url values inject nothing (${JSON.stringify(injected)})`, () => {
+    assert.equal(injected.xss, undefined);
+    assert.equal(injected.onerrorImgs, 0);
+    assert.equal(injected.jsSrcImgs, 0);
+    assert.equal(injected.eveImgSrc, null, 'crafted photo_url should fall back to the initials avatar');
+  });
+  // Accepting a blocked pair: the RPC succeeds but no match exists -> neutral toast, no chat.
+  await resetToast();
+  await eveItem.locator('[data-request-respond="accept"]').click();
+  await page.waitForFunction((id) => !document.querySelector(`[data-request-from="${id}"]`), EVE);
+  await waitForToast(/\S/);
+  const blockedToast = await toast();
+  check(`accept with no resulting match shows a neutral toast (got "${blockedToast}")`, () => assert.equal(blockedToast, 'Request answered.'));
+
   // 5. Chat list now contains the mutual and accepted people only.
   await page.evaluate(() => document.querySelector('[data-nav="chat"]')?.click());
   await page.waitForTimeout(400);
   const chatText = await page.locator('[data-view="chat"]').innerText();
-  check('chat list shows matched people (mutual like + accepted)', () => { assert.ok(chatText.includes(secondRow.name), 'mutual person missing'); assert.ok(chatText.includes('Dev Rao'), 'accepted person missing'); });
-  check('chat list does not show the unmatched liked person', () => assert.ok(!chatText.includes(publicRows.find((r) => firstName.startsWith(r.name.split(' ')[0])).name)));
+  check('chat list shows matched people (mutual like + accepted)', () => { assert.ok(chatText.includes(cara.name), 'mutual person missing'); assert.ok(chatText.includes('Dev Rao'), 'accepted person missing'); });
+  check('chat list does not show the unmatched liked person', () => assert.ok(!chatText.includes(bob.name)));
+  check('chat list does not show the blocked-pair accept', () => assert.ok(!chatText.includes('Eve Stone')));
 
   // 6. Privacy: others are read only through public_profiles; no other-member email/phone in any stubbed body or the DOM.
   check('profiles table read only for own id', () => {

@@ -51,6 +51,8 @@ let selectedChat = null;
 let chatShouldOpenAtLatest = false;
 let suppressChatAutoOpen = false;
 let pitchPerson = null;
+// Ruling P13: a like opens the pitch sheet and defers its single request until the sheet resolves.
+let pendingPitch = null; // { person, resolved }
 const chatMessages = {};
 const readChatIds = new Set();
 let messageSyncTimer = null;
@@ -116,6 +118,22 @@ const restoreConversation = (personId) => {
 };
 
 const escapeHtml = (value = '') => String(value).replace(/[&<>'"]/g, (character) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[character]));
+// Member photo URLs come from other members' rows: allow only https, same-origin or inline image data, and
+// always escape, so a crafted photo_url can never break out of the src attribute (stored XSS).
+const safeImageUrl = (value) => {
+  const raw = String(value || '').trim();
+  if (!raw || /["'<>`\\]/.test(raw)) return '';
+  if (/^data:image\/(png|jpe?g|gif|webp);base64,[a-z0-9+/=\s]+$/i.test(raw)) return raw;
+  try {
+    const url = new URL(raw, window.location.href);
+    if (url.protocol === 'https:' || url.origin === window.location.origin) return url.href;
+  } catch { /* not a URL */ }
+  return '';
+};
+const avatarImage = (image, name) => {
+  const src = safeImageUrl(image);
+  return src ? `<img src="${escapeHtml(src)}" alt="${escapeHtml(name)}" />` : '';
+};
 const initials = (name = 'New Member') => name.split(/\s+/).map((part) => part[0]).join('').slice(0, 2).toUpperCase();
 const headerInitials = (name = 'New Member') => String(name).trim().replace(/\s+/g, '').slice(0, 2).toUpperCase() || 'NM';
 const showToast = (message) => {
@@ -353,7 +371,7 @@ const routeFromUrl = () => {
   setView(validViews.includes(view) ? view : 'explore');
 };
 
-const renderAvatar = (person, className = 'mini-avatar') => person?.image ? `<div class="${className}"><img src="${person.image}" alt="${escapeHtml(person.name)}" /></div>` : `<div class="${className}">${escapeHtml(initials(person?.name))}</div>`;
+const renderAvatar = (person, className = 'mini-avatar') => `<div class="${className}">${avatarImage(person?.image, person?.name) || escapeHtml(initials(person?.name))}</div>`;
 
 const splitProfileValues = (value) => String(value || '').split(',').map((item) => item.trim()).filter(Boolean);
 const normalizedValue = (value) => String(value || '').trim().toLowerCase();
@@ -426,8 +444,8 @@ const renderHome = (queue = getExplorePeople()) => {
   emptyState?.setAttribute('hidden', '');
   updateDailySwipeUi();
   const image = document.querySelector('#swipe-image');
-  if (image) { image.src = currentPerson.coverUrl || currentPerson.image || ''; image.alt = `${currentPerson.name} cover image`; }
-  if (card) card.style.setProperty('--card-avatar-image', `url("${currentPerson.image || ''}")`);
+  if (image) { image.src = safeImageUrl(currentPerson.coverUrl) || safeImageUrl(currentPerson.image); image.alt = `${currentPerson.name} cover image`; }
+  if (card) card.style.setProperty('--card-avatar-image', `url("${safeImageUrl(currentPerson.image).replace(/["\\\n]/g, encodeURIComponent)}")`);
   const name = document.querySelector('#swipe-name'); if (name) name.textContent = currentPerson.name;
   const handle = document.querySelector('#swipe-location'); if (handle) handle.textContent = `@${currentPerson.name.toLowerCase().replace(/[^a-z0-9]+/g, '')}`;
   const cardLabel = document.querySelector('#swipe-card-label');
@@ -526,6 +544,8 @@ const respondToRequest = async (fromId, accept) => {
   pendingRequests = pendingRequests.filter((item) => item.fromId !== fromId);
   renderNotifications();
   if (!accept) { showToast('Request declined.'); return; }
+  // Accepting a blocked pair silently records a decline (Ruling P12): only a real match opens chat.
+  if (!(await hasMatchWith(fromId))) { showToast('Request answered.'); return; }
   addConnection(fromId);
   await refreshConnections();
   renderChats();
@@ -562,11 +582,15 @@ const removeConnectionFromState = (person) => {
 };
 
 const openOverlay = (id) => document.querySelector(`#${id}`)?.removeAttribute('hidden');
-const closeOverlays = () => overlayIds.forEach((id) => document.querySelector(`#${id}`)?.setAttribute('hidden', ''));
+const closeOverlays = () => {
+  const pitchWasOpen = !document.querySelector('#pitch-modal')?.hidden;
+  overlayIds.forEach((id) => document.querySelector(`#${id}`)?.setAttribute('hidden', ''));
+  if (pitchWasOpen) dismissPendingPitch();
+};
 
 const fillInfo = (person) => {
   const avatar = document.querySelector('#info-avatar');
-  if (avatar) avatar.innerHTML = person.image ? `<img src="${person.image}" alt="${escapeHtml(person.name)}" />` : escapeHtml(initials(person.name));
+  if (avatar) avatar.innerHTML = avatarImage(person.image, person.name) || escapeHtml(initials(person.name));
   const infoName = document.querySelector('#info-name'); if (infoName) infoName.textContent = `${person.name}, ${person.age}`;
   const infoRole = document.querySelector('#info-role'); if (infoRole) infoRole.textContent = `${person.role} · ${person.city}`;
   const infoBio = document.querySelector('#info-bio'); if (infoBio) infoBio.textContent = person.bio;
@@ -607,7 +631,7 @@ const openPublicProfile = (person, options = {}) => {
   modal.setAttribute('role', 'dialog');
   modal.setAttribute('aria-modal', 'true');
   modal.setAttribute('aria-label', `${profile.name || 'Member'} public profile`);
-  modal.innerHTML = `<button class="public-profile-backdrop" type="button" data-public-profile-close aria-label="Close profile"></button><section class="public-profile-dialog"><button class="public-profile-close" type="button" data-public-profile-close aria-label="Close profile">×</button><div class="public-profile-cover"><div class="public-profile-avatar">${image ? `<img src="${escapeHtml(image)}" alt="${escapeHtml(profile.name)}" />` : escapeHtml(initials(profile.name))}</div></div><div class="public-profile-body"><p class="public-profile-kicker">BRIVIA MEMBER / PUBLIC PROFILE</p><h2>${escapeHtml(profile.name || 'Brivia member')}</h2><p class="public-profile-role">${escapeHtml(profile.role || 'Brivia member')}</p><p class="public-profile-location">${escapeHtml(location)}</p><p class="public-profile-bio">${escapeHtml(profile.bio || 'Open to meaningful connections inside the club.')}</p><div class="public-profile-facts"><div><span>LOOKING FOR</span><strong>${escapeHtml(lookingFor.join(', ') || 'Meaningful connections')}</strong></div><div><span>SKILLS &amp; INTERESTS</span><strong>${escapeHtml(skills.join(', ') || tags.join(', ') || 'Open to connect')}</strong></div></div><div class="public-profile-pills">${tags.length ? tags.map((tag) => `<span>${escapeHtml(tag)}</span>`).join('') : '<span>Open to connect</span>'}</div></div></section>`;
+  modal.innerHTML = `<button class="public-profile-backdrop" type="button" data-public-profile-close aria-label="Close profile"></button><section class="public-profile-dialog"><button class="public-profile-close" type="button" data-public-profile-close aria-label="Close profile">×</button><div class="public-profile-cover"><div class="public-profile-avatar">${avatarImage(image, profile.name) || escapeHtml(initials(profile.name))}</div></div><div class="public-profile-body"><p class="public-profile-kicker">BRIVIA MEMBER / PUBLIC PROFILE</p><h2>${escapeHtml(profile.name || 'Brivia member')}</h2><p class="public-profile-role">${escapeHtml(profile.role || 'Brivia member')}</p><p class="public-profile-location">${escapeHtml(location)}</p><p class="public-profile-bio">${escapeHtml(profile.bio || 'Open to meaningful connections inside the club.')}</p><div class="public-profile-facts"><div><span>LOOKING FOR</span><strong>${escapeHtml(lookingFor.join(', ') || 'Meaningful connections')}</strong></div><div><span>SKILLS &amp; INTERESTS</span><strong>${escapeHtml(skills.join(', ') || tags.join(', ') || 'Open to connect')}</strong></div></div><div class="public-profile-pills">${tags.length ? tags.map((tag) => `<span>${escapeHtml(tag)}</span>`).join('') : '<span>Open to connect</span>'}</div></div></section>`;
   document.body.append(modal);
   modal.querySelector('.public-profile-cover').style.backgroundImage = `url("${coverUrl.replace(/"/g, '%22')}")`;
   const close = () => modal.remove();
@@ -617,7 +641,26 @@ const openPublicProfile = (person, options = {}) => {
   window.setTimeout(() => modal.focus(), 0);
 };
 
+// Claims the pending like exactly once; every later caller gets null, so one like = one insert.
+const claimPendingPitch = () => {
+  const pending = pendingPitch;
+  if (!pending || pending.resolved) return null;
+  pending.resolved = true;
+  pendingPitch = null;
+  return pending;
+};
+// Close, Escape, backdrop or moving on: send the like's request without a note.
+const dismissPendingPitch = () => {
+  const pending = claimPendingPitch();
+  if (!pending) return;
+  pitchPerson = null;
+  sendConnectionSignal(pending.person).then(({ matched, error }) => {
+    showToast(error ? signalErrorToast : matched ? mutualToast(pending.person) : 'Signal sent');
+  });
+};
 const openPitch = (person) => {
+  dismissPendingPitch();
+  pendingPitch = { person, resolved: false };
   pitchPerson = person;
   const pitchName = document.querySelector('#pitch-name'); if (pitchName) pitchName.textContent = person.name;
   const pitchMessage = document.querySelector('#pitch-message'); if (pitchMessage) pitchMessage.value = `Hey ${person.name}, I noticed we both care about ${person.tags[0].toLowerCase()}. Would love to connect and exchange ideas.`;
@@ -627,6 +670,8 @@ const openPitch = (person) => {
 
 const swipe = (type) => {
   if (!currentPerson) return;
+  // Moving to the next card resolves an open pitch sheet as a plain like.
+  if (pendingPitch) { document.querySelector('#pitch-modal')?.setAttribute('hidden', ''); dismissPendingPitch(); }
   if (!recordDailySwipe()) {
     renderHome();
     showToast('FREE LIMIT EXCEEDED — COME TOMORROW');
@@ -634,13 +679,8 @@ const swipe = (type) => {
   }
   const card = document.querySelector('#swipe-card');
   card?.classList.add(type === 'like' ? 'is-liking' : 'is-passing');
-  if (type === 'like') {
-    const likedPerson = currentPerson;
-    sendConnectionSignal(likedPerson).then(({ matched, error }) => {
-      showToast(error ? signalErrorToast : matched ? mutualToast(likedPerson) : 'Signal sent');
-    });
-    openPitch(likedPerson);
-  }
+  // The request is sent when the pitch sheet resolves (submit with a note, or dismiss without one).
+  if (type === 'like') openPitch(currentPerson);
   window.setTimeout(() => {
     const queue = getExplorePeople();
     if (!queue.length) { currentPerson = null; currentIndex = 0; } else { currentIndex = (currentIndex + 1) % queue.length; currentPerson = queue[currentIndex]; }
@@ -978,7 +1018,7 @@ const openChat = (person, markAsRead = true) => {
   windowPanel?.removeAttribute('hidden');
   const avatar = document.querySelector('#chat-avatar');
   if (avatar) {
-    avatar.innerHTML = person.image ? `<img src="${person.image}" alt="${escapeHtml(person.name)}" />` : escapeHtml(initials(person.name));
+    avatar.innerHTML = avatarImage(person.image, person.name) || escapeHtml(initials(person.name));
     avatar.dataset.publicProfileId = person.id;
     avatar.setAttribute('role', 'button');
     avatar.setAttribute('tabindex', '0');
@@ -1421,7 +1461,7 @@ const renderProfile = () => {
   const profileSidebarCover = document.querySelector('#profile-sidebar-cover');
   if (profileSidebarCover) profileSidebarCover.style.backgroundImage = `url("${coverUrl}")`;
   const avatar = document.querySelector('#profile-avatar');
-  if (avatar) avatar.innerHTML = profile.photoUrl ? `<img src="${profile.photoUrl}" alt="${escapeHtml(profile.name)}" />` : escapeHtml(initials(profile.name));
+  if (avatar) avatar.innerHTML = avatarImage(profile.photoUrl, profile.name) || escapeHtml(initials(profile.name));
   if (avatar && profile.photoName) avatar.title = profile.photoName;
   document.querySelector('#profile-email').textContent = profile.email || '—';
   document.querySelector('#profile-login-email').textContent = profile.email || '—';
@@ -1978,20 +2018,26 @@ document.querySelector('#chat-form')?.addEventListener('submit', async (event) =
 });
 document.querySelector('#pitch-form')?.addEventListener('submit', async (event) => {
   event.preventDefault();
-  const target = pitchPerson || currentPerson;
   const input = document.querySelector('#pitch-message');
   const body = input?.value.trim();
-  if (!target || !body || !supabase || !memberProfile.id) return;
+  if (!body || !supabase || !memberProfile.id) return;
   const submit = event.currentTarget.querySelector('.pitch-submit');
-  if (submit?.disabled) return;
+  const pending = claimPendingPitch();
+  if (!pending) return; // already resolved (double submit) or no like in progress
   if (submit) { submit.disabled = true; submit.setAttribute('aria-busy', 'true'); }
   try {
-    // The pitch travels as the request note; no message is sent until the pair is matched.
-    const { matched, error } = await sendConnectionSignal(target, body);
-    if (error) { showToast(signalErrorToast); return; }
-    closeOverlays();
-    showToast(matched ? mutualToast(target) : `Request sent to ${target.name}`);
+    // The pitch travels as the note of the like's single request; no message is sent until the pair is matched.
+    const { matched, error } = await sendConnectionSignal(pending.person, body);
+    if (error) {
+      // Nothing was stored: hand the like back so the member can retry or dismiss.
+      pending.resolved = false;
+      pendingPitch = pending;
+      showToast(signalErrorToast);
+      return;
+    }
     pitchPerson = null;
+    closeOverlays();
+    showToast(matched ? mutualToast(pending.person) : `Request sent to ${pending.person.name}`);
   } finally {
     if (submit) { submit.disabled = false; submit.removeAttribute('aria-busy'); }
   }
