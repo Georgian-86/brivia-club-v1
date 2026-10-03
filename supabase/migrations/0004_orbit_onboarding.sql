@@ -397,9 +397,9 @@ begin
     from jsonb_array_elements(p_items) e;
 
   update public.profiles
-     set skills = (select array_agg(n.label order by mi.points desc, n.label asc)
-                     from public.member_interest mi join public.interest_node n on n.id = mi.interest_id
-                    where mi.member_id = uid and not n.sensitive),
+     set skills = coalesce((select array_agg(n.label order by mi.points desc, n.label asc)
+                              from public.member_interest mi join public.interest_node n on n.id = mi.interest_id
+                             where mi.member_id = uid and not n.sensitive), '{}'),
          updated_at = now()
    where id = uid;
 end;

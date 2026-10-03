@@ -384,3 +384,19 @@ end $$;
 rollback;
 
 select 'orbit-interests.test.sql OK' as result;
+
+-- I1 re-review: a member whose picks are all sensitive can still save (skills becomes '{}', not NULL).
+begin;
+set local role authenticated;
+set local request.jwt.claims = '{"sub":"b5b5b5b5-0000-0000-0000-0000000000b5"}';
+select public.set_member_interests('[{"interest_id":"wellbeing.spirituality.scripture_study","points":20}]'::jsonb);
+do $$
+begin
+  if (select skills from public.profiles where id = auth.uid()) is distinct from '{}'::text[] then
+    raise exception 'FAIL: all-sensitive skills = %', (select skills from public.profiles where id = auth.uid());
+  end if;
+  if (select count(*) from public.my_interests()) <> 1 then
+    raise exception 'FAIL: all-sensitive member_interest rows missing';
+  end if;
+end $$;
+rollback;
