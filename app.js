@@ -146,6 +146,39 @@ const safeAttachmentUrl = (value) => {
   } catch { /* not a URL */ }
   return '';
 };
+const attachmentFromRow = (message) => (message.attachment_path || message.attachment_url ? {
+  // New rows carry only attachment_path (private bucket, rendered through a signed URL). attachment_url is
+  // kept for external GIF links and for legacy rows, which have no path and show as unavailable.
+  url: message.attachment_url || '',
+  path: message.attachment_path || '',
+  name: message.attachment_name || 'Attachment',
+  mime: message.attachment_mime || '',
+  kind: message.message_type || ((message.attachment_mime || '').startsWith('video/') ? 'video' : 'document'),
+  size: Number(message.attachment_size) || 0,
+} : null);
+// Signed URLs for private chat media: one per path per session, refreshed before they expire.
+const SIGNED_URL_TTL_SECONDS = 3600;
+const SIGNED_URL_REFRESH_MS = 5 * 60 * 1000;
+const signedAttachmentUrls = new Map(); // path -> { url, expiresAt } | { failedAt }
+const signedAttachmentInflight = new Set();
+const signedAttachmentUrl = (path) => {
+  const entry = signedAttachmentUrls.get(path);
+  const now = Date.now();
+  const failed = entry && entry.failedAt && now - entry.failedAt < 30000;
+  const usable = entry && entry.url && entry.expiresAt > now;
+  const needsRefresh = !entry || (entry.url ? entry.expiresAt - now < SIGNED_URL_REFRESH_MS : !failed);
+  if (needsRefresh && supabase && !signedAttachmentInflight.has(path)) {
+    signedAttachmentInflight.add(path);
+    supabase.storage.from('message-attachments').createSignedUrl(path, SIGNED_URL_TTL_SECONDS).then(({ data, error }) => {
+      if (error || !data?.signedUrl) { if (!usable) signedAttachmentUrls.set(path, { failedAt: Date.now() }); } else signedAttachmentUrls.set(path, { url: data.signedUrl, expiresAt: Date.now() + SIGNED_URL_TTL_SECONDS * 1000 });
+    }).catch(() => { if (!usable) signedAttachmentUrls.set(path, { failedAt: Date.now() }); }).finally(() => {
+      signedAttachmentInflight.delete(path);
+      if (typeof renderMessages === 'function') renderMessages();
+    });
+  }
+  if (usable) return { url: entry.url };
+  return { pending: !failed };
+};
 const avatarImage = (image, name) => {
   const src = safeImageUrl(image);
   return src ? `<img src="${escapeHtml(src)}" alt="${escapeHtml(name)}" />` : '';
@@ -179,7 +212,7 @@ const saveNotifications = () => {
   try { window.localStorage.setItem(notificationsStorageKey(), JSON.stringify(notifications.slice(0, 80))); } catch { /* Continue in memory if storage is unavailable. */ }
 };
 const findPersonById = (personId) => people.find((person) => String(person.id) === String(personId));
-const notificationPreview = (message) => message?.body || (message?.attachment_url ? 'Sent an attachment.' : 'Sent you a message.');
+const notificationPreview = (message) => message?.body || ((message?.attachment_url || message?.attachment_path) ? 'Sent an attachment.' : 'Sent you a message.');
 const addMessageNotification = (message) => {
   if (!areNotificationsEnabled() || !message?.id || !memberProfile.id || String(message.sender_id) === String(memberProfile.id)) return false;
   const id = String(message.id);
@@ -1022,14 +1055,7 @@ const loadChatMessages = async (person) => {
       createdAt: message.created_at,
       from: String(message.sender_id) === memberId ? 'me' : 'them',
       text: message.body ?? message.text ?? message.message ?? message.content ?? '',
-      attachment: message.attachment_url ? {
-        url: message.attachment_url,
-        path: message.attachment_path || '',
-        name: message.attachment_name || 'Attachment',
-        mime: message.attachment_mime || '',
-        kind: message.message_type || ((message.attachment_mime || '').startsWith('video/') ? 'video' : 'document'),
-        size: Number(message.attachment_size) || 0,
-      } : null,
+      attachment: attachmentFromRow(message),
     }));
     const previousMessages = chatMessages[person.id] || [];
     const messagesById = new Map(previousMessages.map((message) => [String(message.id), message]));
@@ -1046,7 +1072,7 @@ const loadChatMessages = async (person) => {
     const mergedMessages = [...messagesById.values()].sort((a, b) => new Date(a.createdAt || 0).getTime() - new Date(b.createdAt || 0).getTime());
     const messagesChanged = previousMessages.length !== mergedMessages.length || mergedMessages.some((message, index) => {
       const previous = previousMessages[index];
-      return !previous || previous.id !== message.id || previous.text !== message.text || previous.createdAt !== message.createdAt || previous.attachment?.url !== message.attachment?.url;
+      return !previous || previous.id !== message.id || previous.text !== message.text || previous.createdAt !== message.createdAt || previous.attachment?.url !== message.attachment?.url || previous.attachment?.path !== message.attachment?.path;
     });
     chatMessages[person.id] = mergedMessages;
     if (messagesChanged) renderMessages();
@@ -1075,14 +1101,7 @@ const appendRemoteMessage = (message) => {
     createdAt: message.created_at,
     from: senderId === memberId ? 'me' : 'them',
     text: message.body ?? message.text ?? message.message ?? message.content ?? '',
-    attachment: message.attachment_url ? {
-      url: message.attachment_url,
-      path: message.attachment_path || '',
-      name: message.attachment_name || 'Attachment',
-      mime: message.attachment_mime || '',
-      kind: message.message_type || ((message.attachment_mime || '').startsWith('video/') ? 'video' : 'document'),
-      size: Number(message.attachment_size) || 0,
-    } : null,
+    attachment: attachmentFromRow(message),
   });
   if (senderId !== memberId) readChatIds.delete(otherId);
   renderChats();
@@ -1114,7 +1133,7 @@ const startMessageSync = () => {
 
 const syncIncomingNotificationsFromServer = async () => {
   if (!supabase || !memberProfile.id) return;
-  const { data, error } = await supabase.from('brivia_messages').select('id,sender_id,recipient_id,body,created_at,attachment_url').eq('recipient_id', memberProfile.id).order('created_at', { ascending: false }).limit(80);
+  const { data, error } = await supabase.from('brivia_messages').select('id,sender_id,recipient_id,body,created_at,attachment_url,attachment_path').eq('recipient_id', memberProfile.id).order('created_at', { ascending: false }).limit(80);
   if (!error) await syncIncomingNotifications(data || []);
 };
 
@@ -1166,10 +1185,17 @@ const renderMessages = () => {
   const previousScrollTop = messages.scrollTop;
   const thread = chatMessages[selectedChat.id] || [];
   const renderAttachment = (attachment) => {
-    if (!attachment?.url) return '';
+    if (!attachment || (!attachment.url && !attachment.path)) return '';
     const name = escapeHtml(attachment.name || 'Attachment');
-    const safeUrl = safeAttachmentUrl(attachment.url);
-    if (!safeUrl) return `<span class="message-attachment message-attachment-document"><span class="message-document-icon">↗</span><span><strong>${name}</strong><small>ATTACHMENT UNAVAILABLE</small></span></span>`;
+    const unavailable = (label = 'ATTACHMENT UNAVAILABLE') => `<span class="message-attachment message-attachment-document"><span class="message-document-icon">↗</span><span><strong>${name}</strong><small>${label}</small></span></span>`;
+    let rawUrl = '';
+    if (attachment.path) {
+      const signed = signedAttachmentUrl(attachment.path);
+      if (signed.pending) return unavailable('LOADING ATTACHMENT');
+      rawUrl = signed.url || '';
+    } else if (attachment.kind === 'gif') rawUrl = attachment.url; // external GIF link, not our bucket
+    const safeUrl = safeAttachmentUrl(rawUrl);
+    if (!safeUrl) return unavailable();
     const url = escapeHtml(safeUrl);
     if (attachment.kind === 'image' || attachment.kind === 'gif') return `<a class="message-attachment message-attachment-image-link" href="${url}" target="_blank" rel="noreferrer"><img class="message-attachment-image" src="${url}" alt="${name}" loading="lazy" /></a>`;
     if (attachment.kind === 'video') return `<video class="message-attachment-video" controls playsinline preload="metadata" src="${url}"></video>`;
@@ -2101,8 +2127,8 @@ const insertChatMessage = async (body, attachment = null) => {
   const payload = { sender_id: memberProfile.id, recipient_id: selectedChat.id, body: body || '' };
   if (attachment) Object.assign(payload, {
     message_type: attachment.kind,
-    attachment_url: attachment.url,
-    attachment_path: attachment.path,
+    attachment_url: attachment.path ? null : attachment.url,
+    attachment_path: attachment.path || null,
     attachment_name: attachment.name,
     attachment_mime: attachment.mime,
     attachment_size: attachment.size,
@@ -2246,14 +2272,7 @@ const loadSupabaseCommunity = async () => {
         createdAt: message.created_at,
         from: message.sender_id === session.user.id ? 'me' : 'them',
         text: message.body ?? message.text ?? message.message ?? message.content ?? '',
-        attachment: message.attachment_url ? {
-          url: message.attachment_url,
-          path: message.attachment_path || '',
-          name: message.attachment_name || 'Attachment',
-          mime: message.attachment_mime || '',
-          kind: message.message_type || ((message.attachment_mime || '').startsWith('video/') ? 'video' : 'document'),
-          size: Number(message.attachment_size) || 0,
-        } : null,
+        attachment: attachmentFromRow(message),
       });
     });
     remoteMatchIds = [...inboxIds];

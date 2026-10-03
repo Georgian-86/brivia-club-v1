@@ -126,10 +126,10 @@ export const uploadMessageAttachment = async (userId, file) => {
     contentType: processedFile.type || 'application/octet-stream',
   });
   if (error) throw error;
-  const url = supabase.storage.from('message-attachments').getPublicUrl(path).data.publicUrl;
+  // The bucket is private: the path is stored and rendered through a signed URL (no public URL exists).
   return {
     path,
-    url,
+    url: '',
     kind,
     name: file.name,
     mime: processedFile.type || file.type || 'application/octet-stream',

@@ -29,12 +29,13 @@ form?.addEventListener('submit', async (event) => {
   const submitButton = form.querySelector('.career-form-submit');
   const data = new FormData(form);
   const role = String(data.get('role') || '');
+  const resumeMime = { pdf: 'application/pdf', doc: 'application/msword', docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' };
   const extension = resume.name.split('.').pop()?.toLowerCase() || 'bin';
   const resumePath = `${crypto.randomUUID()}-${resume.name.replace(/[^a-zA-Z0-9._-]/g, '_')}`;
   submitButton.disabled = true;
   status.textContent = 'Saving your application…';
   try {
-    const { error: uploadError } = await supabase.storage.from('career-resumes').upload(resumePath, resume, { upsert: false, contentType: resume.type || `application/${extension}` });
+    const { error: uploadError } = await supabase.storage.from('career-resumes').upload(resumePath, resume, { upsert: false, contentType: resume.type || resumeMime[extension] || 'application/octet-stream' });
     if (uploadError) throw uploadError;
     const { error: insertError } = await supabase.from('career_applications').insert({ role, name: String(data.get('name') || '').trim(), email: String(data.get('email') || '').trim(), linkedin_url: String(data.get('linkedin') || '').trim() || null, resume_path: resumePath, resume_name: resume.name, resume_size: resume.size });
     if (insertError) { await supabase.storage.from('career-resumes').remove([resumePath]); throw insertError; }

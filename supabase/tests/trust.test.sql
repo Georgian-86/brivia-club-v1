@@ -911,4 +911,114 @@ delete from public.brivia_blocks where blocker_id::text like '72000000-%' or blo
 delete from public.profiles where id::text like '72000000-%';
 delete from auth.users where id::text like '72000000-%';
 
+-- =============================================================================================
+-- Task 4: private chat media, bucket limits, careers throttle
+-- =============================================================================================
+-- 4.1 message-attachments is private; every bucket has a size limit and a mime allow-list.
+do $$
+declare r record;
+begin
+  if (select public from storage.buckets where id = 'message-attachments') is distinct from false then
+    raise exception 'FAIL T4: message-attachments is not private';
+  end if;
+  for r in select * from (values ('profile-photos', 5242880), ('profile-covers', 5242880), ('community-posts', 10485760),
+                                 ('message-attachments', 20971520), ('career-resumes', 5242880)) v(id, lim) loop
+    if (select file_size_limit from storage.buckets where id = r.id) is distinct from r.lim::bigint then
+      raise exception 'FAIL T4: % file_size_limit is %', r.id, (select file_size_limit from storage.buckets where id = r.id);
+    end if;
+    if coalesce(array_length((select allowed_mime_types from storage.buckets where id = r.id), 1), 0) = 0 then
+      raise exception 'FAIL T4: % has no allowed_mime_types', r.id;
+    end if;
+  end loop;
+  if (select allowed_mime_types from storage.buckets where id = 'career-resumes') <> array['application/pdf','application/msword','application/vnd.openxmlformats-officedocument.wordprocessingml.document'] then
+    raise exception 'FAIL T4: career-resumes mimes are wrong';
+  end if;
+  if not ('video/mp4' = any (array(select unnest(allowed_mime_types) from storage.buckets where id = 'message-attachments')) and
+          'application/pdf' = any (array(select unnest(allowed_mime_types) from storage.buckets where id = 'message-attachments')) and
+          'text/plain' = any (array(select unnest(allowed_mime_types) from storage.buckets where id = 'message-attachments'))) then
+    raise exception 'FAIL T4: message-attachments mimes miss mp4/pdf/txt';
+  end if;
+  if exists (select 1 from storage.buckets where id in ('profile-photos','profile-covers','community-posts') and not allowed_mime_types <@ array['image/jpeg','image/png','image/webp','image/gif']) then
+    raise exception 'FAIL T4: an image bucket allows a non-image mime';
+  end if;
+end $$;
+
+-- 4.2 Select on a chat object: uploader, sender or recipient of the message row; a third party is denied.
+insert into auth.users (id) values ('73000000-0000-0000-0000-000000000001'),('73000000-0000-0000-0000-000000000002'),('73000000-0000-0000-0000-000000000003') on conflict do nothing;
+insert into public.profiles (id, name, full_name, email, city) values
+  ('73000000-0000-0000-0000-000000000001','Sender','Sender','s4a@example.com','Pune'),
+  ('73000000-0000-0000-0000-000000000002','Recipient','Recipient','s4b@example.com','Pune'),
+  ('73000000-0000-0000-0000-000000000003','Third','Third','s4c@example.com','Pune')
+on conflict (id) do nothing;
+insert into public.brivia_messages (sender_id, recipient_id, body, message_type, attachment_path, attachment_name)
+  values ('73000000-0000-0000-0000-000000000001','73000000-0000-0000-0000-000000000002','', 'image',
+          '73000000-0000-0000-0000-000000000001/a.jpg', 'a.jpg');
+insert into storage.objects (bucket_id, name, owner) values
+  ('message-attachments', '73000000-0000-0000-0000-000000000001/a.jpg', '73000000-0000-0000-0000-000000000001'),
+  ('message-attachments', '73000000-0000-0000-0000-000000000001/unsent.jpg', '73000000-0000-0000-0000-000000000001');
+create or replace function pg_temp.t4_sees(uid text, obj text) returns int language plpgsql as $$
+declare n int;
+begin
+  perform set_config('request.jwt.claims', json_build_object('sub', uid)::text, true);
+  set local role authenticated;
+  select count(*) into n from storage.objects where bucket_id = 'message-attachments' and name = obj;
+  reset role;
+  return n;
+end $$;
+do $$
+begin
+  if pg_temp.t4_sees('73000000-0000-0000-0000-000000000001', '73000000-0000-0000-0000-000000000001/a.jpg') <> 1 then raise exception 'FAIL T4: uploader cannot select'; end if;
+  if pg_temp.t4_sees('73000000-0000-0000-0000-000000000002', '73000000-0000-0000-0000-000000000001/a.jpg') <> 1 then raise exception 'FAIL T4: recipient cannot select'; end if;
+  if pg_temp.t4_sees('73000000-0000-0000-0000-000000000003', '73000000-0000-0000-0000-000000000001/a.jpg') <> 0 then raise exception 'FAIL T4: third party can select'; end if;
+  if pg_temp.t4_sees('73000000-0000-0000-0000-000000000002', '73000000-0000-0000-0000-000000000001/unsent.jpg') <> 0 then raise exception 'FAIL T4: recipient selects an object no message references'; end if;
+  perform set_config('request.jwt.claims', '', true);
+  set local role anon;
+  if (select count(*) from storage.objects where bucket_id = 'message-attachments') <> 0 then raise exception 'FAIL T4: anon selects chat media'; end if;
+  reset role;
+end $$;
+delete from storage.objects where name like '73000000-%';
+delete from public.brivia_messages where sender_id::text like '73000000-%';
+delete from public.profiles where id::text like '73000000-%';
+delete from auth.users where id::text like '73000000-%';
+
+-- 4.3 Careers throttle: > 3 per email in 24 h, > 200 per hour overall; anon insert still allowed.
+do $$
+declare i int; failed boolean;
+begin
+  set local role anon;
+  for i in 1..3 loop
+    insert into public.career_applications (role, name, email, resume_path, resume_name, resume_size) values ('r', 'n', 'Dup@Example.com', 'p' || i, 'cv.pdf', 1);
+  end loop;
+  failed := false;
+  begin
+    insert into public.career_applications (role, name, email, resume_path, resume_name, resume_size) values ('r', 'n', 'dup@example.com', 'p4', 'cv.pdf', 1);
+  exception when others then failed := true; if sqlerrm !~* 'try again later' or sqlerrm ~* 'email|dup' then raise exception 'FAIL T4: error is not generic: %', sqlerrm; end if;
+  end;
+  if not failed then raise exception 'FAIL T4: a 4th application in 24h for one email was accepted'; end if;
+  insert into public.career_applications (role, name, email, resume_path, resume_name, resume_size) values ('r', 'n', 'other@example.com', 'p5', 'cv.pdf', 1);
+  reset role;
+  -- the email window slides: old rows do not count
+  update public.career_applications set created_at = now() - interval '25 hours' where lower(email) = 'dup@example.com';
+  set local role anon;
+  insert into public.career_applications (role, name, email, resume_path, resume_name, resume_size) values ('r', 'n', 'dup@example.com', 'p6', 'cv.pdf', 1);
+  reset role;
+  delete from public.career_applications;
+  insert into public.career_applications (role, name, email, resume_path, resume_name, resume_size)
+    select 'r', 'n', 'bulk' || g || '@example.com', 'b' || g, 'cv.pdf', 1 from generate_series(1, 200) g;
+  set local role anon;
+  failed := false;
+  begin
+    insert into public.career_applications (role, name, email, resume_path, resume_name, resume_size) values ('r', 'n', 'late@example.com', 'late', 'cv.pdf', 1);
+  exception when others then failed := true;
+  end;
+  reset role;
+  if not failed then raise exception 'FAIL T4: the 201st application in an hour was accepted'; end if;
+  delete from public.career_applications;
+  if not exists (select 1 from pg_indexes where tablename = 'career_applications' and indexdef ~* 'lower\(email\)' and indexdef ~* 'created_at') then
+    raise exception 'FAIL T4: no (lower(email), created_at) index';
+  end if;
+end $$;
+
+select 'trust.test T4 OK';
+
 select 'trust.test OK';

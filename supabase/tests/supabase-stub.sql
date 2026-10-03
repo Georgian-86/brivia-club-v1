@@ -14,7 +14,10 @@ do $$ begin
   if not exists (select 1 from pg_roles where rolname = 'authenticated') then create role authenticated nologin; end if;
 end $$;
 
-create table if not exists storage.buckets (id text primary key, name text not null, public boolean default false);
+create table if not exists storage.buckets (id text primary key, name text not null, public boolean default false,
+  file_size_limit bigint, allowed_mime_types text[]);
+alter table storage.buckets add column if not exists file_size_limit bigint;
+alter table storage.buckets add column if not exists allowed_mime_types text[];
 create table if not exists storage.objects (id uuid primary key default gen_random_uuid(), bucket_id text, name text, owner uuid);
 alter table storage.objects enable row level security;
 create or replace function storage.foldername(name text) returns text[] language sql immutable as $$

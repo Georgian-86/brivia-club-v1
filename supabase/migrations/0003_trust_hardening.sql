@@ -518,4 +518,64 @@ create policy "Members can view their own profile"
   on public.profiles for select to authenticated
   using (id = auth.uid());
 
+-- =============================================================================================
+-- Task 4: private chat media, bucket limits, careers throttle
+-- Ships together with the client change (attachment_path + signed URLs); see supabase.js / app.js.
+-- =============================================================================================
+update storage.buckets set public = false where id = 'message-attachments';
+
+-- Uploader (own folder) or the sender / recipient of a message row that references the object.
+drop policy if exists "Members can view their own message attachments" on storage.objects;
+drop policy if exists "Participants can view message attachments" on storage.objects;
+create policy "Participants can view message attachments"
+  on storage.objects for select to authenticated
+  using (
+    bucket_id = 'message-attachments'
+    and (
+      (storage.foldername(name))[1] = (select auth.uid()::text)
+      or exists (
+        select 1 from public.brivia_messages m
+         where m.attachment_path = storage.objects.name
+           and (select auth.uid()) in (m.sender_id, m.recipient_id)
+      )
+    )
+  );
+
+-- Size and type limits on every bucket (enforced by Storage itself).
+update storage.buckets set file_size_limit = 5242880,
+  allowed_mime_types = array['image/jpeg','image/png','image/webp','image/gif']
+  where id in ('profile-photos', 'profile-covers');
+update storage.buckets set file_size_limit = 10485760,
+  allowed_mime_types = array['image/jpeg','image/png','image/webp','image/gif']
+  where id = 'community-posts';
+update storage.buckets set file_size_limit = 20971520,
+  allowed_mime_types = array['image/jpeg','image/png','image/webp','image/gif','video/mp4','video/webm','video/quicktime',
+    'application/pdf','application/msword','application/vnd.openxmlformats-officedocument.wordprocessingml.document','text/plain']
+  where id = 'message-attachments';
+update storage.buckets set file_size_limit = 5242880,
+  allowed_mime_types = array['application/pdf','application/msword','application/vnd.openxmlformats-officedocument.wordprocessingml.document']
+  where id = 'career-resumes';
+
+-- Careers form throttle: anon insert stays allowed, but at most 3 applications per email per 24 h and
+-- 200 per hour overall. The error is deliberately generic.
+create index if not exists career_applications_email_created_idx
+  on public.career_applications (lower(email), created_at);
+create index if not exists career_applications_created_idx on public.career_applications (created_at);
+
+create or replace function public.brivia_career_application_throttle() returns trigger
+language plpgsql security definer set search_path = public as $$
+begin
+  perform pg_advisory_xact_lock(hashtext('career_applications_throttle'));
+  if (select count(*) from public.career_applications
+       where lower(email) = lower(new.email) and created_at > now() - interval '24 hours') >= 3
+     or (select count(*) from public.career_applications where created_at > now() - interval '1 hour') >= 200 then
+    raise exception 'Could not submit the application. Please try again later.' using errcode = 'P0001';
+  end if;
+  return new;
+end $$;
+revoke all on function public.brivia_career_application_throttle() from public, anon, authenticated;
+drop trigger if exists career_applications_throttle on public.career_applications;
+create trigger career_applications_throttle before insert on public.career_applications
+  for each row execute function public.brivia_career_application_throttle();
+
 notify pgrst, 'reload schema';

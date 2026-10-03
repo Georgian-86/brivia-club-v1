@@ -487,8 +487,11 @@ try {
     { id: 'm1', sender_id: KIT, recipient_id: ME, body: '', created_at: ago(50000), message_type: 'image', attachment_url: 'https://cdn.example/a.png?q="><img src=x onerror="window.__xss=2', attachment_name: 'a.png', attachment_mime: 'image/png', attachment_size: 10 },
     { id: 'm2', sender_id: KIT, recipient_id: ME, body: '', created_at: ago(40000), message_type: 'document', attachment_url: 'javascript:window.__xss=3', attachment_name: 'evil.pdf', attachment_mime: 'application/pdf', attachment_size: 10 },
     { id: 'm3', sender_id: KIT, recipient_id: ME, body: '', created_at: ago(30000), message_type: 'video', attachment_url: 'http://insecure.example/v.mp4', attachment_name: 'v.mp4', attachment_mime: 'video/mp4', attachment_size: 10 },
-    { id: 'm4', sender_id: KIT, recipient_id: ME, body: '', created_at: ago(20000), message_type: 'image', attachment_url: 'https://cdn.example/ok.png', attachment_name: 'ok.png', attachment_mime: 'image/png', attachment_size: 10 },
+    { id: 'm4', sender_id: KIT, recipient_id: ME, body: '', created_at: ago(20000), message_type: 'image', attachment_url: null, attachment_path: `${KIT}/ok.png`, attachment_name: 'ok.png', attachment_mime: 'image/png', attachment_size: 10 },
+    // Legacy row: only a (formerly public) URL, no path -> "Attachment unavailable".
+    { id: 'm5', sender_id: KIT, recipient_id: ME, body: '', created_at: ago(10000), message_type: 'image', attachment_url: 'https://cdn.example/legacy.png', attachment_path: null, attachment_name: 'legacy.png', attachment_mime: 'image/png', attachment_size: 10 },
   ];
+  const PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=', 'base64');
   const hard = { calls: [], holdInsert: null, failInsert: false, capInsert: false };
   const hardContext = await browser.newContext({ viewport: { width: 1280, height: 900 } });
   await hardContext.addInitScript(([key, value]) => { window.localStorage.setItem(key, value); }, ['sb-stub-auth-token', JSON.stringify(session)]);
@@ -502,6 +505,11 @@ try {
     const json = (status, payload) => route.fulfill({ status, contentType: 'application/json', body: JSON.stringify(payload), headers: { 'access-control-allow-origin': '*' } });
     if (method === 'OPTIONS') return route.fulfill({ status: 204, headers: { 'access-control-allow-origin': '*', 'access-control-allow-headers': '*', 'access-control-allow-methods': '*' } });
     if (pathName.startsWith('/auth/v1/')) return json(200, pathName.endsWith('/user') ? user : session);
+    // Private chat media: createSignedUrl POSTs /object/sign/<bucket>/<path>; the image GET carries ?token=.
+    if (pathName.startsWith('/storage/v1/object/sign/message-attachments/')) {
+      if (method === 'POST') return json(200, { signedURL: `${pathName.replace('/storage/v1', '')}?token=stubtoken` });
+      return route.fulfill({ status: 200, contentType: 'image/png', body: PNG, headers: { 'access-control-allow-origin': '*' } });
+    }
     if (pathName.startsWith('/storage/v1/object/')) return json(400, { statusCode: '400', error: 'Bucket not found', message: 'Bucket not found' });
     if (pathName === '/rest/v1/profiles') return json(200, (request.headers().accept || '').includes('vnd.pgrst.object') ? ownRow : [ownRow]);
     const args = JSON.parse(postData || '{}');
@@ -638,7 +646,9 @@ try {
     onerror: document.querySelectorAll('#chat-messages [onerror]').length,
     jsHrefs: [...document.querySelectorAll('#chat-messages a')].filter((a) => /^\s*javascript:/i.test(a.getAttribute('href') || '')).length,
     httpMedia: [...document.querySelectorAll('#chat-messages img, #chat-messages video, #chat-messages a')].filter((el) => /^http:/i.test(el.getAttribute('src') || el.getAttribute('href') || '')).length,
-    okImg: [...document.querySelectorAll('#chat-messages img')].some((img) => img.getAttribute('src') === 'https://cdn.example/ok.png'),
+    okImg: [...document.querySelectorAll('#chat-messages img')].some((img) => /^https:\/\/stub\.supabase\.local\/storage\/v1\/object\/sign\/message-attachments\/[^?]+\/ok\.png\?token=stubtoken$/.test(img.getAttribute('src') || '')),
+    legacyImg: [...document.querySelectorAll('#chat-messages img')].some((img) => /legacy\.png/.test(img.getAttribute('src') || '')),
+    legacyText: [...document.querySelectorAll('#chat-messages .message-attachment')].some((el) => /legacy\.png/.test(el.textContent) && /ATTACHMENT UNAVAILABLE/.test(el.textContent)),
     names: document.querySelector('#chat-messages')?.textContent || '',
   }));
   check(`crafted attachment URLs inject nothing and non-https is not linked (${JSON.stringify({ ...attach, names: undefined })})`, () => {
@@ -646,9 +656,19 @@ try {
     assert.equal(attach.onerror, 0);
     assert.equal(attach.jsHrefs, 0);
     assert.equal(attach.httpMedia, 0);
-    assert.equal(attach.okImg, true, 'a safe https image should still render');
+    assert.equal(attach.okImg, true, 'a path row renders through its signed URL');
+    assert.equal(attach.legacyImg, false, 'a url-only legacy row is not rendered as media');
+    assert.equal(attach.legacyText, true, 'a url-only legacy row shows "Attachment unavailable"');
     assert.match(attach.names, /evil\.pdf/, 'an unsafe document still shows its name');
   });
+
+  const signCalls = hard.calls.filter((c) => c.method === 'POST' && c.path.startsWith('/storage/v1/object/sign/message-attachments/'));
+  check(`chat media: signed once per path with a 3600 s expiry, cached across renders (${signCalls.length} sign calls)`, () => {
+    assert.equal(signCalls.length, 1);
+    assert.equal(JSON.parse(signCalls[0].body).expiresIn, 3600);
+    assert.equal(decodeURIComponent(signCalls[0].path), `/storage/v1/object/sign/message-attachments/${KIT}/ok.png`);
+  });
+  check('chat media never uses a public URL', () => assert.equal(hard.calls.filter((c) => c.path.includes('/object/public/message-attachments')).length, 0));
 
   // 8e. Local attachment preview (blob: URL) renders through an escaped src.
   await hardPage.setInputFiles('#chat-photo-input', { name: 'p.png', mimeType: 'image/png', buffer: Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=', 'base64') });

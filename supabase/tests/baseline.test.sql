@@ -91,7 +91,9 @@ declare n int;
 begin
   select count(*) into n from storage.buckets
    where (id, public) in (('profile-photos', true), ('profile-covers', true), ('message-attachments', true),
-                          ('community-posts', true), ('career-resumes', false));
+                          ('community-posts', true), ('career-resumes', false))
+      -- 0003 makes message-attachments private (trust.test.sql checks that); the baseline alone keeps it public.
+      or (id = 'message-attachments' and exists (select 1 from pg_policies where policyname = 'Participants can view message attachments'));
   if n <> 5 then raise exception 'FAIL: % of 5 storage buckets present with the right visibility', n; end if;
 end $$;
 
