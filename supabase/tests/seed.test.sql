@@ -163,6 +163,8 @@ begin
     (r, 'https://proj.supabase.co/storage/v1/object/public/community-posts/' || r || '/p.jpg', r || '/p.jpg');
   insert into public.interaction(viewer_id, target_id, event) values (a, b, 'like'), (b, a, 'impression');
   insert into public.location_change(member_id) values (a), (r);
+  -- signal_ledger.to_id has no foreign key: a real member's attempt at a test member must be purged explicitly.
+  insert into public.signal_ledger(sender_id, to_id) values (a, b), (r, a), (r, 'eeeeeeee-0000-0000-0000-0000000000e2');
   insert into storage.objects(bucket_id, name, owner) values
     ('profile-photos', a || '/avatar.jpg', null), ('community-posts', 'x/y.jpg', b), ('profile-photos', r || '/avatar.jpg', r);
   -- a genuine signup with the reserved domain but no seed id and no profile yet: the purge must keep it
@@ -187,6 +189,7 @@ begin
   select count(*) into n from public.member_interest where member_id = any(ids); if n <> 0 then raise exception 'FAIL P1: % member_interest', n; end if;
   select count(*) into n from public.member_orbit where member_id = any(ids); if n <> 0 then raise exception 'FAIL P1: % member_orbit', n; end if;
   select count(*) into n from public.location_change where member_id = any(ids); if n <> 0 then raise exception 'FAIL P1: % location_change', n; end if;
+  select count(*) into n from public.signal_ledger where sender_id = any(ids) or to_id = any(ids); if n <> 0 then raise exception 'FAIL P1: % signal_ledger', n; end if;
   if not exists (select 1 from auth.users where id = 'eeeeeeee-0000-0000-0000-0000000000e2') then raise exception 'FAIL P3: purge deleted a real @test.brivia.club signup'; end if;
   -- the real member and their data survive
   select count(*) into n from public.profiles where id = 'eeeeeeee-0000-0000-0000-0000000000e1'; if n <> 1 then raise exception 'FAIL P2: real member purged'; end if;
@@ -194,6 +197,7 @@ begin
   select count(*) into n from public.community_posts where author_id = 'eeeeeeee-0000-0000-0000-0000000000e1'; if n <> 1 then raise exception 'FAIL P2: real post purged'; end if;
   if not public.brivia_member_completed('eeeeeeee-0000-0000-0000-0000000000e1') then raise exception 'FAIL P2: real member interests or cell purged'; end if;
   select count(*) into n from public.location_change where member_id = 'eeeeeeee-0000-0000-0000-0000000000e1'; if n <> 1 then raise exception 'FAIL P2: real location_change purged'; end if;
+  select count(*) into n from public.signal_ledger where sender_id = 'eeeeeeee-0000-0000-0000-0000000000e1'; if n <> 1 then raise exception 'FAIL P2: real signal_ledger rows: % (want 1)', n; end if;
 end $$;
 select 'seed.test P1-P2 purge complete, real member intact OK';
 \endif

@@ -534,13 +534,23 @@ begin
 end $$;
 rollback;
 
--- Ruling I6: requests and messages across worlds are refused; same-world ones still work.
+-- Ruling I6: requests and messages across worlds are refused; same-world ones still work. A cross-world signal
+-- answers 'sent' like any other and writes no request (D-032); a cross-world message is an RLS error.
 do $$
-declare stmt text; failed boolean;
+declare stmt text; failed boolean; st text;
 begin
+  foreach stmt in array array['01|70000000-0000-0000-0000-000000000008', '08|70000000-0000-0000-0000-000000000002'] loop
+    set local role authenticated;
+    perform set_config('request.jwt.claims', json_build_object('sub', '70000000-0000-0000-0000-0000000000' || split_part(stmt, '|', 1))::text, true);
+    select status into st from public.send_signal(split_part(stmt, '|', 2)::uuid);
+    reset role;
+    if st <> 'sent' then raise exception 'FAIL I6: cross-world signal % answered %', stmt, st; end if;
+    if exists (select 1 from public.connection_requests where to_id = split_part(stmt, '|', 2)::uuid
+                 and from_id = ('70000000-0000-0000-0000-0000000000' || split_part(stmt, '|', 1))::uuid) then
+      raise exception 'FAIL I6: cross-world request written: %', stmt;
+    end if;
+  end loop;
   foreach stmt in array array[
-    '01|insert into public.connection_requests (from_id, to_id) values (''70000000-0000-0000-0000-000000000001'', ''70000000-0000-0000-0000-000000000008'')',
-    '08|insert into public.connection_requests (from_id, to_id) values (''70000000-0000-0000-0000-000000000008'', ''70000000-0000-0000-0000-000000000002'')',
     '01|insert into public.brivia_messages (sender_id, recipient_id, body) values (''70000000-0000-0000-0000-000000000001'', ''70000000-0000-0000-0000-000000000008'', ''hi'')',
     '08|insert into public.brivia_messages (sender_id, recipient_id, body) values (''70000000-0000-0000-0000-000000000008'', ''70000000-0000-0000-0000-000000000001'', ''hi'')'
   ] loop
@@ -555,7 +565,15 @@ end $$;
 begin;
 set local role authenticated;
 set local request.jwt.claims = '{"sub":"70000000-0000-0000-0000-000000000001"}';
-insert into public.connection_requests (from_id, to_id) values ('70000000-0000-0000-0000-000000000001', '70000000-0000-0000-0000-000000000015');
+select status from public.send_signal('70000000-0000-0000-0000-000000000015');
+reset role;
+do $$ begin
+  if not exists (select 1 from public.connection_requests where from_id = '70000000-0000-0000-0000-000000000001'
+                   and to_id = '70000000-0000-0000-0000-000000000015') then
+    raise exception 'FAIL I6: a same-world signal wrote no request';
+  end if;
+end $$;
+set local role authenticated;
 insert into public.brivia_messages (sender_id, recipient_id, body) values ('70000000-0000-0000-0000-000000000001', '70000000-0000-0000-0000-000000000002', 'same world');
 rollback;
 do $$ begin
@@ -574,7 +592,9 @@ delete from public.profiles where id::text like '70000000-%' or id::text like '7
 delete from auth.users where id::text like '70000000-%' or id::text like '71000000-%';
 
 -- ---------------------------------------------------------------------------------------------
--- Task 3: abuse caps on requests (silent caps, Review Focus 5), 30-day expiry, purge.
+-- Task 3: abuse caps on requests, 30-day expiry, purge. Since 0004 section 6 (Ruling A1, D-032) the caps live in
+-- the sender-only signal_ledger and fail HONESTLY (PT429); recipient-side outcomes answer 'sent'.
+-- Full coverage of the ledger is in orbit-signals.test.sql.
 -- Fixtures (owner): S = 72..0001 sends; R1..R110 = 72..0101..72..0210 receive; all completed, real world.
 -- ---------------------------------------------------------------------------------------------
 insert into auth.users(id)
@@ -587,52 +607,83 @@ on conflict (id) do nothing;
 create or replace function pg_temp.t3(n int) returns uuid language sql immutable as $$
   select ('72000000-0000-0000-0000-' || lpad(n::text, 12, '0'))::uuid $$;
 
--- 3.1 A note over 500 characters is rejected; exactly 500 is accepted.
+-- 3.1 A note over 500 characters is rejected (22001, not charged); exactly 500 is accepted. The table constraint
+-- still holds for the owner path.
 begin;
 set local role authenticated;
 set local request.jwt.claims = '{"sub":"72000000-0000-0000-0000-000000000001"}';
 do $$
 declare failed boolean := false;
 begin
-  insert into public.connection_requests (from_id, to_id, note) values (pg_temp.t3(1), pg_temp.t3(101), repeat('x', 500));
+  perform public.send_signal(pg_temp.t3(101), repeat('x', 500));
+  begin
+    perform public.send_signal(pg_temp.t3(102), repeat('x', 501));
+  exception when sqlstate '22001' then failed := true;
+  end;
+  if not failed then raise exception 'FAIL T3: a 501-character note was accepted'; end if;
+end $$;
+reset role;
+do $$
+declare failed boolean := false;
+begin
+  if (select char_length(note) from public.connection_requests where from_id = pg_temp.t3(1) and to_id = pg_temp.t3(101)) <> 500 then
+    raise exception 'FAIL T3: the 500-character note was not stored';
+  end if;
+  if (select count(*) from public.signal_ledger where sender_id = pg_temp.t3(1)) <> 1 then
+    raise exception 'FAIL T3: the refused note was charged';
+  end if;
   begin
     insert into public.connection_requests (from_id, to_id, note) values (pg_temp.t3(1), pg_temp.t3(102), repeat('x', 501));
   exception when check_violation then failed := true;
   end;
-  if not failed then raise exception 'FAIL T3: a 501-character note was accepted'; end if;
+  if not failed then raise exception 'FAIL T3: the note constraint is gone'; end if;
 end $$;
 rollback;
 
--- 3.2 The 31st request in 24 h is silently not inserted: no error, no row.
+-- 3.2 The 31st request in 24 h fails honestly: PT429 signal_quota_exhausted, no row, not charged (Ruling A1,
+-- which replaces the iteration-2 silent drop).
 begin;
 set local role authenticated;
 set local request.jwt.claims = '{"sub":"72000000-0000-0000-0000-000000000001"}';
 do $$
-declare i int; n int;
+declare i int; st text; msg text;
 begin
-  for i in 101..131 loop  -- 31 inserts; the last must be dropped silently (an error here fails the test)
-    insert into public.connection_requests (from_id, to_id) values (pg_temp.t3(1), pg_temp.t3(i));
-    get diagnostics n = row_count;
-    if i <= 130 and n <> 1 then raise exception 'FAIL T3: request % of 30 not inserted', i - 100; end if;
-    if i = 131 and n <> 0 then raise exception 'FAIL T3: 31st request in 24 h reported % rows', n; end if;
+  for i in 101..130 loop
+    if (select status from public.send_signal(pg_temp.t3(i))) <> 'sent' then raise exception 'FAIL T3: signal % of 30 not sent', i - 100; end if;
   end loop;
+  begin
+    perform public.send_signal(pg_temp.t3(131));
+  exception when others then st := sqlstate; msg := sqlerrm;
+  end;
+  if st is distinct from 'PT429' or msg <> 'signal_quota_exhausted' then
+    raise exception 'FAIL T3: the 31st signal in 24 h gave % %', st, msg;
+  end if;
 end $$;
 reset role;
 do $$ begin
   if (select count(*) from public.connection_requests where from_id = pg_temp.t3(1)) <> 30 then
     raise exception 'FAIL T3: daily cap wrote % rows (want 30)', (select count(*) from public.connection_requests where from_id = pg_temp.t3(1));
   end if;
+  if (select count(*) from public.signal_ledger where sender_id = pg_temp.t3(1)) <> 30 then
+    raise exception 'FAIL T3: the refused signal was charged';
+  end if;
 end $$;
 rollback;
 
--- 3.2b A request that completes a match is never capped (it needs the other member's consent anyway).
+-- 3.2b A request that completes a match is never capped (it needs the other member's consent anyway). It still
+-- costs one unit, and remaining stays 0.
 begin;
 insert into public.connection_requests (from_id, to_id) values (pg_temp.t3(140), pg_temp.t3(1));
-insert into public.connection_requests (from_id, to_id)
+insert into public.signal_ledger (sender_id, to_id)
 select pg_temp.t3(1), pg_temp.t3(i) from generate_series(101, 130) i;  -- 30 today: at the daily cap
 set local role authenticated;
 set local request.jwt.claims = '{"sub":"72000000-0000-0000-0000-000000000001"}';
-insert into public.connection_requests (from_id, to_id) values (pg_temp.t3(1), pg_temp.t3(140));
+do $$
+declare r record;
+begin
+  select * into r from public.send_signal(pg_temp.t3(140));
+  if r.status <> 'matched' or r.remaining <> 0 then raise exception 'FAIL T3: completing signal at the cap answered %', r; end if;
+end $$;
 reset role;
 do $$ begin
   if not exists (select 1 from public.matches where user1_id = least(pg_temp.t3(1), pg_temp.t3(140)) and user2_id = greatest(pg_temp.t3(1), pg_temp.t3(140))) then
@@ -641,20 +692,24 @@ do $$ begin
 end $$;
 rollback;
 
--- 3.3 The 101st pending request (older than 24 h, within 30 days) is silently not inserted. A declined
--- request counts as pending (the sender cannot tell them apart); expired requests do not count.
+-- 3.3 The 101st live target (older than 24 h, within 30 days) fails honestly: PT429 signal_live_cap, no row. Every
+-- unmatched target counts, declined or not (the sender cannot tell them apart); attempts older than 30 days do not.
 begin;
 insert into public.connection_requests (from_id, to_id, status, created_at)
 select pg_temp.t3(1), pg_temp.t3(i), case when i = 101 then 'declined' else 'pending' end, now() - interval '2 days'
 from generate_series(101, 200) i;
+insert into public.signal_ledger (sender_id, to_id, at)
+select pg_temp.t3(1), pg_temp.t3(i), now() - interval '2 days' from generate_series(101, 200) i;
 set local role authenticated;
 set local request.jwt.claims = '{"sub":"72000000-0000-0000-0000-000000000001"}';
 do $$
-declare n int;
+declare st text; msg text;
 begin
-  insert into public.connection_requests (from_id, to_id) values (pg_temp.t3(1), pg_temp.t3(201));
-  get diagnostics n = row_count;
-  if n <> 0 then raise exception 'FAIL T3: 101st pending request reported % rows', n; end if;
+  begin
+    perform public.send_signal(pg_temp.t3(201));
+  exception when others then st := sqlstate; msg := sqlerrm;
+  end;
+  if st is distinct from 'PT429' or msg <> 'signal_live_cap' then raise exception 'FAIL T3: 101st live signal gave % %', st, msg; end if;
 end $$;
 reset role;
 do $$ begin
@@ -662,10 +717,11 @@ do $$ begin
     raise exception 'FAIL T3: 101st pending request was written';
   end if;
 end $$;
--- Once those 100 are expired (older than 30 days), they no longer count.
+-- Once those 100 are older than 30 days, they no longer count.
 update public.connection_requests set created_at = now() - interval '31 days' where from_id = pg_temp.t3(1);
+update public.signal_ledger set at = now() - interval '31 days' where sender_id = pg_temp.t3(1);
 set local role authenticated;
-insert into public.connection_requests (from_id, to_id) values (pg_temp.t3(1), pg_temp.t3(201));
+select status from public.send_signal(pg_temp.t3(201));
 reset role;
 do $$ begin
   if not exists (select 1 from public.connection_requests where from_id = pg_temp.t3(1) and to_id = pg_temp.t3(201)) then
@@ -693,8 +749,8 @@ begin
   exception when no_data_found then failed := true;
   end;
   if not failed then raise exception 'FAIL T3: an expired request was accepted'; end if;
-  insert into public.connection_requests (from_id, to_id) values (pg_temp.t3(1), pg_temp.t3(102));
-  insert into public.connection_requests (from_id, to_id) values (pg_temp.t3(1), pg_temp.t3(104));
+  if (select status from public.send_signal(pg_temp.t3(102))) <> 'sent' then raise exception 'FAIL T3: expired reverse answered matched'; end if;
+  if (select status from public.send_signal(pg_temp.t3(104))) <> 'matched' then raise exception 'FAIL T3: live reverse did not answer matched'; end if;
 end $$;
 reset role;
 do $$ begin
@@ -708,8 +764,9 @@ do $$ begin
 end $$;
 rollback;
 
--- 3.4b The sender's own expired request (pending or declined) is replaced by a fresh one; a live declined
--- request conflicts exactly like a live pending one, so a decline is never revealed.
+-- 3.4b The sender's own expired request (pending or declined) is replaced by a fresh one; a re-signal to a live
+-- declined request answers exactly like one to a live pending request ('sent', one unit each), so a decline is
+-- never revealed.
 begin;
 insert into public.connection_requests (from_id, to_id, status, created_at) values
   (pg_temp.t3(1), pg_temp.t3(105), 'pending', now() - interval '31 days'),
@@ -719,19 +776,17 @@ insert into public.connection_requests (from_id, to_id, status, created_at) valu
 set local role authenticated;
 set local request.jwt.claims = '{"sub":"72000000-0000-0000-0000-000000000001"}';
 do $$
-declare i int; code text; codes text := '';
+declare i int; r record; prev int; codes text := '';
 begin
-  insert into public.connection_requests (from_id, to_id) values (pg_temp.t3(1), pg_temp.t3(105));
-  insert into public.connection_requests (from_id, to_id) values (pg_temp.t3(1), pg_temp.t3(106));
+  perform public.send_signal(pg_temp.t3(105));
+  perform public.send_signal(pg_temp.t3(106));
+  select remaining into prev from public.my_signal_quota();
   foreach i in array array[107, 108] loop
-    code := 'none';
-    begin
-      insert into public.connection_requests (from_id, to_id) values (pg_temp.t3(1), pg_temp.t3(i));
-    exception when others then code := sqlstate;
-    end;
-    codes := codes || code || ',';
+    select * into r from public.send_signal(pg_temp.t3(i));
+    codes := codes || r.status || ':' || (prev - r.remaining) || ',';
+    prev := r.remaining;
   end loop;
-  if codes <> '23505,23505,' then raise exception 'FAIL T3: live pending/declined re-request answers differ: %', codes; end if;
+  if codes <> 'sent:1,sent:1,' then raise exception 'FAIL T3: live pending/declined re-request answers differ: %', codes; end if;
 end $$;
 reset role;
 do $$ begin
@@ -774,11 +829,11 @@ rollback;
 begin;
 set local role authenticated;
 set local request.jwt.claims = '{"sub":"72000000-0000-0000-0000-000000000001"}';
-insert into public.connection_requests (from_id, to_id) values (pg_temp.t3(1), pg_temp.t3(150));
+select status from public.send_signal(pg_temp.t3(150));
 insert into public.brivia_blocks (blocker_id, blocked_id) values (pg_temp.t3(1), pg_temp.t3(150));
 delete from public.brivia_blocks where blocker_id = pg_temp.t3(1) and blocked_id = pg_temp.t3(150);
 set local request.jwt.claims = '{"sub":"72000000-0000-0000-0000-000000000150"}';
-insert into public.connection_requests (from_id, to_id) values (pg_temp.t3(150), pg_temp.t3(1));
+select status from public.send_signal(pg_temp.t3(1));
 reset role;
 do $$ begin
   if exists (select 1 from public.matches where pg_temp.t3(1) in (user1_id, user2_id) and pg_temp.t3(150) in (user1_id, user2_id)) then
@@ -796,19 +851,15 @@ do $$ begin
 end $$;
 rollback;
 
--- 3b.2 Insert is granted on (from_id, to_id, note) only; status and created_at come from defaults.
+-- 3b.2 Members cannot insert requests at all since 0004 (D-032; the 0003 column grant on (from_id, to_id, note) is
+-- revoked). send_signal writes only (from_id, to_id, note); status and created_at come from defaults.
 do $$
 declare c text;
 begin
   if has_table_privilege('authenticated', 'public.connection_requests', 'insert') then
     raise exception 'FAIL T3b: authenticated still holds table-level insert on connection_requests';
   end if;
-  foreach c in array array['from_id', 'to_id', 'note'] loop
-    if not has_column_privilege('authenticated', 'public.connection_requests', c, 'insert') then
-      raise exception 'FAIL T3b: authenticated cannot insert %', c;
-    end if;
-  end loop;
-  foreach c in array array['status', 'created_at'] loop
+  foreach c in array array['from_id', 'to_id', 'note', 'status', 'created_at'] loop
     if has_column_privilege('authenticated', 'public.connection_requests', c, 'insert') then
       raise exception 'FAIL T3b: authenticated can insert %', c;
     end if;
@@ -825,7 +876,13 @@ begin
   exception when insufficient_privilege then failed := true;
   end;
   if not failed then raise exception 'FAIL T3b: client set created_at'; end if;
-  insert into public.connection_requests (from_id, to_id, note) values (pg_temp.t3(1), pg_temp.t3(151), 'hi');
+  failed := false;
+  begin
+    insert into public.connection_requests (from_id, to_id, note) values (pg_temp.t3(1), pg_temp.t3(151), 'hi');
+  exception when insufficient_privilege then failed := true;
+  end;
+  if not failed then raise exception 'FAIL T3b: a raw client insert was allowed'; end if;
+  perform public.send_signal(pg_temp.t3(151), 'hi');
 end $$;
 reset role;
 do $$ begin
@@ -912,6 +969,7 @@ begin
 end $$;
 
 -- Clean up Task 3 fixtures.
+delete from public.signal_ledger where sender_id::text like '72000000-%';
 delete from public.connection_requests where from_id::text like '72000000-%' or to_id::text like '72000000-%';
 delete from public.matches where user1_id::text like '72000000-%' or user2_id::text like '72000000-%';
 delete from public.brivia_blocks where blocker_id::text like '72000000-%' or blocked_id::text like '72000000-%';

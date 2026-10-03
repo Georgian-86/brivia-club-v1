@@ -1,20 +1,23 @@
 -- P0 consent (supabase/migrations/0002_p0_privacy_consent.sql): a connection (match) exists only
 -- after both members agree, created server-side by the connection_requests trigger or by
 -- respond_connection_request. Messages need a match. Blocked pairs never match.
+-- Since 0004 section 6 (D-032) members send requests only through send_signal(p_to, p_note): raw client inserts
+-- are revoked, and every recipient-side refusal (block, duplicate, decline) answers 'sent' with no error.
 -- Data-touching blocks run in transactions that are rolled back, except the race test, which must
 -- commit across two sessions and deletes its own rows afterwards.
 
--- Members: A, B (the pair), C (third party), D (blocks A), E (no profile).
+-- Members: A, B (the pair), C (third party), D (blocks A), E (no profile). A-D have a city, so the harness
+-- autocomplete fixture makes them completed members (0004: send_signal and the consent policies require it).
 insert into auth.users(id) values
   ('a0000000-0000-0000-0000-00000000000a'), ('b0000000-0000-0000-0000-00000000000b'),
   ('c0000000-0000-0000-0000-00000000000c'), ('d0000000-0000-0000-0000-00000000000d'),
   ('e0000000-0000-0000-0000-00000000000e')
   on conflict do nothing;
-insert into public.profiles (id, name, full_name, email) values
-  ('a0000000-0000-0000-0000-00000000000a', 'A', 'A', 'a@test.brivia.club'),
-  ('b0000000-0000-0000-0000-00000000000b', 'B', 'B', 'b@test.brivia.club'),
-  ('c0000000-0000-0000-0000-00000000000c', 'C', 'C', 'c@test.brivia.club'),
-  ('d0000000-0000-0000-0000-00000000000d', 'D', 'D', 'd@test.brivia.club')
+insert into public.profiles (id, name, full_name, email, city) values
+  ('a0000000-0000-0000-0000-00000000000a', 'A', 'A', 'a@test.brivia.club', 'Pune'),
+  ('b0000000-0000-0000-0000-00000000000b', 'B', 'B', 'b@test.brivia.club', 'Pune'),
+  ('c0000000-0000-0000-0000-00000000000c', 'C', 'C', 'c@test.brivia.club', 'Pune'),
+  ('d0000000-0000-0000-0000-00000000000d', 'D', 'D', 'd@test.brivia.club', 'Pune')
   on conflict (id) do nothing;
 
 -- 1. Shape, policies and grants.
@@ -47,11 +50,13 @@ begin
   if n <> 1 then raise exception 'FAIL: brivia_messages has % insert policies (want 1)', n; end if;
   select string_agg(privilege_type, ',' order by privilege_type) into p from information_schema.role_table_grants
    where table_schema = 'public' and table_name = 'connection_requests' and grantee = 'authenticated';
-  -- Insert is column-level since 0003 (from_id, to_id, note); see trust.test.sql 3b.2.
+  -- No client insert at all since 0004 (D-032): members send through send_signal only.
   if p is distinct from 'SELECT' then raise exception 'FAIL: authenticated table privileges on connection_requests = %', p; end if;
   select string_agg(column_name, ',' order by column_name) into p from information_schema.column_privileges
    where table_schema = 'public' and table_name = 'connection_requests' and grantee = 'authenticated' and privilege_type = 'INSERT';
-  if p is distinct from 'from_id,note,to_id' then raise exception 'FAIL: authenticated insertable columns on connection_requests = %', p; end if;
+  if p is not null then raise exception 'FAIL: authenticated insertable columns on connection_requests = %', p; end if;
+  select count(*) into n from pg_policies where schemaname = 'public' and tablename = 'connection_requests' and cmd = 'INSERT';
+  if n <> 0 then raise exception 'FAIL: connection_requests has % client insert policies (want 0)', n; end if;
   select count(*) into n from information_schema.role_table_grants
    where table_schema = 'public' and table_name = 'connection_requests' and grantee in ('anon', 'PUBLIC');
   if n <> 0 then raise exception 'FAIL: anon/public hold % privileges on connection_requests', n; end if;
@@ -72,10 +77,11 @@ begin;
 set local role authenticated;
 set local request.jwt.claims = '{"sub":"a0000000-0000-0000-0000-00000000000a"}';
 do $$
-declare n int;
+declare n int; st text;
 begin
-  insert into public.connection_requests(from_id, to_id, note)
-  values ('a0000000-0000-0000-0000-00000000000a', 'b0000000-0000-0000-0000-00000000000b', 'hi');
+  if (select status from public.send_signal('b0000000-0000-0000-0000-00000000000b', 'hi')) <> 'sent' then
+    raise exception 'FAIL: a one-sided signal did not answer sent';
+  end if;
   select count(*) into n from public.matches;
   if n <> 0 then raise exception 'FAIL: one-sided request created % matches', n; end if;
   begin
@@ -94,7 +100,7 @@ begin
     values ('b0000000-0000-0000-0000-00000000000b', 'a0000000-0000-0000-0000-00000000000a');
     raise exception 'FAIL: client inserted a reversed match';
   exception when insufficient_privilege then null; end;
-  -- cannot spoof the sender, request yourself, or pre-accept
+  -- raw inserts are refused outright (no client insert since 0004): no spoofed sender, no self request, no pre-accept
   begin
     insert into public.connection_requests(from_id, to_id)
     values ('c0000000-0000-0000-0000-00000000000c', 'b0000000-0000-0000-0000-00000000000b');
@@ -105,6 +111,10 @@ begin
     values ('a0000000-0000-0000-0000-00000000000a', 'a0000000-0000-0000-0000-00000000000a');
     raise exception 'FAIL: self request allowed';
   exception when insufficient_privilege or check_violation then null; end;
+  begin
+    perform public.send_signal('a0000000-0000-0000-0000-00000000000a');
+    raise exception 'FAIL: self signal allowed';
+  exception when sqlstate '22023' then null; end;
   begin
     insert into public.connection_requests(from_id, to_id, status)
     values ('a0000000-0000-0000-0000-00000000000a', 'c0000000-0000-0000-0000-00000000000c', 'accepted');
@@ -119,12 +129,12 @@ begin
     delete from public.connection_requests;
     raise exception 'FAIL: client deleted a request';
   exception when insufficient_privilege then null; end;
-  -- re-requesting the same person is a primary-key conflict (no update path, by design)
-  begin
-    insert into public.connection_requests(from_id, to_id)
-    values ('a0000000-0000-0000-0000-00000000000a', 'b0000000-0000-0000-0000-00000000000b');
-    raise exception 'FAIL: duplicate request allowed';
-  exception when unique_violation then null; end;
+  -- re-requesting the same person answers 'sent' and changes nothing (no update path, by design; D-032)
+  if (select status from public.send_signal('b0000000-0000-0000-0000-00000000000b')) <> 'sent' then
+    raise exception 'FAIL: a duplicate signal did not answer sent';
+  end if;
+  select count(*) into n from public.my_outgoing_requests() where to_id = 'b0000000-0000-0000-0000-00000000000b' and note = 'hi';
+  if n <> 1 then raise exception 'FAIL: duplicate signal changed the request (% rows with the first note)', n; end if;
 end $$;
 
 -- C (third party) sees neither the request nor a way to accept it.
@@ -147,8 +157,9 @@ declare n int;
 begin
   select count(*) into n from public.connection_requests where to_id = 'b0000000-0000-0000-0000-00000000000b' and note = 'hi';
   if n <> 1 then raise exception 'FAIL: recipient sees % incoming requests', n; end if;
-  insert into public.connection_requests(from_id, to_id)
-  values ('b0000000-0000-0000-0000-00000000000b', 'a0000000-0000-0000-0000-00000000000a');
+  if (select status from public.send_signal('a0000000-0000-0000-0000-00000000000a')) <> 'matched' then
+    raise exception 'FAIL: the reverse signal did not answer matched';
+  end if;
   select count(*) into n from public.matches;
   if n <> 1 then raise exception 'FAIL: mutual request created % matches (want 1)', n; end if;
   select count(*) into n from public.matches
@@ -159,12 +170,10 @@ begin
   select count(*) into n from public.connection_requests where status = 'accepted';
   select n + count(*) into n from public.my_outgoing_requests() where status = 'accepted';
   if n <> 2 then raise exception 'FAIL: % of 2 requests accepted', n; end if;
-  -- second identical reverse insert: conflict, still one match
-  begin
-    insert into public.connection_requests(from_id, to_id)
-    values ('b0000000-0000-0000-0000-00000000000b', 'a0000000-0000-0000-0000-00000000000a');
-    raise exception 'FAIL: duplicate reverse request allowed';
-  exception when unique_violation then null; end;
+  -- second identical reverse signal: no error, still one match (the pair is matched, so it answers matched)
+  if (select status from public.send_signal('a0000000-0000-0000-0000-00000000000a')) <> 'matched' then
+    raise exception 'FAIL: a repeat signal to a match did not answer matched';
+  end if;
   -- accepting an already-accepted request is not possible and adds nothing
   begin
     perform public.respond_connection_request('a0000000-0000-0000-0000-00000000000a', true);
@@ -188,11 +197,10 @@ rollback;
 begin;
 set local role authenticated;
 set local request.jwt.claims = '{"sub":"a0000000-0000-0000-0000-00000000000a"}';
-insert into public.connection_requests(from_id, to_id)
-values ('a0000000-0000-0000-0000-00000000000a', 'b0000000-0000-0000-0000-00000000000b'),
-       ('a0000000-0000-0000-0000-00000000000a', 'c0000000-0000-0000-0000-00000000000c');
 do $$
 begin
+  perform public.send_signal('b0000000-0000-0000-0000-00000000000b');
+  perform public.send_signal('c0000000-0000-0000-0000-00000000000c');
   -- the sender cannot accept their own request (as either argument shape)
   begin
     perform public.respond_connection_request('a0000000-0000-0000-0000-00000000000a', true);
@@ -232,7 +240,8 @@ begin
     raise exception 'FAIL: accepted after declining';
   exception when no_data_found then null; end;
 end $$;
--- the declined sender cannot re-request (no update policy; primary-key conflict)
+-- the declined sender cannot re-request: a raw upsert is refused, and a new signal answers 'sent' and leaves
+-- the decline in place
 set local request.jwt.claims = '{"sub":"a0000000-0000-0000-0000-00000000000a"}';
 do $$
 begin
@@ -242,10 +251,21 @@ begin
     on conflict (from_id, to_id) do update set status = 'pending';
     raise exception 'FAIL: re-request after decline via upsert allowed';
   exception when insufficient_privilege then null; end;
+  if (select status from public.send_signal('c0000000-0000-0000-0000-00000000000c')) <> 'sent' then
+    raise exception 'FAIL: a re-signal after a decline did not answer sent';
+  end if;
+end $$;
+reset role;
+do $$ begin
+  if not exists (select 1 from public.connection_requests where from_id = 'a0000000-0000-0000-0000-00000000000a'
+                   and to_id = 'c0000000-0000-0000-0000-00000000000c' and status = 'declined') then
+    raise exception 'FAIL: a re-signal overrode the decline';
+  end if;
 end $$;
 rollback;
 
--- 4. Blocks: a blocked pair cannot request, and never matches even if both already requested.
+-- 4. Blocks: a blocked pair cannot request (the signal silently answers 'sent' and writes nothing, D-032), and
+-- never matches even if both already requested.
 begin;
 set local role authenticated;
 set local request.jwt.claims = '{"sub":"d0000000-0000-0000-0000-00000000000d"}';
@@ -254,28 +274,29 @@ values ('d0000000-0000-0000-0000-00000000000d', 'a0000000-0000-0000-0000-0000000
 set local request.jwt.claims = '{"sub":"a0000000-0000-0000-0000-00000000000a"}';
 do $$
 begin
-  begin
-    insert into public.connection_requests(from_id, to_id)
-    values ('a0000000-0000-0000-0000-00000000000a', 'd0000000-0000-0000-0000-00000000000d');
-    raise exception 'FAIL: blocked member can request the blocker';
-  exception when insufficient_privilege then null; end;
+  if (select status from public.send_signal('d0000000-0000-0000-0000-00000000000d')) <> 'sent' then
+    raise exception 'FAIL: a signal to the blocker did not answer sent';
+  end if;
 end $$;
 set local request.jwt.claims = '{"sub":"d0000000-0000-0000-0000-00000000000d"}';
 do $$
 begin
-  begin
-    insert into public.connection_requests(from_id, to_id)
-    values ('d0000000-0000-0000-0000-00000000000d', 'a0000000-0000-0000-0000-00000000000a');
-    raise exception 'FAIL: blocker can request the blocked member';
-  exception when insufficient_privilege then null; end;
+  if (select status from public.send_signal('a0000000-0000-0000-0000-00000000000a')) <> 'sent' then
+    raise exception 'FAIL: a signal to the blocked member did not answer sent';
+  end if;
+end $$;
+reset role;
+do $$ begin
+  if exists (select 1 from public.connection_requests where 'd0000000-0000-0000-0000-00000000000d' in (from_id, to_id)) then
+    raise exception 'FAIL: a blocked pair wrote a request';
+  end if;
 end $$;
 rollback;
 
 begin;
 set local role authenticated;
 set local request.jwt.claims = '{"sub":"a0000000-0000-0000-0000-00000000000a"}';
-insert into public.connection_requests(from_id, to_id)
-values ('a0000000-0000-0000-0000-00000000000a', 'd0000000-0000-0000-0000-00000000000d');
+select status from public.send_signal('d0000000-0000-0000-0000-00000000000d');
 set local request.jwt.claims = '{"sub":"d0000000-0000-0000-0000-00000000000d"}';
 -- D blocks A after A requested; D's pending request row is inserted as the superuser (bypassing
 -- the insert policy) to model "both requested, then a block": the trigger must still not match.
@@ -324,11 +345,9 @@ insert into public.matches(user1_id, user2_id)  -- greatest-first, as legacy uno
 values ('b0000000-0000-0000-0000-00000000000b', 'a0000000-0000-0000-0000-00000000000a');
 set local role authenticated;
 set local request.jwt.claims = '{"sub":"a0000000-0000-0000-0000-00000000000a"}';
-insert into public.connection_requests(from_id, to_id)
-values ('a0000000-0000-0000-0000-00000000000a', 'b0000000-0000-0000-0000-00000000000b');
+select status from public.send_signal('b0000000-0000-0000-0000-00000000000b');
 set local request.jwt.claims = '{"sub":"b0000000-0000-0000-0000-00000000000b"}';
-insert into public.connection_requests(from_id, to_id)
-values ('b0000000-0000-0000-0000-00000000000b', 'a0000000-0000-0000-0000-00000000000a');
+select status from public.send_signal('a0000000-0000-0000-0000-00000000000a');
 do $$
 declare n int;
 begin
@@ -342,8 +361,7 @@ rollback;
 begin;
 set local role authenticated;
 set local request.jwt.claims = '{"sub":"a0000000-0000-0000-0000-00000000000a"}';
-insert into public.connection_requests(from_id, to_id)
-values ('a0000000-0000-0000-0000-00000000000a', 'b0000000-0000-0000-0000-00000000000b');
+select status from public.send_signal('b0000000-0000-0000-0000-00000000000b');
 set local request.jwt.claims = '{"sub":"b0000000-0000-0000-0000-00000000000b"}';
 select public.respond_connection_request('a0000000-0000-0000-0000-00000000000a', true);
 set local request.jwt.claims = '{"sub":"a0000000-0000-0000-0000-00000000000a"}';
@@ -360,8 +378,9 @@ set local request.jwt.claims = '{"sub":"b0000000-0000-0000-0000-00000000000b"}';
 do $$
 declare n int;
 begin
-  insert into public.connection_requests(from_id, to_id)
-  values ('b0000000-0000-0000-0000-00000000000b', 'a0000000-0000-0000-0000-00000000000a');
+  if (select status from public.send_signal('a0000000-0000-0000-0000-00000000000a')) <> 'sent' then
+    raise exception 'FAIL: a one-sided signal after unmatch did not answer sent';
+  end if;
   select count(*) into n from public.matches;
   if n <> 0 then raise exception 'FAIL: one-sided request after unmatch re-created % matches', n; end if;
   begin
@@ -375,31 +394,30 @@ set local request.jwt.claims = '{"sub":"a0000000-0000-0000-0000-00000000000a"}';
 do $$
 declare n int;
 begin
-  insert into public.connection_requests(from_id, to_id)
-  values ('a0000000-0000-0000-0000-00000000000a', 'b0000000-0000-0000-0000-00000000000b');
+  if (select status from public.send_signal('b0000000-0000-0000-0000-00000000000b')) <> 'matched' then
+    raise exception 'FAIL: a mutual re-signal after unmatch did not answer matched';
+  end if;
   select count(*) into n from public.matches;
   if n <> 1 then raise exception 'FAIL: mutual re-request after unmatch created % matches (want 1)', n; end if;
 end $$;
 rollback;
 
 -- 6b. Ruling P11: B declines A, then changes their mind and requests A: match.
--- The declined sender (A) cannot re-insert at all (primary key), so a decline is never overridden by A.
+-- The declined sender (A) cannot re-insert at all (a re-signal answers 'sent' and changes nothing), so a decline
+-- is never overridden by A.
 begin;
 set local role authenticated;
 set local request.jwt.claims = '{"sub":"a0000000-0000-0000-0000-00000000000a"}';
-insert into public.connection_requests(from_id, to_id)
-values ('a0000000-0000-0000-0000-00000000000a', 'b0000000-0000-0000-0000-00000000000b');
+select status from public.send_signal('b0000000-0000-0000-0000-00000000000b');
 set local request.jwt.claims = '{"sub":"b0000000-0000-0000-0000-00000000000b"}';
 select public.respond_connection_request('a0000000-0000-0000-0000-00000000000a', false);
 set local request.jwt.claims = '{"sub":"a0000000-0000-0000-0000-00000000000a"}';
 do $$
 declare n int;
 begin
-  begin
-    insert into public.connection_requests(from_id, to_id)
-    values ('a0000000-0000-0000-0000-00000000000a', 'b0000000-0000-0000-0000-00000000000b');
-    raise exception 'FAIL: declined sender re-inserted their request';
-  exception when unique_violation then null; end;
+  if (select status from public.send_signal('b0000000-0000-0000-0000-00000000000b')) <> 'sent' then
+    raise exception 'FAIL: a declined sender''s re-signal did not answer sent';
+  end if;
   select count(*) into n from public.matches;
   if n <> 0 then raise exception 'FAIL: declined sender got % matches', n; end if;
 end $$;
@@ -407,8 +425,9 @@ set local request.jwt.claims = '{"sub":"b0000000-0000-0000-0000-00000000000b"}';
 do $$
 declare n int;
 begin
-  insert into public.connection_requests(from_id, to_id)
-  values ('b0000000-0000-0000-0000-00000000000b', 'a0000000-0000-0000-0000-00000000000a');
+  if (select status from public.send_signal('a0000000-0000-0000-0000-00000000000a')) <> 'matched' then
+    raise exception 'FAIL: a change of mind after decline did not answer matched';
+  end if;
   select count(*) into n from public.matches;
   if n <> 1 then raise exception 'FAIL: change of mind after decline created % matches (want 1, P11)', n; end if;
   select count(*) into n from public.connection_requests where status = 'accepted';
@@ -421,8 +440,7 @@ rollback;
 begin;
 set local role authenticated;
 set local request.jwt.claims = '{"sub":"a0000000-0000-0000-0000-00000000000a"}';
-insert into public.connection_requests(from_id, to_id, note)
-values ('a0000000-0000-0000-0000-00000000000a', 'b0000000-0000-0000-0000-00000000000b', 'secret note');
+select status from public.send_signal('b0000000-0000-0000-0000-00000000000b', 'secret note');
 set local request.jwt.claims = '{"sub":"b0000000-0000-0000-0000-00000000000b"}';
 insert into public.brivia_blocks(blocker_id, blocked_id)
 values ('b0000000-0000-0000-0000-00000000000b', 'a0000000-0000-0000-0000-00000000000a');
@@ -459,6 +477,10 @@ begin
     perform public.respond_connection_request('a0000000-0000-0000-0000-00000000000a', true);
     raise exception 'FAIL: anon can call respond_connection_request';
   exception when insufficient_privilege then null; end;
+  begin
+    perform public.send_signal('a0000000-0000-0000-0000-00000000000a');
+    raise exception 'FAIL: anon can call send_signal';
+  exception when insufficient_privilege then null; end;
 end $$;
 rollback;
 begin;
@@ -467,14 +489,13 @@ set local request.jwt.claims = '{"sub":"e0000000-0000-0000-0000-00000000000e"}';
 do $$
 begin
   begin
-    insert into public.connection_requests(from_id, to_id)
-    values ('e0000000-0000-0000-0000-00000000000e', 'a0000000-0000-0000-0000-00000000000a');
+    perform public.send_signal('a0000000-0000-0000-0000-00000000000a');
     raise exception 'FAIL: non-member can send a request';
-  exception when insufficient_privilege or foreign_key_violation then null; end;
+  exception when sqlstate '22023' then null; end;
 end $$;
 rollback;
 
--- 7. Race: A->B and B->A in two concurrent sessions. Without serialisation, neither trigger sees
+-- 7. Race: A->B and B->A (send_signal) in two concurrent sessions. Without serialisation, neither trigger sees
 -- the other's uncommitted row and no match is ever created. Session 1 inserts A->B and stays open;
 -- session 2 inserts B->A; session 1 commits; session 2 commits. Exactly one match must exist.
 create schema if not exists brivia_test_ext;
@@ -489,18 +510,16 @@ begin
   perform brivia_test_ext.dblink_exec('s1', 'begin');
   perform brivia_test_ext.dblink_exec('s1', 'set local role authenticated');
   perform brivia_test_ext.dblink_exec('s1', $q$set local request.jwt.claims = '{"sub":"a0000000-0000-0000-0000-00000000000a"}'$q$);
-  perform brivia_test_ext.dblink_exec('s1', $q$insert into public.connection_requests(from_id, to_id)
-    values ('a0000000-0000-0000-0000-00000000000a', 'b0000000-0000-0000-0000-00000000000b')$q$);
+  perform brivia_test_ext.dblink_exec('s1', $q$do $s$ begin perform public.send_signal('b0000000-0000-0000-0000-00000000000b'); end $s$ $q$);
   perform brivia_test_ext.dblink_exec('s2', 'begin');
   perform brivia_test_ext.dblink_exec('s2', 'set local role authenticated');
   perform brivia_test_ext.dblink_exec('s2', $q$set local request.jwt.claims = '{"sub":"b0000000-0000-0000-0000-00000000000b"}'$q$);
-  perform brivia_test_ext.dblink_send_query('s2', $q$insert into public.connection_requests(from_id, to_id)
-    values ('b0000000-0000-0000-0000-00000000000b', 'a0000000-0000-0000-0000-00000000000a')$q$);
+  perform brivia_test_ext.dblink_send_query('s2', $q$do $s$ begin perform public.send_signal('a0000000-0000-0000-0000-00000000000a'); end $s$ $q$);
   -- Wait until session 2 has either finished its insert or is waiting on a lock (max ~5 s).
   loop
     exit when brivia_test_ext.dblink_is_busy('s2') = 0;
     select exists (select 1 from pg_stat_activity
-                    where wait_event_type = 'Lock' and query like '%b0000000-0000-0000-0000-00000000000b'', ''a0000000%')
+                    where wait_event_type = 'Lock' and query like '%send_signal(''a0000000-0000-0000-0000-00000000000a'')%')
       into blocked;
     exit when blocked or waited >= 100;
     perform pg_sleep(0.05); waited := waited + 1;
@@ -520,6 +539,8 @@ begin
                                   ('b0000000-0000-0000-0000-00000000000b', 'a0000000-0000-0000-0000-00000000000a'));
   delete from public.connection_requests
    where from_id in ('a0000000-0000-0000-0000-00000000000a', 'b0000000-0000-0000-0000-00000000000b');
+  delete from public.signal_ledger
+   where sender_id in ('a0000000-0000-0000-0000-00000000000a', 'b0000000-0000-0000-0000-00000000000b');
   if n <> 1 then raise exception 'FAIL: concurrent mutual requests created % matches (want 1)', n; end if;
 end $$;
 drop extension dblink;

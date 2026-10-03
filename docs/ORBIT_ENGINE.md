@@ -340,14 +340,42 @@ north-star metric (people who actually meet).
   Expiry applies to declined requests too. If the sender requests the same person again, the expired request is
   replaced by a fresh one. The owner-only `purge_expired_requests()` deletes expired rows.
 
-**Request caps and consent rules (database, `0003_trust_hardening.sql`).**
-- A sender may send at most **30 requests per 24 hours** and hold at most **100 live unanswered** (pending or
-  declined) requests. A request over a cap is **dropped silently**: no error and no row are written, and the
-  client shows the usual "Signal sent", so the cap is never revealed.
-- A request that **completes a match** (the other member has already asked) is never capped.
+**Request caps and consent rules (database: `0003_trust_hardening.sql`, and since Iteration 3
+`0004_orbit_onboarding.sql` section 6; Ruling A1, D-026, D-032).**
+- **One send path.** Members send a request only through `send_signal(p_to, p_note)` (SECURITY DEFINER, POST only).
+  Raw client inserts into `connection_requests` are revoked. The sender must be completed (§7); otherwise the call
+  fails with `22023 'complete your profile'`. A null or own `p_to` fails with `22023 'invalid signal'`, and a note
+  over 500 characters with `22001`. None of these is charged.
+- **The sender's own quota is honest.** A sender may send at most **30 signals per rolling 24 hours** and hold at
+  most **100 live unanswered** targets. Both limits are private config (`brivia_config` keys `signal_daily_limit` and
+  `signal_live_limit`, owner only). Over a cap the send fails **visibly** with `PT429` (HTTP 429) and the message
+  `signal_quota_exhausted` (daily) or `signal_live_cap` (live), and nothing is charged. `my_signal_quota()` returns
+  the caller's `daily_limit`, `remaining`, `resets_at`, `live_unanswered` and `live_limit`.
+  - The quota is counted from the **sender-only ledger** `signal_ledger(sender_id, to_id, kind, at)` (RLS on, no
+    client grants). Each send writes one row **before** anything about the recipient is looked at. `to_id` has no
+    foreign key, so an attempt at an id that does not exist is charged and kept like any other.
+  - *Daily:* rows of kind `signal` in the last 24 h. `resets_at` is the moment the oldest of them leaves the window,
+    **rounded up to the hour** (coarse on purpose, so a scripted sender cannot pace to the second). It is null when
+    nothing was used.
+  - *Live unanswered:* distinct `to_id` in the ledger (any kind) within 30 days that have no match with the sender.
+    A declined, blocked or non-existent target stays live for its 30 days, exactly like an unanswered one.
+- **Recipient-side outcomes are uniform and silent.** A target who blocked the sender or was blocked by them, a
+  target in the other test world, a duplicate (a live earlier request), a target who declined, a target who is not
+  completed, and an id that does not exist all answer `status = 'sent'` and cost exactly one unit, the same as a
+  normal target. Only a visible target (`brivia_visible_to`, §7) gets a `connection_requests` row. `send_signal` writes
+  **no `interaction` row** on any path, so the sender's response, quota and interaction rows cannot probe recipient
+  state. The response is `matched` only when a match for the pair exists afterwards.
+- A request that **completes a match** (a live pending or declined request from the visible target to the sender
+  already exists) is never refused by either cap, and it still costs one unit (`remaining` stays at 0).
+- **Completion gates every consent path.** `brivia_has_completed_profile()`, used by the request, message, match and
+  post policies, means `brivia_member_completed(auth.uid())`, and `respond_connection_request` refuses a caller who is
+  not completed (`22023 'complete your profile'`).
+- The iteration-2 rule that dropped an over-cap request **silently** (no error, the usual "Signal sent") is replaced
+  by the honest own quota above (D-026 supersedes D-019 in part).
 - **The sender never sees a decline.** Senders read their outgoing requests only through
-  `my_outgoing_requests()`, which shows a declined request as pending. A re-request of a live declined request
-  gives the same conflict as one that is still pending, and both expire at 30 days. One consequence: the
+  `my_outgoing_requests()`, which shows a declined request as pending. A re-signal to a live declined request
+  answers `sent` and costs one unit, exactly like a re-signal to one that is still pending, and both expire at 30
+  days. One consequence: the
   change-of-mind path of Ruling P11 (the member who declined requests back) completes a match only within 30
   days of the original request. After that, their request is a new pending request.
 - **A block withdraws the blocker's own pending and declined requests** to the blocked member. So
@@ -403,7 +431,9 @@ saturated, the outer rings relax first, instead of the deck repeating saturated 
   bundled preset cover), and the client renders them only from the Supabase origin, so a card image can never be a
   third-party tracking pixel. ORBIT's `orbit_cards` returns the same `photo_url` and relies on the same rule.
 - **Long-Range Request:** to request someone in ring ≥ 3 who has not liked you, you spend one of **5 weekly long-range
-  signals**. The request must include a note. The recipient sees the resonance chips and can accept or decline.
+  signals**. The weekly counter uses the same sender-only ledger as §6.4, with rows of `kind = 'long_range'`
+  (Worth-the-Distance signals use `kind = 'wtd'`), and follows the same rules: charged before any recipient lookup,
+  uniform recipient outcomes, and an honest visible failure only for the sender's own limit. The request must include a note. The recipient sees the resonance chips and can accept or decline.
   Declines are private.
 - Acceptance and decline feed the taste model of both members. A member whose long-range acceptance rate stays
   below 15% over 20 or more requests gets a lower weekly quota (anti-spam).

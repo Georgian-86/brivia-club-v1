@@ -62,6 +62,14 @@ The current signup is 3 steps. It becomes **4 steps**:
   RESONANCE" and one extra chip explaining why. Max 2 a day.
 - Deck empty state: "You've met your orbit for today." The next action depends on the cause. If the area is sparse,
   "Widen nothing. We already did. Try search." If the daily limit is hit, keep the existing "Come tomorrow." state.
+- **Signal counter (Ruling A1, D-026, D-032).** The only signal limit is the server quota from `my_signal_quota()`; the
+  old localStorage swipe limit is gone and passes are free.
+  - Normal: "N signals left today".
+  - At 0: "More at HH:MM", from `resets_at` (already rounded to the hour by the server), in the member's local time.
+  - At the live cap: "You have 100 signals waiting for an answer" (the number is `live_limit`).
+  - Over a cap (`send_signal` fails with HTTP 429, `signal_quota_exhausted` or `signal_live_cap`), the card is **not**
+    consumed and the member sees the honest state above. Nothing else ever fails visibly: every recipient-side outcome
+    shows "Signal sent".
 
 ### C. Search and Long-Range Request
 
@@ -75,6 +83,9 @@ The current signup is 3 steps. It becomes **4 steps**:
 
 - A like shows "Signal sent". Chat opens only on a mutual like or an accepted request.
   This replaces today's immediate `saveMatches()`.
+- "Signal sent" is shown for every accepted send, whatever the recipient's state (blocked, other world, duplicate,
+  declined, unknown); the counter drops by exactly one each time. When `send_signal` answers `matched`, the match
+  moment opens instead. Only the sender's own cap is shown as an error (see §B, Signal counter).
 - The match moment shows the shared interests that made the match, and icebreakers derived from them.
 
 #### Consent semantics

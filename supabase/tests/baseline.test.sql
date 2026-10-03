@@ -136,10 +136,11 @@ begin;
 insert into auth.users(id) values
   ('11111111-0000-0000-0000-000000000001'), ('22222222-0000-0000-0000-000000000002'),
   ('33333333-0000-0000-0000-000000000003'), ('44444444-0000-0000-0000-000000000004');
-insert into public.profiles(id, name, full_name, email, phone, phone_number) values
-  ('11111111-0000-0000-0000-000000000001', 'One', 'One', 'one@test.brivia.club', '+1 1', '1'),
-  ('22222222-0000-0000-0000-000000000002', 'Two', 'Two', 'two@test.brivia.club', '+1 2', '2'),
-  ('33333333-0000-0000-0000-000000000003', 'Three', 'Three', 'three@test.brivia.club', '+1 3', '3');
+-- A city makes them completed members in the full chain (0004 completion, via the harness autocomplete fixture).
+insert into public.profiles(id, name, full_name, email, phone, phone_number, city) values
+  ('11111111-0000-0000-0000-000000000001', 'One', 'One', 'one@test.brivia.club', '+1 1', '1', 'Pune'),
+  ('22222222-0000-0000-0000-000000000002', 'Two', 'Two', 'two@test.brivia.club', '+1 2', '2', 'Pune'),
+  ('33333333-0000-0000-0000-000000000003', 'Three', 'Three', 'three@test.brivia.club', '+1 3', '3', 'Pune');
 -- user 4 is authenticated but has no profile (not a member yet).
 -- A server-created (consented) match, and objects in every member bucket for One and Three.
 insert into public.matches(user1_id, user2_id)

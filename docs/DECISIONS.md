@@ -190,3 +190,37 @@ supersedes it.
   count. Without it, those rows would start a fresh streak out of step with the rest.
 - **Alternative rejected:** counting refreshes instead of nights (a missed night keeps the streak). It is simpler, but
   a stalled cron followed by a burst of catch-up runs could un-coarsen a cell sooner than 7 real nights.
+
+## D-032: `send_signal`, the sender-only ledger and the honest own quota (Ruling A1)
+- Accepted 2026-10-03 (Iteration 3, Task 6). Implements D-026 Ruling A1; supersedes the iteration-2 silent cap
+  (D-019 in part, as D-026 already ruled).
+- **Decision:**
+  - Members send requests only through `send_signal(p_to, p_note)` (SECURITY DEFINER, volatile). Raw client inserts
+    into `connection_requests` are revoked and the member insert policy is dropped. The before-insert trigger keeps
+    the pair lock and the expired-row replacement but no longer applies caps.
+  - Every send that passes the caller checks is charged one row in the sender-only `signal_ledger` (RLS on, no client
+    grants, `to_id` without a foreign key) **before** the recipient is looked at. Blocked (either direction),
+    cross-world, duplicate, declined, not-completed and unknown targets all answer `sent` and cost one unit. Only a
+    `brivia_visible_to` target gets a request row. `send_signal` writes no `interaction` row.
+  - The sender's own caps (30 per rolling 24 h, 100 live unanswered within 30 days; private `brivia_config` values)
+    fail visibly with `PT429 signal_quota_exhausted` / `signal_live_cap` and are not charged. A send that completes a
+    match is never refused and still costs one unit. `my_signal_quota()` returns `daily_limit`, `remaining`,
+    `resets_at` (rounded up to the hour), `live_unanswered` and `live_limit`.
+  - Live unanswered is counted from the ledger (distinct targets in 30 days without a match), not from
+    `connection_requests`, which would differ for blocked or cross-world targets and turn the counter into a probe.
+    It counts every ledger kind; the daily counter counts kind `signal` only (`long_range` and `wtd` get their own
+    counters, spec §7).
+  - Completion gates every consent path: `brivia_has_completed_profile()` (same signature, used by the request,
+    message, match and post policies) now means `brivia_member_completed(auth.uid())` (D-030), and
+    `respond_connection_request` refuses a caller who is not completed with `22023 'complete your profile'`.
+- **Why:** uniform charging hides recipient state completely while the sender's own budget is shown honestly
+  (arena record `docs/arena/2026-10-03-iteration-2.md`, Ruling A1). Gating consent on the new completion closes the
+  path where a member without interests or a cell could still request, accept or message.
+- **Consequences:** the client must switch to `send_signal` / `my_signal_quota()` (Task 9); until then a raw insert
+  from the old client fails. Members who completed under the legacy rule cannot message or accept until they finish
+  onboarding. The older harness suites send through `send_signal`; their "silent cap" and `23505` re-request
+  assertions now expect the honest error and a uniform `sent`. The purge script deletes `signal_ledger` rows in both
+  directions, because `to_id` has no foreign key.
+- **Alternatives rejected:** counting the live cap from `connection_requests` (a probe, see above); returning a
+  distinct status for a duplicate (it would reveal a decline, since a live declined request reads as pending);
+  charging after the recipient lookup (the charge would differ by recipient state).

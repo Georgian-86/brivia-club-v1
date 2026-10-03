@@ -1,7 +1,9 @@
 -- 0004_orbit_onboarding.sql: the Iteration 3 (ORBIT onboarding) migration.
 -- Apply after 0001, 0002 and 0003, in the Supabase SQL editor. Idempotent: safe to re-run (the local harness
 -- applies every migration twice).
--- RE-RUN ORDER: section 4 redefines get_candidates, search_members, list_members and brivia_can_see_author from 0003.
+-- RE-RUN ORDER: section 4 redefines get_candidates, search_members, list_members and brivia_can_see_author from 0003;
+-- section 6 redefines brivia_has_completed_profile (0001), brivia_before_connection_request and
+-- respond_connection_request (0003) and revokes the 0003 insert grant on connection_requests.
 -- Any re-run of 0003 (or of 0001/0002, which require a 0003 re-run) must be followed by a re-run of 0004.
 -- Sections:
 --   1. Grid and places: the coarse equal-area grid (D-028, spec §4.1 / §9.1.4) and the place list.
@@ -11,6 +13,9 @@
 --      (D-030, §7). Redefines get_candidates, search_members, list_members and brivia_can_see_author from 0003.
 --   5. k-anonymity: member_flag, cell_density, refresh_cell_density (nightly, 7-night hysteresis), brivia_cell_ok
 --      (§9.1.4).
+--   6. Signals: brivia_config, signal_ledger, send_signal, my_signal_quota (Ruling A1, D-032, §6.4). Revokes raw
+--      client inserts into connection_requests; redefines brivia_before_connection_request (0003, without the caps),
+--      respond_connection_request (0003) and brivia_has_completed_profile (0001) on top of the D-030 completion.
 --   Data: places (section 1) and the interest taxonomy (end of file).
 -- Privacy (CLAUDE.md): coordinates exist only as function arguments. No member table stores them; the only
 -- coordinate columns are the public city centroids in public.place, which no client role can read.
@@ -826,6 +831,244 @@ begin
     raise notice 'pg_cron is not installed: schedule public.refresh_cell_density() nightly (spec §9.1.4).';
   end if;
 end $$;
+
+-- =============================================================================================
+-- 6. Signals
+-- =============================================================================================
+-- Arena Ruling A1 (D-026, D-032; spec §6.4). The sender's OWN quota is honest; every RECIPIENT-side outcome is
+-- uniform and silent.
+-- * Every send goes through send_signal (raw client inserts into connection_requests are revoked below). It charges
+--   the sender-only ledger BEFORE it looks at the recipient, so blocked (either direction), cross-world, duplicate,
+--   declined, unknown and not-completed targets all answer 'sent' and cost exactly one unit: neither the response,
+--   nor my_signal_quota(), nor the sender's interaction rows (send_signal writes none) can probe recipient state.
+-- * Only the sender's own cap fails visibly (PT429, PostgREST HTTP 429), and a refused send is not charged.
+-- * A request that completes a match is never refused, and it still costs one unit.
+-- * Completion gates every consent path: brivia_has_completed_profile() (0001; used by the request, message, match
+--   and post policies) now means brivia_member_completed(auth.uid()), and respond_connection_request requires it.
+
+-- Private config (owner only). Keys: signal_daily_limit (default 30), signal_live_limit (default 100). No row is
+-- inserted here, so the defaults apply until the founder sets private values in the SQL editor.
+create table if not exists public.brivia_config (
+  key text primary key,
+  value jsonb not null
+);
+alter table public.brivia_config enable row level security;
+revoke all on public.brivia_config from public, anon, authenticated;
+
+-- Internal: an integer config value, or the default when the key is missing or not a non-negative number.
+create or replace function public.brivia_config_int(p_key text, p_default int)
+returns int
+language sql
+stable
+set search_path = public
+as $$
+  select coalesce((select case when jsonb_typeof(c.value) = 'number' and (c.value #>> '{}')::numeric >= 0
+                               then floor((c.value #>> '{}')::numeric)::int end
+                     from public.brivia_config c where c.key = p_key), p_default)
+$$;
+revoke all on function public.brivia_config_int(text, int) from public, anon, authenticated;
+
+-- One row per send attempt. Sender-only and server-written: no client grants, RLS on with no policy.
+-- kind: 'signal' (the deck / search signal), 'long_range' (§7, iteration 4) and 'wtd' (Worth-the-Distance, §5.3)
+-- get their own counters. to_id deliberately has NO foreign key: an attempt at a non-existent id is charged and
+-- kept like any other, so the ledger cannot tell a sender which ids exist.
+create table if not exists public.signal_ledger (
+  id bigserial primary key,
+  sender_id uuid not null references public.profiles(id) on delete cascade,
+  to_id uuid not null,
+  kind text not null default 'signal' check (kind in ('signal', 'long_range', 'wtd')),
+  at timestamptz not null default now()
+);
+create index if not exists signal_ledger_sender_kind_at_idx on public.signal_ledger (sender_id, kind, at);
+alter table public.signal_ledger enable row level security;
+revoke all on public.signal_ledger from public, anon, authenticated;
+revoke all on sequence public.signal_ledger_id_seq from public, anon, authenticated;
+
+-- Internal: the caller's quota state. used = 'signal' rows in the last 24 h; live = distinct to_id (any kind) in
+-- the last 30 days with no current match to the sender (a declined or dead target stays live: the sender cannot
+-- tell); resets_at = when the oldest 'signal' row leaves the 24 h window, rounded UP to the hour (null if none).
+create or replace function public.brivia_signal_state(p_sender uuid)
+returns table(daily_limit int, used int, resets_at timestamptz, live_unanswered int, live_limit int)
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select public.brivia_config_int('signal_daily_limit', 30),
+         (select count(*)::int from public.signal_ledger l
+           where l.sender_id = p_sender and l.kind = 'signal' and l.at > now() - interval '24 hours'),
+         (select case when date_trunc('hour', t) = t then t else date_trunc('hour', t) + interval '1 hour' end
+            from (select min(l.at) + interval '24 hours' as t from public.signal_ledger l
+                   where l.sender_id = p_sender and l.kind = 'signal' and l.at > now() - interval '24 hours') o
+           where t is not null),
+         (select count(distinct l.to_id)::int from public.signal_ledger l
+           where l.sender_id = p_sender and l.at > now() - interval '30 days'
+             and not exists (select 1 from public.matches m
+                              where (m.user1_id = p_sender and m.user2_id = l.to_id)
+                                 or (m.user1_id = l.to_id and m.user2_id = p_sender))),
+         public.brivia_config_int('signal_live_limit', 100)
+$$;
+revoke all on function public.brivia_signal_state(uuid) from public, anon, authenticated;
+
+-- my_signal_quota(): the caller's own quota (one row; none without a session). Feeds "N signals left today",
+-- "More at HH:MM" and "You have 100 signals waiting for an answer" (UX_SPEC §B/§D).
+create or replace function public.my_signal_quota()
+returns table(daily_limit int, remaining int, resets_at timestamptz, live_unanswered int, live_limit int)
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select s.daily_limit, greatest(s.daily_limit - s.used, 0), s.resets_at, s.live_unanswered, s.live_limit
+    from public.brivia_signal_state(auth.uid()) s
+   where auth.uid() is not null
+$$;
+revoke all on function public.my_signal_quota() from public, anon;
+grant execute on function public.my_signal_quota() to authenticated;
+
+-- send_signal(p_to, p_note): the only way a member sends a request. The order is normative (spec §6.4):
+--   1. caller checks, not charged: not completed -> 22023 'complete your profile'; p_to null or self -> 22023
+--      'invalid signal'; a note over 500 characters -> 22001;
+--   2. the sender lock (one send per sender at a time), then the pair lock (lock order: sender, then pair);
+--   3. quota: at a cap, raise PT429 'signal_quota_exhausted' (daily) or 'signal_live_cap' (live), not charged,
+--      UNLESS a live reverse request from a visible p_to exists (the completion case is never refused);
+--   4. charge: one ledger row;
+--   5. recipient side, all silent: not brivia_visible_to -> 'sent'; otherwise insert the request (a duplicate or a
+--      vanished recipient -> 'sent'); 'matched' only when a match exists for the pair afterwards;
+--   6. no interaction row on any path; 7. returns the post-charge remaining (floored at 0) and resets_at.
+create or replace function public.send_signal(p_to uuid, p_note text default null)
+returns table(status text, remaining int, resets_at timestamptz)
+language plpgsql
+volatile
+security definer
+set search_path = public
+as $$
+declare
+  me uuid := auth.uid();
+  s record;
+  v_status text := 'sent';
+begin
+  -- 1. Caller checks (the caller's own state and input: honest, not charged).
+  if me is null or not public.brivia_member_completed(me) then
+    raise exception 'complete your profile' using errcode = '22023';
+  end if;
+  if p_to is null or p_to = me then
+    raise exception 'invalid signal' using errcode = '22023';
+  end if;
+  if char_length(p_note) > 500 then
+    raise exception 'note too long' using errcode = '22001';
+  end if;
+  -- 2. One send per sender at a time (parallel sends cannot overshoot the caps), then the pair lock, so a
+  --    concurrent reverse request is seen by the completion check below.
+  perform pg_advisory_xact_lock(hashtextextended('brivia_request_caps:' || me::text, 0));
+  perform public.brivia_lock_pair(me, p_to);
+  -- 3. Quota.
+  select * into s from public.brivia_signal_state(me);
+  if s.used >= s.daily_limit or s.live_unanswered >= s.live_limit then
+    if not (public.brivia_visible_to(me, p_to)
+            and exists (select 1 from public.connection_requests r
+                         where r.from_id = p_to and r.to_id = me and r.status in ('pending', 'declined')
+                           and public.brivia_request_is_live(r.status, r.created_at))) then
+      if s.used >= s.daily_limit then
+        raise exception 'signal_quota_exhausted' using errcode = 'PT429';
+      end if;
+      raise exception 'signal_live_cap' using errcode = 'PT429';
+    end if;
+  end if;
+  -- 4. Charge, before anything about the recipient is looked at.
+  insert into public.signal_ledger (sender_id, to_id) values (me, p_to);
+  -- 5. Recipient side: every outcome below answers the same way.
+  if public.brivia_visible_to(me, p_to) then
+    begin
+      insert into public.connection_requests (from_id, to_id, note) values (me, p_to, p_note);
+    exception when unique_violation or foreign_key_violation then
+      null;  -- a live earlier request (pending or declined) or a recipient that just vanished: still 'sent'
+    end;
+    if exists (select 1 from public.matches m
+                where (m.user1_id = me and m.user2_id = p_to) or (m.user1_id = p_to and m.user2_id = me)) then
+      v_status := 'matched';
+    end if;
+  end if;
+  -- 6. No interaction row. 7. The post-charge quota.
+  select * into s from public.brivia_signal_state(me);
+  return query select v_status, greatest(s.daily_limit - s.used, 0), s.resets_at;
+end;
+$$;
+revoke all on function public.send_signal(uuid, text) from public, anon;
+grant execute on function public.send_signal(uuid, text) to authenticated;
+
+-- Raw client inserts are gone (this also removes the 0003 column grant on from_id, to_id, note).
+revoke insert on public.connection_requests from public, anon, authenticated;
+drop policy if exists "Members can send connection requests" on public.connection_requests;
+
+-- The before-insert trigger (0003) without the caps (the ledger owns them now). It keeps the pair lock and the
+-- replacement of the sender's own expired row (a decline stays indistinguishable from an unanswered request).
+create or replace function public.brivia_before_connection_request()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  perform public.brivia_lock_pair(new.from_id, new.to_id);
+  delete from public.connection_requests
+   where from_id = new.from_id and to_id = new.to_id
+     and not public.brivia_request_is_live(status, created_at);
+  return new;
+end;
+$$;
+revoke all on function public.brivia_before_connection_request() from public, anon, authenticated;
+
+-- Completion gates every consent path (D-032). Same signature as 0001; the request, message, match and post
+-- policies that call it now require the D-030 completion.
+create or replace function public.brivia_has_completed_profile()
+returns boolean
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select public.brivia_member_completed(auth.uid());
+$$;
+revoke all on function public.brivia_has_completed_profile() from public, anon;
+grant execute on function public.brivia_has_completed_profile() to authenticated;
+
+-- respond_connection_request (0003) plus the completion gate: a caller who is not completed gets 22023
+-- 'complete your profile' (their own state; it says nothing about the request). Everything else is unchanged.
+create or replace function public.respond_connection_request(p_from uuid, p_accept boolean)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  me uuid := auth.uid();
+begin
+  if me is null or p_from is null or p_accept is null then
+    raise exception 'no pending connection request' using errcode = 'no_data_found';
+  end if;
+  if not public.brivia_member_completed(me) then
+    raise exception 'complete your profile' using errcode = '22023';
+  end if;
+  perform public.brivia_lock_pair(p_from, me);
+  if not exists (
+    select 1 from public.connection_requests
+    where from_id = p_from and to_id = me and status = 'pending'
+      and public.brivia_request_is_live(status, created_at)
+  ) then
+    raise exception 'no pending connection request' using errcode = 'no_data_found';
+  end if;
+  if not p_accept or public.brivia_pair_is_blocked(p_from, me) then
+    update public.connection_requests set status = 'declined' where from_id = p_from and to_id = me;
+    return;
+  end if;
+  update public.connection_requests set status = 'accepted'
+   where (from_id = p_from and to_id = me) or (from_id = me and to_id = p_from and status = 'pending');
+  perform public.brivia_create_match(p_from, me);
+end;
+$$;
+revoke all on function public.respond_connection_request(uuid, boolean) from public, anon;
+grant execute on function public.respond_connection_request(uuid, boolean) to authenticated;
 
 -- =============================================================================================
 -- Data: interest taxonomy (spec §3.1; India-relevant, spec §10 phase 1). Original Brivia wording.
