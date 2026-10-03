@@ -18,8 +18,9 @@ begin
   if n <> 0 then raise exception 'FAIL: A can read B base profile row (% rows)', n; end if;
   select count(*) into n from public.profiles where email = 'b@example.com';
   if n <> 0 then raise exception 'FAIL: A can read B email'; end if;
-  select count(*) into n from public.public_profiles where id = 'bbbbbbbb-0000-0000-0000-00000000000b';
-  if n <> 1 then raise exception 'FAIL: public_profiles missing B (% rows)', n; end if;
+  -- 0003 closes public_profiles to members; other members are read through get_candidates (same columns).
+  select count(*) into n from public.get_candidates(array['bbbbbbbb-0000-0000-0000-00000000000b'::uuid]);
+  if n <> 1 then raise exception 'FAIL: get_candidates missing B (% rows)', n; end if;
   select count(*) into n from public.profiles where id = 'aaaaaaaa-0000-0000-0000-00000000000a' and email = 'a@example.com' and phone_number = '555';
   if n <> 1 then raise exception 'FAIL: A cannot read own full row'; end if;
 end $$;
@@ -75,6 +76,7 @@ declare p text;
 begin
   select string_agg(privilege_type, ',' order by privilege_type) into p from information_schema.role_table_grants
    where table_schema='public' and table_name='public_profiles' and grantee='authenticated';
-  if p is distinct from 'SELECT' then raise exception 'FAIL: authenticated privileges on view = %', p; end if;
+  -- 0003 revokes the last privilege (SELECT): members have none on the view.
+  if p is not null then raise exception 'FAIL: authenticated privileges on view = %', p; end if;
 end $$;
 select 'p0-privacy.test.sql OK' as result;

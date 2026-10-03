@@ -466,6 +466,92 @@ const renderHome = (queue = getExplorePeople()) => {
 // inserts a connection request; the server creates the match when the other member has already
 // requested (trigger) or accepts (respond_connection_request). Chat opens only once a match exists.
 const isUuid = (value) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(String(value || ''));
+
+// Other members are read only through the candidate RPCs (supabase/migrations/0003): list_members (deck
+// pages, newest first), get_candidates (cards for known ids, at most 50 per call) and search_members.
+// The server hides blocked pairs, incomplete profiles and the other test world; the client never selects
+// public_profiles or another member's profiles row.
+const MEMBER_PAGE_SIZE = 20;
+const CANDIDATE_ID_CAP = 50;
+const memberDeck = { ready: false, cursor: null, hasMore: true, loading: null, filling: false, exhaustedFilterKey: null };
+const toDeckPerson = (row) => {
+  const profile = rowToProfile(row);
+  const skills = profile.skills.split(',').map((item) => item.trim()).filter(Boolean);
+  const looking = profile.lookingFor.split(',').map((item) => item.trim()).filter(Boolean);
+  const tags = [...skills, ...looking];
+  const filters = ['all', ...tags.map((item) => item.toLowerCase()), profile.experience?.toLowerCase() || ''];
+  return { ...profile, age: '', role: profile.experience || 'Brivia member', distance: '', bio: `${profile.name} is open to meaningful connections.`, tags: tags.length ? tags : ['Open to connect'], image: profile.photoUrl || '', filters: filters.filter(Boolean) };
+};
+// Appends cards not already known (the deck keeps its order); returns how many were added.
+const mergePeople = (rows) => {
+  const known = new Set(people.map((person) => String(person.id)));
+  const added = [];
+  (rows || []).forEach((row) => {
+    const id = String(row?.id || '');
+    if (!id || known.has(id) || id === String(memberProfile.id)) return;
+    known.add(id);
+    added.push(toDeckPerson(row));
+  });
+  if (added.length) people = [...people, ...added];
+  return added.length;
+};
+const fetchCandidates = async (ids) => {
+  const unique = [...new Set((ids || []).map(String).filter((id) => isUuid(id) && id !== String(memberProfile.id)))];
+  const rows = [];
+  for (let start = 0; start < unique.length; start += CANDIDATE_ID_CAP) {
+    const { data, error } = await supabase.rpc('get_candidates', { p_ids: unique.slice(start, start + CANDIDATE_ID_CAP) });
+    if (error) return { data: rows, error };
+    rows.push(...(data || []));
+  }
+  return { data: rows, error: null };
+};
+// Loads the next deck page (one request in flight at a time). Resolves to { added, error }.
+const loadMemberPage = () => {
+  if (!supabase || !memberDeck.hasMore) return Promise.resolve({ added: 0, error: null });
+  if (memberDeck.loading) return memberDeck.loading;
+  const params = { p_limit: MEMBER_PAGE_SIZE };
+  if (memberDeck.cursor) { params.p_after = memberDeck.cursor.createdAt; params.p_after_id = memberDeck.cursor.id; }
+  memberDeck.loading = supabase.rpc('list_members', params).then(({ data, error }) => {
+    if (error) { memberDeck.hasMore = false; return { added: 0, error }; }
+    const rows = data || [];
+    if (rows.length < MEMBER_PAGE_SIZE) memberDeck.hasMore = false;
+    const last = rows[rows.length - 1];
+    if (last) memberDeck.cursor = { createdAt: last.created_at, id: last.id };
+    return { added: mergePeople(rows), error: null };
+  }).finally(() => { memberDeck.loading = null; });
+  return memberDeck.loading;
+};
+// When filters leave the queue empty, pull further pages (at most 5 per trigger) until a card matches.
+// The same filters never pull another 5 pages until they change.
+const deckFilterKey = () => JSON.stringify([exploreFilters.query, exploreFilters.location, [...exploreFilters.skills], [...exploreFilters.lookingFor], filterDrafts.skills, filterDrafts.lookingFor]);
+const fillDeckForFilters = async () => {
+  const key = deckFilterKey();
+  if (!memberDeck.ready || memberDeck.filling || !memberDeck.hasMore || memberDeck.exhaustedFilterKey === key) return;
+  memberDeck.filling = true;
+  try {
+    for (let pages = 0; pages < 5 && memberDeck.hasMore && !getExplorePeople().length; pages += 1) {
+      const { error } = await loadMemberPage();
+      if (error) { console.warn('More members could not load:', error.message); break; }
+    }
+    if (!getExplorePeople().length) memberDeck.exhaustedFilterKey = key;
+  } finally { memberDeck.filling = false; }
+  renderExplore();
+};
+// Name search reaches members on pages not loaded yet: their cards join the deck.
+let memberSearchTimer;
+let memberSearchSeq = 0;
+const scheduleMemberSearch = (query) => {
+  window.clearTimeout(memberSearchTimer);
+  const term = String(query || '').trim();
+  if (!supabase || !memberDeck.ready || !term) return;
+  const seq = ++memberSearchSeq;
+  memberSearchTimer = window.setTimeout(async () => {
+    const { data, error } = await supabase.rpc('search_members', { p_query: term, p_limit: 20 });
+    if (seq !== memberSearchSeq) return;
+    if (error) { console.warn('Member search failed:', error.message); return; }
+    if (mergePeople(data)) renderExplore();
+  }, 250);
+};
 const addConnection = (personId) => {
   if (!remoteConnectionIds.some((id) => String(id) === String(personId))) remoteConnectionIds.push(personId);
   if (!remoteMatchIds.some((id) => String(id) === String(personId))) remoteMatchIds.push(personId);
@@ -505,7 +591,7 @@ const loadConnectionRequests = async () => {
   const unknownIds = [...new Set(rows.map((row) => String(row.from_id)).filter((id) => !findPersonById(id) && isUuid(id)))];
   const extraPeople = new Map();
   if (unknownIds.length) {
-    const { data: profileRows, error: profileError } = await supabase.from('public_profiles').select('*').in('id', unknownIds);
+    const { data: profileRows, error: profileError } = await fetchCandidates(unknownIds);
     if (profileError) console.warn('Request senders could not load:', profileError.message);
     (profileRows || []).forEach((row) => { const profile = rowToProfile(row); extraPeople.set(String(profile.id), { ...profile, image: profile.photoUrl || '' }); });
   }
@@ -681,8 +767,14 @@ const swipe = (type) => {
   card?.classList.add(type === 'like' ? 'is-liking' : 'is-passing');
   // The request is sent when the pitch sheet resolves (submit with a note, or dismiss without one).
   if (type === 'like') openPitch(currentPerson);
-  window.setTimeout(() => {
-    const queue = getExplorePeople();
+  window.setTimeout(async () => {
+    let queue = getExplorePeople();
+    // At the end of the queue, load the next page before wrapping around.
+    if (queue.length && currentIndex + 1 >= queue.length && memberDeck.hasMore) {
+      const { error } = await loadMemberPage();
+      if (error) console.warn('More members could not load:', error.message);
+      queue = getExplorePeople();
+    }
     if (!queue.length) { currentPerson = null; currentIndex = 0; } else { currentIndex = (currentIndex + 1) % queue.length; currentPerson = queue[currentIndex]; }
     renderExplore();
   }, 280);
@@ -793,6 +885,7 @@ const renderExplore = () => {
   renderFilterOptions();
   updateDiscoveryFilterResult(queue.length);
   renderHome(queue);
+  if (!queue.length && memberDeck.ready && memberDeck.hasMore && !memberDeck.filling) fillDeckForFilters();
 };
 
 const ensureInboxControls = () => {
@@ -1341,7 +1434,8 @@ const openBlockedUsersManager = () => {
   modal.addEventListener('click', (event) => { if (event.target === modal) close(); });
   const renderList = () => {
     const blockedIds = readBlockedUserIds();
-    const members = people.filter((person) => blockedIds.has(String(person.id)));
+    // The candidate RPCs hide blocked members, so a blocked id may have no loaded card: list it anyway.
+    const members = [...blockedIds].map((id) => findPersonById(id) || { id, name: 'Blocked member', city: '' });
     list.innerHTML = members.length ? members.map((person) => {
       return `<div class="profile-block-user-row"><div><strong>${escapeHtml(person.name)}</strong><span>${escapeHtml(person.city || 'Brivia member')}</span></div><button type="button" data-block-user-id="${escapeHtml(person.id)}">UNBLOCK</button></div>`;
     }).join('') : '<p class="profile-settings-empty">No blocked users.</p>';
@@ -1557,9 +1651,15 @@ const loadCommunityPosts = async () => {
   communityPosts = data || [];
   communityPostAuthors = {};
   const authorIds = [...new Set(communityPosts.map((post) => post.author_id).filter(Boolean))];
-  if (authorIds.length) {
-    const authors = await supabase.from('public_profiles').select('*').in('id', authorIds);
-    if (!authors.error) (authors.data || []).forEach((author) => {
+  // My own posts use my profile; get_candidates never returns the caller.
+  if (memberProfile.id && authorIds.some((id) => String(id) === String(memberProfile.id))) {
+    communityPostAuthors[memberProfile.id] = { ...memberProfile, image: memberProfile.photoUrl || '', photoUrl: memberProfile.photoUrl || '' };
+  }
+  const otherAuthorIds = authorIds.filter((id) => String(id) !== String(memberProfile.id));
+  if (otherAuthorIds.length) {
+    const authors = await fetchCandidates(otherAuthorIds);
+    if (authors.error) console.warn('Post authors could not load:', authors.error.message);
+    (authors.data || []).forEach((author) => {
       const authorProfile = rowToProfile(author);
       const knownPerson = findPersonById(author.id);
       const isOwnProfile = String(author.id) === String(memberProfile.id);
@@ -1760,7 +1860,7 @@ discoveryFilterDrawer?.addEventListener('click', (event) => {
   renderExplore();
 });
 const filterInputBindings = [
-  ['#drawer-filter-search', (value) => { exploreFilters.query = value; }],
+  ['#drawer-filter-search', (value) => { exploreFilters.query = value; scheduleMemberSearch(value); }],
   ['#filter-location-input', (value) => { filterDrafts.location = value; exploreFilters.location = normalizedValue(value); }],
   ['#filter-skills-input', (value) => { filterDrafts.skills = value; }],
   ['#filter-looking-for-input', (value) => { filterDrafts.lookingFor = value; }],
@@ -2126,20 +2226,18 @@ const loadSupabaseCommunity = async () => {
     });
     remoteMatchIds = [...inboxIds];
   } else console.warn('Inbox could not load:', inboxError.message);
-  // Sort locally so Explore still loads if created_at is missing from an older schema cache.
-  const { data: rows, error } = await supabase.from('public_profiles').select('*').neq('id', session.user.id);
-  if (!error && rows?.length) {
-    rows.sort((a, b) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime());
-    people = rows.map((row) => {
-      const profile = rowToProfile(row);
-      const skills = profile.skills.split(',').map((item) => item.trim()).filter(Boolean);
-      const looking = profile.lookingFor.split(',').map((item) => item.trim()).filter(Boolean);
-      const tags = [...skills, ...looking];
-      const filters = ['all', ...tags.map((item) => item.toLowerCase()), profile.experience?.toLowerCase() || ''];
-      return { ...profile, age: '', role: profile.experience || 'Brivia member', distance: '', bio: `${profile.name} is open to meaningful connections.`, tags: tags.length ? tags : ['Open to connect'], image: profile.photoUrl || '', filters: filters.filter(Boolean) };
-    });
-    currentPerson = people[0];
-  } else if (error) showToast(`Community could not load: ${error.message}`);
+  // The deck: the first list_members page (newest first); later pages load when the queue runs out.
+  const { error } = await loadMemberPage();
+  if (error) showToast(`Community could not load: ${error.message}`);
+  // Connections and conversations may be with members beyond the first page: load their cards by id.
+  const missingChatIds = remoteMatchIds.filter((id) => !findPersonById(id));
+  if (missingChatIds.length) {
+    const { data: chatRows, error: chatError } = await fetchCandidates(missingChatIds);
+    if (chatError) console.warn('Connections could not load:', chatError.message);
+    mergePeople(chatRows);
+  }
+  currentPerson = people[0];
+  memberDeck.ready = true;
   renderHome();
   renderExplore();
   renderChats();

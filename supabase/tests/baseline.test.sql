@@ -157,8 +157,11 @@ begin
   if n <> 0 then raise exception 'FAIL: member reads % other base profile rows', n; end if;
   select count(*) into n from public.profiles where email = 'three@test.brivia.club' or phone_number = '3';
   if n <> 0 then raise exception 'FAIL: member reads another member email/phone'; end if;
-  select count(*) into n from public.public_profiles where id = '33333333-0000-0000-0000-000000000003';
-  if n <> 1 then raise exception 'FAIL: public_profiles missing another member (% rows)', n; end if;
+  -- With 0003 applied (full chain) the view is closed to members; candidate RPCs replace it (trust.test.sql).
+  if has_table_privilege('authenticated', 'public.public_profiles', 'select') then
+    select count(*) into n from public.public_profiles where id = '33333333-0000-0000-0000-000000000003';
+    if n <> 1 then raise exception 'FAIL: public_profiles missing another member (% rows)', n; end if;
+  end if;
   select count(*) into n from public.profiles where id = '11111111-0000-0000-0000-000000000001' and email = 'one@test.brivia.club';
   if n <> 1 then raise exception 'FAIL: member cannot read own full row'; end if;
 
@@ -265,8 +268,10 @@ declare n int;
 begin
   select count(*) into n from public.community_posts;
   if n <> 0 then raise exception 'FAIL: non-member sees % community posts', n; end if;
-  select count(*) into n from public.public_profiles;
-  if n <> 0 then raise exception 'FAIL: non-member sees % public_profiles rows', n; end if;
+  if has_table_privilege('authenticated', 'public.public_profiles', 'select') then
+    select count(*) into n from public.public_profiles;
+    if n <> 0 then raise exception 'FAIL: non-member sees % public_profiles rows', n; end if;
+  end if;
   begin
     insert into public.brivia_messages(sender_id, recipient_id, body)
     values ('44444444-0000-0000-0000-000000000004', '11111111-0000-0000-0000-000000000001', 'x');
