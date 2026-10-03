@@ -72,7 +72,7 @@ declare
   phi float8;
   ncols bigint;
 begin
-  m := regexp_match(coalesce(p_cell, ''), '^g([5-7]):([0-9]{1,6}):([0-9]{1,6})$');
+  m := regexp_match(coalesce(p_cell, ''), '^g([5-7]):(0|[1-9][0-9]{0,5}):(0|[1-9][0-9]{0,5})$');
   if m is null then
     raise exception 'invalid cell' using errcode = '22023';
   end if;
@@ -313,6 +313,10 @@ create table if not exists public.interest_node (
     and parent_id is not distinct from nullif(regexp_replace(id, '\.[^.]+$', ''), id)
   )
 );
+-- sensitive (D-029): special-category topics (health and mental health, religion and spirituality, sexual
+-- orientation and gender identity, sobriety). They count toward resonance only and are never shown to other
+-- members: not in profiles.skills, cards, chips or search.
+alter table public.interest_node add column if not exists sensitive boolean not null default false;
 create index if not exists interest_node_parent_idx on public.interest_node (parent_id);
 alter table public.interest_node enable row level security;
 revoke all on public.interest_node from public, anon, authenticated;
@@ -338,6 +342,7 @@ revoke all on public.member_interest from public, anon, authenticated;
 -- Rules: 1-12 items, no duplicate ids, every id an active node at level >= 3, integer points >= 1 summing to
 -- exactly 20, a valid mode. Any violation raises 22023 'invalid interests' and changes nothing. Then
 -- profiles.skills is set to the chosen labels ordered by points desc, label asc (a server-written display copy).
+-- Sensitive interests (D-029) are stored for matching but left out of profiles.skills, which other members see.
 create or replace function public.set_member_interests(p_items jsonb)
 returns void
 language plpgsql
@@ -388,13 +393,13 @@ begin
 
   delete from public.member_interest where member_id = uid;
   insert into public.member_interest (member_id, interest_id, points, mode)
-  select uid, e ->> 'interest_id', (e ->> 'points')::smallint, coalesce(e ->> 'mode', 'play')
+  select uid, e ->> 'interest_id', (e ->> 'points')::numeric::smallint, coalesce(e ->> 'mode', 'play')
     from jsonb_array_elements(p_items) e;
 
   update public.profiles
      set skills = (select array_agg(n.label order by mi.points desc, n.label asc)
                      from public.member_interest mi join public.interest_node n on n.id = mi.interest_id
-                    where mi.member_id = uid),
+                    where mi.member_id = uid and not n.sensitive),
          updated_at = now()
    where id = uid;
 end;
@@ -531,10 +536,18 @@ grant execute on function public.set_home_city(text) to authenticated;
 -- =============================================================================================
 -- Data: interest taxonomy (spec §3.1; India-relevant, spec §10 phase 1). Original Brivia wording.
 -- 13 domains, 62 categories, 327 interests, 30 niches (432 nodes). Re-runs update labels only; a node that a
--- moderator retired stays retired. parent_id and level are derived from the id.
+-- moderator retired stays retired. parent_id and level are derived from the id. `sensitive` (D-029) is set from
+-- the list below on every run: health and mental health, religion and spirituality, LGBTQ+, sobriety.
 -- =============================================================================================
-insert into public.interest_node (id, parent_id, level, label)
-select v.id, nullif(regexp_replace(v.id, '\.[^.]+$', ''), v.id), array_length(string_to_array(v.id, '.'), 1), v.label
+insert into public.interest_node (id, parent_id, level, label, sensitive)
+select v.id, nullif(regexp_replace(v.id, '\.[^.]+$', ''), v.id), array_length(string_to_array(v.id, '.'), 1), v.label,
+       v.id = any (array[
+         'wellbeing.health', 'wellbeing.health.nutrition', 'wellbeing.health.sleep', 'wellbeing.health.peer_support',
+         'wellbeing.health.sober_social', 'wellbeing.health.healthy_ageing',
+         'wellbeing.spirituality', 'wellbeing.spirituality.pilgrimages', 'wellbeing.spirituality.kirtan',
+         'wellbeing.spirituality.scripture_study', 'wellbeing.spirituality.interfaith',
+         'music.singing.devotional',
+         'community.social.lgbtq'])
 from (values
   ('sports', 'Sports and fitness'),
   ('sports.racket', 'Racket sports'),
@@ -969,4 +982,4 @@ from (values
   ('lifestyle.vehicles.electric_vehicles', 'Electric vehicles'),
   ('lifestyle.vehicles.vintage_vehicles', 'Vintage vehicles')
 ) as v(id, label)
-on conflict (id) do update set label = excluded.label;
+on conflict (id) do update set label = excluded.label, sensitive = excluded.sensitive;

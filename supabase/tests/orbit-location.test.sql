@@ -69,6 +69,7 @@ begin
     if e is null or e !~ '^g[5-7]:\d+:\d+$' then raise exception 'FAIL: edge cell %', e; end if;
     perform * from public.brivia_grid_centroid(e);
   end loop;
+  perform * from public.brivia_grid_centroid('g7:0:0');   -- zero itself is a valid row/col
   if public.brivia_grid_cell(0, 180) <> public.brivia_grid_cell(0, -180) then
     raise exception 'FAIL: lng 180 and -180 differ';
   end if;
@@ -88,7 +89,8 @@ begin
     if st is distinct from '22023' then raise exception 'FAIL: (%) gave sqlstate %', args, st; end if;
     if msg <> 'invalid location' or msg ~ '[0-9]' then raise exception 'FAIL: (%) message %', args, msg; end if;
   end loop;
-  foreach args in array array['g8:1:1', 'g7:9999:0', 'g7:5208:99999', 'x', 'g7:-1:0', 'g7:1', ''] loop
+  foreach args in array array['g8:1:1', 'g7:9999:0', 'g7:5208:99999', 'x', 'g7:-1:0', 'g7:1', '',
+                              'g7:05208:11554', 'g7:5208:011554', 'g7:00:0', 'g7:0:00'] loop
     st := null;
     begin
       perform * from public.brivia_grid_centroid(args);

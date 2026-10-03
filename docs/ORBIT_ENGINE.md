@@ -76,6 +76,13 @@ that a moderator confirms). Until placed, they match only by exact id.
   the level-2 prefix; same domain shares the first segment).
 - Members pick only level 3 or 4 nodes. Domains and categories exist for browsing and for `topo`.
 - `status` is `active` or `retired`. A retired node is never offered or accepted for new picks; ids are never reused.
+- **Sensitive interests (D-029).** `sensitive = true` marks special-category topics: health and mental health,
+  religion and spirituality, sexual orientation and gender identity, and sobriety or addiction recovery (and
+  political affiliation, should such a node ever be added). They are private by default: they count toward
+  resonance (§3.5) exactly like any other interest, but they are **never shown to another member**. They never appear
+  in `profiles.skills` (the public display copy), on cards, in "You both: X" chips, in explanations (§6.3) or in
+  search, and search never matches them. The owner still sees them through `my_interests()`. The seed marks 13
+  nodes; the flag is reset from the seed list on every run of the migration.
 - The seed is original Brivia wording, India-relevant: 13 domains, 62 categories, 327 interests and 30 niches
   (432 nodes). Anyone may read the taxonomy (`anon` and `authenticated` have `select`).
 
@@ -605,6 +612,11 @@ select log_impressions($1, $4);
   exactly `id, name, photoUrl, distanceBand, matchPercent, chips, worthTheDistance`; no value anywhere matches an H3
   index (`/^8[0-9a-f]{14}$/i`), a `grid1` cell id (`/^g[5-7]:\d+:\d+$/`), a coordinate pair, an `@` or a phone-shaped digit run; no key is `km`, `G`, `cell`,
   `lat`, `lng`, `email`, `phone*`, `headroom`, `load` or `ring`. A failing contract test blocks deploy.
+- **Sensitive interests never leave the service (D-029).** No card, chip, explanation or search hit carries the
+  label or id of an `interest_node` with `sensitive = true`, and search never matches one. A shared sensitive
+  interest may raise `matchPercent` (it counts toward resonance), but the chips must then name only non-sensitive
+  shared interests, or none. The contract test seeds a pair whose only shared interest is sensitive and asserts that
+  no response contains its label or id.
 - **Members never read model outputs.** In `interaction`, members can select only `id`, `viewer_id`, `target_id`,
   `event` and `created_at` of their own non-impression rows, and can insert only `viewer_id`, `target_id` and `event`
   (`0003_trust_hardening.sql`). An impression's `context.ring` would reveal what the k-anonymity floor hides.

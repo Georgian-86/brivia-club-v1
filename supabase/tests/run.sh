@@ -13,8 +13,9 @@ cleanup() { as_pg "$BIN/pg_ctl" -D "$DATA" -m immediate stop >/dev/null 2>&1 || 
 trap cleanup EXIT
 cleanup
 as_pg "$BIN/initdb" -D "$DATA" -A trust >/dev/null
-# No parameter logging (spec §9.1.4): the set_home_location probe below must never reach the server log.
-as_pg "$BIN/pg_ctl" -D "$DATA" -o "-p $PORT -k /tmp -c listen_addresses='' -c log_min_error_statement=error -c log_parameter_max_length=0 -c log_parameter_max_length_on_error=0" -w -l "$DATA/log" start >/dev/null
+# No parameter logging (spec §9.1.4): the set_home_location probe below must never reach the server log. Every
+# statement is logged (log_statement=all) so the success path of the probe is exercised too, not only the error path.
+as_pg "$BIN/pg_ctl" -D "$DATA" -o "-p $PORT -k /tmp -c listen_addresses='' -c log_statement=all -c log_min_error_statement=error -c log_parameter_max_length=0 -c log_parameter_max_length_on_error=0" -w -l "$DATA/log" start >/dev/null
 "${PSQL[@]}" -d postgres -c "create database $DB"
 
 # Files are copied to /tmp so the postgres OS user can read them.
@@ -44,7 +45,7 @@ for t in "$STAGE"/tests/*.test.sql; do
 done
 
 # The probe coordinate (orbit-location.test.sql) must not appear in the server log; the over-cap error must.
-if grep -q '12.971598\|77.594566' "$DATA/log"; then echo "FAIL: probe coordinate found in the server log"; exit 1; fi
+if grep -qF -e 12.971598 -e 77.594566 "$DATA/log"; then echo "FAIL: probe coordinate found in the server log"; exit 1; fi
 grep -q 'try again later' "$DATA/log" || { echo "FAIL: the over-cap probe error was not logged"; exit 1; }
 
 # 3) Seed + purge (Task 7): own database so the other suites never see test members. The seed runs as the

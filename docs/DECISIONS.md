@@ -123,3 +123,30 @@ supersedes it.
   iteration's largest correctness risk, and it would put third-party algorithm code inside the repository we intend to
   register for copyright (`IP_NOTES.md`).
 - Supersedes, in part, the "H3 res-7 server snap" wording of D-021 and D-026 (and the H3 coarsening levels of D-025): until H3 is available the snap and the coarsening levels are `grid1` g7/g6/g5.
+
+## D-029: Sensitive interests are private by default
+- Accepted 2026-10-03 (Iteration 3, fix round 1 for Tasks 1–3; controller ruling on review finding I1).
+- **Decision:** `interest_node.sensitive` marks special-category topics: health and mental health, religion and
+  spirituality, sexual orientation and gender identity, and sobriety or addiction recovery (and political affiliation,
+  if such a node is ever added). A member can still pick them, and they count toward resonance like any other interest
+  (they are stored in `member_interest`). But they are never shown to other members:
+  - `set_member_interests` leaves them out of the `profiles.skills` display copy, so `search_members`, `get_candidates`
+    and `list_members` never show or match them;
+  - ORBIT never puts them on cards, in chips, in explanations or in search (spec §3.1, §9.1.5).
+  - The owner still sees them through `my_interests()`.
+- The seed marks 13 nodes: Health habits, Nutrition, Better sleep, Mental-health peer support, Sober socialising,
+  Healthy ageing, Spirituality, Pilgrimages, Kirtan and chanting, Scripture study, Interfaith dialogue, Devotional
+  singing, and LGBTQ+ community.
+- **Why:** these are special-category data under GDPR-style rules (GDPR Art. 9: health, religious or philosophical
+  beliefs, sex life or sexual orientation, political opinions), which India's DPDP Act 2023 also treats as personal data
+  that needs care. Publishing them on a profile that every completed member can search would disclose them to people
+  the member never chose, and could out someone or expose them to discrimination. Keeping them private, while still
+  counting them for matching, means consent covers only the use the member expects: being matched on what they care
+  about.
+- **Alternative rejected:** dropping these nodes from the taxonomy. That is simpler and leaks nothing, but members
+  would lose matching on things they genuinely care about (faith communities, recovery and peer support, queer
+  community), which goes against the north star (mutual interests drive a match).
+- **Not marked (judgement calls):** Sufi and qawwali (a music genre), Mythology and epics (literature), Women's circles
+  (gender is already a profile field), Public policy and Climate action (topics, not party affiliation), and the yoga
+  and meditation nodes (practices, not health conditions). A moderator can mark more nodes, but the next migration
+  re-run resets the flag from the seed list, so add them to the list in `0004` as well.

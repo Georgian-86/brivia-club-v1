@@ -300,4 +300,87 @@ begin
   end if;
 end $$;
 
+-- =============================================================================================
+-- Fix round 1
+-- =============================================================================================
+-- M1: points 20.0 is an integer value and is accepted; 2.5 + 17.5 is refused.
+begin;
+set local role authenticated;
+set local request.jwt.claims = '{"sub":"b3b3b3b3-0000-0000-0000-0000000000b3"}';
+select public.set_member_interests('[{"interest_id":"sports.racket.tennis","points":20.0}]'::jsonb);
+do $$
+declare st text; msg text;
+begin
+  if (select points from public.my_interests() where interest_id = 'sports.racket.tennis') is distinct from 20 then
+    raise exception 'FAIL: points 20.0 not stored as 20';
+  end if;
+  begin
+    perform public.set_member_interests('[{"interest_id":"sports.racket.tennis","points":2.5},
+                                          {"interest_id":"sports.racket.badminton","points":17.5}]'::jsonb);
+  exception when others then st := sqlstate; msg := sqlerrm;
+  end;
+  if st is distinct from '22023' or msg <> 'invalid interests' then raise exception 'FAIL: 2.5 points gave % %', st, msg; end if;
+end $$;
+rollback;
+
+-- I1: sensitive interests (health, mental health, religion/spirituality, LGBTQ+, sobriety) never reach the public
+-- profiles.skills copy or search; they still count in member_interest and the owner still sees them.
+do $$
+declare bad text;
+begin
+  select string_agg(id, ', ') into bad from unnest(array[
+    'community.social.lgbtq', 'wellbeing.health', 'wellbeing.health.peer_support', 'wellbeing.health.sober_social',
+    'wellbeing.health.nutrition', 'wellbeing.health.sleep', 'wellbeing.health.healthy_ageing',
+    'wellbeing.spirituality', 'wellbeing.spirituality.pilgrimages', 'wellbeing.spirituality.kirtan',
+    'wellbeing.spirituality.scripture_study', 'wellbeing.spirituality.interfaith', 'music.singing.devotional']) i(id)
+   where not coalesce((select sensitive from public.interest_node n where n.id = i.id), false);
+  if bad is not null then raise exception 'FAIL: not marked sensitive: %', bad; end if;
+  if (select sensitive from public.interest_node where id = 'sports.racket.badminton') then
+    raise exception 'FAIL: badminton marked sensitive';
+  end if;
+end $$;
+
+insert into auth.users(id) values
+  ('a5a5a5a5-0000-0000-0000-0000000000a5'), ('b5b5b5b5-0000-0000-0000-0000000000b5')
+  on conflict do nothing;
+insert into public.profiles (id, name, full_name, email, city)
+values ('a5a5a5a5-0000-0000-0000-0000000000a5','A5','A5','a5@example.com','Pune'),
+       ('b5b5b5b5-0000-0000-0000-0000000000b5','B5','B5','b5@example.com','Pune')
+on conflict (id) do nothing;
+begin;
+set local role authenticated;
+set local request.jwt.claims = '{"sub":"a5a5a5a5-0000-0000-0000-0000000000a5"}';
+select public.set_member_interests('[{"interest_id":"community.social.lgbtq","points":12},
+                                     {"interest_id":"sports.racket.badminton","points":8}]'::jsonb);
+do $$
+begin
+  if (select skills from public.profiles where id = auth.uid()) is distinct from array['Badminton'] then
+    raise exception 'FAIL: skills with a sensitive interest = %', (select skills from public.profiles where id = auth.uid());
+  end if;
+  if (select count(*) from public.my_interests()) <> 2
+     or not exists (select 1 from public.my_interests() where interest_id = 'community.social.lgbtq') then
+    raise exception 'FAIL: my_interests does not return the owner''s sensitive interest';
+  end if;
+end $$;
+commit;
+do $$
+begin
+  if not exists (select 1 from public.member_interest where member_id = 'a5a5a5a5-0000-0000-0000-0000000000a5'
+                  and interest_id = 'community.social.lgbtq' and points = 12) then
+    raise exception 'FAIL: member_interest lost the sensitive row';
+  end if;
+end $$;
+begin;
+set local role authenticated;
+set local request.jwt.claims = '{"sub":"b5b5b5b5-0000-0000-0000-0000000000b5"}';
+do $$
+begin
+  if exists (select 1 from public.search_members('LGBTQ')) then raise exception 'FAIL: search finds a sensitive label'; end if;
+  if exists (select 1 from public.search_members('LGBTQ+ community')) then raise exception 'FAIL: search finds the full sensitive label'; end if;
+  if not exists (select 1 from public.search_members('Badminton') where id = 'a5a5a5a5-0000-0000-0000-0000000000a5') then
+    raise exception 'FAIL: positive control: search does not find A5 by a normal interest';
+  end if;
+end $$;
+rollback;
+
 select 'orbit-interests.test.sql OK' as result;
