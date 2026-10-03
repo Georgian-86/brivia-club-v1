@@ -100,7 +100,7 @@ const saveRemoteBlock = async (personId, blocked) => {
   return supabase.from('brivia_blocks').delete().eq('blocker_id', memberProfile.id).eq('blocked_id', personId);
 };
 const blockedDatabaseMessage = (error) => /brivia_blocks|relation|schema cache|row-level security|policy/i.test(error?.message || '')
-  ? 'Block setup is not enabled yet. Run supabase/blocking.sql in Supabase SQL Editor once.'
+  ? 'Block setup is not enabled yet. Run the SQL files in supabase/migrations/ (in order) in the Supabase SQL Editor.'
   : (error?.message || 'Could not update block status. Please try again.');
 const restoreChatForMe = (personId) => {
   const hiddenIds = readHiddenChatIds();
@@ -701,7 +701,7 @@ const renderChats = () => {
   const matches = conversations.filter((person) => {
     const last = chatMessages[person.id]?.at(-1);
     const unread = last?.from === 'them' && !readChatIds.has(person.id);
-    const haystack = `${person.name} ${person.email || ''} ${person.phone || ''} ${person.city} ${person.state || ''} ${person.role} ${person.experience || ''} ${person.skills || ''} ${person.lookingFor || ''} ${last?.text || ''} ${last?.attachment?.name || ''}`.toLowerCase();
+    const haystack = `${person.name} ${person.city} ${person.state || ''} ${person.role} ${person.experience || ''} ${person.skills || ''} ${person.lookingFor || ''} ${last?.text || ''} ${last?.attachment?.name || ''}`.toLowerCase();
     return (!query || haystack.includes(query)) && (activeChatFilter !== 'unread' || unread);
   });
   const list = document.querySelector('#chat-list');
@@ -976,7 +976,7 @@ const completeChatAction = async (action) => {
     const remoteResult = await removeRemoteConnection(person);
     if (remoteResult.error) {
       showToast(/row-level security|policy|permission denied/i.test(remoteResult.error.message || '')
-        ? 'Run supabase/connection-removal.sql once in Supabase SQL Editor.'
+        ? 'Run the SQL files in supabase/migrations/ (in order) in the Supabase SQL Editor.'
         : `Connection could not be removed: ${remoteResult.error.message}`);
       return;
     }
@@ -1258,7 +1258,7 @@ const openConnectionsManager = () => {
       const remoteResult = await removeRemoteConnection(person);
       if (remoteResult.error) {
         feedback.textContent = /row-level security|policy|permission denied/i.test(remoteResult.error.message || '')
-          ? 'Removal is not enabled yet. Run supabase/connection-removal.sql in Supabase SQL Editor once.'
+          ? 'Removal is not enabled yet. Run the SQL files in supabase/migrations/ (in order) in the Supabase SQL Editor.'
           : `Connection could not be removed: ${remoteResult.error.message}`;
         button.disabled = false;
         return;
@@ -1407,7 +1407,7 @@ const loadCommunityPosts = async () => {
     communityPostsLoading = false;
     communityPostsLoaded = true;
     if (list) list.innerHTML = /community_posts|relation|schema cache/i.test(error.message || '')
-      ? '<div class="community-post-empty"><span>✦</span><h2>Community posts<br /><em>are almost here.</em></h2><p>Run <strong>supabase/community-posts.sql</strong> once to enable shared posts.</p></div>'
+      ? '<div class="community-post-empty"><span>✦</span><h2>Community posts<br /><em>are almost here.</em></h2><p>Run the SQL files in <strong>supabase/migrations/</strong> to enable shared posts.</p></div>'
       : `<div class="community-post-empty"><span>!</span><h2>Could not load<br /><em>the feed.</em></h2><p>${escapeHtml(error.message || 'Please try again.')}</p></div>`;
     return;
   }
@@ -1415,7 +1415,7 @@ const loadCommunityPosts = async () => {
   communityPostAuthors = {};
   const authorIds = [...new Set(communityPosts.map((post) => post.author_id).filter(Boolean))];
   if (authorIds.length) {
-    const authors = await supabase.from('profiles').select('*').in('id', authorIds);
+    const authors = await supabase.from('public_profiles').select('*').in('id', authorIds);
     if (!authors.error) (authors.data || []).forEach((author) => {
       const authorProfile = rowToProfile(author);
       const knownPerson = findPersonById(author.id);
@@ -1497,7 +1497,7 @@ document.querySelector('#community-post-form')?.addEventListener('submit', async
   } catch (error) {
     if (upload?.path) await removeCommunityPostImage(upload.path);
     if (feedback) feedback.textContent = /community_posts|relation|schema cache/i.test(error.message || '')
-      ? 'Run supabase/community-posts.sql once, then try again.'
+      ? 'Run the SQL files in supabase/migrations/ (in order), then try again.'
       : (error.message || 'Your post could not be published.');
   } finally {
     submit.disabled = false;
@@ -1841,7 +1841,7 @@ const insertChatMessage = async (body, attachment = null) => {
   if (error) {
     if (attachment) {
       if (attachment.path) await removeMessageAttachment(attachment.path);
-      if (/column|schema cache|message_type|attachment_/i.test(error.message || '')) throw new Error('Run supabase/chat-attachments.sql once to enable chat media.');
+      if (/column|schema cache|message_type|attachment_/i.test(error.message || '')) throw new Error('Run the SQL files in supabase/migrations/ (in order) to enable chat media.');
     }
     throw error;
   }
@@ -1967,7 +1967,7 @@ const loadSupabaseCommunity = async () => {
     remoteMatchIds = [...inboxIds];
   } else console.warn('Inbox could not load:', inboxError.message);
   // Sort locally so Explore still loads if created_at is missing from an older schema cache.
-  const { data: rows, error } = await supabase.from('profiles').select('*').neq('id', session.user.id);
+  const { data: rows, error } = await supabase.from('public_profiles').select('*').neq('id', session.user.id);
   if (!error && rows?.length) {
     rows.sort((a, b) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime());
     people = rows.map((row) => {
