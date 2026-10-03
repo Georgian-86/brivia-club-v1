@@ -294,3 +294,570 @@ insert into public.place (id, name, region, country, lat, lng, is_launch) values
 on conflict (id) do update
   set name = excluded.name, region = excluded.region, country = excluded.country,
       lat = excluded.lat, lng = excluded.lng, is_launch = excluded.is_launch;
+
+-- =============================================================================================
+-- 2. Taxonomy and member interests
+-- =============================================================================================
+-- Interest Topology (spec §3.1): domain (1) -> category (2) -> interest (3) -> niche (4). Ids are dotted slugs;
+-- level = number of segments, parent = the id without its last segment (enforced by a check constraint).
+-- The taxonomy is original Brivia wording (no third-party taxonomy) and is seeded at the end of this file.
+create table if not exists public.interest_node (
+  id text primary key,
+  parent_id text references public.interest_node(id),
+  level smallint not null check (level between 1 and 4),
+  label text not null,
+  status text not null default 'active' check (status in ('active', 'retired')),
+  constraint interest_node_shape check (
+    id ~ '^[a-z0-9_]+(\.[a-z0-9_]+){0,3}$'
+    and level = array_length(string_to_array(id, '.'), 1)
+    and parent_id is not distinct from nullif(regexp_replace(id, '\.[^.]+$', ''), id)
+  )
+);
+create index if not exists interest_node_parent_idx on public.interest_node (parent_id);
+alter table public.interest_node enable row level security;
+revoke all on public.interest_node from public, anon, authenticated;
+grant select on public.interest_node to anon, authenticated;
+drop policy if exists interest_node_select on public.interest_node;
+create policy interest_node_select on public.interest_node for select to anon, authenticated using (true);
+
+-- Passion Budget (spec §3.2): each member spreads exactly 20 points over 1-12 interests (level 3 or 4).
+-- Written only by set_member_interests; read only through my_interests (no client grants).
+create table if not exists public.member_interest (
+  member_id uuid not null references public.profiles(id) on delete cascade,
+  interest_id text not null references public.interest_node(id),
+  points smallint not null check (points between 1 and 20),
+  mode text not null default 'play' check (mode in ('learn', 'play', 'teach', 'build')),
+  primary key (member_id, interest_id)
+);
+create index if not exists member_interest_interest_idx on public.member_interest (interest_id);
+alter table public.member_interest enable row level security;
+revoke all on public.member_interest from public, anon, authenticated;
+
+-- set_member_interests(p_items): atomically replaces the caller's interests.
+-- p_items = [{ "interest_id": text, "points": int, "mode": "learn"|"play"|"teach"|"build" (optional, default play) }].
+-- Rules: 1-12 items, no duplicate ids, every id an active node at level >= 3, integer points >= 1 summing to
+-- exactly 20, a valid mode. Any violation raises 22023 'invalid interests' and changes nothing. Then
+-- profiles.skills is set to the chosen labels ordered by points desc, label asc (a server-written display copy).
+create or replace function public.set_member_interests(p_items jsonb)
+returns void
+language plpgsql
+volatile
+security definer
+set search_path = public
+as $$
+declare
+  uid uuid := auth.uid();
+  n int;
+begin
+  -- A profile row is required; locking it serialises concurrent calls by the same member.
+  perform 1 from public.profiles where id = uid for update;
+  if uid is null or not found then
+    raise exception 'profile required' using errcode = 'P0002';
+  end if;
+
+  if p_items is null or jsonb_typeof(p_items) <> 'array' then
+    raise exception 'invalid interests' using errcode = '22023';
+  end if;
+  n := jsonb_array_length(p_items);
+  if n < 1 or n > 12 then
+    raise exception 'invalid interests' using errcode = '22023';
+  end if;
+  -- Shape of every item (types first, so the casts below cannot fail).
+  if exists (
+    select 1 from jsonb_array_elements(p_items) e
+     where jsonb_typeof(e) <> 'object'
+        or jsonb_typeof(e -> 'interest_id') is distinct from 'string'
+        or jsonb_typeof(e -> 'points') is distinct from 'number'
+        or (e ? 'mode' and jsonb_typeof(e -> 'mode') is distinct from 'string')
+  ) then
+    raise exception 'invalid interests' using errcode = '22023';
+  end if;
+  -- Values: integer points in 1..20 summing to 20, valid modes, distinct active level-3/4 nodes.
+  if exists (
+    select 1 from jsonb_array_elements(p_items) e
+     where (e ->> 'points')::numeric <> trunc((e ->> 'points')::numeric)
+        or (e ->> 'points')::numeric not between 1 and 20
+        or coalesce(e ->> 'mode', 'play') not in ('learn', 'play', 'teach', 'build')
+        or not exists (select 1 from public.interest_node n
+                        where n.id = e ->> 'interest_id' and n.status = 'active' and n.level >= 3)
+  )
+  or (select sum((e ->> 'points')::numeric) from jsonb_array_elements(p_items) e) <> 20
+  or (select count(distinct e ->> 'interest_id') from jsonb_array_elements(p_items) e) <> n then
+    raise exception 'invalid interests' using errcode = '22023';
+  end if;
+
+  delete from public.member_interest where member_id = uid;
+  insert into public.member_interest (member_id, interest_id, points, mode)
+  select uid, e ->> 'interest_id', (e ->> 'points')::smallint, coalesce(e ->> 'mode', 'play')
+    from jsonb_array_elements(p_items) e;
+
+  update public.profiles
+     set skills = (select array_agg(n.label order by mi.points desc, n.label asc)
+                     from public.member_interest mi join public.interest_node n on n.id = mi.interest_id
+                    where mi.member_id = uid),
+         updated_at = now()
+   where id = uid;
+end;
+$$;
+revoke all on function public.set_member_interests(jsonb) from public, anon;
+grant execute on function public.set_member_interests(jsonb) to authenticated;
+
+-- my_interests(): the caller's own interests with labels.
+create or replace function public.my_interests()
+returns table(interest_id text, label text, points int, mode text)
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select mi.interest_id, n.label, mi.points::int, mi.mode
+    from public.member_interest mi
+    join public.interest_node n on n.id = mi.interest_id
+   where mi.member_id = auth.uid()
+   order by mi.points desc, n.label asc
+$$;
+revoke all on function public.my_interests() from public, anon;
+grant execute on function public.my_interests() to authenticated;
+
+-- =============================================================================================
+-- Data: interest taxonomy (spec §3.1; India-relevant, spec §10 phase 1). Original Brivia wording.
+-- 13 domains, 62 categories, 327 interests, 30 niches (432 nodes). Re-runs update labels only; a node that a
+-- moderator retired stays retired. parent_id and level are derived from the id.
+-- =============================================================================================
+insert into public.interest_node (id, parent_id, level, label)
+select v.id, nullif(regexp_replace(v.id, '\.[^.]+$', ''), v.id), array_length(string_to_array(v.id, '.'), 1), v.label
+from (values
+  ('sports', 'Sports and fitness'),
+  ('sports.racket', 'Racket sports'),
+  ('sports.racket.badminton', 'Badminton'),
+  ('sports.racket.badminton.doubles', 'Doubles badminton'),
+  ('sports.racket.tennis', 'Tennis'),
+  ('sports.racket.table_tennis', 'Table tennis'),
+  ('sports.racket.squash', 'Squash'),
+  ('sports.racket.pickleball', 'Pickleball'),
+  ('sports.racket.padel', 'Padel'),
+  ('sports.team', 'Team sports'),
+  ('sports.team.cricket', 'Cricket'),
+  ('sports.team.cricket.box_cricket', 'Box cricket'),
+  ('sports.team.cricket.tennis_ball_cricket', 'Tennis-ball cricket'),
+  ('sports.team.football', 'Football'),
+  ('sports.team.football.five_a_side', 'Five-a-side football'),
+  ('sports.team.basketball', 'Basketball'),
+  ('sports.team.volleyball', 'Volleyball'),
+  ('sports.team.hockey', 'Field hockey'),
+  ('sports.team.kabaddi', 'Kabaddi'),
+  ('sports.team.kho_kho', 'Kho-kho'),
+  ('sports.team.ultimate', 'Ultimate frisbee'),
+  ('sports.fitness', 'Fitness training'),
+  ('sports.fitness.gym', 'Gym training'),
+  ('sports.fitness.calisthenics', 'Calisthenics'),
+  ('sports.fitness.functional', 'Functional fitness'),
+  ('sports.fitness.powerlifting', 'Powerlifting'),
+  ('sports.fitness.hiit', 'Interval training'),
+  ('sports.fitness.pilates', 'Pilates'),
+  ('sports.endurance', 'Endurance'),
+  ('sports.endurance.running', 'Running'),
+  ('sports.endurance.running.marathon', 'Marathon running'),
+  ('sports.endurance.running.trail_running', 'Trail running'),
+  ('sports.endurance.cycling', 'Cycling'),
+  ('sports.endurance.cycling.road_cycling', 'Road cycling'),
+  ('sports.endurance.cycling.mountain_biking', 'Mountain biking'),
+  ('sports.endurance.swimming', 'Swimming'),
+  ('sports.endurance.swimming.open_water', 'Open-water swimming'),
+  ('sports.endurance.triathlon', 'Triathlon'),
+  ('sports.endurance.walking', 'Walking groups'),
+  ('sports.combat', 'Combat and martial arts'),
+  ('sports.combat.boxing', 'Boxing'),
+  ('sports.combat.karate', 'Karate'),
+  ('sports.combat.taekwondo', 'Taekwondo'),
+  ('sports.combat.judo', 'Judo'),
+  ('sports.combat.kalaripayattu', 'Kalaripayattu'),
+  ('sports.combat.mma', 'Mixed martial arts'),
+  ('sports.combat.wrestling', 'Wrestling'),
+  ('sports.precision', 'Precision and cue sports'),
+  ('sports.precision.archery', 'Archery'),
+  ('sports.precision.shooting', 'Sport shooting'),
+  ('sports.precision.golf', 'Golf'),
+  ('sports.precision.snooker', 'Snooker and pool'),
+  ('sports.fandom', 'Following sport'),
+  ('sports.fandom.following_cricket', 'Following cricket'),
+  ('sports.fandom.following_football', 'Following football'),
+  ('sports.fandom.motorsport_fandom', 'Following motorsport'),
+  ('sports.fandom.fantasy_sports', 'Fantasy leagues'),
+  ('outdoors', 'Outdoors and adventure'),
+  ('outdoors.trekking', 'Trekking and hiking'),
+  ('outdoors.trekking.day_hikes', 'Day hikes'),
+  ('outdoors.trekking.himalayan_treks', 'Himalayan treks'),
+  ('outdoors.trekking.monsoon_treks', 'Monsoon treks in the Western Ghats'),
+  ('outdoors.trekking.camping', 'Camping'),
+  ('outdoors.climbing', 'Climbing'),
+  ('outdoors.climbing.bouldering', 'Bouldering'),
+  ('outdoors.climbing.bouldering.indoor_bouldering', 'Indoor bouldering gyms'),
+  ('outdoors.climbing.sport_climbing', 'Sport climbing'),
+  ('outdoors.climbing.mountaineering', 'Mountaineering'),
+  ('outdoors.water', 'Water adventures'),
+  ('outdoors.water.surfing', 'Surfing'),
+  ('outdoors.water.kayaking', 'Kayaking'),
+  ('outdoors.water.scuba', 'Scuba diving'),
+  ('outdoors.water.rafting', 'River rafting'),
+  ('outdoors.air_snow', 'Air and snow'),
+  ('outdoors.air_snow.paragliding', 'Paragliding'),
+  ('outdoors.air_snow.skiing', 'Skiing'),
+  ('outdoors.nature', 'Nature watching'),
+  ('outdoors.nature.birdwatching', 'Birdwatching'),
+  ('outdoors.nature.birdwatching.urban_birding', 'Birding in the city'),
+  ('outdoors.nature.wildlife_safaris', 'Wildlife safaris'),
+  ('outdoors.nature.stargazing', 'Stargazing'),
+  ('outdoors.nature.butterflies', 'Butterflies and insects'),
+  ('outdoors.riding', 'Road trips and riding'),
+  ('outdoors.riding.motorcycle_touring', 'Motorcycle touring'),
+  ('outdoors.riding.road_trips', 'Road trips'),
+  ('music', 'Music'),
+  ('music.indian_classical', 'Indian classical music'),
+  ('music.indian_classical.hindustani_vocal', 'Hindustani vocal'),
+  ('music.indian_classical.carnatic_vocal', 'Carnatic vocal'),
+  ('music.indian_classical.sitar', 'Sitar'),
+  ('music.indian_classical.tabla', 'Tabla'),
+  ('music.indian_classical.carnatic_violin', 'Carnatic violin'),
+  ('music.indian_classical.veena', 'Veena'),
+  ('music.indian_classical.bansuri', 'Bansuri'),
+  ('music.indian_classical.mridangam', 'Mridangam'),
+  ('music.instruments', 'Playing an instrument'),
+  ('music.instruments.guitar', 'Guitar'),
+  ('music.instruments.guitar.fingerstyle', 'Fingerstyle guitar'),
+  ('music.instruments.guitar.electric_guitar', 'Electric guitar'),
+  ('music.instruments.piano', 'Piano and keys'),
+  ('music.instruments.drums', 'Drums'),
+  ('music.instruments.violin', 'Western violin'),
+  ('music.instruments.ukulele', 'Ukulele'),
+  ('music.instruments.harmonium', 'Harmonium'),
+  ('music.singing', 'Singing'),
+  ('music.singing.karaoke', 'Karaoke'),
+  ('music.singing.choir', 'Choirs'),
+  ('music.singing.film_songs', 'Film songs'),
+  ('music.singing.western_vocals', 'Western vocals'),
+  ('music.singing.devotional', 'Devotional singing'),
+  ('music.making', 'Making music'),
+  ('music.making.songwriting', 'Songwriting'),
+  ('music.making.production', 'Music production'),
+  ('music.making.djing', 'DJing'),
+  ('music.listening', 'Listening and scenes'),
+  ('music.listening.indie', 'Indie music'),
+  ('music.listening.hip_hop', 'Hip-hop'),
+  ('music.listening.rock_metal', 'Rock and metal'),
+  ('music.listening.electronic', 'Electronic music'),
+  ('music.listening.jazz_blues', 'Jazz and blues'),
+  ('music.listening.live_gigs', 'Live gigs'),
+  ('music.listening.sufi_qawwali', 'Sufi and qawwali'),
+  ('music.listening.k_pop', 'K-pop'),
+  ('arts', 'Arts and crafts'),
+  ('arts.visual', 'Drawing and painting'),
+  ('arts.visual.sketching', 'Sketching'),
+  ('arts.visual.watercolour', 'Watercolour'),
+  ('arts.visual.acrylic_oil', 'Acrylic and oil painting'),
+  ('arts.visual.digital_illustration', 'Digital illustration'),
+  ('arts.visual.digital_illustration.character_design', 'Character design'),
+  ('arts.visual.calligraphy', 'Calligraphy'),
+  ('arts.visual.madhubani', 'Madhubani painting'),
+  ('arts.visual.warli', 'Warli art'),
+  ('arts.photography', 'Photography'),
+  ('arts.photography.street_photography', 'Street photography'),
+  ('arts.photography.portraits', 'Portrait photography'),
+  ('arts.photography.wildlife_photography', 'Wildlife photography'),
+  ('arts.photography.film_cameras', 'Film cameras'),
+  ('arts.photography.phone_photography', 'Phone photography'),
+  ('arts.crafts', 'Handmade crafts'),
+  ('arts.crafts.pottery', 'Pottery'),
+  ('arts.crafts.pottery.wheel_throwing', 'Throwing on the wheel'),
+  ('arts.crafts.knitting', 'Knitting and crochet'),
+  ('arts.crafts.embroidery', 'Embroidery'),
+  ('arts.crafts.woodworking', 'Woodworking'),
+  ('arts.crafts.jewellery', 'Jewellery making'),
+  ('arts.crafts.block_printing', 'Block printing'),
+  ('arts.writing', 'Writing'),
+  ('arts.writing.fiction', 'Fiction writing'),
+  ('arts.writing.poetry', 'Poetry'),
+  ('arts.writing.poetry.urdu_shayari', 'Urdu shayari'),
+  ('arts.writing.poetry.slam_poetry', 'Slam poetry'),
+  ('arts.writing.journaling', 'Journaling'),
+  ('arts.writing.essays', 'Essays and blogging'),
+  ('arts.writing.screenwriting', 'Screenwriting'),
+  ('arts.writing.comics', 'Comics and zines'),
+  ('arts.design', 'Design'),
+  ('arts.design.graphic_design', 'Graphic design'),
+  ('arts.design.ux_design', 'Product and UX design'),
+  ('arts.design.interior_design', 'Interior design'),
+  ('arts.design.fashion_design', 'Fashion design'),
+  ('stage_screen', 'Stage and screen'),
+  ('stage_screen.dance', 'Dance'),
+  ('stage_screen.dance.bharatanatyam', 'Bharatanatyam'),
+  ('stage_screen.dance.kathak', 'Kathak'),
+  ('stage_screen.dance.odissi', 'Odissi'),
+  ('stage_screen.dance.salsa', 'Salsa'),
+  ('stage_screen.dance.salsa.bachata', 'Bachata'),
+  ('stage_screen.dance.hip_hop_dance', 'Hip-hop dance'),
+  ('stage_screen.dance.contemporary', 'Contemporary dance'),
+  ('stage_screen.dance.bollywood_dance', 'Bollywood dance'),
+  ('stage_screen.dance.garba', 'Garba and dandiya'),
+  ('stage_screen.theatre', 'Theatre and comedy'),
+  ('stage_screen.theatre.acting', 'Acting'),
+  ('stage_screen.theatre.improv', 'Improv'),
+  ('stage_screen.theatre.stand_up', 'Stand-up comedy'),
+  ('stage_screen.theatre.street_theatre', 'Street theatre'),
+  ('stage_screen.theatre.open_mics', 'Open mics'),
+  ('stage_screen.theatre.storytelling', 'Spoken storytelling'),
+  ('stage_screen.film', 'Film and video'),
+  ('stage_screen.film.filmmaking', 'Filmmaking'),
+  ('stage_screen.film.film_clubs', 'Film clubs'),
+  ('stage_screen.film.world_cinema', 'World cinema'),
+  ('stage_screen.film.documentaries', 'Documentaries'),
+  ('stage_screen.film.video_editing', 'Video editing'),
+  ('stage_screen.film.animation', 'Animation'),
+  ('stage_screen.online', 'Creating online'),
+  ('stage_screen.online.video_channels', 'Video channels'),
+  ('stage_screen.online.podcasting', 'Podcasting'),
+  ('stage_screen.online.live_streaming', 'Live streaming'),
+  ('stage_screen.online.short_video', 'Short-form video'),
+  ('food', 'Food and drink'),
+  ('food.cooking', 'Cooking'),
+  ('food.cooking.home_cooking', 'Everyday home cooking'),
+  ('food.cooking.regional_indian', 'Regional Indian cooking'),
+  ('food.cooking.baking', 'Baking'),
+  ('food.cooking.baking.sourdough', 'Sourdough'),
+  ('food.cooking.plant_based', 'Plant-based cooking'),
+  ('food.cooking.meal_prep', 'Meal prep'),
+  ('food.cooking.barbecue', 'Barbecue and tandoor'),
+  ('food.cooking.mithai', 'Mithai making'),
+  ('food.drinks', 'Drinks'),
+  ('food.drinks.coffee', 'Speciality coffee'),
+  ('food.drinks.coffee.home_espresso', 'Home espresso'),
+  ('food.drinks.coffee.pour_over', 'Pour-over brewing'),
+  ('food.drinks.tea', 'Tea tasting'),
+  ('food.drinks.craft_beer', 'Craft beer'),
+  ('food.drinks.wine', 'Wine'),
+  ('food.drinks.mixology', 'Cocktails and mocktails'),
+  ('food.drinks.fermenting', 'Fermented drinks'),
+  ('food.eating_out', 'Eating out'),
+  ('food.eating_out.street_food', 'Street food walks'),
+  ('food.eating_out.cafe_hopping', 'Cafe hopping'),
+  ('food.eating_out.fine_dining', 'Fine dining'),
+  ('food.growing', 'Growing food'),
+  ('food.growing.terrace_gardening', 'Terrace gardening'),
+  ('food.growing.hydroponics', 'Hydroponics'),
+  ('food.growing.composting', 'Composting'),
+  ('food.growing.foraging', 'Foraging'),
+  ('tech', 'Technology'),
+  ('tech.software', 'Software'),
+  ('tech.software.web_development', 'Web development'),
+  ('tech.software.web_development.frontend', 'Front-end development'),
+  ('tech.software.mobile_apps', 'Mobile apps'),
+  ('tech.software.backend', 'Backend systems'),
+  ('tech.software.devops', 'DevOps and cloud'),
+  ('tech.software.open_source', 'Open source'),
+  ('tech.software.game_dev', 'Game development'),
+  ('tech.software.competitive_programming', 'Competitive programming'),
+  ('tech.ai_data', 'AI and data'),
+  ('tech.ai_data.machine_learning', 'Machine learning'),
+  ('tech.ai_data.machine_learning.ml_deployment', 'Shipping ML models'),
+  ('tech.ai_data.generative_ai', 'Generative AI'),
+  ('tech.ai_data.data_analysis', 'Data analysis'),
+  ('tech.ai_data.data_engineering', 'Data engineering'),
+  ('tech.ai_data.computer_vision', 'Computer vision'),
+  ('tech.ai_data.nlp', 'Natural-language processing'),
+  ('tech.hardware', 'Hardware and making'),
+  ('tech.hardware.electronics', 'Electronics tinkering'),
+  ('tech.hardware.microcontrollers', 'Microcontrollers and single-board computers'),
+  ('tech.hardware.printing_3d', '3D printing'),
+  ('tech.hardware.robotics', 'Robotics'),
+  ('tech.hardware.drones', 'Drones'),
+  ('tech.security', 'Security and privacy'),
+  ('tech.security.ethical_hacking', 'Ethical hacking'),
+  ('tech.security.ctf', 'Capture-the-flag contests'),
+  ('tech.security.privacy_tools', 'Privacy tools'),
+  ('tech.frontier', 'Frontier tech'),
+  ('tech.frontier.blockchain', 'Blockchain'),
+  ('tech.frontier.ar_vr', 'AR and VR'),
+  ('tech.frontier.quantum', 'Quantum computing'),
+  ('tech.frontier.space_tech', 'Space tech'),
+  ('business', 'Work and enterprise'),
+  ('business.startups', 'Startups'),
+  ('business.startups.founding', 'Founding a company'),
+  ('business.startups.fundraising', 'Fundraising'),
+  ('business.startups.product_management', 'Product management'),
+  ('business.startups.growth', 'Growth marketing'),
+  ('business.startups.side_projects', 'Side projects'),
+  ('business.startups.bootstrapping', 'Bootstrapping'),
+  ('business.careers', 'Careers'),
+  ('business.careers.public_speaking', 'Public speaking'),
+  ('business.careers.mentoring', 'Mentoring'),
+  ('business.careers.career_change', 'Changing careers'),
+  ('business.careers.freelancing', 'Freelancing'),
+  ('business.careers.leadership', 'Leading teams'),
+  ('business.money', 'Money'),
+  ('business.money.personal_finance', 'Personal finance'),
+  ('business.money.stock_investing', 'Stock investing'),
+  ('business.money.index_funds', 'Index and mutual funds'),
+  ('business.money.real_estate', 'Real estate'),
+  ('business.money.early_retirement', 'Planning early retirement'),
+  ('business.marketing', 'Marketing and sales'),
+  ('business.marketing.branding', 'Branding'),
+  ('business.marketing.copywriting', 'Copywriting'),
+  ('business.marketing.seo', 'Search optimisation'),
+  ('business.marketing.selling', 'Selling'),
+  ('business.marketing.social_marketing', 'Social media marketing'),
+  ('learning', 'Ideas and learning'),
+  ('learning.languages', 'Languages'),
+  ('learning.languages.english', 'English conversation'),
+  ('learning.languages.hindi', 'Hindi'),
+  ('learning.languages.kannada', 'Kannada'),
+  ('learning.languages.tamil', 'Tamil'),
+  ('learning.languages.marathi', 'Marathi'),
+  ('learning.languages.bengali', 'Bengali'),
+  ('learning.languages.french', 'French'),
+  ('learning.languages.japanese', 'Japanese'),
+  ('learning.languages.sanskrit', 'Sanskrit'),
+  ('learning.languages.sign_language', 'Indian Sign Language'),
+  ('learning.science', 'Science'),
+  ('learning.science.astronomy', 'Astronomy'),
+  ('learning.science.physics', 'Physics'),
+  ('learning.science.biology', 'Biology'),
+  ('learning.science.neuroscience', 'Neuroscience'),
+  ('learning.science.climate_science', 'Climate science'),
+  ('learning.science.maths', 'Recreational maths'),
+  ('learning.humanities', 'Humanities'),
+  ('learning.humanities.history', 'History'),
+  ('learning.humanities.history.indian_history', 'Indian history'),
+  ('learning.humanities.philosophy', 'Philosophy'),
+  ('learning.humanities.psychology', 'Psychology'),
+  ('learning.humanities.economics', 'Economics'),
+  ('learning.humanities.mythology', 'Mythology and epics'),
+  ('learning.humanities.policy', 'Public policy'),
+  ('learning.reading', 'Reading'),
+  ('learning.reading.book_clubs', 'Book clubs'),
+  ('learning.reading.fantasy_scifi', 'Fantasy and sci-fi'),
+  ('learning.reading.literary_fiction', 'Literary fiction'),
+  ('learning.reading.non_fiction', 'Non-fiction'),
+  ('learning.reading.indian_languages', 'Indian-language literature'),
+  ('learning.reading.graphic_novels', 'Manga and graphic novels'),
+  ('learning.reading.poetry_reading', 'Reading poetry'),
+  ('learning.study', 'Study and exams'),
+  ('learning.study.exam_prep', 'Competitive exam prep'),
+  ('learning.study.study_groups', 'Study groups'),
+  ('learning.study.study_abroad', 'Studying abroad'),
+  ('learning.study.quizzing', 'Quizzing'),
+  ('learning.discussion', 'Debate and discussion'),
+  ('learning.discussion.debating', 'Debating'),
+  ('learning.discussion.model_un', 'Model United Nations'),
+  ('learning.discussion.discussion_circles', 'Discussion circles'),
+  ('wellbeing', 'Mind and wellbeing'),
+  ('wellbeing.yoga', 'Yoga'),
+  ('wellbeing.yoga.hatha', 'Hatha yoga'),
+  ('wellbeing.yoga.flow_yoga', 'Flow yoga'),
+  ('wellbeing.yoga.ashtanga', 'Ashtanga yoga'),
+  ('wellbeing.yoga.restorative', 'Restorative yoga'),
+  ('wellbeing.yoga.breathwork', 'Breathwork'),
+  ('wellbeing.meditation', 'Meditation and mindfulness'),
+  ('wellbeing.meditation.silent_retreats', 'Silent retreats'),
+  ('wellbeing.meditation.mindfulness', 'Mindfulness'),
+  ('wellbeing.meditation.sound_baths', 'Sound baths'),
+  ('wellbeing.meditation.guided_meditation', 'Guided meditation'),
+  ('wellbeing.health', 'Health habits'),
+  ('wellbeing.health.nutrition', 'Nutrition'),
+  ('wellbeing.health.sleep', 'Better sleep'),
+  ('wellbeing.health.peer_support', 'Mental-health peer support'),
+  ('wellbeing.health.sober_social', 'Sober socialising'),
+  ('wellbeing.health.healthy_ageing', 'Healthy ageing'),
+  ('wellbeing.spirituality', 'Spirituality'),
+  ('wellbeing.spirituality.pilgrimages', 'Pilgrimages'),
+  ('wellbeing.spirituality.kirtan', 'Kirtan and chanting'),
+  ('wellbeing.spirituality.scripture_study', 'Scripture study'),
+  ('wellbeing.spirituality.interfaith', 'Interfaith dialogue'),
+  ('games', 'Games and play'),
+  ('games.board', 'Board and card games'),
+  ('games.board.chess', 'Chess'),
+  ('games.board.chess.blitz', 'Blitz and bullet chess'),
+  ('games.board.chess.chess_problems', 'Chess problems'),
+  ('games.board.carrom', 'Carrom'),
+  ('games.board.modern_board_games', 'Modern board games'),
+  ('games.board.poker', 'Poker'),
+  ('games.board.bridge', 'Contract bridge'),
+  ('games.board.rummy', 'Rummy'),
+  ('games.board.word_games', 'Word games'),
+  ('games.board.speedcubing', 'Speedcubing'),
+  ('games.video', 'Video games'),
+  ('games.video.pc', 'PC gaming'),
+  ('games.video.console', 'Console gaming'),
+  ('games.video.mobile', 'Mobile gaming'),
+  ('games.video.esports', 'Esports'),
+  ('games.video.retro', 'Retro gaming'),
+  ('games.video.speedrunning', 'Speedrunning'),
+  ('games.tabletop', 'Tabletop and puzzles'),
+  ('games.tabletop.rpg', 'Tabletop role-playing'),
+  ('games.tabletop.rpg.game_mastering', 'Running tabletop games'),
+  ('games.tabletop.escape_rooms', 'Escape rooms'),
+  ('games.tabletop.jigsaws', 'Jigsaw puzzles'),
+  ('games.tabletop.crosswords', 'Crosswords and cryptics'),
+  ('games.tabletop.trivia_nights', 'Pub trivia'),
+  ('games.tabletop.murder_mystery', 'Murder-mystery evenings'),
+  ('games.collecting', 'Collecting'),
+  ('games.collecting.coins', 'Coin collecting'),
+  ('games.collecting.stamps', 'Stamp collecting'),
+  ('games.collecting.sneakers', 'Sneakers'),
+  ('games.collecting.trading_cards', 'Trading cards'),
+  ('games.collecting.building_bricks', 'Building bricks'),
+  ('community', 'Community and causes'),
+  ('community.volunteering', 'Volunteering'),
+  ('community.volunteering.teaching_children', 'Teaching children'),
+  ('community.volunteering.animal_rescue', 'Animal rescue'),
+  ('community.volunteering.food_banks', 'Food banks'),
+  ('community.volunteering.blood_donation', 'Blood donation drives'),
+  ('community.volunteering.disaster_relief', 'Disaster relief'),
+  ('community.environment', 'Environment'),
+  ('community.environment.beach_cleanups', 'Beach clean-ups'),
+  ('community.environment.tree_planting', 'Tree planting'),
+  ('community.environment.low_waste', 'Low-waste living'),
+  ('community.environment.cycle_friendly', 'Cycle-friendly cities'),
+  ('community.environment.lake_restoration', 'Lake restoration'),
+  ('community.environment.climate_action', 'Climate action'),
+  ('community.civic', 'Civic life'),
+  ('community.civic.civic_tech', 'Civic tech'),
+  ('community.civic.urban_planning', 'Urban planning'),
+  ('community.civic.neighbourhood_forums', 'Neighbourhood forums'),
+  ('community.civic.heritage_conservation', 'Heritage conservation'),
+  ('community.social', 'Meeting people'),
+  ('community.social.new_in_town', 'New in town'),
+  ('community.social.expat_circles', 'Expat circles'),
+  ('community.social.parenting', 'Parenting groups'),
+  ('community.social.pet_parents', 'Pet parents'),
+  ('community.social.pet_parents.dog_walks', 'Dog-walking groups'),
+  ('community.social.womens_circles', 'Women''s circles'),
+  ('community.social.lgbtq', 'LGBTQ+ community'),
+  ('lifestyle', 'Home, style and travel'),
+  ('lifestyle.travel', 'Travel'),
+  ('lifestyle.travel.solo_travel', 'Solo travel'),
+  ('lifestyle.travel.solo_travel.women_solo', 'Women travelling solo'),
+  ('lifestyle.travel.heritage_sites', 'Heritage sites'),
+  ('lifestyle.travel.culinary_travel', 'Culinary travel'),
+  ('lifestyle.travel.slow_travel', 'Slow travel'),
+  ('lifestyle.travel.weekend_getaways', 'Weekend getaways'),
+  ('lifestyle.travel.international', 'International travel'),
+  ('lifestyle.home', 'Home and garden'),
+  ('lifestyle.home.indoor_plants', 'Indoor plants'),
+  ('lifestyle.home.indoor_plants.bonsai', 'Bonsai'),
+  ('lifestyle.home.home_decor', 'Home decor'),
+  ('lifestyle.home.home_repairs', 'Home repairs'),
+  ('lifestyle.home.minimalism', 'Minimalism'),
+  ('lifestyle.home.aquariums', 'Aquarium keeping'),
+  ('lifestyle.style', 'Style'),
+  ('lifestyle.style.fashion', 'Fashion'),
+  ('lifestyle.style.thrifting', 'Thrifting'),
+  ('lifestyle.style.handloom', 'Handloom and textiles'),
+  ('lifestyle.style.skincare', 'Skincare'),
+  ('lifestyle.style.tattoos', 'Tattoo art'),
+  ('lifestyle.vehicles', 'Cars and bikes'),
+  ('lifestyle.vehicles.cars', 'Cars'),
+  ('lifestyle.vehicles.motorcycles', 'Motorcycles'),
+  ('lifestyle.vehicles.electric_vehicles', 'Electric vehicles'),
+  ('lifestyle.vehicles.vintage_vehicles', 'Vintage vehicles')
+) as v(id, label)
+on conflict (id) do update set label = excluded.label;

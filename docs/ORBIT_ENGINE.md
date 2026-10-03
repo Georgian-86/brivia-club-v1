@@ -38,7 +38,7 @@ The governing metaphor, which is also the product language:
 
 | Field | Type | Notes |
 |---|---|---|
-| `interests[]` | `{ interest_id, points, mode }` | Up to 12 interests, picked from the taxonomy (§3.1) or proposed as new nodes |
+| `interests[]` | `{ interest_id, points, mode }` | 1–12 interests, picked from the taxonomy (§3.1; level 3 or 4 only) or proposed as new nodes. Stored in `member_interest(member_id, interest_id, points, mode)`, written only by `set_member_interests(p_items jsonb)` and read back by the member only through `my_interests()` (§3.2) |
 | `points` | int ≥ 1 | **Passion Budget:** each member spreads exactly **20 points** over their interests |
 | `mode` | `learn \| play \| teach \| build` | How they relate to the interest. Defaults to `play` |
 | `home_cell` | Scheme-tagged cell id. Now `grid1` level 7, `g7:<row>:<col>` (~2.3 km × 2.3 km, ~5.4 km²), with parents `g6:…` and `g5:…`; H3 res-7 from iteration 4 (§4.1, D-028) | Derived from a city pick or browser geolocation, snapped in Postgres. **Raw coordinates are discarded after snapping.** |
@@ -68,9 +68,26 @@ topo(i, j) = 1.0   if i == j
 New member-proposed interests are placed under a category by moderators (or by an embedding-nearest suggestion
 that a moderator confirms). Until placed, they match only by exact id.
 
+**As stored** (`0004_orbit_onboarding.sql`, table `interest_node(id, parent_id, level, label, status)`):
+- Ids are dotted slugs, one segment per level: `sports` (domain, level 1), `sports.racket` (category, level 2),
+  `sports.racket.badminton` (interest, level 3), `sports.racket.badminton.doubles` (niche, level 4). A check
+  constraint enforces `level` = number of segments and `parent_id` = the id without its last segment, so `topo` can
+  be computed from the ids alone (parent/child = one id is a prefix of the other plus one segment; siblings share
+  the level-2 prefix; same domain shares the first segment).
+- Members pick only level 3 or 4 nodes. Domains and categories exist for browsing and for `topo`.
+- `status` is `active` or `retired`. A retired node is never offered or accepted for new picks; ids are never reused.
+- The seed is original Brivia wording, India-relevant: 13 domains, 62 categories, 327 interests and 30 niches
+  (432 nodes). Anyone may read the taxonomy (`anon` and `authenticated` have `select`).
+
 ### 3.2 Passion Budget
 
 The budget turns every interest into a weight that **sums to 1 per member**: `p_u(i) = points_u(i) / 20`.
+
+Enforced in the database by `set_member_interests(p_items jsonb)` (SECURITY DEFINER, volatile, `authenticated`
+only; needs a profile row). It accepts 1–12 items `{ interest_id, points, mode }` with distinct, active, level ≥ 3
+ids, integer points ≥ 1 that sum to exactly 20, and a mode in `learn | play | teach | build` (missing means `play`).
+Any violation raises `22023 invalid interests` and leaves the earlier set untouched; a valid call replaces the set
+atomically and writes the labels into `profiles.skills` (points desc, then label asc) as a display copy.
 
 Fixed budgets stop "interest inflation". A member who lists 40 interests can't out-match everyone, and the budget
 says what each person *actually* cares about most.
