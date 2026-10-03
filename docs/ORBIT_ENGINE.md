@@ -606,18 +606,25 @@ select log_impressions($1, $4);
   per member by an advisory lock. Over the cap the call fails with errcode **`PT429`** and the generic message "try
   again later" (PostgREST answers HTTP 429), before anything is written: `member_orbit` and the place label stay
   unchanged. This blunts triangulation by moving one's own pin and re-reading distance bands.
-- **k-anonymity floor.** The population of a cell counts only members of the viewer's world who are completed,
-  whose account is older than 14 days and who are not flagged (reported or restricted), so a burst of fresh sybils
-  cannot fill a cell. Floors: **k = 10** for a candidate who would be shown in ring 0 or 1, **k = 5** for rings 2+.
-  When the candidate's level-7 cell is below k, the band is computed from the parent **level-6** cell (centroid to
-  centroid; `home_cell_g6`), then **level-5** (`home_cell_g5`) if that is still below k, and only then the region
-  `placeLabel`. (Under H3 from iteration 4: res-6, then res-5.) Coarsening never yields a
-  number derived from exact km, and any ring-0/1 chip ("~3 km away") is suppressed while coarsened. Scoring still uses
-  the true ring; only what leaves the service is coarsened.
-- **No band flips:** a cell's coarsening level only goes up quickly and comes down slowly. A cell is un-coarsened
-  only after it has met k on 7 consecutive nightly counts, so a band changing from day to day does not reveal a
-  population crossing the threshold. Populations live in an orbit-private `cell_density(cell, res, is_test, n,
-  met_since)` table refreshed nightly.
+- **k-anonymity floor.** The population of a cell counts only members of the viewer's world who are completed
+  (`brivia_member_completed`, §7), whose account is older than 14 days at the refresh date and who are not flagged
+  (reported or restricted), so a burst of fresh sybils cannot fill a cell. Until moderation tooling exists, "flagged"
+  means a row in the owner-only `member_flag(member_id, reason, flagged_at)` table. Floors: **k = 10** for a candidate
+  who would be shown in ring 0 or 1, **k = 5** for rings 2+. When the candidate's g7 cell is below k, the band is
+  computed from the stored parent **g6** cell (centroid to centroid; `home_cell_g6`), then the stored **g5** cell
+  (`home_cell_g5`) if that is still below k, and only then the region `placeLabel`. (Under H3 from iteration 4: res-6,
+  then res-5.) Coarsening never yields a number derived from exact km, and any ring-0/1 chip ("~3 km away") is
+  suppressed while coarsened. Scoring still uses the true ring; only what leaves the service is coarsened.
+- **No band flips:** a cell's coarsening level only goes up quickly and comes down slowly. Populations live in the
+  owner-only `cell_density(cell, is_test, n, streak10, streak5, ok10, ok5, as_of)` table (RLS on, no client grants),
+  one row per g7, g6 and g5 cell and world. `refresh_cell_density(p_as_of date default current_date)` (owner only;
+  scheduled nightly with pg_cron) recounts every cell that has members, plus every existing row (an emptied cell
+  gets n = 0). Counts group by the **stored** `home_cell`, `home_cell_g6` and `home_cell_g5` columns of
+  `member_orbit`; parents are never re-derived, because grid parents are only approximately nested. Per row and per
+  k: `streakK` grows by 1 on each refresh with a new `as_of` while `n ≥ k` and resets to 0 when `n < k`; `okK` is
+  `streakK ≥ 7`. So a cell becomes ok only after 7 consecutive nightly counts at or above k, and stops being ok at
+  the first count below k. A refresh with an `as_of` that a row already has (or an older one) leaves that row
+  unchanged. `brivia_cell_ok(cell, is_test, k)` (internal) reads `okK`; a missing row or any other k is false.
 
 #### 9.1.5 What leaves the service
 

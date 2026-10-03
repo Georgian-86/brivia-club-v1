@@ -9,6 +9,8 @@
 --   3. Member orbit: member_orbit, location_change, set_home_location and set_home_city (§9.1.4).
 --   4. Completion and visibility: brivia_member_completed, brivia_visible_to, the candidate RPCs, my_onboarding_status
 --      (D-030, §7). Redefines get_candidates, search_members, list_members and brivia_can_see_author from 0003.
+--   5. k-anonymity: member_flag, cell_density, refresh_cell_density (nightly, 7-night hysteresis), brivia_cell_ok
+--      (§9.1.4).
 --   Data: places (section 1) and the interest taxonomy (end of file).
 -- Privacy (CLAUDE.md): coordinates exist only as function arguments. No member table stores them; the only
 -- coordinate columns are the public city centroids in public.place, which no client role can read.
@@ -698,6 +700,122 @@ as $$
 $$;
 revoke all on function public.my_onboarding_status() from public, anon;
 grant execute on function public.my_onboarding_status() to authenticated;
+
+-- =============================================================================================
+-- 5. k-anonymity
+-- =============================================================================================
+-- Spec §9.1.4. A cell's population counts members of one world (is_test) who are completed
+-- (brivia_member_completed), whose account is older than 14 days at the refresh date, and who are not flagged.
+-- Floors: k = 10 for rings 0-1, k = 5 for rings 2+. Hysteresis: a cell is ok for k only after 7 consecutive
+-- refreshes with n >= k, and stops being ok at the first refresh with n < k.
+-- Populations are counted for every g7 cell and for the g6 and g5 parents STORED in member_orbit (home_cell_g6,
+-- home_cell_g5). Parents are never re-derived here: grid parents are only approximately nested.
+
+-- "Flagged (reported or restricted)": the source until moderation tooling exists. Owner-only (no client grants).
+create table if not exists public.member_flag (
+  member_id uuid primary key references public.profiles(id) on delete cascade,
+  reason text not null,
+  flagged_at timestamptz not null default now()
+);
+alter table public.member_flag enable row level security;
+revoke all on public.member_flag from public, anon, authenticated;
+
+-- One row per (cell, world). Owner-only: populations near the floor are exactly what k-anonymity hides.
+create table if not exists public.cell_density (
+  cell text not null,
+  is_test boolean not null,
+  n int not null,
+  streak10 int not null default 0,
+  streak5 int not null default 0,
+  ok10 boolean not null default false,
+  ok5 boolean not null default false,
+  as_of date not null,
+  primary key (cell, is_test)
+);
+alter table public.cell_density enable row level security;
+revoke all on public.cell_density from public, anon, authenticated;
+
+-- refresh_cell_density(p_as_of): the nightly count (owner only; pg_cron below). For each (cell, world) row that is
+-- new or older than p_as_of: n = the population; streakK = streakK + 1 when n >= k, else 0; okK = streakK >= 7.
+-- A row already at p_as_of (or later) is left alone, so a same-day re-run changes nothing. A row whose cell has no
+-- members left is refreshed to n = 0. Returns the number of rows written.
+create or replace function public.refresh_cell_density(p_as_of date default current_date)
+returns int
+language plpgsql
+volatile
+set search_path = public
+as $$
+declare
+  v_rows int;
+begin
+  if p_as_of is null then
+    raise exception 'invalid date' using errcode = '22023';
+  end if;
+  perform pg_advisory_xact_lock(hashtextextended('brivia.cell_density', 0));
+  with member as (
+    select o.home_cell, o.home_cell_g6, o.home_cell_g5, p.is_test,
+           (p.created_at < (p_as_of - 14)::timestamptz
+            and not exists (select 1 from public.member_flag f where f.member_id = p.id)
+            and public.brivia_member_completed(p.id)) as counted
+      from public.member_orbit o
+      join public.profiles p on p.id = o.member_id
+  ),
+  counts as (
+    select c.cell, c.is_test, (count(*) filter (where c.counted))::int as n
+      from (select home_cell as cell, is_test, counted from member
+            union all select home_cell_g6, is_test, counted from member
+            union all select home_cell_g5, is_test, counted from member) c
+     group by c.cell, c.is_test
+  ),
+  merged as (
+    select coalesce(c.cell, d.cell) as cell, coalesce(c.is_test, d.is_test) as is_test, coalesce(c.n, 0) as n,
+           coalesce(d.streak10, 0) as old10, coalesce(d.streak5, 0) as old5
+      from counts c
+      full join public.cell_density d on d.cell = c.cell and d.is_test = c.is_test
+     where d.cell is null or d.as_of < p_as_of
+  ),
+  nxt as (
+    select cell, is_test, n,
+           case when n >= 10 then old10 + 1 else 0 end as s10,
+           case when n >= 5 then old5 + 1 else 0 end as s5
+      from merged
+  )
+  insert into public.cell_density (cell, is_test, n, streak10, streak5, ok10, ok5, as_of)
+  select cell, is_test, n, s10, s5, s10 >= 7, s5 >= 7, p_as_of from nxt
+  on conflict (cell, is_test) do update
+    set n = excluded.n, streak10 = excluded.streak10, streak5 = excluded.streak5,
+        ok10 = excluded.ok10, ok5 = excluded.ok5, as_of = excluded.as_of;
+  get diagnostics v_rows = row_count;
+  return v_rows;
+end;
+$$;
+revoke all on function public.refresh_cell_density(date) from public, anon, authenticated;
+
+-- brivia_cell_ok(cell, world, k): may a band be shown at this cell's level for floor k (10 or 5)? Internal.
+-- A missing row, or any k other than 10 or 5, is false.
+create or replace function public.brivia_cell_ok(p_cell text, p_is_test boolean, p_k int)
+returns boolean
+language sql
+stable
+set search_path = public
+as $$
+  select coalesce((select case p_k when 10 then d.ok10 when 5 then d.ok5 else false end
+                     from public.cell_density d where d.cell = p_cell and d.is_test = p_is_test), false)
+$$;
+revoke all on function public.brivia_cell_ok(text, boolean, int) from public, anon, authenticated;
+
+-- Nightly schedule (01:47 IST). pg_cron is optional here: without it (the local harness), run
+-- `select public.refresh_cell_density();` nightly some other way. cron.schedule with a job name replaces that job,
+-- so re-running this migration does not add a second one.
+do $$
+begin
+  if exists (select 1 from pg_extension where extname = 'pg_cron') then
+    execute $q$select cron.schedule('brivia-refresh-cell-density', '17 20 * * *',
+                                     'select public.refresh_cell_density()')$q$;
+  else
+    raise notice 'pg_cron is not installed: schedule public.refresh_cell_density() nightly (spec §9.1.4).';
+  end if;
+end $$;
 
 -- =============================================================================================
 -- Data: interest taxonomy (spec §3.1; India-relevant, spec §10 phase 1). Original Brivia wording.
