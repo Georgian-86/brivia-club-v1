@@ -36,6 +36,9 @@ let people = [];
 let remoteMatchIds = [];
 let remoteConnectionIds = [];
 let notifications = [];
+// Incoming pending connection requests (shown in the notifications panel).
+let pendingRequests = [];
+const respondingRequestIds = new Set();
 
 let currentIndex = 0;
 let currentPerson = people[0];
@@ -51,6 +54,7 @@ let pitchPerson = null;
 const chatMessages = {};
 const readChatIds = new Set();
 let messageSyncTimer = null;
+let connectionSyncTick = 0;
 const overlayIds = ['info-modal', 'pitch-modal'];
 const hiddenChatsStorageKey = () => `brivia-hidden-chats:${memberProfile.id || 'anonymous'}`;
 const readHiddenChatIds = () => {
@@ -182,13 +186,15 @@ const renderNotifications = () => {
   const button = document.querySelector('#app-notification-button');
   if (!list || !badge || !button) return;
   const enabled = areNotificationsEnabled();
-  const unreadCount = enabled ? notifications.filter((notification) => !notification.read).length : 0;
-  button.toggleAttribute('hidden', !enabled);
-  if (!enabled) closeNotificationPanel();
+  const requestCount = pendingRequests.length;
+  // Pending requests stay reachable even with message notifications switched off.
+  const unreadCount = (enabled ? notifications.filter((notification) => !notification.read).length : 0) + requestCount;
+  button.toggleAttribute('hidden', !enabled && !requestCount);
+  if (!enabled && !requestCount) closeNotificationPanel();
   badge.textContent = unreadCount > 99 ? '99+' : String(unreadCount);
   badge.toggleAttribute('hidden', unreadCount === 0);
   button.classList.toggle('has-unread', unreadCount > 0);
-  button.setAttribute('aria-label', enabled ? (unreadCount ? `${unreadCount} unread notifications` : 'Notifications') : 'Notifications are off');
+  button.setAttribute('aria-label', unreadCount ? `${unreadCount} unread notifications` : (enabled ? 'Notifications' : 'Notifications are off'));
   const grouped = new Map();
   notifications.filter((notification) => !notification.read).forEach((notification) => {
     const key = String(notification.personId);
@@ -198,12 +204,24 @@ const renderNotifications = () => {
     grouped.set(key, group);
   });
   const unreadGroups = [...grouped.values()].sort((a, b) => new Date(b.latest.createdAt || 0) - new Date(a.latest.createdAt || 0));
-  list.innerHTML = !enabled ? '<p class="notification-empty">Notifications are off in settings.</p>' : unreadGroups.length ? unreadGroups.map((group) => {
+  const requestsHtml = requestCount ? `<section class="notification-requests" aria-label="Connection requests"><p class="notification-section-title">REQUESTS</p>${pendingRequests.map((request) => {
+    const name = request.person?.name || 'A Brivia member';
+    const busy = respondingRequestIds.has(request.fromId);
+    const disabled = busy ? ' disabled aria-busy="true"' : '';
+    return `<div class="notification-request" data-request-from="${escapeHtml(request.fromId)}">${renderAvatar(request.person, 'notification-avatar')}<div class="notification-copy"><strong>${escapeHtml(name)}</strong>${request.note ? `<span class="notification-request-note">${escapeHtml(request.note)}</span>` : '<span class="notification-request-note">Wants to connect with you.</span>'}</div><time>${escapeHtml(formatNotificationTime(request.createdAt))}</time><div class="notification-request-actions"><button type="button" class="notification-request-button" data-request-respond="accept" aria-label="Accept connection request from ${escapeHtml(name)}"${disabled}>ACCEPT</button><button type="button" class="notification-request-button" data-request-respond="decline" aria-label="Decline connection request from ${escapeHtml(name)}"${disabled}>DECLINE</button></div></div>`;
+  }).join('')}</section>` : '';
+  const messagesHtml = !enabled ? '<p class="notification-empty">Notifications are off in settings.</p>' : unreadGroups.length ? unreadGroups.map((group) => {
     const person = findPersonById(group.personId);
     const title = person?.name || 'a Brivia member';
     const messageLabel = `${group.count} message${group.count === 1 ? '' : 's'} from ${title}`;
     return `<button type="button" class="notification-item is-unread" data-notification-person="${escapeHtml(group.personId)}">${renderAvatar(person, 'notification-avatar')}<span class="notification-copy"><strong>${escapeHtml(messageLabel)}</strong></span><time>${escapeHtml(formatNotificationTime(group.latest.createdAt))}</time></button>`;
-  }).join('') : '<p class="notification-empty">You are all caught up.</p>';
+  }).join('') : (requestCount ? '' : '<p class="notification-empty">You are all caught up.</p>');
+  list.innerHTML = requestsHtml + messagesHtml;
+  list.querySelectorAll('[data-request-respond]').forEach((control) => control.addEventListener('click', (event) => {
+    event.stopPropagation();
+    const fromId = control.closest('[data-request-from]')?.dataset.requestFrom;
+    if (fromId) respondToRequest(fromId, control.dataset.requestRespond === 'accept');
+  }));
   list.querySelectorAll('[data-notification-person]').forEach((item) => item.addEventListener('click', () => {
     const personId = item.dataset.notificationPerson;
     markNotificationsReadForPerson(personId);
@@ -228,7 +246,7 @@ const ensureNotificationControls = () => {
     event.stopPropagation();
     const shouldOpen = panel?.hasAttribute('hidden');
     closeNotificationPanel();
-    if (shouldOpen) { panel?.removeAttribute('hidden'); button.setAttribute('aria-expanded', 'true'); renderNotifications(); }
+    if (shouldOpen) { panel?.removeAttribute('hidden'); button.setAttribute('aria-expanded', 'true'); renderNotifications(); loadConnectionRequests(); }
   });
   document.querySelector('#notification-mark-all')?.addEventListener('click', () => {
     notifications = notifications.map((notification) => ({ ...notification, read: true }));
@@ -426,18 +444,92 @@ const renderHome = (queue = getExplorePeople()) => {
   card?.classList.remove('is-passing', 'is-liking');
 };
 
-const saveMatches = async (person) => {
-  if (!supabase || !memberProfile.id || !person?.id) return false;
-  const { error } = await supabase.from('matches').upsert({ user1_id: memberProfile.id, user2_id: person.id }, { onConflict: 'user1_id,user2_id' });
-  if (error) {
-    console.warn('Match could not be saved:', error.message);
-    return false;
+// Mutual consent (docs/VISION.md, CLAUDE.md): the client never writes `matches`. A like or a pitch
+// inserts a connection request; the server creates the match when the other member has already
+// requested (trigger) or accepts (respond_connection_request). Chat opens only once a match exists.
+const isUuid = (value) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(String(value || ''));
+const addConnection = (personId) => {
+  if (!remoteConnectionIds.some((id) => String(id) === String(personId))) remoteConnectionIds.push(personId);
+  if (!remoteMatchIds.some((id) => String(id) === String(personId))) remoteMatchIds.push(personId);
+  restoreChatForMe(personId);
+};
+// Legacy match rows may be stored in either order, so check both orientations.
+const hasMatchWith = async (personId) => {
+  if (!supabase || !memberProfile.id || !isUuid(personId) || !isUuid(memberProfile.id)) return false;
+  const me = memberProfile.id;
+  const { data, error } = await supabase.from('matches').select('user1_id,user2_id')
+    .or(`and(user1_id.eq.${me},user2_id.eq.${personId}),and(user1_id.eq.${personId},user2_id.eq.${me})`)
+    .limit(1);
+  if (error) { console.warn('Match status could not load:', error.message); return false; }
+  return Boolean(data?.length);
+};
+const sendConnectionSignal = async (person, note = null) => {
+  if (!supabase || !memberProfile.id || !person?.id) return { matched: false, error: new Error('Connection service is unavailable.') };
+  const { error } = await supabase.from('connection_requests').insert({ from_id: memberProfile.id, to_id: person.id, note: note || null });
+  // 23505: this member already signalled this person. Show the same "sent" UX so a decline is never revealed.
+  if (error && error.code !== '23505') {
+    console.warn('Connection request could not be sent:', error.message);
+    return { matched: false, error };
   }
-  if (!remoteMatchIds.includes(person.id)) remoteMatchIds.push(person.id);
-  if (!remoteConnectionIds.some((id) => String(id) === String(person.id))) remoteConnectionIds.push(person.id);
-  restoreChatForMe(person.id);
+  const matched = await hasMatchWith(person.id);
+  if (matched) { addConnection(person.id); renderChats(); }
+  return { matched };
+};
+const mutualToast = (person) => `It's mutual. Say hi to ${person?.name || 'your new connection'}.`;
+const signalErrorToast = 'Your signal could not be sent. Please try again.';
+
+const loadConnectionRequests = async () => {
+  if (!supabase || !memberProfile.id) return;
+  const { data, error } = await supabase.from('connection_requests').select('from_id,note,created_at')
+    .eq('to_id', memberProfile.id).eq('status', 'pending').order('created_at', { ascending: false }).limit(50);
+  if (error) { console.warn('Connection requests could not load:', error.message); return; }
+  const rows = data || [];
+  const unknownIds = [...new Set(rows.map((row) => String(row.from_id)).filter((id) => !findPersonById(id) && isUuid(id)))];
+  const extraPeople = new Map();
+  if (unknownIds.length) {
+    const { data: profileRows, error: profileError } = await supabase.from('public_profiles').select('*').in('id', unknownIds);
+    if (profileError) console.warn('Request senders could not load:', profileError.message);
+    (profileRows || []).forEach((row) => { const profile = rowToProfile(row); extraPeople.set(String(profile.id), { ...profile, image: profile.photoUrl || '' }); });
+  }
+  pendingRequests = rows.map((row) => ({
+    fromId: String(row.from_id),
+    note: row.note || '',
+    createdAt: row.created_at,
+    person: findPersonById(row.from_id) || extraPeople.get(String(row.from_id)) || null,
+  }));
+  renderNotifications();
+};
+const refreshConnections = async () => {
+  if (!supabase || !memberProfile.id) return;
+  const { data, error } = await supabase.from('matches').select('user1_id,user2_id').or(`user1_id.eq.${memberProfile.id},user2_id.eq.${memberProfile.id}`);
+  if (error) { console.warn('Connections could not refresh:', error.message); return; }
+  const before = remoteConnectionIds.length;
+  // Only newly matched people are added, so chats hidden on this device stay hidden.
+  (data || []).map((match) => String(match.user1_id) === String(memberProfile.id) ? match.user2_id : match.user1_id)
+    .filter((id) => !remoteConnectionIds.some((known) => String(known) === String(id)))
+    .forEach(addConnection);
+  return remoteConnectionIds.length !== before;
+};
+const respondToRequest = async (fromId, accept) => {
+  if (!supabase || respondingRequestIds.has(fromId)) return;
+  const request = pendingRequests.find((item) => item.fromId === fromId);
+  respondingRequestIds.add(fromId);
+  renderNotifications();
+  const { error } = await supabase.rpc('respond_connection_request', { p_from: fromId, p_accept: accept });
+  respondingRequestIds.delete(fromId);
+  if (error) {
+    renderNotifications();
+    showToast('That request could not be updated. Please try again.');
+    loadConnectionRequests();
+    return;
+  }
+  pendingRequests = pendingRequests.filter((item) => item.fromId !== fromId);
+  renderNotifications();
+  if (!accept) { showToast('Request declined.'); return; }
+  addConnection(fromId);
+  await refreshConnections();
   renderChats();
-  return true;
+  showToast(mutualToast(request?.person));
 };
 
 const removedConnectionsStorageKey = () => `brivia-removed-connections:${memberProfile.id || 'anonymous'}`;
@@ -542,7 +634,13 @@ const swipe = (type) => {
   }
   const card = document.querySelector('#swipe-card');
   card?.classList.add(type === 'like' ? 'is-liking' : 'is-passing');
-  if (type === 'like') { saveMatches(currentPerson); openPitch(currentPerson); }
+  if (type === 'like') {
+    const likedPerson = currentPerson;
+    sendConnectionSignal(likedPerson).then(({ matched, error }) => {
+      showToast(error ? signalErrorToast : matched ? mutualToast(likedPerson) : 'Signal sent');
+    });
+    openPitch(likedPerson);
+  }
   window.setTimeout(() => {
     const queue = getExplorePeople();
     if (!queue.length) { currentPerson = null; currentIndex = 0; } else { currentIndex = (currentIndex + 1) % queue.length; currentPerson = queue[currentIndex]; }
@@ -712,7 +810,7 @@ const renderChats = () => {
     const unread = last?.from === 'them' && !readChatIds.has(person.id);
     const lastPreview = last?.attachment ? `📎 ${last.attachment.name || 'Attachment'}` : (last?.text || 'Start a conversation');
     return `<div class="chat-row${unread ? ' is-unread' : ''}${selectedChat?.id === person.id ? ' is-selected' : ''}"><button class="chat-row-open" type="button" data-chat-id="${escapeHtml(person.id)}"><span class="member-profile-trigger" data-public-profile-id="${escapeHtml(person.id)}" role="button" tabindex="0" aria-label="Open ${escapeHtml(person.name)} profile">${renderAvatar(person)}</span><span class="chat-row-copy"><strong data-public-profile-id="${escapeHtml(person.id)}">${escapeHtml(person.name)}</strong><span>${escapeHtml(lastPreview)}</span></span><span class="chat-row-meta"><time>${escapeHtml(formatChatTime(last?.createdAt))}</time>${unread ? '<b>1</b>' : ''}</span></button><button class="chat-delete" type="button" data-delete-chat-id="${escapeHtml(person.id)}" aria-label="Delete chat with ${escapeHtml(person.name)}" title="Delete chat"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M4.5 6h11M8 3.5h4M6.5 6l.6 10h5.8l-.6-10M8.5 8.5v5M11.5 8.5v5"/></svg></button></div>`;
-  }).join('') : '<div class="inbox-empty"><strong>No threads found</strong><span>Send a pitch from Explore to open a private conversation.</span><button type="button" class="inbox-empty-action" data-nav="explore">EXPLORE PEOPLE ↗</button></div>'}`;
+  }).join('') : '<div class="inbox-empty"><strong>No threads found</strong><span>Chats open once a connection is mutual. Send a signal from Explore to start one.</span><button type="button" class="inbox-empty-action" data-nav="explore">EXPLORE PEOPLE ↗</button></div>'}`;
   const inboxScroll = list?.querySelector('.chat-inbox-scroll');
   if (list && inboxScroll) {
     inboxScroll.innerHTML = inboxMarkup;
@@ -850,6 +948,11 @@ const startMessageSync = () => {
   const sync = () => {
     if (selectedChat) loadChatMessages(selectedChat);
     syncIncomingNotificationsFromServer().catch((error) => console.warn('Notification sync could not complete:', error.message));
+    // Every ~30 s: pick up new requests, and matches completed by the other member accepting.
+    if (++connectionSyncTick % 6 === 1) {
+      loadConnectionRequests().catch((error) => console.warn('Request sync could not complete:', error.message));
+      refreshConnections().then((changed) => { if (changed) renderChats(); }).catch((error) => console.warn('Connection sync could not complete:', error.message));
+    }
   };
   sync();
   messageSyncTimer = window.setInterval(sync, 5000);
@@ -1879,20 +1982,31 @@ document.querySelector('#pitch-form')?.addEventListener('submit', async (event) 
   const input = document.querySelector('#pitch-message');
   const body = input?.value.trim();
   if (!target || !body || !supabase || !memberProfile.id) return;
-  const matchSaved = await saveMatches(target);
-  if (!matchSaved) console.warn('Match row was not saved; continuing with the chat message.');
-  const { error } = await supabase.from('brivia_messages').insert({ sender_id: memberProfile.id, recipient_id: target.id, body });
-  if (error) { showToast(`Pitch could not be saved: ${error.message}`); return; }
-  if (!remoteMatchIds.includes(target.id)) remoteMatchIds.push(target.id);
-  renderChats();
-  await loadChatMessages(target);
-  closeOverlays();
-  showToast(`Pitch sent to ${target.name}.`);
-  pitchPerson = null;
+  const submit = event.currentTarget.querySelector('.pitch-submit');
+  if (submit?.disabled) return;
+  if (submit) { submit.disabled = true; submit.setAttribute('aria-busy', 'true'); }
+  try {
+    // The pitch travels as the request note; no message is sent until the pair is matched.
+    const { matched, error } = await sendConnectionSignal(target, body);
+    if (error) { showToast(signalErrorToast); return; }
+    closeOverlays();
+    showToast(matched ? mutualToast(target) : `Request sent to ${target.name}`);
+    pitchPerson = null;
+  } finally {
+    if (submit) { submit.disabled = false; submit.removeAttribute('aria-busy'); }
+  }
 });
 document.querySelector('#logout-button')?.addEventListener('click', logoutMember);
 document.querySelector('#app-logout-button')?.addEventListener('click', logoutMember);
-document.addEventListener('keydown', (event) => { if (event.key === 'Escape') { closeOverlays(); closeDiscoveryFilters(); } if (event.key === 'ArrowRight') swipe('like'); if (event.key === 'ArrowLeft') swipe('pass'); });
+document.addEventListener('keydown', (event) => {
+  if (event.key === 'Escape') { closeOverlays(); closeDiscoveryFilters(); }
+  // A like now sends a connection request, so arrow keys must not fire it while typing or with a dialog open.
+  const typing = event.target?.closest?.('input, textarea, select, [contenteditable="true"]');
+  const dialogOpen = overlayIds.some((id) => !document.querySelector(`#${id}`)?.hidden) || document.querySelector('#public-profile-modal');
+  if (typing || dialogOpen || !['home', 'explore'].includes(document.body.dataset.appView)) return;
+  if (event.key === 'ArrowRight') swipe('like');
+  if (event.key === 'ArrowLeft') swipe('pass');
+});
 
 const loadSupabaseCommunity = async () => {
   if (!supabase) {
@@ -2020,8 +2134,10 @@ const renameExploreToConnect = () => {
     const label = [...node.childNodes].find((child) => child.nodeType === Node.TEXT_NODE && child.textContent.trim());
     if (label) label.textContent = 'CONNECT PEOPLE ';
   });
+  // Write only on change: an unconditional write is itself a mutation and re-triggers this observer forever.
   document.querySelectorAll('.inbox-empty span').forEach((node) => {
-    node.textContent = node.textContent.replace(/\bExplore\b/g, 'Connect');
+    const renamed = node.textContent.replace(/\bExplore\b/g, 'Connect');
+    if (renamed !== node.textContent) node.textContent = renamed;
   });
 };
 renameExploreToConnect();
