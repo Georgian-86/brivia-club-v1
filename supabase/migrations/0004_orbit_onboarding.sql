@@ -420,6 +420,115 @@ revoke all on function public.my_interests() from public, anon;
 grant execute on function public.my_interests() to authenticated;
 
 -- =============================================================================================
+-- 3. Member orbit
+-- =============================================================================================
+-- The member's home cell (spec §9.1.4). Only cells are stored: the g7 cell, its g6 and g5 parents (k-anonymity
+-- coarsening) and the nearest place. No client grants: written by set_home_location / set_home_city only.
+create table if not exists public.member_orbit (
+  member_id uuid primary key references public.profiles(id) on delete cascade,
+  cell_scheme text not null default 'grid1',
+  home_cell text not null,
+  home_cell_g6 text not null,
+  home_cell_g5 text not null,
+  place_id text not null references public.place(id),
+  home_set_at timestamptz not null default now()
+);
+alter table public.member_orbit enable row level security;
+revoke all on public.member_orbit from public, anon, authenticated;
+
+-- One row per accepted home (or, later, travel) change. It stores no cell. Cap: 3 per rolling 24 h.
+create table if not exists public.location_change (
+  id bigserial primary key,
+  member_id uuid not null references public.profiles(id) on delete cascade,
+  at timestamptz not null default now()
+);
+create index if not exists location_change_member_at_idx on public.location_change (member_id, at);
+alter table public.location_change enable row level security;
+revoke all on public.location_change from public, anon, authenticated;
+revoke all on sequence public.location_change_id_seq from public, anon, authenticated;
+
+-- Internal: apply one home change for p_member (the caller has checked the profile and validated the cell).
+-- Serialised per member by an advisory lock; over the cap it raises PT429 'try again later' (PostgREST: HTTP 429)
+-- before anything is written.
+create or replace function public.brivia_apply_home_change(p_member uuid, p_cell text, p_place_id text)
+returns text
+language plpgsql
+volatile
+set search_path = public
+as $$
+declare
+  v_name text;
+begin
+  perform pg_advisory_xact_lock(hashtextextended('brivia.location_change:' || p_member::text, 0));
+  if (select count(*) from public.location_change
+       where member_id = p_member and at > now() - interval '24 hours') >= 3 then
+    raise exception 'try again later' using errcode = 'PT429';
+  end if;
+  insert into public.location_change (member_id) values (p_member);
+  insert into public.member_orbit (member_id, cell_scheme, home_cell, home_cell_g6, home_cell_g5, place_id, home_set_at)
+  values (p_member, 'grid1', p_cell, public.brivia_grid_parent(p_cell, 6), public.brivia_grid_parent(p_cell, 5),
+          p_place_id, now())
+  on conflict (member_id) do update
+    set cell_scheme = excluded.cell_scheme, home_cell = excluded.home_cell, home_cell_g6 = excluded.home_cell_g6,
+        home_cell_g5 = excluded.home_cell_g5, place_id = excluded.place_id, home_set_at = excluded.home_set_at;
+  select name into v_name from public.place where id = p_place_id;
+  return v_name;
+end;
+$$;
+revoke all on function public.brivia_apply_home_change(uuid, text, text) from public, anon, authenticated;
+
+-- set_home_location(lat, lng): snaps to the g7 cell in SQL (D-028) and returns the nearest place's name.
+-- Volatile, so PostgREST serves it only on POST (coordinates in the body, never in a query string).
+-- The coordinates are never stored, echoed or put in an error message. Invalid input: 22023 'invalid location',
+-- and no change is consumed. Requires a profile row (P0002 'profile required').
+create or replace function public.set_home_location(lat double precision, lng double precision)
+returns text
+language plpgsql
+volatile
+security definer
+set search_path = public
+as $$
+declare
+  uid uuid := auth.uid();
+  v_cell text;
+begin
+  if uid is null or not exists (select 1 from public.profiles where id = uid) then
+    raise exception 'profile required' using errcode = 'P0002';
+  end if;
+  v_cell := public.brivia_grid_cell($1, $2, 7);
+  return public.brivia_apply_home_change(uid, v_cell, public.brivia_nearest_place(v_cell));
+end;
+$$;
+revoke all on function public.set_home_location(double precision, double precision) from public, anon;
+grant execute on function public.set_home_location(double precision, double precision) to authenticated;
+
+-- set_home_city(p_place_id): the "Pick my city" fallback. Uses the place's centroid cell and that place's id.
+-- Unknown id: 22023 'invalid place'. Same cap and rules as set_home_location.
+create or replace function public.set_home_city(p_place_id text)
+returns text
+language plpgsql
+volatile
+security definer
+set search_path = public
+as $$
+declare
+  uid uuid := auth.uid();
+  v_cell text;
+begin
+  if uid is null or not exists (select 1 from public.profiles where id = uid) then
+    raise exception 'profile required' using errcode = 'P0002';
+  end if;
+  select public.brivia_grid_cell(p.lat, p.lng, 7) into v_cell from public.place p where p.id = p_place_id;
+  if v_cell is null then
+    raise exception 'invalid place' using errcode = '22023';
+  end if;
+  return public.brivia_apply_home_change(uid, v_cell, p_place_id);
+end;
+$$;
+revoke all on function public.set_home_city(text) from public, anon;
+grant execute on function public.set_home_city(text) to authenticated;
+
+-- =============================================================================================
 -- Data: interest taxonomy (spec §3.1; India-relevant, spec §10 phase 1). Original Brivia wording.
 -- 13 domains, 62 categories, 327 interests, 30 niches (432 nodes). Re-runs update labels only; a node that a
 -- moderator retired stays retired. parent_id and level are derived from the id.

@@ -556,20 +556,34 @@ select log_impressions($1, $4);
   **level-7 `grid1` cell** server-side (`brivia_grid_cell`, pure SQL, §4.1 and D-028; H3 res-7 from iteration 4) and
   upserts `member_orbit(member_id = auth.uid(), cell_scheme, home_cell, home_cell_g6, home_cell_g5, place_id,
   home_set_at)`. Coordinates are never stored, logged, echoed back or put in an error message. The member
-  reads back only a place label, never the cell id.
+  reads back only a place label (the nearest `place` name), never the cell id. Invalid input (non-finite or out of
+  range) raises `22023 invalid location` and consumes no change; a caller without a profile row gets
+  `P0002 profile required`.
+- **The snap is in SQL until iteration 4** (`0004_orbit_onboarding.sql`, D-028). `set_home_location` computes the
+  g7 cell and its g6/g5 parents with `brivia_grid_cell` / `brivia_grid_parent` inside the database; the grid helpers
+  are not executable by any client role.
+- **`set_home_city(p_place_id text)`** is the "Pick my city" fallback (geolocation denied, timed out or missing). It
+  has the same rules (SECURITY DEFINER, volatile, `authenticated` only, profile required, shared cap) and stores the
+  cell of the place's centroid with that `place_id`. An unknown id raises `22023 invalid place`. Clients read place
+  names from `place(id, name, region, country, is_launch)`; its centroid columns are never granted.
 - **No parameter logging:** the project sets `log_parameter_max_length_on_error = 0` and
   `log_parameter_max_length = 0`; neither pgaudit nor auto_explain logs parameters (`auto_explain.log_parameter_max_length = 0`
   if enabled). A pre-launch test calls `set_home_location` with a known coordinate (e.g. `12.971598, 77.594566`),
   forces an error path too, and greps the Postgres, API-gateway and service logs for it; any hit fails the check.
-- If h3-pg is not available on the project, the service exposes `POST /v1/location` (JSON body only): it snaps in
-  memory with h3-js, discards the coordinates, and calls `orbit_store_home_cell(p_viewer, p_cell)`, which validates a
-  res-7 cell. That endpoint is excluded from body capture in every proxy, APM and error tracker (Sentry
+  The local harness does this on every run: it starts Postgres with `log_min_error_statement=error`,
+  `log_parameter_max_length=0` and `log_parameter_max_length_on_error=0`, sends the probe only as psql `\bind`
+  parameters (success path and over-cap path), and fails if the coordinate appears in the server log.
+- From iteration 4, if h3-pg is still not available, the service may expose `POST /v1/location` (JSON body only): it
+  snaps in memory with h3-js, discards the coordinates, and calls `orbit_store_home_cell(p_viewer, p_cell)`, which
+  validates a res-7 cell (and sets `cell_scheme = 'h3r7'`). That endpoint is excluded from body capture in every proxy, APM and error tracker (Sentry
   `sendDefaultPii: false`, request body scrubbing on that route).
 - `member_orbit` has RLS on and no grants to `anon` or `authenticated`; members cannot read or write it except
   through these functions. Travel mode uses the same rules (`set_travel_location`, `travel_until` ≤ 30 days).
 - **Rate limit:** at most 3 location changes per member per rolling 24 h, **shared by home and travel** changes
-  (counted in `location_change(member_id, at)`, no cell stored). Over the cap the call fails with a generic "try
-  again later". This blunts triangulation by moving one's own pin and re-reading distance bands.
+  (counted in `location_change(member_id, at)`, no cell stored; the very first set counts). Changes are serialised
+  per member by an advisory lock. Over the cap the call fails with errcode **`PT429`** and the generic message "try
+  again later" (PostgREST answers HTTP 429), before anything is written: `member_orbit` and the place label stay
+  unchanged. This blunts triangulation by moving one's own pin and re-reading distance bands.
 - **k-anonymity floor.** The population of a cell counts only members of the viewer's world who are completed,
   whose account is older than 14 days and who are not flagged (reported or restricted), so a burst of fresh sybils
   cannot fill a cell. Floors: **k = 10** for a candidate who would be shown in ring 0 or 1, **k = 5** for rings 2+.
@@ -613,7 +627,7 @@ select log_impressions($1, $4);
 | Database unreachable | 503; a cached deck is not served, because the `orbit_cards` re-check cannot run |
 | Scoring error or non-finite output | 500; never a fallback to unranked raw rows |
 | Rate limit | 429 with `Retry-After` |
-| Location over the 3/day cap | generic "try again later" |
+| Location over the 3/day cap | `PT429` "try again later" (HTTP 429 through PostgREST) |
 
 #### 9.1.6 Impression logging
 
