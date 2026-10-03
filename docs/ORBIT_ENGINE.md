@@ -141,8 +141,8 @@ is **capped at 25%**, so every strong match can still be explained by named, sha
 - Clients only ever receive a **rounded distance band** ("< 3 km", "~5 km", "~25 km", "Mumbai", "Maharashtra",
   "India", "abroad"). Never coordinates, and never a cell id.
 - Travel mode replaces `home_cell` with `travel_cell` until `travel_until`.
-- Location enters only through a server-side snap (`set_home_location`, at most 3 changes a day), and a candidate in
-  a cell with fewer than 5 completed same-world members is shown only at the ring-2 band label (§9.1.4).
+- Location enters only through a server-side snap (`set_home_location`, at most 3 home or travel changes a day), and
+  a candidate in a sparsely populated cell is shown at a coarser H3 level (k = 10 for rings 0–1, k = 5 beyond; §9.1.4).
 
 ### 4.2 Rings
 
@@ -353,9 +353,10 @@ saturated, the outer rings relax first, instead of the deck repeating saturated 
 - Every like, pass, request, accept, decline and reply is an interaction row with the served feature vector
   (`brivia-club/server/src/engine/index.js` pattern).
 - Client-written interaction rows are the member's own actions only, and `met`, `letgo`, `accept` and `decline` are
-  accepted only with backing evidence (a match, or a request addressed to the member). Their `features`, `score`,
-  `propensity` and `model_version` are client-supplied and untrusted. Offline evaluation must take served features
-  from service-written `impression` rows.
+  accepted only with backing evidence (a match, or a request addressed to the member). Clients write only
+  `viewer_id`, `target_id` and `event`, and never read impression rows or the `features`, `score`, `propensity`,
+  `model_version` and `context` columns. Offline evaluation takes served features from service-written `impression`
+  rows (§9.1.6).
 - The per-member taste weights `w_k` are trained by online logistic SGD with an L2 pull toward the prior (`learn.js`
   pattern). The features are: shared-interest count, max rarity hit, mode-pair indicators, ring, co-presence,
   semantic similarity and recency.
@@ -375,7 +376,7 @@ v1 UI (Vite, Supabase auth)
    ▼
 ORBIT service  ── reuse: brivia-club/server/src/engine/{embeddings,store,stats,learn,candidates(diversify)}.js
    │                new:  topology.js  resonance.js  rings.js  gate.js  compose.js  explain.js
-   │  role orbit_svc, never service_role; queries run as the member (§9.1.3); cards leave only via toCard
+   │  role orbit_svc (never service_role, never impersonates a member): p_viewer definer functions (§9.1.3); cards leave only via toCard
    ▼
 Supabase Postgres  (+ PostGIS or h3-pg, + pgvector)
    tables: interest_node, member_interest, member_orbit(home_cell, travel_cell, travel_until, capacity_k,
@@ -396,36 +397,62 @@ profiles never enter the pool.
 
 ### 9.1 Trust boundary
 
-*Design accepted in Iteration 2 (D-021); built in Iteration 4. Nothing in this section exists in code yet.* The
-service is the only process that sees cells, exact cell-to-cell km, `G`, headroom and served features. Its job at the
-boundary is to make sure none of that leaves, and that it never acts for a member it has not verified.
+*Design accepted in Iteration 2 (D-021, Ruling I10); built in Iteration 4. Nothing in this section exists in code
+yet, except the member-side `interaction` restrictions in `0003_trust_hardening.sql`.* The service is the only
+process that sees cells, exact cell-to-cell km, `G`, headroom and served features. Its job at the boundary is to make
+sure none of that leaves, and that it never acts for a member it has not verified.
 
-**Threat model in one line:** a malicious member (forged or replayed token, enumeration, location triangulation,
-scraping) and a compromised or buggy service (over-broad DB rights, leaky serializer, logs) are both in scope.
+**Threat model.** In scope: a malicious member (forged or replayed token, enumeration, location triangulation,
+scraping, reading their own logged model outputs), and a compromised or buggy service (over-broad DB rights, leaky
+serializer, logs). The service is trusted with every member's cell by design: `orbit_candidate_pool` must return
+candidates' cells for ring retrieval to work, so a compromised service learns every member's cell (never
+coordinates). That is inherent and accepted; everything else is kept out of its reach.
 
 #### 9.1.1 Database role `orbit_svc`
 
-The service connects as its own login role. It is **never** `service_role`, `postgres` or any role with `BYPASSRLS`.
+The service connects as its own login role. It is **never** `service_role`, `postgres` or any role with `BYPASSRLS`,
+and it **never impersonates a member** (Ruling I10): it has no membership in `authenticated` or `anon` and never
+uses `SET ROLE`.
 
 ```sql
 create role orbit_svc login noinherit nosuperuser nocreatedb nocreaterole noreplication nobypassrls
   connection limit 20;                       -- password from the secret store, rotated; never in the repo
-grant authenticated to orbit_svc with inherit false, set true;   -- PG16: may SET ROLE, inherits nothing
 grant usage on schema public to orbit_svc;
+-- no "grant authenticated to orbit_svc", no table grants: only the functions below
 ```
 
-| orbit_svc gets | How |
-|---|---|
-| Candidate pool with eligibility applied | `execute` on `orbit_candidate_pool(p_cells text[], p_limit int)`, SECURITY DEFINER, granted to `orbit_svc` only. The viewer is `auth.uid()` (from the verified claims, below). It applies exactly the `get_candidates` exclusions (caller completed, target completed, not self, same world, no block in either direction, Rulings I3/I5/P14) through one shared helper, so the two cannot drift. It returns `id`, effective cell (travel cell while `travel_until > now()`), `capacity_k`, `load`, `headroom`, activity signals and `member_interest` rows; never name, email, phone, `is_test` or `about`. |
-| Card display columns | `get_candidates(ids)` called **as the member** (§9.1.3): `name`, `photo_url`, `city`/`state` (for `placeLabel`). No direct grant on `profiles`. |
-| Engine tables (no PII) | `select` on `interest_node`, `rarity_cache`; `select, insert, update` on `taste_profile`, `orbit_resolution`; `select` on `member_orbit` and `member_interest`, each through an RLS policy `to orbit_svc using (true)`. |
-| Impression rows | `execute` on `log_impressions(p_rows jsonb)` (§9.1.6). No table-level insert on `interaction`. |
-| Location writes | `execute` on `orbit_store_home_cell(p_cell text)` only for the fallback path in §9.1.4. |
+The service reads and writes only through narrow SECURITY DEFINER functions, each granted `execute` to `orbit_svc`
+only (`revoke all ... from public, anon, authenticated`). Each takes the viewer explicitly as `p_viewer uuid`, the
+`sub` of a JWT the service verified (§9.1.2). The functions do not trust `p_viewer` to be a real member: they re-check
+that the viewer has a completed profile (Ruling I3) and return nothing otherwise.
+
+| Function | Kind | Returns / does |
+|---|---|---|
+| `orbit_candidate_pool(p_viewer uuid, p_cells text[], p_limit int)` | `stable`, read-only | Eligible candidates for the viewer: `id`, effective cell (travel cell while `travel_until > now()`), `capacity_k`, `load`, `headroom`, activity signals and `member_interest` rows. Never name, email, phone, `is_test` or `about`. |
+| `orbit_cards(p_viewer uuid, p_ids uuid[])` | `stable`, read-only | Card columns only (`id`, `name`, `photo_url`, `city`, `state` for `placeLabel`) for at most 50 ids. |
+| `orbit_viewer(p_viewer uuid)` | `stable`, read-only | The viewer's own effective cell, capacity, headroom and interests (needed to score). |
+| `log_impressions(p_viewer uuid, p_rows jsonb)` | `volatile`, the only write | Appends `impression` rows (§9.1.6). |
+| `orbit_store_home_cell(p_viewer uuid, p_cell text)` | `volatile` | Only for the h3-js fallback in §9.1.4. |
+
+`orbit_candidate_pool`, `orbit_cards` and `get_candidates` apply the same exclusions (viewer completed, target
+completed, not self, same world, no block in either direction; Rulings I3, I5, P14) through **one shared helper**
+`brivia_visible_to(p_viewer, p_target)`, so the member RPCs and the service cannot drift apart. Engine-private reads
+(`interest_node`, `rarity_cache`) and engine state writes (`taste_profile`, `orbit_resolution`, Iteration 4) also go
+through definer functions of the same shape, never table grants.
 
 orbit_svc must **never** have: any grant on `profiles` (so no `email`, `phone`, `phone_country_code`,
-`phone_number`, `is_test`); any access to the `auth`, `storage` or `vault` schemas; `brivia_messages`,
-`career_applications`, request notes, `brivia_blocks` rows (block checks happen only inside definer helpers);
-`execute` on `purge_*` or seed functions; `create` on any schema; membership in `service_role` or `postgres`.
+`phone_number`, `is_test`); any access to the `auth`, `storage` or `vault` schemas; any access to `brivia_messages`,
+`connection_requests` (including notes), `matches`, `brivia_blocks` or `career_applications`; `execute` on member
+RPCs, `purge_*` or seed functions; `create` on any schema; membership in `authenticated`, `anon`, `service_role` or
+`postgres`.
+
+**Blast radius of a stolen orbit_svc credential:** public card data (name, photo, city, state), interests, cells
+and engine state of every member, and the ability to **forge impression rows** for any viewer (including made-up
+features, scores and propensities). It can never read email, phone, messages, requests, matches or blocks, and can
+never like, request, message, block or edit a profile as anyone. Forged impressions can poison offline evaluation
+and learning; mitigations: impression rows carry `model_version` and a config hash the trainer checks against
+deployed versions, the trainer drops impressions with no matching served request id in the service's own request
+log, and orbit_svc sessions are audited.
 
 Supabase's default privileges grant every new `public` table to `anon` and `authenticated`. Every engine-table
 migration must therefore `revoke all ... from public, anon, authenticated` and enable RLS explicitly, so
@@ -434,69 +461,85 @@ migration must therefore `revoke all ... from public, anon, authenticated` and e
 #### 9.1.2 Verifying the member
 
 - Every request carries the member's Supabase access token (`Authorization: Bearer`). The service verifies it
-  **locally** against the project JWKS (`https://<ref>.supabase.co/auth/v1/.well-known/jwks.json`). It never
-  calls Supabase Auth per request and never trusts an unverified token's claims.
-- **Asymmetric keys are a prerequisite.** Supabase projects created before asymmetric signing keys sign with a
-  shared HS256 secret; such a project must migrate to asymmetric JWT signing keys (ES256/RS256) before ORBIT goes
-  live. The service holds no HS256 secret. Algorithm allowlist: `ES256`, `RS256` (whichever the project uses).
-  `HS256` and `none` are rejected, and the `alg` must match the JWK's `kty`/`alg` for its `kid`.
-- Checks, all required: signature by a JWKS key with a matching `kid`; `iss` = `https://<ref>.supabase.co/auth/v1`;
-  `aud` = `authenticated`; `role` = `authenticated` (an `anon` or `service_role` token is refused); `exp` in the
-  future and `iat` not in the future, with at most 30 s clock skew; `sub` is a UUID; `is_anonymous` is not true.
-  `sub` is the viewer. No viewer id is ever taken from the request body or query.
-- JWKS cache: keys cached for 10 minutes; an unknown `kid` triggers at most one refetch per minute. If no cached
-  key can verify the token and the JWKS endpoint is unreachable, respond **503**. There is no fallback to an
-  unverified, partially verified or cached-decision path.
-- Residual risk accepted: a token stays valid until `exp` after sign-out (Supabase default 1 h). The service does
-  not read `auth.sessions`.
+  **locally** against the project JWKS (`https://<ref>.supabase.co/auth/v1/.well-known/jwks.json`), never trusts an
+  unverified token's claims, and never takes a viewer id from the request body or query.
+- **Asymmetric keys are a prerequisite.** Projects created before Supabase's asymmetric signing keys sign with a
+  shared HS256 secret; this project must move to asymmetric JWT signing keys before ORBIT goes live. The service holds
+  no HS256 secret. Algorithm allowlist: `ES256`, `RS256`. `HS256` and `none` are rejected, and the header `alg`
+  must match the JWK's `kty`/`alg`.
+- Checks, all required: a `kid` header is **present** and names a JWKS key (no `kid` → 401; never "try every key");
+  valid signature; `iss` equals the configured issuer (`ORBIT_JWT_ISSUER`, e.g. `https://<ref>.supabase.co/auth/v1`,
+  never derived from the token); `aud` = `authenticated`; `role` = `authenticated` (`anon` and `service_role`
+  tokens are refused); `exp` in the future, `nbf` (when present) and `iat` not in the future, with at most 30 s
+  clock skew; `sub` is a UUID; `is_anonymous` is not true. `sub` is `p_viewer`.
+- **JWKS cache:** keys cached and refreshed every 10 minutes; an unknown `kid` triggers at most one refetch per
+  minute. A key that disappears from the JWKS (revoked or rotated out) is trusted for at most 10 more minutes, then
+  dropped. If no cached key can verify the token and the JWKS endpoint is unreachable, respond **503**. There is no
+  fallback to an unverified, partially verified or cached-decision path.
+- **Sign-out and revocation:** a Supabase access token stays valid until `exp` even after sign-out. Either the
+  project's access-token lifetime is set to 10–15 minutes before go-live, or the service checks the token's
+  `session_id` through `orbit_session_alive(session_id)` (a definer function reading only `auth.sessions` existence;
+  result cached for 60 s). The shorter lifetime is preferred because it needs no `auth` access at all.
 
-#### 9.1.3 Running as the member
+#### 9.1.3 Calling the database for a member
 
-Every query runs inside a transaction (Supavisor **transaction** mode; never a session-level `SET`):
+Ruling I10: the service passes the verified `sub` as `p_viewer`; it never sets `request.jwt.claims` and never
+switches role.
 
 ```sql
-begin read only;                                             -- deck and search are read-only
-select set_config('request.jwt.claims', $1, true);           -- $1 = the verified payload (bound parameter, never interpolated)
--- engine-private reads as orbit_svc: orbit_candidate_pool(...), member_interest, rarity_cache
-set local role authenticated;                                -- from here on: RLS, grants and auth.uid() helpers as the member
--- member-scoped reads: get_candidates(ids), own interactions, own requests
-commit;                                                      -- role and claims end with the transaction
+-- one read-only transaction per deck, search or explain request
+begin read only;
+select * from orbit_viewer($1);                              -- $1 = verified sub, a bound parameter
+select * from orbit_candidate_pool($1, $2, 300);             -- $2 = cells of rings 0..5 (§9 retrieval)
+-- score and compose in Node, then fetch display columns for the final ids only:
+select * from orbit_cards($1, $3);
+commit;
+-- separate short transaction for the one write:
+select log_impressions($1, $4);
 ```
 
-- Claims are set first, so every `auth.uid()`-based definer helper (`get_candidates`, `brivia_is_blocked_between`,
-  `brivia_same_world`, `brivia_interaction_allowed`) answers for this member and nobody else.
-- The service switches to `authenticated` only inside a transaction and never switches back within it. Deck,
-  search and explain transactions are `read only`, so even a bug that runs a write under `authenticated` fails.
-  Writes the service makes (impressions, taste updates, resolution state) run in separate transactions as
-  `orbit_svc`, with claims set, through the definer functions above.
-- The final card list is re-checked through `get_candidates(ids)` as the member immediately before serializing, so
-  a block, unmatch or world change between scoring and response drops the card.
-- **Accepted residual risk (recorded in D-021):** because `orbit_svc` may `SET ROLE authenticated` with any claims,
-  a stolen orbit_svc credential can act as any member within `authenticated`'s rights. Mitigations: the credential
-  lives only in the service's secret store; Supabase network restrictions allow orbit_svc only from the service's
-  egress; read-only transactions; a fixed statement allowlist in code (no dynamic SQL); orbit_svc sessions are
-  audited; rotation on any suspicion.
+- All three read functions are `stable` and the read transaction is `read only`, so a bug in the service cannot
+  write during a deck build. `log_impressions` is the single append.
+- Fixed statements only (no dynamic SQL, every value a bound parameter); Supavisor transaction mode; no session
+  state.
+- **Member writes never go through the service.** Likes, passes, requests, accepts, messages, blocks and profile
+  edits stay client → Supabase with the member's own JWT, where RLS, the request triggers and the consent rules apply.
+- `orbit_cards` re-applies the exclusions at the end of the build, so a block, unmatch or world change between
+  pool and response drops the card. **Optional hardening:** re-check the final ids through PostgREST
+  `get_candidates` with the member's own bearer token, so the member-facing rules themselves vouch for the deck.
 
 #### 9.1.4 Location
 
-- Location enters only through `set_home_location(lat double precision, lng double precision)`, SECURITY DEFINER,
-  executable by `authenticated`. It rejects non-finite or out-of-range values, snaps to the **H3 res-7** cell
-  server-side (`h3_lat_lng_to_cell`, h3-pg) and upserts `member_orbit(member_id = auth.uid(), home_cell, home_set_at)`.
-  Coordinates are never stored, logged, echoed back or put in an error message. The member reads back only a
-  place label ("Koramangala, Bengaluru"), never the cell id.
-- If h3-pg is not available on the project, the service exposes `POST /v1/location`: it snaps in memory with h3-js,
-  discards the coordinates, and calls `orbit_store_home_cell(p_cell)` (granted to orbit_svc only; viewer =
-  `auth.uid()`; validates that the cell is res-7). The same rate limit applies in the database.
+- Location enters only through `set_home_location(lat double precision, lng double precision)`: SECURITY DEFINER,
+  **`volatile`**, executable by `authenticated`. PostgREST serves a volatile function only on `POST`, so coordinates
+  travel in the request body and never in a query string. It rejects non-finite or out-of-range values, snaps to the
+  **H3 res-7** cell server-side (`h3_lat_lng_to_cell`, h3-pg) and upserts `member_orbit(member_id = auth.uid(),
+  home_cell, home_set_at)`. Coordinates are never stored, logged, echoed back or put in an error message. The member
+  reads back only a place label, never the cell id.
+- **No parameter logging:** the project sets `log_parameter_max_length_on_error = 0` and
+  `log_parameter_max_length = 0`; neither pgaudit nor auto_explain logs parameters (`auto_explain.log_parameter_max_length = 0`
+  if enabled). A pre-launch test calls `set_home_location` with a known coordinate (e.g. `12.971598, 77.594566`),
+  forces an error path too, and greps the Postgres, API-gateway and service logs for it; any hit fails the check.
+- If h3-pg is not available on the project, the service exposes `POST /v1/location` (JSON body only): it snaps in
+  memory with h3-js, discards the coordinates, and calls `orbit_store_home_cell(p_viewer, p_cell)`, which validates a
+  res-7 cell. That endpoint is excluded from body capture in every proxy, APM and error tracker (Sentry
+  `sendDefaultPii: false`, request body scrubbing on that route).
 - `member_orbit` has RLS on and no grants to `anon` or `authenticated`; members cannot read or write it except
-  through these functions. Travel mode uses the same rules (`set_travel_location`, with `travel_until` ≤ 30 days).
-- **Rate limit:** at most 3 home-location changes per member per rolling 24 h (counted in a `location_change(member_id,
-  at)` table, no cell stored). Over the cap the call fails with a generic "try again later". This blunts
-  triangulation by moving one's own pin and re-reading distance bands.
-- **k-anonymity floor:** if a candidate's cell holds fewer than **5** completed members of the viewer's world, that
-  candidate's distance band is coarsened to the **ring-2 band label** (the metro/region `placeLabel`, else a fixed
-  "< 60 km"; never a number derived from exact km), and any ring-0/1 chip ("~3 km away") is suppressed. Scoring
-  still uses the true ring; only what leaves the service is coarsened. Cell populations come from an orbit-private
-  `cell_density(cell, is_test, n)` table refreshed nightly and on location change.
+  through these functions. Travel mode uses the same rules (`set_travel_location`, `travel_until` ≤ 30 days).
+- **Rate limit:** at most 3 location changes per member per rolling 24 h, **shared by home and travel** changes
+  (counted in `location_change(member_id, at)`, no cell stored). Over the cap the call fails with a generic "try
+  again later". This blunts triangulation by moving one's own pin and re-reading distance bands.
+- **k-anonymity floor.** The population of a cell counts only members of the viewer's world who are completed,
+  whose account is older than 14 days and who are not flagged (reported or restricted), so a burst of fresh sybils
+  cannot fill a cell. Floors: **k = 10** for a candidate who would be shown in ring 0 or 1, **k = 5** for rings 2+.
+  When the candidate's res-7 cell is below k, the band is computed from the parent **res-6** cell (centroid to
+  centroid), then **res-5** if that is still below k, and only then the region `placeLabel`. Coarsening never yields a
+  number derived from exact km, and any ring-0/1 chip ("~3 km away") is suppressed while coarsened. Scoring still uses
+  the true ring; only what leaves the service is coarsened.
+- **No band flips:** a cell's coarsening level only goes up quickly and comes down slowly. A cell is un-coarsened
+  only after it has met k on 7 consecutive nightly counts, so a band changing from day to day does not reveal a
+  population crossing the threshold. Populations live in an orbit-private `cell_density(cell, res, is_test, n,
+  met_since)` table refreshed nightly.
 
 #### 9.1.5 What leaves the service
 
@@ -505,7 +548,10 @@ commit;                                                      -- role and claims 
 - **Contract test** (extends Golden 6): for every endpoint, against seeded fixtures, the response's card keys equal
   exactly `id, name, photoUrl, distanceBand, matchPercent, chips, worthTheDistance`; no value anywhere matches an H3
   index (`/^8[0-9a-f]{14}$/i`), a coordinate pair, an `@` or a phone-shaped digit run; no key is `km`, `G`, `cell`,
-  `lat`, `lng`, `email`, `phone*`, `headroom` or `load`. A failing contract test blocks deploy.
+  `lat`, `lng`, `email`, `phone*`, `headroom`, `load` or `ring`. A failing contract test blocks deploy.
+- **Members never read model outputs.** In `interaction`, members can select only `id`, `viewer_id`, `target_id`,
+  `event` and `created_at` of their own non-impression rows, and can insert only `viewer_id`, `target_id` and `event`
+  (`0003_trust_hardening.sql`). An impression's `context.ring` would reveal what the k-anonymity floor hides.
 - **Logs carry ids only:** request id, viewer id, candidate ids, endpoint, status, latency, model version. Never
   names, cells, km, coordinates, tokens, emails or feature values. Error responses are generic.
 - **Health:** `GET /healthz` (process alive, no dependencies) and `GET /readyz` (DB reachable as orbit_svc, a JWKS
@@ -515,33 +561,42 @@ commit;                                                      -- role and claims 
 - **Deck cache** keyed `(viewer, cell, day)` (day in the viewer's local date; the key also carries the model
   version and config hash). It holds cards plus their impression metadata, is never shared between viewers, and
   expires at the end of the day. A location change produces a new key; a block, unblock, match, unmatch or profile
-  change evicts the viewer's entries. Cached cards still go through the `get_candidates` re-check in §9.1.3.
+  change evicts the viewer's entries. Cached cards still pass through `orbit_cards` before they are served.
 
 | Failure | Response |
 |---|---|
 | JWKS unreachable and no cached key verifies the token | 503 (never an unverified fallback) |
-| Token invalid, expired, wrong `iss`/`aud`/`role`/`alg`, anonymous | 401 |
+| Token invalid, expired, no `kid`, wrong `iss`/`aud`/`role`/`alg`, anonymous, dead session | 401 |
 | Caller not a completed profile | 200 with an empty deck and a reason code (`complete_profile`) |
-| Database unreachable | 503; a cached deck is not served, because the re-check cannot run |
+| Database unreachable | 503; a cached deck is not served, because the `orbit_cards` re-check cannot run |
 | Scoring error or non-finite output | 500; never a fallback to unranked raw rows |
 | Rate limit | 429 with `Retry-After` |
 | Location over the 3/day cap | generic "try again later" |
 
 #### 9.1.6 Impression logging
 
-- `log_impressions(p_rows jsonb)`: SECURITY DEFINER, `execute` granted to `orbit_svc` only, called as orbit_svc
-  with the verified claims set. It stamps `viewer_id = auth.uid()` and `event = 'impression'` itself; neither is
-  taken from `p_rows`. It accepts at most 30 rows per call, skips a target that is the viewer, not same-world or
-  blocked, and enforces the table's existing `features` size and `propensity` range checks.
-- Each row records: `target_id`, `features` (the served feature vector), `score` (`G`), `propensity` (the probability
-  the serving policy showed this card at this position; 1 − ε for ranked slots, ε / |pool| for the exploration slot),
-  `model_version`, and `context` = `{ deck_id, position, lane: "ranked"|"explore"|"wtd", ring, holdout, policy,
-  config_hash }`. `ring` is stored as the ring number, never the cell or km.
-- **Holdout (critic C5):** a stable 5% of viewers, chosen by `hash(viewer_id, salt) mod 100 < 5`, are served by a
-  baseline policy (ring-ordered, gate applied, no taste or Roche reordering) with `holdout: true`, so the learned
-  policy can be compared against it offline. The salt is private config.
-- Client-written like/pass/request rows carry the `deck_id` they acted on; offline evaluation joins them to the
-  service's impression rows and uses only the service's `features`, `score` and `propensity` (§8).
+- `log_impressions(p_viewer uuid, p_rows jsonb)`: SECURITY DEFINER, `execute` granted to `orbit_svc` only. It sets
+  `viewer_id = p_viewer` and `event = 'impression'` itself; neither is taken from `p_rows`. It accepts at most 30
+  rows per call, skips a target that is the viewer, not visible to the viewer (`brivia_visible_to`), and enforces the
+  table's `features` size and `propensity` range checks. **The service can forge impression rows** for any viewer;
+  see the blast-radius paragraph in §9.1.1.
+- Each row records `target_id`, `features` (the served feature vector), `score` (`G`), `propensity`,
+  `model_version`, and `context` = `{ request_id, deck_id, position, lane: "ranked"|"explore"|"wtd", ring, holdout,
+  policy, salt_version, config_hash }`. `holdout` and `policy` are on **every** row. `ring` is the ring number, never
+  the cell or km.
+- **Propensity, honestly.** Ranked and Worth-the-Distance slots are deterministic given the inputs, so their
+  propensity is **1**: they carry no counterfactual information. A deck includes an explore card with probability
+  ε (deck level, §6.2 step 5); the explore card is drawn uniformly from the explore set (eligible members outside the
+  top ranks), so its propensity is **1 / |explore set|** (and `context` records ε). Offline replay and off-policy
+  evaluation use **only the explore lane plus the holdout**; ranked impressions are used for monitoring, not for
+  unbiased estimates.
+- **Holdout (critic C5):** a viewer is in the holdout when the first 8 bytes of `sha256(salt ‖ viewer_uuid)`, read
+  as an unsigned big-endian integer, mod 100 is < 5. The salt is private config with a version tag (`salt_version`,
+  logged on every row) so the holdout can be re-drawn without mixing populations. Holdout viewers get a baseline
+  policy (ring-ordered, gate applied, no taste or Roche reordering).
+- Client rows can no longer carry `deck_id` or features (§9.1.5). Offline evaluation attributes a client like,
+  pass or request to the latest service impression of the same `(viewer_id, target_id)` before it (within 7 days)
+  and uses only the service's `features`, `score` and `propensity` (§8).
 
 ---
 
