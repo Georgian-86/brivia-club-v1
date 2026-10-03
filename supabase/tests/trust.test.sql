@@ -1208,3 +1208,42 @@ end $$;
 
 select 'trust.test T5 evidence OK';
 
+-- T5 fix 2: definer helpers answer only for the caller.
+do $$
+declare
+  a uuid := 'a5a5a5a5-0000-0000-0000-0000000000a5';
+  b uuid := 'b5b5b5b5-0000-0000-0000-0000000000b5';
+  c uuid := 'c1c1c1c1-0000-0000-0000-0000000000c1';
+  ev text; r boolean;
+begin
+  insert into public.matches (user1_id, user2_id) values (least(a,b), greatest(a,b));
+  insert into public.connection_requests (from_id, to_id) values (a, b);
+  set local role authenticated;
+  -- a third party (c) asks about a/b, impersonating either
+  perform set_config('request.jwt.claims', '{"sub":"' || c || '"}', true);
+  foreach ev in array array['like','pass','request','met','letgo','accept','decline'] loop
+    if public.brivia_interaction_allowed(b, a, ev) or public.brivia_interaction_allowed(a, b, ev)
+       or public.brivia_interaction_allowed(c, a, ev) and ev in ('met','letgo','accept','decline') then
+      raise exception 'FAIL T5: helper answered for a non-party, event %', ev;
+    end if;
+  end loop;
+  if public.brivia_same_world(a, b) then
+    raise exception 'FAIL T5: same_world/blocked helper answered for a non-party';
+  end if;
+  -- the real party still gets true
+  perform set_config('request.jwt.claims', '{"sub":"' || b || '"}', true);
+  if not (public.brivia_interaction_allowed(b, a, 'met') and public.brivia_interaction_allowed(b, a, 'accept')) then
+    raise exception 'FAIL T5: helper denied the real party';
+  end if;
+  reset role;
+  insert into public.brivia_blocks (blocker_id, blocked_id) values (a, b);
+  set local role authenticated;
+  perform set_config('request.jwt.claims', '{"sub":"' || c || '"}', true);
+  if public.brivia_is_blocked_between(a, b) then raise exception 'FAIL T5: blocked helper answered for a non-party'; end if;
+  reset role;
+  delete from public.brivia_blocks where blocker_id = a;
+  delete from public.connection_requests where from_id = a;
+  delete from public.matches where user1_id in (a,b);
+end $$;
+
+select 'trust.test T5 definer OK';

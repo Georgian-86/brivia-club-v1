@@ -622,7 +622,7 @@ stable
 security definer
 set search_path = public
 as $$
-  select case
+  select p_viewer = auth.uid() and case
     when p_event in ('like','pass','request') then true
     when p_event in ('met','letgo') then exists (
       select 1 from public.matches m
