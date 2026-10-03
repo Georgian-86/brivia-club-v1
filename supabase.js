@@ -6,6 +6,59 @@ const supabaseKey = (import.meta.env.VITE_SUPABASE_ANON_KEY || import.meta.env.V
 export const supabase = supabaseUrl && supabaseKey ? createClient(supabaseUrl, supabaseKey) : null;
 export const supabaseReady = Boolean(supabase);
 
+// Member images (avatars, covers, post images) auto-load in every viewer's browser, so they are rendered only
+// from this project's Storage origin (never an arbitrary host: no tracking pixels). 0003 enforces the same
+// path shape in the database: /storage/v1/object/public/<bucket>/<owner uid>/<file>.
+export const supabaseOrigin = (() => { try { return supabaseUrl ? new URL(supabaseUrl).origin : ''; } catch { return ''; } })();
+const STORAGE_FILE = /^[A-Za-z0-9][A-Za-z0-9._-]*$/;
+export const isStorageImageUrl = (value, bucket = '', ownerId = '') => {
+  const raw = String(value || '').trim();
+  if (!raw || !supabaseOrigin || /["'<>`\\\s]/.test(raw) || raw.includes('..')) return false;
+  try {
+    const url = new URL(raw);
+    if (url.origin !== supabaseOrigin || url.username || url.password || url.search || url.hash) return false;
+    const parts = url.pathname.split('/');
+    // ['', 'storage', 'v1', 'object', 'public', bucket, owner, file]
+    if (parts.length !== 8 || parts.slice(0, 5).join('/') !== '/storage/v1/object/public') return false;
+    if (bucket && parts[5] !== bucket) return false;
+    if (ownerId && parts[6] !== String(ownerId)) return false;
+    return Boolean(parts[5] && parts[6]) && STORAGE_FILE.test(parts[7]);
+  } catch { return false; }
+};
+// Bundled preset covers (cover-assets.js): same-site paths, never a third-party host.
+export const isPresetCoverUrl = (value) => {
+  const raw = String(value || '').trim();
+  return !raw.includes('..') && /^\/(assets\/|Images\/Cover(%20| )images\/)[A-Za-z0-9][A-Za-z0-9._ -]*$/.test(raw);
+};
+
+// Passwords are never kept client-side (Ruling I11). Older builds cached the signup password in the stored
+// profile ("loginPassword"); strip any such field from every cached profile on load.
+const CREDENTIAL_KEYS = ['loginPassword', 'password', 'passwordConfirm'];
+export const withoutCredentials = (profile) => {
+  if (!profile || typeof profile !== 'object') return profile;
+  const clean = { ...profile };
+  CREDENTIAL_KEYS.forEach((key) => { delete clean[key]; });
+  return clean;
+};
+export const scrubStoredCredentials = () => {
+  [globalThis.localStorage, globalThis.sessionStorage].forEach((store) => {
+    try {
+      if (!store) return;
+      ['loginPassword', 'brivia-login-password', 'brivia-password'].forEach((key) => store.removeItem(key));
+      ['brivia-member-profile', 'brivia-pending-profile'].forEach((key) => {
+        const raw = store.getItem(key);
+        if (!raw) return;
+        let parsed;
+        try { parsed = JSON.parse(raw); } catch { return; }
+        if (parsed && typeof parsed === 'object' && CREDENTIAL_KEYS.some((field) => field in parsed)) {
+          store.setItem(key, JSON.stringify(withoutCredentials(parsed)));
+        }
+      });
+    } catch { /* storage unavailable: nothing cached to scrub */ }
+  });
+};
+scrubStoredCredentials();
+
 const splitValues = (value) => Array.isArray(value) ? value.filter(Boolean) : String(value || '').split(',').map((item) => item.trim()).filter(Boolean);
 
 const normalizeGender = (value) => {
@@ -66,7 +119,6 @@ export const profileToRow = (profile, userId, photoUrl = '') => ({
   looking_for: splitValues(profile.lookingFor || profile.looking_for),
   photo_url: photoUrl || profile.photoUrl || null,
   cover_url: profile.coverUrl || profile.cover_url || null,
-  created_at: profile.createdAt || new Date().toISOString(),
   updated_at: new Date().toISOString(),
 });
 
@@ -173,14 +225,16 @@ export const saveProfile = async (userId, profile, photoFile, coverFile = null) 
     return { data: null, error };
   }
   const row = profileToRow({ ...profile, coverUrl }, userId, photoUrl);
-  // Inline data:/blob: URLs are local previews only (signup shows one before upload). They are never stored:
-  // an update leaves the column unchanged, an insert stores null.
-  ['photo_url', 'cover_url'].forEach((key) => { if (/^(data|blob):/i.test(String(row[key] || '').trim())) delete row[key]; });
-  // Members may update only editable columns (0003_trust_hardening.sql): id, email and created_at
-  // are insert-only, so an upsert (which rewrites every column) would be denied. Update first,
-  // insert the full row only when this member has no profile yet.
+  // Only this member's own Storage files (or a bundled preset cover) are stored (0003 CHECK constraints). Local
+  // data:/blob: previews, OAuth avatars and any other URL are never stored: an update leaves the column
+  // unchanged, an insert stores null.
+  if (row.photo_url && !isStorageImageUrl(row.photo_url, 'profile-photos', userId)) delete row.photo_url;
+  if (row.cover_url && !isStorageImageUrl(row.cover_url, 'profile-covers', userId) && !isPresetCoverUrl(row.cover_url)) delete row.cover_url;
+  // Members may update only editable columns (0003_trust_hardening.sql): id and email are insert-only and
+  // created_at is always the server clock, so an upsert (which rewrites every column) would be denied. Update
+  // first, insert the full row only when this member has no profile yet.
   const write = async (payload) => {
-    const { id: ignoredId, email: ignoredEmail, created_at: ignoredCreatedAt, ...editable } = payload;
+    const { id: ignoredId, email: ignoredEmail, ...editable } = payload;
     const updated = await supabase.from('profiles').update(editable).eq('id', userId).select().maybeSingle();
     if (updated.error || updated.data) return updated;
     return supabase.from('profiles').insert(payload).select().single();

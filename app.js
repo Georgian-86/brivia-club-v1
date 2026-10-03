@@ -15,7 +15,7 @@ import './chat-sidebar-fix.css';
 import './app-navigation.css';
 import './discovery-filters.css';
 import './mobile-app.css';
-import { supabase, rowToProfile, saveProfile, uploadMessageAttachment, removeMessageAttachment, uploadCommunityPostImage, removeCommunityPostImage } from './supabase.js';
+import { supabase, rowToProfile, saveProfile, isStorageImageUrl, withoutCredentials, uploadMessageAttachment, removeMessageAttachment, uploadCommunityPostImage, removeCommunityPostImage } from './supabase.js';
 import { defaultCoverUrl, normalizeCoverUrl } from './cover-assets.js';
 import { chatEmojiCategories } from './chat-emoji-data.js';
 import { chatGifCatalog } from './chat-gif-data.js';
@@ -106,7 +106,10 @@ const syncBlockedUserIds = async () => {
 const saveRemoteBlock = async (personId, blocked) => {
   if (!supabase || !memberProfile.id) return { error: new Error('Block service is unavailable.') };
   if (blocked) {
-    return supabase.from('brivia_blocks').upsert({ blocker_id: memberProfile.id, blocked_id: personId }, { onConflict: 'blocker_id,blocked_id' });
+    // Insert, never upsert: there is no update policy on brivia_blocks, so an upsert of an existing block fails.
+    // A duplicate (23505) means the block already exists, which is the outcome we wanted.
+    const result = await supabase.from('brivia_blocks').insert({ blocker_id: memberProfile.id, blocked_id: personId });
+    return result.error?.code === '23505' ? { ...result, error: null } : result;
   }
   return supabase.from('brivia_blocks').delete().eq('blocker_id', memberProfile.id).eq('blocked_id', personId);
 };
@@ -123,15 +126,18 @@ const restoreConversation = (personId) => {
 };
 
 const escapeHtml = (value = '') => String(value).replace(/[&<>'"]/g, (character) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[character]));
-// Member photo URLs come from other members' rows: allow only https, same-origin or inline image data, and
-// always escape, so a crafted photo_url can never break out of the src attribute (stored XSS).
+// Member photo / cover URLs come from other members' rows and auto-load for every viewer. Allow only this
+// project's Storage public URLs (VITE_SUPABASE_URL origin), same-site assets (preset covers) or an inline image
+// preview; anything else (any other https host, a tracking pixel) falls back to initials / the default cover.
+// Always escaped, so a crafted photo_url can never break out of the src attribute (stored XSS).
 const safeImageUrl = (value) => {
   const raw = String(value || '').trim();
   if (!raw || /["'<>`\\]/.test(raw)) return '';
   if (/^data:image\/(png|jpe?g|gif|webp);base64,[a-z0-9+/=\s]+$/i.test(raw)) return raw;
+  if (isStorageImageUrl(raw)) return new URL(raw).href;
   try {
     const url = new URL(raw, window.location.href);
-    if (url.protocol === 'https:' || url.origin === window.location.origin) return url.href;
+    if (url.origin === window.location.origin) return url.href;
   } catch { /* not a URL */ }
   return '';
 };
@@ -1608,9 +1614,10 @@ const renderProfile = () => {
   document.querySelector('#profile-name').textContent = profile.name || 'New Member';
   document.querySelector('#profile-location').textContent = `${profile.city || 'Your city'}, ${profile.state || 'Your state'}`;
   const profileCover = document.querySelector('#profile-cover-image');
-  if (profileCover) profileCover.style.backgroundImage = `url("${coverUrl}")`;
+  const safeOwnCover = safeImageUrl(coverUrl) || safeImageUrl(defaultCoverUrl);
+  if (profileCover) profileCover.style.backgroundImage = `url("${safeOwnCover}")`;
   const profileSidebarCover = document.querySelector('#profile-sidebar-cover');
-  if (profileSidebarCover) profileSidebarCover.style.backgroundImage = `url("${coverUrl}")`;
+  if (profileSidebarCover) profileSidebarCover.style.backgroundImage = `url("${safeOwnCover}")`;
   const avatar = document.querySelector('#profile-avatar');
   if (avatar) avatar.innerHTML = avatarImage(profile.photoUrl, profile.name) || escapeHtml(initials(profile.name));
   if (avatar && profile.photoName) avatar.title = profile.photoName;
@@ -1683,7 +1690,9 @@ const renderCommunityPosts = () => {
   list.innerHTML = sorted.map((post) => {
     const author = communityPostAuthors[post.author_id] || { id: post.author_id, name: 'Brivia member', image: '' };
     const authorId = author.id || post.author_id;
-    return `<article class="community-post-card"><div class="community-post-image-wrap community-post-profile-trigger" data-public-profile-id="${escapeHtml(authorId)}" role="button" tabindex="0" aria-label="Open ${escapeHtml(author.name)} profile"><span class="community-post-media-label">COMMUNITY</span><img src="${escapeHtml(post.image_url)}" alt="Post by ${escapeHtml(author.name)}" loading="lazy" /></div><div class="community-post-card-body"><div class="community-post-card-top"><span class="community-post-pill">POST</span><span class="community-post-more" aria-hidden="true">•••</span></div><h3>${escapeHtml(post.caption)}</h3><div class="community-post-author" data-public-profile-id="${escapeHtml(authorId)}" role="button" tabindex="0" aria-label="Open ${escapeHtml(author.name)} profile">${renderAvatar({ name: author.name, image: author.image }, 'community-post-avatar')}<div><strong>POSTED BY ${escapeHtml(author.name).toUpperCase()}</strong><span>${formatCommunityPostDate(post.created_at)}</span></div></div></div></article>`;
+    // Only the author's own community-posts Storage file auto-loads; any other URL shows a placeholder.
+    const postImage = isStorageImageUrl(post.image_url, 'community-posts', post.author_id) ? post.image_url : '';
+    return `<article class="community-post-card"><div class="community-post-image-wrap community-post-profile-trigger" data-public-profile-id="${escapeHtml(authorId)}" role="button" tabindex="0" aria-label="Open ${escapeHtml(author.name)} profile"><span class="community-post-media-label">COMMUNITY</span>${postImage ? `<img src="${escapeHtml(postImage)}" alt="Post by ${escapeHtml(author.name)}" loading="lazy" />` : '<span class="community-post-image-missing" role="img" aria-label="Image unavailable"></span>'}</div><div class="community-post-card-body"><div class="community-post-card-top"><span class="community-post-pill">POST</span><span class="community-post-more" aria-hidden="true">•••</span></div><h3>${escapeHtml(post.caption)}</h3><div class="community-post-author" data-public-profile-id="${escapeHtml(authorId)}" role="button" tabindex="0" aria-label="Open ${escapeHtml(author.name)} profile">${renderAvatar({ name: author.name, image: author.image }, 'community-post-avatar')}<div><strong>POSTED BY ${escapeHtml(author.name).toUpperCase()}</strong><span>${formatCommunityPostDate(post.created_at)}</span></div></div></div></article>`;
   }).join('');
   bindCommunityProfileTriggers();
 };
@@ -2251,7 +2260,7 @@ const loadSupabaseCommunity = async () => {
   const resolvedCoverUrl = rowProfile.coverUrl || metadataProfile.coverUrl || cachedCoverUrl;
   memberProfile = isSameUser ? { ...rowProfile, ...metadataProfile, ...cachedProfile, id: session.user.id } : { ...rowProfile, ...metadataProfile, id: session.user.id };
   if (resolvedCoverUrl) memberProfile.coverUrl = resolvedCoverUrl;
-  delete memberProfile.loginPassword;
+  memberProfile = withoutCredentials(memberProfile);  // never cache a password (Ruling I11)
   memberProfile.email = session.user.email || memberProfile.email || '';
   if (!memberProfile.name || memberProfile.name === 'New Member') memberProfile.name = session.user.user_metadata?.name || 'New Member';
   window.localStorage.setItem('brivia-member-profile', JSON.stringify(memberProfile));

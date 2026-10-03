@@ -16,6 +16,10 @@
 // while the sheet opens are ignored; Escape during a failing submit restores nothing; an empty 201 (the silent
 // request cap) reads "Signal sent"; chat attachments link only https/same-origin URLs, escaped; a failed
 // profile-photo upload shows an error and writes no data: URL.
+// Final-review fixes (Ruling I11): member images (avatars, covers, post images) render only from the Supabase
+// Storage origin (a third-party https URL never loads); profileToRow sends no created_at; blocking inserts and
+// treats 23505 as success; no password is ever kept in localStorage (a stale cached one is scrubbed on load).
+import { readFileSync } from 'node:fs';
 import { spawn } from 'node:child_process';
 import assert from 'node:assert/strict';
 import { fileURLToPath } from 'node:url';
@@ -397,8 +401,8 @@ try {
       return json(200, q ? [...directory, quinnRow].filter((row) => row.name.toLowerCase().includes(q)).slice(0, 20) : []);
     }
     if (pathName === '/rest/v1/community_posts') return json(200, [
-      { id: 'post-1', author_id: POST_AUTHOR, image_url: null, image_path: null, caption: 'Hello from page two', created_at: ago(5000) },
-      { id: 'post-2', author_id: ME, image_url: null, image_path: null, caption: 'My own post', created_at: ago(6000) },
+      { id: 'post-1', author_id: POST_AUTHOR, image_url: `${ORIGIN}/storage/v1/object/public/community-posts/${POST_AUTHOR}/a.jpg`, image_path: `${POST_AUTHOR}/a.jpg`, caption: 'Hello from page two', created_at: ago(5000) },
+      { id: 'post-2', author_id: ME, image_url: 'https://tracker.example/pixel.gif', image_path: `${ME}/p.jpg`, caption: 'My own post', created_at: ago(6000) },
     ]);
     if (pathName.startsWith('/rest/v1/')) return json(200, []);
     return json(200, {});
@@ -455,6 +459,15 @@ try {
     assert.match(postText, /member 36/i, 'page-2 author name missing');
     assert.match(postText, /alex me/i, 'own name missing');
   });
+  const postImages = await postsPage.evaluate(() => ({
+    srcs: [...document.querySelectorAll('#community-post-list img')].map((img) => img.getAttribute('src') || ''),
+    missing: document.querySelectorAll('#community-post-list .community-post-image-missing').length,
+  }));
+  check(`post images load only from Supabase storage; others show a placeholder (${JSON.stringify(postImages)})`, () => {
+    assert.ok(postImages.srcs.includes(`${ORIGIN}/storage/v1/object/public/community-posts/${POST_AUTHOR}/a.jpg`), 'storage post image missing');
+    assert.ok(!postImages.srcs.some((src) => /tracker\.example/.test(src)), 'a third-party post image auto-loads');
+    assert.equal(postImages.missing, 1);
+  });
   check('post authors loaded via rpc/get_candidates without my id', () => {
     const authorCalls = deckCalls.filter((c) => c.path === '/rest/v1/rpc/get_candidates').map((c) => JSON.parse(c.body || '{}').p_ids || []);
     assert.ok(authorCalls.some((ids) => ids.includes(POST_AUTHOR)), JSON.stringify(authorCalls));
@@ -477,9 +490,11 @@ try {
   const IVAN = '88888888-8888-4888-8888-000000000002';
   const JO = '88888888-8888-4888-8888-000000000003';
   const KIT = '88888888-8888-4888-8888-000000000004'; // matched; chat thread carries crafted attachments
+  const IVAN_PHOTO = `${ORIGIN}/storage/v1/object/public/profile-photos/${IVAN}/face.jpg`;
+  const STALE_PASSWORD = 'hunter2-stale-secret';
   const hardRows = [
-    { id: HANA, name: 'Hana Cover', city: 'Pune', experience: 'Climber', skills: ['Climbing'], looking_for: ['Friends'], photo_url: '', cover_url: 'http://evil.example/cover.png', created_at: ago(1000) },
-    { id: IVAN, name: 'Ivan Next', city: 'Pune', experience: 'Cook', skills: ['Cooking'], looking_for: ['Friends'], photo_url: '', cover_url: '', created_at: ago(2000) },
+    { id: HANA, name: 'Hana Cover', city: 'Pune', experience: 'Climber', skills: ['Climbing'], looking_for: ['Friends'], photo_url: 'https://tracker.example/face.png', cover_url: 'http://evil.example/cover.png', created_at: ago(1000) },
+    { id: IVAN, name: 'Ivan Next', city: 'Pune', experience: 'Cook', skills: ['Cooking'], looking_for: ['Friends'], photo_url: IVAN_PHOTO, cover_url: '', created_at: ago(2000) },
     { id: JO, name: 'Jo Third', city: 'Pune', experience: 'Runner', skills: ['Running'], looking_for: ['Friends'], photo_url: '', cover_url: '', created_at: ago(3000) },
   ];
   const kitRow = { id: KIT, name: 'Kit Chat', city: 'Pune', experience: 'Painter', skills: ['Painting'], looking_for: ['Friends'], photo_url: '', created_at: ago(4000) };
@@ -497,13 +512,20 @@ try {
   const hard = { calls: [], holdInsert: null, failInsert: false, capInsert: false };
   const hardContext = await browser.newContext({ viewport: { width: 1280, height: 900 } });
   await hardContext.addInitScript(([key, value]) => { window.localStorage.setItem(key, value); }, ['sb-stub-auth-token', JSON.stringify(session)]);
+  // An older build cached the signup password in the stored profile: it must be scrubbed on load.
+  await hardContext.addInitScript(([id, secret]) => {
+    if (window.sessionStorage.getItem('stale-seeded')) return;
+    window.sessionStorage.setItem('stale-seeded', '1');
+    window.localStorage.setItem('brivia-member-profile', JSON.stringify({ id, name: 'Alex Me', loginPassword: secret, password: secret }));
+    window.localStorage.setItem('loginPassword', secret);
+  }, [ME, STALE_PASSWORD]);
   await hardContext.route(`${ORIGIN}/**`, async (route) => {
     const request = route.request();
     const url = new URL(request.url());
     const method = request.method();
     const pathName = url.pathname;
     const postData = request.postData();
-    hard.calls.push({ method, path: pathName, search: decodeURIComponent(url.search), body: postData });
+    hard.calls.push({ method, path: pathName, search: decodeURIComponent(url.search), body: postData, prefer: request.headers().prefer || '' });
     const json = (status, payload) => route.fulfill({ status, contentType: 'application/json', body: JSON.stringify(payload), headers: { 'access-control-allow-origin': '*' } });
     if (method === 'OPTIONS') return route.fulfill({ status: 204, headers: { 'access-control-allow-origin': '*', 'access-control-allow-headers': '*', 'access-control-allow-methods': '*' } });
     if (pathName.startsWith('/auth/v1/')) return json(200, pathName.endsWith('/user') ? user : session);
@@ -523,6 +545,8 @@ try {
       return json(200, filter.includes('and(') && !filter.includes(KIT) ? [] : [{ user1_id: ME, user2_id: KIT }]);
     }
     if (pathName === '/rest/v1/brivia_messages') return json(200, method === 'GET' ? kitMessages : []);
+    // The block already exists (e.g. blocked from another device): the insert hits the primary key.
+    if (pathName === '/rest/v1/brivia_blocks' && method === 'POST') return json(409, { code: '23505', message: 'duplicate key value violates unique constraint "brivia_blocks_pkey"', details: null, hint: null });
     if (pathName === '/rest/v1/connection_requests') {
       if (method === 'POST') {
         if (hard.holdInsert) await hard.holdInsert;
@@ -544,6 +568,19 @@ try {
   const hardCard = () => hardPage.evaluate(() => document.querySelector('#swipe-card:not([hidden]) #swipe-name')?.textContent?.trim() || '');
   await hardPage.waitForFunction(() => document.querySelector('#swipe-card:not([hidden]) #swipe-name')?.textContent?.trim() === 'Hana Cover', null, { timeout: 15000 });
   await hardPage.waitForTimeout(500);
+  const trackerRefs = await hardPage.evaluate(() => [...document.querySelectorAll('*')]
+    .filter((el) => /tracker\.example/.test(`${el.getAttribute('src') || ''} ${el.getAttribute('style') || ''}`)).map((el) => el.tagName));
+  check(`a third-party https photo_url never auto-loads (elements referencing it: ${JSON.stringify(trackerRefs)})`, () => assert.deepEqual(trackerRefs, []));
+  const stored = await hardPage.evaluate(() => Object.keys(window.localStorage).map((key) => [key, window.localStorage.getItem(key) || '']));
+  check(`no password is kept in localStorage after load (${stored.length} keys)`, () => {
+    assert.ok(!stored.some(([, value]) => value.includes(STALE_PASSWORD)), 'a cached password survived');
+    assert.ok(!stored.some(([key]) => key === 'loginPassword'), 'the loginPassword key survived');
+    assert.ok(!stored.some(([, value]) => /"(loginPassword|password|passwordConfirm)"/.test(value)), 'a password field is cached');
+  });
+  const rowKeys = await hardPage.evaluate(async () => Object.keys((await import('/supabase.js')).profileToRow({ name: 'X', createdAt: '2001-01-01T00:00:00.000Z' }, 'id-1')));
+  check(`profileToRow never sends created_at (keys ${rowKeys.join(',')})`, () => assert.ok(!rowKeys.includes('created_at')));
+  const staticProfile = readFileSync(path.join(repoRoot, 'profile.html'), 'utf8');
+  check('profile.html shows no password and no copy-password button', () => assert.ok(!/password/i.test(staticProfile)));
   const hardPosts = () => hard.calls.filter((c) => c.method === 'POST' && c.path === '/rest/v1/connection_requests');
   const hardToast = () => hardPage.locator('#app-toast').textContent();
   const hardResetToast = () => hardPage.evaluate(() => { const t = document.querySelector('#app-toast'); if (t) t.textContent = ''; });
@@ -584,6 +621,8 @@ try {
   // 8c. Escape while a pitch submit is in flight, and the submit then fails: the like is NOT restored behind
   // the hidden sheet, so moving to the next card sends nothing more.
   await hardPage.waitForFunction(() => document.querySelector('#swipe-card:not([hidden]) #swipe-name')?.textContent?.trim() === 'Ivan Next');
+  const ivanImage = await hardPage.evaluate(() => document.querySelector('#swipe-image')?.getAttribute('src') || '');
+  check(`a Supabase storage photo_url renders (got ${ivanImage.slice(0, 90)})`, () => assert.equal(ivanImage, IVAN_PHOTO));
   hardBefore = hardPosts().length;
   await hardPage.locator('[data-action="like"]').click();
   await hardPage.waitForSelector('#pitch-modal:not([hidden])');
@@ -704,6 +743,23 @@ try {
   check(`failed photo upload writes no profile row and no data: URL (${profileWrites.length} writes)`, () => {
     assert.equal(profileWrites.length, 0);
     assert.ok(!profileWrites.some((c) => /data:/.test(c.body || '')));
+  });
+  // 8g. Blocking someone who is already blocked server-side: insert (never upsert) and 23505 counts as success.
+  await hardPage.evaluate(() => document.querySelector('#profile-edit-form [data-profile-edit-close], .profile-edit-close')?.click());
+  await hardPage.evaluate(() => document.querySelector('[data-nav="chat"]')?.click());
+  await hardPage.waitForSelector(`[data-chat-id="${KIT}"]`, { timeout: 8000 });
+  await hardPage.locator(`[data-chat-id="${KIT}"]`).click();
+  await hardPage.waitForSelector('#chat-more', { timeout: 8000 });
+  hardPage.once('dialog', (dialog) => dialog.accept());
+  await hardResetToast();
+  await hardPage.evaluate(() => { document.querySelector('#chat-more')?.click(); document.querySelector('#chat-more-menu [data-chat-action="block"]')?.click(); });
+  await hardPage.waitForFunction(() => /blocked|Block/.test(document.querySelector('#app-toast')?.textContent || ''), null, { timeout: 5000 }).catch(() => {});
+  const blockToast = await hardToast();
+  const blockPosts = hard.calls.filter((c) => c.method === 'POST' && c.path === '/rest/v1/brivia_blocks');
+  check(`block of an already-blocked member succeeds (toast "${blockToast}")`, () => assert.match(blockToast, /Kit Chat is blocked/));
+  check(`block uses a plain insert, not an upsert (${JSON.stringify(blockPosts.map((c) => [c.search, c.prefer]))})`, () => {
+    assert.equal(blockPosts.length, 1);
+    assert.ok(!/on_conflict/.test(blockPosts[0].search) && !/resolution=/.test(blockPosts[0].prefer));
   });
   check('hardening context: no uncaught page errors', () => assert.deepEqual(hardErrors, []));
   await hardContext.close();

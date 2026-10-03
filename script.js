@@ -7,7 +7,7 @@ import './deep-wine-theme.css';
 import './auth-polish.css';
 import './mobile-site.css';
 import './mobile-final-fixes.css';
-import { supabase, supabaseReady, saveProfile, compressedImageDataUrl } from './supabase.js';
+import { supabase, supabaseReady, saveProfile, compressedImageDataUrl, withoutCredentials } from './supabase.js';
 import { defaultCoverUrl, normalizeCoverUrl } from './cover-assets.js';
 
 const introBurst = document.querySelector('#intro-burst');
@@ -954,7 +954,6 @@ const signupSuccessTitle = signupSuccess?.querySelector('h2');
 const signupSuccessMessage = signupSuccess?.querySelector('p');
 signupSuccessTitle?.setAttribute('data-auth-success-title', '');
 signupSuccessMessage?.setAttribute('data-auth-success-message', '');
-signupSuccess?.querySelector('[data-credential="member-password"]')?.closest('.credential-row')?.remove();
 if (signupSuccessMessage) signupSuccessMessage.textContent = 'We sent a verification link. Your email is your login ID; your password stays private and is never shown here.';
 
 signupSuccess?.querySelectorAll('[data-copy-credential]').forEach((button) => {
@@ -1173,11 +1172,8 @@ const restoreCachedMemberProfile = async (user, preferredProfile = null) => {
     return email === userEmail && name && name !== 'New Member' && hasProfileSignals;
   });
   if (!candidate) return false;
-  const profile = { ...candidate, name: candidate.name || candidate.full_name };
+  const profile = withoutCredentials({ ...candidate, name: candidate.name || candidate.full_name });
   delete profile.id;
-  delete profile.password;
-  delete profile.passwordConfirm;
-  delete profile.loginPassword;
   const { error } = await saveProfile(user.id, profile, null);
   if (error) return false;
   window.localStorage.removeItem('brivia-pending-profile');
@@ -1291,10 +1287,7 @@ loginForm?.addEventListener('submit', async (event) => {
     const pending = JSON.parse(window.localStorage.getItem('brivia-pending-profile') || 'null');
     const pendingBelongsToUser = pending?.email?.toLowerCase() === data.user?.email?.toLowerCase();
     if (pending && data.user && pendingBelongsToUser) {
-      const safePending = { ...pending };
-      delete safePending.loginPassword;
-      delete safePending.password;
-      delete safePending.passwordConfirm;
+      const safePending = withoutCredentials(pending);
       const { error: profileError } = await saveProfile(data.user.id, safePending, null);
       if (profileError) throw profileError;
       window.localStorage.removeItem('brivia-pending-profile');
@@ -1370,15 +1363,14 @@ signupForm?.addEventListener('submit', async (event) => {
       return;
     }
   }
-  const profile = Object.fromEntries(formData.entries());
+  // The password goes to Supabase Auth only; it is never part of the stored or cached profile (Ruling I11).
+  const profile = withoutCredentials(Object.fromEntries(formData.entries()));
   profile.gender = normalizeSignupGender(profile.gender);
   const phoneCountryCode = String(formData.get('phoneCountryCode') || '+91').trim();
   const phoneNumber = String(formData.get('phoneNumber') || '').replace(/\D/g, '');
   profile.phoneCountryCode = phoneCountryCode;
   profile.phoneNumber = phoneNumber;
   profile.phone = `${phoneCountryCode} ${phoneNumber}`.trim();
-  delete profile.password;
-  delete profile.passwordConfirm;
   const photoFile = signupForm.querySelector('.photo-input')?.files?.[0] || null;
   profile.photoName = photoFile?.name || '';
   if (photoFile) {
