@@ -105,4 +105,34 @@ begin
   end if;
   revoke update (is_test) on public.profiles from authenticated;
 end $$;
+-- A SECURITY DEFINER function owned by the table owner, called by a member session, cannot set is_test.
+create or replace function public.trust_test_definer_set_is_test(uid uuid)
+returns void language plpgsql security definer set search_path = public as $$
+begin
+  update public.profiles set is_test = true where id = uid;
+  insert into public.profiles (id, name, full_name, email, is_test)
+  values ('c1c1c1c1-0000-0000-0000-0000000000c1','C','C','c1d@example.com', true)
+  on conflict (id) do nothing;
+end $$;
+grant execute on function public.trust_test_definer_set_is_test(uuid) to authenticated;
+do $$ begin
+  if not exists (select 1 from pg_roles where rolname = 'trust_test_login') then
+    create role trust_test_login nologin;
+  end if;
+end $$;
+grant authenticated to trust_test_login;
+begin;
+set session authorization trust_test_login;  -- like authenticator: session_user is not the owner
+set local role authenticated;
+select public.trust_test_definer_set_is_test('a1a1a1a1-0000-0000-0000-0000000000a1');
+reset role;
+reset session authorization;
+do $$
+begin
+  if exists (select 1 from public.profiles where id in ('a1a1a1a1-0000-0000-0000-0000000000a1','c1c1c1c1-0000-0000-0000-0000000000c1') and is_test) then
+    raise exception 'FAIL: definer function called by a member set is_test';
+  end if;
+end $$;
+rollback;
+drop function public.trust_test_definer_set_is_test(uuid);
 select 'trust.test OK';

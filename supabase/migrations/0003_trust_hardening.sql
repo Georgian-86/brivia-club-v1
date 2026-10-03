@@ -17,12 +17,17 @@ grant update (
 
 -- is_test (Ruling P14) is set only by the table owner (the seed script / SQL editor).
 -- Clients cannot choose it on insert and cannot change it on update, even if a grant is added later.
+-- Rule: the bypass applies only when BOTH current_user and session_user are the table owner. Checking
+-- current_user alone would let a member-called SECURITY DEFINER function owned by postgres set is_test;
+-- on Supabase a member's session_user is authenticator, so that path stays closed.
+-- Seeding must therefore run in the SQL editor as postgres. The service_role key will not work.
 create or replace function public.brivia_guard_is_test()
 returns trigger
 language plpgsql
 as $$
 begin
-  if current_user = (select pg_get_userbyid(c.relowner) from pg_class c where c.oid = 'public.profiles'::regclass) then
+  if current_user = (select pg_get_userbyid(c.relowner) from pg_class c where c.oid = 'public.profiles'::regclass)
+     and session_user = (select pg_get_userbyid(c.relowner) from pg_class c where c.oid = 'public.profiles'::regclass) then
     return new;
   end if;
   if tg_op = 'INSERT' then
