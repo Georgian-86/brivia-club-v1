@@ -41,8 +41,8 @@ The governing metaphor, which is also the product language:
 | `interests[]` | `{ interest_id, points, mode }` | Up to 12 interests, picked from the taxonomy (§3.1) or proposed as new nodes |
 | `points` | int ≥ 1 | **Passion Budget:** each member spreads exactly **20 points** over their interests |
 | `mode` | `learn \| play \| teach \| build` | How they relate to the interest. Defaults to `play` |
-| `home_cell` | H3 index, resolution 7 (~5 km² hexagon) | Derived from a city pick or browser geolocation. **Raw coordinates are discarded after snapping.** |
-| `travel_cell`, `travel_until` | H3 r7, timestamp | Optional temporary origin for travel ("Transit mode") |
+| `home_cell` | Scheme-tagged cell id. Now `grid1` level 7, `g7:<row>:<col>` (~2.3 km × 2.3 km, ~5.4 km²), with parents `g6:…` and `g5:…`; H3 res-7 from iteration 4 (§4.1, D-028) | Derived from a city pick or browser geolocation, snapped in Postgres. **Raw coordinates are discarded after snapping.** |
+| `travel_cell`, `travel_until` | Same cell scheme as `home_cell`, timestamp | Optional temporary origin for travel ("Transit mode") |
 | `capacity_k` | `2 \| 3 \| 5 \| 8` | Roche Limit capacity: "new people I can realistically meet per fortnight". Default **5** (§6.4) |
 | `availability[]` | set of `{weekday \| weekend} × {morning \| afternoon \| evening \| night}` | Used for local co-presence |
 | `about` | free text | Embedded (MiniLM, as in engine v1) as a secondary signal |
@@ -137,12 +137,29 @@ is **capped at 25%**, so every strong match can still be explained by named, sha
 
 ### 4.1 Privacy
 
-- Only `home_cell` (H3 resolution 7) is stored. Distance is the great-circle distance between cell centroids.
+- Only `home_cell` (a level-7 cell, ~5 km²) and its two parents are stored, in `member_orbit` together with a
+  `cell_scheme` tag. Distance is the great-circle (haversine, R = 6371.0088 km) distance between cell centroids.
+- **Cell scheme `grid1` (D-028, normative).** h3-pg is not available on the project, so cells come from an
+  equal-area latitude/longitude grid computed in SQL (`0004_orbit_onboarding.sql`, `brivia_grid_cell`):
+  - level L has `n_L` rows per degree of latitude: **48 for g7, 16 for g6, 16/3 for g5**;
+  - `row = least(floor((lat + 90) · n_L), 180·n_L − 1)`, centre latitude `φc = −90 + (row + 0.5)/n_L`;
+  - `ncols = greatest(1, floor(360 · n_L · cos(radians(φc))))`, `col = floor((lng + 180)/360 · ncols) mod ncols`;
+  - id `'g' || L || ':' || row || ':' || col`; centroid `(φc, −180 + (col + 0.5) · 360/ncols)`;
+  - a **parent** is the snap of the child's centroid at the coarser level (approximately nested, as H3 is);
+  - non-finite or out-of-range input, or a level other than 5–7, raises `22023 invalid location` (no value in the message).
+  - A g7 cell is about 2.32 km × 2.32 km. The poles, lng ±180 and the antimeridian all give valid cells, and two
+    points either side of the antimeridian are ring 0.
+- **Migration to H3 (iteration 4).** `member_orbit.cell_scheme` is `'grid1'` now. The ORBIT service backfills
+  `h3 = latLngToCell(gridCentroid(home_cell), 7)` once per member (through `orbit_store_home_cell`) and sets
+  `cell_scheme = 'h3r7'`. The displacement is at most half a g7 diagonal (~1.64 km), below the ring-0 radius. If
+  h3-pg appears, `set_home_location` switches to `h3_lat_lng_to_cell` with the same signature and the backfill runs
+  in SQL. `orbit/src/rings.js` gains a scheme adapter then; it is unchanged in iteration 3.
 - Clients only ever receive a **rounded distance band** ("< 3 km", "~5 km", "~25 km", "Mumbai", "Maharashtra",
   "India", "abroad"). Never coordinates, and never a cell id.
 - Travel mode replaces `home_cell` with `travel_cell` until `travel_until`.
 - Location enters only through a server-side snap (`set_home_location`, at most 3 home or travel changes a day), and
-  a candidate in a sparsely populated cell is shown at a coarser H3 level (k = 10 for rings 0–1, k = 5 beyond; §9.1.4).
+  a candidate in a sparsely populated cell is shown at a coarser cell level (g6, then g5; k = 10 for rings 0–1,
+  k = 5 beyond; §9.1.4).
 
 ### 4.2 Rings
 
@@ -519,8 +536,9 @@ select log_impressions($1, $4);
 - Location enters only through `set_home_location(lat double precision, lng double precision)`: SECURITY DEFINER,
   **`volatile`**, executable by `authenticated`. PostgREST serves a volatile function only on `POST`, so coordinates
   travel in the request body and never in a query string. It rejects non-finite or out-of-range values, snaps to the
-  **H3 res-7** cell server-side (`h3_lat_lng_to_cell`, h3-pg) and upserts `member_orbit(member_id = auth.uid(),
-  home_cell, home_set_at)`. Coordinates are never stored, logged, echoed back or put in an error message. The member
+  **level-7 `grid1` cell** server-side (`brivia_grid_cell`, pure SQL, §4.1 and D-028; H3 res-7 from iteration 4) and
+  upserts `member_orbit(member_id = auth.uid(), cell_scheme, home_cell, home_cell_g6, home_cell_g5, place_id,
+  home_set_at)`. Coordinates are never stored, logged, echoed back or put in an error message. The member
   reads back only a place label, never the cell id.
 - **No parameter logging:** the project sets `log_parameter_max_length_on_error = 0` and
   `log_parameter_max_length = 0`; neither pgaudit nor auto_explain logs parameters (`auto_explain.log_parameter_max_length = 0`
@@ -538,8 +556,9 @@ select log_impressions($1, $4);
 - **k-anonymity floor.** The population of a cell counts only members of the viewer's world who are completed,
   whose account is older than 14 days and who are not flagged (reported or restricted), so a burst of fresh sybils
   cannot fill a cell. Floors: **k = 10** for a candidate who would be shown in ring 0 or 1, **k = 5** for rings 2+.
-  When the candidate's res-7 cell is below k, the band is computed from the parent **res-6** cell (centroid to
-  centroid), then **res-5** if that is still below k, and only then the region `placeLabel`. Coarsening never yields a
+  When the candidate's level-7 cell is below k, the band is computed from the parent **level-6** cell (centroid to
+  centroid; `home_cell_g6`), then **level-5** (`home_cell_g5`) if that is still below k, and only then the region
+  `placeLabel`. (Under H3 from iteration 4: res-6, then res-5.) Coarsening never yields a
   number derived from exact km, and any ring-0/1 chip ("~3 km away") is suppressed while coarsened. Scoring still uses
   the true ring; only what leaves the service is coarsened.
 - **No band flips:** a cell's coarsening level only goes up quickly and comes down slowly. A cell is un-coarsened
@@ -553,7 +572,7 @@ select log_impressions($1, $4);
   deck or hit list never reaches the HTTP layer. Response envelope: `{ cards, nextCursor, deckId }`.
 - **Contract test** (extends Golden 6): for every endpoint, against seeded fixtures, the response's card keys equal
   exactly `id, name, photoUrl, distanceBand, matchPercent, chips, worthTheDistance`; no value anywhere matches an H3
-  index (`/^8[0-9a-f]{14}$/i`), a coordinate pair, an `@` or a phone-shaped digit run; no key is `km`, `G`, `cell`,
+  index (`/^8[0-9a-f]{14}$/i`), a `grid1` cell id (`/^g[5-7]:\d+:\d+$/`), a coordinate pair, an `@` or a phone-shaped digit run; no key is `km`, `G`, `cell`,
   `lat`, `lng`, `email`, `phone*`, `headroom`, `load` or `ring`. A failing contract test blocks deploy.
 - **Members never read model outputs.** In `interaction`, members can select only `id`, `viewer_id`, `target_id`,
   `event` and `created_at` of their own non-impression rows, and can insert only `viewer_id`, `target_id` and `event`
@@ -611,7 +630,7 @@ select log_impressions($1, $4);
 | Phase | Deliverable | Done when |
 |---|---|---|
 | 0 | P0 fixes in v1: `public_profiles` view without email/phone, mutual-consent connections | No client can read another member's email or phone; a one-sided like opens no chat |
-| 1 | Data: interest taxonomy seed (~400 nodes, India-relevant), onboarding for Passion Budget and modes, coarse location capture through `set_home_location` with the k-anonymity floor (§9.1.4; Iteration 3) | New members have interests, points and a cell; no coordinates stored |
+| 1 | Data: interest taxonomy seed (~400 nodes, India-relevant), onboarding for Passion Budget and modes, coarse location capture through `set_home_location` (snapped in SQL to a `grid1` g7 cell, D-028) with the k-anonymity floor (§9.1.4; Iteration 3); a place list (`place`: state capitals, metros, world metros; launch cities Bengaluru, Mumbai, Delhi, Pune) | New members have interests, points and a cell; no coordinates stored; only `place` holds coordinates (public city centroids, never granted to clients) |
 | 2 | ORBIT service with resonance, rings, gate and composition, plus unit tests on every formula in this doc; built behind the §9.1 trust boundary (`orbit_svc` role, JWKS verification, `toCard` contract test, impression logging with holdout; Iteration 4) | Golden-pair tests and the §9.1.5 contract test pass |
 | 3 | Wire the v1 deck, explore and search to the service; add the Worth-the-Distance card style and the Long-Range Request flow; retire `list_members` (Ruling I5 interim) | v1 no longer loads the full member table or calls `list_members` |
 | 4 | Taste learning, interaction log, and nightly rarity and liquidity jobs | A member's deck changes after about 15 swipes |
