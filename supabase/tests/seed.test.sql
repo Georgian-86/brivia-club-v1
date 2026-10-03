@@ -23,7 +23,11 @@ begin
   if n <> 24 then raise exception 'FAIL S1: % test profiles, expected 24', n; end if;
   select count(*) into n from public.profiles p join auth.users u on u.id = p.id
    where p.is_test and u.email like 't__@test.brivia.club' and p.email = u.email and u.aud = 'authenticated'
-     and u.role = 'authenticated' and u.encrypted_password like '$2%' and u.email_confirmed_at is not null;
+     and u.role = 'authenticated' and u.encrypted_password like '$2%' and u.email_confirmed_at is not null
+     and u.confirmation_token = '' and u.recovery_token = '' and u.email_change_token_new = '' and u.email_change = ''
+     and u.email_change_token_current = '' and u.phone_change = '' and u.phone_change_token = '' and u.reauthentication_token = ''
+     and exists (select 1 from auth.identities i where i.user_id = u.id and i.provider = 'email'
+                   and i.provider_id = u.id::text and i.identity_data->>'sub' = u.id::text and i.identity_data->>'email' = u.email);
   if n <> 24 then raise exception 'FAIL S1: only % rows have test emails + auth columns', n; end if;
   select count(*) into n from public.profiles where is_test and not public.brivia_is_completed(name, city);
   if n <> 0 then raise exception 'FAIL S2: % test profiles are not completed (Ruling I3)', n; end if;
@@ -124,6 +128,8 @@ begin
   insert into public.interaction(viewer_id, target_id, event) values (a, b, 'like'), (b, a, 'impression');
   insert into storage.objects(bucket_id, name, owner) values
     ('profile-photos', a || '/avatar.jpg', null), ('community-posts', 'x/y.jpg', b), ('profile-photos', r || '/avatar.jpg', r);
+  -- a genuine signup with the reserved domain but no seed id and no profile yet: the purge must keep it
+  insert into auth.users(id, email) values ('eeeeeeee-0000-0000-0000-0000000000e2', 'someone@test.brivia.club');
 end $$;
 select 'seed.test extras inserted';
 \else
@@ -131,7 +137,7 @@ select 'seed.test extras inserted';
 do $$
 declare n int; ids uuid[] := array(select ('a7e57000-0000-4000-8000-' || lpad(g::text, 12, '0'))::uuid from generate_series(1, 24) g);
 begin
-  select count(*) into n from auth.users where id = any(ids) or email like '%@test.brivia.club'; if n <> 0 then raise exception 'FAIL P1: % auth.users', n; end if;
+  select count(*) into n from auth.users where id = any(ids); if n <> 0 then raise exception 'FAIL P1: % auth.users', n; end if;
   select count(*) into n from public.profiles where id = any(ids) or is_test; if n <> 0 then raise exception 'FAIL P1: % profiles', n; end if;
   select count(*) into n from public.connection_requests where from_id = any(ids) or to_id = any(ids); if n <> 0 then raise exception 'FAIL P1: % requests', n; end if;
   select count(*) into n from public.matches where user1_id = any(ids) or user2_id = any(ids); if n <> 0 then raise exception 'FAIL P1: % matches', n; end if;
@@ -140,6 +146,8 @@ begin
   select count(*) into n from public.community_posts where author_id = any(ids); if n <> 0 then raise exception 'FAIL P1: % posts', n; end if;
   select count(*) into n from public.interaction where viewer_id = any(ids) or target_id = any(ids); if n <> 0 then raise exception 'FAIL P1: % interaction', n; end if;
   select count(*) into n from storage.objects where owner = any(ids) or (storage.foldername(name))[1] = any(array(select unnest(ids)::text)); if n <> 0 then raise exception 'FAIL P1: % storage objects', n; end if;
+  select count(*) into n from auth.identities where user_id = any(ids); if n <> 0 then raise exception 'FAIL P1: % identities', n; end if;
+  if not exists (select 1 from auth.users where id = 'eeeeeeee-0000-0000-0000-0000000000e2') then raise exception 'FAIL P3: purge deleted a real @test.brivia.club signup'; end if;
   -- the real member and their data survive
   select count(*) into n from public.profiles where id = 'eeeeeeee-0000-0000-0000-0000000000e1'; if n <> 1 then raise exception 'FAIL P2: real member purged'; end if;
   select count(*) into n from storage.objects where name like 'eeeeeeee%'; if n <> 1 then raise exception 'FAIL P2: real member storage purged'; end if;

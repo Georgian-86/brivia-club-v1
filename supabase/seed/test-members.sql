@@ -15,6 +15,7 @@
 --     creates the match; no direct insert into matches), plus 4 pending requests: 3->1, 4->1, 9->10, 5->8.
 --     Run as the owner, auth.uid() is null, so the cap trigger steps aside and RLS is bypassed; the AFTER
 --     INSERT consent trigger still runs, so the result obeys the mutual-consent rule.
+-- Run the column check in seed/README.md first: this script was verified only against a local stub.
 -- Requests expire after 30 days (Ruling I8): purge and re-seed to refresh.
 -- Test members and real members never see each other (Ruling P14). Remove everything with purge-test-members.sql.
 
@@ -52,15 +53,26 @@ insert into _seed_members values
 
 -- Deterministic ids: a7e57000-0000-4000-8000-0000000000NN (NN = 01..24).
 insert into auth.users (instance_id, id, aud, role, email, encrypted_password, email_confirmed_at,
-                        raw_app_meta_data, raw_user_meta_data, created_at, updated_at)
+                        raw_app_meta_data, raw_user_meta_data, created_at, updated_at,
+                        confirmation_token, recovery_token, email_change_token_new, email_change,
+                        email_change_token_current, phone_change, phone_change_token, reauthentication_token)
 select '00000000-0000-0000-0000-000000000000',
        ('a7e57000-0000-4000-8000-' || lpad(n::text, 12, '0'))::uuid,
        'authenticated', 'authenticated',
        't' || lpad(n::text, 2, '0') || '@test.brivia.club',
        crypt(gen_random_uuid()::text, gen_salt('bf')),   -- random, never stored anywhere: no one can log in
-       now(), '{"provider":"email","providers":["email"]}'::jsonb, '{"is_test":true}'::jsonb, now(), now()
+       now(), '{"provider":"email","providers":["email"]}'::jsonb, '{"is_test":true}'::jsonb, now(), now(),
+       '', '', '', '', '', '', '', ''   -- GoTrue cannot read NULL here (login/reset/admin list break), like Supabase's own seeding
 from _seed_members
 on conflict (id) do nothing;
+
+insert into auth.identities (id, user_id, provider, provider_id, identity_data, last_sign_in_at, created_at, updated_at)
+select gen_random_uuid(), u.id, 'email', u.id::text,
+       jsonb_build_object('sub', u.id::text, 'email', u.email, 'email_verified', true),
+       now(), now(), now()
+from auth.users u
+where u.id::text like 'a7e57000-0000-4000-8000-%'
+  and not exists (select 1 from auth.identities i where i.user_id = u.id and i.provider = 'email');
 
 insert into public.profiles (id, name, full_name, email, gender, city, state, experience, skills, looking_for, is_test)
 select ('a7e57000-0000-4000-8000-' || lpad(n::text, 12, '0'))::uuid,

@@ -11,6 +11,11 @@ members never see them. Real data is never touched by either script.
 
 ## Seed (exact steps)
 
+0. The seed was verified only against a local stub of Supabase's auth schema. Compare first, in the SQL editor:
+   `select table_name, column_name, is_nullable from information_schema.columns where table_schema='auth' and table_name in ('users','identities') order by 1, ordinal_position;`
+   The seed writes auth.users (instance_id, id, aud, role, email, encrypted_password, email_confirmed_at, the two meta columns,
+   created_at, updated_at, and the eight token/text columns as empty strings) and auth.identities (id, user_id, provider,
+   provider_id, identity_data, last_sign_in_at, created_at, updated_at). If a NOT NULL column is missing from that list, stop.
 1. Apply migrations `0001`, `0002`, `0003` first (in order).
 2. Open the Supabase dashboard, SQL editor, new query, paste all of `supabase/seed/test-members.sql`, Run.
    It must run **as `postgres`**, which is the editor's default. **Do not** run it through the `service_role` key,
@@ -22,6 +27,9 @@ What you get: 24 members (`t01` to `t24@test.brivia.club`), 6 each in Bengaluru,
 looking-for taken from the onboarding chips; one match (t01 and t02, created by the normal mutual-consent trigger from
 requests in both directions, never a direct insert) and four pending requests (t03 to t01, t04 to t01, t09 to t10, t05 to t08).
 Requests expire after 30 days; purge and re-seed to refresh.
+
+The domain `@test.brivia.club` is reserved for these seeds, but the purge never relies on it: it keys on `is_test` or the
+seed id prefix `a7e57000-0000-4000-8000-`, so a real signup using that domain is never deleted.
 
 Nobody can log in as a test member: each has a random password that is never stored. To act as one, reset that user's
 password in Authentication, Users. A member who signs in sees only the test world, so use it to see the demo data.
@@ -40,7 +48,7 @@ of this (including that a real member sees nothing and cannot request or message
 
 Paste `supabase/seed/purge-test-members.sql` into the SQL editor and Run (as `postgres`). It is one transaction and prints
 rows deleted and rows remaining per table; every `remaining` must be 0. It deletes `is_test` profiles (plus orphan
-`@test.brivia.club` auth users from a half-finished seed), cascading to matches, requests, blocks, messages, posts and
+auth users with the seed id prefix from a half-finished seed), and their `auth.identities`, cascading to matches, requests, blocks, messages, posts and
 interaction, and removes `storage.objects` under their folders. Running it with nothing seeded is safe (all zeros).
 Supabase refuses SQL deletes on `storage.objects`; if test members ever uploaded files, the script prints a notice and you
 remove those files in the Storage dashboard. The seed itself uploads nothing.

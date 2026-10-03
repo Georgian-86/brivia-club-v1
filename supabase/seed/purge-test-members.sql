@@ -1,7 +1,7 @@
 -- purge-test-members.sql: removes EVERY test member and everything tied to them, in ONE transaction (Ruling P7).
 -- Run in the Supabase SQL editor as postgres BEFORE launch. This is the LIVE project: it deletes rows for
--- profiles with is_test = true, plus orphan auth.users rows with a @test.brivia.club email and no profile
--- (a half-finished seed). Real members (is_test = false) are never touched. Safe to run when nothing is
+-- profiles with is_test = true, plus auth.users rows with the seed id prefix a7e57000-0000-4000-8000- (never the email domain alone)
+-- and their auth.identities (a half-finished seed). Real members (is_test = false) are never touched. Safe to run when nothing is
 -- seeded (all counts are 0). The final result set shows rows deleted per table and rows remaining (must be 0).
 --
 -- Deleting auth.users cascades to profiles and from there to matches, connection_requests, brivia_blocks,
@@ -15,16 +15,16 @@ create temp table _purge_ids on commit drop as
   select id from public.profiles where is_test
   union
   select u.id from auth.users u
-   where lower(u.email) like '%@test.brivia.club'
-     and not exists (select 1 from public.profiles p where p.id = u.id);
+   where u.id::text like 'a7e57000-0000-4000-8000-%';  -- the seed's id prefix, never the email domain alone
 
 create temp table _purge_report (tbl text, deleted bigint default 0, remaining bigint default 0) on commit drop;
 insert into _purge_report(tbl) values
-  ('auth.users'), ('profiles'), ('connection_requests'), ('matches'), ('brivia_blocks'),
+  ('auth.users'), ('auth.identities'), ('profiles'), ('connection_requests'), ('matches'), ('brivia_blocks'),
   ('brivia_messages'), ('community_posts'), ('interaction'), ('storage.objects');
 
 create temp table _purge_before on commit drop as
   select 'auth.users' as tbl, count(*) as n from auth.users where id in (select id from _purge_ids)
+  union all select 'auth.identities', count(*) from auth.identities where user_id in (select id from _purge_ids)
   union all select 'profiles', count(*) from public.profiles where id in (select id from _purge_ids)
   union all select 'connection_requests', count(*) from public.connection_requests
     where from_id in (select id from _purge_ids) or to_id in (select id from _purge_ids)
@@ -57,11 +57,13 @@ delete from public.brivia_blocks where blocker_id in (select id from _purge_ids)
 delete from public.matches where user1_id in (select id from _purge_ids) or user2_id in (select id from _purge_ids);
 delete from public.connection_requests where from_id in (select id from _purge_ids) or to_id in (select id from _purge_ids);
 delete from public.profiles where id in (select id from _purge_ids);
+delete from auth.identities where user_id in (select id from _purge_ids);
 delete from auth.users where id in (select id from _purge_ids);
 
 update _purge_report r set deleted = b.n from _purge_before b where b.tbl = r.tbl;
 update _purge_report set remaining = case tbl
   when 'auth.users' then (select count(*) from auth.users where id in (select id from _purge_ids))
+  when 'auth.identities' then (select count(*) from auth.identities where user_id in (select id from _purge_ids))
   when 'profiles' then (select count(*) from public.profiles where id in (select id from _purge_ids))
   when 'connection_requests' then (select count(*) from public.connection_requests where from_id in (select id from _purge_ids) or to_id in (select id from _purge_ids))
   when 'matches' then (select count(*) from public.matches where user1_id in (select id from _purge_ids) or user2_id in (select id from _purge_ids))

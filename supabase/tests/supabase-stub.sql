@@ -9,7 +9,15 @@ alter table auth.users
   add column if not exists email text, add column if not exists encrypted_password text,
   add column if not exists email_confirmed_at timestamptz, add column if not exists raw_app_meta_data jsonb,
   add column if not exists raw_user_meta_data jsonb, add column if not exists created_at timestamptz,
-  add column if not exists updated_at timestamptz;
+  add column if not exists updated_at timestamptz,
+  add column if not exists confirmation_token text, add column if not exists recovery_token text,
+  add column if not exists email_change_token_new text, add column if not exists email_change text,
+  add column if not exists email_change_token_current text, add column if not exists phone_change text,
+  add column if not exists phone_change_token text, add column if not exists reauthentication_token text;
+create table if not exists auth.identities (
+  id uuid primary key default gen_random_uuid(), user_id uuid not null references auth.users(id) on delete cascade,
+  identity_data jsonb not null, provider text not null, provider_id text not null,
+  last_sign_in_at timestamptz, created_at timestamptz, updated_at timestamptz, unique (provider_id, provider));
 -- Supabase keeps pgcrypto (crypt, gen_salt) in the "extensions" schema.
 create schema if not exists extensions;
 create extension if not exists pgcrypto schema extensions;
