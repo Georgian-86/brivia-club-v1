@@ -76,7 +76,8 @@ export const uploadProfilePhoto = async (userId, file) => {
   const extension = compressedFile.type === 'image/jpeg' ? 'jpg' : (compressedFile.name.split('.').pop()?.toLowerCase() || 'bin');
   const path = `${userId}/${crypto.randomUUID()}.${extension}`;
   const { error } = await supabase.storage.from('profile-photos').upload(path, compressedFile, { upsert: true, contentType: compressedFile.type || 'application/octet-stream' });
-  if (error) return fileToDataUrl(compressedFile);
+  // Fail visibly: never fall back to storing an inline data: URL (0003 caps photo_url at 2048 characters).
+  if (error) throw new Error('Your photo could not be uploaded. Please try again.');
   return supabase.storage.from('profile-photos').getPublicUrl(path).data.publicUrl;
 };
 
@@ -86,7 +87,7 @@ export const uploadProfileCover = async (userId, file) => {
   const extension = compressedFile.type === 'image/jpeg' ? 'jpg' : (compressedFile.name.split('.').pop()?.toLowerCase() || 'bin');
   const path = `${userId}/${crypto.randomUUID()}.${extension}`;
   const { error } = await supabase.storage.from('profile-covers').upload(path, compressedFile, { upsert: true, contentType: compressedFile.type || 'application/octet-stream' });
-  if (error) return fileToDataUrl(compressedFile);
+  if (error) throw new Error('Your cover photo could not be uploaded. Please try again.');
   return supabase.storage.from('profile-covers').getPublicUrl(path).data.publicUrl;
 };
 
@@ -163,9 +164,18 @@ export const removeCommunityPostImage = async (path) => {
 
 export const saveProfile = async (userId, profile, photoFile, coverFile = null) => {
   if (!supabase) return { data: null, error: new Error('Supabase is not configured.') };
-  const photoUrl = await uploadProfilePhoto(userId, photoFile);
-  const coverUrl = coverFile ? await uploadProfileCover(userId, coverFile) : (profile.coverUrl || profile.cover_url || '');
+  let photoUrl;
+  let coverUrl;
+  try {
+    photoUrl = await uploadProfilePhoto(userId, photoFile);
+    coverUrl = coverFile ? await uploadProfileCover(userId, coverFile) : (profile.coverUrl || profile.cover_url || '');
+  } catch (error) {
+    return { data: null, error };
+  }
   const row = profileToRow({ ...profile, coverUrl }, userId, photoUrl);
+  // Inline data:/blob: URLs are local previews only (signup shows one before upload). They are never stored:
+  // an update leaves the column unchanged, an insert stores null.
+  ['photo_url', 'cover_url'].forEach((key) => { if (/^(data|blob):/i.test(String(row[key] || '').trim())) delete row[key]; });
   // Members may update only editable columns (0003_trust_hardening.sql): id, email and created_at
   // are insert-only, so an upsert (which rewrites every column) would be denied. Update first,
   // insert the full row only when this member has no profile yet.

@@ -12,6 +12,10 @@
 // "It's mutual"; the Requests list
 // renders (escaped note, 44px equal-weight buttons), Accept calls /rest/v1/rpc/respond_connection_request
 // and opens chat only if a match exists; crafted photo_url values cannot inject markup.
+// Hardening (Iteration 2, Task 3b): the public-profile cover goes through safeImageUrl; repeated Like clicks
+// while the sheet opens are ignored; Escape during a failing submit restores nothing; an empty 201 (the silent
+// request cap) reads "Signal sent"; chat attachments link only https/same-origin URLs, escaped; a failed
+// profile-photo upload shows an error and writes no data: URL.
 import { spawn } from 'node:child_process';
 import assert from 'node:assert/strict';
 import { fileURLToPath } from 'node:url';
@@ -465,6 +469,212 @@ try {
   });
   check('paging context: no uncaught page errors', () => assert.deepEqual(deckErrors, []));
   await deckContext.close();
+
+  // 8. Client hardening (Iteration 2, Task 3b) in a fresh context: crafted cover / attachment URLs, the
+  // double-click like, Escape during an in-flight failing pitch submit, the silent request cap, and a
+  // failed profile-photo upload (never a data: URL).
+  const HANA = '88888888-8888-4888-8888-000000000001'; // cover_url is plain http -> must not be used
+  const IVAN = '88888888-8888-4888-8888-000000000002';
+  const JO = '88888888-8888-4888-8888-000000000003';
+  const KIT = '88888888-8888-4888-8888-000000000004'; // matched; chat thread carries crafted attachments
+  const hardRows = [
+    { id: HANA, name: 'Hana Cover', city: 'Pune', experience: 'Climber', skills: ['Climbing'], looking_for: ['Friends'], photo_url: '', cover_url: 'http://evil.example/cover.png', created_at: ago(1000) },
+    { id: IVAN, name: 'Ivan Next', city: 'Pune', experience: 'Cook', skills: ['Cooking'], looking_for: ['Friends'], photo_url: '', cover_url: '', created_at: ago(2000) },
+    { id: JO, name: 'Jo Third', city: 'Pune', experience: 'Runner', skills: ['Running'], looking_for: ['Friends'], photo_url: '', cover_url: '', created_at: ago(3000) },
+  ];
+  const kitRow = { id: KIT, name: 'Kit Chat', city: 'Pune', experience: 'Painter', skills: ['Painting'], looking_for: ['Friends'], photo_url: '', created_at: ago(4000) };
+  const kitMessages = [
+    { id: 'm1', sender_id: KIT, recipient_id: ME, body: '', created_at: ago(50000), message_type: 'image', attachment_url: 'https://cdn.example/a.png?q="><img src=x onerror="window.__xss=2', attachment_name: 'a.png', attachment_mime: 'image/png', attachment_size: 10 },
+    { id: 'm2', sender_id: KIT, recipient_id: ME, body: '', created_at: ago(40000), message_type: 'document', attachment_url: 'javascript:window.__xss=3', attachment_name: 'evil.pdf', attachment_mime: 'application/pdf', attachment_size: 10 },
+    { id: 'm3', sender_id: KIT, recipient_id: ME, body: '', created_at: ago(30000), message_type: 'video', attachment_url: 'http://insecure.example/v.mp4', attachment_name: 'v.mp4', attachment_mime: 'video/mp4', attachment_size: 10 },
+    { id: 'm4', sender_id: KIT, recipient_id: ME, body: '', created_at: ago(20000), message_type: 'image', attachment_url: 'https://cdn.example/ok.png', attachment_name: 'ok.png', attachment_mime: 'image/png', attachment_size: 10 },
+  ];
+  const hard = { calls: [], holdInsert: null, failInsert: false, capInsert: false };
+  const hardContext = await browser.newContext({ viewport: { width: 1280, height: 900 } });
+  await hardContext.addInitScript(([key, value]) => { window.localStorage.setItem(key, value); }, ['sb-stub-auth-token', JSON.stringify(session)]);
+  await hardContext.route(`${ORIGIN}/**`, async (route) => {
+    const request = route.request();
+    const url = new URL(request.url());
+    const method = request.method();
+    const pathName = url.pathname;
+    const postData = request.postData();
+    hard.calls.push({ method, path: pathName, search: decodeURIComponent(url.search), body: postData });
+    const json = (status, payload) => route.fulfill({ status, contentType: 'application/json', body: JSON.stringify(payload), headers: { 'access-control-allow-origin': '*' } });
+    if (method === 'OPTIONS') return route.fulfill({ status: 204, headers: { 'access-control-allow-origin': '*', 'access-control-allow-headers': '*', 'access-control-allow-methods': '*' } });
+    if (pathName.startsWith('/auth/v1/')) return json(200, pathName.endsWith('/user') ? user : session);
+    if (pathName.startsWith('/storage/v1/object/')) return json(400, { statusCode: '400', error: 'Bucket not found', message: 'Bucket not found' });
+    if (pathName === '/rest/v1/profiles') return json(200, (request.headers().accept || '').includes('vnd.pgrst.object') ? ownRow : [ownRow]);
+    const args = JSON.parse(postData || '{}');
+    if (pathName === '/rest/v1/rpc/list_members') return json(200, args.p_after ? [] : hardRows);
+    if (pathName === '/rest/v1/rpc/get_candidates') return json(200, [...hardRows, kitRow].filter((row) => (args.p_ids || []).includes(row.id)));
+    if (pathName === '/rest/v1/rpc/search_members') return json(200, []);
+    if (pathName === '/rest/v1/matches') {
+      const filter = url.searchParams.get('or') || '';
+      return json(200, filter.includes('and(') && !filter.includes(KIT) ? [] : [{ user1_id: ME, user2_id: KIT }]);
+    }
+    if (pathName === '/rest/v1/brivia_messages') return json(200, method === 'GET' ? kitMessages : []);
+    if (pathName === '/rest/v1/connection_requests') {
+      if (method === 'POST') {
+        if (hard.holdInsert) await hard.holdInsert;
+        if (hard.failInsert) return json(500, { code: 'XX000', message: 'stub failure' });
+        // The silent cap: PostgREST answers 201 with no row when the BEFORE INSERT trigger returns NULL.
+        return route.fulfill({ status: 201, body: '', headers: { 'access-control-allow-origin': '*' } });
+      }
+      return json(200, []);
+    }
+    if (pathName.startsWith('/rest/v1/')) return json(200, []);
+    return json(200, {});
+  });
+  await hardContext.route((url) => !url.href.startsWith(BASE) && !url.href.startsWith(ORIGIN), (route) => route.abort());
+  await hardContext.routeWebSocket(/stub\.supabase\.local/, (ws) => ws.close());
+  const hardPage = await hardContext.newPage();
+  const hardErrors = [];
+  hardPage.on('pageerror', (error) => hardErrors.push(String(error)));
+  await hardPage.goto(`${BASE}/app.html`, { waitUntil: 'domcontentloaded' });
+  const hardCard = () => hardPage.evaluate(() => document.querySelector('#swipe-card:not([hidden]) #swipe-name')?.textContent?.trim() || '');
+  await hardPage.waitForFunction(() => document.querySelector('#swipe-card:not([hidden]) #swipe-name')?.textContent?.trim() === 'Hana Cover', null, { timeout: 15000 });
+  await hardPage.waitForTimeout(500);
+  const hardPosts = () => hard.calls.filter((c) => c.method === 'POST' && c.path === '/rest/v1/connection_requests');
+  const hardToast = () => hardPage.locator('#app-toast').textContent();
+  const hardResetToast = () => hardPage.evaluate(() => { const t = document.querySelector('#app-toast'); if (t) t.textContent = ''; });
+  const hardWaitToast = (re) => hardPage.waitForFunction((src) => new RegExp(src).test(document.querySelector('#app-toast')?.textContent || ''), re.source, { timeout: 5000 });
+
+  // 8a. Public-profile cover goes through safeImageUrl: a plain-http cover falls back to the default cover.
+  await hardPage.locator('[data-action="full-info"]').click();
+  await hardPage.waitForSelector('#public-profile-modal');
+  const coverCss = await hardPage.evaluate(() => document.querySelector('#public-profile-modal .public-profile-cover')?.style.backgroundImage || '');
+  check(`public-profile cover never uses an unsafe URL (got ${coverCss.slice(0, 80)})`, () => {
+    assert.ok(coverCss.startsWith('url('), 'cover not set');
+    assert.ok(!/evil\.example|javascript:/i.test(coverCss));
+  });
+  await hardPage.evaluate(() => document.querySelector('#public-profile-modal [data-public-profile-close]')?.click());
+  await hardPage.waitForFunction(() => !document.querySelector('#public-profile-modal'));
+
+  // 8b. Double-clicking Like opens the sheet once and sends nothing until the sheet resolves.
+  let hardBefore = hardPosts().length;
+  await hardPage.locator('[data-action="like"]').dblclick();
+  await hardPage.waitForTimeout(600);
+  const sheetOpenAfterDbl = await hardPage.locator('#pitch-modal').isVisible();
+  check(`double-click Like: sheet open, no request yet (posts ${hardPosts().length - hardBefore})`, () => {
+    assert.equal(sheetOpenAfterDbl, true);
+    assert.equal(hardPosts().length - hardBefore, 0);
+  });
+  await hardResetToast();
+  await hardPage.keyboard.press('Escape');
+  await hardWaitToast(/Signal sent/);
+  await hardPage.waitForTimeout(300);
+  let hardResolved = hardPosts().slice(hardBefore);
+  check(`double-click Like then Escape = exactly one POST, note null (got ${hardResolved.length})`, () => {
+    assert.equal(hardResolved.length, 1);
+    assert.deepEqual([JSON.parse(hardResolved[0].body).to_id, JSON.parse(hardResolved[0].body).note], [HANA, null]);
+  });
+  const capToast = await hardToast();
+  check(`silent cap / plain like toast is "Signal sent" (got "${capToast}")`, () => assert.equal(capToast, 'Signal sent'));
+
+  // 8c. Escape while a pitch submit is in flight, and the submit then fails: the like is NOT restored behind
+  // the hidden sheet, so moving to the next card sends nothing more.
+  await hardPage.waitForFunction(() => document.querySelector('#swipe-card:not([hidden]) #swipe-name')?.textContent?.trim() === 'Ivan Next');
+  hardBefore = hardPosts().length;
+  await hardPage.locator('[data-action="like"]').click();
+  await hardPage.waitForSelector('#pitch-modal:not([hidden])');
+  await hardPage.waitForTimeout(600);
+  let releaseHard;
+  hard.holdInsert = new Promise((resolve) => { releaseHard = resolve; });
+  hard.failInsert = true;
+  await hardPage.locator('#pitch-message').fill('A note for Ivan');
+  await hardResetToast();
+  await hardPage.locator('.pitch-submit').click();
+  await hardPage.waitForTimeout(150);
+  await hardPage.keyboard.press('Escape');
+  await hardPage.waitForTimeout(150);
+  releaseHard(); hard.holdInsert = null;
+  await hardWaitToast(/could not be sent/);
+  hard.failInsert = false;
+  await hardPage.waitForTimeout(300);
+  const failedPosts = hardPosts().length - hardBefore;
+  await hardPage.evaluate(() => document.querySelector('[data-action="pass"]').click());
+  await hardPage.waitForTimeout(700);
+  check(`Escape during a failing submit: one (failed) POST, nothing restored or re-sent later (posts ${failedPosts} then ${hardPosts().length - hardBefore})`, () => {
+    assert.equal(failedPosts, 1);
+    assert.equal(hardPosts().length - hardBefore, 1);
+  });
+  const sheetHiddenAfterEsc = await hardPage.locator('#pitch-modal').isHidden();
+  check('pitch sheet stays hidden after Escape + failure', () => assert.equal(sheetHiddenAfterEsc, true));
+  const noteLimit = await hardPage.locator('#pitch-message').getAttribute('maxlength');
+  check(`pitch note is limited to 500 characters (maxlength ${noteLimit})`, () => assert.equal(noteLimit, '500'));
+
+  // 8b2. Two click events reach the Like button while the sheet is opening (Enter/Space pressed twice before
+  // focus moves to the note, or a touch ghost click): the second is ignored, so the like is not sent as a
+  // plain like and the sheet stays open for the note.
+  await hardPage.waitForFunction(() => document.querySelector('#swipe-card:not([hidden]) #swipe-name')?.textContent?.trim());
+  const currentName = await hardCard();
+  const doubleRow = [...hardRows, kitRow].find((row) => currentName.startsWith(row.name.split(' ')[0]));
+  hardBefore = hardPosts().length;
+  await hardPage.evaluate(() => { const like = document.querySelector('[data-action="like"]'); like.click(); like.click(); });
+  await hardPage.waitForTimeout(600);
+  const sheetOpenAfterDouble = await hardPage.locator('#pitch-modal').isVisible();
+  check(`double Like click while opening: sheet open, no request yet (posts ${hardPosts().length - hardBefore})`, () => {
+    assert.equal(sheetOpenAfterDouble, true);
+    assert.equal(hardPosts().length - hardBefore, 0);
+  });
+  await hardResetToast();
+  await hardPage.keyboard.press('Escape');
+  await hardWaitToast(/Signal sent/).catch(() => {}); // the old code had already resolved the like (no toast now)
+  await hardPage.waitForTimeout(300);
+  hardResolved = hardPosts().slice(hardBefore);
+  check(`double Like click then Escape = exactly one POST to ${doubleRow?.name}, note null (got ${hardResolved.length})`, () => {
+    assert.equal(hardResolved.length, 1);
+    assert.deepEqual([JSON.parse(hardResolved[0].body).to_id, JSON.parse(hardResolved[0].body).note], [doubleRow?.id, null]);
+  });
+
+  // 8d. Chat attachments: src/href escaped; only https (or same-origin) URLs become links or media.
+  await hardPage.evaluate(() => document.querySelector('[data-nav="chat"]')?.click());
+  await hardPage.waitForSelector(`[data-chat-id="${KIT}"]`, { timeout: 8000 });
+  await hardPage.locator(`[data-chat-id="${KIT}"]`).click();
+  await hardPage.waitForSelector('#chat-messages img.message-attachment-image', { timeout: 8000 });
+  await hardPage.waitForTimeout(300);
+  const attach = await hardPage.evaluate(() => ({
+    xss: window.__xss,
+    onerror: document.querySelectorAll('#chat-messages [onerror]').length,
+    jsHrefs: [...document.querySelectorAll('#chat-messages a')].filter((a) => /^\s*javascript:/i.test(a.getAttribute('href') || '')).length,
+    httpMedia: [...document.querySelectorAll('#chat-messages img, #chat-messages video, #chat-messages a')].filter((el) => /^http:/i.test(el.getAttribute('src') || el.getAttribute('href') || '')).length,
+    okImg: [...document.querySelectorAll('#chat-messages img')].some((img) => img.getAttribute('src') === 'https://cdn.example/ok.png'),
+    names: document.querySelector('#chat-messages')?.textContent || '',
+  }));
+  check(`crafted attachment URLs inject nothing and non-https is not linked (${JSON.stringify({ ...attach, names: undefined })})`, () => {
+    assert.equal(attach.xss, undefined);
+    assert.equal(attach.onerror, 0);
+    assert.equal(attach.jsHrefs, 0);
+    assert.equal(attach.httpMedia, 0);
+    assert.equal(attach.okImg, true, 'a safe https image should still render');
+    assert.match(attach.names, /evil\.pdf/, 'an unsafe document still shows its name');
+  });
+
+  // 8e. Local attachment preview (blob: URL) renders through an escaped src.
+  await hardPage.setInputFiles('#chat-photo-input', { name: 'p.png', mimeType: 'image/png', buffer: Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=', 'base64') });
+  await hardPage.waitForSelector('#chat-attachment-preview img', { timeout: 5000 });
+  const previewSrc = await hardPage.locator('#chat-attachment-preview img').first().getAttribute('src');
+  check(`local attachment preview uses a blob: URL (got ${String(previewSrc).slice(0, 20)})`, () => assert.match(previewSrc || '', /^blob:/));
+  await hardPage.evaluate(() => document.querySelector('[data-remove-chat-file]')?.click());
+
+  // 8f. A failed profile-photo upload fails visibly and never stores a data: URL.
+  await hardPage.evaluate(() => document.querySelector('[data-nav="profile"]')?.click());
+  await hardPage.waitForSelector('#profile-photo-editor', { timeout: 8000 });
+  await hardPage.locator('#profile-photo-editor').click();
+  await hardPage.waitForSelector('#profile-edit-form');
+  await hardPage.setInputFiles('#profile-edit-form [name="photoFile"]', { name: 'me.png', mimeType: 'image/png', buffer: Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=', 'base64') });
+  await hardPage.locator('#profile-edit-form [type="submit"]').click();
+  // Settles when the editor shows a result, or closes (the old data-URL fallback "succeeded" and closed it).
+  await hardPage.waitForFunction(() => { const t = document.querySelector('#profile-edit-feedback')?.textContent || ''; return !document.querySelector('#profile-edit-form') || (t && !/Saving/.test(t)); }, null, { timeout: 8000 });
+  const photoFeedback = await hardPage.evaluate(() => document.querySelector('#profile-edit-feedback')?.textContent || '(editor closed)');
+  const profileWrites = hard.calls.filter((c) => c.path === '/rest/v1/profiles' && c.method !== 'GET');
+  check(`failed photo upload is visible (got "${photoFeedback}")`, () => assert.match(photoFeedback, /photo could not be uploaded/i));
+  check(`failed photo upload writes no profile row and no data: URL (${profileWrites.length} writes)`, () => {
+    assert.equal(profileWrites.length, 0);
+    assert.ok(!profileWrites.some((c) => /data:/.test(c.body || '')));
+  });
+  check('hardening context: no uncaught page errors', () => assert.deepEqual(hardErrors, []));
+  await hardContext.close();
 } finally {
   await browser?.close();
   try { process.kill(-vite.pid, 'SIGTERM'); } catch { vite.kill('SIGTERM'); }

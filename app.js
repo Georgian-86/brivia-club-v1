@@ -53,6 +53,11 @@ let suppressChatAutoOpen = false;
 let pitchPerson = null;
 // Ruling P13: a like opens the pitch sheet and defers its single request until the sheet resolves.
 let pendingPitch = null; // { person, resolved }
+// The sheet covers the deck as soon as it opens, so the second click of a double-click can land on its
+// backdrop: backdrop clicks during the opening window are ignored (Task 3b).
+const PITCH_OPENING_MS = 400;
+let pitchOpenedAt = 0;
+const pitchSheetVisible = () => !document.querySelector('#pitch-modal')?.hidden;
 const chatMessages = {};
 const readChatIds = new Set();
 let messageSyncTimer = null;
@@ -124,6 +129,17 @@ const safeImageUrl = (value) => {
   const raw = String(value || '').trim();
   if (!raw || /["'<>`\\]/.test(raw)) return '';
   if (/^data:image\/(png|jpe?g|gif|webp);base64,[a-z0-9+/=\s]+$/i.test(raw)) return raw;
+  try {
+    const url = new URL(raw, window.location.href);
+    if (url.protocol === 'https:' || url.origin === window.location.origin) return url.href;
+  } catch { /* not a URL */ }
+  return '';
+};
+// Chat attachment URLs come from message rows: only https or same-origin URLs become links or media (no
+// javascript:, data: or plain http), and they are always escaped where they are interpolated.
+const safeAttachmentUrl = (value) => {
+  const raw = String(value || '').trim();
+  if (!raw) return '';
   try {
     const url = new URL(raw, window.location.href);
     if (url.protocol === 'https:' || url.origin === window.location.origin) return url.href;
@@ -719,7 +735,8 @@ const openPublicProfile = (person, options = {}) => {
   modal.setAttribute('aria-label', `${profile.name || 'Member'} public profile`);
   modal.innerHTML = `<button class="public-profile-backdrop" type="button" data-public-profile-close aria-label="Close profile"></button><section class="public-profile-dialog"><button class="public-profile-close" type="button" data-public-profile-close aria-label="Close profile">×</button><div class="public-profile-cover"><div class="public-profile-avatar">${avatarImage(image, profile.name) || escapeHtml(initials(profile.name))}</div></div><div class="public-profile-body"><p class="public-profile-kicker">BRIVIA MEMBER / PUBLIC PROFILE</p><h2>${escapeHtml(profile.name || 'Brivia member')}</h2><p class="public-profile-role">${escapeHtml(profile.role || 'Brivia member')}</p><p class="public-profile-location">${escapeHtml(location)}</p><p class="public-profile-bio">${escapeHtml(profile.bio || 'Open to meaningful connections inside the club.')}</p><div class="public-profile-facts"><div><span>LOOKING FOR</span><strong>${escapeHtml(lookingFor.join(', ') || 'Meaningful connections')}</strong></div><div><span>SKILLS &amp; INTERESTS</span><strong>${escapeHtml(skills.join(', ') || tags.join(', ') || 'Open to connect')}</strong></div></div><div class="public-profile-pills">${tags.length ? tags.map((tag) => `<span>${escapeHtml(tag)}</span>`).join('') : '<span>Open to connect</span>'}</div></div></section>`;
   document.body.append(modal);
-  modal.querySelector('.public-profile-cover').style.backgroundImage = `url("${coverUrl.replace(/"/g, '%22')}")`;
+  const safeCover = safeImageUrl(coverUrl) || safeImageUrl(defaultCoverUrl);
+  modal.querySelector('.public-profile-cover').style.backgroundImage = `url("${safeCover.replace(/["\\\n]/g, encodeURIComponent)}")`;
   const close = () => modal.remove();
   modal.addEventListener('click', (event) => { if (event.target.closest('[data-public-profile-close]')) close(); });
   modal.addEventListener('keydown', (event) => { if (event.key === 'Escape') close(); });
@@ -747,6 +764,7 @@ const dismissPendingPitch = () => {
 const openPitch = (person) => {
   dismissPendingPitch();
   pendingPitch = { person, resolved: false };
+  pitchOpenedAt = performance.now();
   pitchPerson = person;
   const pitchName = document.querySelector('#pitch-name'); if (pitchName) pitchName.textContent = person.name;
   const pitchMessage = document.querySelector('#pitch-message'); if (pitchMessage) pitchMessage.value = `Hey ${person.name}, I noticed we both care about ${person.tags[0].toLowerCase()}. Would love to connect and exchange ideas.`;
@@ -756,6 +774,9 @@ const openPitch = (person) => {
 
 const swipe = (type) => {
   if (!currentPerson) return;
+  // A Like while the pitch sheet is opening or open is ignored: a repeated click/keypress must not resolve
+  // the pending like as a plain like and drop the note (Task 3b).
+  if (type === 'like' && pendingPitch && pitchSheetVisible()) return;
   // Moving to the next card resolves an open pitch sheet as a plain like.
   if (pendingPitch) { document.querySelector('#pitch-modal')?.setAttribute('hidden', ''); dismissPendingPitch(); }
   if (!recordDailySwipe()) {
@@ -1146,8 +1167,10 @@ const renderMessages = () => {
   const thread = chatMessages[selectedChat.id] || [];
   const renderAttachment = (attachment) => {
     if (!attachment?.url) return '';
-    const url = escapeHtml(attachment.url);
     const name = escapeHtml(attachment.name || 'Attachment');
+    const safeUrl = safeAttachmentUrl(attachment.url);
+    if (!safeUrl) return `<span class="message-attachment message-attachment-document"><span class="message-document-icon">↗</span><span><strong>${name}</strong><small>ATTACHMENT UNAVAILABLE</small></span></span>`;
+    const url = escapeHtml(safeUrl);
     if (attachment.kind === 'image' || attachment.kind === 'gif') return `<a class="message-attachment message-attachment-image-link" href="${url}" target="_blank" rel="noreferrer"><img class="message-attachment-image" src="${url}" alt="${name}" loading="lazy" /></a>`;
     if (attachment.kind === 'video') return `<video class="message-attachment-video" controls playsinline preload="metadata" src="${url}"></video>`;
     return `<a class="message-attachment message-attachment-document" href="${url}" target="_blank" rel="noreferrer"><span class="message-document-icon">↗</span><span><strong>${name}</strong><small>OPEN DOCUMENT</small></span></a>`;
@@ -1813,7 +1836,11 @@ const finishSwipeDrag = (event, cancelled = false) => {
 };
 swipeCard?.addEventListener('pointerup', (event) => finishSwipeDrag(event));
 swipeCard?.addEventListener('pointercancel', (event) => finishSwipeDrag(event, true));
-document.querySelectorAll('[data-close-overlay]').forEach((button) => button.addEventListener('click', closeOverlays));
+document.querySelectorAll('[data-close-overlay]').forEach((button) => button.addEventListener('click', (event) => {
+  const pitchBackdrop = event.currentTarget.classList.contains('app-overlay-backdrop') && event.currentTarget.closest('#pitch-modal');
+  if (pitchBackdrop && performance.now() - pitchOpenedAt < PITCH_OPENING_MS) return;
+  closeOverlays();
+}));
 const discoveryFilterDrawer = document.querySelector('#discovery-filter-drawer');
 const discoveryFilterButton = document.querySelector('#open-discovery-filters');
 const closeDiscoveryFilters = () => {
@@ -1918,9 +1945,9 @@ const renderPendingChatFiles = () => {
   preview.hidden = !pendingChatFiles.length;
   preview.innerHTML = pendingChatFiles.map((entry, index) => {
     const media = entry.kind === 'image' || entry.kind === 'gif'
-      ? `<img src="${entry.previewUrl}" alt="" />`
+      ? `<img src="${escapeHtml(entry.previewUrl)}" alt="" />`
       : entry.kind === 'video'
-        ? `<video src="${entry.previewUrl}" muted preload="metadata"></video>`
+        ? `<video src="${escapeHtml(entry.previewUrl)}" muted preload="metadata"></video>`
         : '<span class="chat-file-preview-icon">↗</span>';
     return `<div class="chat-attachment-chip"><span class="chat-attachment-thumb">${media}</span><span class="chat-attachment-chip-copy"><strong>${escapeHtml(entry.file.name)}</strong><small>${entry.kind.toUpperCase()} · ${formatFileSize(entry.file.size)}</small></span><button type="button" data-remove-chat-file="${index}" aria-label="Remove ${escapeHtml(entry.file.name)}">×</button></div>`;
   }).join('');
@@ -2129,9 +2156,14 @@ document.querySelector('#pitch-form')?.addEventListener('submit', async (event) 
     // The pitch travels as the note of the like's single request; no message is sent until the pair is matched.
     const { matched, error } = await sendConnectionSignal(pending.person, body);
     if (error) {
-      // Nothing was stored: hand the like back so the member can retry or dismiss.
-      pending.resolved = false;
-      pendingPitch = pending;
+      // Nothing was stored. Hand the like back for a retry only while the sheet is still visible; if the
+      // member closed it meanwhile (Escape, Task 3b), a hidden like must not be sent later on its own.
+      if (pitchSheetVisible() && !pendingPitch) {
+        pending.resolved = false;
+        pendingPitch = pending;
+      } else if (!pendingPitch) {
+        pitchPerson = null;
+      }
       showToast(signalErrorToast);
       return;
     }
