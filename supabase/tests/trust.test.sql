@@ -1103,9 +1103,6 @@ begin
   foreach ev in array array['like','pass','request','accept','decline','met','letgo'] loop
     insert into public.interaction (viewer_id, target_id, event) values (a, b, ev);
   end loop;
-  insert into public.interaction (viewer_id, target_id, event, features, score, propensity, model_version, context)
-    values (a, b, 'like', '{"x":1}', 0.5, 0.25, 'orbit-0', '{"surface":"deck"}');
-
   -- denied cases
   foreach ev in array array[
     'insert into public.interaction (viewer_id, target_id, event) values (''' || b || ''',''' || a || ''',''like'')',
@@ -1114,7 +1111,13 @@ begin
     'insert into public.interaction (viewer_id, target_id, event, propensity) values (''' || a || ''',''' || b || ''',''like'',1.5)',
     'insert into public.interaction (viewer_id, target_id, event, features) values (''' || a || ''',''' || b || ''',''like'',jsonb_build_object(''k'', repeat(''x'', 9000)))',
     'insert into public.interaction (viewer_id, target_id, event, created_at) values (''' || a || ''',''' || b || ''',''like'',''2000-01-01'')',
-    'insert into public.interaction (viewer_id, target_id, event) values (''' || a || ''',''' || d || ''',''like'')'
+    'insert into public.interaction (viewer_id, target_id, event) values (''' || a || ''',''' || d || ''',''like'')',
+    -- fix round 1 (Critical 2): clients write viewer, target and event only
+    'insert into public.interaction (viewer_id, target_id, event, features) values (''' || a || ''',''' || b || ''',''like'',''{"x":1}'')',
+    'insert into public.interaction (viewer_id, target_id, event, score) values (''' || a || ''',''' || b || ''',''like'',0.5)',
+    'insert into public.interaction (viewer_id, target_id, event, propensity) values (''' || a || ''',''' || b || ''',''like'',0.25)',
+    'insert into public.interaction (viewer_id, target_id, event, model_version) values (''' || a || ''',''' || b || ''',''like'',''orbit-0'')',
+    'insert into public.interaction (viewer_id, target_id, event, context) values (''' || a || ''',''' || b || ''',''like'',''{"surface":"deck"}'')'
   ] loop
     failed := false;
     begin execute ev; exception when others then failed := true; end;
@@ -1129,7 +1132,7 @@ begin
   end loop;
 
   select count(*) into n from public.interaction;
-  if n <> 8 then raise exception 'FAIL T5: A sees % own rows, expected 8', n; end if;
+  if n <> 7 then raise exception 'FAIL T5: A sees % own rows, expected 7', n; end if;
 
   -- B sees none of A's rows
   perform set_config('request.jwt.claims', '{"sub":"' || b || '"}', true);
@@ -1247,3 +1250,46 @@ begin
 end $$;
 
 select 'trust.test T5 definer OK';
+
+-- Iteration 2 Task 6 fix round 1 (Critical 2): members never read impression rows or served-model columns.
+do $$
+declare
+  a uuid := 'a5a5a5a5-0000-0000-0000-0000000000a5';
+  b uuid := 'b5b5b5b5-0000-0000-0000-0000000000b5';
+  col text; failed boolean; n int;
+begin
+  delete from public.interaction;
+  -- the service path (owner here; log_impressions in iteration 4) writes an impression for A, with ring in context
+  insert into public.interaction (viewer_id, target_id, event, features, score, propensity, model_version, context)
+    values (a, b, 'impression', '{"x":1}', 0.7, 1, 'orbit-0', '{"ring":0,"holdout":false,"lane":"ranked"}');
+  set local role authenticated;
+  perform set_config('request.jwt.claims', '{"sub":"' || a || '"}', true);
+  insert into public.interaction (viewer_id, target_id, event) values (a, b, 'like');
+  -- A sees the own like through the allowed columns, never the impression row
+  select count(*) into n from public.interaction;
+  if n <> 1 then raise exception 'FAIL T6: A sees % rows, expected 1 (impression must be hidden)', n; end if;
+  select count(*) into n from public.interaction where event = 'impression';
+  if n <> 0 then raise exception 'FAIL T6: A can read own impression rows'; end if;
+  perform id, viewer_id, target_id, event, created_at from public.interaction;
+  -- the served-model columns are not selectable at all
+  foreach col in array array['features','score','propensity','model_version','context'] loop
+    failed := false;
+    begin execute 'select ' || col || ' from public.interaction';
+    exception when insufficient_privilege then failed := true; end;
+    if not failed then raise exception 'FAIL T6: member can select interaction.%', col; end if;
+  end loop;
+  failed := false;
+  begin perform * from public.interaction; exception when insufficient_privilege then failed := true; end;
+  if not failed then raise exception 'FAIL T6: member can select * from interaction'; end if;
+  reset role;
+  -- grants as declared: authenticated has exactly these column privileges
+  if (select string_agg(privilege_type || ':' || column_name, ',' order by privilege_type, column_name)
+        from information_schema.column_privileges
+       where table_schema = 'public' and table_name = 'interaction' and grantee = 'authenticated')
+     is distinct from 'INSERT:event,INSERT:target_id,INSERT:viewer_id,SELECT:created_at,SELECT:event,SELECT:id,SELECT:target_id,SELECT:viewer_id' then
+    raise exception 'FAIL T6: authenticated column privileges on interaction are wrong';
+  end if;
+  delete from public.interaction;
+end $$;
+
+select 'trust.test T6 impressions hidden OK';

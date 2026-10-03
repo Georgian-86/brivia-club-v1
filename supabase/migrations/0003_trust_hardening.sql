@@ -587,8 +587,11 @@ create trigger career_applications_throttle before insert on public.career_appli
   for each row execute function public.brivia_career_application_throttle();
 
 -- Interaction log (Task 5): every like/pass/request/... with the served features, propensity and model version,
--- so ORBIT can be evaluated offline (spec section 8). Clients may append their own explicit actions only;
--- 'impression' rows are written by the service (owner/service role), never by a client.
+-- so ORBIT can be evaluated offline (spec section 8). Clients may append their own explicit actions only
+-- (viewer, target, event; created_at defaults). 'impression' rows, with the served features, score, propensity,
+-- model version and context, are written only by the ORBIT service through log_impressions(p_viewer, ...)
+-- (spec section 9.1.6, Iteration 4), never by a client. Members never read impression rows or those columns:
+-- context.ring would reveal what the k-anonymity floor hides.
 create table if not exists public.interaction (
   id uuid primary key default gen_random_uuid(),
   viewer_id uuid not null references public.profiles(id) on delete cascade,
@@ -607,13 +610,12 @@ create index if not exists interaction_target_created_idx on public.interaction 
 
 alter table public.interaction enable row level security;
 revoke all on public.interaction from public, anon, authenticated;
-grant select on public.interaction to authenticated;
-grant insert (viewer_id, target_id, event, context, features, score, propensity, model_version)
-  on public.interaction to authenticated;
+grant select (id, viewer_id, target_id, event, created_at) on public.interaction to authenticated;
+grant insert (viewer_id, target_id, event) on public.interaction to authenticated;
 
 drop policy if exists interaction_select_own on public.interaction;
 create policy interaction_select_own on public.interaction for select to authenticated
-  using (viewer_id = auth.uid());
+  using (viewer_id = auth.uid() and event <> 'impression');
 -- Labels need backing evidence: met/letgo need a match, accept/decline need a request addressed to the viewer.
 create or replace function public.brivia_interaction_allowed(p_viewer uuid, p_target uuid, p_event text)
 returns boolean
