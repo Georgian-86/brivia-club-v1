@@ -85,6 +85,25 @@
   - the purge function (owner-only execute).
 - [ ] Run the harness. It must PASS. Commit.
 
+### Task 3b: Consent follow-ups from the P0 final review
+
+**Files:** `0003_trust_hardening.sql`, `trust.test.sql`; `app.js`; `supabase.js`; `tests/e2e/consent.spec.mjs`.
+
+- [ ] SQL tests and fixes:
+  - **A block withdraws the blocker's own pending request.** Add an AFTER INSERT trigger on `brivia_blocks` that deletes the blocker's pending request to the blocked member. Test: A requests B, A blocks B, A unblocks B, B requests A → no match.
+  - **Tighter insert grant.** Use `grant insert (from_id, to_id, note)` on `connection_requests`, so clients can't set `created_at` or `status`.
+  - **The sender never sees a decline.** Senders read their outgoing requests only through `my_outgoing_requests()`, an RPC that shows `declined` as `pending`. Remove sender read access to `status` in the base table. Test.
+  - **No oversized photos.** Add `check (photo_url is null or char_length(photo_url) <= 2048)` and the same for `cover_url`.
+  - **Consistent id comparison.** Compare ids as uuid in the 0002 policy (`id = auth.uid()`).
+- [ ] Client fixes:
+  - `supabase.js`: a failed photo upload fails visibly. Never store a data URL.
+  - Escape while a submit is in flight must not restore a pending like when the sheet is hidden. Restore only if `#pitch-modal` is visible.
+  - Ignore Like clicks while the pitch sheet is opening, to prevent the double-click plain-like.
+  - Use `safeImageUrl` for the CSS url() of the public-profile cover.
+  - Escape the attachment `<img src>` (app.js≈1058) and `previewUrl` (≈1821).
+  - Extend e2e for each change.
+- [ ] Run the harness, build and e2e. All must PASS. Commit.
+
 ### Task 4: Private chat media, bucket limits, careers throttle
 
 **Files:** `0003_trust_hardening.sql`; `supabase.js` (the `uploadMessageAttachment` area ≈110-160); `app.js` (attachment rendering); and tests.

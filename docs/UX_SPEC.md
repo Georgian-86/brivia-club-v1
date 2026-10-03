@@ -77,6 +77,15 @@ The current signup is 3 steps. It becomes **4 steps**:
   This replaces today's immediate `saveMatches()`.
 - The match moment shows the shared interests that made the match, and icebreakers derived from them.
 
+#### Consent semantics
+
+From a member's point of view (D-015..D-018):
+
+1. **Unmatching resets the pair.** If either of you deletes the match, earlier requests between you are cleared. You can reconnect only if you both agree again.
+2. **Changing your mind works.** If you declined someone and later like or request them, and they had asked you first, you match straight away. A pending request from them completes the match the same way.
+3. **Blocks stay invisible.** Accepting a request from someone you have blocked (or who blocked you) shows no error and creates no match. It is quietly recorded as declined.
+4. **A like opens the pitch sheet.** Nothing is sent until the sheet closes. Send delivers one request with your note. Closing it, pressing Escape, tapping outside or swiping to the next card delivers one request without a note.
+
 ## Verification (webapp-testing skill)
 
 Use Playwright against `npm run dev`:
