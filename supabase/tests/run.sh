@@ -39,6 +39,9 @@ run tests/supabase-stub.sql
 for pass in 1 2; do
   for m in "$STAGE"/migrations/*.sql; do run "migrations/$(basename "$m")"; done
 done
+# Harness-only fixture (never a migration): keeps the iteration 0-2 suites' "completed = name + city" meaning
+# after D-030. Not matched by the loop below; not loaded in the seed database.
+run tests/harness-autocomplete.sql
 for t in "$STAGE"/tests/*.test.sql; do
   [ "$(basename "$t")" = seed.test.sql ] && continue   # needs the seed: runs in its own database below
   run "tests/$(basename "$t")"

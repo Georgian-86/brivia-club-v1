@@ -1,10 +1,14 @@
 -- 0004_orbit_onboarding.sql: the Iteration 3 (ORBIT onboarding) migration.
 -- Apply after 0001, 0002 and 0003, in the Supabase SQL editor. Idempotent: safe to re-run (the local harness
 -- applies every migration twice).
+-- RE-RUN ORDER: section 4 redefines get_candidates, search_members, list_members and brivia_can_see_author from 0003.
+-- Any re-run of 0003 (or of 0001/0002, which require a 0003 re-run) must be followed by a re-run of 0004.
 -- Sections:
 --   1. Grid and places: the coarse equal-area grid (D-028, spec §4.1 / §9.1.4) and the place list.
 --   2. Taxonomy and member interests: interest_node, member_interest, the 20-point Passion Budget (§3.1 / §3.2).
 --   3. Member orbit: member_orbit, location_change, set_home_location and set_home_city (§9.1.4).
+--   4. Completion and visibility: brivia_member_completed, brivia_visible_to, the candidate RPCs, my_onboarding_status
+--      (D-030, §7). Redefines get_candidates, search_members, list_members and brivia_can_see_author from 0003.
 --   Data: places (section 1) and the interest taxonomy (end of file).
 -- Privacy (CLAUDE.md): coordinates exist only as function arguments. No member table stores them; the only
 -- coordinate columns are the public city centroids in public.place, which no client role can read.
@@ -532,6 +536,168 @@ end;
 $$;
 revoke all on function public.set_home_city(text) from public, anon;
 grant execute on function public.set_home_city(text) to authenticated;
+
+-- =============================================================================================
+-- 4. Completion and visibility
+-- =============================================================================================
+-- D-030 (spec §7): a member is completed when they have
+--   * a name: brivia_is_completed(name, 'x') (trimmed, not empty, not 'New Member'; the legacy city plays no part);
+--   * a member_orbit row (a cell);
+--   * 1-12 member_interest rows whose points sum to exactly 20 (the Passion Budget).
+-- Completion reads member_interest and member_orbit, never profiles.skills (a client-writable display copy).
+-- Internal: not executable by any client role.
+create or replace function public.brivia_member_completed(p_id uuid)
+returns boolean
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select coalesce(
+    exists (select 1 from public.profiles p where p.id = p_id and public.brivia_is_completed(p.name, 'x'))
+    and exists (select 1 from public.member_orbit o where o.member_id = p_id)
+    and (select count(*) between 1 and 12 and coalesce(sum(mi.points), 0) = 20
+           from public.member_interest mi where mi.member_id = p_id),
+    false)
+$$;
+revoke all on function public.brivia_member_completed(uuid) from public, anon, authenticated;
+
+-- The single member-facing visibility rule (spec §9.1.1): both completed, different members, same world (is_test
+-- equal, Ruling P14), and no block in either direction. Internal: not executable by any client role.
+create or replace function public.brivia_visible_to(p_viewer uuid, p_target uuid)
+returns boolean
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select coalesce(
+    p_viewer <> p_target
+    and exists (select 1 from public.profiles a join public.profiles b on a.is_test = b.is_test
+                 where a.id = p_viewer and b.id = p_target)
+    and not exists (select 1 from public.brivia_blocks bl
+                     where (bl.blocker_id = p_viewer and bl.blocked_id = p_target)
+                        or (bl.blocker_id = p_target and bl.blocked_id = p_viewer))
+    and public.brivia_member_completed(p_viewer)
+    and public.brivia_member_completed(p_target),
+    false)
+$$;
+revoke all on function public.brivia_visible_to(uuid, uuid) from public, anon, authenticated;
+
+-- The candidate RPCs of 0003, redefined on top of brivia_member_completed / brivia_visible_to. Signatures, return
+-- types, caps (50 ids, 20 rows), ordering and LIKE escaping are unchanged. A caller who is not completed sees nothing.
+create or replace function public.get_candidates(p_ids uuid[])
+returns setof public.public_profile_card
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  with me as (  -- Ruling I5: the caller must be a completed member
+    select id, is_test from public.profiles where id = auth.uid() and public.brivia_member_completed(id)),
+  wanted as (  -- the first 50 distinct ids, in the order given
+    select id from (
+      select distinct on (u.id) u.id, u.ord from unnest(p_ids) with ordinality as u(id, ord)
+      where u.id is not null order by u.id, u.ord
+    ) d order by d.ord limit 50
+  )
+  select p.id, p.name, p.full_name, p.gender, p.city, p.state, p.experience, p.skills, p.looking_for,
+         p.photo_url, p.cover_url, p.created_at
+  from public.profiles p
+  join me on p.id <> me.id and p.is_test = me.is_test
+  where p.id in (select id from wanted)
+    and public.brivia_visible_to(me.id, p.id)
+  order by p.created_at desc, p.id desc;
+$$;
+revoke all on function public.get_candidates(uuid[]) from public, anon;
+grant execute on function public.get_candidates(uuid[]) to authenticated;
+
+create or replace function public.search_members(p_query text, p_limit int default 20)
+returns setof public.public_profile_card
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  with me as (  -- Ruling I5: the caller must be a completed member
+    select id, is_test from public.profiles where id = auth.uid() and public.brivia_member_completed(id)),
+  q as (  -- LIKE wildcards in the query are literal; empty or whitespace-only queries match nothing
+    select '%' || replace(replace(replace(left(btrim(p_query), 100), '\', '\\'), '%', '\%'), '_', '\_') || '%' as pattern
+    where coalesce(btrim(p_query), '') <> ''
+  )
+  select p.id, p.name, p.full_name, p.gender, p.city, p.state, p.experience, p.skills, p.looking_for,
+         p.photo_url, p.cover_url, p.created_at
+  from public.profiles p
+  join me on p.id <> me.id and p.is_test = me.is_test
+  cross join q
+  where (p.name ilike q.pattern escape '\' or p.full_name ilike q.pattern escape '\'
+         or p.city ilike q.pattern escape '\'
+         or exists (select 1 from unnest(p.skills) s where s ilike q.pattern escape '\')
+         or exists (select 1 from unnest(p.looking_for) l where l ilike q.pattern escape '\'))
+    and public.brivia_visible_to(me.id, p.id)
+  order by (p.name ilike q.pattern escape '\' or p.full_name ilike q.pattern escape '\') desc,
+           p.created_at desc, p.id desc
+  limit greatest(1, least(coalesce(p_limit, 20), 20));
+$$;
+revoke all on function public.search_members(text, int) from public, anon;
+grant execute on function public.search_members(text, int) to authenticated;
+
+create or replace function public.list_members(p_limit int default 20, p_after timestamptz default null,
+                                               p_after_id uuid default null)
+returns setof public.public_profile_card
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  with me as (  -- Ruling I5: the caller must be a completed member
+    select id, is_test from public.profiles where id = auth.uid() and public.brivia_member_completed(id))
+  select p.id, p.name, p.full_name, p.gender, p.city, p.state, p.experience, p.skills, p.looking_for,
+         p.photo_url, p.cover_url, p.created_at
+  from public.profiles p
+  join me on p.id <> me.id and p.is_test = me.is_test
+  where (p_after is null
+         or p.created_at < p_after
+         or (p_after_id is not null and p.created_at = p_after and p.id < p_after_id))
+    and public.brivia_visible_to(me.id, p.id)
+  order by p.created_at desc, p.id desc
+  limit greatest(1, least(coalesce(p_limit, 20), 20));
+$$;
+revoke all on function public.list_members(int, timestamptz, uuid) from public, anon;
+grant execute on function public.list_members(int, timestamptz, uuid) to authenticated;
+
+-- Posts by p_author: own posts always; otherwise brivia_visible_to(caller, author).
+create or replace function public.brivia_can_see_author(p_author uuid)
+returns boolean
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select p_author = auth.uid() or public.brivia_visible_to(auth.uid(), p_author);
+$$;
+revoke all on function public.brivia_can_see_author(uuid) from public, anon;
+grant execute on function public.brivia_can_see_author(uuid) to authenticated;
+
+-- my_onboarding_status(): the caller's own onboarding progress (one row; none without a session). Counts only:
+-- no interest labels, no cell id.
+create or replace function public.my_onboarding_status()
+returns table(interests int, points int, has_cell boolean, place_label text, completed boolean)
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select (select count(*)::int from public.member_interest mi where mi.member_id = me.uid),
+         (select coalesce(sum(mi.points), 0)::int from public.member_interest mi where mi.member_id = me.uid),
+         exists (select 1 from public.member_orbit o where o.member_id = me.uid),
+         (select pl.name from public.member_orbit o join public.place pl on pl.id = o.place_id where o.member_id = me.uid),
+         public.brivia_member_completed(me.uid)
+    from (select auth.uid() as uid) me
+   where me.uid is not null
+$$;
+revoke all on function public.my_onboarding_status() from public, anon;
+grant execute on function public.my_onboarding_status() to authenticated;
 
 -- =============================================================================================
 -- Data: interest taxonomy (spec §3.1; India-relevant, spec §10 phase 1). Original Brivia wording.

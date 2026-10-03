@@ -11,6 +11,15 @@ insert into auth.users(id) values ('eeeeeeee-0000-0000-0000-0000000000e1') on co
 insert into public.profiles (id, name, full_name, email, city, state, skills)
 values ('eeeeeeee-0000-0000-0000-0000000000e1', 'Real Member', 'Real Member', 'real@example.com', 'Bengaluru', 'Karnataka', '{Python}')
 on conflict (id) do nothing;
+-- The real member is completed under D-030 (interests summing to 20 and a cell), so S5 is a real isolation check.
+insert into public.member_interest (member_id, interest_id, points, mode) values
+  ('eeeeeeee-0000-0000-0000-0000000000e1', 'tech.ai_data.data_analysis', 12, 'play'),
+  ('eeeeeeee-0000-0000-0000-0000000000e1', 'sports.racket.badminton', 8, 'play')
+on conflict do nothing;
+insert into public.member_orbit (member_id, home_cell, home_cell_g6, home_cell_g5, place_id)
+select 'eeeeeeee-0000-0000-0000-0000000000e1', c, public.brivia_grid_parent(c, 6), public.brivia_grid_parent(c, 5), 'in-bengaluru'
+  from (select public.brivia_grid_cell(12.9716, 77.5946, 7) as c) x
+on conflict (member_id) do nothing;
 
 select :'phase' = 'seeded' as seeded, :'phase' = 'extras' as extras \gset
 \if :seeded
@@ -29,8 +38,33 @@ begin
      and exists (select 1 from auth.identities i where i.user_id = u.id and i.provider = 'email'
                    and i.provider_id = u.id::text and i.identity_data->>'sub' = u.id::text and i.identity_data->>'email' = u.email);
   if n <> 24 then raise exception 'FAIL S1: only % rows have test emails + auth columns', n; end if;
-  select count(*) into n from public.profiles where is_test and not public.brivia_is_completed(name, city);
-  if n <> 0 then raise exception 'FAIL S2: % test profiles are not completed (Ruling I3)', n; end if;
+  select count(*) into n from public.profiles where is_test and not public.brivia_member_completed(id);
+  if n <> 0 then raise exception 'FAIL S2: % test profiles are not completed (D-030)', n; end if;
+  if not public.brivia_member_completed('eeeeeeee-0000-0000-0000-0000000000e1') then
+    raise exception 'FAIL S2: positive control: the real member is not completed'; end if;
+  -- 3-5 active, non-sensitive interests each, summing to 20; skills is their display copy
+  select count(*) into n from public.profiles p where p.is_test and not (
+    (select count(*) from public.member_interest mi join public.interest_node nd on nd.id = mi.interest_id
+      where mi.member_id = p.id and nd.status = 'active' and nd.level >= 3 and not nd.sensitive) between 3 and 5
+    and (select count(*) from public.member_interest mi where mi.member_id = p.id)
+        = (select count(*) from public.member_interest mi join public.interest_node nd on nd.id = mi.interest_id
+            where mi.member_id = p.id and not nd.sensitive and nd.status = 'active')
+    and (select sum(points) from public.member_interest mi where mi.member_id = p.id) = 20
+    and p.skills = (select array_agg(nd.label order by mi.points desc, nd.label asc)
+                      from public.member_interest mi join public.interest_node nd on nd.id = mi.interest_id
+                     where mi.member_id = p.id));
+  if n <> 0 then raise exception 'FAIL S2: % test members break the 3-5 non-sensitive interests / 20 points / skills rule', n; end if;
+  -- a cell in their own city: g7 plus the stored grid parents, nearest place = the city, within 3 km of its centroid
+  select count(*) into n from public.profiles p join public.member_orbit o on o.member_id = p.id
+    join public.place pl on pl.id = o.place_id
+   where p.is_test and o.cell_scheme = 'grid1' and o.home_cell like 'g7:%'
+     and o.home_cell_g6 = public.brivia_grid_parent(o.home_cell, 6) and o.home_cell_g5 = public.brivia_grid_parent(o.home_cell, 5)
+     and pl.name = p.city and public.brivia_cell_km(o.home_cell, public.brivia_grid_cell(pl.lat, pl.lng, 7)) <= 3;
+  if n <> 24 then raise exception 'FAIL S2: only % test members have a cell in their city', n; end if;
+  select count(distinct o.home_cell) into n from public.member_orbit o join public.profiles p on p.id = o.member_id where p.is_test;
+  if n < 8 then raise exception 'FAIL S2: only % distinct cells (per-member offset missing)', n; end if;
+  if exists (select 1 from public.location_change lc join public.profiles p on p.id = lc.member_id where p.is_test) then
+    raise exception 'FAIL S2: the seed wrote location_change rows'; end if;
   -- the real member is not a test member
   if (select is_test from public.profiles where id = 'eeeeeeee-0000-0000-0000-0000000000e1') then
     raise exception 'FAIL S2: real member flagged test'; end if;
@@ -128,6 +162,7 @@ begin
     (a, 'https://proj.supabase.co/storage/v1/object/public/community-posts/' || a || '/p.jpg', a || '/p.jpg'),
     (r, 'https://proj.supabase.co/storage/v1/object/public/community-posts/' || r || '/p.jpg', r || '/p.jpg');
   insert into public.interaction(viewer_id, target_id, event) values (a, b, 'like'), (b, a, 'impression');
+  insert into public.location_change(member_id) values (a), (r);
   insert into storage.objects(bucket_id, name, owner) values
     ('profile-photos', a || '/avatar.jpg', null), ('community-posts', 'x/y.jpg', b), ('profile-photos', r || '/avatar.jpg', r);
   -- a genuine signup with the reserved domain but no seed id and no profile yet: the purge must keep it
@@ -149,11 +184,16 @@ begin
   select count(*) into n from public.interaction where viewer_id = any(ids) or target_id = any(ids); if n <> 0 then raise exception 'FAIL P1: % interaction', n; end if;
   select count(*) into n from storage.objects where owner = any(ids) or (storage.foldername(name))[1] = any(array(select unnest(ids)::text)); if n <> 0 then raise exception 'FAIL P1: % storage objects', n; end if;
   select count(*) into n from auth.identities where user_id = any(ids); if n <> 0 then raise exception 'FAIL P1: % identities', n; end if;
+  select count(*) into n from public.member_interest where member_id = any(ids); if n <> 0 then raise exception 'FAIL P1: % member_interest', n; end if;
+  select count(*) into n from public.member_orbit where member_id = any(ids); if n <> 0 then raise exception 'FAIL P1: % member_orbit', n; end if;
+  select count(*) into n from public.location_change where member_id = any(ids); if n <> 0 then raise exception 'FAIL P1: % location_change', n; end if;
   if not exists (select 1 from auth.users where id = 'eeeeeeee-0000-0000-0000-0000000000e2') then raise exception 'FAIL P3: purge deleted a real @test.brivia.club signup'; end if;
   -- the real member and their data survive
   select count(*) into n from public.profiles where id = 'eeeeeeee-0000-0000-0000-0000000000e1'; if n <> 1 then raise exception 'FAIL P2: real member purged'; end if;
   select count(*) into n from storage.objects where name like 'eeeeeeee%'; if n <> 1 then raise exception 'FAIL P2: real member storage purged'; end if;
   select count(*) into n from public.community_posts where author_id = 'eeeeeeee-0000-0000-0000-0000000000e1'; if n <> 1 then raise exception 'FAIL P2: real post purged'; end if;
+  if not public.brivia_member_completed('eeeeeeee-0000-0000-0000-0000000000e1') then raise exception 'FAIL P2: real member interests or cell purged'; end if;
+  select count(*) into n from public.location_change where member_id = 'eeeeeeee-0000-0000-0000-0000000000e1'; if n <> 1 then raise exception 'FAIL P2: real location_change purged'; end if;
 end $$;
 select 'seed.test P1-P2 purge complete, real member intact OK';
 \endif

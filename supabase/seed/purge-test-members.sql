@@ -5,7 +5,9 @@
 -- seeded (all counts are 0). The final result set shows rows deleted per table and rows remaining (must be 0).
 --
 -- Deleting auth.users cascades to profiles and from there to matches, connection_requests, brivia_blocks,
--- brivia_messages, community_posts and interaction (all "on delete cascade"). Storage objects are removed
+-- brivia_messages, community_posts and interaction (all "on delete cascade"). The Iteration 3 tables (0004)
+-- member_interest, member_orbit and location_change also reference profiles with "on delete cascade", so deleting
+-- the profiles below removes their rows too (seed.test.sql checks that 0 remain). Storage objects are removed
 -- explicitly below. Note: on Supabase, SQL cannot delete files from Storage (it refuses direct deletes), so if
 -- test members ever uploaded files, delete them via the Storage UI/API; the script tells you when this applies.
 

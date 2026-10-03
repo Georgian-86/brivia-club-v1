@@ -376,11 +376,26 @@ saturated, the outer rings relax first, instead of the deck repeating saturated 
   newest first by `(created_at, id)`, at most 20 per page, more pages on demand), `get_candidates` (cards for known
   ids, at most 50 ids per call) and `search_members` (case-insensitive substring over name, city, skills and
   looking-for; LIKE wildcards are literal; at most 20 rows; not ranked by `R` yet). All three hide the caller,
-  incomplete profiles (`brivia_is_completed`: trimmed name not empty and not 'New Member', trimmed city not empty),
-  blocked pairs in both directions, and the other test world (test and real members never see, request or message
-  each other); a caller who is not completed gets nothing. Community posts follow the same block, world and
-  completed rules for both the caller and the author (own posts always visible). ORBIT's deck and search replace
-  `list_members` and `search_members` in phase 3 and must keep these exclusions.
+  members who are not completed, blocked pairs in both directions, and the other test world (test and real members
+  never see, request or message each other); a caller who is not completed gets nothing. Community posts follow the
+  same block, world and completed rules for both the caller and the author (own posts always visible). ORBIT's deck
+  and search replace `list_members` and `search_members` in phase 3 and must keep these exclusions.
+- **Completed (Iteration 3, D-030, `0004_orbit_onboarding.sql` section 4).** `brivia_member_completed(id)` is true
+  when the member has:
+  - a name: trimmed, not empty and not 'New Member' (`brivia_is_completed(name, 'x')`); the legacy `city` column plays
+    no part;
+  - a home cell (a `member_orbit` row, §9.1.4);
+  - 1–12 `member_interest` rows whose points sum to exactly 20 (the Passion Budget, §3.2).
+
+  It reads `member_interest` and `member_orbit` only, never `profiles.skills` (a client-writable display copy).
+- **One visibility rule.** Every member-facing visibility check goes through `brivia_visible_to(viewer, target)`: both
+  completed, different members, same world (`is_test` equal) and no block in either direction. `get_candidates`,
+  `search_members`, `list_members` and `brivia_can_see_author` are built on it (signatures, caps, ordering and
+  escaping unchanged), and every later candidate RPC (the interim deck, ORBIT's `orbit_cards`) must use it too.
+  `brivia_member_completed` and `brivia_visible_to` are internal: no client role may execute them.
+- **Onboarding progress.** `my_onboarding_status()` returns, for the caller only, `interests` (count), `points` (sum),
+  `has_cell`, `place_label` (the place name of the cell, never the cell id) and `completed`. It carries no interest
+  labels, so sensitive interests (D-029) never appear in it.
 - **Card data members cannot forge (Iteration 2 final review, Ruling I11).** `created_at` on profiles, posts and
   messages is the server clock for every member session (only the owner/seed may set it), so "newest first" cannot
   be gamed by a backdated or future-dated row; members edit only a post's caption. `photo_url`, `cover_url` and post

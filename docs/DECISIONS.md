@@ -150,3 +150,23 @@ supersedes it.
   (gender is already a profile field), Public policy and Climate action (topics, not party affiliation), and the yoga
   and meditation nodes (practices, not health conditions). A moderator can mark more nodes, but the next migration
   re-run resets the flag from the seed list, so add them to the list in `0004` as well.
+
+## D-030: Completion means a name, a spent Passion Budget and a cell
+- Accepted 2026-10-03 (Iteration 3, Task 4; plan open choice 2).
+- **Decision:** a member is completed when they have a name (trimmed, not empty, not 'New Member'), 1–12 interests
+  whose points sum to exactly 20 (`member_interest`), and a home cell (`member_orbit`). The legacy `city` column is no
+  longer part of it. `brivia_member_completed(id)` is the single definition and `brivia_visible_to(viewer, target)` the
+  single member-facing visibility rule (both completed, different, same world, no block either way). `get_candidates`,
+  `search_members`, `list_members` and `brivia_can_see_author` are rebuilt on them in `0004` with unchanged contracts.
+  `my_onboarding_status()` shows the caller their own progress (counts, `has_cell`, place name, `completed`).
+- **Why:** ORBIT matches on interests weighted by the Passion Budget and ranks by ring from the home cell. A member
+  without both cannot be matched or placed, so showing them (or showing others to them) would put people in the deck
+  that the engine cannot reason about. Completion reads only server-written tables, never `profiles.skills`, which a
+  client can write.
+- **Consequences:** new sign-ups stop writing `city`/`state` (client change later in this iteration), but the columns and grants stay, and `search_members`
+  still matches legacy city text. Members who completed under the old rule become invisible until they pick
+  interests and a location. The iteration 0–2 harness suites keep their meaning through a harness-only fixture
+  (`supabase/tests/harness-autocomplete.sql`, never a migration); the seed gives each test member 3–5 non-sensitive
+  interests and a cell.
+- **Alternative rejected:** keeping city as an alternative to a cell. It would let a member with no cell into decks
+  where ring ordering is undefined, and it keeps a free-text, client-written column in a visibility rule.
