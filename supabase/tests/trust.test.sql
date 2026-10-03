@@ -1095,6 +1095,11 @@ begin
   -- member A inserts the allowed events
   set local role authenticated;
   perform set_config('request.jwt.claims', '{"sub":"' || a || '"}', true);
+  reset role;
+  insert into public.matches (user1_id, user2_id) values (least(a,b), greatest(a,b));
+  insert into public.connection_requests (from_id, to_id) values (b, a);
+  set local role authenticated;
+  perform set_config('request.jwt.claims', '{"sub":"' || a || '"}', true);
   foreach ev in array array['like','pass','request','accept','decline','met','letgo'] loop
     insert into public.interaction (viewer_id, target_id, event) values (a, b, ev);
   end loop;
@@ -1151,6 +1156,55 @@ begin
     raise exception 'FAIL T5: missing interaction indexes';
   end if;
   delete from public.interaction;
+  delete from public.matches where user1_id in (a,b);
+  delete from public.connection_requests where from_id::text in (a::text,b::text);
 end $$;
 
 select 'trust.test T5 OK';
+
+-- T5 fix: labels need backing evidence.
+do $$
+declare
+  a uuid := 'a5a5a5a5-0000-0000-0000-0000000000a5';
+  b uuid := 'b5b5b5b5-0000-0000-0000-0000000000b5';
+  ev text; failed boolean;
+begin
+  delete from public.matches where user1_id in (a,b) or user2_id in (a,b);
+  delete from public.connection_requests where from_id::text in (a::text,b::text) or to_id::text in (a::text,b::text);
+  set local role authenticated;
+  perform set_config('request.jwt.claims', '{"sub":"' || a || '"}', true);
+  foreach ev in array array['met','letgo','accept','decline'] loop
+    failed := false;
+    begin insert into public.interaction (viewer_id, target_id, event) values (a, b, ev);
+    exception when others then failed := true; end;
+    if not failed then raise exception 'FAIL T5: % accepted without backing', ev; end if;
+  end loop;
+  insert into public.interaction (viewer_id, target_id, event) values (a, b, 'like'), (a, b, 'pass'), (a, b, 'request');
+  reset role;
+  -- match in reversed order backs met/letgo
+  insert into public.matches (user1_id, user2_id) values (least(a,b), greatest(a,b));
+  set local role authenticated;
+  perform set_config('request.jwt.claims', '{"sub":"' || b || '"}', true);
+  insert into public.interaction (viewer_id, target_id, event) values (b, a, 'met'), (b, a, 'letgo');
+  -- accept needs a request addressed to the viewer, not from the viewer
+  failed := false;
+  begin insert into public.interaction (viewer_id, target_id, event) values (b, a, 'accept');
+  exception when others then failed := true; end;
+  if not failed then raise exception 'FAIL T5: accept without a request'; end if;
+  reset role;
+  insert into public.connection_requests (from_id, to_id) values (a, b);
+  set local role authenticated;
+  insert into public.interaction (viewer_id, target_id, event) values (b, a, 'accept'), (b, a, 'decline');
+  perform set_config('request.jwt.claims', '{"sub":"' || a || '"}', true);
+  failed := false;
+  begin insert into public.interaction (viewer_id, target_id, event) values (a, b, 'accept');
+  exception when others then failed := true; end;
+  reset role;
+  if not failed then raise exception 'FAIL T5: sender accepted own request'; end if;
+  delete from public.interaction;
+  delete from public.connection_requests where from_id::text = a::text;
+  delete from public.matches where user1_id in (a,b);
+end $$;
+
+select 'trust.test T5 evidence OK';
+

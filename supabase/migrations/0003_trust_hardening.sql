@@ -614,12 +614,36 @@ grant insert (viewer_id, target_id, event, context, features, score, propensity,
 drop policy if exists interaction_select_own on public.interaction;
 create policy interaction_select_own on public.interaction for select to authenticated
   using (viewer_id = auth.uid());
+-- Labels need backing evidence: met/letgo need a match, accept/decline need a request addressed to the viewer.
+create or replace function public.brivia_interaction_allowed(p_viewer uuid, p_target uuid, p_event text)
+returns boolean
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select case
+    when p_event in ('like','pass','request') then true
+    when p_event in ('met','letgo') then exists (
+      select 1 from public.matches m
+      where (m.user1_id::text = p_viewer::text and m.user2_id::text = p_target::text)
+         or (m.user1_id::text = p_target::text and m.user2_id::text = p_viewer::text))
+    when p_event in ('accept','decline') then exists (
+      select 1 from public.connection_requests r
+      where r.to_id::text = p_viewer::text and r.from_id::text = p_target::text)
+    else false
+  end;
+$$;
+revoke all on function public.brivia_interaction_allowed(uuid, uuid, text) from public, anon;
+grant execute on function public.brivia_interaction_allowed(uuid, uuid, text) to authenticated;
+
 drop policy if exists interaction_insert_own on public.interaction;
 create policy interaction_insert_own on public.interaction for insert to authenticated
   with check (
     viewer_id = auth.uid()
     and event in ('like','pass','request','accept','decline','met','letgo')
     and public.brivia_same_world(viewer_id, target_id)
+    and public.brivia_interaction_allowed(viewer_id, target_id, event)
   );
 
 notify pgrst, 'reload schema';

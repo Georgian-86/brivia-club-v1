@@ -350,6 +350,10 @@ saturated, the outer rings relax first, instead of the deck repeating saturated 
 
 - Every like, pass, request, accept, decline and reply is an interaction row with the served feature vector
   (`brivia-club/server/src/engine/index.js` pattern).
+- Client-written interaction rows are the member's own actions only, and `met`, `letgo`, `accept` and `decline` are
+  accepted only with backing evidence (a match, or a request addressed to the member). Their `features`, `score`,
+  `propensity` and `model_version` are client-supplied and untrusted. Offline evaluation must take served features
+  from service-written `impression` rows.
 - The per-member taste weights `w_k` are trained by online logistic SGD with an L2 pull toward the prior (`learn.js`
   pattern). The features are: shared-interest count, max rarity hit, mode-pair indicators, ring, co-presence,
   semantic similarity and recency.
