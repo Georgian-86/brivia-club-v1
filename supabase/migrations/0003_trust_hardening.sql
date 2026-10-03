@@ -52,9 +52,9 @@ create trigger brivia_profiles_guard_is_test
 --   get_candidates(p_ids)            cards for specific ids (requests list, post authors, chats); max 50 ids
 --   search_members(p_query, p_limit) case-insensitive search, at most 20 rows ("search reaches everyone")
 --   list_members(p_limit, p_after, p_after_id)  the deck until ORBIT is wired; keyset paged newest first
--- Every function hides: the caller; profiles that are not completed (Ruling I1: name <> 'New Member'
--- and city is not null); blocked pairs in both directions; the other test world (Ruling P14).
--- A session without a profile row sees nothing. Ship with the client change that calls these RPCs.
+-- Every function hides: the caller; profiles that are not completed (Ruling I3, brivia_is_completed);
+-- blocked pairs in both directions; the other test world (Ruling P14). A caller who is not a completed
+-- profile (or has no profile row) sees nothing (Ruling I5). Ship with the client change that calls these RPCs.
 -- ---------------------------------------------------------------------------------------------
 do $$ begin
   if to_regtype('public.public_profile_card') is null then
@@ -65,6 +65,20 @@ do $$ begin
   end if;
 end $$;
 
+-- Ruling I3: the single definition of a completed profile (trimmed name not empty and not 'New Member',
+-- trimmed city not empty). Pure function; used by the candidate RPCs and the community_posts policy.
+create or replace function public.brivia_is_completed(p_name text, p_city text)
+returns boolean
+language sql
+immutable
+set search_path = public
+as $$
+  select nullif(btrim(p_name), '') is not null and btrim(p_name) <> 'New Member'
+     and nullif(btrim(p_city), '') is not null;
+$$;
+revoke all on function public.brivia_is_completed(text, text) from public, anon;
+grant execute on function public.brivia_is_completed(text, text) to authenticated;
+
 create or replace function public.get_candidates(p_ids uuid[])
 returns setof public.public_profile_card
 language sql
@@ -72,7 +86,8 @@ stable
 security definer
 set search_path = public
 as $$
-  with me as (select id, is_test from public.profiles where id = auth.uid()),
+  with me as (  -- Ruling I5: the caller must be a completed profile
+    select id, is_test from public.profiles where id = auth.uid() and public.brivia_is_completed(name, city)),
   wanted as (  -- the first 50 distinct ids, in the order given
     select id from (
       select distinct on (u.id) u.id, u.ord from unnest(p_ids) with ordinality as u(id, ord)
@@ -84,7 +99,7 @@ as $$
   from public.profiles p
   join me on p.id <> me.id and p.is_test = me.is_test
   where p.id in (select id from wanted)
-    and p.name <> 'New Member' and p.city is not null
+    and public.brivia_is_completed(p.name, p.city)
     and not exists (
       select 1 from public.brivia_blocks b
       where (b.blocker_id = me.id and b.blocked_id = p.id) or (b.blocker_id = p.id and b.blocked_id = me.id)
@@ -101,7 +116,8 @@ stable
 security definer
 set search_path = public
 as $$
-  with me as (select id, is_test from public.profiles where id = auth.uid()),
+  with me as (  -- Ruling I5: the caller must be a completed profile
+    select id, is_test from public.profiles where id = auth.uid() and public.brivia_is_completed(name, city)),
   q as (  -- LIKE wildcards in the query are literal; empty or whitespace-only queries match nothing
     select '%' || replace(replace(replace(left(btrim(p_query), 100), '\', '\\'), '%', '\%'), '_', '\_') || '%' as pattern
     where coalesce(btrim(p_query), '') <> ''
@@ -111,7 +127,7 @@ as $$
   from public.profiles p
   join me on p.id <> me.id and p.is_test = me.is_test
   cross join q
-  where p.name <> 'New Member' and p.city is not null
+  where public.brivia_is_completed(p.name, p.city)
     and not exists (
       select 1 from public.brivia_blocks b
       where (b.blocker_id = me.id and b.blocked_id = p.id) or (b.blocker_id = p.id and b.blocked_id = me.id)
@@ -136,12 +152,13 @@ stable
 security definer
 set search_path = public
 as $$
-  with me as (select id, is_test from public.profiles where id = auth.uid())
+  with me as (  -- Ruling I5: the caller must be a completed profile
+    select id, is_test from public.profiles where id = auth.uid() and public.brivia_is_completed(name, city))
   select p.id, p.name, p.full_name, p.gender, p.city, p.state, p.experience, p.skills, p.looking_for,
          p.photo_url, p.cover_url, p.created_at
   from public.profiles p
   join me on p.id <> me.id and p.is_test = me.is_test
-  where p.name <> 'New Member' and p.city is not null
+  where public.brivia_is_completed(p.name, p.city)
     and not exists (
       select 1 from public.brivia_blocks b
       where (b.blocker_id = me.id and b.blocked_id = p.id) or (b.blocker_id = p.id and b.blocked_id = me.id)
@@ -158,3 +175,84 @@ grant execute on function public.list_members(int, timestamptz, uuid) to authent
 -- Close the open directory. The view stays for owner/definer use; 0001/0002 grant select on it, and
 -- this revoke must run after them (re-running 0002 alone would reopen it: re-run 0003 afterwards).
 revoke select on public.public_profiles from authenticated;
+
+-- ---------------------------------------------------------------------------------------------
+-- Task 2 fix round 1: post visibility (Ruling I4) and world isolation for requests and messages (I6).
+-- profiles is owner-only under RLS, so the world and completed checks run in SECURITY DEFINER helpers.
+-- ---------------------------------------------------------------------------------------------
+-- True when the caller is one of the two members and both are in the same world (is_test equal).
+-- A third party always gets false, so it cannot probe who is a test member.
+create or replace function public.brivia_same_world(first_user uuid, second_user uuid)
+returns boolean
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select auth.uid() in (first_user, second_user)
+     and exists (
+       select 1 from public.profiles a join public.profiles b on a.is_test = b.is_test
+       where a.id = first_user and b.id = second_user
+     );
+$$;
+revoke all on function public.brivia_same_world(uuid, uuid) from public, anon;
+grant execute on function public.brivia_same_world(uuid, uuid) to authenticated;
+
+-- May the caller see posts by p_author? Own posts always; otherwise the caller must be completed
+-- (Ruling I3), not blocked with the author in either direction, and in the author's world (Ruling I4).
+create or replace function public.brivia_can_see_author(p_author uuid)
+returns boolean
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select p_author = auth.uid()
+      or exists (
+        select 1 from public.profiles me
+        join public.profiles a on a.id = p_author and a.is_test = me.is_test
+        where me.id = auth.uid() and public.brivia_is_completed(me.name, me.city)
+          and not exists (
+            select 1 from public.brivia_blocks b
+            where (b.blocker_id = me.id and b.blocked_id = a.id) or (b.blocker_id = a.id and b.blocked_id = me.id)
+          )
+      );
+$$;
+revoke all on function public.brivia_can_see_author(uuid) from public, anon;
+grant execute on function public.brivia_can_see_author(uuid) to authenticated;
+
+drop policy if exists "Members can view community posts" on public.community_posts;
+create policy "Members can view community posts"
+  on public.community_posts for select to authenticated
+  using (author_id = auth.uid() or public.brivia_can_see_author(author_id));
+
+-- Requests: same checks as 0002 plus the world check (Ruling I6). A cross-world insert is refused.
+drop policy if exists "Members can send connection requests" on public.connection_requests;
+create policy "Members can send connection requests"
+  on public.connection_requests for insert to authenticated
+  with check (
+    public.brivia_has_completed_profile()
+    and from_id = auth.uid()
+    and to_id <> auth.uid()
+    and status = 'pending'
+    and not public.brivia_is_blocked_between(from_id, to_id)
+    and public.brivia_same_world(from_id, to_id)
+  );
+
+-- Messages: still ONE insert policy (a second permissive policy would OR away these checks).
+-- Same checks as 0002 plus the world check (Ruling I6), so even a legacy cross-world match cannot chat.
+drop policy if exists "Members can send messages" on public.brivia_messages;
+drop policy if exists "Completed members can send messages" on public.brivia_messages;
+create policy "Completed members can send messages"
+  on public.brivia_messages for insert to authenticated
+  with check (
+    public.brivia_has_completed_profile()
+    and sender_id = auth.uid()
+    and not public.brivia_is_blocked_between(sender_id, recipient_id)
+    and public.brivia_same_world(sender_id, recipient_id)
+    and exists (
+      select 1 from public.matches m
+      where (m.user1_id = sender_id and m.user2_id = recipient_id)
+         or (m.user1_id = recipient_id and m.user2_id = sender_id)
+    )
+  );

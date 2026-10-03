@@ -143,7 +143,7 @@ drop function public.trust_test_definer_set_is_test(uuid);
 -- plus 25 real paging members (some sharing created_at to exercise the (created_at, id) tie-break).
 -- ---------------------------------------------------------------------------------------------
 insert into auth.users(id)
-select ('70000000-0000-0000-0000-0000000000' || lpad(n::text, 2, '0'))::uuid from generate_series(1, 9) n
+select ('70000000-0000-0000-0000-0000000000' || lpad(n::text, 2, '0'))::uuid from generate_series(1, 16) n
 on conflict do nothing;
 insert into auth.users(id)
 select ('71000000-0000-0000-0000-0000000000' || lpad(n::text, 2, '0'))::uuid from generate_series(1, 25) n
@@ -158,7 +158,15 @@ insert into public.profiles (id, name, full_name, email, city, skills, looking_f
   ('70000000-0000-0000-0000-000000000006','Nina Nocity','Nina Nocity','rn@example.com',null,'{}','{}',false, now() - interval '6 days'),
   ('70000000-0000-0000-0000-000000000007','Ann 100%','Ann 100%','rp@example.com','Goa','{Poetry}','{Friends}',false, now() - interval '7 days'),
   ('70000000-0000-0000-0000-000000000008','Zed Testonly','Zed Testonly','t1@test.brivia.club','Pune','{Design}','{Friends}',true, now() - interval '8 days'),
-  ('70000000-0000-0000-0000-000000000009','Tara Testa','Tara Testa','t2@test.brivia.club','Pune','{Design}','{Friends}',true, now() - interval '9 days')
+  ('70000000-0000-0000-0000-000000000009','Tara Testa','Tara Testa','t2@test.brivia.club','Pune','{Design}','{Friends}',true, now() - interval '9 days'),
+  -- Ruling I3 edge cases: padded "New Member", empty and whitespace-only names and cities are NOT completed;
+  -- a padded real name and city IS completed.
+  ('70000000-0000-0000-0000-000000000010','  New Member  ','  New Member  ','e10@example.com','Pune','{}','{}',false, now() - interval '10 hours'),
+  ('70000000-0000-0000-0000-000000000011','','','e11@example.com','Pune','{}','{}',false, now() - interval '11 hours'),
+  ('70000000-0000-0000-0000-000000000012','   ','   ','e12@example.com','Pune','{}','{}',false, now() - interval '12 hours'),
+  ('70000000-0000-0000-0000-000000000013','Empty City','Empty City','e13@example.com','','{}','{}',false, now() - interval '13 hours'),
+  ('70000000-0000-0000-0000-000000000014','Space City','Space City','e14@example.com','   ','{}','{}',false, now() - interval '14 hours'),
+  ('70000000-0000-0000-0000-000000000015','  Pat Padded  ','  Pat Padded  ','e15@example.com','  Pune ','{}','{}',false, now() - interval '15 hours')
 on conflict (id) do nothing;
 insert into public.profiles (id, name, full_name, email, city, created_at)
 select ('71000000-0000-0000-0000-0000000000' || lpad(n::text, 2, '0'))::uuid, 'Pager ' || n, 'Pager ' || n,
@@ -238,7 +246,7 @@ rollback;
 create table public.trust_t2_expected as
   select array(select p.id from public.profiles p
                where p.id <> '70000000-0000-0000-0000-000000000001' and not p.is_test
-                 and p.name <> 'New Member' and p.city is not null
+                 and public.brivia_is_completed(p.name, p.city)
                  and p.id not in ('70000000-0000-0000-0000-000000000003', '70000000-0000-0000-0000-000000000004')
                order by p.created_at desc, p.id desc) as ids;
 grant select on public.trust_t2_expected to authenticated;
@@ -429,7 +437,135 @@ begin
 end $$;
 rollback;
 
+
+-- ---------------------------------------------------------------------------------------------
+-- Task 2 fix round 1: Rulings I3 (completed helper), I5 (caller completed), I4 (posts), I6 (world
+-- isolation for requests and messages).
+-- ---------------------------------------------------------------------------------------------
+do $$
+declare f text;
+begin
+  if to_regprocedure('public.brivia_is_completed(text,text)') is null then raise exception 'FAIL I3: brivia_is_completed missing'; end if;
+  if public.brivia_is_completed('  New Member  ', 'Pune') or public.brivia_is_completed('', 'Pune')
+     or public.brivia_is_completed('   ', 'Pune') or public.brivia_is_completed(null, 'Pune')
+     or public.brivia_is_completed('Ann', '') or public.brivia_is_completed('Ann', '   ')
+     or public.brivia_is_completed('Ann', null) then
+    raise exception 'FAIL I3: brivia_is_completed accepts an incomplete profile';
+  end if;
+  if not public.brivia_is_completed('  Pat  ', ' Pune ') then raise exception 'FAIL I3: padded name and city rejected'; end if;
+  foreach f in array array['public.brivia_same_world(uuid,uuid)', 'public.brivia_can_see_author(uuid)'] loop
+    if to_regprocedure(f) is null then raise exception 'FAIL: % missing', f; end if;
+    if not (select prosecdef from pg_proc where oid = to_regprocedure(f)) then raise exception 'FAIL: % not security definer', f; end if;
+    if has_function_privilege('anon', f, 'execute') then raise exception 'FAIL: anon can execute %', f; end if;
+  end loop;
+  if (select count(*) from pg_policies where schemaname = 'public' and tablename = 'brivia_messages' and cmd = 'INSERT') <> 1 then
+    raise exception 'FAIL I6: brivia_messages must keep exactly one insert policy';
+  end if;
+end $$;
+
+-- Owner fixtures: posts by R1, R2, R3 (blocked R1), R4 (blocked by R1), T1, T2, RN (no city);
+-- matches R1-R2 (same world) and R1-T1 (a legacy cross-world row).
+insert into public.community_posts (author_id, image_url, image_path, caption)
+select ('70000000-0000-0000-0000-0000000000' || lpad(n::text, 2, '0'))::uuid, 'u', 'p', 'post ' || n
+from unnest(array[1, 2, 3, 4, 6, 8, 9]) n;
+insert into public.matches (user1_id, user2_id) values
+  ('70000000-0000-0000-0000-000000000001', '70000000-0000-0000-0000-000000000002'),
+  ('70000000-0000-0000-0000-000000000001', '70000000-0000-0000-0000-000000000008')
+on conflict do nothing;
+
+do $$
+declare who text; want text; got text; n int;
+begin
+  -- caller => the post authors (last two digits) they must see, exactly.
+  foreach who in array array['01:01,02,06', '03:02,03,04,06', '04:02,03,04,06', '08:08,09', '09:08,09', '06:06', '15:01,02,03,04,06'] loop
+    want := split_part(who, ':', 2);
+    set local role authenticated;
+    perform set_config('request.jwt.claims', json_build_object('sub', '70000000-0000-0000-0000-0000000000' || split_part(who, ':', 1))::text, true);
+    select string_agg(right(author_id::text, 2), ',' order by author_id) into got
+      from public.community_posts where author_id::text like '70000000-%';
+    reset role;
+    if got is distinct from want then
+      raise exception 'FAIL I4: member % sees posts by % (want %)', split_part(who, ':', 1), got, want;
+    end if;
+  end loop;
+  -- Same-world helper never answers a third party.
+  set local role authenticated;
+  perform set_config('request.jwt.claims', '{"sub":"70000000-0000-0000-0000-000000000003"}', true);
+  if public.brivia_same_world('70000000-0000-0000-0000-000000000001', '70000000-0000-0000-0000-000000000002') then
+    reset role; raise exception 'FAIL: brivia_same_world answers a third party';
+  end if;
+  reset role;
+end $$;
+
+-- Ruling I5: a caller who is not completed (no city; whitespace-only city) gets 0 rows from every RPC.
+do $$
+declare who text; n int;
+begin
+  foreach who in array array['70000000-0000-0000-0000-000000000006', '70000000-0000-0000-0000-000000000014', '70000000-0000-0000-0000-000000000010'] loop
+    set local role authenticated;
+    perform set_config('request.jwt.claims', json_build_object('sub', who)::text, true);
+    select (select count(*) from public.list_members(20)) + (select count(*) from public.search_members('Ravi'))
+         + (select count(*) from public.get_candidates(array['70000000-0000-0000-0000-000000000002'::uuid])) into n;
+    reset role;
+    if n <> 0 then raise exception 'FAIL I5: incomplete caller % got % rows', who, n; end if;
+  end loop;
+end $$;
+
+-- Ruling I3 through the RPCs: padded/empty/whitespace profiles hidden; a padded real profile shown.
+begin;
+set local role authenticated;
+set local request.jwt.claims = '{"sub":"70000000-0000-0000-0000-000000000001"}';
+do $$
+declare n int;
+begin
+  select count(*) into n from public.get_candidates(array['70000000-0000-0000-0000-000000000010','70000000-0000-0000-0000-000000000011',
+    '70000000-0000-0000-0000-000000000012','70000000-0000-0000-0000-000000000013','70000000-0000-0000-0000-000000000014']::uuid[]);
+  if n <> 0 then raise exception 'FAIL I3: get_candidates shows % padded/empty/whitespace profiles', n; end if;
+  select count(*) into n from public.list_members(20) where id::text between '70000000-0000-0000-0000-000000000010' and '70000000-0000-0000-0000-000000000014';
+  if n <> 0 then raise exception 'FAIL I3: list_members shows % incomplete profiles', n; end if;
+  select count(*) into n from public.search_members('City');
+  if n <> 0 then raise exception 'FAIL I3: search shows an empty/whitespace-city profile (%)', n; end if;
+  select count(*) into n from public.get_candidates(array['70000000-0000-0000-0000-000000000015'::uuid]);
+  if n <> 1 then raise exception 'FAIL I3: padded real profile hidden'; end if;
+  select count(*) into n from public.search_members('Pat Padded');
+  if n <> 1 then raise exception 'FAIL I3: padded real profile not searchable (%)', n; end if;
+end $$;
+rollback;
+
+-- Ruling I6: requests and messages across worlds are refused; same-world ones still work.
+do $$
+declare stmt text; failed boolean;
+begin
+  foreach stmt in array array[
+    '01|insert into public.connection_requests (from_id, to_id) values (''70000000-0000-0000-0000-000000000001'', ''70000000-0000-0000-0000-000000000008'')',
+    '08|insert into public.connection_requests (from_id, to_id) values (''70000000-0000-0000-0000-000000000008'', ''70000000-0000-0000-0000-000000000002'')',
+    '01|insert into public.brivia_messages (sender_id, recipient_id, body) values (''70000000-0000-0000-0000-000000000001'', ''70000000-0000-0000-0000-000000000008'', ''hi'')',
+    '08|insert into public.brivia_messages (sender_id, recipient_id, body) values (''70000000-0000-0000-0000-000000000008'', ''70000000-0000-0000-0000-000000000001'', ''hi'')'
+  ] loop
+    failed := false;
+    set local role authenticated;
+    perform set_config('request.jwt.claims', json_build_object('sub', '70000000-0000-0000-0000-0000000000' || split_part(stmt, '|', 1))::text, true);
+    begin execute split_part(stmt, '|', 2); exception when insufficient_privilege then failed := true; end;
+    reset role;
+    if not failed then raise exception 'FAIL I6: cross-world write allowed: %', stmt; end if;
+  end loop;
+end $$;
+begin;
+set local role authenticated;
+set local request.jwt.claims = '{"sub":"70000000-0000-0000-0000-000000000001"}';
+insert into public.connection_requests (from_id, to_id) values ('70000000-0000-0000-0000-000000000001', '70000000-0000-0000-0000-000000000015');
+insert into public.brivia_messages (sender_id, recipient_id, body) values ('70000000-0000-0000-0000-000000000001', '70000000-0000-0000-0000-000000000002', 'same world');
+rollback;
+do $$ begin
+  if exists (select 1 from public.connection_requests where from_id::text like '70000000-%')
+     or exists (select 1 from public.brivia_messages where sender_id::text like '70000000-%') then
+    raise exception 'FAIL: I6 fixtures leaked';
+  end if;
+end $$;
+
 -- Clean up Task 2 fixtures.
+delete from public.community_posts where author_id::text like '70000000-%';
+delete from public.matches where user1_id::text like '70000000-%' or user2_id::text like '70000000-%';
 drop table public.trust_t2_expected;
 delete from public.brivia_blocks where blocker_id::text like '70000000-%';
 delete from public.profiles where id::text like '70000000-%' or id::text like '71000000-%';

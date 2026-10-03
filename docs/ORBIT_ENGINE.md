@@ -313,8 +313,10 @@ saturated, the outer rings relax first, instead of the deck repeating saturated 
   newest first by `(created_at, id)`, at most 20 per page, more pages on demand), `get_candidates` (cards for known
   ids, at most 50 ids per call) and `search_members` (case-insensitive substring over name, city, skills and
   looking-for; LIKE wildcards are literal; at most 20 rows; not ranked by `R` yet). All three hide the caller,
-  incomplete profiles (`name <> 'New Member'` and a city), blocked pairs in both directions, and the other test world
-  (test and real members never see each other). ORBIT's deck and search replace `list_members` and `search_members`
+  incomplete profiles (`brivia_is_completed`: trimmed name not empty and not 'New Member', trimmed city not empty),
+  blocked pairs in both directions, and the other test world (test and real members never see, request or message
+  each other); a caller who is not completed gets nothing. Community posts follow the same block, world and
+  completed-caller rules (own posts always visible). ORBIT's deck and search replace `list_members` and `search_members`
   in phase 3 and must keep these exclusions.
 - **Long-Range Request:** to request someone in ring ≥ 3 who has not liked you, you spend one of **5 weekly long-range
   signals**. The request must include a note. The recipient sees the resonance chips and can accept or decline.
