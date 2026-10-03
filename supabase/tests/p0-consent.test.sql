@@ -47,7 +47,11 @@ begin
   if n <> 1 then raise exception 'FAIL: brivia_messages has % insert policies (want 1)', n; end if;
   select string_agg(privilege_type, ',' order by privilege_type) into p from information_schema.role_table_grants
    where table_schema = 'public' and table_name = 'connection_requests' and grantee = 'authenticated';
-  if p is distinct from 'INSERT,SELECT' then raise exception 'FAIL: authenticated privileges on connection_requests = %', p; end if;
+  -- Insert is column-level since 0003 (from_id, to_id, note); see trust.test.sql 3b.2.
+  if p is distinct from 'SELECT' then raise exception 'FAIL: authenticated table privileges on connection_requests = %', p; end if;
+  select string_agg(column_name, ',' order by column_name) into p from information_schema.column_privileges
+   where table_schema = 'public' and table_name = 'connection_requests' and grantee = 'authenticated' and privilege_type = 'INSERT';
+  if p is distinct from 'from_id,note,to_id' then raise exception 'FAIL: authenticated insertable columns on connection_requests = %', p; end if;
   select count(*) into n from information_schema.role_table_grants
    where table_schema = 'public' and table_name = 'connection_requests' and grantee in ('anon', 'PUBLIC');
   if n <> 0 then raise exception 'FAIL: anon/public hold % privileges on connection_requests', n; end if;
@@ -151,7 +155,9 @@ begin
    where user1_id = least('a0000000-0000-0000-0000-00000000000a'::uuid, 'b0000000-0000-0000-0000-00000000000b'::uuid)
      and user2_id = greatest('a0000000-0000-0000-0000-00000000000a'::uuid, 'b0000000-0000-0000-0000-00000000000b'::uuid);
   if n <> 1 then raise exception 'FAIL: match row is not least/greatest ordered'; end if;
+  -- B reads the incoming row; B's own outgoing row only through my_outgoing_requests() (0003).
   select count(*) into n from public.connection_requests where status = 'accepted';
+  select n + count(*) into n from public.my_outgoing_requests() where status = 'accepted';
   if n <> 2 then raise exception 'FAIL: % of 2 requests accepted', n; end if;
   -- second identical reverse insert: conflict, still one match
   begin
@@ -406,6 +412,7 @@ begin
   select count(*) into n from public.matches;
   if n <> 1 then raise exception 'FAIL: change of mind after decline created % matches (want 1, P11)', n; end if;
   select count(*) into n from public.connection_requests where status = 'accepted';
+  select n + count(*) into n from public.my_outgoing_requests() where status = 'accepted';
   if n <> 2 then raise exception 'FAIL: % of 2 requests accepted after change of mind', n; end if;
 end $$;
 rollback;

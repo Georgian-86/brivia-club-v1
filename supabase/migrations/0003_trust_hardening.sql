@@ -2,7 +2,12 @@
 -- Apply after 0001_baseline.sql and 0002_p0_privacy_consent.sql, in the Supabase SQL editor, and ship
 -- it together with the client changes of the same iteration (saveProfile in supabase.js now updates
 -- editable columns only; a combined upsert would be denied by the column grants below; app.js reads other
--- members only through the candidate RPCs of Task 2, because members can no longer select public_profiles).
+-- members only through the candidate RPCs of Task 2, because members can no longer select public_profiles;
+-- supabase.js no longer stores data: URLs in photo_url/cover_url, which Task 3b caps at 2048 characters).
+-- Senders can no longer select their own outgoing connection_requests rows (Task 3b): any client view of
+-- outgoing requests must call my_outgoing_requests().
+-- Re-running 0002 alone reverts objects that 0003 redefines (public_profiles grant, the request triggers,
+-- respond_connection_request, the request/profile select policies): always re-run 0003 after it.
 -- Idempotent: safe to re-run.
 
 -- ---------------------------------------------------------------------------------------------
@@ -412,13 +417,100 @@ as $$
 $$;
 revoke all on function public.purge_expired_requests() from public, anon, authenticated;
 
--- The Requests list hides expired requests.
+-- The select policy with the expiry condition is defined once, in Task 3b below (recipient-only).
+
+-- ---------------------------------------------------------------------------------------------
+-- Task 3b: consent follow-ups from the P0 final review.
+-- ---------------------------------------------------------------------------------------------
+-- Clients insert only (from_id, to_id, note); status and created_at always come from the defaults, so a
+-- client can neither pre-accept nor back-date a request (back-dating would dodge the caps or expiry).
+revoke insert on public.connection_requests from public, anon, authenticated;
+grant insert (from_id, to_id, note) on public.connection_requests to authenticated;
+
+-- The sender never sees a decline. Senders read their outgoing requests only through
+-- my_outgoing_requests(), which shows 'declined' as 'pending' and hides expired requests, blocked pairs
+-- (either direction) and the other test world. Live declined and live pending rows also conflict the same
+-- way on re-request (primary key), and both expire after 30 days, so nothing tells them apart.
+create or replace function public.my_outgoing_requests()
+returns table (to_id uuid, note text, status text, created_at timestamptz)
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select r.to_id, r.note,
+         case when r.status = 'declined' then 'pending' else r.status end,
+         r.created_at
+  from public.connection_requests r
+  join public.profiles me on me.id = auth.uid()
+  join public.profiles p on p.id = r.to_id and p.is_test = me.is_test
+  where r.from_id = auth.uid()
+    and public.brivia_request_is_live(r.status, r.created_at)
+    and not public.brivia_pair_is_blocked(r.from_id, r.to_id)
+  order by r.created_at desc, r.to_id;
+$$;
+revoke all on function public.my_outgoing_requests() from public, anon;
+grant execute on function public.my_outgoing_requests() to authenticated;
+
+-- The base table shows a member only the requests addressed to them (the Requests list); the sender of a
+-- request cannot read its status here. Expired requests stay hidden (Task 3).
 drop policy if exists "Members can view their connection requests" on public.connection_requests;
 create policy "Members can view their connection requests"
   on public.connection_requests for select to authenticated
   using (
     public.brivia_has_completed_profile()
-    and auth.uid() in (from_id, to_id)
+    and to_id = auth.uid()
     and not public.brivia_is_blocked_between(from_id, to_id)  -- caller is a party, so this answers
     and public.brivia_request_is_live(status, created_at)
   );
+
+-- A block withdraws the blocker's own unanswered request to the blocked member (pending, or declined: to
+-- the blocker both read as pending). Otherwise, after an unblock, the blocked member's later request would
+-- complete a match from consent the blocker gave before blocking. Requests from the blocked member stay
+-- (hidden while blocked); after an unblock the blocker still has to accept them.
+create or replace function public.brivia_on_block_created()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  perform public.brivia_lock_pair(new.blocker_id, new.blocked_id);
+  delete from public.connection_requests
+   where from_id = new.blocker_id and to_id = new.blocked_id and status <> 'accepted';
+  return null;
+end;
+$$;
+revoke all on function public.brivia_on_block_created() from public, anon, authenticated;
+
+drop trigger if exists brivia_on_block_created on public.brivia_blocks;
+create trigger brivia_on_block_created
+  after insert on public.brivia_blocks
+  for each row execute function public.brivia_on_block_created();
+
+-- No oversized photos: photo_url and cover_url hold a storage URL (at most 2048 characters), never an
+-- inline data: URL. The client stopped storing data URLs in the same release. DATA CLEANUP: existing values
+-- longer than 2048 characters (old data-URL fallbacks) are cleared to null before the constraint is added;
+-- those members fall back to their initials / the default cover until they upload again.
+do $$ begin
+  if not exists (select 1 from pg_constraint where conname = 'profiles_photo_url_length'
+                 and conrelid = 'public.profiles'::regclass) then
+    update public.profiles set photo_url = null where char_length(photo_url) > 2048;
+    alter table public.profiles
+      add constraint profiles_photo_url_length check (photo_url is null or char_length(photo_url) <= 2048);
+  end if;
+  if not exists (select 1 from pg_constraint where conname = 'profiles_cover_url_length'
+                 and conrelid = 'public.profiles'::regclass) then
+    update public.profiles set cover_url = null where char_length(cover_url) > 2048;
+    alter table public.profiles
+      add constraint profiles_cover_url_length check (cover_url is null or char_length(cover_url) <= 2048);
+  end if;
+end $$;
+
+-- Consistent id comparison: 0002 compared the own-profile policy as text; ids are uuid everywhere (Ruling P6).
+drop policy if exists "Members can view their own profile" on public.profiles;
+create policy "Members can view their own profile"
+  on public.profiles for select to authenticated
+  using (id = auth.uid());
+
+notify pgrst, 'reload schema';

@@ -764,6 +764,146 @@ begin
 end $$;
 rollback;
 
+-- ---------------------------------------------------------------------------------------------
+-- Task 3b: consent follow-ups from the P0 final review.
+-- ---------------------------------------------------------------------------------------------
+-- 3b.1 A block withdraws the blocker's own pending request: A requests B, A blocks B, A unblocks B,
+-- B requests A -> no match (B's request is just pending).
+begin;
+set local role authenticated;
+set local request.jwt.claims = '{"sub":"72000000-0000-0000-0000-000000000001"}';
+insert into public.connection_requests (from_id, to_id) values (pg_temp.t3(1), pg_temp.t3(150));
+insert into public.brivia_blocks (blocker_id, blocked_id) values (pg_temp.t3(1), pg_temp.t3(150));
+delete from public.brivia_blocks where blocker_id = pg_temp.t3(1) and blocked_id = pg_temp.t3(150);
+set local request.jwt.claims = '{"sub":"72000000-0000-0000-0000-000000000150"}';
+insert into public.connection_requests (from_id, to_id) values (pg_temp.t3(150), pg_temp.t3(1));
+reset role;
+do $$ begin
+  if exists (select 1 from public.matches where pg_temp.t3(1) in (user1_id, user2_id) and pg_temp.t3(150) in (user1_id, user2_id)) then
+    raise exception 'FAIL T3b: block/unblock left the blocker''s request live; a later reverse request matched';
+  end if;
+  if exists (select 1 from public.connection_requests where from_id = pg_temp.t3(1) and to_id = pg_temp.t3(150)) then
+    raise exception 'FAIL T3b: block did not withdraw the blocker''s pending request';
+  end if;
+  if not exists (select 1 from public.connection_requests where from_id = pg_temp.t3(150) and to_id = pg_temp.t3(1) and status = 'pending') then
+    raise exception 'FAIL T3b: the later reverse request is not pending';
+  end if;
+  if not exists (select 1 from pg_proc where oid = to_regprocedure('public.brivia_on_block_created()') and prosecdef and proconfig @> array['search_path=public']) then
+    raise exception 'FAIL T3b: brivia_on_block_created must be security definer with search_path=public';
+  end if;
+end $$;
+rollback;
+
+-- 3b.2 Insert is granted on (from_id, to_id, note) only; status and created_at come from defaults.
+do $$
+declare c text;
+begin
+  if has_table_privilege('authenticated', 'public.connection_requests', 'insert') then
+    raise exception 'FAIL T3b: authenticated still holds table-level insert on connection_requests';
+  end if;
+  foreach c in array array['from_id', 'to_id', 'note'] loop
+    if not has_column_privilege('authenticated', 'public.connection_requests', c, 'insert') then
+      raise exception 'FAIL T3b: authenticated cannot insert %', c;
+    end if;
+  end loop;
+  foreach c in array array['status', 'created_at'] loop
+    if has_column_privilege('authenticated', 'public.connection_requests', c, 'insert') then
+      raise exception 'FAIL T3b: authenticated can insert %', c;
+    end if;
+  end loop;
+end $$;
+begin;
+set local role authenticated;
+set local request.jwt.claims = '{"sub":"72000000-0000-0000-0000-000000000001"}';
+do $$
+declare failed boolean := false;
+begin
+  begin
+    insert into public.connection_requests (from_id, to_id, created_at) values (pg_temp.t3(1), pg_temp.t3(151), now() - interval '40 days');
+  exception when insufficient_privilege then failed := true;
+  end;
+  if not failed then raise exception 'FAIL T3b: client set created_at'; end if;
+  insert into public.connection_requests (from_id, to_id, note) values (pg_temp.t3(1), pg_temp.t3(151), 'hi');
+end $$;
+reset role;
+do $$ begin
+  if not exists (select 1 from public.connection_requests where from_id = pg_temp.t3(1) and to_id = pg_temp.t3(151)
+                 and status = 'pending' and created_at > now() - interval '1 minute') then
+    raise exception 'FAIL T3b: defaults did not fill status/created_at';
+  end if;
+end $$;
+rollback;
+
+-- 3b.3 The sender never sees a decline: my_outgoing_requests() shows declined as pending; the base table
+-- shows the sender none of their outgoing rows; the recipient still reads incoming ones.
+do $$
+begin
+  if to_regprocedure('public.my_outgoing_requests()') is null then raise exception 'FAIL T3b: my_outgoing_requests missing'; end if;
+  if not (select prosecdef and proconfig @> array['search_path=public'] from pg_proc where oid = to_regprocedure('public.my_outgoing_requests()')) then
+    raise exception 'FAIL T3b: my_outgoing_requests must be security definer with search_path=public';
+  end if;
+  if has_function_privilege('anon', 'public.my_outgoing_requests()', 'execute') then raise exception 'FAIL T3b: anon can execute my_outgoing_requests'; end if;
+  if not has_function_privilege('authenticated', 'public.my_outgoing_requests()', 'execute') then raise exception 'FAIL T3b: authenticated cannot execute my_outgoing_requests'; end if;
+end $$;
+begin;
+-- Owner fixtures: S->R152 declined, S->R153 pending, S->R154 accepted, S->R155 expired, S->R156 (R156 blocked S),
+-- S->T (cross-world legacy row; 72..0209 becomes a test member).
+update public.profiles set is_test = true where id = pg_temp.t3(209);
+insert into public.connection_requests (from_id, to_id, status, created_at) values
+  (pg_temp.t3(1), pg_temp.t3(152), 'declined', now() - interval '1 day'),
+  (pg_temp.t3(1), pg_temp.t3(153), 'pending', now() - interval '2 days'),
+  (pg_temp.t3(1), pg_temp.t3(154), 'accepted', now() - interval '3 days'),
+  (pg_temp.t3(1), pg_temp.t3(155), 'pending', now() - interval '31 days'),
+  (pg_temp.t3(1), pg_temp.t3(156), 'pending', now() - interval '4 days'),
+  (pg_temp.t3(1), pg_temp.t3(209), 'pending', now() - interval '5 days');
+insert into public.brivia_blocks (blocker_id, blocked_id) values (pg_temp.t3(156), pg_temp.t3(1));
+set local role authenticated;
+set local request.jwt.claims = '{"sub":"72000000-0000-0000-0000-000000000001"}';
+do $$
+declare got text; n int;
+begin
+  select string_agg(right(to_id::text, 3) || ':' || status, ',' order by to_id) into got from public.my_outgoing_requests();
+  if got is distinct from '152:pending,153:pending,154:accepted' then
+    raise exception 'FAIL T3b: my_outgoing_requests = % (want 152:pending,153:pending,154:accepted)', got;
+  end if;
+  select count(*) into n from public.connection_requests where from_id = auth.uid();
+  if n <> 0 then raise exception 'FAIL T3b: sender reads % outgoing rows from the base table', n; end if;
+end $$;
+set local request.jwt.claims = '{"sub":"72000000-0000-0000-0000-000000000153"}';
+do $$ begin
+  if (select count(*) from public.connection_requests where to_id = auth.uid() and status = 'pending') <> 1 then
+    raise exception 'FAIL T3b: recipient no longer reads incoming pending requests';
+  end if;
+end $$;
+rollback;
+
+-- 3b.4 No oversized photos: photo_url / cover_url longer than 2048 characters are rejected.
+begin;
+set local role authenticated;
+set local request.jwt.claims = '{"sub":"72000000-0000-0000-0000-000000000001"}';
+do $$
+declare col text; failed boolean;
+begin
+  update public.profiles set photo_url = 'https://x/' || repeat('a', 2038), cover_url = 'https://x/' || repeat('a', 2038) where id = auth.uid();
+  foreach col in array array['photo_url', 'cover_url'] loop
+    failed := false;
+    begin
+      execute format('update public.profiles set %I = %L where id = auth.uid()', col, 'data:image/png;base64,' || repeat('A', 2100));
+    exception when check_violation then failed := true;
+    end;
+    if not failed then raise exception 'FAIL T3b: % over 2048 characters accepted', col; end if;
+  end loop;
+end $$;
+rollback;
+
+-- 3b.5 The own-profile select policy compares ids as uuid (no text casts).
+do $$
+declare q text;
+begin
+  select qual into q from pg_policies where schemaname = 'public' and tablename = 'profiles' and policyname = 'Members can view their own profile';
+  if q is null or q ~ '::text' or q !~ 'auth\.uid\(\)' then raise exception 'FAIL T3b: own-profile policy qual is %', q; end if;
+end $$;
+
 -- Clean up Task 3 fixtures.
 delete from public.connection_requests where from_id::text like '72000000-%' or to_id::text like '72000000-%';
 delete from public.matches where user1_id::text like '72000000-%' or user2_id::text like '72000000-%';
