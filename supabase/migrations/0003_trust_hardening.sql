@@ -586,4 +586,40 @@ drop trigger if exists career_applications_throttle on public.career_application
 create trigger career_applications_throttle before insert on public.career_applications
   for each row execute function public.brivia_career_application_throttle();
 
+-- Interaction log (Task 5): every like/pass/request/... with the served features, propensity and model version,
+-- so ORBIT can be evaluated offline (spec section 8). Clients may append their own explicit actions only;
+-- 'impression' rows are written by the service (owner/service role), never by a client.
+create table if not exists public.interaction (
+  id uuid primary key default gen_random_uuid(),
+  viewer_id uuid not null references public.profiles(id) on delete cascade,
+  target_id uuid not null references public.profiles(id) on delete cascade,
+  event text not null check (event in ('like','pass','request','accept','decline','met','letgo','impression')),
+  context jsonb not null default '{}'::jsonb,
+  features jsonb check (features is null or pg_column_size(features) <= 8192),
+  score real,
+  propensity real check (propensity is null or (propensity >= 0 and propensity <= 1)),
+  model_version text,
+  created_at timestamptz not null default now(),
+  check (viewer_id <> target_id)
+);
+create index if not exists interaction_viewer_created_idx on public.interaction (viewer_id, created_at desc);
+create index if not exists interaction_target_created_idx on public.interaction (target_id, created_at desc);
+
+alter table public.interaction enable row level security;
+revoke all on public.interaction from public, anon, authenticated;
+grant select on public.interaction to authenticated;
+grant insert (viewer_id, target_id, event, context, features, score, propensity, model_version)
+  on public.interaction to authenticated;
+
+drop policy if exists interaction_select_own on public.interaction;
+create policy interaction_select_own on public.interaction for select to authenticated
+  using (viewer_id = auth.uid());
+drop policy if exists interaction_insert_own on public.interaction;
+create policy interaction_insert_own on public.interaction for insert to authenticated
+  with check (
+    viewer_id = auth.uid()
+    and event in ('like','pass','request','accept','decline','met','letgo')
+    and public.brivia_same_world(viewer_id, target_id)
+  );
+
 notify pgrst, 'reload schema';

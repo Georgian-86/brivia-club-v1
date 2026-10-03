@@ -1067,3 +1067,90 @@ end $$;
 select 'trust.test T4 OK';
 
 select 'trust.test OK';
+
+-- Iteration 2 (Trust), Task 5: interaction log.
+insert into auth.users(id) values
+  ('a5a5a5a5-0000-0000-0000-0000000000a5'), ('b5b5b5b5-0000-0000-0000-0000000000b5'),
+  ('d5d5d5d5-0000-0000-0000-0000000000d5')
+  on conflict do nothing;
+insert into public.profiles (id, name, full_name, email, city, is_test) values
+  ('a5a5a5a5-0000-0000-0000-0000000000a5','A5','A5','a5@example.com','Austin', false),
+  ('b5b5b5b5-0000-0000-0000-0000000000b5','B5','B5','b5@example.com','Austin', false),
+  ('d5d5d5d5-0000-0000-0000-0000000000d5','D5','D5','d5@test.brivia.club','Austin', true)
+on conflict (id) do nothing;
+
+do $$
+declare
+  a uuid := 'a5a5a5a5-0000-0000-0000-0000000000a5';
+  b uuid := 'b5b5b5b5-0000-0000-0000-0000000000b5';
+  d uuid := 'd5d5d5d5-0000-0000-0000-0000000000d5';
+  ev text; failed boolean; n int; cols text;
+begin
+  select string_agg(column_name, ',' order by column_name) into cols from information_schema.columns
+   where table_schema='public' and table_name='interaction';
+  if cols is distinct from 'context,created_at,event,features,id,model_version,propensity,score,target_id,viewer_id' then
+    raise exception 'FAIL T5: interaction columns are %', cols;
+  end if;
+
+  -- member A inserts the allowed events
+  set local role authenticated;
+  perform set_config('request.jwt.claims', '{"sub":"' || a || '"}', true);
+  foreach ev in array array['like','pass','request','accept','decline','met','letgo'] loop
+    insert into public.interaction (viewer_id, target_id, event) values (a, b, ev);
+  end loop;
+  insert into public.interaction (viewer_id, target_id, event, features, score, propensity, model_version, context)
+    values (a, b, 'like', '{"x":1}', 0.5, 0.25, 'orbit-0', '{"surface":"deck"}');
+
+  -- denied cases
+  foreach ev in array array[
+    'insert into public.interaction (viewer_id, target_id, event) values (''' || b || ''',''' || a || ''',''like'')',
+    'insert into public.interaction (viewer_id, target_id, event) values (''' || a || ''',''' || b || ''',''impression'')',
+    'insert into public.interaction (viewer_id, target_id, event) values (''' || a || ''',''' || b || ''',''bogus'')',
+    'insert into public.interaction (viewer_id, target_id, event, propensity) values (''' || a || ''',''' || b || ''',''like'',1.5)',
+    'insert into public.interaction (viewer_id, target_id, event, features) values (''' || a || ''',''' || b || ''',''like'',jsonb_build_object(''k'', repeat(''x'', 9000)))',
+    'insert into public.interaction (viewer_id, target_id, event, created_at) values (''' || a || ''',''' || b || ''',''like'',''2000-01-01'')',
+    'insert into public.interaction (viewer_id, target_id, event) values (''' || a || ''',''' || d || ''',''like'')'
+  ] loop
+    failed := false;
+    begin execute ev; exception when others then failed := true; end;
+    if not failed then raise exception 'FAIL T5: should be refused: %', ev; end if;
+  end loop;
+
+  -- no client update/delete
+  foreach ev in array array['update public.interaction set score = 1', 'delete from public.interaction'] loop
+    failed := false;
+    begin execute ev; exception when insufficient_privilege then failed := true; end;
+    if not failed then raise exception 'FAIL T5: should be denied: %', ev; end if;
+  end loop;
+
+  select count(*) into n from public.interaction;
+  if n <> 8 then raise exception 'FAIL T5: A sees % own rows, expected 8', n; end if;
+
+  -- B sees none of A's rows
+  perform set_config('request.jwt.claims', '{"sub":"' || b || '"}', true);
+  select count(*) into n from public.interaction;
+  if n <> 0 then raise exception 'FAIL T5: B sees % of A rows', n; end if;
+  reset role;
+
+  -- owner (service) may write an impression
+  insert into public.interaction (viewer_id, target_id, event, propensity) values (a, b, 'impression', 0.1);
+
+  -- anon denied
+  set local role anon;
+  failed := false;
+  begin perform 1 from public.interaction; exception when insufficient_privilege then failed := true; end;
+  if not failed then raise exception 'FAIL T5: anon select allowed'; end if;
+  failed := false;
+  begin insert into public.interaction (viewer_id, target_id, event) values (a, b, 'like');
+  exception when insufficient_privilege then failed := true; end;
+  reset role;
+  if not failed then raise exception 'FAIL T5: anon insert allowed'; end if;
+
+  if (select count(*) from pg_indexes where tablename='interaction' and indexdef ~ 'viewer_id, created_at DESC') <> 1
+     or (select count(*) from pg_indexes where tablename='interaction' and indexdef ~ 'target_id, created_at DESC') <> 1 then
+    raise exception 'FAIL T5: missing interaction indexes';
+  end if;
+  delete from public.interaction;
+end $$;
+
+select 'trust.test T5 OK';
