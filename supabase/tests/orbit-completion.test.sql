@@ -202,8 +202,13 @@ begin
   if not public.brivia_member_completed(w) then raise exception 'FAIL: positive control: c4 is not completed'; end if;
   if public.brivia_visible_to(v, w) or public.brivia_visible_to(w, v) then raise exception 'FAIL: cross-world pair visible'; end if;
   if not public.brivia_visible_to(v, b) then raise exception 'FAIL: positive control: c3 not visible before the block'; end if;
+  -- each direction alone hides the pair both ways
+  insert into public.brivia_blocks (blocker_id, blocked_id) values (v, b);
+  if public.brivia_visible_to(v, b) or public.brivia_visible_to(b, v) then raise exception 'FAIL: (v blocks b) pair visible'; end if;
+  delete from public.brivia_blocks where blocker_id = v and blocked_id = b;
+  if not public.brivia_visible_to(v, b) or not public.brivia_visible_to(b, v) then raise exception 'FAIL: unblock did not restore'; end if;
   insert into public.brivia_blocks (blocker_id, blocked_id) values (b, v);
-  if public.brivia_visible_to(v, b) or public.brivia_visible_to(b, v) then raise exception 'FAIL: blocked pair visible'; end if;
+  if public.brivia_visible_to(v, b) or public.brivia_visible_to(b, v) then raise exception 'FAIL: (b blocks v) pair visible'; end if;
   set local role authenticated;
   perform set_config('request.jwt.claims', json_build_object('sub', v)::text, true);
   select count(*) into k from public.list_members(20) where id in (b, w); if k <> 0 then raise exception 'FAIL: c1 lists blocked/cross-world'; end if;

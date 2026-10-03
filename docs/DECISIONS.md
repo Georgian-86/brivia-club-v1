@@ -170,3 +170,23 @@ supersedes it.
   interests and a cell.
 - **Alternative rejected:** keeping city as an alternative to a cell. It would let a member with no cell into decks
   where ring ordering is undefined, and it keeps a free-text, client-written column in a visibility rule.
+
+## D-031: k-anonymity density table and the interim flag source
+- Accepted 2026-10-03 (Iteration 3, Task 5 and its fix round 1).
+- **Decision:**
+  - "Flagged (reported or restricted)" in the k-anonymity count means a row in the owner-only
+    `member_flag(member_id, reason, flagged_at)` table (RLS on, no client grants) until moderation tooling exists.
+  - Populations live in the owner-only `cell_density(cell, is_test, n, streak10, streak5, ok10, ok5, as_of)` table.
+    It replaces the spec's earlier `cell_density(cell, res, is_test, n, met_since)` design: the level is in the
+    scheme-tagged cell id (g7/g6/g5), and per-k streak columns replace `met_since`, so k = 10 and k = 5 each have their
+    own hysteresis.
+  - `refresh_cell_density(p_as_of)` (owner only, nightly) counts by the stored `home_cell`, `home_cell_g6` and
+    `home_cell_g5`. `streakK` carries over only from the night before; a gap of more than one day restarts it at 1
+    (or 0 below k), so "7 consecutive nightly counts" means 7 actual consecutive nights. `okK = streakK ≥ 7`; it drops
+    at the first count below k. A global watermark makes a same-day or older re-run a no-op; rows with `n = 0` and no
+    streak are deleted.
+- **Why:** the conservative reset means that a missed cron run can only delay un-coarsening, never shorten it. The
+  watermark stops a second same-day run from inserting rows for cells whose population changed since the nightly
+  count. Without it, those rows would start a fresh streak out of step with the rest.
+- **Alternative rejected:** counting refreshes instead of nights (a missed night keeps the streak). It is simpler, but
+  a stalled cron followed by a burst of catch-up runs could un-coarsen a cell sooner than 7 real nights.

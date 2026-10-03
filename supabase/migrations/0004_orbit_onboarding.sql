@@ -707,7 +707,7 @@ grant execute on function public.my_onboarding_status() to authenticated;
 -- Spec §9.1.4. A cell's population counts members of one world (is_test) who are completed
 -- (brivia_member_completed), whose account is older than 14 days at the refresh date, and who are not flagged.
 -- Floors: k = 10 for rings 0-1, k = 5 for rings 2+. Hysteresis: a cell is ok for k only after 7 consecutive
--- refreshes with n >= k, and stops being ok at the first refresh with n < k.
+-- nightly counts with n >= k (a missed night restarts the streak), and stops being ok at the first count with n < k.
 -- Populations are counted for every g7 cell and for the g6 and g5 parents STORED in member_orbit (home_cell_g6,
 -- home_cell_g5). Parents are never re-derived here: grid parents are only approximately nested.
 
@@ -735,10 +735,13 @@ create table if not exists public.cell_density (
 alter table public.cell_density enable row level security;
 revoke all on public.cell_density from public, anon, authenticated;
 
--- refresh_cell_density(p_as_of): the nightly count (owner only; pg_cron below). For each (cell, world) row that is
--- new or older than p_as_of: n = the population; streakK = streakK + 1 when n >= k, else 0; okK = streakK >= 7.
--- A row already at p_as_of (or later) is left alone, so a same-day re-run changes nothing. A row whose cell has no
--- members left is refreshed to n = 0. Returns the number of rows written.
+-- refresh_cell_density(p_as_of): the nightly count (owner only; pg_cron below).
+-- * Watermark: if any row already has as_of >= p_as_of, it returns 0 and changes nothing (a same-day or older
+--   re-run is a true no-op, even if members moved in between).
+-- * Otherwise every (cell, world) with members, and every existing row, is rewritten with as_of = p_as_of:
+--   n = the population; streakK = previous streakK + 1 when n >= k, else 0; okK = streakK >= 7. The previous streak
+--   only carries over from the night before (p_as_of - as_of = 1): a missed night restarts the count at 1 or 0.
+-- * Rows left with n = 0 and both streaks 0 are deleted. Returns the number of rows written.
 create or replace function public.refresh_cell_density(p_as_of date default current_date)
 returns int
 language plpgsql
@@ -752,6 +755,10 @@ begin
     raise exception 'invalid date' using errcode = '22023';
   end if;
   perform pg_advisory_xact_lock(hashtextextended('brivia.cell_density', 0));
+  -- Global watermark: a refresh for a date that is not newer than the last one is a no-op.
+  if exists (select 1 from public.cell_density where as_of >= p_as_of) then
+    return 0;
+  end if;
   with member as (
     select o.home_cell, o.home_cell_g6, o.home_cell_g5, p.is_test,
            (p.created_at < (p_as_of - 14)::timestamptz
@@ -769,10 +776,11 @@ begin
   ),
   merged as (
     select coalesce(c.cell, d.cell) as cell, coalesce(c.is_test, d.is_test) as is_test, coalesce(c.n, 0) as n,
-           coalesce(d.streak10, 0) as old10, coalesce(d.streak5, 0) as old5
+           -- a missed night (a gap of more than one day) restarts the streak
+           case when p_as_of - d.as_of = 1 then d.streak10 else 0 end as old10,
+           case when p_as_of - d.as_of = 1 then d.streak5 else 0 end as old5
       from counts c
       full join public.cell_density d on d.cell = c.cell and d.is_test = c.is_test
-     where d.cell is null or d.as_of < p_as_of
   ),
   nxt as (
     select cell, is_test, n,
@@ -786,6 +794,8 @@ begin
     set n = excluded.n, streak10 = excluded.streak10, streak5 = excluded.streak5,
         ok10 = excluded.ok10, ok5 = excluded.ok5, as_of = excluded.as_of;
   get diagnostics v_rows = row_count;
+  -- An empty cell with no streak carries no information: drop it.
+  delete from public.cell_density where n = 0 and streak10 = 0 and streak5 = 0;
   return v_rows;
 end;
 $$;

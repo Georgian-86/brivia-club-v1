@@ -618,13 +618,15 @@ select log_impressions($1, $4);
 - **No band flips:** a cell's coarsening level only goes up quickly and comes down slowly. Populations live in the
   owner-only `cell_density(cell, is_test, n, streak10, streak5, ok10, ok5, as_of)` table (RLS on, no client grants),
   one row per g7, g6 and g5 cell and world. `refresh_cell_density(p_as_of date default current_date)` (owner only;
-  scheduled nightly with pg_cron) recounts every cell that has members, plus every existing row (an emptied cell
-  gets n = 0). Counts group by the **stored** `home_cell`, `home_cell_g6` and `home_cell_g5` columns of
-  `member_orbit`; parents are never re-derived, because grid parents are only approximately nested. Per row and per
-  k: `streakK` grows by 1 on each refresh with a new `as_of` while `n ≥ k` and resets to 0 when `n < k`; `okK` is
-  `streakK ≥ 7`. So a cell becomes ok only after 7 consecutive nightly counts at or above k, and stops being ok at
-  the first count below k. A refresh with an `as_of` that a row already has (or an older one) leaves that row
-  unchanged. `brivia_cell_ok(cell, is_test, k)` (internal) reads `okK`; a missing row or any other k is false.
+  scheduled nightly with pg_cron) recounts every cell that has members, plus every existing row. Counts group by
+  the **stored** `home_cell`, `home_cell_g6` and `home_cell_g5` columns of `member_orbit`; parents are never
+  re-derived, because grid parents are only approximately nested. Per row and per k: `streakK` is the previous
+  night's `streakK + 1` while `n ≥ k`, and 0 when `n < k`; `okK` is `streakK ≥ 7`. So a cell becomes ok only after
+  **7 consecutive nightly counts** at or above k; **a missed night restarts the streak** (when `as_of` jumps by more
+  than one day, the count restarts at 1, or 0 below k). It stops being ok at the first count below k. The refresh has
+  a global watermark: if any row already has `as_of ≥ p_as_of`, it does nothing and returns 0, so a same-day or older
+  re-run is a true no-op. Rows left with `n = 0` and both streaks 0 are deleted. `brivia_cell_ok(cell, is_test, k)`
+  (internal) reads `okK`; a missing row or any other k is false.
 
 #### 9.1.5 What leaves the service
 
