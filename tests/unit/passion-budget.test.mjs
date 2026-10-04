@@ -152,3 +152,18 @@ test('budgetFromRows rebuilds a state from my_interests rows or a stored pending
   assert.equal(isComplete(s), true);
   assert.deepEqual(budgetFromRows(null).items, []);
 });
+
+test('budgetFromRows trims the largest items until the total is at most 20', () => {
+  const s = budgetFromRows([
+    { id: 'a', label: 'A', points: 15 },
+    { id: 'b', label: 'B', points: 9 },
+    { id: 'c', label: 'C', points: 1 },
+  ]); // 25 -> trim 5 from the largest at each step
+  assert.equal(s.items.reduce((sum, item) => sum + item.points, 0), 20);
+  assert.ok(s.items.every((item) => item.points >= 1));
+  assert.deepEqual(s.items.map((item) => item.points), [10, 9, 1]);
+  const huge = budgetFromRows(Array.from({ length: 12 }, (_, i) => ({ id: `n${i}`, points: 50 })));
+  assert.equal(huge.items.reduce((sum, item) => sum + item.points, 0), 20);
+  assert.ok(huge.items.every((item) => item.points >= 1));
+  assert.equal(isComplete(huge), true);
+});

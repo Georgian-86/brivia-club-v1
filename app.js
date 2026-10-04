@@ -1395,7 +1395,7 @@ const openProfileEditor = () => {
         <label><span>EXPERIENCE / ROLE</span><input name="experience" value="${escapeHtml(profile.experience || '')}" /></label>
         <label><span>CITY</span><input name="city" value="${escapeHtml(profile.city || '')}" /></label>
         <label><span>STATE</span><input name="state" value="${escapeHtml(profile.state || '')}" /></label>
-        <div class="profile-edit-wide profile-edit-readonly"><span>SKILLS / INTERESTS</span><p>${escapeHtml(profile.skills || 'None yet')}</p><small class="profile-edit-helper">These come from your interests and passion points. Private interests are never shown.</small></div>
+        <div class="profile-edit-wide profile-edit-readonly"><span>SKILLS / INTERESTS</span><p>${escapeHtml(profile.skills || 'Pick interests in your profile setup')}</p><small class="profile-edit-helper">These come from your interests and passion points. Private interests are never shown.</small></div>
         <label class="profile-edit-wide"><span>LOOKING FOR</span><input name="lookingFor" list="profile-edit-looking-options" value="${escapeHtml(profile.lookingFor || '')}" placeholder="Search or type what you are looking for" /><datalist id="profile-edit-looking-options">${profileEditDatalist('lookingFor')}</datalist><small class="profile-edit-helper">Choose from suggestions or type your own.</small></label>
         <label><span>PROFILE PHOTO</span><input name="photoFile" type="file" accept="image/*" /></label>
         <label><span>COVER PHOTO</span><input name="coverFile" type="file" accept="image/*" /></label>
@@ -1633,12 +1633,12 @@ const renderProfile = () => {
   if (statEmail) statEmail.textContent = profile.email || 'â€”';
   if (statCity) statCity.textContent = profile.city || 'â€”';
   if (statState) statState.textContent = profile.state || 'â€”';
-  document.querySelector('#profile-skills').innerHTML = skills.length ? skills.map((skill) => `<span>${escapeHtml(skill)}</span>`).join('') : '<span>No skills added yet</span>';
+  document.querySelector('#profile-skills').innerHTML = skills.length ? skills.map((skill) => `<span>${escapeHtml(skill)}</span>`).join('') : '<span>Pick interests in your profile setup</span>';
   document.querySelector('#profile-looking').innerHTML = lookingFor.length ? lookingFor.map((item) => `<span>${escapeHtml(item)}</span>`).join('') : '<span>Add your intentions to find better connections.</span>';
   const statLooking = document.querySelector('#profile-stat-looking');
   const statSkills = document.querySelector('#profile-stat-skills');
   if (statLooking) statLooking.innerHTML = lookingFor.length ? lookingFor.map((item) => `<span>${escapeHtml(item)}</span>`).join('') : '<span>Add your intentions</span>';
-  if (statSkills) statSkills.innerHTML = skills.length ? skills.map((skill) => `<span>${escapeHtml(skill)}</span>`).join('') : '<span>Add a skill</span>';
+  if (statSkills) statSkills.innerHTML = skills.length ? skills.map((skill) => `<span>${escapeHtml(skill)}</span>`).join('') : '<span>Pick interests in your profile setup</span>';
   document.querySelector('#profile-skill-count').textContent = String(skills.length).padStart(2, '0');
   document.querySelector('#profile-looking-count').textContent = String(lookingFor.length).padStart(2, '0');
   document.querySelector('#profile-experience-short').textContent = profile.experience ? profile.experience.replace('Student / just starting', 'STARTING').replace(' years', 'Y') : '—';
@@ -2267,6 +2267,8 @@ const loadSupabaseCommunity = async () => {
   const resolvedCoverUrl = rowProfile.coverUrl || metadataProfile.coverUrl || cachedCoverUrl;
   memberProfile = isSameUser ? { ...rowProfile, ...metadataProfile, ...cachedProfile, id: session.user.id } : { ...rowProfile, ...metadataProfile, id: session.user.id };
   if (resolvedCoverUrl) memberProfile.coverUrl = resolvedCoverUrl;
+  // Skills are server-owned (D-035): always the row's copy, never a stale cached or metadata value.
+  memberProfile.skills = rowProfile.skills;
   memberProfile = withoutCredentials(memberProfile);  // never cache a password (Ruling I11)
   memberProfile.email = session.user.email || memberProfile.email || '';
   if (!memberProfile.name || memberProfile.name === 'New Member') memberProfile.name = session.user.user_metadata?.name || 'New Member';

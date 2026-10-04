@@ -43,11 +43,12 @@ progress bar has `aria-valuemax="4"`. Every step has Back (except step 1); Next 
 1. **The basics** (`STEP 1 OF 4 · THE BASICS`): full name, email, phone, gender and experience. There are no City or
    State inputs; step 2 replaces them.
 2. **Your area** (`STEP 2 OF 4 · YOUR AREA`), "Where do you spend most weeks?"
-   - The explainer **"We only keep a ~5 km area. Nobody ever sees where you are."** is always visible above the two
-     choices, so it is read before the browser asks for permission.
+   - The explainer **"We only keep a rough ~2 km neighbourhood square. Nobody ever sees where you are."** is always
+     visible above the two choices, so it is read before the browser asks for permission. (Honest copy: a g7 cell is
+     about 2.3 km × 2.3 km, D-028.)
    - **Use my location** calls `navigator.geolocation.getCurrentPosition` with
      `{ enableHighAccuracy: false, timeout: 10000, maximumAge: 600000 }`, and only on that tap. Success reads
-     "Got it. We'll keep only a ~5 km area around you." The coordinates stay in memory only (never storage, URL, DOM
+     **"Got it. We keep only the ~2 km square you're in."** The coordinates stay in memory only (never storage, URL, DOM
      or logs) and go to the server in the body of `POST rpc/set_home_location`, which snaps them to a coarse cell.
    - Denial, timeout, an unanswered prompt (15 s), a missing API or an insecure context opens **Pick my city** with
      **"No problem. Pick your city instead."** and moves focus to the city search. It is never a dead end.
@@ -56,8 +57,10 @@ progress bar has `aria-valuemax="4"`. Every step has Back (except step 1); Next 
      city's centre, never your address." and is sent with `rpc/set_home_city`.
    - Next without an area shows "Choose your area to continue." A `PT429` from either call returns the member here
      with **"Try again later."** beside the choices.
-3. **Your signals** (`STEP 3 OF 4 · YOUR SIGNALS`), "Find your people."
-   - A search field ("Interests") over the taxonomy. With no query, one collapsible group per category (level 2),
+3. **Your signals** (`STEP 3 OF 4 · YOUR SIGNALS`), heading **"Your signals."**
+   - A search field ("Interests") over the taxonomy. A short result count ("3 matches", "1 match", "No matches") is
+     written to the polite live region under the field. Escape clears the field. The native clear button uses the
+     wine token. With no query, one collapsible group per category (level 2),
      each holding chips for its interests and niches (levels 3–4, the only selectable levels). With a query, the
      matching chips, grouped by category. Chips are toggle buttons (`aria-pressed`); at 12 the rest are disabled with
      "You can choose up to 12 interests. Remove one to add another."
@@ -75,16 +78,27 @@ progress bar has `aria-valuemax="4"`. Every step has Back (except step 1); Next 
 
 **Submit order.** With a session: save the profile, then `set_home_location` or `set_home_city`, then
 `set_member_interests`, then the app. A failed area or interest call returns to that step with the error beside it.
-Without a session (email confirmation), `brivia-pending-profile` keeps the profile fields, the interests and only
-`orbit: { kind: 'city', placeId }` or `{ kind: 'geo' }`, never coordinates. After login a city choice and complete
-interests are applied silently; a geo choice re-opens step 2. Profile writes never carry `skills` (server-owned,
+Without a session (email confirmation), `brivia-pending-profile` keeps the profile fields, the interests as
+`{ id, points, mode }` only (no labels), only `orbit: { kind: 'city', placeId }` or `{ kind: 'geo' }` (never
+coordinates), and `savedAt`; it is dropped unused after 7 days. **Sensitive interests are left out**; after login step 3
+says "Private interests aren't kept while you confirm your email. Please pick them again." After login a city choice
+and complete interests are applied; a geo choice re-opens step 2. Nothing fails silently: a `PT429` on the city shows
+"Try again later." on step 2, a rejected interest save prefills the budget from the pending list with the budget error,
+and the pending profile is deleted only when every call made succeeded. A save error clears whenever step 3 is entered
+again; a retry does not resend an area that was already stored. Profile writes never carry `skills` (server-owned,
 D-035), `city` or `state`; auth metadata carries no interests or location.
 
 **Completion re-entry (the gate).** Auth and app routing call `my_onboarding_status()`. When `completed` is false,
-the member lands on the completion flow at the first incomplete step: step 2 without a cell, else step 3. A stored
+the member lands on the completion flow at the first incomplete step: step 1 when the name is empty or "New Member"
+(never prefilled), step 2 without a cell, else step 3. A stored
 area is kept ("Your area: Pune. Choose again to change it.") and existing interests prefill the budget.
 
-**Profile editor (`app.js`).** Skills / interests are shown read-only ("These come from your interests and passion
+**Escape and close.** Escape never leaves the signup when a control already handled it, from a field of the signup
+form, or once the signup is past step 1. The close (×) button is 44 × 44 px and the header row reserves room for it,
+so it never covers "Log in".
+
+**Profile editor (`app.js`).** Skills / interests always come from the server row and are shown read-only (empty
+state: "Pick interests in your profile setup") ("These come from your interests and passion
 points. Private interests are never shown.").
 
 ### B. Discover deck (`app.html` swipe card)

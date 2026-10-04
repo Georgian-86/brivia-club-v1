@@ -659,7 +659,8 @@ select log_impressions($1, $4);
   `{ enableHighAccuracy: false, timeout: 10000, maximumAge: 600000 }`; denial, timeout, a missing API or an insecure
   context opens "Pick my city". The coordinates stay in one in-memory variable until `set_home_location` succeeds,
   then are dropped; they never reach `localStorage` / `sessionStorage`, a URL, the DOM or a log. A signup that waits
-  for email confirmation stores only `{ kind: 'city', placeId }` or `{ kind: 'geo' }`; after login a city is applied
+  for email confirmation stores only `{ kind: 'city', placeId }` or `{ kind: 'geo' }` (with interests as
+  `{ id, points, mode }`, sensitive ones left out, and a 7-day `savedAt` expiry); after login a city is applied
   and a geo choice asks for the location again. A `PT429` shows "Try again later." on the location step.
 - **No parameter logging:** the project sets `log_parameter_max_length_on_error = 0` and
   `log_parameter_max_length = 0`; neither pgaudit nor auto_explain logs parameters (`auto_explain.log_parameter_max_length = 0`

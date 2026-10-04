@@ -98,7 +98,7 @@
               <div class="signup-step" data-signup-step="2" hidden>
               <div class="signup-step-heading"><span>STEP 02 · YOUR AREA</span><h2>Where do you spend most weeks?</h2><p>The club shows you people nearby first: your neighbourhood, then your city, then your region.</p></div>
               <div class="area-step" data-area>
-                <p class="area-explainer" data-area-explainer><svg class="area-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 3l7 3v5c0 4.5-3 8.3-7 10-4-1.7-7-5.5-7-10V6l7-3z" /><path d="M9 12l2 2 4-4" /></svg><span>We only keep a ~5 km area. Nobody ever sees where you are.</span></p>
+                <p class="area-explainer" data-area-explainer><svg class="area-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 3l7 3v5c0 4.5-3 8.3-7 10-4-1.7-7-5.5-7-10V6l7-3z" /><path d="M9 12l2 2 4-4" /></svg><span>We only keep a rough ~2 km neighbourhood square. Nobody ever sees where you are.</span></p>
                 <div class="area-options">
                   <button class="area-option" type="button" data-area-geo><svg class="area-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 21s-6.5-5.6-6.5-11a6.5 6.5 0 0 1 13 0c0 5.4-6.5 11-6.5 11z" /><circle cx="12" cy="10" r="2.4" /></svg><span>Use my location</span></button>
                   <button class="area-option" type="button" data-area-city aria-controls="area-city-panel" aria-expanded="false"><svg class="area-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="11" cy="11" r="6.5" /><path d="M16 16l4.5 4.5" /></svg><span>Pick my city</span></button>
@@ -115,7 +115,7 @@
               <div class="signup-step-actions"><button class="auth-secondary signup-step-prev" data-prev-step="1" type="button"><span aria-hidden="true">&larr;</span> BACK TO DETAILS</button><button class="auth-submit signup-next" data-next-step="3" type="button">NEXT: YOUR SIGNALS <span aria-hidden="true">&rarr;</span></button></div>
               </div>
               <div class="signup-step" data-signup-step="3" hidden>
-              <div class="signup-step-heading"><span>STEP 03 · YOUR SIGNALS</span><h2>Find your people.</h2><p>Pick up to 12 interests, then spread 20 passion points across them. More points means it matters more to you.</p></div>
+              <div class="signup-step-heading"><span>STEP 03 · YOUR SIGNALS</span><h2>Your signals.</h2><p>Pick up to 12 interests, then spread 20 passion points across them. More points means it matters more to you.</p></div>
               <div class="interest-picker" data-interest-picker>
                 <label class="interest-label" for="interest-search">Interests</label>
                 <input class="interest-search" id="interest-search" type="search" autocomplete="off" spellcheck="false" placeholder="Search, e.g. chess or hiking" aria-describedby="interest-help" aria-controls="interest-results" />
@@ -124,6 +124,7 @@
               </div>
               <section class="budget" aria-labelledby="budget-title">
                 <div class="budget-head"><h3 id="budget-title">Your passion points</h3><p class="budget-counter" id="budget-counter" aria-live="polite">20 of 20 points left</p><p class="budget-error" id="budget-error" aria-live="polite"></p></div>
+                <p class="budget-note" data-budget-note hidden></p>
                 <ol class="budget-list" id="budget-list" aria-label="Your interests and their points"></ol>
                 <p class="budget-empty" data-budget-empty>Your interests appear here with their points.</p>
               </section>

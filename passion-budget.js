@@ -53,7 +53,8 @@ export const toPayload = (state) => state.items.map((item) => ({ interest_id: it
 export const counterText = (state) => `${pointsLeft(state)} of ${BUDGET} points left`;
 
 // Rebuilds a state from my_interests() rows ({ interest_id, label, points, mode }) or a stored pending list
-// ({ id, label, points, mode }). Drops rows without an id and duplicates; keeps at most 12; points become integers >= 1.
+// ({ id, label, points, mode }). Drops rows without an id and duplicates; keeps at most 12; points become integers >= 1
+// and a total over 20 is trimmed from the largest items.
 export const budgetFromRows = (rows) => {
   const items = [];
   (Array.isArray(rows) ? rows : []).forEach((row) => {
@@ -61,5 +62,14 @@ export const budgetFromRows = (rows) => {
     if (!id || items.some((item) => item.id === id) || items.length >= MAX_INTERESTS) return;
     items.push({ id, label: String(row.label || id), points: Math.max(1, Math.trunc(Number(row.points) || 1)), mode: validMode(row.mode) });
   });
+  // Never more than the budget: take points from the largest item (first on a tie) until the total is at most 20.
+  let over = items.reduce((sum, item) => sum + item.points, 0) - BUDGET;
+  while (over > 0) {
+    const largest = items.reduce((best, item) => (item.points > best.points ? item : best), items[0]);
+    const take = Math.min(over, largest.points - 1, Math.max(1, largest.points - Math.max(...items.filter((i) => i !== largest).map((i) => i.points), 1)));
+    if (take <= 0) break;
+    largest.points -= take;
+    over -= take;
+  }
   return { items };
 };

@@ -2931,3 +2931,27 @@
   .auth-signup-form :is(.area-option, .interest-chip, .budget-step, .budget-remove, .area-city-option),
   .auth-signup-form .mode-option span { transition: background-color .15s ease, color .15s ease, border-color .15s ease; }
 }
+
+/* Interest search: the native clear button in the wine token (a mask, so no raw colour). */
+.auth-signup-form .interest-search::-webkit-search-cancel-button {
+  -webkit-appearance: none; appearance: none; width: 16px; height: 16px; cursor: pointer; background-color: var(--brivia-wine);
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.4' stroke-linecap='round'%3E%3Cpath d='M6 6l12 12M18 6L6 18'/%3E%3C/svg%3E") center / contain no-repeat;
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.4' stroke-linecap='round'%3E%3Cpath d='M6 6l12 12M18 6L6 18'/%3E%3C/svg%3E") center / contain no-repeat;
+}
+.auth-signup-form .budget-note { margin: 0; color: var(--ob-soft); font-size: 12px; font-weight: 600; text-transform: none; letter-spacing: 0; }
+.auth-signup-form .budget-note[hidden] { display: none; }
+
+/* Close (×): a 44 × 44 target that never sits on the header controls (it overlapped "Log in" at 375 px and at
+   desktop widths). The signup header row reserves room for it. */
+.auth-shell .auth-close {
+  display: inline-flex; align-items: center; justify-content: center; width: 44px !important; height: 44px !important;
+  padding: 0; line-height: 1 !important;
+}
+.auth-shell:has(.auth-signup.is-active) .auth-panel-top { padding-right: 56px; }
+@media (min-width: 901px) {
+  .auth-shell:has(.auth-signup.is-active) .auth-top-signup { right: 0; }
+}
+@media (max-width: 480px) {
+  .auth-shell .auth-close { top: 8px; right: 8px; }
+  .auth-shell:has(.auth-signup.is-active) .auth-panel-top { padding-right: 52px; }
+}

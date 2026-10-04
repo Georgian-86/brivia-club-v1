@@ -11,6 +11,7 @@ import {
   supabase, supabaseReady, saveProfile, compressedImageDataUrl, withoutCredentials, rowToProfile, isRateLimited,
   setHomeLocation, setHomeCity, setMemberInterests, fetchMyInterests, fetchInterestNodes, searchPlaces, onboardingStatus,
 } from './supabase.js';
+import { buildPendingOnboarding, isPendingExpired } from './pending-profile.js';
 import {
   MAX_INTERESTS, MODES, emptyBudget, addInterest, removeInterest, stepPoints, setMode, pointsLeft, isComplete, toPayload,
   counterText, budgetFromRows,
@@ -828,7 +829,7 @@ const useMyLocation = () => {
       areaChoice = { kind: 'geo', lat, lng };
       if (areaPicker) areaPicker.hidden = true;
       areaCityButton?.setAttribute('aria-expanded', 'false');
-      setAreaStatus("Got it. We'll keep only a ~5 km area around you.");
+      setAreaStatus("Got it. We keep only the ~2 km square you're in.");
     }, () => { window.clearTimeout(guard); fallBack(); }, GEO_OPTIONS);
   } catch {
     window.clearTimeout(guard);
@@ -939,6 +940,12 @@ const renderInterestResults = () => {
     return;
   }
   const query = normalizeSearch(interestSearch?.value);
+  // A short result count in the polite live region (only when it changes, so re-renders do not re-announce).
+  const setHelp = (text) => { if (interestHelp && interestHelp.textContent !== text) interestHelp.textContent = text; };
+  if (query) {
+    const total = interestCatalog.groups.reduce((sum, group) => sum + group.items.filter((item) => item.search.includes(query)).length, 0);
+    setHelp(total === 0 ? 'No matches' : total === 1 ? '1 match' : `${total} matches`);
+  } else if (/match/.test(interestHelp?.textContent || '')) setHelp(INTEREST_HELP_TEXT);
   if (!query) {
     // Browse: one collapsible group per category (level 2); chips (levels 3-4) inside.
     renderKeepingFocus(interestResults, interestCatalog.groups.map((group) => `<details class="interest-group" data-interest-group="${escapeText(group.id)}"${openInterestGroups.has(group.id) ? ' open' : ''}><summary data-focus-key="group:${escapeText(group.id)}"><span>${escapeText(group.label)}</span><small>${escapeText(group.domain)}</small></summary><div class="interest-chips">${group.items.map(interestChip).join('')}</div></details>`).join(''));
@@ -953,10 +960,15 @@ const renderInterestResults = () => {
   }).join('');
   renderKeepingFocus(interestResults, html || '<p class="interest-loading">No interest matches that yet. Try a broader word.</p>');
 };
+const catalogNode = (id) => interestCatalog?.groups.flatMap((group) => group.items).find((node) => node.id === id) || null;
+const isSensitiveInterest = (id) => Boolean(catalogNode(id)?.sensitive);
+const budgetNote = signupForm?.querySelector('[data-budget-note]');
+const showBudgetNote = (text) => { if (budgetNote) { budgetNote.textContent = text; budgetNote.hidden = !text; } };
 const budgetRow = (item) => {
   const id = escapeText(item.id);
-  const label = escapeText(item.label);
-  const sensitive = interestCatalog?.groups.some((group) => group.items.some((node) => node.id === item.id && node.sensitive));
+  // A pending list carries no labels: the taxonomy names them once it is loaded.
+  const label = escapeText(catalogNode(item.id)?.label || item.label);
+  const sensitive = isSensitiveInterest(item.id);
   return `<li class="budget-row" data-budget-row="${id}">
     <div class="budget-row-head"><span class="budget-label">${label}</span>${sensitive ? `<small class="interest-private">${svgIcon('lock')}${PRIVATE_HINT_TEXT}</small>` : ''}</div>
     <div class="budget-controls">
@@ -983,7 +995,8 @@ const syncBudgetState = () => {
   });
   const complete = isComplete(budget);
   budgetNext?.setAttribute('aria-disabled', String(!complete));
-  if (complete && budgetError) budgetError.textContent = '';
+  // Completing the budget clears only the "place all points" error; a save error stays until step 3 is re-entered.
+  if (complete && budgetError?.textContent === BUDGET_ERROR_TEXT) budgetError.textContent = '';
   if (budgetEmpty) budgetEmpty.hidden = budget.items.length > 0;
 };
 const renderBudget = () => {
@@ -1001,11 +1014,12 @@ const resetBudget = () => {
   if (interestSearch) interestSearch.value = '';
   if (interestHelp) interestHelp.textContent = INTEREST_HELP_TEXT;
   if (budgetError) budgetError.textContent = '';
+  showBudgetNote('');
   renderBudget();
   if (interestCatalog) renderInterestResults();
 };
 const toggleInterest = (id) => {
-  const item = interestCatalog?.groups.flatMap((group) => group.items).find((node) => node.id === id);
+  const item = catalogNode(id);
   if (!item) return;
   if (budget.items.some((chosen) => chosen.id === id)) { setBudget(removeInterest(budget, id)); return; }
   const next = addInterest(budget, { id: item.id, label: item.label });
@@ -1014,7 +1028,14 @@ const toggleInterest = (id) => {
   setBudget(next);
 };
 interestSearch?.addEventListener('input', renderInterestResults);
-interestSearch?.addEventListener('keydown', (event) => { if (event.key === 'Enter') event.preventDefault(); });
+interestSearch?.addEventListener('keydown', (event) => {
+  if (event.key === 'Enter') event.preventDefault();
+  if (event.key === 'Escape') {
+    // Escape clears the search (and is consumed: the global Escape never closes the signup from here).
+    event.preventDefault();
+    if (interestSearch.value) { interestSearch.value = ''; renderInterestResults(); }
+  }
+});
 interestResults?.addEventListener('click', (event) => {
   if (event.target.closest('[data-interest-retry]')) { renderInterestResults(); return; }
   const chip = event.target.closest('[data-interest-id]');
@@ -1102,7 +1123,10 @@ function setSignupStep(step, focusFirst = true) {
   if (signupStepLabel) signupStepLabel.textContent = `STEP ${signupCurrentStep} OF ${SIGNUP_STEPS} · ${SIGNUP_STEP_LABELS[signupCurrentStep - 1]}`;
   // The taxonomy is fetched while the member is on "Your area", so "Your signals" opens ready.
   if (signupCurrentStep >= 2 && !interestCatalog) loadInterestCatalog().then(() => { renderBudget(); renderInterestResults(); }).catch(() => {});
-  if (signupCurrentStep === 3) renderInterestResults();
+  if (signupCurrentStep === 3) {
+    if (budgetError) budgetError.textContent = '';
+    renderInterestResults();
+  }
   const reduceMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
   authPanel?.scrollTo({ top: 0, behavior: reduceMotion ? 'auto' : 'smooth' });
   if (focusFirst) {
@@ -1263,7 +1287,7 @@ const showProfileCompletion = (user, savedProfile = null, { startStep = 1, statu
   const profile = savedProfile || {};
   const phoneParts = getPhoneParts(profile, metadata);
   const values = {
-    name: profile.name || metadata.name || metadata.full_name || '',
+    name: realName(profile.name) || realName(metadata.name) || realName(metadata.full_name),
     email: user.email || profile.email || '',
     phoneCountryCode: phoneParts.phoneCountryCode,
     phoneNumber: phoneParts.phoneNumber,
@@ -1294,34 +1318,64 @@ const showProfileCompletion = (user, savedProfile = null, { startStep = 1, statu
 };
 
 // The first incomplete onboarding step for my_onboarding_status(): 2 without a cell, else 3 (interests / budget).
-const firstIncompleteStep = (status) => (status?.has_cell ? 3 : 2);
+// A usable display name: trimmed, not empty and not the 'New Member' placeholder (the server's completion rule).
+const realName = (value) => { const name = String(value || '').trim(); return name && name !== 'New Member' ? name : ''; };
+// The first incomplete onboarding step: 1 without a real name, 2 without a cell, else 3 (interests / budget).
+const firstIncompleteStep = (status, profileRow = null) => {
+  if (!realName(profileRow?.name)) return 1;
+  return status?.has_cell ? 3 : 2;
+};
+const PRIVATE_OMITTED_NOTE = "Private interests aren't kept while you confirm your email. Please pick them again.";
+const AREA_SAVE_ERROR = "We couldn't save your area. Please try again.";
+const INTERESTS_SAVE_ERROR = 'Your interests could not be saved. Please try again.';
 
 // After a profile exists: the app when onboarding is complete, else the completion flow at the first incomplete step.
 // An unknown status (RPC error) goes to the app, whose server-side visibility still requires completion (D-030).
-const routeAfterProfile = async (user, row = null) => {
+// `pendingResult` (from applyPendingOnboarding) carries what happened to a pending signup's area and interests.
+const routeAfterProfile = async (user, row = null, pendingResult = null) => {
   const { data: status, error } = await onboardingStatus();
   if (error || !status || status.completed !== false) { redirectToApp(); return; }
   let profileRow = row;
   if (!profileRow) ({ data: profileRow } = await supabase.from('profiles').select('*').eq('id', user.id).maybeSingle());
-  showProfileCompletion(user, profileRow ? rowToProfile(profileRow) : null, { startStep: firstIncompleteStep(status), status });
+  let startStep = firstIncompleteStep(status, profileRow);
+  if (pendingResult?.orbitError && startStep > 2) startStep = 2;
+  showProfileCompletion(user, profileRow ? rowToProfile(profileRow) : null, { startStep, status });
+  if (pendingResult?.orbitError) setAreaError(isRateLimited(pendingResult.orbitError.error, pendingResult.orbitError.status) ? 'Try again later.' : AREA_SAVE_ERROR);
   if (status.interests > 0) {
     const { data: rows } = await fetchMyInterests();
     if (Array.isArray(rows) && rows.length && !budget.items.length) setBudget(budgetFromRows(rows), { rerenderChips: true });
   }
+  if (!budget.items.length && pendingResult?.budget?.items.length) {
+    setBudget(pendingResult.budget, { rerenderChips: true });
+    if (pendingResult.privateOmitted) showBudgetNote(PRIVATE_OMITTED_NOTE);
+  }
+  if (pendingResult?.interestsFailed && budgetError) budgetError.textContent = INTERESTS_SAVE_ERROR;
   window.history.replaceState({ briviaAuthView: 'signup' }, '', '/auth.html');
 };
 
-// A signup that needed email confirmation stored { interests, orbit } with the pending profile (never coordinates).
-// After login: a city choice and complete interests are applied silently; a geo choice is asked for again (step 2).
+// A signup that needed email confirmation stored { interests, orbit } with the pending profile (never coordinates,
+// never labels or sensitive interests). After login: a city choice and complete interests are applied; a geo choice is
+// asked for again (step 2). Nothing fails silently: the result tells routeAfterProfile what to show, and the pending
+// profile is removed only when every call that was made succeeded.
 const applyPendingOnboarding = async (pending) => {
-  if (!pending || typeof pending !== 'object') return;
+  const result = { orbitError: null, interestsFailed: false, budget: null, privateOmitted: false, ok: true };
+  if (!pending || typeof pending !== 'object') return result;
   if (pending.orbit?.kind === 'city' && typeof pending.orbit.placeId === 'string' && pending.orbit.placeId) {
-    await setHomeCity(pending.orbit.placeId);
+    const { error, status } = await setHomeCity(pending.orbit.placeId);
+    if (error) result.orbitError = { error, status };
   }
   const stored = budgetFromRows(pending.interests);
-  if (isComplete(stored)) await setMemberInterests(toPayload(stored));
+  result.budget = stored;
+  result.privateOmitted = pending.privateOmitted === true;
+  if (isComplete(stored)) {
+    const { error } = await setMemberInterests(toPayload(stored));
+    if (error) result.interestsFailed = true;
+  }
+  result.ok = !result.orbitError && !result.interestsFailed;
+  if (result.ok) window.localStorage.removeItem('brivia-pending-profile');
+  return result;
 };
-const PENDING_ONBOARDING_KEYS = ['interests', 'orbit'];
+const PENDING_ONBOARDING_KEYS = ['interests', 'orbit', 'privateOmitted', 'savedAt'];
 const withoutOnboarding = (profile) => {
   const clean = { ...(profile || {}) };
   PENDING_ONBOARDING_KEYS.forEach((key) => { delete clean[key]; });
@@ -1364,8 +1418,8 @@ const restoreAuthPageSession = async () => {
   const pending = readPendingProfile();
   const pendingMatches = pending?.email?.toLowerCase() === session.user.email?.toLowerCase();
   if (await restoreCachedMemberProfile(session.user, pendingMatches ? pending : null)) {
-    if (pendingMatches) await applyPendingOnboarding(pending);
-    await routeAfterProfile(session.user);
+    const pendingResult = pendingMatches ? await applyPendingOnboarding(pending) : null;
+    await routeAfterProfile(session.user, null, pendingResult);
     return;
   }
   showProfileCompletion(session.user, pendingMatches ? withoutOnboarding(pending) : null);
@@ -1386,8 +1440,15 @@ const redirectToApp = () => {
   window.location.replace('/app.html');
 };
 
+// The pending signup profile, or null. One older than 7 days (or without savedAt) is removed, never applied.
 const readPendingProfile = () => {
-  try { return JSON.parse(window.localStorage.getItem('brivia-pending-profile') || 'null'); } catch { return null; }
+  let pending = null;
+  try { pending = JSON.parse(window.localStorage.getItem('brivia-pending-profile') || 'null'); } catch { pending = null; }
+  if (pending && isPendingExpired(pending)) {
+    window.localStorage.removeItem('brivia-pending-profile');
+    return null;
+  }
+  return pending && typeof pending === 'object' ? pending : null;
 };
 
 const restoreCachedMemberProfile = async (user, preferredProfile = null) => {
@@ -1419,7 +1480,6 @@ const restoreCachedMemberProfile = async (user, preferredProfile = null) => {
   delete profile.id;
   const { error } = await saveProfile(user.id, profile, null);
   if (error) return false;
-  window.localStorage.removeItem('brivia-pending-profile');
   window.localStorage.setItem('brivia-member-profile', JSON.stringify({ ...profile, id: user.id, email: user.email }));
   return true;
 };
@@ -1529,12 +1589,12 @@ loginForm?.addEventListener('submit', async (event) => {
     if (error) throw error;
     const pending = readPendingProfile();
     const pendingBelongsToUser = pending?.email?.toLowerCase() === data.user?.email?.toLowerCase();
+    let loginPendingResult = null;
     if (pending && data.user && pendingBelongsToUser) {
       const safePending = withoutOnboarding(withoutCredentials(pending));
       const { error: profileError } = await saveProfile(data.user.id, safePending, null);
       if (profileError) throw profileError;
-      await applyPendingOnboarding(pending);
-      window.localStorage.removeItem('brivia-pending-profile');
+      loginPendingResult = await applyPendingOnboarding(pending);
       window.localStorage.setItem('brivia-member-profile', JSON.stringify({ ...safePending, id: data.user.id }));
     } else if (pending && !pendingBelongsToUser) {
       window.localStorage.removeItem('brivia-pending-profile');
@@ -1554,7 +1614,7 @@ loginForm?.addEventListener('submit', async (event) => {
     if (pendingBelongsToUser && pending?.coverUrl) {
       await supabase.auth.updateUser({ data: { coverUrl: pending.coverUrl } }).catch(() => {});
     }
-    await routeAfterProfile(data.user, ownProfile);
+    await routeAfterProfile(data.user, ownProfile, loginPendingResult);
   } catch (error) {
     if (loginNote) loginNote.textContent = error.message || 'Could not sign you in. Check your email and password.';
   } finally {
@@ -1579,7 +1639,7 @@ const finishOnboarding = async () => {
     const { data, error, status } = choice.kind === 'geo' ? await setHomeLocation(choice.lat, choice.lng) : await setHomeCity(choice.placeId);
     if (error) {
       setSignupStep(2);
-      const message = isRateLimited(error, status) ? 'Try again later.' : "We couldn't save your area. Please try again.";
+      const message = isRateLimited(error, status) ? 'Try again later.' : AREA_SAVE_ERROR;
       setAreaError(message);
       throw new OnboardingStepError(message);
     }
@@ -1589,7 +1649,7 @@ const finishOnboarding = async () => {
   const { error } = await setMemberInterests(toPayload(budget));
   if (error) {
     setSignupStep(3);
-    const message = 'Your interests could not be saved. Please try again.';
+    const message = INTERESTS_SAVE_ERROR;
     if (budgetError) budgetError.textContent = message;
     throw new OnboardingStepError(message);
   }
@@ -1718,9 +1778,9 @@ signupForm?.addEventListener('submit', async (event) => {
     }
     // Email confirmation: nothing can be written before a session exists. Keep the interests and only the KIND of
     // area choice (a city id, or "ask for my location again"); the coordinates are dropped here.
-    const pendingOrbit = areaChoice?.kind === 'city' ? { kind: 'city', placeId: areaChoice.placeId } : { kind: 'geo' };
-    const pendingInterests = budget.items.map(({ id, label, points, mode }) => ({ id, label, points, mode }));
-    window.localStorage.setItem('brivia-pending-profile', JSON.stringify({ ...profile, interests: pendingInterests, orbit: pendingOrbit }));
+    // Interests as { id, points, mode } only, sensitive ones left out (asked for again after login), plus savedAt.
+    const pendingOnboarding = buildPendingOnboarding(budget, isSensitiveInterest, areaChoice);
+    window.localStorage.setItem('brivia-pending-profile', JSON.stringify({ ...profile, ...pendingOnboarding }));
     areaChoice = null;
     const accountEmail = signupSuccess?.querySelector('[data-credential="account-email"]');
     if (accountEmail) accountEmail.textContent = profile.email;
@@ -1747,6 +1807,12 @@ signupForm?.addEventListener('submit', async (event) => {
 
 if (document.body.classList.contains('auth-page')) void restoreAuthPageSession();
 
+// Escape closes the auth modal (on auth.html it leaves the page), but never when a control already handled it, never
+// from a field of the signup form, and never once a signup is past step 1: progress must not be lost to one key.
 document.addEventListener('keydown', (event) => {
-  if (event.key === 'Escape' && authModal?.classList.contains('is-open')) closeAuth();
+  if (event.key !== 'Escape' || event.defaultPrevented || !authModal?.classList.contains('is-open')) return;
+  const inSignup = signupForm && event.target instanceof Node && signupForm.contains(event.target);
+  if (inSignup && (event.target.closest?.('input, select, textarea') || signupCurrentStep > 1)) return;
+  if (!signupForm?.hasAttribute('hidden') && authHistoryView === 'signup' && signupCurrentStep > 1) return;
+  closeAuth();
 });
