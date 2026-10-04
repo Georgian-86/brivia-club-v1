@@ -224,3 +224,7 @@ supersedes it.
 - **Alternatives rejected:** counting the live cap from `connection_requests` (a probe, see above); returning a
   distinct status for a duplicate (it would reveal a decline, since a live declined request reads as pending);
   charging after the recipient lookup (the charge would differ by recipient state).
+- **Fix round 1 (2026-10-04):** `matched` reflects any match row the sender can read, independent of visibility (no
+  block or completion leak); requests from senders who are no longer completed are hidden and unanswerable; the
+  completion-gated policies evaluate once per statement; `purge_expired_requests()` prunes ledger rows older than
+  30 days; out-of-range config values fall back to the defaults.

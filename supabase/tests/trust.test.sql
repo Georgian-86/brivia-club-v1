@@ -535,16 +535,17 @@ end $$;
 rollback;
 
 -- Ruling I6: requests and messages across worlds are refused; same-world ones still work. A cross-world signal
--- answers 'sent' like any other and writes no request (D-032); a cross-world message is an RLS error.
+-- writes no request (D-032) and answers like any other: 'sent', or 'matched' when the sender can already read a
+-- match row for the pair (R1-T1 is a legacy cross-world match, fix round 1); a cross-world message is an RLS error.
 do $$
 declare stmt text; failed boolean; st text;
 begin
-  foreach stmt in array array['01|70000000-0000-0000-0000-000000000008', '08|70000000-0000-0000-0000-000000000002'] loop
+  foreach stmt in array array['01|70000000-0000-0000-0000-000000000008|matched', '08|70000000-0000-0000-0000-000000000002|sent'] loop
     set local role authenticated;
     perform set_config('request.jwt.claims', json_build_object('sub', '70000000-0000-0000-0000-0000000000' || split_part(stmt, '|', 1))::text, true);
     select status into st from public.send_signal(split_part(stmt, '|', 2)::uuid);
     reset role;
-    if st <> 'sent' then raise exception 'FAIL I6: cross-world signal % answered %', stmt, st; end if;
+    if st <> split_part(stmt, '|', 3) then raise exception 'FAIL I6: cross-world signal % answered %', stmt, st; end if;
     if exists (select 1 from public.connection_requests where to_id = split_part(stmt, '|', 2)::uuid
                  and from_id = ('70000000-0000-0000-0000-0000000000' || split_part(stmt, '|', 1))::uuid) then
       raise exception 'FAIL I6: cross-world request written: %', stmt;

@@ -364,12 +364,19 @@ north-star metric (people who actually meet).
   completed, and an id that does not exist all answer `status = 'sent'` and cost exactly one unit, the same as a
   normal target. Only a visible target (`brivia_visible_to`, §7) gets a `connection_requests` row. `send_signal` writes
   **no `interaction` row** on any path, so the sender's response, quota and interaction rows cannot probe recipient
-  state. The response is `matched` only when a match for the pair exists afterwards.
+  state. The response is `matched` exactly when a match row for the pair exists afterwards, on every path: the
+  sender can already read that row, so an existing match answers `matched` even if the partner has since blocked the
+  sender, moved worlds or stopped being completed (otherwise `matched` vs `sent` would leak that change). A **new**
+  match is only ever created on the visible path.
 - A request that **completes a match** (a live pending or declined request from the visible target to the sender
   already exists) is never refused by either cap, and it still costs one unit (`remaining` stays at 0).
 - **Completion gates every consent path.** `brivia_has_completed_profile()`, used by the request, message, match and
-  post policies, means `brivia_member_completed(auth.uid())`, and `respond_connection_request` refuses a caller who is
-  not completed (`22023 'complete your profile'`).
+  post policies and by the (owner-run) `public_profiles` view, means `brivia_member_completed(auth.uid())`, and
+  `respond_connection_request` refuses a caller who is not completed (`22023 'complete your profile'`). A request
+  **from** a sender who is no longer completed is hidden from the recipient's Requests list and answers
+  `respond_connection_request` like a request that does not exist, so accepting and liking back agree. The completion-gated policies evaluate the check once per statement.
+- **Ledger pruning.** The owner-only `purge_expired_requests()` also deletes `signal_ledger` rows older than 30 days
+  (no counter reads them). It still returns the number of request rows deleted.
 - The iteration-2 rule that dropped an over-cap request **silently** (no error, the usual "Signal sent") is replaced
   by the honest own quota above (D-026 supersedes D-019 in part).
 - **The sender never sees a decline.** Senders read their outgoing requests only through

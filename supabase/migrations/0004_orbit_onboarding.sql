@@ -3,7 +3,8 @@
 -- applies every migration twice).
 -- RE-RUN ORDER: section 4 redefines get_candidates, search_members, list_members and brivia_can_see_author from 0003;
 -- section 6 redefines brivia_has_completed_profile (0001), brivia_before_connection_request and
--- respond_connection_request (0003) and revokes the 0003 insert grant on connection_requests.
+-- respond_connection_request (0003), recreates the completion-gated policies of 0001-0003 and revokes the 0003
+-- insert grant on connection_requests.
 -- Any re-run of 0003 (or of 0001/0002, which require a 0003 re-run) must be followed by a re-run of 0004.
 -- Sections:
 --   1. Grid and places: the coarse equal-area grid (D-028, spec §4.1 / §9.1.4) and the place list.
@@ -15,7 +16,8 @@
 --      (§9.1.4).
 --   6. Signals: brivia_config, signal_ledger, send_signal, my_signal_quota (Ruling A1, D-032, §6.4). Revokes raw
 --      client inserts into connection_requests; redefines brivia_before_connection_request (0003, without the caps),
---      respond_connection_request (0003) and brivia_has_completed_profile (0001) on top of the D-030 completion.
+--      respond_connection_request (0003) and brivia_has_completed_profile (0001) on top of the D-030 completion,
+--      and recreates the completion-gated request, match, message and post policies (once-per-statement check).
 --   Data: places (section 1) and the interest taxonomy (end of file).
 -- Privacy (CLAUDE.md): coordinates exist only as function arguments. No member table stores them; the only
 -- coordinate columns are the public city centroids in public.place, which no client role can read.
@@ -855,14 +857,16 @@ create table if not exists public.brivia_config (
 alter table public.brivia_config enable row level security;
 revoke all on public.brivia_config from public, anon, authenticated;
 
--- Internal: an integer config value, or the default when the key is missing or not a non-negative number.
+-- Internal: an integer config value, or the default when the key is missing, not a number, negative, or above the
+-- int range (2147483647).
 create or replace function public.brivia_config_int(p_key text, p_default int)
 returns int
 language sql
 stable
 set search_path = public
 as $$
-  select coalesce((select case when jsonb_typeof(c.value) = 'number' and (c.value #>> '{}')::numeric >= 0
+  select coalesce((select case when jsonb_typeof(c.value) = 'number'
+                                    and (c.value #>> '{}')::numeric between 0 and 2147483647
                                then floor((c.value #>> '{}')::numeric)::int end
                      from public.brivia_config c where c.key = p_key), p_default)
 $$;
@@ -933,8 +937,9 @@ grant execute on function public.my_signal_quota() to authenticated;
 --   3. quota: at a cap, raise PT429 'signal_quota_exhausted' (daily) or 'signal_live_cap' (live), not charged,
 --      UNLESS a live reverse request from a visible p_to exists (the completion case is never refused);
 --   4. charge: one ledger row;
---   5. recipient side, all silent: not brivia_visible_to -> 'sent'; otherwise insert the request (a duplicate or a
---      vanished recipient -> 'sent'); 'matched' only when a match exists for the pair afterwards;
+--   5. recipient side, all silent: only a brivia_visible_to target gets a request (a duplicate or a vanished
+--      recipient is swallowed); 'matched' iff a match row for the pair exists afterwards, on every path (the sender
+--      can read that row anyway), otherwise 'sent';
 --   6. no interaction row on any path; 7. returns the post-charge remaining (floored at 0) and resets_at.
 create or replace function public.send_signal(p_to uuid, p_note text default null)
 returns table(status text, remaining int, resets_at timestamptz)
@@ -977,17 +982,20 @@ begin
   end if;
   -- 4. Charge, before anything about the recipient is looked at.
   insert into public.signal_ledger (sender_id, to_id) values (me, p_to);
-  -- 5. Recipient side: every outcome below answers the same way.
+  -- 5. Recipient side: every outcome below answers the same way. Only a visible target gets a request row, so a
+  --    NEW match can only come from this branch (the completion trigger).
   if public.brivia_visible_to(me, p_to) then
     begin
       insert into public.connection_requests (from_id, to_id, note) values (me, p_to, p_note);
     exception when unique_violation or foreign_key_violation then
       null;  -- a live earlier request (pending or declined) or a recipient that just vanished: still 'sent'
     end;
-    if exists (select 1 from public.matches m
-                where (m.user1_id = me and m.user2_id = p_to) or (m.user1_id = p_to and m.user2_id = me)) then
-      v_status := 'matched';
-    end if;
+  end if;
+  -- 'matched' reflects a match row the sender can already read, whatever the partner's state now (blocked, other
+  -- world, no longer completed). Checking it only on the visible path would leak a block or a completion change.
+  if exists (select 1 from public.matches m
+              where (m.user1_id = me and m.user2_id = p_to) or (m.user1_id = p_to and m.user2_id = me)) then
+    v_status := 'matched';
   end if;
   -- 6. No interaction row. 7. The post-charge quota.
   select * into s from public.brivia_signal_state(me);
@@ -996,6 +1004,27 @@ end;
 $$;
 revoke all on function public.send_signal(uuid, text) from public, anon;
 grant execute on function public.send_signal(uuid, text) to authenticated;
+
+-- purge_expired_requests (0003, owner only) also prunes signal_ledger rows older than 30 days: no cap reads them
+-- (daily: 24 h; live: 30 days). It still returns the number of request rows deleted.
+create or replace function public.purge_expired_requests()
+returns integer
+language sql
+volatile
+set search_path = public
+as $$
+  with gone_ledger as (
+    delete from public.signal_ledger where at <= now() - interval '30 days'
+    returning 1
+  ),
+  gone as (
+    delete from public.connection_requests
+     where not public.brivia_request_is_live(status, created_at)
+    returning 1
+  )
+  select count(*)::integer from gone;  -- gone_ledger runs too: data-modifying CTEs always execute
+$$;
+revoke all on function public.purge_expired_requests() from public, anon, authenticated;
 
 -- Raw client inserts are gone (this also removes the 0003 column grant on from_id, to_id, note).
 revoke insert on public.connection_requests from public, anon, authenticated;
@@ -1033,8 +1062,75 @@ $$;
 revoke all on function public.brivia_has_completed_profile() from public, anon;
 grant execute on function public.brivia_has_completed_profile() to authenticated;
 
--- respond_connection_request (0003) plus the completion gate: a caller who is not completed gets 22023
--- 'complete your profile' (their own state; it says nothing about the request). Everything else is unchanged.
+-- Policies gated on completion, recreated so brivia_has_completed_profile() is evaluated once per statement
+-- (wrapped in a scalar subquery: an initplan) instead of once per row. Semantics are those of 0001/0003, except the
+-- incoming-request policy, which also hides requests from senders who are no longer completed (fix round 1), so
+-- "like back" (send_signal writes nothing to them) and "accept" agree.
+-- Internal-for-policies: true only for a sender with a request addressed to the caller who is completed. It answers
+-- false for anyone else, so it is not an oracle about arbitrary members.
+create or replace function public.brivia_request_sender_completed(p_from uuid)
+returns boolean
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select exists (select 1 from public.connection_requests r where r.from_id = p_from and r.to_id = auth.uid())
+     and public.brivia_member_completed(p_from);
+$$;
+revoke all on function public.brivia_request_sender_completed(uuid) from public, anon;
+grant execute on function public.brivia_request_sender_completed(uuid) to authenticated;
+
+drop policy if exists "Members can view their connection requests" on public.connection_requests;
+create policy "Members can view their connection requests"
+  on public.connection_requests for select to authenticated
+  using (
+    (select public.brivia_has_completed_profile())
+    and to_id = auth.uid()
+    and not public.brivia_is_blocked_between(from_id, to_id)  -- caller is a party, so this answers
+    and public.brivia_request_is_live(status, created_at)
+    and public.brivia_request_sender_completed(from_id)
+  );
+
+drop policy if exists "Completed members can view their matches" on public.matches;
+create policy "Completed members can view their matches"
+  on public.matches for select to authenticated
+  using ((select public.brivia_has_completed_profile()) and auth.uid() in (user1_id, user2_id));
+
+drop policy if exists "Completed members can remove their matches" on public.matches;
+create policy "Completed members can remove their matches"
+  on public.matches for delete to authenticated
+  using ((select public.brivia_has_completed_profile()) and auth.uid() in (user1_id, user2_id));
+
+drop policy if exists "Completed members can view their messages" on public.brivia_messages;
+create policy "Completed members can view their messages"
+  on public.brivia_messages for select to authenticated
+  using ((select public.brivia_has_completed_profile()) and auth.uid() in (sender_id, recipient_id));
+
+-- Still ONE insert policy (a second permissive policy would OR away these checks). Same checks as 0003.
+drop policy if exists "Completed members can send messages" on public.brivia_messages;
+create policy "Completed members can send messages"
+  on public.brivia_messages for insert to authenticated
+  with check (
+    (select public.brivia_has_completed_profile())
+    and sender_id = auth.uid()
+    and not public.brivia_is_blocked_between(sender_id, recipient_id)
+    and public.brivia_same_world(sender_id, recipient_id)
+    and exists (
+      select 1 from public.matches m
+      where (m.user1_id = sender_id and m.user2_id = recipient_id)
+         or (m.user1_id = recipient_id and m.user2_id = sender_id)
+    )
+  );
+
+drop policy if exists "Members can create their own community posts" on public.community_posts;
+create policy "Members can create their own community posts"
+  on public.community_posts for insert to authenticated
+  with check ((select public.brivia_has_completed_profile()) and author_id = auth.uid());
+
+-- respond_connection_request (0003) plus the completion gates: a caller who is not completed gets 22023
+-- 'complete your profile' (their own state; it says nothing about the request), and a request from a sender who is
+-- not completed answers no_data_found, like a request that does not exist. Everything else is unchanged.
 create or replace function public.respond_connection_request(p_from uuid, p_accept boolean)
 returns void
 language plpgsql
@@ -1051,11 +1147,13 @@ begin
     raise exception 'complete your profile' using errcode = '22023';
   end if;
   perform public.brivia_lock_pair(p_from, me);
+  -- A request from a sender who is no longer completed is hidden by the select policy below, so it answers like
+  -- one that does not exist (the like-back path, send_signal, writes nothing to such a member either).
   if not exists (
     select 1 from public.connection_requests
     where from_id = p_from and to_id = me and status = 'pending'
       and public.brivia_request_is_live(status, created_at)
-  ) then
+  ) or not public.brivia_member_completed(p_from) then
     raise exception 'no pending connection request' using errcode = 'no_data_found';
   end if;
   if not p_accept or public.brivia_pair_is_blocked(p_from, me) then

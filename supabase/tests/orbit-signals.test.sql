@@ -199,6 +199,41 @@ begin
 end $$;
 rollback;
 
+-- 3b. Fix round 1 (Important): an EXISTING match answers 'matched' whatever the partner's state now. The sender can
+--     already read the match row, so the status must not depend on visibility: a partner who has since blocked the
+--     sender, or is no longer completed, answers exactly like an unblocked partner (same status, same quota delta).
+begin;
+insert into public.matches (user1_id, user2_id)
+select least(pg_temp.s6(1), pg_temp.s6(i)), greatest(pg_temp.s6(1), pg_temp.s6(i)) from generate_series(11, 13) i;
+insert into public.brivia_blocks (blocker_id, blocked_id) values (pg_temp.s6(12), pg_temp.s6(1));
+delete from public.member_interest where member_id = pg_temp.s6(13);   -- 13 is no longer completed
+do $$
+declare t int; r record; q record; prev int := 30; prev_live int; got text := '';
+begin
+  if public.brivia_member_completed(pg_temp.s6(13)) then raise exception 'FAIL setup: 13 still completed'; end if;
+  set local role authenticated;
+  perform set_config('request.jwt.claims', json_build_object('sub', pg_temp.s6(1))::text, true);
+  select live_unanswered into prev_live from public.my_signal_quota();
+  foreach t in array array[11, 12, 13] loop
+    select * into r from public.send_signal(pg_temp.s6(t));
+    select * into q from public.my_signal_quota();
+    got := got || r.status || ':' || (prev - r.remaining) || ':' || (q.live_unanswered - prev_live) || ',';
+    prev := r.remaining; prev_live := q.live_unanswered;
+  end loop;
+  reset role;
+  if got <> 'matched:1:0,matched:1:0,matched:1:0,' then
+    raise exception 'FAIL Review Focus 1: existing matches answer differently by partner state: %', got;
+  end if;
+  -- no new match is ever created off the visible path
+  if (select count(*) from public.matches where pg_temp.s6(1) in (user1_id, user2_id)) <> 3 then
+    raise exception 'FAIL: the match count changed';
+  end if;
+  if exists (select 1 from public.connection_requests where from_id = pg_temp.s6(1) and to_id in (pg_temp.s6(12), pg_temp.s6(13))) then
+    raise exception 'FAIL: a request was written to an invisible partner';
+  end if;
+end $$;
+rollback;
+
 -- 4. The daily cap: 30 per rolling 24 h. The 31st raises PT429 signal_quota_exhausted, is not charged and writes
 --    no request. A request that completes a match is never refused, and remaining stays 0.
 begin;
@@ -308,6 +343,21 @@ begin
   reset role;
 end $$;
 rollback;
+-- Fix round 1: a value above the int range (or not a number, or negative) falls back to the default.
+begin;
+insert into public.brivia_config (key, value) values ('signal_daily_limit', '3000000000'), ('signal_live_limit', '"many"');
+do $$
+declare q record;
+begin
+  set local role authenticated;
+  perform set_config('request.jwt.claims', json_build_object('sub', pg_temp.s6(1))::text, true);
+  select * into q from public.my_signal_quota();
+  reset role;
+  if q.daily_limit <> 30 or q.live_limit <> 100 then raise exception 'FAIL config: out-of-range values gave %', q; end if;
+  update public.brivia_config set value = '-1' where key = 'signal_daily_limit';
+  if public.brivia_config_int('signal_daily_limit', 30) <> 30 then raise exception 'FAIL config: a negative value was used'; end if;
+end $$;
+rollback;
 
 -- 7. brivia_has_completed_profile() means the new completion (D-030): a member who is not completed cannot
 --    message a match or accept a request. Completed members still can.
@@ -341,6 +391,69 @@ begin
   end if;
   if not exists (select 1 from public.matches where pg_temp.s6(10) in (user1_id, user2_id) and pg_temp.s6(2) in (user1_id, user2_id)) then
     raise exception 'FAIL: positive control: the completed member''s accept made no match';
+  end if;
+end $$;
+rollback;
+
+-- 8. Fix round 1, minor 1: an incoming request from a sender who is no longer completed is hidden from the recipient
+--    and cannot be accepted, matching the like-back path (send_signal to them writes nothing).
+begin;
+insert into public.connection_requests (from_id, to_id) values (pg_temp.s6(14), pg_temp.s6(2)), (pg_temp.s6(15), pg_temp.s6(2));
+delete from public.member_interest where member_id = pg_temp.s6(14);   -- 14 is no longer completed; 15 is the control
+do $$
+declare n int; st text;
+begin
+  set local role authenticated;
+  perform set_config('request.jwt.claims', json_build_object('sub', pg_temp.s6(2))::text, true);
+  select count(*) into n from public.connection_requests where from_id = pg_temp.s6(14);
+  if n <> 0 then raise exception 'FAIL: the recipient sees a request from a member who is not completed'; end if;
+  select count(*) into n from public.connection_requests where from_id = pg_temp.s6(15);
+  if n <> 1 then raise exception 'FAIL: positive control: the recipient does not see a completed sender''s request'; end if;
+  begin perform public.respond_connection_request(pg_temp.s6(14), true); exception when others then st := sqlstate; end;
+  if st is distinct from 'P0002' then raise exception 'FAIL: a not-completed sender''s request was answerable (%)', st; end if;
+  reset role;
+  if exists (select 1 from public.matches where pg_temp.s6(14) in (user1_id, user2_id)) then
+    raise exception 'FAIL: accept made a match with a member who is not completed';
+  end if;
+end $$;
+rollback;
+
+-- 9. Fix round 1, minor 2: every RLS policy evaluates brivia_has_completed_profile() once per statement, wrapped as
+--    (select public.brivia_has_completed_profile()). No policy calls it bare.
+do $$
+declare r record; expr text;
+begin
+  for r in select tablename, policyname, coalesce(qual, '') || ' ' || coalesce(with_check, '') as e
+             from pg_policies where schemaname = 'public'
+              and (coalesce(qual, '') || coalesce(with_check, '')) like '%brivia_has_completed_profile%' loop
+    expr := regexp_replace(r.e, '\(\s*SELECT\s+(public\.)?brivia_has_completed_profile\(\)\s+AS\s+brivia_has_completed_profile\s*\)', '', 'g');
+    if expr like '%brivia_has_completed_profile%' then
+      raise exception 'FAIL: policy % on % calls brivia_has_completed_profile() per row: %', r.policyname, r.tablename, r.e;
+    end if;
+  end loop;
+  if (select count(*) from pg_policies where schemaname = 'public'
+        and (coalesce(qual, '') || coalesce(with_check, '')) like '%brivia_has_completed_profile%') < 6 then
+    raise exception 'FAIL: expected at least 6 policies gated on brivia_has_completed_profile()';
+  end if;
+end $$;
+
+-- 10. Fix round 1, minor 3: purge_expired_requests() also prunes ledger rows older than 30 days (they no longer
+--     count toward any cap). It stays owner-only and still returns the number of request rows deleted.
+begin;
+insert into public.signal_ledger (sender_id, to_id, at) values
+  (pg_temp.s6(1), pg_temp.s6(100), now() - interval '31 days'),
+  (pg_temp.s6(1), pg_temp.s6(101), now() - interval '29 days'),
+  (pg_temp.s6(1), pg_temp.s6(102), now());
+insert into public.connection_requests (from_id, to_id, created_at) values (pg_temp.s6(1), pg_temp.s6(103), now() - interval '31 days');
+do $$
+declare n int;
+begin
+  select public.purge_expired_requests() into n;
+  if n <> 1 then raise exception 'FAIL purge: returned % (want 1 request row)', n; end if;
+  if (select string_agg(right(to_id::text, 3), ',' order by to_id) from public.signal_ledger where sender_id = pg_temp.s6(1))
+     is distinct from '101,102' then
+    raise exception 'FAIL purge: ledger rows left: %',
+      (select string_agg(right(to_id::text, 3), ',' order by to_id) from public.signal_ledger where sender_id = pg_temp.s6(1));
   end if;
 end $$;
 rollback;
