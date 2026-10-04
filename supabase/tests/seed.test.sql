@@ -57,7 +57,7 @@ begin
   -- a cell in their own city: g7 plus the stored grid parents, nearest place = the city, within 3 km of its centroid
   select count(*) into n from public.profiles p join public.member_orbit o on o.member_id = p.id
     join public.place pl on pl.id = o.place_id
-   where p.is_test and o.cell_scheme = 'grid1' and o.home_cell like 'g7:%'
+   where p.is_test and o.cell_scheme = 'grid1' and o.home_cell like 'g7:%' and o.precision = 'cell'  -- D-038 R2
      and o.home_cell_g6 = public.brivia_grid_parent(o.home_cell, 6) and o.home_cell_g5 = public.brivia_grid_parent(o.home_cell, 5)
      and pl.name = p.city and public.brivia_cell_km(o.home_cell, public.brivia_grid_cell(pl.lat, pl.lng, 7)) <= 3;
   if n <> 24 then raise exception 'FAIL S2: only % test members have a cell in their city', n; end if;

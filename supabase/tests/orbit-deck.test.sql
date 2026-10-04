@@ -1,8 +1,10 @@
--- Iteration 3, Task 7: deck_candidates, the interim location-first deck, and deck_status (P0-4; spec §7, §9.1.5).
--- Order (D-034): the k-safe display ring asc (the ring the card's band shows, never the true ring), then the
--- shared-interest count desc, then md5(viewer || target). Rings 0-2 only. Cards carry a
--- k-anonymous distance band and at most two "You both" labels; sensitive (D-029) and non-active interests (including
--- the retired harness fixture zz.harness.any) are never shown and never counted, for display or for ordering.
+-- Iteration 3, Task 7: deck_candidates, the interim location-first deck, and deck_status (P0-4; spec §7, §9.1.5),
+-- as amended by the iteration-3 arena (D-038, R1). Membership: a fine target (both precision 'cell', target g7 cell
+-- ok10) at <= 15 km, else the place rule (place centroids <= 60 km). Order: at least one shared interest first, then
+-- the display ring (0, 1, the place tier), then the budget-bounded overlap, then brivia_deck_tie(viewer, target, day).
+-- (orbit-deck-order.test.sql and orbit-triangulation.test.sql test the R1 rules in depth.) Cards carry a k-anonymous
+-- distance band and at most two "You both" labels; sensitive (D-029, D-038) and non-active interests (including the
+-- retired harness fixture zz.harness.any) are never shown and never counted, for display or for ordering.
 -- Members are made completed directly as the owner (the harness autocomplete is off).
 -- Ids: d7e7e7e7-e7e7-4e7e-a7e7-e7e7e7e7e7NN (no 10-digit run, so the phone-shaped contract regex can apply to ids).
 --   01 V viewer (C0, Kochi)   02 A ring 0, 2 shared   03 B ring 0, 1 shared   04 Z ring 0, 0 shared
@@ -73,10 +75,10 @@ begin
             public.brivia_nearest_place(cell))
     on conflict (member_id) do nothing;
     interests := case g
-      when 1  then '{"sports.racket.badminton":8,"sports.racket.tennis":5,"sports.team.cricket":4,"wellbeing.health.sleep":1,"wellbeing.health.nutrition":1,"zz.harness.any":1}'
+      when 1  then '{"sports.racket.badminton":8,"sports.racket.tennis":5,"sports.team.cricket":4,"wellbeing.health.peer_support":1,"wellbeing.spirituality.kirtan":1,"zz.harness.any":1}'
       when 2  then '{"sports.racket.badminton":10,"sports.racket.tennis":10}'
       when 3  then '{"sports.racket.tennis":20}'
-      when 5  then '{"wellbeing.health.sleep":5,"wellbeing.health.nutrition":5,"sports.endurance.running":10}'
+      when 5  then '{"wellbeing.health.peer_support":5,"wellbeing.spirituality.kirtan":5,"sports.endurance.running":10}'
       when 6  then '{"sports.team.cricket":20}'
       when 7  then '{"sports.racket.badminton":7,"sports.racket.tennis":7,"sports.team.cricket":6}'
       when 8  then '{"sports.racket.badminton":7,"sports.racket.tennis":7,"sports.team.cricket":6}'
@@ -95,8 +97,8 @@ begin
      or public.brivia_member_completed(pg_temp.d7(12)) then
     raise exception 'FAIL setup: expected 20 completed deck members (1-20 and 22, all but I)';
   end if;
-  if not (select sensitive from public.interest_node where id = 'wellbeing.health.sleep')
-     or not (select sensitive from public.interest_node where id = 'wellbeing.health.nutrition')
+  if not (select sensitive from public.interest_node where id = 'wellbeing.health.peer_support')
+     or not (select sensitive from public.interest_node where id = 'wellbeing.spirituality.kirtan')
      or exists (select 1 from public.interest_node where id in ('sports.racket.badminton', 'sports.racket.tennis',
                 'sports.team.cricket', 'sports.endurance.running') and (sensitive or status <> 'active')) then
     raise exception 'FAIL setup: interest fixture flags';
@@ -113,9 +115,11 @@ declare f text;
 begin
   foreach f in array array['public.deck_candidates(integer)', 'public.deck_status()'] loop
     if to_regprocedure(f) is null then raise exception 'FAIL: % missing', f; end if;
-    if not (select prosecdef and proconfig @> array['search_path=public'] and provolatile = 's'
+    -- deck_candidates writes impressions (C-4): volatile; deck_status reads only: stable
+    if not (select prosecdef and proconfig @> array['search_path=public']
+                   and provolatile = case when f like 'public.deck_candidates%' then 'v' else 's' end
               from pg_proc where oid = to_regprocedure(f)) then
-      raise exception 'FAIL: % must be stable, security definer, search_path=public', f;
+      raise exception 'FAIL: % must be security definer, search_path=public, with the right volatility', f;
     end if;
     if has_function_privilege('anon', f, 'execute') then raise exception 'FAIL: anon can execute %', f; end if;
     if has_function_privilege('public', f, 'execute') then raise exception 'FAIL: public can execute %', f; end if;
@@ -162,8 +166,8 @@ end $$;
 create or replace function pg_temp.pos(a uuid[], x uuid) returns int language sql immutable as $$
   select array_position(a, x) $$;
 
--- 2. k-anonymity. No density row yet: every band is coarsened to the place (display ring >= 2), never "~3 km",
--- and so every card has display ring 2: the order is the shared count alone (D-034), whatever the true ring.
+-- 2. k-anonymity. No density row yet: no target is fine, so every card is admitted by the place rule and banded
+-- "Kochi" (the place tier), never "~3 km": the order is shared-first, then the overlap, whatever the true ring.
 do $$
 declare v uuid := pg_temp.d7(1); j jsonb; d uuid[];
 begin
@@ -175,11 +179,11 @@ begin
     reset role; raise exception 'FAIL k-anon: a km band without density';
   end if;
   reset role;
-  -- R2 (true ring 2, 3 shared) leads, then A (ring 0, 2 shared); B and R1 (1 shared) follow
+  -- overlap (sum of min points / 20): R2 16/20, A 13/20, B 5/20, R1 4/20
   d := pg_temp.deck_ids(v);
   if pg_temp.pos(d, pg_temp.d7(7)) <> 1 or pg_temp.pos(d, pg_temp.d7(2)) <> 2
-     or pg_temp.pos(d, pg_temp.d7(3)) not in (3, 4) or pg_temp.pos(d, pg_temp.d7(6)) not in (3, 4) then
-    raise exception 'FAIL D-034: without density the order is not the shared count: %', d;
+     or pg_temp.pos(d, pg_temp.d7(3)) <> 3 or pg_temp.pos(d, pg_temp.d7(6)) <> 4 then
+    raise exception 'FAIL D-038: without density the order is not shared-first by overlap: %', d;
   end if;
 end $$;
 
@@ -221,36 +225,35 @@ begin
   if cardinality(d) <> 14 then raise exception 'FAIL: deck size % <> 14', cardinality(d); end if;
 end $$;
 
--- 4. Ordering (P0-4, D-034). C0 now meets k = 10, so its members show "~3 km" (display ring 0) and lead whatever the
--- shared count; within them 2 shared before 1 before 0. S (two shared sensitive interests) and H (shared fixture
--- interest) count 0. R1, R2 and X are coarsened to "Kochi" (display ring 2) and close the deck by shared count.
+-- 4. Ordering (D-038). C0 now meets k = 10, so its members are fine and show "~3 km" (display ring 0). Interest
+-- qualifies, location orders: A (ring 0, overlap 13/20), B (ring 0, 5/20), then the shared place-tier cards R2 (16/20)
+-- and R1 (4/20), then every zero-shared "~3 km" card (S: two shared sensitive interests; H: the shared fixture
+-- interest; both count 0), then X (place tier, nothing shared).
 do $$
 declare d uuid[]; g int; v uuid := pg_temp.d7(1);
 begin
   d := pg_temp.deck_ids(v);
-  if not (pg_temp.pos(d, pg_temp.d7(4)) < pg_temp.pos(d, pg_temp.d7(7))) then
-    raise exception 'FAIL P0-4: ring-0 with 0 shared is not before ring-2 with 3 shared'; end if;
-  if pg_temp.pos(d, pg_temp.d7(2)) <> 1 or pg_temp.pos(d, pg_temp.d7(3)) <> 2 then
-    raise exception 'FAIL P0-4: ring 0 with 2 shared, then 1 shared, must lead: %', d; end if;
-  -- S, H and every other ring-0 zero-shared member come after B: sensitive / fixture interests do not order.
+  if pg_temp.pos(d, pg_temp.d7(2)) <> 1 or pg_temp.pos(d, pg_temp.d7(3)) <> 2
+     or pg_temp.pos(d, pg_temp.d7(7)) <> 3 or pg_temp.pos(d, pg_temp.d7(6)) <> 4 then
+    raise exception 'FAIL D-038: shared cards (A, B at ring 0; R2, R1 in the place tier) must lead: %', d; end if;
+  if not (pg_temp.pos(d, pg_temp.d7(7)) < pg_temp.pos(d, pg_temp.d7(4))) then
+    raise exception 'FAIL D-038: a shared ring-2 card is not before a zero-shared ring-0 card'; end if;
   foreach g in array array[4, 5, 14, 15, 16, 17, 18, 19, 20] loop
-    if pg_temp.pos(d, pg_temp.d7(g)) <= 2 or pg_temp.pos(d, pg_temp.d7(g)) > 11 then
+    if pg_temp.pos(d, pg_temp.d7(g)) < 5 or pg_temp.pos(d, pg_temp.d7(g)) > 13 then
       raise exception 'FAIL: ring-0 zero-shared member % at position %', g, pg_temp.pos(d, pg_temp.d7(g)); end if;
   end loop;
-  if pg_temp.pos(d, pg_temp.d7(7)) <> 12 or pg_temp.pos(d, pg_temp.d7(6)) <> 13 or pg_temp.pos(d, pg_temp.d7(22)) <> 14 then
-    raise exception 'FAIL: the place-band cards (R2 3 shared, R1 1, X 0) must close the deck: %', d; end if;
-  -- the zero-shared ring-0 tail is ordered by md5(viewer || target)
-  if (select array_agg(x order by o) from unnest(d[3:11]) with ordinality u(x, o))
-     <> (select array_agg(x order by md5(v::text || x::text)) from unnest(d[3:11]) u(x)) then
-    raise exception 'FAIL: tie-break is not md5(viewer || target)'; end if;
-  -- deterministic
+  if pg_temp.pos(d, pg_temp.d7(22)) <> 14 then raise exception 'FAIL: X (place tier, 0 shared) must close the deck: %', d; end if;
+  -- the zero-shared ring-0 run is ordered by the daily tie key
+  if (select array_agg(x order by o) from unnest(d[5:13]) with ordinality u(x, o))
+     <> (select array_agg(x order by public.brivia_deck_tie(v, x, current_date)) from unnest(d[5:13]) u(x)) then
+    raise exception 'FAIL: tie-break is not brivia_deck_tie(viewer, target, current_date)'; end if;
+  -- deterministic within a day
   if d <> pg_temp.deck_ids(v) then raise exception 'FAIL: deck order is not deterministic'; end if;
 end $$;
 
 
--- 4b. I1 (D-034): a sparse true-ring-0 card coarsened to the place sorts with the place cards, never ahead of
--- "~3 km" cards, and behind a true-ring-2 place card with more shared interests. Its position does not move as its
--- true ring goes 0 -> 1 -> 2.
+-- 4b. I1 (D-034, D-038): a sparse true-ring-0 card is admitted by the place rule and sorts with the place cards,
+-- never ahead of "~3 km" cards. Its band and position do not move as its true ring goes 0 -> 1 -> 2.
 do $$
 declare v uuid := pg_temp.d7(1); x uuid := pg_temp.d7(22); c record; cell text; d uuid[]; j jsonb;
 begin
@@ -379,10 +382,10 @@ begin
 end $$;
 
 
--- M4: the g5 level. A at g5 only (g7, g6 not ok): never below display ring 2. A true ring-2 target whose g5 cells are
--- ring 3 apart shows its region (the place level would show the place name: greatest(2, 2) = 2).
+-- M4 (amended by D-038): the g6 / g5 band levels are gone. A at g5 only (g7, g6 not ok) is not fine: the place
+-- band. A true ring-2 target whose g7 cell is ok10 is admitted only by the place rule, banded by its place name.
 do $$
-declare v uuid := pg_temp.d7(1); y uuid := pg_temp.d7(24); c record; j jsonb; reg text;
+declare v uuid := pg_temp.d7(1); y uuid := pg_temp.d7(24); c record; j jsonb; pl text;
 begin
   select * into c from deck_cells;
   update public.cell_density set ok10 = false, ok5 = false
@@ -394,7 +397,6 @@ begin
     raise exception 'FAIL M4: ring-0 band at g5 = %', pg_temp.card(v, pg_temp.d7(2))->>'distance_band'; end if;
   update public.cell_density set ok10 = true, ok5 = true
    where not is_test and cell in (c.c0, public.brivia_grid_parent(c.c0, 6));
-  -- the display-ring-3 member
   insert into auth.users(id) values (y) on conflict do nothing;
   insert into public.profiles (id, name, full_name, email) values (y, 'Deck 24', 'Deck 24', 'deck24@example.com')
   on conflict (id) do nothing;
@@ -402,23 +404,13 @@ begin
   values (y, c.r3g5, public.brivia_grid_parent(c.r3g5, 6), public.brivia_grid_parent(c.r3g5, 5), public.brivia_nearest_place(c.r3g5))
   on conflict (member_id) do nothing;
   insert into public.member_interest (member_id, interest_id, points) values (y, 'sports.endurance.running', 20) on conflict do nothing;
-  select pl.region into reg from public.place pl where pl.id = public.brivia_nearest_place(c.r3g5);
-  -- no density for its cells: the place level, display ring 2
-  delete from public.cell_density where not is_test
-     and cell in (c.r3g5, public.brivia_grid_parent(c.r3g5, 6), public.brivia_grid_parent(c.r3g5, 5))
-     and cell not in (c.c0, public.brivia_grid_parent(c.c0, 6), public.brivia_grid_parent(c.c0, 5));
-  j := pg_temp.card(v, y);
-  if j is null or j->>'distance_band' = reg then raise exception 'FAIL M4: ring-2 card at the place level = %', j; end if;
-  -- its g5 parent ok for k = 5 (true ring 2): the g5 distance is ring 3 -> the region
+  select pl2.name into pl from public.place pl2 where pl2.id = public.brivia_nearest_place(c.r3g5);
   insert into public.cell_density (cell, is_test, n, streak10, streak5, ok10, ok5, as_of)
-  values (public.brivia_grid_parent(c.r3g5, 5), false, 5, 0, 7, false, true, current_date + 6)
-  on conflict (cell, is_test) do update set ok5 = true;
-  if not public.brivia_cell_ok(public.brivia_grid_parent(c.r3g5, 5), false, 5)
-     or public.brivia_cell_ok(c.r3g5, false, 5) or public.brivia_cell_ok(public.brivia_grid_parent(c.r3g5, 6), false, 5) then
-    raise exception 'FAIL M4 setup: only the g5 parent may be ok';
-  end if;
+  values (c.r3g5, false, 10, 7, 7, true, true, current_date + 6)
+  on conflict (cell, is_test) do update set ok10 = true, ok5 = true;
   j := pg_temp.card(v, y);
-  if j->>'distance_band' <> reg then raise exception 'FAIL M4: display-ring-3 band = %, expected %', j->>'distance_band', reg; end if;
+  if j is null or j->>'distance_band' <> pl then raise exception 'FAIL M4: true ring-2 ok10 card = %, expected %', j, pl; end if;
+  delete from public.cell_density where not is_test and cell = c.r3g5;
   delete from public.profiles where id = y;
   delete from auth.users where id = y;
 end $$;

@@ -204,7 +204,11 @@ begin
     if not exists (select 1 from pg_proc where oid = to_regprocedure(f) and 'search_path=public' = any(proconfig)) then
       raise exception 'FAIL: % has no search_path=public', f;
     end if;
-    if (select provolatile from pg_proc where oid = to_regprocedure(f)) <> 's' then raise exception 'FAIL: % not stable', f; end if;
+    -- search_members logs impressions since the iteration-3 arena (0004, P0-A3), so it is volatile; the others stable
+    if (select provolatile from pg_proc where oid = to_regprocedure(f))
+       <> (select case when f like 'public.search_members%' then 'v' else 's' end) then
+      raise exception 'FAIL: % has the wrong volatility', f;
+    end if;
     if has_function_privilege('anon', f, 'execute') then raise exception 'FAIL: anon can execute %', f; end if;
     if not has_function_privilege('authenticated', f, 'execute') then raise exception 'FAIL: authenticated cannot execute %', f; end if;
     if exists (select 1 from pg_proc p, aclexplode(coalesce(p.proacl, acldefault('f', p.proowner))) x
@@ -1169,6 +1173,8 @@ begin
   reset role;
   insert into public.matches (user1_id, user2_id) values (least(a,b), greatest(a,b));
   insert into public.connection_requests (from_id, to_id) values (b, a);
+  -- b was served to a (0004, P0-A2: a member's like/pass needs an impression in the last 7 days)
+  insert into public.interaction (viewer_id, target_id, event) values (a, b, 'impression');
   set local role authenticated;
   perform set_config('request.jwt.claims', '{"sub":"' || a || '"}', true);
   foreach ev in array array['like','pass','request','accept','decline','met','letgo'] loop
@@ -1182,7 +1188,6 @@ begin
     'insert into public.interaction (viewer_id, target_id, event, propensity) values (''' || a || ''',''' || b || ''',''like'',1.5)',
     'insert into public.interaction (viewer_id, target_id, event, features) values (''' || a || ''',''' || b || ''',''like'',jsonb_build_object(''k'', repeat(''x'', 9000)))',
     'insert into public.interaction (viewer_id, target_id, event, created_at) values (''' || a || ''',''' || b || ''',''like'',''2000-01-01'')',
-    'insert into public.interaction (viewer_id, target_id, event) values (''' || a || ''',''' || d || ''',''like'')',
     -- fix round 1 (Critical 2): clients write viewer, target and event only
     'insert into public.interaction (viewer_id, target_id, event, features) values (''' || a || ''',''' || b || ''',''like'',''{"x":1}'')',
     'insert into public.interaction (viewer_id, target_id, event, score) values (''' || a || ''',''' || b || ''',''like'',0.5)',
@@ -1194,6 +1199,11 @@ begin
     begin execute ev; exception when others then failed := true; end;
     if not failed then raise exception 'FAIL T5: should be refused: %', ev; end if;
   end loop;
+
+  -- a like for a member of the other world (never served) is silently ignored since 0004 P0-A2: no row, no error,
+  -- so the answer says nothing about the target's world
+  insert into public.interaction (viewer_id, target_id, event) values (a, d, 'like');
+  if exists (select 1 from public.interaction where target_id = d) then raise exception 'FAIL T5: cross-world like stored'; end if;
 
   -- no client update/delete
   foreach ev in array array['update public.interaction set score = 1', 'delete from public.interaction'] loop
@@ -1253,7 +1263,13 @@ begin
     exception when others then failed := true; end;
     if not failed then raise exception 'FAIL T5: % accepted without backing', ev; end if;
   end loop;
+  reset role;
+  insert into public.interaction (viewer_id, target_id, event) values (a, b, 'impression');   -- served (P0-A2)
+  set local role authenticated;
   insert into public.interaction (viewer_id, target_id, event) values (a, b, 'like'), (a, b, 'pass'), (a, b, 'request');
+  if (select count(*) from public.interaction where event in ('like', 'pass', 'request')) <> 3 then
+    raise exception 'FAIL T5: served like/pass/request not stored';
+  end if;
   reset role;
   -- match in reversed order backs met/letgo
   insert into public.matches (user1_id, user2_id) values (least(a,b), greatest(a,b));

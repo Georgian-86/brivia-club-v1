@@ -434,30 +434,54 @@ saturated, the outer rings relax first, instead of the deck repeating saturated 
   `search_members`, `list_members` and `brivia_can_see_author` are built on it (signatures, caps, ordering and
   escaping unchanged), and every later candidate RPC (the interim deck, ORBIT's `orbit_cards`) must use it too.
   `brivia_member_completed` and `brivia_visible_to` are internal: no client role may execute them.
-- **The interim deck (Iteration 3, D-033, `0004_orbit_onboarding.sql` section 7).** Until ORBIT serves the deck
-  (phase 3), `deck_candidates(p_limit default 12)` is the location-first deck. It is a SQL RPC and ports none of
-  ORBIT's formulas (`R`, the gate, the Roche Limit).
-  - **Pool:** every target `brivia_visible_to(caller, target)` whose true ring (§4.2, km between the g7 cell
-    centroids) is 0–2. Hidden: members the caller is matched with; members in the caller's `signal_ledger` within
-    30 days, or with a live outgoing request from the caller; members the caller passed (`interaction` `pass`) within
-    7 days. Only `cell_scheme = 'grid1'` rows take part (caller and target); another scheme is skipped, never an
-    error. A caller who is not completed (or no session) gets no rows. `p_limit` is clamped to [1, 20].
-  - **Order (D-034):** the k-safe display ring (the ring the card's band shows, below) ascending, then the
-    shared-interest count descending (the exact same `interest_id` held by both), then `md5(caller || target)`. The
-    band is computed for the whole pool before the limit, and the true ring is never an ordering key: a sparse
-    ring-0 card coarsened to the place name sorts with the other place-name cards, so its position cannot reveal what
-    its band hides. In sparse areas the order is therefore the shared count within the place band.
-  - **Sensitive and retired interests never count.** The shared count and the labels use only active,
-    non-sensitive nodes (D-029). A shared sensitive interest therefore changes neither a chip nor a card's position
+- **The interim deck (Iteration 3, D-033; pool and order amended by the iteration-3 arena, D-038,
+  `0004_orbit_onboarding.sql` section 7).** Until ORBIT serves the deck (phase 3), `deck_candidates(p_limit default 12)`
+  is the location-first deck. It is a SQL RPC and ports none of ORBIT's formulas (`R`, the gate, the Roche Limit).
+  - **Invariant (D-038, normative):** a target's pool membership and its position depend only on what its card shows
+    (its band and its shared-interest chips) and on the caller's own state. They never depend on a finer location
+    than the band shows. (Before D-038 the pool used the true g7 ring ≤ 2, so a card's presence was a 60 km circle
+    oracle that sybils could walk to recover the target's cell: B-F1.)
+  - **Pool:** every target `brivia_visible_to(caller, target)` that one of two rules admits:
+    - *fine:* caller and target both have `precision = 'cell'` (§9.1.4), the target's g7 cell is `ok10`, and the
+      g7-to-g7 distance is ≤ 15 km (rings 0–1). The band is `~3 km` or `~10 km`: exactly the edges the label already
+      discloses, at a cell that holds at least 10 counted members.
+    - *place:* the target's place centroid is within 60 km of the caller's place centroid. The band is the target's
+      place name. Moving inside one place never changes membership, so walking the pool reveals at most the target's
+      place, which the card already shows.
+
+    Nobody is admitted on the true g7 ring 2. Hidden: members the caller is matched with; members in the caller's
+    `signal_ledger` within 30 days, or with a live outgoing request from the caller; members the caller passed
+    (`interaction` `pass`) within 7 days. Only `cell_scheme = 'grid1'` rows take part (caller and target); another
+    scheme is skipped, never an error. A caller who is not completed (or no session) gets no rows. `p_limit` is
+    clamped to [1, 20]. `supabase/tests/orbit-triangulation.test.sql` replays the B-F1 probe (sybils, pass isolation,
+    an edge walk) and a viewer grid, and asserts that a non-fine target's membership is constant inside each place.
+  - **Order (D-038):** (1) at least one shared interest first (`shared_any desc`); (2) the display ring ascending:
+    0 (`~3 km`), 1 (`~10 km`), then the place tier; (3) the budget-bounded overlap `Σ min(p_caller, p_target) / 20`
+    over the shared ids, descending (breadth-neutral: spreading points thinly cannot raise it, C-3); (4) a daily
+    rotating tie key `brivia_deck_tie(caller, target, current_date)` = `md5(caller ‖ target ‖ 'YYYY-MM-DD')`, so the
+    head of the deck rotates and its propensity is known (C-4). Interest qualifies a person and location orders the
+    qualified: members with nothing in common still appear, after every member who shares an interest. Every key is a
+    function of what the card shows, and the order is computed for the whole pool before the limit. (Open for the
+    founder, D-038 dissent: swapping keys 1 and 2 is privacy-neutral.)
+  - **Impressions (C-4, D-038).** `deck_candidates` is `volatile` and writes one owner-only `interaction` row per
+    returned card: `event = 'impression'`, `propensity = 1`, `model_version = 'interim-v1'`, and `context =
+    { policy: 'interim-v1', surface: 'deck', position, ring (the display ring), overlap, shared (the shared-id count) }`.
+    `search_members` logs its hits the same way (`surface: 'search'`, `position`). Members never read impression rows
+    (§9.1.5). supabase-js `rpc` uses `POST`, which PostgREST requires for a volatile function.
+  - **Served ids (D-038).** A member's own `like` or `pass` row is kept only for a target served to them (an
+    `impression` row) in the last 7 days; otherwise it is silently ignored: no row and no error
+    (`brivia_interaction_served`, a BEFORE INSERT trigger). Free `pass` isolation of the pool is gone, and
+    impressions get a clean denominator. `get_candidates` (chats, request senders, post authors) does not count as
+    serving: no client sends a pass or like from those surfaces.
+  - **Sensitive and retired interests never count.** The shared test, the overlap and the labels use only active,
+    non-sensitive nodes (D-029, D-038). A shared sensitive interest therefore changes neither a chip nor a card's position
     (ORBIT may later let it raise `R`, §9.1.5; the interim deck does not).
   - **`shared_interests`:** at most 2 labels ("You both: …"), by summed points of both members descending, then
     label ascending.
-  - **`distance_band`:** k = 10 when the true ring is ≤ 1, else 5. The level is g7 if `brivia_cell_ok(target g7,
-    world, k)`, else the target's stored g6 parent, else its g5 parent, else the place (§9.1.4). The display ring is
-    the true ring at g7; `greatest(2, ring(distance between the caller's and the target's cells at that level))` at
-    g6 or g5; `greatest(2, true ring)` at the place. Labels: 0 `~3 km`, 1 `~10 km`, 2 the target's place name,
-    3 its region, 4 its country, 5 `Abroad`; also `Abroad` when the target's place is in another country than the
-    caller's. So `~3 km` / `~10 km` appear only when the target's own g7 cell meets k.
+  - **`distance_band`:** `Abroad` when the target's place is in another country than the caller's; otherwise
+    `~3 km` (fine, ring 0), `~10 km` (fine, ring 1) or the target's place name (every place-rule admission). So
+    `~3 km` / `~10 km` appear only between two `cell`-precision members when the target's own g7 cell is `ok10`. The
+    g6 / g5 band levels of D-034 are gone (J2: any coarsened card already showed a place-level label).
   - **`deck_status()`** says why the deck is empty, never with a count: `complete_profile` (caller not completed),
     `no_members_yet` (no member of the caller's world is visible to the caller), otherwise `caught_up`.
   - **Client use (Iteration 3, Task 10).** The v1 deck reads only `deck_candidates({ p_limit: 12 })` and keeps the
@@ -667,7 +691,14 @@ select log_impressions($1, $4);
   are not executable by any client role.
 - **`set_home_city(p_place_id text)`** is the "Pick my city" fallback (geolocation denied, timed out or missing). It
   has the same rules (SECURITY DEFINER, volatile, `authenticated` only, profile required, shared cap) and stores the
-  cell of the place's centroid with that `place_id`. An unknown id raises `22023 invalid place`. Clients read place
+  cell of the place's centroid with that `place_id`. An unknown id raises `22023 invalid place`.
+- **Precision (D-038, R2).** `member_orbit.precision text not null default 'cell' check (precision in ('cell',
+  'place'))`. `set_home_location` writes `'cell'`; `set_home_city` writes `'place'`, because every picker of a city
+  shares the centroid's cell, which says nothing about where they live (A-F2: 12 Mumbai pickers in one cell showed
+  each other as "~3 km"). A `'place'` member is counted in g5 density only, never in g7 or g6, so pickers cannot
+  un-coarsen a geolocated resident of the centroid cell. When either member of a pair is `'place'`, the pair uses the
+  place rule (§7) and the band is the place name: a picker never sees, and is never shown as, `~3 km`. (Showing the
+  member "Your area: Mumbai (city-wide)" with a one-tap upgrade is client work, P0-B.) Clients read place
   names from `place(id, name, region, country, is_launch)`; its centroid columns are never granted.
 - **Client capture (UX_SPEC §A, D-035).** The signup asks for geolocation only after the privacy explainer, with
   `{ enableHighAccuracy: false, timeout: 10000, maximumAge: 600000 }`; denial, timeout, a missing API or an insecure
@@ -702,7 +733,12 @@ select log_impressions($1, $4);
   computed from the stored parent **g6** cell (centroid to centroid; `home_cell_g6`), then the stored **g5** cell
   (`home_cell_g5`) if that is still below k, and only then the region `placeLabel`. (Under H3 from iteration 4: res-6,
   then res-5.) Coarsening never yields a number derived from exact km, and any ring-0/1 chip ("~3 km away") is
-  suppressed while coarsened. Scoring still uses the true ring; only what leaves the service is coarsened.
+  suppressed while coarsened. **Pool membership and position never use a finer location than the band (D-038
+  invariant, §7):** a card's presence is as observable as its label, so a pool cut on the true ring is a
+  triangulation oracle (B-F1). The interim deck (§7) therefore admits on g7 only fine targets (`ok10`, both
+  `precision = 'cell'`, ≤ 15 km) and everyone else by place centroids; ORBIT's deck must keep the same invariant
+  (scoring may use the true ring only inside a pool and an order that do not reveal it). Members with
+  `precision = 'place'` are counted in g5 density only.
 - **No band flips:** a cell's coarsening level only goes up quickly and comes down slowly. Populations live in the
   owner-only `cell_density(cell, is_test, n, streak10, streak5, ok10, ok5, as_of)` table (RLS on, no client grants),
   one row per g7, g6 and g5 cell and world. `refresh_cell_density(p_as_of date default current_date)` (owner only;
@@ -733,7 +769,10 @@ select log_impressions($1, $4);
 - **Member card RPCs (Iteration 3 final review, D-036).** `get_candidates`, `search_members` and `list_members` keep the
   `public_profile_card` keys, but `city` and `state` are always `null`, and `search_members` never matches city or
   state text (`supabase/tests/orbit-city-private.test.sql`). The free text a member once typed never leaves.
-  The true ring is used for the pool and the band, never returned and never an ordering key (D-034). `deck_status()` returns a reason code, never a count.
+  Pool membership and position depend only on what the card shows and on the caller's own state (D-038; this
+  replaces D-034's "the true ring is used for the pool and the band", which was the B-F1 oracle): the true g7 ring
+  is used only to admit and band a fine target (≤ 15 km, `ok10`, both `precision = 'cell'`), never returned and never
+  an ordering key. `deck_status()` returns a reason code, never a count.
 - **Sensitive interests never leave the service (D-029).** No card, chip, explanation or search hit carries the
   label or id of an `interest_node` with `sensitive = true`, and search never matches one. A shared sensitive
   interest may raise `matchPercent` (it counts toward resonance), but the chips must then name only non-sensitive
@@ -787,6 +826,10 @@ select log_impressions($1, $4);
 - Client rows can no longer carry `deck_id` or features (§9.1.5). Offline evaluation attributes a client like,
   pass or request to the latest service impression of the same `(viewer_id, target_id)` before it (within 7 days)
   and uses only the service's `features`, `score` and `propensity` (§8).
+- **Interim impressions (D-038, before ORBIT serves).** `deck_candidates` and `search_members` already write
+  owner-only `impression` rows with `policy = 'interim-v1'` (§7): `position`, `surface`, and for the deck the display
+  `ring`, `overlap` and `shared` count. A member's `like` / `pass` is accepted only for a target with such a row in the
+  last 7 days, so every label has an impression to attribute it to. The shadow-ORBIT run (P1) scores these pools.
 
 ---
 

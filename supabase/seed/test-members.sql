@@ -13,7 +13,8 @@
 --     - 3-5 non-sensitive interests each (member_interest), with points summing to exactly 20 (the Passion Budget);
 --       profiles.skills is the display copy of those labels, built the way set_member_interests builds it;
 --     - a home cell (member_orbit) snapped with brivia_grid_cell from the city centroid in public.place plus a small
---       per-member offset (under 2 km), and the nearest place. No coordinate is stored. No location_change row is
+--       per-member offset (under 2 km), and the nearest place, with precision 'cell' (D-038, R2: they stand for
+--       members who shared their location, not city pickers). No coordinate is stored. No location_change row is
 --       written (the seed is not a member's change, so it does not use up their 3-per-24 h cap);
 --     - looking_for taken from the onboarding chip lists.
 --   * connection_requests inserted the way members do: 1->2 then 2->1 (the existing trigger accepts both and
@@ -107,9 +108,9 @@ update public.profiles p
 
 -- Home cell: the city centroid plus a small per-member offset (k = 0..5 within a city: about 0.6 km steps),
 -- snapped to g7 with its g6/g5 parents. Existing rows are left alone.
-insert into public.member_orbit (member_id, cell_scheme, home_cell, home_cell_g6, home_cell_g5, place_id)
+insert into public.member_orbit (member_id, cell_scheme, home_cell, home_cell_g6, home_cell_g5, place_id, precision)
 select c.id, 'grid1', c.cell, public.brivia_grid_parent(c.cell, 6), public.brivia_grid_parent(c.cell, 5),
-       public.brivia_nearest_place(c.cell)
+       public.brivia_nearest_place(c.cell), 'cell'
 from (
   select ('a7e57000-0000-4000-8000-' || lpad(m.n::text, 12, '0'))::uuid as id,
          public.brivia_grid_cell(pl.lat + (((m.n - 1) % 6) - 2.5) * 0.005,

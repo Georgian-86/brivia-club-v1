@@ -9,7 +9,8 @@
 -- Sections:
 --   1. Grid and places: the coarse equal-area grid (D-028, spec §4.1 / §9.1.4) and the place list.
 --   2. Taxonomy and member interests: interest_node, member_interest, the 20-point Passion Budget (§3.1 / §3.2).
---   3. Member orbit: member_orbit, location_change, set_home_location and set_home_city (§9.1.4).
+--   3. Member orbit: member_orbit (with precision 'cell' / 'place', D-038 R2), location_change, set_home_location and
+--      set_home_city (§9.1.4).
 --   4. Completion and visibility: brivia_member_completed, brivia_visible_to, the candidate RPCs, my_onboarding_status
 --      (D-030, §7). Redefines get_candidates, search_members, list_members and brivia_can_see_author from 0003.
 --   5. k-anonymity: member_flag, cell_density, refresh_cell_density (nightly, 7-night hysteresis), brivia_cell_ok
@@ -18,8 +19,10 @@
 --      client inserts into connection_requests; redefines brivia_before_connection_request (0003, without the caps),
 --      respond_connection_request (0003) and brivia_has_completed_profile (0001) on top of the D-030 completion,
 --      and recreates the completion-gated request, match, message and post policies (once-per-statement check).
---   7. Deck: deck_candidates (k-safe display ring, then shared-interest count; distance bands and "You both" labels) and
---      deck_status (P0-4, D-033, D-034, §7 / §9.1.5).
+--   7. Deck: deck_candidates (membership by the band only: fine targets at <= 15 km, else place centroids <= 60 km;
+--      order: shared interest first, display ring, budget-bounded overlap, daily tie key; impressions logged),
+--      brivia_interaction_served (like/pass only for served targets) and deck_status (P0-4, D-033, D-034, D-038,
+--      §7 / §9.1.5).
 --   Data: places (section 1) and the interest taxonomy (end of file).
 -- Privacy (CLAUDE.md): coordinates exist only as function arguments. No member table stores them; the only
 -- coordinate columns are the public city centroids in public.place, which no client role can read.
@@ -467,6 +470,12 @@ create table if not exists public.member_orbit (
   place_id text not null references public.place(id),
   home_set_at timestamptz not null default now()
 );
+-- precision (D-038, R2): 'cell' when the cell came from the member's own location (set_home_location), 'place' when
+-- the member picked a city (set_home_city: the city centroid's cell, shared by every picker). A 'place' member is
+-- never shown, and never sees anyone, at a km band, and is not counted in g7 or g6 density (section 5).
+alter table public.member_orbit add column if not exists precision text not null default 'cell';
+alter table public.member_orbit drop constraint if exists member_orbit_precision_check;
+alter table public.member_orbit add constraint member_orbit_precision_check check (precision in ('cell', 'place'));
 alter table public.member_orbit enable row level security;
 revoke all on public.member_orbit from public, anon, authenticated;
 
@@ -481,10 +490,11 @@ alter table public.location_change enable row level security;
 revoke all on public.location_change from public, anon, authenticated;
 revoke all on sequence public.location_change_id_seq from public, anon, authenticated;
 
--- Internal: apply one home change for p_member (the caller has checked the profile and validated the cell).
+-- Internal: apply one home change for p_member (the caller has checked the profile and validated the cell) with its
+-- precision ('cell' or 'place', R2).
 -- Serialised per member by an advisory lock; over the cap it raises PT429 'try again later' (PostgREST: HTTP 429)
 -- before anything is written.
-create or replace function public.brivia_apply_home_change(p_member uuid, p_cell text, p_place_id text)
+create or replace function public.brivia_apply_home_change(p_member uuid, p_cell text, p_place_id text, p_precision text)
 returns text
 language plpgsql
 volatile
@@ -499,17 +509,20 @@ begin
     raise exception 'try again later' using errcode = 'PT429';
   end if;
   insert into public.location_change (member_id) values (p_member);
-  insert into public.member_orbit (member_id, cell_scheme, home_cell, home_cell_g6, home_cell_g5, place_id, home_set_at)
+  insert into public.member_orbit (member_id, cell_scheme, home_cell, home_cell_g6, home_cell_g5, place_id, home_set_at,
+                                   precision)
   values (p_member, 'grid1', p_cell, public.brivia_grid_parent(p_cell, 6), public.brivia_grid_parent(p_cell, 5),
-          p_place_id, now())
+          p_place_id, now(), p_precision)
   on conflict (member_id) do update
     set cell_scheme = excluded.cell_scheme, home_cell = excluded.home_cell, home_cell_g6 = excluded.home_cell_g6,
-        home_cell_g5 = excluded.home_cell_g5, place_id = excluded.place_id, home_set_at = excluded.home_set_at;
+        home_cell_g5 = excluded.home_cell_g5, place_id = excluded.place_id, home_set_at = excluded.home_set_at,
+        precision = excluded.precision;
   select name into v_name from public.place where id = p_place_id;
   return v_name;
 end;
 $$;
-revoke all on function public.brivia_apply_home_change(uuid, text, text) from public, anon, authenticated;
+revoke all on function public.brivia_apply_home_change(uuid, text, text, text) from public, anon, authenticated;
+drop function if exists public.brivia_apply_home_change(uuid, text, text);   -- the pre-R2 signature
 
 -- set_home_location(lat, lng): snaps to the g7 cell in SQL (D-028) and returns the nearest place's name.
 -- Volatile, so PostgREST serves it only on POST (coordinates in the body, never in a query string).
@@ -530,14 +543,15 @@ begin
     raise exception 'profile required' using errcode = 'P0002';
   end if;
   v_cell := public.brivia_grid_cell($1, $2, 7);
-  return public.brivia_apply_home_change(uid, v_cell, public.brivia_nearest_place(v_cell));
+  return public.brivia_apply_home_change(uid, v_cell, public.brivia_nearest_place(v_cell), 'cell');
 end;
 $$;
 revoke all on function public.set_home_location(double precision, double precision) from public, anon;
 grant execute on function public.set_home_location(double precision, double precision) to authenticated;
 
--- set_home_city(p_place_id): the "Pick my city" fallback. Uses the place's centroid cell and that place's id.
--- Unknown id: 22023 'invalid place'. Same cap and rules as set_home_location.
+-- set_home_city(p_place_id): the "Pick my city" fallback. Uses the place's centroid cell and that place's id, with
+-- precision 'place' (R2: every picker of a city shares that cell, so it says nothing about where the member lives).
+-- Unknown id: 22023 'invalid place'. Same cap and rules as set_home_location (which writes precision 'cell').
 create or replace function public.set_home_city(p_place_id text)
 returns text
 language plpgsql
@@ -556,7 +570,7 @@ begin
   if v_cell is null then
     raise exception 'invalid place' using errcode = '22023';
   end if;
-  return public.brivia_apply_home_change(uid, v_cell, p_place_id);
+  return public.brivia_apply_home_change(uid, v_cell, p_place_id, 'place');
 end;
 $$;
 revoke all on function public.set_home_city(text) from public, anon;
@@ -644,7 +658,7 @@ grant execute on function public.get_candidates(uuid[]) to authenticated;
 create or replace function public.search_members(p_query text, p_limit int default 20)
 returns setof public.public_profile_card
 language sql
-stable
+volatile
 security definer
 set search_path = public
 as $$
@@ -653,19 +667,33 @@ as $$
   q as (  -- LIKE wildcards in the query are literal; empty or whitespace-only queries match nothing
     select '%' || replace(replace(replace(left(btrim(p_query), 100), '\', '\\'), '%', '\%'), '_', '\_') || '%' as pattern
     where coalesce(btrim(p_query), '') <> ''
+  ),
+  hits as (
+    select p.id, p.name, p.full_name, p.gender, p.experience, p.skills, p.looking_for, p.photo_url, p.cover_url,
+           p.created_at,
+           row_number() over (order by (p.name ilike q.pattern escape '\' or p.full_name ilike q.pattern escape '\') desc,
+                                       p.created_at desc, p.id desc) as pos
+      from public.profiles p
+      join me on p.id <> me.id and p.is_test = me.is_test
+      cross join q
+     where (p.name ilike q.pattern escape '\' or p.full_name ilike q.pattern escape '\'
+            or exists (select 1 from unnest(p.skills) s where s ilike q.pattern escape '\')
+            or exists (select 1 from unnest(p.looking_for) l where l ilike q.pattern escape '\'))
+       and public.brivia_visible_to(me.id, p.id)
+     order by pos
+     limit greatest(1, least(coalesce(p_limit, 20), 20))
+  ),
+  logged as (  -- impressions (C-4, P0-A3), like deck_candidates: owner-only, surface 'search'
+    insert into public.interaction (viewer_id, target_id, event, context, propensity, model_version)
+    select me.id, h.id, 'impression', jsonb_build_object('policy', 'interim-v1', 'surface', 'search', 'position', h.pos),
+           1, 'interim-v1'
+      from hits h cross join me
+    returning 1
   )
-  select p.id, p.name, p.full_name, p.gender, null::text, null::text, p.experience, p.skills, p.looking_for,
-         p.photo_url, p.cover_url, p.created_at
-  from public.profiles p
-  join me on p.id <> me.id and p.is_test = me.is_test
-  cross join q
-  where (p.name ilike q.pattern escape '\' or p.full_name ilike q.pattern escape '\'
-         or exists (select 1 from unnest(p.skills) s where s ilike q.pattern escape '\')
-         or exists (select 1 from unnest(p.looking_for) l where l ilike q.pattern escape '\'))
-    and public.brivia_visible_to(me.id, p.id)
-  order by (p.name ilike q.pattern escape '\' or p.full_name ilike q.pattern escape '\') desc,
-           p.created_at desc, p.id desc
-  limit greatest(1, least(coalesce(p_limit, 20), 20));
+  select h.id, h.name, h.full_name, h.gender, null::text, null::text, h.experience, h.skills, h.looking_for,
+         h.photo_url, h.cover_url, h.created_at
+    from hits h
+   order by h.pos;
 $$;
 revoke all on function public.search_members(text, int) from public, anon;
 grant execute on function public.search_members(text, int) to authenticated;
@@ -732,6 +760,8 @@ grant execute on function public.my_onboarding_status() to authenticated;
 -- =============================================================================================
 -- Spec §9.1.4. A cell's population counts members of one world (is_test) who are completed
 -- (brivia_member_completed), whose account is older than 14 days at the refresh date, and who are not flagged.
+-- Members with precision 'place' (a city pick, R2) are counted in the g5 cell only, never in the g7 or g6 cell: the
+-- city centroid cell they share is not where they live.
 -- Floors: k = 10 for rings 0-1, k = 5 for rings 2+. Hysteresis: a cell is ok for k only after 7 consecutive
 -- nightly counts with n >= k (a missed night restarts the streak), and stops being ok at the first count with n < k.
 -- Populations are counted for every g7 cell and for the g6 and g5 parents STORED in member_orbit (home_cell_g6,
@@ -786,17 +816,17 @@ begin
     return 0;
   end if;
   with member as (
-    select o.home_cell, o.home_cell_g6, o.home_cell_g5, p.is_test,
+    select o.home_cell, o.home_cell_g6, o.home_cell_g5, p.is_test, o.precision = 'cell' as is_cell,
            (p.created_at < (p_as_of - 14)::timestamptz
             and not exists (select 1 from public.member_flag f where f.member_id = p.id)
             and public.brivia_member_completed(p.id)) as counted
       from public.member_orbit o
       join public.profiles p on p.id = o.member_id
   ),
-  counts as (
+  counts as (  -- a 'place' member (a city pick, R2) is counted at g5 only, never at g7 or g6
     select c.cell, c.is_test, (count(*) filter (where c.counted))::int as n
-      from (select home_cell as cell, is_test, counted from member
-            union all select home_cell_g6, is_test, counted from member
+      from (select home_cell as cell, is_test, counted and is_cell as counted from member
+            union all select home_cell_g6, is_test, counted and is_cell from member
             union all select home_cell_g5, is_test, counted from member) c
      group by c.cell, c.is_test
   ),
@@ -1221,59 +1251,83 @@ grant execute on function public.respond_connection_request(uuid, boolean) to au
 -- =============================================================================================
 -- 7. Deck
 -- =============================================================================================
--- The interim location-first deck (P0-4, D-033, D-034; spec §7 and §9.1.5). ORBIT's formulas (R, the gate, the
--- Roche Limit) are NOT ported to SQL: this deck orders by the k-safe display ring, then by the shared-interest count.
--- * Pool: every target with brivia_visible_to(caller, target) and a true ring <= 2 (km between the g7 centroids).
---   Hidden: members the caller is matched with; members in the caller's signal_ledger within 30 days, or with a
---   live outgoing connection_requests row from the caller (requests sent before the ledger existed); members the
---   caller passed (interaction event 'pass') within 7 days. Only cell_scheme 'grid1' rows take part (caller and
---   target); a row of another scheme (the iteration-4 H3 backfill) is skipped, never an error.
+-- The interim location-first deck (P0-4, D-033, D-034, D-038; spec §7 and §9.1.5). ORBIT's formulas (R, the gate,
+-- the Roche Limit) are NOT ported to SQL.
+-- Invariant (D-038, R1): a target's pool membership and its position depend only on what its card shows (the band and
+-- the shared-interest chips) and on the caller's own state, never on a finer location than the band.
+-- * Pool: every target with brivia_visible_to(caller, target) that one of two rules admits:
+--   - fine: caller and target both have precision 'cell' (R2), the target's g7 cell is ok for k = 10
+--     (brivia_cell_ok), and the g7-to-g7 distance is <= 15 km (ring 0 or 1). Band '~3 km' / '~10 km': the edges the
+--     label already discloses, at a cell that holds at least 10 counted members.
+--   - place: the target's place centroid is within 60 km of the caller's place centroid. Band: the target's place
+--     name. Moving inside one place never changes membership, so walking the pool reveals at most the place.
+--   Nobody is admitted on the true g7 ring 2 (the B-F1 oracle). Hidden: members the caller is matched with; members
+--   in the caller's signal_ledger within 30 days, or with a live outgoing connection_requests row from the caller;
+--   members the caller passed (interaction event 'pass') within 7 days. Only cell_scheme 'grid1' rows take part
+--   (caller and target); a row of another scheme (the iteration-4 H3 backfill) is skipped, never an error.
 -- * Shared interests: the exact same interest_id held by both, counting only ACTIVE, NON-SENSITIVE nodes. Sensitive
---   interests (D-029) and retired nodes (including the harness fixture zz.harness.any) are left out of the labels AND
---   of the count used for ordering, so neither a chip nor a card's position can reveal one.
--- * distance_band (k-anonymity, §9.1.4): k = 10 when the true ring <= 1, else 5. The level is g7 if
---   brivia_cell_ok(target g7, world, k), else the stored g6 parent, else the stored g5 parent, else the place.
---   Display ring: the true ring at g7; greatest(2, ring of the distance between the caller's and the target's cells
---   at that level) at g6 / g5; greatest(2, true ring) at the place. Labels: 0 '~3 km', 1 '~10 km', 2 the target's
---   place name, 3 its region, 4 its country, 5 'Abroad'; 'Abroad' too when the target's place is in another
---   country than the caller's. A cell id, km, ring, coordinate, city, state, email or phone never leaves.
--- * Order (D-034): display ring asc, shared count desc, then md5(caller || target). The band is computed for the
---   whole pool BEFORE the limit, and the true ring is never an ordering key: a coarsened card sorts with the other
---   cards of its band, so its position cannot reveal what the band hides.
+--   interests (D-029, D-038) and retired nodes (including the harness fixture zz.harness.any) are left out of the
+--   labels, the shared test and the overlap, so neither a chip nor a card's position can reveal one.
+-- * Order (D-038): (1) at least one shared interest first; (2) display ring asc: 0 '~3 km', 1 '~10 km', then the
+--   place tier (2); (3) budget-bounded overlap desc: sum(least(p_caller, p_target)) / 20 over the shared ids, which
+--   adding thin interests cannot raise (C-3); (4) brivia_deck_tie(caller, target, current_date), a daily rotating key
+--   (C-4). Every key is a function of what the card shows. The order is computed for the whole pool before the limit.
+-- * distance_band: 'Abroad' when the target's place is in another country than the caller's; else display ring 0
+--   '~3 km', 1 '~10 km', otherwise the target's place name. A cell id, km, ring, coordinate, city, state, email or
+--   phone never leaves.
 -- * shared_interests: at most 2 labels, by summed points (caller + target) desc, then label asc.
--- * The caller must be completed; otherwise (or without a session) no rows. p_limit defaults to 12, clamped to
---   [1, 20].
+-- * Impressions (C-4, P0-A3): volatile. Every returned card writes one owner-only interaction row: event
+--   'impression', propensity 1, model_version 'interim-v1', context {policy 'interim-v1', surface 'deck', position,
+--   ring (the display ring), overlap, shared (the shared-id count)}. Members never read impression rows (0003 policy
+--   interaction_select_own). They are also the served set for brivia_interaction_served (below).
+-- * The caller must be completed; otherwise (or without a session) no rows and no impression. p_limit defaults to 12,
+--   clamped to [1, 20].
+-- The daily tie key: md5(caller || target || 'YYYY-MM-DD'). Internal.
+create or replace function public.brivia_deck_tie(p_viewer uuid, p_target uuid, p_day date)
+returns text
+language sql
+immutable
+set search_path = public
+as $$
+  select md5(p_viewer::text || p_target::text || to_char(p_day::timestamp, 'YYYY-MM-DD'))
+$$;
+revoke all on function public.brivia_deck_tie(uuid, uuid, date) from public, anon, authenticated;
+
 create or replace function public.deck_candidates(p_limit int default 12)
 returns table(id uuid, name text, photo_url text, cover_url text, experience text, skills text[],
               looking_for text[], distance_band text, shared_interests text[])
 language sql
-stable
+volatile
 security definer
 set search_path = public
 as $$
   with me as (
-    select p.id, p.is_test, o.home_cell, o.home_cell_g6, o.home_cell_g5, vp.country,
+    select p.id, p.is_test, o.home_cell, o.precision, vp.country, vp.lat as place_lat, vp.lng as place_lng,
            substring(o.home_cell from '^g7:(\d+):')::int as g7row
       from public.profiles p
       join public.member_orbit o on o.member_id = p.id and o.cell_scheme = 'grid1'
       join public.place vp on vp.id = o.place_id
      where p.id = auth.uid() and public.brivia_member_completed(p.id)
   ),
-  near as (  -- ring <= 2 means <= 60 km, so at most 60 / 111.19 deg of latitude (26 g7 rows, plus 1 for flooring):
-             -- a cheap prefilter before the haversine. The CASE keeps a non-grid1 cell away from brivia_cell_km.
-    select o.member_id as tid, o.home_cell, o.home_cell_g6, o.home_cell_g5,
-           tp.name as place_name, tp.region, tp.country,
-           case when o.cell_scheme = 'grid1' and o.home_cell ~ '^g7:'
-                then public.brivia_ring(public.brivia_cell_km(me.home_cell, o.home_cell)) end as ring
+  near as (  -- cheap prefilters before the haversine: a fine pair is <= 15 km apart (at most 8 g7 rows), a place pair
+             -- has place centroids <= 60 km apart (at most 0.54 deg of latitude). The CASE keeps a cell that is not a
+             -- g7 grid1 id away from brivia_cell_km.
+    select o.member_id as tid, tp.name as place_name, tp.country,
+           case when me.precision = 'cell' and o.precision = 'cell' and o.home_cell ~ '^g7:'
+                     and abs(substring(o.home_cell from '^g7:(\d+):')::int - me.g7row) <= 8
+                     and public.brivia_cell_ok(o.home_cell, me.is_test, 10)
+                then public.brivia_ring(public.brivia_cell_km(me.home_cell, o.home_cell)) end as fine_ring,
+           public.brivia_haversine_km(me.place_lat, me.place_lng, tp.lat, tp.lng) as place_km
       from me
       join public.member_orbit o on o.member_id <> me.id and o.cell_scheme = 'grid1'
-                                and abs(coalesce(substring(o.home_cell from '^g7:(\d+):')::int, -100000) - me.g7row) <= 28
       join public.profiles t on t.id = o.member_id and t.is_test = me.is_test
       join public.place tp on tp.id = o.place_id
+     where abs(tp.lat - me.place_lat) <= 0.6
+        or abs(coalesce(substring(o.home_cell from '^g7:(\d+):')::int, -100000) - me.g7row) <= 8
   ),
-  pool as (  -- the cheap own-history checks first; brivia_visible_to (the single visibility rule) last
+  pool as (  -- the two admission rules, then the cheap own-history checks; brivia_visible_to (the single rule) last
     select n.* from near n, me
-     where n.ring <= 2
+     where (n.fine_ring <= 1 or n.place_km <= 60)
        and not exists (select 1 from public.matches m
                         where (m.user1_id = me.id and m.user2_id = n.tid) or (m.user1_id = n.tid and m.user2_id = me.id))
        and not exists (select 1 from public.signal_ledger l
@@ -1287,7 +1341,7 @@ as $$
        and public.brivia_visible_to(me.id, n.tid)
   ),
   shared as (
-    select pool.tid, count(*)::int as n,
+    select pool.tid, count(*)::int as n, sum(least(mv.points, mt.points))::numeric / 20 as overlap,
            (array_agg(nd.label order by mv.points + mt.points desc, nd.label))[1:2] as labels
       from pool
       join public.member_interest mt on mt.member_id = pool.tid
@@ -1295,45 +1349,73 @@ as $$
       join public.interest_node nd on nd.id = mt.interest_id and nd.status = 'active' and not nd.sensitive
      group by pool.tid
   ),
-  banded as (  -- the k-safe band of every pool member, before any ordering or limit
-    select pool.*, coalesce(s.n, 0) as shared_n, coalesce(s.labels, '{}'::text[]) as labels,
-           md5(me.id::text || pool.tid::text) as tie,
-           case
-             when public.brivia_cell_ok(pool.home_cell, me.is_test, case when pool.ring <= 1 then 10 else 5 end)
-               then pool.ring
-             when public.brivia_cell_ok(pool.home_cell_g6, me.is_test, case when pool.ring <= 1 then 10 else 5 end)
-               then greatest(2, public.brivia_ring(public.brivia_cell_km(me.home_cell_g6, pool.home_cell_g6)))
-             when public.brivia_cell_ok(pool.home_cell_g5, me.is_test, case when pool.ring <= 1 then 10 else 5 end)
-               then greatest(2, public.brivia_ring(public.brivia_cell_km(me.home_cell_g5, pool.home_cell_g5)))
-             else greatest(2, pool.ring)
-           end as display_ring,
-           pool.country is distinct from me.country as abroad
+  banded as (
+    select pool.tid, pool.place_name, coalesce(s.n, 0) as shared_n, coalesce(s.overlap, 0) as overlap,
+           coalesce(s.labels, '{}'::text[]) as labels,
+           case when pool.fine_ring <= 1 then pool.fine_ring else 2 end as display_ring,
+           pool.country is distinct from me.country as abroad,
+           public.brivia_deck_tie(me.id, pool.tid, current_date) as tie
       from pool
       cross join me
       left join shared s on s.tid = pool.tid
   ),
   top as (
-    select b.* from banded b
-     order by b.display_ring, b.shared_n desc, b.tie
+    select b.*, row_number() over (order by b.shared_n > 0 desc, b.display_ring, b.overlap desc, b.tie, b.tid) as pos
+      from banded b
+     order by pos
      limit greatest(1, least(coalesce(p_limit, 12), 20))
+  ),
+  logged as (  -- a data-modifying CTE always runs
+    insert into public.interaction (viewer_id, target_id, event, context, propensity, model_version)
+    select me.id, t.tid, 'impression',
+           jsonb_build_object('policy', 'interim-v1', 'surface', 'deck', 'position', t.pos, 'ring', t.display_ring,
+                              'overlap', round(t.overlap, 4), 'shared', t.shared_n),
+           1, 'interim-v1'
+      from top t cross join me
+    returning 1
   )
   select p.id, p.name, p.photo_url, p.cover_url, p.experience, p.skills, p.looking_for,
          case
            when b.abroad then 'Abroad'
            when b.display_ring = 0 then '~3 km'
            when b.display_ring = 1 then '~10 km'
-           when b.display_ring = 2 then b.place_name
-           when b.display_ring = 3 then b.region
-           when b.display_ring = 4 then b.country
-           else 'Abroad'
+           else b.place_name
          end,
          b.labels
     from top b
     join public.profiles p on p.id = b.tid
-   order by b.display_ring, b.shared_n desc, b.tie
+   order by b.pos
 $$;
 revoke all on function public.deck_candidates(int) from public, anon;
 grant execute on function public.deck_candidates(int) to authenticated;
+
+-- Served ids (D-038, R1 supporting change; P0-A2). A member's own 'like' or 'pass' row is kept only for a target served
+-- to them in the last 7 days (an 'impression' row from deck_candidates or search_members, or later from ORBIT).
+-- Otherwise it is silently ignored: no row and no error, so the response says nothing about the target. This stops
+-- free 'pass' isolation of the pool (B-F1) and gives impressions a clean denominator (C-4). Rows a member writes for
+-- another viewer still reach the insert policy and fail there; owner and service rows are not affected.
+-- Definer (it reads impression rows, which members cannot); not executable by any client role (trigger only).
+create or replace function public.brivia_interaction_served()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  if new.event in ('like', 'pass') and new.viewer_id = auth.uid()
+     and not exists (select 1 from public.interaction i
+                      where i.viewer_id = new.viewer_id and i.target_id = new.target_id and i.event = 'impression'
+                        and i.created_at > now() - interval '7 days') then
+    return null;
+  end if;
+  return new;
+end;
+$$;
+revoke all on function public.brivia_interaction_served() from public, anon, authenticated;
+drop trigger if exists brivia_interaction_served on public.interaction;
+create trigger brivia_interaction_served
+  before insert on public.interaction
+  for each row execute function public.brivia_interaction_served();
 
 -- deck_status(): why the deck is empty (the client asks when deck_candidates returns no rows). Never a count
 -- (k-anonymity): 'complete_profile' (the caller is not completed, or no session), 'no_members_yet' (no member in the
