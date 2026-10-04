@@ -228,3 +228,32 @@ supersedes it.
   block or completion leak); requests from senders who are no longer completed are hidden and unanswerable; the
   completion-gated policies evaluate once per statement; `purge_expired_requests()` prunes ledger rows older than
   30 days; out-of-range config values fall back to the defaults.
+
+## D-033: The interim deck orders by ring, then shared interests, with k-anonymous bands
+- Accepted 2026-10-04 (Iteration 3, Task 7; plan entry "D-030", renumbered to the next free number). Implements
+  arena P0-4 (`docs/arena/2026-10-03-iteration-2.md`).
+- **Decision:**
+  - `deck_candidates(p_limit default 12)` (SECURITY DEFINER, stable, `authenticated` only) replaces the newest-first
+    `list_members` deck. Pool: `brivia_visible_to` targets in true rings 0–2. It hides matched members, members
+    signalled in the last 30 days (the caller's `signal_ledger`, plus any live outgoing request), and members passed
+    in the last 7 days. Order: true ring, then the shared-interest count, then `md5(caller || target)`.
+  - Each card returns exactly `id, name, photo_url, cover_url, experience, skills, looking_for, distance_band,
+    shared_interests`. No cell, km, ring, City, State, coordinate, email or phone.
+  - `distance_band` follows the §9.1.4 k-anonymity floors through `brivia_cell_ok` on the stored g7/g6/g5 cells. It
+    falls back g7 → g6 → g5 → place, and below g7 the display ring is at least 2 (the place name), so `~3 km` and
+    `~10 km` appear only when the target's own g7 cell meets k.
+  - Shared interests count and label only active, non-sensitive nodes. Sensitive interests (D-029) and retired
+    nodes (including the harness fixture `zz.harness.any`) are excluded from the labels **and** from the ordering
+    count (controller ruling: the brief did not ask for sensitive interests to affect order).
+  - `deck_status()` returns `complete_profile`, `no_members_yet` or `caught_up` for the empty state, never a count.
+- **Why:** location first, interests second, is the product's core promise (VISION rules 1–2). A ring-0 member with no
+  shared interest outranks a ring-2 member with three. Excluding sensitive interests from the count matters as much
+  as hiding their labels: a card ranked above its visible chips would let a member infer a hidden shared topic.
+- **Consequences:** the order still reveals relative proximity among cards whose bands are coarsened (a ring-0 card
+  comes before a ring-2 card even when both say the place name). That is inherent to a location-first deck and
+  is accepted until ORBIT's §6.2 composition. The pool scan is linear in members (with a cheap latitude prefilter);
+  ORBIT's candidate generation replaces it in phase 3. Passing a card needs only the existing `interaction` insert
+  (`event = 'pass'`). Task 10 switches the client deck to `deck_candidates` / `deck_status`.
+- **Alternatives rejected:** porting `R` and the Escape-Velocity gate to SQL (arena ruling: one engine, in ORBIT);
+  counting sensitive interests for order only (a positional leak, see above); returning the ring or km for the
+  client to band (a probe of what k-anonymity hides).

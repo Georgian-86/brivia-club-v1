@@ -428,6 +428,28 @@ saturated, the outer rings relax first, instead of the deck repeating saturated 
   `search_members`, `list_members` and `brivia_can_see_author` are built on it (signatures, caps, ordering and
   escaping unchanged), and every later candidate RPC (the interim deck, ORBIT's `orbit_cards`) must use it too.
   `brivia_member_completed` and `brivia_visible_to` are internal: no client role may execute them.
+- **The interim deck (Iteration 3, D-033, `0004_orbit_onboarding.sql` section 7).** Until ORBIT serves the deck
+  (phase 3), `deck_candidates(p_limit default 12)` is the location-first deck. It is a SQL RPC and ports none of
+  ORBIT's formulas (`R`, the gate, the Roche Limit).
+  - **Pool:** every target `brivia_visible_to(caller, target)` whose true ring (§4.2, km between the g7 cell
+    centroids) is 0–2. Hidden: members the caller is matched with; members in the caller's `signal_ledger` within
+    30 days, or with a live outgoing request from the caller; members the caller passed (`interaction` `pass`) within
+    7 days. A caller who is not completed (or no session) gets no rows. `p_limit` is clamped to [1, 20].
+  - **Order:** true ring ascending, then the shared-interest count descending (the exact same `interest_id` held by
+    both), then `md5(caller || target)`.
+  - **Sensitive and retired interests never count.** The shared count and the labels use only active,
+    non-sensitive nodes (D-029). A shared sensitive interest therefore changes neither a chip nor a card's position
+    (ORBIT may later let it raise `R`, §9.1.5; the interim deck does not).
+  - **`shared_interests`:** at most 2 labels ("You both: …"), by summed points of both members descending, then
+    label ascending.
+  - **`distance_band`:** k = 10 when the true ring is ≤ 1, else 5. The level is g7 if `brivia_cell_ok(target g7,
+    world, k)`, else the target's stored g6 parent, else its g5 parent, else the place (§9.1.4). The display ring is
+    the true ring at g7; `greatest(2, ring(distance between the caller's and the target's cells at that level))` at
+    g6 or g5; `greatest(2, true ring)` at the place. Labels: 0 `~3 km`, 1 `~10 km`, 2 the target's place name,
+    3 its region, 4 its country, 5 `Abroad`; also `Abroad` when the target's place is in another country than the
+    caller's. So `~3 km` / `~10 km` appear only when the target's own g7 cell meets k.
+  - **`deck_status()`** says why the deck is empty, never with a count: `complete_profile` (caller not completed),
+    `no_members_yet` (no member of the caller's world is visible to the caller), otherwise `caught_up`.
 - **Onboarding progress.** `my_onboarding_status()` returns, for the caller only, `interests` (count), `points` (sum),
   `has_cell`, `place_label` (the place name of the cell, never the cell id) and `completed`. It carries no interest
   labels, so sensitive interests (D-029) never appear in it.
@@ -673,6 +695,12 @@ select log_impressions($1, $4);
   exactly `id, name, photoUrl, distanceBand, matchPercent, chips, worthTheDistance`; no value anywhere matches an H3
   index (`/^8[0-9a-f]{14}$/i`), a `grid1` cell id (`/^g[5-7]:\d+:\d+$/`), a coordinate pair, an `@` or a phone-shaped digit run; no key is `km`, `G`, `cell`,
   `lat`, `lng`, `email`, `phone*`, `headroom`, `load` or `ring`. A failing contract test blocks deploy.
+- **Interim deck contract (Iteration 3, `supabase/tests/orbit-deck.test.sql`).** Until ORBIT serves the deck, the
+  `deck_candidates` row keys equal exactly `id, name, photo_url, cover_url, experience, skills, looking_for,
+  distance_band, shared_interests`. No row's JSON matches `8[0-9a-f]{14}`, `g[5-7]:\d+:\d+`, `-?\d{1,3}\.\d{3,}`, `@`
+  or `\d{10}`, and no key is `city`, `state`, `cell`, `km`, `lat`, `lng`, `ring`, `email`, `phone` or `is_test`. A
+  pair whose only shared interests are sensitive (or the retired harness fixture) gets an empty `shared_interests`.
+  `ring` is computed for ordering but never returned. `deck_status()` returns a reason code, never a count.
 - **Sensitive interests never leave the service (D-029).** No card, chip, explanation or search hit carries the
   label or id of an `interest_node` with `sensitive = true`, and search never matches one. A shared sensitive
   interest may raise `matchPercent` (it counts toward resonance), but the chips must then name only non-sensitive

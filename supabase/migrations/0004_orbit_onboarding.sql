@@ -18,6 +18,8 @@
 --      client inserts into connection_requests; redefines brivia_before_connection_request (0003, without the caps),
 --      respond_connection_request (0003) and brivia_has_completed_profile (0001) on top of the D-030 completion,
 --      and recreates the completion-gated request, match, message and post policies (once-per-statement check).
+--   7. Deck: deck_candidates (ring, then shared-interest count; distance bands and "You both" labels) and
+--      deck_status (P0-4, D-033, §7 / §9.1.5).
 --   Data: places (section 1) and the interest taxonomy (end of file).
 -- Privacy (CLAUDE.md): coordinates exist only as function arguments. No member table stores them; the only
 -- coordinate columns are the public city centroids in public.place, which no client role can read.
@@ -1167,6 +1169,141 @@ end;
 $$;
 revoke all on function public.respond_connection_request(uuid, boolean) from public, anon;
 grant execute on function public.respond_connection_request(uuid, boolean) to authenticated;
+
+-- =============================================================================================
+-- 7. Deck
+-- =============================================================================================
+-- The interim location-first deck (P0-4, D-033; spec §7 and §9.1.5). ORBIT's formulas (R, the gate, the Roche
+-- Limit) are NOT ported to SQL: this deck orders by proximity ring, then by the shared-interest count.
+-- * Pool: every target with brivia_visible_to(caller, target) and a true ring <= 2 (km between the g7 centroids).
+--   Hidden: members the caller is matched with; members in the caller's signal_ledger within 30 days, or with a
+--   live outgoing connection_requests row from the caller (requests sent before the ledger existed); members the
+--   caller passed (interaction event 'pass') within 7 days.
+-- * Shared interests: the exact same interest_id held by both, counting only ACTIVE, NON-SENSITIVE nodes. Sensitive
+--   interests (D-029) and retired nodes (including the harness fixture zz.harness.any) are left out of the labels AND
+--   of the count used for ordering, so neither a chip nor a card's position can reveal one.
+-- * Order: true ring asc, shared count desc, then md5(caller || target) (a stable per-pair shuffle).
+-- * shared_interests: at most 2 labels, by summed points (caller + target) desc, then label asc.
+-- * distance_band (k-anonymity, §9.1.4): k = 10 when the true ring <= 1, else 5. The level is g7 if
+--   brivia_cell_ok(target g7, world, k), else the stored g6 parent, else the stored g5 parent, else the place.
+--   Display ring: the true ring at g7; greatest(2, ring of the distance between the caller's and the target's cells
+--   at that level) at g6 / g5; greatest(2, true ring) at the place. Labels: 0 '~3 km', 1 '~10 km', 2 the target's
+--   place name, 3 its region, 4 its country, 5 'Abroad'; 'Abroad' too when the target's place is in another
+--   country than the caller's. A cell id, km, ring, coordinate, city, state, email or phone never leaves.
+-- * The caller must be completed; otherwise (or without a session) no rows. p_limit defaults to 12, clamped to
+--   [1, 20].
+create or replace function public.deck_candidates(p_limit int default 12)
+returns table(id uuid, name text, photo_url text, cover_url text, experience text, skills text[],
+              looking_for text[], distance_band text, shared_interests text[])
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  with me as (
+    select p.id, p.is_test, o.home_cell, o.home_cell_g6, o.home_cell_g5, vp.country,
+           split_part(o.home_cell, ':', 2)::int as g7row
+      from public.profiles p
+      join public.member_orbit o on o.member_id = p.id
+      join public.place vp on vp.id = o.place_id
+     where p.id = auth.uid() and public.brivia_member_completed(p.id)
+  ),
+  near as (  -- ring <= 2 means <= 60 km, so at most 60 / 111.19 deg of latitude (26 g7 rows, plus 1 for flooring):
+             -- a cheap prefilter before the haversine
+    select o.member_id as tid, o.home_cell, o.home_cell_g6, o.home_cell_g5,
+           tp.name as place_name, tp.region, tp.country,
+           public.brivia_ring(public.brivia_cell_km(me.home_cell, o.home_cell)) as ring
+      from me
+      join public.member_orbit o on o.member_id <> me.id
+                                and abs(split_part(o.home_cell, ':', 2)::int - me.g7row) <= 28
+      join public.profiles t on t.id = o.member_id and t.is_test = me.is_test
+      join public.place tp on tp.id = o.place_id
+  ),
+  pool as (
+    select n.* from near n, me
+     where n.ring <= 2
+       and public.brivia_visible_to(me.id, n.tid)
+       and not exists (select 1 from public.matches m
+                        where (m.user1_id = me.id and m.user2_id = n.tid) or (m.user1_id = n.tid and m.user2_id = me.id))
+       and not exists (select 1 from public.signal_ledger l
+                        where l.sender_id = me.id and l.to_id = n.tid and l.at > now() - interval '30 days')
+       and not exists (select 1 from public.connection_requests r
+                        where r.from_id = me.id and r.to_id = n.tid
+                          and public.brivia_request_is_live(r.status, r.created_at))
+       and not exists (select 1 from public.interaction i
+                        where i.viewer_id = me.id and i.target_id = n.tid and i.event = 'pass'
+                          and i.created_at > now() - interval '7 days')
+  ),
+  shared as (
+    select pool.tid, count(*)::int as n,
+           (array_agg(nd.label order by mv.points + mt.points desc, nd.label))[1:2] as labels
+      from pool
+      join public.member_interest mt on mt.member_id = pool.tid
+      join public.member_interest mv on mv.member_id = (select me.id from me) and mv.interest_id = mt.interest_id
+      join public.interest_node nd on nd.id = mt.interest_id and nd.status = 'active' and not nd.sensitive
+     group by pool.tid
+  ),
+  top as (
+    select pool.*, coalesce(s.n, 0) as shared_n, coalesce(s.labels, '{}'::text[]) as labels,
+           md5(me.id::text || pool.tid::text) as tie,
+           case when pool.ring <= 1 then 10 else 5 end as k
+      from pool
+      cross join me
+      left join shared s on s.tid = pool.tid
+     order by pool.ring, shared_n desc, tie
+     limit greatest(1, least(coalesce(p_limit, 12), 20))
+  ),
+  banded as (
+    select top.*,
+           case
+             when public.brivia_cell_ok(top.home_cell, me.is_test, top.k) then top.ring
+             when public.brivia_cell_ok(top.home_cell_g6, me.is_test, top.k)
+               then greatest(2, public.brivia_ring(public.brivia_cell_km(me.home_cell_g6, top.home_cell_g6)))
+             when public.brivia_cell_ok(top.home_cell_g5, me.is_test, top.k)
+               then greatest(2, public.brivia_ring(public.brivia_cell_km(me.home_cell_g5, top.home_cell_g5)))
+             else greatest(2, top.ring)
+           end as display_ring,
+           top.country is distinct from me.country as abroad
+      from top cross join me
+  )
+  select p.id, p.name, p.photo_url, p.cover_url, p.experience, p.skills, p.looking_for,
+         case
+           when b.abroad then 'Abroad'
+           when b.display_ring = 0 then '~3 km'
+           when b.display_ring = 1 then '~10 km'
+           when b.display_ring = 2 then b.place_name
+           when b.display_ring = 3 then b.region
+           when b.display_ring = 4 then b.country
+           else 'Abroad'
+         end,
+         b.labels
+    from banded b
+    join public.profiles p on p.id = b.tid
+   order by b.ring, b.shared_n desc, b.tie
+$$;
+revoke all on function public.deck_candidates(int) from public, anon;
+grant execute on function public.deck_candidates(int) to authenticated;
+
+-- deck_status(): why the deck is empty (the client asks when deck_candidates returns no rows). Never a count
+-- (k-anonymity): 'complete_profile' (the caller is not completed, or no session), 'no_members_yet' (no member in the
+-- caller's world is brivia_visible_to the caller), otherwise 'caught_up'.
+create or replace function public.deck_status()
+returns text
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select case
+    when not public.brivia_member_completed(auth.uid()) then 'complete_profile'
+    when not exists (select 1 from public.profiles t
+                      where t.is_test = (select p.is_test from public.profiles p where p.id = auth.uid())
+                        and public.brivia_visible_to(auth.uid(), t.id)) then 'no_members_yet'
+    else 'caught_up'
+  end
+$$;
+revoke all on function public.deck_status() from public, anon;
+grant execute on function public.deck_status() to authenticated;
 
 -- =============================================================================================
 -- Data: interest taxonomy (spec §3.1; India-relevant, spec §10 phase 1). Original Brivia wording.
