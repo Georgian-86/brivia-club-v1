@@ -462,3 +462,24 @@ supersedes it.
      The consent step itself is P0-B.
 - **Open:** impression rows have no retention purge yet (they grow with every deck and search call); the P0-B
   retention schedule should set one. The `my_onboarding_status` "(city-wide)" state for `place` members is P0-B.
+
+## D-040: Launch is 18+ only; a separate student world comes later (founder decision)
+
+- **Date:** 2026-10-04. **Decided by:** the founder, choosing between options the controller set out.
+- **Decision:** the first launch is adults only (18+). The 18+ gate stays a P0-B item before real members.
+- **Planned later:** a separate student world, as its own iteration with its own arena review. It has these properties:
+  - Ages 13–17 only.
+  - Parental or guardian approval by email before the account becomes visible.
+  - Students see, search, request and message only other students within about ±2 years of their age.
+  - Adults can never find students, and students can never find adults. This works like the test world (P14).
+  - City-level location only.
+  - No taste learning and no behavioural profiling.
+  - No targeted advertising.
+- **Why:**
+  - DPDP Act 2023 s.9 requires verifiable parental consent for anyone under 18.
+  - It also forbids tracking and behavioural monitoring of children and targeted advertising at them.
+  - A location-first feed that tells strangers "similar interests, ~3 km away" is a grooming risk when adults and children are mixed.
+- **Alternatives rejected:**
+  - Students in a restricted mode alongside adults: much riskier and hard to enforce.
+  - School invite codes as the only route: stronger verification, but kept as a fallback.
+- **Open:** a lawyer must confirm whether email approval meets "verifiable" parental consent under the DPDP Rules. If it does not, use school or teacher invite codes.
