@@ -225,10 +225,10 @@ begin
   if n <> 1 then raise exception 'FAIL: member sees % community posts', n; end if;
 
   -- own profile update works; someone else's cannot be updated
-  update public.profiles set city = 'Austin' where id = '11111111-0000-0000-0000-000000000001';
+  update public.profiles set experience = 'Austin' where id = '11111111-0000-0000-0000-000000000001';
   get diagnostics n = row_count;
   if n <> 1 then raise exception 'FAIL: own profile update touched % rows', n; end if;
-  update public.profiles set city = 'X' where id = '33333333-0000-0000-0000-000000000003';
+  update public.profiles set experience = 'X' where id = '33333333-0000-0000-0000-000000000003';
   get diagnostics n = row_count;
   if n <> 0 then raise exception 'FAIL: updated another member profile'; end if;
 end $$;

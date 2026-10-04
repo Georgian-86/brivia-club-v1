@@ -441,12 +441,15 @@ grant execute on function public.my_interests() to authenticated;
 
 -- profiles.skills is server-owned from here on (Task 8 ruling): set_member_interests is its only writer, so a member
 -- cannot self-publish a label (a sensitive one included) that is not in their Passion Budget. This replaces the 0003
--- update grant with the same editable columns minus skills. Insert is unchanged: a value sent with the first insert
+-- update grant with the same editable columns minus skills (and, D-036, minus city and state). Insert is unchanged: a value sent with the first insert
 -- is overwritten by set_member_interests, which completion (D-030) requires before anyone can see the member.
 -- A re-run of 0003 (which grants skills again) must be followed by 0004.
+-- city and state are not editable either (D-036): they are legacy free text that no other member sees any more, and
+-- the member's area is the cell set through set_home_location / set_home_city. Changing it from the profile is a later
+-- iteration.
 revoke update on public.profiles from public, anon, authenticated;
 grant update (
-  name, full_name, phone, phone_country_code, phone_number, gender, city, state,
+  name, full_name, phone, phone_country_code, phone_number, gender,
   experience, looking_for, photo_url, cover_url, updated_at
 ) on public.profiles to authenticated;
 
@@ -609,6 +612,9 @@ revoke all on function public.brivia_visible_to(uuid, uuid) from public, anon, a
 
 -- The candidate RPCs of 0003, redefined on top of brivia_member_completed / brivia_visible_to. Signatures, return
 -- types, caps (50 ids, 20 rows), ordering and LIKE escaping are unchanged. A caller who is not completed sees nothing.
+-- The legacy free-text city and state are private (D-036, supersedes D-030 in part): the three RPCs return them as
+-- null::text (the public_profile_card type keeps both columns, so the contract is unchanged) and search_members no
+-- longer matches city text. A member's area reaches other members only as deck_candidates' distance_band.
 create or replace function public.get_candidates(p_ids uuid[])
 returns setof public.public_profile_card
 language sql
@@ -624,7 +630,7 @@ as $$
       where u.id is not null order by u.id, u.ord
     ) d order by d.ord limit 50
   )
-  select p.id, p.name, p.full_name, p.gender, p.city, p.state, p.experience, p.skills, p.looking_for,
+  select p.id, p.name, p.full_name, p.gender, null::text, null::text, p.experience, p.skills, p.looking_for,
          p.photo_url, p.cover_url, p.created_at
   from public.profiles p
   join me on p.id <> me.id and p.is_test = me.is_test
@@ -648,13 +654,12 @@ as $$
     select '%' || replace(replace(replace(left(btrim(p_query), 100), '\', '\\'), '%', '\%'), '_', '\_') || '%' as pattern
     where coalesce(btrim(p_query), '') <> ''
   )
-  select p.id, p.name, p.full_name, p.gender, p.city, p.state, p.experience, p.skills, p.looking_for,
+  select p.id, p.name, p.full_name, p.gender, null::text, null::text, p.experience, p.skills, p.looking_for,
          p.photo_url, p.cover_url, p.created_at
   from public.profiles p
   join me on p.id <> me.id and p.is_test = me.is_test
   cross join q
   where (p.name ilike q.pattern escape '\' or p.full_name ilike q.pattern escape '\'
-         or p.city ilike q.pattern escape '\'
          or exists (select 1 from unnest(p.skills) s where s ilike q.pattern escape '\')
          or exists (select 1 from unnest(p.looking_for) l where l ilike q.pattern escape '\'))
     and public.brivia_visible_to(me.id, p.id)
@@ -675,7 +680,7 @@ set search_path = public
 as $$
   with me as (  -- Ruling I5: the caller must be a completed member
     select id, is_test from public.profiles where id = auth.uid() and public.brivia_member_completed(id))
-  select p.id, p.name, p.full_name, p.gender, p.city, p.state, p.experience, p.skills, p.looking_for,
+  select p.id, p.name, p.full_name, p.gender, null::text, null::text, p.experience, p.skills, p.looking_for,
          p.photo_url, p.cover_url, p.created_at
   from public.profiles p
   join me on p.id <> me.id and p.is_test = me.is_test
@@ -835,18 +840,8 @@ as $$
 $$;
 revoke all on function public.brivia_cell_ok(text, boolean, int) from public, anon, authenticated;
 
--- Nightly schedule (01:47 IST). pg_cron is optional here: without it (the local harness), run
--- `select public.refresh_cell_density();` nightly some other way. cron.schedule with a job name replaces that job,
--- so re-running this migration does not add a second one.
-do $$
-begin
-  if exists (select 1 from pg_extension where extname = 'pg_cron') then
-    execute $q$select cron.schedule('brivia-refresh-cell-density', '17 20 * * *',
-                                     'select public.refresh_cell_density()')$q$;
-  else
-    raise notice 'pg_cron is not installed: schedule public.refresh_cell_density() nightly (spec §9.1.4).';
-  end if;
-end $$;
+-- Nightly schedule (01:47 IST): brivia_schedule_nightly_jobs() at the end of section 6 schedules this together with
+-- purge_expired_requests() when pg_cron is installed (runbook: supabase/migrations/README.md).
 
 -- =============================================================================================
 -- 6. Signals
@@ -1039,6 +1034,47 @@ as $$
   select count(*)::integer from gone;  -- gone_ledger runs too: data-modifying CTEs always execute
 $$;
 revoke all on function public.purge_expired_requests() from public, anon, authenticated;
+
+-- Nightly jobs (I-2; runbook: supabase/migrations/README.md). When pg_cron is installed, schedule
+--   brivia-refresh-cell-density    17 20 * * * UTC (01:47 IST)  select public.refresh_cell_density()
+--   brivia-purge-expired-requests  37 20 * * * UTC (02:07 IST)  select public.purge_expired_requests()
+-- Each job is unscheduled by name first, so a re-run never adds a second copy (and picks up a changed schedule).
+-- Without pg_cron (the local harness, or a project where it is not enabled yet) it raises a notice and returns 0;
+-- enable pg_cron, then re-run 0004 or `select public.brivia_schedule_nightly_jobs();`. Returns the number of jobs
+-- scheduled. Owner only. All cron.* calls are dynamic so the function compiles without the cron schema.
+create or replace function public.brivia_schedule_nightly_jobs()
+returns integer
+language plpgsql
+volatile
+set search_path = public
+as $$
+declare
+  j record;
+  v_exists boolean;
+  n integer := 0;
+begin
+  if to_regprocedure('cron.schedule(text,text,text)') is null or to_regclass('cron.job') is null then
+    raise notice 'pg_cron is not installed: refresh_cell_density() and purge_expired_requests() are not scheduled (see supabase/migrations/README.md).';
+    return 0;
+  end if;
+  for j in
+    select * from (values
+      ('brivia-refresh-cell-density', '17 20 * * *', 'select public.refresh_cell_density()'),
+      ('brivia-purge-expired-requests', '37 20 * * *', 'select public.purge_expired_requests()')
+    ) v(jobname, schedule, command)
+  loop
+    execute 'select exists (select 1 from cron.job where jobname = $1)' into v_exists using j.jobname;
+    if v_exists then
+      execute 'select cron.unschedule($1)' using j.jobname;
+    end if;
+    execute 'select cron.schedule($1, $2, $3)' using j.jobname, j.schedule, j.command;
+    n := n + 1;
+  end loop;
+  return n;
+end;
+$$;
+revoke all on function public.brivia_schedule_nightly_jobs() from public, anon, authenticated;
+select public.brivia_schedule_nightly_jobs();
 
 -- Raw client inserts are gone (this also removes the 0003 column grant on from_id, to_id, note).
 revoke insert on public.connection_requests from public, anon, authenticated;

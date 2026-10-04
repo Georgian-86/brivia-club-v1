@@ -104,8 +104,8 @@ const fileToDataUrl = (file) => new Promise((resolve, reject) => {
 export const compressedImageDataUrl = async (file) => file ? fileToDataUrl(await compressImage(file)) : '';
 
 // profiles.skills is server-owned (0004): only set_member_interests writes it, so it is never part of a client row.
-// The legacy city / state are sent only when the profile carries them (the profile editor); signup no longer has
-// them, and saveProfile never inserts them (the home area is a coarse cell set through set_home_location / city).
+// The legacy city / state are never sent (D-036: private and not client-editable); the home area is a coarse cell set
+// through set_home_location / set_home_city.
 export const profileToRow = (profile, userId, photoUrl = '') => ({
   id: userId,
   name: profile.name || 'New Member',
@@ -115,8 +115,6 @@ export const profileToRow = (profile, userId, photoUrl = '') => ({
   phone_country_code: profile.phoneCountryCode || profile.phone_country_code || '',
   phone_number: profile.phoneNumber || profile.phone_number || '',
   gender: normalizeGender(profile.gender),
-  ...(typeof profile.city === 'string' ? { city: profile.city } : {}),
-  ...(typeof profile.state === 'string' ? { state: profile.state } : {}),
   experience: profile.experience || '',
   looking_for: splitValues(profile.lookingFor || profile.looking_for),
   photo_url: photoUrl || profile.photoUrl || null,
@@ -239,8 +237,7 @@ export const saveProfile = async (userId, profile, photoFile, coverFile = null) 
     const { id: ignoredId, email: ignoredEmail, ...editable } = payload;
     const updated = await supabase.from('profiles').update(editable).eq('id', userId).select().maybeSingle();
     if (updated.error || updated.data) return updated;
-    const { city: ignoredCity, state: ignoredState, ...insertRow } = payload;
-    return supabase.from('profiles').insert(insertRow).select().single();
+    return supabase.from('profiles').insert(payload).select().single();
   };
   let result = await write(row);
   if (result.error && /cover_url|column/i.test(result.error.message || '')) {

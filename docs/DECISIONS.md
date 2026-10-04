@@ -306,3 +306,37 @@ supersedes it.
 - **Alternatives rejected:** also revoking `insert (skills)` (it would break the existing client-insert `is_test`
   guard test for no privacy gain, since the value is overwritten before visibility); keeping coordinates in
   `sessionStorage` across the email round trip (a stored coordinate, against CLAUDE.md).
+
+## D-036: Free-text city/state are private (supersedes D-030 in part)
+- Accepted 2026-10-04 (Iteration 3 final whole-branch review, item I-1; with the I-2/I-3/I-4 runbook and Minors 1, 2, 6).
+- **Decision:** the legacy `profiles.city` / `profiles.state` free text never leaves the member's own row.
+  - `0004` redefines `get_candidates`, `search_members` and `list_members` to return `city` and `state` as `null::text`.
+    The `public_profile_card` type and the signatures are unchanged.
+  - `search_members` no longer matches city text (D-030 had kept that match).
+  - The `update` column grant on `profiles` drops `city` and `state`. A client update of either fails.
+  - The profile editor has no City/State inputs. It shows the member's area (`my_onboarding_status().place_label`)
+    read-only, with "Change your area: coming soon". Changing the area from the profile is out of scope for this iteration.
+  - The profile page labels email and phone as private. It no longer says "visible to members".
+- **Why:** after D-030 the area is the coarse cell and other members see only `distance_band`. The free text a member
+  once typed (it can be a street or a neighbourhood) still went to every viewer through the card RPCs, and it was
+  searchable. The client dropped it on display, but the server still sent it, and the location-privacy rule in
+  CLAUDE.md is about what the server sends.
+- **Also in this round:**
+  - `0004` gains `brivia_schedule_nightly_jobs()` (owner only). When pg_cron is installed, it schedules
+    `refresh_cell_density()` and `purge_expired_requests()` nightly. It unschedules each job by name first, so a
+    re-run never duplicates a job.
+  - `supabase/migrations/README.md` is the apply-and-deploy runbook. It covers enabling pg_cron first, the log
+    settings check (`log_parameter_max_length` must be 0 whenever statement logging is on, recorded in the go-live
+    entry), and the deploy order: migrations and client in one window, members told to redo onboarding, then the
+    seed, then the advisors.
+  - After an email confirmation, a pending city that `set_home_city` applied is dropped from the stored pending
+    profile at once. A later login therefore never spends another of the 3 daily location changes.
+  - Search results that join the deck skip members you are already matched with, and cards you already swiped.
+  - The band list in spec §4.1 now matches the shipped set.
+- **Cost:** members cannot edit City/State, and their old text is now dead data. Search by city is gone until ORBIT
+  search (§7) adds place-aware search on the cell.
+- **Alternatives rejected:**
+  - Dropping the columns. This would change the composite type and break the 0003 contract tests and older rows for
+    no privacy gain, since nothing reads them now.
+  - Returning the place name of the target's cell in the card RPCs. That is a new location surface, and it would
+    bypass the k-anonymity coarsening that `deck_candidates` applies (§9.1.4).

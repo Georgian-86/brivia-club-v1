@@ -17,6 +17,7 @@
 //   no skills, city or state;
 // * sensitive interests show the private hint; email confirmation stores no coordinate (only { kind: 'geo' } or
 //   { kind: 'city', placeId }); after login a city choice is applied silently and a geo choice re-opens step 2;
+//   an applied pending city is dropped from the kept pending profile, so a second login never re-applies it;
 // * the gate: an app.html member whose my_onboarding_status().completed is false lands on the first incomplete step.
 import { spawn } from 'node:child_process';
 import assert from 'node:assert/strict';
@@ -797,10 +798,16 @@ try {
     await page.waitForFunction(() => document.querySelector('[data-budget-row="sports.racket.tennis"] .budget-label')?.textContent === 'Tennis', null, { timeout: 5000 }).catch(() => {});
     const err = (await page.locator('#budget-error').textContent()).trim();
     const rows = await page.locator('#budget-list [data-budget-row]').evaluateAll((els) => els.map((el) => [el.dataset.budgetRow, el.querySelector('[data-budget-points]').textContent, el.querySelector('input:checked')?.value]));
-    const kept = 'local:brivia-pending-profile' in (await storageDump(page));
+    const keptDump = await storageDump(page);
+    const kept = 'local:brivia-pending-profile' in keptDump;
+    const keptPending = JSON.parse(keptDump['local:brivia-pending-profile'] || 'null');
     check(`pending interests rejected: step 3 with the budget error (got "${err}")`, () => assert.equal(err, 'Your interests could not be saved. Please try again.'));
     check(`pending interests rejected: budget prefilled from the pending list (${JSON.stringify(rows)})`, () => assert.deepEqual(rows, [['sports.racket.tennis', '20', 'build']]));
     check('pending interests rejected: the pending profile is kept', () => assert.ok(kept));
+    check(`pending interests rejected: the applied city is dropped from the kept pending profile (${JSON.stringify(keptPending?.orbit ?? null)})`, () => {
+      assert.ok(keptPending && !('orbit' in keptPending));
+      assert.deepEqual(keptPending.interests, [{ id: 'sports.racket.tennis', points: 20, mode: 'build' }]);
+    });
     await page.locator('[data-signup-step="3"] .signup-next').click();
     await page.waitForSelector('[data-signup-step="4"]:not([hidden])');
     await page.locator('[data-signup-step="4"] [type="submit"]').click();
@@ -811,6 +818,30 @@ try {
       assert.ok(!('local:brivia-pending-profile' in final));
     });
     check('pending interests rejected: no uncaught page errors', () => assert.deepEqual(errors, []));
+    await context.close();
+  }
+
+  // 9c. Minor 1: the city applied at the first login is not applied again at a second login (each set_home_city counts
+  //     toward the 3-per-24 h location cap), even though the interests failed both times and the pending profile stays.
+  {
+    const context = await browser.newContext({ viewport: { width: 1280, height: 900 } });
+    await seedPending(context, { ...basePending, interests: [{ id: 'sports.racket.tennis', points: 20, mode: 'build' }], orbit: { kind: 'city', placeId: 'in-mumbai' }, savedAt: Date.now() });
+    const stub = await stubContext(context, { signupSession: false, interestsStatus: [400, 400] });
+    const { page, errors } = await newPage(context, stub.consoleLines);
+    await loginOnFreshPage(page);
+    await page.waitForSelector('[data-signup-step="3"]:not([hidden])', { timeout: 15000 });
+    // Sign out locally (drop the stored session), then log in again on a fresh page load.
+    await page.evaluate(() => { Object.keys(localStorage).filter((k) => k.startsWith('sb-')).forEach((k) => localStorage.removeItem(k)); });
+    await loginOnFreshPage(page);
+    await page.waitForSelector('[data-signup-step="3"]:not([hidden])', { timeout: 15000 });
+    await page.waitForTimeout(300);
+    const cityCalls = stub.posts('/rest/v1/rpc/set_home_city').length;
+    const interestCalls = stub.posts('/rest/v1/rpc/set_member_interests').length;
+    check(`second login: set_home_city is not called again (${cityCalls} calls; set_member_interests ${interestCalls})`, () => {
+      assert.equal(cityCalls, 1);
+      assert.equal(interestCalls, 2);
+    });
+    check('second login: no uncaught page errors', () => assert.deepEqual(errors, []));
     await context.close();
   }
 

@@ -19,6 +19,9 @@
 //   focus moves to the empty-state title when the deck empties;
 // * zero quota: plain copy, Pitch aria-disabled and described by the notice, the 1440 px card stays below the top bar;
 // * a 'matched' like from the deck shows the mutual toast;
+// * search results join the deck except members already matched with me and cards already swiped (Minor 2);
+// * my own profile: details marked private, the area is place_label (read-only in the editor, "coming soon"), no
+//   City/State anywhere, and a profile save sends no city, state or skills (D-036);
 // * at 375 px the chips wrap without clipping and the action buttons are at least 44 px tall.
 // E2E_SCREENSHOTS=<dir> saves 375 px and 1440 px screenshots: card with band and chips (with the quota counter), the
 // zero-quota state, and the caught-up and no-members-yet empty states.
@@ -42,6 +45,9 @@ const A = 'aaaaaaaa-aaaa-4aaa-8aaa-000000000001';
 const B = 'aaaaaaaa-aaaa-4aaa-8aaa-000000000002';
 const C = 'aaaaaaaa-aaaa-4aaa-8aaa-000000000003';
 const D = 'aaaaaaaa-aaaa-4aaa-8aaa-000000000004';
+// Search-only members (Minor 2): M is already matched with me, N is new.
+const M = 'aaaaaaaa-aaaa-4aaa-8aaa-000000000005';
+const N = 'aaaaaaaa-aaaa-4aaa-8aaa-000000000006';
 // The stub wrongly adds city / state to deck rows: none of these strings may ever reach the page.
 const LEAK = { city: 'Zanzibarton', state: 'Ungujastate' };
 const LEAK_RE = /Zanzibarton|Ungujastate/;
@@ -52,6 +58,11 @@ const deckRows = [
   { id: B, name: 'Bilal Place', photo_url: PHOTO(B), cover_url: null, experience: 'Engineer', skills: ['Badminton'], looking_for: ['Mentor'], distance_band: 'Pune', shared_interests: ['Badminton'], ...LEAK },
   { id: C, name: 'Chen Abroad', photo_url: PHOTO(C), cover_url: null, experience: 'Writer', skills: ['Badminton', 'Travel'], looking_for: ['Friends'], distance_band: 'Abroad', shared_interests: ['Badminton'], ...LEAK },
   { id: D, name: 'Dana Blank', photo_url: null, cover_url: null, experience: null, skills: [], looking_for: [], distance_band: '~10 km', shared_interests: [], ...LEAK },
+];
+const searchRows = [
+  { id: A, name: 'Asha Band', photo_url: PHOTO(A), cover_url: null, experience: 'Product designer', skills: ['Badminton'], looking_for: ['Friends'] },
+  { id: M, name: 'Kai Matched', photo_url: null, cover_url: null, experience: 'Chef', skills: ['Cooking'], looking_for: ['Friends'] },
+  { id: N, name: 'Kai New', photo_url: null, cover_url: null, experience: 'Pilot', skills: ['Flying'], looking_for: ['Friends'] },
 ];
 const ownRow = { id: ME, name: 'Alex Me', full_name: 'Alex Me', email: 'alex@test.brivia.club', phone: '', city: null, state: null, experience: 'Founder', skills: ['Badminton'], looking_for: ['Friends'], created_at: new Date(Date.now() - 9e6).toISOString() };
 
@@ -83,7 +94,8 @@ try {
   browser = await chromium.launch({ headless: true, executablePath: EXECUTABLE });
   // One mutable stub serves every context; tests change it between page loads.
   // onboarding: the my_onboarding_status answers in order (the last one repeats); 'error' answers HTTP 500.
-  const fresh = () => ({ status: 'caught_up', emptyDeck: false, deckFail: false, matchAll: false, onboarding: [true], onboardingCalls: 0, passed: new Set(), signalled: new Set(), remaining: 30, resetsAt: null });
+  // matchIds: members I am matched with (GET /rest/v1/matches); search: the rpc/search_members answer.
+  const fresh = () => ({ status: 'caught_up', emptyDeck: false, deckFail: false, matchAll: false, onboarding: [true], onboardingCalls: 0, passed: new Set(), signalled: new Set(), remaining: 30, resetsAt: null, matchIds: [], search: [] });
   const st = { ...fresh(), calls: [], bodies: [] };
   const resetStub = (patch = {}) => Object.assign(st, fresh(), patch);
   const makeContext = async (viewport) => {
@@ -126,6 +138,8 @@ try {
         return route.fulfill({ status: 201, body: '', headers: { 'access-control-allow-origin': '*' } });
       }
       if (pathName === '/rest/v1/rpc/list_members') return json(200, deckRows);
+      if (pathName === '/rest/v1/rpc/search_members') return json(200, st.search);
+      if (pathName === '/rest/v1/matches' && method === 'GET') return json(200, st.matchIds.map((id) => ({ user1_id: ME, user2_id: id })));
       if (pathName.startsWith('/rest/v1/')) return json(200, []);
       return json(200, {});
     });
@@ -345,6 +359,44 @@ try {
   check('"Clear filters" brings card 1 back', () => assert.equal(clearedBack, true));
   await wide.close();
 
+  // 6b. Minor 2: search results join the deck, except members already matched with me or already swiped this session.
+  resetStub({ matchIds: [M], search: searchRows });
+  const searchCtx = await makeContext({ width: 1440, height: 900 });
+  page = await open(searchCtx);
+  await waitForCard(page, 'Asha Band');
+  await page.locator('[data-action="pass"]').click();   // Asha is consumed (deck.seen)
+  await waitForCard(page, 'Bilal Place');
+  await page.locator('#open-discovery-filters').click();
+  await page.locator('#drawer-filter-search').fill('Kai');
+  await page.waitForTimeout(700);
+  check('search: rpc/search_members was called', () => assert.ok(st.calls.some((c) => c.path === '/rest/v1/rpc/search_members')));
+  await page.locator('.discovery-filter-close').click();
+  const firstHit = await waitForCard(page, 'Kai New');
+  check(`search: the first "Kai" card is the new member, not the matched one (got "${await cardName(page)}")`, () => assert.equal(firstHit, true));
+  await page.locator('[data-action="pass"]').click();
+  const noMoreKai = await waitForEmpty(page, 'No one in this deck matches these filters.');
+  check('search: the matched member never joins the deck', () => assert.equal(noMoreKai, true));
+  // Clear the search (works whether or not the empty state showed), then walk the rest of the deck.
+  await page.locator('#open-discovery-filters').click();
+  await page.locator('#drawer-filter-search').fill('');
+  await page.locator('.discovery-filter-close').click();
+  const seenNames = [];
+  for (let i = 0; i < 8; i += 1) {
+    const name = await page.waitForFunction(() => {
+      const empty = document.querySelector('#home-empty-state');
+      if (empty && !empty.hidden) return '(empty)';
+      return document.querySelector('#swipe-card:not([hidden]) #swipe-name')?.textContent?.trim() || false;
+    }, null, { timeout: 8000 }).then((h) => h.jsonValue(), () => '(timeout)');
+    if (name === '(empty)' || name === '(timeout)') { seenNames.push(name); break; }
+    seenNames.push(name);
+    await page.locator('[data-action="pass"]').click();
+    await page.waitForFunction((n) => document.querySelector('#swipe-card:not([hidden]) #swipe-name')?.textContent?.trim() !== n || !document.querySelector('#home-empty-state')?.hidden, name, { timeout: 8000 }).catch(() => {});
+  }
+  check(`search: after clearing, the deck has neither the passed nor the matched member (${seenNames.join(', ')})`, () => {
+    assert.deepEqual(seenNames, ['Bilal Place', 'Chen Abroad', 'Dana Blank', '(empty)']);
+  });
+  await searchCtx.close();
+
   // 7. 375 px: chips wrap without clipping; the action buttons are at least 44 px tall.
   resetStub();
   const narrow = await makeContext({ width: 375, height: 812 });
@@ -425,6 +477,41 @@ try {
   await wpage.waitForFunction(() => document.querySelector('#profile-location')?.textContent?.trim() === 'Kochi', null, { timeout: 5000 }).catch(() => {});
   const ownArea = await wpage.evaluate(() => document.querySelector('#profile-location')?.textContent?.trim() || '');
   check(`own profile location line is place_label "Kochi" (got "${ownArea}")`, () => assert.equal(ownArea, 'Kochi'));
+  // I-1 (D-036): my own details are private, the area is read-only, and the editor has no City/State; saving works.
+  const ownCard = await wpage.evaluate(() => ({
+    details: document.querySelector('.profile-details-card')?.textContent || '',
+    statArea: document.querySelector('#profile-stat-area')?.textContent?.trim() || '',
+    cityNodes: document.querySelectorAll('#profile-city, #profile-state, #profile-stat-city, #profile-stat-state').length,
+  }));
+  check(`own details card is marked private, not "visible to members" (${JSON.stringify(ownCard)})`, () => {
+    assert.ok(!/VISIBLE TO MEMBERS/i.test(ownCard.details));
+    assert.match(ownCard.details, /PRIVATE/);
+    assert.equal(ownCard.cityNodes, 0);
+  });
+  check(`own location stat is the place_label (got "${ownCard.statArea}")`, () => assert.equal(ownCard.statArea, 'Kochi'));
+  await wpage.locator('#profile-photo-editor').click();
+  await wpage.waitForSelector('#profile-edit-form');
+  const editor = await wpage.evaluate(() => ({
+    cityInputs: document.querySelectorAll('#profile-edit-form input[name="city"], #profile-edit-form input[name="state"]').length,
+    area: document.querySelector('#profile-edit-form [data-profile-area]')?.textContent?.replace(/\s+/g, ' ').trim() || '',
+  }));
+  check(`profile editor: no City/State inputs; the area is read-only with "coming soon" (${JSON.stringify(editor)})`, () => {
+    assert.equal(editor.cityInputs, 0);
+    assert.match(editor.area, /Kochi/);
+    assert.match(editor.area, /Change your area: coming soon/);
+  });
+  const patchesBefore = st.calls.filter((c) => c.method === 'PATCH' && c.path === '/rest/v1/profiles').length;
+  await wpage.locator('#profile-edit-form input[name="experience"]').fill('Founder and cook');
+  await wpage.locator('#profile-edit-form [type="submit"]').click();
+  await wpage.waitForFunction(() => /Profile updated and saved\./.test(document.querySelector('#app-toast')?.textContent || ''), null, { timeout: 5000 }).catch(() => {});
+  const saveToast = await wpage.locator('#app-toast').textContent();
+  const patches = st.calls.filter((c) => c.method === 'PATCH' && c.path === '/rest/v1/profiles').slice(patchesBefore).map((c) => JSON.parse(c.body || '{}'));
+  check(`profile save still works and sends no city/state/skills (${patches.map((b) => Object.keys(b).join(',')).join(' ; ')})`, () => {
+    assert.equal(saveToast, 'Profile updated and saved.');
+    assert.equal(patches.length, 1);
+    assert.equal(patches[0].experience, 'Founder and cook');
+    ['city', 'state', 'skills', 'email', 'id'].forEach((key) => assert.ok(!(key in patches[0]), key));
+  });
   await wide2.close();
 
   // Empty states at 375 px: the one action is at least 44 px tall.

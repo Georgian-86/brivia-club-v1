@@ -16,7 +16,7 @@ do $$
 declare n int;
 begin
   update public.profiles set name='A2', full_name='A2', phone='1', phone_country_code='+1', phone_number='1',
-    gender='Male', city='Houston', state='TX', experience='x', looking_for='{c}',
+    gender='Male', experience='x', looking_for='{c}',
     photo_url='https://proj.supabase.co/storage/v1/object/public/profile-photos/a1a1a1a1-0000-0000-0000-0000000000a1/p.jpg',
     cover_url='/assets/c.png', updated_at=now()
   where id = auth.uid();
@@ -35,7 +35,10 @@ begin
     'update public.profiles set created_at = now() - interval ''1 year'' where id = auth.uid()',
     'update public.profiles set id = ''c1c1c1c1-0000-0000-0000-0000000000c1'' where id = auth.uid()',
     -- 0004 (Task 8 ruling): profiles.skills is server-owned; only set_member_interests writes it.
-    'update public.profiles set skills = ''{Hacked}'' where id = auth.uid()'
+    'update public.profiles set skills = ''{Hacked}'' where id = auth.uid()',
+    -- 0004 (D-036): the legacy free-text city and state are private and no longer client-editable.
+    'update public.profiles set city = ''Houston'' where id = auth.uid()',
+    'update public.profiles set state = ''TX'' where id = auth.uid()'
   ] loop
     failed := false;
     set local role authenticated;
@@ -312,7 +315,7 @@ begin
   select count(*) into n from public.search_members('New Member');
   if n <> 0 then raise exception 'FAIL I1: search shows a New Member profile'; end if;
 
-  -- Search: case-insensitive over name/full_name/city/skills/looking_for; wildcards are literal.
+  -- Search: case-insensitive over name/full_name/skills/looking_for (not city, D-036); wildcards are literal.
   select count(*) into n from public.search_members('rAVI');
   if n <> 1 then raise exception 'FAIL: search not case-insensitive (%)', n; end if;
   select count(*) into n from public.search_members('climb');
@@ -324,7 +327,7 @@ begin
   select count(*) into n from public.search_members('friends', 20);
   if n <> 2 then raise exception 'FAIL: search does not match looking_for (% rows, want Ravi + Ann)', n; end if;
   select count(*) into n from public.search_members('goa');
-  if n <> 1 then raise exception 'FAIL: search does not match city (%)', n; end if;
+  if n <> 0 then raise exception 'FAIL D-036: search matches city text (%)', n; end if;
   select count(*) into n from public.search_members('%');
   if n <> 1 then raise exception 'FAIL: %% is not literal (% rows, want only Ann 100%%)', n; end if;
   select count(*) into n from public.search_members('_');

@@ -181,8 +181,9 @@ is **capped at 25%**, so every strong match can still be explained by named, sha
   `cell_scheme = 'h3r7'`. The displacement is at most half a g7 diagonal (~1.64 km), below the ring-0 radius. If
   h3-pg appears, `set_home_location` switches to `h3_lat_lng_to_cell` with the same signature and the backfill runs
   in SQL. `orbit/src/rings.js` gains a scheme adapter then; it is unchanged in iteration 3.
-- Clients only ever receive a **rounded distance band** ("< 3 km", "~5 km", "~25 km", "Mumbai", "Maharashtra",
-  "India", "abroad"). Never coordinates, and never a cell id.
+- Clients only ever receive a **rounded distance band**: `~3 km`, `~10 km`, the place name ("Mumbai"), the region
+  ("Maharashtra"), the country ("India") or `Abroad` (the set shipped in `deck_candidates`, §7). Never coordinates,
+  never a cell id, and never another member's legacy free-text `city` / `state` (D-036).
 - Travel mode replaces `home_cell` with `travel_cell` until `travel_until`.
 - Location enters only through a server-side snap (`set_home_location`, at most 3 home or travel changes a day), and
   a candidate in a sparsely populated cell is shown at a coarser cell level (g6, then g5; k = 10 for rings 0–1,
@@ -412,8 +413,9 @@ saturated, the outer rings relax first, instead of the deck repeating saturated 
   `public_profiles` directory. The v1 client reads other members only through three SECURITY DEFINER RPCs that
   return the same public card columns (never email, phone or `is_test`): `list_members` (the deck, keyset-paged
   newest first by `(created_at, id)`, at most 20 per page, more pages on demand), `get_candidates` (cards for known
-  ids, at most 50 ids per call) and `search_members` (case-insensitive substring over name, city, skills and
-  looking-for; LIKE wildcards are literal; at most 20 rows; not ranked by `R` yet). All three hide the caller,
+  ids, at most 50 ids per call) and `search_members` (case-insensitive substring over name, skills and
+  looking-for; LIKE wildcards are literal; at most 20 rows; not ranked by `R` yet; city text stopped matching in
+  Iteration 3, D-036). All three hide the caller,
   members who are not completed, blocked pairs in both directions, and the other test world (test and real members
   never see, request or message each other); a caller who is not completed gets nothing. Community posts follow the
   same block, world and completed rules for both the caller and the author (own posts always visible). ORBIT's deck
@@ -464,6 +466,12 @@ saturated, the outer rings relax first, instead of the deck repeating saturated 
     pass is stored (`interaction` `pass`) before the next `deck_candidates` call. When nothing new comes back,
     `deck_status()` picks the empty state (UX_SPEC §B). The client drops any `city` / `state` on another member's row,
     so a card's only location is `distance_band`.
+- **Free-text city and state are private (Iteration 3 final review, D-036; supersedes D-030 in part).** The legacy
+  `profiles.city` / `profiles.state` columns stay (the `public_profile_card` type keeps both, so contracts are
+  unchanged), but `get_candidates`, `search_members` and `list_members` return them as `null` for every row, and
+  `search_members` no longer matches city text. Clients can no longer update them (the `update` column grant on
+  `profiles` omits `city` and `state`). A member's own area is `my_onboarding_status().place_label` (read-only in the
+  profile; changing it from the profile is a later iteration). Other members see only `distance_band`.
 - **Onboarding progress.** `my_onboarding_status()` returns, for the caller only, `interests` (count), `points` (sum),
   `has_cell`, `place_label` (the place name of the cell, never the cell id) and `completed`. It carries no interest
   labels, so sensitive interests (D-029) never appear in it.
@@ -564,7 +572,7 @@ that the viewer has a completed profile (Ruling I3) and return nothing otherwise
 | Function | Kind | Returns / does |
 |---|---|---|
 | `orbit_candidate_pool(p_viewer uuid, p_cells text[], p_limit int)` | `stable`, read-only | Eligible candidates for the viewer: `id`, effective cell (travel cell while `travel_until > now()`), `capacity_k`, `load`, `headroom`, activity signals and `member_interest` rows. Never name, email, phone, `is_test` or `about`. |
-| `orbit_cards(p_viewer uuid, p_ids uuid[])` | `stable`, read-only | Card columns only (`id`, `name`, `photo_url`, `city`, `state` for `placeLabel`) for at most 50 ids. |
+| `orbit_cards(p_viewer uuid, p_ids uuid[])` | `stable`, read-only | Card columns only (`id`, `name`, `photo_url`, and the place name of `member_orbit.place_id` for `placeLabel`; never the legacy free-text `city` / `state`, D-036) for at most 50 ids. |
 | `orbit_viewer(p_viewer uuid)` | `stable`, read-only | The viewer's own effective cell, capacity, headroom and interests (needed to score). |
 | `log_impressions(p_viewer uuid, p_rows jsonb)` | `volatile`, the only write | Appends `impression` rows (§9.1.6). |
 | `orbit_store_home_cell(p_viewer uuid, p_cell text)` | `volatile` | Only for the h3-js fallback in §9.1.4. |
@@ -581,7 +589,7 @@ orbit_svc must **never** have: any grant on `profiles` (so no `email`, `phone`, 
 RPCs, `purge_*` or seed functions; `create` on any schema; membership in `authenticated`, `anon`, `service_role` or
 `postgres`.
 
-**Blast radius of a stolen orbit_svc credential:** public card data (name, photo, city, state), interests, cells
+**Blast radius of a stolen orbit_svc credential:** public card data (name, photo, place label), interests, cells
 and engine state of every member, and the ability to **forge impression rows** for any viewer (including made-up
 features, scores and propensities). It can never read email, phone, messages, requests, matches or blocks, and can
 never like, request, message, block or edit a profile as anyone. Forged impressions can poison offline evaluation
@@ -698,7 +706,8 @@ select log_impressions($1, $4);
 - **No band flips:** a cell's coarsening level only goes up quickly and comes down slowly. Populations live in the
   owner-only `cell_density(cell, is_test, n, streak10, streak5, ok10, ok5, as_of)` table (RLS on, no client grants),
   one row per g7, g6 and g5 cell and world. `refresh_cell_density(p_as_of date default current_date)` (owner only;
-  scheduled nightly with pg_cron) recounts every cell that has members, plus every existing row. Counts group by
+  scheduled nightly with pg_cron by `brivia_schedule_nightly_jobs()`, together with `purge_expired_requests()`;
+  runbook: `supabase/migrations/README.md`) recounts every cell that has members, plus every existing row. Counts group by
   the **stored** `home_cell`, `home_cell_g6` and `home_cell_g5` columns of `member_orbit`; parents are never
   re-derived, because grid parents are only approximately nested. Per row and per k: `streakK` is the previous
   night's `streakK + 1` while `n ≥ k`, and 0 when `n < k`; `okK` is `streakK ≥ 7`. So a cell becomes ok only after
@@ -721,6 +730,9 @@ select log_impressions($1, $4);
   distance_band, shared_interests`. No row's JSON matches `8[0-9a-f]{14}`, `g[5-7]:\d+:\d+`, `-?\d{1,3}\.\d{3,}` or
   `@`; no value other than `id` and the image URLs matches `\d{10}` (a uuid can hold ten digits); and no key is `city`, `state`, `cell`, `km`, `lat`, `lng`, `ring`, `email`, `phone` or `is_test`. A
   pair whose only shared interests are sensitive (or the retired harness fixture) gets an empty `shared_interests`.
+- **Member card RPCs (Iteration 3 final review, D-036).** `get_candidates`, `search_members` and `list_members` keep the
+  `public_profile_card` keys, but `city` and `state` are always `null`, and `search_members` never matches city or
+  state text (`supabase/tests/orbit-city-private.test.sql`). The free text a member once typed never leaves.
   The true ring is used for the pool and the band, never returned and never an ordering key (D-034). `deck_status()` returns a reason code, never a count.
 - **Sensitive interests never leave the service (D-029).** No card, chip, explanation or search hit carries the
   label or id of an `interest_node` with `sensitive = true`, and search never matches one. A shared sensitive

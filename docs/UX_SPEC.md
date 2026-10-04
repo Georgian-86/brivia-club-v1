@@ -100,6 +100,9 @@ so it never covers "Log in".
 **Profile editor (`app.js`).** Skills / interests always come from the server row and are shown read-only (empty
 state: "Pick interests in your profile setup") ("These come from your interests and passion
 points. Private interests are never shown.").
+There are no City or State inputs (D-036). The member's area (`my_onboarding_status().place_label`) is shown
+read-only as "YOUR AREA" with "Change your area: coming soon." The profile page's details card (email, phone) is
+labelled "PRIVATE · ONLY YOU SEE THESE", and the hero and the area stat show the place label.
 
 ### B. Discover deck (`app.html` swipe card)
 

@@ -548,7 +548,6 @@ const toMemberPerson = (row) => {
   const filters = ['all', ...tags.map((item) => item.toLowerCase()), profile.experience?.toLowerCase() || ''];
   return { ...profile, ...deckFields(safeRow), city: '', state: '', email: '', phone: '', phoneCountryCode: '', phoneNumber: '', age: '', role: profile.experience || 'Brivia member', distance: '', bio: `${profile.name} is open to meaningful connections.`, tags, image: profile.photoUrl || '', filters: filters.filter(Boolean) };
 };
-const toDeckPerson = toMemberPerson;
 // Adds cards not already known to the registry (a known card gains a band or chips it lacked); returns their ids.
 const mergePeople = (rows) => {
   const added = [];
@@ -556,7 +555,7 @@ const mergePeople = (rows) => {
     const id = String(row?.id || '');
     if (!id || id === String(memberProfile.id)) return;
     const known = findPersonById(id);
-    const person = toDeckPerson(row);
+    const person = toMemberPerson(row);
     if (!known) { people.push(person); added.push(id); return; }
     if (person.distanceBand && !known.distanceBand) known.distanceBand = person.distanceBand;
     if (person.shared.length && !known.shared?.length) known.shared = person.shared;
@@ -638,7 +637,9 @@ const scheduleMemberSearch = (query) => {
     const { data, error } = await supabase.rpc('search_members', { p_query: term, p_limit: 20 });
     if (seq !== memberSearchSeq) return;
     if (error) { console.warn('Member search failed:', error.message); return; }
-    if (enqueueDeckIds(mergePeople(data))) renderExplore();
+    // Members I am already matched with are in chat, not the deck; consumed cards stay out (enqueueDeckIds).
+    const matched = new Set([...remoteConnectionIds, ...remoteMatchIds].map(String));
+    if (enqueueDeckIds(mergePeople(data).filter((id) => !matched.has(id)))) renderExplore();
   }, 250);
 };
 const addConnection = (personId) => {
@@ -1477,8 +1478,7 @@ const openProfileEditor = () => {
         <label><span>EMAIL</span><input value="${escapeHtml(profile.email || '')}" readonly /></label>
         <label><span>PHONE</span><input name="phone" value="${escapeHtml(profile.phone || '')}" /></label>
         <label><span>EXPERIENCE / ROLE</span><input name="experience" value="${escapeHtml(profile.experience || '')}" /></label>
-        <label><span>CITY</span><input name="city" value="${escapeHtml(profile.city || '')}" /></label>
-        <label><span>STATE</span><input name="state" value="${escapeHtml(profile.state || '')}" /></label>
+        <div class="profile-edit-wide profile-edit-readonly" data-profile-area><span>YOUR AREA</span><p>${escapeHtml(memberPlaceLabel || 'Not set yet')}</p><small class="profile-edit-helper">Change your area: coming soon. Other members only ever see a rough distance, never your area's name.</small></div>
         <div class="profile-edit-wide profile-edit-readonly"><span>SKILLS / INTERESTS</span><p>${escapeHtml(profile.skills || 'Pick interests in your profile setup')}</p><small class="profile-edit-helper">These come from your interests and passion points. Private interests are never shown.</small></div>
         <label class="profile-edit-wide"><span>LOOKING FOR</span><input name="lookingFor" list="profile-edit-looking-options" value="${escapeHtml(profile.lookingFor || '')}" placeholder="Search or type what you are looking for" /><datalist id="profile-edit-looking-options">${profileEditDatalist('lookingFor')}</datalist><small class="profile-edit-helper">Choose from suggestions or type your own.</small></label>
         <label><span>PROFILE PHOTO</span><input name="photoFile" type="file" accept="image/*" /></label>
@@ -1502,8 +1502,6 @@ const openProfileEditor = () => {
       ...memberProfile,
       name: String(formData.get('name') || '').trim(),
       phone: String(formData.get('phone') || '').trim(),
-      city: String(formData.get('city') || '').trim(),
-      state: String(formData.get('state') || '').trim(),
       experience: String(formData.get('experience') || '').trim(),
       lookingFor: String(formData.get('lookingFor') || '').trim(),
     };
@@ -1695,8 +1693,8 @@ const renderProfile = () => {
   const coverUrl = normalizeCoverUrl(profile.coverUrl || profile.cover_url || profile.cover_image_url) || defaultCoverUrl;
   ensureProfilePhotoEditor();
   document.querySelector('#profile-name').textContent = profile.name || 'New Member';
-  // My area as the server names it (my_onboarding_status().place_label). The editor's City/State fields are the
-  // member's own legacy data and stay for now; they are not the area and are never shown to other members.
+  // My area as the server names it (my_onboarding_status().place_label), read-only here (D-036). The legacy free-text
+  // City/State are neither shown nor editable: no other member can read them, and the area is the server's cell.
   document.querySelector('#profile-location').textContent = memberPlaceLabel || 'Your area';
   const profileCover = document.querySelector('#profile-cover-image');
   const safeOwnCover = safeImageUrl(coverUrl) || safeImageUrl(defaultCoverUrl);
@@ -1709,16 +1707,12 @@ const renderProfile = () => {
   document.querySelector('#profile-email').textContent = profile.email || '—';
   document.querySelector('#profile-login-email').textContent = profile.email || '—';
   document.querySelector('#profile-phone').textContent = profile.phone || '—';
-  document.querySelector('#profile-city').textContent = profile.city || '—';
-  document.querySelector('#profile-state').textContent = profile.state || '—';
   const skills = (profile.skills || '').split(',').map((skill) => skill.trim()).filter(Boolean);
   const lookingFor = (profile.lookingFor || '').split(',').map((item) => item.trim()).filter(Boolean);
   const statEmail = document.querySelector('#profile-stat-email');
-  const statCity = document.querySelector('#profile-stat-city');
-  const statState = document.querySelector('#profile-stat-state');
-  if (statEmail) statEmail.textContent = profile.email || 'â€”';
-  if (statCity) statCity.textContent = profile.city || 'â€”';
-  if (statState) statState.textContent = profile.state || 'â€”';
+  const statArea = document.querySelector('#profile-stat-area');
+  if (statEmail) statEmail.textContent = profile.email || '—';
+  if (statArea) statArea.textContent = memberPlaceLabel || '—';
   document.querySelector('#profile-skills').innerHTML = skills.length ? skills.map((skill) => `<span>${escapeHtml(skill)}</span>`).join('') : '<span>Pick interests in your profile setup</span>';
   document.querySelector('#profile-looking').innerHTML = lookingFor.length ? lookingFor.map((item) => `<span>${escapeHtml(item)}</span>`).join('') : '<span>Add your intentions to find better connections.</span>';
   const statLooking = document.querySelector('#profile-stat-looking');

@@ -1353,6 +1353,17 @@ const routeAfterProfile = async (user, row = null, pendingResult = null) => {
   window.history.replaceState({ briviaAuthView: 'signup' }, '', '/auth.html');
 };
 
+// Removes the area choice from the stored pending profile once set_home_city has applied it, keeping the rest (for
+// example interests that still have to be retried). Never throws.
+const dropPendingOrbit = () => {
+  try {
+    const stored = JSON.parse(window.localStorage.getItem('brivia-pending-profile') || 'null');
+    if (!stored || typeof stored !== 'object' || !('orbit' in stored)) return;
+    delete stored.orbit;
+    window.localStorage.setItem('brivia-pending-profile', JSON.stringify(stored));
+  } catch { /* storage unavailable: nothing to drop */ }
+};
+
 // A signup that needed email confirmation stored { interests, orbit } with the pending profile (never coordinates,
 // never labels or sensitive interests). After login: a city choice and complete interests are applied; a geo choice is
 // asked for again (step 2). Nothing fails silently: the result tells routeAfterProfile what to show, and the pending
@@ -1363,6 +1374,7 @@ const applyPendingOnboarding = async (pending) => {
   if (pending.orbit?.kind === 'city' && typeof pending.orbit.placeId === 'string' && pending.orbit.placeId) {
     const { error, status } = await setHomeCity(pending.orbit.placeId);
     if (error) result.orbitError = { error, status };
+    else dropPendingOrbit();  // applied: a later login must not spend another of the 3 daily location changes
   }
   const stored = budgetFromRows(pending.interests);
   result.budget = stored;
