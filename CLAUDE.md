@@ -58,5 +58,9 @@ npm run dev      # vite dev server
 npm run build    # production build → dist/
 npm run test:unit  # client helper unit tests (node --test tests/unit/*.test.mjs)
 cd orbit && npm test   # ORBIT engine unit tests (node --test)
+bash supabase/tests/run.sh   # SQL harness: all migrations twice, every *.test.sql, seed + purge
+# e2e (stubbed Supabase; Playwright installed outside the repo, see tests/e2e/README.md):
+PLAYWRIGHT_MODULE=/tmp/pw/node_modules/playwright/index.mjs node tests/e2e/consent.spec.mjs   # also deck.spec.mjs, onboarding.spec.mjs
 ```
+Going live: follow `supabase/migrations/README.md` (pg_cron first, apply 0001→0004 and deploy the client together, then seed).
 Env: `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY` (see `.env.example`). SQL migrations live in `supabase/migrations/*.sql` (run manually in the Supabase SQL editor, in order; `supabase/legacy/` is archive only). Verify locally with `bash supabase/tests/run.sh`.

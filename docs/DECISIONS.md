@@ -340,3 +340,25 @@ supersedes it.
     no privacy gain, since nothing reads them now.
   - Returning the place name of the target's cell in the card RPCs. That is a new location surface, and it would
     bypass the k-anonymity coarsening that `deck_candidates` applies (§9.1.4).
+
+## D-037: Iteration 3 delivered (ORBIT onboarding, honest signals, location-first deck)
+
+- **Date:** 2026-10-04. **Branch:** `claude/jolly-edison-49xvza`. **Migration set:** `0001`–`0004`; `0004_orbit_onboarding.sql` is new.
+- **Delivered:**
+  - a server-side `grid1` cell (D-028);
+  - the interest taxonomy and Passion Budget, with sensitive interests private (D-029);
+  - completion that requires interests, all 20 points and a cell (D-030);
+  - k-anonymity density (D-031);
+  - `send_signal` with the honest own quota (D-032);
+  - the interim deck `deck_candidates`, ordered by the k-safe display ring (D-033, D-034);
+  - server-owned skills and no client-side coordinates (D-035);
+  - private free-text city and state (D-036);
+  - client: the 4-step signup, the quota counter, deck cards with bands and "You both" chips, and empty states.
+- **Verified locally at delivery:** SQL harness ALL PASSED (coordinate log grep clean). ORBIT 86/86. Unit 42/42. e2e: consent 99/99, deck 57/57, onboarding 121/121. Build OK. `dist/` has no `service_role` or legacy swipe-limit keys; the only `latitude`/`longitude` are the geolocation reads.
+- **Not yet done:** applying to the live project. The Supabase connector's `apply_migration` was refused, so the founder must allow it or run the SQL editor (runbook `supabase/migrations/README.md`).
+- **Go-live gate:** test members only is ready once applied. A closed beta still waits on gate items 7–11 of the iteration-2 arena record: auth hardening, account deletion end to end, legal notice, operations, and founder sign-off.
+- **Carried to the iteration-3 arena:**
+  - ring-2 place labels in metro clusters;
+  - residual probe surfaces (`brivia_can_see_author`, `brivia_request_sender_completed`, the interaction-insert world oracle, `get_candidates`, `my_outgoing_requests`);
+  - `deck_status` in a tiny world;
+  - the D-034 trade-off.

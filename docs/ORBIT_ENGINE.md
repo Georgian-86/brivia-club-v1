@@ -802,6 +802,8 @@ select log_impressions($1, $4);
 | 5 | Calibration from real data: tune θ, Φ, γ and the Roche constants with an offline replay of interactions. Add a per-region Gini of 7-day impressions as a fairness monitor | Far-card like-back rate ≥ ring-1 like-back rate; impression Gini ≤ 0.55 |
 | 6 | Draft: Constellations (Appendix A), only in regions where L ≥ 2·L* for 4 consecutive weeks | Arena re-review passes |
 
+**Status (2026-10-04):** Phase 0 is done (iterations 1–2). Phase 1 is built in iteration 3 (migration `0004`, D-028..D-036) and verified on the local harness; it is not yet applied to the live project. Phase 3 is partly done: the v1 client no longer calls `list_members` and uses the interim SQL deck `deck_candidates` (§7). The ORBIT service (phase 2) is iteration 4. No ORBIT score reaches a member yet.
+
 **Golden-pair tests (must hold):**
 
 1. Same neighbourhood with one shared common interest is eligible. Another state with the same single common interest is **not** eligible.
