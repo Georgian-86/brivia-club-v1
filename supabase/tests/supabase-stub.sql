@@ -13,7 +13,9 @@ alter table auth.users
   add column if not exists confirmation_token text, add column if not exists recovery_token text,
   add column if not exists email_change_token_new text, add column if not exists email_change text,
   add column if not exists email_change_token_current text, add column if not exists phone_change text,
-  add column if not exists phone_change_token text, add column if not exists reauthentication_token text;
+  add column if not exists phone_change_token text, add column if not exists reauthentication_token text,
+  -- Supabase anonymous sign-ins (D-038 hygiene: an anonymous account is never completed)
+  add column if not exists is_anonymous boolean not null default false;
 create table if not exists auth.identities (
   id uuid primary key default gen_random_uuid(), user_id uuid not null references auth.users(id) on delete cascade,
   identity_data jsonb not null, provider text not null, provider_id text not null,

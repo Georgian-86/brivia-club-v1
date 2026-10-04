@@ -35,7 +35,8 @@ show log_statement;
 ## 3. Enable pg_cron (before `0004`)
 
 `0004` schedules two nightly jobs when pg_cron is installed: `refresh_cell_density()` (the k-anonymity streaks,
-§9.1.4) and `purge_expired_requests()` (expired requests and signal-ledger rows older than 30 days).
+§9.1.4) and `purge_expired_requests()` (expired requests, signal-ledger rows older than 30 days, `location_change`
+and `interest_rewrite` rows older than 24 hours, and `cron.job_run_details` history older than 7 days).
 
 1. Dashboard → **Database → Extensions** → enable **pg_cron**.
 2. Then apply `0004` (step 4).

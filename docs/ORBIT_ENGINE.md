@@ -396,7 +396,9 @@ north-star metric (people who actually meet).
   **from** a sender who is no longer completed is hidden from the recipient's Requests list and answers
   `respond_connection_request` like a request that does not exist, so accepting and liking back agree. The completion-gated policies evaluate the check once per statement.
 - **Ledger pruning.** The owner-only `purge_expired_requests()` also deletes `signal_ledger` rows older than 30 days
-  (no counter reads them). It still returns the number of request rows deleted.
+  (no counter reads them), `location_change` and `interest_rewrite` rows older than 24 hours, and, when pg_cron is
+  installed, `cron.job_run_details` rows that ended more than 7 days ago (D-038 hygiene). It still returns the number
+  of request rows deleted.
 - The iteration-2 rule that dropped an over-cap request **silently** (no error, the usual "Signal sent") is replaced
   by the honest own quota above (D-026 supersedes D-019 in part).
 - **The sender never sees a decline, or a block.** Senders read their outgoing requests only through
@@ -440,7 +442,8 @@ saturated, the outer rings relax first, instead of the deck repeating saturated 
   same block, world and completed rules for both the caller and the author (own posts always visible). ORBIT's deck
   and search replace `list_members` and `search_members` in phase 3 and must keep these exclusions.
 - **Completed (Iteration 3, D-030, `0004_orbit_onboarding.sql` section 4).** `brivia_member_completed(id)` is true
-  when the member has:
+  when the account is not anonymous (`auth.users.is_anonymous`, D-038 hygiene: an anonymous sign-in is never a
+  member) and the member has:
   - a name: trimmed, not empty and not 'New Member' (`brivia_is_completed(name, 'x')`); the legacy `city` column plays
     no part;
   - a home cell (a `member_orbit` row, §9.1.4);
@@ -453,7 +456,15 @@ saturated, the outer rings relax first, instead of the deck repeating saturated 
   completed, different members, same world (`is_test` equal) and no block in either direction. `get_candidates`,
   `search_members`, `list_members` and `brivia_can_see_author` are built on it (signatures, caps, ordering and
   escaping unchanged), and every later candidate RPC (the interim deck, ORBIT's `orbit_cards`) must use it too.
-  `brivia_member_completed` and `brivia_visible_to` are internal: no client role may execute them.
+  `brivia_member_completed` and `brivia_visible_to` are internal: no client role may execute them. The same holds for
+  every helper that answers about an arbitrary pair (D-038 hygiene, live advisor findings): `brivia_same_world`,
+  `brivia_interaction_allowed` and both `brivia_is_blocked_between` overloads (0001–0003) are revoked from every
+  client role in `0004` section 8. The policies that used them call definer wrappers pinned to `auth.uid()`
+  (`brivia_can_message`, `brivia_incoming_request_visible`, `brivia_interaction_insert_ok`), which answer only about
+  the caller's own match, request or interaction. `brivia_guard_is_test` pins its `search_path`; it and the
+  storage-URL checks are not executable by `anon` or PUBLIC (the URL checks stay executable by `authenticated`,
+  because the profile and post CHECK constraints run as the writer). `brivia_can_see_author` remains for the post
+  policy until `community_feed()` replaces it (P1).
 - **The interim deck (Iteration 3, D-033; pool and order amended by the iteration-3 arena, D-038,
   `0004_orbit_onboarding.sql` section 7).** Until ORBIT serves the deck (phase 3), `deck_candidates(p_limit default 12)`
   is the location-first deck. It is a SQL RPC and ports none of ORBIT's formulas (`R`, the gate, the Roche Limit).
@@ -742,7 +753,8 @@ select log_impressions($1, $4);
   through these functions. Travel mode uses the same rules (`set_travel_location`, `travel_until` ≤ 30 days).
 - **Rate limit:** at most 3 location changes per member per rolling 24 h, **shared by home and travel** changes
   (counted in `location_change(member_id, at)`, no cell stored; the very first set counts). Changes are serialised
-  per member by an advisory lock. Over the cap the call fails with errcode **`PT429`** and the generic message "try
+  per member by an advisory lock; rows older than 24 hours are deleted by the nightly `purge_expired_requests()`
+  (D-038 hygiene). Over the cap the call fails with errcode **`PT429`** and the generic message "try
   again later" (PostgREST answers HTTP 429), before anything is written: `member_orbit` and the place label stay
   unchanged. This blunts triangulation by moving one's own pin and re-reading distance bands.
 - **k-anonymity floor.** The population of a cell counts only members of the viewer's world who are completed

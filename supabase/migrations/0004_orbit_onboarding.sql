@@ -23,6 +23,7 @@
 --      order: shared interest first, display ring, budget-bounded overlap, daily tie key; impressions logged),
 --      brivia_interaction_served (like/pass only for served targets) and deck_status (P0-4, D-033, D-034, D-038,
 --      §7 / §9.1.5).
+--   8. Hygiene: the 0001-0003 helpers (pinned search_path, revokes of pair helpers and trigger functions).
 --   Data: places (section 1) and the interest taxonomy (end of file).
 -- Privacy (CLAUDE.md): coordinates exist only as function arguments. No member table stores them; the only
 -- coordinate columns are the public city centroids in public.place, which no client role can read.
@@ -676,7 +677,7 @@ grant execute on function public.set_home_city(text) to authenticated;
 -- =============================================================================================
 -- 4. Completion and visibility
 -- =============================================================================================
--- D-030 (spec §7): a member is completed when they have
+-- D-030 (spec §7): a member is completed when their account is not anonymous (auth.users.is_anonymous) and they have
 --   * a name: brivia_is_completed(name, 'x') (trimmed, not empty, not 'New Member'; the legacy city plays no part);
 --   * a member_orbit row (a cell);
 --   * 1-12 member_interest rows whose points sum to exactly 20 (the Passion Budget), at least one of them
@@ -693,6 +694,8 @@ set search_path = public
 as $$
   select coalesce(
     exists (select 1 from public.profiles p where p.id = p_id and public.brivia_is_completed(p.name, 'x'))
+    -- an anonymous account (Supabase anonymous sign-in) is never completed (D-038 hygiene, B-F3)
+    and not exists (select 1 from auth.users u where u.id = p_id and coalesce(u.is_anonymous, false))
     and exists (select 1 from public.member_orbit o where o.member_id = p_id)
     and (select count(*) between 1 and 12 and coalesce(sum(mi.points), 0) = 20
            from public.member_interest mi where mi.member_id = p_id)
@@ -1148,29 +1151,33 @@ $$;
 revoke all on function public.send_signal(uuid, text) from public, anon;
 grant execute on function public.send_signal(uuid, text) to authenticated;
 
--- purge_expired_requests (0003, owner only) also prunes signal_ledger rows older than 30 days: no cap reads them
--- (daily: 24 h; live: 30 days), and interest_rewrite rows older than 24 h (the R3 cap window). It still returns the
--- number of request rows deleted.
+-- purge_expired_requests (0003, owner only), the nightly purge. Besides expired requests it deletes rows that no rule
+-- reads any more (D-038 hygiene; retention, DPDP):
+--   * signal_ledger rows older than 30 days (daily cap: 24 h; live cap: 30 days);
+--   * interest_rewrite and location_change rows older than 24 h (their caps' windows; location_change says when a
+--     member moved);
+--   * cron.job_run_details rows that ended more than 7 days ago, when pg_cron is installed (dynamic SQL, so this
+--     compiles without the cron schema).
+-- It still returns the number of request rows deleted.
 create or replace function public.purge_expired_requests()
 returns integer
-language sql
+language plpgsql
 volatile
 set search_path = public
 as $$
-  with gone_ledger as (
-    delete from public.signal_ledger where at <= now() - interval '30 days'
-    returning 1
-  ),
-  gone_rewrites as (
-    delete from public.interest_rewrite where at <= now() - interval '24 hours'
-    returning 1
-  ),
-  gone as (
-    delete from public.connection_requests
-     where not public.brivia_request_is_live(status, created_at)
-    returning 1
-  )
-  select count(*)::integer from gone;  -- gone_ledger runs too: data-modifying CTEs always execute
+declare
+  n integer;
+begin
+  delete from public.signal_ledger where at <= now() - interval '30 days';
+  delete from public.interest_rewrite where at <= now() - interval '24 hours';
+  delete from public.location_change where at <= now() - interval '24 hours';
+  if to_regclass('cron.job_run_details') is not null then
+    execute 'delete from cron.job_run_details where end_time < now() - interval ''7 days''';
+  end if;
+  delete from public.connection_requests where not public.brivia_request_is_live(status, created_at);
+  get diagnostics n = row_count;
+  return n;
+end;
 $$;
 revoke all on function public.purge_expired_requests() from public, anon, authenticated;
 
@@ -1255,8 +1262,26 @@ grant execute on function public.brivia_has_completed_profile() to authenticated
 -- (wrapped in a scalar subquery: an initplan) instead of once per row. Semantics are those of 0001/0003, except the
 -- incoming-request policy, which also hides requests from senders who are no longer completed (fix round 1), so
 -- "like back" (send_signal writes nothing to them) and "accept" agree.
--- Internal-for-policies: true only for a sender with a request addressed to the caller who is completed. It answers
--- false for anyone else, so it is not an oracle about arbitrary members.
+-- Policy helpers pinned to auth.uid() (advisor finding, 2026-10-04): the 0001-0003 pair helpers
+-- (brivia_is_blocked_between, brivia_same_world, brivia_interaction_allowed) take any two members, so they are revoked
+-- from every client role at the end of this file. Each policy calls one definer wrapper instead. A wrapper answers
+-- only about the caller's own request, match or interaction, never more than the guarded statement itself reveals.
+-- brivia_incoming_request_visible(p_from): a request from p_from to the caller exists, p_from is completed, and no
+-- block either way. (Replaces brivia_request_sender_completed plus brivia_is_blocked_between in the select policy.)
+create or replace function public.brivia_incoming_request_visible(p_from uuid)
+returns boolean
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select exists (select 1 from public.connection_requests r where r.from_id = p_from and r.to_id = auth.uid())
+     and public.brivia_member_completed(p_from)
+     and not public.brivia_pair_is_blocked(p_from, auth.uid());
+$$;
+revoke all on function public.brivia_incoming_request_visible(uuid) from public, anon;
+grant execute on function public.brivia_incoming_request_visible(uuid) to authenticated;
+-- The pre-advisor helper is kept for owner use only.
 create or replace function public.brivia_request_sender_completed(p_from uuid)
 returns boolean
 language sql
@@ -1267,8 +1292,28 @@ as $$
   select exists (select 1 from public.connection_requests r where r.from_id = p_from and r.to_id = auth.uid())
      and public.brivia_member_completed(p_from);
 $$;
-revoke all on function public.brivia_request_sender_completed(uuid) from public, anon;
-grant execute on function public.brivia_request_sender_completed(uuid) to authenticated;
+revoke all on function public.brivia_request_sender_completed(uuid) from public, anon, authenticated;
+
+-- brivia_can_message(p_recipient): the caller and p_recipient are matched, in the same world and not blocked either
+-- way. False for anyone the caller is not matched with.
+create or replace function public.brivia_can_message(p_recipient uuid)
+returns boolean
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select coalesce(
+    exists (select 1 from public.matches m
+             where (m.user1_id = auth.uid() and m.user2_id = p_recipient)
+                or (m.user1_id = p_recipient and m.user2_id = auth.uid()))
+    and not public.brivia_pair_is_blocked(auth.uid(), p_recipient)
+    and exists (select 1 from public.profiles a join public.profiles b on a.is_test = b.is_test
+                 where a.id = auth.uid() and b.id = p_recipient),
+    false);
+$$;
+revoke all on function public.brivia_can_message(uuid) from public, anon;
+grant execute on function public.brivia_can_message(uuid) to authenticated;
 
 drop policy if exists "Members can view their connection requests" on public.connection_requests;
 create policy "Members can view their connection requests"
@@ -1276,9 +1321,8 @@ create policy "Members can view their connection requests"
   using (
     (select public.brivia_has_completed_profile())
     and to_id = auth.uid()
-    and not public.brivia_is_blocked_between(from_id, to_id)  -- caller is a party, so this answers
     and public.brivia_request_is_live(status, created_at)
-    and public.brivia_request_sender_completed(from_id)
+    and public.brivia_incoming_request_visible(from_id)
   );
 
 drop policy if exists "Completed members can view their matches" on public.matches;
@@ -1296,20 +1340,15 @@ create policy "Completed members can view their messages"
   on public.brivia_messages for select to authenticated
   using ((select public.brivia_has_completed_profile()) and auth.uid() in (sender_id, recipient_id));
 
--- Still ONE insert policy (a second permissive policy would OR away these checks). Same checks as 0003.
+-- Still ONE insert policy (a second permissive policy would OR away these checks). Same checks as 0003 (match, no
+-- block, same world), through the pinned wrapper.
 drop policy if exists "Completed members can send messages" on public.brivia_messages;
 create policy "Completed members can send messages"
   on public.brivia_messages for insert to authenticated
   with check (
     (select public.brivia_has_completed_profile())
     and sender_id = auth.uid()
-    and not public.brivia_is_blocked_between(sender_id, recipient_id)
-    and public.brivia_same_world(sender_id, recipient_id)
-    and exists (
-      select 1 from public.matches m
-      where (m.user1_id = sender_id and m.user2_id = recipient_id)
-         or (m.user1_id = recipient_id and m.user2_id = sender_id)
-    )
+    and public.brivia_can_message(recipient_id)
   );
 
 drop policy if exists "Members can create their own community posts" on public.community_posts;
@@ -1550,6 +1589,28 @@ create trigger brivia_interaction_served
   before insert on public.interaction
   for each row execute function public.brivia_interaction_served();
 
+-- The interaction insert policy (0003) through a wrapper pinned to auth.uid() (advisor finding): same checks (same
+-- world; met/letgo need a match; accept/decline need a request addressed to the caller).
+create or replace function public.brivia_interaction_insert_ok(p_target uuid, p_event text)
+returns boolean
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select coalesce(public.brivia_same_world(auth.uid(), p_target)
+                  and public.brivia_interaction_allowed(auth.uid(), p_target, p_event), false);
+$$;
+revoke all on function public.brivia_interaction_insert_ok(uuid, text) from public, anon;
+grant execute on function public.brivia_interaction_insert_ok(uuid, text) to authenticated;
+drop policy if exists interaction_insert_own on public.interaction;
+create policy interaction_insert_own on public.interaction for insert to authenticated
+  with check (
+    viewer_id = auth.uid()
+    and event in ('like','pass','request','accept','decline','met','letgo')
+    and public.brivia_interaction_insert_ok(target_id, event)
+  );
+
 -- deck_status(): why the deck is empty (the client asks when deck_candidates returns no rows). Never a count
 -- (k-anonymity): 'complete_profile' (the caller is not completed, or no session), 'no_members_yet' (no member in the
 -- caller's world is brivia_visible_to the caller), otherwise 'caught_up'.
@@ -1570,6 +1631,47 @@ as $$
 $$;
 revoke all on function public.deck_status() from public, anon;
 grant execute on function public.deck_status() to authenticated;
+
+-- =============================================================================================
+-- 8. Hygiene: the 0001-0003 helpers (D-038 P0-A8 and the live advisor findings of 2026-10-04)
+-- =============================================================================================
+-- 0001-0003 are applied on the live project and frozen, so their helpers are fixed here.
+-- * brivia_guard_is_test (0003, a trigger function): pinned search_path (advisor: function_search_path_mutable), and
+--   no client role may call it. Same body.
+create or replace function public.brivia_guard_is_test()
+returns trigger
+language plpgsql
+set search_path = public
+as $$
+begin
+  if current_user = (select pg_get_userbyid(c.relowner) from pg_class c where c.oid = 'public.profiles'::regclass)
+     and session_user = (select pg_get_userbyid(c.relowner) from pg_class c where c.oid = 'public.profiles'::regclass) then
+    return new;
+  end if;
+  if tg_op = 'INSERT' then
+    new.is_test := false;
+  else
+    new.is_test := old.is_test;
+  end if;
+  return new;
+end;
+$$;
+revoke all on function public.brivia_guard_is_test() from public, anon, authenticated;
+-- * The storage-URL checks (0003) back CHECK constraints on profiles and community_posts, which run as the writing
+--   role, so authenticated keeps execute; anon and PUBLIC lose it.
+revoke all on function public.brivia_is_storage_url(text, text, uuid) from public, anon;
+grant execute on function public.brivia_is_storage_url(text, text, uuid) to authenticated;
+revoke all on function public.brivia_is_preset_cover(text) from public, anon;
+grant execute on function public.brivia_is_preset_cover(text) to authenticated;
+-- * Pair helpers that take any two members (advisor: definer functions callable with arbitrary arguments). Every
+--   policy now calls a wrapper pinned to auth.uid() (sections 6 and 7); definer functions still call these as owner.
+--   brivia_is_blocked_between answered "has this member blocked me?" for any member (B-F5, R6).
+revoke all on function public.brivia_same_world(uuid, uuid) from public, anon, authenticated;
+revoke all on function public.brivia_interaction_allowed(uuid, uuid, text) from public, anon, authenticated;
+revoke all on function public.brivia_is_blocked_between(uuid, uuid) from public, anon, authenticated;
+revoke all on function public.brivia_is_blocked_between(text, text) from public, anon, authenticated;
+-- (brivia_can_see_author, an oracle about a post author's visibility, stays for the community_posts policy until
+-- community_feed() replaces it: R6, P1.)
 
 -- =============================================================================================
 -- Data: interest taxonomy (spec §3.1; India-relevant, spec §10 phase 1). Original Brivia wording.

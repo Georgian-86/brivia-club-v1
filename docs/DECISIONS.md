@@ -425,3 +425,40 @@ supersedes it.
   - B's 24 h settling delay and 50 % public-share rule were not adopted.
   - C would keep Sufi/qawwali public.
   - A wanted the launch-city cold-start flow ahead of engine work. It is P1, run in parallel.
+
+## D-039: P0-A implementation of D-038 (0004 amended in place): where it differs from or adds to D-038
+- **Date:** 2026-10-04. **Branch:** `claude/jolly-edison-49xvza`. **Migration set:** `0001`–`0003` are applied live
+  and frozen; every change is in `0004_orbit_onboarding.sql`, still unapplied, amended in place and idempotent.
+  Report: `.superpowers/sdd/2026-10-03-iteration-3-orbit-onboarding/p0a-report.md`.
+- **As D-038, no deviation:** coarse pool membership (fine ≤ 15 km at `ok10` between two `cell`-precision members,
+  else place centroids ≤ 60 km); the interest-first order with budget-bounded overlap and a daily tie key; volatile
+  `deck_candidates` / `search_members` with `interim-v1` impressions; served-id like/pass; `precision`; harvest
+  closure; the sensitive set, consent, completion floor and rewrite cap; R6; the hygiene list.
+- **Deviations and additions (implementation choices, none changes a D-038 rule):**
+  1. **`get_candidates` does not count as serving.** D-038 listed deck, search or `get_candidates`. No client sends a
+     like or pass from `get_candidates` surfaces (chats, request senders, post authors), and counting it would let any
+     known id be "served" for free, so only `deck_candidates` and `search_members` write impressions. Stricter.
+  2. **The served check applies to a member's own rows only** (`viewer_id = auth.uid()`). A row for another viewer
+     still fails at the insert policy, and owner or service rows are untouched. An unserved like/pass for a
+     cross-world member is also silently ignored (it used to raise), so the answer says nothing about the world.
+  3. **The g6 / g5 band levels are gone from the interim deck.** Every non-fine card is banded by its place name (or
+     "Abroad"); the region label cannot occur under the 60 km place rule. J2 had already shown the levels did not
+     change any label.
+  4. **Withdrawal does not redistribute points.** `set_sensitive_consent(false)` deletes the sensitive rows, so the
+     member is below 20 points and not completed until they re-spend them. Moving points without the member was
+     rejected.
+  5. **A rewrite is a call by a member who is completed before it.** The first save, and a re-save after falling
+     below completion (for example after withdrawal), are free; the ledger is `interest_rewrite`.
+  6. **`sensitive_consent_at` is guarded on insert by a trigger.** `authenticated` holds table-wide insert on
+     `profiles` (Supabase default privileges), so a client insert has the column nulled; it has no update grant.
+  7. **Advisor findings, beyond the two named helpers:** both `brivia_is_blocked_between` overloads are revoked from
+     every client role too (they answered "has this member blocked me?" for any member: B-F5). Policies use pinned
+     wrappers (`brivia_can_message`, `brivia_incoming_request_visible`, `brivia_interaction_insert_ok`);
+     `brivia_request_sender_completed` is now owner-only. `brivia_can_see_author` stays until `community_feed()` (P1).
+  8. **`is_anonymous` is read from `auth.users`**, not from the JWT, because completion is evaluated for other members.
+  9. **Client changes forced by the SQL (each with an e2e check):** search sends nothing under 2 non-space characters
+     and the field says "2+ letters"; another member's gender is never rendered; a consent-refused interest save shows
+     "Private interests need a separate consent, which is coming soon. Remove the ones marked Private to continue."
+     The consent step itself is P0-B.
+- **Open:** impression rows have no retention purge yet (they grow with every deck and search call); the P0-B
+  retention schedule should set one. The `my_onboarding_status` "(city-wide)" state for `place` members is P0-B.

@@ -1,6 +1,14 @@
 -- Baseline schema (supabase/migrations/0001_baseline.sql): shape, uuid ids, RLS, buckets, block rule,
 -- secure-by-default policies. run.sh runs this file twice: against 0001 alone, and after all migrations.
 -- Every data-touching block runs in a transaction that is rolled back.
+-- brivia_is_blocked_between (0001) is called through these owner wrappers (security definer, so auth.uid() still reads
+-- the caller's claims): 0004 revokes it from every client role (D-038 hygiene, advisor finding), and this file also
+-- runs on the full chain. The answers checked below are the function's own; whether a client may call it is checked
+-- at the end (0001 only: authenticated may; with 0004: nobody).
+create or replace function pg_temp.bb_uuid(a uuid, b uuid) returns boolean language sql security definer
+  set search_path = public as $w$ select public.brivia_is_blocked_between(a, b) $w$;
+create or replace function pg_temp.bb_text(a text, b text) returns boolean language sql security definer
+  set search_path = public as $w$ select public.brivia_is_blocked_between(a, b) $w$;
 
 -- 1. Every table the client uses exists, with the columns the client reads/writes.
 do $$
@@ -186,11 +194,11 @@ begin
   values ('11111111-0000-0000-0000-000000000001', '22222222-0000-0000-0000-000000000002');
 
   -- the blocker gets correct answers for uuid and text arguments, in both orders
-  if not public.brivia_is_blocked_between('11111111-0000-0000-0000-000000000001'::uuid, '22222222-0000-0000-0000-000000000002'::uuid)
+  if not pg_temp.bb_uuid('11111111-0000-0000-0000-000000000001', '22222222-0000-0000-0000-000000000002')
      then raise exception 'FAIL: uuid block check (1,2) false'; end if;
-  if not public.brivia_is_blocked_between('22222222-0000-0000-0000-000000000002'::text, '11111111-0000-0000-0000-000000000001'::text)
+  if not pg_temp.bb_text('22222222-0000-0000-0000-000000000002', '11111111-0000-0000-0000-000000000001')
      then raise exception 'FAIL: text block check (2,1) false'; end if;
-  if public.brivia_is_blocked_between('11111111-0000-0000-0000-000000000001', '33333333-0000-0000-0000-000000000003')
+  if pg_temp.bb_text('11111111-0000-0000-0000-000000000001', '33333333-0000-0000-0000-000000000003')
      then raise exception 'FAIL: block check (1,3) true'; end if;
 
   -- cannot block on behalf of someone else
@@ -237,7 +245,7 @@ end $$;
 set local request.jwt.claims = '{"sub":"22222222-0000-0000-0000-000000000002"}';
 do $$
 begin
-  if not public.brivia_is_blocked_between('22222222-0000-0000-0000-000000000002'::uuid, '11111111-0000-0000-0000-000000000001'::uuid)
+  if not pg_temp.bb_uuid('22222222-0000-0000-0000-000000000002', '11111111-0000-0000-0000-000000000001')
      then raise exception 'FAIL: blocked party gets false'; end if;
   begin
     insert into public.brivia_messages(sender_id, recipient_id, body)
@@ -251,9 +259,9 @@ set local request.jwt.claims = '{"sub":"33333333-0000-0000-0000-000000000003"}';
 do $$
 declare n int;
 begin
-  if public.brivia_is_blocked_between('11111111-0000-0000-0000-000000000001'::uuid, '22222222-0000-0000-0000-000000000002'::uuid)
-     or public.brivia_is_blocked_between('22222222-0000-0000-0000-000000000002'::text, '11111111-0000-0000-0000-000000000001'::text)
-     or public.brivia_is_blocked_between('11111111-0000-0000-0000-000000000001', '22222222-0000-0000-0000-000000000002')
+  if pg_temp.bb_uuid('11111111-0000-0000-0000-000000000001', '22222222-0000-0000-0000-000000000002')
+     or pg_temp.bb_text('22222222-0000-0000-0000-000000000002', '11111111-0000-0000-0000-000000000001')
+     or pg_temp.bb_text('11111111-0000-0000-0000-000000000001', '22222222-0000-0000-0000-000000000002')
   then raise exception 'FAIL: third party learns the One/Two block status'; end if;
   select count(*) into n from public.brivia_blocks;
   if n <> 0 then raise exception 'FAIL: third party sees % blocks', n; end if;
@@ -308,5 +316,14 @@ begin
   exception when insufficient_privilege then null; end;
 end $$;
 rollback;
+
+-- Who may call brivia_is_blocked_between: authenticated on 0001 alone; no client role once 0004 is applied.
+do $$
+begin
+  if has_function_privilege('authenticated', 'public.brivia_is_blocked_between(uuid, uuid)', 'execute')
+     <> (to_regprocedure('public.deck_candidates(integer)') is null) then
+    raise exception 'FAIL: authenticated execute on brivia_is_blocked_between is wrong for this migration level';
+  end if;
+end $$;
 
 select 'baseline.test.sql OK' as result;

@@ -511,13 +511,15 @@ begin
       raise exception 'FAIL I4: member % sees posts by % (want %)', split_part(who, ':', 1), got, want;
     end if;
   end loop;
-  -- Same-world helper never answers a third party.
-  set local role authenticated;
+  -- Same-world helper never answers a third party (called as the owner with the caller's claims: since 0004 no
+  -- client role may execute it, D-038 hygiene).
+  if has_function_privilege('authenticated', 'public.brivia_same_world(uuid, uuid)', 'execute') then
+    raise exception 'FAIL: authenticated can execute brivia_same_world';
+  end if;
   perform set_config('request.jwt.claims', '{"sub":"70000000-0000-0000-0000-000000000003"}', true);
   if public.brivia_same_world('70000000-0000-0000-0000-000000000001', '70000000-0000-0000-0000-000000000002') then
-    reset role; raise exception 'FAIL: brivia_same_world answers a third party';
+    raise exception 'FAIL: brivia_same_world answers a third party';
   end if;
-  reset role;
 end $$;
 
 -- Ruling I5: a caller who is not completed (no city; whitespace-only city) gets 0 rows from every RPC.
@@ -1321,7 +1323,12 @@ declare
 begin
   insert into public.matches (user1_id, user2_id) values (least(a,b), greatest(a,b));
   insert into public.connection_requests (from_id, to_id) values (a, b);
-  set local role authenticated;
+  -- Since 0004 (D-038 hygiene, advisor finding) no client role may execute these pair helpers at all; their answers
+  -- are still checked here, as the owner with the caller's claims (they read auth.uid()).
+  foreach ev in array array['public.brivia_interaction_allowed(uuid, uuid, text)', 'public.brivia_same_world(uuid, uuid)',
+                            'public.brivia_is_blocked_between(uuid, uuid)'] loop
+    if has_function_privilege('authenticated', ev, 'execute') then raise exception 'FAIL T5: authenticated can execute %', ev; end if;
+  end loop;
   -- a third party (c) asks about a/b, impersonating either
   perform set_config('request.jwt.claims', '{"sub":"' || c || '"}', true);
   foreach ev in array array['like','pass','request','met','letgo','accept','decline'] loop
@@ -1338,12 +1345,9 @@ begin
   if not (public.brivia_interaction_allowed(b, a, 'met') and public.brivia_interaction_allowed(b, a, 'accept')) then
     raise exception 'FAIL T5: helper denied the real party';
   end if;
-  reset role;
   insert into public.brivia_blocks (blocker_id, blocked_id) values (a, b);
-  set local role authenticated;
   perform set_config('request.jwt.claims', '{"sub":"' || c || '"}', true);
   if public.brivia_is_blocked_between(a, b) then raise exception 'FAIL T5: blocked helper answered for a non-party'; end if;
-  reset role;
   delete from public.brivia_blocks where blocker_id = a;
   delete from public.connection_requests where from_id = a;
   delete from public.matches where user1_id in (a,b);
