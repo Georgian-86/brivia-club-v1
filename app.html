@@ -22,11 +22,11 @@
             <div class="swipe-card-image"><img id="swipe-image" src="./assets/bala.webp" alt="Member profile" /><div class="swipe-card-shade"></div><span class="member-active"><i></i> ACTIVE</span></div>
             <div class="swipe-card-info"><div class="member-name-row"><h2 id="swipe-name"></h2><span id="swipe-age">24</span><span class="verified-mark">✓</span></div><p id="swipe-role"></p><p id="swipe-location" class="swipe-band" hidden></p><div class="member-tags" id="swipe-tags"></div><button class="view-info-button" data-action="full-info">VIEW FULL INFO <span>↗</span></button></div>
           </div>
-          <div class="deck-empty" id="home-empty-state" role="status" aria-live="polite" hidden><svg class="deck-empty-mark" viewBox="0 0 48 48" aria-hidden="true"><circle cx="24" cy="24" r="6"/><ellipse cx="24" cy="24" rx="19" ry="9"/><circle cx="41" cy="21" r="2.2"/></svg><p class="app-eyebrow">DISCOVERY</p><h2 id="deck-empty-title"></h2><p id="deck-empty-copy"></p><button class="deck-empty-action" id="deck-empty-action" type="button"></button></div>
+          <div class="deck-empty" id="home-empty-state" role="status" aria-live="polite" hidden><svg class="deck-empty-mark" viewBox="0 0 48 48" aria-hidden="true"><circle cx="24" cy="24" r="6"/><ellipse cx="24" cy="24" rx="19" ry="9"/><circle cx="41" cy="21" r="2.2"/></svg><p class="app-eyebrow">DISCOVERY</p><h2 id="deck-empty-title" tabindex="-1"></h2><p id="deck-empty-copy"></p><button class="deck-empty-action" id="deck-empty-action" type="button"></button></div>
           <div class="swipe-actions"><button class="swipe-action swipe-pass" data-action="pass" aria-label="Pass">×</button><button class="swipe-action swipe-like" data-action="like" aria-label="Connect">✓</button></div>
           <p class="swipe-hint">PASS WITH INTENTION <span aria-hidden="true">·</span> <b class="swipe-left-copy" hidden><strong id="swipe-left-count"></strong> <span aria-hidden="true">·</span></b> PITCH WITH PURPOSE</p>
           <span class="swipe-daily-count" id="swipe-daily-count" aria-live="polite"></span>
-          <div class="swipe-limit-state" id="swipe-limit-state" role="status" hidden><svg class="swipe-limit-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/></svg><div><p class="app-eyebrow">SIGNALS</p><span id="swipe-limit-copy"></span></div></div>
+          <div class="swipe-limit-state" id="swipe-limit-state" hidden><svg class="swipe-limit-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/></svg><div><p class="app-eyebrow">SIGNALS</p><span id="swipe-limit-copy"></span></div></div>
         </section>
 
         <section class="app-view community-feed-view" data-view="posts" hidden>
@@ -122,7 +122,6 @@
       </aside>
     </div>
 
-    <div class="app-overlay" id="info-modal" hidden><div class="app-overlay-backdrop" data-close-overlay></div><section class="info-panel"><button class="overlay-close" data-close-overlay>×</button><p class="app-eyebrow">FULL INTRODUCTION</p><div class="info-person"><div class="mini-avatar" id="info-avatar">P</div><div><h2 id="info-name">Priya</h2><p id="info-role">Product designer</p></div></div><p id="info-bio">—</p><div class="info-facts" id="info-facts"></div><div class="profile-pills" id="info-tags"></div></section></div>
     <div class="app-overlay" id="pitch-modal" hidden><div class="app-overlay-backdrop" data-close-overlay></div><section class="pitch-panel"><button class="overlay-close" data-close-overlay>×</button><p class="app-eyebrow">A WARM INTRODUCTION</p><h2>Send a pitch<br /><em>with context.</em></h2><p class="pitch-copy">Tell <strong id="pitch-name">them</strong> why you’d like to connect.</p><form id="pitch-form"><textarea id="pitch-message" rows="4" maxlength="500" placeholder="Hey, I noticed we both care about..." required></textarea><button class="pitch-submit" type="submit">SEND PITCH <span>→</span></button></form></section></div>
     <div class="app-toast" id="app-toast" role="status"></div>
     <script>

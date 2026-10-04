@@ -15,10 +15,10 @@ import './chat-sidebar-fix.css';
 import './app-navigation.css';
 import './discovery-filters.css';
 import './mobile-app.css';
-import { supabase, rowToProfile, saveProfile, onboardingStatus, sendSignal, fetchSignalQuota, isStorageImageUrl, withoutCredentials, uploadMessageAttachment, removeMessageAttachment, uploadCommunityPostImage, removeCommunityPostImage } from './supabase.js';
+import { supabase, rowToProfile, saveProfile, onboardingStatus, sendSignal, fetchSignalQuota, isRateLimited, isStorageImageUrl, withoutCredentials, uploadMessageAttachment, removeMessageAttachment, uploadCommunityPostImage, removeCommunityPostImage } from './supabase.js';
 import { defaultCoverUrl, normalizeCoverUrl } from './cover-assets.js';
-import { quotaLabel, quotaErrorText, quotaBlocked } from './signal-quota.js';
-import { pitchLine, deckChips, deckEmptyState, deckFields, interestedIn } from './deck-view.js';
+import { quotaLabel, quotaErrorText, quotaBlocked, quotaNotice } from './signal-quota.js';
+import { pitchLine, deckChips, deckEmptyState, deckFields } from './deck-view.js';
 import { chatEmojiCategories } from './chat-emoji-data.js';
 import { chatGifCatalog } from './chat-gif-data.js';
 import './chat-attachments.css';
@@ -67,7 +67,7 @@ const chatMessages = {};
 const readChatIds = new Set();
 let messageSyncTimer = null;
 let connectionSyncTick = 0;
-const overlayIds = ['info-modal', 'pitch-modal'];
+const overlayIds = ['pitch-modal'];
 const hiddenChatsStorageKey = () => `brivia-hidden-chats:${memberProfile.id || 'anonymous'}`;
 const readHiddenChatIds = () => {
   try {
@@ -343,7 +343,6 @@ const ensureNotificationControls = () => {
 // passes never touch it. At a cap the client sends nothing, and the card is not consumed.
 let signalQuota = null;
 let signalQuotaTimer;
-const signalBlockedCopy = (quota) => (quotaBlocked(quota) ? `${quotaLabel(quota)} · Passing is always free.` : '');
 const renderSignalQuota = () => {
   const label = quotaLabel(signalQuota);
   const inline = document.querySelector('#swipe-left-count');
@@ -352,10 +351,17 @@ const renderSignalQuota = () => {
   const live = document.querySelector('#swipe-daily-count');
   if (live && live.textContent !== label) live.textContent = label;
   const limitState = document.querySelector('#swipe-limit-state');
-  const copy = signalBlockedCopy(signalQuota);
+  const copy = quotaNotice(signalQuota);
   const limitCopy = document.querySelector('#swipe-limit-copy');
   if (limitCopy) limitCopy.textContent = copy;
   limitState?.toggleAttribute('hidden', !copy || !currentPerson);
+  // At a cap, Pitch says so to assistive tech and looks muted, but stays focusable: a tap explains why (F2).
+  const like = document.querySelector('[data-action="like"]');
+  if (like) {
+    like.classList.toggle('is-capped', Boolean(copy));
+    if (copy) { like.setAttribute('aria-disabled', 'true'); like.setAttribute('aria-describedby', 'swipe-limit-copy'); }
+    else { like.removeAttribute('aria-disabled'); like.removeAttribute('aria-describedby'); }
+  }
 };
 const refreshSignalQuota = async () => {
   if (!supabase || !memberProfile.id) return;
@@ -370,6 +376,9 @@ const refreshSignalQuota = async () => {
     signalQuotaTimer = window.setTimeout(refreshSignalQuota, Math.min(Math.max(resetsAt - Date.now() + 1000, 1000), 24 * 60 * 60 * 1000));
   }
 };
+
+// A cap may clear in another tab or after the reset: read the quota again whenever this tab is shown (F4).
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') refreshSignalQuota(); });
 
 const setView = (view) => {
   const renderedView = view === 'explore' ? 'home' : view;
@@ -447,7 +456,24 @@ const renderDeckEmpty = (emptyState) => {
   const action = emptyState.querySelector('#deck-empty-action');
   action.textContent = view.action;
   action.dataset.deckAction = view.kind;
+  const wasHidden = emptyState.hidden;
   emptyState.hidden = false;
+  // When the deck empties, focus moves to the reason (F8). Not while the member types a filter; while the pitch sheet
+  // is open over the deck (the last card was liked), it moves when the sheet closes.
+  if (wasHidden && cause !== 'filters') {
+    if (pitchSheetVisible()) focusEmptyOnSheetClose = true;
+    else focusDeckEmpty();
+  }
+};
+let focusEmptyOnSheetClose = false;
+const focusDeckEmpty = () => {
+  focusEmptyOnSheetClose = false;
+  const emptyState = document.querySelector('#home-empty-state');
+  // A field inside a just-hidden sheet can stay activeElement for a moment; only a visible field counts as typing.
+  const typing = document.activeElement?.closest?.('input, textarea, select, #discovery-filter-drawer');
+  const typingVisible = Boolean(typing && typing.getClientRects().length);
+  if (!emptyState || emptyState.hidden || typingVisible || !['home', 'explore'].includes(document.body.dataset.appView)) return;
+  emptyState.querySelector('#deck-empty-title')?.focus({ preventScroll: true });
 };
 const renderCardChips = (container, person) => {
   container.replaceChildren(...deckChips(person).map((chip) => {
@@ -568,19 +594,35 @@ const loadDeck = () => {
   return deck.loading;
 };
 // A pass is recorded before the next load, so the server hides the card (7 days) and never serves it again.
-const recordPass = async (personId) => {
-  if (!supabase || !memberProfile.id || !isUuid(personId)) return;
-  const { error } = await supabase.from('interaction').insert({ viewer_id: memberProfile.id, target_id: personId, event: 'pass' });
-  if (error) console.warn('Pass could not be recorded:', error.message);
+// Passes still being stored; refillDeck waits for all of them (F9).
+const pendingPasses = new Set();
+const recordPass = (personId) => {
+  if (!supabase || !memberProfile.id || !isUuid(personId)) return Promise.resolve();
+  const stored = (async () => {
+    const { error } = await supabase.from('interaction').insert({ viewer_id: memberProfile.id, target_id: personId, event: 'pass' });
+    if (error) console.warn('Pass could not be recorded:', error.message);
+  })();
+  pendingPasses.add(stored);
+  stored.finally(() => pendingPasses.delete(stored));
+  return stored;
 };
 // When the queue runs out: load once more; if nothing new comes back, ask deck_status() why (never a count).
 const refillDeck = async () => {
   if (!deck.ready || deckPeople().length) return;
+  await Promise.allSettled([...pendingPasses]);
   const { added, error } = await loadDeck();
   if (error) { console.warn('The deck could not load:', error.message); deck.end = 'error'; }
   else if (!added) {
     const { data: status, error: statusError } = await supabase.rpc('deck_status');
-    deck.end = statusError ? 'error' : (typeof status === 'string' && status) || 'caught_up';
+    let cause = statusError ? 'error' : (typeof status === 'string' && status) || 'caught_up';
+    // complete_profile is never a dead end (F6): ask onboarding again. Completed after all -> a retryable error;
+    // not completed -> straight to onboarding; unreadable -> the "Finish profile" state.
+    if (cause === 'complete_profile') {
+      const { data: onboarding, error: onboardingError } = await onboardingStatus();
+      if (!onboardingError && onboarding?.completed === true) cause = 'error';
+      else if (!onboardingError && onboarding?.completed === false) { window.location.replace('/auth.html?complete-profile=1'); return; }
+    }
+    deck.end = cause;
   }
   renderExplore();
 };
@@ -615,15 +657,21 @@ const hasMatchWith = async (personId) => {
   return Boolean(data?.length);
 };
 // One signal = one send_signal call (D-032). The response is the same for every recipient state ('sent'), except
-// 'matched' when a match exists afterwards (the match moment). Only the sender's own caps fail visibly: HTTP 429 with
-// 'signal_quota_exhausted' or 'signal_live_cap' (not charged); the result then carries quotaText for the toast.
+// 'matched' when a match exists afterwards (the mutual toast; the full match moment, UX_SPEC §D, comes later). Only
+// the sender's own caps fail visibly: PT429 / HTTP 429 with 'signal_quota_exhausted' or 'signal_live_cap' (not
+// charged); the result then carries quotaText for the toast.
 const sendConnectionSignal = async (person, note = null) => {
   if (!supabase || !memberProfile.id || !person?.id) return { matched: false, error: new Error('Connection service is unavailable.') };
-  const { data, error } = await sendSignal(person.id, note);
+  const { data, error, status } = await sendSignal(person.id, note);
   if (error) {
-    if (quotaErrorText(error, signalQuota)) {
+    if (quotaErrorText(error, signalQuota, status)) {
       await refreshSignalQuota();
-      return { matched: false, error, quotaText: quotaErrorText(error, signalQuota) };
+      return { matched: false, error, quotaText: quotaErrorText(error, signalQuota, status) };
+    }
+    // A 429 without a known cap message (a gateway limit, say): read the quota again; it may now be at a cap.
+    if (isRateLimited(error, status)) {
+      await refreshSignalQuota();
+      return { matched: false, error, quotaText: quotaBlocked(signalQuota) ? quotaBlockedToast() : null };
     }
     console.warn('Signal could not be sent:', error.message);
     return { matched: false, error };
@@ -638,7 +686,8 @@ const sendConnectionSignal = async (person, note = null) => {
   return { matched, status: data?.status || null };
 };
 const mutualToast = (person) => `It's mutual. Say hi to ${person?.name || 'your new connection'}.`;
-const signalErrorToast = 'Your signal could not be sent. Please try again.';
+// A failed signal never loses the person: their card goes back to the front (F1).
+const signalErrorToast = "Your signal could not be sent. They're back at the front so you can try again.";
 // "Signal sent" only for status 'sent', "It's mutual" only for 'matched', the honest cap text for a 429.
 const signalResultToast = (person, result) => {
   if (result.error) return result.quotaText || signalErrorToast;
@@ -736,27 +785,7 @@ const closeOverlays = () => {
   const pitchWasOpen = !document.querySelector('#pitch-modal')?.hidden;
   overlayIds.forEach((id) => document.querySelector(`#${id}`)?.setAttribute('hidden', ''));
   if (pitchWasOpen) dismissPendingPitch();
-};
-
-// The info sheet: the distance band for "BASED IN", never a City/State. Every label is set as text.
-const fillInfo = (person) => {
-  const avatar = document.querySelector('#info-avatar');
-  if (avatar) avatar.innerHTML = avatarImage(person.image, person.name) || escapeHtml(initials(person.name));
-  const infoName = document.querySelector('#info-name'); if (infoName) infoName.textContent = person.name || 'Brivia member';
-  const infoRole = document.querySelector('#info-role'); if (infoRole) infoRole.textContent = person.role || 'Brivia member';
-  const infoBio = document.querySelector('#info-bio'); if (infoBio) infoBio.textContent = person.bio || '';
-  const facts = document.querySelector('#info-facts');
-  if (facts) {
-    const fact = (label, value) => {
-      const item = document.createElement('div');
-      const name = document.createElement('span'); name.textContent = label;
-      const text = document.createElement('strong'); text.textContent = value;
-      item.append(name, text);
-      return item;
-    };
-    facts.replaceChildren(...[person.distanceBand ? fact('BASED IN', person.distanceBand) : null, fact('INTERESTED IN', interestedIn(person))].filter(Boolean));
-  }
-  const tags = document.querySelector('#info-tags'); if (tags) renderCardChips(tags, person);
+  if (pitchWasOpen && focusEmptyOnSheetClose) focusDeckEmpty();
 };
 
 const resolvePublicPerson = (person = {}) => {
@@ -804,6 +833,8 @@ const openPublicProfile = (person, options = {}) => {
   window.setTimeout(() => modal.focus(), 0);
 };
 
+// Notes typed into a pitch whose send failed, kept in memory (never storage) until the member tries again.
+const unsentNotes = new Map();
 // Claims the pending like exactly once; every later caller gets null, so one like = one insert.
 const claimPendingPitch = () => {
   const pending = pendingPitch;
@@ -818,7 +849,7 @@ const dismissPendingPitch = () => {
   if (!pending) return;
   pitchPerson = null;
   sendConnectionSignal(pending.person).then((result) => {
-    if (result.quotaText) requeuePerson(pending.person);
+    if (result.error) requeuePerson(pending.person);
     showToast(signalResultToast(pending.person, result));
   });
 };
@@ -828,18 +859,21 @@ const openPitch = (person) => {
   pitchOpenedAt = performance.now();
   pitchPerson = person;
   const pitchName = document.querySelector('#pitch-name'); if (pitchName) pitchName.textContent = person.name || 'them';
-  const pitchMessage = document.querySelector('#pitch-message'); if (pitchMessage) pitchMessage.value = pitchLine(person);
+  // A note from a failed send comes back when the member tries again.
+  const savedNote = unsentNotes.get(String(person.id));
+  unsentNotes.delete(String(person.id));
+  const pitchMessage = document.querySelector('#pitch-message'); if (pitchMessage) pitchMessage.value = savedNote || pitchLine(person);
   openOverlay('pitch-modal');
   window.setTimeout(() => pitchMessage?.focus(), 80);
 };
 
-// Bumped when a card is put back (requeuePerson): a card advance scheduled before that must not skip it.
-let deckAdvanceToken = 0;
-// A like refused by the server cap (a race with the cached quota) puts its card back at the front of the queue.
+// Per-card requeue generations: a card advance scheduled before its card was put back must not consume it (F5).
+const requeueGeneration = new Map();
+// A failed signal (any error, F1) puts its card back at the front of the queue.
 const requeuePerson = (person) => {
   if (!person?.id) return;
-  deckAdvanceToken += 1;
   const id = String(person.id);
+  requeueGeneration.set(id, (requeueGeneration.get(id) || 0) + 1);
   if (!findPersonById(id)) people.push(person);
   deck.seen.delete(id);
   deck.ids = [id, ...deck.ids.filter((item) => item !== id)];
@@ -847,41 +881,52 @@ const requeuePerson = (person) => {
   currentPerson = findPersonById(id);
   renderExplore();
 };
-const quotaBlockedToast = () => quotaErrorText({ message: quotaBlocked(signalQuota) === 'live' ? 'signal_live_cap' : 'signal_quota_exhausted' }, signalQuota);
+const quotaBlockedToast = () => quotaErrorText({ code: 'PT429', message: quotaBlocked(signalQuota) === 'live' ? 'signal_live_cap' : 'signal_quota_exhausted' }, signalQuota);
 // A swiped card leaves the queue for this session (passed or liked): the deck never wraps around.
 const consumeCard = (person) => {
   const id = String(person.id);
   deck.ids = deck.ids.filter((item) => item !== id);
   deck.seen.add(id);
 };
+// From the start of a swipe until the next card renders, further swipes are ignored (a double tap, Pass then Like).
+let deckAdvancing = false;
+let capCheckInFlight = false;
 
 const swipe = (type) => {
-  if (!currentPerson) return;
+  if (!currentPerson || deckAdvancing || capCheckInFlight) return;
   // A Like while the pitch sheet is opening or open is ignored: a repeated click/keypress must not resolve
   // the pending like as a plain like and drop the note (Task 3b).
   if (type === 'like' && pendingPitch && pitchSheetVisible()) return;
-  // At a cap a Like sends nothing, opens no pitch and keeps the card (D-026). Passing is always free.
+  // At a cached cap, read the quota again first: the cap may have cleared (F4). Still capped: a Like sends nothing,
+  // opens no pitch and keeps the card (D-026). Passing is always free.
   if (type === 'like' && quotaBlocked(signalQuota)) {
-    renderSignalQuota();
-    showToast(quotaBlockedToast());
+    capCheckInFlight = true;
+    refreshSignalQuota().finally(() => {
+      capCheckInFlight = false;
+      if (quotaBlocked(signalQuota)) { renderSignalQuota(); showToast(quotaBlockedToast()); return; }
+      swipe('like');
+    });
     return;
   }
+  deckAdvancing = true;
   // Moving to the next card resolves an open pitch sheet as a plain like.
   if (pendingPitch) { document.querySelector('#pitch-modal')?.setAttribute('hidden', ''); dismissPendingPitch(); }
   const person = currentPerson;
+  const id = String(person.id);
+  const generation = requeueGeneration.get(id) || 0;
   const card = document.querySelector('#swipe-card');
   card?.classList.add(type === 'like' ? 'is-liking' : 'is-passing');
   // The request is sent when the pitch sheet resolves (submit with a note, or dismiss without one).
   if (type === 'like') openPitch(person);
-  const passRecorded = type === 'pass' ? recordPass(person.id) : Promise.resolve();
-  const token = deckAdvanceToken;
+  if (type === 'pass') recordPass(person.id);
   window.setTimeout(async () => {
-    if (token !== deckAdvanceToken) { renderExplore(); return; }
+    deckAdvancing = false;
+    if ((requeueGeneration.get(id) || 0) !== generation) { renderExplore(); return; }
     consumeCard(person);
     currentPerson = null;
     renderExplore();
-    // The pass is stored before the next deck_candidates call, so the server does not serve the card again.
-    if (!deckPeople().length) { await passRecorded; await refillDeck(); }
+    // Every pass is stored before the next deck_candidates call (refillDeck waits for them).
+    if (!deckPeople().length) await refillDeck();
   }, 280);
 };
 
@@ -1650,7 +1695,8 @@ const renderProfile = () => {
   const coverUrl = normalizeCoverUrl(profile.coverUrl || profile.cover_url || profile.cover_image_url) || defaultCoverUrl;
   ensureProfilePhotoEditor();
   document.querySelector('#profile-name').textContent = profile.name || 'New Member';
-  // My area as the server names it (my_onboarding_status().place_label); no City/State inputs since Task 8.
+  // My area as the server names it (my_onboarding_status().place_label). The editor's City/State fields are the
+  // member's own legacy data and stay for now; they are not the area and are never shown to other members.
   document.querySelector('#profile-location').textContent = memberPlaceLabel || 'Your area';
   const profileCover = document.querySelector('#profile-cover-image');
   const safeOwnCover = safeImageUrl(coverUrl) || safeImageUrl(defaultCoverUrl);
@@ -1988,7 +2034,7 @@ document.querySelector('#deck-empty-action')?.addEventListener('click', async (e
   const kind = event.currentTarget.dataset.deckAction;
   if (kind === 'clear-filters') clearDiscoveryFilters();
   else if (kind === 'search') openDiscoveryFilters();
-  else if (kind === 'finish-profile') window.location.assign('/auth.html#complete');
+  else if (kind === 'finish-profile') window.location.assign('/auth.html?complete-profile=1');
   else if (kind === 'retry') { deck.end = null; refillDeck(); }
   else if (kind === 'invite') {
     const link = window.location.origin;
@@ -2252,14 +2298,12 @@ document.querySelector('#pitch-form')?.addEventListener('submit', async (event) 
       return;
     }
     if (result.error) {
-      // Nothing was stored. Hand the like back for a retry only while the sheet is still visible; if the
-      // member closed it meanwhile (Escape, Task 3b), a hidden like must not be sent later on its own.
-      if (pitchSheetVisible() && !pendingPitch) {
-        pending.resolved = false;
-        pendingPitch = pending;
-      } else if (!pendingPitch) {
-        pitchPerson = null;
-      }
+      // Nothing was stored. The sheet closes and the card goes back to the front with the note kept, so Pitch
+      // retries with it (F1). A hidden like is never sent later on its own (Task 3b).
+      unsentNotes.set(String(pending.person.id), body);
+      document.querySelector('#pitch-modal')?.setAttribute('hidden', '');
+      if (!pendingPitch) pitchPerson = null;
+      requeuePerson(pending.person);
       showToast(signalErrorToast);
       return;
     }

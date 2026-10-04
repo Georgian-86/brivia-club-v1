@@ -109,13 +109,13 @@ points. Private interests are never shown.").
 - **Worth-the-Distance card:** the same card with a wine-gradient top band reading "WORTH THE DISTANCE · 91%
   RESONANCE" and one extra chip explaining why. Max 2 a day.
 - **The interim deck (shipped in Iteration 3, Task 10; `deck_candidates`, ORBIT_ENGINE §7).**
-  - The card's location line (`#swipe-location`, with an SVG pin) is the server's `distance_band` only. Cards, the
-    info sheet ("BASED IN") and the public-profile modal never show another member's City, State, cell, km or a match
-    %; the public profile shows the band when known and otherwise no location line. The client drops `city` / `state`
+  - The card's location line (`#swipe-location`, with an SVG pin) is the server's `distance_band` only. Cards and the
+    public-profile modal ("VIEW PROFILE") never show another member's City, State, cell, km or a match %; the public
+    profile shows the band when known and otherwise no location line. (The old `#info-modal` info sheet was never
+    opened and was removed in Fix round 1.) The client drops `city` / `state`
     from every other member's row, so no other surface (chat header, lists) can show them either.
   - The tag row (`#swipe-tags`) starts with up to 2 wine "You both: X" chips (`.chip-shared`, from
     `shared_interests`), then up to 3 profile tags that do not repeat them. Chips wrap, never clip or ellipsize.
-    "INTERESTED IN" on the info sheet is the first shared interest, else the first tag, else "Open to connect".
     Every label is set as text, never as HTML.
   - The pitch sheet starts with "Hey {name}, I noticed we both care about {first shared interest, lowercased}. Would
     love to connect and exchange ideas.", or "Hey {name}, I'd love to connect and exchange ideas." when nothing is
@@ -125,22 +125,29 @@ points. Private interests are never shown.").
   - A passed or liked card leaves the deck for the session: there is no wrap-around. When the queue runs out, the deck
     loads once more; if nothing new comes back, `deck_status()` picks the empty state.
 - **Deck empty states (final copy).** Each says why the deck is empty and offers exactly one action (`#deck-empty-action`,
-  at least 44 px tall, visible focus). Pass/Pitch and the hint are hidden while it shows.
+  at least 44 px tall, visible focus). Pass/Pitch and the hint are hidden while it shows. When the deck empties, focus
+  moves to the title (`#deck-empty-title`, `tabindex="-1"`); if the pitch sheet is open over it, focus moves when the
+  sheet closes. Not for the filters case, where the member is typing. All passes are stored before the next load.
 
   | Cause | Title | Copy | Action |
   |---|---|---|---|
   | filters hide every loaded card | "No one in this deck matches these filters." | "Clear them to see everyone in your deck again." | "Clear filters" |
   | `caught_up` (also: members exist, but only far away) | "You're caught up." | "You've met your orbit for today. New people near you show up as they join. Try search to reach further." | "Search members" (opens the search box, focused) |
   | `no_members_yet` | "Your area is just opening." | "Brivia Club is new around you. Invite a friend who shares your interests." | "Invite a friend" (copies the site link, toast "Link copied") |
-  | `complete_profile` | "Finish your orbit to see people near you." | "Add your area and place your 20 interest points so we can find your people." | "Finish profile" (`/auth.html#complete`) |
+  | `complete_profile` | "Finish your orbit to see people near you." | "Add your area and place your 20 interest points so we can find your people." | "Finish profile" (`/auth.html?complete-profile=1`) |
   | the deck could not load | "Your deck could not load." | "Check your connection and try again." | "Try again" |
+
+  `complete_profile` is never a dead end: `my_onboarding_status()` is read again first. Completed after all: the
+  "could not load" state with "Try again". Not completed: straight to `/auth.html?complete-profile=1`. Only when the
+  status cannot be read does the "Finish profile" row show.
 
   This replaces the earlier draft ("Widen nothing. We already did.") and the old "Come tomorrow." daily-limit state:
   the only limit left is the signal quota, which keeps the card (below).
 - **Signal counter (Ruling A1, D-026, D-032).** The only signal limit is the server quota from `my_signal_quota()`; the
   old localStorage swipe limit is gone and passes are free.
   - Normal: "N signals left today".
-  - At 0: "More at HH:MM", from `resets_at` (already rounded to the hour by the server), in the member's local time.
+  - At 0: "0 signals left · more at HH:MM", from `resets_at` (already rounded to the hour by the server), in the
+    member's local time (Fix round 1, F2: zero is stated plainly).
   - At the live cap: "You have 100 signals waiting for an answer" (the number is `live_limit`).
   - Over a cap (`send_signal` fails with HTTP 429, `signal_quota_exhausted` or `signal_live_cap`), the card is **not**
     consumed and the member sees the honest state above. Nothing else ever fails visibly: every recipient-side outcome
@@ -148,14 +155,25 @@ points. Private interests are never shown.").
   - **Client (Iteration 3, Task 9).** The quota is read at boot and after every `send_signal`, held in memory only
     (never in `localStorage`), and shown in the hint line under the deck (`#swipe-left-count`, mirrored to a polite live
     region `#swipe-daily-count`). Copy comes from `signal-quota.js`.
-    - When the cached quota is at a cap (`remaining` 0, or `live_unanswered` ≥ `live_limit`), Like sends nothing, opens
-      no pitch sheet and keeps the card. The toast gives the honest cap text ("You've used today's signals. More at
-      HH:MM." or "You have 100 signals waiting for an answer."), and a compact notice `#swipe-limit-state` (eyebrow
-      "SIGNALS", SVG clock) reads "More at HH:MM · Passing is always free." beside the deck. Passes never touch the quota.
-    - A 429 from `send_signal` (a race with the cached quota, e.g. another tab) puts the card back at the front of the
-      queue, shows the honest toast and refreshes the counter. A pitch submitted with a note closes its sheet the same way.
+    - When the cached quota is at a cap (`remaining` 0, or `live_unanswered` ≥ `live_limit`), a Like first reads
+      `my_signal_quota()` again (the cap may have cleared); the quota is also read again whenever the tab becomes
+      visible. Still capped: Like sends nothing, opens no pitch sheet and keeps the card. The toast gives the honest cap
+      text ("You've used today's signals. More at HH:MM." or "You have 100 signals waiting for an answer."), and a
+      compact notice `#swipe-limit-state` (eyebrow "SIGNALS", SVG clock, no live role: the counter's live region
+      announces the change once) reads "No signals left today. More at HH:MM · Passing is always free." (at the live
+      cap: "You have 100 signals waiting for an answer · Passing is always free."). At 1440 px it shares the hint's
+      grid row, so the card never moves under the top bar. The Pitch button gets `aria-disabled="true"`,
+      `aria-describedby="swipe-limit-copy"` and a muted token style; it stays focusable and a tap shows the toast.
+      Passes never touch the quota.
+    - **A failed signal never loses the person (F1).** Any `send_signal` error puts the card back at the front of the
+      queue. A cap 429 (`PT429` or HTTP 429 with a cap message) shows the honest toast and refreshes the counter; a 429
+      without a cap message also reads the quota again; any other error reads "Your signal could not be sent. They're
+      back at the front so you can try again." A pitch sent with a note closes its sheet and keeps the note (in memory
+      only) for the retry.
+    - From the start of a swipe until the next card renders, further swipes are ignored (Pass then Like within 100 ms
+      is one pass and no signal).
     - The toast reads "Signal sent" only for `status = 'sent'` (with or without a note) and "It's mutual. Say hi to …"
-      only for `matched`, which also adds the chat (the match moment).
+      only for `matched`, which also adds the chat: the mutual toast; the full match moment (§D) comes later.
     - At a cap, incoming requests can still be accepted from the notifications panel (`respond_connection_request` is
       not a signal). A like-back from the deck waits for the reset, even though the server would let a completing
       signal through.

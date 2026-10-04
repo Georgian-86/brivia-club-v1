@@ -28,22 +28,35 @@ export const quotaBlocked = (quota) => {
   return null;
 };
 
-// The counter line: "N signals left today", "1 signal left today", or "More at HH:MM" at 0.
+// The counter line: "N signals left today", "1 signal left today", or "0 signals left · more at HH:MM" at 0.
 export const quotaLabel = (quota) => {
   const blocked = quotaBlocked(quota);
   if (!quota || !Number.isFinite(Number(quota.remaining))) return '';
   if (blocked === 'daily') {
     const time = resetTimeLabel(quota.resets_at);
-    return time ? `More at ${time}` : 'No signals left today';
+    return time ? `0 signals left · more at ${time}` : '0 signals left today';
   }
   if (blocked === 'live') return `You have ${liveLimit(quota)} signals waiting for an answer`;
   const remaining = Number(quota.remaining);
   return `${remaining} ${remaining === 1 ? 'signal' : 'signals'} left today`;
 };
 
+// The notice beside the deck at a cap (empty when nothing blocks): it says plainly that no signal is left.
+export const quotaNotice = (quota) => {
+  const blocked = quotaBlocked(quota);
+  if (blocked === 'daily') {
+    const time = resetTimeLabel(quota.resets_at);
+    return time ? `No signals left today. More at ${time} · Passing is always free.` : 'No signals left today · Passing is always free.';
+  }
+  if (blocked === 'live') return `You have ${liveLimit(quota)} signals waiting for an answer · Passing is always free.`;
+  return '';
+};
+
 // The toast for a refused send (HTTP 429, SQLSTATE PT429): only the sender's own caps are ever shown. Any other
-// error returns null so the caller shows its generic message.
-export const quotaErrorText = (error, quota) => {
+// error returns null so the caller shows its generic message. The cap messages count only with SQLSTATE PT429 or
+// HTTP 429, so another error that happens to carry the same words is never mistaken for a cap.
+export const quotaErrorText = (error, quota, status = 0) => {
+  if (!(error?.code === 'PT429' || status === 429)) return null;
   const message = String(error?.message || '');
   if (message.includes('signal_quota_exhausted')) {
     const time = resetTimeLabel(quota?.resets_at);

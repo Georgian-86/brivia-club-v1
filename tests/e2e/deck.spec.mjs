@@ -12,9 +12,13 @@
 // * Like on a card with tags: [] and shared_interests: [] opens the pitch with the neutral line, with no page error (A5);
 // * after the last card an empty deck_candidates + deck_status() 'caught_up' shows "You're caught up." with
 //   "Search members"; the deck does NOT wrap back to card 1;
-// * each deck_status value ('no_members_yet', 'complete_profile', 'caught_up') and the filters case show their copy
-//   and their one action (Invite copies location.origin and toasts "Link copied"; Finish profile opens
-//   /auth.html#complete; Search members focuses the search box; Clear filters brings the card back);
+// * each deck_status value ('no_members_yet', 'complete_profile', 'caught_up'), a failed load and the filters case show
+//   their copy and their one action (Invite copies location.origin and toasts "Link copied"; complete_profile re-reads
+//   my_onboarding_status: completed -> the error state, not completed -> /auth.html?complete-profile=1, unreadable ->
+//   "Finish profile"; Search members focuses the search box; Try again reloads; Clear filters brings the card back);
+//   focus moves to the empty-state title when the deck empties;
+// * zero quota: plain copy, Pitch aria-disabled and described by the notice, the 1440 px card stays below the top bar;
+// * a 'matched' like from the deck shows the mutual toast;
 // * at 375 px the chips wrap without clipping and the action buttons are at least 44 px tall.
 // E2E_SCREENSHOTS=<dir> saves 375 px and 1440 px screenshots: card with band and chips (with the quota counter), the
 // zero-quota state, and the caught-up and no-members-yet empty states.
@@ -78,8 +82,10 @@ try {
   await waitForServer();
   browser = await chromium.launch({ headless: true, executablePath: EXECUTABLE });
   // One mutable stub serves every context; tests change it between page loads.
-  const st = { status: 'caught_up', emptyDeck: false, passed: new Set(), signalled: new Set(), remaining: 30, resetsAt: null, calls: [], bodies: [] };
-  const resetStub = (patch = {}) => Object.assign(st, { status: 'caught_up', emptyDeck: false, passed: new Set(), signalled: new Set(), remaining: 30, resetsAt: null }, patch);
+  // onboarding: the my_onboarding_status answers in order (the last one repeats); 'error' answers HTTP 500.
+  const fresh = () => ({ status: 'caught_up', emptyDeck: false, deckFail: false, matchAll: false, onboarding: [true], onboardingCalls: 0, passed: new Set(), signalled: new Set(), remaining: 30, resetsAt: null });
+  const st = { ...fresh(), calls: [], bodies: [] };
+  const resetStub = (patch = {}) => Object.assign(st, fresh(), patch);
   const makeContext = async (viewport) => {
     const context = await browser.newContext({ viewport });
     await context.addInitScript(([key, value]) => { window.localStorage.setItem(key, value); }, ['sb-stub-auth-token', JSON.stringify(session)]);
@@ -98,8 +104,14 @@ try {
       if (pathName.startsWith('/storage/v1/object/public/')) return route.fulfill({ status: 200, contentType: 'image/png', body: STILL, headers: { 'access-control-allow-origin': '*' } });
       if (pathName === '/rest/v1/profiles') return json(200, (request.headers().accept || '').includes('vnd.pgrst.object') ? ownRow : [ownRow]);
       const args = JSON.parse(postData || '{}');
-      if (pathName === '/rest/v1/rpc/my_onboarding_status') return json(200, [{ interests: 2, points: 20, has_cell: true, place_label: 'Kochi', completed: true }]);
+      if (pathName === '/rest/v1/rpc/my_onboarding_status') {
+        const answer = st.onboarding[Math.min(st.onboardingCalls, st.onboarding.length - 1)];
+        st.onboardingCalls += 1;
+        if (answer === 'error') return json(500, { code: 'XX000', message: 'stub failure' });
+        return json(200, [{ interests: 2, points: 20, has_cell: true, place_label: 'Kochi', completed: answer }]);
+      }
       if (pathName === '/rest/v1/rpc/deck_candidates') {
+        if (st.deckFail) return json(500, { code: 'XX000', message: 'stub failure' });
         if (st.emptyDeck) return json(200, []);
         return json(200, deckRows.filter((row) => !st.passed.has(row.id) && !st.signalled.has(row.id)).slice(0, Number(args.p_limit) || 12));
       }
@@ -107,7 +119,7 @@ try {
       if (pathName === '/rest/v1/rpc/my_signal_quota') return json(200, [{ daily_limit: 30, remaining: st.remaining, resets_at: st.resetsAt, live_unanswered: 0, live_limit: 100 }]);
       if (pathName === '/rest/v1/rpc/send_signal') {
         st.signalled.add(args.p_to); st.remaining = Math.max(0, st.remaining - 1); st.resetsAt = '2026-10-04T15:00:00+00:00';
-        return json(200, [{ status: 'sent', remaining: st.remaining, resets_at: st.resetsAt }]);
+        return json(200, [{ status: st.matchAll ? 'matched' : 'sent', remaining: st.remaining, resets_at: st.resetsAt }]);
       }
       if (pathName === '/rest/v1/interaction' && method === 'POST') {
         if (args.event === 'pass') st.passed.add(args.target_id);
@@ -216,7 +228,10 @@ try {
     copy: document.querySelector('#deck-empty-copy')?.textContent?.trim() || '',
     action: document.querySelector('#deck-empty-action')?.textContent?.trim() || '',
     buttons: document.querySelectorAll('#home-empty-state button, #home-empty-state a').length,
+    focused: document.activeElement?.id || '',
+    titleTabindex: document.querySelector('#deck-empty-title')?.getAttribute('tabindex'),
   }));
+  check(`when the deck empties, focus moves to the empty-state title (focused "${caught.focused}")`, () => { assert.equal(caught.focused, 'deck-empty-title'); assert.equal(caught.titleTabindex, '-1'); });
   check(`caught up: the copy and one "Search members" action (${JSON.stringify(caught)})`, () => {
     assert.match(caught.copy, /New people near you show up as they join\./);
     assert.equal(caught.action, 'Search members');
@@ -251,18 +266,36 @@ try {
   const copied = { toast: await page.locator('#app-toast').textContent(), clip: await page.evaluate(() => navigator.clipboard.readText()).catch((e) => `ERR ${e.message}`) };
   check(`Invite copies location.origin and toasts "Link copied" (${JSON.stringify(copied)})`, () => { assert.equal(copied.toast, 'Link copied'); assert.equal(copied.clip, BASE); });
 
-  resetStub({ emptyDeck: true, status: 'complete_profile' });
+  // complete_profile (F6): the status is re-read first. Still completed -> the error state with "Try again"
+  // (never a dead end); not completed -> straight to onboarding; unreadable -> "Finish profile".
+  resetStub({ emptyDeck: true, status: 'complete_profile', onboarding: [true] });
+  await page.reload({ waitUntil: 'domcontentloaded' });
+  const raceShown = await waitForEmpty(page, 'Your deck could not load.');
+  action = await page.locator('#deck-empty-action').textContent();
+  check(`complete_profile while my_onboarding_status says completed -> "Your deck could not load." + "Try again" (got "${action?.trim()}")`, () => { assert.equal(raceShown, true); assert.equal(action?.trim(), 'Try again'); });
+  check('complete_profile re-reads my_onboarding_status before choosing the state', () => assert.ok(st.onboardingCalls >= 2));
+
+  resetStub({ emptyDeck: true, status: 'complete_profile', onboarding: [true, 'error'] });
   await page.reload({ waitUntil: 'domcontentloaded' });
   const finishShown = await waitForEmpty(page, 'Finish your orbit to see people near you.');
-  check('complete_profile: "Finish your orbit to see people near you."', () => assert.equal(finishShown, true));
   action = await page.locator('#deck-empty-action').textContent();
-  check(`complete_profile: one "Finish profile" action (got "${action?.trim()}")`, () => assert.equal(action?.trim(), 'Finish profile'));
+  check(`complete_profile with an unreadable status -> "Finish profile" (got "${action?.trim()}")`, () => { assert.equal(finishShown, true); assert.equal(action?.trim(), 'Finish profile'); });
   // auth.html routes on by itself with the stubbed session, so record every navigation rather than the final URL.
   const visited = [];
   page.on('framenavigated', (frame) => { if (frame === page.mainFrame()) visited.push(frame.url()); });
   await page.locator('#deck-empty-action').click();
   await page.waitForTimeout(1500);
-  check(`"Finish profile" opens /auth.html#complete (${JSON.stringify(visited)})`, () => assert.ok(visited.some((url) => /\/auth\.html#complete$/.test(url))));
+  check(`"Finish profile" opens /auth.html?complete-profile=1 (${JSON.stringify(visited)})`, () => assert.ok(visited.some((url) => /\/auth\.html\?complete-profile=1$/.test(url))));
+  await page.close();
+
+  resetStub({ emptyDeck: true, status: 'complete_profile', onboarding: [true, false] });
+  const visitedReplace = [];
+  page = await wide.newPage();
+  page.on('pageerror', (error) => pageErrors.push(String(error)));
+  page.on('framenavigated', (frame) => { if (frame === page.mainFrame()) visitedReplace.push(frame.url()); });
+  await page.goto(`${BASE}/app.html`, { waitUntil: 'domcontentloaded' });
+  await page.waitForTimeout(2500);
+  check(`complete_profile while not completed -> location.replace('/auth.html?complete-profile=1') (${JSON.stringify(visitedReplace)})`, () => assert.ok(visitedReplace.some((url) => /\/auth\.html\?complete-profile=1$/.test(url))));
 
   // auth.html routes on by itself (stubbed session); continue in a fresh page rather than racing its redirect.
   await page.close();
@@ -270,6 +303,26 @@ try {
   page = await open(wide);
   const caughtFirst = await waitForEmpty(page, "You're caught up.");
   check('caught_up on an empty first load shows "You\'re caught up."', () => assert.equal(caughtFirst, true));
+
+  // F11: a deck that cannot load shows "Your deck could not load." with "Try again", which loads it.
+  resetStub({ deckFail: true });
+  await page.reload({ waitUntil: 'domcontentloaded' });
+  const errorShown = await waitForEmpty(page, 'Your deck could not load.');
+  action = await page.locator('#deck-empty-action').textContent();
+  check(`a failed deck_candidates shows the error state with "Try again" (got "${action?.trim()}")`, () => { assert.equal(errorShown, true); assert.equal(action?.trim(), 'Try again'); });
+  st.deckFail = false;
+  await page.locator('#deck-empty-action').click();
+  const retried = await waitForCard(page, 'Asha Band');
+  check('"Try again" loads the deck', () => assert.equal(retried, true));
+  // F11: a 'matched' result from the deck shows the mutual toast.
+  st.matchAll = true;
+  await page.locator('[data-action="like"]').click();
+  await page.waitForSelector('#pitch-modal:not([hidden])');
+  await page.waitForTimeout(450);
+  await page.keyboard.press('Escape');
+  await page.waitForFunction(() => /It's mutual/.test(document.querySelector('#app-toast')?.textContent || ''), null, { timeout: 5000 }).catch(() => {});
+  const mutual = await page.locator('#app-toast').textContent();
+  check(`a matched like from the deck shows "It's mutual. Say hi to Asha Band." (got "${mutual}")`, () => assert.equal(mutual, "It's mutual. Say hi to Asha Band."));
 
   // 6. Filters: nothing in the loaded deck matches -> the filters copy and "Clear filters"; clearing brings card 1 back.
   resetStub();
@@ -331,14 +384,41 @@ try {
   await small.reload({ waitUntil: 'domcontentloaded' });
   await waitForCard(small, 'Asha Band');
   await small.waitForFunction(() => !document.querySelector('#swipe-limit-state')?.hidden, null, { timeout: 5000 }).catch(() => {});
-  const zero = await small.evaluate(() => ({ text: document.querySelector('#swipe-limit-copy')?.textContent || '', overflow: document.documentElement.scrollWidth - window.innerWidth }));
-  check(`375 px zero quota: the notice shows without horizontal scroll (${JSON.stringify(zero)})`, () => { assert.match(zero.text, /^More at .+ · Passing is always free\.$/); assert.ok(zero.overflow <= 1); });
+  const zeroState = (p) => p.evaluate(() => {
+    const like = document.querySelector('[data-action="like"]');
+    return {
+      text: document.querySelector('#swipe-limit-copy')?.textContent || '',
+      hint: document.querySelector('#swipe-left-count')?.textContent || '',
+      role: document.querySelector('#swipe-limit-state')?.getAttribute('role'),
+      ariaDisabled: like?.getAttribute('aria-disabled'),
+      describedBy: like?.getAttribute('aria-describedby'),
+      focusable: like ? !like.disabled && like.tabIndex >= 0 : false,
+      overflow: document.documentElement.scrollWidth - window.innerWidth,
+      cardTop: document.querySelector('#swipe-card')?.getBoundingClientRect().top,
+      barBottom: document.querySelector('.app-topbar')?.getBoundingClientRect().bottom,
+    };
+  });
+  const zero = await zeroState(small);
+  check(`375 px zero quota: plain copy, no horizontal scroll (${JSON.stringify(zero)})`, () => {
+    assert.match(zero.text, /^No signals left today\. More at .+ · Passing is always free\.$/);
+    assert.match(zero.hint, /^0 signals left · more at .+$/);
+    assert.ok(zero.overflow <= 1);
+  });
+  check(`zero quota: Pitch is aria-disabled, described by the notice and still focusable; the notice has no role=status (${JSON.stringify(zero)})`, () => {
+    assert.equal(zero.ariaDisabled, 'true');
+    assert.equal(zero.describedBy, 'swipe-limit-copy');
+    assert.equal(zero.focusable, true);
+    assert.equal(zero.role, null);
+  });
   await small.locator('#swipe-limit-state').scrollIntoViewIfNeeded();
   await shot(small, 'deck-375-zero-quota.png');
   const wide2 = await makeContext({ width: 1440, height: 900 });
   const wpage = await open(wide2);
   await waitForCard(wpage, 'Asha Band');
   await wpage.waitForFunction(() => !document.querySelector('#swipe-limit-state')?.hidden, null, { timeout: 5000 }).catch(() => {});
+  await wpage.waitForTimeout(300);
+  const wideZero = await zeroState(wpage);
+  check(`1440 px zero quota: the card top is at or below the top bar (card ${wideZero.cardTop}, bar ${wideZero.barBottom})`, () => assert.ok(wideZero.cardTop >= wideZero.barBottom - 0.5));
   await shot(wpage, 'deck-1440-zero-quota.png');
   // My own profile's location line is my_onboarding_status().place_label.
   await wpage.evaluate(() => document.querySelector('[data-nav="profile"]')?.click());

@@ -1,7 +1,7 @@
 // The interim deck's card copy (UX_SPEC §B, Iteration 3 Task 10). Run: npm run test:unit
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { pitchLine, deckChips, deckEmptyState, deckFields, interestedIn } from '../../deck-view.js';
+import { pitchLine, deckChips, deckEmptyState, deckFields } from '../../deck-view.js';
 
 test('pitchLine: a shared interest is named, lowercased', () => {
   assert.equal(pitchLine({ name: 'Asha', shared: ['Badminton', 'Chess'], tags: ['Running'] }),
@@ -40,12 +40,6 @@ test('deckFields: keeps only the band and up to 2 shared labels; never city, sta
   assert.deepEqual(fields, { distanceBand: '~3 km', shared: ['Badminton', 'Chess'] });
   assert.deepEqual(deckFields({}), { distanceBand: '', shared: [] });
   assert.deepEqual(deckFields({ distance_band: '  ', shared_interests: null }), { distanceBand: '', shared: [] });
-});
-
-test('interestedIn: shared first, then the first tag, then "Open to connect"', () => {
-  assert.equal(interestedIn({ shared: ['Badminton'], tags: ['Chess'] }), 'Badminton');
-  assert.equal(interestedIn({ shared: [], tags: ['Chess'] }), 'Chess');
-  assert.equal(interestedIn({}), 'Open to connect');
 });
 
 test('deckEmptyState: every cause has a title, a reason and exactly one action', () => {

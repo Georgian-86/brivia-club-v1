@@ -28,9 +28,6 @@ export const deckChips = (person) => {
   ];
 };
 
-// The info sheet's "INTERESTED IN": the first shared interest, else the first tag, else "Open to connect".
-export const interestedIn = (person) => cleanLabels(person?.shared)[0] || cleanLabels(person?.tags)[0] || 'Open to connect';
-
 // The pitch sheet's starting note (A5: never throws for a missing name, tags or shared list).
 export const pitchLine = (person) => {
   const name = typeof person?.name === 'string' && person.name.trim() ? person.name.trim() : 'there';

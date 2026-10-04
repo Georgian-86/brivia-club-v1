@@ -661,6 +661,11 @@ try {
   hard.failInsert = false;
   await hardPage.waitForTimeout(300);
   const failedPosts = hardPosts().length - hardBefore;
+  const afterFail = { card: await hardCard(), toast: await hardToast() };
+  check(`a failed pitch submit brings Ivan back to the front with the retry copy (${JSON.stringify(afterFail)})`, () => {
+    assert.equal(afterFail.card, 'Ivan Next');
+    assert.equal(afterFail.toast, "Your signal could not be sent. They're back at the front so you can try again.");
+  });
   await hardPage.evaluate(() => document.querySelector('[data-action="pass"]').click());
   await hardPage.waitForTimeout(700);
   check(`Escape during a failing submit: one (failed) POST, nothing restored or re-sent later (posts ${failedPosts} then ${hardPosts().length - hardBefore})`, () => {
@@ -806,9 +811,9 @@ try {
   // 9. Honest signal quota (Iteration 3, Task 9, D-026/D-032) in a fresh context with a 24-member deck. The quota is
   // the server's (my_signal_quota / send_signal); nothing about it is kept in localStorage.
   const quotaMember = (i) => ({ id: `99999999-9999-4999-8999-${String(i).padStart(12, '0')}`, name: `Quota ${i}`, experience: 'Member', skills: ['Badminton'], looking_for: ['Friends'], photo_url: '', cover_url: '', distance_band: '~3 km', shared_interests: ['Badminton'], created_at: ago(10000 + i * 1000) });
-  const quotaDeck = Array.from({ length: 24 }, (_, k) => quotaMember(k + 1));
+  const quotaDeck = Array.from({ length: 28 }, (_, k) => quotaMember(k + 1));
   const RESETS_AT = '2026-10-04T15:00:00+00:00';
-  const q = { remaining: 30, resetsAt: null, race: false, calls: [], passed: new Set(), signalled: new Set() };
+  const q = { remaining: 30, resetsAt: null, race: false, fail: false, limitedUnknown: false, calls: [], passed: new Set(), signalled: new Set() };
   const quotaContext = await browser.newContext({ viewport: { width: 1280, height: 900 } });
   await quotaContext.addInitScript(([key, value]) => { window.localStorage.setItem(key, value); }, ['sb-stub-auth-token', JSON.stringify(session)]);
   await quotaContext.route(`${ORIGIN}/**`, async (route) => {
@@ -827,6 +832,9 @@ try {
     if (pathName === '/rest/v1/rpc/my_onboarding_status') return json(200, [{ interests: 2, points: 20, has_cell: true, place_label: 'Pune', completed: true }]);
     if (pathName === '/rest/v1/rpc/my_signal_quota') return json(200, [{ daily_limit: 30, remaining: q.remaining, resets_at: q.resetsAt, live_unanswered: 0, live_limit: 100 }]);
     if (pathName === '/rest/v1/rpc/send_signal') {
+      if (q.fail) return json(500, { code: 'XX000', message: 'stub failure', details: null, hint: null });
+      // A 429 without a known cap message (e.g. a gateway limit): the client refreshes the quota and keeps the card.
+      if (q.limitedUnknown) return json(429, { code: 'PT429', message: 'too many requests', details: null, hint: null });
       if (q.race) {
         // Another tab used the last signals: the server refuses (not charged) and the quota now reads 0.
         q.remaining = 0; q.resetsAt = RESETS_AT;
@@ -871,8 +879,37 @@ try {
   if (SHOTS) await quotaPage.screenshot({ path: path.join(SHOTS, 'quota-1280-counter.png') });
   check(`after one like the counter reads "29 signals left today" (got "${afterOne}")`, () => assert.equal(afterOne, '29 signals left today'));
   check('my_signal_quota is read again after send_signal', () => assert.ok(qQuotaReads().length > readsBefore));
+  // F1: a failed signal never loses the person. A 500, then a 429 without a cap message: the card comes back to the
+  // front each time, with the retry copy; the unknown 429 also reads the quota again.
+  const likeAndEscape = async () => {
+    await quotaPage.locator('[data-action="like"]').click();
+    await quotaPage.waitForSelector('#pitch-modal:not([hidden])');
+    await quotaPage.waitForTimeout(500);
+    const advanced = await qCard();
+    await quotaPage.evaluate(() => { const t = document.querySelector('#app-toast'); if (t) t.textContent = ''; });
+    await quotaPage.keyboard.press('Escape');
+    return advanced;
+  };
+  await quotaPage.waitForTimeout(400);
+  for (const [flag, label] of [['fail', 'HTTP 500'], ['limitedUnknown', 'a 429 without a cap message']]) {
+    const failCard = await qCard();
+    const readsAt = qQuotaReads().length;
+    q[flag] = true;
+    const advancedPast = await likeAndEscape();
+    await qWaitToast(/could not be sent/);
+    await quotaPage.waitForFunction((n) => document.querySelector('#swipe-card:not([hidden]) #swipe-name')?.textContent?.trim() === n, failCard, { timeout: 4000 }).catch(() => {});
+    await quotaPage.waitForTimeout(300);
+    q[flag] = false;
+    const failState = { card: await qCard(), toast: await quotaPage.locator('#app-toast').textContent() };
+    check(`${label} from send_signal brings the card back to the front (${failCard} -> ${advancedPast} -> ${failState.card})`, () => {
+      assert.notEqual(advancedPast, failCard);
+      assert.equal(failState.card, failCard);
+      assert.equal(failState.toast, "Your signal could not be sent. They're back at the front so you can try again.");
+    });
+    if (flag === 'limitedUnknown') check('a 429 without a cap message reads my_signal_quota again', () => assert.ok(qQuotaReads().length > readsAt));
+  }
   // A PT429 race (the cached quota said 29): the card comes back to the front, the honest toast shows, and the
-  // counter refreshes to "More at HH:MM".
+  // counter refreshes to "0 signals left · more at HH:MM".
   await quotaPage.waitForTimeout(400);
   const raceCard = await qCard();
   q.race = true;
@@ -891,13 +928,14 @@ try {
   });
   check(`PT429 shows the honest toast and refreshes the counter (${JSON.stringify(raceState)})`, () => {
     assert.equal(raceState.toast, `You've used today's signals. More at ${resetLabel}.`);
-    assert.equal(raceState.counter, `More at ${resetLabel}`);
+    assert.equal(raceState.counter, `0 signals left · more at ${resetLabel}`);
   });
   q.race = false;
   // At 0: Like keeps the same card, opens no pitch, sends nothing, and the honest state shows.
   const zeroBefore = qSignals().length;
   await quotaPage.evaluate(() => { const t = document.querySelector('#app-toast'); if (t) t.textContent = ''; });
-  await quotaPage.locator('[data-action="like"]').click();
+  // A tap on the aria-disabled button (Playwright's click() refuses aria-disabled elements by design).
+  await quotaPage.evaluate(() => document.querySelector('[data-action="like"]').click());
   await quotaPage.waitForTimeout(700);
   const zeroState = await quotaPage.evaluate(() => ({
     card: document.querySelector('#swipe-card:not([hidden]) #swipe-name')?.textContent?.trim() || '',
@@ -905,6 +943,7 @@ try {
     limitVisible: !document.querySelector('#swipe-limit-state')?.hidden,
     limitText: document.querySelector('#swipe-limit-state')?.textContent?.replace(/\s+/g, ' ').trim() || '',
     toast: document.querySelector('#app-toast')?.textContent || '',
+    ariaDisabled: document.querySelector('[data-action="like"]')?.getAttribute('aria-disabled'),
   }));
   if (SHOTS) await quotaPage.screenshot({ path: path.join(SHOTS, 'quota-1280-zero.png') });
   check(`at 0 a Like keeps the same card and opens no pitch (${JSON.stringify(zeroState)})`, () => {
@@ -912,10 +951,11 @@ try {
     assert.equal(zeroState.pitchOpen, false);
   });
   check('at 0 a Like makes no send_signal call', () => assert.equal(qSignals().length, zeroBefore));
-  check(`at 0 the limit state reads "More at HH:MM · Passing is always free." (${zeroState.limitText})`, () => {
+  check(`at 0 the notice reads "No signals left today. More at HH:MM · Passing is always free." and Pitch is aria-disabled (${JSON.stringify(zeroState)})`, () => {
     assert.equal(zeroState.limitVisible, true);
-    assert.match(zeroState.limitText, new RegExp(`More at ${resetLabel} · Passing is always free\\.`));
+    assert.match(zeroState.limitText, new RegExp(`No signals left today\\. More at ${resetLabel} · Passing is always free\\.`));
     assert.match(zeroState.toast, /More at/);
+    assert.equal(zeroState.ariaDisabled, 'true');
   });
   // 20 passes: free, no send_signal call, and no swipe counter in localStorage.
   const passBefore = qSignals().length;
@@ -929,6 +969,46 @@ try {
   const swipeKeys = await quotaPage.evaluate(() => Object.keys(window.localStorage).filter((key) => /brivia-daily-swipes|swipe|quota|signal/i.test(key)));
   check(`20 passes keep no swipe/quota key in localStorage (${JSON.stringify(swipeKeys)})`, () => assert.deepEqual(swipeKeys, []));
   check(`20 passes make no send_signal call (${qSignals().length - passBefore})`, () => assert.equal(qSignals().length - passBefore, 0));
+  // F4: a cached cap clears. The server quota is back (stub at 30): Like re-reads it, and the pitch opens.
+  q.remaining = 30; q.resetsAt = null;
+  await quotaPage.evaluate(() => document.querySelector('[data-action="like"]').click());
+  const reopened = await quotaPage.waitForSelector('#pitch-modal:not([hidden])', { timeout: 4000 }).then(() => true, () => false);
+  const afterClear = await quotaPage.evaluate(() => ({ ariaDisabled: document.querySelector('[data-action="like"]')?.getAttribute('aria-disabled'), notice: !document.querySelector('#swipe-limit-state')?.hidden }));
+  check(`a cached cap clears when my_signal_quota says signals are back: the pitch opens (${JSON.stringify(afterClear)})`, () => {
+    assert.equal(reopened, true);
+    assert.equal(afterClear.ariaDisabled, null);
+    assert.equal(afterClear.notice, false);
+  });
+  await quotaPage.waitForTimeout(450);
+  await quotaPage.keyboard.press('Escape');
+  await qWaitToast(/Signal sent/);
+  // F4: the quota is read again when the tab becomes visible.
+  q.remaining = 0; q.resetsAt = RESETS_AT;
+  await quotaPage.evaluate(() => document.dispatchEvent(new Event('visibilitychange')));
+  const capShown = await quotaPage.waitForFunction(() => !document.querySelector('#swipe-limit-state')?.hidden, null, { timeout: 4000 }).then(() => true, () => false);
+  q.remaining = 30; q.resetsAt = null;
+  await quotaPage.evaluate(() => document.dispatchEvent(new Event('visibilitychange')));
+  const capCleared = await quotaPage.waitForFunction(() => document.querySelector('#swipe-limit-state')?.hidden, null, { timeout: 4000 }).then(() => true, () => false);
+  check(`visibilitychange re-reads the quota: the cap shows, then clears (${capShown}, ${capCleared})`, () => { assert.equal(capShown, true); assert.equal(capCleared, true); });
+  // F5: Pass then Like within 100 ms: exactly one pass and no signal for that person.
+  await quotaPage.waitForTimeout(400);
+  const doubleName = await qCard();
+  const doubleId = quotaDeck.find((row) => row.name === doubleName)?.id;
+  const passCalls = () => q.calls.filter((c) => c.method === 'POST' && c.path === '/rest/v1/interaction').map((c) => JSON.parse(c.body || '{}'));
+  const passesBefore = passCalls().length;
+  const signalsBefore = qSignals().length;
+  await quotaPage.evaluate(() => { document.querySelector('[data-action="pass"]').click(); window.setTimeout(() => document.querySelector('[data-action="like"]').click(), 50); });
+  await quotaPage.waitForTimeout(900);
+  const doubleState = {
+    passes: passCalls().slice(passesBefore).map((b) => b.target_id === doubleId),
+    signals: qSignals().slice(signalsBefore).map((c) => JSON.parse(c.body || '{}').p_to),
+    pitchOpen: await quotaPage.evaluate(() => !document.querySelector('#pitch-modal')?.hidden),
+  };
+  check(`Pass then Like within 100 ms: one pass for ${doubleName}, no signal, no pitch (${JSON.stringify(doubleState)})`, () => {
+    assert.deepEqual(doubleState.passes, [true]);
+    assert.ok(!doubleState.signals.includes(doubleId));
+    assert.equal(doubleState.pitchOpen, false);
+  });
   check('quota context: never POSTs /rest/v1/connection_requests', () => assert.equal(q.calls.filter((c) => c.method === 'POST' && c.path === '/rest/v1/connection_requests').length, 0));
   check('quota context: no uncaught page errors', () => assert.deepEqual(quotaErrors, []));
   await quotaContext.close();

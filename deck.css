@@ -20,7 +20,8 @@ body.app-body {
 .swipe-left-copy[hidden] { display: none !important; }
 .swipe-left-copy strong { color: var(--dk-ink); font-weight: 700; letter-spacing: .08em; text-transform: uppercase; }
 
-/* At a cap: a compact notice beside the deck. The card stays; passing stays free. */
+/* At a cap: a compact notice beside the deck. The card stays; passing stays free. It is not a live region: the
+   counter's live region already announces the change once. */
 .swipe-limit-state[hidden] { display: none !important; }
 .swipe-limit-state {
   display: flex;
@@ -39,8 +40,21 @@ body.app-body {
 .swipe-limit-state span { display: block; color: var(--dk-ink); font-size: 13px; font-weight: 600; line-height: 1.35; }
 .swipe-limit-icon { flex: 0 0 22px; width: 22px; height: 22px; fill: none; stroke: var(--dk-accent); stroke-width: 1.6; stroke-linecap: round; }
 @media (min-width: 850px) {
-  .app-view[data-view="home"] .swipe-limit-state { grid-column: 1; grid-row: 5; justify-self: center; }
+  /* Shares the hint's row (no extra grid row, so the card never moves up under the top bar). */
+  .app-view[data-view="home"] .swipe-limit-state { grid-column: 1; grid-row: 4; align-self: end; justify-self: center; margin: 0; }
 }
+
+/* Pitch at a cap: muted with tokens, still focusable (aria-disabled, not disabled), so a tap explains why. */
+.app-view[data-view="home"] .swipe-like.is-capped,
+.app-view[data-view="home"] .swipe-like.is-capped:hover {
+  border-color: var(--dk-line);
+  background: var(--dk-tint);
+  color: var(--dk-soft);
+  box-shadow: none;
+  transform: none;
+  cursor: not-allowed;
+}
+.app-view[data-view="home"] .swipe-like.is-capped::before { color: var(--dk-soft); }
 
 /* The card's location line is the server's distance band ("~3 km", a place, "Abroad"); a pin marks it. */
 .app-view[data-view="home"] #swipe-location.swipe-band[hidden] { display: none !important; }
@@ -67,8 +81,7 @@ body.app-body {
 /* "You both: X" chips lead the tag row in wine; every chip wraps rather than clipping (UX rule: chip reflow). */
 .app-view[data-view="home"] .member-tags { flex-wrap: wrap; min-width: 0; }
 .app-view[data-view="home"] .member-tags span { max-width: 100%; white-space: normal; overflow-wrap: anywhere; text-overflow: clip; }
-.app-view[data-view="home"] .member-tags span.chip-shared,
-.info-panel .profile-pills span.chip-shared {
+.app-view[data-view="home"] .member-tags span.chip-shared {
   border-color: var(--dk-accent);
   background: var(--dk-ink);
   color: var(--dk-paper);
@@ -123,6 +136,8 @@ body.app-body {
   transition: background .2s, color .2s;
 }
 .deck-empty-action:hover { background: var(--dk-accent); }
+#deck-empty-title:focus { outline: none; }
+#deck-empty-title:focus-visible { outline: 2px solid var(--dk-soft); outline-offset: 4px; border-radius: 4px; }
 .deck-empty-action:focus-visible,
 .swipe-action:focus-visible,
 .view-info-button:focus-visible { outline: 2px solid var(--dk-soft); outline-offset: 3px; }
