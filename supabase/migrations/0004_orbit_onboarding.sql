@@ -2,7 +2,7 @@
 -- Apply after 0001, 0002 and 0003, in the Supabase SQL editor. Idempotent: safe to re-run (the local harness
 -- applies every migration twice).
 -- RE-RUN ORDER: section 4 redefines get_candidates, search_members, list_members and brivia_can_see_author from 0003;
--- section 6 redefines brivia_has_completed_profile (0001), brivia_before_connection_request and
+-- section 6 redefines brivia_has_completed_profile (0001), brivia_before_connection_request, my_outgoing_requests and
 -- respond_connection_request (0003), recreates the completion-gated policies of 0001-0003 and revokes the 0003
 -- insert grant on connection_requests.
 -- Any re-run of 0003 (or of 0001/0002, which require a 0003 re-run) must be followed by a re-run of 0004.
@@ -331,9 +331,10 @@ create table if not exists public.interest_node (
     and parent_id is not distinct from nullif(regexp_replace(id, '\.[^.]+$', ''), id)
   )
 );
--- sensitive (D-029): special-category topics (health and mental health, religion and spirituality, sexual
--- orientation and gender identity, sobriety). They count toward resonance only and are never shown to other
--- members: not in profiles.skills, cards, chips or search.
+-- sensitive (D-029, amended by D-038 R3): special-category topics and their close proxies (health and mental health,
+-- religion and spirituality, sexual orientation and gender identity, sobriety, disability, women-only safety signals;
+-- the list is at the end of this file). They are never shown to other members (not in profiles.skills, cards, chips
+-- or search), need a separate consent (profiles.sensitive_consent_at), and do not affect who a member sees yet.
 alter table public.interest_node add column if not exists sensitive boolean not null default false;
 create index if not exists interest_node_parent_idx on public.interest_node (parent_id);
 alter table public.interest_node enable row level security;
@@ -355,12 +356,89 @@ create index if not exists member_interest_interest_idx on public.member_interes
 alter table public.member_interest enable row level security;
 revoke all on public.member_interest from public, anon, authenticated;
 
+-- One row per counted interest rewrite (R3 cap: 3 per rolling 24 h). Owner-only; rows older than 24 h are purged
+-- nightly by purge_expired_requests().
+create table if not exists public.interest_rewrite (
+  id bigserial primary key,
+  member_id uuid not null references public.profiles(id) on delete cascade,
+  at timestamptz not null default now()
+);
+create index if not exists interest_rewrite_member_at_idx on public.interest_rewrite (member_id, at);
+alter table public.interest_rewrite enable row level security;
+revoke all on public.interest_rewrite from public, anon, authenticated;
+revoke all on sequence public.interest_rewrite_id_seq from public, anon, authenticated;
+
+-- Separate, explicit, withdrawable consent for sensitive interests (D-038 R3, DPDP). Written only by
+-- set_sensitive_consent: the profiles update grant (below) does not include it, and a client insert cannot set it
+-- (brivia_profiles_consent_on_insert).
+alter table public.profiles add column if not exists sensitive_consent_at timestamptz;
+create or replace function public.brivia_profiles_consent_on_insert()
+returns trigger
+language plpgsql
+set search_path = public, pg_catalog
+as $$
+begin
+  -- Only an owner session (current_user AND session_user own the table: the seed / SQL editor) may set it.
+  if not (current_user = (select pg_get_userbyid(c.relowner) from pg_class c where c.oid = tg_relid)
+          and session_user = (select pg_get_userbyid(c.relowner) from pg_class c where c.oid = tg_relid)) then
+    new.sensitive_consent_at := null;
+  end if;
+  return new;
+end;
+$$;
+revoke all on function public.brivia_profiles_consent_on_insert() from public, anon, authenticated;
+drop trigger if exists brivia_profiles_consent_on_insert on public.profiles;
+create trigger brivia_profiles_consent_on_insert before insert on public.profiles
+  for each row execute function public.brivia_profiles_consent_on_insert();
+
+-- set_sensitive_consent(p_consent): true records the consent (now(), kept if already given); false withdraws it and,
+-- in the same action, deletes every sensitive member_interest row of the caller. The remaining points then sum to
+-- less than 20, so the member re-spends them (my_onboarding_status shows points < 20) before they are completed
+-- again. profiles.skills never held a sensitive label, so it is unchanged. Null: 22023 'invalid consent'.
+create or replace function public.set_sensitive_consent(p_consent boolean)
+returns void
+language plpgsql
+volatile
+security definer
+set search_path = public
+as $$
+declare
+  uid uuid := auth.uid();
+begin
+  perform 1 from public.profiles where id = uid for update;
+  if uid is null or not found then
+    raise exception 'profile required' using errcode = 'P0002';
+  end if;
+  if p_consent is null then
+    raise exception 'invalid consent' using errcode = '22023';
+  end if;
+  if p_consent then
+    update public.profiles set sensitive_consent_at = coalesce(sensitive_consent_at, now()) where id = uid;
+  else
+    delete from public.member_interest mi
+     using public.interest_node nd
+     where mi.member_id = uid and nd.id = mi.interest_id and nd.sensitive;
+    update public.profiles set sensitive_consent_at = null, updated_at = now() where id = uid;
+  end if;
+end;
+$$;
+revoke all on function public.set_sensitive_consent(boolean) from public, anon;
+grant execute on function public.set_sensitive_consent(boolean) to authenticated;
+
 -- set_member_interests(p_items): atomically replaces the caller's interests.
 -- p_items = [{ "interest_id": text, "points": int, "mode": "learn"|"play"|"teach"|"build" (optional, default play) }].
 -- Rules: 1-12 items, no duplicate ids, every id an active node at level >= 3, integer points >= 1 summing to
 -- exactly 20, a valid mode. Any violation raises 22023 'invalid interests' and changes nothing. Then
 -- profiles.skills is set to the chosen labels ordered by points desc, label asc (a server-written display copy).
 -- Sensitive interests (D-029) are stored for matching but left out of profiles.skills, which other members see.
+-- D-038 (R3), checked in this order after the rules above, each changing nothing when it fails:
+--   * a sensitive id needs the member's separate consent (profiles.sensitive_consent_at, set_sensitive_consent):
+--     22023 'sensitive consent required';
+--   * the completion floor: at least one non-sensitive id (B-F4: otherwise empty skills on a completed member would
+--     reveal that every interest is sensitive): 22023 'invalid interests';
+--   * the rewrite cap: a call by a member who is completed before it is a rewrite; 3 per rolling 24 h
+--     (interest_rewrite), the 4th raises PT429 'try again later'. The first save, and a re-save after the member fell
+--     below completion (for example after withdrawing consent), are not counted.
 create or replace function public.set_member_interests(p_items jsonb)
 returns void
 language plpgsql
@@ -407,6 +485,25 @@ begin
   or (select sum((e ->> 'points')::numeric) from jsonb_array_elements(p_items) e) <> 20
   or (select count(distinct e ->> 'interest_id') from jsonb_array_elements(p_items) e) <> n then
     raise exception 'invalid interests' using errcode = '22023';
+  end if;
+  -- Separate consent for sensitive interests (R3, DPDP).
+  if exists (select 1 from jsonb_array_elements(p_items) e
+               join public.interest_node nd on nd.id = e ->> 'interest_id' where nd.sensitive)
+     and (select pr.sensitive_consent_at from public.profiles pr where pr.id = uid) is null then
+    raise exception 'sensitive consent required' using errcode = '22023';
+  end if;
+  -- The completion floor (R3, B-F4).
+  if not exists (select 1 from jsonb_array_elements(p_items) e
+                   join public.interest_node nd on nd.id = e ->> 'interest_id' where not nd.sensitive) then
+    raise exception 'invalid interests' using errcode = '22023';
+  end if;
+  -- The rewrite cap (R3): serialised by the profile row lock above.
+  if public.brivia_member_completed(uid) then
+    if (select count(*) from public.interest_rewrite r
+         where r.member_id = uid and r.at > now() - interval '24 hours') >= 3 then
+      raise exception 'try again later' using errcode = 'PT429';
+    end if;
+    insert into public.interest_rewrite (member_id) values (uid);
   end if;
 
   delete from public.member_interest where member_id = uid;
@@ -582,7 +679,8 @@ grant execute on function public.set_home_city(text) to authenticated;
 -- D-030 (spec §7): a member is completed when they have
 --   * a name: brivia_is_completed(name, 'x') (trimmed, not empty, not 'New Member'; the legacy city plays no part);
 --   * a member_orbit row (a cell);
---   * 1-12 member_interest rows whose points sum to exactly 20 (the Passion Budget).
+--   * 1-12 member_interest rows whose points sum to exactly 20 (the Passion Budget), at least one of them
+--     non-sensitive (the completion floor, D-038 R3).
 -- Completion reads member_interest and member_orbit, never profiles.skills (a display copy written only by
 -- set_member_interests).
 -- Internal: not executable by any client role.
@@ -597,7 +695,10 @@ as $$
     exists (select 1 from public.profiles p where p.id = p_id and public.brivia_is_completed(p.name, 'x'))
     and exists (select 1 from public.member_orbit o where o.member_id = p_id)
     and (select count(*) between 1 and 12 and coalesce(sum(mi.points), 0) = 20
-           from public.member_interest mi where mi.member_id = p_id),
+           from public.member_interest mi where mi.member_id = p_id)
+    -- the completion floor (D-038 R3): at least one non-sensitive interest
+    and exists (select 1 from public.member_interest mi join public.interest_node nd on nd.id = mi.interest_id
+                 where mi.member_id = p_id and not nd.sensitive),
     false)
 $$;
 revoke all on function public.brivia_member_completed(uuid) from public, anon, authenticated;
@@ -626,6 +727,8 @@ revoke all on function public.brivia_visible_to(uuid, uuid) from public, anon, a
 
 -- The candidate RPCs of 0003, redefined on top of brivia_member_completed / brivia_visible_to. Signatures, return
 -- types, caps (50 ids, 20 rows), ordering and LIKE escaping are unchanged. A caller who is not completed sees nothing.
+-- Harvest closure (D-038 R4): gender is returned as null::text by all three (the type is unchanged, like city and
+-- state); list_members is executable by no client role; search_members needs at least 2 non-space characters.
 -- The legacy free-text city and state are private (D-036, supersedes D-030 in part): the three RPCs return them as
 -- null::text (the public_profile_card type keeps both columns, so the contract is unchanged) and search_members no
 -- longer matches city text. A member's area reaches other members only as deck_candidates' distance_band.
@@ -644,7 +747,7 @@ as $$
       where u.id is not null order by u.id, u.ord
     ) d order by d.ord limit 50
   )
-  select p.id, p.name, p.full_name, p.gender, null::text, null::text, p.experience, p.skills, p.looking_for,
+  select p.id, p.name, p.full_name, null::text, null::text, null::text, p.experience, p.skills, p.looking_for,
          p.photo_url, p.cover_url, p.created_at
   from public.profiles p
   join me on p.id <> me.id and p.is_test = me.is_test
@@ -664,12 +767,13 @@ set search_path = public
 as $$
   with me as (  -- Ruling I5: the caller must be a completed member
     select id, is_test from public.profiles where id = auth.uid() and public.brivia_member_completed(id)),
-  q as (  -- LIKE wildcards in the query are literal; empty or whitespace-only queries match nothing
+  q as (  -- LIKE wildcards in the query are literal; a query with fewer than 2 non-space characters matches nothing
+         -- (R4: a one-letter query would page the directory)
     select '%' || replace(replace(replace(left(btrim(p_query), 100), '\', '\\'), '%', '\%'), '_', '\_') || '%' as pattern
-    where coalesce(btrim(p_query), '') <> ''
+    where char_length(regexp_replace(coalesce(p_query, ''), '\s', '', 'g')) >= 2
   ),
   hits as (
-    select p.id, p.name, p.full_name, p.gender, p.experience, p.skills, p.looking_for, p.photo_url, p.cover_url,
+    select p.id, p.name, p.full_name, p.experience, p.skills, p.looking_for, p.photo_url, p.cover_url,
            p.created_at,
            row_number() over (order by (p.name ilike q.pattern escape '\' or p.full_name ilike q.pattern escape '\') desc,
                                        p.created_at desc, p.id desc) as pos
@@ -690,7 +794,7 @@ as $$
       from hits h cross join me
     returning 1
   )
-  select h.id, h.name, h.full_name, h.gender, null::text, null::text, h.experience, h.skills, h.looking_for,
+  select h.id, h.name, h.full_name, null::text, null::text, null::text, h.experience, h.skills, h.looking_for,
          h.photo_url, h.cover_url, h.created_at
     from hits h
    order by h.pos;
@@ -708,7 +812,7 @@ set search_path = public
 as $$
   with me as (  -- Ruling I5: the caller must be a completed member
     select id, is_test from public.profiles where id = auth.uid() and public.brivia_member_completed(id))
-  select p.id, p.name, p.full_name, p.gender, null::text, null::text, p.experience, p.skills, p.looking_for,
+  select p.id, p.name, p.full_name, null::text, null::text, null::text, p.experience, p.skills, p.looking_for,
          p.photo_url, p.cover_url, p.created_at
   from public.profiles p
   join me on p.id <> me.id and p.is_test = me.is_test
@@ -719,8 +823,8 @@ as $$
   order by p.created_at desc, p.id desc
   limit greatest(1, least(coalesce(p_limit, 20), 20));
 $$;
-revoke all on function public.list_members(int, timestamptz, uuid) from public, anon;
-grant execute on function public.list_members(int, timestamptz, uuid) to authenticated;
+-- R4 (B-F2): list_members pages every visible member, and the client no longer calls it: no client role may.
+revoke all on function public.list_members(int, timestamptz, uuid) from public, anon, authenticated;
 
 -- Posts by p_author: own posts always; otherwise brivia_visible_to(caller, author).
 create or replace function public.brivia_can_see_author(p_author uuid)
@@ -1045,7 +1149,8 @@ revoke all on function public.send_signal(uuid, text) from public, anon;
 grant execute on function public.send_signal(uuid, text) to authenticated;
 
 -- purge_expired_requests (0003, owner only) also prunes signal_ledger rows older than 30 days: no cap reads them
--- (daily: 24 h; live: 30 days). It still returns the number of request rows deleted.
+-- (daily: 24 h; live: 30 days), and interest_rewrite rows older than 24 h (the R3 cap window). It still returns the
+-- number of request rows deleted.
 create or replace function public.purge_expired_requests()
 returns integer
 language sql
@@ -1054,6 +1159,10 @@ set search_path = public
 as $$
   with gone_ledger as (
     delete from public.signal_ledger where at <= now() - interval '30 days'
+    returning 1
+  ),
+  gone_rewrites as (
+    delete from public.interest_rewrite where at <= now() - interval '24 hours'
     returning 1
   ),
   gone as (
@@ -1207,6 +1316,30 @@ drop policy if exists "Members can create their own community posts" on public.c
 create policy "Members can create their own community posts"
   on public.community_posts for insert to authenticated
   with check ((select public.brivia_has_completed_profile()) and author_id = auth.uid());
+
+-- my_outgoing_requests (0003) without the block filter (D-038 R6, B-F5). A block by the recipient no longer hides the
+-- sender's row at once: like a decline (already shown as 'pending'), it stays exactly as it was until its natural
+-- 30-day expiry, so the sender cannot infer the block. (A block by the sender withdraws the sender's own unanswered
+-- request: brivia_on_block_created, 0003.) Same signature and columns.
+create or replace function public.my_outgoing_requests()
+returns table (to_id uuid, note text, status text, created_at timestamptz)
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select r.to_id, r.note,
+         case when r.status = 'declined' then 'pending' else r.status end,
+         r.created_at
+  from public.connection_requests r
+  join public.profiles me on me.id = auth.uid()
+  join public.profiles p on p.id = r.to_id and p.is_test = me.is_test
+  where r.from_id = auth.uid()
+    and public.brivia_request_is_live(r.status, r.created_at)
+  order by r.created_at desc, r.to_id;
+$$;
+revoke all on function public.my_outgoing_requests() from public, anon;
+grant execute on function public.my_outgoing_requests() to authenticated;
 
 -- respond_connection_request (0003) plus the completion gates: a caller who is not completed gets 22023
 -- 'complete your profile' (their own state; it says nothing about the request), and a request from a sender who is
@@ -1441,18 +1574,20 @@ grant execute on function public.deck_status() to authenticated;
 -- =============================================================================================
 -- Data: interest taxonomy (spec §3.1; India-relevant, spec §10 phase 1). Original Brivia wording.
 -- 13 domains, 62 categories, 327 interests, 30 niches (432 nodes). Re-runs update labels only; a node that a
--- moderator retired stays retired. parent_id and level are derived from the id. `sensitive` (D-029) is set from
--- the list below on every run: health and mental health, religion and spirituality, LGBTQ+, sobriety.
+-- moderator retired stays retired. parent_id and level are derived from the id. `sensitive` (D-029, amended by D-038)
+-- is set from the list below on every run: health and mental health, religion and spirituality (and its proxy Sufi
+-- and qawwali), LGBTQ+, sobriety, disability (its proxy Indian Sign Language) and women-only safety signals (Women's
+-- circles, Women travelling solo). Nutrition, better sleep and healthy ageing are lifestyle interests: public (R3).
 -- =============================================================================================
 insert into public.interest_node (id, parent_id, level, label, sensitive)
 select v.id, nullif(regexp_replace(v.id, '\.[^.]+$', ''), v.id), array_length(string_to_array(v.id, '.'), 1), v.label,
        v.id = any (array[
-         'wellbeing.health', 'wellbeing.health.nutrition', 'wellbeing.health.sleep', 'wellbeing.health.peer_support',
-         'wellbeing.health.sober_social', 'wellbeing.health.healthy_ageing',
+         'wellbeing.health', 'wellbeing.health.peer_support', 'wellbeing.health.sober_social',
          'wellbeing.spirituality', 'wellbeing.spirituality.pilgrimages', 'wellbeing.spirituality.kirtan',
          'wellbeing.spirituality.scripture_study', 'wellbeing.spirituality.interfaith',
-         'music.singing.devotional',
-         'community.social.lgbtq'])
+         'music.singing.devotional', 'music.listening.sufi_qawwali',
+         'learning.languages.sign_language',
+         'community.social.lgbtq', 'community.social.womens_circles', 'lifestyle.travel.solo_travel.women_solo'])
 from (values
   ('sports', 'Sports and fitness'),
   ('sports.racket', 'Racket sports'),

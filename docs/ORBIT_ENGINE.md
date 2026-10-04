@@ -99,6 +99,22 @@ atomically and writes the labels into `profiles.skills` (points desc, then label
 and `set_member_interests` is its only writer (a value smuggled into a first insert is overwritten before the member
 can be completed, §7).
 
+**Sensitive interests (D-029, amended by D-038 R3).** The sensitive set is: health and mental health (peer support,
+sober social), religion and spirituality (pilgrimages, kirtan, scripture study, interfaith, devotional singing, and
+the proxy Sufi and qawwali), LGBTQ+, disability (the proxy Indian Sign Language) and women-only safety signals
+(Women's circles, Women travelling solo). Nutrition, better sleep and healthy ageing are lifestyle interests and are
+public; yoga, meditation, mythology, public policy and climate action stay public (a per-interest "show on my
+profile" toggle is P2). After the rules above, `set_member_interests` checks, each failure changing nothing:
+- **separate consent:** a sensitive id needs `profiles.sensitive_consent_at` (DPDP: specific, explicit, withdrawable),
+  else `22023 sensitive consent required`. Only `set_sensitive_consent(true)` sets it (no update grant; a client
+  insert cannot set it). `set_sensitive_consent(false)` withdraws it and, in the same action, deletes every sensitive
+  `member_interest` row; the member then re-spends the freed points before being completed again;
+- **completion floor:** at least one non-sensitive id, else `22023 invalid interests` (B-F4: a completed member with
+  empty `skills` would reveal that every interest is sensitive). `brivia_member_completed` requires it too;
+- **rewrite cap:** a call by a member who is completed before it counts as a rewrite (`interest_rewrite`, owner-only,
+  purged after 24 h); the 4th in a rolling 24 h raises `PT429 try again later`. The first save, and a re-save after
+  falling below completion, are free.
+
 Fixed budgets stop "interest inflation". A member who lists 40 interests can't out-match everyone, and the budget
 says what each person *actually* cares about most.
 
@@ -383,8 +399,10 @@ north-star metric (people who actually meet).
   (no counter reads them). It still returns the number of request rows deleted.
 - The iteration-2 rule that dropped an over-cap request **silently** (no error, the usual "Signal sent") is replaced
   by the honest own quota above (D-026 supersedes D-019 in part).
-- **The sender never sees a decline.** Senders read their outgoing requests only through
-  `my_outgoing_requests()`, which shows a declined request as pending. A re-signal to a live declined request
+- **The sender never sees a decline, or a block.** Senders read their outgoing requests only through
+  `my_outgoing_requests()`, which shows a declined request as pending. Since D-038 (R6, B-F5) a request to a member
+  who then blocked the sender also stays exactly as it was ('pending', same date) until its natural 30-day expiry;
+  hiding it at once told the sender about the block. A re-signal to a live declined request
   answers `sent` and costs one unit, exactly like a re-signal to one that is still pending, and both expire at 30
   days. One consequence: the
   change-of-mind path of Ruling P11 (the member who declined requests back) completes a match only within 30
@@ -412,7 +430,8 @@ saturated, the outer rings relax first, instead of the deck repeating saturated 
 - **Interim, until phase 3 (Iteration 2, `supabase/migrations/0003_trust_hardening.sql`):** members no longer read the
   `public_profiles` directory. The v1 client reads other members only through three SECURITY DEFINER RPCs that
   return the same public card columns (never email, phone or `is_test`): `list_members` (the deck, keyset-paged
-  newest first by `(created_at, id)`, at most 20 per page, more pages on demand), `get_candidates` (cards for known
+  newest first by `(created_at, id)`, at most 20 per page, more pages on demand; closed to every client role since
+  D-038 R4), `get_candidates` (cards for known
   ids, at most 50 ids per call) and `search_members` (case-insensitive substring over name, skills and
   looking-for; LIKE wildcards are literal; at most 20 rows; not ranked by `R` yet; city text stopped matching in
   Iteration 3, D-036). All three hide the caller,
@@ -425,7 +444,8 @@ saturated, the outer rings relax first, instead of the deck repeating saturated 
   - a name: trimmed, not empty and not 'New Member' (`brivia_is_completed(name, 'x')`); the legacy `city` column plays
     no part;
   - a home cell (a `member_orbit` row, §9.1.4);
-  - 1–12 `member_interest` rows whose points sum to exactly 20 (the Passion Budget, §3.2).
+  - 1–12 `member_interest` rows whose points sum to exactly 20 (the Passion Budget, §3.2), at least one of them
+    non-sensitive (the completion floor, D-038 R3).
 
   It reads `member_interest` and `member_orbit` only, never `profiles.skills` (a display copy written only by
   `set_member_interests`, D-035).
@@ -766,6 +786,12 @@ select log_impressions($1, $4);
   distance_band, shared_interests`. No row's JSON matches `8[0-9a-f]{14}`, `g[5-7]:\d+:\d+`, `-?\d{1,3}\.\d{3,}` or
   `@`; no value other than `id` and the image URLs matches `\d{10}` (a uuid can hold ten digits); and no key is `city`, `state`, `cell`, `km`, `lat`, `lng`, `ring`, `email`, `phone` or `is_test`. A
   pair whose only shared interests are sensitive (or the retired harness fixture) gets an empty `shared_interests`.
+- **Harvest closure (D-038 R4).** `list_members` is executable by no client role (the client stopped calling it in
+  iteration 3; it pages every visible member, B-F2). Every card RPC returns `gender` as `null` (the
+  `public_profile_card` type is unchanged), and the client never renders another member's gender. `search_members`
+  answers only a query with at least 2 non-space characters (the client sends nothing shorter and says so in the
+  field); 3 would exclude short real names. P1: a per-caller card budget, `created_at` coarsened to the month and
+  private photo URLs.
 - **Member card RPCs (Iteration 3 final review, D-036).** `get_candidates`, `search_members` and `list_members` keep the
   `public_profile_card` keys, but `city` and `state` are always `null`, and `search_members` never matches city or
   state text (`supabase/tests/orbit-city-private.test.sql`). The free text a member once typed never leaves.
@@ -773,11 +799,15 @@ select log_impressions($1, $4);
   replaces D-034's "the true ring is used for the pool and the band", which was the B-F1 oracle): the true g7 ring
   is used only to admit and band a fine target (≤ 15 km, `ok10`, both `precision = 'cell'`), never returned and never
   an ordering key. `deck_status()` returns a reason code, never a count.
-- **Sensitive interests never leave the service (D-029).** No card, chip, explanation or search hit carries the
-  label or id of an `interest_node` with `sensitive = true`, and search never matches one. A shared sensitive
-  interest may raise `matchPercent` (it counts toward resonance), but the chips must then name only non-sensitive
-  shared interests, or none. The contract test seeds a pair whose only shared interest is sensitive and asserts that
-  no response contains its label or id.
+- **Sensitive interests never leave the service (D-029, amended by D-038 R3).** No card, chip, explanation or search
+  hit carries the label or id of an `interest_node` with `sensitive = true`, and search never matches one. **A
+  sensitive interest does not affect who a member sees yet:** ORBIT keeps sensitive hits out of the displayed `R`
+  (`matchPercent`), the gate, the order and `explain`, until a future mutual opt-in (C-2: otherwise a member could
+  probe a target's sensitive interests by changing their own and watching `matchPercent` move). Topology nodes carry
+  `sensitive`. The contract test seeds a pair whose only shared interest is sensitive and asserts that no response
+  contains its label or id, and that changing only a sensitive interest leaves every card's `matchPercent`, chips
+  and position unchanged (P0-E, before any ORBIT code reads member data). The interim deck already ignores them
+  (§7).
 - **Members never read model outputs.** In `interaction`, members can select only `id`, `viewer_id`, `target_id`,
   `event` and `created_at` of their own non-impression rows, and can insert only `viewer_id`, `target_id` and `event`
   (`0003_trust_hardening.sql`). An impression's `context.ring` would reveal what the k-anonymity floor hides.

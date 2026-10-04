@@ -1,4 +1,10 @@
 -- Iteration 2 (Trust), Task 1: column-locked profiles; is_test is owner-only.
+-- list_members is executable by no client role since D-038 (R4). Its visibility semantics are still tested, through
+-- this owner wrapper (security definer; auth.uid() still reads the caller's claims).
+create or replace function pg_temp.list_members(p_limit int default 20, p_after timestamptz default null,
+                                                p_after_id uuid default null)
+returns setof public.public_profile_card language sql security definer set search_path = public as $w$
+  select * from public.list_members(p_limit, p_after, p_after_id) $w$;
 insert into auth.users(id) values
   ('a1a1a1a1-0000-0000-0000-0000000000a1'), ('b1b1b1b1-0000-0000-0000-0000000000b1'),
   ('c1c1c1c1-0000-0000-0000-0000000000c1')
@@ -210,7 +216,10 @@ begin
       raise exception 'FAIL: % has the wrong volatility', f;
     end if;
     if has_function_privilege('anon', f, 'execute') then raise exception 'FAIL: anon can execute %', f; end if;
-    if not has_function_privilege('authenticated', f, 'execute') then raise exception 'FAIL: authenticated cannot execute %', f; end if;
+    -- list_members: no client role since D-038 (R4); the other two: authenticated
+    if has_function_privilege('authenticated', f, 'execute') <> (f not like 'public.list_members%') then
+      raise exception 'FAIL: authenticated execute on % is wrong', f;
+    end if;
     if exists (select 1 from pg_proc p, aclexplode(coalesce(p.proacl, acldefault('f', p.proowner))) x
                where p.oid = to_regprocedure(f) and x.grantee = 0) then
       raise exception 'FAIL: PUBLIC can execute %', f;
@@ -282,7 +291,7 @@ begin
   if n <> 1 then raise exception 'FAIL: real member cannot find real Ravi (% rows)', n; end if;
   select count(*) into n from public.get_candidates(array[t1, t2]);
   if n <> 0 then raise exception 'FAIL P14: get_candidates returned test members to a real member (%)', n; end if;
-  select count(*) into n from public.list_members(20) where id in (t1, t2);
+  select count(*) into n from pg_temp.list_members(20) where id in (t1, t2);
   if n <> 0 then raise exception 'FAIL P14: list_members returned test members to a real member'; end if;
 
   -- Review Focus 2: 500 ids -> at most 50 rows, never the caller; only the first 50 distinct ids count.
@@ -308,7 +317,7 @@ begin
   if n <> 1 then raise exception 'FAIL RF3: get_candidates shows a blocked pair (% rows)', n; end if;
   select count(*) into n from public.search_members('Blo');
   if n <> 0 then raise exception 'FAIL RF3: search shows a blocked pair (% rows)', n; end if;
-  select count(*) into n from public.list_members(20) where id in (r3, r4);
+  select count(*) into n from pg_temp.list_members(20) where id in (r3, r4);
   if n <> 0 then raise exception 'FAIL RF3: list_members shows a blocked pair'; end if;
 
   -- Ruling I1: incomplete profiles are hidden everywhere.
@@ -332,12 +341,15 @@ begin
   if n <> 2 then raise exception 'FAIL: search does not match looking_for (% rows, want Ravi + Ann)', n; end if;
   select count(*) into n from public.search_members('goa');
   if n <> 0 then raise exception 'FAIL D-036: search matches city text (%)', n; end if;
-  select count(*) into n from public.search_members('%');
+  -- (two characters each: since D-038 R4 a one-character query matches nothing, which the next lines also check)
+  select count(*) into n from public.search_members('0%');
   if n <> 1 then raise exception 'FAIL: %% is not literal (% rows, want only Ann 100%%)', n; end if;
-  select count(*) into n from public.search_members('_');
+  select count(*) into n from public.search_members('R_');
   if n <> 0 then raise exception 'FAIL: _ is not literal (% rows)', n; end if;
-  select count(*) into n from public.search_members('\');
+  select count(*) into n from public.search_members('\\');
   if n <> 0 then raise exception 'FAIL: backslash query matched (% rows)', n; end if;
+  select count(*) into n from public.search_members('%');
+  if n <> 0 then raise exception 'FAIL R4: a one-character query matched (% rows)', n; end if;
   select count(*) into n from public.search_members('');
   if n <> 0 then raise exception 'FAIL: empty query returned % rows', n; end if;
   select count(*) into n from public.search_members('   ');
@@ -359,15 +371,15 @@ begin
 
   -- list_members: keyset paging newest first, disjoint pages that together cover everyone visible.
   expected := (select e.ids from public.trust_t2_expected e);
-  select array_agg(id) into page1 from public.list_members(20);
-  select created_at, id into last_at, last_id from public.list_members(20) offset 19 limit 1;
-  select array_agg(id) into page2 from public.list_members(20, last_at, last_id);
+  select array_agg(id) into page1 from pg_temp.list_members(20);
+  select created_at, id into last_at, last_id from pg_temp.list_members(20) offset 19 limit 1;
+  select array_agg(id) into page2 from pg_temp.list_members(20, last_at, last_id);
   if coalesce(array_length(page1, 1), 0) <> 20 then raise exception 'FAIL: page 1 has % rows', array_length(page1, 1); end if;
   if page1 && page2 then raise exception 'FAIL: pages overlap'; end if;
   allpages := page1 || coalesce(page2, '{}');
   if array_length(page2, 1) = 20 then
-    select created_at, id into last_at, last_id from public.list_members(20, last_at, last_id) offset 19 limit 1;
-    select array_agg(id) into page3 from public.list_members(20, last_at, last_id);
+    select created_at, id into last_at, last_id from pg_temp.list_members(20, last_at, last_id) offset 19 limit 1;
+    select array_agg(id) into page3 from pg_temp.list_members(20, last_at, last_id);
     allpages := allpages || coalesce(page3, '{}');
   end if;
   if allpages is distinct from expected then
@@ -377,20 +389,20 @@ begin
   -- Small pages split groups of members that share created_at: the (created_at, id) key must not skip or repeat.
   allpages := '{}'; last_at := null; last_id := null;
   loop
-    page3 := array(select id from public.list_members(4, last_at, last_id));
+    page3 := array(select id from pg_temp.list_members(4, last_at, last_id));
     exit when coalesce(array_length(page3, 1), 0) = 0;
     if allpages && page3 then raise exception 'FAIL: small pages overlap'; end if;
     allpages := allpages || page3;
-    select created_at, id into last_at, last_id from public.list_members(4, last_at, last_id) offset array_length(page3, 1) - 1 limit 1;
+    select created_at, id into last_at, last_id from pg_temp.list_members(4, last_at, last_id) offset array_length(page3, 1) - 1 limit 1;
   end loop;
   if allpages is distinct from expected then
     raise exception 'FAIL: 4-row paging skipped or repeated members (got %, want %)', array_length(allpages, 1), array_length(expected, 1);
   end if;
-  select count(*) into n from public.list_members(1000);
+  select count(*) into n from pg_temp.list_members(1000);
   if n <> 20 then raise exception 'FAIL: list limit not clamped to 20 (%)', n; end if;
-  select count(*) into n from public.list_members(0);
+  select count(*) into n from pg_temp.list_members(0);
   if n <> 1 then raise exception 'FAIL: list limit not clamped to 1 (%)', n; end if;
-  select count(*) into n from public.list_members(20) where id = r1;
+  select count(*) into n from pg_temp.list_members(20) where id = r1;
   if n <> 0 then raise exception 'FAIL: list_members returned the caller'; end if;
 end $$;
 rollback;
@@ -408,8 +420,8 @@ begin
   if n <> 1 then raise exception 'FAIL: test member cannot find another test member (%)', n; end if;
   select count(*) into n from public.get_candidates(array['70000000-0000-0000-0000-000000000002'::uuid, '70000000-0000-0000-0000-000000000009'::uuid]);
   if n <> 1 then raise exception 'FAIL P14: get_candidates crossed worlds (% rows, want 1)', n; end if;
-  select count(*) into n from public.list_members(20);
-  if n <> 1 or (select id from public.list_members(20)) <> '70000000-0000-0000-0000-000000000009' then
+  select count(*) into n from pg_temp.list_members(20);
+  if n <> 1 or (select id from pg_temp.list_members(20)) <> '70000000-0000-0000-0000-000000000009' then
     raise exception 'FAIL P14: test member deck is not just the test world (% rows)', n;
   end if;
 end $$;
@@ -426,7 +438,7 @@ begin
     if n <> 0 then raise exception 'FAIL RF3: % sees R1 via get_candidates', who; end if;
     select count(*) into n from public.search_members('Rita');
     if n <> 0 then raise exception 'FAIL RF3: % finds R1 via search', who; end if;
-    select count(*) into n from public.list_members(20) where id = '70000000-0000-0000-0000-000000000001';
+    select count(*) into n from pg_temp.list_members(20) where id = '70000000-0000-0000-0000-000000000001';
     if n <> 0 then raise exception 'FAIL RF3: % sees R1 in list_members', who; end if;
     select count(*) into n from public.search_members('Ravi');
     if n <> 1 then raise exception 'FAIL: % cannot see unrelated R2 (%)', who, n; end if;
@@ -441,7 +453,7 @@ set local request.jwt.claims = '{"sub":"70000000-0000-0000-0000-000000000099"}';
 do $$
 declare n int;
 begin
-  select (select count(*) from public.list_members(20)) + (select count(*) from public.search_members('Ravi'))
+  select (select count(*) from pg_temp.list_members(20)) + (select count(*) from public.search_members('Ravi'))
        + (select count(*) from public.get_candidates(array['70000000-0000-0000-0000-000000000002'::uuid])) into n;
   if n <> 0 then raise exception 'FAIL: caller without a profile got % rows', n; end if;
 end $$;
@@ -515,7 +527,7 @@ begin
   foreach who in array array['70000000-0000-0000-0000-000000000006', '70000000-0000-0000-0000-000000000014', '70000000-0000-0000-0000-000000000010'] loop
     set local role authenticated;
     perform set_config('request.jwt.claims', json_build_object('sub', who)::text, true);
-    select (select count(*) from public.list_members(20)) + (select count(*) from public.search_members('Ravi'))
+    select (select count(*) from pg_temp.list_members(20)) + (select count(*) from public.search_members('Ravi'))
          + (select count(*) from public.get_candidates(array['70000000-0000-0000-0000-000000000002'::uuid])) into n;
     reset role;
     if n <> 0 then raise exception 'FAIL I5: incomplete caller % got % rows', who, n; end if;
@@ -532,7 +544,7 @@ begin
   select count(*) into n from public.get_candidates(array['70000000-0000-0000-0000-000000000010','70000000-0000-0000-0000-000000000011',
     '70000000-0000-0000-0000-000000000012','70000000-0000-0000-0000-000000000013','70000000-0000-0000-0000-000000000014']::uuid[]);
   if n <> 0 then raise exception 'FAIL I3: get_candidates shows % padded/empty/whitespace profiles', n; end if;
-  select count(*) into n from public.list_members(20) where id::text between '70000000-0000-0000-0000-000000000010' and '70000000-0000-0000-0000-000000000014';
+  select count(*) into n from pg_temp.list_members(20) where id::text between '70000000-0000-0000-0000-000000000010' and '70000000-0000-0000-0000-000000000014';
   if n <> 0 then raise exception 'FAIL I3: list_members shows % incomplete profiles', n; end if;
   select count(*) into n from public.search_members('City');
   if n <> 0 then raise exception 'FAIL I3: search shows an empty/whitespace-city profile (%)', n; end if;
@@ -916,7 +928,8 @@ begin
 end $$;
 begin;
 -- Owner fixtures: S->R152 declined, S->R153 pending, S->R154 accepted, S->R155 expired, S->R156 (R156 blocked S),
--- S->T (cross-world legacy row; 72..0209 becomes a test member).
+-- S->T (cross-world legacy row; 72..0209 becomes a test member). Since D-038 (R6) the row to R156, who blocked S, stays
+-- 'pending' until its natural expiry (hiding it at once told S about the block).
 update public.profiles set is_test = true where id = pg_temp.t3(209);
 insert into public.connection_requests (from_id, to_id, status, created_at) values
   (pg_temp.t3(1), pg_temp.t3(152), 'declined', now() - interval '1 day'),
@@ -932,8 +945,8 @@ do $$
 declare got text; n int;
 begin
   select string_agg(right(to_id::text, 3) || ':' || status, ',' order by to_id) into got from public.my_outgoing_requests();
-  if got is distinct from '152:pending,153:pending,154:accepted' then
-    raise exception 'FAIL T3b: my_outgoing_requests = % (want 152:pending,153:pending,154:accepted)', got;
+  if got is distinct from '152:pending,153:pending,154:accepted,156:pending' then
+    raise exception 'FAIL T3b: my_outgoing_requests = % (want 152:pending,153:pending,154:accepted,156:pending)', got;
   end if;
   select count(*) into n from public.connection_requests where from_id = auth.uid();
   if n <> 0 then raise exception 'FAIL T3b: sender reads % outgoing rows from the base table', n; end if;

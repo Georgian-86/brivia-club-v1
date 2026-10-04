@@ -385,7 +385,8 @@ try {
   const directory = Array.from({ length: 30 }, (_, k) => ({ id: memberId(k + 1), name: `Member ${k + 1}`, photo_url: '', cover_url: null, experience: 'Builder', skills: ['Build'], looking_for: ['Friends'], distance_band: '~10 km', shared_interests: [] }));
   directory[4].skills = ['Pottery'];
   const postAuthorRow = { id: POST_AUTHOR, name: 'Member 36', city: 'Mumbai', experience: 'Builder', skills: ['Build'], looking_for: ['Friends'], photo_url: '' };
-  const quinnRow = { id: QUINN, name: 'Quinn Far', city: 'Leh', experience: 'Guide', skills: ['Trekking'], looking_for: ['Friends'], photo_url: '', created_at: ago(500000) };
+  // gender: a stub that wrongly sends one (the server returns null since D-038 R4) must still never render it.
+  const quinnRow = { id: QUINN, name: 'Quinn Far', city: 'Leh', gender: 'Zygender', experience: 'Guide', skills: ['Trekking'], looking_for: ['Friends'], photo_url: '', created_at: ago(500000) };
   const deckPassed = new Set();
   const deckCalls = [];
   const deckBodies = [];
@@ -452,12 +453,20 @@ try {
     const second = deckCalls.findIndex((c, i) => c.path === '/rest/v1/rpc/deck_candidates' && deckCalls.slice(0, i).some((p) => p.path === '/rest/v1/rpc/deck_candidates'));
     assert.equal(deckCalls.slice(0, second).filter((c) => c.method === 'POST' && c.path === '/rest/v1/interaction').length, 12);
   });
+  // Search needs 2+ non-space characters (D-038 R4): a one-letter query is never sent, and the field says so.
+  await setFilter('#drawer-filter-search', ' Q ');
+  await deckPage.waitForTimeout(500);
+  check('a one-letter search sends no rpc/search_members call', () => assert.equal(deckCalls.filter((c) => c.path === '/rest/v1/rpc/search_members').length, 0));
+  const searchHint = await deckPage.evaluate(() => { const i = document.querySelector('#drawer-filter-search'); return `${i.placeholder} | ${i.getAttribute('aria-label')}`; });
+  check(`the search field states the 2-letter minimum ("${searchHint}")`, () => assert.ok(/2\+ letters/.test(searchHint) && /at least 2 letters/.test(searchHint)));
   // Name search reaches a member in no deck batch.
   await setFilter('#drawer-filter-search', 'Quinn');
   await waitForCard('Quinn Far');
   check('name search calls rpc/search_members with the typed query', () => assert.ok(deckCalls.some((c) => c.path === '/rest/v1/rpc/search_members' && JSON.parse(c.body || '{}').p_query === 'Quinn')));
   const quinnText = await deckPage.evaluate(() => document.querySelector('#swipe-card')?.textContent || '');
   check('a searched card never shows its row city (Leh)', () => assert.ok(!/\bLeh\b/.test(quinnText)));
+  const quinnPage = await deckPage.evaluate(() => document.body.innerText);
+  check('another member\'s gender is never rendered (Zygender)', () => assert.ok(!/Zygender/.test(quinnPage) && !/Zygender/.test(quinnText)));
   await setFilter('#drawer-filter-search', '');
   check('the paging context never calls rpc/list_members', () => assert.equal(deckCalls.filter((c) => c.path === '/rest/v1/rpc/list_members').length, 0));
 

@@ -2,6 +2,12 @@ set brivia.harness_autocomplete = 'off';
 -- Iteration 3, Task 4: completion = a name, plus 1-12 interests summing to 20 points, plus a cell (D-030, spec §7).
 -- The legacy city column plays no part. Every member-facing visibility check goes through brivia_visible_to.
 -- The harness autocomplete fixture is switched off above, so this file sees the real rule.
+-- list_members is executable by no client role since D-038 (R4). Its visibility semantics are still tested, through
+-- this owner wrapper (security definer; auth.uid() still reads the caller's claims).
+create or replace function pg_temp.list_members(p_limit int default 20, p_after timestamptz default null,
+                                                p_after_id uuid default null)
+returns setof public.public_profile_card language sql security definer set search_path = public as $w$
+  select * from public.list_members(p_limit, p_after, p_after_id) $w$;
 insert into auth.users(id) values
   ('c0c0c0c0-0000-0000-0000-0000000000c1'), ('c0c0c0c0-0000-0000-0000-0000000000c2'),
   ('c0c0c0c0-0000-0000-0000-0000000000c3'), ('c0c0c0c0-0000-0000-0000-0000000000c4'),
@@ -81,16 +87,16 @@ begin
   if public.brivia_visible_to(v, n) or public.brivia_visible_to(n, v) then raise exception 'FAIL: stage 0 c2 visible'; end if;
   set local role authenticated;
   perform set_config('request.jwt.claims', json_build_object('sub', v)::text, true);
-  select count(*) into k from public.list_members(20) where id = n; if k <> 0 then raise exception 'FAIL: stage 0 list_members shows c2'; end if;
+  select count(*) into k from pg_temp.list_members(20) where id = n; if k <> 0 then raise exception 'FAIL: stage 0 list_members shows c2'; end if;
   select count(*) into k from public.search_members('Cee Two', 20); if k <> 0 then raise exception 'FAIL: stage 0 search shows c2'; end if;
   select count(*) into k from public.get_candidates(array[n]); if k <> 0 then raise exception 'FAIL: stage 0 get_candidates shows c2'; end if;
   if public.brivia_can_see_author(n) then raise exception 'FAIL: stage 0 c2 posts visible'; end if;
   -- positive control: c3 is visible to c1
-  select count(*) into k from public.list_members(20) where id = 'c0c0c0c0-0000-0000-0000-0000000000c3';
+  select count(*) into k from pg_temp.list_members(20) where id = 'c0c0c0c0-0000-0000-0000-0000000000c3';
   if k <> 1 then raise exception 'FAIL: positive control: c1 does not list c3'; end if;
   -- c2 as the viewer gets nothing
   perform set_config('request.jwt.claims', json_build_object('sub', n)::text, true);
-  select count(*) into k from public.list_members(20); if k <> 0 then raise exception 'FAIL: stage 0 c2 lists % rows', k; end if;
+  select count(*) into k from pg_temp.list_members(20); if k <> 0 then raise exception 'FAIL: stage 0 c2 lists % rows', k; end if;
   select count(*) into k from public.search_members('Cee', 20); if k <> 0 then raise exception 'FAIL: stage 0 c2 searches % rows', k; end if;
   select count(*) into k from public.get_candidates(array[v]); if k <> 0 then raise exception 'FAIL: stage 0 c2 gets % cards', k; end if;
   if public.brivia_can_see_author(v) then raise exception 'FAIL: stage 0 c2 sees c1 posts'; end if;
@@ -121,11 +127,11 @@ begin
   if s.interests <> 3 or s.points <> 20 or s.has_cell or s.place_label is not null or s.completed then
     raise exception 'FAIL: stage 1 status %', s;
   end if;
-  select count(*) into k from public.list_members(20); if k <> 0 then raise exception 'FAIL: stage 1 c2 lists % rows', k; end if;
+  select count(*) into k from pg_temp.list_members(20); if k <> 0 then raise exception 'FAIL: stage 1 c2 lists % rows', k; end if;
   select count(*) into k from public.search_members('Cee', 20); if k <> 0 then raise exception 'FAIL: stage 1 c2 searches % rows', k; end if;
   select count(*) into k from public.get_candidates(array[v]); if k <> 0 then raise exception 'FAIL: stage 1 c2 gets % cards', k; end if;
   perform set_config('request.jwt.claims', json_build_object('sub', v)::text, true);
-  select count(*) into k from public.list_members(20) where id = n; if k <> 0 then raise exception 'FAIL: stage 1 c1 lists c2'; end if;
+  select count(*) into k from pg_temp.list_members(20) where id = n; if k <> 0 then raise exception 'FAIL: stage 1 c1 lists c2'; end if;
   select count(*) into k from public.search_members('Cee Two', 20); if k <> 0 then raise exception 'FAIL: stage 1 search shows c2'; end if;
   select count(*) into k from public.get_candidates(array[n]); if k <> 0 then raise exception 'FAIL: stage 1 get_candidates shows c2'; end if;
   reset role;
@@ -145,10 +151,10 @@ begin
     raise exception 'FAIL: stage 2 status %', s;
   end if;
   if (select count(*) from public.my_onboarding_status()) <> 1 then raise exception 'FAIL: status is not one row'; end if;
-  select count(*) into k from public.list_members(20) where id = v; if k <> 1 then raise exception 'FAIL: stage 2 c2 does not list c1'; end if;
+  select count(*) into k from pg_temp.list_members(20) where id = v; if k <> 1 then raise exception 'FAIL: stage 2 c2 does not list c1'; end if;
   select count(*) into k from public.get_candidates(array[v]); if k <> 1 then raise exception 'FAIL: stage 2 c2 gets % cards', k; end if;
   perform set_config('request.jwt.claims', json_build_object('sub', v)::text, true);
-  select count(*) into k from public.list_members(20) where id = n; if k <> 1 then raise exception 'FAIL: stage 2 c1 does not list c2'; end if;
+  select count(*) into k from pg_temp.list_members(20) where id = n; if k <> 1 then raise exception 'FAIL: stage 2 c1 does not list c2'; end if;
   select count(*) into k from public.search_members('Cee Two', 20); if k <> 1 then raise exception 'FAIL: stage 2 search misses c2'; end if;
   select count(*) into k from public.get_candidates(array[n]); if k <> 1 then raise exception 'FAIL: stage 2 get_candidates misses c2'; end if;
   if not public.brivia_can_see_author(n) then raise exception 'FAIL: stage 2 c2 posts hidden'; end if;
@@ -211,7 +217,7 @@ begin
   if public.brivia_visible_to(v, b) or public.brivia_visible_to(b, v) then raise exception 'FAIL: (b blocks v) pair visible'; end if;
   set local role authenticated;
   perform set_config('request.jwt.claims', json_build_object('sub', v)::text, true);
-  select count(*) into k from public.list_members(20) where id in (b, w); if k <> 0 then raise exception 'FAIL: c1 lists blocked/cross-world'; end if;
+  select count(*) into k from pg_temp.list_members(20) where id in (b, w); if k <> 0 then raise exception 'FAIL: c1 lists blocked/cross-world'; end if;
   select count(*) into k from public.get_candidates(array[b, w]); if k <> 0 then raise exception 'FAIL: c1 gets blocked/cross-world cards'; end if;
   select count(*) into k from public.search_members('Cee', 20) where id in (b, w); if k <> 0 then raise exception 'FAIL: c1 searches blocked/cross-world'; end if;
   if public.brivia_can_see_author(b) or public.brivia_can_see_author(w) then raise exception 'FAIL: c1 sees blocked/cross-world posts'; end if;

@@ -626,12 +626,14 @@ const refillDeck = async () => {
   renderExplore();
 };
 // Name search reaches members anywhere: their cards join the end of the deck (search reaches everyone, VISION).
+// The server answers only queries with at least 2 non-space characters (D-038 R4), so shorter ones are not sent.
+const MEMBER_SEARCH_MIN_CHARS = 2;
 let memberSearchTimer;
 let memberSearchSeq = 0;
 const scheduleMemberSearch = (query) => {
   window.clearTimeout(memberSearchTimer);
   const term = String(query || '').trim();
-  if (!supabase || !deck.ready || !term) return;
+  if (!supabase || !deck.ready || term.replace(/\s/g, '').length < MEMBER_SEARCH_MIN_CHARS) return;
   const seq = ++memberSearchSeq;
   memberSearchTimer = window.setTimeout(async () => {
     const { data, error } = await supabase.rpc('search_members', { p_query: term, p_limit: 20 });

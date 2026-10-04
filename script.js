@@ -1328,6 +1328,10 @@ const firstIncompleteStep = (status, profileRow = null) => {
 const PRIVATE_OMITTED_NOTE = "Private interests aren't kept while you confirm your email. Please pick them again.";
 const AREA_SAVE_ERROR = "We couldn't save your area. Please try again.";
 const INTERESTS_SAVE_ERROR = 'Your interests could not be saved. Please try again.';
+// The server refuses a private (sensitive) interest until the member gives the separate consent (D-038 R3). The consent
+// step itself is P0-B; until then the member is told why and how to continue.
+const SENSITIVE_CONSENT_ERROR = 'Private interests need a separate consent, which is coming soon. Remove the ones marked Private to continue.';
+const isSensitiveConsentError = (error) => /sensitive consent required/i.test(String(error?.message || ''));
 
 // After a profile exists: the app when onboarding is complete, else the completion flow at the first incomplete step.
 // An unknown status (RPC error) goes to the app, whose server-side visibility still requires completion (D-030).
@@ -1661,7 +1665,7 @@ const finishOnboarding = async () => {
   const { error } = await setMemberInterests(toPayload(budget));
   if (error) {
     setSignupStep(3);
-    const message = INTERESTS_SAVE_ERROR;
+    const message = isSensitiveConsentError(error) ? SENSITIVE_CONSENT_ERROR : INTERESTS_SAVE_ERROR;
     if (budgetError) budgetError.textContent = message;
     throw new OnboardingStepError(message);
   }

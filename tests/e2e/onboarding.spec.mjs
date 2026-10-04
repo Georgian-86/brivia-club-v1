@@ -146,6 +146,8 @@ const stubContext = async (context, opts = {}) => {
       const forced = state.interestsStatus.shift();
       if (forced === 400) return json(400, { code: '22023', message: 'invalid interests', details: null, hint: null });
       if (items.reduce((s, i) => s + i.points, 0) !== 20) return json(400, { code: '22023', message: 'invalid interests' });
+      // Like the server since D-038 (R3): a sensitive id needs the separate consent, which no client gives yet.
+      if (items.some((i) => nodes.find((n) => n.id === i.interest_id)?.sensitive)) return json(400, { code: '22023', message: 'sensitive consent required', details: null, hint: null });
       state.interests = items.map((i) => ({ interest_id: i.interest_id, label: nodes.find((n) => n.id === i.interest_id)?.label, points: i.points, mode: i.mode }));
       return route.fulfill({ status: 204, body: '', headers });
     }
@@ -747,6 +749,40 @@ try {
     const after = await storageDump(page);
     check('private: pending profile removed after login', () => assert.ok(!('local:brivia-pending-profile' in after)));
     check('private: no uncaught page errors', () => assert.deepEqual(errors, []));
+    await context.close();
+  }
+
+  // 7b. D-038 (R3): the server refuses a sensitive pick without the separate consent (the consent step is P0-B). The
+  //     member stays on step 3 with a message that says why and how to continue; removing the pick then completes.
+  {
+    const context = await browser.newContext({ viewport: { width: 1280, height: 900 } });
+    const stub = await stubContext(context);
+    const { page, errors } = await newPage(context, stub.consoleLines);
+    await openSignup(page);
+    await fillStepOne(page);
+    await page.locator('[data-area-city]').click();
+    await pickCityByKeyboard(page);
+    await page.locator('[data-signup-step="2"] .signup-next').click();
+    await page.waitForSelector('#interest-results [data-interest-group]', { state: 'attached' });
+    await page.locator('#interest-search').fill('Chess');
+    await clickInterest(page, 'Chess');
+    await page.locator('#interest-search').fill('scripture');
+    await clickInterest(page, 'Scripture study');
+    for (let i = 0; i < 18; i += 1) await page.getByRole('button', { name: 'Add a point to Chess', exact: true }).click();
+    await page.locator('.looking-search').click();
+    await page.locator('#looking-results [data-looking-option]').first().click();
+    await page.locator('[data-signup-step="3"] .signup-next').click();
+    await finishStepFour(page);
+    await page.waitForSelector('[data-signup-step="3"]:not([hidden])', { timeout: 15000 });
+    await page.waitForFunction(() => /separate consent/.test(document.querySelector('#budget-error')?.textContent || ''), null, { timeout: 5000 }).catch(() => {});
+    const message = (await page.locator('#budget-error').textContent()).trim();
+    const consentStep = await stepLabel(page);
+    check(`consent: a sensitive pick is refused with the consent message on step 3 ("${message}")`, () => {
+      assert.match(consentStep, /^STEP 3 OF 4\b/);
+      assert.equal(message, 'Private interests need a separate consent, which is coming soon. Remove the ones marked Private to continue.');
+    });
+    check('consent: the app was not opened', () => assert.ok(!/\/app\.html/.test(page.url())));
+    check('consent: no uncaught page errors', () => assert.deepEqual(errors, []));
     await context.close();
   }
 

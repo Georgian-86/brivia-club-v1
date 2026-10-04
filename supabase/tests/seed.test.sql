@@ -6,6 +6,13 @@
   \set phase seeded
 \endif
 
+-- list_members is executable by no client role since D-038 (R4); its world isolation is still checked through this
+-- owner wrapper (security definer; auth.uid() still reads the caller's claims). Members see test members only through
+-- deck_candidates, search_members and get_candidates, which S5/S6 also check.
+create or replace function pg_temp.list_members(p_limit int default 20)
+returns setof public.public_profile_card language sql security definer set search_path = public as $w$
+  select * from public.list_members(p_limit) $w$;
+
 -- A real member (is_test = false) and the founder-style completed profile, created in both phases.
 insert into auth.users(id) values ('eeeeeeee-0000-0000-0000-0000000000e1') on conflict do nothing;
 insert into public.profiles (id, name, full_name, email, city, state, skills)
@@ -106,8 +113,10 @@ begin
   select array_agg(id) into ids from public.profiles where is_test;
   set local role authenticated;
   perform set_config('request.jwt.claims', '{"sub":"eeeeeeee-0000-0000-0000-0000000000e1"}', true);
-  select count(*) into n from public.list_members(20);
+  select count(*) into n from pg_temp.list_members(20);
   if n <> 0 then raise exception 'FAIL S5: real member lists % rows', n; end if;
+  select count(*) into n from public.deck_candidates(20) where id = any(ids);
+  if n <> 0 then raise exception 'FAIL S5: real member''s deck shows % test members', n; end if;
   select count(*) into n from public.search_members('Bengaluru', 20) where id = any(ids);
   if n <> 0 then raise exception 'FAIL S5: real member searches % test rows by city', n; end if;
   select count(*) into n from public.search_members('test.brivia', 20)
@@ -133,7 +142,14 @@ declare n int; f text := 'a7e57000-0000-4000-8000-';
 begin
   set local role authenticated;
   perform set_config('request.jwt.claims', '{"sub":"a7e57000-0000-4000-8000-000000000001"}', true);
-  select count(*) into n from public.list_members(20); if n <> 20 then raise exception 'FAIL S6: test member lists %', n; end if;
+  select count(*) into n from pg_temp.list_members(20); if n <> 20 then raise exception 'FAIL S6: test member lists %', n; end if;
+  -- the deck (D-038): member 1 (Bengaluru) sees the other Bengaluru test members not matched with it, by the place
+  -- rule (no density yet, so no km band), and nobody from the other cities
+  select count(*) into n from public.deck_candidates(20) d
+   where d.distance_band = 'Bengaluru' and d.id::text like f || '%';
+  if n <> 4 then raise exception 'FAIL S6: member 1 deck has % Bengaluru cards (want 4: 3-6)', n; end if;
+  select count(*) into n from public.deck_candidates(20) d where d.distance_band <> 'Bengaluru';
+  if n <> 0 then raise exception 'FAIL S6: member 1 deck has % cards outside Bengaluru', n; end if;
   select count(*) into n from public.get_candidates(array['eeeeeeee-0000-0000-0000-0000000000e1'::uuid]);
   if n <> 0 then raise exception 'FAIL S6: test member sees a real member'; end if;
   select count(*) into n from public.matches; if n <> 1 then raise exception 'FAIL S6: member 1 sees % matches', n; end if;

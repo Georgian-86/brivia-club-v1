@@ -31,6 +31,8 @@ begin
   if r.id is null then raise exception 'FAIL I-1: search_members by name does not find the target'; end if;
   if r.city is not null or r.state is not null then raise exception 'FAIL I-1: search_members returns city/state (%, %)', r.city, r.state; end if;
 
+  -- list_members is executable by no client role since D-038 (R4): checked as the owner, with the viewer's claims.
+  reset role;
   select * into r from public.list_members(20) where id = t;
   if r.id is null then raise exception 'FAIL I-1: list_members does not show the target'; end if;
   if r.city is not null or r.state is not null then raise exception 'FAIL I-1: list_members returns city/state (%, %)', r.city, r.state; end if;
@@ -38,6 +40,7 @@ begin
   -- No row from any of the three carries a city or state, whoever it is.
   select count(*) into n from public.list_members(20) where city is not null or state is not null;
   if n <> 0 then raise exception 'FAIL I-1: list_members returns % rows with city/state', n; end if;
+  set local role authenticated;
 
   -- City and state text are not searchable.
   select count(*) into n from public.search_members('Zanzibarton');

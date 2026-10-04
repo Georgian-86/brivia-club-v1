@@ -323,15 +323,16 @@ begin
 end $$;
 rollback;
 
--- I1: sensitive interests (health, mental health, religion/spirituality, LGBTQ+, sobriety) never reach the public
--- profiles.skills copy or search; they still count in member_interest and the owner still sees them.
+-- I1: sensitive interests (health, mental health, religion/spirituality, LGBTQ+, sobriety; the list as amended by
+-- D-038, see orbit-sensitive.test.sql) never reach the public profiles.skills copy or search; they are stored in
+-- member_interest and the owner still sees them. Picking one needs the separate consent (given here as the owner).
 do $$
 declare bad text;
 begin
   select string_agg(id, ', ') into bad from unnest(array[
     'community.social.lgbtq', 'wellbeing.health', 'wellbeing.health.peer_support', 'wellbeing.health.sober_social',
-    'wellbeing.health.nutrition', 'wellbeing.health.sleep', 'wellbeing.health.healthy_ageing',
-    'wellbeing.spirituality', 'wellbeing.spirituality.pilgrimages', 'wellbeing.spirituality.kirtan',
+    'music.listening.sufi_qawwali', 'learning.languages.sign_language', 'community.social.womens_circles',
+    'lifestyle.travel.solo_travel.women_solo', 'wellbeing.spirituality', 'wellbeing.spirituality.pilgrimages', 'wellbeing.spirituality.kirtan',
     'wellbeing.spirituality.scripture_study', 'wellbeing.spirituality.interfaith', 'music.singing.devotional']) i(id)
    where not coalesce((select sensitive from public.interest_node n where n.id = i.id), false);
   if bad is not null then raise exception 'FAIL: not marked sensitive: %', bad; end if;
@@ -347,6 +348,8 @@ insert into public.profiles (id, name, full_name, email, city)
 values ('a5a5a5a5-0000-0000-0000-0000000000a5','A5','A5','a5@example.com','Pune'),
        ('b5b5b5b5-0000-0000-0000-0000000000b5','B5','B5','b5@example.com','Pune')
 on conflict (id) do nothing;
+update public.profiles set sensitive_consent_at = now()
+ where id in ('a5a5a5a5-0000-0000-0000-0000000000a5', 'b5b5b5b5-0000-0000-0000-0000000000b5');
 begin;
 set local role authenticated;
 set local request.jwt.claims = '{"sub":"a5a5a5a5-0000-0000-0000-0000000000a5"}';
@@ -385,19 +388,21 @@ rollback;
 
 select 'orbit-interests.test.sql OK' as result;
 
--- I1 re-review: a member whose picks are all sensitive can still save (skills becomes '{}', not NULL).
+-- I1 re-review, amended by D-038 (R3 completion floor, B-F4): a member whose picks are all sensitive can no longer
+-- save (22023 'invalid interests', even with consent), so a completed member never has empty skills.
 begin;
 set local role authenticated;
 set local request.jwt.claims = '{"sub":"b5b5b5b5-0000-0000-0000-0000000000b5"}';
-select public.set_member_interests('[{"interest_id":"wellbeing.spirituality.scripture_study","points":20}]'::jsonb);
 do $$
+declare st text; msg text;
 begin
-  if (select skills from public.profiles where id = auth.uid()) is distinct from '{}'::text[] then
-    raise exception 'FAIL: all-sensitive skills = %', (select skills from public.profiles where id = auth.uid());
-  end if;
-  if (select count(*) from public.my_interests()) <> 1 then
-    raise exception 'FAIL: all-sensitive member_interest rows missing';
-  end if;
+  begin
+    perform public.set_member_interests('[{"interest_id":"wellbeing.spirituality.scripture_study","points":20}]'::jsonb);
+  exception when others then st := sqlstate; msg := sqlerrm;
+  end;
+  if st is distinct from '22023' or msg <> 'invalid interests' then raise exception 'FAIL: all-sensitive save gave % %', st, msg; end if;
+  if exists (select 1 from public.my_interests() where interest_id = 'wellbeing.spirituality.scripture_study') then
+    raise exception 'FAIL: all-sensitive rows stored'; end if;
 end $$;
 rollback;
 

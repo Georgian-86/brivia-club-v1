@@ -11,7 +11,7 @@
 set brivia.harness_autocomplete = 'off';
 
 create or replace function pg_temp.u(n int) returns uuid language sql immutable as $$
-  select ('b1b1b1b1-0000-4000-8000-0000000000' || lpad(n::text, 2, '0'))::uuid $$;
+  select ('7a17a17a-0000-4000-8000-0000000000' || lpad(n::text, 2, '0'))::uuid $$;
 
 do $$
 declare g int; mid uuid; cell text;
@@ -125,8 +125,8 @@ begin
 end $$;
 
 -- Clean up.
-delete from public.interaction where viewer_id::text like 'b1b1b1b1-%' or target_id::text like 'b1b1b1b1-%';
-delete from public.profiles where id::text like 'b1b1b1b1-%';
-delete from auth.users where id::text like 'b1b1b1b1-%';
+delete from public.interaction where viewer_id::text like '7a17a17a-%' or target_id::text like '7a17a17a-%';
+delete from public.profiles where id::text like '7a17a17a-%';
+delete from auth.users where id::text like '7a17a17a-%';
 
 select 'orbit-triangulation.test.sql OK' as result;
