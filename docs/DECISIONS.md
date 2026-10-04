@@ -362,3 +362,66 @@ supersedes it.
   - residual probe surfaces (`brivia_can_see_author`, `brivia_request_sender_completed`, the interaction-insert world oracle, `get_candidates`, `my_outgoing_requests`);
   - `deck_status` in a tiny world;
   - the D-034 trade-off.
+
+## D-038: Iteration-3 arena outcome: deck membership follows the band, interest-then-ring order, amend 0004 before the first apply
+- Accepted 2026-10-04 (iteration-3 arena judge; record `docs/arena/2026-10-03-iteration-3.md`). Every participant
+  was a Claude model, so heterogeneity was reduced (disclosed in the record). Supersedes D-033/D-034 in part (pool and
+  order), D-029 in part (the sensitive list and completion), and the spec's "true ring is used for the pool"
+  (`ORBIT_ENGINE.md` §9.1.5).
+- **Evidence:** the judge reproduced all three Criticals locally.
+  - **B-F1:** `deck_candidates` admits a target on the true g7 ring ≤ 2. With free `pass` isolation and 3 moves a
+    day per sybil, the 60 km pool edge was pinned to about 1.5 km while the card said only "Pune".
+  - **A-F2:** 12 "Pick my city" members share one centroid cell, which reaches `ok10` and shows them to each other
+    as "~3 km".
+  - **C-1:** `orbit/src/rings.js` returns 0 km for any two `grid1` ids, or for garbage.
+- **Decision (pool membership):** a target's membership and position may depend only on what its card shows and on
+  the viewer's own state.
+  - A *fine* target (both members `precision = 'cell'`, target g7 cell `ok10`) is admitted at ≤ 15 km on g7 and
+    banded `~3 km` / `~10 km`.
+  - Every other admission uses the place rule: place centroids within 60 km, band = place name, region or "Abroad".
+  - Nobody is admitted on the true g7 ring 2 any more.
+  - `like` and `pass` rows are accepted only for targets served in the last 7 days, otherwise silently ignored.
+  - A harness test replays the probe.
+- **Decision (order):**
+  1. at least one shared non-sensitive exact interest, first;
+  2. display ring (0, 1, place tier);
+  3. budget-bounded overlap `Σ min(p_v, p_t)/20`;
+  4. a daily rotating tie key `md5(caller || target || current_date)`.
+
+  `deck_candidates` becomes volatile and writes owner-only `impression` rows (`policy = 'interim-v1'`).
+- **Decision (other rulings):**
+  - City-picked members get `member_orbit.precision = 'place'`: excluded from g7/g6 density, always place-banded.
+  - Sensitive set:
+    - nutrition, sleep and healthy ageing become public;
+    - Sufi/qawwali, Indian Sign Language, Women's circles and Women travelling solo become sensitive;
+    - completion needs at least one non-sensitive interest;
+    - sensitive interests need a separate, withdrawable consent;
+    - interest rewrites are capped at 3 per 24 h;
+    - ORBIT keeps sensitive hits out of R, the gate, the order and the chips (spec §9.1.5 amended with that work).
+  - `list_members` is revoked from `authenticated`, and card RPCs return `gender` as null.
+  - `my_outgoing_requests` keeps blocked pairs as pending until natural expiry.
+  - The rolling 24 h quota stays, with copy that says so.
+- **Decision (migrations):** nothing is live, so the P0-A SQL changes amend `0004` before its first apply. The
+  founder should not run 0004 on the live project until the amendment lands.
+  - From now on, a migration file applied to the live project is frozen; later changes go in a new numbered file.
+  - If 0004 is applied first anyway (test members only is safe), the same items ship as `0005` with the same
+    acceptance criteria.
+- **Why:**
+  - Membership on the true ring was an oracle that D-034's ordering fix did not reach.
+  - Interest qualifies a person and location orders the qualified (CLAUDE.md rules 1–2). The exact-count key rewarded
+    spreading points thinly and gave C1 no usable data.
+  - A city pick is not a neighbourhood, so showing it as one was false precision.
+- **Go-live gate:** item 4 (location privacy) is reopened. New items:
+  - harvest closure and the completion floor;
+  - the UX honesty fixes;
+  - an 18+ gate, separate sensitive consent and a retention schedule (under item 9);
+  - a report path (under item 8).
+
+  The grid1 adapter and the sensitive firewall block any ORBIT wiring. C1–C4, J1 and a 2-week shadow run block ORBIT
+  serving. None of these blocks the closed beta while the interim deck serves.
+- **Dissent preserved:**
+  - Location-first purists would put the display ring ahead of shared interest. That is open for the founder: the swap
+    is privacy-neutral.
+  - B's 24 h settling delay and 50 % public-share rule were not adopted.
+  - C would keep Sufi/qawwali public.
+  - A wanted the launch-city cold-start flow ahead of engine work. It is P1, run in parallel.
