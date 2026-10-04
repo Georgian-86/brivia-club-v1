@@ -319,7 +319,6 @@
   body.app-body .swipe-card-info .member-name-row{min-width:0}
   body.app-body .member-name-row h2{min-width:0;max-width:calc(100% - 40px)}
   body.app-body .swipe-limit-state{box-sizing:border-box;overflow:hidden}
-  body.app-body .swipe-limit-state h2{max-width:100%;overflow-wrap:anywhere;text-align:center}
 
   /* Explore filter drawer */
   body.app-body .discovery-filter-drawer{z-index:100}

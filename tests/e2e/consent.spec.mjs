@@ -3,9 +3,9 @@
 //
 //   PLAYWRIGHT_MODULE=/path/to/node_modules/playwright/index.mjs node tests/e2e/consent.spec.mjs
 //
-// Asserts: a like opens the pitch sheet and sends exactly ONE /rest/v1/connection_requests POST when the
-// sheet resolves (Ruling P13): submit carries the note; close / Escape / backdrop / next card send note
-// null; nothing is POSTed before. Never /rest/v1/matches or /rest/v1/brivia_messages. Other members are
+// Asserts: a like opens the pitch sheet and sends exactly ONE POST /rest/v1/rpc/send_signal when the sheet
+// resolves (Ruling P13, D-032): submit carries the note; close / Escape / backdrop / next card send note null;
+// nothing is POSTed before, and /rest/v1/connection_requests is never POSTed (raw inserts are revoked). Never /rest/v1/matches or /rest/v1/brivia_messages. Other members are
 // read only through the candidate RPCs (/rest/v1/rpc/list_members | get_candidates | search_members), never
 // /rest/v1/public_profiles or another member's /rest/v1/profiles row; the deck loads more pages when the
 // (filtered) queue runs out, and name search reaches members on no loaded page; a stubbed match row shows
@@ -13,12 +13,14 @@
 // renders (escaped note, 44px equal-weight buttons), Accept calls /rest/v1/rpc/respond_connection_request
 // and opens chat only if a match exists; crafted photo_url values cannot inject markup.
 // Hardening (Iteration 2, Task 3b): the public-profile cover goes through safeImageUrl; repeated Like clicks
-// while the sheet opens are ignored; Escape during a failing submit restores nothing; an empty 201 (the silent
-// request cap) reads "Signal sent"; chat attachments link only https/same-origin URLs, escaped; a failed
+// while the sheet opens are ignored; Escape during a failing submit restores nothing; chat attachments link only https/same-origin URLs, escaped; a failed
 // profile-photo upload shows an error and writes no data: URL.
 // Final-review fixes (Ruling I11): member images (avatars, covers, post images) render only from the Supabase
 // Storage origin (a third-party https URL never loads); profileToRow sends no created_at; blocking inserts and
 // treats 23505 as success; no password is ever kept in localStorage (a stale cached one is scrubbed on load).
+// Honest signal quota (Iteration 3, Task 9, D-026/D-032): the counter reads my_signal_quota ("30 signals left
+// today", then 29 after one like); at 0 a Like keeps the card, sends nothing and shows "More at HH:MM"; a PT429 race
+// puts the card back at the front; passes never call send_signal and nothing is kept in localStorage.
 import { readFileSync } from 'node:fs';
 import { spawn } from 'node:child_process';
 import assert from 'node:assert/strict';
@@ -31,6 +33,8 @@ const PORT = Number(process.env.E2E_PORT || 5199);
 const ORIGIN = 'https://stub.supabase.local';
 const BASE = `http://127.0.0.1:${PORT}`;
 const EXECUTABLE = process.env.CHROMIUM_PATH || '/opt/pw-browsers/chromium';
+// Optional: E2E_SCREENSHOTS=<dir> saves screenshots of the quota states (for visual review).
+const SHOTS = process.env.E2E_SCREENSHOTS || '';
 
 const ME = '11111111-1111-4111-8111-111111111111';
 const BOB = '22222222-2222-4222-8222-222222222222';
@@ -78,7 +82,7 @@ try {
   const context = await browser.newContext({ viewport: { width: 1280, height: 900 } });
   await context.addInitScript(([key, value]) => { window.localStorage.setItem(key, value); }, ['sb-stub-auth-token', JSON.stringify(session)]);
 
-  const state = { matchedWith: new Set(), insertedRequests: new Set(), answered: new Set(), holdInsert: null, holdRpc: null };
+  const state = { matchedWith: new Set(), insertedRequests: new Set(), answered: new Set(), holdInsert: null, holdRpc: null, remaining: 30 };
   const calls = [];
   const bodies = [];
   await context.route(`${ORIGIN}/**`, async (route) => {
@@ -116,15 +120,19 @@ try {
       const rows = [...state.matchedWith].filter((id) => filter.includes(id) || !filter.includes('and(')).map((id) => ({ user1_id: ME, user2_id: id }));
       return json(200, rows);
     }
+    // send_signal (D-032): one row; 'matched' when a match row exists afterwards, otherwise 'sent' for every
+    // recipient state (a repeat send included). Charged once per call.
+    if (pathName === '/rest/v1/rpc/send_signal') {
+      if (state.holdInsert) await state.holdInsert;
+      const { p_to: to } = JSON.parse(postData || '{}');
+      state.insertedRequests.add(to);
+      state.remaining = Math.max(0, state.remaining - 1);
+      return json(200, [{ status: state.matchedWith.has(to) ? 'matched' : 'sent', remaining: state.remaining, resets_at: '2026-10-04T15:00:00+00:00' }]);
+    }
+    if (pathName === '/rest/v1/rpc/my_signal_quota') return json(200, [{ daily_limit: 30, remaining: state.remaining, resets_at: null, live_unanswered: 0, live_limit: 100 }]);
     if (pathName === '/rest/v1/connection_requests') {
-      if (method === 'POST') {
-        if (state.holdInsert) await state.holdInsert;
-        const row = JSON.parse(postData || '{}');
-        const key = `${row.from_id}>${row.to_id}`;
-        if (state.insertedRequests.has(key)) return json(409, { code: '23505', message: 'duplicate key value violates unique constraint', details: null, hint: null });
-        state.insertedRequests.add(key);
-        return route.fulfill({ status: 201, body: '', headers: { 'access-control-allow-origin': '*' } });
-      }
+      // Raw inserts are revoked (0004): the client must never POST here.
+      if (method === 'POST') return json(403, { code: '42501', message: 'permission denied for table connection_requests' });
       return json(200, [
         { from_id: DEV, note: '<b>climb</b> with me?', created_at: ago(60000) },
         { from_id: EVE, note: null, created_at: ago(120000) },
@@ -158,7 +166,9 @@ try {
   const toast = () => page.locator('#app-toast').textContent();
   const posts = (p) => calls.filter((call) => call.method === 'POST' && call.path === p);
 
-  const requestPosts = () => posts('/rest/v1/connection_requests');
+  const requestPosts = () => posts('/rest/v1/rpc/send_signal');
+  const rawRequestPosts = () => posts('/rest/v1/connection_requests');
+  const signalBody = (call) => { const b = JSON.parse(call.body || '{}'); return { to: b.p_to, note: b.p_note }; };
   const matchWrites = () => calls.filter((c) => c.path === '/rest/v1/matches' && c.method !== 'GET');
   const cardRow = async () => { const name = (await page.locator('#swipe-name').textContent()).trim(); return publicRows.find((row) => name.startsWith(row.name.split(' ')[0])); };
   const waitForToast = (re) => page.waitForFunction((src) => new RegExp(src).test(document.querySelector('#app-toast')?.textContent || ''), re.source, { timeout: 5000 });
@@ -192,17 +202,16 @@ try {
   await page.evaluate(() => document.querySelector('#pitch-form').requestSubmit());
   releaseInsert(); state.holdInsert = null;
   await page.waitForFunction(() => document.querySelector('#pitch-modal')?.hidden);
-  await waitForToast(/Request sent to/);
+  await waitForToast(/Signal sent/);
   await page.waitForTimeout(300);
   const submitPosts = requestPosts().slice(before);
   check('pitch submit disabled while in flight', () => assert.equal(disabledInFlight, true));
   check(`like + submit = exactly one POST (got ${submitPosts.length})`, () => assert.equal(submitPosts.length, 1));
-  check('that one POST carries the note and the liked person', () => {
-    const body = JSON.parse(submitPosts[0].body);
-    assert.deepEqual({ from: body.from_id, to: body.to_id, note: body.note }, { from: ME, to: bob.id, note: 'Hello, shall we talk design?' });
+  check('that one POST carries the note and the liked person (p_to, p_note only)', () => {
+    assert.deepEqual(JSON.parse(submitPosts[0].body), { p_to: bob.id, p_note: 'Hello, shall we talk design?' });
   });
   const submitToast = await toast();
-  check(`submit toast is "Request sent to ${bob.name}" (got "${submitToast}")`, () => assert.equal(submitToast, `Request sent to ${bob.name}`));
+  check(`submit toast is "Signal sent" (got "${submitToast}")`, () => assert.equal(submitToast, 'Signal sent'));
   check('pitch never POSTs /rest/v1/brivia_messages', () => assert.equal(posts('/rest/v1/brivia_messages').length, 0));
 
   // 2. Like + close (×): one POST, note null. The stubbed matches lookup returns a row -> "It's mutual".
@@ -215,7 +224,7 @@ try {
   await waitForToast(/It's mutual/);
   await page.waitForTimeout(300);
   let resolved = requestPosts().slice(before);
-  check(`like + close = one POST with note null (got ${resolved.length})`, () => { assert.equal(resolved.length, 1); const b = JSON.parse(resolved[0].body); assert.equal(b.to_id, cara.id); assert.equal(b.note, null); });
+  check(`like + close = one POST with note null (got ${resolved.length})`, () => { assert.equal(resolved.length, 1); assert.deepEqual(signalBody(resolved[0]), { to: cara.id, note: null }); });
   const mutualToast = await toast();
   check(`mutual toast (got "${mutualToast}")`, () => assert.equal(mutualToast, `It's mutual. Say hi to ${cara.name}.`));
 
@@ -227,11 +236,11 @@ try {
   await waitForToast(/Signal sent/);
   await page.waitForTimeout(300);
   resolved = requestPosts().slice(before);
-  check(`like + Escape = one POST with note null (got ${resolved.length})`, () => { assert.equal(resolved.length, 1); const b = JSON.parse(resolved[0].body); assert.equal(b.to_id, dev.id); assert.equal(b.note, null); });
+  check(`like + Escape = one POST with note null (got ${resolved.length})`, () => { assert.equal(resolved.length, 1); assert.deepEqual(signalBody(resolved[0]), { to: dev.id, note: null }); });
   const escToast = await toast();
   check(`plain like toast is "Signal sent" (got "${escToast}")`, () => assert.equal(escToast, 'Signal sent'));
 
-  // 4. Like + backdrop: one POST, note null (a repeat like of the same person gets 23505 -> same "Signal sent").
+  // 4. Like + backdrop: one POST, note null (a repeat signal to the same person answers 'sent' -> same "Signal sent").
   before = requestPosts().length;
   const again = await likeAndOpenSheet();
   await resetToast();
@@ -239,9 +248,9 @@ try {
   await waitForToast(/Signal sent|It's mutual/);
   await page.waitForTimeout(300);
   resolved = requestPosts().slice(before);
-  check(`like + backdrop = one POST with note null (got ${resolved.length})`, () => { assert.equal(resolved.length, 1); const b = JSON.parse(resolved[0].body); assert.equal(b.to_id, again.id); assert.equal(b.note, null); });
+  check(`like + backdrop = one POST with note null (got ${resolved.length})`, () => { assert.equal(resolved.length, 1); assert.deepEqual(signalBody(resolved[0]), { to: again.id, note: null }); });
   const dupToast = await toast();
-  check(`duplicate (23505) like still reads "Signal sent" (got "${dupToast}")`, () => assert.equal(dupToast, 'Signal sent'));
+  check(`a repeat signal still reads "Signal sent" (got "${dupToast}")`, () => assert.equal(dupToast, 'Signal sent'));
 
   // 5. Like, then move to the next card with the sheet open: one POST for the liked person, note null.
   before = requestPosts().length;
@@ -249,11 +258,12 @@ try {
   await page.evaluate(() => document.querySelector('[data-action="pass"]').click());
   await page.waitForTimeout(600);
   resolved = requestPosts().slice(before);
-  check(`like + next card = one POST with note null (got ${resolved.length})`, () => { assert.equal(resolved.length, 1); const b = JSON.parse(resolved[0].body); assert.equal(b.to_id, liked.id); assert.equal(b.note, null); });
+  check(`like + next card = one POST with note null (got ${resolved.length})`, () => { assert.equal(resolved.length, 1); assert.deepEqual(signalBody(resolved[0]), { to: liked.id, note: null }); });
   const sheetHidden = await page.locator('#pitch-modal').isHidden();
   check('moving to the next card closes the pitch sheet', () => assert.equal(sheetHidden, true));
   check('no writes to /rest/v1/matches at any point', () => assert.equal(matchWrites().length, 0));
-  check('like checks matches in both orders', () => assert.ok(calls.some((c) => c.path === '/rest/v1/matches' && /and\(user1_id\.eq\.[^,]+,user2_id\.eq\.[^)]+\),and\(/.test(c.search))));
+  check('a like never POSTs /rest/v1/connection_requests (raw inserts are revoked)', () => assert.equal(rawRequestPosts().length, 0));
+  check('the like outcome comes from send_signal: no matches lookup for a like', () => assert.ok(!calls.some((c) => c.path === '/rest/v1/matches' && c.search.includes('and('))));
   await page.waitForTimeout(3000); // let the last toast clear
 
   // 4. Requests list in the notifications panel.
@@ -296,6 +306,7 @@ try {
     assert.deepEqual(JSON.parse(rpc[0].body), { p_from: DEV, p_accept: true });
   });
   check(`accept toast (got "${acceptToast}")`, () => assert.equal(acceptToast, "It's mutual. Say hi to Dev Rao."));
+  check('accept checks matches in both orders', () => assert.ok(calls.some((c) => c.path === '/rest/v1/matches' && /and\(user1_id\.eq\.[^,]+,user2_id\.eq\.[^)]+\),and\(/.test(c.search))));
   check('accept refreshed connections from matches', () => assert.ok(calls.filter((c) => c.path === '/rest/v1/matches' && c.method === 'GET' && !c.search.includes('and(')).length >= 2));
 
   // 4b. A stranger's request: sender loaded via rpc/get_candidates; a crafted photo_url cannot inject markup.
@@ -486,7 +497,7 @@ try {
   await deckContext.close();
 
   // 8. Client hardening (Iteration 2, Task 3b) in a fresh context: crafted cover / attachment URLs, the
-  // double-click like, Escape during an in-flight failing pitch submit, the silent request cap, and a
+  // double-click like, Escape during an in-flight failing pitch submit, and a
   // failed profile-photo upload (never a data: URL).
   const HANA = '88888888-8888-4888-8888-000000000001'; // cover_url is plain http -> must not be used
   const IVAN = '88888888-8888-4888-8888-000000000002';
@@ -550,13 +561,14 @@ try {
     if (pathName === '/rest/v1/brivia_messages') return json(200, method === 'GET' ? kitMessages : []);
     // The block already exists (e.g. blocked from another device): the insert hits the primary key.
     if (pathName === '/rest/v1/brivia_blocks' && method === 'POST') return json(409, { code: '23505', message: 'duplicate key value violates unique constraint "brivia_blocks_pkey"', details: null, hint: null });
+    if (pathName === '/rest/v1/rpc/send_signal') {
+      if (hard.holdInsert) await hard.holdInsert;
+      if (hard.failInsert) return json(500, { code: 'XX000', message: 'stub failure' });
+      return json(200, [{ status: 'sent', remaining: 20, resets_at: '2026-10-04T15:00:00+00:00' }]);
+    }
+    if (pathName === '/rest/v1/rpc/my_signal_quota') return json(200, [{ daily_limit: 30, remaining: 20, resets_at: '2026-10-04T15:00:00+00:00', live_unanswered: 4, live_limit: 100 }]);
     if (pathName === '/rest/v1/connection_requests') {
-      if (method === 'POST') {
-        if (hard.holdInsert) await hard.holdInsert;
-        if (hard.failInsert) return json(500, { code: 'XX000', message: 'stub failure' });
-        // The silent cap: PostgREST answers 201 with no row when the BEFORE INSERT trigger returns NULL.
-        return route.fulfill({ status: 201, body: '', headers: { 'access-control-allow-origin': '*' } });
-      }
+      if (method === 'POST') return json(403, { code: '42501', message: 'permission denied for table connection_requests' });
       return json(200, []);
     }
     if (pathName.startsWith('/rest/v1/')) return json(200, []);
@@ -584,7 +596,8 @@ try {
   check(`profileToRow never sends created_at (keys ${rowKeys.join(',')})`, () => assert.ok(!rowKeys.includes('created_at')));
   const staticProfile = readFileSync(path.join(repoRoot, 'profile.html'), 'utf8');
   check('profile.html shows no password and no copy-password button', () => assert.ok(!/password/i.test(staticProfile)));
-  const hardPosts = () => hard.calls.filter((c) => c.method === 'POST' && c.path === '/rest/v1/connection_requests');
+  const hardPosts = () => hard.calls.filter((c) => c.method === 'POST' && c.path === '/rest/v1/rpc/send_signal');
+  const hardSignal = (call) => { const b = JSON.parse(call.body || '{}'); return [b.p_to, b.p_note]; };
   const hardToast = () => hardPage.locator('#app-toast').textContent();
   const hardResetToast = () => hardPage.evaluate(() => { const t = document.querySelector('#app-toast'); if (t) t.textContent = ''; });
   const hardWaitToast = (re) => hardPage.waitForFunction((src) => new RegExp(src).test(document.querySelector('#app-toast')?.textContent || ''), re.source, { timeout: 5000 });
@@ -616,10 +629,10 @@ try {
   let hardResolved = hardPosts().slice(hardBefore);
   check(`double-click Like then Escape = exactly one POST, note null (got ${hardResolved.length})`, () => {
     assert.equal(hardResolved.length, 1);
-    assert.deepEqual([JSON.parse(hardResolved[0].body).to_id, JSON.parse(hardResolved[0].body).note], [HANA, null]);
+    assert.deepEqual(hardSignal(hardResolved[0]), [HANA, null]);
   });
-  const capToast = await hardToast();
-  check(`silent cap / plain like toast is "Signal sent" (got "${capToast}")`, () => assert.equal(capToast, 'Signal sent'));
+  const plainToast = await hardToast();
+  check(`plain like toast is "Signal sent" (got "${plainToast}")`, () => assert.equal(plainToast, 'Signal sent'));
 
   // 8c. Escape while a pitch submit is in flight, and the submit then fails: the like is NOT restored behind
   // the hidden sheet, so moving to the next card sends nothing more.
@@ -676,7 +689,7 @@ try {
   hardResolved = hardPosts().slice(hardBefore);
   check(`double Like click then Escape = exactly one POST to ${doubleRow?.name}, note null (got ${hardResolved.length})`, () => {
     assert.equal(hardResolved.length, 1);
-    assert.deepEqual([JSON.parse(hardResolved[0].body).to_id, JSON.parse(hardResolved[0].body).note], [doubleRow?.id, null]);
+    assert.deepEqual(hardSignal(hardResolved[0]), [doubleRow?.id, null]);
   });
 
   // 8d. Chat attachments: src/href escaped; only https (or same-origin) URLs become links or media.
@@ -785,6 +798,139 @@ try {
   });
   check('hardening context: no uncaught page errors', () => assert.deepEqual(hardErrors, []));
   await hardContext.close();
+
+  // 9. Honest signal quota (Iteration 3, Task 9, D-026/D-032) in a fresh context with a 24-member deck. The quota is
+  // the server's (my_signal_quota / send_signal); nothing about it is kept in localStorage.
+  const quotaMember = (i) => ({ id: `99999999-9999-4999-8999-${String(i).padStart(12, '0')}`, name: `Quota ${i}`, experience: 'Member', skills: ['Badminton'], looking_for: ['Friends'], photo_url: '', cover_url: '', distance_band: '~3 km', shared_interests: ['Badminton'], created_at: ago(10000 + i * 1000) });
+  const quotaDeck = Array.from({ length: 24 }, (_, k) => quotaMember(k + 1));
+  const RESETS_AT = '2026-10-04T15:00:00+00:00';
+  const q = { remaining: 30, resetsAt: null, race: false, calls: [], passed: new Set() };
+  const quotaContext = await browser.newContext({ viewport: { width: 1280, height: 900 } });
+  await quotaContext.addInitScript(([key, value]) => { window.localStorage.setItem(key, value); }, ['sb-stub-auth-token', JSON.stringify(session)]);
+  await quotaContext.route(`${ORIGIN}/**`, async (route) => {
+    const request = route.request();
+    const url = new URL(request.url());
+    const method = request.method();
+    const pathName = url.pathname;
+    const postData = request.postData();
+    q.calls.push({ method, path: pathName, body: postData });
+    const json = (status, payload) => route.fulfill({ status, contentType: 'application/json', body: JSON.stringify(payload), headers: { 'access-control-allow-origin': '*' } });
+    if (method === 'OPTIONS') return route.fulfill({ status: 204, headers: { 'access-control-allow-origin': '*', 'access-control-allow-headers': '*', 'access-control-allow-methods': '*' } });
+    if (pathName.startsWith('/auth/v1/')) return json(200, pathName.endsWith('/user') ? user : session);
+    if (pathName === '/rest/v1/profiles') return json(200, (request.headers().accept || '').includes('vnd.pgrst.object') ? ownRow : [ownRow]);
+    const args = JSON.parse(postData || '{}');
+    if (pathName === '/rest/v1/rpc/list_members') {
+      const start = args.p_after ? quotaDeck.findIndex((row) => row.id === args.p_after_id) + 1 : 0;
+      return json(200, quotaDeck.slice(start, start + (args.p_limit || 20)));
+    }
+    if (pathName === '/rest/v1/rpc/my_onboarding_status') return json(200, [{ interests: 2, points: 20, has_cell: true, place_label: 'Pune', completed: true }]);
+    if (pathName === '/rest/v1/rpc/my_signal_quota') return json(200, [{ daily_limit: 30, remaining: q.remaining, resets_at: q.resetsAt, live_unanswered: 0, live_limit: 100 }]);
+    if (pathName === '/rest/v1/rpc/send_signal') {
+      if (q.race) {
+        // Another tab used the last signals: the server refuses (not charged) and the quota now reads 0.
+        q.remaining = 0; q.resetsAt = RESETS_AT;
+        return json(429, { code: 'PT429', message: 'signal_quota_exhausted', details: null, hint: null });
+      }
+      q.remaining = Math.max(0, q.remaining - 1); q.resetsAt = RESETS_AT;
+      return json(200, [{ status: 'sent', remaining: q.remaining, resets_at: q.resetsAt }]);
+    }
+    if (pathName === '/rest/v1/interaction' && method === 'POST') { q.passed.add(args.target_id); return route.fulfill({ status: 201, body: '', headers: { 'access-control-allow-origin': '*' } }); }
+    if (pathName.startsWith('/rest/v1/')) return json(200, []);
+    return json(200, {});
+  });
+  await quotaContext.route((url) => !url.href.startsWith(BASE) && !url.href.startsWith(ORIGIN), (route) => route.abort());
+  await quotaContext.routeWebSocket(/stub\.supabase\.local/, (ws) => ws.close());
+  const quotaPage = await quotaContext.newPage();
+  const quotaErrors = [];
+  quotaPage.on('pageerror', (error) => quotaErrors.push(String(error)));
+  await quotaPage.goto(`${BASE}/app.html`, { waitUntil: 'domcontentloaded' });
+  const qCard = () => quotaPage.evaluate(() => document.querySelector('#swipe-card:not([hidden]) #swipe-name')?.textContent?.trim() || '');
+  const qCounter = () => quotaPage.evaluate(() => document.querySelector('#swipe-left-count')?.textContent?.trim() || '');
+  const qWaitCounter = (text) => quotaPage.waitForFunction((t) => document.querySelector('#swipe-left-count')?.textContent?.trim() === t, text, { timeout: 6000 }).catch(() => {});
+  const qWaitToast = (re) => quotaPage.waitForFunction((src) => new RegExp(src).test(document.querySelector('#app-toast')?.textContent || ''), re.source, { timeout: 6000 }).catch(() => {});
+  const qSignals = () => q.calls.filter((c) => c.method === 'POST' && c.path === '/rest/v1/rpc/send_signal');
+  const qQuotaReads = () => q.calls.filter((c) => c.path === '/rest/v1/rpc/my_signal_quota');
+  await quotaPage.waitForFunction(() => document.querySelector('#swipe-card:not([hidden]) #swipe-name')?.textContent?.trim(), null, { timeout: 15000 });
+  await qWaitCounter('30 signals left today');
+  const firstCounter = await qCounter();
+  check(`quota counter reads "30 signals left today" from my_signal_quota (got "${firstCounter}")`, () => {
+    assert.equal(firstCounter, '30 signals left today');
+    assert.ok(qQuotaReads().length >= 1, 'my_signal_quota was not read at boot');
+  });
+  const resetLabel = await quotaPage.evaluate((iso) => new Date(iso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }), RESETS_AT);
+  // One like resolves: the counter drops to 29 (the stub decrements) and the quota is read again.
+  const readsBefore = qQuotaReads().length;
+  await quotaPage.locator('[data-action="like"]').click();
+  await quotaPage.waitForSelector('#pitch-modal:not([hidden])');
+  await quotaPage.waitForTimeout(500);
+  await quotaPage.keyboard.press('Escape');
+  await qWaitToast(/Signal sent/);
+  await qWaitCounter('29 signals left today');
+  const afterOne = await qCounter();
+  if (SHOTS) await quotaPage.screenshot({ path: path.join(SHOTS, 'quota-1280-counter.png') });
+  check(`after one like the counter reads "29 signals left today" (got "${afterOne}")`, () => assert.equal(afterOne, '29 signals left today'));
+  check('my_signal_quota is read again after send_signal', () => assert.ok(qQuotaReads().length > readsBefore));
+  // A PT429 race (the cached quota said 29): the card comes back to the front, the honest toast shows, and the
+  // counter refreshes to "More at HH:MM".
+  await quotaPage.waitForTimeout(400);
+  const raceCard = await qCard();
+  q.race = true;
+  await quotaPage.locator('[data-action="like"]').click();
+  await quotaPage.waitForSelector('#pitch-modal:not([hidden])');
+  await quotaPage.waitForTimeout(500);
+  const advancedTo = await qCard();
+  await quotaPage.keyboard.press('Escape');
+  await qWaitToast(/today's signals/);
+  await quotaPage.waitForFunction((n) => document.querySelector('#swipe-card:not([hidden]) #swipe-name')?.textContent?.trim() === n, raceCard, { timeout: 4000 }).catch(() => {});
+  await quotaPage.waitForTimeout(400);
+  const raceState = { card: await qCard(), toast: await quotaPage.locator('#app-toast').textContent(), counter: await qCounter() };
+  check(`PT429 signal_quota_exhausted puts the card back at the front (${raceCard} -> ${advancedTo} -> ${raceState.card})`, () => {
+    assert.notEqual(advancedTo, raceCard, 'the like did not advance the deck');
+    assert.equal(raceState.card, raceCard);
+  });
+  check(`PT429 shows the honest toast and refreshes the counter (${JSON.stringify(raceState)})`, () => {
+    assert.equal(raceState.toast, `You've used today's signals. More at ${resetLabel}.`);
+    assert.equal(raceState.counter, `More at ${resetLabel}`);
+  });
+  q.race = false;
+  // At 0: Like keeps the same card, opens no pitch, sends nothing, and the honest state shows.
+  const zeroBefore = qSignals().length;
+  await quotaPage.evaluate(() => { const t = document.querySelector('#app-toast'); if (t) t.textContent = ''; });
+  await quotaPage.locator('[data-action="like"]').click();
+  await quotaPage.waitForTimeout(700);
+  const zeroState = await quotaPage.evaluate(() => ({
+    card: document.querySelector('#swipe-card:not([hidden]) #swipe-name')?.textContent?.trim() || '',
+    pitchOpen: !document.querySelector('#pitch-modal')?.hidden,
+    limitVisible: !document.querySelector('#swipe-limit-state')?.hidden,
+    limitText: document.querySelector('#swipe-limit-state')?.textContent?.replace(/\s+/g, ' ').trim() || '',
+    toast: document.querySelector('#app-toast')?.textContent || '',
+  }));
+  if (SHOTS) await quotaPage.screenshot({ path: path.join(SHOTS, 'quota-1280-zero.png') });
+  check(`at 0 a Like keeps the same card and opens no pitch (${JSON.stringify(zeroState)})`, () => {
+    assert.equal(zeroState.card, raceCard);
+    assert.equal(zeroState.pitchOpen, false);
+  });
+  check('at 0 a Like makes no send_signal call', () => assert.equal(qSignals().length, zeroBefore));
+  check(`at 0 the limit state reads "More at HH:MM · Passing is always free." (${zeroState.limitText})`, () => {
+    assert.equal(zeroState.limitVisible, true);
+    assert.match(zeroState.limitText, new RegExp(`More at ${resetLabel} · Passing is always free\\.`));
+    assert.match(zeroState.toast, /More at/);
+  });
+  // 20 passes: free, no send_signal call, and no swipe counter in localStorage.
+  const passBefore = qSignals().length;
+  for (let i = 0; i < 20; i += 1) {
+    const name = await qCard();
+    if (!name) break;
+    await quotaPage.locator('[data-action="pass"]').click();
+    await quotaPage.waitForFunction((n) => (document.querySelector('#swipe-card:not([hidden]) #swipe-name')?.textContent?.trim() || '') !== n, name, { timeout: 4000 }).catch(() => {});
+  }
+  await quotaPage.waitForTimeout(300);
+  const swipeKeys = await quotaPage.evaluate(() => Object.keys(window.localStorage).filter((key) => /brivia-daily-swipes|swipe|quota|signal/i.test(key)));
+  check(`20 passes keep no swipe/quota key in localStorage (${JSON.stringify(swipeKeys)})`, () => assert.deepEqual(swipeKeys, []));
+  check(`20 passes make no send_signal call (${qSignals().length - passBefore})`, () => assert.equal(qSignals().length - passBefore, 0));
+  check('quota context: never POSTs /rest/v1/connection_requests', () => assert.equal(q.calls.filter((c) => c.method === 'POST' && c.path === '/rest/v1/connection_requests').length, 0));
+  check('quota context: no uncaught page errors', () => assert.deepEqual(quotaErrors, []));
+  await quotaContext.close();
 } finally {
   await browser?.close();
   try { process.kill(-vite.pid, 'SIGTERM'); } catch { vite.kill('SIGTERM'); }

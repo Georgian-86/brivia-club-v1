@@ -86,11 +86,4 @@ body.app-body{background:radial-gradient(circle at 84% 6%,rgba(137,43,73,.09),tr
   .app-view[data-view="home"] .home-heading h1{white-space:nowrap}
 }
 
-.swipe-daily-count{display:none!important}
-.swipe-limit-state[hidden]{display:none!important}
-.swipe-limit-state{display:grid;place-items:center;padding:48px 28px;border:1px solid rgba(116,31,57,.2);background:rgba(255,250,241,.82);color:#291d1b;text-align:center}
-.swipe-limit-state h2{margin:16px 0 10px;color:#741f39;font-family:'Bodoni Moda',Didot,'Times New Roman',serif;font-size:clamp(48px,5vw,76px);font-weight:500;line-height:.9;letter-spacing:-.06em}
-.swipe-limit-state>span{color:var(--app-muted);font-size:13px}
-.swipe-limit-state .swipe-reset-time{display:block;margin-top:10px;color:#741f39;font-size:12px;font-weight:700;letter-spacing:.02em}
-@media(min-width:850px){.app-view[data-view="home"] .swipe-limit-state{grid-column:2;grid-row:2/5;align-self:center;width:min(100%,520px);min-height:500px}}
 .swipe-left-copy{color:#5a061f;font-size:1em;font-weight:700}

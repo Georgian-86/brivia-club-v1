@@ -118,6 +118,20 @@ points. Private interests are never shown.").
   - Over a cap (`send_signal` fails with HTTP 429, `signal_quota_exhausted` or `signal_live_cap`), the card is **not**
     consumed and the member sees the honest state above. Nothing else ever fails visibly: every recipient-side outcome
     shows "Signal sent".
+  - **Client (Iteration 3, Task 9).** The quota is read at boot and after every `send_signal`, held in memory only
+    (never in `localStorage`), and shown in the hint line under the deck (`#swipe-left-count`, mirrored to a polite live
+    region `#swipe-daily-count`). Copy comes from `signal-quota.js`.
+    - When the cached quota is at a cap (`remaining` 0, or `live_unanswered` ≥ `live_limit`), Like sends nothing, opens
+      no pitch sheet and keeps the card. The toast gives the honest cap text ("You've used today's signals. More at
+      HH:MM." or "You have 100 signals waiting for an answer."), and a compact notice `#swipe-limit-state` (eyebrow
+      "SIGNALS", SVG clock) reads "More at HH:MM · Passing is always free." beside the deck. Passes never touch the quota.
+    - A 429 from `send_signal` (a race with the cached quota, e.g. another tab) puts the card back at the front of the
+      queue, shows the honest toast and refreshes the counter. A pitch submitted with a note closes its sheet the same way.
+    - The toast reads "Signal sent" only for `status = 'sent'` (with or without a note) and "It's mutual. Say hi to …"
+      only for `matched`, which also adds the chat (the match moment).
+    - At a cap, incoming requests can still be accepted from the notifications panel (`respond_connection_request` is
+      not a signal). A like-back from the deck waits for the reset, even though the server would let a completing
+      signal through.
 
 ### C. Search and Long-Range Request
 

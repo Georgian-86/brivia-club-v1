@@ -15,14 +15,16 @@ import './chat-sidebar-fix.css';
 import './app-navigation.css';
 import './discovery-filters.css';
 import './mobile-app.css';
-import { supabase, rowToProfile, saveProfile, onboardingStatus, isStorageImageUrl, withoutCredentials, uploadMessageAttachment, removeMessageAttachment, uploadCommunityPostImage, removeCommunityPostImage } from './supabase.js';
+import { supabase, rowToProfile, saveProfile, onboardingStatus, sendSignal, fetchSignalQuota, isStorageImageUrl, withoutCredentials, uploadMessageAttachment, removeMessageAttachment, uploadCommunityPostImage, removeCommunityPostImage } from './supabase.js';
 import { defaultCoverUrl, normalizeCoverUrl } from './cover-assets.js';
+import { quotaLabel, quotaErrorText, quotaBlocked } from './signal-quota.js';
 import { chatEmojiCategories } from './chat-emoji-data.js';
 import { chatGifCatalog } from './chat-gif-data.js';
 import './chat-attachments.css';
 import './mobile-final-fixes.css';
 import './community-feed.css';
 import './chat-empty-state.css';
+import './deck.css';
 
 document.body.classList.add('app-auth-pending');
 let appBackGuardActive = false;
@@ -333,72 +335,37 @@ const ensureNotificationControls = () => {
   document.addEventListener('keydown', (event) => { if (event.key === 'Escape') closeNotificationPanel(); });
 };
 
-const DAILY_SWIPE_LIMIT = 15;
-const SWIPE_RESET_WINDOW_MS = 24 * 60 * 60 * 1000;
-let dailySwipeResetTimer;
-const dailySwipeStorageKey = () => `brivia-daily-swipes:${memberProfile.id || 'anonymous'}`;
-const readDailySwipeState = () => {
-  try {
-    const saved = JSON.parse(window.localStorage.getItem(dailySwipeStorageKey()) || 'null');
-    const count = Math.min(DAILY_SWIPE_LIMIT, Math.max(0, Number(saved?.count) || 0));
-    let resetAt = Number(saved?.resetAt) || null;
-    if (resetAt && Date.now() >= resetAt) return { count: 0, resetAt: null };
-    // Migrate an older limit record that did not save its reset timestamp.
-    if (count >= DAILY_SWIPE_LIMIT && !resetAt) {
-      resetAt = Date.now() + SWIPE_RESET_WINDOW_MS;
-      try { window.localStorage.setItem(dailySwipeStorageKey(), JSON.stringify({ ...saved, count, resetAt })); } catch { /* Continue if storage is unavailable. */ }
-    }
-    return { count, resetAt };
-  } catch {
-    return { count: 0, resetAt: null };
+// The honest signal quota (UX_SPEC §B "Signal counter", D-026, D-032). The server quota is the only signal limit:
+// it is read from my_signal_quota() at boot and after every send_signal, kept in memory only (never in storage), and
+// passes never touch it. At a cap the client sends nothing, and the card is not consumed.
+let signalQuota = null;
+let signalQuotaTimer;
+const signalBlockedCopy = (quota) => (quotaBlocked(quota) ? `${quotaLabel(quota)} · Passing is always free.` : '');
+const renderSignalQuota = () => {
+  const label = quotaLabel(signalQuota);
+  const inline = document.querySelector('#swipe-left-count');
+  if (inline) inline.textContent = label;
+  document.querySelector('.swipe-left-copy')?.toggleAttribute('hidden', !label);
+  const live = document.querySelector('#swipe-daily-count');
+  if (live && live.textContent !== label) live.textContent = label;
+  const limitState = document.querySelector('#swipe-limit-state');
+  const copy = signalBlockedCopy(signalQuota);
+  const limitCopy = document.querySelector('#swipe-limit-copy');
+  if (limitCopy) limitCopy.textContent = copy;
+  limitState?.toggleAttribute('hidden', !copy || !currentPerson);
+};
+const refreshSignalQuota = async () => {
+  if (!supabase || !memberProfile.id) return;
+  const { data, error } = await fetchSignalQuota();
+  if (error) console.warn('Signal quota could not load:', error.message);
+  else if (data) signalQuota = data;
+  renderSignalQuota();
+  // At 0, read the quota again just after the server's reset time (it is already rounded up to the hour).
+  window.clearTimeout(signalQuotaTimer);
+  const resetsAt = Date.parse(signalQuota?.resets_at || '');
+  if (quotaBlocked(signalQuota) === 'daily' && Number.isFinite(resetsAt)) {
+    signalQuotaTimer = window.setTimeout(refreshSignalQuota, Math.min(Math.max(resetsAt - Date.now() + 1000, 1000), 24 * 60 * 60 * 1000));
   }
-};
-const dailySwipeCount = () => readDailySwipeState().count;
-const dailySwipeLimitReached = () => {
-  const state = readDailySwipeState();
-  return state.count >= DAILY_SWIPE_LIMIT && (!state.resetAt || Date.now() < state.resetAt);
-};
-const recordDailySwipe = () => {
-  const state = readDailySwipeState();
-  if (state.count >= DAILY_SWIPE_LIMIT) return false;
-  state.count += 1;
-  if (state.count === DAILY_SWIPE_LIMIT) state.resetAt = Date.now() + SWIPE_RESET_WINDOW_MS;
-  try { window.localStorage.setItem(dailySwipeStorageKey(), JSON.stringify(state)); } catch { /* Continue for this session if storage is unavailable. */ }
-  return true;
-};
-const updateDailySwipeUi = () => {
-  const state = readDailySwipeState();
-  const remaining = Math.max(0, DAILY_SWIPE_LIMIT - state.count);
-  const counter = document.querySelector('#swipe-daily-count');
-  if (counter) counter.textContent = `${remaining} SWIPES LEFT`;
-  const inlineCounter = document.querySelector('#swipe-left-count');
-  if (inlineCounter) inlineCounter.textContent = String(remaining);
-  const resetTime = document.querySelector('#swipe-reset-time');
-  if (resetTime && state.resetAt) {
-    const resetAt = new Date(state.resetAt);
-    const millisecondsLeft = Math.max(0, resetAt.getTime() - Date.now());
-    const totalSeconds = Math.ceil(millisecondsLeft / 1000);
-    const hours = Math.floor(totalSeconds / 3600);
-    const minutes = Math.floor((totalSeconds % 3600) / 60);
-    const seconds = totalSeconds % 60;
-    const countdown = hours > 0
-      ? `${hours}h ${String(minutes).padStart(2, '0')}m`
-      : `${minutes}m ${String(seconds).padStart(2, '0')}s`;
-    const timeLabel = resetAt.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
-    resetTime.textContent = `Resets at ${timeLabel} · in ${countdown}`;
-  } else if (resetTime) resetTime.textContent = '';
-};
-const scheduleDailySwipeReset = () => {
-  window.clearInterval(dailySwipeResetTimer);
-  let wasLimited = dailySwipeLimitReached();
-  const refresh = () => {
-    updateDailySwipeUi();
-    const isLimited = dailySwipeLimitReached();
-    if (wasLimited && !isLimited) renderHome();
-    wasLimited = isLimited;
-  };
-  refresh();
-  dailySwipeResetTimer = window.setInterval(refresh, 1000);
 };
 
 const setView = (view) => {
@@ -485,22 +452,11 @@ const renderHome = (queue = getExplorePeople()) => {
     const count = document.querySelector('#queue-count'); if (count) count.textContent = '00 / 00';
     return;
   }
-  if (dailySwipeLimitReached()) {
-    card?.setAttribute('hidden', '');
-    actions?.setAttribute('hidden', '');
-    hint?.setAttribute('hidden', '');
-    emptyState?.setAttribute('hidden', '');
-    limitState?.removeAttribute('hidden');
-    const count = document.querySelector('#queue-count'); if (count) count.textContent = `${DAILY_SWIPE_LIMIT} / ${DAILY_SWIPE_LIMIT}`;
-    updateDailySwipeUi();
-    return;
-  }
   card?.removeAttribute('hidden');
   actions?.removeAttribute('hidden');
   hint?.removeAttribute('hidden');
-  limitState?.setAttribute('hidden', '');
   emptyState?.setAttribute('hidden', '');
-  updateDailySwipeUi();
+  renderSignalQuota();
   const image = document.querySelector('#swipe-image');
   if (image) { image.src = safeImageUrl(currentPerson.coverUrl) || safeImageUrl(currentPerson.image); image.alt = `${currentPerson.name} cover image`; }
   if (card) card.style.setProperty('--card-avatar-image', `url("${safeImageUrl(currentPerson.image).replace(/["\\\n]/g, encodeURIComponent)}")`);
@@ -625,20 +581,37 @@ const hasMatchWith = async (personId) => {
   if (error) { console.warn('Match status could not load:', error.message); return false; }
   return Boolean(data?.length);
 };
+// One signal = one send_signal call (D-032). The response is the same for every recipient state ('sent'), except
+// 'matched' when a match exists afterwards (the match moment). Only the sender's own caps fail visibly: HTTP 429 with
+// 'signal_quota_exhausted' or 'signal_live_cap' (not charged); the result then carries quotaText for the toast.
 const sendConnectionSignal = async (person, note = null) => {
   if (!supabase || !memberProfile.id || !person?.id) return { matched: false, error: new Error('Connection service is unavailable.') };
-  const { error } = await supabase.from('connection_requests').insert({ from_id: memberProfile.id, to_id: person.id, note: note || null });
-  // 23505: this member already signalled this person. Show the same "sent" UX so a decline is never revealed.
-  if (error && error.code !== '23505') {
-    console.warn('Connection request could not be sent:', error.message);
+  const { data, error } = await sendSignal(person.id, note);
+  if (error) {
+    if (quotaErrorText(error, signalQuota)) {
+      await refreshSignalQuota();
+      return { matched: false, error, quotaText: quotaErrorText(error, signalQuota) };
+    }
+    console.warn('Signal could not be sent:', error.message);
     return { matched: false, error };
   }
-  const matched = await hasMatchWith(person.id);
+  if (data) {
+    signalQuota = { ...(signalQuota || {}), remaining: data.remaining, resets_at: data.resets_at };
+    renderSignalQuota();
+  }
+  refreshSignalQuota();
+  const matched = data?.status === 'matched';
   if (matched) { addConnection(person.id); renderChats(); }
-  return { matched };
+  return { matched, status: data?.status || null };
 };
 const mutualToast = (person) => `It's mutual. Say hi to ${person?.name || 'your new connection'}.`;
 const signalErrorToast = 'Your signal could not be sent. Please try again.';
+// "Signal sent" only for status 'sent', "It's mutual" only for 'matched', the honest cap text for a 429.
+const signalResultToast = (person, result) => {
+  if (result.error) return result.quotaText || signalErrorToast;
+  if (result.matched) return mutualToast(person);
+  return result.status === 'sent' ? 'Signal sent' : signalErrorToast;
+};
 
 const loadConnectionRequests = async () => {
   if (!supabase || !memberProfile.id) return;
@@ -799,8 +772,9 @@ const dismissPendingPitch = () => {
   const pending = claimPendingPitch();
   if (!pending) return;
   pitchPerson = null;
-  sendConnectionSignal(pending.person).then(({ matched, error }) => {
-    showToast(error ? signalErrorToast : matched ? mutualToast(pending.person) : 'Signal sent');
+  sendConnectionSignal(pending.person).then((result) => {
+    if (result.quotaText) requeuePerson(pending.person);
+    showToast(signalResultToast(pending.person, result));
   });
 };
 const openPitch = (person) => {
@@ -814,23 +788,41 @@ const openPitch = (person) => {
   window.setTimeout(() => pitchMessage?.focus(), 80);
 };
 
+// Bumped when a card is put back (requeuePerson): a card advance scheduled before that must not skip it.
+let deckAdvanceToken = 0;
+// A like refused by the server cap (a race with the cached quota) puts its card back at the front of the queue.
+const requeuePerson = (person) => {
+  if (!person?.id) return;
+  deckAdvanceToken += 1;
+  const queue = getExplorePeople();
+  const index = queue.findIndex((item) => String(item.id) === String(person.id));
+  if (index < 0) return;
+  currentIndex = index;
+  currentPerson = queue[index];
+  renderExplore();
+};
+const quotaBlockedToast = () => quotaErrorText({ message: quotaBlocked(signalQuota) === 'live' ? 'signal_live_cap' : 'signal_quota_exhausted' }, signalQuota);
+
 const swipe = (type) => {
   if (!currentPerson) return;
   // A Like while the pitch sheet is opening or open is ignored: a repeated click/keypress must not resolve
   // the pending like as a plain like and drop the note (Task 3b).
   if (type === 'like' && pendingPitch && pitchSheetVisible()) return;
-  // Moving to the next card resolves an open pitch sheet as a plain like.
-  if (pendingPitch) { document.querySelector('#pitch-modal')?.setAttribute('hidden', ''); dismissPendingPitch(); }
-  if (!recordDailySwipe()) {
-    renderHome();
-    showToast('FREE LIMIT EXCEEDED — COME TOMORROW');
+  // At a cap a Like sends nothing, opens no pitch and keeps the card (D-026). Passing is always free.
+  if (type === 'like' && quotaBlocked(signalQuota)) {
+    renderSignalQuota();
+    showToast(quotaBlockedToast());
     return;
   }
+  // Moving to the next card resolves an open pitch sheet as a plain like.
+  if (pendingPitch) { document.querySelector('#pitch-modal')?.setAttribute('hidden', ''); dismissPendingPitch(); }
   const card = document.querySelector('#swipe-card');
   card?.classList.add(type === 'like' ? 'is-liking' : 'is-passing');
   // The request is sent when the pitch sheet resolves (submit with a note, or dismiss without one).
   if (type === 'like') openPitch(currentPerson);
+  const token = deckAdvanceToken;
   window.setTimeout(async () => {
+    if (token !== deckAdvanceToken) { renderExplore(); return; }
     let queue = getExplorePeople();
     // At the end of the queue, load the next page before wrapping around.
     if (queue.length && currentIndex + 1 >= queue.length && memberDeck.hasMore) {
@@ -838,6 +830,7 @@ const swipe = (type) => {
       if (error) console.warn('More members could not load:', error.message);
       queue = getExplorePeople();
     }
+    if (token !== deckAdvanceToken) { renderExplore(); return; }
     if (!queue.length) { currentPerson = null; currentIndex = 0; } else { currentIndex = (currentIndex + 1) % queue.length; currentPerson = queue[currentIndex]; }
     renderExplore();
   }, 280);
@@ -2196,8 +2189,16 @@ document.querySelector('#pitch-form')?.addEventListener('submit', async (event) 
   if (submit) { submit.disabled = true; submit.setAttribute('aria-busy', 'true'); }
   try {
     // The pitch travels as the note of the like's single request; no message is sent until the pair is matched.
-    const { matched, error } = await sendConnectionSignal(pending.person, body);
-    if (error) {
+    const result = await sendConnectionSignal(pending.person, body);
+    if (result.quotaText) {
+      // Over a cap: nothing was sent or charged. The sheet closes, and the card comes back to the front.
+      document.querySelector('#pitch-modal')?.setAttribute('hidden', '');
+      if (!pendingPitch) pitchPerson = null;
+      requeuePerson(pending.person);
+      showToast(result.quotaText);
+      return;
+    }
+    if (result.error) {
       // Nothing was stored. Hand the like back for a retry only while the sheet is still visible; if the
       // member closed it meanwhile (Escape, Task 3b), a hidden like must not be sent later on its own.
       if (pitchSheetVisible() && !pendingPitch) {
@@ -2211,7 +2212,7 @@ document.querySelector('#pitch-form')?.addEventListener('submit', async (event) 
     }
     pitchPerson = null;
     closeOverlays();
-    showToast(matched ? mutualToast(pending.person) : `Request sent to ${pending.person.name}`);
+    showToast(signalResultToast(pending.person, result));
   } finally {
     if (submit) { submit.disabled = false; submit.removeAttribute('aria-busy'); }
   }
@@ -2320,7 +2321,7 @@ const loadSupabaseCommunity = async () => {
   renderChats();
   renderProfile();
   try { ensureNotificationControls(); renderNotifications(); } catch (error) { console.warn('Notification controls could not load:', error.message); }
-  scheduleDailySwipeReset();
+  refreshSignalQuota();
   subscribeToMessages();
   startMessageSync();
   if (!appBackGuardActive) {

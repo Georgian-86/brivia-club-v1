@@ -23,9 +23,9 @@
             <div class="swipe-card-info"><div class="member-name-row"><h2 id="swipe-name">Bala</h2><span id="swipe-age">24</span><span class="verified-mark">✓</span></div><p id="swipe-role">Product designer</p><p id="swipe-location">Bengaluru, India</p><div class="member-tags" id="swipe-tags"></div><button class="view-info-button" data-action="full-info">VIEW FULL INFO <span>↗</span></button></div>
           </div>
           <div class="swipe-actions"><button class="swipe-action swipe-pass" data-action="pass" aria-label="Pass">×</button><button class="swipe-action swipe-like" data-action="like" aria-label="Connect">✓</button></div>
-          <p class="swipe-hint">PASS WITH INTENTION <span>·</span> <b class="swipe-left-copy"><span id="swipe-left-count">15</span> SWIPES LEFT</b> <span>·</span> PITCH WITH PURPOSE</p>
-          <span class="swipe-daily-count" id="swipe-daily-count">15 SWIPES LEFT TODAY</span>
-          <div class="swipe-limit-state" id="swipe-limit-state" hidden><p class="app-eyebrow">FREE LIMIT EXCEEDED</p><h2>Come tomorrow.</h2><span>You’ve used all 15 swipes for today.</span><span class="swipe-reset-time" id="swipe-reset-time" aria-live="polite"></span></div>
+          <p class="swipe-hint">PASS WITH INTENTION <span aria-hidden="true">·</span> <b class="swipe-left-copy" hidden><strong id="swipe-left-count"></strong> <span aria-hidden="true">·</span></b> PITCH WITH PURPOSE</p>
+          <span class="swipe-daily-count" id="swipe-daily-count" aria-live="polite"></span>
+          <div class="swipe-limit-state" id="swipe-limit-state" role="status" hidden><svg class="swipe-limit-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/></svg><div><p class="app-eyebrow">SIGNALS</p><span id="swipe-limit-copy"></span></div></div>
         </section>
 
         <section class="app-view community-feed-view" data-view="posts" hidden>

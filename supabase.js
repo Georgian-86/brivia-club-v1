@@ -297,6 +297,15 @@ export const onboardingStatus = async () => {
   return { ...result, data: row };
 };
 
+// Signals (D-026, D-032): send_signal is the only way to send a request (raw connection_requests inserts are revoked).
+// Both RPCs return one row in an array; data is that row or null.
+//   sendSignal  -> { status: 'sent' | 'matched', remaining, resets_at }; a cap is HTTP 429 / PT429 with the message
+//                  'signal_quota_exhausted' or 'signal_live_cap' (not charged).
+//   fetchSignalQuota -> { daily_limit, remaining, resets_at, live_unanswered, live_limit }.
+const firstRow = (result) => ({ ...result, data: Array.isArray(result.data) ? result.data[0] || null : result.data || null });
+export const sendSignal = async (to, note = null) => firstRow(await rpcCall('send_signal', { p_to: to, p_note: note || null }));
+export const fetchSignalQuota = async () => firstRow(await rpcCall('my_signal_quota', {}));
+
 // The active taxonomy (spec §3.1): id, parent_id, level, label, sensitive. Levels 1-2 group, levels 3-4 are selectable.
 export const fetchInterestNodes = async () => {
   if (!supabase) return notConfigured();

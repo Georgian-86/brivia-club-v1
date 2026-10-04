@@ -1,0 +1,43 @@
+/* Discover deck: the honest signal counter (UX_SPEC §B, D-026, D-032). Brand tokens only, no raw hex. */
+body.app-body {
+  --dk-ink: var(--brivia-deep-wine);
+  --dk-accent: var(--brivia-wine);
+  --dk-soft: var(--brivia-wine-soft);
+  --dk-line: color-mix(in srgb, var(--brivia-deep-wine) 20%, transparent);
+  --dk-tint: color-mix(in srgb, var(--brivia-deep-wine) 6%, transparent);
+  --dk-paper: color-mix(in srgb, var(--brivia-deep-wine) 3%, white);
+}
+
+/* The counter is read aloud from a polite live region; the visible copy sits in the hint line. */
+.swipe-daily-count {
+  position: absolute !important;
+  width: 1px !important;
+  height: 1px !important;
+  overflow: hidden !important;
+  clip: rect(0, 0, 0, 0) !important;
+  white-space: nowrap !important;
+}
+.swipe-left-copy[hidden] { display: none !important; }
+.swipe-left-copy strong { color: var(--dk-ink); font-weight: 700; letter-spacing: .08em; text-transform: uppercase; }
+
+/* At a cap: a compact notice beside the deck. The card stays; passing stays free. */
+.swipe-limit-state[hidden] { display: none !important; }
+.swipe-limit-state {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: min(100%, 420px);
+  margin: 14px auto 0;
+  padding: 12px 16px;
+  border: 1px solid var(--dk-line);
+  border-radius: 14px;
+  background: var(--dk-paper);
+  color: var(--dk-ink);
+  text-align: left;
+}
+.swipe-limit-state .app-eyebrow { margin: 0 0 3px; color: var(--dk-soft); font-size: 9px; letter-spacing: .16em; }
+.swipe-limit-state span { display: block; color: var(--dk-ink); font-size: 13px; font-weight: 600; line-height: 1.35; }
+.swipe-limit-icon { flex: 0 0 22px; width: 22px; height: 22px; fill: none; stroke: var(--dk-accent); stroke-width: 1.6; stroke-linecap: round; }
+@media (min-width: 850px) {
+  .app-view[data-view="home"] .swipe-limit-state { grid-column: 1; grid-row: 5; justify-self: center; }
+}

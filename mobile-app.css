@@ -88,9 +88,6 @@
   body.app-body .swipe-actions{gap:14px;margin:17px auto 11px}
   body.app-body .swipe-action{width:58px;height:58px;font-size:27px}
   body.app-body .swipe-hint{margin:0;font-size:8px;line-height:1.5;letter-spacing:.1em}
-  body.app-body .swipe-daily-count{margin-top:10px;font-size:8px}
-  body.app-body .swipe-limit-state{width:100%;min-height:430px;padding:34px 20px}
-  body.app-body .swipe-limit-state h2{font-size:clamp(46px,14vw,70px)}
 
   /* Mobile chat is one readable column; opening a thread replaces the list. */
   body.app-body .app-view[data-view="chat"]{padding:24px 12px 28px}

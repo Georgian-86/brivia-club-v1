@@ -12,7 +12,10 @@ PLAYWRIGHT_MODULE=/tmp/pw/node_modules/playwright/index.mjs CHROMIUM_PATH=/opt/p
 
 Other members are stubbed only at `/rest/v1/rpc/list_members`, `/rest/v1/rpc/get_candidates` and
 `/rest/v1/rpc/search_members` (migration 0003); `/rest/v1/public_profiles` answers 403 and the script asserts it is never
-called. A second browser context serves a 41-member directory in keyset pages to check load-more, name search and
+called. Signals go only through `/rest/v1/rpc/send_signal` (one row `{ status, remaining, resets_at }`) and the
+counter reads `/rest/v1/rpc/my_signal_quota` (migration 0004, D-032); a `POST /rest/v1/connection_requests` answers 403 and
+the script asserts it is never made. A separate context checks the honest quota: the counter, the zero-quota state, a
+`PT429 signal_quota_exhausted` race and 20 free passes. `E2E_SCREENSHOTS=<dir>` saves the quota states. A second browser context serves a 41-member directory in keyset pages to check load-more, name search and
 post authors.
 
 `onboarding.spec.mjs` (Iteration 3, Task 8) loads `auth.html` the same way (Vite on :5198, stubbed Supabase) and checks
