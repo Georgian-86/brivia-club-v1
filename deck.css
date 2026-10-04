@@ -41,3 +41,100 @@ body.app-body {
 @media (min-width: 850px) {
   .app-view[data-view="home"] .swipe-limit-state { grid-column: 1; grid-row: 5; justify-self: center; }
 }
+
+/* The card's location line is the server's distance band ("~3 km", a place, "Abroad"); a pin marks it. */
+.app-view[data-view="home"] #swipe-location.swipe-band[hidden] { display: none !important; }
+.app-view[data-view="home"] #swipe-location.swipe-band {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--dk-soft);
+  font-family: 'Instrument Sans', Arial, sans-serif;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: .04em;
+}
+.app-view[data-view="home"] #swipe-location.swipe-band::before {
+  flex: 0 0 11px;
+  width: 11px;
+  height: 11px;
+  background: currentColor;
+  content: '';
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.2' stroke-linecap='round'%3E%3Cpath d='M12 21s-6.5-6.1-6.5-11a6.5 6.5 0 0 1 13 0c0 4.9-6.5 11-6.5 11Z'/%3E%3Ccircle cx='12' cy='10' r='2.3'/%3E%3C/svg%3E") center / contain no-repeat;
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.2' stroke-linecap='round'%3E%3Cpath d='M12 21s-6.5-6.1-6.5-11a6.5 6.5 0 0 1 13 0c0 4.9-6.5 11-6.5 11Z'/%3E%3Ccircle cx='12' cy='10' r='2.3'/%3E%3C/svg%3E") center / contain no-repeat;
+}
+
+/* "You both: X" chips lead the tag row in wine; every chip wraps rather than clipping (UX rule: chip reflow). */
+.app-view[data-view="home"] .member-tags { flex-wrap: wrap; min-width: 0; }
+.app-view[data-view="home"] .member-tags span { max-width: 100%; white-space: normal; overflow-wrap: anywhere; text-overflow: clip; }
+.app-view[data-view="home"] .member-tags span.chip-shared,
+.info-panel .profile-pills span.chip-shared {
+  border-color: var(--dk-accent);
+  background: var(--dk-ink);
+  color: var(--dk-paper);
+  font-weight: 600;
+}
+
+/* Theme rules set display on these, so [hidden] needs help: an empty deck shows no card, no Pass/Pitch, no hint. */
+.app-view[data-view="home"] .swipe-card[hidden],
+.app-view[data-view="home"] .swipe-actions[hidden],
+.app-view[data-view="home"] .swipe-hint[hidden] { display: none !important; }
+
+/* The empty deck: why it is empty, and exactly one next action. */
+.deck-empty[hidden] { display: none !important; }
+.deck-empty {
+  display: grid;
+  justify-items: center;
+  gap: 10px;
+  width: min(100%, 520px);
+  margin: 0 auto;
+  padding: 44px 26px;
+  border: 1px solid var(--dk-line);
+  border-radius: 24px;
+  background: var(--dk-paper);
+  color: var(--dk-ink);
+  text-align: center;
+}
+.deck-empty-mark { width: 52px; height: 52px; fill: none; stroke: var(--dk-accent); stroke-width: 1.5; }
+.deck-empty .app-eyebrow { margin: 4px 0 0; color: var(--dk-soft); font-size: 10px; letter-spacing: .16em; }
+.deck-empty h2 {
+  margin: 0;
+  color: var(--dk-ink);
+  font-family: 'Bodoni Moda', Didot, 'Times New Roman', serif;
+  font-size: clamp(32px, 4vw, 48px);
+  font-weight: 500;
+  line-height: 1;
+  letter-spacing: -.03em;
+  overflow-wrap: anywhere;
+}
+.deck-empty p:not(.app-eyebrow) { max-width: 36ch; margin: 0; color: var(--dk-soft); font-size: 14px; line-height: 1.5; }
+.deck-empty-action {
+  min-height: 48px;
+  margin-top: 10px;
+  padding: 12px 26px;
+  border: 1px solid var(--dk-ink);
+  border-radius: 999px;
+  background: var(--dk-ink);
+  color: var(--dk-paper);
+  font: 700 12px/1 'Instrument Sans', Arial, sans-serif;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: background .2s, color .2s;
+}
+.deck-empty-action:hover { background: var(--dk-accent); }
+.deck-empty-action:focus-visible,
+.swipe-action:focus-visible,
+.view-info-button:focus-visible { outline: 2px solid var(--dk-soft); outline-offset: 3px; }
+@media (min-width: 850px) {
+  .app-view[data-view="home"] .deck-empty { grid-column: 2; grid-row: 2 / 5; align-self: center; }
+}
+@media (max-width: 700px) {
+  .deck-empty { padding: 34px 18px; border-radius: 20px; }
+}
+
+/* No card fling with reduced motion: a short fade only (UX_SPEC rule 6). */
+@media (prefers-reduced-motion: reduce) {
+  .swipe-card, .swipe-card.is-passing, .swipe-card.is-liking { transition: opacity .15s !important; transform: none !important; }
+  .deck-empty-action { transition: none; }
+}

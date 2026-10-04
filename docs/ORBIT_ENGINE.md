@@ -458,6 +458,12 @@ saturated, the outer rings relax first, instead of the deck repeating saturated 
     caller's. So `~3 km` / `~10 km` appear only when the target's own g7 cell meets k.
   - **`deck_status()`** says why the deck is empty, never with a count: `complete_profile` (caller not completed),
     `no_members_yet` (no member of the caller's world is visible to the caller), otherwise `caught_up`.
+  - **Client use (Iteration 3, Task 10).** The v1 deck reads only `deck_candidates({ p_limit: 12 })` and keeps the
+    server order; it no longer calls `list_members` (`get_candidates` and `search_members` stay for chats, request
+    senders, post authors and search). A passed or liked card leaves the queue for the session (no wrap-around). A
+    pass is stored (`interaction` `pass`) before the next `deck_candidates` call. When nothing new comes back,
+    `deck_status()` picks the empty state (UX_SPEC §B). The client drops any `city` / `state` on another member's row,
+    so a card's only location is `distance_band`.
 - **Onboarding progress.** `my_onboarding_status()` returns, for the caller only, `interests` (count), `points` (sum),
   `has_cell`, `place_label` (the place name of the cell, never the cell id) and `completed`. It carries no interest
   labels, so sensitive interests (D-029) never appear in it.

@@ -105,11 +105,38 @@ points. Private interests are never shown.").
 
 - The card location line shows the **distance band** ("~3 km", "Mumbai", "Abroad"), never the city of a ring 0–1 person's home cell beyond "~N km".
 - The card adds a **resonance line** with the match % (resonance, not the ranking score) and up to 3 evidence chips
-  (see `ORBIT_ENGINE.md §6.3`).
+  (see `ORBIT_ENGINE.md §6.3`). *Deferred to ORBIT (phase 3): the interim deck shows no match %.*
 - **Worth-the-Distance card:** the same card with a wine-gradient top band reading "WORTH THE DISTANCE · 91%
   RESONANCE" and one extra chip explaining why. Max 2 a day.
-- Deck empty state: "You've met your orbit for today." The next action depends on the cause. If the area is sparse,
-  "Widen nothing. We already did. Try search." If the daily limit is hit, keep the existing "Come tomorrow." state.
+- **The interim deck (shipped in Iteration 3, Task 10; `deck_candidates`, ORBIT_ENGINE §7).**
+  - The card's location line (`#swipe-location`, with an SVG pin) is the server's `distance_band` only. Cards, the
+    info sheet ("BASED IN") and the public-profile modal never show another member's City, State, cell, km or a match
+    %; the public profile shows the band when known and otherwise no location line. The client drops `city` / `state`
+    from every other member's row, so no other surface (chat header, lists) can show them either.
+  - The tag row (`#swipe-tags`) starts with up to 2 wine "You both: X" chips (`.chip-shared`, from
+    `shared_interests`), then up to 3 profile tags that do not repeat them. Chips wrap, never clip or ellipsize.
+    "INTERESTED IN" on the info sheet is the first shared interest, else the first tag, else "Open to connect".
+    Every label is set as text, never as HTML.
+  - The pitch sheet starts with "Hey {name}, I noticed we both care about {first shared interest, lowercased}. Would
+    love to connect and exchange ideas.", or "Hey {name}, I'd love to connect and exchange ideas." when nothing is
+    shared (A5: never fails on a card with no tags or shared interests).
+  - The PLACE filter is gone (cards carry no City/State; the deck already starts nearby). Name, skills and
+    looking-for filters apply to the loaded deck.
+  - A passed or liked card leaves the deck for the session: there is no wrap-around. When the queue runs out, the deck
+    loads once more; if nothing new comes back, `deck_status()` picks the empty state.
+- **Deck empty states (final copy).** Each says why the deck is empty and offers exactly one action (`#deck-empty-action`,
+  at least 44 px tall, visible focus). Pass/Pitch and the hint are hidden while it shows.
+
+  | Cause | Title | Copy | Action |
+  |---|---|---|---|
+  | filters hide every loaded card | "No one in this deck matches these filters." | "Clear them to see everyone in your deck again." | "Clear filters" |
+  | `caught_up` (also: members exist, but only far away) | "You're caught up." | "You've met your orbit for today. New people near you show up as they join. Try search to reach further." | "Search members" (opens the search box, focused) |
+  | `no_members_yet` | "Your area is just opening." | "Brivia Club is new around you. Invite a friend who shares your interests." | "Invite a friend" (copies the site link, toast "Link copied") |
+  | `complete_profile` | "Finish your orbit to see people near you." | "Add your area and place your 20 interest points so we can find your people." | "Finish profile" (`/auth.html#complete`) |
+  | the deck could not load | "Your deck could not load." | "Check your connection and try again." | "Try again" |
+
+  This replaces the earlier draft ("Widen nothing. We already did.") and the old "Come tomorrow." daily-limit state:
+  the only limit left is the signal quota, which keeps the card (below).
 - **Signal counter (Ruling A1, D-026, D-032).** The only signal limit is the server quota from `my_signal_quota()`; the
   old localStorage swipe limit is gone and passes are free.
   - Normal: "N signals left today".

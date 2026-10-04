@@ -5,11 +5,12 @@
 //
 // Asserts: a like opens the pitch sheet and sends exactly ONE POST /rest/v1/rpc/send_signal when the sheet
 // resolves (Ruling P13, D-032): submit carries the note; close / Escape / backdrop / next card send note null;
-// nothing is POSTed before, and /rest/v1/connection_requests is never POSTed (raw inserts are revoked). Never /rest/v1/matches or /rest/v1/brivia_messages. Other members are
-// read only through the candidate RPCs (/rest/v1/rpc/list_members | get_candidates | search_members), never
-// /rest/v1/public_profiles or another member's /rest/v1/profiles row; the deck loads more pages when the
-// (filtered) queue runs out, and name search reaches members on no loaded page; a stubbed match row shows
-// "It's mutual"; the Requests list
+// nothing is POSTed before, and /rest/v1/connection_requests is never POSTed (raw inserts are revoked).
+// Never /rest/v1/matches or /rest/v1/brivia_messages. Other members are read only through the candidate RPCs
+// (/rest/v1/rpc/deck_candidates | get_candidates | search_members; never list_members since Iteration 3 Task 10),
+// never /rest/v1/public_profiles or another member's /rest/v1/profiles row; the deck loads more cards when the
+// queue runs out (after the passes are recorded), skills filters apply to the loaded deck, and name search reaches
+// members on no deck page; a send_signal 'matched' shows "It's mutual"; the Requests list
 // renders (escaped note, 44px equal-weight buttons), Accept calls /rest/v1/rpc/respond_connection_request
 // and opens chat only if a match exists; crafted photo_url values cannot inject markup.
 // Hardening (Iteration 2, Task 3b): the public-profile cover goes through safeImageUrl; repeated Like clicks
@@ -42,11 +43,16 @@ const CARA = '33333333-3333-4333-8333-333333333333';
 const DEV = '44444444-4444-4444-8444-444444444444';
 const EVE = '55555555-5555-4555-8555-555555555555'; // not in the deck: loaded via rpc/get_candidates
 const ago = (ms) => new Date(Date.now() - ms).toISOString();
-// public_profile_card rows: no email / phone columns, exactly like the RPCs return.
+// deck_candidates rows (0004, Task 7 shape): no email / phone / city / state columns, exactly like the RPC returns.
+// The deck never wraps around (Task 10), so each like step below needs its own card.
+const deckRow = (id, name, experience, skill, extra = {}) => ({ id, name, photo_url: '', cover_url: null, experience, skills: [skill], looking_for: ['Friends'], distance_band: '~3 km', shared_interests: [], ...extra });
 const publicRows = [
-  { id: BOB, name: 'Bob Lane', city: 'Pune', experience: 'Designer', skills: ['Design'], looking_for: ['Cofounder'], photo_url: 'javascript:window.__xss=1', created_at: ago(1000) },
-  { id: CARA, name: 'Cara Moss', city: 'Pune', experience: 'Engineer', skills: ['Climbing'], looking_for: ['Friends'], photo_url: '', created_at: ago(2000) },
-  { id: DEV, name: 'Dev Rao', city: 'Pune', experience: 'Writer', skills: ['Poetry'], looking_for: ['Friends'], photo_url: '', created_at: ago(3000) },
+  deckRow(BOB, 'Bob Lane', 'Designer', 'Design', { looking_for: ['Cofounder'], photo_url: 'javascript:window.__xss=1', shared_interests: ['Design'] }),
+  deckRow(CARA, 'Cara Moss', 'Engineer', 'Climbing'),
+  deckRow(DEV, 'Dev Rao', 'Writer', 'Poetry'),
+  deckRow('22222222-2222-4222-8222-000000000004', 'Fay Hill', 'Baker', 'Baking'),
+  deckRow('22222222-2222-4222-8222-000000000005', 'Gus Pike', 'Pilot', 'Flying'),
+  deckRow('22222222-2222-4222-8222-000000000006', 'Hal Reed', 'Potter', 'Pottery'),
 ];
 // A stranger whose photo_url tries to break out of the src attribute.
 const eveRow = { id: EVE, name: 'Eve Stone', city: 'Delhi', experience: 'Analyst', skills: ['Chess'], looking_for: ['Friends'], photo_url: 'x" onerror="window.__xss=1', created_at: ago(4000) };
@@ -82,7 +88,7 @@ try {
   const context = await browser.newContext({ viewport: { width: 1280, height: 900 } });
   await context.addInitScript(([key, value]) => { window.localStorage.setItem(key, value); }, ['sb-stub-auth-token', JSON.stringify(session)]);
 
-  const state = { matchedWith: new Set(), insertedRequests: new Set(), answered: new Set(), holdInsert: null, holdRpc: null, remaining: 30 };
+  const state = { matchedWith: new Set(), insertedRequests: new Set(), answered: new Set(), holdInsert: null, holdRpc: null, remaining: 30, passed: new Set() };
   const calls = [];
   const bodies = [];
   await context.route(`${ORIGIN}/**`, async (route) => {
@@ -104,10 +110,9 @@ try {
       return json(200, wantsObject ? ownRow : [ownRow]);
     }
     if (pathName === '/rest/v1/public_profiles') return json(403, { code: '42501', message: 'permission denied for view public_profiles' });
-    if (pathName === '/rest/v1/rpc/list_members') {
-      const { p_after: after } = JSON.parse(postData || '{}');
-      return json(200, after ? [] : publicRows);
-    }
+    if (pathName === '/rest/v1/rpc/deck_candidates') return json(200, publicRows.filter((row) => !state.passed.has(row.id) && !state.insertedRequests.has(row.id)).slice(0, 12));
+    if (pathName === '/rest/v1/rpc/deck_status') return json(200, 'caught_up');
+    if (pathName === '/rest/v1/interaction' && method === 'POST') { state.passed.add(JSON.parse(postData || '{}').target_id); return route.fulfill({ status: 201, body: '', headers: { 'access-control-allow-origin': '*' } }); }
     if (pathName === '/rest/v1/rpc/get_candidates') {
       const { p_ids: ids = [] } = JSON.parse(postData || '{}');
       return json(200, [...publicRows, eveRow].filter((row) => ids.includes(row.id)).slice(0, 50));
@@ -240,7 +245,7 @@ try {
   const escToast = await toast();
   check(`plain like toast is "Signal sent" (got "${escToast}")`, () => assert.equal(escToast, 'Signal sent'));
 
-  // 4. Like + backdrop: one POST, note null (a repeat signal to the same person answers 'sent' -> same "Signal sent").
+  // 4. Like + backdrop: one POST, note null, "Signal sent".
   before = requestPosts().length;
   const again = await likeAndOpenSheet();
   await resetToast();
@@ -250,7 +255,7 @@ try {
   resolved = requestPosts().slice(before);
   check(`like + backdrop = one POST with note null (got ${resolved.length})`, () => { assert.equal(resolved.length, 1); assert.deepEqual(signalBody(resolved[0]), { to: again.id, note: null }); });
   const dupToast = await toast();
-  check(`a repeat signal still reads "Signal sent" (got "${dupToast}")`, () => assert.equal(dupToast, 'Signal sent'));
+  check(`like + backdrop toast reads "Signal sent" (got "${dupToast}")`, () => assert.equal(dupToast, 'Signal sent'));
 
   // 5. Like, then move to the next card with the sheet open: one POST for the liked person, note null.
   before = requestPosts().length;
@@ -350,10 +355,11 @@ try {
     assert.ok(profileReads.length >= 1);
     profileReads.forEach((c) => assert.ok(c.search.includes(`id=eq.${ME}`), c.search));
   });
-  check('deck loaded via rpc/list_members (first page: p_limit 20, no cursor)', () => {
-    const first = calls.find((c) => c.path === '/rest/v1/rpc/list_members');
-    assert.ok(first, 'no list_members call');
-    assert.deepEqual(JSON.parse(first.body || '{}'), { p_limit: 20 });
+  check('deck loaded via rpc/deck_candidates { p_limit: 12 }, never rpc/list_members', () => {
+    const first = calls.find((c) => c.path === '/rest/v1/rpc/deck_candidates');
+    assert.ok(first, 'no deck_candidates call');
+    assert.deepEqual(JSON.parse(first.body || '{}'), { p_limit: 12 });
+    assert.equal(calls.filter((c) => c.path === '/rest/v1/rpc/list_members').length, 0);
   });
   check('never reads /rest/v1/public_profiles (closed directory)', () => assert.equal(calls.filter((c) => c.path === '/rest/v1/public_profiles').length, 0));
   check('get_candidates never sent more than 50 ids or my own id', () => {
@@ -369,22 +375,18 @@ try {
   check('no uncaught page errors', () => assert.deepEqual(consoleErrors, []));
   await page.screenshot({ path: process.env.E2E_SCREENSHOT || path.join(process.env.TMPDIR || '/tmp', 'consent-e2e.png') });
 
-  // 7. Paging, search and post authors (Task 2, Iteration 2) in a fresh context: a 41-member directory
-  // served by a keyset-paging list_members stub (pages of 20; every two rows share created_at), plus one
-  // member (Quinn) who is on no deck page and is reachable only through search_members.
+  // 7. Deck paging, filters, search and post authors (Iteration 2 Task 2; deck_candidates since Iteration 3 Task 10)
+  // in a fresh context: a 30-member deck served 12 at a time by a deck_candidates stub that hides passed members
+  // (like the server's 7-day pass memory), plus one member (Quinn) who is in no deck batch and is reachable only
+  // through search_members.
   const memberId = (i) => `66666666-6666-4666-8666-${String(i).padStart(12, '0')}`;
   const QUINN = '77777777-7777-4777-8777-777777777777';
   const POST_AUTHOR = memberId(36);
-  const stamp = ago(100000);
-  const directory = Array.from({ length: 41 }, (_, k) => {
-    const i = k + 1;
-    return { id: memberId(i), name: `Member ${i}`, city: 'Mumbai', experience: 'Builder', skills: ['Build'], looking_for: ['Friends'], photo_url: '', created_at: new Date(Date.parse(stamp) - Math.floor(i / 2) * 1000).toISOString() };
-  });
-  const byKey = (a, b) => (a.created_at === b.created_at ? (a.id < b.id ? 1 : -1) : (a.created_at < b.created_at ? 1 : -1));
-  directory.sort(byKey);
-  // Deck order positions: one Pune member on page 1 and one on page 2; the only Goa member is alone on page 3.
-  directory[4].city = 'Pune'; directory[29].city = 'Pune'; directory[40].city = 'Goa';
+  const directory = Array.from({ length: 30 }, (_, k) => ({ id: memberId(k + 1), name: `Member ${k + 1}`, photo_url: '', cover_url: null, experience: 'Builder', skills: ['Build'], looking_for: ['Friends'], distance_band: '~10 km', shared_interests: [] }));
+  directory[4].skills = ['Pottery'];
+  const postAuthorRow = { id: POST_AUTHOR, name: 'Member 36', city: 'Mumbai', experience: 'Builder', skills: ['Build'], looking_for: ['Friends'], photo_url: '' };
   const quinnRow = { id: QUINN, name: 'Quinn Far', city: 'Leh', experience: 'Guide', skills: ['Trekking'], looking_for: ['Friends'], photo_url: '', created_at: ago(500000) };
+  const deckPassed = new Set();
   const deckCalls = [];
   const deckBodies = [];
   const deckContext = await browser.newContext({ viewport: { width: 1280, height: 900 } });
@@ -402,12 +404,10 @@ try {
     if (pathName === '/rest/v1/profiles') return json(200, (request.headers().accept || '').includes('vnd.pgrst.object') ? ownRow : [ownRow]);
     if (pathName === '/rest/v1/public_profiles') return json(403, { code: '42501', message: 'permission denied for view public_profiles' });
     const args = JSON.parse(postData || '{}');
-    if (pathName === '/rest/v1/rpc/list_members') {
-      const limit = Math.max(1, Math.min(Number(args.p_limit) || 20, 20));
-      const rows = directory.filter((row) => !args.p_after || row.created_at < args.p_after || (args.p_after_id && row.created_at === args.p_after && row.id < args.p_after_id));
-      return json(200, rows.slice(0, limit));
-    }
-    if (pathName === '/rest/v1/rpc/get_candidates') return json(200, [...directory, quinnRow].filter((row) => (args.p_ids || []).slice(0, 50).includes(row.id)));
+    if (pathName === '/rest/v1/rpc/deck_candidates') return json(200, directory.filter((row) => !deckPassed.has(row.id)).slice(0, Math.max(1, Math.min(Number(args.p_limit) || 12, 20))));
+    if (pathName === '/rest/v1/rpc/deck_status') return json(200, 'caught_up');
+    if (pathName === '/rest/v1/interaction' && method === 'POST') { deckPassed.add(args.target_id); return route.fulfill({ status: 201, body: '', headers: { 'access-control-allow-origin': '*' } }); }
+    if (pathName === '/rest/v1/rpc/get_candidates') return json(200, [...directory, postAuthorRow, quinnRow].filter((row) => (args.p_ids || []).slice(0, 50).includes(row.id)));
     if (pathName === '/rest/v1/rpc/my_onboarding_status') return json(200, [{ interests: 2, points: 20, has_cell: true, place_label: 'Pune', completed: true }]);
     if (pathName === '/rest/v1/rpc/search_members') {
       const q = String(args.p_query || '').trim().toLowerCase();
@@ -430,36 +430,36 @@ try {
   const waitForCard = (name) => deckPage.waitForFunction((n) => document.querySelector('#swipe-card:not([hidden]) #swipe-name')?.textContent?.trim() === n, name, { timeout: 8000 })
     .catch(async (error) => { console.log(`card "${name}" did not show (got "${await cardName()}")`, JSON.stringify(deckCalls.filter((c) => c.path.startsWith('/rest/v1/rpc/')).map((c) => `${c.path} ${c.body}`))); throw error; });
   const setFilter = (selector, value) => deckPage.evaluate(([sel, v]) => { const input = document.querySelector(sel); input.value = v; input.dispatchEvent(new Event('input', { bubbles: true })); }, [selector, value]);
-  const listCalls = () => deckCalls.filter((c) => c.path === '/rest/v1/rpc/list_members').map((c) => JSON.parse(c.body || '{}'));
+  const deckRpcCalls = () => deckCalls.filter((c) => c.path === '/rest/v1/rpc/deck_candidates').map((c) => JSON.parse(c.body || '{}'));
   await waitForCard(directory[0].name);
-  check(`deck shows the newest member first (${directory[0].name}) from one list_members page`, () => assert.deepEqual(listCalls(), [{ p_limit: 20 }]));
+  check(`deck shows the server's first card (${directory[0].name}) from one deck_candidates call`, () => assert.deepEqual(deckRpcCalls(), [{ p_limit: 12 }]));
 
-  // The filtered queue runs out on page 1 (one Pune member); passing loads page 2 with the keyset cursor.
-  await setFilter('#filter-location-input', 'Pune');
+  // A skills filter applies to the loaded deck; clearing it restores the server order.
+  await setFilter('#filter-skills-input', 'Pottery');
   await waitForCard(directory[4].name);
-  await deckPage.evaluate(() => document.querySelector('[data-action="pass"]').click());
-  await waitForCard(directory[29].name);
-  check('end of the filtered queue loads the next page with (created_at, id) of the last row', () => {
-    const calls2 = listCalls();
-    assert.equal(calls2.length, 2);
-    assert.deepEqual(calls2[1], { p_limit: 20, p_after: directory[19].created_at, p_after_id: directory[19].id });
+  await setFilter('#filter-skills-input', '');
+  await waitForCard(directory[0].name);
+  check('a skills filter narrows the loaded deck without another deck_candidates call', () => assert.equal(deckRpcCalls().length, 1));
+
+  // Passing all 12 cards: the 12 passes are recorded, then the next batch loads (no wrap-around to card 1).
+  for (let i = 0; i < 12; i += 1) {
+    await deckPage.evaluate(() => document.querySelector('[data-action="pass"]').click());
+    await deckPage.waitForFunction((n) => (document.querySelector('#swipe-card:not([hidden]) #swipe-name')?.textContent?.trim() || '') !== n, directory[i].name, { timeout: 6000 }).catch(() => {});
+  }
+  await waitForCard(directory[12].name);
+  check('the end of the queue loads the next batch after the 12 passes are stored', () => {
+    assert.deepEqual(deckRpcCalls(), [{ p_limit: 12 }, { p_limit: 12 }]);
+    const second = deckCalls.findIndex((c, i) => c.path === '/rest/v1/rpc/deck_candidates' && deckCalls.slice(0, i).some((p) => p.path === '/rest/v1/rpc/deck_candidates'));
+    assert.equal(deckCalls.slice(0, second).filter((c) => c.method === 'POST' && c.path === '/rest/v1/interaction').length, 12);
   });
-  // A filter with no loaded match pulls further pages until one matches (page 3 holds the Goa member).
-  await setFilter('#filter-location-input', 'Goa');
-  await waitForCard(directory[40].name);
-  check('an empty filtered queue loads further pages (3 list_members calls in total)', () => {
-    const calls3 = listCalls();
-    assert.equal(calls3.length, 3);
-    assert.deepEqual(calls3[2], { p_limit: 20, p_after: directory[39].created_at, p_after_id: directory[39].id });
-  });
-  await deckPage.waitForTimeout(300);
-  check('no list_members call after the last (short) page', () => assert.equal(listCalls().length, 3));
-  // Name search reaches a member on no deck page.
-  await setFilter('#filter-location-input', '');
+  // Name search reaches a member in no deck batch.
   await setFilter('#drawer-filter-search', 'Quinn');
   await waitForCard('Quinn Far');
   check('name search calls rpc/search_members with the typed query', () => assert.ok(deckCalls.some((c) => c.path === '/rest/v1/rpc/search_members' && JSON.parse(c.body || '{}').p_query === 'Quinn')));
+  const quinnText = await deckPage.evaluate(() => document.querySelector('#swipe-card')?.textContent || '');
+  check('a searched card never shows its row city (Leh)', () => assert.ok(!/\bLeh\b/.test(quinnText)));
   await setFilter('#drawer-filter-search', '');
+  check('the paging context never calls rpc/list_members', () => assert.equal(deckCalls.filter((c) => c.path === '/rest/v1/rpc/list_members').length, 0));
 
   // Post authors come from get_candidates (never my own id); my own post uses my profile.
   const postsPage = await deckContext.newPage();
@@ -509,7 +509,10 @@ try {
     { id: HANA, name: 'Hana Cover', city: 'Pune', experience: 'Climber', skills: ['Climbing'], looking_for: ['Friends'], photo_url: 'https://tracker.example/face.png', cover_url: 'http://evil.example/cover.png', created_at: ago(1000) },
     { id: IVAN, name: 'Ivan Next', city: 'Pune', experience: 'Cook', skills: ['Cooking'], looking_for: ['Friends'], photo_url: IVAN_PHOTO, cover_url: '', created_at: ago(2000) },
     { id: JO, name: 'Jo Third', city: 'Pune', experience: 'Runner', skills: ['Running'], looking_for: ['Friends'], photo_url: '', cover_url: '', created_at: ago(3000) },
-  ];
+    // The deck no longer wraps around (Task 10): two more cards for the later like steps.
+    { id: '88888888-8888-4888-8888-000000000005', name: 'Lena Fourth', experience: 'Singer', skills: ['Singing'], looking_for: ['Friends'], photo_url: '', cover_url: '' },
+    { id: '88888888-8888-4888-8888-000000000006', name: 'Milo Fifth', experience: 'Sailor', skills: ['Sailing'], looking_for: ['Friends'], photo_url: '', cover_url: '' },
+  ].map((row) => ({ ...row, distance_band: 'Pune', shared_interests: [] }));
   const kitRow = { id: KIT, name: 'Kit Chat', city: 'Pune', experience: 'Painter', skills: ['Painting'], looking_for: ['Friends'], photo_url: '', created_at: ago(4000) };
   const kitMessages = [
     { id: 'm1', sender_id: KIT, recipient_id: ME, body: '', created_at: ago(50000), message_type: 'image', attachment_url: 'https://cdn.example/a.png?q="><img src=x onerror="window.__xss=2', attachment_name: 'a.png', attachment_mime: 'image/png', attachment_size: 10 },
@@ -550,7 +553,8 @@ try {
     if (pathName.startsWith('/storage/v1/object/')) return json(400, { statusCode: '400', error: 'Bucket not found', message: 'Bucket not found' });
     if (pathName === '/rest/v1/profiles') return json(200, (request.headers().accept || '').includes('vnd.pgrst.object') ? ownRow : [ownRow]);
     const args = JSON.parse(postData || '{}');
-    if (pathName === '/rest/v1/rpc/list_members') return json(200, args.p_after ? [] : hardRows);
+    if (pathName === '/rest/v1/rpc/deck_candidates') return json(200, hardRows);
+    if (pathName === '/rest/v1/rpc/deck_status') return json(200, 'caught_up');
     if (pathName === '/rest/v1/rpc/get_candidates') return json(200, [...hardRows, kitRow].filter((row) => (args.p_ids || []).includes(row.id)));
     if (pathName === '/rest/v1/rpc/search_members') return json(200, []);
     if (pathName === '/rest/v1/rpc/my_onboarding_status') return json(200, [{ interests: 2, points: 20, has_cell: true, place_label: 'Pune', completed: true }]);
@@ -804,7 +808,7 @@ try {
   const quotaMember = (i) => ({ id: `99999999-9999-4999-8999-${String(i).padStart(12, '0')}`, name: `Quota ${i}`, experience: 'Member', skills: ['Badminton'], looking_for: ['Friends'], photo_url: '', cover_url: '', distance_band: '~3 km', shared_interests: ['Badminton'], created_at: ago(10000 + i * 1000) });
   const quotaDeck = Array.from({ length: 24 }, (_, k) => quotaMember(k + 1));
   const RESETS_AT = '2026-10-04T15:00:00+00:00';
-  const q = { remaining: 30, resetsAt: null, race: false, calls: [], passed: new Set() };
+  const q = { remaining: 30, resetsAt: null, race: false, calls: [], passed: new Set(), signalled: new Set() };
   const quotaContext = await browser.newContext({ viewport: { width: 1280, height: 900 } });
   await quotaContext.addInitScript(([key, value]) => { window.localStorage.setItem(key, value); }, ['sb-stub-auth-token', JSON.stringify(session)]);
   await quotaContext.route(`${ORIGIN}/**`, async (route) => {
@@ -819,10 +823,7 @@ try {
     if (pathName.startsWith('/auth/v1/')) return json(200, pathName.endsWith('/user') ? user : session);
     if (pathName === '/rest/v1/profiles') return json(200, (request.headers().accept || '').includes('vnd.pgrst.object') ? ownRow : [ownRow]);
     const args = JSON.parse(postData || '{}');
-    if (pathName === '/rest/v1/rpc/list_members') {
-      const start = args.p_after ? quotaDeck.findIndex((row) => row.id === args.p_after_id) + 1 : 0;
-      return json(200, quotaDeck.slice(start, start + (args.p_limit || 20)));
-    }
+    if (pathName === '/rest/v1/rpc/deck_candidates') return json(200, quotaDeck.filter((row) => !q.passed.has(row.id) && !q.signalled.has(row.id)).slice(0, args.p_limit || 12));
     if (pathName === '/rest/v1/rpc/my_onboarding_status') return json(200, [{ interests: 2, points: 20, has_cell: true, place_label: 'Pune', completed: true }]);
     if (pathName === '/rest/v1/rpc/my_signal_quota') return json(200, [{ daily_limit: 30, remaining: q.remaining, resets_at: q.resetsAt, live_unanswered: 0, live_limit: 100 }]);
     if (pathName === '/rest/v1/rpc/send_signal') {
@@ -831,7 +832,7 @@ try {
         q.remaining = 0; q.resetsAt = RESETS_AT;
         return json(429, { code: 'PT429', message: 'signal_quota_exhausted', details: null, hint: null });
       }
-      q.remaining = Math.max(0, q.remaining - 1); q.resetsAt = RESETS_AT;
+      q.remaining = Math.max(0, q.remaining - 1); q.resetsAt = RESETS_AT; q.signalled.add(args.p_to);
       return json(200, [{ status: 'sent', remaining: q.remaining, resets_at: q.resetsAt }]);
     }
     if (pathName === '/rest/v1/interaction' && method === 'POST') { q.passed.add(args.target_id); return route.fulfill({ status: 201, body: '', headers: { 'access-control-allow-origin': '*' } }); }

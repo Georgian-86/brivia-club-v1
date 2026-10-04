@@ -18,6 +18,7 @@ import './mobile-app.css';
 import { supabase, rowToProfile, saveProfile, onboardingStatus, sendSignal, fetchSignalQuota, isStorageImageUrl, withoutCredentials, uploadMessageAttachment, removeMessageAttachment, uploadCommunityPostImage, removeCommunityPostImage } from './supabase.js';
 import { defaultCoverUrl, normalizeCoverUrl } from './cover-assets.js';
 import { quotaLabel, quotaErrorText, quotaBlocked } from './signal-quota.js';
+import { pitchLine, deckChips, deckEmptyState, deckFields, interestedIn } from './deck-view.js';
 import { chatEmojiCategories } from './chat-emoji-data.js';
 import { chatGifCatalog } from './chat-gif-data.js';
 import './chat-attachments.css';
@@ -33,6 +34,8 @@ let appBackGuardActive = false;
 // Never render cached profile data as the current user. The authenticated
 // Supabase session and completed profile are the source of truth.
 let memberProfile = {};
+// my_onboarding_status().place_label: the member's own area name (never another member's).
+let memberPlaceLabel = '';
 
 let people = [];
 let remoteMatchIds = [];
@@ -45,8 +48,8 @@ const respondingRequestIds = new Set();
 let currentIndex = 0;
 let currentPerson = people[0];
 let activeFilter = 'all';
-const exploreFilters = { query: '', location: '', skills: new Set(), lookingFor: new Set() };
-const filterDrafts = { location: '', skills: '', lookingFor: '' };
+const exploreFilters = { query: '', skills: new Set(), lookingFor: new Set() };
+const filterDrafts = { skills: '', lookingFor: '' };
 let activeChatFilter = 'all';
 let chatSearchQuery = '';
 let selectedChat = null;
@@ -410,20 +413,49 @@ const explorePersonMatches = (person) => {
   const hasLookingFor = !exploreFilters.lookingFor.size || [...exploreFilters.lookingFor].some((selected) => lookingFor.some((item) => normalizedValue(item) === selected));
   const hasSkillSearch = !skillQuery || skills.some((skill) => normalizedValue(skill).includes(skillQuery));
   const hasLookingSearch = !lookingQuery || lookingFor.some((item) => normalizedValue(item).includes(lookingQuery));
-  const location = normalizedValue([person.city, person.state].filter(Boolean).join(', '));
-  const hasLocation = !exploreFilters.location || location.includes(exploreFilters.location);
   const hasName = !query || normalizedValue(person.name).includes(query);
-  return hasName && hasLocation && hasSkill && hasLookingFor && hasSkillSearch && hasLookingSearch;
+  return hasName && hasSkill && hasLookingFor && hasSkillSearch && hasLookingSearch;
 };
-const getExplorePeople = () => people.filter(explorePersonMatches);
+const filtersActive = () => Boolean(exploreFilters.query || exploreFilters.skills.size || exploreFilters.lookingFor.size || filterDrafts.skills || filterDrafts.lookingFor);
+
+// The deck (UX_SPEC §B, Iteration 3 Task 10). deck_candidates returns the next cards in the server's order (k-safe
+// display ring, then shared interests); the client keeps that order. A card is consumed when it is passed or liked:
+// it leaves the queue and joins `deck.seen`, so a later load never brings it back in this session. There is no
+// wrap-around: when the queue runs out the deck loads once more, and if nothing new comes back deck_status() says why.
+// `people` stays the registry of every member card known to this page (deck, search, chats, request senders).
+const DECK_PAGE_SIZE = 12;
+const deck = { ready: false, ids: [], seen: new Set(), loading: null, end: null };
+const deckPeople = () => deck.ids.map((id) => findPersonById(id)).filter(Boolean);
+const getExplorePeople = () => deckPeople().filter(explorePersonMatches);
+// The current card is always the first card of the (filtered) queue, so clearing a filter returns to the server order.
 const syncExploreQueue = () => {
   const queue = getExplorePeople();
-  const currentId = currentPerson?.id;
-  if (!queue.length) { currentIndex = 0; currentPerson = null; return queue; }
-  const matchingIndex = currentId ? queue.findIndex((person) => person.id === currentId) : -1;
-  currentIndex = matchingIndex >= 0 ? matchingIndex : 0;
-  currentPerson = queue[currentIndex];
+  currentIndex = 0;
+  currentPerson = queue[0] || null;
   return queue;
+};
+
+// Why the deck is empty: the filters (when the loaded deck has cards they hide), else the server's deck_status().
+const deckEmptyCause = () => (filtersActive() && deckPeople().length ? 'filters' : deck.end);
+const renderDeckEmpty = (emptyState) => {
+  const cause = deckEmptyCause();
+  if (!cause) { emptyState.hidden = true; return; }
+  const view = deckEmptyState(cause);
+  emptyState.dataset.cause = cause;
+  emptyState.querySelector('#deck-empty-title').textContent = view.title;
+  emptyState.querySelector('#deck-empty-copy').textContent = view.copy;
+  const action = emptyState.querySelector('#deck-empty-action');
+  action.textContent = view.action;
+  action.dataset.deckAction = view.kind;
+  emptyState.hidden = false;
+};
+const renderCardChips = (container, person) => {
+  container.replaceChildren(...deckChips(person).map((chip) => {
+    const element = document.createElement('span');
+    if (chip.kind === 'shared') element.className = 'chip-shared';
+    element.textContent = chip.label;
+    return element;
+  }));
 };
 
 const renderHome = (queue = getExplorePeople()) => {
@@ -431,24 +463,13 @@ const renderHome = (queue = getExplorePeople()) => {
   const actions = document.querySelector('.swipe-actions');
   const hint = document.querySelector('.swipe-hint');
   const limitState = document.querySelector('#swipe-limit-state');
-  let emptyState = document.querySelector('#home-empty-state');
-  if (!emptyState && card?.parentElement) {
-    emptyState = document.createElement('p');
-    emptyState.id = 'home-empty-state';
-    emptyState.className = 'empty-state';
-    emptyState.textContent = 'No members in the community yet.';
-    card.parentElement.append(emptyState);
-  }
+  const emptyState = document.querySelector('#home-empty-state');
   if (!currentPerson) {
     card?.setAttribute('hidden', '');
     actions?.setAttribute('hidden', '');
     hint?.setAttribute('hidden', '');
     limitState?.setAttribute('hidden', '');
-    if (emptyState) {
-      const hasFilters = exploreFilters.query || exploreFilters.location || exploreFilters.skills.size || exploreFilters.lookingFor.size;
-      emptyState.textContent = hasFilters ? 'No people match these filters.' : 'No members in the community yet.';
-    }
-    emptyState?.removeAttribute('hidden');
+    if (emptyState) renderDeckEmpty(emptyState);
     const count = document.querySelector('#queue-count'); if (count) count.textContent = '00 / 00';
     return;
   }
@@ -461,53 +482,68 @@ const renderHome = (queue = getExplorePeople()) => {
   if (image) { image.src = safeImageUrl(currentPerson.coverUrl) || safeImageUrl(currentPerson.image); image.alt = `${currentPerson.name} cover image`; }
   if (card) card.style.setProperty('--card-avatar-image', `url("${safeImageUrl(currentPerson.image).replace(/["\\\n]/g, encodeURIComponent)}")`);
   const name = document.querySelector('#swipe-name'); if (name) name.textContent = currentPerson.name;
-  const handle = document.querySelector('#swipe-location'); if (handle) handle.textContent = `@${currentPerson.name.toLowerCase().replace(/[^a-z0-9]+/g, '')}`;
   const cardLabel = document.querySelector('#swipe-card-label');
   if (cardLabel) {
     const profileText = `${currentPerson.role || ''} ${currentPerson.lookingFor || ''} ${(currentPerson.tags || []).join(' ')}`.toLowerCase();
     cardLabel.textContent = /engineer|developer|ai|tech|system|build/.test(profileText) ? 'BUILDING' : /marketing|content|brand|impact|startup/.test(profileText) ? 'IDEAS TO IMPACT' : 'CREATIVE SOUL';
   }
   const role = document.querySelector('#swipe-role'); if (role) role.textContent = currentPerson.role;
-  const location = document.querySelector('#swipe-location'); if (location) location.textContent = `@${currentPerson.name.toLowerCase().replace(/[^a-z0-9]+/g, '')}`;
-  const tags = document.querySelector('#swipe-tags'); if (tags) tags.innerHTML = currentPerson.tags.map((tag) => `<span>${escapeHtml(tag)}</span>`).join('');
-  const count = document.querySelector('#queue-count'); if (count) count.textContent = `${String(currentIndex + 1).padStart(2, '0')} / ${String(people.length).padStart(2, '0')}`;
-  const filteredQueueCount = document.querySelector('#queue-count');
-  if (filteredQueueCount) filteredQueueCount.textContent = String(currentIndex + 1).padStart(2, '0') + ' / ' + String(queue.length).padStart(2, '0');
+  // The server's distance band only ("~3 km", a place, a region, "Abroad"): never a City/State, cell or km.
+  const location = document.querySelector('#swipe-location');
+  if (location) {
+    location.textContent = currentPerson.distanceBand || '';
+    location.hidden = !currentPerson.distanceBand;
+    if (currentPerson.distanceBand) location.setAttribute('aria-label', `Distance: ${currentPerson.distanceBand}`);
+    else location.removeAttribute('aria-label');
+  }
+  const tags = document.querySelector('#swipe-tags'); if (tags) renderCardChips(tags, currentPerson);
+  const count = document.querySelector('#queue-count');
+  if (count) count.textContent = `${String(currentIndex + 1).padStart(2, '0')} / ${String(queue.length).padStart(2, '0')}`;
   card?.classList.remove('is-passing', 'is-liking');
 };
 
-// Mutual consent (docs/VISION.md, CLAUDE.md): the client never writes `matches`. A like or a pitch
-// inserts a connection request; the server creates the match when the other member has already
-// requested (trigger) or accepts (respond_connection_request). Chat opens only once a match exists.
+// Mutual consent (docs/VISION.md, CLAUDE.md): the client never writes `matches`. A like or a pitch sends one signal
+// (send_signal); the server creates the match when the other member has already asked, or accepts
+// (respond_connection_request). Chat opens only once a match exists.
 const isUuid = (value) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(String(value || ''));
 
-// Other members are read only through the candidate RPCs (supabase/migrations/0003): list_members (deck
-// pages, newest first), get_candidates (cards for known ids, at most 50 per call) and search_members.
-// The server hides blocked pairs, incomplete profiles and the other test world; the client never selects
-// public_profiles or another member's profiles row.
-const MEMBER_PAGE_SIZE = 20;
+// Other members are read only through the candidate RPCs (0003, 0004): deck_candidates (the deck), get_candidates
+// (cards for known ids, at most 50 per call) and search_members. The server hides blocked pairs, incomplete profiles
+// and the other test world; the client never selects public_profiles or another member's profiles row.
 const CANDIDATE_ID_CAP = 50;
-const memberDeck = { ready: false, cursor: null, hasMore: true, loading: null, filling: false, exhaustedFilterKey: null };
-const toDeckPerson = (row) => {
-  const profile = rowToProfile(row);
+// Another member's card. Location is only the deck's distance band: a City/State on any row is dropped here, so no
+// surface (card, info sheet, public profile, chat header, lists) can show it.
+const toMemberPerson = (row) => {
+  const { city, state, email, phone, phone_country_code: phoneCountryCode, phone_number: phoneNumber, ...safeRow } = row || {};
+  const profile = rowToProfile(safeRow);
   const skills = profile.skills.split(',').map((item) => item.trim()).filter(Boolean);
   const looking = profile.lookingFor.split(',').map((item) => item.trim()).filter(Boolean);
   const tags = [...skills, ...looking];
   const filters = ['all', ...tags.map((item) => item.toLowerCase()), profile.experience?.toLowerCase() || ''];
-  return { ...profile, age: '', role: profile.experience || 'Brivia member', distance: '', bio: `${profile.name} is open to meaningful connections.`, tags: tags.length ? tags : ['Open to connect'], image: profile.photoUrl || '', filters: filters.filter(Boolean) };
+  return { ...profile, ...deckFields(safeRow), city: '', state: '', email: '', phone: '', phoneCountryCode: '', phoneNumber: '', age: '', role: profile.experience || 'Brivia member', distance: '', bio: `${profile.name} is open to meaningful connections.`, tags, image: profile.photoUrl || '', filters: filters.filter(Boolean) };
 };
-// Appends cards not already known (the deck keeps its order); returns how many were added.
+const toDeckPerson = toMemberPerson;
+// Adds cards not already known to the registry (a known card gains a band or chips it lacked); returns their ids.
 const mergePeople = (rows) => {
-  const known = new Set(people.map((person) => String(person.id)));
   const added = [];
   (rows || []).forEach((row) => {
     const id = String(row?.id || '');
-    if (!id || known.has(id) || id === String(memberProfile.id)) return;
-    known.add(id);
-    added.push(toDeckPerson(row));
+    if (!id || id === String(memberProfile.id)) return;
+    const known = findPersonById(id);
+    const person = toDeckPerson(row);
+    if (!known) { people.push(person); added.push(id); return; }
+    if (person.distanceBand && !known.distanceBand) known.distanceBand = person.distanceBand;
+    if (person.shared.length && !known.shared?.length) known.shared = person.shared;
+    added.push(id);
   });
-  if (added.length) people = [...people, ...added];
-  return added.length;
+  return added;
+};
+// Puts new ids at the end of the deck queue, in order; skips cards already queued or consumed this session.
+const enqueueDeckIds = (ids) => {
+  const queued = new Set(deck.ids);
+  const fresh = ids.filter((id) => !queued.has(id) && !deck.seen.has(id));
+  deck.ids.push(...fresh);
+  return fresh.length;
 };
 const fetchCandidates = async (ids) => {
   const unique = [...new Set((ids || []).map(String).filter((id) => isUuid(id) && id !== String(memberProfile.id)))];
@@ -519,51 +555,48 @@ const fetchCandidates = async (ids) => {
   }
   return { data: rows, error: null };
 };
-// Loads the next deck page (one request in flight at a time). Resolves to { added, error }.
-const loadMemberPage = () => {
-  if (!supabase || !memberDeck.hasMore) return Promise.resolve({ added: 0, error: null });
-  if (memberDeck.loading) return memberDeck.loading;
-  const params = { p_limit: MEMBER_PAGE_SIZE };
-  if (memberDeck.cursor) { params.p_after = memberDeck.cursor.createdAt; params.p_after_id = memberDeck.cursor.id; }
-  memberDeck.loading = supabase.rpc('list_members', params).then(({ data, error }) => {
-    if (error) { memberDeck.hasMore = false; return { added: 0, error }; }
-    const rows = data || [];
-    if (rows.length < MEMBER_PAGE_SIZE) memberDeck.hasMore = false;
-    const last = rows[rows.length - 1];
-    if (last) memberDeck.cursor = { createdAt: last.created_at, id: last.id };
-    return { added: mergePeople(rows), error: null };
-  }).finally(() => { memberDeck.loading = null; });
-  return memberDeck.loading;
+// The next deck cards (one request in flight at a time). Resolves to { added, error }: how many unseen cards joined.
+const loadDeck = () => {
+  if (!supabase) return Promise.resolve({ added: 0, error: null });
+  if (deck.loading) return deck.loading;
+  deck.loading = supabase.rpc('deck_candidates', { p_limit: DECK_PAGE_SIZE }).then(({ data, error }) => {
+    if (error) return { added: 0, error };
+    const added = enqueueDeckIds(mergePeople(data));
+    if (added) deck.end = null;
+    return { added, error: null };
+  }).finally(() => { deck.loading = null; });
+  return deck.loading;
 };
-// When filters leave the queue empty, pull further pages (at most 5 per trigger) until a card matches.
-// The same filters never pull another 5 pages until they change.
-const deckFilterKey = () => JSON.stringify([exploreFilters.query, exploreFilters.location, [...exploreFilters.skills], [...exploreFilters.lookingFor], filterDrafts.skills, filterDrafts.lookingFor]);
-const fillDeckForFilters = async () => {
-  const key = deckFilterKey();
-  if (!memberDeck.ready || memberDeck.filling || !memberDeck.hasMore || memberDeck.exhaustedFilterKey === key) return;
-  memberDeck.filling = true;
-  try {
-    for (let pages = 0; pages < 5 && memberDeck.hasMore && !getExplorePeople().length; pages += 1) {
-      const { error } = await loadMemberPage();
-      if (error) { console.warn('More members could not load:', error.message); break; }
-    }
-    if (!getExplorePeople().length) memberDeck.exhaustedFilterKey = key;
-  } finally { memberDeck.filling = false; }
+// A pass is recorded before the next load, so the server hides the card (7 days) and never serves it again.
+const recordPass = async (personId) => {
+  if (!supabase || !memberProfile.id || !isUuid(personId)) return;
+  const { error } = await supabase.from('interaction').insert({ viewer_id: memberProfile.id, target_id: personId, event: 'pass' });
+  if (error) console.warn('Pass could not be recorded:', error.message);
+};
+// When the queue runs out: load once more; if nothing new comes back, ask deck_status() why (never a count).
+const refillDeck = async () => {
+  if (!deck.ready || deckPeople().length) return;
+  const { added, error } = await loadDeck();
+  if (error) { console.warn('The deck could not load:', error.message); deck.end = 'error'; }
+  else if (!added) {
+    const { data: status, error: statusError } = await supabase.rpc('deck_status');
+    deck.end = statusError ? 'error' : (typeof status === 'string' && status) || 'caught_up';
+  }
   renderExplore();
 };
-// Name search reaches members on pages not loaded yet: their cards join the deck.
+// Name search reaches members anywhere: their cards join the end of the deck (search reaches everyone, VISION).
 let memberSearchTimer;
 let memberSearchSeq = 0;
 const scheduleMemberSearch = (query) => {
   window.clearTimeout(memberSearchTimer);
   const term = String(query || '').trim();
-  if (!supabase || !memberDeck.ready || !term) return;
+  if (!supabase || !deck.ready || !term) return;
   const seq = ++memberSearchSeq;
   memberSearchTimer = window.setTimeout(async () => {
     const { data, error } = await supabase.rpc('search_members', { p_query: term, p_limit: 20 });
     if (seq !== memberSearchSeq) return;
     if (error) { console.warn('Member search failed:', error.message); return; }
-    if (mergePeople(data)) renderExplore();
+    if (enqueueDeckIds(mergePeople(data))) renderExplore();
   }, 250);
 };
 const addConnection = (personId) => {
@@ -624,7 +657,7 @@ const loadConnectionRequests = async () => {
   if (unknownIds.length) {
     const { data: profileRows, error: profileError } = await fetchCandidates(unknownIds);
     if (profileError) console.warn('Request senders could not load:', profileError.message);
-    (profileRows || []).forEach((row) => { const profile = rowToProfile(row); extraPeople.set(String(profile.id), { ...profile, image: profile.photoUrl || '' }); });
+    (profileRows || []).forEach((row) => { const person = toMemberPerson(row); extraPeople.set(String(person.id), person); });
   }
   pendingRequests = rows.map((row) => ({
     fromId: String(row.from_id),
@@ -682,7 +715,7 @@ const saveRemovedConnections = (records) => {
 const rememberRemovedConnection = (person) => {
   if (!person?.id) return false;
   const records = readRemovedConnections().filter((record) => String(record.id) !== String(person.id));
-  records.unshift({ id: String(person.id), name: person.name || 'Brivia member', city: person.city || '', image: person.image || '', removedAt: new Date().toISOString() });
+  records.unshift({ id: String(person.id), name: person.name || 'Brivia member', image: person.image || '', removedAt: new Date().toISOString() });
   return saveRemovedConnections(records);
 };
 const removeRemoteConnection = async (person) => {
@@ -705,14 +738,25 @@ const closeOverlays = () => {
   if (pitchWasOpen) dismissPendingPitch();
 };
 
+// The info sheet: the distance band for "BASED IN", never a City/State. Every label is set as text.
 const fillInfo = (person) => {
   const avatar = document.querySelector('#info-avatar');
   if (avatar) avatar.innerHTML = avatarImage(person.image, person.name) || escapeHtml(initials(person.name));
-  const infoName = document.querySelector('#info-name'); if (infoName) infoName.textContent = `${person.name}, ${person.age}`;
-  const infoRole = document.querySelector('#info-role'); if (infoRole) infoRole.textContent = `${person.role} · ${person.city}`;
-  const infoBio = document.querySelector('#info-bio'); if (infoBio) infoBio.textContent = person.bio;
-  const facts = document.querySelector('#info-facts'); if (facts) facts.innerHTML = `<div><span>BASED IN</span><strong>${escapeHtml(person.city)}</strong></div><div><span>INTERESTED IN</span><strong>${escapeHtml(person.tags[0])}</strong></div>`;
-  const tags = document.querySelector('#info-tags'); if (tags) tags.innerHTML = person.tags.map((tag) => `<span>${escapeHtml(tag)}</span>`).join('');
+  const infoName = document.querySelector('#info-name'); if (infoName) infoName.textContent = person.name || 'Brivia member';
+  const infoRole = document.querySelector('#info-role'); if (infoRole) infoRole.textContent = person.role || 'Brivia member';
+  const infoBio = document.querySelector('#info-bio'); if (infoBio) infoBio.textContent = person.bio || '';
+  const facts = document.querySelector('#info-facts');
+  if (facts) {
+    const fact = (label, value) => {
+      const item = document.createElement('div');
+      const name = document.createElement('span'); name.textContent = label;
+      const text = document.createElement('strong'); text.textContent = value;
+      item.append(name, text);
+      return item;
+    };
+    facts.replaceChildren(...[person.distanceBand ? fact('BASED IN', person.distanceBand) : null, fact('INTERESTED IN', interestedIn(person))].filter(Boolean));
+  }
+  const tags = document.querySelector('#info-tags'); if (tags) renderCardChips(tags, person);
 };
 
 const resolvePublicPerson = (person = {}) => {
@@ -741,14 +785,15 @@ const openPublicProfile = (person, options = {}) => {
   const skills = splitProfileValues(profile.skills);
   const lookingFor = splitProfileValues(profile.lookingFor);
   const tags = profile.tags?.length ? profile.tags : [...skills, ...lookingFor];
-  const location = [profile.city, profile.state].filter(Boolean).join(', ') || 'Brivia Club member';
+  // Location is the deck's distance band when known, and otherwise no line at all (never a City/State).
+  const location = profile.distanceBand || '';
   const modal = document.createElement('div');
   modal.id = 'public-profile-modal';
   modal.className = 'public-profile-modal';
   modal.setAttribute('role', 'dialog');
   modal.setAttribute('aria-modal', 'true');
   modal.setAttribute('aria-label', `${profile.name || 'Member'} public profile`);
-  modal.innerHTML = `<button class="public-profile-backdrop" type="button" data-public-profile-close aria-label="Close profile"></button><section class="public-profile-dialog"><button class="public-profile-close" type="button" data-public-profile-close aria-label="Close profile">×</button><div class="public-profile-cover"><div class="public-profile-avatar">${avatarImage(image, profile.name) || escapeHtml(initials(profile.name))}</div></div><div class="public-profile-body"><p class="public-profile-kicker">BRIVIA MEMBER / PUBLIC PROFILE</p><h2>${escapeHtml(profile.name || 'Brivia member')}</h2><p class="public-profile-role">${escapeHtml(profile.role || 'Brivia member')}</p><p class="public-profile-location">${escapeHtml(location)}</p><p class="public-profile-bio">${escapeHtml(profile.bio || 'Open to meaningful connections inside the club.')}</p><div class="public-profile-facts"><div><span>LOOKING FOR</span><strong>${escapeHtml(lookingFor.join(', ') || 'Meaningful connections')}</strong></div><div><span>SKILLS &amp; INTERESTS</span><strong>${escapeHtml(skills.join(', ') || tags.join(', ') || 'Open to connect')}</strong></div></div><div class="public-profile-pills">${tags.length ? tags.map((tag) => `<span>${escapeHtml(tag)}</span>`).join('') : '<span>Open to connect</span>'}</div></div></section>`;
+  modal.innerHTML = `<button class="public-profile-backdrop" type="button" data-public-profile-close aria-label="Close profile"></button><section class="public-profile-dialog"><button class="public-profile-close" type="button" data-public-profile-close aria-label="Close profile">×</button><div class="public-profile-cover"><div class="public-profile-avatar">${avatarImage(image, profile.name) || escapeHtml(initials(profile.name))}</div></div><div class="public-profile-body"><p class="public-profile-kicker">BRIVIA MEMBER / PUBLIC PROFILE</p><h2>${escapeHtml(profile.name || 'Brivia member')}</h2><p class="public-profile-role">${escapeHtml(profile.role || 'Brivia member')}</p>${location ? `<p class="public-profile-location">${escapeHtml(location)}</p>` : ''}<p class="public-profile-bio">${escapeHtml(profile.bio || 'Open to meaningful connections inside the club.')}</p><div class="public-profile-facts"><div><span>LOOKING FOR</span><strong>${escapeHtml(lookingFor.join(', ') || 'Meaningful connections')}</strong></div><div><span>SKILLS &amp; INTERESTS</span><strong>${escapeHtml(skills.join(', ') || tags.join(', ') || 'Open to connect')}</strong></div></div><div class="public-profile-pills">${tags.length ? tags.map((tag) => `<span>${escapeHtml(tag)}</span>`).join('') : '<span>Open to connect</span>'}</div></div></section>`;
   document.body.append(modal);
   const safeCover = safeImageUrl(coverUrl) || safeImageUrl(defaultCoverUrl);
   modal.querySelector('.public-profile-cover').style.backgroundImage = `url("${safeCover.replace(/["\\\n]/g, encodeURIComponent)}")`;
@@ -782,8 +827,8 @@ const openPitch = (person) => {
   pendingPitch = { person, resolved: false };
   pitchOpenedAt = performance.now();
   pitchPerson = person;
-  const pitchName = document.querySelector('#pitch-name'); if (pitchName) pitchName.textContent = person.name;
-  const pitchMessage = document.querySelector('#pitch-message'); if (pitchMessage) pitchMessage.value = `Hey ${person.name}, I noticed we both care about ${person.tags[0].toLowerCase()}. Would love to connect and exchange ideas.`;
+  const pitchName = document.querySelector('#pitch-name'); if (pitchName) pitchName.textContent = person.name || 'them';
+  const pitchMessage = document.querySelector('#pitch-message'); if (pitchMessage) pitchMessage.value = pitchLine(person);
   openOverlay('pitch-modal');
   window.setTimeout(() => pitchMessage?.focus(), 80);
 };
@@ -794,14 +839,21 @@ let deckAdvanceToken = 0;
 const requeuePerson = (person) => {
   if (!person?.id) return;
   deckAdvanceToken += 1;
-  const queue = getExplorePeople();
-  const index = queue.findIndex((item) => String(item.id) === String(person.id));
-  if (index < 0) return;
-  currentIndex = index;
-  currentPerson = queue[index];
+  const id = String(person.id);
+  if (!findPersonById(id)) people.push(person);
+  deck.seen.delete(id);
+  deck.ids = [id, ...deck.ids.filter((item) => item !== id)];
+  deck.end = null;
+  currentPerson = findPersonById(id);
   renderExplore();
 };
 const quotaBlockedToast = () => quotaErrorText({ message: quotaBlocked(signalQuota) === 'live' ? 'signal_live_cap' : 'signal_quota_exhausted' }, signalQuota);
+// A swiped card leaves the queue for this session (passed or liked): the deck never wraps around.
+const consumeCard = (person) => {
+  const id = String(person.id);
+  deck.ids = deck.ids.filter((item) => item !== id);
+  deck.seen.add(id);
+};
 
 const swipe = (type) => {
   if (!currentPerson) return;
@@ -816,23 +868,20 @@ const swipe = (type) => {
   }
   // Moving to the next card resolves an open pitch sheet as a plain like.
   if (pendingPitch) { document.querySelector('#pitch-modal')?.setAttribute('hidden', ''); dismissPendingPitch(); }
+  const person = currentPerson;
   const card = document.querySelector('#swipe-card');
   card?.classList.add(type === 'like' ? 'is-liking' : 'is-passing');
   // The request is sent when the pitch sheet resolves (submit with a note, or dismiss without one).
-  if (type === 'like') openPitch(currentPerson);
+  if (type === 'like') openPitch(person);
+  const passRecorded = type === 'pass' ? recordPass(person.id) : Promise.resolve();
   const token = deckAdvanceToken;
   window.setTimeout(async () => {
     if (token !== deckAdvanceToken) { renderExplore(); return; }
-    let queue = getExplorePeople();
-    // At the end of the queue, load the next page before wrapping around.
-    if (queue.length && currentIndex + 1 >= queue.length && memberDeck.hasMore) {
-      const { error } = await loadMemberPage();
-      if (error) console.warn('More members could not load:', error.message);
-      queue = getExplorePeople();
-    }
-    if (token !== deckAdvanceToken) { renderExplore(); return; }
-    if (!queue.length) { currentPerson = null; currentIndex = 0; } else { currentIndex = (currentIndex + 1) % queue.length; currentPerson = queue[currentIndex]; }
+    consumeCard(person);
+    currentPerson = null;
     renderExplore();
+    // The pass is stored before the next deck_candidates call, so the server does not serve the card again.
+    if (!deckPeople().length) { await passRecorded; await refillDeck(); }
   }, 280);
 };
 
@@ -853,10 +902,9 @@ const uniqueFilterValues = (values) => {
   });
   return [...unique.values()].sort((a, b) => a.localeCompare(b));
 };
-const profileLocationLabel = (person) => [person.city, person.state].filter(Boolean).join(', ');
+// Filter suggestions come from member cards only; there is no place filter (cards carry no City/State, UX_SPEC §B).
 const getFilterValues = () => ({
   names: uniqueFilterValues(people.map((person) => person.name)),
-  locations: uniqueFilterValues(people.map(profileLocationLabel)),
   skills: uniqueFilterValues(people.flatMap((person) => splitProfileValues(person.skills))),
   lookingFor: uniqueFilterValues(people.flatMap((person) => splitProfileValues(person.lookingFor))),
 });
@@ -908,17 +956,14 @@ const renderSelectedFilters = (container, values, selected, kind) => {
 };
 const renderFilterOptions = () => {
   const search = document.querySelector('#drawer-filter-search');
-  const locationInput = document.querySelector('#filter-location-input');
   const skillsInput = document.querySelector('#filter-skills-input');
   const lookingInput = document.querySelector('#filter-looking-for-input');
-  if (!search || !locationInput || !skillsInput || !lookingInput) return;
-  const { names, locations, skills, lookingFor } = getFilterValues();
+  if (!search || !skillsInput || !lookingInput) return;
+  const { names, skills, lookingFor } = getFilterValues();
   if (document.activeElement !== search && search.value !== exploreFilters.query) search.value = exploreFilters.query;
-  if (document.activeElement !== locationInput && locationInput.value !== filterDrafts.location) locationInput.value = filterDrafts.location;
   if (document.activeElement !== skillsInput && skillsInput.value !== filterDrafts.skills) skillsInput.value = filterDrafts.skills;
   if (document.activeElement !== lookingInput && lookingInput.value !== filterDrafts.lookingFor) lookingInput.value = filterDrafts.lookingFor;
   renderSuggestionList(document.querySelector('#filter-name-suggestions'), names, exploreFilters.query, 'name', new Set(), false);
-  renderSuggestionList(document.querySelector('#filter-location-suggestions'), locations, filterDrafts.location, 'location', new Set(), document.activeElement === locationInput);
   renderSelectedFilters(document.querySelector('#filter-skills-selected'), skills, exploreFilters.skills, 'skills');
   renderSuggestionList(document.querySelector('#filter-skills-suggestions'), skills, filterDrafts.skills, 'skills', exploreFilters.skills, document.activeElement === skillsInput);
   renderSelectedFilters(document.querySelector('#filter-looking-for-selected'), lookingFor, exploreFilters.lookingFor, 'looking-for');
@@ -927,7 +972,7 @@ const renderFilterOptions = () => {
 const updateDiscoveryFilterResult = (count) => {
   const result = document.querySelector('#discovery-filter-result');
   if (!result) return;
-  const activeCount = exploreFilters.skills.size + exploreFilters.lookingFor.size + (exploreFilters.location ? 1 : 0) + (exploreFilters.query ? 1 : 0) + (filterDrafts.skills ? 1 : 0) + (filterDrafts.lookingFor ? 1 : 0);
+  const activeCount = exploreFilters.skills.size + exploreFilters.lookingFor.size + (exploreFilters.query ? 1 : 0) + (filterDrafts.skills ? 1 : 0) + (filterDrafts.lookingFor ? 1 : 0);
   result.textContent = activeCount ? (count + ' ' + (count === 1 ? 'person' : 'people') + ' match') : 'All people';
   const resetButton = document.querySelector('#clear-discovery-filters');
   if (resetButton) {
@@ -941,7 +986,8 @@ const renderExplore = () => {
   renderFilterOptions();
   updateDiscoveryFilterResult(queue.length);
   renderHome(queue);
-  if (!queue.length && memberDeck.ready && memberDeck.hasMore && !memberDeck.filling) fillDeckForFilters();
+  // The queue ran out (not just filtered away): load once more, then deck_status() decides the empty state.
+  if (!queue.length && deck.ready && !deckPeople().length && !deck.end && !deck.loading) refillDeck();
 };
 
 const ensureInboxControls = () => {
@@ -1604,7 +1650,8 @@ const renderProfile = () => {
   const coverUrl = normalizeCoverUrl(profile.coverUrl || profile.cover_url || profile.cover_image_url) || defaultCoverUrl;
   ensureProfilePhotoEditor();
   document.querySelector('#profile-name').textContent = profile.name || 'New Member';
-  document.querySelector('#profile-location').textContent = `${profile.city || 'Your city'}, ${profile.state || 'Your state'}`;
+  // My area as the server names it (my_onboarding_status().place_label); no City/State inputs since Task 8.
+  document.querySelector('#profile-location').textContent = memberPlaceLabel || 'Your area';
   const profileCover = document.querySelector('#profile-cover-image');
   const safeOwnCover = safeImageUrl(coverUrl) || safeImageUrl(defaultCoverUrl);
   if (profileCover) profileCover.style.backgroundImage = `url("${safeOwnCover}")`;
@@ -1718,7 +1765,7 @@ const loadCommunityPosts = async () => {
     const authors = await fetchCandidates(otherAuthorIds);
     if (authors.error) console.warn('Post authors could not load:', authors.error.message);
     (authors.data || []).forEach((author) => {
-      const authorProfile = rowToProfile(author);
+      const authorProfile = toMemberPerson(author);
       const knownPerson = findPersonById(author.id);
       const isOwnProfile = String(author.id) === String(memberProfile.id);
       communityPostAuthors[author.id] = {
@@ -1883,13 +1930,14 @@ const closeDiscoveryFilters = () => {
   discoveryFilterButton?.setAttribute('aria-expanded', 'false');
   document.body.classList.remove('discovery-filters-open');
 };
-discoveryFilterButton?.addEventListener('click', () => {
+const openDiscoveryFilters = () => {
   renderFilterOptions();
   discoveryFilterDrawer?.removeAttribute('hidden');
-  discoveryFilterButton.setAttribute('aria-expanded', 'true');
+  discoveryFilterButton?.setAttribute('aria-expanded', 'true');
   document.body.classList.add('discovery-filters-open');
   window.setTimeout(() => document.querySelector('#drawer-filter-search')?.focus(), 80);
-});
+};
+discoveryFilterButton?.addEventListener('click', openDiscoveryFilters);
 discoveryFilterDrawer?.querySelectorAll('[data-close-discovery-filters]').forEach((button) => button.addEventListener('click', closeDiscoveryFilters));
 discoveryFilterDrawer?.addEventListener('click', (event) => {
   const removeButton = event.target.closest('[data-remove-filter]');
@@ -1907,11 +1955,6 @@ discoveryFilterDrawer?.addEventListener('click', (event) => {
     exploreFilters.query = value;
     const input = document.querySelector('#drawer-filter-search');
     if (input) input.value = value;
-  } else if (kind === 'location') {
-    exploreFilters.location = normalizedValue(value);
-    filterDrafts.location = value;
-    const input = document.querySelector('#filter-location-input');
-    if (input) input.value = value;
   } else {
     const targetSet = kind === 'skills' ? exploreFilters.skills : exploreFilters.lookingFor;
     targetSet.add(normalizedValue(value));
@@ -1923,7 +1966,6 @@ discoveryFilterDrawer?.addEventListener('click', (event) => {
 });
 const filterInputBindings = [
   ['#drawer-filter-search', (value) => { exploreFilters.query = value; scheduleMemberSearch(value); }],
-  ['#filter-location-input', (value) => { filterDrafts.location = value; exploreFilters.location = normalizedValue(value); }],
   ['#filter-skills-input', (value) => { filterDrafts.skills = value; }],
   ['#filter-looking-for-input', (value) => { filterDrafts.lookingFor = value; }],
 ];
@@ -1932,15 +1974,26 @@ filterInputBindings.forEach(([selector, update]) => {
   input?.addEventListener('input', (event) => { update(event.target.value); renderExplore(); });
   input?.addEventListener('focus', () => renderExplore());
 });
-document.querySelector('#clear-discovery-filters')?.addEventListener('click', () => {
+const clearDiscoveryFilters = () => {
   exploreFilters.query = '';
-  exploreFilters.location = '';
   exploreFilters.skills.clear();
   exploreFilters.lookingFor.clear();
-  filterDrafts.location = '';
   filterDrafts.skills = '';
   filterDrafts.lookingFor = '';
   renderExplore();
+};
+document.querySelector('#clear-discovery-filters')?.addEventListener('click', clearDiscoveryFilters);
+// The empty deck's one next action (UX_SPEC §B): its kind comes from deckEmptyState().
+document.querySelector('#deck-empty-action')?.addEventListener('click', async (event) => {
+  const kind = event.currentTarget.dataset.deckAction;
+  if (kind === 'clear-filters') clearDiscoveryFilters();
+  else if (kind === 'search') openDiscoveryFilters();
+  else if (kind === 'finish-profile') window.location.assign('/auth.html#complete');
+  else if (kind === 'retry') { deck.end = null; refillDeck(); }
+  else if (kind === 'invite') {
+    const link = window.location.origin;
+    try { await navigator.clipboard.writeText(link); showToast('Link copied'); } catch { showToast(`Copy this link: ${link}`); }
+  }
 });
 document.querySelector('#apply-discovery-filters')?.addEventListener('click', () => {
   closeDiscoveryFilters();
@@ -2257,6 +2310,7 @@ const loadSupabaseCommunity = async () => {
     window.location.replace('/auth.html?complete-profile=1');
     return;
   }
+  memberPlaceLabel = typeof onboarding?.place_label === 'string' ? onboarding.place_label : '';
   const cachedProfile = JSON.parse(window.localStorage.getItem('brivia-member-profile') || 'null') || {};
   const isSameUser = cachedProfile.id === session.user.id;
   const rowProfile = rowToProfile(ownRow);
@@ -2304,9 +2358,9 @@ const loadSupabaseCommunity = async () => {
     });
     remoteMatchIds = [...inboxIds];
   } else console.warn('Inbox could not load:', inboxError.message);
-  // The deck: the first list_members page (newest first); later pages load when the queue runs out.
-  const { error } = await loadMemberPage();
-  if (error) showToast(`Community could not load: ${error.message}`);
+  // The deck: the first deck_candidates cards (location-first, server order); more load when the queue runs out.
+  const { error } = await loadDeck();
+  if (error) { console.warn('The deck could not load:', error.message); deck.end = 'error'; }
   // Connections and conversations may be with members beyond the first page: load their cards by id.
   const missingChatIds = remoteMatchIds.filter((id) => !findPersonById(id));
   if (missingChatIds.length) {
@@ -2314,8 +2368,8 @@ const loadSupabaseCommunity = async () => {
     if (chatError) console.warn('Connections could not load:', chatError.message);
     mergePeople(chatRows);
   }
-  currentPerson = people[0];
-  memberDeck.ready = true;
+  currentPerson = deckPeople()[0] || null;
+  deck.ready = true;
   renderHome();
   renderExplore();
   renderChats();
