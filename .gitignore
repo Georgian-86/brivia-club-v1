@@ -11,3 +11,4 @@ dist/
 tmp-video-frames/
 *.log
 chrome-out.txt
+/screenshots/
