@@ -2770,3 +2770,164 @@
     content: '\201CMeet your people.\A Build something real.\201D';
   }
 }
+
+/* ---------------------------------------------------------------------------------------------------------------
+   ORBIT onboarding (UX_SPEC flow A): step 2 "Your area", step 3 interests + Passion Budget.
+   Brand tokens only (--brivia-*; tints via color-mix), SVG icons, 44 px targets, visible focus, reduced motion.
+   --------------------------------------------------------------------------------------------------------------- */
+.auth-signup-form {
+  --ob-ink: var(--brivia-deep-wine);
+  --ob-accent: var(--brivia-wine);
+  --ob-soft: var(--brivia-wine-soft);
+  --ob-line: color-mix(in srgb, var(--brivia-deep-wine) 20%, transparent);
+  --ob-tint: color-mix(in srgb, var(--brivia-deep-wine) 6%, transparent);
+  --ob-tint-strong: color-mix(in srgb, var(--brivia-deep-wine) 12%, transparent);
+  --ob-paper: color-mix(in srgb, var(--brivia-deep-wine) 3%, white);
+}
+.auth-signup-form .sr-only {
+  position: absolute !important; width: 1px !important; height: 1px !important; padding: 0 !important; margin: -1px !important;
+  overflow: hidden !important; clip: rect(0 0 0 0) !important; white-space: nowrap !important; border: 0 !important;
+}
+.auth-signup-form .ob-icon,
+.auth-signup-form .area-icon {
+  width: 18px; height: 18px; flex: 0 0 auto; fill: none; stroke: currentColor; stroke-width: 1.8;
+  stroke-linecap: round; stroke-linejoin: round;
+}
+.auth-signup-form .signup-next[aria-disabled="true"] { opacity: .55; cursor: not-allowed; }
+.auth-signup-form :is(.area-option, .interest-chip, .budget-step, .budget-remove, .interest-retry, .interest-group > summary):focus-visible,
+.auth-signup-form .mode-option input:focus-visible + span {
+  outline: 2px solid var(--ob-ink); outline-offset: 2px;
+}
+
+/* Step 2: Your area */
+.auth-signup-form .area-step { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+.auth-signup-form .area-explainer {
+  display: flex; align-items: flex-start; gap: 10px; margin: 0; padding: 12px 14px; border: 1px solid var(--ob-line);
+  border-radius: 10px; background: var(--ob-tint); color: var(--ob-ink); font-size: 12px; font-weight: 600; line-height: 1.45;
+  text-transform: none; letter-spacing: 0;
+}
+.auth-signup-form .area-options { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.auth-signup-form .area-option {
+  display: flex; align-items: center; justify-content: center; gap: 8px; min-height: 48px; padding: 10px 14px;
+  border: 1px solid var(--ob-ink); border-radius: 999px; background: transparent; color: var(--ob-ink);
+  font: 700 11px/1.2 'Instrument Sans', Arial, sans-serif; letter-spacing: .08em; text-transform: uppercase; cursor: pointer;
+}
+.auth-signup-form .area-option[aria-expanded="true"] { background: var(--ob-ink); color: white; }
+.auth-signup-form .area-option[aria-busy="true"] { opacity: .7; cursor: progress; }
+.auth-signup-form .area-city { position: relative; display: flex; flex-direction: column; gap: 8px; }
+.auth-signup-form .area-city[hidden] { display: none; }
+.auth-signup-form .area-fallback:empty,
+.auth-signup-form .area-status:empty,
+.auth-signup-form .area-error:empty,
+.auth-signup-form .budget-error:empty { display: none; }
+.auth-signup-form .area-fallback { margin: 0; color: var(--ob-ink); font-size: 12px; font-weight: 600; text-transform: none; letter-spacing: 0; }
+.auth-signup-form .area-city-results {
+  display: flex; flex-direction: column; gap: 2px; max-height: 240px; margin: 0; padding: 4px; overflow-y: auto; list-style: none;
+  border: 1px solid var(--ob-line); border-radius: 8px; background: white;
+}
+.auth-signup-form .area-city-results[hidden],
+.auth-signup-form .area-city-results:empty { display: none; }
+.auth-signup-form .area-city-option {
+  display: flex; align-items: baseline; justify-content: space-between; gap: 10px; min-height: 44px; padding: 12px; border-radius: 6px;
+  color: var(--ob-ink); font-size: 13px; font-weight: 600; cursor: pointer;
+}
+.auth-signup-form .area-city-option small { color: var(--ob-soft); font-size: 11px; font-weight: 500; }
+.auth-signup-form .area-city-option[aria-selected="true"] { background: var(--ob-tint-strong); }
+.auth-signup-form .area-city-empty { padding: 12px; color: var(--ob-soft); font-size: 12px; }
+.auth-signup-form .area-status { margin: 0; color: var(--ob-ink); font-size: 12px; font-weight: 600; text-transform: none; letter-spacing: 0; }
+.auth-signup-form .area-error,
+.auth-signup-form .budget-error { margin: 0; color: var(--ob-accent); font-size: 12px; font-weight: 700; text-transform: none; letter-spacing: 0; }
+
+/* Step 3: interest picker */
+.auth-signup-form .interest-picker { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.auth-signup-form .interest-help { margin: 0; color: var(--ob-soft); font-size: 11px; text-transform: none; letter-spacing: 0; }
+.auth-signup-form .interest-results {
+  display: flex; flex-direction: column; gap: 6px; max-height: 340px; overflow-y: auto; padding: 2px; overscroll-behavior: contain;
+}
+.auth-signup-form .interest-group { border: 1px solid var(--ob-line); border-radius: 10px; background: var(--ob-paper); }
+.auth-signup-form .interest-group > summary,
+.auth-signup-form .interest-group-title {
+  display: flex; align-items: baseline; justify-content: space-between; gap: 10px; min-height: 44px; margin: 0; padding: 12px 14px;
+  color: var(--ob-ink); font-size: 13px; font-weight: 700; cursor: pointer; list-style: none;
+}
+.auth-signup-form .interest-group-title { cursor: default; padding-bottom: 4px; }
+.auth-signup-form .interest-group > summary::-webkit-details-marker { display: none; }
+.auth-signup-form .interest-group > summary small,
+.auth-signup-form .interest-group-title small { color: var(--ob-soft); font-size: 10px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; }
+.auth-signup-form .interest-chips { display: flex; flex-wrap: wrap; gap: 8px; padding: 4px 12px 12px; }
+.auth-signup-form .interest-chip {
+  display: inline-flex; flex-wrap: wrap; align-items: center; gap: 4px 6px; min-height: 44px; max-width: 100%; padding: 8px 14px;
+  border: 1px solid var(--ob-line); border-radius: 999px; background: white; color: var(--ob-ink);
+  font: 600 12px/1.25 'Instrument Sans', Arial, sans-serif; text-align: left; cursor: pointer;
+}
+.auth-signup-form .interest-chip.is-private { border-radius: 14px; }
+.auth-signup-form .interest-chip.is-selected { border-color: var(--ob-ink); background: var(--ob-ink); color: white; }
+.auth-signup-form .interest-chip[aria-disabled="true"] { opacity: .5; cursor: not-allowed; }
+.auth-signup-form .interest-chip .ob-icon { width: 14px; height: 14px; }
+.auth-signup-form .interest-private {
+  display: inline-flex; align-items: center; gap: 4px; flex-basis: 100%; color: inherit; opacity: .85;
+  font-size: 10px; font-weight: 500; line-height: 1.3; letter-spacing: 0; text-transform: none;
+}
+.auth-signup-form .interest-private .ob-icon { width: 12px; height: 12px; }
+.auth-signup-form .interest-loading { margin: 0; padding: 12px; color: var(--ob-soft); font-size: 12px; text-transform: none; letter-spacing: 0; }
+.auth-signup-form .interest-retry {
+  min-height: 44px; margin-left: 6px; padding: 0 14px; border: 1px solid var(--ob-ink); border-radius: 999px;
+  background: transparent; color: var(--ob-ink); font: 700 10px 'Instrument Sans', Arial, sans-serif; letter-spacing: .08em; cursor: pointer;
+}
+
+/* Step 3: Passion Budget */
+.auth-signup-form .budget { display: flex; flex-direction: column; gap: 10px; min-width: 0; padding: 14px; border: 1px solid var(--ob-line); border-radius: 12px; background: var(--ob-paper); }
+.auth-signup-form .budget-head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 4px 12px; }
+.auth-signup-form .budget-head h3 { margin: 0; color: var(--ob-ink); font: 400 20px/1.1 Georgia, 'Times New Roman', serif; letter-spacing: -.02em; }
+.auth-signup-form .budget-counter { margin: 0; color: var(--ob-ink); font-size: 12px; font-weight: 700; letter-spacing: .04em; font-variant-numeric: tabular-nums; }
+.auth-signup-form .budget-error { flex-basis: 100%; }
+.auth-signup-form .budget-list { display: flex; flex-direction: column; gap: 10px; margin: 0; padding: 0; list-style: none; }
+.auth-signup-form .budget-empty { margin: 0; color: var(--ob-soft); font-size: 12px; text-transform: none; letter-spacing: 0; }
+.auth-signup-form .budget-empty[hidden] { display: none; }
+.auth-signup-form .budget-row { display: flex; flex-direction: column; gap: 8px; padding: 10px 0 0; border-top: 1px solid var(--ob-line); }
+.auth-signup-form .budget-row:first-child { padding-top: 0; border-top: 0; }
+.auth-signup-form .budget-row-head { display: flex; flex-direction: column; gap: 2px; color: var(--ob-ink); }
+.auth-signup-form .budget-label { font-size: 14px; font-weight: 700; }
+.auth-signup-form .budget-row-head .interest-private { color: var(--ob-soft); }
+.auth-signup-form .budget-controls { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.auth-signup-form .budget-stepper { display: inline-flex; align-items: center; gap: 4px; }
+.auth-signup-form .budget-step,
+.auth-signup-form .budget-remove {
+  display: inline-flex; align-items: center; justify-content: center; width: 44px; height: 44px; padding: 0;
+  border: 1px solid var(--ob-ink); border-radius: 50%; background: white; color: var(--ob-ink); cursor: pointer;
+}
+.auth-signup-form .budget-step[aria-disabled="true"] { opacity: .4; cursor: not-allowed; }
+.auth-signup-form .budget-remove { margin-left: auto; border-color: var(--ob-line); }
+.auth-signup-form .budget-points { min-width: 30px; color: var(--ob-ink); font-size: 18px; font-weight: 700; text-align: center; font-variant-numeric: tabular-nums; }
+.auth-signup-form .mode-control {
+  display: flex; flex: 1 1 188px; min-width: 0; padding: 2px; border: 1px solid var(--ob-line); border-radius: 999px; background: white;
+}
+.auth-shell .auth-signup-form .mode-control .mode-option {
+  position: relative; display: block; flex: 1 1 0; min-width: 44px; margin: 0; color: var(--ob-ink); cursor: pointer;
+}
+.auth-shell .auth-signup-form .mode-control .mode-option input {
+  position: absolute !important; width: 1px !important; height: 1px !important; min-height: 0 !important; padding: 0 !important;
+  margin: 0 !important; overflow: hidden; clip: rect(0 0 0 0); clip-path: inset(50%); border: 0 !important; opacity: 0;
+}
+.auth-shell .auth-signup-form .mode-control .mode-option span {
+  display: flex; align-items: center; justify-content: center; min-width: 44px; min-height: 44px; padding: 0 6px; border-radius: 999px;
+  color: var(--ob-ink); font: 700 11px/1 'Instrument Sans', Arial, sans-serif; letter-spacing: .02em; text-transform: none;
+}
+.auth-shell .auth-signup-form .mode-control .mode-option input:checked + span { background: var(--ob-ink); color: white; }
+
+/* Hover only where a pointer can hover (no sticky hover after a tap). */
+@media (hover: hover) {
+  .auth-signup-form .area-option:hover { background: var(--ob-ink); color: white; }
+  .auth-signup-form .area-city-option:hover { background: var(--ob-tint-strong); }
+  .auth-signup-form .budget-step:hover:not([aria-disabled="true"]) { background: var(--ob-ink); color: white; }
+  .auth-signup-form .budget-remove:hover { border-color: var(--ob-ink); }
+  .auth-signup-form .interest-chip:not(.is-selected):not([aria-disabled="true"]):hover { border-color: var(--ob-ink); }
+}
+@media (max-width: 480px) {
+  .auth-signup-form .area-options { grid-template-columns: 1fr; }
+  .auth-signup-form .mode-control { flex-basis: 100%; order: 3; }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .auth-signup-form :is(.area-option, .interest-chip, .budget-step, .budget-remove, .area-city-option),
+  .auth-signup-form .mode-option span { transition: background-color .15s ease, color .15s ease, border-color .15s ease; }
+}

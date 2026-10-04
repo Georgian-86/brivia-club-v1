@@ -439,6 +439,17 @@ $$;
 revoke all on function public.my_interests() from public, anon;
 grant execute on function public.my_interests() to authenticated;
 
+-- profiles.skills is server-owned from here on (Task 8 ruling): set_member_interests is its only writer, so a member
+-- cannot self-publish a label (a sensitive one included) that is not in their Passion Budget. This replaces the 0003
+-- update grant with the same editable columns minus skills. Insert is unchanged: a value sent with the first insert
+-- is overwritten by set_member_interests, which completion (D-030) requires before anyone can see the member.
+-- A re-run of 0003 (which grants skills again) must be followed by 0004.
+revoke update on public.profiles from public, anon, authenticated;
+grant update (
+  name, full_name, phone, phone_country_code, phone_number, gender, city, state,
+  experience, looking_for, photo_url, cover_url, updated_at
+) on public.profiles to authenticated;
+
 -- =============================================================================================
 -- 3. Member orbit
 -- =============================================================================================
@@ -555,7 +566,8 @@ grant execute on function public.set_home_city(text) to authenticated;
 --   * a name: brivia_is_completed(name, 'x') (trimmed, not empty, not 'New Member'; the legacy city plays no part);
 --   * a member_orbit row (a cell);
 --   * 1-12 member_interest rows whose points sum to exactly 20 (the Passion Budget).
--- Completion reads member_interest and member_orbit, never profiles.skills (a client-writable display copy).
+-- Completion reads member_interest and member_orbit, never profiles.skills (a display copy written only by
+-- set_member_interests).
 -- Internal: not executable by any client role.
 create or replace function public.brivia_member_completed(p_id uuid)
 returns boolean

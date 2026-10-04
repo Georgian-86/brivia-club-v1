@@ -7,7 +7,14 @@ import './deep-wine-theme.css';
 import './auth-polish.css';
 import './mobile-site.css';
 import './mobile-final-fixes.css';
-import { supabase, supabaseReady, saveProfile, compressedImageDataUrl, withoutCredentials } from './supabase.js';
+import {
+  supabase, supabaseReady, saveProfile, compressedImageDataUrl, withoutCredentials, rowToProfile, isRateLimited,
+  setHomeLocation, setHomeCity, setMemberInterests, fetchMyInterests, fetchInterestNodes, searchPlaces, onboardingStatus,
+} from './supabase.js';
+import {
+  MAX_INTERESTS, MODES, emptyBudget, addInterest, removeInterest, stepPoints, setMode, pointsLeft, isComplete, toPayload,
+  counterText, budgetFromRows,
+} from './passion-budget.js';
 import { defaultCoverUrl, normalizeCoverUrl } from './cover-assets.js';
 
 const introBurst = document.querySelector('#intro-burst');
@@ -460,7 +467,6 @@ const signupSuccess = document.querySelector('#auth-success');
 const loginForm = document.querySelector('#login-form');
 const loginNote = document.querySelector('#login-note');
 const signupPasswordFields = signupForm?.querySelector('.signup-password-fields');
-const signupStepOne = signupForm?.querySelector('[data-signup-step="1"]');
 const signupStepLabel = signupForm?.querySelector('[data-signup-step-label]');
 const signupProgress = signupForm?.querySelector('.signup-progress-track');
 const signupProgressFill = signupForm?.querySelector('[data-signup-progress-fill]');
@@ -468,11 +474,9 @@ let signupCurrentStep = 1;
 let profileCompletionUser = null;
 let authCloseTimer;
 let authEnvelopeTimer;
-let resetSkills = () => {};
 let resetLooking = () => {};
 let resetPhoto = () => {};
 let resetCover = () => {};
-let fillSkills = () => {};
 let fillLooking = () => {};
 let profileCompletionPhotoUrl = '';
 let profileCompletionCoverUrl = '';
@@ -576,129 +580,6 @@ if (coverPicker) {
     setCover(coverOptionUrl(defaultChoice) || defaultCover, defaultChoice);
   };
   resetCover();
-}
-
-const skillOptions = [
-  'Python', 'SQL', 'Data Structures & Algorithms', 'Git', 'GitHub', 'REST APIs', 'JavaScript', 'React', 'Linux', 'AWS',
-  'Generative AI', 'Prompt Engineering', 'LLMs', 'RAG', 'AI Agents', 'AI Automation', 'n8n', 'Docker', 'Data Analysis',
-  'Power BI', 'Tableau', 'Excel', 'Problem Solving', 'Critical Thinking', 'English Communication', 'Public Speaking',
-  'Presentation Skills', 'Professional Email Writing', 'Resume Building', 'Interview Skills', 'LinkedIn Networking',
-  'Personal Branding', 'Project Management', 'Business Communication', 'Sales', 'Negotiation', 'Time Management',
-  'Personal Finance', 'Budgeting', 'Digital Security', 'Password Management', 'Google Maps', 'Navigation', 'Trip Planning',
-  'Public Transport', 'Travel Budgeting', 'Packing', 'First Aid', 'Cooking', 'Geography', 'Cross-Cultural Communication',
-  'Photography', 'Adaptability', 'Other',
-];
-
-const skillsPicker = document.querySelector('[data-skills-picker]');
-if (skillsPicker) {
-  const skillsSearch = skillsPicker.querySelector('.skills-search');
-  const skillsOtherInput = skillsPicker.querySelector('.skills-other-input');
-  const skillsResults = skillsPicker.querySelector('.skills-results');
-  const skillsSelected = skillsPicker.querySelector('.skills-selected');
-  const skillsValue = skillsPicker.querySelector('.skills-value');
-  const selectedSkills = [];
-  let customSkillsMode = false;
-
-  const syncSkills = () => {
-    if (skillsValue) skillsValue.value = selectedSkills.join(', ');
-    if (skillsSearch) skillsSearch.setCustomValidity(selectedSkills.length ? '' : 'Select at least one skill.');
-    if (skillsSelected) {
-      skillsSelected.innerHTML = selectedSkills.map((skill) => `<button type="button" class="skill-chip" data-remove-skill="${skill.replace(/"/g, '&quot;')}">${skill}<span aria-hidden="true">×</span></button>`).join('');
-      skillsSelected.querySelectorAll('[data-remove-skill]').forEach((button) => {
-        button.addEventListener('click', () => {
-          const index = selectedSkills.indexOf(button.dataset.removeSkill);
-          if (index > -1) selectedSkills.splice(index, 1);
-          syncSkills();
-          renderSkills();
-          skillsSearch?.focus();
-        });
-      });
-    }
-  };
-
-  const addSkill = (skill) => {
-    const cleanSkill = skill.trim();
-    if (!cleanSkill || selectedSkills.some((item) => item.toLowerCase() === cleanSkill.toLowerCase())) return;
-    selectedSkills.push(cleanSkill);
-    customSkillsMode = false;
-    skillsOtherInput?.setAttribute('hidden', '');
-    if (skillsOtherInput) skillsOtherInput.value = '';
-    if (skillsSearch) skillsSearch.value = '';
-    if (skillsSearch) skillsSearch.placeholder = 'Search and select skills...';
-    syncSkills();
-    renderSkills();
-    skillsSearch?.focus();
-  };
-
-  const renderSkills = () => {
-    if (!skillsResults || !skillsSearch) return;
-    const query = skillsSearch.value.trim().toLowerCase();
-    const matches = skillOptions.filter((skill) => skill.toLowerCase().includes(query));
-    const hasExactMatch = skillOptions.some((skill) => skill.toLowerCase() === query);
-    if (query && !hasExactMatch) matches.push(`__custom__${skillsSearch.value.trim()}`);
-    skillsResults.innerHTML = matches.length ? matches.map((skill) => {
-      if (skill.startsWith('__custom__')) return `<button type="button" class="skill-option skill-option--custom" data-custom-skill="${skill.slice(10).replace(/"/g, '&quot;')}">ADD “${skill.slice(10)}” AS OTHER <span>＋</span></button>`;
-      const isSelected = selectedSkills.includes(skill);
-      return `<button type="button" class="skill-option${isSelected ? ' is-selected' : ''}" data-skill="${skill.replace(/"/g, '&quot;')}" role="option" aria-selected="${isSelected}">${skill}<span>${isSelected ? '✓' : '＋'}</span></button>`;
-    }).join('') : '<p class="skills-empty">No matching skill. Type a skill and press Enter to add it as Other.</p>';
-    skillsResults.querySelectorAll('[data-skill]').forEach((button) => {
-      button.addEventListener('click', () => {
-        const skill = button.dataset.skill;
-        if (skill === 'Other') {
-          customSkillsMode = true;
-          skillsPicker.classList.remove('is-open');
-          skillsOtherInput?.removeAttribute('hidden');
-          skillsOtherInput?.focus();
-          return;
-        }
-        customSkillsMode = false;
-        skillsSearch.placeholder = 'Search and select skills...';
-        const index = selectedSkills.indexOf(skill);
-        if (index > -1) selectedSkills.splice(index, 1); else selectedSkills.push(skill);
-        syncSkills();
-        renderSkills();
-        skillsSearch.focus();
-      });
-    });
-    skillsResults.querySelectorAll('[data-custom-skill]').forEach((button) => button.addEventListener('click', () => addSkill(button.dataset.customSkill)));
-  };
-
-  resetSkills = () => {
-    selectedSkills.splice(0, selectedSkills.length);
-    customSkillsMode = false;
-    skillsOtherInput?.setAttribute('hidden', '');
-    if (skillsOtherInput) skillsOtherInput.value = '';
-    if (skillsSearch) skillsSearch.value = '';
-    if (skillsSearch) skillsSearch.placeholder = 'Search and select skills...';
-    syncSkills();
-    renderSkills();
-  };
-  fillSkills = (value) => {
-    selectedSkills.splice(0, selectedSkills.length, ...String(value || '').split(',').map((item) => item.trim()).filter(Boolean));
-    syncSkills();
-    renderSkills();
-  };
-  skillsSearch?.addEventListener('focus', () => { skillsPicker.classList.add('is-open'); renderSkills(); });
-  skillsSearch?.addEventListener('input', () => { skillsPicker.classList.add('is-open'); renderSkills(); });
-  skillsSearch?.addEventListener('keydown', (event) => {
-    if (event.key !== 'Enter' || !skillsSearch.value.trim()) return;
-    event.preventDefault();
-    const query = skillsSearch.value.trim();
-    if (!customSkillsMode && !skillOptions.some((skill) => skill.toLowerCase() === query.toLowerCase())) addSkill(query);
-  });
-  skillsOtherInput?.addEventListener('keydown', (event) => {
-    if (event.key !== 'Enter' || !skillsOtherInput.value.trim()) return;
-    event.preventDefault();
-    addSkill(skillsOtherInput.value);
-  });
-  document.addEventListener('click', (event) => {
-    const clickedInsidePicker = event.composedPath().includes(skillsPicker);
-    if (!clickedInsidePicker) {
-      skillsPicker.classList.remove('is-open');
-      skillsSearch?.setAttribute('aria-expanded', 'false');
-    } else skillsSearch?.setAttribute('aria-expanded', String(skillsPicker.classList.contains('is-open')));
-  });
-  renderSkills();
 }
 
 const lookingOptions = [
@@ -826,32 +707,348 @@ if (lookingPicker) {
   renderLooking();
 }
 
-// Keep the second step focused on signals; security, avatar and cover belong together in step three.
-const signupSignalsStep = signupForm?.querySelector('[data-signup-step="2"]');
-const signupFinishStep = signupForm?.querySelector('[data-signup-step="3"]');
-if (signupSignalsStep && signupFinishStep) {
-  const profilePhoto = signupSignalsStep.querySelector('[data-photo-upload]');
-  const stepTwoActions = signupSignalsStep.querySelector('.signup-step-actions');
-  const coverPickerElement = signupFinishStep.querySelector('[data-cover-picker]');
-  const signalsPicker = signupFinishStep.querySelector('[data-skills-picker]');
-  const intentionPicker = signupFinishStep.querySelector('[data-looking-picker]');
-  const stepTwoHeading = signupSignalsStep.querySelector('.signup-step-heading');
-  const stepThreeHeading = signupFinishStep.querySelector('.signup-step-heading');
-  if (stepTwoHeading) {
-    stepTwoHeading.querySelector('span').textContent = 'STEP 02 · YOUR SIGNALS';
-    stepTwoHeading.querySelector('h2').textContent = 'Find your people.';
-    stepTwoHeading.querySelector('p').textContent = 'Tell the club what you know and what kind of momentum you are open to.';
+// ---------------------------------------------------------------------------------------------------------------
+// ORBIT onboarding (UX_SPEC flow A). Step 2 "Your area" and step 3 "Your signals" (interests + Passion Budget).
+// Privacy (CLAUDE.md, Review Focus 4): coordinates live only in `areaChoice` below, in memory. They are never written
+// to localStorage / sessionStorage, the URL, the DOM or a log, and are dropped as soon as the server has the cell.
+// ---------------------------------------------------------------------------------------------------------------
+const GEO_OPTIONS = { enableHighAccuracy: false, timeout: 10000, maximumAge: 600000 };
+const AREA_FALLBACK_TEXT = 'No problem. Pick your city instead.';
+const BUDGET_ERROR_TEXT = 'Place all 20 points to continue.';
+const PRIVATE_HINT_TEXT = 'Private: counts for matching, never shown on your profile';
+const escapeText = (value) => String(value ?? '').replace(/[&<>"']/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
+const svgIcon = (name) => {
+  const paths = {
+    plus: '<path d="M12 5v14M5 12h14" />',
+    minus: '<path d="M5 12h14" />',
+    close: '<path d="M6 6l12 12M18 6L6 18" />',
+    check: '<path d="M5 12.5l4.5 4.5L19 7.5" />',
+    lock: '<rect x="5" y="11" width="14" height="9" rx="2" /><path d="M8 11V8a4 4 0 0 1 8 0v3" />',
+  };
+  return `<svg class="ob-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">${paths[name] || ''}</svg>`;
+};
+// Re-renders a container and puts focus back on the element with the same data-focus-key (keyboard users keep place).
+const renderKeepingFocus = (container, html) => {
+  if (!container) return;
+  const active = document.activeElement;
+  const key = active && container.contains(active) ? active.dataset?.focusKey : null;
+  container.innerHTML = html;
+  if (key) [...container.querySelectorAll('[data-focus-key]')].find((el) => el.dataset.focusKey === key)?.focus({ preventScroll: true });
+};
+
+// { kind: 'geo', lat, lng } | { kind: 'city', placeId, label } | { kind: 'keep', label } (a cell is already stored)
+let areaChoice = null;
+const areaRoot = signupForm?.querySelector('[data-area]');
+const areaGeoButton = areaRoot?.querySelector('[data-area-geo]');
+const areaCityButton = areaRoot?.querySelector('[data-area-city]');
+const areaPicker = areaRoot?.querySelector('[data-area-picker]');
+const areaFallback = areaRoot?.querySelector('[data-area-fallback]');
+const areaSearch = areaRoot?.querySelector('#area-city-search');
+const areaResults = areaRoot?.querySelector('#area-city-results');
+const areaStatus = areaRoot?.querySelector('[data-area-status]');
+const areaError = areaRoot?.querySelector('[data-area-error]');
+let cityOptions = [];
+let cityActive = -1;
+let citySearchSeq = 0;
+let citySearchTimer;
+let geoPending = false;
+
+const setAreaStatus = (text) => { if (areaStatus) areaStatus.textContent = text; };
+const setAreaError = (text) => { if (areaError) areaError.textContent = text; };
+const setCityListOpen = (open) => {
+  areaSearch?.setAttribute('aria-expanded', String(open));
+  areaResults?.toggleAttribute('hidden', !open);
+  if (!open) { cityActive = -1; areaSearch?.removeAttribute('aria-activedescendant'); }
+};
+const highlightCity = (index) => {
+  const options = [...(areaResults?.querySelectorAll('[role="option"]') || [])];
+  if (!options.length) return;
+  cityActive = (index + options.length) % options.length;
+  options.forEach((option, i) => option.setAttribute('aria-selected', String(i === cityActive)));
+  areaSearch?.setAttribute('aria-activedescendant', options[cityActive].id);
+  options[cityActive].scrollIntoView({ block: 'nearest' });
+};
+const renderCityResults = async () => {
+  if (!areaSearch || !areaResults) return;
+  const seq = ++citySearchSeq;
+  const { data, error } = await searchPlaces(areaSearch.value);
+  if (seq !== citySearchSeq) return;
+  cityOptions = error ? [] : data;
+  areaResults.innerHTML = cityOptions.length
+    ? cityOptions.map((place, i) => `<li class="area-city-option" role="option" id="area-city-option-${i}" aria-selected="false" data-place-index="${i}"><span>${escapeText(place.name)}</span><small>${escapeText(place.region)}</small></li>`).join('')
+    : `<li class="area-city-empty" role="presentation">${error ? 'Cities could not load. Check your connection and try again.' : 'No city found. Try the nearest larger city.'}</li>`;
+  setCityListOpen(true);
+  cityActive = -1;
+};
+const chooseCity = (place) => {
+  if (!place) return;
+  areaChoice = { kind: 'city', placeId: place.id, label: `${place.name}, ${place.region}` };
+  if (areaSearch) areaSearch.value = place.name;
+  setCityListOpen(false);
+  setAreaError('');
+  setAreaStatus(`Your area: ${place.name}, ${place.region}. We use the city's centre, never your address.`);
+};
+const openCityPicker = (fallbackText = '') => {
+  if (!areaPicker) return;
+  areaPicker.hidden = false;
+  areaCityButton?.setAttribute('aria-expanded', 'true');
+  if (areaFallback) areaFallback.textContent = fallbackText;
+  areaSearch?.focus();
+  void renderCityResults();
+};
+const useMyLocation = () => {
+  if (geoPending) return;
+  setAreaError('');
+  const geo = window.isSecureContext ? navigator.geolocation : undefined;
+  if (!geo || typeof geo.getCurrentPosition !== 'function') { setAreaStatus(''); openCityPicker(AREA_FALLBACK_TEXT); return; }
+  geoPending = true;
+  areaGeoButton?.setAttribute('aria-busy', 'true');
+  setAreaStatus('Finding your area…');
+  let settled = false;
+  const fallBack = () => {
+    if (settled) return;
+    settled = true;
+    geoPending = false;
+    areaGeoButton?.removeAttribute('aria-busy');
+    setAreaStatus('');
+    openCityPicker(AREA_FALLBACK_TEXT);
+  };
+  // A permission prompt that is never answered must not strand the member either.
+  const guard = window.setTimeout(fallBack, 15000);
+  try {
+    geo.getCurrentPosition((position) => {
+      window.clearTimeout(guard);
+      if (settled) return;
+      const lat = Number(position?.coords?.latitude);
+      const lng = Number(position?.coords?.longitude);
+      if (!Number.isFinite(lat) || !Number.isFinite(lng)) { fallBack(); return; }
+      settled = true;
+      geoPending = false;
+      areaGeoButton?.removeAttribute('aria-busy');
+      areaChoice = { kind: 'geo', lat, lng };
+      if (areaPicker) areaPicker.hidden = true;
+      areaCityButton?.setAttribute('aria-expanded', 'false');
+      setAreaStatus("Got it. We'll keep only a ~5 km area around you.");
+    }, () => { window.clearTimeout(guard); fallBack(); }, GEO_OPTIONS);
+  } catch {
+    window.clearTimeout(guard);
+    fallBack();
   }
-  if (stepThreeHeading) {
-    stepThreeHeading.querySelector('span').textContent = 'STEP 03 · SECURITY & PRESENCE';
-    stepThreeHeading.querySelector('h2').textContent = 'Make it yours.';
-    stepThreeHeading.querySelector('p').textContent = 'Set your private password, add your circular photo, then choose the scene behind your profile.';
+};
+const resetArea = () => {
+  areaChoice = null;
+  geoPending = false;
+  areaGeoButton?.removeAttribute('aria-busy');
+  if (areaPicker) areaPicker.hidden = true;
+  areaCityButton?.setAttribute('aria-expanded', 'false');
+  if (areaFallback) areaFallback.textContent = '';
+  if (areaSearch) areaSearch.value = '';
+  if (areaResults) areaResults.innerHTML = '';
+  setCityListOpen(false);
+  setAreaStatus('');
+  setAreaError('');
+};
+const keepCurrentArea = (label) => {
+  areaChoice = { kind: 'keep', label: label || '' };
+  setAreaStatus(label ? `Your area: ${label}. Choose again to change it.` : 'Your area is set. Choose again to change it.');
+};
+areaGeoButton?.addEventListener('click', useMyLocation);
+areaCityButton?.addEventListener('click', () => openCityPicker(''));
+areaSearch?.addEventListener('input', () => {
+  // The visible options no longer match what was typed: drop them so Enter cannot pick a stale city.
+  citySearchSeq += 1;
+  cityOptions = [];
+  if (areaResults) areaResults.innerHTML = '';
+  setCityListOpen(false);
+  window.clearTimeout(citySearchTimer);
+  citySearchTimer = window.setTimeout(() => void renderCityResults(), 150);
+});
+areaSearch?.addEventListener('focus', () => { if (!areaResults?.children.length) void renderCityResults(); });
+areaSearch?.addEventListener('keydown', (event) => {
+  if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+    event.preventDefault();
+    if (areaSearch.getAttribute('aria-expanded') !== 'true') { void renderCityResults(); return; }
+    highlightCity(cityActive + (event.key === 'ArrowDown' ? 1 : -1) + (cityActive < 0 && event.key === 'ArrowUp' ? 1 : 0));
+  } else if (event.key === 'Enter') {
+    event.preventDefault(); // never submit the signup form from the city search
+    if (cityActive >= 0) chooseCity(cityOptions[cityActive]);
+    else if (cityOptions.length === 1) chooseCity(cityOptions[0]);
+  } else if (event.key === 'Escape' && areaSearch.getAttribute('aria-expanded') === 'true') {
+    event.preventDefault();
+    event.stopPropagation();
+    setCityListOpen(false);
   }
-  if (signalsPicker) signupSignalsStep.append(signalsPicker);
-  if (intentionPicker) signupSignalsStep.append(intentionPicker);
-  if (stepTwoActions) signupSignalsStep.append(stepTwoActions);
-  if (profilePhoto && coverPickerElement) signupFinishStep.insertBefore(profilePhoto, coverPickerElement);
-}
+});
+areaResults?.addEventListener('mousedown', (event) => event.preventDefault()); // keep focus in the input
+areaResults?.addEventListener('click', (event) => {
+  const option = event.target.closest('[data-place-index]');
+  if (option) chooseCity(cityOptions[Number(option.dataset.placeIndex)]);
+});
+
+// Step 3: interests and the Passion Budget.
+let budget = emptyBudget();
+let interestCatalog = null; // { groups: [{ id, label, domain, items: [{ id, label, sensitive, search }] }] }
+let interestCatalogPromise = null;
+const openInterestGroups = new Set();
+const interestPicker = signupForm?.querySelector('[data-interest-picker]');
+const interestSearch = interestPicker?.querySelector('#interest-search');
+const interestHelp = interestPicker?.querySelector('#interest-help');
+const interestResults = interestPicker?.querySelector('#interest-results');
+const budgetList = signupForm?.querySelector('#budget-list');
+const budgetCounter = signupForm?.querySelector('#budget-counter');
+const budgetError = signupForm?.querySelector('#budget-error');
+const budgetEmpty = signupForm?.querySelector('[data-budget-empty]');
+const budgetNext = signupForm?.querySelector('[data-signup-step="3"] .signup-next');
+const INTEREST_HELP_TEXT = 'Choose 1 to 12. Select again to remove.';
+const normalizeSearch = (value) => String(value || '').toLowerCase().normalize('NFKD').replace(/[̀-ͯ]/g, '').trim();
+
+const buildInterestCatalog = (nodes) => {
+  const byId = new Map(nodes.map((node) => [node.id, node]));
+  const groups = new Map();
+  nodes.filter((node) => node.level === 2).forEach((node) => {
+    groups.set(node.id, { id: node.id, label: node.label, domain: byId.get(node.parent_id)?.label || '', items: [] });
+  });
+  nodes.filter((node) => node.level >= 3).forEach((node) => {
+    const group = groups.get(node.id.split('.').slice(0, 2).join('.'));
+    if (!group) return;
+    const parent = node.level === 4 ? byId.get(node.parent_id)?.label || '' : '';
+    group.items.push({ id: node.id, label: node.label, sensitive: Boolean(node.sensitive), search: normalizeSearch(`${node.label} ${parent} ${group.label}`) });
+  });
+  return { groups: [...groups.values()].filter((group) => group.items.length) };
+};
+const loadInterestCatalog = () => {
+  interestCatalogPromise ||= fetchInterestNodes().then(({ data, error }) => {
+    if (error) throw error;
+    interestCatalog = buildInterestCatalog(data || []);
+    return interestCatalog;
+  }).catch((error) => { interestCatalogPromise = null; throw error; });
+  return interestCatalogPromise;
+};
+const interestChip = (item) => {
+  const selected = budget.items.some((chosen) => chosen.id === item.id);
+  const full = !selected && budget.items.length >= MAX_INTERESTS;
+  return `<button type="button" class="interest-chip${selected ? ' is-selected' : ''}${item.sensitive ? ' is-private' : ''}" data-interest-id="${escapeText(item.id)}" data-focus-key="chip:${escapeText(item.id)}" aria-pressed="${selected}"${full ? ' aria-disabled="true"' : ''}><span class="interest-chip-label">${escapeText(item.label)}</span>${svgIcon(selected ? 'check' : 'plus')}${item.sensitive ? `<small class="interest-private">${svgIcon('lock')}${PRIVATE_HINT_TEXT}</small>` : ''}</button>`;
+};
+const renderInterestResults = () => {
+  if (!interestResults) return;
+  if (!interestCatalog) {
+    interestResults.innerHTML = '<p class="interest-loading">Loading interests…</p>';
+    loadInterestCatalog().then(() => { renderBudget(); renderInterestResults(); }).catch(() => {
+      interestResults.innerHTML = '<p class="interest-loading">Interests could not load. <button type="button" class="interest-retry" data-interest-retry>TRY AGAIN</button></p>';
+    });
+    return;
+  }
+  const query = normalizeSearch(interestSearch?.value);
+  if (!query) {
+    // Browse: one collapsible group per category (level 2); chips (levels 3-4) inside.
+    renderKeepingFocus(interestResults, interestCatalog.groups.map((group) => `<details class="interest-group" data-interest-group="${escapeText(group.id)}"${openInterestGroups.has(group.id) ? ' open' : ''}><summary data-focus-key="group:${escapeText(group.id)}"><span>${escapeText(group.label)}</span><small>${escapeText(group.domain)}</small></summary><div class="interest-chips">${group.items.map(interestChip).join('')}</div></details>`).join(''));
+    return;
+  }
+  let shown = 0;
+  const html = interestCatalog.groups.map((group) => {
+    const items = group.items.filter((item) => item.search.includes(query)).slice(0, Math.max(0, 40 - shown));
+    shown += items.length;
+    if (!items.length) return '';
+    return `<div class="interest-group is-match" data-interest-group="${escapeText(group.id)}"><p class="interest-group-title"><span>${escapeText(group.label)}</span><small>${escapeText(group.domain)}</small></p><div class="interest-chips">${items.map(interestChip).join('')}</div></div>`;
+  }).join('');
+  renderKeepingFocus(interestResults, html || '<p class="interest-loading">No interest matches that yet. Try a broader word.</p>');
+};
+const budgetRow = (item) => {
+  const id = escapeText(item.id);
+  const label = escapeText(item.label);
+  const sensitive = interestCatalog?.groups.some((group) => group.items.some((node) => node.id === item.id && node.sensitive));
+  return `<li class="budget-row" data-budget-row="${id}">
+    <div class="budget-row-head"><span class="budget-label">${label}</span>${sensitive ? `<small class="interest-private">${svgIcon('lock')}${PRIVATE_HINT_TEXT}</small>` : ''}</div>
+    <div class="budget-controls">
+      <div class="budget-stepper" role="group" aria-label="Points for ${label}">
+        <button type="button" class="budget-step" data-step="-1" data-id="${id}" data-focus-key="minus:${id}" aria-label="Remove a point from ${label}">${svgIcon('minus')}</button>
+        <span class="budget-points"><span data-budget-points>${item.points}</span><span class="sr-only"> points</span></span>
+        <button type="button" class="budget-step" data-step="1" data-id="${id}" data-focus-key="plus:${id}" aria-label="Add a point to ${label}">${svgIcon('plus')}</button>
+      </div>
+      <div class="mode-control" role="radiogroup" aria-label="How you take part in ${label}">${MODES.map((mode) => `<label class="mode-option"><input type="radio" name="mode-${id}" value="${mode}" data-id="${id}" data-focus-key="mode:${id}:${mode}"${item.mode === mode ? ' checked' : ''} /><span>${mode[0].toUpperCase()}${mode.slice(1)}</span></label>`).join('')}</div>
+      <button type="button" class="budget-remove" data-remove-interest="${id}" data-focus-key="remove:${id}" aria-label="Remove ${label}">${svgIcon('close')}</button>
+    </div>
+  </li>`;
+};
+// Updates the counter, the stepper states and Next without rebuilding the rows.
+const syncBudgetState = () => {
+  const left = pointsLeft(budget);
+  if (budgetCounter) budgetCounter.textContent = counterText(budget);
+  budget.items.forEach((item) => {
+    const row = [...(budgetList?.querySelectorAll('[data-budget-row]') || [])].find((el) => el.dataset.budgetRow === item.id);
+    if (!row) return;
+    row.querySelector('[data-budget-points]').textContent = String(item.points);
+    row.querySelector('[data-step="-1"]').setAttribute('aria-disabled', String(item.points <= 1));
+    row.querySelector('[data-step="1"]').setAttribute('aria-disabled', String(left <= 0));
+  });
+  const complete = isComplete(budget);
+  budgetNext?.setAttribute('aria-disabled', String(!complete));
+  if (complete && budgetError) budgetError.textContent = '';
+  if (budgetEmpty) budgetEmpty.hidden = budget.items.length > 0;
+};
+const renderBudget = () => {
+  renderKeepingFocus(budgetList, budget.items.map(budgetRow).join(''));
+  syncBudgetState();
+};
+const setBudget = (next, { rerenderChips = false } = {}) => {
+  const rowsChanged = next.items.length !== budget.items.length || next.items.some((item, i) => item.id !== budget.items[i]?.id);
+  budget = next;
+  if (rowsChanged) renderBudget(); else syncBudgetState();
+  if (rowsChanged || rerenderChips) renderInterestResults();
+};
+const resetBudget = () => {
+  budget = emptyBudget();
+  if (interestSearch) interestSearch.value = '';
+  if (interestHelp) interestHelp.textContent = INTEREST_HELP_TEXT;
+  if (budgetError) budgetError.textContent = '';
+  renderBudget();
+  if (interestCatalog) renderInterestResults();
+};
+const toggleInterest = (id) => {
+  const item = interestCatalog?.groups.flatMap((group) => group.items).find((node) => node.id === id);
+  if (!item) return;
+  if (budget.items.some((chosen) => chosen.id === id)) { setBudget(removeInterest(budget, id)); return; }
+  const next = addInterest(budget, { id: item.id, label: item.label });
+  if (next === budget) { if (interestHelp) interestHelp.textContent = `You can choose up to ${MAX_INTERESTS} interests. Remove one to add another.`; return; }
+  if (interestHelp) interestHelp.textContent = INTEREST_HELP_TEXT;
+  setBudget(next);
+};
+interestSearch?.addEventListener('input', renderInterestResults);
+interestSearch?.addEventListener('keydown', (event) => { if (event.key === 'Enter') event.preventDefault(); });
+interestResults?.addEventListener('click', (event) => {
+  if (event.target.closest('[data-interest-retry]')) { renderInterestResults(); return; }
+  const chip = event.target.closest('[data-interest-id]');
+  if (chip) toggleInterest(chip.dataset.interestId);
+});
+interestResults?.addEventListener('toggle', (event) => {
+  const group = event.target.closest?.('[data-interest-group]');
+  if (!group || group.tagName !== 'DETAILS') return;
+  if (group.open) openInterestGroups.add(group.dataset.interestGroup); else openInterestGroups.delete(group.dataset.interestGroup);
+}, true);
+budgetList?.addEventListener('click', (event) => {
+  const step = event.target.closest('[data-step]');
+  if (step) {
+    if (step.getAttribute('aria-disabled') === 'true') return;
+    setBudget(stepPoints(budget, step.dataset.id, Number(step.dataset.step)));
+    return;
+  }
+  const remove = event.target.closest('[data-remove-interest]');
+  if (remove) {
+    const id = remove.dataset.removeInterest;
+    const rows = [...budgetList.querySelectorAll('[data-budget-row]')];
+    const index = rows.findIndex((row) => row.dataset.budgetRow === id);
+    setBudget(removeInterest(budget, id));
+    // Keep keyboard focus in the list: the next row's remove button, else the search field.
+    const nextRow = budgetList.querySelectorAll('[data-budget-row]')[Math.min(index, budget.items.length - 1)];
+    (nextRow?.querySelector('[data-remove-interest]') || interestSearch)?.focus({ preventScroll: true });
+  }
+});
+budgetList?.addEventListener('change', (event) => {
+  const radio = event.target.closest('input[type="radio"][data-id]');
+  if (radio) budget = setMode(budget, radio.dataset.id, radio.value);
+});
+const showBudgetError = () => { if (budgetError) budgetError.textContent = BUDGET_ERROR_TEXT; };
+renderBudget();
 
 if (authCta && authModal) {
   authCta.classList.add('auth-trigger');
@@ -862,7 +1059,8 @@ if (authCta && authModal) {
 
 const resetSignup = () => {
   signupForm?.reset();
-  resetSkills();
+  resetArea();
+  resetBudget();
   resetLooking();
   resetPhoto();
   resetCover();
@@ -892,18 +1090,24 @@ function setSignupPasswordMode(enabled, required = enabled) {
   });
 }
 
+const SIGNUP_STEPS = 4;
+const SIGNUP_STEP_LABELS = ['THE BASICS', 'YOUR AREA', 'YOUR SIGNALS', 'SECURITY & PRESENCE'];
 function setSignupStep(step, focusFirst = true) {
-  signupCurrentStep = Math.min(3, Math.max(1, Number(step) || 1));
+  signupCurrentStep = Math.min(SIGNUP_STEPS, Math.max(1, Number(step) || 1));
   signupForm?.querySelectorAll('[data-signup-step]').forEach((panel) => {
     panel.toggleAttribute('hidden', Number(panel.dataset.signupStep) !== signupCurrentStep);
   });
-  if (signupProgress) { signupProgress.setAttribute('aria-valuemax', '3'); signupProgress.setAttribute('aria-valuenow', String(signupCurrentStep)); }
-  if (signupProgressFill) signupProgressFill.style.width = `${signupCurrentStep * 33.3333}%`;
-  if (signupStepLabel) signupStepLabel.textContent = signupCurrentStep === 1 ? 'STEP 1 OF 3 · THE BASICS' : signupCurrentStep === 2 ? 'STEP 2 OF 3 · YOUR SIGNALS' : 'STEP 3 OF 3 · SECURITY & COVER';
-  authPanel?.scrollTo({ top: 0, behavior: 'smooth' });
+  if (signupProgress) { signupProgress.setAttribute('aria-valuemax', String(SIGNUP_STEPS)); signupProgress.setAttribute('aria-valuenow', String(signupCurrentStep)); }
+  if (signupProgressFill) signupProgressFill.style.width = `${(signupCurrentStep / SIGNUP_STEPS) * 100}%`;
+  if (signupStepLabel) signupStepLabel.textContent = `STEP ${signupCurrentStep} OF ${SIGNUP_STEPS} · ${SIGNUP_STEP_LABELS[signupCurrentStep - 1]}`;
+  // The taxonomy is fetched while the member is on "Your area", so "Your signals" opens ready.
+  if (signupCurrentStep >= 2 && !interestCatalog) loadInterestCatalog().then(() => { renderBudget(); renderInterestResults(); }).catch(() => {});
+  if (signupCurrentStep === 3) renderInterestResults();
+  const reduceMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+  authPanel?.scrollTo({ top: 0, behavior: reduceMotion ? 'auto' : 'smooth' });
   if (focusFirst) {
     const activeStep = signupForm?.querySelector(`[data-signup-step="${signupCurrentStep}"]`);
-    const firstVisibleField = [...(activeStep?.querySelectorAll('input:not([type="hidden"]):not([type="file"]), select, textarea') || [])]
+    const firstVisibleField = [...(activeStep?.querySelectorAll('input:not([type="hidden"]):not([type="file"]), select, textarea, button:not(.signup-step-prev)') || [])]
       .find((field) => field.getClientRects().length && !field.disabled);
     firstVisibleField?.focus({ preventScroll: true });
   }
@@ -921,25 +1125,27 @@ const validateSignupStep = (step = signupCurrentStep) => {
   }
   return true;
 };
+// Step gates. Step 2 needs an area; step 3 needs a complete Passion Budget (error beside the counter) and one
+// "looking for" choice.
+const validateOnboardingStep = (step) => {
+  if (step === 2) {
+    if (areaChoice) return true;
+    setAreaError('Choose your area to continue.');
+    return false;
+  }
+  if (step === 3) {
+    if (!isComplete(budget)) { showBudgetError(); return false; }
+    return validateSignupStep(3);
+  }
+  return validateSignupStep(step);
+};
 signupForm?.querySelectorAll('.signup-next').forEach((button) => button.addEventListener('click', () => {
   const nextStep = Number(button.dataset.nextStep);
-  // Let members reach the security/cover step even if they still need to
-  // choose a signal; the final submit validates skills and intentions.
-  if (nextStep === 3) {
-    if (!validateSignupStep(2)) return;
-    setAuthView('signup', 'none');
-    setSignupStep(3);
-    return;
-  }
-  if (button.dataset.nextStep && validateSignupStep()) setSignupStep(button.dataset.nextStep);
+  if (nextStep && validateOnboardingStep(nextStep - 1)) setSignupStep(nextStep);
 }));
 signupForm?.querySelectorAll('.signup-step-prev').forEach((button) => button.addEventListener('click', () => {
   setSignupStep(button.dataset.prevStep || 1);
 }));
-const validateSignupStepOne = () => {
-  if (!signupStepOne) return true;
-  return validateSignupStep(1);
-};
 
 const signupFeedback = signupForm ? document.createElement('p') : null;
 if (signupFeedback && signupForm) {
@@ -1047,7 +1253,9 @@ const normalizeSignupGender = (value) => {
   return '';
 };
 
-const showProfileCompletion = (user, savedProfile = null) => {
+// Completion (re-entry): the same 4-step form, prefilled, opened at `startStep`. `status` is my_onboarding_status():
+// an existing cell is kept unless the member picks a new area; existing interests prefill the Passion Budget.
+const showProfileCompletion = (user, savedProfile = null, { startStep = 1, status = null } = {}) => {
   if (!signupForm || !user) return;
   resetSignup();
   profileCompletionUser = user;
@@ -1060,8 +1268,6 @@ const showProfileCompletion = (user, savedProfile = null) => {
     phoneCountryCode: phoneParts.phoneCountryCode,
     phoneNumber: phoneParts.phoneNumber,
     phone: profile.phone || metadata.phone || '',
-    city: profile.city || metadata.city || '',
-    state: profile.state || metadata.state || '',
     experience: profile.experience || metadata.experience || '',
     gender: normalizeSignupGender(profile.gender || metadata.gender),
   };
@@ -1071,7 +1277,6 @@ const showProfileCompletion = (user, savedProfile = null) => {
   });
   const emailField = signupForm.elements.namedItem('email');
   emailField?.setAttribute('readonly', '');
-  fillSkills(profile.skills || metadata.skills || '');
   fillLooking(profile.lookingFor || profile.looking_for || metadata.lookingFor || metadata.looking_for || '');
   profileCompletionPhotoUrl = profile.photoUrl || metadata.avatar_url || metadata.picture || '';
   profileCompletionCoverUrl = normalizeCoverUrl(profile.coverUrl || profile.cover_url || metadata.coverUrl || '');
@@ -1082,9 +1287,45 @@ const showProfileCompletion = (user, savedProfile = null) => {
   if (submit) submit.innerHTML = 'COMPLETE MY PROFILE <span>→</span>';
   const backButton = authModal?.querySelector('.auth-back-trigger');
   if (backButton) backButton.textContent = 'SIGN OUT / BACK TO LOGIN';
-  if (signupFeedback) signupFeedback.textContent = 'Finish your Brivia profile to unlock the club. Your email is verified with Google.';
+  if (signupFeedback) signupFeedback.textContent = 'Finish your Brivia profile to unlock the club.';
+  if (status?.has_cell) keepCurrentArea(status.place_label || '');
   setAuthView('signup');
-  setSignupStep(1);
+  setSignupStep(startStep);
+};
+
+// The first incomplete onboarding step for my_onboarding_status(): 2 without a cell, else 3 (interests / budget).
+const firstIncompleteStep = (status) => (status?.has_cell ? 3 : 2);
+
+// After a profile exists: the app when onboarding is complete, else the completion flow at the first incomplete step.
+// An unknown status (RPC error) goes to the app, whose server-side visibility still requires completion (D-030).
+const routeAfterProfile = async (user, row = null) => {
+  const { data: status, error } = await onboardingStatus();
+  if (error || !status || status.completed !== false) { redirectToApp(); return; }
+  let profileRow = row;
+  if (!profileRow) ({ data: profileRow } = await supabase.from('profiles').select('*').eq('id', user.id).maybeSingle());
+  showProfileCompletion(user, profileRow ? rowToProfile(profileRow) : null, { startStep: firstIncompleteStep(status), status });
+  if (status.interests > 0) {
+    const { data: rows } = await fetchMyInterests();
+    if (Array.isArray(rows) && rows.length && !budget.items.length) setBudget(budgetFromRows(rows), { rerenderChips: true });
+  }
+  window.history.replaceState({ briviaAuthView: 'signup' }, '', '/auth.html');
+};
+
+// A signup that needed email confirmation stored { interests, orbit } with the pending profile (never coordinates).
+// After login: a city choice and complete interests are applied silently; a geo choice is asked for again (step 2).
+const applyPendingOnboarding = async (pending) => {
+  if (!pending || typeof pending !== 'object') return;
+  if (pending.orbit?.kind === 'city' && typeof pending.orbit.placeId === 'string' && pending.orbit.placeId) {
+    await setHomeCity(pending.orbit.placeId);
+  }
+  const stored = budgetFromRows(pending.interests);
+  if (isComplete(stored)) await setMemberInterests(toPayload(stored));
+};
+const PENDING_ONBOARDING_KEYS = ['interests', 'orbit'];
+const withoutOnboarding = (profile) => {
+  const clean = { ...(profile || {}) };
+  PENDING_ONBOARDING_KEYS.forEach((key) => { delete clean[key]; });
+  return clean;
 };
 
 const restoreAuthPageSession = async () => {
@@ -1117,16 +1358,17 @@ const restoreAuthPageSession = async () => {
     return;
   }
   if (profile) {
-    redirectToApp();
+    await routeAfterProfile(session.user, profile);
     return;
   }
-  const pending = JSON.parse(window.localStorage.getItem('brivia-pending-profile') || 'null');
+  const pending = readPendingProfile();
   const pendingMatches = pending?.email?.toLowerCase() === session.user.email?.toLowerCase();
   if (await restoreCachedMemberProfile(session.user, pendingMatches ? pending : null)) {
-    redirectToApp();
+    if (pendingMatches) await applyPendingOnboarding(pending);
+    await routeAfterProfile(session.user);
     return;
   }
-  showProfileCompletion(session.user, pendingMatches ? pending : null);
+  showProfileCompletion(session.user, pendingMatches ? withoutOnboarding(pending) : null);
   window.history.replaceState({ briviaAuthView: 'signup' }, '', '/auth.html');
 };
 
@@ -1144,6 +1386,10 @@ const redirectToApp = () => {
   window.location.replace('/app.html');
 };
 
+const readPendingProfile = () => {
+  try { return JSON.parse(window.localStorage.getItem('brivia-pending-profile') || 'null'); } catch { return null; }
+};
+
 const restoreCachedMemberProfile = async (user, preferredProfile = null) => {
   if (!user?.id || !supabase) return false;
   const userEmail = String(user.email || '').trim().toLowerCase();
@@ -1156,11 +1402,8 @@ const restoreCachedMemberProfile = async (user, preferredProfile = null) => {
     phone: metadata.phone || '',
     phoneCountryCode: metadata.phoneCountryCode || metadata.phone_country_code || '',
     phoneNumber: metadata.phoneNumber || metadata.phone_number || '',
-    city: metadata.city || '',
-    state: metadata.state || '',
     experience: metadata.experience || '',
     gender: metadata.gender || '',
-    skills: metadata.skills || '',
     lookingFor: metadata.lookingFor || metadata.looking_for || '',
     coverUrl: metadata.coverUrl || metadata.cover_url || '',
   };
@@ -1168,11 +1411,11 @@ const restoreCachedMemberProfile = async (user, preferredProfile = null) => {
   const candidate = candidates.find((item) => {
     const email = String(item.email || user.email || '').trim().toLowerCase();
     const name = String(item.name || item.full_name || '').trim();
-    const hasProfileSignals = item !== metadataProfile || Boolean(item.phone || item.city || item.state || item.experience || item.gender || item.skills || item.lookingFor || item.coverUrl);
+    const hasProfileSignals = item !== metadataProfile || Boolean(item.phone || item.experience || item.gender || item.lookingFor || item.coverUrl);
     return email === userEmail && name && name !== 'New Member' && hasProfileSignals;
   });
   if (!candidate) return false;
-  const profile = withoutCredentials({ ...candidate, name: candidate.name || candidate.full_name });
+  const profile = withoutOnboarding(withoutCredentials({ ...candidate, name: candidate.name || candidate.full_name }));
   delete profile.id;
   const { error } = await saveProfile(user.id, profile, null);
   if (error) return false;
@@ -1284,12 +1527,13 @@ loginForm?.addEventListener('submit', async (event) => {
     if (!supabaseReady || !supabase) throw new Error('Supabase is not configured.');
     const { data, error } = await supabase.auth.signInWithPassword({ email, password });
     if (error) throw error;
-    const pending = JSON.parse(window.localStorage.getItem('brivia-pending-profile') || 'null');
+    const pending = readPendingProfile();
     const pendingBelongsToUser = pending?.email?.toLowerCase() === data.user?.email?.toLowerCase();
     if (pending && data.user && pendingBelongsToUser) {
-      const safePending = withoutCredentials(pending);
+      const safePending = withoutOnboarding(withoutCredentials(pending));
       const { error: profileError } = await saveProfile(data.user.id, safePending, null);
       if (profileError) throw profileError;
+      await applyPendingOnboarding(pending);
       window.localStorage.removeItem('brivia-pending-profile');
       window.localStorage.setItem('brivia-member-profile', JSON.stringify({ ...safePending, id: data.user.id }));
     } else if (pending && !pendingBelongsToUser) {
@@ -1299,18 +1543,18 @@ loginForm?.addEventListener('submit', async (event) => {
     if (ownProfileError) throw ownProfileError;
     if (!ownProfile) {
       if (await restoreCachedMemberProfile(data.user)) {
-        redirectToApp();
+        await routeAfterProfile(data.user);
         return;
       }
-      showProfileCompletion(data.user, pendingBelongsToUser ? pending : null);
+      showProfileCompletion(data.user, pendingBelongsToUser ? withoutOnboarding(pending) : null);
       return;
     }
-    const cachedPendingProfile = pendingBelongsToUser ? pending : {};
+    const cachedPendingProfile = pendingBelongsToUser ? withoutOnboarding(withoutCredentials(pending)) : {};
     window.localStorage.setItem('brivia-member-profile', JSON.stringify({ ...cachedPendingProfile, id: data.user.id, email: data.user.email || email }));
     if (pendingBelongsToUser && pending?.coverUrl) {
       await supabase.auth.updateUser({ data: { coverUrl: pending.coverUrl } }).catch(() => {});
     }
-    redirectToApp();
+    await routeAfterProfile(data.user, ownProfile);
   } catch (error) {
     if (loginNote) loginNote.textContent = error.message || 'Could not sign you in. Check your email and password.';
   } finally {
@@ -1318,24 +1562,57 @@ loginForm?.addEventListener('submit', async (event) => {
   }
 });
 
+// The profile fields a signup stores (an allowlist: no password, no picker inputs, no coordinates).
+const SIGNUP_PROFILE_FIELDS = ['name', 'email', 'phoneCountryCode', 'phoneNumber', 'gender', 'experience', 'lookingFor', 'coverUrl'];
+const collectSignupProfile = (formData) => {
+  const profile = {};
+  SIGNUP_PROFILE_FIELDS.forEach((key) => { profile[key] = String(formData.get(key) || '').trim(); });
+  return profile;
+};
+
+class OnboardingStepError extends Error {}
+// After saveProfile: the home area (location or city), then the Passion Budget. A failure returns the member to the
+// step that failed with the error beside it; the profile row already saved is simply updated on the next try.
+const finishOnboarding = async () => {
+  if (areaChoice && areaChoice.kind !== 'keep') {
+    const choice = areaChoice;
+    const { data, error, status } = choice.kind === 'geo' ? await setHomeLocation(choice.lat, choice.lng) : await setHomeCity(choice.placeId);
+    if (error) {
+      setSignupStep(2);
+      const message = isRateLimited(error, status) ? 'Try again later.' : "We couldn't save your area. Please try again.";
+      setAreaError(message);
+      throw new OnboardingStepError(message);
+    }
+    // The server has the cell: forget the coordinates.
+    keepCurrentArea(typeof data === 'string' && data ? data : choice.label || '');
+  }
+  const { error } = await setMemberInterests(toPayload(budget));
+  if (error) {
+    setSignupStep(3);
+    const message = 'Your interests could not be saved. Please try again.';
+    if (budgetError) budgetError.textContent = message;
+    throw new OnboardingStepError(message);
+  }
+};
+
 signupForm?.addEventListener('submit', async (event) => {
   event.preventDefault();
-  if (signupCurrentStep < 3) {
-    if (signupCurrentStep === 2 || validateSignupStep()) setSignupStep(signupCurrentStep + 1);
+  if (signupCurrentStep < SIGNUP_STEPS) {
+    if (validateOnboardingStep(signupCurrentStep)) setSignupStep(signupCurrentStep + 1);
     return;
   }
   signupForm.elements.namedItem('passwordConfirm')?.setCustomValidity('');
+  for (const step of [1, 2, 3]) {
+    if (!validateOnboardingStep(step)) {
+      setSignupStep(step, false);
+      validateOnboardingStep(step);
+      if (signupFeedback) signupFeedback.textContent = 'Please complete this step first.';
+      return;
+    }
+  }
   if (!signupForm.checkValidity()) {
     signupForm.reportValidity();
     if (signupFeedback) signupFeedback.textContent = 'Please complete all required fields.';
-    return;
-  }
-  const skillsValue = signupForm.querySelector('.skills-value');
-  const lookingValue = signupForm.querySelector('.looking-value');
-  if (!skillsValue?.value || !lookingValue?.value) {
-    signupForm.querySelector('.skills-search')?.reportValidity();
-    signupForm.querySelector('.looking-search')?.reportValidity();
-    if (signupFeedback) signupFeedback.textContent = 'Select at least one skill and one thing you are looking for.';
     return;
   }
   const formData = new FormData(signupForm);
@@ -1364,10 +1641,10 @@ signupForm?.addEventListener('submit', async (event) => {
     }
   }
   // The password goes to Supabase Auth only; it is never part of the stored or cached profile (Ruling I11).
-  const profile = withoutCredentials(Object.fromEntries(formData.entries()));
+  const profile = collectSignupProfile(formData);
   profile.gender = normalizeSignupGender(profile.gender);
-  const phoneCountryCode = String(formData.get('phoneCountryCode') || '+91').trim();
-  const phoneNumber = String(formData.get('phoneNumber') || '').replace(/\D/g, '');
+  const phoneCountryCode = profile.phoneCountryCode || '+91';
+  const phoneNumber = profile.phoneNumber.replace(/\D/g, '');
   profile.phoneCountryCode = phoneCountryCode;
   profile.phoneNumber = phoneNumber;
   profile.phone = `${phoneCountryCode} ${phoneNumber}`.trim();
@@ -1382,7 +1659,7 @@ signupForm?.addEventListener('submit', async (event) => {
     try { profile.coverUrl = await compressedImageDataUrl(coverFile); } catch { profile.coverUrl = ''; }
   } else if (profileCompletionCoverUrl) profile.coverUrl = normalizeCoverUrl(profileCompletionCoverUrl);
   const submit = signupForm.querySelector('[type="submit"]');
-  if (submit) submit.disabled = true;
+  if (submit) { submit.disabled = true; submit.setAttribute('aria-busy', 'true'); }
   if (signupFeedback) signupFeedback.textContent = 'Saving your profile...';
   try {
     if (!supabaseReady || !supabase) throw new Error('Supabase is not configured.');
@@ -1399,6 +1676,7 @@ signupForm?.addEventListener('submit', async (event) => {
       }
       const { error: profileError } = await saveProfile(sessionUser.id, profile, photoFile, coverFile);
       if (profileError) throw profileError;
+      await finishOnboarding();
       window.localStorage.removeItem('brivia-pending-profile');
       window.localStorage.setItem('brivia-member-profile', JSON.stringify({ ...profile, id: sessionUser.id }));
       redirectToApp();
@@ -1410,17 +1688,15 @@ signupForm?.addEventListener('submit', async (event) => {
       password,
       options: {
         emailRedirectTo: `${window.location.origin}/auth.html`,
+        // Auth metadata holds contact basics only: never interests (some are private) or any location.
         data: {
           name: profile.name,
           full_name: profile.name,
           phone: profile.phone,
           phoneCountryCode: profile.phoneCountryCode,
           phoneNumber: profile.phoneNumber,
-          city: profile.city,
-          state: profile.state,
           experience: profile.experience,
           gender: profile.gender,
-          skills: profile.skills,
           lookingFor: profile.lookingFor,
           coverUrl: profile.coverUrl,
         },
@@ -1435,11 +1711,17 @@ signupForm?.addEventListener('submit', async (event) => {
       if (submit) submit.innerHTML = 'COMPLETE MY PROFILE <span>→</span>';
       const { error: profileError } = await saveProfile(data.user.id, profile, photoFile, coverFile);
       if (profileError) throw profileError;
+      await finishOnboarding();
       window.localStorage.setItem('brivia-member-profile', JSON.stringify({ ...profile, id: data.user.id }));
       redirectToApp();
       return;
     }
-    window.localStorage.setItem('brivia-pending-profile', JSON.stringify(profile));
+    // Email confirmation: nothing can be written before a session exists. Keep the interests and only the KIND of
+    // area choice (a city id, or "ask for my location again"); the coordinates are dropped here.
+    const pendingOrbit = areaChoice?.kind === 'city' ? { kind: 'city', placeId: areaChoice.placeId } : { kind: 'geo' };
+    const pendingInterests = budget.items.map(({ id, label, points, mode }) => ({ id, label, points, mode }));
+    window.localStorage.setItem('brivia-pending-profile', JSON.stringify({ ...profile, interests: pendingInterests, orbit: pendingOrbit }));
+    areaChoice = null;
     const accountEmail = signupSuccess?.querySelector('[data-credential="account-email"]');
     if (accountEmail) accountEmail.textContent = profile.email;
     const successTitle = signupSuccess?.querySelector('[data-auth-success-title]');
@@ -1452,11 +1734,14 @@ signupForm?.addEventListener('submit', async (event) => {
     authModal?.querySelector('.auth-back-trigger')?.setAttribute('hidden', '');
     signupSuccess?.querySelector('button')?.focus();
   } catch (error) {
-    if (loginNote) loginNote.textContent = error.message || 'Could not create your account. Please try again.';
-    if (signupFeedback) signupFeedback.textContent = error.message || 'Could not create your account. Please try again.';
-    if (authPanelKicker) authPanelKicker.textContent = error.message || 'ACCOUNT CREATION FAILED';
+    const message = error.message || 'Could not create your account. Please try again.';
+    if (signupFeedback) signupFeedback.textContent = message;
+    if (!(error instanceof OnboardingStepError)) {
+      if (loginNote) loginNote.textContent = message;
+      if (authPanelKicker) authPanelKicker.textContent = message;
+    }
   } finally {
-    if (submit) submit.disabled = false;
+    if (submit) { submit.disabled = false; submit.removeAttribute('aria-busy'); }
   }
 });
 

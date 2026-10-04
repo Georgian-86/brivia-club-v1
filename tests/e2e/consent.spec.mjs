@@ -109,6 +109,7 @@ try {
       return json(200, [...publicRows, eveRow].filter((row) => ids.includes(row.id)).slice(0, 50));
     }
     if (pathName === '/rest/v1/rpc/search_members') return json(200, []);
+    if (pathName === '/rest/v1/rpc/my_onboarding_status') return json(200, [{ interests: 2, points: 20, has_cell: true, place_label: 'Pune', completed: true }]);
     if (pathName === '/rest/v1/matches') {
       if (method !== 'GET') return json(403, { code: '42501', message: 'clients cannot write matches' });
       const filter = url.searchParams.get('or') || '';
@@ -396,6 +397,7 @@ try {
       return json(200, rows.slice(0, limit));
     }
     if (pathName === '/rest/v1/rpc/get_candidates') return json(200, [...directory, quinnRow].filter((row) => (args.p_ids || []).slice(0, 50).includes(row.id)));
+    if (pathName === '/rest/v1/rpc/my_onboarding_status') return json(200, [{ interests: 2, points: 20, has_cell: true, place_label: 'Pune', completed: true }]);
     if (pathName === '/rest/v1/rpc/search_members') {
       const q = String(args.p_query || '').trim().toLowerCase();
       return json(200, q ? [...directory, quinnRow].filter((row) => row.name.toLowerCase().includes(q)).slice(0, 20) : []);
@@ -540,6 +542,7 @@ try {
     if (pathName === '/rest/v1/rpc/list_members') return json(200, args.p_after ? [] : hardRows);
     if (pathName === '/rest/v1/rpc/get_candidates') return json(200, [...hardRows, kitRow].filter((row) => (args.p_ids || []).includes(row.id)));
     if (pathName === '/rest/v1/rpc/search_members') return json(200, []);
+    if (pathName === '/rest/v1/rpc/my_onboarding_status') return json(200, [{ interests: 2, points: 20, has_cell: true, place_label: 'Pune', completed: true }]);
     if (pathName === '/rest/v1/matches') {
       const filter = url.searchParams.get('or') || '';
       return json(200, filter.includes('and(') && !filter.includes(KIT) ? [] : [{ user1_id: ME, user2_id: KIT }]);
@@ -743,6 +746,25 @@ try {
   check(`failed photo upload writes no profile row and no data: URL (${profileWrites.length} writes)`, () => {
     assert.equal(profileWrites.length, 0);
     assert.ok(!profileWrites.some((c) => /data:/.test(c.body || '')));
+  });
+  // 8f2. Iteration 3, Task 8: profiles.skills is server-owned. The editor shows it read-only, and a save (no photo)
+  // still succeeds with a row that carries no skills key.
+  const skillsInputs = await hardPage.locator('#profile-edit-form [name="skills"]').count();
+  check('profile editor has no editable skills field (server-owned)', () => assert.equal(skillsInputs, 0));
+  await hardPage.setInputFiles('#profile-edit-form [name="photoFile"]', []);
+  await hardPage.locator('#profile-edit-form [name="name"]').fill('Alex Renamed');
+  const writesBeforeSave = hard.calls.length;
+  await hardPage.locator('#profile-edit-form [type="submit"]').click();
+  await hardPage.waitForFunction(() => !document.querySelector('#profile-edit-form'), null, { timeout: 8000 }).catch(() => {});
+  const saveWrites = hard.calls.slice(writesBeforeSave).filter((c) => c.path === '/rest/v1/profiles' && c.method !== 'GET');
+  const saveToast = await hardPage.locator('#app-toast').textContent();
+  check(`profile save still works without skills (${saveWrites.map((c) => `${c.method} ${Object.keys(JSON.parse(c.body || '{}')).join(',')}`).join(' ; ')}; toast "${saveToast}")`, () => {
+    assert.equal(saveWrites.length, 1);
+    assert.equal(saveWrites[0].method, 'PATCH');
+    const row = JSON.parse(saveWrites[0].body || '{}');
+    assert.equal(row.name, 'Alex Renamed');
+    assert.ok(!('skills' in row));
+    assert.match(saveToast, /Profile updated and saved/);
   });
   // 8g. Blocking someone who is already blocked server-side: insert (never upsert) and 23505 counts as success.
   await hardPage.evaluate(() => document.querySelector('#profile-edit-form [data-profile-edit-close], .profile-edit-close')?.click());

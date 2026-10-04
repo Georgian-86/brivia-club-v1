@@ -95,6 +95,9 @@ only; needs a profile row). It accepts 1–12 items `{ interest_id, points, mode
 ids, integer points ≥ 1 that sum to exactly 20, and a mode in `learn | play | teach | build` (missing means `play`).
 Any violation raises `22023 invalid interests` and leaves the earlier set untouched; a valid call replaces the set
 atomically and writes the labels into `profiles.skills` (points desc, then label asc) as a display copy.
+`profiles.skills` is **server-owned** (D-035): `authenticated` has no `update` grant on it, the client never sends it,
+and `set_member_interests` is its only writer (a value smuggled into a first insert is overwritten before the member
+can be completed, §7).
 
 Fixed budgets stop "interest inflation". A member who lists 40 interests can't out-match everyone, and the budget
 says what each person *actually* cares about most.
@@ -422,7 +425,8 @@ saturated, the outer rings relax first, instead of the deck repeating saturated 
   - a home cell (a `member_orbit` row, §9.1.4);
   - 1–12 `member_interest` rows whose points sum to exactly 20 (the Passion Budget, §3.2).
 
-  It reads `member_interest` and `member_orbit` only, never `profiles.skills` (a client-writable display copy).
+  It reads `member_interest` and `member_orbit` only, never `profiles.skills` (a display copy written only by
+  `set_member_interests`, D-035).
 - **One visibility rule.** Every member-facing visibility check goes through `brivia_visible_to(viewer, target)`: both
   completed, different members, same world (`is_test` equal) and no block in either direction. `get_candidates`,
   `search_members`, `list_members` and `brivia_can_see_author` are built on it (signatures, caps, ordering and
@@ -651,6 +655,12 @@ select log_impressions($1, $4);
   has the same rules (SECURITY DEFINER, volatile, `authenticated` only, profile required, shared cap) and stores the
   cell of the place's centroid with that `place_id`. An unknown id raises `22023 invalid place`. Clients read place
   names from `place(id, name, region, country, is_launch)`; its centroid columns are never granted.
+- **Client capture (UX_SPEC §A, D-035).** The signup asks for geolocation only after the privacy explainer, with
+  `{ enableHighAccuracy: false, timeout: 10000, maximumAge: 600000 }`; denial, timeout, a missing API or an insecure
+  context opens "Pick my city". The coordinates stay in one in-memory variable until `set_home_location` succeeds,
+  then are dropped; they never reach `localStorage` / `sessionStorage`, a URL, the DOM or a log. A signup that waits
+  for email confirmation stores only `{ kind: 'city', placeId }` or `{ kind: 'geo' }`; after login a city is applied
+  and a geo choice asks for the location again. A `PT429` shows "Try again later." on the location step.
 - **No parameter logging:** the project sets `log_parameter_max_length_on_error = 0` and
   `log_parameter_max_length = 0`; neither pgaudit nor auto_explain logs parameters (`auto_explain.log_parameter_max_length = 0`
   if enabled). A pre-launch test calls `set_home_location` with a known coordinate (e.g. `12.971598, 77.594566`),

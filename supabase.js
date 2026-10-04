@@ -103,6 +103,9 @@ const fileToDataUrl = (file) => new Promise((resolve, reject) => {
 
 export const compressedImageDataUrl = async (file) => file ? fileToDataUrl(await compressImage(file)) : '';
 
+// profiles.skills is server-owned (0004): only set_member_interests writes it, so it is never part of a client row.
+// The legacy city / state are sent only when the profile carries them (the profile editor); signup no longer has
+// them, and saveProfile never inserts them (the home area is a coarse cell set through set_home_location / city).
 export const profileToRow = (profile, userId, photoUrl = '') => ({
   id: userId,
   name: profile.name || 'New Member',
@@ -112,10 +115,9 @@ export const profileToRow = (profile, userId, photoUrl = '') => ({
   phone_country_code: profile.phoneCountryCode || profile.phone_country_code || '',
   phone_number: profile.phoneNumber || profile.phone_number || '',
   gender: normalizeGender(profile.gender),
-  city: profile.city || '',
-  state: profile.state || '',
+  ...(typeof profile.city === 'string' ? { city: profile.city } : {}),
+  ...(typeof profile.state === 'string' ? { state: profile.state } : {}),
   experience: profile.experience || '',
-  skills: splitValues(profile.skills),
   looking_for: splitValues(profile.lookingFor || profile.looking_for),
   photo_url: photoUrl || profile.photoUrl || null,
   cover_url: profile.coverUrl || profile.cover_url || null,
@@ -237,7 +239,8 @@ export const saveProfile = async (userId, profile, photoFile, coverFile = null) 
     const { id: ignoredId, email: ignoredEmail, ...editable } = payload;
     const updated = await supabase.from('profiles').update(editable).eq('id', userId).select().maybeSingle();
     if (updated.error || updated.data) return updated;
-    return supabase.from('profiles').insert(payload).select().single();
+    const { city: ignoredCity, state: ignoredState, ...insertRow } = payload;
+    return supabase.from('profiles').insert(insertRow).select().single();
   };
   let result = await write(row);
   if (result.error && /cover_url|column/i.test(result.error.message || '')) {
@@ -268,3 +271,46 @@ export const rowToProfile = (row) => ({
   coverUrl: row.cover_url || row.coverUrl || row.cover_image_url || row.cover_image || '',
   coverName: row.cover_url || row.coverUrl || row.cover_image_url || row.cover_image ? 'Cover image' : '',
 });
+
+// ---------------------------------------------------------------------------------------------
+// ORBIT onboarding (0004). Coordinates go only into the POST body of set_home_location (a volatile RPC, so PostgREST
+// never serves it on GET); this module never stores, caches or logs them. Every call returns { data, error, status }.
+// ---------------------------------------------------------------------------------------------
+const notConfigured = () => ({ data: null, error: new Error('Supabase is not configured.'), status: 0 });
+const rpcCall = async (name, args) => {
+  if (!supabase) return notConfigured();
+  const { data, error, status } = await supabase.rpc(name, args);
+  return { data, error, status };
+};
+// A PostgREST error raised with SQLSTATE PT429 (for example 'try again later': the 3-per-24-h location cap).
+export const isRateLimited = (error, status = 0) => status === 429 || error?.code === 'PT429';
+
+export const setHomeLocation = (lat, lng) => rpcCall('set_home_location', { lat, lng });
+export const setHomeCity = (placeId) => rpcCall('set_home_city', { p_place_id: placeId });
+export const setMemberInterests = (items) => rpcCall('set_member_interests', { p_items: items });
+export const fetchMyInterests = () => rpcCall('my_interests');
+
+// my_onboarding_status(): { interests, points, has_cell, place_label, completed } or null when there is no row.
+export const onboardingStatus = async () => {
+  const result = await rpcCall('my_onboarding_status');
+  const row = Array.isArray(result.data) ? result.data[0] || null : result.data || null;
+  return { ...result, data: row };
+};
+
+// The active taxonomy (spec §3.1): id, parent_id, level, label, sensitive. Levels 1-2 group, levels 3-4 are selectable.
+export const fetchInterestNodes = async () => {
+  if (!supabase) return notConfigured();
+  const { data, error, status } = await supabase.from('interest_node')
+    .select('id,parent_id,level,label,sensitive').eq('status', 'active').order('id');
+  return { data: data || [], error, status };
+};
+
+// City list for "Pick my city": name or region match, launch cities first. Wildcards in the query are dropped.
+export const searchPlaces = async (query, limit = 8) => {
+  if (!supabase) return notConfigured();
+  const clean = String(query || '').replace(/[^\p{L}\p{N} '-]/gu, ' ').replace(/\s+/g, ' ').trim().slice(0, 60);
+  let request = supabase.from('place').select('id,name,region,country');
+  if (clean) request = request.or(`name.ilike.*${clean}*,region.ilike.*${clean}*`);
+  const { data, error, status } = await request.order('is_launch', { ascending: false }).order('name').limit(limit);
+  return { data: data || [], error, status };
+};

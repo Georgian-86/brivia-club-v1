@@ -280,3 +280,29 @@ supersedes it.
   that already shows `~3 km` / `~10 km`, or adding noise instead of coarsening the order).
 - **Alternatives rejected:** keeping the true-ring order (the triangulation above); ordering by true ring only before
   the limit, then by display ring (the limit would still select by true ring, which is the same leak).
+
+## D-035: `profiles.skills` is server-owned; the signup client never persists coordinates
+- Accepted 2026-10-04 (Iteration 3, Task 8; controller rulings on skills ownership, sensitive interests and coordinates).
+- **Decision (skills):** 0004 replaces the 0003 `update` column grant on `profiles` with the same editable columns minus
+  `skills`. The client no longer sends `skills` (`profileToRow`, signup, profile editor); the editor shows it read-only.
+  `set_member_interests` is its only writer. Insert is unchanged: a `skills` value sent with a first insert is
+  overwritten by `set_member_interests`, which completion (D-030) requires before anyone can see the member, so it can
+  never reach another member. A harness test asserts that a client update of `skills` fails and that the client's
+  profile save still works.
+- **Decision (client capture):** coordinates live in one in-memory variable from the geolocation callback until
+  `set_home_location` succeeds, then are dropped. They are never written to `localStorage` / `sessionStorage`, a URL,
+  the DOM, a log or auth metadata. Geolocation is requested only on "Use my location", after the privacy explainer;
+  any failure opens "Pick my city". A signup waiting for email confirmation stores only `{ kind: 'city', placeId }` or
+  `{ kind: 'geo' }`; a geo choice is asked for again after login. Auth metadata no longer carries `skills`, `city` or
+  `state`.
+- **Decision (gate):** `my_onboarding_status().completed = false` routes a member from auth or the app to the
+  completion flow at the first incomplete step (2 without a cell, else 3). Only an explicit `false` redirects; an
+  unreadable status lets the app load, because the server already hides incomplete members (D-030).
+- **Why:** a client-writable `skills` let a member publish a label outside their Passion Budget, including a sensitive
+  one (D-029). Persisting coordinates anywhere in the browser would outlive the coarse cell that is the whole point of
+  §9.1.4.
+- **Cost:** members can no longer free-type skills; they change them through their interests. A member who signed up
+  with "Use my location" and confirmed by email is asked for their area once more.
+- **Alternatives rejected:** also revoking `insert (skills)` (it would break the existing client-insert `is_test`
+  guard test for no privacy gain, since the value is overwritten before visibility); keeping coordinates in
+  `sessionStorage` across the email round trip (a stored coordinate, against CLAUDE.md).

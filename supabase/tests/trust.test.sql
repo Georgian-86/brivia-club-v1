@@ -16,7 +16,7 @@ do $$
 declare n int;
 begin
   update public.profiles set name='A2', full_name='A2', phone='1', phone_country_code='+1', phone_number='1',
-    gender='Male', city='Houston', state='TX', experience='x', skills='{a,b}', looking_for='{c}',
+    gender='Male', city='Houston', state='TX', experience='x', looking_for='{c}',
     photo_url='https://proj.supabase.co/storage/v1/object/public/profile-photos/a1a1a1a1-0000-0000-0000-0000000000a1/p.jpg',
     cover_url='/assets/c.png', updated_at=now()
   where id = auth.uid();
@@ -33,7 +33,9 @@ begin
     'update public.profiles set is_test = true where id = auth.uid()',
     'update public.profiles set email = ''evil@example.com'' where id = auth.uid()',
     'update public.profiles set created_at = now() - interval ''1 year'' where id = auth.uid()',
-    'update public.profiles set id = ''c1c1c1c1-0000-0000-0000-0000000000c1'' where id = auth.uid()'
+    'update public.profiles set id = ''c1c1c1c1-0000-0000-0000-0000000000c1'' where id = auth.uid()',
+    -- 0004 (Task 8 ruling): profiles.skills is server-owned; only set_member_interests writes it.
+    'update public.profiles set skills = ''{Hacked}'' where id = auth.uid()'
   ] loop
     failed := false;
     set local role authenticated;

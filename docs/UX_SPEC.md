@@ -35,23 +35,57 @@ New components reuse these tokens. **No raw hex in new components**, and no new 
 
 ## Flow changes
 
-### A. Onboarding: replace the free-text City/State and add "Your orbit"
+### A. Onboarding: 4 steps with "Your area" and the Passion Budget (shipped in Iteration 3, Task 8)
 
-The current signup is 3 steps. It becomes **4 steps**:
+The signup (`auth.html`, `script.js`, `passion-budget.js`) has **4 steps**. The progress reads `STEP n OF 4 · …` and the
+progress bar has `aria-valuemax="4"`. Every step has Back (except step 1); Next validates only its own step.
 
-1. **The basics:** name, email, phone. City/State text inputs are **replaced** by step 2.
-2. **Your area (new):** "Where do you spend most weeks?" Two options:
-   - **Use my location** (browser geolocation). Ask in context, after the explanation "We only keep a ~5 km area.
-     Nobody ever sees where you are." The coordinates are snapped to the coarse cell **on the server** and discarded.
-   - **Pick my city:** searchable city list, which uses the city centroid.
-   - Denying geolocation is never a dead end, because it falls back to "Pick my city".
-3. **Your signals (reworked):** pick up to 12 interests from the taxonomy (searchable chips, grouped by category),
-   then spread **20 passion points**:
-   - each chosen interest has a −/+ stepper (tap-friendly and keyboard-operable; no slider-only control);
-   - a live counter reads "14 of 20 points left", announced via `aria-live="polite"`;
-   - a mode toggle per interest: *Learn · Play · Teach · Build* (a segmented control with visible labels);
-   - you can't continue until all 20 points are placed. The error appears beside the counter.
-4. **Security and presence:** unchanged (password, photo, cover).
+1. **The basics** (`STEP 1 OF 4 · THE BASICS`): full name, email, phone, gender and experience. There are no City or
+   State inputs; step 2 replaces them.
+2. **Your area** (`STEP 2 OF 4 · YOUR AREA`), "Where do you spend most weeks?"
+   - The explainer **"We only keep a ~5 km area. Nobody ever sees where you are."** is always visible above the two
+     choices, so it is read before the browser asks for permission.
+   - **Use my location** calls `navigator.geolocation.getCurrentPosition` with
+     `{ enableHighAccuracy: false, timeout: 10000, maximumAge: 600000 }`, and only on that tap. Success reads
+     "Got it. We'll keep only a ~5 km area around you." The coordinates stay in memory only (never storage, URL, DOM
+     or logs) and go to the server in the body of `POST rpc/set_home_location`, which snaps them to a coarse cell.
+   - Denial, timeout, an unanswered prompt (15 s), a missing API or an insecure context opens **Pick my city** with
+     **"No problem. Pick your city instead."** and moves focus to the city search. It is never a dead end.
+   - **Pick my city** is a labelled combobox ("Your city") over a listbox of `place` rows (name, region; launch cities
+     first). Arrow keys move, Enter picks, Escape closes. The pick reads "Your area: Bengaluru, Karnataka. We use the
+     city's centre, never your address." and is sent with `rpc/set_home_city`.
+   - Next without an area shows "Choose your area to continue." A `PT429` from either call returns the member here
+     with **"Try again later."** beside the choices.
+3. **Your signals** (`STEP 3 OF 4 · YOUR SIGNALS`), "Find your people."
+   - A search field ("Interests") over the taxonomy. With no query, one collapsible group per category (level 2),
+     each holding chips for its interests and niches (levels 3–4, the only selectable levels). With a query, the
+     matching chips, grouped by category. Chips are toggle buttons (`aria-pressed`); at 12 the rest are disabled with
+     "You can choose up to 12 interests. Remove one to add another."
+   - **Sensitive interests** (D-029) can be picked like any other. Their chip and their budget row show a lock icon
+     and **"Private: counts for matching, never shown on your profile"**. They never appear anywhere public.
+   - **The Passion Budget:** 20 points over 1–12 interests, each with at least 1 point. A new interest gets 1 point
+     (taken from the largest one when none are left). Each chosen interest has a −/+ stepper
+     (`aria-label="Remove a point from <label>"` / `"Add a point to <label>"`, 44 × 44 px, focusable even at a
+     limit), a segmented radio group **Learn · Play · Teach · Build** (default Play; arrow keys move), and a remove
+     button. Steppers never take an interest below 1 or the total over 20.
+   - The counter **"N of 20 points left"** is `aria-live="polite"`. Next stays `aria-disabled` until all 20 points
+     are placed; activating it then shows **"Place all 20 points to continue."** beside the counter.
+   - "What are you looking for?" (unchanged) is required here too.
+4. **Security and presence** (`STEP 4 OF 4 · SECURITY & PRESENCE`): password, photo and cover, unchanged.
+
+**Submit order.** With a session: save the profile, then `set_home_location` or `set_home_city`, then
+`set_member_interests`, then the app. A failed area or interest call returns to that step with the error beside it.
+Without a session (email confirmation), `brivia-pending-profile` keeps the profile fields, the interests and only
+`orbit: { kind: 'city', placeId }` or `{ kind: 'geo' }`, never coordinates. After login a city choice and complete
+interests are applied silently; a geo choice re-opens step 2. Profile writes never carry `skills` (server-owned,
+D-035), `city` or `state`; auth metadata carries no interests or location.
+
+**Completion re-entry (the gate).** Auth and app routing call `my_onboarding_status()`. When `completed` is false,
+the member lands on the completion flow at the first incomplete step: step 2 without a cell, else step 3. A stored
+area is kept ("Your area: Pune. Choose again to change it.") and existing interests prefill the budget.
+
+**Profile editor (`app.js`).** Skills / interests are shown read-only ("These come from your interests and passion
+points. Private interests are never shown.").
 
 ### B. Discover deck (`app.html` swipe card)
 

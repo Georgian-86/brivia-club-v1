@@ -400,3 +400,53 @@ begin
   end if;
 end $$;
 rollback;
+
+-- Task 8 ruling: profiles.skills is server-owned. A client cannot update it; the editable columns still save;
+-- set_member_interests (SECURITY DEFINER) is the writer that counts.
+insert into auth.users(id) values ('d8d8d8d8-0000-0000-0000-0000000000d8') on conflict do nothing;
+do $$
+declare failed boolean; n int;
+begin
+  set local role authenticated;
+  perform set_config('request.jwt.claims', '{"sub":"a3a3a3a3-0000-0000-0000-0000000000a3"}', true);
+  failed := false;
+  begin
+    update public.profiles set skills = '{Self-disclosed}' where id = auth.uid();
+  exception when insufficient_privilege then failed := true;
+  end;
+  if not failed then raise exception 'FAIL: a client update of profiles.skills succeeded'; end if;
+  -- The profile save the client sends (editable columns, no skills) still works.
+  update public.profiles set name = 'A3', full_name = 'A3', phone = '1', phone_country_code = '+1',
+    phone_number = '1', gender = 'Female', experience = 'x', looking_for = '{Friends}', updated_at = now()
+   where id = auth.uid();
+  get diagnostics n = row_count;
+  if n <> 1 then raise exception 'FAIL: editable profile update touched % rows', n; end if;
+  -- First-time insert: the client's insert shape (no skills, no city/state) works. A skills value smuggled into the
+  -- first insert does not survive completion: set_member_interests overwrites it.
+  perform set_config('request.jwt.claims', '{"sub":"d8d8d8d8-0000-0000-0000-0000000000d8"}', true);
+  insert into public.profiles (id, name, full_name, email, phone, phone_country_code, phone_number, gender,
+                               experience, looking_for, photo_url, cover_url, skills, updated_at)
+  values ('d8d8d8d8-0000-0000-0000-0000000000d8', 'D8', 'D8', 'd8@example.com', '', '', '', null, '', '{}', null, null,
+          '{Self-disclosed}', now());
+  perform public.set_member_interests('[{"interest_id":"sports.racket.badminton","points":20}]'::jsonb);
+  reset role;
+  if (select skills from public.profiles where id = 'd8d8d8d8-0000-0000-0000-0000000000d8') is distinct from array['Badminton'] then
+    raise exception 'FAIL: smuggled insert skills survived set_member_interests: %',
+      (select skills from public.profiles where id = 'd8d8d8d8-0000-0000-0000-0000000000d8');
+  end if;
+  delete from public.profiles where id = 'd8d8d8d8-0000-0000-0000-0000000000d8';
+end $$;
+-- anon cannot write skills either.
+do $$
+declare failed boolean := false;
+begin
+  set local role anon;
+  begin
+    update public.profiles set skills = '{x}';
+  exception when insufficient_privilege then failed := true;
+  end;
+  reset role;
+  if not failed then raise exception 'FAIL: anon update of skills allowed'; end if;
+end $$;
+
+select 'orbit-interests.test.sql skills ownership OK' as result;

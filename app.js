@@ -15,7 +15,7 @@ import './chat-sidebar-fix.css';
 import './app-navigation.css';
 import './discovery-filters.css';
 import './mobile-app.css';
-import { supabase, rowToProfile, saveProfile, isStorageImageUrl, withoutCredentials, uploadMessageAttachment, removeMessageAttachment, uploadCommunityPostImage, removeCommunityPostImage } from './supabase.js';
+import { supabase, rowToProfile, saveProfile, onboardingStatus, isStorageImageUrl, withoutCredentials, uploadMessageAttachment, removeMessageAttachment, uploadCommunityPostImage, removeCommunityPostImage } from './supabase.js';
 import { defaultCoverUrl, normalizeCoverUrl } from './cover-assets.js';
 import { chatEmojiCategories } from './chat-emoji-data.js';
 import { chatGifCatalog } from './chat-gif-data.js';
@@ -1395,7 +1395,7 @@ const openProfileEditor = () => {
         <label><span>EXPERIENCE / ROLE</span><input name="experience" value="${escapeHtml(profile.experience || '')}" /></label>
         <label><span>CITY</span><input name="city" value="${escapeHtml(profile.city || '')}" /></label>
         <label><span>STATE</span><input name="state" value="${escapeHtml(profile.state || '')}" /></label>
-        <label class="profile-edit-wide"><span>SKILLS / INTERESTS</span><input name="skills" list="profile-edit-skills-options" value="${escapeHtml(profile.skills || '')}" placeholder="Search or type skills, separated by commas" /><datalist id="profile-edit-skills-options">${profileEditDatalist('skills')}</datalist><small class="profile-edit-helper">Choose from suggestions or type your own.</small></label>
+        <div class="profile-edit-wide profile-edit-readonly"><span>SKILLS / INTERESTS</span><p>${escapeHtml(profile.skills || 'None yet')}</p><small class="profile-edit-helper">These come from your interests and passion points. Private interests are never shown.</small></div>
         <label class="profile-edit-wide"><span>LOOKING FOR</span><input name="lookingFor" list="profile-edit-looking-options" value="${escapeHtml(profile.lookingFor || '')}" placeholder="Search or type what you are looking for" /><datalist id="profile-edit-looking-options">${profileEditDatalist('lookingFor')}</datalist><small class="profile-edit-helper">Choose from suggestions or type your own.</small></label>
         <label><span>PROFILE PHOTO</span><input name="photoFile" type="file" accept="image/*" /></label>
         <label><span>COVER PHOTO</span><input name="coverFile" type="file" accept="image/*" /></label>
@@ -1421,7 +1421,6 @@ const openProfileEditor = () => {
       city: String(formData.get('city') || '').trim(),
       state: String(formData.get('state') || '').trim(),
       experience: String(formData.get('experience') || '').trim(),
-      skills: String(formData.get('skills') || '').trim(),
       lookingFor: String(formData.get('lookingFor') || '').trim(),
     };
     const photoFile = form.querySelector('[name="photoFile"]')?.files?.[0] || null;
@@ -2246,6 +2245,14 @@ const loadSupabaseCommunity = async () => {
     return;
   }
   if (!ownRow) {
+    window.location.replace('/auth.html?complete-profile=1');
+    return;
+  }
+  // Onboarding gate (UX_SPEC flow A): a member without a home area or a complete Passion Budget finishes it first.
+  // Only an explicit completed = false redirects; if the status cannot be read, the server still hides an incomplete
+  // member from everyone (D-030).
+  const { data: onboarding, error: onboardingError } = await onboardingStatus();
+  if (!onboardingError && onboarding && onboarding.completed === false) {
     window.location.replace('/auth.html?complete-profile=1');
     return;
   }
