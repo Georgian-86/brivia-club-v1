@@ -257,3 +257,26 @@ supersedes it.
 - **Alternatives rejected:** porting `R` and the Escape-Velocity gate to SQL (arena ruling: one engine, in ORBIT);
   counting sensitive interests for order only (a positional leak, see above); returning the ring or km for the
   client to band (a probe of what k-anonymity hides).
+
+## D-034: Deck order uses the k-safe display ring (supersedes D-033 in part)
+- Accepted 2026-10-04 (Iteration 3, Task 7 fix round 1; controller ruling I1, privacy over precision). It replaces
+  only D-033's ordering key: `deck_candidates` now orders by the display ring, the ring the card's `distance_band`
+  shows, instead of the true ring. The rest of D-033 stands.
+- **Decision:** the band (and so the display ring) is computed for the whole pool **before** the limit. The order
+  is display ring ascending, then shared count descending, then `md5(caller || target)`. A true ring-0 member in a
+  sparse cell, whose band is coarsened to the place name, sorts with the other place-name cards. It never comes
+  ahead of `~3 km` cards, and it comes behind a ring-2 place-name card with more shared interests. Its position
+  does not change as its true ring moves from 0 to 2.
+- **Why (the triangulation attack):** under D-033 a coarsened card's position still told its true ring. A member
+  could walk the pool by passing cards (each pass hides one for 7 days, revealing the next) and note where a target
+  lands relative to the `~3 km` / place-name boundary. Combined with 3 home moves a day (§9.1.4), each from a
+  different cell, the ring-0 / ring-1 / ring-2 boundaries from several vantage points intersect to a small area. That
+  recovers what the k-anonymity floor exists to hide, for exactly the sparse cells it protects.
+- **Cost:** in sparse areas (no cell meeting k), location-first ordering degrades to shared-count order within the
+  place band: a ring-0 neighbour with no shared interest no longer outranks a ring-2 member with three. The P0-4
+  acceptance order (ring 0 with 0 shared before ring 2 with 3 shared) still holds wherever the ring-0 band is
+  `~3 km`, which the test asserts. Dense launch cells are unaffected.
+- **Open:** this goes to the iteration-3 arena for challenge (for example, ordering by true ring only within a band
+  that already shows `~3 km` / `~10 km`, or adding noise instead of coarsening the order).
+- **Alternatives rejected:** keeping the true-ring order (the triangulation above); ordering by true ring only before
+  the limit, then by display ring (the limit would still select by true ring, which is the same leak).

@@ -18,8 +18,8 @@
 --      client inserts into connection_requests; redefines brivia_before_connection_request (0003, without the caps),
 --      respond_connection_request (0003) and brivia_has_completed_profile (0001) on top of the D-030 completion,
 --      and recreates the completion-gated request, match, message and post policies (once-per-statement check).
---   7. Deck: deck_candidates (ring, then shared-interest count; distance bands and "You both" labels) and
---      deck_status (P0-4, D-033, §7 / §9.1.5).
+--   7. Deck: deck_candidates (k-safe display ring, then shared-interest count; distance bands and "You both" labels) and
+--      deck_status (P0-4, D-033, D-034, §7 / §9.1.5).
 --   Data: places (section 1) and the interest taxonomy (end of file).
 -- Privacy (CLAUDE.md): coordinates exist only as function arguments. No member table stores them; the only
 -- coordinate columns are the public city centroids in public.place, which no client role can read.
@@ -1173,23 +1173,26 @@ grant execute on function public.respond_connection_request(uuid, boolean) to au
 -- =============================================================================================
 -- 7. Deck
 -- =============================================================================================
--- The interim location-first deck (P0-4, D-033; spec §7 and §9.1.5). ORBIT's formulas (R, the gate, the Roche
--- Limit) are NOT ported to SQL: this deck orders by proximity ring, then by the shared-interest count.
+-- The interim location-first deck (P0-4, D-033, D-034; spec §7 and §9.1.5). ORBIT's formulas (R, the gate, the
+-- Roche Limit) are NOT ported to SQL: this deck orders by the k-safe display ring, then by the shared-interest count.
 -- * Pool: every target with brivia_visible_to(caller, target) and a true ring <= 2 (km between the g7 centroids).
 --   Hidden: members the caller is matched with; members in the caller's signal_ledger within 30 days, or with a
 --   live outgoing connection_requests row from the caller (requests sent before the ledger existed); members the
---   caller passed (interaction event 'pass') within 7 days.
+--   caller passed (interaction event 'pass') within 7 days. Only cell_scheme 'grid1' rows take part (caller and
+--   target); a row of another scheme (the iteration-4 H3 backfill) is skipped, never an error.
 -- * Shared interests: the exact same interest_id held by both, counting only ACTIVE, NON-SENSITIVE nodes. Sensitive
 --   interests (D-029) and retired nodes (including the harness fixture zz.harness.any) are left out of the labels AND
 --   of the count used for ordering, so neither a chip nor a card's position can reveal one.
--- * Order: true ring asc, shared count desc, then md5(caller || target) (a stable per-pair shuffle).
--- * shared_interests: at most 2 labels, by summed points (caller + target) desc, then label asc.
 -- * distance_band (k-anonymity, §9.1.4): k = 10 when the true ring <= 1, else 5. The level is g7 if
 --   brivia_cell_ok(target g7, world, k), else the stored g6 parent, else the stored g5 parent, else the place.
 --   Display ring: the true ring at g7; greatest(2, ring of the distance between the caller's and the target's cells
 --   at that level) at g6 / g5; greatest(2, true ring) at the place. Labels: 0 '~3 km', 1 '~10 km', 2 the target's
 --   place name, 3 its region, 4 its country, 5 'Abroad'; 'Abroad' too when the target's place is in another
 --   country than the caller's. A cell id, km, ring, coordinate, city, state, email or phone never leaves.
+-- * Order (D-034): display ring asc, shared count desc, then md5(caller || target). The band is computed for the
+--   whole pool BEFORE the limit, and the true ring is never an ordering key: a coarsened card sorts with the other
+--   cards of its band, so its position cannot reveal what the band hides.
+-- * shared_interests: at most 2 labels, by summed points (caller + target) desc, then label asc.
 -- * The caller must be completed; otherwise (or without a session) no rows. p_limit defaults to 12, clamped to
 --   [1, 20].
 create or replace function public.deck_candidates(p_limit int default 12)
@@ -1202,27 +1205,27 @@ set search_path = public
 as $$
   with me as (
     select p.id, p.is_test, o.home_cell, o.home_cell_g6, o.home_cell_g5, vp.country,
-           split_part(o.home_cell, ':', 2)::int as g7row
+           substring(o.home_cell from '^g7:(\d+):')::int as g7row
       from public.profiles p
-      join public.member_orbit o on o.member_id = p.id
+      join public.member_orbit o on o.member_id = p.id and o.cell_scheme = 'grid1'
       join public.place vp on vp.id = o.place_id
      where p.id = auth.uid() and public.brivia_member_completed(p.id)
   ),
   near as (  -- ring <= 2 means <= 60 km, so at most 60 / 111.19 deg of latitude (26 g7 rows, plus 1 for flooring):
-             -- a cheap prefilter before the haversine
+             -- a cheap prefilter before the haversine. The CASE keeps a non-grid1 cell away from brivia_cell_km.
     select o.member_id as tid, o.home_cell, o.home_cell_g6, o.home_cell_g5,
            tp.name as place_name, tp.region, tp.country,
-           public.brivia_ring(public.brivia_cell_km(me.home_cell, o.home_cell)) as ring
+           case when o.cell_scheme = 'grid1' and o.home_cell ~ '^g7:'
+                then public.brivia_ring(public.brivia_cell_km(me.home_cell, o.home_cell)) end as ring
       from me
-      join public.member_orbit o on o.member_id <> me.id
-                                and abs(split_part(o.home_cell, ':', 2)::int - me.g7row) <= 28
+      join public.member_orbit o on o.member_id <> me.id and o.cell_scheme = 'grid1'
+                                and abs(coalesce(substring(o.home_cell from '^g7:(\d+):')::int, -100000) - me.g7row) <= 28
       join public.profiles t on t.id = o.member_id and t.is_test = me.is_test
       join public.place tp on tp.id = o.place_id
   ),
-  pool as (
+  pool as (  -- the cheap own-history checks first; brivia_visible_to (the single visibility rule) last
     select n.* from near n, me
      where n.ring <= 2
-       and public.brivia_visible_to(me.id, n.tid)
        and not exists (select 1 from public.matches m
                         where (m.user1_id = me.id and m.user2_id = n.tid) or (m.user1_id = n.tid and m.user2_id = me.id))
        and not exists (select 1 from public.signal_ledger l
@@ -1233,6 +1236,7 @@ as $$
        and not exists (select 1 from public.interaction i
                         where i.viewer_id = me.id and i.target_id = n.tid and i.event = 'pass'
                           and i.created_at > now() - interval '7 days')
+       and public.brivia_visible_to(me.id, n.tid)
   ),
   shared as (
     select pool.tid, count(*)::int as n,
@@ -1243,28 +1247,27 @@ as $$
       join public.interest_node nd on nd.id = mt.interest_id and nd.status = 'active' and not nd.sensitive
      group by pool.tid
   ),
-  top as (
+  banded as (  -- the k-safe band of every pool member, before any ordering or limit
     select pool.*, coalesce(s.n, 0) as shared_n, coalesce(s.labels, '{}'::text[]) as labels,
            md5(me.id::text || pool.tid::text) as tie,
-           case when pool.ring <= 1 then 10 else 5 end as k
+           case
+             when public.brivia_cell_ok(pool.home_cell, me.is_test, case when pool.ring <= 1 then 10 else 5 end)
+               then pool.ring
+             when public.brivia_cell_ok(pool.home_cell_g6, me.is_test, case when pool.ring <= 1 then 10 else 5 end)
+               then greatest(2, public.brivia_ring(public.brivia_cell_km(me.home_cell_g6, pool.home_cell_g6)))
+             when public.brivia_cell_ok(pool.home_cell_g5, me.is_test, case when pool.ring <= 1 then 10 else 5 end)
+               then greatest(2, public.brivia_ring(public.brivia_cell_km(me.home_cell_g5, pool.home_cell_g5)))
+             else greatest(2, pool.ring)
+           end as display_ring,
+           pool.country is distinct from me.country as abroad
       from pool
       cross join me
       left join shared s on s.tid = pool.tid
-     order by pool.ring, shared_n desc, tie
-     limit greatest(1, least(coalesce(p_limit, 12), 20))
   ),
-  banded as (
-    select top.*,
-           case
-             when public.brivia_cell_ok(top.home_cell, me.is_test, top.k) then top.ring
-             when public.brivia_cell_ok(top.home_cell_g6, me.is_test, top.k)
-               then greatest(2, public.brivia_ring(public.brivia_cell_km(me.home_cell_g6, top.home_cell_g6)))
-             when public.brivia_cell_ok(top.home_cell_g5, me.is_test, top.k)
-               then greatest(2, public.brivia_ring(public.brivia_cell_km(me.home_cell_g5, top.home_cell_g5)))
-             else greatest(2, top.ring)
-           end as display_ring,
-           top.country is distinct from me.country as abroad
-      from top cross join me
+  top as (
+    select b.* from banded b
+     order by b.display_ring, b.shared_n desc, b.tie
+     limit greatest(1, least(coalesce(p_limit, 12), 20))
   )
   select p.id, p.name, p.photo_url, p.cover_url, p.experience, p.skills, p.looking_for,
          case
@@ -1277,9 +1280,9 @@ as $$
            else 'Abroad'
          end,
          b.labels
-    from banded b
+    from top b
     join public.profiles p on p.id = b.tid
-   order by b.ring, b.shared_n desc, b.tie
+   order by b.display_ring, b.shared_n desc, b.tie
 $$;
 revoke all on function public.deck_candidates(int) from public, anon;
 grant execute on function public.deck_candidates(int) to authenticated;

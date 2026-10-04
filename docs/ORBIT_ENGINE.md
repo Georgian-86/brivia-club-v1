@@ -434,9 +434,13 @@ saturated, the outer rings relax first, instead of the deck repeating saturated 
   - **Pool:** every target `brivia_visible_to(caller, target)` whose true ring (§4.2, km between the g7 cell
     centroids) is 0–2. Hidden: members the caller is matched with; members in the caller's `signal_ledger` within
     30 days, or with a live outgoing request from the caller; members the caller passed (`interaction` `pass`) within
-    7 days. A caller who is not completed (or no session) gets no rows. `p_limit` is clamped to [1, 20].
-  - **Order:** true ring ascending, then the shared-interest count descending (the exact same `interest_id` held by
-    both), then `md5(caller || target)`.
+    7 days. Only `cell_scheme = 'grid1'` rows take part (caller and target); another scheme is skipped, never an
+    error. A caller who is not completed (or no session) gets no rows. `p_limit` is clamped to [1, 20].
+  - **Order (D-034):** the k-safe display ring (the ring the card's band shows, below) ascending, then the
+    shared-interest count descending (the exact same `interest_id` held by both), then `md5(caller || target)`. The
+    band is computed for the whole pool before the limit, and the true ring is never an ordering key: a sparse
+    ring-0 card coarsened to the place name sorts with the other place-name cards, so its position cannot reveal what
+    its band hides. In sparse areas the order is therefore the shared count within the place band.
   - **Sensitive and retired interests never count.** The shared count and the labels use only active,
     non-sensitive nodes (D-029). A shared sensitive interest therefore changes neither a chip nor a card's position
     (ORBIT may later let it raise `R`, §9.1.5; the interim deck does not).
@@ -697,10 +701,10 @@ select log_impressions($1, $4);
   `lat`, `lng`, `email`, `phone*`, `headroom`, `load` or `ring`. A failing contract test blocks deploy.
 - **Interim deck contract (Iteration 3, `supabase/tests/orbit-deck.test.sql`).** Until ORBIT serves the deck, the
   `deck_candidates` row keys equal exactly `id, name, photo_url, cover_url, experience, skills, looking_for,
-  distance_band, shared_interests`. No row's JSON matches `8[0-9a-f]{14}`, `g[5-7]:\d+:\d+`, `-?\d{1,3}\.\d{3,}`, `@`
-  or `\d{10}`, and no key is `city`, `state`, `cell`, `km`, `lat`, `lng`, `ring`, `email`, `phone` or `is_test`. A
+  distance_band, shared_interests`. No row's JSON matches `8[0-9a-f]{14}`, `g[5-7]:\d+:\d+`, `-?\d{1,3}\.\d{3,}` or
+  `@`; no value other than `id` and the image URLs matches `\d{10}` (a uuid can hold ten digits); and no key is `city`, `state`, `cell`, `km`, `lat`, `lng`, `ring`, `email`, `phone` or `is_test`. A
   pair whose only shared interests are sensitive (or the retired harness fixture) gets an empty `shared_interests`.
-  `ring` is computed for ordering but never returned. `deck_status()` returns a reason code, never a count.
+  The true ring is used for the pool and the band, never returned and never an ordering key (D-034). `deck_status()` returns a reason code, never a count.
 - **Sensitive interests never leave the service (D-029).** No card, chip, explanation or search hit carries the
   label or id of an `interest_node` with `sensitive = true`, and search never matches one. A shared sensitive
   interest may raise `matchPercent` (it counts toward resonance), but the chips must then name only non-sensitive
