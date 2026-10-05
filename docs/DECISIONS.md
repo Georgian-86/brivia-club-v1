@@ -546,3 +546,37 @@ supersedes it.
   gate item 7 (auth hardening). Performance is unchanged from D-042 (17 `auth_rls_initplan`, 4 unindexed foreign keys,
   unused-index INFO); the fix is queued for `0005`.
 - **Gate:** test members only — **met** on the live project. Real members still wait on P0-B, gate items 7, 10, 11.
+
+## D-044: P0-B design arena: 18+ gate, consent history, report_member, self-serve deletion, retention (iteration 4)
+- **Date:** 2026-10-05. **Record:** `docs/arena/2026-10-05-p0b-design.md` (critics A UX, B privacy/security/DPDP,
+  C data/ops/engine, and a judge; all Claude models, heterogeneity reduced and disclosed). Snapshot `0eb76f7`.
+- **Decision (binding rulings R1–R14), summarised:**
+  - **18+ (R1):** `profiles.adult_declared_at`, settable only by `declare_adult(p_notice_version)`; completion requires
+    it; location and interest writes are refused before it; a BEFORE UPDATE guard protects it and
+    `sensitive_consent_at`; test members are backfilled. The client gate sits at the end of step 1 and routing reads
+    the member's own row (covers OAuth).
+  - **Sensitive consent (R2, R3):** separate opt-in panel; withdrawing deletes the private interests and
+    **redistributes** their points, so withdrawing is as easy as giving. Every give/withdraw/adult/deletion is an
+    append-only `consent_event` (owner-only, account life + 1 year).
+  - **Reports (R4):** `report_member` charges a sender-only cap first (10 / 24 h), always blocks any existing id (no new
+    oracle), keeps the report after the target deletes (no FK), stores the last 50 messages as evidence, flags only at
+    2 qualifying reporters in 30 days (auto flags expire at 90 days), and a qualifying `underage` report suspends the
+    target pending a 72 h founder review.
+  - **Deletion (R5, R6):** client removes Storage files first; `delete_my_account('DELETE')` needs a sign-in within
+    10 minutes and an empty folder, then deletes `auth.users` (cascade). A reported or flagged member leaves an
+    email-HMAC tombstone for 365 days; a rejoin is flagged for review.
+  - **Retention (R7)** as the table in the record; three questions go to counsel (IT Rules 180-day retention, DPDP
+    Rules log retention, CERT-In logs). Gate item 9 needs counsel's answer or a recorded founder decision.
+  - **Migrations (R8, R14):** `0005` holds R1–R7 and R9; the 17 `(select auth.uid())` policy rewrites and 4 FK
+    indexes go in a separate `0006` with a `pg_policies` drift test. The dropped 0003 request-insert policy is never
+    recreated.
+  - **Client (R9–R12):** `(city-wide)` label, `privacy.html` (version tied to `brivia_notice_version()`), honesty fixes
+    (no unverified ticks, no "already here" claim), ≥ 12 px and contrast on the safety surfaces, `compressImage` fails
+    closed, video location warning. **R13:** `docs/BREACH_RUNBOOK.md`.
+- **Deferred to P1:** phone/provider tombstone with a Vault key, storage insert policies that check the user still
+  exists, an orphan-attachment queue, an Edge Function deletion, inactive-account deletion, moderation tooling and
+  appeals, and the 12 px rule app-wide.
+- **Dissent preserved:** see the record (the packet's withdraw→recompletion and single migration; B's wider tombstone
+  and relation-before-block; B's career-resumes check; C's 14-day reporter age and suffix in `set_home_city`).
+- **Founder to confirm:** the named member cards on the `auth.html` preview stay only if each person consented
+  (otherwise they become unnamed "Example" cards); the moderation and grievance contact `thebrivia.club@gmail.com`.
