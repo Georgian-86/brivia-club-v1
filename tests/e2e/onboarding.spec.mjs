@@ -85,6 +85,8 @@ const stubContext = async (context, opts = {}) => {
   const state = {
     profile: opts.profileExists ? { id: ME, name: opts.profileName ?? 'Nia New', full_name: opts.profileName ?? 'Nia New', email: EMAIL, phone: '+91 9876543210', phone_country_code: '+91', phone_number: '9876543210', gender: 'Female', experience: '1–3 years', looking_for: ['Friends'], skills: [] } : null,
     hasCell: Boolean(opts.hasCell),
+    adultAt: opts.profileExists && opts.adultDeclared !== false ? '2026-10-05T00:00:00Z' : null,
+    declareStatus: [...(opts.declareStatus || [])],
     placeLabel: opts.hasCell ? 'Pune' : null,
     interests: opts.interests || [],
     homeCityStatus: [...(opts.homeCityStatus || [])],
@@ -107,19 +109,31 @@ const stubContext = async (context, opts = {}) => {
     if (p.startsWith('/auth/v1/')) return json(200, p.endsWith('/user') ? user : session);
     const wantsObject = (request.headers().accept || '').includes('vnd.pgrst.object');
     if (p === '/rest/v1/profiles') {
+      const own = () => ({ ...state.profile, adult_declared_at: state.adultAt });
       if (method === 'POST') {
         const row = JSON.parse(body || '{}');
         state.profile = { ...row, skills: [] };
-        return json(201, wantsObject ? state.profile : [state.profile]);
+        return json(201, wantsObject ? own() : [own()]);
       }
       if (method === 'PATCH') {
         if (!state.profile) return wantsObject ? json(406, { code: 'PGRST116', message: 'JSON object requested, multiple (or no) rows returned' }) : json(200, []);
         Object.assign(state.profile, JSON.parse(body || '{}'));
-        return json(200, wantsObject ? state.profile : [state.profile]);
+        return json(200, wantsObject ? own() : [own()]);
       }
       if (!state.profile) return wantsObject ? json(406, { code: 'PGRST116', message: 'JSON object requested, multiple (or no) rows returned' }) : json(200, []);
-      return json(200, wantsObject ? state.profile : [state.profile]);
+      return json(200, wantsObject ? own() : [own()]);
     }
+    // R1: location and interests are refused until the member has declared they are an adult.
+    const ADULT_REQUIRED = { code: 'P0001', message: 'adult declaration required', details: null, hint: null };
+    if (p === '/rest/v1/rpc/declare_adult') {
+      if (!state.profile) return json(404, { code: 'P0002', message: 'profile required' });
+      if (JSON.parse(body || '{}').p_notice_version !== '2026-10-05') return json(400, { code: '22023', message: 'stale notice version' });
+      const forced = state.declareStatus.shift();
+      if (forced === 500) return json(500, { code: 'XX000', message: 'boom' });
+      state.adultAt = state.adultAt || new Date().toISOString();
+      return route.fulfill({ status: 204, body: '', headers });
+    }
+    if (['set_home_location', 'set_home_city', 'set_member_interests'].some((n) => p === `/rest/v1/rpc/${n}`) && state.profile && !state.adultAt) return json(400, ADULT_REQUIRED);
     // staleCatalog: a catalog loaded before a node became sensitive (the server still refuses it without consent).
     if (p === '/rest/v1/interest_node') return json(200, opts.staleCatalog ? nodes.map((n) => ({ ...n, sensitive: false })) : nodes);
     if (p === '/rest/v1/place') {
@@ -155,7 +169,7 @@ const stubContext = async (context, opts = {}) => {
     if (p === '/rest/v1/rpc/my_interests') return json(200, state.interests);
     if (p === '/rest/v1/rpc/my_onboarding_status') {
       const points = state.interests.reduce((s, i) => s + i.points, 0);
-      return json(200, [{ interests: state.interests.length, points, has_cell: state.hasCell, place_label: state.placeLabel, completed: Boolean(state.profile && !['', 'New Member'].includes(String(state.profile.name || '').trim()) && state.hasCell && points === 20) }]);
+      return json(200, [{ interests: state.interests.length, points, has_cell: state.hasCell, place_label: state.placeLabel, completed: Boolean(state.profile && state.adultAt && !['', 'New Member'].includes(String(state.profile.name || '').trim()) && state.hasCell && points === 20) }]);
     }
     if (p.startsWith('/rest/v1/rpc/')) return json(200, []);
     if (p.startsWith('/rest/v1/')) return json(200, []);
@@ -175,7 +189,7 @@ const stubContext = async (context, opts = {}) => {
     const original = geo.getCurrentPosition.bind(geo);
     geo.getCurrentPosition = (ok, fail, options) => {
       const explainer = document.querySelector('[data-area-explainer]');
-      window.__geoCalls.push({ options, explainerVisible: Boolean(explainer && explainer.getClientRects().length && /We only keep a rough ~2 km neighbourhood square\. Nobody ever sees where you are\./.test(explainer.textContent)) });
+      window.__geoCalls.push({ options, explainerVisible: Boolean(explainer && explainer.getClientRects().length && /We keep only a rough ~2 km square, never your exact location\. Other members see a rounded distance or your city, and only once enough people are nearby\./.test(explainer.textContent)) });
       return original(ok, fail, options);
     };
   });
@@ -222,6 +236,7 @@ const fillStepOne = async (page) => {
   await step.locator('input[name="phoneNumber"]').fill('98765 43210');
   await step.locator('.gender-option', { hasText: 'FEMALE' }).click();
   await step.locator('select[name="experience"]').selectOption({ index: 2 });
+  await step.locator('input[name="adultConfirm"]').check();
   await step.locator('.signup-next').click();
   await page.waitForSelector('[data-signup-step="2"]:not([hidden])');
 };
@@ -292,7 +307,7 @@ try {
     const geoCallsBefore = await page.evaluate(() => window.__geoCalls.length);
     check(`1440: step 2 reads "STEP 2 OF 4" (got "${label2}")`, () => assert.match(label2, /^STEP 2 OF 4\b/));
     check(`1440: privacy explainer visible before any geolocation call ("${explainerText}")`, () => {
-      assert.ok(explainerVisible); assert.match(explainerText, /We only keep a rough ~2 km neighbourhood square\. Nobody ever sees where you are\./); assert.equal(geoCallsBefore, 0);
+      assert.ok(explainerVisible); assert.match(explainerText, /We keep only a rough ~2 km square, never your exact location\. Other members see a rounded distance or your city, and only once enough people are nearby\./); assert.equal(geoCallsBefore, 0);
     });
     // Next is blocked until an area is chosen.
     await page.locator('[data-signup-step="2"] .signup-next').click();
@@ -317,7 +332,7 @@ try {
     check(`1440: step 3 reads "STEP 3 OF 4" (got "${label3}")`, () => assert.match(label3, /^STEP 3 OF 4\b/));
     await page.waitForSelector('#interest-results [data-interest-group]', { state: 'attached' });
     const heading3 = (await page.locator('[data-signup-step="3"] .signup-step-heading h2').textContent()).trim();
-    check(`1440: step 3 heading is "Your signals." (got "${heading3}")`, () => assert.equal(heading3, 'Your signals.'));
+    check(`1440: step 3 heading is "What you care about" (got "${heading3}")`, () => assert.equal(heading3, 'What you care about'));
     // Escape in the interest search clears it and never leaves the page (the global Escape closes the auth modal).
     await page.locator('#interest-search').fill('chess');
     await page.waitForTimeout(50);
@@ -430,8 +445,8 @@ try {
     await finishStepFour(page);
     await page.waitForURL(/\/app\.html/, { timeout: 15000 });
     const flow = stub.calls.slice(callsBeforeSubmit).filter((c) => c.method !== 'GET' && c.method !== 'OPTIONS').map((c) => `${c.method} ${c.path}`);
-    const order = ['/auth/v1/signup', '/rest/v1/profiles', '/rest/v1/rpc/set_home_location', '/rest/v1/rpc/set_member_interests'].map((p) => flow.findIndex((f) => f.endsWith(p)));
-    check(`1440: submit order signup -> profile -> set_home_location -> set_member_interests -> app (${flow.join(' | ')})`, () => {
+    const order = ['/auth/v1/signup', '/rest/v1/profiles', '/rest/v1/rpc/declare_adult', '/rest/v1/rpc/set_home_location', '/rest/v1/rpc/set_member_interests'].map((p) => flow.findIndex((f) => f.endsWith(p)));
+    check(`1440: submit order signup -> profile -> declare_adult -> set_home_location -> set_member_interests -> app (${flow.join(' | ')})`, () => {
       assert.ok(order.every((i) => i >= 0)); assert.deepEqual([...order].sort((a, b) => a - b), order);
     });
     const interestsBody = JSON.parse(stub.posts('/rest/v1/rpc/set_member_interests').at(-1)?.body || '{}');
@@ -599,6 +614,7 @@ try {
       assert.equal(typeof pending.savedAt, 'number');
       assert.ok(Math.abs(Date.now() - pending.savedAt) < 120000);
     });
+    check('email path: the pending profile records adultDeclared: true', () => assert.equal(pending.adultDeclared, true));
     check('email path: pending profile has no lat / lng / latitude / longitude key and no 12.97', () => {
       assert.equal(keyDeep(pending, ['lat', 'lng', 'latitude', 'longitude']), false);
       assert.ok(!pendingRaw.includes('12.97'));
@@ -643,7 +659,7 @@ try {
   // 5. Email confirmation with a city choice: after login it is applied silently and the member goes to the app.
   {
     const context = await browser.newContext({ viewport: { width: 1280, height: 900 } });
-    const pending = { name: 'Nia New', email: EMAIL, phone: '+91 9876543210', phoneCountryCode: '+91', phoneNumber: '9876543210', gender: 'Female', experience: '1–3 years', lookingFor: 'Friends', interests: [{ id: 'sports.racket.tennis', points: 20, mode: 'learn' }], orbit: { kind: 'city', placeId: 'in-mumbai' }, savedAt: Date.now() };
+    const pending = { name: 'Nia New', email: EMAIL, phone: '+91 9876543210', phoneCountryCode: '+91', phoneNumber: '9876543210', gender: 'Female', experience: '1–3 years', lookingFor: 'Friends', adultDeclared: true, interests: [{ id: 'sports.racket.tennis', points: 20, mode: 'learn' }], orbit: { kind: 'city', placeId: 'in-mumbai' }, savedAt: Date.now() };
     await context.addInitScript(([value]) => { if (!sessionStorage.getItem('seeded')) { localStorage.setItem('brivia-pending-profile', value); sessionStorage.setItem('seeded', '1'); } }, [JSON.stringify(pending)]);
     const stub = await stubContext(context, { signupSession: false });
     const { page, errors } = await newPage(context, stub.consoleLines);
@@ -657,8 +673,8 @@ try {
     const interests = JSON.parse(stub.posts('/rest/v1/rpc/set_member_interests').at(-1)?.body || '{}').p_items || [];
     check(`city pending: applied silently after login (${JSON.stringify(city)})`, () => assert.deepEqual(city, [{ p_place_id: 'in-mumbai' }]));
     check(`city pending: interests applied (${JSON.stringify(interests)})`, () => assert.deepEqual(interests, [{ interest_id: 'sports.racket.tennis', points: 20, mode: 'learn' }]));
-    const order = ['/rest/v1/profiles', '/rest/v1/rpc/set_home_city', '/rest/v1/rpc/set_member_interests'].map((p) => stub.calls.findIndex((c) => c.method !== 'GET' && c.path === p));
-    check(`city pending: profile, then city, then interests (${order.join(',')})`, () => { assert.ok(order.every((i) => i >= 0)); assert.deepEqual([...order].sort((a, b) => a - b), order); });
+    const order = ['/rest/v1/profiles', '/rest/v1/rpc/declare_adult', '/rest/v1/rpc/set_home_city', '/rest/v1/rpc/set_member_interests'].map((p) => stub.calls.findIndex((c) => c.method !== 'GET' && c.path === p));
+    check(`city pending: profile, then declare_adult, then city, then interests (${order.join(',')})`, () => { assert.ok(order.every((i) => i >= 0)); assert.deepEqual([...order].sort((a, b) => a - b), order); });
     check('city pending: no uncaught page errors', () => assert.deepEqual(errors, []));
     await context.close();
   }
@@ -708,7 +724,7 @@ try {
   const seedPending = (context, pending) => context.addInitScript(([value]) => {
     if (!sessionStorage.getItem('seeded')) { localStorage.setItem('brivia-pending-profile', value); sessionStorage.setItem('seeded', '1'); }
   }, [JSON.stringify(pending)]);
-  const basePending = { name: 'Nia New', email: EMAIL, phone: '+91 9876543210', phoneCountryCode: '+91', phoneNumber: '9876543210', gender: 'Female', experience: '1–3 years', lookingFor: 'Friends' };
+  const basePending = { name: 'Nia New', email: EMAIL, phone: '+91 9876543210', phoneCountryCode: '+91', phoneNumber: '9876543210', gender: 'Female', experience: '1–3 years', lookingFor: 'Friends', adultDeclared: true };
 
   // 7. Email confirmation with a sensitive pick: it is left out of the pending profile (privateOmitted); after login the
   //    city is applied, step 3 opens prefilled (labels from the taxonomy) with a one-line note asking for private
@@ -903,6 +919,8 @@ try {
     const beside = await page.evaluate(() => document.querySelector('#budget-error')?.parentElement === document.querySelector('#budget-counter')?.parentElement);
     check(`22023: back on step 3 with the error beside the counter (got "${err}")`, () => { assert.equal(err, 'Your interests could not be saved. Please try again.'); assert.ok(beside); });
     await page.locator('[data-signup-step="3"] .signup-step-prev').click();
+    const cityLabel = (await page.locator('[data-area-status]').textContent()).trim();
+    check(`R9: a saved city pick reads "(city-wide)" exactly once (got "${cityLabel}")`, () => assert.equal(cityLabel, 'Your area: Bengaluru (city-wide). Choose again to change it.'));
     await page.locator('[data-signup-step="2"] .signup-next').click();
     await page.waitForSelector('[data-signup-step="3"]:not([hidden])');
     const cleared = (await page.locator('#budget-error').textContent()).trim();
@@ -934,6 +952,160 @@ try {
     check(`no name: re-entry opens step 1 (got "${label}")`, () => assert.match(label, /^STEP 1 OF 4\b/));
     check(`no name: "New Member" is not prefilled (got "${name}")`, () => assert.equal(name, ''));
     check('no name: no uncaught page errors', () => assert.deepEqual(errors, []));
+    await context.close();
+  }
+
+  // ---------------------------------------------------------------------------------------------------------------
+  // 12. Iteration 4, R1 + R11 (client): the 18+ step, honest notices, the step-3 rename, declare_adult order.
+  {
+    const context = await browser.newContext({ viewport: { width: 375, height: 800 } });
+    const stub = await stubContext(context, { signupSession: true });
+    const { page, errors } = await newPage(context, stub.consoleLines);
+    await openSignup(page);
+    const s1 = page.locator('[data-signup-step="1"]');
+    const stepCounterVisible = await page.locator('.auth-step').isVisible();
+    check('18+: the "01 / 02" counter is hidden during signup', () => assert.equal(stepCounterVisible, false));
+    const boxLabel = (await s1.locator('.adult-row').textContent()).trim().replace(/\s+/g, ' ');
+    const helper = (await s1.locator('#adult-help').textContent()).trim();
+    const rowHeight = await s1.locator('.adult-row').evaluate((el) => el.getBoundingClientRect().height);
+    const box = s1.locator('input[name="adultConfirm"]');
+    const lastBeforeNext = await s1.evaluate((el) => { const next = el.querySelector('.signup-next'); return next.previousElementSibling?.classList.contains('adult-confirm'); });
+    check(`18+: label "I confirm I'm 18 or older." and helper text (got "${boxLabel}" / "${helper}")`, () => {
+      assert.ok(boxLabel.startsWith("I confirm I'm 18 or older."));
+      assert.equal(helper, "Brivia is for adults only. We don't ask for your date of birth.");
+    });
+    check(`18+: the row is at least 44 px tall (${rowHeight}) and sits last above Next`, () => { assert.ok(rowHeight >= 44); assert.ok(lastBeforeNext); });
+    const link1 = await s1.locator('a[href="/privacy.html"]').evaluate((a) => ({ href: a.getAttribute('href'), target: a.target }));
+    check(`18+: step 1 privacy link opens /privacy.html in a new tab (${JSON.stringify(link1)})`, () => assert.deepEqual(link1, { href: '/privacy.html', target: '_blank' }));
+    // Without the box: stays on step 1, inline error linked by aria-describedby, box focused, no reportValidity bubble.
+    await s1.locator('input[name="name"]').fill('Nia New');
+    await s1.locator('input[name="email"]').fill(EMAIL);
+    await s1.locator('input[name="phoneNumber"]').fill('98765 43210');
+    await s1.locator('.gender-option', { hasText: 'FEMALE' }).click();
+    await s1.locator('select[name="experience"]').selectOption({ index: 2 });
+    await s1.locator('.signup-next').click();
+    await page.waitForTimeout(150);
+    const blocked = await page.evaluate(() => {
+      const box = document.querySelector('input[name="adultConfirm"]');
+      const err = document.querySelector('#adult-error');
+      const ids = (box.getAttribute('aria-describedby') || '').split(/\s+/);
+      return { step: [...document.querySelectorAll('[data-signup-step]')].find((el) => !el.hidden)?.dataset.signupStep, text: err?.textContent.trim(), describedBy: ids.includes('adult-error'), focused: document.activeElement === box, invalid: box.getAttribute('aria-invalid') };
+    });
+    check(`18+: Next without the box stays on step 1 with the inline error, linked and focused (${JSON.stringify(blocked)})`, () => {
+      assert.equal(blocked.step, '1'); assert.equal(blocked.text, 'You need to be 18 or older to join Brivia.');
+      assert.ok(blocked.describedBy); assert.ok(blocked.focused); assert.equal(blocked.invalid, 'true');
+    });
+    await box.check();
+    await s1.locator('.signup-next').click();
+    await page.waitForSelector('[data-signup-step="2"]:not([hidden])');
+    const errAfter = (await page.locator('#adult-error').textContent()).trim();
+    check('18+: with the box ticked Next opens step 2 and the error is cleared', () => assert.equal(errAfter, ''));
+    // Step 2 notices and the repeated privacy link.
+    const notice = (await page.locator('[data-area-explainer]').textContent()).trim();
+    const promise = (await page.locator('[data-signup-step="2"] .signup-step-heading p').textContent()).trim();
+    const link2 = await page.locator('[data-signup-step="2"] a[href="/privacy.html"]').evaluate((a) => a.target);
+    check(`R11: step 2 notice is the honest copy (got "${notice}")`, () => assert.equal(notice, 'We keep only a rough ~2 km square, never your exact location. Other members see a rounded distance or your city, and only once enough people are nearby.'));
+    check(`R11: the promise line says "nearby first, as your area fills up" (got "${promise}")`, () => assert.ok(promise.includes('nearby first, as your area fills up')));
+    check('18+: step 2 repeats the privacy link with target=_blank', () => assert.equal(link2, '_blank'));
+    await page.locator('[data-area-city]').click();
+    await pickCityByKeyboard(page);
+    await page.locator('[data-signup-step="2"] .signup-next').click();
+    await page.waitForSelector('#interest-results [data-interest-group]', { state: 'attached' });
+    const h3 = (await page.locator('[data-signup-step="3"] .signup-step-heading h2').textContent()).trim();
+    const kicker3 = (await page.locator('[data-signup-step="3"] .signup-step-heading > span').textContent()).trim();
+    check(`R11: step 3 heading is "What you care about" (got "${h3}", kicker "${kicker3}")`, () => { assert.equal(h3, 'What you care about'); assert.ok(!/signals/i.test(kicker3)); });
+    await fillBudgetWithMouse(page, 'Chess');
+    await page.locator('.looking-search').click();
+    await page.locator('#looking-results [data-looking-option]').first().click();
+    await page.locator('[data-signup-step="3"] .signup-next').click();
+    const label3 = await stepLabel(page);
+    await finishStepFour(page);
+    await page.waitForURL(/\/app\.html/, { timeout: 15000 });
+    const flow = stub.calls.filter((c) => c.method !== 'GET' && c.method !== 'OPTIONS').map((c) => c.path.replace('/rest/v1/', '').replace('/auth/v1/', ''));
+    const idx = ['signup', 'profiles', 'rpc/declare_adult', 'rpc/set_home_city', 'rpc/set_member_interests'].map((n) => flow.indexOf(n));
+    check(`18+: order profiles -> declare_adult -> set_home_city -> set_member_interests (${flow.join(' | ')})`, () => { assert.ok(idx.every((i) => i >= 0)); assert.deepEqual([...idx].sort((a, b) => a - b), idx); });
+    const declareBody = JSON.parse(stub.posts('/rest/v1/rpc/declare_adult')[0]?.body || '{}');
+    check(`18+: declare_adult sends the notice version (${JSON.stringify(declareBody)})`, () => assert.deepEqual(declareBody, { p_notice_version: '2026-10-05' }));
+    const adultInBody = stub.calls.filter((c) => c.path === '/rest/v1/profiles' && ['POST', 'PATCH'].includes(c.method) && /adult_declared_at|adultDeclared/.test(c.body));
+    check('18+: adult_declared_at is never in a profiles write body', () => assert.equal(adultInBody.length, 0));
+    check('R11: the signup step label for step 3 no longer says "signals"', () => assert.ok(!/signals/i.test(label3)));
+    check('18+: no uncaught page errors', () => assert.deepEqual(errors, []));
+    await context.close();
+  }
+
+  // 12b. Email-confirmation path: the pending profile records adultDeclared; after login declare_adult runs before
+  //      set_home_city.
+  {
+    const context = await browser.newContext({ viewport: { width: 1280, height: 900 } });
+    await seedPending(context, { ...basePending, interests: [{ id: 'sports.racket.tennis', points: 20, mode: 'learn' }], orbit: { kind: 'city', placeId: 'in-mumbai' }, savedAt: Date.now() });
+    const stub = await stubContext(context, { signupSession: false });
+    const { page, errors } = await newPage(context, stub.consoleLines);
+    await loginOnFreshPage(page);
+    await page.waitForURL(/\/app\.html/, { timeout: 15000 });
+    const idx = ['/rest/v1/rpc/declare_adult', '/rest/v1/rpc/set_home_city', '/rest/v1/rpc/set_member_interests'].map((n) => stub.calls.findIndex((c) => c.method === 'POST' && c.path === n));
+    check(`18+ pending: after login declare_adult runs before set_home_city and interests (${idx.join(',')})`, () => { assert.ok(idx.every((i) => i >= 0)); assert.deepEqual([...idx].sort((a, b) => a - b), idx); });
+    const profileBodies = stub.calls.filter((c) => c.path === '/rest/v1/profiles' && ['POST', 'PATCH'].includes(c.method)).map((c) => c.body);
+    check('18+ pending: adultDeclared / adult_declared_at never reach a profiles body', () => assert.ok(!profileBodies.some((b) => /adult/i.test(b))));
+    check('18+ pending: no uncaught page errors', () => assert.deepEqual(errors, []));
+    await context.close();
+  }
+
+  // 12c. An OAuth / old account: its own profile row has adult_declared_at null while my_onboarding_status says
+  //      has_cell and 3 interests. The member lands on step 1 with the box focused.
+  {
+    const context = await browser.newContext({ viewport: { width: 1280, height: 900 } });
+    await context.addInitScript(([key, value]) => { if (!sessionStorage.getItem('seeded')) { localStorage.setItem(key, value); sessionStorage.setItem('seeded', '1'); } }, ['sb-stub-auth-token', JSON.stringify(session)]);
+    const interests = [
+      { interest_id: 'sports.racket.tennis', label: 'Tennis', points: 10, mode: 'play' },
+      { interest_id: 'games.board.chess', label: 'Chess', points: 5, mode: 'play' },
+      { interest_id: 'sports.racket.badminton', label: 'Badminton', points: 5, mode: 'play' },
+    ];
+    const stub = await stubContext(context, { profileExists: true, adultDeclared: false, hasCell: true, interests, realApp: true });
+    const { page, errors } = await newPage(context, stub.consoleLines);
+    await page.goto(`${BASE}/app.html`, { waitUntil: 'domcontentloaded' });
+    await page.waitForURL(/\/auth\.html/, { timeout: 15000 });
+    await page.waitForSelector('[data-signup-step="1"]:not([hidden])', { timeout: 15000 });
+    await page.waitForTimeout(300);
+    const landed = await page.evaluate(() => ({ focused: document.activeElement?.getAttribute('name'), checked: document.querySelector('input[name="adultConfirm"]').checked }));
+    check(`18+ OAuth: an undeclared member lands on step 1 with the unchecked box focused (${JSON.stringify(landed)})`, () => { assert.equal(landed.focused, 'adultConfirm'); assert.equal(landed.checked, false); });
+    // Finishing: tick, walk to the end, submit: declare_adult first, no area or interests re-sent for the kept data.
+    await page.locator('input[name="adultConfirm"]').check();
+    await page.locator('[data-signup-step="1"] .signup-next').click();
+    await page.waitForSelector('[data-signup-step="2"]:not([hidden])');
+    await page.locator('[data-signup-step="2"] .signup-next').click();
+    await page.waitForSelector('[data-signup-step="3"]:not([hidden])');
+    await context.route(`${BASE}/app.html*`, (route) => route.fulfill({ status: 200, contentType: 'text/html', body: '<!doctype html><title>app</title>' }));
+    await page.locator('[data-signup-step="3"] .signup-next').click();
+    await page.waitForSelector('[data-signup-step="4"]:not([hidden])');
+    await page.locator('[data-signup-step="4"] [type="submit"]').click();
+    await page.waitForURL(/\/app\.html/, { timeout: 15000 });
+    check('18+ OAuth: completing declares once (declare_adult POSTed)', () => assert.equal(stub.posts('/rest/v1/rpc/declare_adult').length, 1));
+    check('18+ OAuth: no uncaught page errors', () => assert.deepEqual(errors.filter((e) => !/Failed to fetch|NetworkError|aborted/i.test(e)), []));
+    await context.close();
+  }
+
+  // 12d. declare_adult fails during a session signup: back to step 1 with the retry message, and nothing after it runs.
+  {
+    const context = await browser.newContext({ viewport: { width: 1280, height: 900 } });
+    const stub = await stubContext(context, { signupSession: true, declareStatus: [500] });
+    const { page, errors } = await newPage(context, stub.consoleLines);
+    await openSignup(page);
+    await fillStepOne(page);
+    await page.locator('[data-area-city]').click();
+    await pickCityByKeyboard(page);
+    await page.locator('[data-signup-step="2"] .signup-next').click();
+    await page.waitForSelector('#interest-results [data-interest-group]', { state: 'attached' });
+    await fillBudgetWithMouse(page, 'Chess');
+    await page.locator('.looking-search').click();
+    await page.locator('#looking-results [data-looking-option]').first().click();
+    await page.locator('[data-signup-step="3"] .signup-next').click();
+    await finishStepFour(page);
+    await page.waitForSelector('[data-signup-step="1"]:not([hidden])', { timeout: 15000 });
+    await page.waitForFunction(() => (document.querySelector('#adult-error')?.textContent || '').trim().length > 0, null, { timeout: 5000 });
+    const msg = (await page.locator('#adult-error').textContent()).trim();
+    check(`18+ failure: back on step 1 with the retry message (got "${msg}")`, () => assert.equal(msg, "We couldn't record your confirmation. Please try again."));
+    check('18+ failure: no location or interests call was made', () => { assert.equal(stub.posts('/rest/v1/rpc/set_home_city').length, 0); assert.equal(stub.posts('/rest/v1/rpc/set_member_interests').length, 0); });
+    check('18+ failure: no uncaught page errors', () => assert.deepEqual(errors, []));
     await context.close();
   }
 } catch (error) {

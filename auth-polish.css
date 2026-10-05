@@ -2955,3 +2955,20 @@
   .auth-shell .auth-close { top: 8px; right: 8px; }
   .auth-shell:has(.auth-signup.is-active) .auth-panel-top { padding-right: 52px; }
 }
+
+/* R1: the 18+ declaration (signup step 1, last field above Next). Reuses the signup palette; 44 px row, 12 px+ text. */
+.auth-signup-form .adult-confirm { display: flex; flex-direction: column; gap: 4px; min-width: 0; margin: 0; padding: 0; border: 0; }
+.auth-signup-form .adult-legend { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+.auth-signup-form .adult-row {
+  display: flex; align-items: center; gap: 12px; min-height: 48px; padding: 8px 12px; border: 1px solid var(--ob-line, #d9cfc8);
+  border-radius: 10px; background: transparent; color: var(--ob-ink, #5a061f); font-size: 14px; font-weight: 700; line-height: 1.3;
+  letter-spacing: 0; text-transform: none; cursor: pointer;
+}
+.auth-signup-form .adult-row input[type="checkbox"] { flex: 0 0 auto; width: 24px; height: 24px; margin: 0; accent-color: var(--ob-ink, #5a061f); cursor: pointer; }
+.auth-signup-form .adult-row:focus-within { outline: 2px solid var(--ob-ink, #5a061f); outline-offset: 2px; }
+.auth-signup-form .adult-row:has(input[aria-invalid="true"]) { border-color: #b00020; }
+.auth-signup-form .adult-help { margin: 0; color: #5f5a57; font-size: 12px; line-height: 1.45; text-transform: none; letter-spacing: 0; }
+.auth-signup-form .adult-error { margin: 0; color: #b00020; font-size: 12px; font-weight: 700; line-height: 1.4; text-transform: none; letter-spacing: 0; }
+.auth-signup-form .adult-error:empty { display: none; }
+.auth-signup-form .privacy-link { margin: 0; font-size: 12px; text-transform: none; letter-spacing: 0; }
+.auth-signup-form .privacy-link a { display: inline-flex; align-items: center; min-height: 44px; color: var(--ob-ink, #5a061f); font-weight: 700; text-decoration: underline; text-underline-offset: 2px; }

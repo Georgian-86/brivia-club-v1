@@ -9,7 +9,7 @@ import './mobile-site.css';
 import './mobile-final-fixes.css';
 import {
   supabase, supabaseReady, saveProfile, compressedImageDataUrl, withoutCredentials, rowToProfile, isRateLimited,
-  setHomeLocation, setHomeCity, setMemberInterests, fetchMyInterests, fetchInterestNodes, searchPlaces, onboardingStatus,
+  declareAdult, setHomeLocation, setHomeCity, setMemberInterests, fetchMyInterests, fetchInterestNodes, searchPlaces, onboardingStatus,
 } from './supabase.js';
 import { buildPendingOnboarding, isPendingExpired } from './pending-profile.js';
 import {
@@ -472,6 +472,7 @@ const signupStepLabel = signupForm?.querySelector('[data-signup-step-label]');
 const signupProgress = signupForm?.querySelector('.signup-progress-track');
 const signupProgressFill = signupForm?.querySelector('[data-signup-progress-fill]');
 let signupCurrentStep = 1;
+let adultAlreadyDeclared = false;  // the member row already has adult_declared_at (completion re-entry): no second declare_adult
 let profileCompletionUser = null;
 let authCloseTimer;
 let authEnvelopeTimer;
@@ -709,7 +710,7 @@ if (lookingPicker) {
 }
 
 // ---------------------------------------------------------------------------------------------------------------
-// ORBIT onboarding (UX_SPEC flow A). Step 2 "Your area" and step 3 "Your signals" (interests + Passion Budget).
+// ORBIT onboarding (UX_SPEC flow A). Step 2 "Your area" and step 3 "What you care about" (interests + Passion Budget).
 // Privacy (CLAUDE.md, Review Focus 4): coordinates live only in `areaChoice` below, in memory. They are never written
 // to localStorage / sessionStorage, the URL, the DOM or a log, and are dropped as soon as the server has the cell.
 // ---------------------------------------------------------------------------------------------------------------
@@ -1093,6 +1094,8 @@ const resetSignup = () => {
   resetLooking();
   resetPhoto();
   resetCover();
+  setAdultError('');
+  adultAlreadyDeclared = false;
   profileCompletionUser = null;
   profileCompletionPhotoUrl = '';
   profileCompletionCoverUrl = '';
@@ -1120,7 +1123,7 @@ function setSignupPasswordMode(enabled, required = enabled) {
 }
 
 const SIGNUP_STEPS = 4;
-const SIGNUP_STEP_LABELS = ['THE BASICS', 'YOUR AREA', 'YOUR SIGNALS', 'SECURITY & PRESENCE'];
+const SIGNUP_STEP_LABELS = ['THE BASICS', 'YOUR AREA', 'WHAT YOU CARE ABOUT', 'SECURITY & PRESENCE'];
 function setSignupStep(step, focusFirst = true) {
   signupCurrentStep = Math.min(SIGNUP_STEPS, Math.max(1, Number(step) || 1));
   signupForm?.querySelectorAll('[data-signup-step]').forEach((panel) => {
@@ -1129,7 +1132,7 @@ function setSignupStep(step, focusFirst = true) {
   if (signupProgress) { signupProgress.setAttribute('aria-valuemax', String(SIGNUP_STEPS)); signupProgress.setAttribute('aria-valuenow', String(signupCurrentStep)); }
   if (signupProgressFill) signupProgressFill.style.width = `${(signupCurrentStep / SIGNUP_STEPS) * 100}%`;
   if (signupStepLabel) signupStepLabel.textContent = `STEP ${signupCurrentStep} OF ${SIGNUP_STEPS} · ${SIGNUP_STEP_LABELS[signupCurrentStep - 1]}`;
-  // The taxonomy is fetched while the member is on "Your area", so "Your signals" opens ready.
+  // The taxonomy is fetched while the member is on "Your area", so "What you care about" opens ready.
   if (signupCurrentStep >= 2 && !interestCatalog) loadInterestCatalog().then(() => { renderBudget(); renderInterestResults(); }).catch(() => {});
   if (signupCurrentStep === 3) {
     if (budgetError) budgetError.textContent = '';
@@ -1144,6 +1147,23 @@ function setSignupStep(step, focusFirst = true) {
     firstVisibleField?.focus({ preventScroll: true });
   }
 }
+
+// R1: the 18+ confirmation. The error is inline (aria-describedby on the box), never a reportValidity bubble.
+const adultBox = signupForm?.elements.namedItem('adultConfirm');
+const adultError = document.getElementById('adult-error');
+const ADULT_REQUIRED_TEXT = 'You need to be 18 or older to join Brivia.';
+const ADULT_SAVE_ERROR = "We couldn't record your confirmation. Please try again.";
+const setAdultError = (message) => {
+  if (adultError) adultError.textContent = message || '';
+  adultBox?.setAttribute('aria-invalid', message ? 'true' : 'false');
+};
+const validateAdultConfirm = () => {
+  if (adultBox?.checked) { setAdultError(''); return true; }
+  setAdultError(ADULT_REQUIRED_TEXT);
+  adultBox?.focus();
+  return false;
+};
+adultBox?.addEventListener('change', () => { if (adultBox.checked) setAdultError(''); });
 
 const validateSignupStep = (step = signupCurrentStep) => {
   const activeStep = signupForm?.querySelector(`[data-signup-step="${step}"]`);
@@ -1169,6 +1189,7 @@ const validateOnboardingStep = (step) => {
     if (!isComplete(budget)) { showBudgetError(); return false; }
     return validateSignupStep(3);
   }
+  if (step === 1) return validateSignupStep(1) && validateAdultConfirm();
   return validateSignupStep(step);
 };
 signupForm?.querySelectorAll('.signup-next').forEach((button) => button.addEventListener('click', () => {
@@ -1225,7 +1246,11 @@ const setAuthView = (view, historyMode = 'push') => {
     item.classList.toggle('is-active', isActive);
     item.toggleAttribute('hidden', !isActive);
   });
-  if (authStep) authStep.textContent = view === 'welcome' ? 'WELCOME' : view === 'login' ? '01 / 02' : '02 / 02';
+  if (authStep) {
+    authStep.textContent = view === 'welcome' ? 'WELCOME' : view === 'login' ? '01 / 02' : '02 / 02';
+    authStep.toggleAttribute('hidden', view === 'signup');  // the counter means nothing beside the 4-step signup
+    authStep.style.display = view === 'signup' ? 'none' : '';
+  }
   if (authPanelKicker) authPanelKicker.textContent = view === 'welcome' ? 'THE BRIVIA CLUB' : view === 'login' ? 'RETURNING MEMBER' : 'YOUR APPLICATION';
   const authTopSignup = authModal?.querySelector('.auth-top-signup');
   if (authTopSignup) authTopSignup.innerHTML = view === 'signup' ? 'ALREADY A MEMBER? <b>LOG IN</b>' : 'NEW HERE? <b>CREATE ACCOUNT</b>';
@@ -1287,7 +1312,7 @@ const normalizeSignupGender = (value) => {
 
 // Completion (re-entry): the same 4-step form, prefilled, opened at `startStep`. `status` is my_onboarding_status():
 // an existing cell is kept unless the member picks a new area; existing interests prefill the Passion Budget.
-const showProfileCompletion = (user, savedProfile = null, { startStep = 1, status = null } = {}) => {
+const showProfileCompletion = (user, savedProfile = null, { startStep = 1, status = null, adultDeclared = false } = {}) => {
   if (!signupForm || !user) return;
   resetSignup();
   profileCompletionUser = user;
@@ -1321,16 +1346,21 @@ const showProfileCompletion = (user, savedProfile = null, { startStep = 1, statu
   if (backButton) backButton.textContent = 'SIGN OUT / BACK TO LOGIN';
   if (signupFeedback) signupFeedback.textContent = 'Finish your Brivia profile to unlock the club.';
   if (status?.has_cell) keepCurrentArea(status.place_label || '');
+  // R1: a member whose own row already has adult_declared_at sees the box ticked and is not asked again.
+  if (adultDeclared && adultBox) { adultBox.checked = true; adultAlreadyDeclared = true; }
   setAuthView('signup');
   setSignupStep(startStep);
+  // An OAuth or older account with no declaration yet lands on step 1 with only the box missing: focus it.
+  if (startStep === 1 && !adultDeclared && realName(values.name)) adultBox?.focus();
 };
 
 // The first incomplete onboarding step for my_onboarding_status(): 2 without a cell, else 3 (interests / budget).
 // A usable display name: trimmed, not empty and not the 'New Member' placeholder (the server's completion rule).
 const realName = (value) => { const name = String(value || '').trim(); return name && name !== 'New Member' ? name : ''; };
-// The first incomplete onboarding step: 1 without a real name, 2 without a cell, else 3 (interests / budget).
+// The first incomplete onboarding step: 1 without a real name or the 18+ declaration, 2 without a cell, else 3.
 const firstIncompleteStep = (status, profileRow = null) => {
   if (!realName(profileRow?.name)) return 1;
+  if (!profileRow?.adult_declared_at) return 1;  // R1: OAuth, old accounts and a failed declaration start at the box
   return status?.has_cell ? 3 : 2;
 };
 const PRIVATE_OMITTED_NOTE = "Private interests aren't kept while you confirm your email. Please pick them again.";
@@ -1351,7 +1381,8 @@ const routeAfterProfile = async (user, row = null, pendingResult = null) => {
   if (!profileRow) ({ data: profileRow } = await supabase.from('profiles').select('*').eq('id', user.id).maybeSingle());
   let startStep = firstIncompleteStep(status, profileRow);
   if (pendingResult?.orbitError && startStep > 2) startStep = 2;
-  showProfileCompletion(user, profileRow ? rowToProfile(profileRow) : null, { startStep, status });
+  showProfileCompletion(user, profileRow ? rowToProfile(profileRow) : null, { startStep, status, adultDeclared: Boolean(profileRow?.adult_declared_at) });
+  if (pendingResult?.adultError) setAdultError(ADULT_SAVE_ERROR);
   if (pendingResult?.orbitError) setAreaError(isRateLimited(pendingResult.orbitError.error, pendingResult.orbitError.status) ? 'Try again later.' : AREA_SAVE_ERROR);
   if (status.interests > 0) {
     const { data: rows } = await fetchMyInterests();
@@ -1383,6 +1414,11 @@ const dropPendingOrbit = () => {
 const applyPendingOnboarding = async (pending) => {
   const result = { orbitError: null, interestsFailed: false, budget: null, privateOmitted: false, ok: true };
   if (!pending || typeof pending !== 'object') return result;
+  // R1: the declaration comes first (the server refuses location and interests before it). A pending profile from an
+  // older build has none: nothing is applied and the member is asked on step 1; the pending data is kept.
+  if (pending.adultDeclared !== true) { result.ok = false; return result; }
+  const declared = await declareAdult();
+  if (declared.error) { result.adultError = true; result.ok = false; return result; }
   if (pending.orbit?.kind === 'city' && typeof pending.orbit.placeId === 'string' && pending.orbit.placeId) {
     const { error, status } = await setHomeCity(pending.orbit.placeId);
     if (error) result.orbitError = { error, status };
@@ -1399,7 +1435,7 @@ const applyPendingOnboarding = async (pending) => {
   if (result.ok) window.localStorage.removeItem('brivia-pending-profile');
   return result;
 };
-const PENDING_ONBOARDING_KEYS = ['interests', 'orbit', 'privateOmitted', 'savedAt'];
+const PENDING_ONBOARDING_KEYS = ['interests', 'orbit', 'privateOmitted', 'savedAt', 'adultDeclared'];
 const withoutOnboarding = (profile) => {
   const clean = { ...(profile || {}) };
   PENDING_ONBOARDING_KEYS.forEach((key) => { delete clean[key]; });
@@ -1657,7 +1693,21 @@ const collectSignupProfile = (formData) => {
 class OnboardingStepError extends Error {}
 // After saveProfile: the home area (location or city), then the Passion Budget. A failure returns the member to the
 // step that failed with the error beside it; the profile row already saved is simply updated on the next try.
+const cityWideLabel = (label) => (!label || /\(city-wide\)$/.test(label) ? label : `${label} (city-wide)`);
+// R1: record the 18+ declaration right after the profile row exists and before any location or interest call.
+const declareAdultStep = async () => {
+  if (adultAlreadyDeclared) return;
+  const { error } = await declareAdult();
+  if (error) {
+    setSignupStep(1, false);
+    setAdultError(ADULT_SAVE_ERROR);
+    adultBox?.focus();
+    throw new OnboardingStepError(ADULT_SAVE_ERROR);
+  }
+  adultAlreadyDeclared = true;
+};
 const finishOnboarding = async () => {
+  await declareAdultStep();
   if (areaChoice && areaChoice.kind !== 'keep') {
     const choice = areaChoice;
     const { data, error, status } = choice.kind === 'geo' ? await setHomeLocation(choice.lat, choice.lng) : await setHomeCity(choice.placeId);
@@ -1668,7 +1718,9 @@ const finishOnboarding = async () => {
       throw new OnboardingStepError(message);
     }
     // The server has the cell: forget the coordinates.
-    keepCurrentArea(typeof data === 'string' && data ? data : choice.label || '');
+    // set_home_city is always a city pick (precision 'place'): the label says so; a location result gets no suffix.
+    const savedLabel = typeof data === 'string' && data ? data : choice.label || '';
+    keepCurrentArea(choice.kind === 'city' ? cityWideLabel(savedLabel) : savedLabel);
   }
   const { error } = await setMemberInterests(toPayload(budget));
   if (error) {
@@ -1804,7 +1856,7 @@ signupForm?.addEventListener('submit', async (event) => {
     // area choice (a city id, or "ask for my location again"); the coordinates are dropped here.
     // Interests as { id, points, mode } only, sensitive ones left out (asked for again after login), plus savedAt.
     const pendingOnboarding = buildPendingOnboarding(budget, isSensitiveInterest, areaChoice);
-    window.localStorage.setItem('brivia-pending-profile', JSON.stringify({ ...profile, ...pendingOnboarding }));
+    window.localStorage.setItem('brivia-pending-profile', JSON.stringify({ ...profile, ...pendingOnboarding, adultDeclared: true }));
     areaChoice = null;
     const accountEmail = signupSuccess?.querySelector('[data-credential="account-email"]');
     if (accountEmail) accountEmail.textContent = profile.email;

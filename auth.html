@@ -93,12 +93,19 @@
                 <fieldset class="gender-picker"><legend>GENDER</legend><div class="gender-options"><label class="gender-option"><input type="radio" name="gender" value="Male" required /><span>MALE</span></label><label class="gender-option"><input type="radio" name="gender" value="Female" /><span>FEMALE</span></label><label class="gender-option"><input type="radio" name="gender" value="Prefer not to say" /><span>PREFER NOT TO SAY</span></label></div></fieldset>
                 <label>Experience<select name="experience" required><option value="" disabled selected>Choose one</option><option>Student / just starting</option><option>1–3 years</option><option>3–7 years</option><option>7–12 years</option><option>12+ years</option></select></label>
               </div>
+              <fieldset class="adult-confirm"><legend class="adult-legend">Age confirmation</legend>
+                <label class="adult-row"><input type="checkbox" name="adultConfirm" value="yes" aria-describedby="adult-help adult-error" /><span>I confirm I'm 18 or older.</span></label>
+                <p class="adult-help" id="adult-help">Brivia is for adults only. We don't ask for your date of birth.</p>
+                <p class="privacy-link"><a href="/privacy.html" target="_blank" rel="noopener">How we use your data</a></p>
+                <p class="adult-error" id="adult-error" aria-live="polite"></p>
+              </fieldset>
               <button class="auth-submit signup-next" data-next-step="2" type="button">NEXT: YOUR AREA <span aria-hidden="true">&rarr;</span></button>
               </div>
               <div class="signup-step" data-signup-step="2" hidden>
-              <div class="signup-step-heading"><span>STEP 02 · YOUR AREA</span><h2>Where do you spend most weeks?</h2><p>The club shows you people nearby first: your neighbourhood, then your city, then your region.</p></div>
+              <div class="signup-step-heading"><span>STEP 02 · YOUR AREA</span><h2>Where do you spend most weeks?</h2><p>The club shows you people nearby first, as your area fills up: your neighbourhood, then your city, then your region.</p></div>
               <div class="area-step" data-area>
-                <p class="area-explainer" data-area-explainer><svg class="area-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 3l7 3v5c0 4.5-3 8.3-7 10-4-1.7-7-5.5-7-10V6l7-3z" /><path d="M9 12l2 2 4-4" /></svg><span>We only keep a rough ~2 km neighbourhood square. Nobody ever sees where you are.</span></p>
+                <p class="area-explainer" data-area-explainer><svg class="area-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 3l7 3v5c0 4.5-3 8.3-7 10-4-1.7-7-5.5-7-10V6l7-3z" /><path d="M9 12l2 2 4-4" /></svg><span>We keep only a rough ~2 km square, never your exact location. Other members see a rounded distance or your city, and only once enough people are nearby.</span></p>
+                <p class="privacy-link"><a href="/privacy.html" target="_blank" rel="noopener">How we use your data</a></p>
                 <div class="area-options">
                   <button class="area-option" type="button" data-area-geo><svg class="area-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 21s-6.5-5.6-6.5-11a6.5 6.5 0 0 1 13 0c0 5.4-6.5 11-6.5 11z" /><circle cx="12" cy="10" r="2.4" /></svg><span>Use my location</span></button>
                   <button class="area-option" type="button" data-area-city aria-controls="area-city-panel" aria-expanded="false"><svg class="area-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="11" cy="11" r="6.5" /><path d="M16 16l4.5 4.5" /></svg><span>Pick my city</span></button>
@@ -115,7 +122,7 @@
               <div class="signup-step-actions"><button class="auth-secondary signup-step-prev" data-prev-step="1" type="button"><span aria-hidden="true">&larr;</span> BACK TO DETAILS</button><button class="auth-submit signup-next" data-next-step="3" type="button">NEXT: YOUR SIGNALS <span aria-hidden="true">&rarr;</span></button></div>
               </div>
               <div class="signup-step" data-signup-step="3" hidden>
-              <div class="signup-step-heading"><span>STEP 03 · YOUR SIGNALS</span><h2>Your signals.</h2><p>Pick up to 12 interests, then spread 20 passion points across them. More points means it matters more to you.</p></div>
+              <div class="signup-step-heading"><span>STEP 03 · WHAT YOU CARE ABOUT</span><h2>What you care about</h2><p>Pick up to 12 interests, then spread 20 passion points across them. More points means it matters more to you.</p></div>
               <div class="interest-picker" data-interest-picker>
                 <label class="interest-label" for="interest-search">Interests</label>
                 <input class="interest-search" id="interest-search" type="search" autocomplete="off" spellcheck="false" placeholder="Search, e.g. chess or hiking" aria-describedby="interest-help" aria-controls="interest-results" />
@@ -173,7 +180,7 @@
                   <button class="cover-choice" type="button" data-cover-option="/Images/Cover%20images/F28EA63E-1BEB-49E9-BA01-F62127017DB1.PNG" aria-label="Choose cover image 18"><img src="/Images/Cover%20images/F28EA63E-1BEB-49E9-BA01-F62127017DB1.PNG" alt="Cover image 18" /><span>MAKE IT MATTER</span></button>
                 </div></div>
               </div>
-              <div class="signup-step-actions"><button class="auth-secondary signup-step-prev" data-prev-step="3" type="button"><span aria-hidden="true">&larr;</span> BACK TO SIGNALS</button><button class="auth-submit" type="submit">CREATE MY PROFILE <span>→</span></button></div>
+              <div class="signup-step-actions"><button class="auth-secondary signup-step-prev" data-prev-step="3" type="button"><span aria-hidden="true">&larr;</span> BACK TO WHAT YOU CARE ABOUT</button><button class="auth-submit" type="submit">CREATE MY PROFILE <span>→</span></button></div>
               </div>
             </form>
             <div class="auth-success" id="auth-success" hidden><span class="auth-success-mark">✓</span><h2 data-auth-success-title>Check your email.</h2><p data-auth-success-message>We sent a verification link. Your email is your login ID; your password stays private and is never shown here.</p><div class="credential-list"><div class="credential-row"><span>LOGIN ID</span><code data-credential="account-email">you@example.com</code><button type="button" data-copy-credential="account-email">COPY</button></div></div><button class="auth-secondary auth-close-success" type="button">BACK TO BRIVIA <span>↗</span></button></div>

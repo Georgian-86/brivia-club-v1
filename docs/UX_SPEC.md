@@ -41,11 +41,23 @@ The signup (`auth.html`, `script.js`, `passion-budget.js`) has **4 steps**. The 
 progress bar has `aria-valuemax="4"`. Every step has Back (except step 1); Next validates only its own step.
 
 1. **The basics** (`STEP 1 OF 4 · THE BASICS`): full name, email, phone, gender and experience. There are no City or
-   State inputs; step 2 replaces them.
+   State inputs; step 2 replaces them. **Iteration 4 (R1): the 18+ confirmation** is the last field, a fieldset above
+   Next: a checkbox row at least 44 px tall, **"I confirm I'm 18 or older."**, helper **"Brivia is for adults only. We
+   don't ask for your date of birth."** and a "How we use your data" link (`/privacy.html`, `target="_blank"`; repeated
+   on step 2). Next without the box stays on step 1 and shows the inline error **"You need to be 18 or older to join
+   Brivia."** (linked to the box by `aria-describedby`, `aria-invalid`, box focused; never a `reportValidity` bubble).
+   Submit order: `saveProfile` → `rpc/declare_adult` (`{ p_notice_version: '2026-10-05' }`, `notice-version.js`) →
+   `set_home_*` → `set_member_interests`; the client never sends `adult_declared_at`. A failed declaration returns to
+   step 1 with **"We couldn't record your confirmation. Please try again."** The email-confirmation path stores
+   `adultDeclared: true` in the pending profile and declares first after login. Routing reads the member's own
+   profile row: a null `adult_declared_at` (OAuth, older accounts, a failed declare) opens step 1 with the box focused;
+   a declared member sees it ticked and is not asked again. The "01 / 02" counter is hidden during signup.
 2. **Your area** (`STEP 2 OF 4 · YOUR AREA`), "Where do you spend most weeks?"
-   - The explainer **"We only keep a rough ~2 km neighbourhood square. Nobody ever sees where you are."** is always
-     visible above the two choices, so it is read before the browser asks for permission. (Honest copy: a g7 cell is
-     about 2.3 km × 2.3 km, D-028.)
+   - The explainer **"We keep only a rough ~2 km square, never your exact location. Other members see a rounded
+     distance or your city, and only once enough people are nearby."** (Iteration 4, R11; it replaces "We only keep a
+     rough ~2 km neighbourhood square. Nobody ever sees where you are.") is always visible above the two choices, so it
+     is read before the browser asks for permission. (A g7 cell is about 2.3 km × 2.3 km, D-028.) The promise line
+     reads "The club shows you people nearby first, as your area fills up: …".
    - **Use my location** calls `navigator.geolocation.getCurrentPosition` with
      `{ enableHighAccuracy: false, timeout: 10000, maximumAge: 600000 }`, and only on that tap. Success reads
      **"Got it. We keep only the ~2 km square you're in."** The coordinates stay in memory only (never storage, URL, DOM
@@ -54,10 +66,12 @@ progress bar has `aria-valuemax="4"`. Every step has Back (except step 1); Next 
      **"No problem. Pick your city instead."** and moves focus to the city search. It is never a dead end.
    - **Pick my city** is a labelled combobox ("Your city") over a listbox of `place` rows (name, region; launch cities
      first). Arrow keys move, Enter picks, Escape closes. The pick reads "Your area: Bengaluru, Karnataka. We use the
-     city's centre, never your address." and is sent with `rpc/set_home_city`.
+     city's centre, never your address." and is sent with `rpc/set_home_city`. Once saved, the label the member sees
+     ends " (city-wide)" (R9; added once, never doubled; a `set_home_location` result gets no suffix).
    - Next without an area shows "Choose your area to continue." A `PT429` from either call returns the member here
      with **"Try again later."** beside the choices.
-3. **Your signals** (`STEP 3 OF 4 · YOUR SIGNALS`), heading **"Your signals."**
+3. **What you care about** (`STEP 3 OF 4 · WHAT YOU CARE ABOUT`), heading **"What you care about"** (renamed from
+   "Your signals" in Iteration 4, R11, so it is not confused with the signal quota).
    - A search field ("Interests") over the taxonomy. A short result count ("3 matches", "1 match", "No matches") is
      written to the polite live region under the field. Escape clears the field. The native clear button uses the
      wine token. With no query, one collapsible group per category (level 2),
