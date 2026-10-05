@@ -179,11 +179,14 @@ begin
     reset role; raise exception 'FAIL k-anon: a km band without density';
   end if;
   reset role;
-  -- overlap (sum of min points / 20): R2 16/20, A 13/20, B 5/20, R1 4/20
+  -- overlap (sum of min points / 20): R2 16/20 and A 13/20 are both 'high', B 5/20 and R1 4/20 both 'low' (fix
+  -- round 1, M-2: 4 levels), so each pair is ordered by the daily tie key
   d := pg_temp.deck_ids(v);
-  if pg_temp.pos(d, pg_temp.d7(7)) <> 1 or pg_temp.pos(d, pg_temp.d7(2)) <> 2
-     or pg_temp.pos(d, pg_temp.d7(3)) <> 3 or pg_temp.pos(d, pg_temp.d7(6)) <> 4 then
-    raise exception 'FAIL D-038: without density the order is not shared-first by overlap: %', d;
+  if d[1:2] <> (select array_agg(x order by public.brivia_deck_tie(v, x, current_date))
+                  from unnest(array[pg_temp.d7(7), pg_temp.d7(2)]) u(x))
+     or d[3:4] <> (select array_agg(x order by public.brivia_deck_tie(v, x, current_date))
+                     from unnest(array[pg_temp.d7(3), pg_temp.d7(6)]) u(x)) then
+    raise exception 'FAIL D-038: without density the order is not shared-first by overlap level: %', d;
   end if;
 end $$;
 

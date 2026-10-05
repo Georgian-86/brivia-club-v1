@@ -62,5 +62,5 @@ bash supabase/tests/run.sh   # SQL harness: all migrations twice, every *.test.s
 # e2e (stubbed Supabase; Playwright installed outside the repo, see tests/e2e/README.md):
 PLAYWRIGHT_MODULE=/tmp/pw/node_modules/playwright/index.mjs node tests/e2e/consent.spec.mjs   # also deck.spec.mjs, onboarding.spec.mjs
 ```
-Going live: follow `supabase/migrations/README.md` (pg_cron first, apply 0001→0004 and deploy the client together, then seed).
+Going live: follow `supabase/migrations/README.md`. 0001–0003 are live and frozen (never edit or re-run them); run the pre-flight checks, enable pg_cron, apply only 0004 and deploy the client together, then seed. Expect the listed advisor warnings for the intended RPCs.
 Env: `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY` (see `.env.example`). SQL migrations live in `supabase/migrations/*.sql` (run manually in the Supabase SQL editor, in order; `supabase/legacy/` is archive only). Verify locally with `bash supabase/tests/run.sh`.

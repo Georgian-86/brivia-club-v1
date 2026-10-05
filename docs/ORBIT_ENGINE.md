@@ -111,9 +111,9 @@ profile" toggle is P2). After the rules above, `set_member_interests` checks, ea
   `member_interest` row; the member then re-spends the freed points before being completed again;
 - **completion floor:** at least one non-sensitive id, else `22023 invalid interests` (B-F4: a completed member with
   empty `skills` would reveal that every interest is sensitive). `brivia_member_completed` requires it too;
-- **rewrite cap:** a call by a member who is completed before it counts as a rewrite (`interest_rewrite`, owner-only,
-  purged after 24 h); the 4th in a rolling 24 h raises `PT429 try again later`. The first save, and a re-save after
-  falling below completion, are free.
+- **rewrite cap:** a call by a member who already has `member_interest` rows counts as a rewrite, completed or not
+  (`interest_rewrite`, owner-only, purged after 24 h; D-041); the 4th in a rolling 24 h raises `PT429 try again
+  later`. Only the very first save is free, so a 'New Member' name toggle or a consent withdrawal cannot reset it.
 
 Fixed budgets stop "interest inflation". A member who lists 40 interests can't out-match everyone, and the budget
 says what each person *actually* cares about most.
@@ -396,7 +396,8 @@ north-star metric (people who actually meet).
   **from** a sender who is no longer completed is hidden from the recipient's Requests list and answers
   `respond_connection_request` like a request that does not exist, so accepting and liking back agree. The completion-gated policies evaluate the check once per statement.
 - **Ledger pruning.** The owner-only `purge_expired_requests()` also deletes `signal_ledger` rows older than 30 days
-  (no counter reads them), `location_change` and `interest_rewrite` rows older than 24 hours, and, when pg_cron is
+  (no counter reads them), `location_change` and `interest_rewrite` rows older than 24 hours, `impression` rows older
+  than 30 days (fix round 1, I-2), and, when pg_cron is
   installed, `cron.job_run_details` rows that ended more than 7 days ago (D-038 hygiene). It still returns the number
   of request rows deleted.
 - The iteration-2 rule that dropped an over-cap request **silently** (no error, the usual "Signal sent") is replaced
@@ -460,8 +461,11 @@ saturated, the outer rings relax first, instead of the deck repeating saturated 
   every helper that answers about an arbitrary pair (D-038 hygiene, live advisor findings): `brivia_same_world`,
   `brivia_interaction_allowed` and both `brivia_is_blocked_between` overloads (0001–0003) are revoked from every
   client role in `0004` section 8. The policies that used them call definer wrappers pinned to `auth.uid()`
-  (`brivia_can_message`, `brivia_incoming_request_visible`, `brivia_interaction_insert_ok`), which answer only about
-  the caller's own match, request or interaction. `brivia_guard_is_test` pins its `search_path`; it and the
+  (`brivia_private.brivia_can_message`, `brivia_private.brivia_incoming_request_visible`,
+  `brivia_private.brivia_interaction_insert_ok`), which answer only about the caller's own match, request or
+  interaction. They live in the schema `brivia_private` (fix round 1, M-1): PostgREST exposes only `public`, so they
+  are not `/rpc` endpoints; `authenticated` has usage on the schema and execute on them so that RLS policies,
+  evaluated as the member, can call them; `anon` and PUBLIC have neither. `brivia_guard_is_test` pins its `search_path`; it and the
   storage-URL checks are not executable by `anon` or PUBLIC (the URL checks stay executable by `authenticated`,
   because the profile and post CHECK constraints run as the writer). `brivia_can_see_author` remains for the post
   policy until `community_feed()` replaces it (P1).
@@ -488,17 +492,23 @@ saturated, the outer rings relax first, instead of the deck repeating saturated 
     an edge walk) and a viewer grid, and asserts that a non-fine target's membership is constant inside each place.
   - **Order (D-038):** (1) at least one shared interest first (`shared_any desc`); (2) the display ring ascending:
     0 (`~3 km`), 1 (`~10 km`), then the place tier; (3) the budget-bounded overlap `Σ min(p_caller, p_target) / 20`
-    over the shared ids, descending (breadth-neutral: spreading points thinly cannot raise it, C-3); (4) a daily
+    over the shared ids (breadth-neutral: spreading points thinly cannot raise it, C-3), bucketed into 4 levels and
+    sorted descending: 0 (none), low (≤ 0.25), mid (≤ 0.5), high (fix round 1, M-2); (4) a daily
     rotating tie key `brivia_deck_tie(caller, target, current_date)` = `md5(caller ‖ target ‖ 'YYYY-MM-DD')`, so the
     head of the deck rotates and its propensity is known (C-4). Interest qualifies a person and location orders the
-    qualified: members with nothing in common still appear, after every member who shares an interest. Every key is a
-    function of what the card shows, and the order is computed for the whole pool before the limit. (Open for the
+    qualified: members with nothing in common still appear, after every member who shares an interest. Keys 1, 2 and 4
+    are functions of what the card shows. The overlap level is the one order key that uses private points (the
+    target's point split): it carries no location, it is coarse (4 levels, so the order reveals little about anyone's
+    split), and probing it by changing one's own points is bounded by the rewrite cap (§3.2). The order is computed
+    for the whole pool before the limit. (Open for the
     founder, D-038 dissent: swapping keys 1 and 2 is privacy-neutral.)
   - **Impressions (C-4, D-038).** `deck_candidates` is `volatile` and writes one owner-only `interaction` row per
     returned card: `event = 'impression'`, `propensity = 1`, `model_version = 'interim-v1'`, and `context =
-    { policy: 'interim-v1', surface: 'deck', position, ring (the display ring), overlap, shared (the shared-id count) }`.
-    `search_members` logs its hits the same way (`surface: 'search'`, `position`). Members never read impression rows
-    (§9.1.5). supabase-js `rpc` uses `POST`, which PostgREST requires for a volatile function.
+    { policy: 'interim-v1', surface: 'deck', position, ring (the display ring), overlap (exact), overlap_level, shared
+    (the shared-id count) }`. `search_members` logs its hits the same way (`surface: 'search'`, `position`). At most
+    one impression is kept per (viewer, target, surface, UTC day) (the unique partial index
+    `interaction_impression_daily_idx`, `ON CONFLICT DO NOTHING`; fix round 1, I-2), and `purge_expired_requests()`
+    deletes impressions older than 30 days. Members never read impression rows (§9.1.5). supabase-js `rpc` uses `POST`, which PostgREST requires for a volatile function.
   - **Served ids (D-038).** A member's own `like` or `pass` row is kept only for a target served to them (an
     `impression` row) in the last 7 days; otherwise it is silently ignored: no row and no error
     (`brivia_interaction_served`, a BEFORE INSERT trigger). Free `pass` isolation of the pool is gone, and

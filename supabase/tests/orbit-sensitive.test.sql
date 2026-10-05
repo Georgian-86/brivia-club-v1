@@ -189,23 +189,24 @@ begin
 end $$;
 reset role;
 
--- 6. The rewrite cap: M1 re-spends (not completed before the call: not counted), then 3 rewrites as a completed member;
--- the 4th raises PT429 and changes nothing; a slot frees after 24 h. (The section-4 rewrite is cleared first.)
+-- 6. The rewrite cap (fix round 1, D-041): every save by a member who already has interest rows counts, completed or
+-- not. M1 (12 points left after withdrawal) re-spends (counted), then 2 more rewrites; the 4th raises PT429 and changes
+-- nothing; a slot frees after 24 h. (The section-4 rewrite is cleared first.)
 delete from public.interest_rewrite where member_id = pg_temp.s5(1);
 set role authenticated;
 select set_config('request.jwt.claims', json_build_object('sub', pg_temp.s5(1))::text, false);
 do $$
 declare i int; e text;
 begin
-  perform public.set_member_interests('[{"interest_id":"sports.racket.tennis","points":20}]');   -- re-completion: free
-  for i in 1..3 loop
+  perform public.set_member_interests('[{"interest_id":"sports.racket.tennis","points":20}]');   -- re-spend: counted
+  for i in 1..2 loop
     perform public.set_member_interests(('[{"interest_id":"sports.racket.tennis","points":' || (20 - i)
                                         || '},{"interest_id":"games.board.chess","points":' || i || '}]')::jsonb);
   end loop;
   e := pg_temp.err($q$select public.set_member_interests('[{"interest_id":"sports.racket.squash","points":20}]')$q$);
   if e is distinct from 'PT429 try again later' then raise exception 'FAIL R3: the 4th rewrite in 24 h gave %', e; end if;
   if (select string_agg(interest_id || ':' || points, ',' order by interest_id) from public.my_interests())
-     <> 'games.board.chess:3,sports.racket.tennis:17' then
+     <> 'games.board.chess:2,sports.racket.tennis:18' then
     raise exception 'FAIL R3: the refused rewrite changed the interests';
   end if;
 end $$;
@@ -221,9 +222,69 @@ begin
   if (select string_agg(interest_id, ',') from public.member_interest where member_id = pg_temp.s5(1)) <> 'sports.racket.squash' then
     raise exception 'FAIL R3: a freed rewrite slot was not usable'; end if;
   if (select count(*) from public.interest_rewrite where member_id = pg_temp.s5(1)) <> 4 then
-    raise exception 'FAIL R3: % ledger rows (want 4: 3 rewrites + 1, the re-completion not counted)',
+    raise exception 'FAIL R3: % ledger rows (want 4: the re-spend, 2 rewrites, then 1 after the freed slot)',
       (select count(*) from public.interest_rewrite where member_id = pg_temp.s5(1));
   end if;
+end $$;
+
+-- 7. Fix round 1 (I-1): the cap cannot be bypassed by falling below completion between saves.
+--   M4 toggles its name to 'New Member' (not completed): saves still count, the 4th within 24 h raises PT429.
+--   M5 cycles set_sensitive_consent(false/true): the re-spend after each withdrawal counts too.
+do $$
+declare g int; mid uuid; cell text := public.brivia_grid_cell(18.5204, 73.8567, 7);
+begin
+  for g in 4..5 loop
+    mid := pg_temp.s5(g);
+    insert into auth.users(id) values (mid) on conflict do nothing;
+    insert into public.profiles (id, name, full_name, email) values (mid, 'Sens ' || g, 'Sens ' || g, 's' || g || '@example.com')
+    on conflict (id) do nothing;
+    insert into public.member_orbit (member_id, home_cell, home_cell_g6, home_cell_g5, place_id)
+    values (mid, cell, public.brivia_grid_parent(cell, 6), public.brivia_grid_parent(cell, 5), 'in-pune')
+    on conflict (member_id) do nothing;
+  end loop;
+end $$;
+do $$
+declare i int; e text;
+begin
+  perform set_config('request.jwt.claims', json_build_object('sub', pg_temp.s5(4))::text, true);
+  set local role authenticated;
+  perform public.set_member_interests('[{"interest_id":"sports.racket.tennis","points":20}]');   -- first save: free
+  reset role;
+  update public.profiles set name = 'New Member' where id = pg_temp.s5(4);
+  if public.brivia_member_completed(pg_temp.s5(4)) then raise exception 'FAIL setup: M4 still completed'; end if;
+  set local role authenticated;
+  for i in 1..3 loop
+    perform public.set_member_interests(('[{"interest_id":"sports.racket.tennis","points":' || (20 - i)
+                                        || '},{"interest_id":"games.board.chess","points":' || i || '}]')::jsonb);
+  end loop;
+  e := pg_temp.err($q$select public.set_member_interests('[{"interest_id":"sports.racket.squash","points":20}]')$q$);
+  reset role;
+  if e is distinct from 'PT429 try again later' then raise exception 'FAIL I-1: name toggle bypasses the cap: 4th save gave %', e; end if;
+end $$;
+do $$
+declare i int; e text;
+begin
+  update public.profiles set sensitive_consent_at = now() where id = pg_temp.s5(5);
+  perform set_config('request.jwt.claims', json_build_object('sub', pg_temp.s5(5))::text, true);
+  set local role authenticated;
+  perform public.set_member_interests('[{"interest_id":"sports.racket.tennis","points":15},
+                                        {"interest_id":"wellbeing.spirituality.kirtan","points":5}]');   -- first save: free
+  for i in 1..2 loop
+    perform public.set_sensitive_consent(false);   -- deletes kirtan: 15 points, not completed
+    if i = 1 then
+      perform public.set_member_interests('[{"interest_id":"sports.racket.tennis","points":20}]');           -- counted (1)
+      perform public.set_sensitive_consent(true);
+      perform public.set_member_interests('[{"interest_id":"sports.racket.tennis","points":15},
+                                            {"interest_id":"wellbeing.spirituality.kirtan","points":5}]');  -- counted (2)
+    else
+      perform public.set_member_interests('[{"interest_id":"sports.racket.tennis","points":20}]');           -- counted (3)
+      perform public.set_sensitive_consent(true);
+      e := pg_temp.err($q$select public.set_member_interests('[{"interest_id":"sports.racket.tennis","points":15},
+                                                              {"interest_id":"wellbeing.spirituality.kirtan","points":5}]')$q$);
+    end if;
+  end loop;
+  reset role;
+  if e is distinct from 'PT429 try again later' then raise exception 'FAIL I-1: the consent cycle bypasses the cap: 4th save gave %', e; end if;
 end $$;
 
 -- Clean up.

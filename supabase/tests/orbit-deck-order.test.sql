@@ -13,6 +13,9 @@
 --   04 S1 ring 1, kabaddi (8 vs 20)   05 N0 ring 0, nothing shared   06-10 T1..T5 ring 0, nothing shared
 --   12 FV viewer on the Navi Mumbai side of the Navi Mumbai / Pune boundary   13 FT ~12 km away on the Pune side
 --   14 F2 ~27 km away on the Pune side (true ring 2)
+--   15 K kabaddi (8 vs 20: overlap 0.4)   16 Q squash 6 (overlap 0.3): with D (0.5) all in the 'mid' overlap level
+-- Fix round 1 (M-2): the overlap key is bucketed into 4 levels (0; low <= 0.25; mid <= 0.5; high), so within one level
+-- the daily tie key orders. (I-2): one impression per (viewer, target, surface, UTC day); purge after 30 days.
 set brivia.harness_autocomplete = 'off';
 
 create or replace function pg_temp.e8(n int) returns uuid language sql immutable as $$
@@ -42,7 +45,7 @@ begin
        where a.id = 'in-navi-mumbai' and b.id = 'in-pune') <= 60 then
     raise exception 'FAIL setup: Navi Mumbai and Pune are within 60 km';
   end if;
-  for g in 1..14 loop
+  for g in 1..16 loop
     continue when g = 11;
     mid := pg_temp.e8(g);
     cell := case when g = 4 then c.c1 when g = 12 then c.fv when g = 13 then c.ft when g = 14 then c.f2 else c.c0 end;
@@ -58,13 +61,15 @@ begin
       when 2 then '{"sports.racket.squash":10,"sports.endurance.running":10}'
       when 3 then '{"sports.racket.padel":1,"sports.racket.pickleball":1,"sports.endurance.running":18}'
       when 4 then '{"sports.team.kabaddi":20}'
+      when 15 then '{"sports.team.kabaddi":20}'
+      when 16 then '{"sports.racket.squash":6,"sports.endurance.running":14}'
       else '{"sports.endurance.running":20}' end::jsonb;
     for it in select key, value::int as pts from jsonb_each_text(interests) loop
       insert into public.member_interest (member_id, interest_id, points) values (mid, it.key, it.pts) on conflict do nothing;
     end loop;
   end loop;
-  if (select count(*) from public.profiles where id::text like 'e8e8e8e8-%' and public.brivia_member_completed(id)) <> 13 then
-    raise exception 'FAIL setup: 13 completed members expected';
+  if (select count(*) from public.profiles where id::text like 'e8e8e8e8-%' and public.brivia_member_completed(id)) <> 15 then
+    raise exception 'FAIL setup: 15 completed members expected';
   end if;
   -- C0 and c1 meet k = 10 (forced as the owner)
   insert into public.cell_density (cell, is_test, n, streak10, streak5, ok10, ok5, as_of)
@@ -106,21 +111,24 @@ begin
   end if;
 end $$;
 
--- 2. Order: interest first, then display ring, then overlap, then the daily tie key.
+-- 2. Order: interest first, then display ring, then the overlap level, then the daily tie key.
 do $$
-declare v uuid := pg_temp.e8(1); d uuid[]; tail uuid[];
+declare v uuid := pg_temp.e8(1); d uuid[]; tail uuid[]; mid3 uuid[] := array[pg_temp.e8(2), pg_temp.e8(15), pg_temp.e8(16)];
 begin
   d := pg_temp.deck_ids(v);
-  if cardinality(d) <> 9 then raise exception 'FAIL: V deck has % cards: %', cardinality(d), d; end if;
-  -- deep (1 shared id, overlap 10/20) before broad (2 shared ids, overlap 2/20)
-  if d[1] <> pg_temp.e8(2) or d[2] <> pg_temp.e8(3) then
+  if cardinality(d) <> 11 then raise exception 'FAIL: V deck has % cards: %', cardinality(d), d; end if;
+  -- the 'mid' level (D 0.5, K 0.4, Q 0.3) is ordered by the tie key, not by the exact overlap (M-2)
+  if d[1:3] <> (select array_agg(x order by public.brivia_deck_tie(v, x, current_date)) from unnest(mid3) u(x)) then
+    raise exception 'FAIL M-2: the mid overlap level is not ordered by the tie key: %', d; end if;
+  -- deep (1 shared id, overlap 10/20, mid) before broad (2 shared ids, overlap 2/20, low)
+  if d[4] <> pg_temp.e8(3) or array_position(d, pg_temp.e8(2)) > 3 then
     raise exception 'FAIL R1 (C-3): a deep 10+10 card must lead a broad 2-point card: %', d; end if;
   -- a shared ring-1 card before every zero-shared ring-0 card
-  if d[3] <> pg_temp.e8(4) then raise exception 'FAIL R1: the shared ring-1 card is not third: %', d; end if;
+  if d[5] <> pg_temp.e8(4) then raise exception 'FAIL R1: the shared ring-1 card is not fifth: %', d; end if;
   if pg_temp.band(v, pg_temp.e8(4)) <> '~10 km' or pg_temp.band(v, pg_temp.e8(5)) <> '~3 km' then
     raise exception 'FAIL setup: bands % / %', pg_temp.band(v, pg_temp.e8(4)), pg_temp.band(v, pg_temp.e8(5)); end if;
   -- the zero-shared ring-0 tail follows brivia_deck_tie(viewer, target, current_date)
-  tail := d[4:9];
+  tail := d[6:11];
   if tail <> (select array_agg(x order by public.brivia_deck_tie(v, x, current_date)) from unnest(tail) u(x)) then
     raise exception 'FAIL R1 (C-4): the tie order is not brivia_deck_tie(viewer, target, current_date)'; end if;
   -- and it rotates: two fixed dates give two different orders of the same tail
@@ -134,7 +142,7 @@ begin
   update public.cell_density set ok10 = false where cell = (select c1 from ord_cells) and not is_test;
   d := pg_temp.deck_ids(v);
   if pg_temp.band(v, pg_temp.e8(4)) <> 'Kolkata' then raise exception 'FAIL: S1 place band = %', pg_temp.band(v, pg_temp.e8(4)); end if;
-  if d[3] <> pg_temp.e8(4) then raise exception 'FAIL R1: a shared place-tier card must lead zero-shared ring-0 cards: %', d; end if;
+  if d[5] <> pg_temp.e8(4) then raise exception 'FAIL R1: a shared place-tier card must lead zero-shared ring-0 cards: %', d; end if;
   update public.cell_density set ok10 = true where cell = (select c1 from ord_cells) and not is_test;
 end $$;
 
@@ -184,8 +192,19 @@ begin
      or (select (context->>'ring')::int from public.interaction where viewer_id = v and target_id = pg_temp.e8(2)) <> 0
      or (select (context->>'overlap')::numeric from public.interaction where viewer_id = v and target_id = pg_temp.e8(2)) <> 0.5
      or (select (context->>'overlap')::numeric from public.interaction where viewer_id = v and target_id = pg_temp.e8(3)) <> 0.1
-     or (select (context->>'overlap')::numeric from public.interaction where viewer_id = v and target_id = pg_temp.e8(5)) <> 0 then
+     or (select (context->>'overlap')::numeric from public.interaction where viewer_id = v and target_id = pg_temp.e8(5)) <> 0
+     or (select (context->>'overlap_level')::int from public.interaction where viewer_id = v and target_id = pg_temp.e8(2)) <> 2
+     or (select (context->>'overlap_level')::int from public.interaction where viewer_id = v and target_id = pg_temp.e8(3)) <> 1
+     or (select (context->>'overlap_level')::int from public.interaction where viewer_id = v and target_id = pg_temp.e8(5)) <> 0 then
     raise exception 'FAIL C-4: impression ring/overlap values';
+  end if;
+  -- I-2: a second deck call on the same UTC day adds no impression for the same targets
+  perform pg_temp.deck_ids(v);
+  select count(*) into n from public.interaction where viewer_id = v and event = 'impression';
+  if n <> cardinality(d) then raise exception 'FAIL I-2: % impressions after two deck calls for % cards', n, cardinality(d); end if;
+  if exists (select 1 from public.interaction where event = 'impression' and viewer_id = v
+              group by target_id, context->>'surface', (created_at at time zone 'UTC')::date having count(*) > 1) then
+    raise exception 'FAIL I-2: duplicate impressions';
   end if;
   -- members never read impression rows (0003 policy interaction_select_own)
   set local role authenticated;
@@ -208,6 +227,13 @@ begin
    where viewer_id = v and event = 'impression' and context->>'policy' = 'interim-v1' and context->>'surface' = 'search'
      and (context->>'position')::int between 1 and hits and model_version = 'interim-v1';
   if hits < 10 or n <> hits then raise exception 'FAIL C-4: search logged % impressions for % cards', n, hits; end if;
+  -- I-2: the same search again adds nothing today
+  set local role authenticated;
+  perform set_config('request.jwt.claims', json_build_object('sub', v)::text, true);
+  perform * from public.search_members('Order', 20);
+  reset role;
+  if (select count(*) from public.interaction where viewer_id = v and event = 'impression') <> hits then
+    raise exception 'FAIL I-2: a repeated search duplicated impressions'; end if;
 end $$;
 
 -- 5. Served ids (P0-A2): like/pass only for a target served in the last 7 days; otherwise silently ignored.
@@ -248,6 +274,21 @@ begin
   reset role;
   if not exists (select 1 from public.interaction where viewer_id = v and target_id = pg_temp.e8(5) and event = 'pass') then
     raise exception 'FAIL P0-A2: a pass for a search hit was not stored'; end if;
+end $$;
+
+-- 6. I-2 retention: purge_expired_requests deletes impressions older than 30 days, and keeps newer ones.
+do $$
+declare v uuid := pg_temp.e8(1); n_before int;
+begin
+  delete from public.interaction where viewer_id = v;
+  insert into public.interaction (viewer_id, target_id, event, created_at) values
+    (v, pg_temp.e8(2), 'impression', now() - interval '31 days'),
+    (v, pg_temp.e8(3), 'impression', now() - interval '29 days');
+  perform public.purge_expired_requests();
+  if exists (select 1 from public.interaction where viewer_id = v and target_id = pg_temp.e8(2)) then
+    raise exception 'FAIL I-2: a 31-day-old impression survived the purge'; end if;
+  if not exists (select 1 from public.interaction where viewer_id = v and target_id = pg_temp.e8(3)) then
+    raise exception 'FAIL I-2: a 29-day-old impression was purged'; end if;
 end $$;
 
 -- Clean up.

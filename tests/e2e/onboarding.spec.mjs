@@ -67,7 +67,7 @@ const places = [
   { id: 'in-mumbai', name: 'Mumbai', region: 'Maharashtra', country: 'India' },
   { id: 'in-pune', name: 'Pune', region: 'Maharashtra', country: 'India' },
 ];
-const PRIVATE_HINT = 'Private: counts for matching, never shown on your profile';
+const PRIVATE_NOTE = 'Private interests will be available soon.';
 
 const results = [];
 const check = (name, fn) => { try { fn(); results.push(['PASS', name]); } catch (error) { results.push(['FAIL', `${name}: ${error.message}`]); } };
@@ -120,7 +120,8 @@ const stubContext = async (context, opts = {}) => {
       if (!state.profile) return wantsObject ? json(406, { code: 'PGRST116', message: 'JSON object requested, multiple (or no) rows returned' }) : json(200, []);
       return json(200, wantsObject ? state.profile : [state.profile]);
     }
-    if (p === '/rest/v1/interest_node') return json(200, nodes);
+    // staleCatalog: a catalog loaded before a node became sensitive (the server still refuses it without consent).
+    if (p === '/rest/v1/interest_node') return json(200, opts.staleCatalog ? nodes.map((n) => ({ ...n, sensitive: false })) : nodes);
     if (p === '/rest/v1/place') {
       const or = url.searchParams.get('or') || '';
       const q = (or.match(/name\.ilike\.\*([^*]*)\*/) || [])[1] || '';
@@ -348,10 +349,15 @@ try {
     const counterLive = await counter.getAttribute('aria-live');
     const counterStart = (await counter.textContent()).trim();
     check(`1440: counter aria-live=polite, "20 of 20 points left" (got ${counterLive}, "${counterStart}")`, () => { assert.equal(counterLive, 'polite'); assert.equal(counterStart, '20 of 20 points left'); });
-    // Sensitive interests carry the private hint.
+    // Until the consent step ships (P0-B, D-038 R3), sensitive interests are not offered, and a one-line note says so.
     await page.locator('#interest-search').fill('scripture');
-    const sensitiveChip = (await page.locator('#interest-results [data-interest-id="wellbeing.spirituality.scripture_study"]').textContent()).replace(/\s+/g, ' ');
-    check(`1440: a sensitive chip shows the private hint ("${sensitiveChip.trim()}")`, () => assert.ok(sensitiveChip.includes(PRIVATE_HINT)));
+    await page.waitForTimeout(150);
+    const sensitiveChips = await page.locator('#interest-results [data-interest-id="wellbeing.spirituality.scripture_study"]').count();
+    const privateNote = (await page.locator('[data-interest-private-note]').textContent()).trim();
+    const privateNoteVisible = await page.locator('[data-interest-private-note]').isVisible();
+    check(`1440: a sensitive interest is not offered (${sensitiveChips} chips) and the note shows ("${privateNote}")`, () => {
+      assert.equal(sensitiveChips, 0); assert.equal(privateNote, PRIVATE_NOTE); assert.ok(privateNoteVisible);
+    });
 
     // Keyboard only from here: add Tennis (Space) and Chess (Enter).
     const search = page.locator('#interest-search');
@@ -704,36 +710,15 @@ try {
   }, [JSON.stringify(pending)]);
   const basePending = { name: 'Nia New', email: EMAIL, phone: '+91 9876543210', phoneCountryCode: '+91', phoneNumber: '9876543210', gender: 'Female', experience: '1–3 years', lookingFor: 'Friends' };
 
-  // 7. Email confirmation with a sensitive pick: it is left out of the pending profile; after login the city is applied,
-  //    step 3 opens prefilled (labels from the taxonomy) with a one-line note asking for private interests again.
+  // 7. Email confirmation with a sensitive pick: it is left out of the pending profile (privateOmitted); after login the
+  //    city is applied, step 3 opens prefilled (labels from the taxonomy) with a one-line note asking for private
+  //    interests again. Sensitive picks are hidden in the picker until the consent step ships (D-038 R3, fix round 1
+  //    M-5), so the pending profile such a signup stores is seeded directly.
   {
     const context = await browser.newContext({ viewport: { width: 1280, height: 900 } });
+    await seedPending(context, { ...basePending, interests: [{ id: 'games.board.chess', points: 19, mode: 'play' }], privateOmitted: true, orbit: { kind: 'city', placeId: 'in-bengaluru' }, savedAt: Date.now() });
     const stub = await stubContext(context, { signupSession: false });
     const { page, errors } = await newPage(context, stub.consoleLines);
-    await openSignup(page);
-    await fillStepOne(page);
-    await page.locator('[data-area-city]').click();
-    await pickCityByKeyboard(page);
-    await page.locator('[data-signup-step="2"] .signup-next').click();
-    await page.waitForSelector('#interest-results [data-interest-group]', { state: 'attached' });
-    await page.locator('#interest-search').fill('Chess');
-    await clickInterest(page, 'Chess');
-    await page.locator('#interest-search').fill('scripture');
-    await clickInterest(page, 'Scripture study');
-    for (let i = 0; i < 18; i += 1) await page.getByRole('button', { name: 'Add a point to Chess', exact: true }).click();
-    await page.locator('.looking-search').click();
-    await page.locator('#looking-results [data-looking-option]').first().click();
-    await page.locator('[data-signup-step="3"] .signup-next').click();
-    await finishStepFour(page);
-    await page.waitForSelector('#auth-success:not([hidden])', { timeout: 15000 });
-    const raw = (await storageDump(page))['local:brivia-pending-profile'] || '';
-    const pending = JSON.parse(raw || 'null');
-    check(`private: the sensitive pick is not in the pending profile (${raw.slice(0, 220)})`, () => {
-      assert.deepEqual(pending.interests, [{ id: 'games.board.chess', points: 19, mode: 'play' }]);
-      assert.equal(pending.privateOmitted, true);
-      assert.ok(!raw.includes('scripture') && !raw.includes('Scripture'));
-      assert.deepEqual(pending.orbit, { kind: 'city', placeId: 'in-bengaluru' });
-    });
     await loginOnFreshPage(page);
     await page.waitForSelector('[data-signup-step="3"]:not([hidden])', { timeout: 15000 });
     await page.waitForFunction(() => document.querySelector('[data-budget-row="games.board.chess"] .budget-label')?.textContent === 'Chess', null, { timeout: 5000 }).catch(() => {});
@@ -755,8 +740,9 @@ try {
   // 7b. D-038 (R3): the server refuses a sensitive pick without the separate consent (the consent step is P0-B). The
   //     member stays on step 3 with a message that says why and how to continue; removing the pick then completes.
   {
+    // A stale catalog (loaded before the node became sensitive) still offers the pick; the server refuses it.
     const context = await browser.newContext({ viewport: { width: 1280, height: 900 } });
-    const stub = await stubContext(context);
+    const stub = await stubContext(context, { staleCatalog: true, realApp: false });
     const { page, errors } = await newPage(context, stub.consoleLines);
     await openSignup(page);
     await fillStepOne(page);
@@ -782,6 +768,19 @@ try {
       assert.equal(message, 'Private interests need a separate consent, which is coming soon. Remove the ones marked Private to continue.');
     });
     check('consent: the app was not opened', () => assert.ok(!/\/app\.html/.test(page.url())));
+    // M-4: removing the private pick (select it again) and placing its point lets signup complete.
+    await page.locator('#interest-search').fill('scripture');
+    await clickInterest(page, 'Scripture study');
+    await page.getByRole('button', { name: 'Add a point to Chess', exact: true }).click();
+    await page.locator('[data-signup-step="3"] .signup-next').click();
+    await page.waitForSelector('[data-signup-step="4"]:not([hidden])');
+    await page.locator('[data-signup-step="4"] [type="submit"]').click();
+    await page.waitForURL(/\/app\.html/, { timeout: 15000 }).catch(() => {});
+    const finalItems = JSON.parse(stub.posts('/rest/v1/rpc/set_member_interests').at(-1)?.body || '{}').p_items || [];
+    check(`consent: after removing the private pick, signup completes (${JSON.stringify(finalItems)})`, () => {
+      assert.ok(/\/app\.html/.test(page.url()));
+      assert.deepEqual(finalItems, [{ interest_id: 'games.board.chess', points: 20, mode: 'play' }]);
+    });
     check('consent: no uncaught page errors', () => assert.deepEqual(errors, []));
     await context.close();
   }

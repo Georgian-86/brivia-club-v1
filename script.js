@@ -716,7 +716,11 @@ if (lookingPicker) {
 const GEO_OPTIONS = { enableHighAccuracy: false, timeout: 10000, maximumAge: 600000 };
 const AREA_FALLBACK_TEXT = 'No problem. Pick your city instead.';
 const BUDGET_ERROR_TEXT = 'Place all 20 points to continue.';
-const PRIVATE_HINT_TEXT = 'Private: counts for matching, never shown on your profile';
+// D-038 R3: sensitive interests are never shown to others and do not affect who the member sees yet.
+const PRIVATE_HINT_TEXT = 'Private: never shown on your profile, and does not change who you see yet';
+// Until the separate-consent step ships (P0-B), sensitive interests are not offered in the picker: the server refuses
+// them without consent (D-038 R3). Their nodes stay in the catalog so stored picks still get labels.
+const SENSITIVE_PICKS_ENABLED = false;
 const escapeText = (value) => String(value ?? '').replace(/[&<>"']/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
 const svgIcon = (name) => {
   const paths = {
@@ -906,6 +910,7 @@ const normalizeSearch = (value) => String(value || '').toLowerCase().normalize('
 const buildInterestCatalog = (nodes) => {
   const byId = new Map(nodes.map((node) => [node.id, node]));
   const groups = new Map();
+  const hidden = [];
   nodes.filter((node) => node.level === 2).forEach((node) => {
     groups.set(node.id, { id: node.id, label: node.label, domain: byId.get(node.parent_id)?.label || '', items: [] });
   });
@@ -913,9 +918,11 @@ const buildInterestCatalog = (nodes) => {
     const group = groups.get(node.id.split('.').slice(0, 2).join('.'));
     if (!group) return;
     const parent = node.level === 4 ? byId.get(node.parent_id)?.label || '' : '';
-    group.items.push({ id: node.id, label: node.label, sensitive: Boolean(node.sensitive), search: normalizeSearch(`${node.label} ${parent} ${group.label}`) });
+    const item = { id: node.id, label: node.label, sensitive: Boolean(node.sensitive), search: normalizeSearch(`${node.label} ${parent} ${group.label}`) };
+    if (item.sensitive && !SENSITIVE_PICKS_ENABLED) hidden.push(item);
+    else group.items.push(item);
   });
-  return { groups: [...groups.values()].filter((group) => group.items.length) };
+  return { groups: [...groups.values()].filter((group) => group.items.length), hidden };
 };
 const loadInterestCatalog = () => {
   interestCatalogPromise ||= fetchInterestNodes().then(({ data, error }) => {
@@ -960,7 +967,8 @@ const renderInterestResults = () => {
   }).join('');
   renderKeepingFocus(interestResults, html || '<p class="interest-loading">No interest matches that yet. Try a broader word.</p>');
 };
-const catalogNode = (id) => interestCatalog?.groups.flatMap((group) => group.items).find((node) => node.id === id) || null;
+const catalogNode = (id) => interestCatalog?.groups.flatMap((group) => group.items).find((node) => node.id === id)
+  || interestCatalog?.hidden?.find((node) => node.id === id) || null;
 const isSensitiveInterest = (id) => Boolean(catalogNode(id)?.sensitive);
 const budgetNote = signupForm?.querySelector('[data-budget-note]');
 const showBudgetNote = (text) => { if (budgetNote) { budgetNote.textContent = text; budgetNote.hidden = !text; } };

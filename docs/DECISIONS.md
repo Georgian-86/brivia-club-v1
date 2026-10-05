@@ -483,3 +483,13 @@ supersedes it.
   - Students in a restricted mode alongside adults: much riskier and hard to enforce.
   - School invite codes as the only route: stronger verification, but kept as a fallback.
 - **Open:** a lawyer must confirm whether email approval meets "verifiable" parental consent under the DPDP Rules. If it does not, use school or teacher invite codes.
+
+## D-041: Interest-rewrite cap counts every save after the first (corrects D-039 item 5)
+- **Date:** 2026-10-05 (P0-A fix round 1, pre-apply review of `0004`).
+- **Correction:** D-039 item 5 counted a rewrite only when the member was completed before the call. That let a member
+  reset the cap by dropping below completion (a 'New Member' name, or a `set_sensitive_consent(false/true)` cycle).
+  Now every `set_member_interests` call by a member who already has `member_interest` rows counts, completed or not;
+  only the very first save is free. 3 per rolling 24 h, the 4th raises `PT429`. Harness: `orbit-sensitive.test.sql` §7.
+- **Same round (no rule change):** impressions are deduped to one per (viewer, target, surface, UTC day) and purged
+  after 30 days; the policy wrappers moved to the non-exposed schema `brivia_private`; the deck's overlap key is
+  bucketed into 4 levels; sensitive interests are hidden in the signup picker until the consent step (P0-B).

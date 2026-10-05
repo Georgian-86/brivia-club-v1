@@ -28,6 +28,12 @@
 -- Privacy (CLAUDE.md): coordinates exist only as function arguments. No member table stores them; the only
 -- coordinate columns are the public city centroids in public.place, which no client role can read.
 
+-- Policy-only helpers live in brivia_private (fix round 1, M-1). PostgREST exposes only the public schema, so nothing
+-- here is an /rpc endpoint; authenticated has usage so that RLS policies, evaluated as the member, can call them.
+create schema if not exists brivia_private;
+revoke all on schema brivia_private from public, anon;
+grant usage on schema brivia_private to authenticated;
+
 -- =============================================================================================
 -- 1. Grid and places
 -- =============================================================================================
@@ -437,9 +443,9 @@ grant execute on function public.set_sensitive_consent(boolean) to authenticated
 --     22023 'sensitive consent required';
 --   * the completion floor: at least one non-sensitive id (B-F4: otherwise empty skills on a completed member would
 --     reveal that every interest is sensitive): 22023 'invalid interests';
---   * the rewrite cap: a call by a member who is completed before it is a rewrite; 3 per rolling 24 h
---     (interest_rewrite), the 4th raises PT429 'try again later'. The first save, and a re-save after the member fell
---     below completion (for example after withdrawing consent), are not counted.
+--   * the rewrite cap: a call by a member who already has member_interest rows is a rewrite (D-041), whether or not
+--     they are completed; 3 per rolling 24 h (interest_rewrite), the 4th raises PT429 'try again later'. Only the very
+--     first save (no rows yet) is free.
 create or replace function public.set_member_interests(p_items jsonb)
 returns void
 language plpgsql
@@ -498,8 +504,10 @@ begin
                    join public.interest_node nd on nd.id = e ->> 'interest_id' where not nd.sensitive) then
     raise exception 'invalid interests' using errcode = '22023';
   end if;
-  -- The rewrite cap (R3): serialised by the profile row lock above.
-  if public.brivia_member_completed(uid) then
+  -- The rewrite cap (R3; fix round 1, D-041): every save by a member who already has interest rows counts, completed
+  -- or not, so dropping below completion (a 'New Member' name, a consent withdrawal) cannot reset it. Serialised by
+  -- the profile row lock above.
+  if exists (select 1 from public.member_interest where member_id = uid) then
     if (select count(*) from public.interest_rewrite r
          where r.member_id = uid and r.at > now() - interval '24 hours') >= 3 then
       raise exception 'try again later' using errcode = 'PT429';
@@ -795,6 +803,8 @@ as $$
     select me.id, h.id, 'impression', jsonb_build_object('policy', 'interim-v1', 'surface', 'search', 'position', h.pos),
            1, 'interim-v1'
       from hits h cross join me
+    on conflict (viewer_id, target_id, (context ->> 'surface'), ((created_at at time zone 'UTC')::date))
+      where event = 'impression' do nothing
     returning 1
   )
   select h.id, h.name, h.full_name, null::text, null::text, null::text, h.experience, h.skills, h.looking_for,
@@ -1156,6 +1166,7 @@ grant execute on function public.send_signal(uuid, text) to authenticated;
 --   * signal_ledger rows older than 30 days (daily cap: 24 h; live cap: 30 days);
 --   * interest_rewrite and location_change rows older than 24 h (their caps' windows; location_change says when a
 --     member moved);
+--   * impression rows older than 30 days (I-2; a like/pass needs one from the last 7 days);
 --   * cron.job_run_details rows that ended more than 7 days ago, when pg_cron is installed (dynamic SQL, so this
 --     compiles without the cron schema).
 -- It still returns the number of request rows deleted.
@@ -1171,6 +1182,7 @@ begin
   delete from public.signal_ledger where at <= now() - interval '30 days';
   delete from public.interest_rewrite where at <= now() - interval '24 hours';
   delete from public.location_change where at <= now() - interval '24 hours';
+  delete from public.interaction where event = 'impression' and created_at <= now() - interval '30 days';
   if to_regclass('cron.job_run_details') is not null then
     execute 'delete from cron.job_run_details where end_time < now() - interval ''7 days''';
   end if;
@@ -1262,13 +1274,14 @@ grant execute on function public.brivia_has_completed_profile() to authenticated
 -- (wrapped in a scalar subquery: an initplan) instead of once per row. Semantics are those of 0001/0003, except the
 -- incoming-request policy, which also hides requests from senders who are no longer completed (fix round 1), so
 -- "like back" (send_signal writes nothing to them) and "accept" agree.
--- Policy helpers pinned to auth.uid() (advisor finding, 2026-10-04): the 0001-0003 pair helpers
+-- Policy helpers pinned to auth.uid() (advisor finding, 2026-10-04), in the non-exposed schema brivia_private (M-1):
+-- the 0001-0003 pair helpers
 -- (brivia_is_blocked_between, brivia_same_world, brivia_interaction_allowed) take any two members, so they are revoked
 -- from every client role at the end of this file. Each policy calls one definer wrapper instead. A wrapper answers
 -- only about the caller's own request, match or interaction, never more than the guarded statement itself reveals.
 -- brivia_incoming_request_visible(p_from): a request from p_from to the caller exists, p_from is completed, and no
 -- block either way. (Replaces brivia_request_sender_completed plus brivia_is_blocked_between in the select policy.)
-create or replace function public.brivia_incoming_request_visible(p_from uuid)
+create or replace function brivia_private.brivia_incoming_request_visible(p_from uuid)
 returns boolean
 language sql
 stable
@@ -1279,8 +1292,8 @@ as $$
      and public.brivia_member_completed(p_from)
      and not public.brivia_pair_is_blocked(p_from, auth.uid());
 $$;
-revoke all on function public.brivia_incoming_request_visible(uuid) from public, anon;
-grant execute on function public.brivia_incoming_request_visible(uuid) to authenticated;
+revoke all on function brivia_private.brivia_incoming_request_visible(uuid) from public, anon;
+grant execute on function brivia_private.brivia_incoming_request_visible(uuid) to authenticated;
 -- The pre-advisor helper is kept for owner use only.
 create or replace function public.brivia_request_sender_completed(p_from uuid)
 returns boolean
@@ -1296,7 +1309,7 @@ revoke all on function public.brivia_request_sender_completed(uuid) from public,
 
 -- brivia_can_message(p_recipient): the caller and p_recipient are matched, in the same world and not blocked either
 -- way. False for anyone the caller is not matched with.
-create or replace function public.brivia_can_message(p_recipient uuid)
+create or replace function brivia_private.brivia_can_message(p_recipient uuid)
 returns boolean
 language sql
 stable
@@ -1312,8 +1325,8 @@ as $$
                  where a.id = auth.uid() and b.id = p_recipient),
     false);
 $$;
-revoke all on function public.brivia_can_message(uuid) from public, anon;
-grant execute on function public.brivia_can_message(uuid) to authenticated;
+revoke all on function brivia_private.brivia_can_message(uuid) from public, anon;
+grant execute on function brivia_private.brivia_can_message(uuid) to authenticated;
 
 drop policy if exists "Members can view their connection requests" on public.connection_requests;
 create policy "Members can view their connection requests"
@@ -1322,7 +1335,7 @@ create policy "Members can view their connection requests"
     (select public.brivia_has_completed_profile())
     and to_id = auth.uid()
     and public.brivia_request_is_live(status, created_at)
-    and public.brivia_incoming_request_visible(from_id)
+    and brivia_private.brivia_incoming_request_visible(from_id)
   );
 
 drop policy if exists "Completed members can view their matches" on public.matches;
@@ -1348,7 +1361,7 @@ create policy "Completed members can send messages"
   with check (
     (select public.brivia_has_completed_profile())
     and sender_id = auth.uid()
-    and public.brivia_can_message(recipient_id)
+    and brivia_private.brivia_can_message(recipient_id)
   );
 
 drop policy if exists "Members can create their own community posts" on public.community_posts;
@@ -1441,19 +1454,29 @@ grant execute on function public.respond_connection_request(uuid, boolean) to au
 --   interests (D-029, D-038) and retired nodes (including the harness fixture zz.harness.any) are left out of the
 --   labels, the shared test and the overlap, so neither a chip nor a card's position can reveal one.
 -- * Order (D-038): (1) at least one shared interest first; (2) display ring asc: 0 '~3 km', 1 '~10 km', then the
---   place tier (2); (3) budget-bounded overlap desc: sum(least(p_caller, p_target)) / 20 over the shared ids, which
---   adding thin interests cannot raise (C-3); (4) brivia_deck_tie(caller, target, current_date), a daily rotating key
---   (C-4). Every key is a function of what the card shows. The order is computed for the whole pool before the limit.
+--   place tier (2); (3) the budget-bounded overlap sum(least(p_caller, p_target)) / 20 over the shared ids, which
+--   adding thin interests cannot raise (C-3), bucketed into 4 levels desc (0; low <= 0.25; mid <= 0.5; high);
+--   (4) brivia_deck_tie(caller, target, current_date), a daily rotating key (C-4). Keys 1, 2 and 4 are functions of
+--   what the card shows. The overlap level is the one key that uses private points (the target's point split): it
+--   carries no location, it is coarse (4 levels, so the order reveals little about anyone's split), and probing it by
+--   changing one's own points is bounded by the rewrite cap. The order is computed for the whole pool before the limit.
 -- * distance_band: 'Abroad' when the target's place is in another country than the caller's; else display ring 0
 --   '~3 km', 1 '~10 km', otherwise the target's place name. A cell id, km, ring, coordinate, city, state, email or
 --   phone never leaves.
 -- * shared_interests: at most 2 labels, by summed points (caller + target) desc, then label asc.
 -- * Impressions (C-4, P0-A3): volatile. Every returned card writes one owner-only interaction row: event
 --   'impression', propensity 1, model_version 'interim-v1', context {policy 'interim-v1', surface 'deck', position,
---   ring (the display ring), overlap, shared (the shared-id count)}. Members never read impression rows (0003 policy
+--   ring (the display ring), overlap (exact, owner-only), overlap_level, shared (the shared-id count)}. At most one
+--   impression per (viewer, target, surface, UTC day) (I-2: interaction_impression_daily_idx); purged after 30 days. Members never read impression rows (0003 policy
 --   interaction_select_own). They are also the served set for brivia_interaction_served (below).
 -- * The caller must be completed; otherwise (or without a session) no rows and no impression. p_limit defaults to 12,
 --   clamped to [1, 20].
+-- Impression dedupe (fix round 1, I-2): at most one impression per (viewer, target, surface, UTC day). The deck and
+-- search inserts use ON CONFLICT DO NOTHING on this index, so reloading the deck does not multiply rows.
+create unique index if not exists interaction_impression_daily_idx
+  on public.interaction (viewer_id, target_id, (context ->> 'surface'), ((created_at at time zone 'UTC')::date))
+  where event = 'impression';
+
 -- The daily tie key: md5(caller || target || 'YYYY-MM-DD'). Internal.
 create or replace function public.brivia_deck_tie(p_viewer uuid, p_target uuid, p_day date)
 returns text
@@ -1523,6 +1546,9 @@ as $$
   ),
   banded as (
     select pool.tid, pool.place_name, coalesce(s.n, 0) as shared_n, coalesce(s.overlap, 0) as overlap,
+           -- the overlap in 4 levels (M-2): 0 none, 1 low (<= 0.25), 2 mid (<= 0.5), 3 high
+           case when coalesce(s.overlap, 0) = 0 then 0 when s.overlap <= 0.25 then 1 when s.overlap <= 0.5 then 2
+                else 3 end as overlap_level,
            coalesce(s.labels, '{}'::text[]) as labels,
            case when pool.fine_ring <= 1 then pool.fine_ring else 2 end as display_ring,
            pool.country is distinct from me.country as abroad,
@@ -1532,7 +1558,7 @@ as $$
       left join shared s on s.tid = pool.tid
   ),
   top as (
-    select b.*, row_number() over (order by b.shared_n > 0 desc, b.display_ring, b.overlap desc, b.tie, b.tid) as pos
+    select b.*, row_number() over (order by b.shared_n > 0 desc, b.display_ring, b.overlap_level desc, b.tie, b.tid) as pos
       from banded b
      order by pos
      limit greatest(1, least(coalesce(p_limit, 12), 20))
@@ -1541,9 +1567,11 @@ as $$
     insert into public.interaction (viewer_id, target_id, event, context, propensity, model_version)
     select me.id, t.tid, 'impression',
            jsonb_build_object('policy', 'interim-v1', 'surface', 'deck', 'position', t.pos, 'ring', t.display_ring,
-                              'overlap', round(t.overlap, 4), 'shared', t.shared_n),
+                              'overlap', round(t.overlap, 4), 'overlap_level', t.overlap_level, 'shared', t.shared_n),
            1, 'interim-v1'
       from top t cross join me
+    on conflict (viewer_id, target_id, (context ->> 'surface'), ((created_at at time zone 'UTC')::date))
+      where event = 'impression' do nothing
     returning 1
   )
   select p.id, p.name, p.photo_url, p.cover_url, p.experience, p.skills, p.looking_for,
@@ -1591,7 +1619,7 @@ create trigger brivia_interaction_served
 
 -- The interaction insert policy (0003) through a wrapper pinned to auth.uid() (advisor finding): same checks (same
 -- world; met/letgo need a match; accept/decline need a request addressed to the caller).
-create or replace function public.brivia_interaction_insert_ok(p_target uuid, p_event text)
+create or replace function brivia_private.brivia_interaction_insert_ok(p_target uuid, p_event text)
 returns boolean
 language sql
 stable
@@ -1601,14 +1629,14 @@ as $$
   select coalesce(public.brivia_same_world(auth.uid(), p_target)
                   and public.brivia_interaction_allowed(auth.uid(), p_target, p_event), false);
 $$;
-revoke all on function public.brivia_interaction_insert_ok(uuid, text) from public, anon;
-grant execute on function public.brivia_interaction_insert_ok(uuid, text) to authenticated;
+revoke all on function brivia_private.brivia_interaction_insert_ok(uuid, text) from public, anon;
+grant execute on function brivia_private.brivia_interaction_insert_ok(uuid, text) to authenticated;
 drop policy if exists interaction_insert_own on public.interaction;
 create policy interaction_insert_own on public.interaction for insert to authenticated
   with check (
     viewer_id = auth.uid()
     and event in ('like','pass','request','accept','decline','met','letgo')
-    and public.brivia_interaction_insert_ok(target_id, event)
+    and brivia_private.brivia_interaction_insert_ok(target_id, event)
   );
 
 -- deck_status(): why the deck is empty (the client asks when deck_candidates returns no rows). Never a count
@@ -1670,6 +1698,10 @@ revoke all on function public.brivia_same_world(uuid, uuid) from public, anon, a
 revoke all on function public.brivia_interaction_allowed(uuid, uuid, text) from public, anon, authenticated;
 revoke all on function public.brivia_is_blocked_between(uuid, uuid) from public, anon, authenticated;
 revoke all on function public.brivia_is_blocked_between(text, text) from public, anon, authenticated;
+-- * The policy wrappers moved to brivia_private (M-1); a public copy from an earlier draft of this file is dropped.
+drop function if exists public.brivia_can_message(uuid);
+drop function if exists public.brivia_incoming_request_visible(uuid);
+drop function if exists public.brivia_interaction_insert_ok(uuid, text);
 -- (brivia_can_see_author, an oracle about a post author's visibility, stays for the community_posts policy until
 -- community_feed() replaces it: R6, P1.)
 

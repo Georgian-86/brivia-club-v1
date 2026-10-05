@@ -4,9 +4,22 @@ The files here are applied **by hand in the Supabase SQL editor, as `postgres`, 
 file is idempotent: the local harness (`bash supabase/tests/run.sh`) applies every file twice. Verify locally with
 the harness before touching the live project. `supabase/legacy/` is archive only and is never applied.
 
+**Live state (2026-10-04): `0001`, `0002` and `0003` are applied on the live project and frozen** (D-038: a file
+applied live is never edited again; later changes go in a new numbered file). **Apply only `0004`.** Once `0004` is
+applied it is frozen too.
+
+## 0. Pre-flight checks (run in the SQL editor before `0004`)
+
+```sql
+select is_anonymous from auth.users limit 0;                     -- must succeed: completion reads this column
+select extname from pg_extension where extname = 'pg_cron';      -- one row: pg_cron is on (step 3); none: enable it first
+```
+
+If the first query fails, stop: `0004`'s `brivia_member_completed` reads `auth.users.is_anonymous`.
+
 ## 1. Before you apply: plan the window (deploy order)
 
-- **Apply `0001` → `0004` and deploy the new client in the same window.** The old client breaks against `0004`
+- **Apply `0004` and deploy the new client in the same window** (`0001`–`0003` are already live). The old client breaks against `0004`
   (raw `connection_requests` inserts are revoked, `skills`, `city` and `state` are no longer client-writable, and
   the deck moved to `deck_candidates`). The new client breaks without `0004` (it calls `send_signal`,
   `my_signal_quota`, `deck_candidates`, `my_onboarding_status`, `set_home_*` and `set_member_interests`).
@@ -61,10 +74,28 @@ in sparse cells stay coarsened (safe, but the deck shows place names instead of 
 
 ## 4. Apply
 
-1. Apply `0001_baseline.sql`, `0002_p0_privacy_consent.sql`, `0003_trust_hardening.sql`, `0004_orbit_onboarding.sql`,
-   in that order, each as one run in the SQL editor. Re-running `0003` alone must be followed by `0004`.
+1. Apply only `0004_orbit_onboarding.sql`, as one run in the SQL editor (it is clean in a single transaction;
+   `0001`–`0003` are live and frozen: never re-run or edit them).
 2. Deploy the new client (same window, step 1).
 3. **Then run the seed** (only if test members are wanted): follow `supabase/seed/README.md`
    (`seed/test-members.sql`, as `postgres`; remove with `seed/purge-test-members.sql`).
-4. **Then run the advisors**: Dashboard → **Advisors** → Security and Performance. The security advisor must be
-   clean (go-live gate, D-026). Record the result in the go-live DECISIONS entry.
+4. **Then run the advisors**: Dashboard → **Advisors** → Security and Performance. Record the result in the go-live
+   DECISIONS entry. The security advisor must show nothing beyond the expected warnings below (go-live gate, D-026).
+
+### Expected advisor warnings after `0004` (intended, not failures)
+
+The lint "security definer function executable by `authenticated`" (and its "public" variant) is expected for exactly
+these **intended member RPCs** in `public`. Each is pinned to `auth.uid()`, has `search_path = public`, and is not
+executable by `anon`:
+
+`deck_candidates`, `deck_status`, `get_candidates`, `search_members`, `send_signal`, `my_signal_quota`,
+`my_outgoing_requests`, `respond_connection_request`, `my_interests`, `my_onboarding_status`, `set_member_interests`,
+`set_sensitive_consent`, `set_home_location`, `set_home_city`, `brivia_has_completed_profile` (0001, used by policies),
+`brivia_can_see_author` (0003, the post policy; replaced by `community_feed()` in P1).
+
+The policy wrappers in `brivia_private` (`brivia_can_message`, `brivia_incoming_request_visible`,
+`brivia_interaction_insert_ok`) are not in an exposed schema; if a lint lists them, it is the same intended case.
+Anything else is a finding: `list_members`, `brivia_same_world`, `brivia_interaction_allowed`,
+`brivia_is_blocked_between`, `brivia_request_sender_completed`, the grid helpers and `brivia_guard_is_test` must not
+be executable by `authenticated` or `anon`, and no function may have a mutable `search_path`. The harness checks the
+same list (`supabase/tests/orbit-hygiene.test.sql`, H3/H5).

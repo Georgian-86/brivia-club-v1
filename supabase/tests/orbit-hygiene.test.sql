@@ -5,8 +5,9 @@
 --      brivia_guard_is_test has a pinned search_path (advisor: mutable search_path);
 --   H3 no 0001-0003 helper that answers about an arbitrary pair is client-executable: brivia_same_world,
 --      brivia_interaction_allowed and both brivia_is_blocked_between overloads are revoked from every client role;
---      the policies that used them call definer wrappers pinned to auth.uid(); the client-executable function set is
---      exactly the RPC whitelist below;
+--      the policies that used them call definer wrappers pinned to auth.uid(), which live in the non-exposed schema
+--      brivia_private (fix round 1, M-1: PostgREST exposes only public, so they are not RPCs); the client-executable
+--      definer set in public is exactly the RPC whitelist below;
 --   H4 purge_expired_requests also deletes location_change rows older than 24 h and interest_rewrite rows older than
 --      24 h, and prunes cron.job_run_details older than 7 days when pg_cron is installed;
 --   H5 every function in public pins its search_path.
@@ -89,8 +90,8 @@ begin
   select string_agg(p.proname, ',' order by p.proname) into got
     from pg_proc p where p.pronamespace = 'public'::regnamespace and p.prosecdef
      and has_function_privilege('authenticated', p.oid, 'execute');
-  want := 'brivia_can_message,brivia_can_see_author,brivia_has_completed_profile,brivia_incoming_request_visible,'
-       || 'brivia_interaction_insert_ok,deck_candidates,deck_status,get_candidates,my_interests,my_onboarding_status,'
+  want := 'brivia_can_see_author,brivia_has_completed_profile,'
+       || 'deck_candidates,deck_status,get_candidates,my_interests,my_onboarding_status,'
        || 'my_outgoing_requests,my_signal_quota,respond_connection_request,search_members,send_signal,set_home_city,'
        || 'set_home_location,set_member_interests,set_sensitive_consent';
   if got is distinct from want then raise exception 'FAIL H3: authenticated may execute definer functions %', got; end if;
@@ -98,6 +99,34 @@ begin
               and has_function_privilege('anon', p.oid, 'execute')) then
     raise exception 'FAIL H3: anon may execute a definer function';
   end if;
+  -- M-1: the wrappers are not in public (no /rpc), but in brivia_private, usable by authenticated policies only
+  foreach f in array array['brivia_can_message(uuid)', 'brivia_incoming_request_visible(uuid)',
+                           'brivia_interaction_insert_ok(uuid, text)'] loop
+    if to_regprocedure('public.' || f) is not null then raise exception 'FAIL M-1: public.% is exposed', f; end if;
+    if to_regprocedure('brivia_private.' || f) is null then raise exception 'FAIL M-1: brivia_private.% missing', f; end if;
+    if has_function_privilege('anon', 'brivia_private.' || f, 'execute')
+       or not has_function_privilege('authenticated', 'brivia_private.' || f, 'execute') then
+      raise exception 'FAIL M-1: brivia_private.% grants', f;
+    end if;
+  end loop;
+  if has_schema_privilege('anon', 'brivia_private', 'usage') or has_schema_privilege('public', 'brivia_private', 'usage')
+     or not has_schema_privilege('authenticated', 'brivia_private', 'usage') then
+    raise exception 'FAIL M-1: brivia_private schema usage grants';
+  end if;
+end $$;
+-- An /rpc-style call of the old public names fails for a member.
+do $$
+declare stmt text; failed boolean;
+begin
+  foreach stmt in array array['select public.brivia_can_message(''4e8e4e8e-0000-4000-8000-000000000002''::uuid)',
+                              'select public.brivia_incoming_request_visible(''4e8e4e8e-0000-4000-8000-000000000002''::uuid)',
+                              'select public.brivia_interaction_insert_ok(''4e8e4e8e-0000-4000-8000-000000000002''::uuid, ''like'')'] loop
+    failed := false;
+    set local role authenticated;
+    begin execute stmt; exception when undefined_function or insufficient_privilege then failed := true; end;
+    reset role;
+    if not failed then raise exception 'FAIL M-1: a member ran %', stmt; end if;
+  end loop;
 end $$;
 
 -- The wrappers answer only about the caller's own pairs, and the policies built on them still work.
@@ -109,13 +138,13 @@ begin
   set local role authenticated;
   -- the caller c is in no match with a or b: no answer about them
   perform set_config('request.jwt.claims', json_build_object('sub', c)::text, true);
-  if public.brivia_can_message(a) or public.brivia_can_message(b) then reset role; raise exception 'FAIL H3: can_message answers a non-party'; end if;
-  if public.brivia_incoming_request_visible(a) then reset role; raise exception 'FAIL H3: request wrapper answers a non-party'; end if;
+  if brivia_private.brivia_can_message(a) or brivia_private.brivia_can_message(b) then reset role; raise exception 'FAIL H3: can_message answers a non-party'; end if;
+  if brivia_private.brivia_incoming_request_visible(a) then reset role; raise exception 'FAIL H3: request wrapper answers a non-party'; end if;
   -- a and b are matched: a messages b
   perform set_config('request.jwt.claims', json_build_object('sub', a)::text, true);
-  if not public.brivia_can_message(b) then reset role; raise exception 'FAIL H3: can_message denies a match'; end if;
+  if not brivia_private.brivia_can_message(b) then reset role; raise exception 'FAIL H3: can_message denies a match'; end if;
   insert into public.brivia_messages (sender_id, recipient_id, body) values (a, b, 'hi');
-  if not public.brivia_incoming_request_visible(c) then reset role; raise exception 'FAIL H3: a cannot see c''s request'; end if;
+  if not brivia_private.brivia_incoming_request_visible(c) then reset role; raise exception 'FAIL H3: a cannot see c''s request'; end if;
   if (select count(*) from public.connection_requests where to_id = a) <> 1 then reset role; raise exception 'FAIL H3: request policy'; end if;
   reset role;
   -- a blocks b: no message, either way; a blocks c: c's request is hidden from a
