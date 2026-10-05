@@ -532,6 +532,8 @@ begin
   on conflict (member_id) do nothing;
   insert into public.member_interest (member_id, interest_id, points) values (pg_temp.d7(25), 'sports.racket.badminton', 20)
   on conflict do nothing;
+  update public.profiles set adult_declared_at = now() where profiles.id = pg_temp.d7(25);   -- R1: declared, so only the scheme excludes it
+  if not public.brivia_member_completed(pg_temp.d7(25)) then raise exception 'FAIL M1 setup: the non-grid1 target is not completed'; end if;
   d := pg_temp.deck_ids(v);
   if d <> before_deck then raise exception 'FAIL M1: a non-grid1 target changed the deck: %', d; end if;
   if cardinality(pg_temp.deck_ids(h)) <> 0 then raise exception 'FAIL M1: a non-grid1 caller got cards'; end if;
