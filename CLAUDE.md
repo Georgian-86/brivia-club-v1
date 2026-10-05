@@ -24,11 +24,12 @@ in `docs/`.
 
 | Repo | Role | Keep / take |
 |---|---|---|
-| `brivia-club-v1` (this repo) | **The product UI we ship.** Vite, vanilla JS, Supabase (auth, profiles, chat, storage). | Keep the UI. It currently has **no matching engine**: the deck is newest-first plus client-side filters. |
+| `brivia-club-v1` (this repo) | **The product UI we ship.** Vite, vanilla JS, Supabase (auth, profiles, chat, storage). | Keep the UI. The deck is an interim server ranking (`deck_candidates`, shared interest, then band); ORBIT is specified and unit-tested in `orbit/` but not yet wired to members. |
 | `brivia-club` | The older version: Fastify, Prisma, Postgres/pgvector, and a matching engine v1 (`server/src/engine/`). | Reference and reuse for the engine plumbing: embeddings, interaction log, per-member taste learning, explainability. Its scoring model is **not** location-first, so ORBIT replaces it. |
 
 ## Docs map (read the relevant one before working)
 
+- `docs/HANDOFF.md`: **where we are right now**: what is done, live DB state, what to do next and which file covers what. Read it second, and update it at the end of every session.
 - `docs/VISION.md`: product aim, non-negotiable rules, and who it's for
 - `docs/ENGINE_AUDIT.md`: arena-style audit and rating of the existing backend and matching engine
 - `docs/ORBIT_ENGINE.md`: **the ORBIT matching engine spec** (the copyright asset), formulas, data model, rollout plan
