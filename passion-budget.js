@@ -1,4 +1,4 @@
-// Passion Budget (ORBIT spec §3.2): pure state helpers for the signup "Your signals" step. No DOM, no storage.
+// Passion Budget (ORBIT spec §3.2): pure state helpers for the signup "What you care about" step. No DOM, no storage.
 // State: { items: [{ id, label, points, mode }] }. Every helper returns a new state (or the same one when nothing
 // changes) and never mutates its input. The server (set_member_interests) re-checks every rule.
 export const BUDGET = 20;

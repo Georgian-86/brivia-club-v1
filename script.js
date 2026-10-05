@@ -1416,6 +1416,9 @@ const applyPendingOnboarding = async (pending) => {
   if (!pending || typeof pending !== 'object') return result;
   // R1: the declaration comes first (the server refuses location and interests before it). A pending profile from an
   // older build has none: nothing is applied and the member is asked on step 1; the pending data is kept.
+  // The stored interests still prefill step 3 on these early returns.
+  result.budget = budgetFromRows(pending.interests);
+  result.privateOmitted = pending.privateOmitted === true;
   if (pending.adultDeclared !== true) { result.ok = false; return result; }
   const declared = await declareAdult();
   if (declared.error) { result.adultError = true; result.ok = false; return result; }

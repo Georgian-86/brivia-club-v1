@@ -11,7 +11,7 @@ they are. This spec applies the skill's UX rules to the new ORBIT flows.*
 | Deep wine | `--brivia-deep-wine: #430416`, `--brivia-wine: #5e0b28`, `--brivia-wine-soft: #76243f` | `deep-wine-theme.css` |
 | App surfaces | `--app-bg`, `--app-panel`, `--app-red`, `--app-green`, `--app-violet` (light and dark pairs) | `app.css` |
 | Type | Display: *Bodoni Moda*. Body/UI: *Instrument Sans*. Editorial accents: *Georgia* | `app.css`, `style.css` |
-| Voice | Uppercase micro-labels ("STEP 02 · YOUR SIGNALS"), short editorial headlines ("Find your people.") | `auth.html` |
+| Voice | Uppercase micro-labels ("STEP 02 · YOUR AREA"), short editorial headlines ("Find your people.") | `auth.html` |
 
 New components reuse these tokens. **No raw hex in new components**, and no new font families.
 

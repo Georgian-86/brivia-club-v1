@@ -1006,6 +1006,8 @@ try {
     const link2 = await page.locator('[data-signup-step="2"] a[href="/privacy.html"]').evaluate((a) => a.target);
     check(`R11: step 2 notice is the honest copy (got "${notice}")`, () => assert.equal(notice, 'We keep only a rough ~2 km square, never your exact location. Other members see a rounded distance or your city, and only once enough people are nearby.'));
     check(`R11: the promise line says "nearby first, as your area fills up" (got "${promise}")`, () => assert.ok(promise.includes('nearby first, as your area fills up')));
+    const next2 = (await page.locator('[data-signup-step="2"] .signup-next').textContent()).trim().replace(/\s+/g, ' ');
+    check(`R11: the step-2 button reads "NEXT: WHAT YOU CARE ABOUT" (got "${next2}")`, () => assert.match(next2, /^NEXT: WHAT YOU CARE ABOUT\b/));
     check('18+: step 2 repeats the privacy link with target=_blank', () => assert.equal(link2, '_blank'));
     await page.locator('[data-area-city]').click();
     await pickCityByKeyboard(page);
@@ -1106,6 +1108,33 @@ try {
     check(`18+ failure: back on step 1 with the retry message (got "${msg}")`, () => assert.equal(msg, "We couldn't record your confirmation. Please try again."));
     check('18+ failure: no location or interests call was made', () => { assert.equal(stub.posts('/rest/v1/rpc/set_home_city').length, 0); assert.equal(stub.posts('/rest/v1/rpc/set_member_interests').length, 0); });
     check('18+ failure: no uncaught page errors', () => assert.deepEqual(errors, []));
+    await context.close();
+  }
+
+  // 12e. An old pending profile (no adultDeclared) and a failed declare: after login the member is on step 1, nothing
+  //      was applied, and the stored interests still prefill step 3.
+  for (const variant of ['old pending', 'declare fails']) {
+    const context = await browser.newContext({ viewport: { width: 1280, height: 900 } });
+    const pend = { ...basePending, interests: [{ id: 'games.board.chess', points: 20, mode: 'play' }], orbit: { kind: 'city', placeId: 'in-mumbai' }, savedAt: Date.now() };
+    if (variant === 'old pending') delete pend.adultDeclared;
+    await seedPending(context, pend);
+    const stub = await stubContext(context, { signupSession: false, declareStatus: variant === 'declare fails' ? [500] : [] });
+    const { page, errors } = await newPage(context, stub.consoleLines);
+    await loginOnFreshPage(page);
+    await page.waitForSelector('[data-signup-step="1"]:not([hidden])', { timeout: 15000 });
+    await page.waitForTimeout(300);
+    await page.locator('input[name="adultConfirm"]').check();
+    await page.locator('[data-signup-step="1"] .signup-next').click();
+    await page.waitForSelector('[data-signup-step="2"]:not([hidden])');
+    await page.locator('[data-area-city]').click();
+    await pickCityByKeyboard(page, 'Pun');
+    await page.locator('[data-signup-step="2"] .signup-next').click();
+    await page.waitForSelector('[data-signup-step="3"]:not([hidden])');
+    await page.waitForSelector('[data-budget-row="games.board.chess"]', { timeout: 5000 }).catch(() => {});
+    const rows = await page.locator('#budget-list [data-budget-row]').evaluateAll((els) => els.map((el) => el.dataset.budgetRow));
+    check(`18+ ${variant}: stored interests prefill step 3 (${rows.join(',')})`, () => assert.deepEqual(rows, ['games.board.chess']));
+    check(`18+ ${variant}: no location or interests call before the declaration`, () => assert.equal(stub.posts('/rest/v1/rpc/set_home_city').length + stub.posts('/rest/v1/rpc/set_member_interests').length, 0));
+    check(`18+ ${variant}: no uncaught page errors`, () => assert.deepEqual(errors, []));
     await context.close();
   }
 } catch (error) {

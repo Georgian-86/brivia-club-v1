@@ -2966,9 +2966,9 @@
 }
 .auth-signup-form .adult-row input[type="checkbox"] { flex: 0 0 auto; width: 24px; height: 24px; margin: 0; accent-color: var(--ob-ink, #5a061f); cursor: pointer; }
 .auth-signup-form .adult-row:focus-within { outline: 2px solid var(--ob-ink, #5a061f); outline-offset: 2px; }
-.auth-signup-form .adult-row:has(input[aria-invalid="true"]) { border-color: #b00020; }
-.auth-signup-form .adult-help { margin: 0; color: #5f5a57; font-size: 12px; line-height: 1.45; text-transform: none; letter-spacing: 0; }
-.auth-signup-form .adult-error { margin: 0; color: #b00020; font-size: 12px; font-weight: 700; line-height: 1.4; text-transform: none; letter-spacing: 0; }
+.auth-signup-form .adult-row:has(input[aria-invalid="true"]) { border-color: var(--ob-accent); }
+.auth-signup-form .adult-help { margin: 0; color: color-mix(in srgb, var(--brivia-deep-wine) 78%, white); font-size: 12px; line-height: 1.45; text-transform: none; letter-spacing: 0; }
+.auth-signup-form .adult-error { margin: 0; color: var(--ob-accent); font-size: 12px; font-weight: 700; line-height: 1.4; text-transform: none; letter-spacing: 0; }
 .auth-signup-form .adult-error:empty { display: none; }
 .auth-signup-form .privacy-link { margin: 0; font-size: 12px; text-transform: none; letter-spacing: 0; }
 .auth-signup-form .privacy-link a { display: inline-flex; align-items: center; min-height: 44px; color: var(--ob-ink, #5a061f); font-weight: 700; text-decoration: underline; text-underline-offset: 2px; }
