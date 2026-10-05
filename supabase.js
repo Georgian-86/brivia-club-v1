@@ -288,6 +288,8 @@ export const declareAdult = () => rpcCall('declare_adult', { p_notice_version: N
 export const setHomeLocation = (lat, lng) => rpcCall('set_home_location', { lat, lng });
 export const setHomeCity = (placeId) => rpcCall('set_home_city', { p_place_id: placeId });
 export const setMemberInterests = (items) => rpcCall('set_member_interests', { p_items: items });
+// R2: give (true) or withdraw (false) the separate consent for private interests. Withdrawal deletes them server-side.
+export const setSensitiveConsent = (consent) => rpcCall('set_sensitive_consent', { p_consent: consent });
 export const fetchMyInterests = () => rpcCall('my_interests');
 
 // my_onboarding_status(): { interests, points, has_cell, place_label, completed } or null when there is no row.

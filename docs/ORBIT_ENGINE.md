@@ -107,8 +107,18 @@ public; yoga, meditation, mythology, public policy and climate action stay publi
 profile" toggle is P2). After the rules above, `set_member_interests` checks, each failure changing nothing:
 - **separate consent:** a sensitive id needs `profiles.sensitive_consent_at` (DPDP: specific, explicit, withdrawable),
   else `22023 sensitive consent required`. Only `set_sensitive_consent(true)` sets it (no update grant; a client
-  insert cannot set it). `set_sensitive_consent(false)` withdraws it and, in the same action, deletes every sensitive
-  `member_interest` row; the member then re-spends the freed points before being completed again;
+  insert cannot set it). `set_sensitive_consent(true)` keeps an earlier timestamp and appends one
+  `consent_event('sensitive_give')` only when it was null (giving twice logs once). `set_sensitive_consent(false)`
+  (Iteration 4 R2, `0005` section 2) withdraws it and, in the same action, deletes every sensitive `member_interest`
+  row and **redistributes the freed points over the remaining rows by largest remainder**: with P the remaining sum,
+  `base_i = floor(p_i * 20 / P)` (always >= 1, since `p_i >= 1 > P/20`), the leftover units go one each to the largest
+  fractional parts `(p_i * 20) mod P`, ties broken by `interest_id`; the total is exactly 20. `profiles.skills` is
+  refreshed as `set_member_interests` does, no `interest_rewrite` row is written (a withdrawal is not a counted
+  rewrite) and a `consent_event('sensitive_withdraw')` is appended. The member stays completed (the completion floor
+  guarantees a non-sensitive row remains). Example: 8 + 8 + 4 (sensitive) becomes 10 + 10;
+- **sign-up give panel (R2):** the picker offers sensitive interests only after the member opens "Add private
+  interests (optional)" and ticks the unticked consent box. The client calls `set_sensitive_consent(true)` only when a
+  sensitive pick is submitted, before `set_member_interests`, and calls `set_sensitive_consent(false)` if that save fails;
 - **completion floor:** at least one non-sensitive id, else `22023 invalid interests` (B-F4: a completed member with
   empty `skills` would reveal that every interest is sensitive). `brivia_member_completed` requires it too;
 - **rewrite cap:** a call by a member who already has `member_interest` rows counts as a rewrite, completed or not
@@ -450,6 +460,7 @@ saturated, the outer rings relax first, instead of the deck repeating saturated 
   - a home cell (a `member_orbit` row, §9.1.4);
   - 1–12 `member_interest` rows whose points sum to exactly 20 (the Passion Budget, §3.2), at least one of them
     non-sensitive (the completion floor, D-038 R3).
+  - Withdrawing the private-interest consent never un-completes a member: the freed points are redistributed (§3.2).
   - **the 18+ declaration** (Iteration 4, P0-B R1, `0005`): `profiles.adult_declared_at is not null`, written only by
     `declare_adult(p_notice_version)` (a stale notice version is refused, `22023`; the first call appends a
     `consent_event('adult')`, later calls change nothing). No client write can set the column (insert nulls it; a

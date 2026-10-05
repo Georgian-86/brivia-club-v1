@@ -9,7 +9,7 @@ import './mobile-site.css';
 import './mobile-final-fixes.css';
 import {
   supabase, supabaseReady, saveProfile, compressedImageDataUrl, withoutCredentials, rowToProfile, isRateLimited,
-  declareAdult, setHomeLocation, setHomeCity, setMemberInterests, fetchMyInterests, fetchInterestNodes, searchPlaces, onboardingStatus,
+  declareAdult, setHomeLocation, setHomeCity, setMemberInterests, setSensitiveConsent, fetchMyInterests, fetchInterestNodes, searchPlaces, onboardingStatus,
 } from './supabase.js';
 import { buildPendingOnboarding, isPendingExpired } from './pending-profile.js';
 import {
@@ -718,10 +718,11 @@ const GEO_OPTIONS = { enableHighAccuracy: false, timeout: 10000, maximumAge: 600
 const AREA_FALLBACK_TEXT = 'No problem. Pick your city instead.';
 const BUDGET_ERROR_TEXT = 'Place all 20 points to continue.';
 // D-038 R3: sensitive interests are never shown to others and do not affect who the member sees yet.
-const PRIVATE_HINT_TEXT = 'Private: never shown on your profile, and does not change who you see yet';
-// Until the separate-consent step ships (P0-B), sensitive interests are not offered in the picker: the server refuses
-// them without consent (D-038 R3). Their nodes stay in the catalog so stored picks still get labels.
-const SENSITIVE_PICKS_ENABLED = false;
+const PRIVATE_HINT_TEXT = 'Private: never shown on your profile, and does not change who you see';
+// R2: sensitive interests are offered only after the member opens the consent panel and continues (the box ticked).
+// Their nodes stay in the catalog (as `hidden`) so stored picks still get labels. Consent is sent to the server only
+// when a sensitive pick is submitted (finishOnboarding), never on Continue.
+let privateUnlocked = false;
 const escapeText = (value) => String(value ?? '').replace(/[&<>"']/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
 const svgIcon = (name) => {
   const paths = {
@@ -920,15 +921,17 @@ const buildInterestCatalog = (nodes) => {
     if (!group) return;
     const parent = node.level === 4 ? byId.get(node.parent_id)?.label || '' : '';
     const item = { id: node.id, label: node.label, sensitive: Boolean(node.sensitive), search: normalizeSearch(`${node.label} ${parent} ${group.label}`) };
-    if (item.sensitive && !SENSITIVE_PICKS_ENABLED) hidden.push(item);
+    if (item.sensitive && !privateUnlocked) hidden.push(item);
     else group.items.push(item);
   });
   return { groups: [...groups.values()].filter((group) => group.items.length), hidden };
 };
+let interestNodes = [];
 const loadInterestCatalog = () => {
   interestCatalogPromise ||= fetchInterestNodes().then(({ data, error }) => {
     if (error) throw error;
-    interestCatalog = buildInterestCatalog(data || []);
+    interestNodes = data || [];
+    interestCatalog = buildInterestCatalog(interestNodes);
     return interestCatalog;
   }).catch((error) => { interestCatalogPromise = null; throw error; });
   return interestCatalogPromise;
@@ -971,6 +974,38 @@ const renderInterestResults = () => {
 const catalogNode = (id) => interestCatalog?.groups.flatMap((group) => group.items).find((node) => node.id === id)
   || interestCatalog?.hidden?.find((node) => node.id === id) || null;
 const isSensitiveInterest = (id) => Boolean(catalogNode(id)?.sensitive);
+// The consent panel (R2): a real <dialog> (focus trap, Escape, focus return are the platform's). Nothing is pre-ticked;
+// "Not now" and "Continue" weigh the same. Continue unlocks the private chips; the server call happens at submit.
+const privateDialog = signupForm?.querySelector('#private-consent');
+const privateOpenButton = signupForm?.querySelector('[data-private-open]');
+const privateCheck = privateDialog?.querySelector('[data-private-checkbox]');
+const privateContinue = privateDialog?.querySelector('[data-private-continue]');
+const privateMessage = privateDialog?.querySelector('[data-private-message]');
+let serverWantedConsent = false;
+const openPrivateConsent = (message = '') => {
+  if (!privateDialog || privateDialog.open) return;
+  if (privateCheck) privateCheck.checked = false;
+  if (privateContinue) privateContinue.disabled = true;
+  if (privateMessage) { privateMessage.textContent = message; privateMessage.hidden = !message; }
+  if (typeof privateDialog.showModal === 'function') privateDialog.showModal(); else privateDialog.setAttribute('open', '');
+  privateCheck?.focus();
+};
+const closePrivateConsent = () => {
+  if (privateDialog?.open) privateDialog.close();
+  // The platform returns focus to the opener; if that is gone (hidden after Continue, or a refusal opened the panel)
+  // focus lands on the interest search.
+  if (!document.activeElement || document.activeElement === document.body || privateOpenButton?.hidden) interestSearch?.focus();
+};
+const unlockPrivate = () => {
+  privateUnlocked = true;
+  if (interestCatalog) interestCatalog = buildInterestCatalog(interestNodes);
+  if (privateOpenButton) privateOpenButton.hidden = true;
+  renderInterestResults();
+};
+privateOpenButton?.addEventListener('click', () => openPrivateConsent());
+privateCheck?.addEventListener('change', () => { if (privateContinue) privateContinue.disabled = !privateCheck.checked; });
+privateDialog?.querySelector('[data-private-cancel]')?.addEventListener('click', closePrivateConsent);
+privateContinue?.addEventListener('click', () => { if (!privateCheck?.checked) return; unlockPrivate(); closePrivateConsent(); });
 const budgetNote = signupForm?.querySelector('[data-budget-note]');
 const showBudgetNote = (text) => { if (budgetNote) { budgetNote.textContent = text; budgetNote.hidden = !text; } };
 const budgetRow = (item) => {
@@ -1366,9 +1401,9 @@ const firstIncompleteStep = (status, profileRow = null) => {
 const PRIVATE_OMITTED_NOTE = "Private interests aren't kept while you confirm your email. Please pick them again.";
 const AREA_SAVE_ERROR = "We couldn't save your area. Please try again.";
 const INTERESTS_SAVE_ERROR = 'Your interests could not be saved. Please try again.';
-// The server refuses a private (sensitive) interest until the member gives the separate consent (D-038 R3). The consent
-// step itself is P0-B; until then the member is told why and how to continue.
-const SENSITIVE_CONSENT_ERROR = 'Private interests need a separate consent, which is coming soon. Remove the ones marked Private to continue.';
+// The server refuses a private (sensitive) interest until the member gives the separate consent (D-038 R3, R2). The
+// client then opens the consent panel with this message.
+const SENSITIVE_CONSENT_ERROR = 'Private interests need your consent first.';
 const isSensitiveConsentError = (error) => /sensitive consent required/i.test(String(error?.message || ''));
 
 // After a profile exists: the app when onboarding is complete, else the completion flow at the first incomplete step.
@@ -1725,12 +1760,31 @@ const finishOnboarding = async () => {
     const savedLabel = typeof data === 'string' && data ? data : choice.label || '';
     keepCurrentArea(choice.kind === 'city' ? cityWideLabel(savedLabel) : savedLabel);
   }
+  // R2: consent is given only when a private interest is in the budget (or the server asked for it and the member agreed
+  // in the panel), and is withdrawn again if the save then fails.
+  const wantsConsent = budget.items.some((item) => isSensitiveInterest(item.id)) || (serverWantedConsent && privateUnlocked);
+  let gaveConsent = false;
+  if (wantsConsent) {
+    const { error: consentError } = await setSensitiveConsent(true);
+    if (consentError) {
+      setSignupStep(3);
+      if (budgetError) budgetError.textContent = INTERESTS_SAVE_ERROR;
+      throw new OnboardingStepError(INTERESTS_SAVE_ERROR);
+    }
+    gaveConsent = true;
+  }
   const { error } = await setMemberInterests(toPayload(budget));
   if (error) {
+    if (gaveConsent) await setSensitiveConsent(false).catch(() => {});
     setSignupStep(3);
-    const message = isSensitiveConsentError(error) ? SENSITIVE_CONSENT_ERROR : INTERESTS_SAVE_ERROR;
-    if (budgetError) budgetError.textContent = message;
-    throw new OnboardingStepError(message);
+    if (isSensitiveConsentError(error)) {
+      serverWantedConsent = true;
+      if (budgetError) budgetError.textContent = '';
+      openPrivateConsent(SENSITIVE_CONSENT_ERROR);
+      throw new OnboardingStepError(SENSITIVE_CONSENT_ERROR);
+    }
+    if (budgetError) budgetError.textContent = INTERESTS_SAVE_ERROR;
+    throw new OnboardingStepError(INTERESTS_SAVE_ERROR);
   }
 };
 

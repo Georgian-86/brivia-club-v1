@@ -126,9 +126,17 @@
               <div class="interest-picker" data-interest-picker>
                 <label class="interest-label" for="interest-search">Interests</label>
                 <input class="interest-search" id="interest-search" type="search" autocomplete="off" spellcheck="false" placeholder="Search, e.g. chess or hiking" aria-describedby="interest-help" aria-controls="interest-results" />
-                <p class="interest-help" id="interest-help" aria-live="polite">Choose 1 to 12. Select again to remove.</p><p class="interest-help interest-private-note" data-interest-private-note>Private interests will be available soon.</p>
+                <p class="interest-help" id="interest-help" aria-live="polite">Choose 1 to 12. Select again to remove.</p><button class="private-open" type="button" data-private-open aria-haspopup="dialog">Add private interests (optional)</button>
                 <div class="interest-results" id="interest-results" role="region" aria-label="Interests by category"></div>
               </div>
+              <dialog class="private-consent" id="private-consent" aria-labelledby="private-consent-title" aria-describedby="private-consent-purpose">
+                <h3 id="private-consent-title">Private interests</h3>
+                <p class="private-message" data-private-message role="alert"></p>
+                <p class="private-purpose" id="private-consent-purpose" data-private-purpose>Private interests (like faith, health or orientation) help us understand you. They are never shown to anyone and don't change who you see. If we ever want to use them for matching, we'll ask you again first. You can withdraw any time in Profile → Privacy and account.</p>
+                <div class="private-check"><input type="checkbox" id="private-consent-check" data-private-checkbox /><label for="private-consent-check">I consent to Brivia storing my private interests for this purpose.</label></div>
+                <p class="private-link"><a href="/privacy.html" target="_blank" rel="noopener">How we use your data</a></p>
+                <div class="private-actions"><button type="button" class="auth-secondary private-btn" data-private-cancel>Not now</button><button type="button" class="auth-secondary private-btn" data-private-continue disabled>Continue</button></div>
+              </dialog>
               <section class="budget" aria-labelledby="budget-title">
                 <div class="budget-head"><h3 id="budget-title">Your passion points</h3><p class="budget-counter" id="budget-counter" aria-live="polite">20 of 20 points left</p><p class="budget-error" id="budget-error" aria-live="polite"></p></div>
                 <p class="budget-note" data-budget-note hidden></p>

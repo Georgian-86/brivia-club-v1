@@ -67,7 +67,8 @@ const places = [
   { id: 'in-mumbai', name: 'Mumbai', region: 'Maharashtra', country: 'India' },
   { id: 'in-pune', name: 'Pune', region: 'Maharashtra', country: 'India' },
 ];
-const PRIVATE_NOTE = 'Private interests will be available soon.';
+const PURPOSE = "Private interests (like faith, health or orientation) help us understand you. They are never shown to anyone and don't change who you see. If we ever want to use them for matching, we'll ask you again first. You can withdraw any time in Profile → Privacy and account.";
+const CONSENT_LABEL = 'I consent to Brivia storing my private interests for this purpose.';
 
 const results = [];
 const check = (name, fn) => { try { fn(); results.push(['PASS', name]); } catch (error) { results.push(['FAIL', `${name}: ${error.message}`]); } };
@@ -91,6 +92,7 @@ const stubContext = async (context, opts = {}) => {
     interests: opts.interests || [],
     homeCityStatus: [...(opts.homeCityStatus || [])],
     interestsStatus: [...(opts.interestsStatus || [])],
+    consent: false,
   };
   const calls = [];
   const consoleLines = [];
@@ -161,9 +163,14 @@ const stubContext = async (context, opts = {}) => {
       const forced = state.interestsStatus.shift();
       if (forced === 400) return json(400, { code: '22023', message: 'invalid interests', details: null, hint: null });
       if (items.reduce((s, i) => s + i.points, 0) !== 20) return json(400, { code: '22023', message: 'invalid interests' });
-      // Like the server since D-038 (R3): a sensitive id needs the separate consent, which no client gives yet.
-      if (items.some((i) => nodes.find((n) => n.id === i.interest_id)?.sensitive)) return json(400, { code: '22023', message: 'sensitive consent required', details: null, hint: null });
+      // Like the server (D-038 R3): a sensitive id needs the separate consent given through set_sensitive_consent.
+      if (!state.consent && items.some((i) => nodes.find((n) => n.id === i.interest_id)?.sensitive)) return json(400, { code: '22023', message: 'sensitive consent required', details: null, hint: null });
       state.interests = items.map((i) => ({ interest_id: i.interest_id, label: nodes.find((n) => n.id === i.interest_id)?.label, points: i.points, mode: i.mode }));
+      return route.fulfill({ status: 204, body: '', headers });
+    }
+    if (p === '/rest/v1/rpc/set_sensitive_consent') {
+      if (!state.profile) return json(404, { code: 'P0002', message: 'profile required' });
+      state.consent = JSON.parse(body || '{}').p_consent === true;
       return route.fulfill({ status: 204, body: '', headers });
     }
     if (p === '/rest/v1/rpc/my_interests') return json(200, state.interests);
@@ -364,15 +371,51 @@ try {
     const counterLive = await counter.getAttribute('aria-live');
     const counterStart = (await counter.textContent()).trim();
     check(`1440: counter aria-live=polite, "20 of 20 points left" (got ${counterLive}, "${counterStart}")`, () => { assert.equal(counterLive, 'polite'); assert.equal(counterStart, '20 of 20 points left'); });
-    // Until the consent step ships (P0-B, D-038 R3), sensitive interests are not offered, and a one-line note says so.
+    // R2: sensitive interests are not offered until the member opens the consent panel and continues.
     await page.locator('#interest-search').fill('scripture');
     await page.waitForTimeout(150);
     const sensitiveChips = await page.locator('#interest-results [data-interest-id="wellbeing.spirituality.scripture_study"]').count();
-    const privateNote = (await page.locator('[data-interest-private-note]').textContent()).trim();
-    const privateNoteVisible = await page.locator('[data-interest-private-note]').isVisible();
-    check(`1440: a sensitive interest is not offered (${sensitiveChips} chips) and the note shows ("${privateNote}")`, () => {
-      assert.equal(sensitiveChips, 0); assert.equal(privateNote, PRIVATE_NOTE); assert.ok(privateNoteVisible);
+    const openButton = page.locator('[data-private-open]');
+    const openText = (await openButton.textContent()).trim();
+    const openBox = await openButton.boundingBox();
+    check(`1440: no sensitive chip before consent (${sensitiveChips}) and the entry reads "Add private interests (optional)" (got "${openText}", ${openBox?.height}px)`, () => {
+      assert.equal(sensitiveChips, 0); assert.equal(openText, 'Add private interests (optional)'); assert.ok(openBox.height >= 44);
     });
+    await openButton.click();
+    const dlg = page.locator('dialog#private-consent');
+    const dlgOpen = await dlg.evaluate((el) => el.open);
+    const purpose = (await dlg.locator('[data-private-purpose]').textContent()).trim();
+    const ticked0 = await dlg.locator('[data-private-checkbox]').isChecked();
+    const contDisabled0 = await dlg.locator('[data-private-continue]').isDisabled();
+    const labelText = (await dlg.locator('label[for="private-consent-check"]').textContent()).trim();
+    const notNowBox = await dlg.locator('[data-private-cancel]').boundingBox();
+    const contBox = await dlg.locator('[data-private-continue]').boundingBox();
+    const chipsBeforeContinue = await page.locator('#interest-results [data-interest-id="wellbeing.spirituality.scripture_study"]').count();
+    check('1440: the consent panel is a real dialog with the purpose copy (no "yet"), an unticked box and Continue disabled', () => {
+      assert.ok(dlgOpen); assert.equal(purpose, PURPOSE); assert.ok(!/yet/.test(purpose)); assert.equal(labelText, CONSENT_LABEL);
+      assert.equal(ticked0, false); assert.equal(contDisabled0, true); assert.equal(chipsBeforeContinue, 0);
+    });
+    check(`1440: "Not now" has equal weight to Continue (${JSON.stringify([notNowBox?.width, notNowBox?.height, contBox?.width, contBox?.height])})`, () => {
+      assert.ok(notNowBox.height >= 44 && contBox.height >= 44); assert.ok(Math.abs(notNowBox.width - contBox.width) <= 4);
+    });
+    await page.keyboard.press('Escape');
+    const closedByEscape = await dlg.evaluate((el) => !el.open);
+    const focusBack = await page.evaluate(() => document.activeElement?.hasAttribute('data-private-open'));
+    check('1440: Escape closes the panel and returns focus to the entry button', () => { assert.ok(closedByEscape); assert.ok(focusBack); });
+    await openButton.click();
+    await dlg.locator('[data-private-cancel]').click();
+    check('1440: nothing was sent to set_sensitive_consent by Not now', () => assert.equal(stub.posts('/rest/v1/rpc/set_sensitive_consent').length, 0));
+    await openButton.click();
+    await dlg.locator('[data-private-checkbox]').check();
+    const contEnabled = await dlg.locator('[data-private-continue]').isEnabled();
+    await dlg.locator('[data-private-continue]').click();
+    await page.waitForSelector('#interest-results [data-interest-id="wellbeing.spirituality.scripture_study"]', { timeout: 3000 }).catch(() => {});
+    const chipsAfter = await page.locator('#interest-results [data-interest-id="wellbeing.spirituality.scripture_study"]').count();
+    check('1440: ticking enables Continue; after Continue the sensitive chip appears (with no server call yet)', () => {
+      assert.ok(contEnabled); assert.equal(chipsAfter, 1); assert.equal(stub.posts('/rest/v1/rpc/set_sensitive_consent').length, 0);
+    });
+    await page.locator('#interest-search').fill('');
+    await page.waitForTimeout(100);
 
     // Keyboard only from here: add Tennis (Space) and Chess (Enter).
     const search = page.locator('#interest-search');
@@ -465,6 +508,7 @@ try {
     const leaks = stub.calls.filter((c) => (COORD_RE.test(c.url) || COORD_RE.test(c.body)) && !(c.method === 'POST' && c.path === '/rest/v1/rpc/set_home_location'));
     check(`1440: the coordinate is in no URL and no other body (${leaks.map((c) => `${c.method} ${c.path}`).join(', ')})`, () => assert.equal(leaks.length, 0));
     check('1440: set_home_city not called on the geo path', () => assert.equal(stub.posts('/rest/v1/rpc/set_home_city').length, 0));
+    check('1440: with no sensitive pick set_sensitive_consent was never called, even after the panel was used', () => assert.equal(stub.posts('/rest/v1/rpc/set_sensitive_consent').length, 0));
     const profileWrites = stub.calls.filter((c) => c.path === '/rest/v1/profiles' && ['POST', 'PATCH'].includes(c.method)).map((c) => JSON.parse(c.body || '{}'));
     check(`1440: profile writes carry no skills, city or state (${profileWrites.map((w) => Object.keys(w).join(',')).join(' ; ')})`, () => {
       assert.ok(profileWrites.length >= 1);
@@ -753,10 +797,10 @@ try {
     await context.close();
   }
 
-  // 7b. D-038 (R3): the server refuses a sensitive pick without the separate consent (the consent step is P0-B). The
-  //     member stays on step 3 with a message that says why and how to continue; removing the pick then completes.
+  // 7b. R2: a stale catalog still lets a sensitive pick through; the server refuses it without consent. The client opens
+  //     the consent panel with "Private interests need your consent first."; after Continue the retry gives the consent
+  //     first, then saves.
   {
-    // A stale catalog (loaded before the node became sensitive) still offers the pick; the server refuses it.
     const context = await browser.newContext({ viewport: { width: 1280, height: 900 } });
     const stub = await stubContext(context, { staleCatalog: true, realApp: false });
     const { page, errors } = await newPage(context, stub.consoleLines);
@@ -775,29 +819,67 @@ try {
     await page.locator('#looking-results [data-looking-option]').first().click();
     await page.locator('[data-signup-step="3"] .signup-next').click();
     await finishStepFour(page);
-    await page.waitForSelector('[data-signup-step="3"]:not([hidden])', { timeout: 15000 });
-    await page.waitForFunction(() => /separate consent/.test(document.querySelector('#budget-error')?.textContent || ''), null, { timeout: 5000 }).catch(() => {});
-    const message = (await page.locator('#budget-error').textContent()).trim();
+    await page.waitForSelector('dialog#private-consent[open]', { timeout: 15000 }).catch(() => {});
+    const dlgOpen = await page.locator('dialog#private-consent').evaluate((el) => el.open);
+    const message = (await page.locator('[data-private-message]').textContent()).trim();
     const consentStep = await stepLabel(page);
-    check(`consent: a sensitive pick is refused with the consent message on step 3 ("${message}")`, () => {
-      assert.match(consentStep, /^STEP 3 OF 4\b/);
-      assert.equal(message, 'Private interests need a separate consent, which is coming soon. Remove the ones marked Private to continue.');
+    check(`consent: a server refusal opens the consent panel with the message ("${message}")`, () => {
+      assert.ok(dlgOpen); assert.match(consentStep, /^STEP 3 OF 4\b/);
+      assert.equal(message, 'Private interests need your consent first.');
     });
     check('consent: the app was not opened', () => assert.ok(!/\/app\.html/.test(page.url())));
-    // M-4: removing the private pick (select it again) and placing its point lets signup complete.
-    await page.locator('#interest-search').fill('scripture');
-    await clickInterest(page, 'Scripture study');
-    await page.getByRole('button', { name: 'Add a point to Chess', exact: true }).click();
+    await page.locator('[data-private-checkbox]').check();
+    await page.locator('[data-private-continue]').click();
     await page.locator('[data-signup-step="3"] .signup-next').click();
     await page.waitForSelector('[data-signup-step="4"]:not([hidden])');
     await page.locator('[data-signup-step="4"] [type="submit"]').click();
     await page.waitForURL(/\/app\.html/, { timeout: 15000 }).catch(() => {});
-    const finalItems = JSON.parse(stub.posts('/rest/v1/rpc/set_member_interests').at(-1)?.body || '{}').p_items || [];
-    check(`consent: after removing the private pick, signup completes (${JSON.stringify(finalItems)})`, () => {
+    const seq = stub.calls.filter((c) => /set_sensitive_consent|set_member_interests/.test(c.path)).map((c) => `${c.path.split('/').pop()}${c.path.endsWith('consent') ? ':' + JSON.parse(c.body).p_consent : ''}`);
+    check(`consent: after Continue the retry gives consent first, then saves (${seq.join(' > ')})`, () => {
       assert.ok(/\/app\.html/.test(page.url()));
-      assert.deepEqual(finalItems, [{ interest_id: 'games.board.chess', points: 20, mode: 'play' }]);
+      assert.deepEqual(seq, ['set_member_interests', 'set_sensitive_consent:true', 'set_member_interests']);
     });
     check('consent: no uncaught page errors', () => assert.deepEqual(errors, []));
+    await context.close();
+  }
+
+  // 7c. R2: a sensitive pick calls set_sensitive_consent(true) BEFORE set_member_interests; when the save then fails the
+  //     client withdraws with set_sensitive_consent(false).
+  {
+    const context = await browser.newContext({ viewport: { width: 1280, height: 900 } });
+    const stub = await stubContext(context, { interestsStatus: [400], realApp: false });
+    const { page, errors } = await newPage(context, stub.consoleLines);
+    await openSignup(page);
+    await fillStepOne(page);
+    await page.locator('[data-area-city]').click();
+    await pickCityByKeyboard(page);
+    await page.locator('[data-signup-step="2"] .signup-next').click();
+    await page.waitForSelector('#interest-results [data-interest-group]', { state: 'attached' });
+    await page.locator('[data-private-open]').click();
+    await page.locator('[data-private-checkbox]').check();
+    await page.locator('[data-private-continue]').click();
+    await page.locator('#interest-search').fill('Chess');
+    await clickInterest(page, 'Chess');
+    await page.locator('#interest-search').fill('scripture');
+    await clickInterest(page, 'Scripture study');
+    for (let i = 0; i < 18; i += 1) await page.getByRole('button', { name: 'Add a point to Chess', exact: true }).click();
+    await page.locator('.looking-search').click();
+    await page.locator('#looking-results [data-looking-option]').first().click();
+    await page.locator('[data-signup-step="3"] .signup-next').click();
+    await finishStepFour(page);
+    await page.waitForFunction(() => /could not be saved/.test(document.querySelector('#budget-error')?.textContent || ''), null, { timeout: 15000 }).catch(() => {});
+    const seqFail = stub.calls.filter((c) => /set_sensitive_consent|set_member_interests/.test(c.path)).map((c) => `${c.path.split('/').pop()}${c.path.endsWith('consent') ? ':' + JSON.parse(c.body).p_consent : ''}`);
+    check(`consent: a failed save after consent withdraws it (${seqFail.join(' > ')})`, () => assert.deepEqual(seqFail, ['set_sensitive_consent:true', 'set_member_interests', 'set_sensitive_consent:false']));
+    check('consent: the failed attempt leaves no consent on the server', () => assert.equal(stub.state.consent, false));
+    await page.locator('[data-signup-step="3"] .signup-next').click();
+    await page.waitForSelector('[data-signup-step="4"]:not([hidden])');
+    await page.locator('[data-signup-step="4"] [type="submit"]').click();
+    await page.waitForURL(/\/app\.html/, { timeout: 15000 }).catch(() => {});
+    const items = JSON.parse(stub.posts('/rest/v1/rpc/set_member_interests').at(-1)?.body || '{}').p_items || [];
+    check(`consent: the retry succeeds with the sensitive pick (${items.map((i) => i.interest_id).join(',')})`, () => {
+      assert.ok(/\/app\.html/.test(page.url())); assert.ok(items.some((i) => i.interest_id === 'wellbeing.spirituality.scripture_study')); assert.equal(stub.state.consent, true);
+    });
+    check('consent: no uncaught page errors (7c)', () => assert.deepEqual(errors, []));
     await context.close();
   }
 

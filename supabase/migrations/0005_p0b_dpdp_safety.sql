@@ -2,6 +2,7 @@
 -- Apply only this file on the live project (0001-0004 are applied and frozen). Idempotent: the harness runs it twice.
 -- Sections (appended by task, in order):
 --   1. 18+ declaration gate, consent history, consent column guard (R1, R3)
+--   2. Sensitive consent: give and redistributing withdrawal (R2)
 -- Spec: docs/ORBIT_ENGINE.md section 7; rulings: docs/arena/2026-10-05-p0b-design.md.
 
 -- =============================================================================================
@@ -200,3 +201,81 @@ create trigger brivia_require_adult before insert or update on public.member_int
 
 -- Backfill (guarded): test members are declared by the seed; real members declare in the app.
 update public.profiles set adult_declared_at = now() where is_test and adult_declared_at is null;
+
+-- =============================================================================================
+-- 2. Sensitive consent: give and withdraw (R2)
+-- =============================================================================================
+-- set_sensitive_consent(p_consent), redefined (create or replace; the section 1 version is superseded):
+--   true  -> coalesce(sensitive_consent_at, now()); a consent_event 'sensitive_give' only when it was null (give twice = one event);
+--   false -> delete the member's sensitive member_interest rows and REDISTRIBUTE their points over the remaining rows by
+--            largest remainder: base = floor(p_i * 20 / P) (P = the remaining sum; always >= 1 because p_i >= 1 > P/20),
+--            the leftover units go one each to the largest fractional parts (p_i * 20 mod P), ties by interest_id;
+--            profiles.skills is refreshed as set_member_interests does; NO interest_rewrite row (a withdrawal is not a
+--            rewrite); sensitive_consent_at is nulled and a 'sensitive_withdraw' event is appended.
+-- Both set brivia.consent_write locally so the consent column guard lets the owner-context update through.
+create or replace function public.set_sensitive_consent(p_consent boolean)
+returns void
+language plpgsql
+volatile
+security definer
+set search_path = public
+as $$
+declare
+  uid uuid := auth.uid();
+  v_had timestamptz;
+  v_deleted int;
+begin
+  perform 1 from public.profiles where id = uid for update;
+  if uid is null or not found then
+    raise exception 'profile required' using errcode = 'P0002';
+  end if;
+  if p_consent is null then
+    raise exception 'invalid consent' using errcode = '22023';
+  end if;
+  select sensitive_consent_at into v_had from public.profiles where id = uid;
+  perform set_config('brivia.consent_write', 'on', true);
+  if p_consent then
+    update public.profiles set sensitive_consent_at = coalesce(sensitive_consent_at, now()) where id = uid;
+    if v_had is null then
+      insert into public.consent_event (member_id, kind, notice_version)
+      values (uid, 'sensitive_give', public.brivia_notice_version());
+    end if;
+  else
+    delete from public.member_interest mi
+     using public.interest_node nd
+     where mi.member_id = uid and nd.id = mi.interest_id and nd.sensitive;
+    get diagnostics v_deleted = row_count;
+    if v_deleted > 0 and exists (select 1 from public.member_interest where member_id = uid) then
+      with cur as (
+        select mi.interest_id, mi.points::int as p, sum(mi.points) over () as total
+          from public.member_interest mi where mi.member_id = uid
+      ), base as (
+        select interest_id, (p * 20) / total::int as b, (p * 20) % total::int as frac, total::int as total
+          from cur
+      ), ranked as (
+        select interest_id, b,
+               row_number() over (order by frac desc, interest_id asc) as rk,
+               20 - sum(b) over () as leftover
+          from base
+      )
+      update public.member_interest mi
+         set points = (r.b + case when r.rk <= r.leftover then 1 else 0 end)::smallint
+        from ranked r
+       where mi.member_id = uid and mi.interest_id = r.interest_id;
+      update public.profiles
+         set skills = coalesce((select array_agg(n.label order by mi.points desc, n.label asc)
+                                  from public.member_interest mi join public.interest_node n on n.id = mi.interest_id
+                                 where mi.member_id = uid and not n.sensitive), '{}')
+       where id = uid;
+    end if;
+    update public.profiles set sensitive_consent_at = null, updated_at = now() where id = uid;
+    if v_had is not null or v_deleted > 0 then
+      insert into public.consent_event (member_id, kind, notice_version)
+      values (uid, 'sensitive_withdraw', public.brivia_notice_version());
+    end if;
+  end if;
+  perform set_config('brivia.consent_write', 'off', true);
+end;
+$$;
+revoke all on function public.set_sensitive_consent(boolean) from public, anon;
+grant execute on function public.set_sensitive_consent(boolean) to authenticated;

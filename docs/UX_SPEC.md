@@ -78,8 +78,18 @@ progress bar has `aria-valuemax="4"`. Every step has Back (except step 1); Next 
      each holding chips for its interests and niches (levels 3–4, the only selectable levels). With a query, the
      matching chips, grouped by category. Chips are toggle buttons (`aria-pressed`); at 12 the rest are disabled with
      "You can choose up to 12 interests. Remove one to add another."
-   - **Sensitive interests** (D-029) can be picked like any other. Their chip and their budget row show a lock icon
-     and **"Private: counts for matching, never shown on your profile"**. They never appear anywhere public.
+   - **Sensitive interests** (D-029, R2) are not in the picker until the member opens the consent panel: a neutral
+     text button **"Add private interests (optional)"** (44 px tall, no badge, no nudge) under the search field. It opens a
+     real `<dialog>` (focus trap, Escape closes, focus returns to the button) with the purpose copy: "Private interests
+     (like faith, health or orientation) help us understand you. They are never shown to anyone and don't change who you
+     see. If we ever want to use them for matching, we'll ask you again first. You can withdraw any time in Profile →
+     Privacy and account.", an **unticked** checkbox "I consent to Brivia storing my private interests for this purpose.",
+     **Continue** (disabled until ticked) and **Not now**, both 44 px and of equal weight. Only Continue reveals the
+     private chips; consent reaches the server only when a private pick is submitted. If the server still refuses
+     ("sensitive consent required") the panel opens with "Private interests need your consent first." Once revealed, the
+     chip and budget row show a lock icon and **"Private: never shown on your profile, and does not change who you see"**.
+     They never appear anywhere public. Withdrawal UI (Profile → Privacy and account, "Withdraw and delete" / "Keep") is a
+     later task.
    - **The Passion Budget:** 20 points over 1–12 interests, each with at least 1 point. A new interest gets 1 point
      (taken from the largest one when none are left). Each chosen interest has a −/+ stepper
      (`aria-label="Remove a point from <label>"` / `"Add a point to <label>"`, 44 × 44 px, focusable even at a

@@ -171,10 +171,10 @@ begin
               where mi.member_id = pg_temp.s5(1) and n.sensitive) then
     raise exception 'FAIL R3: withdrawal left sensitive rows'; end if;
   if (select string_agg(interest_id || ':' || points, ',') from public.member_interest where member_id = pg_temp.s5(1))
-     <> 'sports.racket.tennis:12' then
-    raise exception 'FAIL R3: withdrawal touched the public rows'; end if;
-  -- the freed points must be re-spent: not completed until then
-  if public.brivia_member_completed(pg_temp.s5(1)) then raise exception 'FAIL R3: 12 points is completed'; end if;
+     <> 'sports.racket.tennis:20' then
+    raise exception 'FAIL R3: withdrawal did not redistribute the freed points (R2)'; end if;
+  -- R2 (iteration 4): the freed points are redistributed, so the member stays completed
+  if not public.brivia_member_completed(pg_temp.s5(1)) then raise exception 'FAIL R3: not completed after redistribution'; end if;
 end $$;
 
 -- After withdrawal a sensitive id is refused again.
