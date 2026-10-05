@@ -51,6 +51,23 @@ done
 if grep -qF -e 12.971598 -e 77.594566 "$DATA/log"; then echo "FAIL: probe coordinate found in the server log"; exit 1; fi
 grep -q 'try again later' "$DATA/log" || { echo "FAIL: the over-cap probe error was not logged"; exit 1; }
 
+# 2b) R8 drift check (0006): a database with 0001-0005 only; snapshot pg_policies, apply 0006 twice, snapshot again.
+#     The two snapshots must be equal once the `( SELECT auth.uid() AS uid)` wrapper is normalised back; no public
+#     policy may keep a bare auth.uid(); the 0003 request-insert policy (dropped by 0004) must stay absent.
+"${PSQL[@]}" -d postgres -c "create database ${DB}_drift encoding 'UTF8' template template0"
+( DB=${DB}_drift; echo "## database $DB (0006 drift check)"
+  run tests/supabase-stub.sql
+  for m in "$STAGE"/migrations/000[1-5]_*.sql; do run "migrations/$(basename "$m")"; done
+  "${PSQL[@]}" -d $DB -f "$STAGE/tests/policy-snapshot.sql" > "$STAGE/policies.before.tsv"
+  run migrations/0006_perf_policies.sql; run migrations/0006_perf_policies.sql
+  "${PSQL[@]}" -d $DB -f "$STAGE/tests/policy-snapshot.sql" > "$STAGE/policies.after.tsv"
+  [ -s "$STAGE/policies.before.tsv" ] || { echo "FAIL: empty policy snapshot"; exit 1; }
+  if ! diff -u "$STAGE/policies.before.tsv" "$STAGE/policies.after.tsv"; then
+    echo "FAIL: 0006 changed a policy beyond the auth.uid() wrapper"; exit 1; fi
+  bad=$("${PSQL[@]}" -d $DB -At -f "$STAGE/tests/policy-unwrapped.sql")
+  if [ -n "$bad" ]; then echo "$bad" | sed 's/^/FAIL: /'; exit 1; fi
+  echo "drift check ok: $(wc -l < "$STAGE/policies.after.tsv") policies unchanged" )
+
 # 3) Seed + purge (Task 7): own database so the other suites never see test members. The seed runs as the
 #    owner (here postgres, session_user = current_user), exactly like the SQL editor; it is run twice (idempotent).
 "${PSQL[@]}" -d postgres -c "create database ${DB}_seed encoding 'UTF8' template template0"

@@ -122,3 +122,24 @@ matching client in the same window (the client declares the 18+ confirmation; an
   test-member session, `select auth.jwt()->'amr'` must show a `timestamp` (an array of `{"method": ..., "timestamp": <epoch>}`).
   If it does not, the RPC refuses every call with `reauth_required`; fix that before shipping the deletion UI.
 - `purge_expired_requests()` keeps its signature and cron command; it now also applies the retention schedule (spec 9.1.6).
+
+## 0006: performance policies (R8)
+
+Apply **only `0006_perf_policies.sql`**, as `postgres` in the SQL editor, **after 0005 is applied and verified live**. No
+client change is needed. The file is idempotent. It rewrites 17 RLS policies with `(select auth.uid())` (same command,
+roles, permissive flag and checks) and adds 4 foreign-key indexes (`brivia_blocks_blocked_idx`,
+`community_posts_author_idx`, `matches_user2_idx`, `member_orbit_place_idx`). It never creates "Members can send
+connection requests" (0004 dropped it on purpose).
+
+- **Before applying, read-only diff** of live `pg_policies` against the harness snapshot (run the same query on the 0001-0005
+  harness database and live, normalise `( SELECT auth.uid() AS uid)` to `auth.uid()`, and compare; any difference means live
+  drifted from the migrations and must be understood first):
+
+  ```sql
+  select schemaname, tablename, policyname, cmd, roles::text, permissive, qual, with_check
+  from pg_policies where schemaname in ('public', 'storage') order by 1, 2, 3;
+  ```
+- **Expected result:** the 17 `auth_rls_initplan` warnings and the 4 `unindexed_foreign_keys` infos disappear from the
+  performance advisor. Nothing else changes.
+- The harness proves no drift (`supabase/tests/run.sh`, database `brivia_test_drift`): the snapshot before and after 0006
+  is equal, no public policy keeps a bare `auth.uid()`, and the request-insert policy stays absent.
