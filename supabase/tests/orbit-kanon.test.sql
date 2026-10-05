@@ -35,6 +35,7 @@ begin
     insert into auth.users(id) values (mid) on conflict do nothing;
     insert into public.profiles (id, name, full_name, email, is_test)
     values (mid, 'Kanon ' || g, 'Kanon ' || g, 'kanon' || g || '@example.com', w) on conflict (id) do nothing;
+    update public.profiles set adult_declared_at = now() where profiles.id = mid;   -- R1: declared (fixture is off)
     update public.profiles set created_at = now() - age where profiles.id = mid;   -- owner update
     insert into public.member_orbit (member_id, home_cell, home_cell_g6, home_cell_g5, place_id)
     values (mid, cell, public.brivia_grid_parent(cell, 6), public.brivia_grid_parent(cell, 5), 'in-pune')

@@ -49,6 +49,8 @@ create temp table _purge_before on commit drop as
 -- Storage rows first (folder "<uid>/..." or owner).
 do $$
 begin
+  -- Supabase refuses direct deletes on storage tables unless this flag is set (transaction-local).
+  perform set_config('storage.allow_delete_query', 'true', true);
   delete from storage.objects
    where owner in (select id from _purge_ids) or (storage.foldername(name))[1] in (select id::text from _purge_ids);
 exception when others then

@@ -64,6 +64,7 @@ begin
     insert into public.profiles (id, name, full_name, email, is_test, experience, looking_for)
     values (mid, 'Deck ' || g, 'Deck ' || g, 'deck' || g || '@example.com', g = 11, 'Some years', array['Friends'])
     on conflict (id) do nothing;
+    update public.profiles set adult_declared_at = now() where profiles.id = mid;   -- R1: declared (fixture is off)
     if g = 2 then   -- M3: a realistic Storage photo URL in the member's own folder (controlled id)
       update public.profiles
          set photo_url = 'https://proj.supabase.co/storage/v1/object/public/profile-photos/' || mid || '/p.jpg'
@@ -403,6 +404,7 @@ begin
   insert into auth.users(id) values (y) on conflict do nothing;
   insert into public.profiles (id, name, full_name, email) values (y, 'Deck 24', 'Deck 24', 'deck24@example.com')
   on conflict (id) do nothing;
+  update public.profiles set adult_declared_at = now() where profiles.id = y;   -- R1: declared (fixture is off)
   insert into public.member_orbit (member_id, home_cell, home_cell_g6, home_cell_g5, place_id)
   values (y, c.r3g5, public.brivia_grid_parent(c.r3g5, 6), public.brivia_grid_parent(c.r3g5, 5), public.brivia_nearest_place(c.r3g5))
   on conflict (member_id) do nothing;
@@ -487,6 +489,7 @@ begin
   insert into auth.users(id) values (x) on conflict do nothing;
   insert into public.profiles (id, name, full_name, email, is_test) values (x, 'Deck 21', 'Deck 21', 'deck21@example.com', true)
   on conflict (id) do nothing;
+  update public.profiles set adult_declared_at = now() where profiles.id = x;   -- R1: declared (fixture is off)
   insert into public.member_orbit (member_id, home_cell, home_cell_g6, home_cell_g5, place_id)
   select x, home_cell, home_cell_g6, home_cell_g5, place_id from public.member_orbit where member_id = pg_temp.d7(11)
   on conflict (member_id) do nothing;
@@ -514,6 +517,7 @@ begin
   insert into auth.users(id) values (h) on conflict do nothing;
   insert into public.profiles (id, name, full_name, email) values (h, 'Deck 23', 'Deck 23', 'deck23@example.com')
   on conflict (id) do nothing;
+  update public.profiles set adult_declared_at = now() where profiles.id = h;   -- R1: declared (fixture is off)
   insert into public.member_orbit (member_id, cell_scheme, home_cell, home_cell_g6, home_cell_g5, place_id)
   values (h, 'h3r7', '872a1072bffffff', '862a1072fffffff', '852a1073fffffff', 'in-kochi')
   on conflict (member_id) do nothing;

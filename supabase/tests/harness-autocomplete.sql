@@ -33,6 +33,11 @@ begin
     return null;
   end if;
   if public.brivia_is_completed(new.name, new.city) then
+    -- R1: the 18+ declaration is part of completion (0005), so the fixture declares first. Dynamic SQL and a column
+    -- check keep the fixture loadable before 0005 exists.
+    if to_jsonb(new) ? 'adult_declared_at' and to_jsonb(new)->>'adult_declared_at' is null then
+      execute 'update public.profiles set adult_declared_at = now() where id = $1 and adult_declared_at is null' using new.id;
+    end if;
     if not exists (select 1 from public.member_interest where member_id = new.id) then
       insert into public.member_interest (member_id, interest_id, points, mode)
       values (new.id, 'zz.harness.any', 20, 'play');

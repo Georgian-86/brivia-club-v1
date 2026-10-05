@@ -450,6 +450,13 @@ saturated, the outer rings relax first, instead of the deck repeating saturated 
   - a home cell (a `member_orbit` row, §9.1.4);
   - 1–12 `member_interest` rows whose points sum to exactly 20 (the Passion Budget, §3.2), at least one of them
     non-sensitive (the completion floor, D-038 R3).
+  - **the 18+ declaration** (Iteration 4, P0-B R1, `0005`): `profiles.adult_declared_at is not null`, written only by
+    `declare_adult(p_notice_version)` (a stale notice version is refused, `22023`; the first call appends a
+    `consent_event('adult')`, later calls change nothing). No client write can set the column (insert nulls it; a
+    BEFORE UPDATE guard keeps it unless an owner session or a definer consent RPC wrote it). Location and interests are
+    not processed before it: a non-owner write to `member_orbit` or `member_interest` for an undeclared member is
+    refused (`P0001 'adult declaration required'`). Date of birth is never asked or stored;
+  - **no `member_flag` with reason `suspended_pending_review`** (a member under review is not shown to anyone).
 
   It reads `member_interest` and `member_orbit` only, never `profiles.skills` (a display copy written only by
   `set_member_interests`, D-035).

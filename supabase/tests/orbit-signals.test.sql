@@ -16,6 +16,7 @@ on conflict (id) do nothing;
 insert into public.profiles (id, name, full_name, email, city, is_test)
 values ('f6000000-0000-0000-0000-000000000005', 'Sig 5', 'Sig 5', 'sig5@test.brivia.club', 'Pune', true)
 on conflict (id) do nothing;
+update public.profiles set adult_declared_at = now() where id::text like 'f6000000-%';   -- R1: declared (fixture is off)
 create or replace function pg_temp.s6(n int) returns uuid language sql immutable as $$
   select ('f6000000-0000-0000-0000-' || lpad(n::text, 12, '0'))::uuid $$;
 

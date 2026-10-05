@@ -24,6 +24,7 @@ begin
     insert into auth.users(id) values (mid) on conflict do nothing;
     insert into public.profiles (id, name, full_name, email) values (mid, 'Hyg ' || g, 'Hyg ' || g, 'h' || g || '@example.com')
     on conflict (id) do nothing;
+    update public.profiles set adult_declared_at = now() where profiles.id = mid;   -- R1: declared (fixture is off)
     insert into public.member_orbit (member_id, home_cell, home_cell_g6, home_cell_g5, place_id)
     values (mid, cell, public.brivia_grid_parent(cell, 6), public.brivia_grid_parent(cell, 5), 'in-pune')
     on conflict (member_id) do nothing;
@@ -91,7 +92,7 @@ begin
     from pg_proc p where p.pronamespace = 'public'::regnamespace and p.prosecdef
      and has_function_privilege('authenticated', p.oid, 'execute');
   want := 'brivia_can_see_author,brivia_has_completed_profile,'
-       || 'deck_candidates,deck_status,get_candidates,my_interests,my_onboarding_status,'
+       || 'deck_candidates,deck_status,declare_adult,get_candidates,my_interests,my_onboarding_status,'
        || 'my_outgoing_requests,my_signal_quota,respond_connection_request,search_members,send_signal,set_home_city,'
        || 'set_home_location,set_member_interests,set_sensitive_consent';
   if got is distinct from want then raise exception 'FAIL H3: authenticated may execute definer functions %', got; end if;

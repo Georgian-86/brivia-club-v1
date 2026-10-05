@@ -53,6 +53,7 @@ begin
     insert into public.profiles (id, name, full_name, email, experience, looking_for)
     values (mid, 'Order ' || lpad(g::text, 2, '0'), 'Order ' || g, 'order' || g || '@example.com', 'x', array['Friends'])
     on conflict (id) do nothing;
+    update public.profiles set adult_declared_at = now() where profiles.id = mid;   -- R1: declared (fixture is off)
     insert into public.member_orbit (member_id, home_cell, home_cell_g6, home_cell_g5, place_id)
     values (mid, cell, public.brivia_grid_parent(cell, 6), public.brivia_grid_parent(cell, 5), public.brivia_nearest_place(cell))
     on conflict (member_id) do nothing;

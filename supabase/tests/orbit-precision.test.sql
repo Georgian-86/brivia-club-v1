@@ -27,6 +27,7 @@ begin
     insert into public.profiles (id, name, full_name, email, is_test, experience, looking_for)
     values (mid, 'Pick ' || g, 'Pick ' || g, 'pick' || g || '@example.com', false, 'x', array['Friends'])
     on conflict (id) do nothing;
+    update public.profiles set adult_declared_at = now() where profiles.id = mid;   -- R1: declared (fixture is off)
     insert into public.member_interest values (mid, 'sports.racket.tennis', 20, 'play') on conflict do nothing;
   end loop;
 end $$;

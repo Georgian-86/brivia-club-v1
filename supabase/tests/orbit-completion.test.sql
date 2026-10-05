@@ -24,6 +24,7 @@ on conflict (id) do nothing;
 insert into public.profiles (id, name, full_name, email, is_test)
 values ('c0c0c0c0-0000-0000-0000-0000000000c4', 'Cee Four', 'Cee Four', 'c4@example.com', true)
 on conflict (id) do nothing;
+update public.profiles set adult_declared_at = now() where id::text like 'c0c0c0c0-%';   -- R1: declared (fixture is off)
 
 -- No autocomplete here: a name and a city alone give no interests and no cell.
 do $$

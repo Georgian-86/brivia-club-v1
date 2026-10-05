@@ -1104,7 +1104,9 @@ begin
     check (attachment_path is null or split_part(attachment_path, '/', 1) = sender_id::text);
   alter table public.brivia_messages enable trigger user;
 end $$;
+set storage.allow_delete_query = 'true';
 delete from storage.objects where name like '73000000-%';
+reset storage.allow_delete_query;
 delete from public.brivia_messages where sender_id::text like '73000000-%';
 delete from public.profiles where id::text like '73000000-%';
 delete from auth.users where id::text like '73000000-%';

@@ -15,8 +15,8 @@ returns setof public.public_profile_card language sql security definer set searc
 
 -- A real member (is_test = false) and the founder-style completed profile, created in both phases.
 insert into auth.users(id) values ('eeeeeeee-0000-0000-0000-0000000000e1') on conflict do nothing;
-insert into public.profiles (id, name, full_name, email, city, state, skills)
-values ('eeeeeeee-0000-0000-0000-0000000000e1', 'Real Member', 'Real Member', 'real@example.com', 'Bengaluru', 'Karnataka', '{Python}')
+insert into public.profiles (id, name, full_name, email, city, state, skills, adult_declared_at)
+values ('eeeeeeee-0000-0000-0000-0000000000e1', 'Real Member', 'Real Member', 'real@example.com', 'Bengaluru', 'Karnataka', '{Python}', now())
 on conflict (id) do nothing;
 -- The real member is completed under D-030 (interests summing to 20 and a cell), so S5 is a real isolation check.
 insert into public.member_interest (member_id, interest_id, points, mode) values

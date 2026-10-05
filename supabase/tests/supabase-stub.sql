@@ -29,6 +29,11 @@ create or replace function auth.uid() returns uuid language sql stable as $$
   select nullif(nullif(current_setting('request.jwt.claims', true), '')::json->>'sub', '')::uuid
 $$;
 
+-- Supabase auth.jwt(): the whole claims object ({} when none).
+create or replace function auth.jwt() returns jsonb language sql stable as $$
+  select coalesce(nullif(current_setting('request.jwt.claims', true), '')::jsonb, '{}'::jsonb)
+$$;
+
 do $$ begin
   if not exists (select 1 from pg_roles where rolname = 'anon') then create role anon nologin; end if;
   if not exists (select 1 from pg_roles where rolname = 'authenticated') then create role authenticated nologin; end if;
@@ -39,6 +44,19 @@ create table if not exists storage.buckets (id text primary key, name text not n
 alter table storage.buckets add column if not exists file_size_limit bigint;
 alter table storage.buckets add column if not exists allowed_mime_types text[];
 create table if not exists storage.objects (id uuid primary key default gen_random_uuid(), bucket_id text, name text, owner uuid);
+-- Real Supabase has owner_id text; and forbids direct DELETEs on storage tables (the Storage API sets the flag).
+alter table storage.objects add column if not exists owner_id text;
+create or replace function storage.protect_delete() returns trigger language plpgsql as $$
+begin
+  if coalesce(current_setting('storage.allow_delete_query', true), 'false') <> 'true' then
+    raise exception 'Direct deletion from storage tables is not allowed. Use the Storage API instead.'
+      using hint = 'This prevents accidental data loss from orphaned objects.', errcode = '42501';
+  end if;
+  return null;
+end $$;
+drop trigger if exists protect_objects_delete on storage.objects;
+create trigger protect_objects_delete before delete on storage.objects
+  for each statement execute function storage.protect_delete();
 alter table storage.objects enable row level security;
 create or replace function storage.foldername(name text) returns text[] language sql immutable as $$
   select string_to_array(name, '/')
@@ -51,7 +69,7 @@ do $$ begin
 end $$;
 
 grant usage on schema public, auth to anon, authenticated;
-grant execute on function auth.uid() to anon, authenticated;
+grant execute on function auth.uid(), auth.jwt() to anon, authenticated;
 grant usage on schema storage to anon, authenticated;
 alter default privileges in schema public grant all on tables to anon, authenticated;
 alter default privileges in schema public grant all on functions to anon, authenticated;

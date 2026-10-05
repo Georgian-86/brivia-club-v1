@@ -87,6 +87,9 @@ select ('a7e57000-0000-4000-8000-' || lpad(n::text, 12, '0'))::uuid,
        '{}', looking_for, true
 from _seed_members
 on conflict (id) do nothing;
+-- R1: the seed declares the 18+ confirmation for its members (an owner session may set the column).
+update public.profiles set adult_declared_at = now()
+ where is_test and adult_declared_at is null and email like '%@test.brivia.club';
 
 -- Interests: only for seeded members who have none yet (a re-run, or an edit made in the app, is left alone).
 insert into public.member_interest (member_id, interest_id, points, mode)
