@@ -26,17 +26,17 @@ Test status at `c42e805`: harness ALL PASSED (19 files); build OK; `test:unit` 4
 - `0001`, `0002`, `0003` are **applied and frozen**. Never edit or re-run them; later changes go in `0005+`.
 - `0004_orbit_onboarding.sql` is **applied (2026-10-05) and frozen**. It was verified read-only; see D-042 for the
   log settings and the advisor results. New SQL goes in `0005_*.sql`.
-- **Not done yet:**
-  - the test-member seed (`supabase/seed/test-members.sql`, run as postgres; expect 24 members, 6 requests, 1 match);
-  - deploying the new client build.
+- **Test-member seed: done (2026-10-05), verified read-only.** 24 `is_test` profiles, all completed, each with a
+  20-point budget and a cell, across 4 places; 6 requests, 1 match. To refresh it, purge and re-seed after 30 days.
+  If the SQL editor shows `relation "_seed_members" does not exist`, the editor ran only a selected part of the
+  script. Select nothing and run the whole file.
+- **Not done yet:** deploying the new client build.
 - `0005` should include the performance hygiene from D-042: `(select auth.uid())` in the policies, and 4 foreign-key indexes.
 - Real members are **not allowed yet**. See the go-live gate table at the end of the arena doc.
 
 ## 3. What to do next (in order)
 
-1. **Seed and deploy:**
-   - The founder runs the seed. Verify it read-only (24 `is_test` profiles, 6 requests, 1 match).
-   - Deploy the client built from this branch.
+1. **Deploy** the client built from this branch. The seed is already done.
 2. **P0-B** (before any real member). Arena doc, section "P0-B", items 9–12:
    - UX honesty: quota copy, promise copy, contrast, Pass glyph, focus styles.
    - Step 3 renamed to "What you care about", and the `auth.html` location notice.
