@@ -95,11 +95,11 @@ end $$;
 do $$
 declare a uuid := pg_temp.id(1); t uuid := pg_temp.id(3); n int;
 begin
-  perform pg_temp.rep(a, t, 'harassment', E'  rude \u0001 messages\t ');
+  perform pg_temp.rep(a, t, 'harassment', E'  rude \u0001 mess\u200bages\r\u0085\u202e\u2066 x\t ');
   select count(*) into n from public.member_report where reporter_id = a and target_id = t;
   if n <> 1 then raise exception 'FAIL R1: % reports', n; end if;
   if not (select qualifying from public.member_report where reporter_id = a and target_id = t) then raise exception 'FAIL R1: report not qualifying'; end if;
-  if (select note from public.member_report where reporter_id = a and target_id = t) <> 'rude  messages' then
+  if (select note from public.member_report where reporter_id = a and target_id = t) <> 'rude  messages x' then
     raise exception 'FAIL R1: note not sanitised: [%]', (select note from public.member_report where reporter_id = a and target_id = t); end if;
   if not exists (select 1 from public.brivia_blocks where blocker_id = a and blocked_id = t) then raise exception 'FAIL R1: no block'; end if;
   if exists (select 1 from public.member_flag where member_id = t) then raise exception 'FAIL R1: one qualifying report flagged'; end if;
@@ -119,13 +119,16 @@ do $$
 declare t uuid := pg_temp.id(3); v_cell text; n0 int; n1 int; ex timestamptz;
 begin
   select home_cell into v_cell from public.member_orbit where member_id = t;
+  perform public.refresh_cell_density(current_date + 1);   -- nightly table: refresh (strictly newer dates) before and after
   select d.n into n0 from public.cell_density d where d.cell = v_cell and not d.is_test;
+  if n0 is null then raise exception 'FAIL R2 setup: no density row for the target cell'; end if;
   perform pg_temp.rep(pg_temp.id(2), t, 'harassment');
   if not exists (select 1 from public.member_flag where member_id = t and reason = 'reported') then raise exception 'FAIL R2: no flag after 2 qualifying reporters'; end if;
   select expires_at into ex from public.member_flag where member_id = t;
   if ex is null or ex < now() + interval '89 days' or ex > now() + interval '91 days' then raise exception 'FAIL R2: expiry %', ex; end if;
+  perform public.refresh_cell_density(current_date + 2);
   select d.n into n1 from public.cell_density d where d.cell = v_cell and not d.is_test;
-  if n1 <> n0 - 1 then raise exception 'FAIL R2: cell count % -> % (target not counted out)', n0, n1; end if;
+  if n1 is null or n1 <> n0 - 1 then raise exception 'FAIL R2: cell count % -> % (target not counted out)', n0, n1; end if;
 end $$;
 
 -- R3: non-qualifying reports never flag; each is stored with qualifying = false.
@@ -140,6 +143,18 @@ begin
   if r <> 4 then raise exception 'FAIL R3: % reports', r; end if;
   if exists (select 1 from public.member_report where target_id in (t, pg_temp.id(4)) and qualifying) then raise exception 'FAIL R3: a non-qualifying report is qualifying'; end if;
   if exists (select 1 from public.member_flag where member_id in (t, pg_temp.id(4))) then raise exception 'FAIL R3: non-qualifying reports flagged'; end if;
+end $$;
+
+-- R3b: a reporter whose only relation is an automatic impression does not qualify.
+do $$
+begin
+  perform pg_temp.mk(23, 10, true);
+  insert into public.interaction (viewer_id, target_id, event) values (pg_temp.id(23), pg_temp.id(14), 'impression'), (pg_temp.id(23), pg_temp.id(13), 'like');
+  if (select count(*) from public.interaction where viewer_id = pg_temp.id(23)) <> 2 then raise exception 'FAIL R3b setup: interaction rows'; end if;
+  perform pg_temp.rep(pg_temp.id(23), pg_temp.id(14), 'spam');
+  if (select qualifying from public.member_report where reporter_id = pg_temp.id(23)) is not false then raise exception 'FAIL R3b: an impression qualified a report'; end if;
+  perform pg_temp.rep(pg_temp.id(23), pg_temp.id(13), 'spam');
+  if (select qualifying from public.member_report where reporter_id = pg_temp.id(23) and target_id = pg_temp.id(13)) is not true then raise exception 'FAIL R3b control: a like did not qualify'; end if;
 end $$;
 
 -- R4: same-world and other-world target leave the same footprint; unknown id and self write nothing but the attempt.
@@ -158,7 +173,7 @@ begin
   if (select count(*) from public.report_attempt where reporter_id = a) <> at0 + 2 then raise exception 'FAIL R4: the no-ops were not charged'; end if;
 end $$;
 
--- R5: the cap is charged first: 10 no-ops, the 11th is PT429; a bad reason is 22023 (and charged).
+-- R5: the cap is charged first: 10 no-ops, the 11th is PT429; a bad reason is 22023 (argument errors roll back the attempt row: only calls that pass validation are charged).
 do $$
 declare g constant uuid := pg_temp.id(12); i int; code text; bad text;
 begin

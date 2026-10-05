@@ -16,7 +16,7 @@ as_pg "$BIN/initdb" -D "$DATA" -A trust >/dev/null
 # No parameter logging (spec §9.1.4): the set_home_location probe below must never reach the server log. Every
 # statement is logged (log_statement=all) so the success path of the probe is exercised too, not only the error path.
 as_pg "$BIN/pg_ctl" -D "$DATA" -o "-p $PORT -k /tmp -c listen_addresses='' -c log_statement=all -c log_min_error_statement=error -c log_parameter_max_length=0 -c log_parameter_max_length_on_error=0" -w -l "$DATA/log" start >/dev/null
-"${PSQL[@]}" -d postgres -c "create database $DB"
+"${PSQL[@]}" -d postgres -c "create database $DB encoding 'UTF8' template template0"
 
 # Files are copied to /tmp so the postgres OS user can read them.
 STAGE=$(mktemp -d /tmp/brivia-sql.XXXX); trap 'cleanup; rm -rf "$STAGE"' EXIT
@@ -28,7 +28,7 @@ chmod -R a+rX "$STAGE"
 run() { echo "== $1"; "${PSQL[@]}" -d $DB -f "$STAGE/$1"; }
 
 # 1) The baseline alone must be secure by default: stub + 0001 only, then the baseline test.
-"${PSQL[@]}" -d postgres -c "create database ${DB}_0001"
+"${PSQL[@]}" -d postgres -c "create database ${DB}_0001 encoding 'UTF8' template template0"
 ( DB=${DB}_0001; echo "## database $DB (0001 only)"
   run tests/supabase-stub.sql; run migrations/0001_baseline.sql; run tests/baseline.test.sql )
 
@@ -53,7 +53,7 @@ grep -q 'try again later' "$DATA/log" || { echo "FAIL: the over-cap probe error 
 
 # 3) Seed + purge (Task 7): own database so the other suites never see test members. The seed runs as the
 #    owner (here postgres, session_user = current_user), exactly like the SQL editor; it is run twice (idempotent).
-"${PSQL[@]}" -d postgres -c "create database ${DB}_seed"
+"${PSQL[@]}" -d postgres -c "create database ${DB}_seed encoding 'UTF8' template template0"
 ( DB=${DB}_seed; echo "## database $DB (seed and purge)"
   run tests/supabase-stub.sql
   for m in "$STAGE"/migrations/*.sql; do run "migrations/$(basename "$m")"; done

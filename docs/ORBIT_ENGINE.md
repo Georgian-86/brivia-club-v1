@@ -466,7 +466,10 @@ saturated, the outer rings relax first, instead of the deck repeating saturated 
     `consent_event('adult')`, later calls change nothing). No client write can set the column (insert nulls it; a
     BEFORE UPDATE guard keeps it unless an owner session or a definer consent RPC wrote it). Location and interests are
     not processed before it: a non-owner write to `member_orbit` or `member_interest` for an undeclared member is
-    refused (`P0001 'adult declaration required'`). Date of birth is never asked or stored;
+    refused (`P0001 'adult declaration required'`). The trigger (`brivia_require_adult`) is SECURITY INVOKER and asks the
+    definer helper `brivia_is_declared`; its one carve-out is the redistribution UPDATE of `member_interest` inside
+    `set_sensitive_consent(false)` (owner context with `brivia.consent_write = 'on'`), so an undeclared member can still
+    withdraw private-interest consent. Date of birth is never asked or stored;
   - **no `member_flag` with reason `suspended_pending_review`** (a member under review is not shown to anyone). The
     flag is set by `report_member` (§9.1.4) when a *qualifying* report has reason `underage`; it never replaces
     `restricted`, has no expiry, and is lifted only by an operator (published 72 h founder review).
@@ -797,8 +800,8 @@ select log_impressions($1, $4);
   `rejoin_review`). `rejoin_review` is written by `declare_adult` when a live `moderation_tombstone` matches the caller's
   email digest (`hmac_sha256(lower(trim(email)), pepper)`; the address itself is never stored). A report is *qualifying*
   when the reporter is completed, in the same world, has an account of at least 7 days, and has a relation with the target
-  (any `interaction`, `connection_requests`, `matches` or `brivia_messages` row in either direction, read before the
-  block is written). Order inside `report_member`: profile (`P0002`), charge `report_attempt` (more than 10 in a rolling
+  (any `interaction` other than an automatic `impression`, `connection_requests`, `matches` or `brivia_messages` row in either direction, read before the
+  block is written). Only calls that pass argument validation are charged (argument errors do not depend on the target and roll back the attempt row). Order inside `report_member`: profile (`P0002`), charge `report_attempt` (more than 10 in a rolling
   24 h is `PT429`), reason (`22023`), self or unknown target returns, block (`on conflict do nothing`), same pair within
   24 h returns, insert `member_report` (note trimmed and control characters stripped, at most 500; evidence = the last 50
   messages of the pair). Flags with `expires_at` are to be purged when due (the sweep is not part of this section); founder flags have none. Floors: **k = 10** for a candidate

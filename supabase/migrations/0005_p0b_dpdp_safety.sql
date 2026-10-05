@@ -383,8 +383,8 @@ begin
   if p_reason is null or p_reason not in ('harassment', 'explicit', 'spam', 'fake', 'underage', 'safety', 'other') then
     raise exception 'invalid reason' using errcode = '22023';
   end if;
-  -- control characters stripped (newline and tab kept), trimmed, empty -> null
-  v_note := nullif(btrim(regexp_replace(coalesce(p_note, ''), '[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]', '', 'g'), E' \t\r\n'), '');
+  -- control characters (C0, DEL, C1), zero-width and bidi characters stripped; only newline and tab survive
+  v_note := nullif(btrim(regexp_replace(coalesce(p_note, ''), '[\x00-\x08\x0b-\x1f\x7f-\x9f\u200b-\u200f\u202a-\u202e\u2066-\u2069]', '', 'g'), E' \t\r\n'), '');
   if char_length(v_note) > 500 then
     raise exception 'note too long' using errcode = '22023';
   end if;
@@ -399,7 +399,8 @@ begin
     and public.brivia_member_completed(uid)
     and (select created_at <= now() - interval '7 days' from public.profiles where id = uid)
     and (exists (select 1 from public.interaction i
-                  where (i.viewer_id = uid and i.target_id = p_target) or (i.viewer_id = p_target and i.target_id = uid))
+                  where i.event <> 'impression'   -- impressions are written automatically by the deck and search
+                    and ((i.viewer_id = uid and i.target_id = p_target) or (i.viewer_id = p_target and i.target_id = uid)))
          or exists (select 1 from public.connection_requests c
                      where (c.from_id = uid and c.to_id = p_target) or (c.from_id = p_target and c.to_id = uid))
          or exists (select 1 from public.matches m
