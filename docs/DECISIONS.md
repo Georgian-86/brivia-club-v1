@@ -528,3 +528,21 @@ supersedes it.
   - Unused-index INFO: expected while the database is empty.
 - **Still not met for real members:** the go-live gate items for P0-B, auth hardening, operations and founder
   sign-off. See `docs/arena/2026-10-03-iteration-3.md`.
+
+## D-043: Test members are live (go-live entry for the test world; verified read-only)
+- **Date:** 2026-10-05. **Migration set live:** `0001`–`0004` (all frozen). **Seed:** `supabase/seed/test-members.sql`,
+  run by the founder in the SQL editor. **Client:** not yet deployed from this branch (HANDOFF step 1).
+- **Verified by Claude through the Supabase connector (read-only `select`s and the advisors only, 2026-10-05):**
+  - 24 profiles, all `is_test`, all completed (`brivia_member_completed`); 0 real profiles.
+  - 24 `member_orbit` rows across 4 places; every member has exactly 20 budget points.
+  - 6 connection requests, 1 match; 0 `member_flag` rows; 0 storage objects.
+  - 432 taxonomy nodes; both pg_cron jobs as D-042 (`17 20 * * *`, `37 20 * * *`).
+  - Log settings unchanged from D-042: `log_statement = ddl`, `log_min_duration_statement = -1`,
+    `log_parameter_max_length = -1` (safe while statement logging stays DDL-only).
+  - Buckets: `profile-photos`, `profile-covers`, `community-posts` public; `message-attachments`, `career-resumes`
+    private (private photo URLs are P1 item 21).
+- **Advisors, compared with `supabase/migrations/README.md`:** security shows the same 16 intended member-RPC WARN and
+  8 deny-all INFO as D-042, plus one new **founder setting**: *Leaked password protection disabled* (Auth). It joins
+  gate item 7 (auth hardening). Performance is unchanged from D-042 (17 `auth_rls_initplan`, 4 unindexed foreign keys,
+  unused-index INFO); the fix is queued for `0005`.
+- **Gate:** test members only — **met** on the live project. Real members still wait on P0-B, gate items 7, 10, 11.
