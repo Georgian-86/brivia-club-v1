@@ -104,7 +104,7 @@ same list (`supabase/tests/orbit-hygiene.test.sql`, H3/H5).
 
 Apply **only `0005_p0b_dpdp_safety.sql`** (0001-0004 are live and frozen), as `postgres` in the SQL editor, and deploy the
 matching client in the same window (the client declares the 18+ confirmation; an old client cannot complete members after
-0005). The file is idempotent. Sections are appended by task; this part covers section 1 (the 18+ gate).
+0005). The file is idempotent. Sections are appended by task; this part covers sections 1-3 (the 18+ gate, consent, reports and the rejoin tombstone).
 
 - **Effect on live members:** completion now needs `profiles.adult_declared_at`. Real members who completed before 0005
   are not declared and become invisible until they confirm in the app (they are routed back to step 1). Test members are
@@ -114,6 +114,8 @@ matching client in the same window (the client declares the 18+ confirmation; an
   ```sql
   select count(*) from profiles where not is_test and adult_declared_at is null;
   ```
-- **Expected advisor list after 0005:** the 0004 list above, plus the new intended RPC `declare_adult` (and, as later
-  sections land, `report_member` and `delete_my_account`); `brivia_notice_version` is a plain invoker function.
-  Nothing else may be executable by `authenticated`/`anon`: `consent_event` is owner-only (RLS on, no grants).
+- **Expected advisor list after 0005:** the 0004 list above, plus the new intended RPCs `declare_adult` and `report_member` (and, as later
+  sections land, `delete_my_account`); `brivia_notice_version` is a plain invoker function.
+  Nothing else may be executable by `authenticated`/`anon`: `consent_event`, `member_report`, `report_attempt`,
+  `moderation_pepper` and `moderation_tombstone` are owner-only (RLS on, no grants); `brivia_email_digest` and
+  `brivia_is_declared` are owner-only functions.

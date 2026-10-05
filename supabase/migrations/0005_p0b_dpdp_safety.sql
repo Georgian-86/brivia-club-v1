@@ -3,6 +3,7 @@
 -- Sections (appended by task, in order):
 --   1. 18+ declaration gate, consent history, consent column guard (R1, R3)
 --   2. Sensitive consent: give and redistributing withdrawal (R2)
+--   3. report_member, member_flag expiry, suspension, rejoin tombstone; brivia_require_adult withdrawal carve-out (R4, R6)
 -- Spec: docs/ORBIT_ENGINE.md section 7; rulings: docs/arena/2026-10-05-p0b-design.md.
 
 -- =============================================================================================
@@ -279,3 +280,230 @@ end;
 $$;
 revoke all on function public.set_sensitive_consent(boolean) from public, anon;
 grant execute on function public.set_sensitive_consent(boolean) to authenticated;
+
+
+-- =============================================================================================
+-- 3. Reports, flags, suspension and the rejoin tombstone (R4, R6)
+-- =============================================================================================
+-- Carried-in fix (Task 3 review): the redistribution UPDATE inside set_sensitive_consent(false) must not be refused for
+-- an undeclared member. brivia_require_adult is now SECURITY INVOKER so current_user is the real caller: it is the table
+-- owner only inside a definer RPC (or an owner session). The carve-out is the narrowest one: an UPDATE of member_interest
+-- while brivia.consent_write = 'on'. Inserts and member_orbit writes stay gated, so a stray flag opens nothing else.
+create or replace function public.brivia_is_declared(p_id uuid)
+returns boolean
+language sql
+stable
+security definer
+set search_path = public
+as $$ select exists (select 1 from public.profiles p where p.id = p_id and p.adult_declared_at is not null) $$;
+revoke all on function public.brivia_is_declared(uuid) from public, anon, authenticated;
+
+create or replace function public.brivia_require_adult()
+returns trigger
+language plpgsql
+set search_path = public, pg_catalog
+as $$
+declare
+  v_owner text := (select pg_get_userbyid(c.relowner) from pg_class c where c.oid = 'public.profiles'::regclass);
+begin
+  if current_user = v_owner and session_user = v_owner then
+    return new;
+  end if;
+  if tg_op = 'UPDATE' and tg_table_name = 'member_interest' and current_user = v_owner
+     and coalesce(current_setting('brivia.consent_write', true), '') = 'on' then
+    return new;
+  end if;
+  if not public.brivia_is_declared(new.member_id) then
+    raise exception 'adult declaration required' using errcode = 'P0001';
+  end if;
+  return new;
+end;
+$$;
+revoke all on function public.brivia_require_adult() from public, anon, authenticated;
+
+-- Flags expire (automatic 'reported' flags after 90 days; founder flags and suspensions have no expiry).
+alter table public.member_flag add column if not exists expires_at timestamptz;
+
+-- Per-reporter attempt ledger for the cap (10 per rolling 24 h). Charged before any validation. Owner-only.
+create table if not exists public.report_attempt (
+  reporter_id uuid not null references public.profiles(id) on delete cascade,
+  at timestamptz not null default now()
+);
+create index if not exists report_attempt_reporter_at_idx on public.report_attempt (reporter_id, at);
+alter table public.report_attempt enable row level security;
+revoke all on public.report_attempt from public, anon, authenticated;
+
+-- Reports. target_id has no FK on purpose (the report outlives the target's account). Owner-only.
+create table if not exists public.member_report (
+  id bigint generated always as identity primary key,
+  reporter_id uuid references public.profiles(id) on delete set null,
+  target_id uuid not null,
+  reason text not null,
+  note text,
+  evidence jsonb not null default '[]'::jsonb,
+  qualifying boolean not null,
+  created_at timestamptz not null default now()
+);
+alter table public.member_report drop constraint if exists member_report_reason_check;
+alter table public.member_report add constraint member_report_reason_check
+  check (reason in ('harassment', 'explicit', 'spam', 'fake', 'underage', 'safety', 'other'));
+alter table public.member_report drop constraint if exists member_report_note_check;
+alter table public.member_report add constraint member_report_note_check check (char_length(note) <= 500);
+create index if not exists member_report_reporter_created_idx on public.member_report (reporter_id, created_at);
+create index if not exists member_report_target_idx on public.member_report (target_id);
+create index if not exists member_report_created_idx on public.member_report (created_at);
+alter table public.member_report enable row level security;
+revoke all on public.member_report from public, anon, authenticated;
+revoke all on sequence public.member_report_id_seq from public, anon, authenticated;
+
+-- report_member(p_target, p_reason, p_note). Order is binding (R4): profile (P0002) -> charge the cap (PT429 above 10
+-- in 24 h) -> reason (22023) -> self or unknown target: return -> block -> same pair within 24 h: return -> report.
+create or replace function public.report_member(p_target uuid, p_reason text, p_note text default null)
+returns void
+language plpgsql
+volatile
+security definer
+set search_path = public
+as $$
+declare
+  uid uuid := auth.uid();
+  v_note text;
+  v_world boolean;
+  v_qual boolean;
+  v_evidence jsonb;
+begin
+  perform 1 from public.profiles where id = uid for update;   -- also serialises this member's calls (the cap)
+  if uid is null or not found then
+    raise exception 'profile required' using errcode = 'P0002';
+  end if;
+  insert into public.report_attempt (reporter_id) values (uid);
+  if (select count(*) from public.report_attempt where reporter_id = uid and at > now() - interval '24 hours') > 10 then
+    raise exception 'report_cap' using errcode = 'PT429';
+  end if;
+  if p_reason is null or p_reason not in ('harassment', 'explicit', 'spam', 'fake', 'underage', 'safety', 'other') then
+    raise exception 'invalid reason' using errcode = '22023';
+  end if;
+  -- control characters stripped (newline and tab kept), trimmed, empty -> null
+  v_note := nullif(btrim(regexp_replace(coalesce(p_note, ''), '[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]', '', 'g'), E' \t\r\n'), '');
+  if char_length(v_note) > 500 then
+    raise exception 'note too long' using errcode = '22023';
+  end if;
+  if p_target is null or p_target = uid or not exists (select 1 from public.profiles where id = p_target) then
+    return;
+  end if;
+  -- Qualification and evidence are read BEFORE the block: a block deletes the pair's pending requests (0003), which are
+  -- one of the relations that qualify a report.
+  select (select is_test from public.profiles where id = uid) = (select is_test from public.profiles where id = p_target)
+    into v_world;
+  v_qual := coalesce(v_world, false)
+    and public.brivia_member_completed(uid)
+    and (select created_at <= now() - interval '7 days' from public.profiles where id = uid)
+    and (exists (select 1 from public.interaction i
+                  where (i.viewer_id = uid and i.target_id = p_target) or (i.viewer_id = p_target and i.target_id = uid))
+         or exists (select 1 from public.connection_requests c
+                     where (c.from_id = uid and c.to_id = p_target) or (c.from_id = p_target and c.to_id = uid))
+         or exists (select 1 from public.matches m
+                     where (m.user1_id = uid and m.user2_id = p_target) or (m.user1_id = p_target and m.user2_id = uid))
+         or exists (select 1 from public.brivia_messages b
+                     where (b.sender_id = uid and b.recipient_id = p_target) or (b.sender_id = p_target and b.recipient_id = uid)));
+  select coalesce(jsonb_agg(e.j order by e.at desc), '[]'::jsonb) into v_evidence
+    from (select m.created_at as at,
+                 jsonb_build_object('from_me', m.sender_id = uid, 'body', m.body, 'kind', m.message_type,
+                                    'attachment_path', m.attachment_path, 'at', m.created_at) as j
+            from public.brivia_messages m
+           where (m.sender_id = uid and m.recipient_id = p_target) or (m.sender_id = p_target and m.recipient_id = uid)
+           order by m.created_at desc, m.id desc
+           limit 50) e;
+  -- a report always blocks, for any existing profile in either world (exactly what a direct block insert allows)
+  insert into public.brivia_blocks (blocker_id, blocked_id) values (uid, p_target) on conflict do nothing;
+  if exists (select 1 from public.member_report r
+              where r.reporter_id = uid and r.target_id = p_target and r.created_at > now() - interval '24 hours') then
+    return;
+  end if;
+  insert into public.member_report (reporter_id, target_id, reason, note, evidence, qualifying)
+  values (uid, p_target, p_reason, v_note, v_evidence, v_qual);
+  if v_qual then
+    if (select count(distinct r.reporter_id) from public.member_report r
+         where r.target_id = p_target and r.qualifying and r.reporter_id is not null
+           and r.created_at > now() - interval '30 days') >= 2 then
+      insert into public.member_flag (member_id, reason, expires_at)
+      values (p_target, 'reported', now() + interval '90 days') on conflict (member_id) do nothing;
+    end if;
+    if p_reason = 'underage' then
+      insert into public.member_flag (member_id, reason, expires_at) values (p_target, 'suspended_pending_review', null)
+      on conflict (member_id) do update
+        set reason = 'suspended_pending_review', flagged_at = now(), expires_at = null
+        where public.member_flag.reason in ('reported', 'rejoin_review');
+    end if;
+  end if;
+end;
+$$;
+revoke all on function public.report_member(uuid, text, text) from public, anon;
+grant execute on function public.report_member(uuid, text, text) to authenticated;
+
+-- Delete-and-rejoin evasion (R6): a keyed digest of the lower-cased email, never the address itself.
+create table if not exists public.moderation_pepper (
+  id int primary key check (id = 1),
+  pepper bytea not null
+);
+alter table public.moderation_pepper enable row level security;
+revoke all on public.moderation_pepper from public, anon, authenticated;
+insert into public.moderation_pepper (id, pepper) values (1, extensions.gen_random_bytes(32)) on conflict do nothing;
+
+create table if not exists public.moderation_tombstone (
+  digest text primary key,
+  reasons text[],
+  report_ids bigint[],
+  deleted_at timestamptz not null default now(),
+  expires_at timestamptz not null
+);
+alter table public.moderation_tombstone enable row level security;
+revoke all on public.moderation_tombstone from public, anon, authenticated;
+
+create or replace function public.brivia_email_digest(p_email text)
+returns text
+language sql
+stable
+security definer
+set search_path = public, extensions
+as $$
+  select encode(extensions.hmac(convert_to(lower(btrim(p_email)), 'utf8'), (select pepper from public.moderation_pepper where id = 1), 'sha256'::text), 'hex')
+$$;
+revoke all on function public.brivia_email_digest(text) from public, anon, authenticated;
+
+-- declare_adult, redefined: the section 1 behaviour exactly, plus: on the first declaration, a live tombstone for the
+-- caller's email digest puts the new account into founder review ('rejoin_review', no expiry).
+create or replace function public.declare_adult(p_notice_version text)
+returns void
+language plpgsql
+volatile
+security definer
+set search_path = public
+as $$
+declare
+  uid uuid := auth.uid();
+  v_first boolean;
+begin
+  perform 1 from public.profiles where id = uid for update;
+  if uid is null or not found then
+    raise exception 'profile required' using errcode = 'P0002';
+  end if;
+  if p_notice_version is distinct from public.brivia_notice_version() then
+    raise exception 'stale notice version' using errcode = '22023';
+  end if;
+  select adult_declared_at is null into v_first from public.profiles where id = uid;
+  if v_first then
+    perform set_config('brivia.consent_write', 'on', true);
+    update public.profiles set adult_declared_at = coalesce(adult_declared_at, now()) where id = uid;
+    perform set_config('brivia.consent_write', 'off', true);
+    insert into public.consent_event (member_id, kind, notice_version) values (uid, 'adult', p_notice_version);
+    if exists (select 1 from public.moderation_tombstone t
+                where t.expires_at > now()
+                  and t.digest = public.brivia_email_digest((select u.email from auth.users u where u.id = uid))) then
+      insert into public.member_flag (member_id, reason) values (uid, 'rejoin_review') on conflict (member_id) do nothing;
+    end if;
+  end if;
+end;
+$$;
+revoke all on function public.declare_adult(text) from public, anon;
+grant execute on function public.declare_adult(text) to authenticated;

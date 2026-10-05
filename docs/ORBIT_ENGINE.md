@@ -467,7 +467,9 @@ saturated, the outer rings relax first, instead of the deck repeating saturated 
     BEFORE UPDATE guard keeps it unless an owner session or a definer consent RPC wrote it). Location and interests are
     not processed before it: a non-owner write to `member_orbit` or `member_interest` for an undeclared member is
     refused (`P0001 'adult declaration required'`). Date of birth is never asked or stored;
-  - **no `member_flag` with reason `suspended_pending_review`** (a member under review is not shown to anyone).
+  - **no `member_flag` with reason `suspended_pending_review`** (a member under review is not shown to anyone). The
+    flag is set by `report_member` (§9.1.4) when a *qualifying* report has reason `underage`; it never replaces
+    `restricted`, has no expiry, and is lifted only by an operator (published 72 h founder review).
 
   It reads `member_interest` and `member_orbit` only, never `profiles.skills` (a display copy written only by
   `set_member_interests`, D-035).
@@ -787,8 +789,19 @@ select log_impressions($1, $4);
   unchanged. This blunts triangulation by moving one's own pin and re-reading distance bands.
 - **k-anonymity floor.** The population of a cell counts only members of the viewer's world who are completed
   (`brivia_member_completed`, §7), whose account is older than 14 days at the refresh date and who are not flagged
-  (reported or restricted), so a burst of fresh sybils cannot fill a cell. Until moderation tooling exists, "flagged"
-  means a row in the owner-only `member_flag(member_id, reason, flagged_at)` table. Floors: **k = 10** for a candidate
+  (reported or restricted), so a burst of fresh sybils cannot fill a cell. "Flagged" means a row in the owner-only
+  `member_flag(member_id, reason, flagged_at, expires_at)` table. Its sources (Iteration 4, `0005` section 3):
+  `report_member(p_target, p_reason, p_note)` writes `reported` when **at least 2 distinct qualifying reporters** reported
+  the target within 30 days (`expires_at` = now + 90 days; the flag is `on conflict do nothing`, so a founder `restricted`
+  stays), and `suspended_pending_review` for a qualifying `underage` report (§7; it replaces only `reported` and
+  `rejoin_review`). `rejoin_review` is written by `declare_adult` when a live `moderation_tombstone` matches the caller's
+  email digest (`hmac_sha256(lower(trim(email)), pepper)`; the address itself is never stored). A report is *qualifying*
+  when the reporter is completed, in the same world, has an account of at least 7 days, and has a relation with the target
+  (any `interaction`, `connection_requests`, `matches` or `brivia_messages` row in either direction, read before the
+  block is written). Order inside `report_member`: profile (`P0002`), charge `report_attempt` (more than 10 in a rolling
+  24 h is `PT429`), reason (`22023`), self or unknown target returns, block (`on conflict do nothing`), same pair within
+  24 h returns, insert `member_report` (note trimmed and control characters stripped, at most 500; evidence = the last 50
+  messages of the pair). Flags with `expires_at` are to be purged when due (the sweep is not part of this section); founder flags have none. Floors: **k = 10** for a candidate
   who would be shown in ring 0 or 1, **k = 5** for rings 2+. When the candidate's g7 cell is below k, the band is
   computed from the stored parent **g6** cell (centroid to centroid; `home_cell_g6`), then the stored **g5** cell
   (`home_cell_g5`) if that is still below k, and only then the region `placeLabel`. (Under H3 from iteration 4: res-6,
