@@ -3,7 +3,9 @@
 -- Sections (appended by task, in order):
 --   1. 18+ declaration gate, consent history, consent column guard (R1, R3)
 --   2. Sensitive consent: give and redistributing withdrawal (R2)
---   3. report_member, member_flag expiry, suspension, rejoin tombstone; brivia_require_adult withdrawal carve-out (R4, R6)
+--   3. report_member, member_flag expiry, suspension, rejoin tombstone; brivia_require_adult withdrawal carve-out (R4, R6).
+--      A report qualifies on a relation other than an automatic 'impression' (the deck and search write those).
+--   4. Storage delete policies, delete_my_account, retention purge, city-wide label (R5, R7, R9)
 -- Spec: docs/ORBIT_ENGINE.md section 7; rulings: docs/arena/2026-10-05-p0b-design.md.
 
 -- =============================================================================================
@@ -324,7 +326,7 @@ revoke all on function public.brivia_require_adult() from public, anon, authenti
 -- Flags expire (automatic 'reported' flags after 90 days; founder flags and suspensions have no expiry).
 alter table public.member_flag add column if not exists expires_at timestamptz;
 
--- Per-reporter attempt ledger for the cap (10 per rolling 24 h). Charged before any validation. Owner-only.
+-- Per-reporter attempt ledger for the cap (10 per rolling 24 h). Charged after the profile check; an argument error rolls the charge back. Owner-only.
 create table if not exists public.report_attempt (
   reporter_id uuid not null references public.profiles(id) on delete cascade,
   at timestamptz not null default now()
@@ -508,3 +510,137 @@ end;
 $$;
 revoke all on function public.declare_adult(text) from public, anon;
 grant execute on function public.declare_adult(text) to authenticated;
+
+-- =============================================================================================
+-- 4. Account deletion, retention, city-wide label (R5, R7, R9)
+-- =============================================================================================
+-- Members may delete their own profile photos and covers (the client empties its folders through the Storage API before
+-- calling delete_my_account; SQL never deletes from storage.objects).
+drop policy if exists "Members can delete their profile photos" on storage.objects;
+create policy "Members can delete their profile photos"
+  on storage.objects for delete to authenticated
+  using (bucket_id = 'profile-photos' and (storage.foldername(name))[1] = (select auth.uid()::text));
+drop policy if exists "Members can delete their profile covers" on storage.objects;
+create policy "Members can delete their profile covers"
+  on storage.objects for delete to authenticated
+  using (bucket_id = 'profile-covers' and (storage.foldername(name))[1] = (select auth.uid()::text));
+
+-- delete_my_account(p_confirm): self-serve deletion. No uid parameter. Order: session (P0002), 'DELETE' (22023), a login
+-- within 10 minutes (the newest `amr` timestamp of the JWT; else P0001 'reauth_required'), no stored objects (P0001
+-- 'storage_not_empty': any object in the 4 member buckets under the member's folder, or owned by the member in any bucket
+-- except career-resumes, a separate recruiting purpose). A member with a report against them or a flag leaves a
+-- moderation_tombstone (R6). consent_event('account_deleted') is written, then auth.users is deleted; every FK to
+-- profiles cascades (reports the member made keep their row with reporter_id null).
+create or replace function public.delete_my_account(p_confirm text)
+returns void
+language plpgsql
+volatile
+security definer
+set search_path = public, extensions
+as $$
+declare
+  uid uuid := auth.uid();
+  v_amr jsonb := auth.jwt() -> 'amr';
+  v_last bigint;
+  v_email text;
+  v_reasons text[];
+  v_reports bigint[];
+begin
+  if uid is null then
+    raise exception 'profile required' using errcode = 'P0002';
+  end if;
+  if p_confirm is distinct from 'DELETE' then
+    raise exception 'confirmation required' using errcode = '22023';
+  end if;
+  if jsonb_typeof(v_amr) = 'array' then
+    select max((e ->> 'timestamp')::bigint) into v_last
+      from jsonb_array_elements(v_amr) e
+     where jsonb_typeof(e) = 'object' and e ->> 'timestamp' ~ '^[0-9]{1,12}$';
+  end if;
+  if v_last is null or v_last < extract(epoch from now())::bigint - 600 then
+    raise exception 'reauth_required' using errcode = 'P0001';
+  end if;
+  if exists (select 1 from storage.objects o
+              where (o.bucket_id in ('profile-photos', 'profile-covers', 'message-attachments', 'community-posts')
+                     and (storage.foldername(o.name))[1] = uid::text)
+                 or (o.bucket_id <> 'career-resumes' and (o.owner_id = uid::text or o.owner = uid))) then
+    raise exception 'storage_not_empty' using errcode = 'P0001';
+  end if;
+  select u.email into v_email from auth.users u where u.id = uid;
+  select coalesce(array_agg(r.id order by r.id), '{}'::bigint[]) into v_reports from public.member_report r where r.target_id = uid;
+  select array(select distinct x from (select r.reason as x from public.member_report r where r.target_id = uid
+                                       union all select f.reason from public.member_flag f where f.member_id = uid) q order by x)
+    into v_reasons;
+  if v_email is not null and (cardinality(v_reports) > 0 or exists (select 1 from public.member_flag f where f.member_id = uid)) then
+    insert into public.moderation_tombstone (digest, reasons, report_ids, expires_at)
+    values (public.brivia_email_digest(v_email), v_reasons, v_reports, now() + interval '365 days')
+    on conflict (digest) do update
+      set reasons = array(select distinct x from unnest(public.moderation_tombstone.reasons || excluded.reasons) x order by x),
+          report_ids = array(select distinct x from unnest(public.moderation_tombstone.report_ids || excluded.report_ids) x order by x),
+          deleted_at = now(),
+          expires_at = greatest(public.moderation_tombstone.expires_at, excluded.expires_at);
+  end if;
+  insert into public.consent_event (member_id, kind, notice_version) values (uid, 'account_deleted', public.brivia_notice_version());
+  delete from auth.users where id = uid;
+end;
+$$;
+revoke all on function public.delete_my_account(text) from public, anon;
+grant execute on function public.delete_my_account(text) to authenticated;
+
+-- purge_expired_requests, redefined: the 0004 body unchanged, plus the retention schedule (R7; spec 9.1.6):
+-- like/pass interactions 180 d; request/accept/decline/met/letgo 365 d (impressions stay at 30 d, above);
+-- member_report 365 d; report_attempt 30 d; automatic flags past expires_at (founder flags have none);
+-- moderation_tombstone past expires_at; every consent_event of a member whose account_deleted event is older than 1 y;
+-- career_applications 180 d. Same signature and return value (request rows deleted); the cron command is unchanged.
+create or replace function public.purge_expired_requests()
+returns integer
+language plpgsql
+volatile
+set search_path = public
+as $$
+declare
+  n integer;
+begin
+  delete from public.signal_ledger where at <= now() - interval '30 days';
+  delete from public.interest_rewrite where at <= now() - interval '24 hours';
+  delete from public.location_change where at <= now() - interval '24 hours';
+  delete from public.interaction where event = 'impression' and created_at <= now() - interval '30 days';
+  delete from public.interaction where event in ('like', 'pass') and created_at <= now() - interval '180 days';
+  delete from public.interaction where event in ('request', 'accept', 'decline', 'met', 'letgo') and created_at <= now() - interval '365 days';
+  delete from public.member_report where created_at <= now() - interval '365 days';
+  delete from public.report_attempt where at <= now() - interval '30 days';
+  delete from public.member_flag where expires_at < now();
+  delete from public.moderation_tombstone where expires_at < now();
+  delete from public.consent_event where member_id in
+    (select c.member_id from public.consent_event c where c.kind = 'account_deleted' and c.at <= now() - interval '1 year');
+  delete from public.career_applications where created_at <= now() - interval '180 days';
+  if to_regclass('cron.job_run_details') is not null then
+    execute 'delete from cron.job_run_details where end_time < now() - interval ''7 days''';
+  end if;
+  delete from public.connection_requests where not public.brivia_request_is_live(status, created_at);
+  get diagnostics n = row_count;
+  return n;
+end;
+$$;
+revoke all on function public.purge_expired_requests() from public, anon, authenticated;
+
+-- my_onboarding_status, redefined: the 0004 body and type unchanged except place_label, which says "(city-wide)" for a
+-- member who picked a city (precision 'place'): their cell is the city centroid, not where they live (R9).
+create or replace function public.my_onboarding_status()
+returns table(interests int, points int, has_cell boolean, place_label text, completed boolean)
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select (select count(*)::int from public.member_interest mi where mi.member_id = me.uid),
+         (select coalesce(sum(mi.points), 0)::int from public.member_interest mi where mi.member_id = me.uid),
+         exists (select 1 from public.member_orbit o where o.member_id = me.uid),
+         (select case when o.precision = 'place' then pl.name || ' (city-wide)' else pl.name end
+            from public.member_orbit o join public.place pl on pl.id = o.place_id where o.member_id = me.uid),
+         public.brivia_member_completed(me.uid)
+    from (select auth.uid() as uid) me
+   where me.uid is not null
+$$;
+revoke all on function public.my_onboarding_status() from public, anon;
+grant execute on function public.my_onboarding_status() to authenticated;

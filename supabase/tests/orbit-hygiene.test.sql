@@ -92,7 +92,7 @@ begin
     from pg_proc p where p.pronamespace = 'public'::regnamespace and p.prosecdef
      and has_function_privilege('authenticated', p.oid, 'execute');
   want := 'brivia_can_see_author,brivia_has_completed_profile,'
-       || 'deck_candidates,deck_status,declare_adult,get_candidates,my_interests,my_onboarding_status,'
+       || 'deck_candidates,deck_status,declare_adult,delete_my_account,get_candidates,my_interests,my_onboarding_status,'
        || 'my_outgoing_requests,my_signal_quota,report_member,respond_connection_request,search_members,send_signal,set_home_city,'
        || 'set_home_location,set_member_interests,set_sensitive_consent';
   if got is distinct from want then raise exception 'FAIL H3: authenticated may execute definer functions %', got; end if;

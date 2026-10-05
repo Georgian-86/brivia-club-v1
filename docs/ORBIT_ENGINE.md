@@ -322,6 +322,9 @@ teach/learn chip, because that chip would name an interest the other member does
 likes, stops replying, and everyone else's like-back rate collapses. Incumbents cap what members *send*. ORBIT caps
 what a member *receives*, at a level the receiver declares, and releases capacity when real-world outcomes happen.
 
+**Retention of the signals it reads (R7).** `like` / `pass` rows live 180 days and impressions 30 days; the load uses only the last
+10 days of pending likes and the fortnight's orbits, so the purge loses no Roche input (see §9.1.6).
+
 **Capacity.** Each member declares `K_u ∈ {2, 3, 5, 8}` new people per fortnight (default 5, editable any time).
 
 **Load.** Recomputed nightly and on every relevant event:
@@ -761,8 +764,8 @@ select log_impressions($1, $4);
   shares the centroid's cell, which says nothing about where they live (A-F2: 12 Mumbai pickers in one cell showed
   each other as "~3 km"). A `'place'` member is counted in g5 density only, never in g7 or g6, so pickers cannot
   un-coarsen a geolocated resident of the centroid cell. When either member of a pair is `'place'`, the pair uses the
-  place rule (§7) and the band is the place name: a picker never sees, and is never shown as, `~3 km`. (Showing the
-  member "Your area: Mumbai (city-wide)" with a one-tap upgrade is client work, P0-B.) Clients read place
+  place rule (§7) and the band is the place name: a picker never sees, and is never shown as, `~3 km`. `my_onboarding_status().place_label` appends " (city-wide)" for a `'place'` member (`Mumbai (city-wide)`; a `'cell'`
+  member gets the bare name), so the client can show "Your area: Mumbai (city-wide)" with a one-tap upgrade (R9). Clients read place
   names from `place(id, name, region, country, is_launch)`; its centroid columns are never granted.
 - **Client capture (UX_SPEC §A, D-035).** The signup asks for geolocation only after the privacy explainer, with
   `{ enableHighAccuracy: false, timeout: 10000, maximumAge: 600000 }`; denial, timeout, a missing API or an insecure
@@ -889,6 +892,18 @@ select log_impressions($1, $4);
 | Location over the 3/day cap | `PT429` "try again later" (HTTP 429 through PostgREST) |
 
 #### 9.1.6 Impression logging
+
+- **Retention (R7, `purge_expired_requests()`, nightly, owner-only; signature, return value and cron command unchanged).**
+  `impression` 30 d; `like` / `pass` 180 d; `request` / `accept` / `decline` / `met` / `letgo` 365 d; `member_report`
+  (with its evidence) 365 d from creation; `report_attempt` 30 d; `member_flag` rows past `expires_at` (automatic
+  `reported` flags, 90 d; founder flags and suspensions have none); `moderation_tombstone` past `expires_at` (365 d);
+  every `consent_event` of a member whose `account_deleted` event is older than 1 y; `career_applications` 180 d (resume
+  files are swept by hand). Messages, matches, posts and the profile live as long as the account. No inactivity deletion yet.
+- **Account deletion (R5).** `delete_my_account('DELETE')` needs a login within 10 minutes (newest JWT `amr` timestamp),
+  refuses (`storage_not_empty`) while the member has objects in the 4 member buckets (by folder, `owner_id` or `owner`;
+  `career-resumes` is not checked), records a tombstone when the member was reported or flagged (R6), logs
+  `consent_event('account_deleted')` and deletes `auth.users`; every FK to `profiles` cascades, a report the member made
+  keeps its row with `reporter_id` null, and a report about them survives. SQL never deletes from `storage.objects`.
 
 - `log_impressions(p_viewer uuid, p_rows jsonb)`: SECURITY DEFINER, `execute` granted to `orbit_svc` only. It sets
   `viewer_id = p_viewer` and `event = 'impression'` itself; neither is taken from `p_rows`. It accepts at most 30

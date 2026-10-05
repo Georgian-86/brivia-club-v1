@@ -148,9 +148,14 @@ begin
   perform set_config('request.jwt.claims', json_build_object('sub', n)::text, true);
   perform public.set_home_city('in-mumbai');
   select * into s from public.my_onboarding_status();
-  if s.interests <> 3 or s.points <> 20 or not s.has_cell or s.place_label is distinct from 'Mumbai' or not s.completed then
+  if s.interests <> 3 or s.points <> 20 or not s.has_cell or s.place_label is distinct from 'Mumbai (city-wide)' or not s.completed then
     raise exception 'FAIL: stage 2 status %', s;
   end if;
+  -- R9: a member whose cell came from their own location (precision 'cell') gets the bare place name
+  reset role; update public.member_orbit set precision = 'cell' where member_id = n; set local role authenticated;
+  select * into s from public.my_onboarding_status();
+  if s.place_label is distinct from 'Mumbai' then raise exception 'FAIL: R9 cell precision label %', s.place_label; end if;
+  reset role; update public.member_orbit set precision = 'place' where member_id = n; set local role authenticated;
   if (select count(*) from public.my_onboarding_status()) <> 1 then raise exception 'FAIL: status is not one row'; end if;
   select count(*) into k from pg_temp.list_members(20) where id = v; if k <> 1 then raise exception 'FAIL: stage 2 c2 does not list c1'; end if;
   select count(*) into k from public.get_candidates(array[v]); if k <> 1 then raise exception 'FAIL: stage 2 c2 gets % cards', k; end if;
