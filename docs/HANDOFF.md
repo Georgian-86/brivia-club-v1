@@ -1,6 +1,6 @@
 # Session handoff (read after CLAUDE.md)
 
-Last updated: 2026-10-05, at commit `c42e805` on branch `claude/jolly-edison-49xvza` (repo `Georgian-86/brivia-club-v1`).
+Last updated: 2026-10-05, after 0004 went live (code at `c42e805`) on branch `claude/jolly-edison-49xvza` (repo `Georgian-86/brivia-club-v1`).
 Update this file at the end of every session. CLAUDE.md holds the aim; this file holds **where we are**.
 
 ## 1. What is done
@@ -24,22 +24,19 @@ Test status at `c42e805`: harness ALL PASSED (19 files); build OK; `test:unit` 4
 ## 2. Live Supabase state (project `wfbddovczpfdrspmxgfo`)
 
 - `0001`, `0002`, `0003` are **applied and frozen**. Never edit or re-run them; later changes go in `0005+`.
-- `0004_orbit_onboarding.sql` is **ready but not yet applied**. The founder applies it by hand in the SQL editor,
-  following `supabase/migrations/README.md`:
-  1. pre-flight queries;
-  2. log settings check;
-  3. enable pg_cron;
-  4. run 0004 together with deploying the new client;
-  5. optionally run `supabase/seed/test-members.sql` (expect 24 members, 6 requests, 1 match).
-- Once applied, **0004 is frozen too**. Claude then verifies with the Supabase connector, read-only only:
-  - `execute_sql` selects;
-  - `get_advisors`, where the README lists the warnings to expect.
+- `0004_orbit_onboarding.sql` is **applied (2026-10-05) and frozen**. It was verified read-only; see D-042 for the
+  log settings and the advisor results. New SQL goes in `0005_*.sql`.
+- **Not done yet:**
+  - the test-member seed (`supabase/seed/test-members.sql`, run as postgres; expect 24 members, 6 requests, 1 match);
+  - deploying the new client build.
+- `0005` should include the performance hygiene from D-042: `(select auth.uid())` in the policies, and 4 foreign-key indexes.
 - Real members are **not allowed yet**. See the go-live gate table at the end of the arena doc.
 
 ## 3. What to do next (in order)
 
-1. **If 0004 is not applied yet:** walk the founder through the runbook, then verify read-only. After that, append a
-   go-live-of-0004 DECISIONS entry with the log-settings values and the advisor results.
+1. **Seed and deploy:**
+   - The founder runs the seed. Verify it read-only (24 `is_test` profiles, 6 requests, 1 match).
+   - Deploy the client built from this branch.
 2. **P0-B** (before any real member). Arena doc, section "P0-B", items 9–12:
    - UX honesty: quota copy, promise copy, contrast, Pass glyph, focus styles.
    - Step 3 renamed to "What you care about", and the `auth.html` location notice.

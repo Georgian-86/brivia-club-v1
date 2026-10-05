@@ -493,3 +493,38 @@ supersedes it.
 - **Same round (no rule change):** impressions are deduped to one per (viewer, target, surface, UTC day) and purged
   after 30 days; the policy wrappers moved to the non-exposed schema `brivia_private`; the deck's overlap key is
   bucketed into 4 levels; sensitive interests are hidden in the signup picker until the consent step (P0-B).
+
+## D-042: Migration 0004 applied to live (verified read-only)
+- **Date:** 2026-10-05. **Applied by:** the founder, in the Supabase SQL editor, from commit `c42e805`
+  (`0004_orbit_onboarding.sql`). `0004` is now **frozen**; later SQL goes in `0005+`.
+- **Verified by Claude through the Supabase connector (read-only selects and advisors only):**
+  - 432 taxonomy nodes, 14 of them sensitive.
+  - Both pg_cron jobs exist: `brivia-refresh-cell-density 17 20 * * *` and `brivia-purge-expired-requests 37 20 * * *`.
+  - The `brivia_private` schema exists. `authenticated` has usage on it; `anon` does not.
+  - `interaction_impression_daily_idx` exists.
+  - `list_members` and `refresh_cell_density` cannot be executed by `anon` or `authenticated`.
+    `deck_candidates` can be executed by `authenticated` only.
+  - 0 profiles, so no real accounts exist yet and the seed has not been run.
+- **Log settings (runbook step 2):**
+
+  | Setting | Value |
+  |---|---|
+  | `log_statement` | `ddl` |
+  | `log_min_duration_statement` | `-1` |
+  | `log_parameter_max_length` | `-1` |
+
+  Statement logging covers DDL only, and `set_home_location` calls are not DDL, so coordinates do not reach the log.
+  If `log_statement` is ever raised to `mod`/`all`, or a duration threshold is set, `log_parameter_max_length` must
+  be set to `0` first.
+- **Security advisor:** the 16 WARN are exactly the intended member RPCs listed in `supabase/migrations/README.md`.
+  The 8 INFO "RLS enabled, no policy" are the deny-all internal tables, which are reached only through definer RPCs:
+  `brivia_config`, `cell_density`, `interest_rewrite`, `location_change`, `member_flag`, `member_interest`,
+  `member_orbit` and `signal_ledger`. The 0003-era findings (mutable `search_path` on `brivia_guard_is_test`, and the
+  `brivia_same_world`/`brivia_interaction_allowed` oracles) are gone.
+- **Performance advisor:** none of these block a closed beta. They are queued for `0005` (P1 hygiene):
+  - 17 `auth_rls_initplan` WARN: wrap `auth.uid()` as `(select auth.uid())` in the policies.
+  - 4 unindexed foreign keys: `brivia_blocks.blocked_id`, `community_posts.author_id`, `matches.user2_id` and
+    `member_orbit.place_id`.
+  - Unused-index INFO: expected while the database is empty.
+- **Still not met for real members:** the go-live gate items for P0-B, auth hardening, operations and founder
+  sign-off. See `docs/arena/2026-10-03-iteration-3.md`.
