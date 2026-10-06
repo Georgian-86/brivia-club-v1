@@ -171,3 +171,5 @@ connection requests" (0004 dropped it on purpose).
   performance advisor. Nothing else changes.
 - The harness proves no drift (`supabase/tests/run.sh`, database `brivia_test_drift`): the snapshot before and after 0006
   is equal, no public policy keeps a bare `auth.uid()`, and the request-insert policy stays absent.
+
+Incident response (suspected data breach, pausing the purge cron, notices): see `docs/BREACH_RUNBOOK.md`.

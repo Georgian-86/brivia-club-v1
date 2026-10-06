@@ -57,3 +57,7 @@ auth users with the seed id prefix from a half-finished seed), and their `auth.i
 interaction, `member_interest`, `member_orbit` and `location_change`, and removes `storage.objects` under their folders. Running it with nothing seeded is safe (all zeros).
 Supabase refuses SQL deletes on `storage.objects`; if test members ever uploaded files, the script prints a notice and you
 remove those files in the Storage dashboard. The seed itself uploads nothing.
+
+Note: `purge-test-members.sql` now sets `storage.allow_delete_query`, which removes **only the `storage.objects` metadata rows**.
+The files themselves stay in the buckets. If test members ever uploaded files, remove them through the Storage API or the
+dashboard first (or accept orphaned test files; the orphan report in `docs/BREACH_RUNBOOK.md` section 7 will list them).

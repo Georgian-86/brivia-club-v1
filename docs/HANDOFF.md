@@ -100,6 +100,7 @@ install it).
 | Brand, tokens, flows, copy | `docs/UX_SPEC.md` |
 | Applying SQL to live | `supabase/migrations/README.md` |
 | Test members | `supabase/seed/README.md` |
+| Data breach response (containment, notices, orphan-folder report) | `docs/BREACH_RUNBOOK.md` |
 | SQL behaviour tests | `supabase/tests/*.test.sql` (run with `run.sh`) |
 | Signup (4 steps) | `auth.html`, `script.js`, `passion-budget.js`, `pending-profile.js` |
 | App, deck, quota | `app.html`, `app.js`, `deck-view.js`, `signal-quota.js` |
