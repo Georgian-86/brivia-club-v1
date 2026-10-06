@@ -95,7 +95,7 @@ try {
   // One mutable stub serves every context; tests change it between page loads.
   // onboarding: the my_onboarding_status answers in order (the last one repeats); 'error' answers HTTP 500.
   // matchIds: members I am matched with (GET /rest/v1/matches); search: the rpc/search_members answer.
-  const fresh = () => ({ status: 'caught_up', emptyDeck: false, deckFail: false, matchAll: false, onboarding: [true], onboardingCalls: 0, passed: new Set(), signalled: new Set(), remaining: 30, resetsAt: null, matchIds: [], search: [] });
+  const fresh = () => ({ status: 'caught_up', emptyDeck: false, deckFail: false, matchAll: false, onboarding: [true], onboardingCalls: 0, passed: new Set(), signalled: new Set(), remaining: 30, resetsAt: null, matchIds: [], search: [], report: 'ok' });
   const st = { ...fresh(), calls: [], bodies: [] };
   const resetStub = (patch = {}) => Object.assign(st, fresh(), patch);
   const makeContext = async (viewport) => {
@@ -137,6 +137,12 @@ try {
         if (args.event === 'pass') st.passed.add(args.target_id);
         return route.fulfill({ status: 201, body: '', headers: { 'access-control-allow-origin': '*' } });
       }
+      if (pathName === '/rest/v1/rpc/report_member') {
+        if (st.report === 'cap') return json(429, { code: 'PT429', message: 'report_cap', details: null, hint: null });
+        st.passed.add(args.p_target);
+        return route.fulfill({ status: 204, body: '', headers: { 'access-control-allow-origin': '*' } });
+      }
+      if (pathName === '/rest/v1/brivia_blocks' && method === 'POST') return route.fulfill({ status: 201, body: '', headers: { 'access-control-allow-origin': '*' } });
       if (pathName === '/rest/v1/rpc/list_members') return json(200, deckRows);
       if (pathName === '/rest/v1/rpc/search_members') return json(200, st.search);
       if (pathName === '/rest/v1/matches' && method === 'GET') return json(200, st.matchIds.map((id) => ({ user1_id: ME, user2_id: id })));
@@ -526,6 +532,122 @@ try {
     await shot(small, file);
   }
   await narrow.close();
+
+  // 7b. Iteration 4, Task 8 (R4): the card overflow (Report, Block) and the report dialog at 375 px.
+  resetStub();
+  const repCtx = await makeContext({ width: 375, height: 812 });
+  const rep = await open(repCtx);
+  await waitForCard(rep, 'Asha Band');
+  await rep.waitForTimeout(300);
+  rep.on('dialog', (d) => d.accept());
+  const reportCalls = () => st.calls.filter((c) => c.path === '/rest/v1/rpc/report_member');
+  const more = await rep.evaluate(() => { const b = document.querySelector('#swipe-card .card-more'); const r = b?.getBoundingClientRect(); return { label: b?.getAttribute('aria-label'), popup: b?.getAttribute('aria-haspopup'), w: Math.round(r?.width || 0), h: Math.round(r?.height || 0), tag: b?.tagName }; });
+  check(`card overflow is a real 44x44 button labelled for the member (${JSON.stringify(more)})`, () => { assert.equal(more.tag, 'BUTTON'); assert.equal(more.label, 'More options for Asha Band'); assert.equal(more.popup, 'menu'); assert.ok(more.w >= 44 && more.h >= 44); });
+  await rep.locator('#swipe-card .card-more').focus();
+  await rep.keyboard.press('Enter');
+  const menuItems = await rep.evaluate(() => ({ open: !document.querySelector('.card-more-menu')?.hidden, items: [...document.querySelectorAll('.card-more-menu [role="menuitem"]')].map((el) => el.textContent.trim()), expanded: document.querySelector('.card-more')?.getAttribute('aria-expanded') }));
+  check(`the overflow opens with the keyboard: Report and Block (${JSON.stringify(menuItems)})`, () => { assert.equal(menuItems.open, true); assert.deepEqual(menuItems.items, ['Report', 'Block']); assert.equal(menuItems.expanded, 'true'); });
+  await rep.keyboard.press('Escape');
+  const menuClosed = await rep.evaluate(() => ({ hidden: document.querySelector('.card-more-menu')?.hidden, focus: document.activeElement?.className || '' }));
+  check(`Escape closes the overflow menu and returns focus to it (${JSON.stringify(menuClosed)})`, () => { assert.equal(menuClosed.hidden, true); assert.match(menuClosed.focus, /card-more/); });
+  await rep.keyboard.press('Enter');
+  await rep.locator('.card-more-menu [data-card-action="report"]').click();
+  await rep.waitForSelector('dialog.report-dialog[open]');
+  const dlg = await rep.evaluate(() => {
+    const d = document.querySelector('dialog.report-dialog');
+    const radios = [...d.querySelectorAll('fieldset input[type="radio"]')];
+    const box = d.getBoundingClientRect();
+    const note = d.querySelector('textarea');
+    const e = d.querySelector('[data-report-emergency]');
+    return {
+      legend: d.querySelector('fieldset legend')?.textContent?.trim(),
+      labels: radios.map((r) => r.closest('label')?.textContent.trim()),
+      values: radios.map((r) => r.value),
+      targets: radios.map((r) => Math.round(r.closest('label').getBoundingClientRect().height)),
+      noteMax: note?.getAttribute('maxlength'),
+      noteLabel: d.querySelector(`label[for="${note?.id}"]`)?.textContent?.replace(/\s+/g, ' ').trim(),
+      submit: d.querySelector('[data-report-submit]')?.textContent?.trim(),
+      submitH: Math.round(d.querySelector('[data-report-submit]')?.getBoundingClientRect().height || 0),
+      contact: d.textContent.includes('Urgent? Email thebrivia.club@gmail.com'),
+      modal: d.matches(':modal'),
+      inside: d.contains(document.activeElement),
+      scroll: d.scrollWidth - d.clientWidth,
+      pageScroll: document.documentElement.scrollWidth - window.innerWidth,
+      fits: box.left >= 0 && box.right <= window.innerWidth + 0.5,
+      emergency: Boolean(e) && !e.hidden && getComputedStyle(e).display !== 'none',
+    };
+  });
+  check(`report dialog: modal, focus inside, fieldset legend "${dlg.legend}"`, () => { assert.equal(dlg.modal, true); assert.equal(dlg.inside, true); assert.match(dlg.legend, /Why are you reporting/); });
+  check(`report reasons use the human labels and server values (${JSON.stringify(dlg.labels)})`, () => {
+    assert.deepEqual(dlg.labels, ['Harassment or hate', 'Sexual or explicit content', 'Spam or scam', 'Fake profile or impersonation', 'May be under 18', 'I feel unsafe or threatened', 'Something else']);
+    assert.deepEqual(dlg.values, ['harassment', 'explicit', 'spam', 'fake', 'underage', 'safety', 'other']);
+  });
+  check(`report dialog copy: note label, maxlength 500, button, contact line (${JSON.stringify([dlg.noteLabel, dlg.noteMax, dlg.submit])})`, () => {
+    assert.match(dlg.noteLabel, /^Anything else we should know\? \(optional\)/);
+    assert.match(dlg.noteLabel, /Kept for up to a year so we can review it\./);
+    assert.equal(dlg.noteMax, '500'); assert.equal(dlg.submit, 'Report and block'); assert.equal(dlg.contact, true);
+  });
+  check(`report dialog at 375 px: no horizontal scroll, targets >= 44 px (${JSON.stringify([dlg.scroll, dlg.pageScroll, dlg.targets, dlg.submitH])})`, () => {
+    assert.ok(dlg.scroll <= 0 && dlg.pageScroll <= 1 && dlg.fits);
+    dlg.targets.forEach((h) => assert.ok(h >= 44)); assert.ok(dlg.submitH >= 44);
+  });
+  check('no 112 line before a reason is chosen', () => assert.equal(dlg.emergency, false));
+  const emergency = async (value) => { await rep.locator(`dialog.report-dialog input[value="${value}"]`).check(); return rep.evaluate(() => { const e = document.querySelector('[data-report-emergency]'); return { shown: !e.hidden && getComputedStyle(e).display !== 'none', text: e.textContent.trim() }; }); };
+  const eSafety = await emergency('safety'); const eUnder = await emergency('underage'); const eSpam = await emergency('spam');
+  check(`the 112 line shows for safety and underage only (${JSON.stringify([eSafety.shown, eUnder.shown, eSpam.shown])})`, () => {
+    assert.equal(eSafety.shown, true); assert.equal(eUnder.shown, true); assert.equal(eSpam.shown, false);
+    assert.equal(eSafety.text, 'If anyone is in immediate danger, call 112.');
+  });
+  let escaped = false;
+  for (let i = 0; i < 14; i += 1) { await rep.keyboard.press('Tab'); if (!await rep.evaluate(() => document.querySelector('dialog.report-dialog').contains(document.activeElement))) escaped = true; }
+  check('Tab stays inside the report dialog (focus trap)', () => assert.equal(escaped, false));
+  await rep.keyboard.press('Escape');
+  await rep.waitForFunction(() => !document.querySelector('dialog.report-dialog[open]'));
+  const back = await rep.evaluate(() => document.activeElement?.className || '');
+  check(`Escape closes the dialog and returns focus to the overflow button (${back})`, () => assert.match(back, /card-more/));
+  check('closing the dialog reported nothing', () => assert.equal(reportCalls().length, 0));
+  await rep.locator('#swipe-card .card-more').click();
+  await rep.locator('.card-more-menu [data-card-action="report"]').click();
+  await rep.waitForSelector('dialog.report-dialog[open]');
+  await rep.locator('[data-report-submit]').click();
+  const noReason = await rep.evaluate(() => document.querySelector('[data-report-error]')?.textContent?.trim() || '');
+  check(`submit with no reason shows "${noReason}" and sends nothing`, () => { assert.match(noReason, /Choose a reason/); assert.equal(reportCalls().length, 0); });
+  st.report = 'cap';
+  await rep.locator('dialog.report-dialog input[value="spam"]').check();
+  const interBefore = passes().length;
+  await rep.locator('[data-report-submit]').click();
+  await rep.waitForFunction(() => /several reports/.test(document.querySelector('[data-report-error]')?.textContent || '')).catch(() => {});
+  const capText = await rep.evaluate(() => ({ err: document.querySelector('[data-report-error]')?.textContent?.trim(), role: document.querySelector('[data-report-error]')?.getAttribute('role'), open: Boolean(document.querySelector('dialog.report-dialog')?.open) }));
+  check(`PT429 shows the cap copy in role=alert and keeps the dialog open (${JSON.stringify(capText)})`, () => {
+    assert.equal(capText.err, "You've sent several reports today. For anything urgent, email thebrivia.club@gmail.com.");
+    assert.equal(capText.role, 'alert'); assert.equal(capText.open, true);
+  });
+  const capName = await cardName(rep);
+  check(`after the cap the card did not advance (${capName})`, () => assert.equal(capName, 'Asha Band'));
+  const capBody = JSON.parse(reportCalls().at(-1)?.body || '{}');
+  check(`the RPC body is { p_target, p_reason, p_note } with a null note when empty (${JSON.stringify(capBody)})`, () => assert.deepEqual(capBody, { p_target: A, p_reason: 'spam', p_note: null }));
+  st.report = 'ok';
+  await rep.locator('dialog.report-dialog input[value="harassment"]').check();
+  await rep.locator('dialog.report-dialog textarea').fill('  rude messages  ');
+  await rep.locator('[data-report-submit]').click();
+  await waitForCard(rep, 'Bilal Place');
+  await rep.waitForFunction(() => !document.querySelector('dialog.report-dialog[open]'));
+  const sent = JSON.parse(reportCalls().at(-1)?.body || '{}');
+  check(`submit sends { p_target, p_reason, p_note } (${JSON.stringify(sent)})`, () => assert.deepEqual(sent, { p_target: A, p_reason: 'harassment', p_note: 'rude messages' }));
+  await rep.waitForTimeout(300);
+  const toastText = await rep.locator('#app-toast').textContent();
+  check(`success toast names the member (${toastText})`, () => assert.equal(toastText, "Thanks. We've received your report, and you won't see Asha Band again."));
+  check('the deck advanced like a Pass: one card fewer and NO pass interaction POST', () => assert.equal(passes().length, interBefore));
+  const hiddenLocal = await rep.evaluate((id) => Object.entries(window.localStorage).some(([k, v]) => k.startsWith('brivia-blocked-users:') && JSON.parse(v).includes(id)), A);
+  check('the reported member is also hidden locally like a block', () => assert.equal(hiddenLocal, true));
+  await rep.locator('#swipe-card .card-more').click();
+  await rep.locator('.card-more-menu [data-card-action="block"]').click();
+  await waitForCard(rep, 'Chen Abroad');
+  const blockPost = st.calls.filter((c) => c.method === 'POST' && c.path === '/rest/v1/brivia_blocks').map((c) => JSON.parse(c.body));
+  check(`Block from the card inserts one brivia_blocks row and advances, with no pass (${JSON.stringify(blockPost)})`, () => { assert.deepEqual(blockPost, [{ blocker_id: ME, blocked_id: B }]); assert.equal(passes().length, interBefore); });
+  const roundButtons = await rep.evaluate(() => document.querySelectorAll('.swipe-actions button').length);
+  check(`no third round action beside Pass and Pitch (${roundButtons} buttons)`, () => assert.equal(roundButtons, 2));
+  await repCtx.close();
 
   // 8. Privacy across the run.
   const storedKeys = await (async () => { const ctx = await makeContext({ width: 800, height: 600 }); const p2 = await open(ctx); await p2.waitForTimeout(800); const keys = await p2.evaluate(() => Object.entries(window.localStorage).map(([k, v]) => `${k}=${v}`)); await ctx.close(); return keys; })();

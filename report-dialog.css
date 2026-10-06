@@ -1,0 +1,50 @@
+/* Report dialog and card overflow (Iteration 4, Task 8). Deep-wine tokens only; 44 px targets; text >= 12 px. */
+.app-view[data-view="home"] .swipe-card-topline .card-more {
+  display: grid; flex: 0 0 44px; width: 44px; height: 44px; margin: -1px -14px -1px 0; padding: 0;
+  place-items: center; border: 0; border-radius: 50%; background: transparent; color: #fffaf1; cursor: pointer;
+}
+.swipe-card-topline .card-more svg { width: 20px; height: 20px; fill: currentColor; }
+.swipe-card-topline .card-more:hover, .swipe-card-topline .card-more[aria-expanded="true"] { background: rgba(255, 250, 241, .16); }
+.card-more:focus-visible, .card-more-menu button:focus-visible, .report-dialog :focus-visible { outline: 2px solid var(--brivia-deep-wine); outline-offset: 2px; }
+.card-more:focus-visible { outline-color: #fffaf1; outline-offset: -4px; }
+.card-more-menu {
+  position: absolute; z-index: 6; top: calc(100% + 4px); right: 0; display: flex; min-width: 168px; flex-direction: column; gap: 2px;
+  padding: 6px; border: 1px solid rgba(67, 4, 22, .16); border-radius: 10px; background: #fffaf1; box-shadow: 0 12px 30px rgba(64, 37, 30, .22);
+}
+.card-more-menu[hidden] { display: none !important; }
+.card-more-menu button {
+  display: block; width: 100%; min-height: 44px; padding: 0 14px; border: 0; border-radius: 7px; background: transparent;
+  color: #291d1b; font-family: inherit; font-size: 14px; text-align: left; cursor: pointer;
+}
+.card-more-menu button:hover { background: #f0e2d5; color: var(--brivia-deep-wine); }
+
+.report-dialog {
+  box-sizing: border-box; width: min(480px, calc(100vw - 32px)); max-height: calc(100dvh - 32px); padding: 0; overflow: auto;
+  border: 1px solid rgba(67, 4, 22, .2); border-radius: 14px; background: #fffaf1; color: #291d1b;
+  box-shadow: 0 24px 60px rgba(64, 37, 30, .35); font-family: 'Instrument Sans', Arial, sans-serif;
+}
+.report-dialog::backdrop { background: rgba(43, 4, 16, .62); }
+.report-form { box-sizing: border-box; display: flex; max-width: 100%; flex-direction: column; gap: 12px; padding: 20px; }
+.report-form h2 { margin: 0; color: var(--brivia-deep-wine); font-family: 'Bodoni Moda', Georgia, serif; font-size: 24px; font-weight: 500; line-height: 1.15; overflow-wrap: anywhere; }
+.report-intro, .report-contact, .report-emergency, .report-error { margin: 0; font-size: 13px; line-height: 1.45; overflow-wrap: anywhere; }
+.report-reasons { min-width: 0; margin: 0; padding: 0; border: 0; }
+.report-reasons legend { padding: 0; margin-bottom: 6px; color: var(--brivia-deep-wine); font-size: 14px; font-weight: 700; overflow-wrap: anywhere; }
+.report-reason { display: flex; min-height: 44px; align-items: center; gap: 12px; padding: 0 8px; border-radius: 8px; font-size: 14px; cursor: pointer; }
+.report-reason:hover { background: #f0e2d5; }
+.report-reason input { flex: 0 0 20px; width: 20px; height: 20px; margin: 0; accent-color: var(--brivia-deep-wine); }
+.report-emergency { padding: 10px 12px; border-left: 3px solid var(--brivia-deep-wine); background: #f0e2d5; color: var(--brivia-deep-wine); }
+.report-emergency[hidden] { display: none; }
+.report-note { font-size: 14px; font-weight: 700; line-height: 1.35; }
+.report-note small { display: block; margin-top: 2px; color: #6b5a54; font-size: 12px; font-weight: 400; }
+.report-form textarea { box-sizing: border-box; width: 100%; min-height: 88px; padding: 10px 12px; border: 1px solid rgba(67, 4, 22, .32); border-radius: 8px; background: #fff; color: #291d1b; font: inherit; font-size: 16px; resize: vertical; }
+.report-error { min-height: 0; color: var(--brivia-deep-wine); font-weight: 700; }
+.report-error:empty { display: none; }
+.report-contact { color: #6b5a54; }
+.report-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 10px; }
+.report-actions button { min-width: 44px; min-height: 44px; padding: 0 18px; border-radius: 99px; font: inherit; font-size: 14px; font-weight: 700; cursor: pointer; }
+.report-cancel { border: 1px solid rgba(67, 4, 22, .32); background: transparent; color: var(--brivia-deep-wine); }
+.report-submit { border: 0; background: var(--brivia-deep-wine); color: #fffaf1; }
+.report-submit:hover:not(:disabled) { background: var(--brivia-wine); }
+.report-submit:disabled { opacity: .6; cursor: progress; }
+@media (max-width: 420px) { .report-actions button { flex: 1 1 140px; } }
+@media (prefers-reduced-motion: reduce) { .report-dialog, .report-dialog * { transition: none !important; animation: none !important; } }

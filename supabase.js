@@ -299,6 +299,8 @@ export const onboardingStatus = async () => {
 //                  'signal_quota_exhausted' or 'signal_live_cap' (not charged).
 //   fetchSignalQuota -> { daily_limit, remaining, resets_at, live_unanswered, live_limit }.
 const firstRow = (result) => ({ ...result, data: Array.isArray(result.data) ? result.data[0] || null : result.data || null });
+// R4: report_member always blocks reporter -> target on the server too. Resolves { error, status } (PT429 = report cap).
+export const reportMember = (target, reason, note = null) => rpcCall('report_member', { p_target: target, p_reason: reason, p_note: note || null });
 export const sendSignal = async (to, note = null) => firstRow(await rpcCall('send_signal', { p_to: to, p_note: note || null }));
 export const fetchSignalQuota = async () => firstRow(await rpcCall('my_signal_quota', {}));
 

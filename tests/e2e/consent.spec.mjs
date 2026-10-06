@@ -574,6 +574,7 @@ try {
     if (pathName === '/rest/v1/brivia_messages') return json(200, method === 'GET' ? kitMessages : []);
     // The block already exists (e.g. blocked from another device): the insert hits the primary key.
     if (pathName === '/rest/v1/brivia_blocks' && method === 'POST') return json(409, { code: '23505', message: 'duplicate key value violates unique constraint "brivia_blocks_pkey"', details: null, hint: null });
+    if (pathName === '/rest/v1/rpc/report_member') return route.fulfill({ status: 204, body: '', headers: { 'access-control-allow-origin': '*' } });
     if (pathName === '/rest/v1/rpc/send_signal') {
       if (hard.holdInsert) await hard.holdInsert;
       if (hard.failInsert) return json(500, { code: 'XX000', message: 'stub failure' });
@@ -883,6 +884,30 @@ try {
     assert.equal(blockPosts.length, 1);
     assert.ok(!/on_conflict/.test(blockPosts[0].search) && !/resolution=/.test(blockPosts[0].prefer));
   });
+  // 8h. Iteration 4, Task 8 (R4): "Report and block" in the chat ••• menu, after "Block user".
+  await hardPage.evaluate(([key]) => window.localStorage.removeItem(key), [`brivia-blocked-users:${ME}`]);
+  await hardPage.evaluate((id) => { document.querySelector(`[data-chat-id="${id}"]`)?.click(); }, KIT);
+  await hardPage.waitForSelector('#chat-more', { timeout: 8000 });
+  await hardPage.evaluate(() => document.querySelector('#chat-more')?.click());
+  const chatItems = await hardPage.evaluate(() => [...document.querySelectorAll('#chat-more-menu button')].map((b) => b.textContent.trim()));
+  check(`chat menu lists "Report and block" after "Block user" (${JSON.stringify(chatItems)})`, () => {
+    assert.ok(chatItems.indexOf('Report and block') > chatItems.indexOf('Block user') && chatItems.indexOf('Block user') >= 0);
+  });
+  await hardPage.evaluate(() => document.querySelector('#chat-more-menu [data-chat-action="report"]')?.click());
+  await hardPage.waitForSelector('dialog.report-dialog[open]', { timeout: 5000 }).catch(() => {});
+  await hardPage.locator('dialog.report-dialog input[value="explicit"]').check().catch(() => {});
+  await hardPage.locator('dialog.report-dialog textarea').fill('sent a photo').catch(() => {});
+  await hardPage.locator('[data-report-submit]').click().catch(() => {});
+  await hardPage.waitForFunction(() => document.querySelector('#chat-window')?.hidden === true, null, { timeout: 5000 }).catch(() => {});
+  const chatReport = hard.calls.filter((c) => c.path === '/rest/v1/rpc/report_member').map((c) => JSON.parse(c.body || '{}'));
+  const chatState = await hardPage.evaluate(([id]) => ({ closed: document.querySelector('#chat-window')?.hidden === true, dialog: Boolean(document.querySelector('dialog.report-dialog[open]')), blocked: Object.entries(window.localStorage).some(([k, v]) => k.startsWith('brivia-blocked-users:') && JSON.parse(v).includes(id)), toast: document.querySelector('#app-toast')?.textContent || '' }), [KIT]);
+  check(`chat: Report and block sends the RPC (${JSON.stringify(chatReport)})`, () => assert.deepEqual(chatReport, [{ p_target: KIT, p_reason: 'explicit', p_note: 'sent a photo' }]));
+  check(`chat: on success the chat closes and the member is blocked locally (${JSON.stringify(chatState)})`, () => { assert.equal(chatState.closed, true); assert.equal(chatState.dialog, false); assert.equal(chatState.blocked, true); assert.match(chatState.toast, /We've received your report, and you won't see Kit Chat again\./); });
+  await hardPage.evaluate(() => { document.querySelector('[data-nav="profile"]')?.click(); });
+  await hardPage.evaluate(() => { document.querySelector('#profile-settings-button')?.click(); document.querySelector('[data-profile-setting="block"]')?.click(); });
+  await hardPage.waitForSelector('#profile-blocked-modal', { timeout: 5000 }).catch(() => {});
+  const blockedNote = await hardPage.evaluate(() => document.querySelector('#profile-blocked-modal')?.textContent || '');
+  check('Blocked users says unblocking does not cancel a report', () => assert.match(blockedNote, /Unblocking doesn't cancel a report you've made\./));
   check('hardening context: no uncaught page errors', () => assert.deepEqual(hardErrors, []));
   await hardContext.close();
 

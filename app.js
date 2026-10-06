@@ -15,7 +15,8 @@ import './chat-sidebar-fix.css';
 import './app-navigation.css';
 import './discovery-filters.css';
 import './mobile-app.css';
-import { supabase, rowToProfile, saveProfile, onboardingStatus, sendSignal, fetchSignalQuota, isRateLimited, isStorageImageUrl, withoutCredentials, uploadMessageAttachment, removeMessageAttachment, uploadCommunityPostImage, removeCommunityPostImage, ImageProcessingError, compressAttachmentFiles, attachmentKind } from './supabase.js';
+import { supabase, rowToProfile, saveProfile, onboardingStatus, sendSignal, fetchSignalQuota, isRateLimited, isStorageImageUrl, withoutCredentials, uploadMessageAttachment, removeMessageAttachment, uploadCommunityPostImage, removeCommunityPostImage, ImageProcessingError, compressAttachmentFiles, attachmentKind, reportMember } from './supabase.js';
+import { openReportDialog, bindCardOverflow, cardOverflowOpen, reportSuccessCopy } from './report-dialog.js';
 import { defaultCoverUrl, normalizeCoverUrl } from './cover-assets.js';
 import { quotaLabel, quotaErrorText, quotaBlocked, quotaNotice } from './signal-quota.js';
 import { pitchLine, deckChips, deckEmptyState, deckFields } from './deck-view.js';
@@ -26,6 +27,7 @@ import './mobile-final-fixes.css';
 import './community-feed.css';
 import './chat-empty-state.css';
 import './deck.css';
+import './report-dialog.css';
 
 document.body.classList.add('app-auth-pending');
 let appBackGuardActive = false;
@@ -508,6 +510,7 @@ const renderHome = (queue = getExplorePeople()) => {
   if (image) { image.src = safeImageUrl(currentPerson.coverUrl) || safeImageUrl(currentPerson.image); image.alt = `${currentPerson.name} cover image`; }
   if (card) card.style.setProperty('--card-avatar-image', `url("${safeImageUrl(currentPerson.image).replace(/["\\\n]/g, encodeURIComponent)}")`);
   const name = document.querySelector('#swipe-name'); if (name) name.textContent = currentPerson.name;
+  document.querySelector('#card-more')?.setAttribute('aria-label', `More options for ${currentPerson.name}`);
   const cardLabel = document.querySelector('#swipe-card-label');
   if (cardLabel) {
     const profileText = `${currentPerson.role || ''} ${currentPerson.lookingFor || ''} ${(currentPerson.tags || []).join(' ')}`.toLowerCase();
@@ -933,6 +936,37 @@ const swipe = (type) => {
   }, 280);
 };
 
+// Report or block from the card (R4). The server already blocked the member (report) or the block flow just did, so the
+// card leaves like a Pass visually but sends no pass interaction.
+const dismissCardLikePass = (person) => {
+  if (deckAdvancing) return;
+  deckAdvancing = true;
+  document.querySelector('#swipe-card')?.classList.add('is-passing');
+  window.setTimeout(async () => {
+    deckAdvancing = false;
+    consumeCard(person);
+    if (currentPerson && String(currentPerson.id) === String(person.id)) currentPerson = null;
+    renderExplore();
+    if (!deckPeople().length) await refillDeck();
+  }, 280);
+};
+bindCardOverflow(async (action, trigger) => {
+  const person = currentPerson;
+  if (!person || deckAdvancing || pitchSheetVisible()) return;
+  if (action === 'report') {
+    const reported = await openReportDialog({ name: person.name, trigger, send: (reason, note) => reportMember(person.id, reason, note) });
+    if (!reported) return;
+    hideReportedMember(person);
+    showToast(reportSuccessCopy(person.name));
+    dismissCardLikePass(person);
+    return;
+  }
+  if (!window.confirm(`Block ${person.name}? You won't see them in your deck again.`)) return;
+  if (!await blockMember(person)) return;
+  showToast(`${person.name} is blocked.`);
+  dismissCardLikePass(person);
+});
+
 const exploreCoverImages = [
   './assets/chat-reference-room.png',
   './assets/macbook-roses-cream.png',
@@ -1342,9 +1376,33 @@ const closeSelectedChat = () => {
   renderChats();
   suppressChatAutoOpen = false;
 };
+// The one block flow: the remote row, then the local blocked-ids store. Shared by the chat menu and the card overflow.
+const blockMember = async (person) => {
+  const remoteResult = await saveRemoteBlock(person.id, true);
+  if (remoteResult.error) { showToast(blockedDatabaseMessage(remoteResult.error)); return false; }
+  const blockedIds = readBlockedUserIds();
+  blockedIds.add(String(person.id));
+  if (!saveBlockedUserIds(blockedIds)) { showToast('Could not block this user. Please try again.'); return false; }
+  return true;
+};
+// R4: report_member blocks on the server as well, so on success the member is hidden locally exactly like a block.
+const hideReportedMember = (person) => {
+  const blockedIds = readBlockedUserIds();
+  blockedIds.add(String(person.id));
+  saveBlockedUserIds(blockedIds);
+  readChatIds.delete(person.id);
+};
 const completeChatAction = async (action) => {
   const person = selectedChat;
   if (!person) return;
+  if (action === 'report') {
+    const reported = await openReportDialog({ name: person.name, trigger: document.querySelector('#chat-more'), send: (reason, note) => reportMember(person.id, reason, note) });
+    if (!reported) return;
+    hideReportedMember(person);
+    closeSelectedChat();
+    showToast(reportSuccessCopy(person.name));
+    return;
+  }
   if (action === 'unblock') {
     const remoteResult = await saveRemoteBlock(person.id, false);
     if (remoteResult.error) { showToast(blockedDatabaseMessage(remoteResult.error)); return; }
@@ -1375,11 +1433,7 @@ const completeChatAction = async (action) => {
   const label = action === 'block' ? `Block ${person.name}? The conversation will stay here.` : `Delete your chat with ${person.name} from this device?`;
   if (!window.confirm(label)) return;
   if (action === 'block') {
-    const remoteResult = await saveRemoteBlock(person.id, true);
-    if (remoteResult.error) { showToast(blockedDatabaseMessage(remoteResult.error)); return; }
-    const blockedIds = readBlockedUserIds();
-    blockedIds.add(String(person.id));
-    if (!saveBlockedUserIds(blockedIds)) { showToast('Could not block this user. Please try again.'); return; }
+    if (!await blockMember(person)) return;
     readChatIds.delete(person.id);
     renderChats();
     renderMessages();
@@ -1396,7 +1450,7 @@ const completeChatAction = async (action) => {
 const ensureChatMoreMenu = () => {
   const header = document.querySelector('.chat-window-head');
   if (!header) return;
-  if (!document.querySelector('#chat-more')) header.insertAdjacentHTML('beforeend', '<button class="chat-more" id="chat-more" type="button" aria-label="More chat options" aria-expanded="false">•••</button><div class="chat-more-menu" id="chat-more-menu" hidden><button type="button" data-chat-action="delete">Delete chat</button><button type="button" data-chat-action="remove-connection">Remove connection</button><button type="button" data-chat-action="block">Block user</button></div>');
+  if (!document.querySelector('#chat-more')) header.insertAdjacentHTML('beforeend', '<button class="chat-more" id="chat-more" type="button" aria-label="More chat options" aria-expanded="false">•••</button><div class="chat-more-menu" id="chat-more-menu" hidden><button type="button" data-chat-action="delete">Delete chat</button><button type="button" data-chat-action="remove-connection">Remove connection</button><button type="button" data-chat-action="block">Block user</button><button type="button" data-chat-action="report">Report and block</button></div>');
   const more = document.querySelector('#chat-more');
   const menu = document.querySelector('#chat-more-menu');
   const actionButton = menu?.querySelector('[data-chat-action="block"], [data-chat-action="unblock"]');
@@ -1581,6 +1635,7 @@ const openBlockedUsersManager = () => {
     <p class="profile-edit-kicker">THE BRIVIA CLUB / SETTINGS</p>
     <h2 id="profile-settings-title">Blocked <em>users.</em></h2>
     <p class="profile-settings-note">Manage members you have blocked from starting new conversations.</p>
+    <p class="profile-settings-note">Unblocking doesn't cancel a report you've made.</p>
     <div class="profile-block-user-list"></div>
     <p class="profile-settings-feedback" role="status"></p>
   </div>`;
@@ -2347,7 +2402,7 @@ document.addEventListener('keydown', (event) => {
   if (event.key === 'Escape') { closeOverlays(); closeDiscoveryFilters(); }
   // A like now sends a connection request, so arrow keys must not fire it while typing or with a dialog open.
   const typing = event.target?.closest?.('input, textarea, select, [contenteditable="true"]');
-  const dialogOpen = overlayIds.some((id) => !document.querySelector(`#${id}`)?.hidden) || document.querySelector('#public-profile-modal');
+  const dialogOpen = overlayIds.some((id) => !document.querySelector(`#${id}`)?.hidden) || document.querySelector('#public-profile-modal') || document.querySelector('dialog[open]') || cardOverflowOpen();
   if (typing || dialogOpen || !['home', 'explore'].includes(document.body.dataset.appView)) return;
   if (event.key === 'ArrowRight') swipe('like');
   if (event.key === 'ArrowLeft') swipe('pass');

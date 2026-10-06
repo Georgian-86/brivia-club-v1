@@ -236,6 +236,30 @@ From a member's point of view (D-015..D-018):
 - Chat: choosing a video shows "Videos can include the place they were filmed. Send only if you're comfortable sharing that." inline above the composer, before Send; hidden for other attachments.
 - Replacing a profile photo or cover removes the previous object only if it is the member's own file in the same bucket (never a preset cover or another member's path); its error is ignored.
 
+### F. Report a member (R4, Iteration 4)
+
+- **Placement.** The card's top strip carries a real overflow button (`#card-more`, 44x44, `aria-haspopup="menu"`,
+  `aria-label="More options for {name}"`) whose menu has **Report** and **Block**. There is no third round button beside
+  Pass and Pitch. Block from the card reuses the one block flow (`blockMember`, same `brivia_blocks` insert and local
+  store as the chat) and asks to confirm. In chat the `...` menu gains **Report and block** after "Block user".
+- **Menu behaviour.** Enter/click opens and focuses the first item; Up/Down move; Escape or Tab closes; Escape returns
+  focus to the button. Arrow-key swiping is off while a menu or dialog is open.
+- **Dialog.** A real `<dialog>` (`showModal`) in `report-dialog.js`: title "Report {name}", a `fieldset`/`legend` of seven
+  reasons, an optional note (`maxlength` 500), "Report and block", Cancel. Escape or Cancel closes with nothing sent; Tab
+  wraps inside; focus returns to the trigger. Targets are at least 44 px, text at least 12 px, no horizontal scroll at 375 px.
+- **Copy.** Reasons: Harassment or hate (`harassment`), Sexual or explicit content (`explicit`), Spam or scam (`spam`),
+  Fake profile or impersonation (`fake`), May be under 18 (`underage`), I feel unsafe or threatened (`safety`),
+  Something else (`other`). Note label "Anything else we should know? (optional)" with "Kept for up to a year so we can
+  review it." Safety and underage show "If anyone is in immediate danger, call 112." Always: "Urgent? Email
+  thebrivia.club@gmail.com". Submitting with no reason shows "Choose a reason to continue."
+- **Outcomes.** Success: the dialog closes, the toast says "Thanks. We've received your report, and you won't see {name}
+  again.", the member is added to the local blocked ids (the server already blocked), and from the deck the card leaves
+  like a Pass with **no** pass interaction POST; from chat the chat closes. Cap (HTTP 429 / `PT429` `report_cap`):
+  "You've sent several reports today. For anything urgent, email thebrivia.club@gmail.com." in `role="alert"`, the dialog
+  and card stay. Other errors keep the dialog open with a retry message.
+- **Blocked users** (Profile settings) adds "Unblocking doesn't cancel a report you've made."
+- **Verified by** `tests/e2e/deck.spec.mjs` (section 7b) and `tests/e2e/consent.spec.mjs` (8h).
+
 ## Verification (webapp-testing skill)
 
 Use Playwright against `npm run dev`:
