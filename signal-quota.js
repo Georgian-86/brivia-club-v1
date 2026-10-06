@@ -2,15 +2,23 @@
 // lives only on the server (my_signal_quota(), send_signal) and in memory for the current page.
 //
 // quota = { remaining, resets_at, live_unanswered?, live_limit? } as my_signal_quota() / send_signal return it.
-// resets_at is already rounded up to the hour by the server; it is shown as-is, in the member's local time.
+// resets_at is already rounded up to the hour by the server; it is shown in the member's local time as a plain hour
+// ("3 PM", hour: 'numeric'). Minutes appear only for a time that is not on the hour (the server never sends one).
 
 const DEFAULT_LIVE_LIMIT = 100;
+const DEFAULT_DAILY_LIMIT = 30;
 
 export const resetTimeLabel = (resetsAt) => {
   if (!resetsAt) return '';
   const date = new Date(resetsAt);
   if (Number.isNaN(date.getTime())) return '';
-  return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  const options = date.getMinutes() === 0 ? { hour: 'numeric' } : { hour: 'numeric', minute: '2-digit' };
+  return date.toLocaleTimeString([], options);
+};
+
+const dailyLimit = (quota) => {
+  const limit = Number(quota?.daily_limit);
+  return Number.isFinite(limit) && limit > 0 ? limit : DEFAULT_DAILY_LIMIT;
 };
 
 const liveLimit = (quota) => {
@@ -28,17 +36,18 @@ export const quotaBlocked = (quota) => {
   return null;
 };
 
-// The counter line: "N signals left today", "1 signal left today", or "0 signals left · more at HH:MM" at 0.
+// The counter line (iteration 3 R7): "N of 30 signals left · 24-hour window" (30 = daily_limit from my_signal_quota),
+// and at 0 "Your next signal frees up at 3 PM". Without a reset time it never invents one.
 export const quotaLabel = (quota) => {
   const blocked = quotaBlocked(quota);
   if (!quota || !Number.isFinite(Number(quota.remaining))) return '';
+  if (blocked === 'live') return `You have ${liveLimit(quota)} signals waiting for an answer`;
   if (blocked === 'daily') {
     const time = resetTimeLabel(quota.resets_at);
-    return time ? `0 signals left · more at ${time}` : '0 signals left today';
+    if (time) return `Your next signal frees up at ${time}`;
   }
-  if (blocked === 'live') return `You have ${liveLimit(quota)} signals waiting for an answer`;
-  const remaining = Number(quota.remaining);
-  return `${remaining} ${remaining === 1 ? 'signal' : 'signals'} left today`;
+  const remaining = Math.max(Number(quota.remaining), 0);
+  return `${remaining} of ${dailyLimit(quota)} signals left · 24-hour window`;
 };
 
 // The notice beside the deck at a cap (empty when nothing blocks): it says plainly that no signal is left.

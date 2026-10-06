@@ -20,7 +20,6 @@
 .app-view[data-view="explore"] .explore-row-copy{align-self:center}
 .explore-row-name{display:flex;align-items:center;gap:7px}
 .explore-row-name strong{font-size:15px;letter-spacing:-.2px}
-.explore-row-verified{display:grid;width:15px;height:15px;place-items:center;border-radius:50%;background:#5a061f;color:#fffaf1;font-size:9px;font-weight:700}
 .app-view[data-view="explore"] .explore-row-role{margin-top:4px;color:rgba(52,31,28,.62);font-size:11px}
 .explore-row-intent{display:-webkit-box;margin:6px 0 0;overflow:hidden;color:rgba(52,31,28,.78);font-size:11px;line-height:1.35;-webkit-box-orient:vertical;-webkit-line-clamp:1}
 .app-view[data-view="explore"] .explore-row-tags{gap:5px;margin-top:8px}
@@ -234,7 +233,6 @@ body .app-view[data-view="explore"] .explore-card-name h2{
   line-height:1.05;
 }
 body .app-view[data-view="explore"] .explore-card-name > span{color:rgba(51,37,34,.55);font-family:Georgia,'Times New Roman',serif;font-size:11px}
-body .app-view[data-view="explore"] .explore-card-name .explore-row-verified{width:14px;height:14px;flex:0 0 14px;background:#5a061f;color:#fffaf1;font-size:8px}
 body .app-view[data-view="explore"] .explore-card-meta{margin:7px 0 0;color:rgba(51,37,34,.62);font-family:Georgia,'Times New Roman',serif;font-size:11px;font-style:italic}
 body .app-view[data-view="explore"] .explore-card-meta em{padding:0 3px;color:#5a061f;font-style:normal}
 body .app-view[data-view="explore"] .explore-card-intent{display:-webkit-box;margin:14px 0 0;overflow:hidden;color:rgba(51,37,34,.75);font-family:Georgia,'Times New Roman',serif;font-size:12px;line-height:1.42;-webkit-box-orient:vertical;-webkit-line-clamp:2}

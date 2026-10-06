@@ -21,7 +21,7 @@ import { openPrivacyAccount } from './privacy-account.js';
 import { openReportDialog, bindCardOverflow, cardOverflowOpen, reportSuccessCopy } from './report-dialog.js';
 import { defaultCoverUrl, normalizeCoverUrl } from './cover-assets.js';
 import { quotaLabel, quotaErrorText, quotaBlocked, quotaNotice } from './signal-quota.js';
-import { pitchLine, deckChips, deckEmptyState, deckFields } from './deck-view.js';
+import { pitchLine, deckChips, deckEmptyState, deckFields, bandNote } from './deck-view.js';
 import { chatEmojiCategories } from './chat-emoji-data.js';
 import { chatGifCatalog } from './chat-gif-data.js';
 import './chat-attachments.css';
@@ -527,6 +527,12 @@ const renderHome = (queue = getExplorePeople()) => {
     location.hidden = !currentPerson.distanceBand;
     if (currentPerson.distanceBand) location.setAttribute('aria-label', `Distance: ${currentPerson.distanceBand}`);
     else location.removeAttribute('aria-label');
+  }
+  const bandNoteEl = document.querySelector('#swipe-band-note');
+  if (bandNoteEl) {
+    const note = bandNote(currentPerson.distanceBand);
+    bandNoteEl.textContent = note;
+    bandNoteEl.hidden = !note;
   }
   const tags = document.querySelector('#swipe-tags'); if (tags) renderCardChips(tags, currentPerson);
   const count = document.querySelector('#queue-count');

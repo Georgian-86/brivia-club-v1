@@ -28,6 +28,14 @@ export const deckChips = (person) => {
   ];
 };
 
+// The one-line note under a place-name band (iteration 3 R8, iteration 4 R11): a band that is a place, region, country
+// or "Abroad" (anything but "~N km") is not a distance yet, and the note says so. "~3 km" / "~10 km" get no note.
+export const BAND_NOTE = 'Distances appear as your area fills up.';
+export const bandNote = (band) => {
+  const text = typeof band === 'string' ? band.trim() : '';
+  return text && !/^~\s*\d/.test(text) ? BAND_NOTE : '';
+};
+
 // The pitch sheet's starting note (A5: never throws for a missing name, tags or shared list).
 export const pitchLine = (person) => {
   const name = typeof person?.name === 'string' && person.name.trim() ? person.name.trim() : 'there';
@@ -41,7 +49,7 @@ export const pitchLine = (person) => {
 // 'no_members_yet', 'complete_profile') or 'error'. 'caught_up' also covers "members exist, but only far away".
 const EMPTY_STATES = {
   filters: { title: 'No one in this deck matches these filters.', copy: 'Clear them to see everyone in your deck again.', action: 'Clear filters', kind: 'clear-filters' },
-  caught_up: { title: "You're caught up.", copy: "You've met your orbit for today. New people near you show up as they join. Try search to reach further.", action: 'Search members', kind: 'search' },
+  caught_up: { title: "You're caught up.", copy: "You've seen everyone we can show you for now. New people near you show up as they join. Search can reach anyone, anywhere.", action: 'Search members', kind: 'search' },
   no_members_yet: { title: 'Your area is just opening.', copy: 'Brivia Club is new around you. Invite a friend who shares your interests.', action: 'Invite a friend', kind: 'invite' },
   complete_profile: { title: 'Finish your orbit to see people near you.', copy: 'Add your area and place your 20 interest points so we can find your people.', action: 'Finish profile', kind: 'finish-profile' },
   error: { title: 'Your deck could not load.', copy: 'Check your connection and try again.', action: 'Try again', kind: 'retry' },

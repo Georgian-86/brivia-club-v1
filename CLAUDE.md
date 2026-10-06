@@ -60,7 +60,7 @@ npm run build    # production build → dist/
 npm run test:unit  # client helper unit tests (node --test tests/unit/*.test.mjs)
 cd orbit && npm test   # ORBIT engine unit tests (node --test)
 bash supabase/tests/run.sh   # SQL harness: all migrations twice, every *.test.sql, seed + purge
-# e2e (stubbed Supabase; Playwright installed outside the repo, see tests/e2e/README.md):
+# e2e (stubbed Supabase; Playwright and axe-core installed outside the repo, see tests/e2e/README.md):
 PLAYWRIGHT_MODULE=/tmp/pw/node_modules/playwright/index.mjs node tests/e2e/consent.spec.mjs   # also deck.spec.mjs, onboarding.spec.mjs
 ```
 Going live: follow `supabase/migrations/README.md`. 0001–0003 are live and frozen (never edit or re-run them); run the pre-flight checks, enable pg_cron, apply only 0004 and deploy the client together, then seed. Expect the listed advisor warnings for the intended RPCs.

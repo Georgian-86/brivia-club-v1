@@ -22,6 +22,7 @@
 import { spawn } from 'node:child_process';
 import assert from 'node:assert/strict';
 import { fileURLToPath } from 'node:url';
+import { axeViolations, smallText } from './a11y.mjs';
 import path from 'node:path';
 
 const { chromium } = await import(process.env.PLAYWRIGHT_MODULE || 'playwright');
@@ -231,6 +232,14 @@ const closeAndHeader = (page) => page.evaluate(() => {
   const overlap = others.some((o) => o.w && o.h && close.x < o.r && o.x < close.r && close.y < o.b && o.y < close.b);
   return { close, overlap };
 });
+
+// Iteration 4, Task 10 (R11): axe color-contrast and >= 12 px visible text on a signup step, plus the wine step label.
+const a11yStep = async (page, tag) => {
+  const contrast = await axeViolations(page, { rules: ['color-contrast'], include: '.auth-panel', decorative: ['.auth-shell::before'] });
+  check(`${tag}: axe color-contrast has no violations (${contrast.join(' | ')})`, () => assert.deepEqual(contrast, []));
+  const small = await smallText(page, { root: '.auth-panel' });
+  check(`${tag}: visible text is at least 12 px (${small.join(' | ')})`, () => assert.deepEqual(small, []));
+};
 const openSignup = async (page) => {
   await page.goto(`${BASE}/auth.html#signup`, { waitUntil: 'domcontentloaded' });
   await page.waitForSelector('[data-signup-step="1"]:not([hidden])', { timeout: 15000 });
@@ -304,6 +313,23 @@ try {
     check('1440: step 1 holds gender and experience', () => assert.ok(stepOneHasIdentity));
     const noScroll1 = await noHorizontalScroll(page);
     check('1440: page does not scroll sideways (step 1)', () => assert.ok(noScroll1));
+    await a11yStep(page, '1440 step 1');
+    const previewHeadline = await page.evaluate(() => document.querySelector('#community-preview-title')?.textContent.replace(/\s+/g, ' ').trim());
+    check(`1440: the preview headline is "THE KIND OF PEOPLE WE'RE BUILDING FOR." (got "${previewHeadline}")`, () => assert.equal(previewHeadline, "THE KIND OF PEOPLE WE'RE BUILDING FOR."));
+    const stepLabelStyle = await page.evaluate(() => { const el = document.querySelector('[data-signup-step-label]'); const st = getComputedStyle(el); return { color: st.color, size: parseFloat(st.fontSize) }; });
+    check(`1440: the "STEP n OF 4" label is #5e0b28 at 12 px or more (${JSON.stringify(stepLabelStyle)})`, () => { assert.equal(stepLabelStyle.color, 'rgb(94, 11, 40)'); assert.ok(stepLabelStyle.size >= 12); });
+    const counterShown = await page.evaluate(() => { const el = document.querySelector('.auth-step'); return Boolean(el && el.getClientRects().length && getComputedStyle(el).visibility !== 'hidden'); });
+    check('1440: the "01 / 02" counter is hidden during signup', () => assert.equal(counterShown, false));
+    const probeInput = () => page.evaluate(() => { const st = getComputedStyle(document.querySelector('[data-signup-step="1"] input[name="name"]')); return JSON.stringify({ outline: st.outlineStyle, shadow: st.boxShadow, border: st.borderColor }); });
+    await page.evaluate(() => document.querySelector('[data-signup-step="1"] input[name="name"]').blur());
+    await page.waitForTimeout(400);
+    const inputBefore = await probeInput();
+    await page.locator('[data-signup-step="1"] input[name="name"]').focus();
+    await page.waitForTimeout(400);
+    const focusRules = { inputChanges: inputBefore !== await probeInput() };
+    check(`1440: a focused input keeps its focus style (${JSON.stringify(focusRules)})`, () => assert.equal(focusRules.inputChanges, true));
+    const clickFocus = await page.evaluate(() => { const css = [...document.styleSheets].flatMap((sheet) => { try { return [...sheet.cssRules]; } catch { return []; } }).map((r) => r.cssText).filter((t) => /:focus:not\(:focus-visible\)/.test(t)); return { rules: css.length, scopedToControls: css.every((t) => /button|chip|option/.test(t.split('{')[0]) && !/(^|,)\s*(input|textarea|select)\b/.test(t.split('{')[0]) && !/(^|,)\s*\*/.test(t.split('{')[0])) }; });
+    check(`1440: :focus:not(:focus-visible) exists and is scoped to buttons and chips (${JSON.stringify(clickFocus)})`, () => { assert.ok(clickFocus.rules >= 1); assert.equal(clickFocus.scopedToControls, true); });
     await shot(page, 'onboarding-1440-step1-header.png');
     const header1440 = await closeAndHeader(page);
     check(`1440: the close button is 44x44 and overlaps no header control (${JSON.stringify(header1440)})`, () => { assert.ok(header1440.close.w >= 44 && header1440.close.h >= 44); assert.equal(header1440.overlap, false); });
@@ -313,6 +339,7 @@ try {
     const explainerText = (await page.locator('[data-area-explainer]').textContent()).trim();
     const geoCallsBefore = await page.evaluate(() => window.__geoCalls.length);
     check(`1440: step 2 reads "STEP 2 OF 4" (got "${label2}")`, () => assert.match(label2, /^STEP 2 OF 4\b/));
+    await a11yStep(page, '1440 step 2');
     check(`1440: privacy explainer visible before any geolocation call ("${explainerText}")`, () => {
       assert.ok(explainerVisible); assert.match(explainerText, /We keep only a rough ~2 km square, never your exact location\. Other members see a rounded distance or your city, and only once enough people are nearby\./); assert.equal(geoCallsBefore, 0);
     });
@@ -338,6 +365,7 @@ try {
     const label3 = await stepLabel(page);
     check(`1440: step 3 reads "STEP 3 OF 4" (got "${label3}")`, () => assert.match(label3, /^STEP 3 OF 4\b/));
     await page.waitForSelector('#interest-results [data-interest-group]', { state: 'attached' });
+    await a11yStep(page, '1440 step 3');
     const heading3 = (await page.locator('[data-signup-step="3"] .signup-step-heading h2').textContent()).trim();
     check(`1440: step 3 heading is "What you care about" (got "${heading3}")`, () => assert.equal(heading3, 'What you care about'));
     // Escape in the interest search clears it and never leaves the page (the global Escape closes the auth modal).
@@ -482,6 +510,7 @@ try {
     await page.waitForSelector('[data-signup-step="4"]:not([hidden])');
     const label4 = await stepLabel(page);
     check(`1440: step 4 reads "STEP 4 OF 4" (got "${label4}")`, () => assert.match(label4, /^STEP 4 OF 4\b/));
+    await a11yStep(page, '1440 step 4');
     const noScroll4 = await noHorizontalScroll(page);
     check('1440: page does not scroll sideways (step 4)', () => assert.ok(noScroll4));
     const callsBeforeSubmit = stub.calls.length;

@@ -7,6 +7,7 @@ import './deep-wine-theme.css';
 import './auth-polish.css';
 import './mobile-site.css';
 import './mobile-final-fixes.css';
+import './auth-a11y.css';
 import {
   supabase, supabaseReady, saveProfile, compressImageOnly, fileToDataUrl, PHOTO_ERROR_MESSAGE, withoutCredentials, rowToProfile, isRateLimited,
   declareAdult, setHomeLocation, setHomeCity, setMemberInterests, setSensitiveConsent, fetchMyInterests, fetchInterestNodes, searchPlaces, onboardingStatus,

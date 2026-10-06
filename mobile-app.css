@@ -80,7 +80,7 @@
   body.app-body .swipe-card-image{inset:4px;border-radius:12px}
   body.app-body .swipe-card-info{right:16px;bottom:17px;left:16px}
   body.app-body .member-name-row h2{max-width:70vw;overflow:hidden;font-size:28px;text-overflow:ellipsis;white-space:nowrap}
-  body.app-body .member-name-row>span:not(.verified-mark){font-size:14px}
+  body.app-body .member-name-row>span{font-size:14px}
   body.app-body .swipe-card-info>p{font-size:12px}
   body.app-body .member-tags{gap:5px;margin-top:11px}
   body.app-body .member-tags span{max-width:44%;overflow:hidden;padding:6px 8px;font-size:8px;text-overflow:ellipsis;white-space:nowrap}

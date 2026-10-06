@@ -40,6 +40,18 @@ New components reuse these tokens. **No raw hex in new components**, and no new 
 The signup (`auth.html`, `script.js`, `passion-budget.js`) has **4 steps**. The progress reads `STEP n OF 4 · …` and the
 progress bar has `aria-valuemax="4"`. Every step has Back (except step 1); Next validates only its own step.
 
+**Legibility and focus (Iteration 4, Task 10, R11; `auth-a11y.css`, loaded last).** Informative text on the signup is at
+least 12 px (labels, legends, helper copy, buttons, cover captions; the old 8-11 px rules are overridden). The
+`STEP n OF 4` label, the step kickers and the eyebrows are `#5e0b28` (`--brivia-wine`); helper copy is `#5f5651` (about
+6:1 on cream); "ALREADY A MEMBER?" and the photo copy use `--brivia-wine-soft` / wine. At 480 px and below the Back and
+Next buttons stack. `:focus:not(:focus-visible)` drops the outline of **buttons, chips and options only**: inputs,
+selects and textareas keep their focus styles, and keyboard focus (`:focus-visible`) keeps a 2 px wine ring. The
+preview band headline reads **"THE KIND OF PEOPLE WE'RE BUILDING FOR."** (the named example cards are unchanged until the
+founder confirms each person consented; if not, they become unnamed cards labelled "Example"). Verified by
+`onboarding.spec.mjs`: axe `color-contrast` on steps 1-4 and computed font-size >= 12 px for the visible text
+(`tests/e2e/a11y.mjs`; the decorative shimmer `.auth-shell::before` is hidden only while axe runs, because axe cannot read a
+background under a pseudo-element).
+
 1. **The basics** (`STEP 1 OF 4 · THE BASICS`): full name, email, phone, gender and experience. There are no City or
    State inputs; step 2 replaces them. **Iteration 4 (R1): the 18+ confirmation** is the last field, a fieldset above
    Next: a checkbox row at least 44 px tall, **"I confirm I'm 18 or older."**, helper **"Brivia is for adults only. We
@@ -136,11 +148,18 @@ labelled "PRIVATE · ONLY YOU SEE THESE", and the hero and the area stat show th
 - **Worth-the-Distance card:** the same card with a wine-gradient top band reading "WORTH THE DISTANCE · 91%
   RESONANCE" and one extra chip explaining why. Max 2 a day.
 - **The interim deck (shipped in Iteration 3, Task 10; `deck_candidates`, ORBIT_ENGINE §7).**
-  - The card's location line (`#swipe-location`, with an SVG pin) is the server's `distance_band` only. Cards and the
+  - There is **no verified mark** on the card (nobody is verified; `.verified-mark` and the explore equivalent were removed,
+    Iteration 4 R11). The card's location line (`#swipe-location`, with an SVG pin) is the server's `distance_band` only. Cards and the
     public-profile modal ("VIEW PROFILE") never show another member's City, State, cell, km or a match %; the public
     profile shows the band when known and otherwise no location line. (The old `#info-modal` info sheet was never
     opened and was removed in Fix round 1.) The client drops `city` / `state`
     from every other member's row, so no other surface (chat header, lists) can show them either.
+  - Under a **place-name band** (a city, region, country or "Abroad", never "~3 km" or "~10 km") the card shows one line
+    (`#swipe-band-note`): **"Distances appear as your area fills up."** (`bandNote()` in `deck-view.js`).
+  - Pass and Pitch are one SVG glyph each (an X and a check, `aria-hidden`), with `aria-label="Pass"` and
+    `aria-label="Pitch"` (the same word as the "PITCH WITH PURPOSE" hint, never "Connect"). The PASS / PITCH captions
+    are 12 px. All informative deck text is at least 12 px (tags, chips, band, hint, "VIEW PROFILE", kicker); the
+    `focus:not(:focus-visible)` rule is scoped to buttons.
   - The tag row (`#swipe-tags`) starts with up to 2 wine "You both: X" chips (`.chip-shared`, from
     `shared_interests`), then up to 3 profile tags that do not repeat them. Chips wrap, never clip or ellipsize.
     Every label is set as text, never as HTML.
@@ -159,7 +178,7 @@ labelled "PRIVATE · ONLY YOU SEE THESE", and the hero and the area stat show th
   | Cause | Title | Copy | Action |
   |---|---|---|---|
   | filters hide every loaded card | "No one in this deck matches these filters." | "Clear them to see everyone in your deck again." | "Clear filters" |
-  | `caught_up` (also: members exist, but only far away) | "You're caught up." | "You've met your orbit for today. New people near you show up as they join. Try search to reach further." | "Search members" (opens the search box, focused) |
+  | `caught_up` (also: members exist, but only far away) | "You're caught up." | "You've seen everyone we can show you for now. New people near you show up as they join. Search can reach anyone, anywhere." (Iteration 3 R8: the old "met your orbit for today" promised more than the deck can know) | "Search members" (opens the search box, focused) |
   | `no_members_yet` | "Your area is just opening." | "Brivia Club is new around you. Invite a friend who shares your interests." | "Invite a friend" (copies the site link, toast "Link copied") |
   | `complete_profile` | "Finish your orbit to see people near you." | "Add your area and place your 20 interest points so we can find your people." | "Finish profile" (`/auth.html?complete-profile=1`) |
   | the deck could not load | "Your deck could not load." | "Check your connection and try again." | "Try again" |
@@ -172,9 +191,12 @@ labelled "PRIVATE · ONLY YOU SEE THESE", and the hero and the area stat show th
   the only limit left is the signal quota, which keeps the card (below).
 - **Signal counter (Ruling A1, D-026, D-032).** The only signal limit is the server quota from `my_signal_quota()`; the
   old localStorage swipe limit is gone and passes are free.
-  - Normal: "N signals left today".
-  - At 0: "0 signals left · more at HH:MM", from `resets_at` (already rounded to the hour by the server), in the
-    member's local time (Fix round 1, F2: zero is stated plainly).
+  - Normal: **"N of 30 signals left · 24-hour window"** (N = `remaining`, 30 = `daily_limit` from `my_signal_quota()`,
+    30 when a merged `send_signal` result has none). The unit is the rolling window, so there is no singular form.
+  - At 0: **"Your next signal frees up at 3 PM"**, from `resets_at` (already rounded to the hour by the server), in the
+    member's local time with `toLocaleTimeString([], { hour: 'numeric' })`; minutes are added only for a time that is not on
+    the hour (the server never sends one). Without a `resets_at` it reads "0 of 30 signals left · 24-hour window" and never
+    invents a time. The line is at least 12 px in full ink (`--brivia-deep-wine`), not a muted tone.
   - At the live cap: "You have 100 signals waiting for an answer" (the number is `live_limit`).
   - Over a cap (`send_signal` fails with HTTP 429, `signal_quota_exhausted` or `signal_live_cap`), the card is **not**
     consumed and the member sees the honest state above. Nothing else ever fails visibly: every recipient-side outcome
@@ -185,9 +207,9 @@ labelled "PRIVATE · ONLY YOU SEE THESE", and the hero and the area stat show th
     - When the cached quota is at a cap (`remaining` 0, or `live_unanswered` ≥ `live_limit`), a Like first reads
       `my_signal_quota()` again (the cap may have cleared); the quota is also read again whenever the tab becomes
       visible. Still capped: Like sends nothing, opens no pitch sheet and keeps the card. The toast gives the honest cap
-      text ("You've used today's signals. More at HH:MM." or "You have 100 signals waiting for an answer."), and a
+      text ("You've used today's signals. More at 3 PM." or "You have 100 signals waiting for an answer."), and a
       compact notice `#swipe-limit-state` (eyebrow "SIGNALS", SVG clock, no live role: the counter's live region
-      announces the change once) reads "No signals left today. More at HH:MM · Passing is always free." (at the live
+      announces the change once) reads "No signals left today. More at 3 PM · Passing is always free." (at the live
       cap: "You have 100 signals waiting for an answer · Passing is always free."). At 1440 px it shares the hint's
       grid row, so the card never moves under the top bar. The Pitch button gets `aria-disabled="true"`,
       `aria-describedby="swipe-limit-copy"` and a muted token style; it stays focusable and a tap shows the toast.
@@ -297,6 +319,31 @@ From a member's point of view (D-015..D-018):
   text at least 12 px, no horizontal scroll at 375 px; deep-wine tokens; reduced motion respected.
 - **Verified by** `tests/unit/account-deletion.test.mjs` and `tests/e2e/consent.spec.mjs` (section 10).
 
+### H. privacy.html (R10, Iteration 4, Task 10)
+
+A new deep-wine Vite page (`privacy.html`, `privacy.css`, `privacy.js`; `index.html` is untouched). Cream paper, wine
+headings in Bodoni Moda, Instrument Sans body at 17 px (16 px under 480 px), a 720 px column, 44 px links, visible
+focus ring, a skip link, no raw hex outside the token block, reduced motion respected.
+- **Sections in order:** The short version (5 bullets: what we keep, the ~2 km square, private interests never shown,
+  delete or withdraw in Profile, contact) · What we collect · Your area · Private interests · Who sees what · Adults only
+  (18+) · How long we keep things · Deleting your account (what is deleted, what remains: the R5 list, the same strings as the
+  delete dialog) · Where your data lives ("Supabase, Mumbai (ap-south-1), India") · Reports and safety (72 h review of an
+  under-18 report, 112) · Your rights (access, correction, erasure, withdraw consent, grievance, nominee, complaint to the
+  Data Protection Board of India) · Grievance officer (the founder of Brivia Club, thebrivia.club@gmail.com, "We reply
+  within 7 days and resolve within 90 days"). The version line is **"Version 2026-10-05 · effective 5 October 2026"**.
+- **Retention** is a real `<table>` with a `<caption>`, `th scope`, and 15 rows that mirror `purge_expired_requests()` in
+  0005 (likes/passes 180 d; requests, accepts, declines and other events 365 d; impressions 30 d; signal ledger 30 d;
+  location and interest-rewrite logs 24 h; unanswered connection requests 30 d; reports and evidence 365 d; report
+  attempts 30 d; automatic flags 90 d; delete-and-rejoin record 365 d; consent log life + 1 y; career applications 180 d;
+  messages, matches, posts, profile, interests and area for the life of the account; inactive accounts: not deleted
+  automatically yet; backups and platform logs per the host). Under 480 px each row becomes a small card
+  ("How long: ..."), with no sideways scroll at 375 px.
+- **`?deleted=1`** (where `delete_my_account` lands): an empty `role="status"` region is in the page from the start and
+  `privacy.js` fills it with **"Your account and everything in it has been deleted. Sorry to see you go."**
+- **Verified by** `tests/unit/notice-version.test.mjs` (the version in `privacy.html`, `notice-version.js` and
+  `brivia_notice_version()` are equal) and `tests/e2e/consent.spec.mjs` section 11 (375 px, banner, axe default rules,
+  font-size).
+
 ## Verification (webapp-testing skill)
 
 Use Playwright against `npm run dev`:
@@ -304,4 +351,6 @@ Use Playwright against `npm run dev`:
 - the keyboard-only pass through the passion-budget steppers;
 - that geolocation denial falls back to the city picker;
 - that a Worth-the-Distance card renders with its label;
-- that **no network response contains another member's email, phone or coordinates**.
+- that **no network response contains another member's email, phone or coordinates**;
+- axe `color-contrast` on signup steps 1-4 and the deck card, axe's full default rule set on `privacy.html`, and computed
+  font-size >= 12 px on those surfaces (`tests/e2e/a11y.mjs`, axe-core installed outside the repo).

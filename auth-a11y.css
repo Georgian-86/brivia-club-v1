@@ -1,0 +1,70 @@
+/* Signup legibility (Iteration 4, Task 10, R11; UX_SPEC §A). Informative text is at least 12 px with brand-token colours
+   (deep wine on cream, at least 4.5:1). Loaded last; font-size carries !important only because the older mobile rules use it too. Nothing here changes layout
+   except letting captions wrap and stacking the step buttons on narrow screens. */
+body.auth-page .auth-shell {
+  --a11y-wine: #5e0b28;          /* var(--brivia-wine): the step label and eyebrows */
+  --a11y-ink-soft: #5f5651;      /* helper copy on cream, about 6:1 */
+}
+body.auth-page .auth-shell .auth-panel .auth-top-signup,
+body.auth-page .auth-shell .auth-panel .auth-top-signup b,
+body.auth-page .auth-shell .auth-panel .auth-eyebrow,
+body.auth-page .auth-shell .auth-panel .auth-intro,
+body.auth-page .auth-shell .auth-panel .auth-back-trigger,
+body.auth-page .auth-shell .auth-panel .signup-progress,
+body.auth-page .auth-shell .auth-panel .signup-progress span,
+body.auth-page .auth-shell .auth-signup-form label,
+body.auth-page .auth-shell .auth-signup-form legend,
+body.auth-page .auth-shell .auth-signup-form .gender-option span,
+body.auth-page .auth-shell .auth-signup-form .adult-row span,
+body.auth-page .auth-shell .auth-signup-form .signup-step-heading > span,
+body.auth-page .auth-shell .auth-signup-form .signup-step-heading p,
+body.auth-page .auth-shell .auth-signup-form .signup-password-hint,
+body.auth-page .auth-shell .auth-signup-form .interest-help,
+body.auth-page .auth-shell .auth-signup-form .looking-helper,
+body.auth-page .auth-shell .auth-signup-form .interest-group > summary small,
+body.auth-page .auth-shell .auth-signup-form .area-option span,
+body.auth-page .auth-shell .auth-signup-form .photo-copy strong,
+body.auth-page .auth-shell .auth-signup-form .photo-copy small,
+body.auth-page .auth-shell .auth-signup-form .cover-picker-label span,
+body.auth-page .auth-shell .auth-signup-form .cover-picker-label small,
+body.auth-page .auth-shell .auth-signup-form .cover-section-heading h3,
+body.auth-page .auth-shell .auth-signup-form .cover-section-heading span,
+body.auth-page .auth-shell .auth-signup-form .cover-choice span,
+body.auth-page .auth-shell .auth-signup-form .signup-step-actions .auth-secondary,
+body.auth-page .auth-shell .auth-signup-form .signup-step-actions .auth-submit,
+body.auth-page .auth-shell .auth-signup-form .signup-next { font-size: 12px !important; }
+body.auth-page .auth-shell .auth-signup-form .cover-choice.is-selected::after { font-size: 12px !important; }
+/* Colours: the step label, kickers and eyebrows are deep wine; helper copy is darker than the old grey. */
+body.auth-page .auth-shell .auth-panel .signup-progress,
+body.auth-page .auth-shell .auth-panel .signup-progress span,
+body.auth-page .auth-shell .auth-panel .auth-eyebrow,
+body.auth-page .auth-shell .auth-signup-form .signup-step-heading > span,
+body.auth-page .auth-shell .auth-signup-form .cover-picker-label > span { color: var(--a11y-wine); }
+body.auth-page .auth-shell .auth-panel .signup-progress-track span { background: var(--a11y-wine); color: transparent; }
+body.auth-page .auth-shell .auth-signup-form .signup-step-heading p,
+body.auth-page .auth-shell .auth-signup-form .signup-password-hint,
+body.auth-page .auth-shell .auth-signup-form .interest-help,
+body.auth-page .auth-shell .auth-signup-form .looking-helper,
+body.auth-page .auth-shell .auth-panel .auth-intro { color: var(--a11y-ink-soft); }
+body.auth-page .auth-shell .auth-signup-form .cover-choice span { white-space: normal; }
+@media (max-width: 480px) {
+  body.auth-page .auth-shell .auth-signup-form .signup-step-actions { grid-template-columns: 1fr; }
+  body.auth-page .auth-shell .auth-signup-form .signup-step-actions .auth-secondary { width: 100%; white-space: normal; }
+}
+
+/* Focus (A-F12): a mouse click on a button or chip leaves no lingering ring; the keyboard ring (:focus-visible) stays.
+   Scoped to buttons and chips only: inputs, selects and textareas keep their focus styles. */
+body.auth-page .auth-shell :is(button, .chip, .area-option, .interest-chip, .gender-option, .mode-option, summary):focus:not(:focus-visible) { outline: none; }
+body.auth-page .auth-shell :is(button, summary, .area-option, .interest-chip):focus-visible { outline: 2px solid var(--a11y-wine); outline-offset: 2px; }
+
+/* Colours axe measured under 4.5:1 once the decorative shimmer is ignored: all moved to brand tokens. */
+body.auth-page .auth-shell .auth-panel .auth-top-signup { color: var(--brivia-wine-soft); }
+body.auth-page .auth-shell .auth-signup-form .photo-copy strong,
+body.auth-page .auth-shell .auth-signup-form .photo-remove,
+body.auth-page .auth-shell .auth-signup-form .photo-remove span { color: var(--a11y-wine); }
+body.auth-page .auth-shell .auth-signup-form .photo-remove,
+body.auth-page .auth-shell .auth-signup-form .photo-remove span { font-size: 12px !important; }
+body.auth-page .auth-shell .auth-signup-form .photo-copy small,
+body.auth-page .auth-shell .auth-signup-form .cover-picker-label small,
+body.auth-page .auth-shell .auth-signup-form .cover-section-heading span { color: var(--a11y-ink-soft); }
+@media (min-width: 781px) { .community-preview-heading h2 { font-size: clamp(40px, 5.6vw, 84px); } }

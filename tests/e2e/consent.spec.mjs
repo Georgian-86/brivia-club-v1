@@ -19,13 +19,14 @@
 // Final-review fixes (Ruling I11): member images (avatars, covers, post images) render only from the Supabase
 // Storage origin (a third-party https URL never loads); profileToRow sends no created_at; blocking inserts and
 // treats 23505 as success; no password is ever kept in localStorage (a stale cached one is scrubbed on load).
-// Honest signal quota (Iteration 3, Task 9, D-026/D-032): the counter reads my_signal_quota ("30 signals left
-// today", then 29 after one like); at 0 a Like keeps the card, sends nothing and shows "More at HH:MM"; a PT429 race
+// Honest signal quota (Iteration 3, Task 9, D-026/D-032; copy R7, Iteration 4): the counter reads my_signal_quota
+// ("30 of 30 signals left · 24-hour window", then 29 after one like); at 0 a Like keeps the card, sends nothing and shows "More at 3 PM"; a PT429 race
 // puts the card back at the front; passes never call send_signal and nothing is kept in localStorage.
 import { readFileSync } from 'node:fs';
 import { spawn } from 'node:child_process';
 import assert from 'node:assert/strict';
 import { fileURLToPath } from 'node:url';
+import { axeViolations, smallText } from './a11y.mjs';
 import path from 'node:path';
 
 const { chromium } = await import(process.env.PLAYWRIGHT_MODULE || 'playwright');
@@ -963,13 +964,13 @@ try {
   const qSignals = () => q.calls.filter((c) => c.method === 'POST' && c.path === '/rest/v1/rpc/send_signal');
   const qQuotaReads = () => q.calls.filter((c) => c.path === '/rest/v1/rpc/my_signal_quota');
   await quotaPage.waitForFunction(() => document.querySelector('#swipe-card:not([hidden]) #swipe-name')?.textContent?.trim(), null, { timeout: 15000 });
-  await qWaitCounter('30 signals left today');
+  await qWaitCounter('30 of 30 signals left · 24-hour window');
   const firstCounter = await qCounter();
-  check(`quota counter reads "30 signals left today" from my_signal_quota (got "${firstCounter}")`, () => {
-    assert.equal(firstCounter, '30 signals left today');
+  check(`quota counter reads "30 of 30 signals left · 24-hour window" from my_signal_quota (got "${firstCounter}")`, () => {
+    assert.equal(firstCounter, '30 of 30 signals left · 24-hour window');
     assert.ok(qQuotaReads().length >= 1, 'my_signal_quota was not read at boot');
   });
-  const resetLabel = await quotaPage.evaluate((iso) => new Date(iso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }), RESETS_AT);
+  const resetLabel = await quotaPage.evaluate((iso) => new Date(iso).toLocaleTimeString([], { hour: 'numeric' }), RESETS_AT);
   // One like resolves: the counter drops to 29 (the stub decrements) and the quota is read again.
   const readsBefore = qQuotaReads().length;
   await quotaPage.locator('[data-action="like"]').click();
@@ -977,10 +978,10 @@ try {
   await quotaPage.waitForTimeout(500);
   await quotaPage.keyboard.press('Escape');
   await qWaitToast(/Signal sent/);
-  await qWaitCounter('29 signals left today');
+  await qWaitCounter('29 of 30 signals left · 24-hour window');
   const afterOne = await qCounter();
   if (SHOTS) await quotaPage.screenshot({ path: path.join(SHOTS, 'quota-1280-counter.png') });
-  check(`after one like the counter reads "29 signals left today" (got "${afterOne}")`, () => assert.equal(afterOne, '29 signals left today'));
+  check(`after one like the counter reads "29 of 30 signals left · 24-hour window" (got "${afterOne}")`, () => assert.equal(afterOne, '29 of 30 signals left · 24-hour window'));
   check('my_signal_quota is read again after send_signal', () => assert.ok(qQuotaReads().length > readsBefore));
   // F1: a failed signal never loses the person. A 500, then a 429 without a cap message: the card comes back to the
   // front each time, with the retry copy; the unknown 429 also reads the quota again.
@@ -1012,7 +1013,7 @@ try {
     if (flag === 'limitedUnknown') check('a 429 without a cap message reads my_signal_quota again', () => assert.ok(qQuotaReads().length > readsAt));
   }
   // A PT429 race (the cached quota said 29): the card comes back to the front, the honest toast shows, and the
-  // counter refreshes to "0 signals left · more at HH:MM".
+  // counter refreshes to "Your next signal frees up at 3 PM".
   await quotaPage.waitForTimeout(400);
   const raceCard = await qCard();
   q.race = true;
@@ -1031,7 +1032,7 @@ try {
   });
   check(`PT429 shows the honest toast and refreshes the counter (${JSON.stringify(raceState)})`, () => {
     assert.equal(raceState.toast, `You've used today's signals. More at ${resetLabel}.`);
-    assert.equal(raceState.counter, `0 signals left · more at ${resetLabel}`);
+    assert.equal(raceState.counter, `Your next signal frees up at ${resetLabel}`);
   });
   q.race = false;
   // At 0: Like keeps the same card, opens no pitch, sends nothing, and the honest state shows.
@@ -1350,6 +1351,58 @@ try {
   check(`after returning from Google the delete dialog reopens and the marker is consumed (${reopened2}, ${markerAfter})`, () => { assert.equal(reopened2, true); assert.equal(markerAfter, null); });
   check('privacy context (google): no uncaught page errors', () => assert.deepEqual(gg.errors, []));
   await gg.ctx.close();
+
+  // 11. privacy.html (Iteration 4, Task 10, R10): the real page under Vite, no Supabase stub needed. 375 px: no sideways
+  // scroll, the retention table is a stacked list; the ?deleted=1 landing shows a role="status" banner; axe's default
+  // rule set finds nothing; text is at least 12 px; the version and the grievance contact are on the page.
+  const privCtx = await browser.newContext({ viewport: { width: 375, height: 812 } });
+  await privCtx.route((url) => !url.href.startsWith(BASE), (route) => route.abort());
+  const priv = await privCtx.newPage();
+  const privErrors = [];
+  priv.on('pageerror', (error) => privErrors.push(String(error)));
+  await priv.goto(`${BASE}/privacy.html`, { waitUntil: 'domcontentloaded' });
+  await priv.waitForSelector('h1');
+  const page375 = await priv.evaluate(() => ({
+    overflow: document.documentElement.scrollWidth - window.innerWidth,
+    h2: [...document.querySelectorAll('main h2')].map((h) => h.textContent.trim()),
+    caption: document.querySelector('table caption')?.textContent.trim(),
+    rows: document.querySelectorAll('table tbody tr').length,
+    stacked: getComputedStyle(document.querySelector('table tbody td')).display,
+    bodySize: parseFloat(getComputedStyle(document.body).fontSize),
+    banner: document.querySelector('[role="status"]')?.textContent.trim() ?? null,
+    version: document.querySelector('[data-notice-version]')?.textContent.trim(),
+    text: document.body.innerText,
+  }));
+  check(`privacy.html at 375 px: no horizontal scroll (${page375.overflow})`, () => assert.ok(page375.overflow <= 0));
+  check(`privacy.html sections in order (${page375.h2.join(' | ')})`, () => assert.deepEqual(page375.h2, ['The short version', 'What we collect', 'Your area', 'Private interests', 'Who sees what', 'Adults only (18+)', 'How long we keep things', 'Deleting your account', 'Where your data lives', 'Reports and safety', 'Your rights', 'Grievance officer']));
+  check(`privacy.html: the retention table has a caption and stacks under 480 px (${page375.caption}, ${page375.rows} rows, td ${page375.stacked})`, () => { assert.ok(page375.caption); assert.ok(page375.rows >= 14); assert.equal(page375.stacked, 'block'); });
+  check(`privacy.html: body text is 16 px or more (${page375.bodySize})`, () => assert.ok(page375.bodySize >= 16));
+  check('privacy.html without ?deleted=1 shows an empty status region', () => assert.equal(page375.banner, ''));
+  check(`privacy.html: version line, region and grievance contact (${page375.version})`, () => {
+    assert.equal(page375.version, 'Version 2026-10-05 · effective 5 October 2026');
+    for (const needle of ['Supabase, Mumbai (ap-south-1), India', 'thebrivia.club@gmail.com', 'We reply within 7 days and resolve within 90 days', 'Data Protection Board of India', 'The founder of Brivia Club', 'call 112', '72 hours', 'Your messages, which disappear from other people']) assert.ok(page375.text.includes(needle), needle);
+  });
+  const privSmall = await smallText(priv, { root: 'body' });
+  check(`privacy.html: visible text is at least 12 px (${privSmall.join(' | ')})`, () => assert.deepEqual(privSmall, []));
+  const privAxe = await axeViolations(priv);
+  check(`privacy.html: axe (default rule set) finds no violations (${privAxe.join(' | ')})`, () => assert.deepEqual(privAxe, []));
+  if (SHOTS) await priv.screenshot({ path: path.join(SHOTS, 'privacy-375.png'), fullPage: true });
+  await priv.goto(`${BASE}/privacy.html?deleted=1`, { waitUntil: 'domcontentloaded' });
+  await priv.waitForFunction(() => document.querySelector('[role="status"]')?.textContent.trim());
+  const deleted = await priv.evaluate(() => ({ role: document.querySelector('#deleted-banner')?.getAttribute('role'), text: document.querySelector('#deleted-banner')?.textContent.trim(), overflow: document.documentElement.scrollWidth - window.innerWidth }));
+  check(`privacy.html?deleted=1 shows the role="status" banner (${JSON.stringify(deleted)})`, () => {
+    assert.equal(deleted.role, 'status');
+    assert.equal(deleted.text, 'Your account and everything in it has been deleted. Sorry to see you go.');
+    assert.ok(deleted.overflow <= 0);
+  });
+  const deletedAxe = await axeViolations(priv);
+  check(`privacy.html?deleted=1: axe finds no violations (${deletedAxe.join(' | ')})`, () => assert.deepEqual(deletedAxe, []));
+  await priv.setViewportSize({ width: 1440, height: 900 });
+  const wideTable = await priv.evaluate(() => ({ overflow: document.documentElement.scrollWidth - window.innerWidth, display: getComputedStyle(document.querySelector('table tbody tr')).display }));
+  check(`privacy.html at 1440 px: a real table, no horizontal scroll (${JSON.stringify(wideTable)})`, () => { assert.equal(wideTable.display, 'table-row'); assert.ok(wideTable.overflow <= 0); });
+  if (SHOTS) await priv.screenshot({ path: path.join(SHOTS, 'privacy-1440-deleted.png') });
+  check('privacy.html: no uncaught page errors', () => assert.deepEqual(privErrors, []));
+  await privCtx.close();
 } finally {
   await browser?.close();
   try { process.kill(-vite.pid, 'SIGTERM'); } catch { vite.kill('SIGTERM'); }

@@ -153,3 +153,40 @@ body.app-body {
   .swipe-card, .swipe-card.is-passing, .swipe-card.is-liking { transition: opacity .15s !important; transform: none !important; }
   .deck-empty-action { transition: none; }
 }
+
+/* ---- Iteration 4, R11: honesty and legibility on the deck (UX_SPEC §B). Informative text is at least 12 px; the quota
+   line is full ink; Pass/Pitch are SVG glyphs. These come last so they win over the older mobile rules. ---- */
+body.app-body .app-view[data-view="home"] .swipe-card-topline span,
+body.app-body .app-view[data-view="home"] #swipe-location.swipe-band,
+body.app-body .app-view[data-view="home"] .member-tags span,
+body.app-body .app-view[data-view="home"] .member-tags span.chip-shared { font-size: 12px; }
+body.app-body .app-view[data-view="home"] .view-info-button::before { font-size: 12px; }
+.app-view[data-view="home"] .swipe-band-note[hidden] { display: none !important; }
+.app-view[data-view="home"] .swipe-band-note {
+  margin: 2px 0 0;
+  color: var(--dk-soft);
+  font-family: 'Instrument Sans', Arial, sans-serif;
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.35;
+}
+body.app-body .app-view[data-view="home"] .swipe-hint {
+  color: var(--dk-ink);
+  font-size: 12px;
+  line-height: 1.5;
+  letter-spacing: .06em;
+}
+body.app-body .app-view[data-view="home"] .swipe-hint .swipe-left-copy strong { font-size: 12px; letter-spacing: .06em; }
+body.app-body .app-view[data-view="home"] .swipe-action::after { font-size: 12px; letter-spacing: .1em; }
+body.app-body .app-view[data-view="home"] .swipe-action::before { content: none; }
+.swipe-glyph { display: block; width: 30px; height: 30px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.app-view[data-view="home"] .swipe-pass .swipe-glyph { color: #5a061f; }
+.app-view[data-view="home"] .swipe-like .swipe-glyph { color: #fffaf1; }
+.app-view[data-view="home"] .swipe-like.is-capped .swipe-glyph { color: var(--dk-soft); }
+@media (max-width: 560px) { .swipe-glyph { width: 28px; height: 28px; } }
+body.app-body .app-view[data-view="home"] .home-kicker { font-size: 12px; }
+.app-view[data-view="home"] .swipe-pass::after { color: var(--dk-ink); }
+
+/* Focus (A-F12): a mouse click on a button or chip leaves no lingering ring; the keyboard ring (:focus-visible) stays.
+   Scoped to buttons and chips only: inputs and textareas keep their focus styles. */
+body.app-body :is(button, [role="button"], .filter-button, .discovery-filter-suggestion):focus:not(:focus-visible) { outline: none; }

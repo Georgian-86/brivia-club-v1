@@ -26,6 +26,7 @@
 // E2E_SCREENSHOTS=<dir> saves 375 px and 1440 px screenshots: card with band and chips (with the quota counter), the
 // zero-quota state, and the caught-up and no-members-yet empty states.
 import { readFileSync } from 'node:fs';
+import { axeViolations, smallText } from './a11y.mjs';
 import { spawn } from 'node:child_process';
 import assert from 'node:assert/strict';
 import { fileURLToPath } from 'node:url';
@@ -184,14 +185,14 @@ try {
   const wide = await makeContext({ width: 1440, height: 900 });
   let page = await open(wide);
   await waitForCard(page, 'Asha Band');
-  await page.waitForFunction(() => document.querySelector('#swipe-left-count')?.textContent?.trim() === '30 signals left today', null, { timeout: 5000 }).catch(() => {});
+  await page.waitForFunction(() => document.querySelector('#swipe-left-count')?.textContent?.trim() === '30 of 30 signals left · 24-hour window', null, { timeout: 5000 }).catch(() => {});
   let card = await cardState(page);
   check(`card 1 shows the band "~3 km" (got "${card.band}")`, () => { assert.equal(card.band, '~3 km'); assert.equal(card.bandHidden, false); });
   check(`card 1 shows 2 "You both" chips then up to 3 tags (${JSON.stringify(card.chips)})`, () => {
     assert.deepEqual(card.shared, ['You both: Badminton', 'You both: Chess']);
     assert.deepEqual(card.chips, ['You both: Badminton', 'You both: Chess', 'Long-distance running', 'Poetry', 'Jazz piano']);
   });
-  check(`the quota counter shows under the deck (got "${card.counter}")`, () => assert.equal(card.counter, '30 signals left today'));
+  check(`the quota counter shows under the deck (got "${card.counter}")`, () => assert.equal(card.counter, '30 of 30 signals left · 24-hour window'));
   check('the deck loads from rpc/deck_candidates { p_limit: 12 } and never rpc/list_members', () => {
     assert.ok(deckCalls().length >= 1);
     deckCalls().forEach((c) => assert.deepEqual(JSON.parse(c.body || '{}'), { p_limit: 12 }));
@@ -202,6 +203,38 @@ try {
   await shot(page, 'deck-1440-card-band-chips.png');
   let text = await pageText(page);
   check('card 1: the page never shows the stub City/State', () => assert.ok(!LEAK_RE.test(text)));
+  // Iteration 4, Task 10 (R11): honesty, glyphs, contrast, 12 px.
+  const glyphs = await page.evaluate(() => {
+    const pass = document.querySelector('[data-action="pass"]');
+    const like = document.querySelector('[data-action="like"]');
+    return {
+      verified: document.querySelectorAll('.verified-mark').length,
+      passLabel: pass?.getAttribute('aria-label'), likeLabel: like?.getAttribute('aria-label'),
+      passSvg: Boolean(pass?.querySelector('svg[aria-hidden="true"]')), likeSvg: Boolean(like?.querySelector('svg[aria-hidden="true"]')),
+      passText: pass?.textContent.trim(), likeText: like?.textContent.trim(),
+      passBefore: getComputedStyle(pass, '::before').content, likeBefore: getComputedStyle(like, '::before').content,
+      hintText: document.querySelector('.swipe-hint')?.textContent || '',
+    };
+  });
+  check(`no verified mark on the card (${glyphs.verified})`, () => assert.equal(glyphs.verified, 0));
+  check(`Pass and Pitch are SVG glyphs with aria-label "Pass" / "Pitch", no text glyphs (${JSON.stringify(glyphs)})`, () => {
+    assert.equal(glyphs.passLabel, 'Pass'); assert.equal(glyphs.likeLabel, 'Pitch');
+    assert.ok(glyphs.passSvg && glyphs.likeSvg);
+    assert.equal(glyphs.passText, ''); assert.equal(glyphs.likeText, '');
+    assert.ok(['none', 'normal', '""'].includes(glyphs.passBefore) && ['none', 'normal', '""'].includes(glyphs.likeBefore), 'no text glyph in ::before');
+    assert.match(glyphs.hintText, /PITCH WITH PURPOSE/);
+  });
+  const bandNote = (p) => p.evaluate(() => { const el = document.querySelector('#swipe-band-note'); return { text: el?.textContent.trim() || '', visible: Boolean(el && !el.hidden && el.getClientRects().length) }; });
+  const note1 = await bandNote(page);
+  check(`a "~3 km" band has no area-filling note (${JSON.stringify(note1)})`, () => assert.equal(note1.visible, false));
+  const deckContrast = await axeViolations(page, { rules: ['color-contrast'], include: '#swipe-card', decorative: ['.swipe-card-info::before'] });
+  check(`axe color-contrast: the deck card has no violations (${deckContrast.join(' | ')})`, () => assert.deepEqual(deckContrast, []));
+  const deckContrastAll = await axeViolations(page, { rules: ['color-contrast'], include: '.app-view[data-view="home"]' });
+  check(`axe color-contrast: the whole deck view has no violations (${deckContrastAll.join(' | ')})`, () => assert.deepEqual(deckContrastAll, []));
+  const deckSmall = await smallText(page, { root: '.app-view[data-view="home"]' });
+  check(`deck: visible text is at least 12 px (${deckSmall.join(' | ')})`, () => assert.deepEqual(deckSmall, []));
+  const quotaStyle = await page.evaluate(() => { const el = document.querySelector('#swipe-left-count'); const s = getComputedStyle(el); return { size: parseFloat(s.fontSize), color: s.color }; });
+  check(`the quota line is at least 12 px in full ink (${JSON.stringify(quotaStyle)})`, () => { assert.ok(quotaStyle.size >= 12); assert.equal(quotaStyle.color, 'rgb(67, 4, 22)'); });
   // The public-profile modal: the band, never a City/State.
   await page.locator('[data-action="full-info"]').click();
   await page.waitForSelector('#public-profile-modal');
@@ -219,14 +252,25 @@ try {
   check(`Pass sends one POST /rest/v1/interaction with event 'pass' (${JSON.stringify(passBodies)})`, () => assert.deepEqual(passBodies, [{ viewer_id: ME, target_id: A, event: 'pass' }]));
   card = await cardState(page);
   check(`card 2 shows "Pune" and "You both: Badminton" (${JSON.stringify(card)})`, () => { assert.equal(card.band, 'Pune'); assert.deepEqual(card.shared, ['You both: Badminton']); });
+  const noteText = 'Distances appear as your area fills up.';
+  const note2 = await bandNote(page);
+  check(`under the place band "Pune" the note reads "${noteText}" (${JSON.stringify(note2)})`, () => { assert.equal(note2.text, noteText); assert.equal(note2.visible, true); });
+  const noteContrast = await axeViolations(page, { rules: ['color-contrast'], include: '#swipe-card', decorative: ['.swipe-card-info::before'] });
+  check(`axe color-contrast: the place-band card has no violations (${noteContrast.join(' | ')})`, () => assert.deepEqual(noteContrast, []));
+  const noteSmall = await smallText(page, { root: '#swipe-card' });
+  check(`the place-band card text is at least 12 px (${noteSmall.join(' | ')})`, () => assert.deepEqual(noteSmall, []));
   await page.locator('[data-action="pass"]').click();
   await waitForCard(page, 'Chen Abroad');
   card = await cardState(page);
   check(`card 3 shows "Abroad" and "You both: Badminton" (${JSON.stringify(card)})`, () => { assert.equal(card.band, 'Abroad'); assert.deepEqual(card.shared, ['You both: Badminton']); });
+  const note3 = await bandNote(page);
+  check(`under "Abroad" the area-filling note shows too (${JSON.stringify(note3)})`, () => { assert.equal(note3.text, noteText); assert.equal(note3.visible, true); });
   text = await pageText(page);
   check('cards 2-3: the page never shows the stub City/State', () => assert.ok(!LEAK_RE.test(text)));
   await page.locator('[data-action="pass"]').click();
   await waitForCard(page, 'Dana Blank');
+  const note4 = await bandNote(page);
+  check(`a "~10 km" band has no area-filling note (${JSON.stringify(note4)})`, () => assert.equal(note4.visible, false));
 
   // 3. A5: Like on a card with no tags and no shared interests opens the pitch with the neutral line.
   const errorsBefore = pageErrors.length;
@@ -254,6 +298,7 @@ try {
   check(`when the deck empties, focus moves to the empty-state title (focused "${caught.focused}")`, () => { assert.equal(caught.focused, 'deck-empty-title'); assert.equal(caught.titleTabindex, '-1'); });
   check(`caught up: the copy and one "Search members" action (${JSON.stringify(caught)})`, () => {
     assert.match(caught.copy, /New people near you show up as they join\./);
+    assert.ok(!/met your orbit/i.test(caught.copy), 'the old promise copy is gone (iteration 3 R8)');
     assert.equal(caught.action, 'Search members');
     assert.equal(caught.buttons, 1);
   });
@@ -458,8 +503,8 @@ try {
   });
   const zero = await zeroState(small);
   check(`375 px zero quota: plain copy, no horizontal scroll (${JSON.stringify(zero)})`, () => {
-    assert.match(zero.text, /^No signals left today\. More at .+ · Passing is always free\.$/);
-    assert.match(zero.hint, /^0 signals left · more at .+$/);
+    assert.match(zero.text, /^No signals left today\. More at \d{1,2}(:\d\d)? ?[AP]M · Passing is always free\.$/i);
+    assert.match(zero.hint, /^Your next signal frees up at \d{1,2}(:\d\d)? ?[AP]M$/i);
     assert.ok(zero.overflow <= 1);
   });
   check(`zero quota: Pitch is aria-disabled, described by the notice and still focusable; the notice has no role=status (${JSON.stringify(zero)})`, () => {

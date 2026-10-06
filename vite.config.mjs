@@ -11,6 +11,7 @@ export default defineConfig({
         chat: 'chat.html',
         profile: 'profile.html',
         careers: 'careers.html',
+        privacy: 'privacy.html',
       },
     },
   },

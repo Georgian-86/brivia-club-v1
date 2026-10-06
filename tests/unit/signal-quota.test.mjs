@@ -4,24 +4,32 @@ import assert from 'node:assert/strict';
 import { quotaLabel, quotaErrorText, quotaBlocked, resetTimeLabel, quotaNotice } from '../../signal-quota.js';
 
 const RESETS = '2026-10-03T15:00:00Z';
-const localTime = new Date(RESETS).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+// R7 (iteration 3): the reset time is shown as a plain hour ("3 PM"), in the member's local time. The server rounds
+// resets_at up to the hour; a time that is not on the hour (never expected) keeps its minutes.
+const localTime = new Date(RESETS).toLocaleTimeString([], { hour: 'numeric' });
 
-test('quotaLabel: 30 left reads "30 signals left today"', () => {
-  assert.equal(quotaLabel({ remaining: 30, resets_at: null }), '30 signals left today');
+test('quotaLabel: normal state reads "N of 30 signals left · 24-hour window" (30 = the quota\'s daily_limit)', () => {
+  assert.equal(quotaLabel({ remaining: 30, daily_limit: 30, resets_at: null }), '30 of 30 signals left · 24-hour window');
+  assert.equal(quotaLabel({ remaining: 12, daily_limit: 30, resets_at: RESETS }), '12 of 30 signals left · 24-hour window');
+  assert.equal(quotaLabel({ remaining: 7, daily_limit: 20, resets_at: RESETS }), '7 of 20 signals left · 24-hour window', 'the limit comes from the quota object');
 });
 
-test('quotaLabel: 1 left is singular', () => {
-  assert.equal(quotaLabel({ remaining: 1, resets_at: RESETS }), '1 signal left today');
+test('quotaLabel: a quota without daily_limit (send_signal result merged early) falls back to 30', () => {
+  assert.equal(quotaLabel({ remaining: 29, resets_at: RESETS }), '29 of 30 signals left · 24-hour window');
 });
 
-test('quotaLabel: 0 left says so plainly: "0 signals left · more at HH:MM" in local time', () => {
-  const label = quotaLabel({ remaining: 0, resets_at: RESETS });
-  assert.match(label, /more at/);
-  assert.equal(label, `0 signals left · more at ${localTime}`);
+test('quotaLabel: 1 left stays "1 of 30 signals left" (the unit is the window, not the count)', () => {
+  assert.equal(quotaLabel({ remaining: 1, daily_limit: 30, resets_at: RESETS }), '1 of 30 signals left · 24-hour window');
+});
+
+test('quotaLabel: 0 left says "Your next signal frees up at 3 PM" in local time, hour numeric', () => {
+  const label = quotaLabel({ remaining: 0, daily_limit: 30, resets_at: RESETS });
+  assert.equal(label, `Your next signal frees up at ${localTime}`);
+  assert.doesNotMatch(label, /:\d\d/, 'on the hour: no minutes');
 });
 
 test('quotaLabel: 0 left without a reset time never invents one', () => {
-  assert.equal(quotaLabel({ remaining: 0, resets_at: null }), '0 signals left today');
+  assert.equal(quotaLabel({ remaining: 0, daily_limit: 30, resets_at: null }), '0 of 30 signals left · 24-hour window');
 });
 
 test('quotaNotice: the zero-quota notice beside the deck', () => {
@@ -76,8 +84,10 @@ test('quotaBlocked: daily at 0, live at the live cap, otherwise null', () => {
   assert.equal(quotaBlocked(null), null, 'an unknown quota never blocks: the server decides');
 });
 
-test('resetTimeLabel: local HH:MM, empty for a missing or bad value', () => {
+test('resetTimeLabel: local hour ("3 PM"), minutes only when not on the hour, empty for a missing or bad value', () => {
   assert.equal(resetTimeLabel(RESETS), localTime);
+  const offHour = '2026-10-03T15:30:00Z';
+  assert.equal(resetTimeLabel(offHour), new Date(offHour).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }));
   assert.equal(resetTimeLabel(null), '');
   assert.equal(resetTimeLabel('not a date'), '');
 });
