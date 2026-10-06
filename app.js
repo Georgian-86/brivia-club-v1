@@ -15,7 +15,7 @@ import './chat-sidebar-fix.css';
 import './app-navigation.css';
 import './discovery-filters.css';
 import './mobile-app.css';
-import { supabase, rowToProfile, saveProfile, onboardingStatus, sendSignal, fetchSignalQuota, isRateLimited, isStorageImageUrl, withoutCredentials, uploadMessageAttachment, removeMessageAttachment, uploadCommunityPostImage, removeCommunityPostImage, ImageProcessingError } from './supabase.js';
+import { supabase, rowToProfile, saveProfile, onboardingStatus, sendSignal, fetchSignalQuota, isRateLimited, isStorageImageUrl, withoutCredentials, uploadMessageAttachment, removeMessageAttachment, uploadCommunityPostImage, removeCommunityPostImage, ImageProcessingError, compressAttachmentFiles, attachmentKind } from './supabase.js';
 import { defaultCoverUrl, normalizeCoverUrl } from './cover-assets.js';
 import { quotaLabel, quotaErrorText, quotaBlocked, quotaNotice } from './signal-quota.js';
 import { pitchLine, deckChips, deckEmptyState, deckFields } from './deck-view.js';
@@ -2063,10 +2063,7 @@ let pendingChatGif = null;
 let chatCameraStream = null;
 const chatFileLimits = { image: 12 * 1024 * 1024, gif: 8 * 1024 * 1024, video: 50 * 1024 * 1024, document: 12 * 1024 * 1024 };
 const formatFileSize = (size) => size < 1024 * 1024 ? `${Math.max(1, Math.round(size / 1024))} KB` : `${(size / (1024 * 1024)).toFixed(1)} MB`;
-const getChatFileKind = (file) => {
-  const mime = file.type || '';
-  return mime === 'image/gif' ? 'gif' : mime.startsWith('image/') ? 'image' : mime.startsWith('video/') ? 'video' : 'document';
-};
+const getChatFileKind = attachmentKind;
 const queueChatFiles = (files) => {
   [...(files || [])].forEach((file) => {
     const kind = getChatFileKind(file);
@@ -2281,7 +2278,9 @@ document.querySelector('#chat-form')?.addEventListener('submit', async (event) =
   if (!selectedChat || (!body && !pendingChatFiles.length && !pendingChatGif) || !supabase || !memberProfile.id) return;
   if (sendButton) sendButton.disabled = true;
   try {
-    const files = pendingChatFiles.map((entry) => entry.file);
+    // Re-encode every image BEFORE anything is sent: one failure aborts the whole send (no text, no files) and the
+    // composer keeps its state so the member can remove the bad file. Compressed files are not re-encoded on upload.
+    const files = await compressAttachmentFiles(pendingChatFiles.map((entry) => entry.file));
     if (!files.length && !pendingChatGif) await insertChatMessage(body);
     for (let index = 0; index < files.length; index += 1) {
       const file = files[index];
@@ -2294,7 +2293,7 @@ document.querySelector('#chat-form')?.addEventListener('submit', async (event) =
     await loadChatMessages(selectedChat);
   } catch (error) {
     if (error instanceof ImageProcessingError) {
-      // Refused, nothing sent: shown inline in the composer, not as a toast.
+      // Refused before anything was uploaded or sent: shown inline in the composer, not as a toast.
       setChatAttachmentError(error.message);
       return;
     }

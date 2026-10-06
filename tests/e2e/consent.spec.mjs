@@ -790,6 +790,25 @@ try {
     assert.equal(chatUploads.length, 0);
   });
   await hardPage.evaluate(() => document.querySelector('[data-remove-chat-file]')?.click());
+  // 8e3. Two images, the 2nd unprocessable, plus text: the whole send aborts (no upload, no message row) and the
+  // composer keeps its text and files so the member can remove the bad one. A .heic with an empty type is refused too.
+  await hardPage.fill('#chat-input', 'hello both');
+  await hardPage.setInputFiles('#chat-photo-input', { name: 'good.png', mimeType: 'image/png', buffer: Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=', 'base64') });
+  await hardPage.setInputFiles('#chat-photo-input', { name: 'shot.heic', mimeType: '', buffer: Buffer.from('heic bytes the browser cannot decode') });
+  await hardPage.waitForFunction(() => document.querySelectorAll('#chat-attachment-preview .chat-attachment-chip').length === 2, null, { timeout: 5000 });
+  const multiBefore = hard.calls.length;
+  await hardPage.locator('#chat-form button[type="submit"]').click();
+  await hardPage.waitForFunction(() => !document.querySelector('#chat-attachment-error')?.hidden, null, { timeout: 8000 });
+  const multi = await hardPage.evaluate(() => ({ text: document.querySelector('#chat-attachment-error')?.textContent, input: document.querySelector('#chat-input')?.value, chips: document.querySelectorAll('#chat-attachment-preview .chat-attachment-chip').length }));
+  const multiWrites = hard.calls.slice(multiBefore).filter((c) => c.method !== 'GET' && (c.path.startsWith('/storage/v1/object/message-attachments') || c.path === '/rest/v1/brivia_messages'));
+  check(`2 images, 2nd unprocessable: nothing uploaded or sent, composer intact (${JSON.stringify(multi)})`, () => {
+    assert.equal(multi.text, "We couldn't process this photo. Try a JPG or PNG.");
+    assert.equal(multi.input, 'hello both');
+    assert.equal(multi.chips, 2);
+    assert.equal(multiWrites.length, 0);
+  });
+  await hardPage.evaluate(() => { document.querySelectorAll('[data-remove-chat-file]').forEach((b) => b.click()); });
+  await hardPage.fill('#chat-input', '');
 
   // 8f. A failed profile-photo upload fails visibly and never stores a data: URL.
   await hardPage.evaluate(() => document.querySelector('[data-nav="profile"]')?.click());
@@ -808,6 +827,15 @@ try {
     assert.equal(editError.linked, 'profile-photo-error');
     assert.equal(editWrites.length, 0);
   });
+  // 8f1. A good photo with an unprocessable cover: both are compressed before either is uploaded, so nothing is stored.
+  const coverCallsBefore = hard.calls.length;
+  await hardPage.setInputFiles('#profile-edit-form [name="photoFile"]', { name: 'ok.png', mimeType: 'image/png', buffer: Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=', 'base64') });
+  await hardPage.setInputFiles('#profile-edit-form [name="coverFile"]', { name: 'bad-cover.png', mimeType: 'image/png', buffer: Buffer.from('this is not an image') });
+  await hardPage.locator('#profile-edit-form [type="submit"]').click();
+  await hardPage.waitForFunction(() => !document.querySelector('#profile-cover-error')?.hidden, null, { timeout: 8000 });
+  const coverWrites = hard.calls.slice(coverCallsBefore).filter((c) => c.method !== 'GET' && (c.path.startsWith('/storage/') || c.path === '/rest/v1/profiles'));
+  check('bad cover: inline cover error and the good photo was not uploaded either (no orphan)', () => assert.equal(coverWrites.length, 0));
+  await hardPage.setInputFiles('#profile-edit-form [name="coverFile"]', []);
   await hardPage.setInputFiles('#profile-edit-form [name="photoFile"]', { name: 'me.png', mimeType: 'image/png', buffer: Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=', 'base64') });
   await hardPage.locator('#profile-edit-form [type="submit"]').click();
   // Settles when the editor shows a result, or closes (the old data-URL fallback "succeeded" and closed it).

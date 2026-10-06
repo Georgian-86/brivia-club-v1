@@ -8,7 +8,7 @@ import './auth-polish.css';
 import './mobile-site.css';
 import './mobile-final-fixes.css';
 import {
-  supabase, supabaseReady, saveProfile, compressedImageDataUrl, PHOTO_ERROR_MESSAGE, withoutCredentials, rowToProfile, isRateLimited,
+  supabase, supabaseReady, saveProfile, compressImageOnly, fileToDataUrl, PHOTO_ERROR_MESSAGE, withoutCredentials, rowToProfile, isRateLimited,
   declareAdult, setHomeLocation, setHomeCity, setMemberInterests, setSensitiveConsent, fetchMyInterests, fetchInterestNodes, searchPlaces, onboardingStatus,
 } from './supabase.js';
 import { buildPendingOnboarding, isPendingExpired } from './pending-profile.js';
@@ -1841,7 +1841,7 @@ signupForm?.addEventListener('submit', async (event) => {
   profile.phoneCountryCode = phoneCountryCode;
   profile.phoneNumber = phoneNumber;
   profile.phone = `${phoneCountryCode} ${phoneNumber}`.trim();
-  const photoFile = signupForm.querySelector('.photo-input')?.files?.[0] || null;
+  let photoFile = signupForm.querySelector('.photo-input')?.files?.[0] || null;
   profile.photoName = photoFile?.name || '';
   const mediaErrors = { photo: signupForm.querySelector('#profile-photo-error'), cover: signupForm.querySelector('#profile-cover-error') };
   const setMediaError = (which, message) => {
@@ -1860,12 +1860,12 @@ signupForm?.addEventListener('submit', async (event) => {
     signupForm.querySelector(which === 'photo' ? '.photo-input' : '.cover-input')?.focus();
   };
   if (photoFile) {
-    try { profile.photoUrl = await compressedImageDataUrl(photoFile); } catch { failMedia('photo'); return; }
+    try { photoFile = await compressImageOnly(photoFile); profile.photoUrl = await fileToDataUrl(photoFile); } catch { failMedia('photo'); return; }
   } else if (profileCompletionPhotoUrl) profile.photoUrl = profileCompletionPhotoUrl;
-  const coverFile = signupForm.querySelector('.cover-input')?.files?.[0] || null;
+  let coverFile = signupForm.querySelector('.cover-input')?.files?.[0] || null;
   profile.coverName = coverFile?.name || (profile.coverUrl?.startsWith('/assets/') || profile.coverUrl?.startsWith('/Images/Cover%20images/') ? 'Brivia suggestion' : '');
   if (coverFile) {
-    try { profile.coverUrl = await compressedImageDataUrl(coverFile); } catch { failMedia('cover'); return; }
+    try { coverFile = await compressImageOnly(coverFile); profile.coverUrl = await fileToDataUrl(coverFile); } catch { failMedia('cover'); return; }
   } else if (profileCompletionCoverUrl) profile.coverUrl = normalizeCoverUrl(profileCompletionCoverUrl);
   const submit = signupForm.querySelector('[type="submit"]');
   if (submit) { submit.disabled = true; submit.setAttribute('aria-busy', 'true'); }

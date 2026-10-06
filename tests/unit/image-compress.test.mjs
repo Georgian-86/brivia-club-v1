@@ -1,7 +1,7 @@
 // compressImage fails closed (R12): never returns the original (with its EXIF/GPS) on a failure. Run: npm run test:unit
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { compressImage, ImageProcessingError, PHOTO_ERROR_MESSAGE, replacedObjectPath } from '../../image-compress.js';
+import { compressImage, ImageProcessingError, PHOTO_ERROR_MESSAGE, replacedObjectPath, isImageLike, compressImageOnly, attachmentKind, compressAttachmentFiles } from '../../image-compress.js';
 
 const MESSAGE = "We couldn't process this photo. Try a JPG or PNG.";
 const file = (name = 'holiday.HEIC.png', type = 'image/png') => ({ name, type, size: 10 });
@@ -75,4 +75,56 @@ test('replacedObjectPath: removes only the previous own-bucket object; preset co
   assert.equal(replacedObjectPath('', 'n', own), '');
   const same = 'https://s.test/storage/v1/object/public/profile-covers/me/same.jpg';
   assert.equal(replacedObjectPath(same, same, own), '', 'never removes the file just uploaded');
+});
+
+test('isImageLike: MIME image/* or an image extension (case-insensitive), e.g. HEIC with an empty type', () => {
+  assert.equal(isImageLike({ type: '', name: 'x.HEIC' }), true);
+  assert.equal(isImageLike({ type: '', name: 'x.tiff' }), true);
+  assert.equal(isImageLike({ type: 'image/png', name: 'noext' }), true);
+  assert.equal(isImageLike({ type: '', name: 'x.pdf' }), false);
+  assert.equal(isImageLike({ type: 'video/mp4', name: 'x.mp4' }), false);
+});
+
+test('an empty-type .heic that fails to decode throws (original with GPS never returned)', async () => {
+  const { deps } = makeDeps({ loadImage: async () => { throw new Error('decode'); } });
+  await assert.rejects(() => compressImage({ type: '', name: 'x.heic', size: 3 }, deps), ImageProcessingError);
+});
+
+test('an empty-type .jpg that decodes returns a JPEG', async () => {
+  const { deps } = makeDeps();
+  const out = await compressImage({ type: '', name: 'x.jpg', size: 3 }, deps);
+  assert.equal(out.type, 'image/jpeg');
+  assert.equal(out.name, 'x.jpg');
+});
+
+test('compressImageOnly refuses a non-image for an image-only destination', async () => {
+  const { deps } = makeDeps();
+  await assert.rejects(() => compressImageOnly({ type: 'application/pdf', name: 'a.pdf' }, deps), ImageProcessingError);
+  await assert.rejects(() => compressImageOnly(null, deps), ImageProcessingError);
+});
+
+test('an already compressed file is not re-encoded (second failure cannot surface)', async () => {
+  const { deps } = makeDeps();
+  const once = await compressImageOnly(file(), deps);
+  const { deps: failing } = makeDeps({ loadImage: async () => { throw new Error('boom'); } });
+  assert.equal(await compressImageOnly(once, failing), once);
+});
+
+test('attachmentKind: MIME then extension; gif stays gif', () => {
+  assert.equal(attachmentKind({ type: 'image/gif', name: 'a.gif' }), 'gif');
+  assert.equal(attachmentKind({ type: '', name: 'a.heic' }), 'image');
+  assert.equal(attachmentKind({ type: 'video/quicktime', name: 'a.mov' }), 'video');
+  assert.equal(attachmentKind({ type: '', name: 'a.pdf' }), 'document');
+});
+
+test('compressAttachmentFiles: any failure rejects the whole batch before anything is returned', async () => {
+  let n = 0;
+  const { deps } = makeDeps({ loadImage: async () => { n += 1; if (n === 2) throw new Error('bad'); return { naturalWidth: 10, naturalHeight: 10, image: {} }; } });
+  const files = [file('a.png'), file('b.png'), { type: 'application/pdf', name: 'c.pdf' }];
+  await assert.rejects(() => compressAttachmentFiles(files, deps), ImageProcessingError);
+  n = 99;
+  const ok = await compressAttachmentFiles([file('a.png'), { type: 'image/gif', name: 'g.gif' }, { type: 'application/pdf', name: 'c.pdf' }], deps);
+  assert.equal(ok[0].type, 'image/jpeg');
+  assert.equal(ok[1].name, 'g.gif');
+  assert.equal(ok[2].name, 'c.pdf');
 });

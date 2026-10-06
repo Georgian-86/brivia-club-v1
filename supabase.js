@@ -1,8 +1,8 @@
 import { createClient } from '@supabase/supabase-js';
 import { NOTICE_VERSION } from './notice-version.js';
-import { compressImage, replacedObjectPath, ImageProcessingError } from './image-compress.js';
+import { compressImageOnly, compressAttachmentFiles, attachmentKind, replacedObjectPath, ImageProcessingError } from './image-compress.js';
 
-export { ImageProcessingError, PHOTO_ERROR_MESSAGE } from './image-compress.js';
+export { ImageProcessingError, PHOTO_ERROR_MESSAGE, compressImageOnly, compressAttachmentFiles, attachmentKind } from './image-compress.js';
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL?.trim();
 const supabaseKey = (import.meta.env.VITE_SUPABASE_ANON_KEY || import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY)?.trim();
@@ -80,7 +80,8 @@ const fileToDataUrl = (file) => new Promise((resolve, reject) => {
   reader.readAsDataURL(file);
 });
 
-export const compressedImageDataUrl = async (file) => file ? fileToDataUrl(await compressImage(file)) : '';
+export const compressedImageDataUrl = async (file) => file ? fileToDataUrl(await compressImageOnly(file)) : '';
+export { fileToDataUrl };
 
 // profiles.skills is server-owned (0004): only set_member_interests writes it, so it is never part of a client row.
 // The legacy city / state are never sent (D-036: private and not client-editable); the home area is a coarse cell set
@@ -103,7 +104,7 @@ export const profileToRow = (profile, userId, photoUrl = '') => ({
 
 export const uploadProfilePhoto = async (userId, file) => {
   if (!supabase || !file) return '';
-  const compressedFile = await compressImage(file);
+  const compressedFile = await compressImageOnly(file);
   const extension = compressedFile.type === 'image/jpeg' ? 'jpg' : (compressedFile.name.split('.').pop()?.toLowerCase() || 'bin');
   const path = `${userId}/${crypto.randomUUID()}.${extension}`;
   const { error } = await supabase.storage.from('profile-photos').upload(path, compressedFile, { upsert: true, contentType: compressedFile.type || 'application/octet-stream' });
@@ -114,7 +115,7 @@ export const uploadProfilePhoto = async (userId, file) => {
 
 export const uploadProfileCover = async (userId, file) => {
   if (!supabase || !file) return '';
-  const compressedFile = await compressImage(file);
+  const compressedFile = await compressImageOnly(file);
   const extension = compressedFile.type === 'image/jpeg' ? 'jpg' : (compressedFile.name.split('.').pop()?.toLowerCase() || 'bin');
   const path = `${userId}/${crypto.randomUUID()}.${extension}`;
   const { error } = await supabase.storage.from('profile-covers').upload(path, compressedFile, { upsert: true, contentType: compressedFile.type || 'application/octet-stream' });
@@ -139,17 +140,13 @@ const messageAttachmentExtension = (file) => {
   return mimeExtension[file.type] || file.name.split('.').pop()?.toLowerCase() || 'bin';
 };
 
-const messageAttachmentKind = (file) => {
-  if ((file.type || '').startsWith('image/')) return file.type === 'image/gif' ? 'gif' : 'image';
-  if ((file.type || '').startsWith('video/')) return 'video';
-  return 'document';
-};
+const messageAttachmentKind = attachmentKind;
 
 export const uploadMessageAttachment = async (userId, file) => {
   if (!supabase || !userId || !file) throw new Error('Chat media upload is not configured.');
   const kind = messageAttachmentKind(file);
   // GIFs stay animated; normal images are resized and converted to JPEG before upload.
-  const processedFile = kind === 'image' ? await compressImage(file) : file;
+  const processedFile = kind === 'image' ? await compressImageOnly(file) : file; // already-compressed files are not re-encoded
   const extension = messageAttachmentExtension(processedFile);
   const path = `${userId}/${crypto.randomUUID()}.${extension}`;
   const { error } = await supabase.storage.from('message-attachments').upload(path, processedFile, {
@@ -175,7 +172,7 @@ export const removeMessageAttachment = async (path) => {
 
 export const uploadCommunityPostImage = async (userId, file) => {
   if (!supabase || !userId || !file) throw new Error('Community post uploads are not configured.');
-  const processedFile = await compressImage(file);
+  const processedFile = await compressImageOnly(file);
   const path = `${userId}/${crypto.randomUUID()}.jpg`;
   const { error } = await supabase.storage.from('community-posts').upload(path, processedFile, {
     upsert: false,
@@ -205,6 +202,13 @@ export const saveProfile = async (userId, profile, photoFile, coverFile = null, 
   if (!supabase) return { data: null, error: new Error('Supabase is not configured.') };
   let photoUrl;
   let coverUrl;
+  // Compress BOTH before uploading either: a failure on the second must not leave the first orphaned in Storage.
+  try {
+    if (photoFile) { try { photoFile = await compressImageOnly(photoFile); } catch (error) { if (error instanceof ImageProcessingError) error.field = 'photo'; throw error; } }
+    if (coverFile) { try { coverFile = await compressImageOnly(coverFile); } catch (error) { if (error instanceof ImageProcessingError) error.field = 'cover'; throw error; } }
+  } catch (error) {
+    return { data: null, error };
+  }
   try {
     try { photoUrl = await uploadProfilePhoto(userId, photoFile); } catch (error) { if (error instanceof ImageProcessingError) error.field = 'photo'; throw error; }
     try { coverUrl = coverFile ? await uploadProfileCover(userId, coverFile) : (profile.coverUrl || profile.cover_url || ''); } catch (error) { if (error instanceof ImageProcessingError) error.field = 'cover'; throw error; }
