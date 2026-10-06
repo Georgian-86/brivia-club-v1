@@ -237,7 +237,8 @@ const closeAndHeader = (page) => page.evaluate(() => {
 const a11yStep = async (page, tag) => {
   const contrast = await axeViolations(page, { rules: ['color-contrast'], include: '.auth-panel', decorative: ['.auth-shell::before'] });
   check(`${tag}: axe color-contrast has no violations (${contrast.join(' | ')})`, () => assert.deepEqual(contrast, []));
-  const small = await smallText(page, { root: '.auth-panel' });
+  // .auth-shell also covers the visual pane (.auth-visual: aria-hidden brand art, skipped by smallText) at narrow widths.
+  const small = await smallText(page, { root: '.auth-shell' });
   check(`${tag}: visible text is at least 12 px (${small.join(' | ')})`, () => assert.deepEqual(small, []));
 };
 const openSignup = async (page) => {
@@ -566,6 +567,7 @@ try {
     const label1 = await stepLabel(page);
     const valuemax = await page.locator('.signup-progress-track').getAttribute('aria-valuemax');
     check(`375: "STEP 1 OF 4", aria-valuemax 4 (got "${label1}", ${valuemax})`, () => { assert.match(label1, /^STEP 1 OF 4\b/); assert.equal(valuemax, '4'); });
+    await a11yStep(page, '375 step 1');
     const cityInputs = await page.locator('input[name="city"], input[name="state"]').count();
     check('375: no input[name=city] or input[name=state]', () => assert.equal(cityInputs, 0));
     const noScroll1 = await noHorizontalScroll(page);
@@ -576,6 +578,7 @@ try {
     await fillStepOne(page);
     const label2 = await stepLabel(page);
     check(`375: "STEP 2 OF 4" (got "${label2}")`, () => assert.match(label2, /^STEP 2 OF 4\b/));
+    await a11yStep(page, '375 step 2');
     const pickerHiddenBefore = await page.locator('[data-area-picker]').isHidden();
     await page.locator('[data-area-geo]').click();
     await page.waitForSelector('[data-area-picker]:not([hidden])', { timeout: 15000 });
@@ -596,6 +599,7 @@ try {
     await page.waitForSelector('#interest-results [data-interest-group]', { state: 'attached' });
     const label3 = await stepLabel(page);
     check(`375: "STEP 3 OF 4" (got "${label3}")`, () => assert.match(label3, /^STEP 3 OF 4\b/));
+    await a11yStep(page, '375 step 3');
     await fillBudgetWithMouse(page, 'Badminton');
     const sizes = await page.locator('[data-budget-row] .budget-step, [data-budget-row] .mode-option span, [data-budget-row] .budget-remove').evaluateAll((els) => els.map((el) => { const r = el.getBoundingClientRect(); return [Math.round(r.width), Math.round(r.height)]; }));
     check(`375: steppers, mode segments and remove are at least 44x44 px (${JSON.stringify(sizes)})`, () => { assert.ok(sizes.length >= 7); sizes.forEach(([w, h]) => { assert.ok(w >= 44 && h >= 44); }); });
@@ -611,6 +615,7 @@ try {
     await page.waitForSelector('[data-signup-step="4"]:not([hidden])');
     const label4 = await stepLabel(page);
     check(`375: "STEP 4 OF 4" (got "${label4}")`, () => assert.match(label4, /^STEP 4 OF 4\b/));
+    await a11yStep(page, '375 step 4');
     // R12: a photo that cannot be re-encoded stops the submit BEFORE any account or profile write, on step 4,
     // with the inline error linked to the photo field.
     await page.locator('[data-signup-step="4"] input[name="password"]').fill('correct horse 1');

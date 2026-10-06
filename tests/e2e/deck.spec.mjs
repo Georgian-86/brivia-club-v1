@@ -26,7 +26,7 @@
 // E2E_SCREENSHOTS=<dir> saves 375 px and 1440 px screenshots: card with band and chips (with the quota counter), the
 // zero-quota state, and the caught-up and no-members-yet empty states.
 import { readFileSync } from 'node:fs';
-import { axeViolations, smallText } from './a11y.mjs';
+import { axeViolations, smallText, photoContrast } from './a11y.mjs';
 import { spawn } from 'node:child_process';
 import assert from 'node:assert/strict';
 import { fileURLToPath } from 'node:url';
@@ -231,6 +231,12 @@ try {
   check(`axe color-contrast: the deck card has no violations (${deckContrast.join(' | ')})`, () => assert.deepEqual(deckContrast, []));
   const deckContrastAll = await axeViolations(page, { rules: ['color-contrast'], include: '.app-view[data-view="home"]' });
   check(`axe color-contrast: the whole deck view has no violations (${deckContrastAll.join(' | ')})`, () => assert.deepEqual(deckContrastAll, []));
+  // The kicker, heading and hint sit on a photo, which axe cannot read: measure the worst pixel behind each box instead.
+  for (const sel of ['.home-kicker span', '.home-heading h1', '.home-heading h1 em', '.swipe-hint', '#swipe-left-count']) {
+    const pc = await photoContrast(page, sel);
+    check(`deck text over the photo, ${sel}: worst-pixel contrast ${pc.ratio}:1 >= ${pc.required}:1 (${pc.color})`, () => assert.ok(pc.ratio >= pc.required));
+  }
+  await page.evaluate(() => window.scrollTo(0, 0));
   const deckSmall = await smallText(page, { root: '.app-view[data-view="home"]' });
   check(`deck: visible text is at least 12 px (${deckSmall.join(' | ')})`, () => assert.deepEqual(deckSmall, []));
   const quotaStyle = await page.evaluate(() => { const el = document.querySelector('#swipe-left-count'); const s = getComputedStyle(el); return { size: parseFloat(s.fontSize), color: s.color }; });

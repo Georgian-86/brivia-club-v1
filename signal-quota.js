@@ -2,8 +2,9 @@
 // lives only on the server (my_signal_quota(), send_signal) and in memory for the current page.
 //
 // quota = { remaining, resets_at, live_unanswered?, live_limit? } as my_signal_quota() / send_signal return it.
-// resets_at is already rounded up to the hour by the server; it is shown in the member's local time as a plain hour
-// ("3 PM", hour: 'numeric'). Minutes appear only for a time that is not on the hour (the server never sends one).
+// resets_at is rounded up to the UTC hour by the server, so in a zone with a 30 or 45 minute offset (India, +5:30) it is
+// not on the local hour. It is shown in the member's local time via toLocaleTimeString: "3 PM" when on the hour,
+// "8:30 PM" otherwise (hour: 'numeric', plus minute: '2-digit' only when the minutes are not 0).
 
 const DEFAULT_LIVE_LIMIT = 100;
 const DEFAULT_DAILY_LIMIT = 30;

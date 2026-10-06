@@ -4,4 +4,6 @@ export const DELETED_MESSAGE = 'Your account and everything in it has been delet
 const banner = document.getElementById('deleted-banner');
 if (banner && new URLSearchParams(window.location.search).get('deleted') === '1') {
   banner.textContent = DELETED_MESSAGE;
+  // The member is signed out by now: a link into the app would only bounce them to the login.
+  document.querySelector('.header-link')?.setAttribute('hidden', '');
 }

@@ -113,6 +113,7 @@ export const DELETE_DISCLOSURE = {
     'Reports you made are kept for up to a year, without your name.',
     'Reports about you, with their evidence, are kept for 365 days.',
     'A log of your consent and this deletion is kept for 1 year.',
+    'If you were reported or flagged before you deleted, a one-way code made from your email is kept for 365 days, so a rejoin can be reviewed.',
     "Entries about you in other members' daily limits clear within 30 days.",
     "Files other people sent you stay in their own folders.",
     'Sign-in and platform logs and backups clear on their own schedules, and cached images can take about an hour to disappear.',

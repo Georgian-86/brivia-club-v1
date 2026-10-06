@@ -970,7 +970,7 @@ try {
     assert.equal(firstCounter, '30 of 30 signals left · 24-hour window');
     assert.ok(qQuotaReads().length >= 1, 'my_signal_quota was not read at boot');
   });
-  const resetLabel = await quotaPage.evaluate((iso) => new Date(iso).toLocaleTimeString([], { hour: 'numeric' }), RESETS_AT);
+  const resetLabel = await quotaPage.evaluate((iso) => (() => { const d = new Date(iso); return d.toLocaleTimeString([], d.getMinutes() === 0 ? { hour: 'numeric' } : { hour: 'numeric', minute: '2-digit' }); })(), RESETS_AT);
   // One like resolves: the counter drops to 29 (the stub decrements) and the quota is read again.
   const readsBefore = qQuotaReads().length;
   await quotaPage.locator('[data-action="like"]').click();
@@ -1383,6 +1383,8 @@ try {
     for (const needle of ['Supabase, Mumbai (ap-south-1), India', 'thebrivia.club@gmail.com', 'We reply within 7 days and resolve within 90 days', 'Data Protection Board of India', 'The founder of Brivia Club', 'call 112', '72 hours', 'Your messages, which disappear from other people']) assert.ok(page375.text.includes(needle), needle);
   });
   const privSmall = await smallText(priv, { root: 'body' });
+  const privDeleted = await priv.evaluate(() => ({ under18: /member who has been in touch with someone reports that they may be under 18/.test(document.body.innerText) && /We review every under-18 report within 72 hours/.test(document.body.innerText), flags: /Safety pauses and rejoin reviews: until we have reviewed them/.test(document.body.innerText), code: document.body.innerText.includes('a one-way code made from your email'), noOld: !/the interests you chose to show/.test(document.body.innerText) }));
+  check(`privacy.html: under-18 pause, flag expiry and rejoin-code wording is accurate (${JSON.stringify(privDeleted)})`, () => assert.deepEqual(privDeleted, { under18: true, flags: true, code: true, noOld: true }));
   check(`privacy.html: visible text is at least 12 px (${privSmall.join(' | ')})`, () => assert.deepEqual(privSmall, []));
   const privAxe = await axeViolations(priv);
   check(`privacy.html: axe (default rule set) finds no violations (${privAxe.join(' | ')})`, () => assert.deepEqual(privAxe, []));
@@ -1399,6 +1401,8 @@ try {
   check(`privacy.html?deleted=1: axe finds no violations (${deletedAxe.join(' | ')})`, () => assert.deepEqual(deletedAxe, []));
   await priv.setViewportSize({ width: 1440, height: 900 });
   const wideTable = await priv.evaluate(() => ({ overflow: document.documentElement.scrollWidth - window.innerWidth, display: getComputedStyle(document.querySelector('table tbody tr')).display }));
+  const backLink = await priv.evaluate(() => { const a = document.querySelector('.header-link'); return a.hidden || a.getClientRects().length === 0; });
+  check('privacy.html?deleted=1 hides the "Back to the app" link', () => assert.equal(backLink, true));
   check(`privacy.html at 1440 px: a real table, no horizontal scroll (${JSON.stringify(wideTable)})`, () => { assert.equal(wideTable.display, 'table-row'); assert.ok(wideTable.overflow <= 0); });
   if (SHOTS) await priv.screenshot({ path: path.join(SHOTS, 'privacy-1440-deleted.png') });
   check('privacy.html: no uncaught page errors', () => assert.deepEqual(privErrors, []));

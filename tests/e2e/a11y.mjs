@@ -81,3 +81,41 @@ export const smallText = async (page, { root = 'body', minPx = 12 } = {}) => pag
   }
   return small;
 }, { root, minPx });
+
+// Worst-case contrast of an element's text against what is actually painted behind it (a photo, a gradient), which axe
+// reports as "incomplete". The text is made transparent, the element's box is screenshotted, and the text colour is
+// compared with every pixel: the result is the lowest ratio found (so it is a guarantee for every pixel behind the box,
+// not an average). Returns { ratio, large, required, color } where required is 3 for large text and 4.5 otherwise.
+export const photoContrast = async (page, selector) => {
+  await page.locator(selector).first().scrollIntoViewIfNeeded();
+  const info = await page.evaluate((sel) => {
+    const el = document.querySelector(sel);
+    const st = getComputedStyle(el);
+    const r = el.getBoundingClientRect();
+    return { color: st.color, size: parseFloat(st.fontSize), weight: Number(st.fontWeight), rect: { x: Math.max(0, r.x), y: Math.max(0, r.y), width: Math.min(r.width, window.innerWidth - Math.max(0, r.x)), height: r.height } };
+  }, selector);
+  await page.evaluate((sel) => document.querySelector(sel).setAttribute('data-a11y-probe', ''), selector);
+  if (!(await page.evaluate(() => Boolean(document.getElementById('a11y-probe-style'))))) await page.addStyleTag({ content: '[data-a11y-probe],[data-a11y-probe] *{color:transparent!important;-webkit-text-fill-color:transparent!important;text-shadow:none!important}' }).then((h) => h.evaluate((n) => { n.id = 'a11y-probe-style'; }));
+  const png = await page.screenshot({ clip: info.rect });
+  await page.evaluate((sel) => document.querySelector(sel)?.removeAttribute('data-a11y-probe'), selector);
+  const ratio = await page.evaluate(async ({ b64, color }) => {
+    const img = new Image();
+    img.src = `data:image/png;base64,${b64}`;
+    await img.decode();
+    const c = document.createElement('canvas'); c.width = img.width; c.height = img.height;
+    const ctx = c.getContext('2d'); ctx.drawImage(img, 0, 0);
+    const data = ctx.getImageData(0, 0, c.width, c.height).data;
+    const lum = (r, g, b) => [r, g, b].map((v) => { v /= 255; return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4; }).reduce((a, v, i) => a + v * [0.2126, 0.7152, 0.0722][i], 0);
+    const [tr, tg, tb] = color.match(/[\d.]+/g).map(Number);
+    const lt = lum(tr, tg, tb);
+    let worst = Infinity;
+    for (let i = 0; i < data.length; i += 4) {
+      const lb = lum(data[i], data[i + 1], data[i + 2]);
+      const ratio = (Math.max(lt, lb) + 0.05) / (Math.min(lt, lb) + 0.05);
+      if (ratio < worst) worst = ratio;
+    }
+    return worst;
+  }, { b64: png.toString('base64'), color: info.color });
+  const large = info.size >= 24 || (info.size >= 18.66 && info.weight >= 700);
+  return { ratio: Math.round(ratio * 100) / 100, large, required: large ? 3 : 4.5, color: info.color };
+};

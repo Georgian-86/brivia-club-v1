@@ -194,8 +194,8 @@ labelled "PRIVATE · ONLY YOU SEE THESE", and the hero and the area stat show th
   - Normal: **"N of 30 signals left · 24-hour window"** (N = `remaining`, 30 = `daily_limit` from `my_signal_quota()`,
     30 when a merged `send_signal` result has none). The unit is the rolling window, so there is no singular form.
   - At 0: **"Your next signal frees up at 3 PM"**, from `resets_at` (already rounded to the hour by the server), in the
-    member's local time with `toLocaleTimeString([], { hour: 'numeric' })`; minutes are added only for a time that is not on
-    the hour (the server never sends one). Without a `resets_at` it reads "0 of 30 signals left · 24-hour window" and never
+    member's local time with `toLocaleTimeString([], { hour: 'numeric' })`; minutes are added only when the local time is not
+    on the hour: the server rounds to the UTC hour, so in India (+5:30) the line reads "Your next signal frees up at 8:30 PM". Without a `resets_at` it reads "0 of 30 signals left · 24-hour window" and never
     invents a time. The line is at least 12 px in full ink (`--brivia-deep-wine`), not a muted tone.
   - At the live cap: "You have 100 signals waiting for an answer" (the number is `live_limit`).
   - Over a cap (`send_signal` fails with HTTP 429, `signal_quota_exhausted` or `signal_live_cap`), the card is **not**

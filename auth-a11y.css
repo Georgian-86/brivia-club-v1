@@ -68,3 +68,11 @@ body.auth-page .auth-shell .auth-signup-form .photo-copy small,
 body.auth-page .auth-shell .auth-signup-form .cover-picker-label small,
 body.auth-page .auth-shell .auth-signup-form .cover-section-heading span { color: var(--a11y-ink-soft); }
 @media (min-width: 781px) { .community-preview-heading h2 { font-size: clamp(40px, 5.6vw, 84px); } }
+
+/* Back buttons: cream text on the cream panel (1.2:1) at 375 px, found by the axe pass at that width. */
+body.auth-page .auth-shell .auth-signup-form .signup-step-actions .auth-secondary,
+body.auth-page .auth-shell .auth-signup-form .signup-step-prev {
+  color: var(--a11y-wine) !important;
+  border-color: color-mix(in srgb, var(--a11y-wine) 45%, transparent) !important;
+  background: transparent !important;
+}

@@ -4,9 +4,21 @@ import assert from 'node:assert/strict';
 import { quotaLabel, quotaErrorText, quotaBlocked, resetTimeLabel, quotaNotice } from '../../signal-quota.js';
 
 const RESETS = '2026-10-03T15:00:00Z';
-// R7 (iteration 3): the reset time is shown as a plain hour ("3 PM"), in the member's local time. The server rounds
-// resets_at up to the hour; a time that is not on the hour (never expected) keeps its minutes.
-const localTime = new Date(RESETS).toLocaleTimeString([], { hour: 'numeric' });
+// R7 (iteration 3): the reset time is local, "3 PM" on the hour and "8:30 PM" otherwise. The server rounds to the UTC hour, so
+// in Asia/Kolkata (+5:30) 15:00Z is 8:30 PM. The expectation uses the same Intl formatting, so the suite passes in any TZ
+// (run it under TZ=UTC and TZ=Asia/Kolkata to see both branches).
+const localFormat = (iso) => {
+  const d = new Date(iso);
+  return d.toLocaleTimeString([], d.getMinutes() === 0 ? { hour: 'numeric' } : { hour: 'numeric', minute: '2-digit' });
+};
+const localTime = localFormat(RESETS);
+
+test('the local time keeps its minutes only when the zone is off the hour', () => {
+  const off = new Date(RESETS).getMinutes() !== 0;
+  assert.equal(/:\d\d/.test(localTime), off);
+  if (process.env.TZ === 'Asia/Kolkata') assert.match(localTime, /^8:30\s?PM$/i);
+  if (process.env.TZ === 'UTC') assert.match(localTime, /^3\s?PM$/i);
+});
 
 test('quotaLabel: normal state reads "N of 30 signals left · 24-hour window" (30 = the quota\'s daily_limit)', () => {
   assert.equal(quotaLabel({ remaining: 30, daily_limit: 30, resets_at: null }), '30 of 30 signals left · 24-hour window');
@@ -25,7 +37,6 @@ test('quotaLabel: 1 left stays "1 of 30 signals left" (the unit is the window, n
 test('quotaLabel: 0 left says "Your next signal frees up at 3 PM" in local time, hour numeric', () => {
   const label = quotaLabel({ remaining: 0, daily_limit: 30, resets_at: RESETS });
   assert.equal(label, `Your next signal frees up at ${localTime}`);
-  assert.doesNotMatch(label, /:\d\d/, 'on the hour: no minutes');
 });
 
 test('quotaLabel: 0 left without a reset time never invents one', () => {
@@ -86,8 +97,7 @@ test('quotaBlocked: daily at 0, live at the live cap, otherwise null', () => {
 
 test('resetTimeLabel: local hour ("3 PM"), minutes only when not on the hour, empty for a missing or bad value', () => {
   assert.equal(resetTimeLabel(RESETS), localTime);
-  const offHour = '2026-10-03T15:30:00Z';
-  assert.equal(resetTimeLabel(offHour), new Date(offHour).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }));
+  for (const iso of ['2026-10-03T15:30:00Z', '2026-10-03T15:45:00Z', '2026-10-03T00:00:00Z']) assert.equal(resetTimeLabel(iso), localFormat(iso));
   assert.equal(resetTimeLabel(null), '');
   assert.equal(resetTimeLabel('not a date'), '');
 });
