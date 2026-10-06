@@ -1,0 +1,36 @@
+/* PRIVACY & ACCOUNT dialogs (Iteration 4, Task 9). Deep-wine tokens; 44 px targets; text >= 12 px. UX_SPEC §G. */
+.profile-settings-menu { width: max-content; min-width: 170px; max-width: calc(100vw - 30px); }
+.profile-settings-menu button { min-height: 44px; font-size: 12px; }
+.privacy-dialog {
+  box-sizing: border-box; width: min(520px, calc(100vw - 32px)); max-height: calc(100dvh - 32px); padding: 0; overflow: auto;
+  border: 1px solid rgba(67, 4, 22, .2); border-radius: 14px; background: #fffaf1; color: #291d1b;
+  box-shadow: 0 24px 60px rgba(64, 37, 30, .35); font-family: 'Instrument Sans', Arial, sans-serif;
+}
+.privacy-dialog::backdrop { background: rgba(43, 4, 16, .62); }
+.privacy-dialog :focus-visible { outline: 2px solid var(--brivia-deep-wine); outline-offset: 2px; }
+.privacy-body { box-sizing: border-box; display: flex; max-width: 100%; flex-direction: column; gap: 12px; padding: 20px; }
+.privacy-body h2 { margin: 0; color: var(--brivia-deep-wine); font-family: 'Bodoni Moda', Georgia, serif; font-size: 24px; font-weight: 500; line-height: 1.15; overflow-wrap: anywhere; }
+.privacy-body h3 { margin: 4px 0 0; color: var(--brivia-deep-wine); font-size: 14px; font-weight: 700; }
+.privacy-body p, .privacy-body li { margin: 0; font-size: 14px; line-height: 1.45; overflow-wrap: anywhere; }
+.privacy-body ul { margin: 0; padding-left: 20px; display: flex; flex-direction: column; gap: 6px; }
+.privacy-body hr { width: 100%; margin: 4px 0; border: 0; border-top: 1px solid rgba(67, 4, 22, .18); }
+.privacy-links a { display: inline-block; min-height: 44px; padding: 12px 0; color: var(--brivia-deep-wine); font-size: 14px; font-weight: 700; text-decoration: underline; }
+.privacy-field { font-size: 14px; font-weight: 700; line-height: 1.35; }
+.privacy-body input[type="text"], .privacy-body input[type="password"] {
+  box-sizing: border-box; width: 100%; min-height: 44px; padding: 8px 12px; border: 1px solid rgba(67, 4, 22, .32);
+  border-radius: 8px; background: #fff; color: #291d1b; font: inherit; font-size: 16px;
+}
+.privacy-reauth { display: flex; flex-direction: column; gap: 10px; }
+.privacy-reauth[hidden], .privacy-reauth [hidden], .privacy-body [hidden] { display: none !important; }
+.privacy-error { color: var(--brivia-deep-wine); font-weight: 700; }
+.privacy-error:empty { display: none; }
+.privacy-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 10px; }
+.privacy-actions-start { justify-content: flex-start; }
+.privacy-actions button, .privacy-reauth button { min-width: 44px; min-height: 44px; padding: 0 18px; border-radius: 99px; font: inherit; font-size: 14px; font-weight: 700; cursor: pointer; }
+.privacy-secondary { border: 1px solid rgba(67, 4, 22, .32); background: transparent; color: var(--brivia-deep-wine); }
+.privacy-primary, .privacy-danger { border: 0; background: var(--brivia-deep-wine); color: #fffaf1; }
+.privacy-primary:hover, .privacy-danger:hover { background: var(--brivia-wine); }
+.privacy-danger[aria-disabled="true"], .privacy-primary[aria-disabled="true"] { opacity: .55; cursor: not-allowed; }
+.privacy-dialog[aria-busy] button { cursor: progress; }
+@media (max-width: 420px) { .privacy-actions button { flex: 1 1 140px; } }
+@media (prefers-reduced-motion: reduce) { .privacy-dialog, .privacy-dialog * { transition: none !important; animation: none !important; } }

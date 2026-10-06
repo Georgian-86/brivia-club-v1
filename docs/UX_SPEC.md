@@ -260,6 +260,42 @@ From a member's point of view (D-015..D-018):
 - **Blocked users** (Profile settings) adds "Unblocking doesn't cancel a report you've made."
 - **Verified by** `tests/e2e/deck.spec.mjs` (section 7b) and `tests/e2e/consent.spec.mjs` (8h).
 
+### G. Privacy & account (R2 withdraw, R5 delete, Iteration 4)
+
+- **Entry.** The profile settings menu gains **PRIVACY & ACCOUNT** (after Removed connections, before Log out; items are
+  44 px tall, 12 px text). It opens a real `<dialog>` (`privacy-account.js`): consent status ("Private interests:
+  consent given on 5 October 2026." or "consent not given."), **Withdraw consent** (only while consent is given), links
+  to `/privacy.html` and `thebrivia.club@gmail.com`, and **Delete my account**. Status comes from the member's own
+  `profiles.sensitive_consent_at`.
+- **Withdraw (R2).** Dialog "Withdraw consent?" / "We'll delete your private interests now and spread their points
+  across your other interests. You can add them again later." Buttons **Withdraw and delete** / **Keep** (Keep has
+  initial focus). It calls `set_sensitive_consent(false)`; the member stays in the app, the status flips to "not given",
+  the Withdraw button goes away and the profile's interests are re-read. A failure shows "We couldn't withdraw your
+  consent. Try again, or email thebrivia.club@gmail.com." in `role="alert"`.
+- **Delete (R5).** Dialog "Delete my account" lists, in plain language, what is deleted (profile, photos, interests,
+  points; matches, requests, signals; messages, which vanish from other people's chats too; posts and uploaded files)
+  and what remains and for how long (reports you made, up to a year, without your name; reports about you and their
+  evidence, 365 days; consent and deletion log, 1 year; other members' daily-limit entries about you, within 30 days;
+  files others sent you stay in their folders; auth/platform logs, backups and CDN cache on their own schedules;
+  other devices). Input label **Type DELETE to confirm**, compared after `trim().toUpperCase()`; the button is
+  `aria-disabled="true"` until it matches and does nothing while disabled.
+- **Order and failures (`account-deletion.js`).** Storage first (list pages of 100 with `offset`, remove in batches of at
+  most 100, re-list until a list returns 0 items, in profile-photos, profile-covers, message-attachments,
+  community-posts), then `delete_my_account('DELETE')`. Only on success: `signOut({ scope: 'local' })` (errors ignored),
+  every `brivia-*` key cleared from localStorage and sessionStorage, `location.assign('/privacy.html?deleted=1')`.
+  Failures show in `role="alert"` and every run can be retried: storage "We removed some of your files but couldn't
+  finish. Nothing else was deleted. Try again." (the `storage_not_empty` RPC error adds "If it keeps failing, email
+  thebrivia.club@gmail.com."), RPC "Your photos and files are gone, but your account still exists. Try again to finish,
+  or email thebrivia.club@gmail.com."
+- **Recent sign-in.** `reauth_required` reveals **Confirm your password** (password members: `signInWithPassword`, then the
+  deletion retries on the same click) or **Sign in with Google again** (Google-only members: sets the sessionStorage
+  marker `brivia-reauth-delete`, re-runs OAuth with `prompt=login`; on return `app.js` consumes the marker and reopens the
+  delete dialog). The method comes from `app_metadata.provider(s)`.
+- **Dialog behaviour.** Real `<dialog>` + `showModal`; Tab wraps; Escape closes except while a request is in flight;
+  focus returns to the trigger (the settings button, or the Delete / Withdraw button when nested); targets at least 44 px,
+  text at least 12 px, no horizontal scroll at 375 px; deep-wine tokens; reduced motion respected.
+- **Verified by** `tests/unit/account-deletion.test.mjs` and `tests/e2e/consent.spec.mjs` (section 10).
+
 ## Verification (webapp-testing skill)
 
 Use Playwright against `npm run dev`:

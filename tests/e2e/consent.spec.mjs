@@ -1115,6 +1115,241 @@ try {
   check('quota context: never POSTs /rest/v1/connection_requests', () => assert.equal(q.calls.filter((c) => c.method === 'POST' && c.path === '/rest/v1/connection_requests').length, 0));
   check('quota context: no uncaught page errors', () => assert.deepEqual(quotaErrors, []));
   await quotaContext.close();
+
+  // 10. Iteration 4, Task 9 (R2 withdraw, R5 client): PRIVACY & ACCOUNT in the profile settings menu. Own context per
+  // sign-in method so the stub can answer as a password member or a Google-only member.
+  const makePrivacyContext = async (provider, label) => {
+    const ctx = await browser.newContext({ viewport: { width: 375, height: 800 } });
+    const pUser = { ...user, app_metadata: { provider, providers: [provider] } };
+    const pSession = { ...session, user: pUser };
+    await ctx.addInitScript(([key, value]) => { window.localStorage.setItem(key, value); }, ['sb-stub-auth-token', JSON.stringify(pSession)]);
+    const st = {
+      consentAt: '2026-10-05T10:00:00+00:00', calls: [], files: { 'profile-photos': ['p1.jpg'], 'profile-covers': [], 'message-attachments': Array.from({ length: 230 }, (_, i) => `m${String(i).padStart(3, '0')}.png`), 'community-posts': ['c1.jpg'] },
+      failDeleteAt: 0, deleteCount: 0, rpcMode: [], rpcCalls: [], holdList: null, tokenCalls: 0, listsServed: 0,
+    };
+    await ctx.route(`${BASE}/privacy.html**`, (route) => route.fulfill({ status: 200, contentType: 'text/html', body: '<!doctype html><title>privacy stub</title><p>stub</p>' }));
+    await ctx.route(`${ORIGIN}/**`, async (route) => {
+      const request = route.request();
+      const url = new URL(request.url());
+      const method = request.method();
+      const pathName = url.pathname;
+      const postData = request.postData();
+      st.calls.push({ method, path: pathName, search: decodeURIComponent(url.search), body: postData });
+      const json = (status, payload) => route.fulfill({ status, contentType: 'application/json', body: JSON.stringify(payload), headers: { 'access-control-allow-origin': '*' } });
+      if (method === 'OPTIONS') return route.fulfill({ status: 204, headers: { 'access-control-allow-origin': '*', 'access-control-allow-headers': '*', 'access-control-allow-methods': '*' } });
+      if (pathName === '/auth/v1/token' && url.searchParams.get('grant_type') === 'password') { st.tokenCalls += 1; st.reauthed = true; return json(200, pSession); }
+      if (pathName === '/auth/v1/authorize') return route.fulfill({ status: 200, contentType: 'text/html', body: '<!doctype html><title>oauth stub</title>' });
+      if (pathName.startsWith('/auth/v1/')) return json(200, pathName.endsWith('/user') ? pUser : pSession);
+      const listMatch = pathName.match(/^\/storage\/v1\/object\/list\/([^/]+)$/);
+      if (listMatch && method === 'POST') {
+        if (st.holdList) await st.holdList;
+        const body = JSON.parse(postData || '{}');
+        st.listsServed += 1;
+        const names = st.files[listMatch[1]] || [];
+        return json(200, names.slice(body.offset || 0, (body.offset || 0) + (body.limit || 100)).map((name) => ({ name, id: `id-${name}`, metadata: {} })));
+      }
+      const delMatch = pathName.match(/^\/storage\/v1\/object\/([^/]+)$/);
+      if (delMatch && method === 'DELETE') {
+        st.deleteCount += 1;
+        if (st.failDeleteAt && st.deleteCount === st.failDeleteAt) return json(500, { statusCode: '500', error: 'Internal', message: 'storage unavailable' });
+        const { prefixes = [] } = JSON.parse(postData || '{}');
+        st.files[delMatch[1]] = (st.files[delMatch[1]] || []).filter((n) => !prefixes.includes(`${ME}/${n}`));
+        return json(200, prefixes.map((name) => ({ name })));
+      }
+      if (pathName === '/rest/v1/profiles') { const row = { ...ownRow, sensitive_consent_at: st.consentAt }; return json(200, (request.headers().accept || '').includes('vnd.pgrst.object') ? row : [row]); }
+      if (pathName === '/rest/v1/rpc/set_sensitive_consent') { st.consentAt = JSON.parse(postData || '{}').p_consent ? new Date().toISOString() : null; return route.fulfill({ status: 204, body: '', headers: { 'access-control-allow-origin': '*' } }); }
+      if (pathName === '/rest/v1/rpc/delete_my_account') {
+        st.rpcCalls.push(JSON.parse(postData || '{}'));
+        const mode = st.rpcMode.shift() || 'ok';
+        if (mode === 'reauth' && !st.reauthed) return json(400, { code: 'P0001', message: 'reauth_required', details: null, hint: null });
+        if (mode === 'boom') return json(500, { code: 'XX000', message: 'boom' });
+        return route.fulfill({ status: 204, body: '', headers: { 'access-control-allow-origin': '*' } });
+      }
+      if (pathName === '/rest/v1/rpc/deck_candidates') return json(200, []);
+      if (pathName === '/rest/v1/rpc/deck_status') return json(200, 'caught_up');
+      if (pathName === '/rest/v1/rpc/get_candidates' || pathName === '/rest/v1/rpc/search_members') return json(200, []);
+      if (pathName === '/rest/v1/rpc/my_onboarding_status') return json(200, [{ interests: 2, points: 20, has_cell: true, place_label: 'Pune', completed: true }]);
+      if (pathName === '/rest/v1/rpc/my_signal_quota') return json(200, [{ daily_limit: 30, remaining: 30, resets_at: null, live_unanswered: 0, live_limit: 100 }]);
+      if (pathName.startsWith('/rest/v1/')) return json(200, []);
+      return json(200, {});
+    });
+    await ctx.route((url) => !url.href.startsWith(BASE) && !url.href.startsWith(ORIGIN), (route) => route.abort());
+    await ctx.routeWebSocket(/stub\.supabase\.local/, (ws) => ws.close());
+    const page = await ctx.newPage();
+    const errors = [];
+    page.on('pageerror', (error) => errors.push(String(error)));
+    await page.goto(`${BASE}/app.html`, { waitUntil: 'domcontentloaded' });
+    await page.waitForSelector('[data-nav="profile"]', { state: 'attached', timeout: 15000 });
+    await page.waitForFunction(() => !document.body.classList.contains('app-auth-pending'), null, { timeout: 15000 });
+    await page.evaluate(() => document.querySelector('[data-nav="profile"]')?.click());
+    await page.waitForSelector('#profile-settings-button', { timeout: 8000 });
+    return { ctx, page, st, errors, label };
+  };
+  const openSettingsItem = async (page, name) => {
+    await page.locator('#profile-settings-button').click();
+    await page.locator(`[data-profile-setting="${name}"]`).click();
+  };
+  const activeInside = (page, sel) => page.evaluate((s) => Boolean(document.querySelector(s)?.contains(document.activeElement)), sel);
+
+  const pw = await makePrivacyContext('email', 'password member');
+  const pwItems = await pw.page.evaluate(() => { document.querySelector('#profile-settings-button').click(); return [...document.querySelectorAll('#profile-settings-menu button')].map((b) => ({ text: b.textContent.trim(), h: Math.round(b.getBoundingClientRect().height) })); });
+  check(`profile settings menu has PRIVACY & ACCOUNT (${JSON.stringify(pwItems.map((i) => i.text))})`, () => { assert.ok(pwItems.some((i) => i.text === 'PRIVACY & ACCOUNT')); assert.ok(pwItems.every((i) => i.h >= 44), 'menu targets under 44 px'); });
+  await pw.page.locator('[data-profile-setting="privacy"]').click();
+  await pw.page.waitForSelector('dialog.privacy-dialog[data-privacy="account"][open]', { timeout: 5000 }).catch(() => {});
+  const acct = await pw.page.evaluate(() => {
+    const d = document.querySelector('dialog[data-privacy="account"]');
+    return d ? {
+      status: d.querySelector('[data-privacy-status]')?.textContent.trim(), withdraw: Boolean(d.querySelector('[data-privacy-withdraw]')), del: d.querySelector('[data-privacy-delete]')?.textContent.trim(),
+      links: [...d.querySelectorAll('a')].map((a) => a.getAttribute('href')), noHScroll: d.scrollWidth <= d.clientWidth, docNoHScroll: document.documentElement.scrollWidth <= window.innerWidth,
+      small: [...d.querySelectorAll('button, a')].filter((b) => b.getBoundingClientRect().height < 43.5).map((b) => b.textContent.trim()),
+      fonts: [...d.querySelectorAll('p, small, li, label, a, button, span')].filter((e) => e.textContent.trim() && parseFloat(getComputedStyle(e).fontSize) < 12).map((e) => e.textContent.trim().slice(0, 20)),
+    } : null;
+  });
+  check(`account section: consent status, withdraw, links, delete (${JSON.stringify(acct)})`, () => {
+    assert.ok(acct);
+    assert.match(acct.status, /consent given on 5 October 2026/);
+    assert.equal(acct.withdraw, true);
+    assert.equal(acct.del, 'Delete my account');
+    assert.ok(acct.links.includes('/privacy.html') && acct.links.includes('mailto:thebrivia.club@gmail.com'));
+    assert.ok(acct.noHScroll && acct.docNoHScroll, 'horizontal scroll at 375 px');
+    assert.deepEqual(acct.small, []);
+    assert.deepEqual(acct.fonts, []);
+  });
+  await pw.page.keyboard.press('Escape');
+  await pw.page.waitForFunction(() => !document.querySelector('dialog[data-privacy="account"]'), null, { timeout: 3000 }).catch(() => {});
+  const escClosed = await pw.page.evaluate(() => !document.querySelector('dialog[data-privacy="account"]'));
+  const escFocus = await pw.page.evaluate(() => document.activeElement?.id);
+  check(`Escape closes the account dialog and focus returns to the settings button (${escClosed}, ${escFocus})`, () => { assert.equal(escClosed, true); assert.equal(escFocus, 'profile-settings-button'); });
+
+  // R2 withdraw: Keep sends nothing; Withdraw and delete calls set_sensitive_consent(false), the member stays in the app.
+  await openSettingsItem(pw.page, 'privacy');
+  await pw.page.waitForSelector('dialog[data-privacy="account"][open]');
+  await pw.page.locator('[data-privacy-withdraw]').click();
+  await pw.page.waitForSelector('dialog[data-privacy="withdraw"][open]', { timeout: 5000 }).catch(() => {});
+  const wd = await pw.page.evaluate(() => { const d = document.querySelector('dialog[data-privacy="withdraw"]'); return d ? { text: d.textContent.replace(/\s+/g, ' '), buttons: [...d.querySelectorAll('button')].map((b) => b.textContent.trim()) } : null; });
+  check(`withdraw dialog uses the R2 copy and buttons (${JSON.stringify(wd)})`, () => {
+    assert.ok(wd);
+    assert.ok(wd.text.includes("Withdraw consent? We'll delete your private interests now and spread their points across your other interests. You can add them again later."));
+    assert.ok(wd.buttons.includes('Withdraw and delete') && wd.buttons.includes('Keep'));
+  });
+  const trapOk = [];
+  for (let i = 0; i < 6; i += 1) { await pw.page.keyboard.press('Tab'); trapOk.push(await activeInside(pw.page, 'dialog[data-privacy="withdraw"]')); }
+  await pw.page.keyboard.press('Shift+Tab');
+  trapOk.push(await activeInside(pw.page, 'dialog[data-privacy="withdraw"]'));
+  check(`withdraw dialog traps focus (${trapOk})`, () => assert.ok(trapOk.every(Boolean)));
+  await pw.page.locator('[data-privacy-keep]').click();
+  await pw.page.waitForFunction(() => !document.querySelector('dialog[data-privacy="withdraw"]'), null, { timeout: 3000 }).catch(() => {});
+  const afterKeep = await pw.page.evaluate(() => ({ withdrawOpen: Boolean(document.querySelector('dialog[data-privacy="withdraw"]')), focusIsWithdraw: document.activeElement?.hasAttribute('data-privacy-withdraw') }));
+  check(`Keep closes the dialog, returns focus, and sends nothing (${JSON.stringify(afterKeep)})`, () => {
+    assert.equal(afterKeep.withdrawOpen, false); assert.equal(afterKeep.focusIsWithdraw, true);
+    assert.equal(pw.st.calls.filter((c) => c.path === '/rest/v1/rpc/set_sensitive_consent').length, 0);
+  });
+  await pw.page.locator('[data-privacy-withdraw]').click();
+  await pw.page.waitForSelector('dialog[data-privacy="withdraw"][open]');
+  await pw.page.locator('[data-privacy-confirm-withdraw]').click();
+  await pw.page.waitForFunction(() => /consent not given/.test(document.querySelector('[data-privacy-status]')?.textContent || ''), null, { timeout: 5000 }).catch(() => {});
+  const afterWd = await pw.page.evaluate(() => ({ status: document.querySelector('[data-privacy-status]')?.textContent.trim(), withdrawBtn: Boolean(document.querySelector('[data-privacy-withdraw]:not([hidden])')), url: location.pathname, wdOpen: Boolean(document.querySelector('dialog[data-privacy="withdraw"]')) }));
+  const wdCalls = pw.st.calls.filter((c) => c.path === '/rest/v1/rpc/set_sensitive_consent').map((c) => JSON.parse(c.body || '{}'));
+  check(`withdraw calls set_sensitive_consent {p_consent:false}, the member stays in the app and the status updates (${JSON.stringify([wdCalls, afterWd])})`, () => {
+    assert.deepEqual(wdCalls, [{ p_consent: false }]);
+    assert.equal(afterWd.url, '/app.html'); assert.equal(afterWd.wdOpen, false);
+    assert.match(afterWd.status, /consent not given/); assert.equal(afterWd.withdrawBtn, false);
+  });
+
+  // R5 delete dialog.
+  await pw.page.locator('[data-privacy-delete]').click();
+  await pw.page.waitForSelector('dialog[data-privacy="delete"][open]', { timeout: 5000 }).catch(() => {});
+  const dd = await pw.page.evaluate(() => {
+    const d = document.querySelector('dialog[data-privacy="delete"]');
+    if (!d) return null;
+    const input = d.querySelector('#privacy-delete-confirm');
+    const btn = d.querySelector('[data-privacy-confirm-delete]');
+    return { text: d.textContent.replace(/\s+/g, ' '), label: d.querySelector('label[for="privacy-delete-confirm"]')?.textContent.trim(), hasInput: Boolean(input), aria: btn?.getAttribute('aria-disabled'), alert: d.querySelector('[data-privacy-error]')?.getAttribute('role'), noH: d.scrollWidth <= d.clientWidth };
+  });
+  check(`delete dialog lists what is deleted and what remains, labelled input, aria-disabled button (${JSON.stringify({ ...dd, text: dd?.text.slice(0, 80) })})`, () => {
+    assert.ok(dd && dd.hasInput);
+    assert.equal(dd.label, 'Type DELETE to confirm');
+    assert.equal(dd.aria, 'true'); assert.equal(dd.alert, 'alert'); assert.ok(dd.noH);
+    for (const re of [/Your messages, which disappear from other people's chats too/, /can't be undone/i, /Reports you made are kept for up to a year/, /Reports about you/, /consent and this deletion is kept for 1 year/, /Files other people sent you stay in their own folders/, /backups/, /about an hour/, /Other devices/]) assert.match(dd.text, re);
+  });
+  const trap2 = [];
+  for (let i = 0; i < 8; i += 1) { await pw.page.keyboard.press('Tab'); trap2.push(await activeInside(pw.page, 'dialog[data-privacy="delete"]')); }
+  check(`delete dialog traps focus (${trap2})`, () => assert.ok(trap2.every(Boolean)));
+  const listsBefore = pw.st.listsServed;
+  await pw.page.locator('#privacy-delete-confirm').fill('nope');
+  await pw.page.locator('[data-privacy-confirm-delete]').click({ force: true });
+  await pw.page.waitForTimeout(200);
+  const gate1 = await pw.page.evaluate(() => document.querySelector('[data-privacy-confirm-delete]').getAttribute('aria-disabled'));
+  check(`a wrong word keeps the delete button aria-disabled and does nothing (${gate1}, lists ${pw.st.listsServed - listsBefore})`, () => { assert.equal(gate1, 'true'); assert.equal(pw.st.listsServed, listsBefore); assert.equal(pw.st.rpcCalls.length, 0); });
+  await pw.page.locator('#privacy-delete-confirm').fill('  delete ');
+  const gate2 = await pw.page.evaluate(() => document.querySelector('[data-privacy-confirm-delete]').getAttribute('aria-disabled'));
+  check(`"  delete " (trim, upper-case) enables the button (${gate2})`, () => assert.notEqual(gate2, 'true'));
+  // Escape is ignored while a request is in flight.
+  let release; pw.st.holdList = new Promise((resolve) => { release = resolve; });
+  pw.st.failDeleteAt = 3; // the 3rd Storage remove fails (1st: photos, 2nd: first attachment batch): mid-way
+  await pw.page.locator('[data-privacy-confirm-delete]').click();
+  await pw.page.waitForTimeout(300);
+  await pw.page.keyboard.press('Escape');
+  const busyOpen = await pw.page.evaluate(() => Boolean(document.querySelector('dialog[data-privacy="delete"][open]')));
+  check(`Escape does nothing while the request is in flight (${busyOpen})`, () => assert.equal(busyOpen, true));
+  pw.st.holdList = null; release();
+  await pw.page.waitForFunction(() => (document.querySelector('[data-privacy-error]')?.textContent || '').length > 0, null, { timeout: 10000 }).catch(() => {});
+  const storageFail = await pw.page.evaluate(() => ({ text: document.querySelector('[data-privacy-error]')?.textContent.trim(), role: document.querySelector('[data-privacy-error]')?.getAttribute('role') }));
+  check(`mid-way storage failure shows the storage copy, deletes nothing else (${JSON.stringify(storageFail)}; rpc calls ${pw.st.rpcCalls.length})`, () => {
+    assert.match(storageFail.text, /^We removed some of your files but couldn't finish\. Nothing else was deleted\. Try again\./);
+    assert.match(storageFail.text, /thebrivia\.club@gmail\.com/);
+    assert.equal(pw.st.rpcCalls.length, 0);
+    assert.ok(pw.st.files['message-attachments'].length > 0 && pw.st.files['message-attachments'].length < 230, `left ${pw.st.files['message-attachments'].length}`);
+    assert.ok(pw.st.calls.filter((c) => c.method === 'DELETE').every((c) => (JSON.parse(c.body || '{}').prefixes || []).length <= 100));
+  });
+  check('a failed deletion never signs out', () => assert.equal(pw.st.calls.filter((c) => c.path === '/auth/v1/logout').length, 0));
+  // Retry: storage finishes, then the RPC fails once (rpc copy), then needs a recent sign-in (password), then succeeds.
+  pw.st.failDeleteAt = 0; pw.st.rpcMode = ['boom', 'reauth'];
+  await pw.page.locator('[data-privacy-confirm-delete]').click();
+  await pw.page.waitForFunction(() => /account still exists/.test(document.querySelector('[data-privacy-error]')?.textContent || ''), null, { timeout: 10000 }).catch(() => {});
+  const rpcFail = await pw.page.evaluate(() => document.querySelector('[data-privacy-error]')?.textContent.trim());
+  check(`rpc failure after storage shows the rpc copy (${rpcFail})`, () => {
+    assert.equal(rpcFail, 'Your photos and files are gone, but your account still exists. Try again to finish, or email thebrivia.club@gmail.com.');
+    assert.deepEqual(Object.values(pw.st.files).map((f) => f.length), [0, 0, 0, 0]);
+  });
+  await pw.page.locator('[data-privacy-confirm-delete]').click();
+  await pw.page.waitForSelector('#privacy-delete-password', { timeout: 10000 }).catch(() => {});
+  const reauthUi = await pw.page.evaluate(() => ({ label: document.querySelector('label[for="privacy-delete-password"]')?.textContent.trim(), type: document.querySelector('#privacy-delete-password')?.type, google: Boolean(document.querySelector('[data-privacy-google]:not([hidden])')), url: location.pathname }));
+  check(`reauth_required asks a password member for their password (${JSON.stringify(reauthUi)})`, () => { assert.equal(reauthUi.label, 'Confirm your password'); assert.equal(reauthUi.type, 'password'); assert.equal(reauthUi.google, false); assert.equal(reauthUi.url, '/app.html'); });
+  await pw.page.locator('#privacy-delete-password').fill('correct horse');
+  const navigated = pw.page.waitForURL(/\/privacy\.html\?deleted=1$/, { timeout: 15000 }).then(() => true, () => false);
+  await pw.page.locator('[data-privacy-confirm-delete]').click();
+  const landed = await navigated;
+  const leftovers = landed ? await pw.page.evaluate(() => Object.keys(window.localStorage).filter((k) => k.startsWith('brivia-'))) : ['n/a'];
+  check(`password re-auth signs in again and retries; success lands on /privacy.html?deleted=1 (${landed}; token calls ${pw.st.tokenCalls}; rpc calls ${pw.st.rpcCalls.length})`, () => {
+    assert.equal(landed, true); assert.equal(pw.st.tokenCalls, 1); assert.equal(pw.st.rpcCalls.length, 3);
+    assert.ok(pw.st.rpcCalls.every((a) => a.p_confirm === 'DELETE'));
+    assert.deepEqual(leftovers, []);
+  });
+  check(`signOut ran only after the RPC succeeded (local scope)`, () => { const logout = pw.st.calls.filter((c) => c.path === '/auth/v1/logout'); assert.equal(logout.length, 1); assert.match(logout[0].search, /scope=local/); });
+  check('privacy context (password): no uncaught page errors', () => assert.deepEqual(pw.errors, []));
+  await pw.ctx.close();
+
+  // Google-only member: "Sign in with Google again" with a return marker; the delete dialog reopens after return.
+  const gg = await makePrivacyContext('google', 'google member');
+  gg.st.rpcMode = ['reauth'];
+  await openSettingsItem(gg.page, 'privacy');
+  await gg.page.locator('[data-privacy-delete]').click();
+  await gg.page.locator('#privacy-delete-confirm').fill('DELETE');
+  await gg.page.locator('[data-privacy-confirm-delete]').click();
+  await gg.page.waitForSelector('[data-privacy-google]', { timeout: 10000 }).catch(() => {});
+  const ggUi = await gg.page.evaluate(() => ({ btn: document.querySelector('[data-privacy-google]')?.textContent.trim(), pwField: Boolean(document.querySelector('[data-privacy-password-row]:not([hidden])')) }));
+  check(`a Google-only member gets a Google button, no password field (${JSON.stringify(ggUi)})`, () => { assert.equal(ggUi.btn, 'Sign in with Google again'); assert.equal(ggUi.pwField, false); });
+  await gg.page.locator('[data-privacy-google]').click();
+  await gg.page.waitForURL(/\/auth\/v1\/authorize/, { timeout: 10000 }).catch(() => {});
+  const authReq = gg.st.calls.find((c) => c.path === '/auth/v1/authorize');
+  check(`Google re-auth starts OAuth (${authReq?.search}); the return marker is proven by the reopen below`, () => { assert.ok(authReq); assert.match(authReq.search, /provider=google/); });
+  await gg.page.goto(`${BASE}/app.html`, { waitUntil: 'domcontentloaded' });
+  const reopened2 = await gg.page.waitForSelector('dialog[data-privacy="delete"][open]', { timeout: 15000 }).then(() => true, () => false);
+  const markerAfter = await gg.page.evaluate(() => window.sessionStorage.getItem('brivia-reauth-delete'));
+  check(`after returning from Google the delete dialog reopens and the marker is consumed (${reopened2}, ${markerAfter})`, () => { assert.equal(reopened2, true); assert.equal(markerAfter, null); });
+  check('privacy context (google): no uncaught page errors', () => assert.deepEqual(gg.errors, []));
+  await gg.ctx.close();
 } finally {
   await browser?.close();
   try { process.kill(-vite.pid, 'SIGTERM'); } catch { vite.kill('SIGTERM'); }

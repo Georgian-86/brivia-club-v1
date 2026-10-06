@@ -38,5 +38,9 @@ one `interaction` pass POST per Pass, the A5 neutral pitch line, no wrap-around,
 PLAYWRIGHT_MODULE=/tmp/pw/node_modules/playwright/index.mjs node tests/e2e/deck.spec.mjs
 ```
 
+`consent.spec.mjs` section 10 (Iteration 4, Task 9) also covers PRIVACY & ACCOUNT with mocked Storage `list`/`remove`
+(`/storage/v1/object/list/<bucket>`, `DELETE /storage/v1/object/<bucket>`), `delete_my_account` (`ok`, `reauth_required`,
+a 500), `set_sensitive_consent` and the password / Google re-auth paths; `/privacy.html` is stubbed there (Task 10 owns it).
+
 Unit tests for the pure client helpers: `npm run test:unit` (`node --test tests/unit/*.test.mjs`; Node 22 does not
 expand a bare directory argument).

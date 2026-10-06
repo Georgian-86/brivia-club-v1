@@ -285,6 +285,13 @@ export const setMemberInterests = (items) => rpcCall('set_member_interests', { p
 // R2: give (true) or withdraw (false) the separate consent for private interests. Withdrawal deletes them server-side.
 export const setSensitiveConsent = (consent) => rpcCall('set_sensitive_consent', { p_consent: consent });
 export const fetchMyInterests = () => rpcCall('my_interests');
+// The member's own consent state: profiles.sensitive_consent_at (null = no consent). Own row only (RLS).
+export const fetchSensitiveConsentAt = async (userId) => {
+  if (!supabase || !userId) return null;
+  const { data, error } = await supabase.from('profiles').select('sensitive_consent_at').eq('id', userId).maybeSingle();
+  if (error) throw error;
+  return data?.sensitive_consent_at || null;
+};
 
 // my_onboarding_status(): { interests, points, has_cell, place_label, completed } or null when there is no row.
 export const onboardingStatus = async () => {

@@ -15,7 +15,9 @@ import './chat-sidebar-fix.css';
 import './app-navigation.css';
 import './discovery-filters.css';
 import './mobile-app.css';
-import { supabase, rowToProfile, saveProfile, onboardingStatus, sendSignal, fetchSignalQuota, isRateLimited, isStorageImageUrl, withoutCredentials, uploadMessageAttachment, removeMessageAttachment, uploadCommunityPostImage, removeCommunityPostImage, ImageProcessingError, compressAttachmentFiles, attachmentKind, reportMember } from './supabase.js';
+import { supabase, rowToProfile, saveProfile, onboardingStatus, sendSignal, fetchSignalQuota, isRateLimited, isStorageImageUrl, withoutCredentials, uploadMessageAttachment, removeMessageAttachment, uploadCommunityPostImage, removeCommunityPostImage, ImageProcessingError, compressAttachmentFiles, attachmentKind, reportMember, setSensitiveConsent, fetchSensitiveConsentAt } from './supabase.js';
+import { deleteAccount, clearBriviaKeys, DELETE_BUCKETS } from './account-deletion.js';
+import { openPrivacyAccount } from './privacy-account.js';
 import { openReportDialog, bindCardOverflow, cardOverflowOpen, reportSuccessCopy } from './report-dialog.js';
 import { defaultCoverUrl, normalizeCoverUrl } from './cover-assets.js';
 import { quotaLabel, quotaErrorText, quotaBlocked, quotaNotice } from './signal-quota.js';
@@ -28,6 +30,7 @@ import './community-feed.css';
 import './chat-empty-state.css';
 import './deck.css';
 import './report-dialog.css';
+import './privacy-account.css';
 
 document.body.classList.add('app-auth-pending');
 let appBackGuardActive = false;
@@ -1500,7 +1503,7 @@ const ensureProfilePhotoEditor = () => {
   menu.id = 'profile-settings-menu';
   menu.className = 'profile-settings-menu';
   menu.hidden = true;
-  menu.innerHTML = '<button type="button" data-profile-setting="notifications">NOTIFICATIONS</button><button type="button" data-profile-setting="block">BLOCKED USERS</button><button type="button" data-profile-setting="removed">REMOVED CONNECTIONS</button><button type="button" data-profile-setting="logout">LOG OUT</button>';
+  menu.innerHTML = '<button type="button" data-profile-setting="notifications">NOTIFICATIONS</button><button type="button" data-profile-setting="block">BLOCKED USERS</button><button type="button" data-profile-setting="removed">REMOVED CONNECTIONS</button><button type="button" data-profile-setting="privacy">PRIVACY &amp; ACCOUNT</button><button type="button" data-profile-setting="logout">LOG OUT</button>';
   actions.prepend(settings);
   actions.append(menu);
   const close = () => { menu.hidden = true; settings.setAttribute('aria-expanded', 'false'); };
@@ -1513,6 +1516,7 @@ const ensureProfilePhotoEditor = () => {
   menu.querySelector('[data-profile-setting="block"]')?.addEventListener('click', () => { close(); openBlockedUsersManager(); });
   menu.querySelector('[data-profile-setting="notifications"]')?.addEventListener('click', () => { close(); openNotificationSettings(); });
   menu.querySelector('[data-profile-setting="removed"]')?.addEventListener('click', () => { close(); openRemovedConnectionsManager(); });
+  menu.querySelector('[data-profile-setting="privacy"]')?.addEventListener('click', () => { close(); openPrivacy(settings); });
   menu.querySelector('[data-profile-setting="logout"]')?.addEventListener('click', () => { close(); logoutMember(); });
   document.addEventListener('click', (event) => { if (!hero.contains(event.target)) close(); });
 };
@@ -1591,6 +1595,40 @@ const openProfileEditor = () => {
     renderProfile();
     showToast('Profile updated and saved.');
   });
+};
+
+// PRIVACY & ACCOUNT (Iteration 4, Task 9; R2, R5). The dialogs live in privacy-account.js; this wires them to Supabase.
+const REAUTH_DELETE_KEY = 'brivia-reauth-delete'; // sessionStorage marker: reopen the delete dialog after Google re-auth
+const privacyDeps = (session) => ({
+  user: session.user,
+  fetchConsentAt: () => fetchSensitiveConsentAt(session.user.id),
+  withdrawConsent: () => setSensitiveConsent(false),
+  // The server deleted the private interests: re-read the own row so skills (server-owned) are not stale.
+  onWithdrawn: async () => {
+    const { data } = await supabase.from('profiles').select('*').eq('id', session.user.id).maybeSingle();
+    if (data) { memberProfile = { ...memberProfile, skills: rowToProfile(data).skills }; window.localStorage.setItem('brivia-member-profile', JSON.stringify(memberProfile)); renderProfile(); }
+  },
+  runDeletion: () => deleteAccount({
+    storage: supabase.storage,
+    rpc: (name, args) => supabase.rpc(name, args),
+    signOut: (options) => supabase.auth.signOut(options),
+    clearLocal: () => clearBriviaKeys(window.localStorage, window.sessionStorage),
+    buckets: DELETE_BUCKETS,
+    uid: session.user.id,
+  }),
+  signInWithPassword: (email, password) => supabase.auth.signInWithPassword({ email, password }),
+  startGoogle: async () => {
+    try { window.sessionStorage.setItem(REAUTH_DELETE_KEY, '1'); } catch { /* the member can reopen the dialog by hand */ }
+    const { error } = await supabase.auth.signInWithOAuth({ provider: 'google', options: { redirectTo: `${window.location.origin}/auth.html`, queryParams: { prompt: 'login' } } });
+    if (error) { try { window.sessionStorage.removeItem(REAUTH_DELETE_KEY); } catch { /* ignore */ } throw error; }
+  },
+  onDeleted: () => window.location.assign('/privacy.html?deleted=1'),
+});
+const openPrivacy = async (trigger, { autoDelete = false } = {}) => {
+  if (!supabase) return;
+  const { data } = await supabase.auth.getSession();
+  if (!data?.session) return;
+  openPrivacyAccount({ trigger, deps: privacyDeps(data.session), autoDelete });
 };
 
 const logoutMember = async () => {
@@ -2514,6 +2552,13 @@ const loadSupabaseCommunity = async () => {
   }
   document.body.classList.remove('app-auth-pending');
   if (document.body.dataset.appView === 'posts') loadCommunityPosts();
+  // Back from "Sign in with Google again" (R5 re-auth): reopen the delete dialog on the profile view.
+  let reauthReturn = false;
+  try { reauthReturn = window.sessionStorage.getItem(REAUTH_DELETE_KEY) === '1'; window.sessionStorage.removeItem(REAUTH_DELETE_KEY); } catch { /* storage unavailable */ }
+  if (reauthReturn) {
+    document.querySelector('[data-nav="profile"]')?.click();
+    openPrivacy(document.querySelector('#profile-settings-button'), { autoDelete: true });
+  }
 };
 
 renderHome();
