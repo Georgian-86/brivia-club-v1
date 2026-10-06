@@ -94,10 +94,24 @@ export const photoContrast = async (page, selector) => {
     const r = el.getBoundingClientRect();
     return { color: st.color, size: parseFloat(st.fontSize), weight: Number(st.fontWeight), rect: { x: Math.max(0, r.x), y: Math.max(0, r.y), width: Math.min(r.width, window.innerWidth - Math.max(0, r.x)), height: r.height } };
   }, selector);
-  await page.evaluate((sel) => document.querySelector(sel).setAttribute('data-a11y-probe', ''), selector);
+  // The photo must really be painted: load every background image on the element and its ancestors and wait (bounded) for
+  // it to decode, so the check cannot pass against a fallback gradient while the image is still loading.
+  const images = await page.evaluate(async (sel) => {
+    const urls = [];
+    for (let el = document.querySelector(sel); el; el = el.parentElement) {
+      for (const m of getComputedStyle(el).backgroundImage.matchAll(/url\(["']?([^"')]+)["']?\)/g)) urls.push(m[1]);
+    }
+    const loaded = await Promise.all(urls.map((u) => { const img = new Image(); img.src = u; return Promise.race([img.decode().then(() => true, () => false), new Promise((r) => setTimeout(() => r(false), 8000))]); }));
+    return { urls: urls.length, loaded: loaded.filter(Boolean).length };
+  }, selector);
+  await page.waitForTimeout(150);
+  // Hide the text of the nearest block ancestor, not only the element: an inline element that wraps has a box that also
+  // covers its siblings' text, and that text must not be measured as "background".
+  await page.evaluate((sel) => { let el = document.querySelector(sel); while (el.parentElement && getComputedStyle(el).display.startsWith('inline')) el = el.parentElement; el.setAttribute('data-a11y-probe', ''); }, selector);
   if (!(await page.evaluate(() => Boolean(document.getElementById('a11y-probe-style'))))) await page.addStyleTag({ content: '[data-a11y-probe],[data-a11y-probe] *{color:transparent!important;-webkit-text-fill-color:transparent!important;text-shadow:none!important}' }).then((h) => h.evaluate((n) => { n.id = 'a11y-probe-style'; }));
   const png = await page.screenshot({ clip: info.rect });
-  await page.evaluate((sel) => document.querySelector(sel)?.removeAttribute('data-a11y-probe'), selector);
+  if (process.env.A11Y_DEBUG_DIR) (await import('node:fs')).writeFileSync(`${process.env.A11Y_DEBUG_DIR}/${selector.replace(/\W+/g, '_')}-${info.rect.width | 0}x${info.rect.height | 0}.png`, png);
+  await page.evaluate(() => document.querySelectorAll('[data-a11y-probe]').forEach((e) => e.removeAttribute('data-a11y-probe')));
   const ratio = await page.evaluate(async ({ b64, color }) => {
     const img = new Image();
     img.src = `data:image/png;base64,${b64}`;
@@ -117,5 +131,6 @@ export const photoContrast = async (page, selector) => {
     return worst;
   }, { b64: png.toString('base64'), color: info.color });
   const large = info.size >= 24 || (info.size >= 18.66 && info.weight >= 700);
-  return { ratio: Math.round(ratio * 100) / 100, large, required: large ? 3 : 4.5, color: info.color };
+  const alpha = info.color.match(/[\d.]+/g).length > 3 ? Number(info.color.match(/[\d.]+/g)[3]) : 1;
+  return { ratio: Math.round(ratio * 100) / 100, large, required: large ? 3 : 4.5, color: info.color, alpha, images };
 };

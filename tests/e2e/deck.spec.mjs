@@ -232,11 +232,18 @@ try {
   const deckContrastAll = await axeViolations(page, { rules: ['color-contrast'], include: '.app-view[data-view="home"]' });
   check(`axe color-contrast: the whole deck view has no violations (${deckContrastAll.join(' | ')})`, () => assert.deepEqual(deckContrastAll, []));
   // The kicker, heading and hint sit on a photo, which axe cannot read: measure the worst pixel behind each box instead.
-  for (const sel of ['.home-kicker span', '.home-heading h1', '.home-heading h1 em', '.swipe-hint', '#swipe-left-count']) {
-    const pc = await photoContrast(page, sel);
-    check(`deck text over the photo, ${sel}: worst-pixel contrast ${pc.ratio}:1 >= ${pc.required}:1 (${pc.color})`, () => assert.ok(pc.ratio >= pc.required));
-  }
-  await page.evaluate(() => window.scrollTo(0, 0));
+  const photoChecks = async (pg, tag) => {
+    for (const sel of ['.home-kicker span', '.home-heading h1', '.home-heading h1 em', '.swipe-hint', '#swipe-left-count']) {
+      const pc = await photoContrast(pg, sel);
+      check(`${tag} deck text over the photo, ${sel}: worst-pixel contrast ${pc.ratio}:1 >= ${pc.required}:1 (${pc.color}, ${JSON.stringify(pc.images)})`, () => {
+        assert.equal(pc.alpha, 1, 'text colour must be opaque');
+        assert.ok(pc.images.urls >= 1 && pc.images.loaded === pc.images.urls, 'the background photo must have loaded');
+        assert.ok(pc.ratio >= pc.required);
+      });
+    }
+    await pg.evaluate(() => window.scrollTo(0, 0));
+  };
+  await photoChecks(page, '1440:');
   const deckSmall = await smallText(page, { root: '.app-view[data-view="home"]' });
   check(`deck: visible text is at least 12 px (${deckSmall.join(' | ')})`, () => assert.deepEqual(deckSmall, []));
   const quotaStyle = await page.evaluate(() => { const el = document.querySelector('#swipe-left-count'); const s = getComputedStyle(el); return { size: parseFloat(s.fontSize), color: s.color }; });
@@ -460,6 +467,7 @@ try {
   const small = await open(narrow);
   await waitForCard(small, 'Asha Band');
   await small.waitForTimeout(400);
+  await photoChecks(small, '375:');
   const layout = await small.evaluate(() => {
     const tags = document.querySelector('#swipe-tags');
     const cardBox = document.querySelector('#swipe-card').getBoundingClientRect();
