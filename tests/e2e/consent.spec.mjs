@@ -1201,7 +1201,7 @@ try {
     return d ? {
       status: d.querySelector('[data-privacy-status]')?.textContent.trim(), withdraw: Boolean(d.querySelector('[data-privacy-withdraw]')), del: d.querySelector('[data-privacy-delete]')?.textContent.trim(),
       links: [...d.querySelectorAll('a')].map((a) => a.getAttribute('href')), noHScroll: d.scrollWidth <= d.clientWidth, docNoHScroll: document.documentElement.scrollWidth <= window.innerWidth,
-      small: [...d.querySelectorAll('button, a')].filter((b) => b.getBoundingClientRect().height < 43.5).map((b) => b.textContent.trim()),
+      small: [...d.querySelectorAll('button, a')].filter((b) => !b.closest('[hidden]') && !b.hidden && b.getBoundingClientRect().height < 43.5).map((b) => b.textContent.trim()),
       fonts: [...d.querySelectorAll('p, small, li, label, a, button, span')].filter((e) => e.textContent.trim() && parseFloat(getComputedStyle(e).fontSize) < 12).map((e) => e.textContent.trim().slice(0, 20)),
     } : null;
   });

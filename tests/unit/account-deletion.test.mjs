@@ -151,7 +151,7 @@ test('consentStatusCopy: given on a date, or not given', () => {
 });
 
 test('clearBriviaKeys removes only brivia-* keys', () => {
-  const data = new Map([['brivia-a', '1'], ['brivia-hidden-chats:x', '2'], ['sb-auth', '3']]);
+  const data = new Map([['brivia-a', '1'], ['brivia-hidden-chats:x', '2'], ['sb-abc-auth-token', '4'], ['sb-auth', '3']]);
   const store = { removeItem: (k) => data.delete(k) };
   Object.defineProperty(store, 'keys', { value: () => [...data.keys()] });
   // emulate Object.keys(store) on a Storage by defining enumerable props

@@ -76,12 +76,12 @@ export const deletionErrorCopy = (stage) => {
   return RPC_FAILED_COPY;
 };
 
-// Removes every `brivia-*` key from the given Web Storage objects (and any key a member-scoped helper prefixed so).
+// Removes every `brivia-*` key and the Supabase auth token (`sb-*-auth-token`, so a failed signOut leaves no stale JWT).
 export const clearBriviaKeys = (...stores) => {
   stores.forEach((store) => {
     try {
       if (!store) return;
-      Object.keys(store).filter((key) => key.startsWith('brivia-')).forEach((key) => store.removeItem(key));
+      Object.keys(store).filter((key) => key.startsWith('brivia-') || /^sb-.*-auth-token$/.test(key)).forEach((key) => store.removeItem(key));
     } catch { /* storage unavailable */ }
   });
 };

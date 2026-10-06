@@ -603,6 +603,8 @@ try {
   check('Tab stays inside the report dialog (focus trap)', () => assert.equal(escaped, false));
   await rep.keyboard.press('Escape');
   await rep.waitForFunction(() => !document.querySelector('dialog.report-dialog[open]'));
+  // The dialog's `close` event (which removes it and restores focus) is queued after `open` is removed, so wait, bounded.
+  await rep.waitForFunction(() => /card-more/.test(document.activeElement?.className || ''), null, { timeout: 3000 }).catch(() => {});
   const back = await rep.evaluate(() => document.activeElement?.className || '');
   check(`Escape closes the dialog and returns focus to the overflow button (${back})`, () => assert.match(back, /card-more/));
   check('closing the dialog reported nothing', () => assert.equal(reportCalls().length, 0));

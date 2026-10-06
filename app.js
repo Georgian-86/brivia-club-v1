@@ -1612,14 +1612,14 @@ const privacyDeps = (session) => ({
     storage: supabase.storage,
     rpc: (name, args) => supabase.rpc(name, args),
     signOut: (options) => supabase.auth.signOut(options),
-    clearLocal: () => clearBriviaKeys(window.localStorage, window.sessionStorage),
+    clearLocal: () => clearBriviaKeys(window.localStorage, window.sessionStorage), // also the sb-*-auth-token keys
     buckets: DELETE_BUCKETS,
     uid: session.user.id,
   }),
   signInWithPassword: (email, password) => supabase.auth.signInWithPassword({ email, password }),
   startGoogle: async () => {
-    try { window.sessionStorage.setItem(REAUTH_DELETE_KEY, '1'); } catch { /* the member can reopen the dialog by hand */ }
-    const { error } = await supabase.auth.signInWithOAuth({ provider: 'google', options: { redirectTo: `${window.location.origin}/auth.html`, queryParams: { prompt: 'login' } } });
+    try { window.sessionStorage.setItem(REAUTH_DELETE_KEY, String(Date.now())); } catch { /* the member can reopen the dialog by hand */ }
+    const { error } = await supabase.auth.signInWithOAuth({ provider: 'google', options: { redirectTo: `${window.location.origin}/auth.html`, queryParams: { prompt: 'select_account' } } });
     if (error) { try { window.sessionStorage.removeItem(REAUTH_DELETE_KEY); } catch { /* ignore */ } throw error; }
   },
   onDeleted: () => window.location.assign('/privacy.html?deleted=1'),
@@ -2554,7 +2554,7 @@ const loadSupabaseCommunity = async () => {
   if (document.body.dataset.appView === 'posts') loadCommunityPosts();
   // Back from "Sign in with Google again" (R5 re-auth): reopen the delete dialog on the profile view.
   let reauthReturn = false;
-  try { reauthReturn = window.sessionStorage.getItem(REAUTH_DELETE_KEY) === '1'; window.sessionStorage.removeItem(REAUTH_DELETE_KEY); } catch { /* storage unavailable */ }
+  try { const stamp = Number(window.sessionStorage.getItem(REAUTH_DELETE_KEY)); window.sessionStorage.removeItem(REAUTH_DELETE_KEY); reauthReturn = stamp > 0 && Date.now() - stamp < 10 * 60 * 1000; } catch { /* storage unavailable */ }
   if (reauthReturn) {
     document.querySelector('[data-nav="profile"]')?.click();
     openPrivacy(document.querySelector('#profile-settings-button'), { autoDelete: true });

@@ -150,12 +150,14 @@ const openDeleteDialog = ({ trigger, fallbackFocus, deps }) => {
 export const openPrivacyAccount = async ({ trigger, deps, autoDelete = false }) => {
   if (document.querySelector('dialog.privacy-dialog[data-privacy="account"]')) return;
   let consentAt = null;
-  try { consentAt = await deps.fetchConsentAt(); } catch { consentAt = null; }
+  let consentLoadFailed = false;
+  try { consentAt = await deps.fetchConsentAt(); } catch { consentLoadFailed = true; }
   const { dialog, close } = createDialog({
     kind: 'account', trigger,
     html: `<div class="privacy-body">
     <h2 id="__ID__">Privacy &amp; account</h2>
     <p data-privacy-status></p>
+    <div class="privacy-actions privacy-actions-start" data-privacy-retry-row hidden><button type="button" class="privacy-secondary" data-privacy-retry>Try again</button></div>
     <div class="privacy-actions privacy-actions-start"><button type="button" class="privacy-secondary" data-privacy-withdraw>Withdraw consent</button></div>
     <p class="privacy-links"><a href="/privacy.html">Privacy notice</a> · <a href="mailto:${CONTACT}">Contact us: ${CONTACT}</a></p>
     <hr />
@@ -167,8 +169,18 @@ export const openPrivacyAccount = async ({ trigger, deps, autoDelete = false }) 
   const status = dialog.querySelector('[data-privacy-status]');
   const withdrawBtn = dialog.querySelector('[data-privacy-withdraw]');
   const deleteBtn = dialog.querySelector('[data-privacy-delete]');
-  const render = () => { status.textContent = consentStatusCopy(consentAt); withdrawBtn.hidden = !consentAt; };
+  const retryRow = dialog.querySelector('[data-privacy-retry-row]');
+  const render = () => {
+    status.textContent = consentLoadFailed ? "We couldn't load your consent status. Try again." : consentStatusCopy(consentAt);
+    withdrawBtn.hidden = consentLoadFailed || !consentAt;
+    retryRow.hidden = !consentLoadFailed;
+  };
   render();
+  dialog.querySelector('[data-privacy-retry]').addEventListener('click', async () => {
+    try { consentAt = await deps.fetchConsentAt(); consentLoadFailed = false; } catch { consentLoadFailed = true; }
+    render();
+    (consentLoadFailed ? dialog.querySelector('[data-privacy-retry]') : (consentAt ? withdrawBtn : deleteBtn)).focus();
+  });
   dialog.querySelector('[data-privacy-close]').addEventListener('click', close);
   withdrawBtn.addEventListener('click', async () => {
     const withdrawn = await openWithdrawDialog({ trigger: withdrawBtn, fallbackFocus: () => deleteBtn, withdraw: deps.withdrawConsent });
@@ -180,6 +192,6 @@ export const openPrivacyAccount = async ({ trigger, deps, autoDelete = false }) 
   });
   deleteBtn.addEventListener('click', () => openDeleteDialog({ trigger: deleteBtn, fallbackFocus: () => deleteBtn, deps }));
   dialog.showModal();
-  (consentAt ? withdrawBtn : deleteBtn).focus();
+  (consentLoadFailed ? dialog.querySelector('[data-privacy-retry]') : consentAt ? withdrawBtn : deleteBtn).focus();
   if (autoDelete) openDeleteDialog({ trigger: deleteBtn, fallbackFocus: () => deleteBtn, deps });
 };
