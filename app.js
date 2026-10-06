@@ -15,7 +15,7 @@ import './chat-sidebar-fix.css';
 import './app-navigation.css';
 import './discovery-filters.css';
 import './mobile-app.css';
-import { supabase, rowToProfile, saveProfile, onboardingStatus, sendSignal, fetchSignalQuota, isRateLimited, isStorageImageUrl, withoutCredentials, uploadMessageAttachment, removeMessageAttachment, uploadCommunityPostImage, removeCommunityPostImage } from './supabase.js';
+import { supabase, rowToProfile, saveProfile, onboardingStatus, sendSignal, fetchSignalQuota, isRateLimited, isStorageImageUrl, withoutCredentials, uploadMessageAttachment, removeMessageAttachment, uploadCommunityPostImage, removeCommunityPostImage, ImageProcessingError } from './supabase.js';
 import { defaultCoverUrl, normalizeCoverUrl } from './cover-assets.js';
 import { quotaLabel, quotaErrorText, quotaBlocked, quotaNotice } from './signal-quota.js';
 import { pitchLine, deckChips, deckEmptyState, deckFields } from './deck-view.js';
@@ -1483,8 +1483,8 @@ const openProfileEditor = () => {
         <div class="profile-edit-wide profile-edit-readonly" data-profile-area><span>YOUR AREA</span><p>${escapeHtml(memberPlaceLabel || 'Not set yet')}</p><small class="profile-edit-helper">Change your area: coming soon. Other members only ever see a rough distance, never your area's name.</small></div>
         <div class="profile-edit-wide profile-edit-readonly"><span>SKILLS / INTERESTS</span><p>${escapeHtml(profile.skills || 'Pick interests in your profile setup')}</p><small class="profile-edit-helper">These come from your interests and passion points. Private interests are never shown.</small></div>
         <label class="profile-edit-wide"><span>LOOKING FOR</span><input name="lookingFor" list="profile-edit-looking-options" value="${escapeHtml(profile.lookingFor || '')}" placeholder="Search or type what you are looking for" /><datalist id="profile-edit-looking-options">${profileEditDatalist('lookingFor')}</datalist><small class="profile-edit-helper">Choose from suggestions or type your own.</small></label>
-        <label><span>PROFILE PHOTO</span><input name="photoFile" type="file" accept="image/*" /></label>
-        <label><span>COVER PHOTO</span><input name="coverFile" type="file" accept="image/*" /></label>
+        <label><span>PROFILE PHOTO</span><input name="photoFile" type="file" accept="image/*" aria-describedby="profile-photo-error" /><small class="media-inline-error" id="profile-photo-error" role="alert" hidden></small></label>
+        <label><span>COVER PHOTO</span><input name="coverFile" type="file" accept="image/*" aria-describedby="profile-cover-error" /><small class="media-inline-error" id="profile-cover-error" role="alert" hidden></small></label>
       </div>
       <p class="profile-edit-feedback" id="profile-edit-feedback" role="status"></p>
       <div class="profile-edit-actions"><button type="button" class="profile-edit-cancel" data-profile-edit-close>CANCEL</button><button type="submit" class="profile-edit-save">SAVE CHANGES <span>↗</span></button></div>
@@ -1510,11 +1510,23 @@ const openProfileEditor = () => {
     const photoFile = form.querySelector('[name="photoFile"]')?.files?.[0] || null;
     const coverFile = form.querySelector('[name="coverFile"]')?.files?.[0] || null;
     if (!nextProfile.name) { feedback.textContent = 'Please add your name.'; return; }
+    const photoError = form.querySelector('#profile-photo-error');
+    const coverError = form.querySelector('#profile-cover-error');
+    [photoError, coverError].forEach((node) => { node.hidden = true; node.textContent = ''; });
     submit.disabled = true;
     feedback.textContent = 'Saving your profile...';
-    const { data, error } = await saveProfile(memberProfile.id, nextProfile, photoFile, coverFile);
+    const { data, error } = await saveProfile(memberProfile.id, nextProfile, photoFile, coverFile, { photoUrl: memberProfile.photoUrl, coverUrl: memberProfile.coverUrl });
     if (error) {
       submit.disabled = false;
+      if (error instanceof ImageProcessingError) {
+        // Inline beside the field that failed (nothing was uploaded); photo is processed first.
+        const target = error.field === 'cover' ? coverError : photoError;
+        target.textContent = error.message;
+        target.hidden = false;
+        feedback.textContent = '';
+        form.querySelector(error.field === 'cover' ? '[name="coverFile"]' : '[name="photoFile"]')?.focus();
+        return;
+      }
       feedback.textContent = error.message || 'Profile could not be saved.';
       return;
     }
@@ -1870,7 +1882,7 @@ document.querySelector('#community-post-form')?.addEventListener('submit', async
   if (!file.type.startsWith('image/')) { if (feedback) feedback.textContent = 'Please choose an image file.'; return; }
   if (file.size > 8 * 1024 * 1024) { if (feedback) feedback.textContent = 'Keep the image under 8MB.'; return; }
   submit.disabled = true;
-  if (feedback) feedback.textContent = 'Publishing your post...';
+  if (feedback) { feedback.textContent = 'Publishing your post...'; feedback.setAttribute('role', 'alert'); }
   let upload = null;
   try {
     upload = await uploadCommunityPostImage(memberProfile.id, file);
@@ -1886,7 +1898,8 @@ document.querySelector('#community-post-form')?.addEventListener('submit', async
     showToast('Your post is live in Explore.');
   } catch (error) {
     if (upload?.path) await removeCommunityPostImage(upload.path);
-    if (feedback) feedback.textContent = /community_posts|relation|schema cache/i.test(error.message || '')
+    if (error instanceof ImageProcessingError) { if (feedback) feedback.textContent = error.message; }
+    else if (feedback) feedback.textContent = /community_posts|relation|schema cache/i.test(error.message || '')
       ? 'Run the SQL files in supabase/migrations/ (in order), then try again.'
       : (error.message || 'Your post could not be published.');
   } finally {
@@ -2069,6 +2082,12 @@ const queueChatGif = (gif) => {
   pendingChatGif = gif;
   renderPendingChatFiles();
 };
+const setChatAttachmentError = (message) => {
+  const node = document.querySelector('#chat-attachment-error');
+  if (!node) return;
+  node.textContent = message || '';
+  node.hidden = !message;
+};
 const renderPendingChatFiles = () => {
   const preview = document.querySelector('#chat-attachment-preview');
   if (!preview) return;
@@ -2085,6 +2104,9 @@ const renderPendingChatFiles = () => {
     preview.innerHTML += `<div class="chat-attachment-chip"><span class="chat-attachment-thumb"><img src="${escapeHtml(pendingChatGif.url)}" alt="${escapeHtml(pendingChatGif.label)} GIF" /></span><span class="chat-attachment-chip-copy"><strong>${escapeHtml(pendingChatGif.label)} GIF</strong><small>GIF · READY TO SEND</small></span><button type="button" data-remove-chat-gif aria-label="Remove GIF">×</button></div>`;
   }
   preview.hidden = !pendingChatFiles.length && !pendingChatGif;
+  const videoWarning = document.querySelector('#chat-video-warning');
+  if (videoWarning) videoWarning.hidden = !pendingChatFiles.some((entry) => entry.kind === 'video');
+  setChatAttachmentError('');
   preview.querySelectorAll('[data-remove-chat-file]').forEach((button) => button.addEventListener('click', () => {
     const index = Number(button.dataset.removeChatFile);
     const [removed] = pendingChatFiles.splice(index, 1);
@@ -2158,6 +2180,11 @@ const ensureChatComposer = () => {
   preview.className = 'chat-attachment-preview';
   preview.hidden = true;
   form.parentElement.insertBefore(preview, form);
+  const note = document.createElement('div');
+  note.className = 'chat-attachment-note';
+  note.innerHTML = '<p class="chat-video-warning" id="chat-video-warning" hidden>Videos can include the place they were filmed. Send only if you\'re comfortable sharing that.</p><p class="chat-attachment-error" id="chat-attachment-error" role="alert" hidden></p>';
+  form.parentElement.insertBefore(note, form);
+  form.querySelector('#chat-input')?.setAttribute('aria-describedby', 'chat-video-warning chat-attachment-error');
   form.insertAdjacentHTML('afterbegin', '<div class="chat-compose-tools"><button class="chat-compose-icon" id="chat-emoji-toggle" type="button" aria-label="Open emoji picker" aria-expanded="false">☺</button><button class="chat-compose-icon" id="chat-attach-toggle" type="button" aria-label="Open attachment options" aria-expanded="false">+</button><div class="chat-emoji-picker" id="chat-emoji-picker" hidden><button type="button" data-chat-emoji="😀">😀</button><button type="button" data-chat-emoji="😂">😂</button><button type="button" data-chat-emoji="😍">😍</button><button type="button" data-chat-emoji="🔥">🔥</button><button type="button" data-chat-emoji="👏">👏</button><button type="button" data-chat-emoji="✨">✨</button><button type="button" data-chat-emoji="🤝">🤝</button><button type="button" data-chat-emoji="❤️">❤️</button></div><div class="chat-attachment-menu" id="chat-attachment-menu" hidden><button type="button" data-chat-picker="photo">PHOTO / VIDEO</button><button type="button" data-chat-picker="document">DOCUMENT</button><button type="button" data-chat-picker="gif">GIF</button><button type="button" data-chat-picker="camera">CAMERA</button></div></div>');
   form.querySelector('.chat-compose-tools')?.insertAdjacentHTML('beforeend', '<div class="chat-gif-picker" id="chat-gif-picker" hidden></div>');
   form.insertAdjacentHTML('beforeend', '<input id="chat-photo-input" type="file" accept="image/*,video/*" multiple hidden /><input id="chat-document-input" type="file" accept=".pdf,.doc,.docx,.txt,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain" multiple hidden /><input id="chat-camera-input" type="file" accept="image/*" capture="environment" hidden />');
@@ -2266,6 +2293,11 @@ document.querySelector('#chat-form')?.addEventListener('submit', async (event) =
     resetPendingChatFiles();
     await loadChatMessages(selectedChat);
   } catch (error) {
+    if (error instanceof ImageProcessingError) {
+      // Refused, nothing sent: shown inline in the composer, not as a toast.
+      setChatAttachmentError(error.message);
+      return;
+    }
     showToast(/row-level security|policy|brivia_is_blocked_between|blocked/i.test(error?.message || '')
       ? 'This conversation is blocked. Unblock the user before sending a message.'
       : (error.message || 'Message could not be saved.'));

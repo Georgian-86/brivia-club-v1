@@ -204,3 +204,10 @@ body.app-body[data-app-view="chat"] .chat-layout>.chat-window{
   .message-attachment-image{max-height:240px}
   .message-attachment-video{max-height:240px}
 }
+
+.chat-attachment-note{display:flex;flex-direction:column;gap:4px;padding:0 14px}
+.chat-attachment-note p{margin:6px 0 0;font:600 12px/1.4 'Instrument Sans',Arial,sans-serif;color:#5a061f}
+.chat-attachment-note .chat-attachment-error{color:#a3203a}
+.chat-attachment-note p[hidden]{display:none}
+.media-inline-error{display:block;margin:6px 0 0;font:600 12px/1.4 'Instrument Sans',Arial,sans-serif;color:#a3203a}
+.media-inline-error[hidden]{display:none}

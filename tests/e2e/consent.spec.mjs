@@ -761,12 +761,53 @@ try {
   const previewSrc = await hardPage.locator('#chat-attachment-preview img').first().getAttribute('src');
   check(`local attachment preview uses a blob: URL (got ${String(previewSrc).slice(0, 20)})`, () => assert.match(previewSrc || '', /^blob:/));
   await hardPage.evaluate(() => document.querySelector('[data-remove-chat-file]')?.click());
+  const VIDEO_WARNING = "Videos can include the place they were filmed. Send only if you're comfortable sharing that.";
+  const warningState = () => hardPage.evaluate(() => { const n = document.querySelector('#chat-video-warning'); return n ? { text: n.textContent, visible: !n.hidden && n.getBoundingClientRect().height > 0 } : null; });
+  const imageWarning = await warningState();
+  check(`no video warning without a video (${JSON.stringify(imageWarning)})`, () => assert.equal(imageWarning?.visible, false));
+  await hardPage.setInputFiles('#chat-photo-input', { name: 'clip.mp4', mimeType: 'video/mp4', buffer: Buffer.from('not-a-real-video') });
+  await hardPage.waitForSelector('#chat-attachment-preview .chat-attachment-chip', { timeout: 5000 });
+  const videoWarning = await warningState();
+  check(`selecting a video shows the exact warning inline before Send (${JSON.stringify(videoWarning)})`, () => {
+    assert.equal(videoWarning?.text, VIDEO_WARNING);
+    assert.equal(videoWarning?.visible, true);
+  });
+  await hardPage.evaluate(() => document.querySelector('[data-remove-chat-file]')?.click());
+  const afterRemove = await warningState();
+  check('removing the video hides the warning again', () => assert.equal(afterRemove?.visible, false));
+  // 8e2. A chat image that cannot be re-encoded is refused inline in the composer: nothing uploaded, nothing sent.
+  const chatCallsBefore = hard.calls.length;
+  await hardPage.setInputFiles('#chat-photo-input', { name: 'broken.png', mimeType: 'image/png', buffer: Buffer.from('this is not an image') });
+  await hardPage.waitForSelector('#chat-attachment-preview .chat-attachment-chip', { timeout: 5000 });
+  await hardPage.locator('#chat-form button[type="submit"]').click();
+  await hardPage.waitForFunction(() => !document.querySelector('#chat-attachment-error')?.hidden, null, { timeout: 8000 });
+  const chatError = await hardPage.evaluate(() => ({ text: document.querySelector('#chat-attachment-error')?.textContent, role: document.querySelector('#chat-attachment-error')?.getAttribute('role'), toast: document.querySelector('#app-toast')?.textContent || '' }));
+  const chatUploads = hard.calls.slice(chatCallsBefore).filter((c) => c.method !== 'GET' && (c.path.startsWith('/storage/v1/object/message-attachments') || c.path === '/rest/v1/brivia_messages'));
+  check(`unprocessable chat image: inline error, no upload, no message, no toast (${JSON.stringify(chatError)})`, () => {
+    assert.equal(chatError.text, "We couldn't process this photo. Try a JPG or PNG.");
+    assert.equal(chatError.role, 'alert');
+    assert.ok(!/process this photo/.test(chatError.toast));
+    assert.equal(chatUploads.length, 0);
+  });
+  await hardPage.evaluate(() => document.querySelector('[data-remove-chat-file]')?.click());
 
   // 8f. A failed profile-photo upload fails visibly and never stores a data: URL.
   await hardPage.evaluate(() => document.querySelector('[data-nav="profile"]')?.click());
   await hardPage.waitForSelector('#profile-photo-editor', { timeout: 8000 });
   await hardPage.locator('#profile-photo-editor').click();
   await hardPage.waitForSelector('#profile-edit-form');
+  // 8f0. An unprocessable photo shows the inline error beside the field; nothing is uploaded or written.
+  const editCallsBefore = hard.calls.length;
+  await hardPage.setInputFiles('#profile-edit-form [name="photoFile"]', { name: 'broken.png', mimeType: 'image/png', buffer: Buffer.from('this is not an image') });
+  await hardPage.locator('#profile-edit-form [type="submit"]').click();
+  await hardPage.waitForFunction(() => !document.querySelector('#profile-photo-error')?.hidden, null, { timeout: 8000 });
+  const editError = await hardPage.evaluate(() => ({ text: document.querySelector('#profile-photo-error')?.textContent, linked: document.querySelector('[name="photoFile"]')?.getAttribute('aria-describedby') }));
+  const editWrites = hard.calls.slice(editCallsBefore).filter((c) => c.method !== 'GET' && (c.path.startsWith('/storage/') || c.path === '/rest/v1/profiles'));
+  check(`unprocessable profile photo: inline error linked by aria-describedby, nothing uploaded (${JSON.stringify(editError)})`, () => {
+    assert.equal(editError.text, "We couldn't process this photo. Try a JPG or PNG.");
+    assert.equal(editError.linked, 'profile-photo-error');
+    assert.equal(editWrites.length, 0);
+  });
   await hardPage.setInputFiles('#profile-edit-form [name="photoFile"]', { name: 'me.png', mimeType: 'image/png', buffer: Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=', 'base64') });
   await hardPage.locator('#profile-edit-form [type="submit"]').click();
   // Settles when the editor shows a result, or closes (the old data-URL fallback "succeeded" and closed it).

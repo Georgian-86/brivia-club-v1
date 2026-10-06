@@ -231,6 +231,11 @@ From a member's point of view (D-015..D-018):
 3. **Blocks stay invisible.** Accepting a request from someone you have blocked (or who blocked you) shows no error and creates no match. It is quietly recorded as declined.
 4. **A like opens the pitch sheet.** Nothing is sent until the sheet closes. Send delivers one request with your note. Closing it, pressing Escape, tapping outside or swiping to the next card delivers one request without a note.
 
+### E. Media (R12, Iteration 4)
+- Every image upload (signup photo/cover, profile editor, chat image, community post) is re-encoded to JPEG (max 1280 px, EXIF dropped). If that fails (decode error, no 2d context, null blob) the original is NEVER used: the action stops and the inline message "We couldn't process this photo. Try a JPG or PNG." shows beside the field (`role="alert"`, linked by `aria-describedby`), in the chat composer, or in the post composer. Not a toast. Signup stops before any account or profile write and returns to step 4. GIFs pass through unchanged.
+- Chat: choosing a video shows "Videos can include the place they were filmed. Send only if you're comfortable sharing that." inline above the composer, before Send; hidden for other attachments.
+- Replacing a profile photo or cover removes the previous object only if it is the member's own file in the same bucket (never a preset cover or another member's path); its error is ignored.
+
 ## Verification (webapp-testing skill)
 
 Use Playwright against `npm run dev`:

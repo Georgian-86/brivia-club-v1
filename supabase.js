@@ -1,5 +1,8 @@
 import { createClient } from '@supabase/supabase-js';
 import { NOTICE_VERSION } from './notice-version.js';
+import { compressImage, replacedObjectPath, ImageProcessingError } from './image-compress.js';
+
+export { ImageProcessingError, PHOTO_ERROR_MESSAGE } from './image-compress.js';
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL?.trim();
 const supabaseKey = (import.meta.env.VITE_SUPABASE_ANON_KEY || import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY)?.trim();
@@ -68,31 +71,6 @@ const normalizeGender = (value) => {
   if (gender === 'female') return 'Female';
   if (['prefer not to say', 'prefer_not_to_say', 'prefer not say'].includes(gender)) return 'Prefer not to say';
   return null;
-};
-
-const compressImage = async (file) => {
-  if (!file || !(file.type || '').startsWith('image/')) return file;
-  const objectUrl = URL.createObjectURL(file);
-  try {
-    const image = new Image();
-    image.decoding = 'async';
-    image.src = objectUrl;
-    await image.decode();
-    const maxSize = 1280;
-    const scale = Math.min(1, maxSize / Math.max(image.naturalWidth, image.naturalHeight));
-    const canvas = document.createElement('canvas');
-    canvas.width = Math.max(1, Math.round(image.naturalWidth * scale));
-    canvas.height = Math.max(1, Math.round(image.naturalHeight * scale));
-    const context = canvas.getContext('2d');
-    if (!context) return file;
-    context.drawImage(image, 0, 0, canvas.width, canvas.height);
-    const blob = await new Promise((resolve) => canvas.toBlob(resolve, 'image/jpeg', 0.78));
-    return blob ? new File([blob], `${file.name.replace(/\.[^.]+$/, '')}.jpg`, { type: 'image/jpeg', lastModified: Date.now() }) : file;
-  } catch {
-    return file;
-  } finally {
-    URL.revokeObjectURL(objectUrl);
-  }
 };
 
 const fileToDataUrl = (file) => new Promise((resolve, reject) => {
@@ -215,13 +193,21 @@ export const removeCommunityPostImage = async (path) => {
   await supabase.storage.from('community-posts').remove([path]);
 };
 
-export const saveProfile = async (userId, profile, photoFile, coverFile = null) => {
+// After a successful replace + profile save, drop the previous object, only when it is this member's own file in the
+// same bucket (never a preset cover or another member's path). Its error is ignored: a stray file is harmless.
+const removeReplacedImage = async (bucket, userId, previousUrl, newUrl) => {
+  const objectPath = replacedObjectPath(previousUrl, newUrl, (value) => isStorageImageUrl(value, bucket, userId));
+  if (!objectPath) return;
+  try { await supabase.storage.from(bucket).remove([objectPath]); } catch { /* ignored */ }
+};
+
+export const saveProfile = async (userId, profile, photoFile, coverFile = null, previous = {}) => {
   if (!supabase) return { data: null, error: new Error('Supabase is not configured.') };
   let photoUrl;
   let coverUrl;
   try {
-    photoUrl = await uploadProfilePhoto(userId, photoFile);
-    coverUrl = coverFile ? await uploadProfileCover(userId, coverFile) : (profile.coverUrl || profile.cover_url || '');
+    try { photoUrl = await uploadProfilePhoto(userId, photoFile); } catch (error) { if (error instanceof ImageProcessingError) error.field = 'photo'; throw error; }
+    try { coverUrl = coverFile ? await uploadProfileCover(userId, coverFile) : (profile.coverUrl || profile.cover_url || ''); } catch (error) { if (error instanceof ImageProcessingError) error.field = 'cover'; throw error; }
   } catch (error) {
     return { data: null, error };
   }
@@ -244,6 +230,10 @@ export const saveProfile = async (userId, profile, photoFile, coverFile = null) 
   if (result.error && /cover_url|column/i.test(result.error.message || '')) {
     const { cover_url: ignoredCoverUrl, ...legacyRow } = row;
     result = await write(legacyRow);
+  }
+  if (!result.error) {
+    if (photoFile && photoUrl) await removeReplacedImage('profile-photos', userId, previous.photoUrl, photoUrl);
+    if (coverFile && coverUrl) await removeReplacedImage('profile-covers', userId, previous.coverUrl, coverUrl);
   }
   return result;
 };

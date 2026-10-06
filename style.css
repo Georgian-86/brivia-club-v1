@@ -621,3 +621,6 @@ body.auth-open{overflow:hidden}
 .menu-drawer-brand strong,
 .menu-drawer nav a b{color:#722039!important}
 .menu-drawer nav a:hover{color:#5a061f!important}
+
+.media-inline-error{display:block;margin:6px 0 0;font:600 12px/1.4 'Instrument Sans',Arial,sans-serif;color:#a3203a}
+.media-inline-error[hidden]{display:none}

@@ -582,6 +582,25 @@ try {
     await page.waitForSelector('[data-signup-step="4"]:not([hidden])');
     const label4 = await stepLabel(page);
     check(`375: "STEP 4 OF 4" (got "${label4}")`, () => assert.match(label4, /^STEP 4 OF 4\b/));
+    // R12: a photo that cannot be re-encoded stops the submit BEFORE any account or profile write, on step 4,
+    // with the inline error linked to the photo field.
+    await page.locator('[data-signup-step="4"] input[name="password"]').fill('correct horse 1');
+    await page.locator('[data-signup-step="4"] input[name="passwordConfirm"]').fill('correct horse 1');
+    await page.locator('.photo-input').setInputFiles({ name: 'broken.png', mimeType: 'image/png', buffer: Buffer.from('this is not an image') });
+    await page.locator('[data-signup-step="4"] [type="submit"]').click();
+    await page.waitForFunction(() => !document.querySelector('#profile-photo-error')?.hidden, null, { timeout: 8000 });
+    const photoFail = await page.evaluate(() => ({ text: document.querySelector('#profile-photo-error')?.textContent, role: document.querySelector('#profile-photo-error')?.getAttribute('role'), linked: document.querySelector('.photo-input')?.getAttribute('aria-describedby'), step4: !document.querySelector('[data-signup-step="4"]')?.hidden }));
+    check(`375: unprocessable signup photo shows the inline error on step 4 (${JSON.stringify(photoFail)})`, () => {
+      assert.equal(photoFail.text, "We couldn't process this photo. Try a JPG or PNG.");
+      assert.equal(photoFail.role, 'alert');
+      assert.equal(photoFail.linked, 'profile-photo-error');
+      assert.equal(photoFail.step4, true);
+    });
+    check('375: no signUp or profile write before the photo problem is fixed', () => {
+      assert.equal(stub.posts('/auth/v1/signup').length, 0);
+      assert.equal(stub.posts('/rest/v1/profiles').length, 0);
+    });
+    await page.locator('.photo-input').setInputFiles([]);
     await finishStepFour(page);
     // The first set_home_city answers PT429: back on step 2 with "Try again later." beside the location step.
     await page.waitForSelector('[data-signup-step="2"]:not([hidden])', { timeout: 15000 });
