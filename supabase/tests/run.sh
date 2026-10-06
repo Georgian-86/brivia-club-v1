@@ -57,11 +57,21 @@ grep -q 'try again later' "$DATA/log" || { echo "FAIL: the over-cap probe error 
 "${PSQL[@]}" -d postgres -c "create database ${DB}_drift encoding 'UTF8' template template0"
 ( DB=${DB}_drift; echo "## database $DB (0006 drift check)"
   run tests/supabase-stub.sql
-  for m in "$STAGE"/migrations/000[1-5]_*.sql; do run "migrations/$(basename "$m")"; done
+  # Exactly 0001-0005: a renamed or missing file must fail here, not silently shrink the "before" state.
+  files=("$STAGE"/migrations/000[1-5]_*.sql)
+  [ "${#files[@]}" -eq 5 ] || { echo "FAIL: drift check expects exactly 5 migrations 0001-0005, matched ${#files[@]}"; exit 1; }
+  for m in "${files[@]}"; do run "migrations/$(basename "$m")"; done
   "${PSQL[@]}" -d $DB -f "$STAGE/tests/policy-snapshot.sql" > "$STAGE/policies.before.tsv"
   run migrations/0006_perf_policies.sql; run migrations/0006_perf_policies.sql
   "${PSQL[@]}" -d $DB -f "$STAGE/tests/policy-snapshot.sql" > "$STAGE/policies.after.tsv"
-  [ -s "$STAGE/policies.before.tsv" ] || { echo "FAIL: empty policy snapshot"; exit 1; }
+  [ -s "$STAGE/policies.before.tsv" ] || { echo "FAIL: empty policy snapshot (before)"; exit 1; }
+  [ -s "$STAGE/policies.after.tsv" ] || { echo "FAIL: empty policy snapshot (after)"; exit 1; }
+  # Pin both snapshots to the committed files (byte for byte). A migration that changes a policy must update them
+  # deliberately; the README tells the founder to compare live policies against these same files before 0006.
+  diff -u "$HERE/policies-0005.expected.tsv" "$STAGE/policies.before.tsv" \
+    || { echo "FAIL: 0001-0005 policies differ from supabase/tests/policies-0005.expected.tsv"; exit 1; }
+  diff -u "$HERE/policies-0006.expected.tsv" "$STAGE/policies.after.tsv" \
+    || { echo "FAIL: policies after 0006 differ from supabase/tests/policies-0006.expected.tsv"; exit 1; }
   if ! diff -u "$STAGE/policies.before.tsv" "$STAGE/policies.after.tsv"; then
     echo "FAIL: 0006 changed a policy beyond the auth.uid() wrapper"; exit 1; fi
   bad=$("${PSQL[@]}" -d $DB -At -f "$STAGE/tests/policy-unwrapped.sql")

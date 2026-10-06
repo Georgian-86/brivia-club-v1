@@ -1,0 +1,35 @@
+public	brivia_blocks	Members can create their own blocks	INSERT	{authenticated}	PERMISSIVE	-	(blocker_id = auth.uid())
+public	brivia_blocks	Members can remove their own blocks	DELETE	{authenticated}	PERMISSIVE	(blocker_id = auth.uid())	-
+public	brivia_blocks	Members can view their own blocks	SELECT	{authenticated}	PERMISSIVE	(blocker_id = auth.uid())	-
+public	brivia_messages	Completed members can send messages	INSERT	{authenticated}	PERMISSIVE	-	(( SELECT brivia_has_completed_profile() AS brivia_has_completed_profile) AND (sender_id = auth.uid()) AND brivia_private.brivia_can_message(recipient_id))
+public	brivia_messages	Completed members can view their messages	SELECT	{authenticated}	PERMISSIVE	(( SELECT brivia_has_completed_profile() AS brivia_has_completed_profile) AND ((auth.uid() = sender_id) OR (auth.uid() = recipient_id)))	-
+public	career_applications	Anyone can submit career applications	INSERT	{anon,authenticated}	PERMISSIVE	-	true
+public	community_posts	Members can create their own community posts	INSERT	{authenticated}	PERMISSIVE	-	(( SELECT brivia_has_completed_profile() AS brivia_has_completed_profile) AND (author_id = auth.uid()))
+public	community_posts	Members can delete their own community posts	DELETE	{authenticated}	PERMISSIVE	(author_id = auth.uid())	-
+public	community_posts	Members can update their own community posts	UPDATE	{authenticated}	PERMISSIVE	(author_id = auth.uid())	(author_id = auth.uid())
+public	community_posts	Members can view community posts	SELECT	{authenticated}	PERMISSIVE	((author_id = auth.uid()) OR brivia_can_see_author(author_id))	-
+public	connection_requests	Members can view their connection requests	SELECT	{authenticated}	PERMISSIVE	(( SELECT brivia_has_completed_profile() AS brivia_has_completed_profile) AND (to_id = auth.uid()) AND brivia_request_is_live(status, created_at) AND brivia_private.brivia_incoming_request_visible(from_id))	-
+public	interaction	interaction_insert_own	INSERT	{authenticated}	PERMISSIVE	-	((viewer_id = auth.uid()) AND (event = ANY (ARRAY['like'::text, 'pass'::text, 'request'::text, 'accept'::text, 'decline'::text, 'met'::text, 'letgo'::text])) AND brivia_private.brivia_interaction_insert_ok(target_id, event))
+public	interaction	interaction_select_own	SELECT	{authenticated}	PERMISSIVE	((viewer_id = auth.uid()) AND (event <> 'impression'::text))	-
+public	interest_node	interest_node_select	SELECT	{anon,authenticated}	PERMISSIVE	true	-
+public	matches	Completed members can remove their matches	DELETE	{authenticated}	PERMISSIVE	(( SELECT brivia_has_completed_profile() AS brivia_has_completed_profile) AND ((auth.uid() = user1_id) OR (auth.uid() = user2_id)))	-
+public	matches	Completed members can view their matches	SELECT	{authenticated}	PERMISSIVE	(( SELECT brivia_has_completed_profile() AS brivia_has_completed_profile) AND ((auth.uid() = user1_id) OR (auth.uid() = user2_id)))	-
+public	place	place_select	SELECT	{anon,authenticated}	PERMISSIVE	true	-
+public	profiles	Members can create their profile	INSERT	{authenticated}	PERMISSIVE	-	(id = auth.uid())
+public	profiles	Members can update their profile	UPDATE	{authenticated}	PERMISSIVE	(id = auth.uid())	(id = auth.uid())
+public	profiles	Members can view their own profile	SELECT	{authenticated}	PERMISSIVE	(id = auth.uid())	-
+storage	objects	Anyone can upload career resumes	INSERT	{anon,authenticated}	PERMISSIVE	-	((bucket_id = 'career-resumes'::text) AND (lower(storage.extension(name)) = ANY (ARRAY['pdf'::text, 'doc'::text, 'docx'::text])))
+storage	objects	Members can delete their community post images	DELETE	{authenticated}	PERMISSIVE	((bucket_id = 'community-posts'::text) AND ((storage.foldername(name))[1] = ( SELECT (auth.uid())::text AS uid)))	-
+storage	objects	Members can delete their message attachments	DELETE	{authenticated}	PERMISSIVE	((bucket_id = 'message-attachments'::text) AND ((storage.foldername(name))[1] = ( SELECT (auth.uid())::text AS uid)))	-
+storage	objects	Members can delete their profile covers	DELETE	{authenticated}	PERMISSIVE	((bucket_id = 'profile-covers'::text) AND ((storage.foldername(name))[1] = ( SELECT (auth.uid())::text AS uid)))	-
+storage	objects	Members can delete their profile photos	DELETE	{authenticated}	PERMISSIVE	((bucket_id = 'profile-photos'::text) AND ((storage.foldername(name))[1] = ( SELECT (auth.uid())::text AS uid)))	-
+storage	objects	Members can update their profile cover	UPDATE	{authenticated}	PERMISSIVE	((bucket_id = 'profile-covers'::text) AND ((storage.foldername(name))[1] = ( SELECT (auth.uid())::text AS uid)))	((bucket_id = 'profile-covers'::text) AND ((storage.foldername(name))[1] = ( SELECT (auth.uid())::text AS uid)))
+storage	objects	Members can update their profile photo	UPDATE	{authenticated}	PERMISSIVE	((bucket_id = 'profile-photos'::text) AND ((storage.foldername(name))[1] = ( SELECT (auth.uid())::text AS uid)))	((bucket_id = 'profile-photos'::text) AND ((storage.foldername(name))[1] = ( SELECT (auth.uid())::text AS uid)))
+storage	objects	Members can upload community post images	INSERT	{authenticated}	PERMISSIVE	-	((bucket_id = 'community-posts'::text) AND ((storage.foldername(name))[1] = ( SELECT (auth.uid())::text AS uid)))
+storage	objects	Members can upload message attachments	INSERT	{authenticated}	PERMISSIVE	-	((bucket_id = 'message-attachments'::text) AND ((storage.foldername(name))[1] = ( SELECT (auth.uid())::text AS uid)))
+storage	objects	Members can upload their profile cover	INSERT	{authenticated}	PERMISSIVE	-	((bucket_id = 'profile-covers'::text) AND ((storage.foldername(name))[1] = ( SELECT (auth.uid())::text AS uid)))
+storage	objects	Members can upload their profile photo	INSERT	{authenticated}	PERMISSIVE	-	((bucket_id = 'profile-photos'::text) AND ((storage.foldername(name))[1] = ( SELECT (auth.uid())::text AS uid)))
+storage	objects	Members can view their own community post images	SELECT	{authenticated}	PERMISSIVE	((bucket_id = 'community-posts'::text) AND ((storage.foldername(name))[1] = ( SELECT (auth.uid())::text AS uid)))	-
+storage	objects	Members can view their own profile covers	SELECT	{authenticated}	PERMISSIVE	((bucket_id = 'profile-covers'::text) AND ((storage.foldername(name))[1] = ( SELECT (auth.uid())::text AS uid)))	-
+storage	objects	Members can view their own profile photos	SELECT	{authenticated}	PERMISSIVE	((bucket_id = 'profile-photos'::text) AND ((storage.foldername(name))[1] = ( SELECT (auth.uid())::text AS uid)))	-
+storage	objects	Participants can view message attachments	SELECT	{authenticated}	PERMISSIVE	((bucket_id = 'message-attachments'::text) AND (((storage.foldername(name))[1] = ( SELECT (auth.uid())::text AS uid)) OR (EXISTS ( SELECT 1\n   FROM brivia_messages m\n  WHERE ((m.attachment_path = objects.name) AND ((storage.foldername(objects.name))[1] = (m.sender_id)::text) AND ((auth.uid() = m.sender_id) OR (auth.uid() = m.recipient_id)))))))	-

@@ -131,14 +131,42 @@ roles, permissive flag and checks) and adds 4 foreign-key indexes (`brivia_block
 `community_posts_author_idx`, `matches_user2_idx`, `member_orbit_place_idx`). It never creates "Members can send
 connection requests" (0004 dropped it on purpose).
 
-- **Before applying, read-only diff** of live `pg_policies` against the harness snapshot (run the same query on the 0001-0005
-  harness database and live, normalise `( SELECT auth.uid() AS uid)` to `auth.uid()`, and compare; any difference means live
-  drifted from the migrations and must be understood first):
+- **Before applying: read-only drift check (mandatory).** 0006 replaces policies by name only, so a policy edited in the
+  dashboard would be silently overwritten, and an extra dashboard-created permissive policy would survive and OR with the
+  hardened ones. Run these three queries in the SQL editor (all read-only):
 
-  ```sql
-  select schemaname, tablename, policyname, cmd, roles::text, permissive, qual, with_check
-  from pg_policies where schemaname in ('public', 'storage') order by 1, 2, 3;
-  ```
+  1. Live policies in the same normalised form as the committed snapshot
+     [`supabase/tests/policies-0005.expected.tsv`](../tests/policies-0005.expected.tsv) (same columns, same sort):
+
+     ```sql
+     select schemaname, tablename, policyname, cmd, roles::text as roles, permissive,
+            replace(replace(coalesce(qual, '-'), '( SELECT auth.uid() AS uid)', 'auth.uid()'), E'\n', '\n') as qual,
+            replace(replace(coalesce(with_check, '-'), '( SELECT auth.uid() AS uid)', 'auth.uid()'), E'\n', '\n') as with_check
+     from pg_policies
+     where schemaname in ('public', 'storage')
+     order by schemaname collate "C", tablename collate "C", policyname collate "C";
+     ```
+  2. Policy count per table (must equal the number of lines in the TSV for that table; 35 in total):
+
+     ```sql
+     select schemaname, tablename, count(*) as policies
+     from pg_policies where schemaname in ('public', 'storage')
+     group by 1, 2 order by schemaname collate "C", tablename collate "C";
+     ```
+  3. The policy 0004 dropped on purpose (must return **0 rows**):
+
+     ```sql
+     select schemaname, tablename, policyname from pg_policies
+     where policyname = 'Members can send connection requests';
+     ```
+
+  **What to compare:** query 1 returns 35 rows. Compare them, row by row and column by column, with the 35 lines of
+  `supabase/tests/policies-0005.expected.tsv` (tab-separated: schemaname, tablename, policyname, cmd, roles, permissive,
+  qual, with_check; a literal `\n` in the file is a line break in the cell). Query 2 must match the per-table line counts
+  and total (35); query 3 must return 0 rows. **On any difference (a changed, missing or extra policy, a different count,
+  or a row from query 3): stop, do not apply 0006, and report it.** Live has drifted from the migrations and must be
+  understood first. The harness pins that TSV to migrations 0001-0005 (`supabase/tests/run.sh` fails if they diverge), and
+  pins the post-0006 state to `supabase/tests/policies-0006.expected.tsv`.
 - **Expected result:** the 17 `auth_rls_initplan` warnings and the 4 `unindexed_foreign_keys` infos disappear from the
   performance advisor. Nothing else changes.
 - The harness proves no drift (`supabase/tests/run.sh`, database `brivia_test_drift`): the snapshot before and after 0006
