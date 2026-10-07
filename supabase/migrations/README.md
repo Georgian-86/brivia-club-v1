@@ -1,14 +1,18 @@
 # Migrations: apply and deploy runbook
 
-The files here are applied **by hand in the Supabase SQL editor, as `postgres`, in order** (`0001` → `0004`). Each
+The files here are applied **by hand in the Supabase SQL editor, as `postgres`, in order** (`0001` → `0006`). Each
 file is idempotent: the local harness (`bash supabase/tests/run.sh`) applies every file twice. Verify locally with
 the harness before touching the live project. `supabase/legacy/` is archive only and is never applied.
 
-**Live state (2026-10-04): `0001`, `0002` and `0003` are applied on the live project and frozen** (D-038: a file
-applied live is never edited again; later changes go in a new numbered file). **Apply only `0004`.** Once `0004` is
-applied it is frozen too.
+**Live state (2026-10-07): `0001`–`0004` are applied on the live project and frozen** (D-038: a file applied live is
+never edited again; later changes go in a new numbered file; `0004` went live on 2026-10-05, D-042). **Next: apply
+`0005`, verify it, then apply `0006`; deploy the new client in the same window as `0005`** (sections "0005" and "0006"
+below). Sections 0–4 are the historical `0004` runbook, kept for reference (pg_cron, log settings and the advisor list
+still apply).
 
-## 0. Pre-flight checks (run in the SQL editor before `0004`)
+Daily moderation (reports, suspensions, rejoin reviews) after `0005`: `docs/MODERATION.md`.
+
+## 0. Pre-flight checks (historical: run in the SQL editor before `0004`)
 
 ```sql
 select is_anonymous from auth.users limit 0;                     -- must succeed: completion reads this column
@@ -72,7 +76,7 @@ and `interest_rewrite` rows older than 24 hours, and `cron.job_run_details` hist
 Without pg_cron, `0004` raises a notice and schedules nothing. A missed night restarts the density streaks, so cards
 in sparse cells stay coarsened (safe, but the deck shows place names instead of `~3 km`).
 
-## 4. Apply
+## 4. Apply (historical: the 0004 window)
 
 1. Apply only `0004_orbit_onboarding.sql`, as one run in the SQL editor (it is clean in a single transaction;
    `0001`–`0003` are live and frozen: never re-run or edit them).
@@ -104,24 +108,76 @@ same list (`supabase/tests/orbit-hygiene.test.sql`, H3/H5).
 
 Apply **only `0005_p0b_dpdp_safety.sql`** (0001-0004 are live and frozen), as `postgres` in the SQL editor, and deploy the
 matching client in the same window (the client declares the 18+ confirmation; an old client cannot complete members after
-0005). The file is idempotent. Sections are appended by task; this part covers sections 1-4 (the 18+ gate, consent, reports, the rejoin tombstone, account deletion, the retention purge and the city-wide label).
+0005). Verify it (below), then apply `0006`. The file is idempotent. Sections are appended by task; this part covers
+sections 1-4 (the 18+ gate, consent, reports, the rejoin tombstone, account deletion, the retention purge and the
+city-wide label).
+
+### Pre-flight (read-only, before the apply)
+
+```sql
+select rolbypassrls from pg_roles where rolname = 'postgres';      -- must be t (it was t on 2026-10-07)
+select n.nspname from pg_extension e join pg_namespace n on n.oid = e.extnamespace
+ where e.extname = 'pgcrypto';                                     -- must be 'extensions' (0005 calls extensions.hmac / gen_random_bytes)
+select has_table_privilege('postgres', 'auth.users', 'DELETE');    -- must be t (delete_my_account deletes the auth user)
+-- Every foreign key to profiles or auth.users must cascade or set null; a NO ACTION / RESTRICT key (for example from a
+-- table made in the dashboard) makes delete_my_account fail for any member who has such a row. Expect 0 rows.
+select conrelid::regclass as from_table, conname, confrelid::regclass as to_table, confdeltype
+  from pg_constraint
+ where contype = 'f' and confrelid in ('public.profiles'::regclass, 'auth.users'::regclass)
+   and confdeltype not in ('c', 'n')
+ order by 1, 2;
+-- Career applications the first nightly purge will delete (see the warning below).
+select count(*), min(created_at) from public.career_applications where created_at <= now() - interval '180 days';
+```
+
+- **`rolbypassrls` must be `t`.** `delete_my_account` checks that the member's Storage folders are empty by reading
+  `storage.objects` as `postgres`, and RLS is on there. Without BYPASSRLS the check sees no rows and **fails open**: an
+  account is deleted while its files stay publicly served. If it is `f`, stop: do not ship the deletion UI.
+- If pgcrypto is not in `extensions`, or `postgres` cannot delete from `auth.users`, or the FK query returns a row you
+  cannot explain, stop and report it.
+
+> **WARNING: the first nightly purge after 0005 deletes real data.** `purge_expired_requests()` now deletes
+> `career_applications` rows older than 180 days (applicants' name, email, LinkedIn and `resume_path`; they are not
+> test members). The live count was 0 on 2026-10-07; **re-run the count above right before applying**. If it is not 0,
+> export those rows or record the decision first. The resume files in `career-resumes` are **never** deleted by SQL:
+> sweep files older than 180 days by hand every month (`docs/MODERATION.md` §6).
+
+### Apply
+
+- Avoid the cron window **20:17–20:37 UTC (01:47–02:07 IST)**: the two nightly jobs run then.
+- Put `set lock_timeout = '5s';` on the first line of the editor, above the file, and run everything as one run. If a
+  lock times out, nothing is applied (one transaction): run it again a little later.
+
+### Post-apply checks (read-only)
+
+```sql
+select count(*) from public.moderation_pepper;                                         -- 1
+select count(*) from public.profiles where is_test and adult_declared_at is not null;   -- 24 (the seeded test members)
+select count(*) from public.profiles where is_test and adult_declared_at is null;       -- 0
+select jobname, schedule, command from cron.job order by jobname;
+-- unchanged: brivia-purge-expired-requests | 37 20 * * * | select public.purge_expired_requests()
+--            brivia-refresh-cell-density   | 17 20 * * * | select public.refresh_cell_density()
+select tgname, tgrelid::regclass from pg_trigger
+ where tgname in ('brivia_profiles_consent_guard', 'brivia_require_adult') and not tgisinternal
+ order by 1, 2;                                                                         -- 3 rows: profiles; member_interest, member_orbit
+select count(*) from public.profiles where not is_test and adult_declared_at is null;   -- real members who must still declare
+```
 
 - **Effect on live members:** completion now needs `profiles.adult_declared_at`. Real members who completed before 0005
   are not declared and become invisible until they confirm in the app (they are routed back to step 1). Test members are
-  backfilled by 0005 itself.
-- **Post-apply check** (how many real members must still declare):
-
-  ```sql
-  select count(*) from profiles where not is_test and adult_declared_at is null;
-  ```
+  backfilled by 0005 itself (the 24 above).
 - **Expected advisor list after 0005:** the 0004 list above, plus the new intended RPCs `declare_adult`, `report_member` and `delete_my_account`; `brivia_notice_version` is a plain invoker function.
   Nothing else may be executable by `authenticated`/`anon`: `consent_event`, `member_report`, `report_attempt`,
   `moderation_pepper` and `moderation_tombstone` are owner-only (RLS on, no grants); `brivia_email_digest` and
-  `brivia_is_declared` are owner-only functions.
-- **Live check before relying on deletion recency** (`delete_my_account` requires a login within 10 minutes): on a
-  test-member session, `select auth.jwt()->'amr'` must show a `timestamp` (an array of `{"method": ..., "timestamp": <epoch>}`).
-  If it does not, the RPC refuses every call with `reauth_required`; fix that before shipping the deletion UI.
+  `brivia_is_declared` are owner-only functions. Also expected (INFO, intended): **"RLS enabled, no policy"** for those 5
+  owner-only tables, and **"no primary key"** for `report_attempt` (an append-only counter, purged after 30 days).
+- **Go-live gates for self-serve deletion** (both read-only, both before the deletion UI ships):
+  1. `rolbypassrls` is `t` (pre-flight above).
+  2. The JWT `amr` shape: on a test-member session, `select auth.jwt()->'amr'` must show a `timestamp` (an array of
+     `{"method": ..., "timestamp": <epoch>}`). If it does not, `delete_my_account` (which requires a login within 10
+     minutes) refuses every call with `reauth_required`; fix that before shipping the deletion UI.
 - `purge_expired_requests()` keeps its signature and cron command; it now also applies the retention schedule (spec 9.1.6).
+- **Moderation starts the day 0005 is live:** `docs/MODERATION.md` (daily; the 72-hour under-18 review is a published promise).
 
 ## 0006: performance policies (R8)
 

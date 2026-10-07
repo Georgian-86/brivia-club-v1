@@ -101,6 +101,7 @@ install it).
 | Applying SQL to live | `supabase/migrations/README.md` |
 | Test members | `supabase/seed/README.md` |
 | Data breach response (containment, notices, orphan-folder report) | `docs/BREACH_RUNBOOK.md` |
+| Daily moderation (new reports, flags, the 72 h suspension queue, rejoin reviews; SQL editor as owner) | `docs/MODERATION.md` |
 | SQL behaviour tests | `supabase/tests/*.test.sql` (run with `run.sh`) |
 | Signup (4 steps) | `auth.html`, `script.js`, `passion-budget.js`, `pending-profile.js` |
 | App, deck, quota | `app.html`, `app.js`, `deck-view.js`, `signal-quota.js` |
