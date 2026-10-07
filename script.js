@@ -10,9 +10,10 @@ import './mobile-final-fixes.css';
 import './auth-a11y.css';
 import {
   supabase, supabaseReady, saveProfile, compressImageOnly, fileToDataUrl, PHOTO_ERROR_MESSAGE, withoutCredentials, rowToProfile, isRateLimited,
-  declareAdult, setHomeLocation, setHomeCity, setMemberInterests, setSensitiveConsent, fetchMyInterests, fetchInterestNodes, searchPlaces, onboardingStatus,
+  declareAdult, setHomeLocation, setHomeCity, setMemberInterests, setSensitiveConsent, fetchSensitiveConsentAt, fetchMyInterests, fetchInterestNodes, searchPlaces, onboardingStatus,
 } from './supabase.js';
 import { buildPendingOnboarding, isPendingExpired } from './pending-profile.js';
+import { isUnderReview, shouldWithdrawConsent } from './onboarding-guard.js';
 import {
   MAX_INTERESTS, MODES, emptyBudget, addInterest, removeInterest, stepPoints, setMode, pointsLeft, isComplete, toPayload,
   counterText, budgetFromRows,
@@ -1415,6 +1416,8 @@ const routeAfterProfile = async (user, row = null, pendingResult = null) => {
   if (error || !status || status.completed !== false) { redirectToApp(); return; }
   let profileRow = row;
   if (!profileRow) ({ data: profileRow } = await supabase.from('profiles').select('*').eq('id', user.id).maybeSingle());
+  // F2: every step done but not completed = under review; the app shows the notice (no onboarding loop here).
+  if (isUnderReview(status, profileRow)) { redirectToApp(); return; }
   let startStep = firstIncompleteStep(status, profileRow);
   if (pendingResult?.orbitError && startStep > 2) startStep = 2;
   showProfileCompletion(user, profileRow ? rowToProfile(profileRow) : null, { startStep, status, adultDeclared: Boolean(profileRow?.adult_declared_at) });
@@ -1745,7 +1748,7 @@ const declareAdultStep = async () => {
   }
   adultAlreadyDeclared = true;
 };
-const finishOnboarding = async () => {
+const finishOnboarding = async (userId) => {
   await declareAdultStep();
   if (areaChoice && areaChoice.kind !== 'keep') {
     const choice = areaChoice;
@@ -1765,7 +1768,11 @@ const finishOnboarding = async () => {
   // in the panel), and is withdrawn again if the save then fails.
   const wantsConsent = budget.items.some((item) => isSensitiveInterest(item.id)) || (serverWantedConsent && privateUnlocked);
   let gaveConsent = false;
+  // F2b: the member's own consent before this submit. A failed save withdraws only a consent this submit created;
+  // an earlier one (or an unreadable state: undefined) is kept.
+  let consentBefore;
   if (wantsConsent) {
+    try { consentBefore = await fetchSensitiveConsentAt(userId); } catch { consentBefore = undefined; }
     const { error: consentError } = await setSensitiveConsent(true);
     if (consentError) {
       setSignupStep(3);
@@ -1776,7 +1783,7 @@ const finishOnboarding = async () => {
   }
   const { error } = await setMemberInterests(toPayload(budget));
   if (error) {
-    if (gaveConsent) await setSensitiveConsent(false).catch(() => {});
+    if (shouldWithdrawConsent({ gaveConsent, consentBefore })) await setSensitiveConsent(false).catch(() => {});
     setSignupStep(3);
     if (isSensitiveConsentError(error)) {
       serverWantedConsent = true;
@@ -1886,7 +1893,7 @@ signupForm?.addEventListener('submit', async (event) => {
       }
       const { error: profileError } = await saveProfile(sessionUser.id, profile, photoFile, coverFile);
       if (profileError) throw profileError;
-      await finishOnboarding();
+      await finishOnboarding(sessionUser.id);
       window.localStorage.removeItem('brivia-pending-profile');
       window.localStorage.setItem('brivia-member-profile', JSON.stringify({ ...profile, id: sessionUser.id }));
       redirectToApp();
@@ -1921,7 +1928,7 @@ signupForm?.addEventListener('submit', async (event) => {
       if (submit) submit.innerHTML = 'COMPLETE MY PROFILE <span>→</span>';
       const { error: profileError } = await saveProfile(data.user.id, profile, photoFile, coverFile);
       if (profileError) throw profileError;
-      await finishOnboarding();
+      await finishOnboarding(data.user.id);
       window.localStorage.setItem('brivia-member-profile', JSON.stringify({ ...profile, id: data.user.id }));
       redirectToApp();
       return;

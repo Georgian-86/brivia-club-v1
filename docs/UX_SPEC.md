@@ -128,6 +128,18 @@ D-035), `city` or `state`; auth metadata carries no interests or location.
 the member lands on the completion flow at the first incomplete step: step 1 when the name is empty or "New Member"
 (never prefilled), step 2 without a cell, else step 3. A stored
 area is kept ("Your area: Pune. Choose again to change it.") and existing interests prefill the budget.
+**Under review (final fix F2).** When `completed` is false although every step the client can see is done (a real name,
+the member's own `adult_declared_at`, a cell, 1–12 interests worth exactly 20 points), an operator review flag is on the
+member. `app.js` then keeps the app hidden and shows a neutral notice instead of the completion flow: eyebrow "THE BRIVIA
+CLUB", heading **"Profile under review"** (focused), "Your profile is being reviewed. This usually takes up to 72 hours.
+Questions? Email thebrivia.club@gmail.com." (a mailto link) and **Sign out**; 44 px targets, deep-wine tokens, no
+mention of a report. `auth.html?complete-profile=1` sends such a member back to the app (no loop, no interest rewrite).
+The same rule (`onboarding-guard.js` `isUnderReview`) applies to the deck's `complete_profile` re-check.
+
+**Consent rollback.** When a private pick is submitted, `set_sensitive_consent(true)` runs before `set_member_interests`.
+If that save then fails, consent is withdrawn again **only if the member had none before this submit** (their own
+`profiles.sensitive_consent_at` is read first; an unreadable state counts as "had one"). An earlier consent is never
+withdrawn by a failed save.
 
 **Escape and close.** Escape never leaves the signup when a control already handled it, from a field of the signup
 form, or once the signup is past step 1. The close (×) button is 44 × 44 px and the header row reserves room for it,

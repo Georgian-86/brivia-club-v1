@@ -18,6 +18,7 @@ import './mobile-app.css';
 import { supabase, rowToProfile, saveProfile, onboardingStatus, sendSignal, fetchSignalQuota, isRateLimited, isStorageImageUrl, withoutCredentials, uploadMessageAttachment, removeMessageAttachment, uploadCommunityPostImage, removeCommunityPostImage, ImageProcessingError, compressAttachmentFiles, attachmentKind, reportMember, setSensitiveConsent, fetchSensitiveConsentAt } from './supabase.js';
 import { deleteAccount, clearBriviaKeys, DELETE_BUCKETS } from './account-deletion.js';
 import { openPrivacyAccount } from './privacy-account.js';
+import { isUnderReview, UNDER_REVIEW_COPY } from './onboarding-guard.js';
 import { openReportDialog, bindCardOverflow, cardOverflowOpen, reportSuccessCopy } from './report-dialog.js';
 import { defaultCoverUrl, normalizeCoverUrl } from './cover-assets.js';
 import { quotaLabel, quotaErrorText, quotaBlocked, quotaNotice } from './signal-quota.js';
@@ -617,6 +618,31 @@ const recordPass = (personId) => {
   stored.finally(() => pendingPasses.delete(stored));
   return stored;
 };
+// UNDER REVIEW (final fix F2): completed = false while every client-visible step is done means an operator review flag
+// is on the member. They see a neutral notice in the app (never why, never who), not onboarding again: each pass
+// through step 3 would burn an interest rewrite. Any other incomplete member finishes onboarding as before.
+const UNDER_REVIEW_CONTACT = 'thebrivia.club@gmail.com';
+const showUnderReview = () => {
+  if (document.querySelector('[data-under-review]')) return;
+  document.body.classList.add('app-auth-pending'); // the app stays hidden behind the notice
+  const lead = escapeHtml(UNDER_REVIEW_COPY.slice(0, UNDER_REVIEW_COPY.lastIndexOf(UNDER_REVIEW_CONTACT)));
+  const section = document.createElement('section');
+  section.className = 'under-review';
+  section.dataset.underReview = '';
+  section.setAttribute('aria-labelledby', 'under-review-title');
+  section.innerHTML = `<div class="under-review-card"><p class="under-review-eyebrow">THE BRIVIA CLUB</p><h1 id="under-review-title" tabindex="-1">Profile under review</h1><p>${lead}<a href="mailto:${UNDER_REVIEW_CONTACT}">${UNDER_REVIEW_CONTACT}</a>.</p><div class="under-review-actions"><button type="button" class="under-review-signout" data-under-review-signout>Sign out</button></div></div>`;
+  document.body.append(section);
+  section.querySelector('[data-under-review-signout]').addEventListener('click', () => logoutMember());
+  section.querySelector('h1').focus();
+};
+// completed = false: the notice for a member under review, else the completion flow. ownRow is the member's own
+// profiles row (read here when the caller does not have it).
+const routeIncompleteMember = async (onboarding, ownRow = null) => {
+  let row = ownRow;
+  if (!row && supabase && memberProfile.id) ({ data: row } = await supabase.from('profiles').select('*').eq('id', memberProfile.id).maybeSingle());
+  if (isUnderReview(onboarding, row)) { showUnderReview(); return; }
+  window.location.replace('/auth.html?complete-profile=1');
+};
 // When the queue runs out: load once more; if nothing new comes back, ask deck_status() why (never a count).
 const refillDeck = async () => {
   if (!deck.ready || deckPeople().length) return;
@@ -631,7 +657,7 @@ const refillDeck = async () => {
     if (cause === 'complete_profile') {
       const { data: onboarding, error: onboardingError } = await onboardingStatus();
       if (!onboardingError && onboarding?.completed === true) cause = 'error';
-      else if (!onboardingError && onboarding?.completed === false) { window.location.replace('/auth.html?complete-profile=1'); return; }
+      else if (!onboardingError && onboarding?.completed === false) { await routeIncompleteMember(onboarding); return; }
     }
     deck.end = cause;
   }
@@ -2477,7 +2503,7 @@ const loadSupabaseCommunity = async () => {
   // member from everyone (D-030).
   const { data: onboarding, error: onboardingError } = await onboardingStatus();
   if (!onboardingError && onboarding && onboarding.completed === false) {
-    window.location.replace('/auth.html?complete-profile=1');
+    await routeIncompleteMember(onboarding, ownRow);
     return;
   }
   memberPlaceLabel = typeof onboarding?.place_label === 'string' ? onboarding.place_label : '';

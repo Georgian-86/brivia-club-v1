@@ -34,3 +34,16 @@
 .privacy-dialog[aria-busy] button { cursor: progress; }
 @media (max-width: 420px) { .privacy-actions button { flex: 1 1 140px; } }
 @media (prefers-reduced-motion: reduce) { .privacy-dialog, .privacy-dialog * { transition: none !important; animation: none !important; } }
+
+/* UNDER REVIEW notice (final fix F2): app.js shows it instead of onboarding while an operator review flag is on the
+   member. Deep-wine tokens on the member-area cream; 44 px targets; text >= 14 px; no motion. */
+.under-review { position: fixed; inset: 0; z-index: 70; display: grid; place-items: center; box-sizing: border-box; padding: 16px; overflow: auto; background: var(--app-bg); color: var(--brivia-deep-wine); font-family: 'Instrument Sans', Arial, sans-serif; }
+.under-review-card { box-sizing: border-box; display: flex; width: min(520px, 100%); flex-direction: column; gap: 14px; padding: 24px; border: 1px solid var(--app-line); border-radius: 14px; background: var(--app-panel); }
+.under-review-eyebrow { margin: 0; font-size: 12px; font-weight: 700; letter-spacing: .12em; }
+.under-review h1 { margin: 0; font-family: 'Bodoni Moda', Georgia, serif; font-size: clamp(26px, 6vw, 34px); font-weight: 500; line-height: 1.12; overflow-wrap: anywhere; }
+.under-review h1:focus { outline: none; }
+.under-review p { margin: 0; font-size: 16px; line-height: 1.5; overflow-wrap: anywhere; }
+.under-review a { display: inline-flex; min-height: 44px; align-items: center; color: var(--brivia-deep-wine); font-weight: 700; text-decoration: underline; }
+.under-review-actions { display: flex; }
+.under-review-signout { min-width: 44px; min-height: 44px; padding: 0 20px; border: 1px solid var(--app-line); border-radius: 99px; background: transparent; color: var(--brivia-deep-wine); font: inherit; font-size: 14px; font-weight: 700; cursor: pointer; }
+.under-review a:focus-visible, .under-review-signout:focus-visible { outline: 2px solid var(--brivia-deep-wine); outline-offset: 2px; }

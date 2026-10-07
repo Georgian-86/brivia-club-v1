@@ -82,7 +82,8 @@ const waitForServer = async () => {
   throw new Error('vite did not start');
 };
 
-// One stubbed Supabase per context. opts: signupSession (bool), profileExists, hasCell, interests, homeCityStatus[].
+// One stubbed Supabase per context. opts: signupSession (bool), profileExists, hasCell, interests, homeCityStatus[],
+// interestsStatus[] (400 | 429), consentAt (consent given before this visit), underReview (completed stays false: F2).
 const stubContext = async (context, opts = {}) => {
   const state = {
     profile: opts.profileExists ? { id: ME, name: opts.profileName ?? 'Nia New', full_name: opts.profileName ?? 'Nia New', email: EMAIL, phone: '+91 9876543210', phone_country_code: '+91', phone_number: '9876543210', gender: 'Female', experience: '1–3 years', looking_for: ['Friends'], skills: [] } : null,
@@ -93,7 +94,8 @@ const stubContext = async (context, opts = {}) => {
     interests: opts.interests || [],
     homeCityStatus: [...(opts.homeCityStatus || [])],
     interestsStatus: [...(opts.interestsStatus || [])],
-    consent: false,
+    consent: Boolean(opts.consentAt),
+    consentAt: opts.consentAt || null,
   };
   const calls = [];
   const consoleLines = [];
@@ -112,7 +114,7 @@ const stubContext = async (context, opts = {}) => {
     if (p.startsWith('/auth/v1/')) return json(200, p.endsWith('/user') ? user : session);
     const wantsObject = (request.headers().accept || '').includes('vnd.pgrst.object');
     if (p === '/rest/v1/profiles') {
-      const own = () => ({ ...state.profile, adult_declared_at: state.adultAt });
+      const own = () => ({ ...state.profile, adult_declared_at: state.adultAt, sensitive_consent_at: state.consentAt });
       if (method === 'POST') {
         const row = JSON.parse(body || '{}');
         state.profile = { ...row, skills: [] };
@@ -163,6 +165,7 @@ const stubContext = async (context, opts = {}) => {
       const items = JSON.parse(body || '{}').p_items || [];
       const forced = state.interestsStatus.shift();
       if (forced === 400) return json(400, { code: '22023', message: 'invalid interests', details: null, hint: null });
+      if (forced === 429) return json(429, { code: 'PT429', message: 'interest_rewrite_cap', details: null, hint: null });
       if (items.reduce((s, i) => s + i.points, 0) !== 20) return json(400, { code: '22023', message: 'invalid interests' });
       // Like the server (D-038 R3): a sensitive id needs the separate consent given through set_sensitive_consent.
       if (!state.consent && items.some((i) => nodes.find((n) => n.id === i.interest_id)?.sensitive)) return json(400, { code: '22023', message: 'sensitive consent required', details: null, hint: null });
@@ -172,12 +175,13 @@ const stubContext = async (context, opts = {}) => {
     if (p === '/rest/v1/rpc/set_sensitive_consent') {
       if (!state.profile) return json(404, { code: 'P0002', message: 'profile required' });
       state.consent = JSON.parse(body || '{}').p_consent === true;
+      state.consentAt = state.consent ? (state.consentAt || new Date().toISOString()) : null;
       return route.fulfill({ status: 204, body: '', headers });
     }
     if (p === '/rest/v1/rpc/my_interests') return json(200, state.interests);
     if (p === '/rest/v1/rpc/my_onboarding_status') {
       const points = state.interests.reduce((s, i) => s + i.points, 0);
-      return json(200, [{ interests: state.interests.length, points, has_cell: state.hasCell, place_label: state.placeLabel, completed: Boolean(state.profile && state.adultAt && !['', 'New Member'].includes(String(state.profile.name || '').trim()) && state.hasCell && points === 20) }]);
+      return json(200, [{ interests: state.interests.length, points, has_cell: state.hasCell, place_label: state.placeLabel, completed: !opts.underReview && Boolean(state.profile && state.adultAt && !['', 'New Member'].includes(String(state.profile.name || '').trim()) && state.hasCell && points === 20) }]);
     }
     if (p.startsWith('/rest/v1/rpc/')) return json(200, []);
     if (p.startsWith('/rest/v1/')) return json(200, []);
@@ -1270,6 +1274,81 @@ try {
     check(`18+ ${variant}: stored interests prefill step 3 (${rows.join(',')})`, () => assert.deepEqual(rows, ['games.board.chess']));
     check(`18+ ${variant}: no location or interests call before the declaration`, () => assert.equal(stub.posts('/rest/v1/rpc/set_home_city').length + stub.posts('/rest/v1/rpc/set_member_interests').length, 0));
     check(`18+ ${variant}: no uncaught page errors`, () => assert.deepEqual(errors, []));
+    await context.close();
+  }
+
+  // 12f. F2a: a member under review (every client-visible step done, completed = false: an operator review flag) sees a
+  //      neutral notice in the app instead of onboarding, and auth.html?complete-profile=1 sends them back to it (no loop,
+  //      no interest rewrite, no consent call).
+  {
+    const context = await browser.newContext({ viewport: { width: 375, height: 800 } });
+    await context.addInitScript(([key, value]) => { if (!sessionStorage.getItem('seeded')) { localStorage.setItem(key, value); sessionStorage.setItem('seeded', '1'); } }, ['sb-stub-auth-token', JSON.stringify(session)]);
+    const interests = [
+      { interest_id: 'sports.racket.tennis', label: 'Tennis', points: 10, mode: 'play' },
+      { interest_id: 'games.board.chess', label: 'Chess', points: 10, mode: 'play' },
+    ];
+    const stub = await stubContext(context, { profileExists: true, hasCell: true, interests, underReview: true, realApp: true });
+    const { page, errors } = await newPage(context, stub.consoleLines);
+    await page.goto(`${BASE}/app.html`, { waitUntil: 'domcontentloaded' });
+    await page.waitForSelector('[data-under-review]', { timeout: 15000 }).catch(() => {});
+    await page.waitForTimeout(500);
+    const notice = await page.evaluate(() => {
+      const el = document.querySelector('[data-under-review]');
+      return el ? { path: location.pathname, text: el.textContent.replace(/\s+/g, ' ').trim(), mail: el.querySelector('a[href^="mailto:"]')?.getAttribute('href'), heading: el.querySelector('h1')?.textContent.trim(), focus: el.contains(document.activeElement), targets: [...el.querySelectorAll('a, button')].map((b) => Math.round(b.getBoundingClientRect().height)), noH: document.documentElement.scrollWidth <= window.innerWidth } : { path: location.pathname };
+    });
+    check(`F2a: under review stays in the app with the neutral notice (${JSON.stringify(notice)})`, () => {
+      assert.equal(notice.path, '/app.html');
+      assert.ok(notice.text?.includes('Your profile is being reviewed. This usually takes up to 72 hours. Questions? Email thebrivia.club@gmail.com.'), notice.text);
+      assert.equal(notice.mail, 'mailto:thebrivia.club@gmail.com');
+      assert.ok(notice.heading); assert.ok(notice.focus, 'focus moves to the notice');
+      assert.ok(notice.targets.every((h) => h >= 44), 'targets under 44 px'); assert.ok(notice.noH, 'horizontal scroll at 375 px');
+      assert.ok(!/report/i.test(notice.text), 'the notice never mentions a report');
+    });
+    const small = await smallText(page, { root: '[data-under-review]' });
+    check(`F2a: the notice text is at least 12 px (${small.join(' | ')})`, () => assert.deepEqual(small, []));
+    const contrast = await axeViolations(page, { rules: ['color-contrast'], include: '[data-under-review]' });
+    check(`F2a: the notice passes axe color-contrast (${contrast.join(' | ')})`, () => assert.deepEqual(contrast, []));
+    await page.goto(`${BASE}/auth.html?complete-profile=1`, { waitUntil: 'domcontentloaded' });
+    await page.waitForURL(/\/app\.html/, { timeout: 15000 }).catch(() => {});
+    await page.waitForSelector('[data-under-review]', { timeout: 15000 }).catch(() => {});
+    const back = await page.evaluate(() => ({ path: location.pathname, notice: Boolean(document.querySelector('[data-under-review]')) }));
+    check(`F2a: auth.html?complete-profile=1 sends a member under review back to the notice (${JSON.stringify(back)})`, () => assert.deepEqual(back, { path: '/app.html', notice: true }));
+    check('F2a: no interest rewrite, consent or area call was made', () => {
+      for (const n of ['set_member_interests', 'set_sensitive_consent', 'set_home_city', 'set_home_location']) assert.equal(stub.posts(`/rest/v1/rpc/${n}`).length, 0, n);
+    });
+    check('F2a: no uncaught page errors', () => assert.deepEqual(errors.filter((e) => !/Failed to fetch|NetworkError|aborted/i.test(e)), []));
+    await context.close();
+  }
+
+  // 12g. F2b: a member who consented before this visit, with a sensitive pick, whose save is refused (PT429): the client
+  //      does NOT withdraw the earlier consent (no set_sensitive_consent(false)).
+  {
+    const context = await browser.newContext({ viewport: { width: 1280, height: 900 } });
+    await context.addInitScript(([key, value]) => { if (!sessionStorage.getItem('seeded')) { localStorage.setItem(key, value); sessionStorage.setItem('seeded', '1'); } }, ['sb-stub-auth-token', JSON.stringify(session)]);
+    const stub = await stubContext(context, { profileExists: true, hasCell: true, consentAt: '2026-10-01T00:00:00Z', interestsStatus: [429], realApp: true });
+    const { page, errors } = await newPage(context, stub.consoleLines);
+    await page.goto(`${BASE}/app.html`, { waitUntil: 'domcontentloaded' });
+    await page.waitForURL(/\/auth\.html/, { timeout: 15000 });
+    await page.waitForSelector('[data-signup-step="3"]:not([hidden])', { timeout: 15000 });
+    await page.waitForSelector('#interest-results [data-interest-group]', { state: 'attached' });
+    await page.locator('[data-private-open]').click();
+    await page.locator('[data-private-checkbox]').check();
+    await page.locator('[data-private-continue]').click();
+    await page.locator('#interest-search').fill('Chess');
+    await clickInterest(page, 'Chess');
+    await page.locator('#interest-search').fill('scripture');
+    await clickInterest(page, 'Scripture study');
+    for (let i = 0; i < 18; i += 1) await page.getByRole('button', { name: 'Add a point to Chess', exact: true }).click();
+    await page.locator('[data-signup-step="3"] .signup-next').click();
+    await page.waitForSelector('[data-signup-step="4"]:not([hidden])');
+    await page.locator('[data-signup-step="4"] [type="submit"]').click();
+    await page.waitForFunction(() => /could not be saved/.test(document.querySelector('#budget-error')?.textContent || ''), null, { timeout: 15000 }).catch(() => {});
+    const seq = stub.calls.filter((c) => /set_sensitive_consent|set_member_interests/.test(c.path)).map((c) => `${c.path.split('/').pop()}${c.path.endsWith('consent') ? ':' + JSON.parse(c.body).p_consent : ''}`);
+    check(`F2b: a PT429 save keeps the consent given before this submit (${seq.join(' > ')})`, () => {
+      assert.deepEqual(seq, ['set_sensitive_consent:true', 'set_member_interests']);
+      assert.equal(stub.state.consent, true);
+    });
+    check('F2b: no uncaught page errors', () => assert.deepEqual(errors.filter((e) => !/Failed to fetch|NetworkError|aborted/i.test(e)), []));
     await context.close();
   }
 } catch (error) {

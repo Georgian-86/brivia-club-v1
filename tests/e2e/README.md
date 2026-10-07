@@ -22,7 +22,8 @@ post authors.
 `onboarding.spec.mjs` (Iteration 3, Task 8) loads `auth.html` the same way (Vite on :5198, stubbed Supabase) and checks
 the 4-step signup: "STEP n OF 4" at 375 px and 1440 px, geolocation granted / denied / missing / timed out, the
 keyboard-only Passion Budget, the submit order, the email-confirmation pending profile (no coordinates) and the
-`my_onboarding_status` gate from `app.html`. `E2E_SCREENSHOTS=<dir>` also saves screenshots of the key states.
+`my_onboarding_status` gate from `app.html`, including the "Profile under review" notice for a member whose every step
+is done but `completed` is false, and that a failed save never withdraws a consent given before it (final fix F2). `E2E_SCREENSHOTS=<dir>` also saves screenshots of the key states.
 
 ```bash
 PLAYWRIGHT_MODULE=/tmp/pw/node_modules/playwright/index.mjs node tests/e2e/onboarding.spec.mjs
