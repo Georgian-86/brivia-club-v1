@@ -685,3 +685,24 @@ supersedes it.
   - B wanted every deletion held.
   - A wanted the paused member's full app.
   - The judge's own trade-off: a minor seen only in the deck stays visible until the founder reviews.
+
+## D-047: Apply 0005 and 0006 to live now, for testing with test members only (founder decision; supersedes D-046 "amend 0005 in place")
+- **Date:** 2026-10-07. **Decided by:** the founder, choosing between options the controller set out: a staging
+  project, which the free plan blocks (2 active projects already), apply now, upgrade, or screens only.
+- **Decision:** 0005 and then 0006 are applied to the live project from commit `ff937d7`, by the founder in the SQL
+  editor, and the matching client is deployed to test. Once applied, `0005` and `0006` are **frozen**. The D-046 P0-C
+  SQL items (R1 corroboration, R3 ladder, R4 deletion hold, R8 collapse, R9 purge) ship as new migrations `0007+`,
+  and the R5 alert moves to the next free number.
+- **Why:** there are 0 real members and 24 `is_test` members, so the risks D-046 found (single-report suspension,
+  `restricted` that hides no one, evidence loss on deletion) cannot hurt a real person while only testers use the app.
+- **Pre-flight, verified read-only 2026-10-07 21:06 UTC:**
+  - `postgres` has `rolbypassrls = t` and DELETE on `auth.users`;
+  - pgcrypto is in `extensions`;
+  - 0 non-cascading foreign keys to `profiles` or `auth.users`;
+  - 0 career applications older than 180 days;
+  - 0 real and 24 test profiles;
+  - both cron jobs unchanged;
+  - `log_statement = ddl`;
+  - none of the 0005 functions exist yet.
+- **Condition:** no real member may join until the P0-C items and the founder gate items in D-046 are met. The
+  deletion UI also stays behind the live `amr` check (README gate 2).
