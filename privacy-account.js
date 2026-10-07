@@ -47,7 +47,7 @@ const openWithdrawDialog = ({ trigger, fallbackFocus, withdraw }) => new Promise
     kind: 'withdraw', trigger, fallbackFocus, onClosed: () => resolve(done),
     html: `<div class="privacy-body">
     <h2 id="__ID__">Withdraw consent?</h2>
-    <p>We'll delete your private interests now and spread their points across your other interests. You can add them again later.</p>
+    <p>We'll delete your private interests now and spread their points across your other interests.</p>
     <p class="privacy-error" data-privacy-error role="alert"></p>
     <div class="privacy-actions"><button type="button" class="privacy-secondary" data-privacy-keep>Keep</button><button type="button" class="privacy-primary" data-privacy-confirm-withdraw>Withdraw and delete</button></div>
   </div>`,

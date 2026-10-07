@@ -201,7 +201,7 @@ const stubContext = async (context, opts = {}) => {
     const original = geo.getCurrentPosition.bind(geo);
     geo.getCurrentPosition = (ok, fail, options) => {
       const explainer = document.querySelector('[data-area-explainer]');
-      window.__geoCalls.push({ options, explainerVisible: Boolean(explainer && explainer.getClientRects().length && /We keep only a rough ~2 km square, never your exact location\. Other members see a rounded distance or your city, and only once enough people are nearby\./.test(explainer.textContent)) });
+      window.__geoCalls.push({ options, explainerVisible: Boolean(explainer && explainer.getClientRects().length && /We keep only a rough ~2 km square, never your exact location\. Other members see a rounded distance once enough people are nearby; until then they see your city\./.test(explainer.textContent)) });
       return original(ok, fail, options);
     };
   });
@@ -346,7 +346,7 @@ try {
     check(`1440: step 2 reads "STEP 2 OF 4" (got "${label2}")`, () => assert.match(label2, /^STEP 2 OF 4\b/));
     await a11yStep(page, '1440 step 2');
     check(`1440: privacy explainer visible before any geolocation call ("${explainerText}")`, () => {
-      assert.ok(explainerVisible); assert.match(explainerText, /We keep only a rough ~2 km square, never your exact location\. Other members see a rounded distance or your city, and only once enough people are nearby\./); assert.equal(geoCallsBefore, 0);
+      assert.ok(explainerVisible); assert.match(explainerText, /We keep only a rough ~2 km square, never your exact location\. Other members see a rounded distance once enough people are nearby; until then they see your city\./); assert.equal(geoCallsBefore, 0);
     });
     // Next is blocked until an area is chosen.
     await page.locator('[data-signup-step="2"] .signup-next').click();
@@ -1143,7 +1143,7 @@ try {
     const notice = (await page.locator('[data-area-explainer]').textContent()).trim();
     const promise = (await page.locator('[data-signup-step="2"] .signup-step-heading p').textContent()).trim();
     const link2 = await page.locator('[data-signup-step="2"] a[href="/privacy.html"]').evaluate((a) => a.target);
-    check(`R11: step 2 notice is the honest copy (got "${notice}")`, () => assert.equal(notice, 'We keep only a rough ~2 km square, never your exact location. Other members see a rounded distance or your city, and only once enough people are nearby.'));
+    check(`R11: step 2 notice is the honest copy (got "${notice}")`, () => assert.equal(notice, 'We keep only a rough ~2 km square, never your exact location. Other members see a rounded distance once enough people are nearby; until then they see your city.'));
     check(`R11: the promise line says "nearby first, as your area fills up" (got "${promise}")`, () => assert.ok(promise.includes('nearby first, as your area fills up')));
     const next2 = (await page.locator('[data-signup-step="2"] .signup-next').textContent()).trim().replace(/\s+/g, ' ');
     check(`R11: the step-2 button reads "NEXT: WHAT YOU CARE ABOUT" (got "${next2}")`, () => assert.match(next2, /^NEXT: WHAT YOU CARE ABOUT\b/));

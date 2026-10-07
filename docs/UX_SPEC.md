@@ -66,7 +66,8 @@ background under a pseudo-element).
    a declared member sees it ticked and is not asked again. The "01 / 02" counter is hidden during signup.
 2. **Your area** (`STEP 2 OF 4 · YOUR AREA`), "Where do you spend most weeks?"
    - The explainer **"We keep only a rough ~2 km square, never your exact location. Other members see a rounded
-     distance or your city, and only once enough people are nearby."** (Iteration 4, R11; it replaces "We only keep a
+     distance once enough people are nearby; until then they see your city."** (Iteration 4, R11, made exact in final
+     fix F4; it replaces "We only keep a
      rough ~2 km neighbourhood square. Nobody ever sees where you are.") is always visible above the two choices, so it
      is read before the browser asks for permission. (A g7 cell is about 2.3 km × 2.3 km, D-028.) The promise line
      reads "The club shows you people nearby first, as your area fills up: …".
@@ -302,14 +303,16 @@ From a member's point of view (D-015..D-018):
   to `/privacy.html` and `thebrivia.club@gmail.com`, and **Delete my account**. Status comes from the member's own
   `profiles.sensitive_consent_at`.
 - **Withdraw (R2).** Dialog "Withdraw consent?" / "We'll delete your private interests now and spread their points
-  across your other interests. You can add them again later." Buttons **Withdraw and delete** / **Keep** (Keep has
+  across your other interests." (F4: "You can add them again later." was dropped: no interest-edit path exists yet.)
+  Buttons **Withdraw and delete** / **Keep** (Keep has
   initial focus). It calls `set_sensitive_consent(false)`; the member stays in the app, the status flips to "not given",
   the Withdraw button goes away and the profile's interests are re-read. A failure shows "We couldn't withdraw your
   consent. Try again, or email thebrivia.club@gmail.com." in `role="alert"`.
 - **Delete (R5).** Dialog "Delete my account" lists, in plain language, what is deleted (profile, photos, interests,
   points; matches, requests, signals; messages, which vanish from other people's chats too; posts and uploaded files)
-  and what remains and for how long (reports you made, up to a year, without your name; reports about you and their
-  evidence, 365 days; consent and deletion log, 1 year; other members' daily-limit entries about you, within 30 days;
+  and what remains and for how long (reports you made, up to a year, without your name; reports about you, 365 days, with
+  their evidence: the text of the last 50 messages and references to attachments, whose images may be gone once their
+  owner deletes them (F4); consent and deletion log, 1 year; other members' daily-limit entries about you, within 30 days;
   files others sent you stay in their folders; auth/platform logs, backups and CDN cache on their own schedules;
   other devices). Input label **Type DELETE to confirm**, compared after `trim().toUpperCase()`; the button is
   `aria-disabled="true"` until it matches and does nothing while disabled.

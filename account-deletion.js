@@ -139,7 +139,7 @@ export const DELETE_DISCLOSURE = {
   ],
   remains: [
     'Reports you made are kept for up to a year, without your name.',
-    'Reports about you, with their evidence, are kept for 365 days.',
+    'Reports about you are kept for 365 days, with their evidence: the text of the last 50 messages between you and the reporter, and references to attachments. The attachment images may no longer be available if their owner deletes them.',
     'A log of your consent and this deletion is kept for 1 year.',
     'If you were reported or flagged before you deleted, a one-way code made from your email, with the reasons and ids of those reports, is kept for 365 days, so a rejoin can be reviewed.',
     "Entries about you in other members' daily limits clear within 30 days.",

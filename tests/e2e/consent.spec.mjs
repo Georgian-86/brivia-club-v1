@@ -1232,7 +1232,8 @@ try {
   const wd = await pw.page.evaluate(() => { const d = document.querySelector('dialog[data-privacy="withdraw"]'); return d ? { text: d.textContent.replace(/\s+/g, ' '), buttons: [...d.querySelectorAll('button')].map((b) => b.textContent.trim()) } : null; });
   check(`withdraw dialog uses the R2 copy and buttons (${JSON.stringify(wd)})`, () => {
     assert.ok(wd);
-    assert.ok(wd.text.includes("Withdraw consent? We'll delete your private interests now and spread their points across your other interests. You can add them again later."));
+    assert.ok(wd.text.includes("Withdraw consent? We'll delete your private interests now and spread their points across your other interests."));
+    assert.ok(!/add them again later/i.test(wd.text), 'F4: no promise of a path that does not exist yet');
     assert.ok(wd.buttons.includes('Withdraw and delete') && wd.buttons.includes('Keep'));
   });
   const trapOk = [];
