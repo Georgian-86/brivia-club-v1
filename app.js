@@ -1436,6 +1436,10 @@ const completeChatAction = async (action) => {
     hideReportedMember(person);
     closeSelectedChat();
     showToast(reportSuccessCopy(person.name));
+    // F7: the chat (and its menu button) is gone: put focus on the chat list, or its heading when the list is empty.
+    const chatFocus = document.querySelector('#chat-list .chat-row-open') || document.querySelector('[data-view="chat"] .view-heading h1');
+    if (chatFocus && !chatFocus.matches('button, a, input')) chatFocus.setAttribute('tabindex', '-1');
+    chatFocus?.focus();
     return;
   }
   if (action === 'unblock') {

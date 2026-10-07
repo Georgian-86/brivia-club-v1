@@ -139,6 +139,7 @@ try {
         return route.fulfill({ status: 201, body: '', headers: { 'access-control-allow-origin': '*' } });
       }
       if (pathName === '/rest/v1/rpc/report_member') {
+        if (st.reportHold) await st.reportHold;
         if (st.report === 'cap') return json(429, { code: 'PT429', message: 'report_cap', details: null, hint: null });
         st.passed.add(args.p_target);
         return route.fulfill({ status: 204, body: '', headers: { 'access-control-allow-origin': '*' } });
@@ -706,9 +707,56 @@ try {
   await waitForCard(rep, 'Chen Abroad');
   const blockPost = st.calls.filter((c) => c.method === 'POST' && c.path === '/rest/v1/brivia_blocks').map((c) => JSON.parse(c.body));
   check(`Block from the card inserts one brivia_blocks row and advances, with no pass (${JSON.stringify(blockPost)})`, () => { assert.deepEqual(blockPost, [{ blocker_id: ME, blocked_id: B }]); assert.equal(passes().length, interBefore); });
+  // F7: a forced close while the report is in flight (Chrome closes a modal on a second Escape even when the first was
+  // cancelled) still applies the outcome once the server answers: hidden locally, the toast, the deck advances.
+  let releaseReport; st.reportHold = new Promise((resolve) => { releaseReport = resolve; });
+  await rep.locator('#swipe-card .card-more').click();
+  await rep.locator('.card-more-menu [data-card-action="report"]').click();
+  await rep.waitForSelector('dialog.report-dialog[open]');
+  await rep.locator('dialog.report-dialog input[value="spam"]').check();
+  await rep.evaluate(() => { const t = document.querySelector('#app-toast'); if (t) t.textContent = ''; });
+  const forcedBefore = reportCalls().length;
+  await rep.locator('[data-report-submit]').click();
+  for (let i = 0; i < 50 && reportCalls().length === forcedBefore; i += 1) await rep.waitForTimeout(100);
+  await rep.evaluate(() => document.querySelector('dialog.report-dialog')?.close());
+  await rep.waitForTimeout(200);
+  releaseReport(); st.reportHold = null;
+  const forcedAdvanced = await waitForCard(rep, 'Dana Blank');
+  await rep.waitForTimeout(300);
+  const forced = await rep.evaluate((id) => ({ toast: document.querySelector('#app-toast')?.textContent || '', hidden: Object.entries(window.localStorage).some(([k, v]) => k.startsWith('brivia-blocked-users:') && JSON.parse(v).includes(id)) }), C);
+  check(`F7: a forced close mid-report still hides the member, shows the toast and advances (${JSON.stringify({ forcedAdvanced, ...forced })})`, () => {
+    assert.equal(forcedAdvanced, true); assert.equal(forced.hidden, true);
+    assert.equal(forced.toast, "Thanks. We've received your report, and you won't see Chen Abroad again.");
+  });
   const roundButtons = await rep.evaluate(() => document.querySelectorAll('.swipe-actions button').length);
   check(`no third round action beside Pass and Pitch (${roundButtons} buttons)`, () => assert.equal(roundButtons, 2));
   await repCtx.close();
+
+  // 7c. F7: reporting from a chat closes the chat and puts focus on the chat list, not on <body>.
+  resetStub({ matchIds: [A] });
+  const chatCtx = await makeContext({ width: 1280, height: 900 });
+  const chatPage = await open(chatCtx);
+  await chatPage.evaluate(() => document.querySelector('[data-nav="chat"]')?.click());
+  await chatPage.waitForSelector(`#chat-list [data-chat-id="${A}"]`, { timeout: 8000 }).catch(() => {});
+  await chatPage.locator(`#chat-list .chat-row-open[data-chat-id="${A}"]`).click();
+  await chatPage.waitForSelector('#chat-more', { timeout: 5000 });
+  await chatPage.locator('#chat-more').click();
+  await chatPage.locator('[data-chat-action="report"]').click();
+  await chatPage.waitForSelector('dialog.report-dialog[open]');
+  await chatPage.locator('dialog.report-dialog input[value="harassment"]').check();
+  await chatPage.locator('[data-report-submit]').click();
+  await chatPage.waitForFunction(() => !document.querySelector('dialog.report-dialog'), null, { timeout: 5000 }).catch(() => {});
+  await chatPage.waitForTimeout(400);
+  const chatFocus = await chatPage.evaluate(() => {
+    const el = document.activeElement;
+    return { tag: el?.tagName, inChatView: Boolean(el?.closest('[data-view="chat"]')), windowHidden: document.querySelector('#chat-window')?.hidden, toast: document.querySelector('#app-toast')?.textContent || '' };
+  });
+  check(`F7: after a chat report the chat closes and focus is on the chat list (${JSON.stringify(chatFocus)})`, () => {
+    assert.equal(chatFocus.windowHidden, true);
+    assert.notEqual(chatFocus.tag, 'BODY'); assert.equal(chatFocus.inChatView, true);
+    assert.match(chatFocus.toast, /won't see Asha Band again/);
+  });
+  await chatCtx.close();
 
   // 8. Privacy across the run.
   const storedKeys = await (async () => { const ctx = await makeContext({ width: 800, height: 600 }); const p2 = await open(ctx); await p2.waitForTimeout(800); const keys = await p2.evaluate(() => Object.entries(window.localStorage).map(([k, v]) => `${k}=${v}`)); await ctx.close(); return keys; })();

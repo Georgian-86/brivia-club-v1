@@ -25,7 +25,9 @@ const reportErrorCopy = (error, status) => {
 const escapeText = (value) => String(value).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 let dialogCount = 0;
 
-// Resolves true once the report was accepted (the dialog is closed), false when the member cancelled.
+// Resolves true once the report was accepted, false when the member cancelled or it failed. The outcome follows the
+// request, not the close (F7): if the dialog is closed while the request is in flight (Chrome closes a modal on a
+// second Escape even though the first was cancelled), the promise waits for the server's answer.
 // send(reason, note) -> { error, status } (supabase.js reportMember).
 export const openReportDialog = ({ name, trigger, send }) => new Promise((resolve) => {
   if (document.querySelector('dialog.report-dialog')) { resolve(false); return; }
@@ -53,10 +55,11 @@ export const openReportDialog = ({ name, trigger, send }) => new Promise((resolv
   const submit = dialog.querySelector('[data-report-submit]');
   let sent = false;
   let busy = false;
+  let inFlight = null; // resolves to true / false when the request in flight answers
   dialog.addEventListener('close', () => {
     dialog.remove();
     if (trigger?.isConnected) trigger.focus();
-    resolve(sent);
+    if (inFlight) inFlight.then(resolve); else resolve(sent);
   });
   // A busy dialog ignores Escape: the request is in flight and its result must still reach the member.
   dialog.addEventListener('cancel', (event) => { if (busy) event.preventDefault(); });
@@ -87,9 +90,12 @@ export const openReportDialog = ({ name, trigger, send }) => new Promise((resolv
     submit.disabled = true;
     submit.setAttribute('aria-busy', 'true');
     errorBox.textContent = '';
-    let result;
-    try { result = await send(reason, note); } catch (error) { result = { error }; }
+    const request = (async () => { try { return await send(reason, note); } catch (error) { return { error }; } })();
+    inFlight = request.then((answer) => !answer?.error);
+    const result = await request;
     busy = false;
+    inFlight = null;
+    if (!dialog.open) return; // closed while in flight: the close handler already waits for this outcome
     if (result?.error) {
       errorBox.textContent = reportErrorCopy(result.error, result.status);
       submit.disabled = false;

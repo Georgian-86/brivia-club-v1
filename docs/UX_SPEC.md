@@ -289,9 +289,12 @@ From a member's point of view (D-015..D-018):
   thebrivia.club@gmail.com". Submitting with no reason shows "Choose a reason to continue."
 - **Outcomes.** Success: the dialog closes, the toast says "Thanks. We've received your report, and you won't see {name}
   again.", the member is added to the local blocked ids (the server already blocked), and from the deck the card leaves
-  like a Pass with **no** pass interaction POST; from chat the chat closes. Cap (HTTP 429 / `PT429` `report_cap`):
+  like a Pass with **no** pass interaction POST; from chat the chat closes and focus moves to the chat list (its first row,
+  or the heading when it is empty). Cap (HTTP 429 / `PT429` `report_cap`):
   "You've sent several reports today. For anything urgent, email thebrivia.club@gmail.com." in `role="alert"`, the dialog
-  and card stay. Other errors keep the dialog open with a retry message.
+  and card stay. Other errors keep the dialog open with a retry message. The outcome follows the request, not the close
+  (F7): if the browser force-closes the dialog while the request is in flight (Chrome's second Escape), a success still
+  hides the member, shows the toast and advances the card.
 - **Blocked users** (Profile settings) adds "Unblocking doesn't cancel a report you've made."
 - **Verified by** `tests/e2e/deck.spec.mjs` (section 7b) and `tests/e2e/consent.spec.mjs` (8h).
 
