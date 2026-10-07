@@ -116,6 +116,20 @@ export const reauthMethod = (user) => {
   return providers.length ? 'oauth' : 'password';
 };
 
+// The sessionStorage marker that reopens the delete dialog after "Sign in with Google again" (final fix F3). It names
+// the member who asked: Google's account chooser can bring back a different account, and that account must never
+// see its own delete dialog open by itself.
+export const REAUTH_MARKER_TTL_MS = 10 * 60 * 1000;
+export const reauthMarker = (userId, now = Date.now()) => JSON.stringify({ userId, ts: now });
+export const reauthMarkerMatches = (raw, sessionUserId, now = Date.now()) => {
+  if (!raw || !sessionUserId) return false;
+  let marker;
+  try { marker = JSON.parse(raw); } catch { return false; }
+  if (!marker || typeof marker !== 'object' || marker.userId !== sessionUserId) return false;
+  const ts = Number(marker.ts);
+  return ts > 0 && now - ts >= 0 && now - ts < REAUTH_MARKER_TTL_MS;
+};
+
 export const DELETE_DISCLOSURE = {
   deleted: [
     'Your profile, photos, interests and points.',

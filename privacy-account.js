@@ -75,10 +75,13 @@ const openWithdrawDialog = ({ trigger, fallbackFocus, withdraw }) => new Promise
 // R5: the delete dialog. deps: { user, runDeletion, signInWithPassword, startGoogle, onDeleted }.
 const openDeleteDialog = ({ trigger, fallbackFocus, deps }) => {
   const list = (items) => `<ul>${items.map((item) => `<li>${escapeText(item)}</li>`).join('')}</ul>`;
+  // F3: name the account being deleted (the current session user's own email only; never another member's).
+  const ownEmail = deps.user?.email ? `<p class="privacy-account-email" data-privacy-account-email>Deleting the account for <strong>${escapeText(deps.user.email)}</strong></p>` : '';
   const { dialog, close, setBusy } = createDialog({
     kind: 'delete', trigger, fallbackFocus,
     html: `<div class="privacy-body">
     <h2 id="__ID__">Delete my account</h2>
+    ${ownEmail}
     <p>This can't be undone. Your account and everything in it is deleted for good.</p>
     <h3>What we delete</h3>
     ${list(DELETE_DISCLOSURE.deleted)}

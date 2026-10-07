@@ -16,7 +16,7 @@ import './app-navigation.css';
 import './discovery-filters.css';
 import './mobile-app.css';
 import { supabase, rowToProfile, saveProfile, onboardingStatus, sendSignal, fetchSignalQuota, isRateLimited, isStorageImageUrl, withoutCredentials, uploadMessageAttachment, removeMessageAttachment, uploadCommunityPostImage, removeCommunityPostImage, ImageProcessingError, compressAttachmentFiles, attachmentKind, reportMember, setSensitiveConsent, fetchSensitiveConsentAt } from './supabase.js';
-import { deleteAccount, clearBriviaKeys, DELETE_BUCKETS } from './account-deletion.js';
+import { deleteAccount, clearBriviaKeys, DELETE_BUCKETS, reauthMarker, reauthMarkerMatches } from './account-deletion.js';
 import { openPrivacyAccount } from './privacy-account.js';
 import { isUnderReview, UNDER_REVIEW_COPY } from './onboarding-guard.js';
 import { openReportDialog, bindCardOverflow, cardOverflowOpen, reportSuccessCopy } from './report-dialog.js';
@@ -1650,7 +1650,7 @@ const privacyDeps = (session) => ({
   }),
   signInWithPassword: (email, password) => supabase.auth.signInWithPassword({ email, password }),
   startGoogle: async () => {
-    try { window.sessionStorage.setItem(REAUTH_DELETE_KEY, String(Date.now())); } catch { /* the member can reopen the dialog by hand */ }
+    try { window.sessionStorage.setItem(REAUTH_DELETE_KEY, reauthMarker(session.user.id)); } catch { /* the member can reopen the dialog by hand */ }
     const { error } = await supabase.auth.signInWithOAuth({ provider: 'google', options: { redirectTo: `${window.location.origin}/auth.html`, queryParams: { prompt: 'select_account' } } });
     if (error) { try { window.sessionStorage.removeItem(REAUTH_DELETE_KEY); } catch { /* ignore */ } throw error; }
   },
@@ -2584,9 +2584,10 @@ const loadSupabaseCommunity = async () => {
   }
   document.body.classList.remove('app-auth-pending');
   if (document.body.dataset.appView === 'posts') loadCommunityPosts();
-  // Back from "Sign in with Google again" (R5 re-auth): reopen the delete dialog on the profile view.
+  // Back from "Sign in with Google again" (R5 re-auth): reopen the delete dialog on the profile view, but only for the
+  // same member who asked (F3): another account picked in Google's chooser gets nothing, and the marker is dropped.
   let reauthReturn = false;
-  try { const stamp = Number(window.sessionStorage.getItem(REAUTH_DELETE_KEY)); window.sessionStorage.removeItem(REAUTH_DELETE_KEY); reauthReturn = stamp > 0 && Date.now() - stamp < 10 * 60 * 1000; } catch { /* storage unavailable */ }
+  try { const raw = window.sessionStorage.getItem(REAUTH_DELETE_KEY); window.sessionStorage.removeItem(REAUTH_DELETE_KEY); reauthReturn = reauthMarkerMatches(raw, session.user.id); } catch { /* storage unavailable */ }
   if (reauthReturn) {
     document.querySelector('[data-nav="profile"]')?.click();
     openPrivacy(document.querySelector('#profile-settings-button'), { autoDelete: true });

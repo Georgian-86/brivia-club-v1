@@ -213,3 +213,17 @@ test('clearBriviaKeys removes only brivia-* keys', () => {
   clearBriviaKeys(store, undefined);
   assert.deepEqual([...data.keys()], ['sb-auth']);
 });
+
+test('F3: the re-auth marker records the user id and time; only the same user within 10 minutes reopens the dialog', async () => {
+  const { reauthMarker, reauthMarkerMatches } = await import('../../account-deletion.js');
+  const now = 1_800_000_000_000;
+  const raw = reauthMarker('u-1', now);
+  assert.deepEqual(JSON.parse(raw), { userId: 'u-1', ts: now });
+  assert.equal(reauthMarkerMatches(raw, 'u-1', now + 60_000), true);
+  assert.equal(reauthMarkerMatches(raw, 'u-2', now + 60_000), false, 'another account came back from Google');
+  assert.equal(reauthMarkerMatches(raw, 'u-1', now + 11 * 60_000), false, 'older than 10 minutes');
+  assert.equal(reauthMarkerMatches(String(now), 'u-1', now + 1000), false, 'an old timestamp-only marker names no user');
+  assert.equal(reauthMarkerMatches(null, 'u-1', now), false);
+  assert.equal(reauthMarkerMatches('{bad json', 'u-1', now), false);
+  assert.equal(reauthMarkerMatches(raw, '', now), false);
+});

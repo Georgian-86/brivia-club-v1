@@ -327,8 +327,10 @@ From a member's point of view (D-015..D-018):
   again, or email thebrivia.club@gmail.com."
 - **Recent sign-in.** `reauth_required` reveals **Confirm your password** (password members: `signInWithPassword`, then the
   deletion retries on the same click) or **Sign in with Google again** (Google-only members: sets the sessionStorage
-  marker `brivia-reauth-delete`, re-runs OAuth with `prompt=select_account`; the marker holds a timestamp and is honoured for 10 minutes; on return `app.js`
-  consumes it first and reopens the delete dialog). The method comes from `app_metadata.provider(s)`.
+  marker `brivia-reauth-delete`, re-runs OAuth with `prompt=select_account`; the marker holds `{ userId, ts }` and is honoured for 10 minutes; on return `app.js`
+  consumes it first and reopens the delete dialog **only when the session user is the marker's user** (F3: another account
+  picked in Google's chooser gets nothing, and the marker is dropped)). The delete dialog always names the account it
+  deletes under its heading: "Deleting the account for {email}", the current session user's own email. The method comes from `app_metadata.provider(s)`.
 - **Dialog behaviour.** Real `<dialog>` + `showModal`; Tab wraps; Escape closes except while a request is in flight;
   focus returns to the trigger (the settings button, or the Delete / Withdraw button when nested); targets at least 44 px,
   text at least 12 px, no horizontal scroll at 375 px; deep-wine tokens; reduced motion respected.

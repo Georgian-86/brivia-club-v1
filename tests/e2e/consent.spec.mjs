@@ -1273,6 +1273,7 @@ try {
     assert.ok(dd && dd.hasInput);
     assert.equal(dd.label, 'Type DELETE to confirm');
     assert.equal(dd.aria, 'true'); assert.equal(dd.alert, 'alert'); assert.ok(dd.noH);
+    assert.match(dd.text, /Deleting the account for alex@test\.brivia\.club/, 'F3: the dialog names the account it deletes');
     for (const re of [/Your messages, which disappear from other people's chats too/, /can't be undone/i, /Reports you made are kept for up to a year/, /Reports about you/, /consent and this deletion is kept for 1 year/, /Files other people sent you stay in their own folders/, /backups/, /about an hour/, /Other devices/]) assert.match(dd.text, re);
   });
   const trap2 = [];
@@ -1364,6 +1365,15 @@ try {
   const reopened2 = await gg.page.waitForSelector('dialog[data-privacy="delete"][open]', { timeout: 15000 }).then(() => true, () => false);
   const markerAfter = await gg.page.evaluate(() => window.sessionStorage.getItem('brivia-reauth-delete'));
   check(`after returning from Google the delete dialog reopens and the marker is consumed (${reopened2}, ${markerAfter})`, () => { assert.equal(reopened2, true); assert.equal(markerAfter, null); });
+  const reopenedFor = await gg.page.evaluate(() => document.querySelector('dialog[data-privacy="delete"]')?.textContent.replace(/\s+/g, ' ') || '');
+  check('F3: the reopened dialog names the signed-in account', () => assert.match(reopenedFor, /Deleting the account for alex@test\.brivia\.club/));
+  // F3: a different account came back from Google's chooser: the marker names another user, so nothing opens.
+  await gg.page.evaluate(() => window.sessionStorage.setItem('brivia-reauth-delete', JSON.stringify({ userId: '99999999-9999-4999-8999-999999999999', ts: Date.now() })));
+  await gg.page.goto(`${BASE}/app.html`, { waitUntil: 'domcontentloaded' });
+  await gg.page.waitForFunction(() => !document.body.classList.contains('app-auth-pending') && !window.sessionStorage.getItem('brivia-reauth-delete'), null, { timeout: 15000 }).catch(() => {});
+  await gg.page.waitForTimeout(1500);
+  const otherUser = await gg.page.evaluate(() => ({ dialog: Boolean(document.querySelector('dialog.privacy-dialog[open]')), marker: window.sessionStorage.getItem('brivia-reauth-delete') }));
+  check(`F3: a marker for another account opens nothing and is dropped (${JSON.stringify(otherUser)})`, () => assert.deepEqual(otherUser, { dialog: false, marker: null }));
   check('privacy context (google): no uncaught page errors', () => assert.deepEqual(gg.errors, []));
   await gg.ctx.close();
 
