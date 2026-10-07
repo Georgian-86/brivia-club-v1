@@ -564,7 +564,8 @@ saturated, the outer rings relax first, instead of the deck repeating saturated 
   `profiles` omits `city` and `state`). A member's own area is `my_onboarding_status().place_label` (read-only in the
   profile; changing it from the profile is a later iteration). Other members see only `distance_band`.
 - **Onboarding progress.** `my_onboarding_status()` returns, for the caller only, `interests` (count), `points` (sum),
-  `has_cell`, `place_label` (the place name of the cell, never the cell id) and `completed`. It carries no interest
+  `has_cell`, `place_label` (the place name of the cell, never the cell id; for a `'place'` member, a city pick, it ends
+  in " (city-wide)", e.g. `Mumbai (city-wide)`, since 0005, R9) and `completed`. It carries no interest
   labels, so sensitive interests (D-029) never appear in it.
 - **Card data members cannot forge (Iteration 2 final review, Ruling I11).** `created_at` on profiles, posts and
   messages is the server clock for every member session (only the owner/seed may set it), so "newest first" cannot
@@ -765,7 +766,8 @@ select log_impressions($1, $4);
   each other as "~3 km"). A `'place'` member is counted in g5 density only, never in g7 or g6, so pickers cannot
   un-coarsen a geolocated resident of the centroid cell. When either member of a pair is `'place'`, the pair uses the
   place rule (§7) and the band is the place name: a picker never sees, and is never shown as, `~3 km`. `my_onboarding_status().place_label` appends " (city-wide)" for a `'place'` member (`Mumbai (city-wide)`; a `'cell'`
-  member gets the bare name), so the client can show "Your area: Mumbai (city-wide)" with a one-tap upgrade (R9). Clients read place
+  member gets the bare name), so the client can show "Your area: Mumbai (city-wide)" (R9). There is no in-app upgrade to a ~2 km area yet: the
+  profile says "Change your area: coming soon.". Clients read place
   names from `place(id, name, region, country, is_launch)`; its centroid columns are never granted.
 - **Client capture (UX_SPEC §A, D-035).** The signup asks for geolocation only after the privacy explainer, with
   `{ enableHighAccuracy: false, timeout: 10000, maximumAge: 600000 }`; denial, timeout, a missing API or an insecure

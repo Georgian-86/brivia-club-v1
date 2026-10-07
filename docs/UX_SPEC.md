@@ -101,8 +101,8 @@ background under a pseudo-element).
      private chips; consent reaches the server only when a private pick is submitted. If the server still refuses
      ("sensitive consent required") the panel opens with "Private interests need your consent first." Once revealed, the
      chip and budget row show a lock icon and **"Private: never shown on your profile, and does not change who you see"**.
-     They never appear anywhere public. Withdrawal UI (Profile → Privacy and account, "Withdraw and delete" / "Keep") is a
-     later task.
+     They never appear anywhere public. Withdrawal is in Profile → Privacy and account ("Withdraw and delete" / "Keep",
+     §G).
    - **The Passion Budget:** 20 points over 1–12 interests, each with at least 1 point. A new interest gets 1 point
      (taken from the largest one when none are left). Each chosen interest has a −/+ stepper
      (`aria-label="Remove a point from <label>"` / `"Add a point to <label>"`, 44 × 44 px, focusable even at a
