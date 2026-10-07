@@ -580,3 +580,108 @@ supersedes it.
   and relation-before-block; B's career-resumes check; C's 14-day reporter age and suffix in `set_home_city`).
 - **Founder to confirm:** the named member cards on the `auth.html` preview stay only if each person consented
   (otherwise they become unnamed "Example" cards); the moderation and grievance contact `thebrivia.club@gmail.com`.
+
+## D-045: P0-B delivered on the branch (iteration 4); not yet applied live
+- **Dates:** 2026-10-05 to 2026-10-07. **Branch:** `claude/jolly-edison-49xvza`, range `bc7542e..c208bdc`.
+  **Plan:** `docs/superpowers/plans/2026-10-05-iteration-4-p0b.md`. **Spec:** D-044 / `docs/arena/2026-10-05-p0b-design.md`.
+- **Delivered:**
+  - `0005_p0b_dpdp_safety.sql`:
+    - the 18+ declaration gate and `consent_event`;
+    - sensitive consent give and withdraw, with the points redistributed on withdrawal;
+    - `report_member` (cap first, evidence, qualified flags, underage suspension, a per-target lock);
+    - the rejoin tombstone;
+    - `delete_my_account` (re-auth within 10 minutes, empty storage, cascade), plus owner storage-delete policies;
+    - the retention purge;
+    - the "(city-wide)" label.
+  - `0006_perf_policies.sql`: 17 policies use `(select auth.uid())` and 4 foreign-key indexes are added. A drift test
+    is pinned to committed TSVs, and the live policies were verified equal to that snapshot read-only.
+  - **Client:**
+    - the 18+ step;
+    - the private-interest consent panel;
+    - the card overflow menu and the chat report dialog;
+    - Privacy & account (withdraw, and deletion with re-auth, asking the server before any file is touched);
+    - the under-review notice;
+    - fail-closed image compression with extension-aware detection, and the video location warning;
+    - `privacy.html` (version `2026-10-05`);
+    - honesty, contrast and 12 px fixes, with axe and per-pixel photo-contrast checks.
+  - **Docs:** `docs/BREACH_RUNBOOK.md`, `docs/MODERATION.md`, and the 0005/0006 apply runbook in
+    `supabase/migrations/README.md`.
+- **Gate at `c208bdc`:**
+  - SQL harness ALL PASSED, including the drift check; unit tests 88 (also under TZ=Asia/Kolkata); ORBIT 86.
+  - e2e: consent 153, onboarding 198, deck 103 (three runs); build OK.
+  - `0001`–`0004` and `index.html` are unchanged.
+- **Process:** 11 tasks, each with an implementer, a task review and fix rounds, then a two-part final review (SQL
+  and client) and one fix wave. Every participant was a Claude model.
+- **Controller rulings made during execution** (each with its cost if wrong; full ledger in the session):
+  1. The H3 allow-list grew per task, so no test names a function before it exists.
+  2. The test purge sets `storage.allow_delete_query`. It removes metadata only, and the README says so.
+  3. Pending interests are kept when the 18+ declaration fails.
+  4. The 18+ trigger allows the withdrawal redistribution, as a narrow, invoker-checked carve-out.
+  5. Impressions never count as a relation for report qualification. This is superseded and tightened by D-046 R1.
+  6. A file is image-like by MIME type or by extension, and must re-encode or be refused. `image/gif` passes through
+     only in chat.
+  7. The quota reset shows the true local time ("8:30 PM" in India) rather than rounding.
+  8. The flaky deck focus check was root-caused (focus returns in the async `close` event) and fixed with a bounded
+     wait.
+  9. Several review minors were folded into the fix rounds where they were cheap and touched the same code.
+- **Live facts verified read-only:**
+  - `postgres` has `rolbypassrls = true` and DELETE on `auth.users`;
+  - `storage.protect_delete` is present;
+  - pgcrypto is in the `extensions` schema;
+  - `career_applications` has 0 rows;
+  - the orphan-folder query returns 0 rows;
+  - the region is ap-south-1.
+- **Not done:** 0005, 0006 and the client are **not** applied or deployed. D-046 amends 0005 in place before its
+  first apply. The `app.js:1577` profile helper sentence is still untrue; it is D-046 R10.
+
+## D-046: Iteration-4 arena outcome: corroborated underage suspension, enforcement ladder, deletion hold, founder alert, amend 0005 before its first apply
+- **Date:** 2026-10-07. **Record:** `docs/arena/2026-10-07-iteration-4.md`. Critics: A (UX), B (privacy, security
+  and DPDP), C (data, ops, engine and IP), and a judge. All were Claude models, so heterogeneity is reduced; this is
+  disclosed. Snapshot `c208bdc`.
+- **Evidence:**
+  - One sock account aged 7 days or more can insert a raw `'request'` interaction row for any same-world id. That row
+    counts as a relation, so one underage report suspends any adult with no expiry (J1, confirmed by the judge).
+  - A member under review cannot reach Privacy & account.
+  - `restricted` hides no one, and the Restrict statement in MODERATION.md un-hides a suspended member.
+  - Messages vanish if a harasser deletes before anyone reports them.
+  - **Rejected:** "attachments are public" (the bucket is private, with signed URLs) and "region unverified" (live is
+    ap-south-1).
+- **Decision (binding; 0005 is amended in place before its first live apply, as D-038 did for 0004; the alert is a
+  new 0007):**
+  - **R1:** an underage report hides the target only with two distinct qualifying reporters within 30 days, or one
+    qualifying reporter who has a match with the target. A reporter's own `request` rows never count. A single report
+    is stored, raises an alert and enters a 72 h review queue (`member_report.reviewed_at`).
+  - **R3, the enforcement ladder:**
+    - a `banned` flag;
+    - Restrict never replaces `suspended_pending_review` or `banned`;
+    - an owner-only `moderation_remove_member`;
+    - a rejoin whose tombstone has `underage` or `banned` is suspended;
+    - tombstones only for qualifying reports or flags.
+  - **R4:** deletion is held (`deletion_held`) for a flagged member, or one with an open qualifying report from the
+    last 30 days. The founder completes it within 30 days. **Counsel question** recorded: deletion before any report.
+  - **R5:** `0007_moderation_alert.sql` runs an hourly pg_cron job that posts counts only to a founder webhook through
+    pg_net, plus a digest row. This adds a new live dependency, `pg_net`, which needs a pre-flight check.
+  - **R6:** a live deletion rehearsal on a throwaway test-world member, covering password and Google re-auth, the
+    `amr` shape and zero residual rows.
+  - **R7:** the under-review notice links Privacy & account, and deletion from there takes the R4 hold.
+  - **R8:** collapse the duplicate definitions in 0005 to one each.
+  - **R9:** the purge fails loudly and alerts.
+  - **R10:** honesty copy, including `app.js:1577`, the reporter-identifiability caveat, the under-18 text per R1,
+    and career data under "What remains".
+  - **R11:** auth hardening is a founder gate, recorded as a dated DECISIONS entry.
+- **Backlog:** P0-C items 1–10 (the record's table, each with acceptance criteria). P1 holds the A-I UX items, the
+  parked ledger items, private photo URLs and the card budget, the P0-E grid1 adapter and sensitive firewall, and the
+  IP dossier. P2 holds Gmail normalisation, pepper rotation, age assurance, inactivity deletion, re-consent, a
+  localised emergency number, reporter feedback and ring forensics.
+- **Go-live gate at `c208bdc`:**
+  - met: rows 1 and 5;
+  - met live: rows 4 and 12;
+  - met locally: row 3;
+  - partly met: rows 2 and 6;
+  - in the build but not deployed: row 13;
+  - not met: rows 7–11 and 14 (row 14 is not needed for the closed beta).
+- **Dissent preserved:**
+  - C wanted a mutual relation for all qualification, and wanted purge failures non-blocking.
+  - B wanted every deletion held.
+  - A wanted the paused member's full app.
+  - The judge's own trade-off: a minor seen only in the deck stays visible until the founder reviews.
