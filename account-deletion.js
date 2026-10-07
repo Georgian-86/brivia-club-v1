@@ -1,10 +1,12 @@
-// Self-serve account deletion, client side (Iteration 4, Task 9, ruling R5; critic A C3).
-// Pure and injectable: no supabase import, no DOM. Order matters: the member's Storage objects go first (SQL never
-// deletes Storage rows), then the delete_my_account RPC. Every step is safe to repeat, so a retry after a partial
-// failure finishes the job. signOut and clearLocal run ONLY after the RPC succeeded.
+// Self-serve account deletion, client side (Iteration 4, Task 9, ruling R5; critic A C3; final fix F1).
+// Pure and injectable: no supabase import, no DOM. Order matters (F1): the delete_my_account RPC is asked FIRST, so a
+// stale sign-in (reauth_required) is answered before a single file is touched. Only when the server answers
+// storage_not_empty are the member's Storage objects removed (SQL never deletes Storage rows); then the RPC is called
+// once more. Every step is safe to repeat, so a retry after a partial failure finishes the job. signOut and clearLocal
+// run ONLY after the RPC succeeded.
 //
 //   deleteAccount({ storage, rpc, signOut, clearLocal, buckets, uid })
-//     -> { ok: true } | { ok: false, stage: 'storage' | 'rpc' | 'reauth', error }
+//     -> { ok: true } | { ok: false, stage: 'storage' | 'rpc' | 'reauth', filesRemoved: boolean, error }
 //   storage.from(bucket).list(prefix, { limit, offset }) / .remove(paths)   (Supabase Storage client shape)
 //   rpc(name, args) -> { error }                                              (Supabase rpc shape)
 export const DELETE_BUCKETS = ['profile-photos', 'profile-covers', 'message-attachments', 'community-posts'];
@@ -14,6 +16,7 @@ const MAX_PASSES = 50; // a bucket that never empties is reported, not looped on
 
 export const STORAGE_FAILED_COPY = "We removed some of your files but couldn't finish. Nothing else was deleted. Try again.";
 export const RPC_FAILED_COPY = 'Your photos and files are gone, but your account still exists. Try again to finish, or email thebrivia.club@gmail.com.';
+export const RPC_NOTHING_REMOVED_COPY = "We couldn't delete your account. Try again, or email thebrivia.club@gmail.com.";
 export const STORAGE_NOT_EMPTY_COPY = `${STORAGE_FAILED_COPY} If it keeps failing, email thebrivia.club@gmail.com.`;
 export const REAUTH_COPY = 'For your security, confirm it is you before we delete your account.';
 
@@ -56,24 +59,35 @@ export const rpcStage = (error) => {
 };
 
 export async function deleteAccount({ storage, rpc, signOut, clearLocal, buckets = DELETE_BUCKETS, uid }) {
-  try {
-    for (const name of buckets) await emptyBucket(storage, name, uid);
-  } catch (error) {
-    return { ok: false, stage: 'storage', error: asError(error) };
+  const callRpc = async () => {
+    try { return (await rpc('delete_my_account', { p_confirm: 'DELETE' })) || {}; } catch (error) { return { error }; }
+  };
+  const fail = (error, filesRemoved) => ({ ok: false, stage: rpcStage(error), filesRemoved, error: asError(error) });
+  let result = await callRpc();
+  let filesRemoved = false;
+  if (result.error) {
+    // reauth_required or any other refusal: no file has been touched.
+    if (rpcStage(result.error) !== 'storage') return fail(result.error, false);
+    try {
+      for (const name of buckets) await emptyBucket(storage, name, uid);
+    } catch (error) {
+      return { ok: false, stage: 'storage', filesRemoved: true, error: asError(error) };
+    }
+    filesRemoved = true;
+    result = await callRpc(); // once more; a second storage_not_empty is reported (stage 'storage', email fallback)
+    if (result.error) return fail(result.error, filesRemoved);
   }
-  let result;
-  try { result = await rpc('delete_my_account', { p_confirm: 'DELETE' }); } catch (error) { result = { error }; }
-  if (result?.error) return { ok: false, stage: rpcStage(result.error), error: asError(result.error) };
   try { await signOut({ scope: 'local' }); } catch { /* the auth user is already gone: ignore */ }
   try { clearLocal(); } catch { /* nothing more to clear */ }
   return { ok: true };
 }
 
-// The copy shown in the dialog's role="alert" region for a failed run.
-export const deletionErrorCopy = (stage) => {
+// The copy shown in the dialog's role="alert" region for a failed run. An RPC failure only says the files are gone
+// when this run removed them.
+export const deletionErrorCopy = (stage, { filesRemoved = false } = {}) => {
   if (stage === 'storage') return STORAGE_NOT_EMPTY_COPY;
   if (stage === 'reauth') return REAUTH_COPY;
-  return RPC_FAILED_COPY;
+  return filesRemoved ? RPC_FAILED_COPY : RPC_NOTHING_REMOVED_COPY;
 };
 
 // Removes every `brivia-*` key and the Supabase auth token (`sb-*-auth-token`, so a failed signOut leaves no stale JWT).

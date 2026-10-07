@@ -39,8 +39,8 @@ PLAYWRIGHT_MODULE=/tmp/pw/node_modules/playwright/index.mjs node tests/e2e/deck.
 ```
 
 `consent.spec.mjs` section 10 (Iteration 4, Task 9) also covers PRIVACY & ACCOUNT with mocked Storage `list`/`remove`
-(`/storage/v1/object/list/<bucket>`, `DELETE /storage/v1/object/<bucket>`), `delete_my_account` (`ok`, `reauth_required`,
-a 500), `set_sensitive_consent` and the password / Google re-auth paths; the `deleted=1` landing is stubbed there, and section 11 checks the real page.
+(`/storage/v1/object/list/<bucket>`, `DELETE /storage/v1/object/<bucket>`), `delete_my_account` (`reauth_required` before any
+Storage call, `storage_not_empty` while files remain, then `ok`, a 500), `set_sensitive_consent` and the password / Google re-auth paths; the `deleted=1` landing is stubbed there, and section 11 checks the real page.
 
 **Accessibility checks (Iteration 4, Task 10).** `a11y.mjs` is a shared helper, not a spec. It injects
 `/tmp/pw/node_modules/axe-core/axe.min.js` (override with `AXE_PATH`) through `page.addScriptTag`. `onboarding.spec.mjs` runs

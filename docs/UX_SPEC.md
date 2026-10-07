@@ -302,14 +302,17 @@ From a member's point of view (D-015..D-018):
   other devices). Input label **Type DELETE to confirm**, compared after `trim().toUpperCase()`; the button is
   `aria-disabled="true"` until it matches and does nothing while disabled.
 - **Consent status load failure.** If the status cannot be read, the section says "We couldn't load your consent status. Try again." with a Try again button; it never shows "not given" or hides Withdraw on a failed read.
-- **Order and failures (`account-deletion.js`).** Storage first (list pages of 100 with `offset`, remove in batches of at
-  most 100, re-list until a list returns 0 items, in profile-photos, profile-covers, message-attachments,
-  community-posts), then `delete_my_account('DELETE')`. Only on success: `signOut({ scope: 'local' })` (errors ignored),
+- **Order and failures (`account-deletion.js`; final fix F1).** `delete_my_account('DELETE')` is called **first**, so a
+  stale sign-in (`reauth_required`) is answered before any file is touched. Only when it answers `storage_not_empty`
+  does the client empty Storage (list pages of 100 with `offset`, remove in batches of at most 100, re-list until a list
+  returns 0 items, in profile-photos, profile-covers, message-attachments, community-posts) and call the RPC once more; a
+  member with no files is deleted by the first call. Only on success: `signOut({ scope: 'local' })` (errors ignored),
   every `brivia-*` key and the `sb-*-auth-token` key cleared from localStorage and sessionStorage, `location.assign('/privacy.html?deleted=1')`.
   Failures show in `role="alert"` and every run can be retried: storage "We removed some of your files but couldn't
-  finish. Nothing else was deleted. Try again." (the `storage_not_empty` RPC error adds "If it keeps failing, email
-  thebrivia.club@gmail.com."), RPC "Your photos and files are gone, but your account still exists. Try again to finish,
-  or email thebrivia.club@gmail.com."
+  finish. Nothing else was deleted. Try again." (with "If it keeps failing, email thebrivia.club@gmail.com."), an RPC
+  failure after the files were removed "Your photos and files are gone, but your account still exists. Try again to finish,
+  or email thebrivia.club@gmail.com.", an RPC failure before any file was touched "We couldn't delete your account. Try
+  again, or email thebrivia.club@gmail.com."
 - **Recent sign-in.** `reauth_required` reveals **Confirm your password** (password members: `signInWithPassword`, then the
   deletion retries on the same click) or **Sign in with Google again** (Google-only members: sets the sessionStorage
   marker `brivia-reauth-delete`, re-runs OAuth with `prompt=select_account`; the marker holds a timestamp and is honoured for 10 minutes; on return `app.js`

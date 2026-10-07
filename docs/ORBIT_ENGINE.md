@@ -904,6 +904,8 @@ select log_impressions($1, $4);
   `career-resumes` is not checked), records a tombstone when the member was reported or flagged (R6), logs
   `consent_event('account_deleted')` and deletes `auth.users`; every FK to `profiles` cascades, a report the member made
   keeps its row with `reporter_id` null, and a report about them survives. SQL never deletes from `storage.objects`.
+  The client calls the RPC first (the sign-in check runs before the storage check, so `reauth_required` comes back
+  before any file is touched), empties the member's Storage folders only on `storage_not_empty`, then calls it once more.
 
 - `log_impressions(p_viewer uuid, p_rows jsonb)`: SECURITY DEFINER, `execute` granted to `orbit_svc` only. It sets
   `viewer_id = p_viewer` and `event = 'impression'` itself; neither is taken from `p_rows`. It accepts at most 30

@@ -1162,8 +1162,10 @@ try {
       if (pathName === '/rest/v1/rpc/delete_my_account') {
         st.rpcCalls.push(JSON.parse(postData || '{}'));
         const mode = st.rpcMode.shift() || 'ok';
+        // Like 0005: the sign-in check comes before the storage check; storage_not_empty while any file remains.
         if (mode === 'reauth' && !st.reauthed) return json(400, { code: 'P0001', message: 'reauth_required', details: null, hint: null });
         if (mode === 'boom') return json(500, { code: 'XX000', message: 'boom' });
+        if (Object.values(st.files).some((f) => f.length)) return json(400, { code: 'P0001', message: 'storage_not_empty', details: null, hint: null });
         return route.fulfill({ status: 204, body: '', headers: { 'access-control-allow-origin': '*' } });
       }
       if (pathName === '/rest/v1/rpc/deck_candidates') return json(200, []);
@@ -1285,7 +1287,21 @@ try {
   await pw.page.locator('#privacy-delete-confirm').fill('  delete ');
   const gate2 = await pw.page.evaluate(() => document.querySelector('[data-privacy-confirm-delete]').getAttribute('aria-disabled'));
   check(`"  delete " (trim, upper-case) enables the button (${gate2})`, () => assert.notEqual(gate2, 'true'));
+  // F1: the RPC is asked first. A stale sign-in answers reauth_required before a single file is touched.
+  const storageCalls = () => pw.st.calls.filter((c) => (c.method === 'POST' && c.path.startsWith('/storage/v1/object/list/')) || (c.method === 'DELETE' && c.path.startsWith('/storage/v1/object/'))).length;
+  const storageBefore = storageCalls();
+  pw.st.rpcMode = ['reauth'];
+  await pw.page.locator('[data-privacy-confirm-delete]').click();
+  await pw.page.waitForSelector('#privacy-delete-password', { timeout: 10000 }).catch(() => {});
+  const reauthUi = await pw.page.evaluate(() => ({ label: document.querySelector('label[for="privacy-delete-password"]')?.textContent.trim(), type: document.querySelector('#privacy-delete-password')?.type, google: Boolean(document.querySelector('[data-privacy-google]:not([hidden])')), url: location.pathname }));
+  check(`reauth_required asks a password member for their password (${JSON.stringify(reauthUi)})`, () => { assert.equal(reauthUi.label, 'Confirm your password'); assert.equal(reauthUi.type, 'password'); assert.equal(reauthUi.google, false); assert.equal(reauthUi.url, '/app.html'); });
+  check(`F1: reauth_required comes before any Storage list or remove; every file is still there (${storageCalls() - storageBefore} storage calls, files ${JSON.stringify(Object.values(pw.st.files).map((f) => f.length))})`, () => {
+    assert.equal(storageCalls(), storageBefore);
+    assert.deepEqual(Object.values(pw.st.files).map((f) => f.length), [1, 0, 230, 1]);
+    assert.equal(pw.st.rpcCalls.length, 1);
+  });
   // Escape is ignored while a request is in flight.
+  await pw.page.locator('#privacy-delete-password').fill('correct horse');
   let release; pw.st.holdList = new Promise((resolve) => { release = resolve; });
   pw.st.failDeleteAt = 3; // the 3rd Storage remove fails (1st: photos, 2nd: first attachment batch): mid-way
   await pw.page.locator('[data-privacy-confirm-delete]').click();
@@ -1294,36 +1310,32 @@ try {
   const busyOpen = await pw.page.evaluate(() => Boolean(document.querySelector('dialog[data-privacy="delete"][open]')));
   check(`Escape does nothing while the request is in flight (${busyOpen})`, () => assert.equal(busyOpen, true));
   pw.st.holdList = null; release();
-  await pw.page.waitForFunction(() => (document.querySelector('[data-privacy-error]')?.textContent || '').length > 0, null, { timeout: 10000 }).catch(() => {});
+  await pw.page.waitForFunction(() => /We removed some of your files/.test(document.querySelector('[data-privacy-error]')?.textContent || ''), null, { timeout: 10000 }).catch(() => {});
   const storageFail = await pw.page.evaluate(() => ({ text: document.querySelector('[data-privacy-error]')?.textContent.trim(), role: document.querySelector('[data-privacy-error]')?.getAttribute('role') }));
-  check(`mid-way storage failure shows the storage copy, deletes nothing else (${JSON.stringify(storageFail)}; rpc calls ${pw.st.rpcCalls.length})`, () => {
+  check(`after the re-auth, storage_not_empty empties the folders; a mid-way failure shows the storage copy and calls the RPC no more (${JSON.stringify(storageFail)}; rpc calls ${pw.st.rpcCalls.length})`, () => {
     assert.match(storageFail.text, /^We removed some of your files but couldn't finish\. Nothing else was deleted\. Try again\./);
     assert.match(storageFail.text, /thebrivia\.club@gmail\.com/);
-    assert.equal(pw.st.rpcCalls.length, 0);
+    assert.equal(pw.st.rpcCalls.length, 2);
     assert.ok(pw.st.files['message-attachments'].length > 0 && pw.st.files['message-attachments'].length < 230, `left ${pw.st.files['message-attachments'].length}`);
     assert.ok(pw.st.calls.filter((c) => c.method === 'DELETE').every((c) => (JSON.parse(c.body || '{}').prefixes || []).length <= 100));
   });
   check('a failed deletion never signs out', () => assert.equal(pw.st.calls.filter((c) => c.path === '/auth/v1/logout').length, 0));
-  // Retry: storage finishes, then the RPC fails once (rpc copy), then needs a recent sign-in (password), then succeeds.
-  pw.st.failDeleteAt = 0; pw.st.rpcMode = ['boom', 'reauth'];
+  // Retry: storage_not_empty, storage finishes, then the second RPC call fails (rpc copy: the files are gone).
+  pw.st.failDeleteAt = 0; pw.st.rpcMode = ['ok', 'boom'];
   await pw.page.locator('[data-privacy-confirm-delete]').click();
   await pw.page.waitForFunction(() => /account still exists/.test(document.querySelector('[data-privacy-error]')?.textContent || ''), null, { timeout: 10000 }).catch(() => {});
   const rpcFail = await pw.page.evaluate(() => document.querySelector('[data-privacy-error]')?.textContent.trim());
   check(`rpc failure after storage shows the rpc copy (${rpcFail})`, () => {
     assert.equal(rpcFail, 'Your photos and files are gone, but your account still exists. Try again to finish, or email thebrivia.club@gmail.com.');
     assert.deepEqual(Object.values(pw.st.files).map((f) => f.length), [0, 0, 0, 0]);
+    assert.equal(pw.st.rpcCalls.length, 4);
   });
-  await pw.page.locator('[data-privacy-confirm-delete]').click();
-  await pw.page.waitForSelector('#privacy-delete-password', { timeout: 10000 }).catch(() => {});
-  const reauthUi = await pw.page.evaluate(() => ({ label: document.querySelector('label[for="privacy-delete-password"]')?.textContent.trim(), type: document.querySelector('#privacy-delete-password')?.type, google: Boolean(document.querySelector('[data-privacy-google]:not([hidden])')), url: location.pathname }));
-  check(`reauth_required asks a password member for their password (${JSON.stringify(reauthUi)})`, () => { assert.equal(reauthUi.label, 'Confirm your password'); assert.equal(reauthUi.type, 'password'); assert.equal(reauthUi.google, false); assert.equal(reauthUi.url, '/app.html'); });
-  await pw.page.locator('#privacy-delete-password').fill('correct horse');
   const navigated = pw.page.waitForURL(/\/privacy\.html\?deleted=1$/, { timeout: 15000 }).then(() => true, () => false);
   await pw.page.locator('[data-privacy-confirm-delete]').click();
   const landed = await navigated;
   const leftovers = landed ? await pw.page.evaluate(() => Object.keys(window.localStorage).filter((k) => k.startsWith('brivia-'))) : ['n/a'];
   check(`password re-auth signs in again and retries; success lands on /privacy.html?deleted=1 (${landed}; token calls ${pw.st.tokenCalls}; rpc calls ${pw.st.rpcCalls.length})`, () => {
-    assert.equal(landed, true); assert.equal(pw.st.tokenCalls, 1); assert.equal(pw.st.rpcCalls.length, 3);
+    assert.equal(landed, true); assert.equal(pw.st.tokenCalls, 3); assert.equal(pw.st.rpcCalls.length, 5);
     assert.ok(pw.st.rpcCalls.every((a) => a.p_confirm === 'DELETE'));
     assert.deepEqual(leftovers, []);
   });
@@ -1340,7 +1352,10 @@ try {
   await gg.page.locator('[data-privacy-confirm-delete]').click();
   await gg.page.waitForSelector('[data-privacy-google]', { timeout: 10000 }).catch(() => {});
   const ggUi = await gg.page.evaluate(() => ({ btn: document.querySelector('[data-privacy-google]')?.textContent.trim(), pwField: Boolean(document.querySelector('[data-privacy-password-row]:not([hidden])')) }));
-  check(`a Google-only member gets a Google button, no password field (${JSON.stringify(ggUi)})`, () => { assert.equal(ggUi.btn, 'Sign in with Google again'); assert.equal(ggUi.pwField, false); });
+  check(`a Google-only member gets a Google button, no password field, and no file was touched (${JSON.stringify(ggUi)})`, () => {
+    assert.equal(ggUi.btn, 'Sign in with Google again'); assert.equal(ggUi.pwField, false);
+    assert.equal(gg.st.calls.filter((c) => c.path.startsWith('/storage/v1/object/')).length, 0);
+  });
   await gg.page.locator('[data-privacy-google]').click();
   await gg.page.waitForURL(/\/auth\/v1\/authorize/, { timeout: 10000 }).catch(() => {});
   const authReq = gg.st.calls.find((c) => c.path === '/auth/v1/authorize');

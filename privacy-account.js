@@ -138,7 +138,7 @@ const openDeleteDialog = ({ trigger, fallbackFocus, deps }) => {
     setBusy(false);
     sync();
     if (result.stage === 'reauth') { needsPassword = false; showReauth(); return; }
-    errorBox.textContent = deletionErrorCopy(result.stage);
+    errorBox.textContent = deletionErrorCopy(result.stage, result);
   });
   dialog.showModal();
   input.focus();
