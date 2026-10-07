@@ -9,6 +9,7 @@ set brivia.harness_autocomplete = 'off';
 --   D5 tombstone only for a reported or flagged member (digest of the auth email, reasons, report ids, +365 d)
 --   D6 the storage delete policies exist for profile-photos and profile-covers
 --   D7 clients can run the RPC (authenticated) and anon cannot
+--   D8 (final fix F8) its search_path is exactly public
 -- Client sessions use SET LOCAL SESSION AUTHORIZATION. One transaction, rolled back.
 begin;
 
@@ -63,6 +64,11 @@ begin
   end if;
   if has_function_privilege('anon', 'public.delete_my_account(text)', 'execute') then raise exception 'FAIL D7: anon may delete'; end if;
   if not has_function_privilege('authenticated', 'public.delete_my_account(text)', 'execute') then raise exception 'FAIL D7: authenticated cannot'; end if;
+  -- F8: the definer's search_path is public only (no unused extensions schema).
+  if (select proconfig from pg_proc where oid = 'public.delete_my_account(text)'::regprocedure) is distinct from array['search_path=public'] then
+    raise exception 'FAIL D8: delete_my_account search_path must be exactly public, got %',
+      (select proconfig from pg_proc where oid = 'public.delete_my_account(text)'::regprocedure);
+  end if;
 end $$;
 
 -- relations for member 1 (every kind of row the member owns)

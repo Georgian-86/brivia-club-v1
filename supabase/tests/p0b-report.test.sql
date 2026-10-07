@@ -305,4 +305,17 @@ begin
   end;
 end $$;
 
+-- F8: the 2-reporter threshold is race-free: report_member takes a per-target transaction advisory lock
+-- (hashtext('report:' || target)) before it counts qualifying reporters, so two concurrent qualifying reports cannot each
+-- see only themselves. Checked on the function body (a single-session harness cannot run two transactions at once).
+do $$
+declare
+  src text := (select prosrc from pg_proc where oid = 'public.report_member(uuid,text,text)'::regprocedure);
+  lock_at int := strpos(src, 'pg_advisory_xact_lock(hashtext(''report:'' || p_target::text))');
+  count_at int := strpos(src, 'count(distinct r.reporter_id)');
+begin
+  if lock_at = 0 then raise exception 'FAIL F8: report_member takes no per-target advisory lock'; end if;
+  if count_at = 0 or lock_at > count_at then raise exception 'FAIL F8: the advisory lock must come before the reporter count'; end if;
+end $$;
+
 rollback;

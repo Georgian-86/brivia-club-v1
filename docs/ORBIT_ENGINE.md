@@ -807,7 +807,9 @@ select log_impressions($1, $4);
   block is written). Only calls that pass argument validation are charged (argument errors do not depend on the target and roll back the attempt row). Order inside `report_member`: profile (`P0002`), charge `report_attempt` (more than 10 in a rolling
   24 h is `PT429`), reason (`22023`), self or unknown target returns, block (`on conflict do nothing`), same pair within
   24 h returns, insert `member_report` (note trimmed and control characters stripped, at most 500; evidence = the last 50
-  messages of the pair). Flags with `expires_at` are to be purged when due (the sweep is not part of this section); founder flags have none. Floors: **k = 10** for a candidate
+  messages of the pair). A qualifying report then takes a per-target transaction advisory lock
+  (`hashtext('report:' || target)`) before counting distinct qualifying reporters, so two concurrent reports cannot each
+  count only themselves and miss the 2-reporter threshold. Flags with `expires_at` are to be purged when due (the sweep is not part of this section); founder flags have none. Floors: **k = 10** for a candidate
   who would be shown in ring 0 or 1, **k = 5** for rings 2+. When the candidate's g7 cell is below k, the band is
   computed from the stored parent **g6** cell (centroid to centroid; `home_cell_g6`), then the stored **g5** cell
   (`home_cell_g5`) if that is still below k, and only then the region `placeLabel`. (Under H3 from iteration 4: res-6,

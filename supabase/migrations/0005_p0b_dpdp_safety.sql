@@ -426,6 +426,9 @@ begin
   insert into public.member_report (reporter_id, target_id, reason, note, evidence, qualifying)
   values (uid, p_target, p_reason, v_note, v_evidence, v_qual);
   if v_qual then
+    -- Serialise qualifying reports about one target (F8): two concurrent reports must not each count only themselves
+    -- and both miss the 2-reporter threshold. The count below runs after the lock, on a fresh snapshot.
+    perform pg_advisory_xact_lock(hashtext('report:' || p_target::text));
     if (select count(distinct r.reporter_id) from public.member_report r
          where r.target_id = p_target and r.qualifying and r.reporter_id is not null
            and r.created_at > now() - interval '30 days') >= 2 then
@@ -536,7 +539,7 @@ returns void
 language plpgsql
 volatile
 security definer
-set search_path = public, extensions
+set search_path = public
 as $$
 declare
   uid uuid := auth.uid();
