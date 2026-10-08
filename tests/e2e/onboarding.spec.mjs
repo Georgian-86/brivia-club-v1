@@ -12,7 +12,7 @@
 //   city listbox works from the keyboard and the request goes to rpc/set_home_city; a PT429 shows "Try again later."
 //   beside the location step;
 // * keyboard-only (Tab, Space, Enter, arrows): 2 interests added, 20 points placed with the steppers, a mode set;
-//   at 19 points Next is disabled and "Place all 20 points to continue." shows beside the aria-live counter;
+//   at 19 points Next is disabled and "Place all 20 points to continue (1 left)." shows beside the aria-live counter;
 // * submit order saveProfile -> set_home_* -> set_member_interests (points sum to 20) -> the app; profile writes carry
 //   no skills, city or state;
 // * sensitive interests show the private hint; email confirmation stores no coordinate (only { kind: 'geo' } or
@@ -183,6 +183,7 @@ const stubContext = async (context, opts = {}) => {
       const points = state.interests.reduce((s, i) => s + i.points, 0);
       return json(200, [{ interests: state.interests.length, points, has_cell: state.hasCell, place_label: state.placeLabel, completed: !opts.underReview && Boolean(state.profile && state.adultAt && !['', 'New Member'].includes(String(state.profile.name || '').trim()) && state.hasCell && points === 20) }]);
     }
+    if (opts.uploadStatus && method === 'POST' && p.startsWith('/storage/v1/object/')) return json(opts.uploadStatus, { statusCode: String(opts.uploadStatus), error: 'boom', message: 'upload failed' });
     if (p.startsWith('/rest/v1/rpc/')) return json(200, []);
     if (p.startsWith('/rest/v1/')) return json(200, []);
     return json(200, {});
@@ -475,15 +476,16 @@ try {
     const nextDisabled = await nextThree.getAttribute('aria-disabled');
     check(`1440: 19 points placed, "1 of 20 points left" (got "${at19}")`, () => assert.equal(at19, '1 of 20 points left'));
     check(`1440: Next is disabled at 19 points (aria-disabled ${nextDisabled})`, () => assert.equal(nextDisabled, 'true'));
-    const reachedNext = await tabTo(page, () => document.activeElement?.matches?.('[data-signup-step="3"] .signup-next'));
+    // 120: "Spread the remaining points evenly" is one more stop before the long "looking for" list.
+    const reachedNext = await tabTo(page, () => document.activeElement?.matches?.('[data-signup-step="3"] .signup-next'), 120);
     await page.keyboard.press('Enter');
     await page.waitForTimeout(150);
     const errorText = (await page.locator('#budget-error').textContent()).trim();
     const errorVisible = await page.locator('#budget-error').isVisible();
     const stepAfterBlocked = await visibleStep(page);
     const errorBesideCounter = await page.evaluate(() => document.querySelector('#budget-error')?.parentElement === document.querySelector('#budget-counter')?.parentElement);
-    check(`1440: Enter on the disabled Next shows "Place all 20 points to continue." beside the counter (got "${errorText}")`, () => {
-      assert.ok(reachedNext); assert.ok(errorVisible); assert.equal(errorText, 'Place all 20 points to continue.'); assert.ok(errorBesideCounter); assert.equal(stepAfterBlocked, '3');
+    check(`1440: Enter on the disabled Next shows "Place all 20 points to continue (1 left)." beside the counter (got "${errorText}")`, () => {
+      assert.ok(reachedNext); assert.ok(errorVisible); assert.equal(errorText, 'Place all 20 points to continue (1 left).'); assert.ok(errorBesideCounter); assert.equal(stepAfterBlocked, '3');
     });
     await shot(page, 'onboarding-1440-step3-19-points.png', '#budget-error');
     const plusDisabledTotal = await page.getByRole('button', { name: 'Add a point to Tennis', exact: true }).getAttribute('aria-disabled');
@@ -1349,6 +1351,157 @@ try {
       assert.equal(stub.state.consent, true);
     });
     check('F2b: no uncaught page errors', () => assert.deepEqual(errors.filter((e) => !/Failed to fetch|NetworkError|aborted/i.test(e)), []));
+    await context.close();
+  }
+  // ---------------------------------------------------------------------------------------------------------------
+  // 13. Live signup walkthrough on brivia-club.vercel.app (2026-10-08): every bug it found, on the email path.
+  //     The phone pattern compiles under the browser's v flag; a typed city with Next (no click) is accepted; step 3
+  //     with no interest says so; "Spread the remaining points evenly" completes the budget; the signup photo kept
+  //     while the email is confirmed is uploaded to profile-photos after login (it was silently lost).
+  {
+    const context = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+    const stub = await stubContext(context, { signupSession: false });
+    const { page, errors } = await newPage(context, stub.consoleLines);
+    await openSignup(page);
+    const phone = page.locator('input[name="phoneNumber"]');
+    await phone.fill('abc');
+    const lettersInvalid = await phone.evaluate((el) => !el.checkValidity());
+    await phone.fill('-------');
+    const noDigitsInvalid = await phone.evaluate((el) => !el.checkValidity());
+    await phone.fill('(022) 123-4567');
+    const bracketsValid = await phone.evaluate((el) => el.checkValidity());
+    check(`live: the phone pattern compiles and validates (letters refused ${lettersInvalid}, brackets ok ${bracketsValid})`, () => {
+      assert.ok(lettersInvalid); assert.ok(noDigitsInvalid); assert.ok(bracketsValid);
+      assert.ok(!stub.consoleLines.some((line) => /Pattern attribute value/.test(line)), stub.consoleLines.join(' | '));
+    });
+    await fillStepOne(page);
+    await page.locator('[data-area-city]').click();
+    const hint = (await page.locator('#area-city-hint').textContent()).trim();
+    await page.locator('#area-city-search').pressSequentially('bengaluru', { delay: 20 });
+    await page.locator('[data-signup-step="2"] .signup-next').click();
+    await page.waitForSelector('[data-signup-step="3"]:not([hidden])', { timeout: 5000 }).catch(() => {});
+    const afterTyped = await visibleStep(page);
+    check(`live: a typed city with Next (no click on the list) moves on (step ${afterTyped}, hint "${hint}")`, () => {
+      assert.equal(afterTyped, '3'); assert.equal(hint, 'Type your city, then pick it from the list.');
+    });
+    await page.waitForSelector('#interest-results [data-interest-group]', { state: 'attached' });
+    await page.locator('[data-signup-step="3"] .signup-next').click({ force: true });
+    const noPick = (await page.locator('#budget-error').textContent()).trim();
+    check(`live: Next with no interest asks for one (got "${noPick}")`, () => assert.equal(noPick, 'Pick at least one interest to continue.'));
+    const spreadHiddenEmpty = await page.locator('[data-budget-spread]').isHidden();
+    await page.locator('#interest-search').fill('Chess');
+    await clickInterest(page, 'Chess');
+    await page.locator('#interest-search').fill('Tennis');
+    await clickInterest(page, 'Tennis');
+    const followed = (await page.locator('#budget-error').textContent()).trim();
+    const spread = page.locator('[data-budget-spread]');
+    const spreadShown = await spread.isVisible();
+    const spreadHeight = await spread.evaluate((el) => el.getBoundingClientRect().height);
+    await spread.click();
+    const focusAfterSpread = await page.evaluate(() => document.activeElement?.matches?.('[data-signup-step="3"] .signup-next'));
+    check('live: after spreading, focus moves to Next (the button hides)', () => assert.ok(focusAfterSpread));
+    const counter = (await page.locator('#budget-counter').textContent()).trim();
+    const points = await page.locator('#budget-list [data-budget-points]').allTextContents();
+    const nextDisabled = await page.locator('[data-signup-step="3"] .signup-next').getAttribute('aria-disabled');
+    const spreadHiddenFull = await spread.isHidden();
+    const errorCleared = (await page.locator('#budget-error').textContent()).trim();
+    check(`live: the gate error follows the points left (got "${followed}")`, () => assert.equal(followed, 'Place all 20 points to continue (18 left).'));
+    check(`live: "Spread the remaining points evenly" completes the budget (${counter}, ${points.join('+')}, ${spreadHeight}px)`, () => {
+      assert.ok(spreadHiddenEmpty); assert.ok(spreadShown); assert.ok(spreadHeight >= 44);
+      assert.equal(counter, '0 of 20 points left'); assert.deepEqual(points, ['10', '10']);
+      assert.notEqual(nextDisabled, 'true'); assert.ok(spreadHiddenFull); assert.equal(errorCleared, '');
+    });
+    await page.locator('.looking-search').click();
+    await page.locator('#looking-results [data-looking-option]').first().click();
+    await page.locator('[data-signup-step="3"] .signup-next').click();
+    await page.waitForSelector('[data-signup-step="4"]:not([hidden])');
+    const actions = await page.locator('[data-signup-step="4"] .signup-step-actions').evaluate((el) => [...el.children].map((c) => Math.round(c.getBoundingClientRect().height)));
+    check(`live: Back and Next are the same height (${actions.join(',')})`, () => assert.equal(new Set(actions).size, 1));
+    const eyebrowShown = await page.locator('[data-signup-step="4"] .signup-step-heading > span').isVisible();
+    check('live: the duplicate "STEP 04" eyebrow is hidden (the progress label says it)', () => assert.equal(eyebrowShown, false));
+    const onePixelPng = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==', 'base64');
+    await page.locator('.photo-input').setInputFiles({ name: 'me.png', mimeType: 'image/png', buffer: onePixelPng });
+    await finishStepFour(page);
+    await page.waitForSelector('#auth-success:not([hidden])', { timeout: 15000 });
+    const successCopy = (await page.locator('[data-auth-success-message]').textContent()).trim();
+    check(`live: the check-your-email copy says the link signs you in and to check spam ("${successCopy}")`, () => { assert.match(successCopy, /signs you in/); assert.match(successCopy, /spam/); });
+    const pendingHasPhoto = await page.evaluate(() => /^data:image\//.test(JSON.parse(localStorage.getItem('brivia-pending-profile') || '{}').photoUrl || ''));
+    check('live: no upload before a session exists; the pending profile keeps the photo preview', () => {
+      assert.ok(pendingHasPhoto); assert.equal(stub.calls.filter((c) => c.path.startsWith('/storage/v1/object/')).length, 0);
+    });
+    await page.goto(`${BASE}/auth.html?later=1#login`, { waitUntil: 'domcontentloaded' });
+    await page.waitForSelector('#login-form');
+    await page.locator('#login-form input[name="email"]').fill(EMAIL);
+    await page.locator('#login-form input[name="password"]').fill('correct horse 1');
+    await page.locator('#login-form .auth-submit').click();
+    await page.waitForURL(/\/app\.html/, { timeout: 15000 }).catch(() => {});
+    const uploads = stub.calls.filter((c) => c.method === 'POST' && c.path.startsWith(`/storage/v1/object/profile-photos/${ME}/`));
+    const photoWrite = stub.calls.filter((c) => c.path === '/rest/v1/profiles' && ['POST', 'PATCH'].includes(c.method)).map((c) => JSON.parse(c.body || '{}').photo_url).filter(Boolean);
+    check(`live: after login the signup photo is uploaded to profile-photos/<id>/ (${uploads.map((c) => c.path).join(', ')})`, () => assert.equal(uploads.length, 1));
+    check(`live: the stored photo_url is the storage URL, never a data URL (${photoWrite.map((u) => u.slice(0, 60)).join(' ; ')})`, () => {
+      assert.ok(photoWrite.length >= 1); photoWrite.forEach((u) => { assert.ok(!u.startsWith('data:')); assert.match(u, /\/storage\/v1\/object\/public\/profile-photos\//); });
+    });
+    check('live: no uncaught page errors', () => assert.deepEqual(errors, []));
+    await context.close();
+  }
+  // 13b. Review B1 + S1 of the live fixes. A login whose onboarding fails (PT429 on the city) keeps the pending
+  //      profile: the second login must not upload again nor write photo_url = null. And an upload that fails never
+  //      blocks sign-in: the profile is saved without the photo and the member is routed on.
+  for (const variant of ['retry', 'upload-fails']) {
+    const context = await browser.newContext({ viewport: { width: 1280, height: 900 } });
+    const stub = await stubContext(context, { signupSession: false, homeCityStatus: variant === 'retry' ? [429] : [], uploadStatus: variant === 'upload-fails' ? 500 : 0 });
+    const { page, errors } = await newPage(context, stub.consoleLines);
+    await openSignup(page);
+    await fillStepOne(page);
+    await page.locator('[data-area-city]').click();
+    await pickCityByKeyboard(page, 'Pun');
+    await page.locator('[data-signup-step="2"] .signup-next').click();
+    await page.waitForSelector('#interest-results [data-interest-group]', { state: 'attached' });
+    await page.locator('#interest-search').fill('Chess');
+    await clickInterest(page, 'Chess');
+    await page.locator('[data-budget-spread]').click();
+    await page.locator('.looking-search').click();
+    await page.locator('#looking-results [data-looking-option]').first().click();
+    await page.locator('[data-signup-step="3"] .signup-next').click();
+    await page.waitForSelector('[data-signup-step="4"]:not([hidden])');
+    await page.locator('.photo-input').setInputFiles({ name: 'me.png', mimeType: 'image/png', buffer: Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==', 'base64') });
+    await finishStepFour(page);
+    await page.waitForSelector('#auth-success:not([hidden])', { timeout: 15000 });
+    const login = async () => {
+      await page.goto(`${BASE}/auth.html?later=${Date.now()}#login`, { waitUntil: 'domcontentloaded' });
+      await page.waitForSelector('#login-form');
+      await page.locator('#login-form input[name="email"]').fill(EMAIL);
+      await page.locator('#login-form input[name="password"]').fill('correct horse 1');
+      await page.locator('#login-form .auth-submit').click();
+      await page.waitForTimeout(2500);
+    };
+    const photoWrites = () => stub.calls.filter((c) => c.path === '/rest/v1/profiles' && ['POST', 'PATCH'].includes(c.method)).map((c) => JSON.parse(c.body || '{}')).filter((b) => 'photo_url' in b).map((b) => b.photo_url);
+    const uploads = () => stub.calls.filter((c) => c.method === 'POST' && c.path.startsWith('/storage/v1/object/profile-photos/')).length;
+    await login();
+    if (variant === 'retry') {
+      const kept = await page.evaluate(() => JSON.parse(localStorage.getItem('brivia-pending-profile') || 'null'));
+      check(`B1: after a PT429 the pending profile is kept with the stored photo URL, not the preview (${String(kept?.photoUrl).slice(0, 60)})`, () => {
+        assert.ok(kept); assert.match(kept.photoUrl, /\/storage\/v1\/object\/public\/profile-photos\//);
+      });
+      const cached = await page.evaluate(() => JSON.parse(localStorage.getItem('brivia-member-profile') || '{}').photoUrl || '');
+      check('B1: the cached member profile never holds the data: preview', () => assert.ok(!cached.startsWith('data:')));
+      // The session expires (the pending profile stays in this browser); the member logs in again.
+      await page.evaluate(() => Object.keys(localStorage).filter((k) => k.startsWith('sb-')).forEach((k) => localStorage.removeItem(k)));
+      await login();
+      const writes = photoWrites();
+      check(`B1: a second login neither uploads again nor writes photo_url = null (uploads ${uploads()}, writes ${JSON.stringify(writes.map((w) => (w || 'NULL').slice(0, 40)))})`, () => {
+        assert.equal(uploads(), 1); assert.ok(writes.length >= 2); writes.forEach((w) => assert.match(String(w), /profile-photos/));
+      });
+    } else {
+      const routedOn = await page.evaluate(() => location.pathname);
+      const writes = photoWrites();
+      const pendingPhoto = await page.evaluate(() => JSON.parse(localStorage.getItem('brivia-pending-profile') || '{}').photoUrl || '');
+      check(`S1: a failed upload does not block sign-in (at ${routedOn}; writes ${JSON.stringify(writes)})`, () => {
+        assert.equal(routedOn, '/app.html'); assert.ok(writes.every((w) => w === null || /profile-photos/.test(w)));
+        assert.ok(!pendingPhoto.startsWith('data:'));
+      });
+    }
+    check(`${variant}: no uncaught page errors`, () => assert.deepEqual(errors, []));
     await context.close();
   }
 } catch (error) {

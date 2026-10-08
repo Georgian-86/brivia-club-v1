@@ -204,7 +204,8 @@ const avatarImage = (image, name) => {
   return src ? `<img src="${escapeHtml(src)}" alt="${escapeHtml(name)}" />` : '';
 };
 const initials = (name = 'New Member') => name.split(/\s+/).map((part) => part[0]).join('').slice(0, 2).toUpperCase();
-const headerInitials = (name = 'New Member') => String(name).trim().replace(/\s+/g, '').slice(0, 2).toUpperCase() || 'NM';
+// Header and board avatars use the same initials as the profile avatar ("Qa Tester" -> "QT", never "QA").
+const headerInitials = (name = 'New Member') => initials(String(name || '').trim() || 'New Member') || 'NM';
 const showToast = (message) => {
   const toast = document.querySelector('#app-toast');
   if (!toast) return;
@@ -1833,6 +1834,9 @@ const renderProfile = () => {
     headerAvatar.textContent = headerInitials(profile.name);
     headerAvatar.setAttribute('aria-label', `Open ${profile.name || 'member'} profile`);
   }
+  // The board avatar was a static "YU" placeholder in app.html (live walkthrough, 2026-10-08).
+  const boardAvatar = document.querySelector('.profile-board-avatar');
+  if (boardAvatar) boardAvatar.innerHTML = avatarImage(profile.photoUrl, profile.name) || escapeHtml(initials(profile.name));
   const coverUrl = normalizeCoverUrl(profile.coverUrl || profile.cover_url || profile.cover_image_url) || defaultCoverUrl;
   ensureProfilePhotoEditor();
   document.querySelector('#profile-name').textContent = profile.name || 'New Member';

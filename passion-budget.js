@@ -52,6 +52,21 @@ export const toPayload = (state) => state.items.map((item) => ({ interest_id: it
 
 export const counterText = (state) => `${pointsLeft(state)} of ${BUDGET} points left`;
 
+// The step 3 gate message: an interest first, then the points still to place.
+export const budgetGateText = (state) => (state.items.length
+  ? `Place all ${BUDGET} points to continue (${pointsLeft(state)} left).`
+  : 'Pick at least one interest to continue.');
+
+// "Spread the rest": shares the points left evenly across the chosen interests (earlier picks take the remainder),
+// keeping every point the member already placed. A full or empty budget is returned unchanged.
+export const spreadRemaining = (state) => {
+  const left = pointsLeft(state);
+  if (!state.items.length || left <= 0) return state;
+  const share = Math.floor(left / state.items.length);
+  const extra = left % state.items.length;
+  return { items: state.items.map((item, index) => ({ ...item, points: item.points + share + (index < extra ? 1 : 0) })) };
+};
+
 // Rebuilds a state from my_interests() rows ({ interest_id, label, points, mode }) or a stored pending list
 // ({ id, label, points, mode }). Drops rows without an id and duplicates; keeps at most 12; points become integers >= 1
 // and a total over 20 is trimmed from the largest items.

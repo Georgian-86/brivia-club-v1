@@ -742,3 +742,98 @@ supersedes it.
   - the D-046 P0-C items, now as new migrations from `0007`;
   - the founder gate items.
   - **Real members are still not allowed.**
+
+## D-049: Live signup walkthrough on brivia-club.vercel.app; UI fixes from it (2026-10-08)
+
+**Why.** The founder asked for a real signup on the live URL through the UI, "not just API calls".
+
+**How it was run.**
+- The session sandbox cannot reach `*.vercel.app` or `*.supabase.co`, so a Vercel Sandbox (project `brivia-club`) ran
+  headless Chromium against `https://brivia-club.vercel.app` and live Supabase.
+- It used a 390 px phone viewport, typed input, real clicks and a real photo file.
+- Screens were checked as text, DOM state, console and network. Screenshots were taken locally from the same code
+  with the e2e stubs.
+- After each step, the stored data was verified read-only through the Supabase connector.
+
+**Accounts it created (both real, non-test rows).**
+- `brivia.qa.muzfgszm@maxxspace.com`: the confirmation email never reached the disposable inbox. The account is
+  unconfirmed, has no profile, and the founder can delete it in Auth → Users.
+- `optimus4586prime+briviaqa1008@gmail.com`: confirmed, completed onboarding, Bengaluru (city-wide), 2 interests.
+  It was then **deleted through the in-app flow**. This closes the D-048 "amr" item.
+  - The flow: Profile ⚙ → Privacy & account → Delete my account → typed "delete".
+  - The server answered `reauth_required` (the sign-in was over 10 minutes old), and the dialog asked for the
+    password.
+  - After the password, the account was deleted and the member landed on `privacy.html?deleted=1`.
+  - Verified read-only: 0 auth users, 0 profiles, 0 orphan interests, 0 storage files left for it.
+  - One cosmetic console 403 remains: sign-out after deletion gets `user_not_found`.
+
+**Found and fixed (client only; no SQL).**
+1. **Phone pattern was invalid.** The pattern `[0-9 ()-]{7,20}` is not valid under the browser's `v` flag, so it threw
+   a console error and phone validation was silently off. It is now `[0-9 \(\)\-]{7,20}`.
+2. **Typed city refused.** Typing a city and pressing Next said "Choose your area to continue."; only a click on the
+   suggestion worked (the founder hit this). Now:
+   - an unambiguous typed city is accepted on Next or Enter (`area-pick.js`);
+   - Next waits for a search still in flight;
+   - a hint reads "Type your city, then pick it from the list.";
+   - an ambiguous city gets "Pick your city from the list below."
+3. **Wrong step-3 gate message.** It said "Place all 20 points to continue." even with no interest picked. It is now
+   "Pick at least one interest to continue.", then "Place all 20 points to continue (N left).", tracking the points
+   left.
+4. **Placing 20 points took about 18 taps.** Two picks leave 18 points to place one tap at a time. Added "Spread the
+   remaining points evenly" (`spreadRemaining`). It only fills the budget and keeps the points already placed. The
+   ORBIT model and the server rule (20 points, 1–12 interests) are unchanged.
+5. **The signup photo was lost on the email-confirmation path.**
+   - The cause: the photo waited in `brivia-pending-profile` as a data:image preview, and the post-login save drops
+     data URLs, so it was never uploaded. Live, `photo_url` was null.
+   - Now: after login, both on the verify link and on the password login, the preview becomes a File and is uploaded
+     to `profile-photos/<id>/`. Then it is removed from the pending profile so a retry never uploads it twice.
+6. **Avatars.** The Profile board avatar was a static "YU" placeholder, and the header showed the first two letters
+   ("QA" for "Qa Tester"). All three avatars now show the same initials, or the photo.
+7. **Copy and layout.**
+   - The check-your-email copy now says the link signs you in, and to check spam.
+   - The duplicate "STEP 0n" eyebrow under the progress label is hidden.
+   - Back and Next are the same height (they differed at 1440 px).
+
+**Checked and fine:**
+- the 18+ gate error;
+- "Use my location", with the coordinate dropped;
+- the city label " (city-wide)";
+- interests and modes saved with exactly 20 points;
+- "looking for" saved;
+- verification lands in the app signed in;
+- `skills` filled server-side only;
+- no horizontal scroll at 390 px.
+
+An empty deck for a real member is expected: the test members are in the test world (D-043).
+
+**Founder actions (dashboard, not code).**
+- Configure custom SMTP and a Brivia-branded confirmation template before real members. The default sender is
+  rate-limited, and the email reads "an application powered by Supabase". The disposable inbox never received it.
+- Delete the unconfirmed QA account above.
+
+**Review (independent subagent).** It found 1 blocking issue, 5 should-fix and 6 nits. Fixed:
+- **B1:** a retry login after a failed onboarding wrote `photo_url = null`. The pending preview is now replaced by the
+  stored URL, not deleted.
+- **S1:** a failed photo upload blocked sign-in. Now the profile is saved without the photo and the member moves on.
+- **S2:** the board-avatar photo is sized to its circle.
+- **S3:** focus moves to Next after "Spread".
+- **S4:** a single city option is taken only when its name starts with the typed text.
+- **S5:** the async Next handler stops if the member went Back meanwhile.
+- **N1:** the cached profile never keeps the data: preview.
+- **N3:** the gate flag resets.
+- **N5:** the phone number needs 7 digits.
+
+Left as is:
+- N2: orphaned uploads after a failed row write.
+- N4: Enter in another step-2 field.
+- N6: the pending file name.
+- The 34 px board avatar (it predates this change).
+
+**Tests.**
+- `tests/unit/signup-live-fixes.test.mjs` (8 tests).
+- Onboarding e2e:
+  - block 13 (13 checks);
+  - block 13b (retry login and failed upload).
+- The photo-upload checks were confirmed to fail on the old code.
+- Consent e2e: an avatar-initials check.
+- The step-3 Tab limit was raised for the new button.

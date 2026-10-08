@@ -81,7 +81,11 @@ background under a pseudo-element).
      first). Arrow keys move, Enter picks, Escape closes. The pick reads "Your area: Bengaluru, Karnataka. We use the
      city's centre, never your address." and is sent with `rpc/set_home_city`. Once saved, the label the member sees
      ends " (city-wide)" (R9; added once, never doubled; a `set_home_location` result gets no suffix).
-   - Next without an area shows "Choose your area to continue." A `PT429` from either call returns the member here
+   - A hint under the label reads "Type your city, then pick it from the list." A typed city counts as picked on
+     Next or Enter when it is unambiguous: the only listed option, or the one whose name (or "name, region") equals the
+     text, ignoring case; Next waits for a search still in flight (live walkthrough, D-049).
+   - Next without an area shows "Choose your area to continue." ("Pick your city from the list below." when a city
+     was typed but is ambiguous or unknown). A `PT429` from either call returns the member here
      with **"Try again later."** beside the choices.
 3. **What you care about** (`STEP 3 OF 4 · WHAT YOU CARE ABOUT`), heading **"What you care about"** (renamed from
    "Your signals" in Iteration 4, R11, so it is not confused with the signal quota).
@@ -109,7 +113,13 @@ background under a pseudo-element).
      limit), a segmented radio group **Learn · Play · Teach · Build** (default Play; arrow keys move), and a remove
      button. Steppers never take an interest below 1 or the total over 20.
    - The counter **"N of 20 points left"** is `aria-live="polite"`. Next stays `aria-disabled` until all 20 points
-     are placed; activating it then shows **"Place all 20 points to continue."** beside the counter.
+     are placed; activating it then shows **"Pick at least one interest to continue."** with no interest, else
+     **"Place all 20 points to continue (N left)."** beside the counter; while shown it follows the points left and it
+     clears at 20.
+   - **"Spread the remaining points evenly"** (a full-width 44 px secondary button under the list, shown only while
+     points are left and at least one interest is chosen) shares the points left across the chosen interests, earlier
+     picks taking the remainder, and keeps every point already placed (live walkthrough, D-049). It only fills the
+     budget; the member can still move points before Next.
    - "What are you looking for?" (unchanged) is required here too.
 4. **Security and presence** (`STEP 4 OF 4 · SECURITY & PRESENCE`): password, photo and cover, unchanged.
 

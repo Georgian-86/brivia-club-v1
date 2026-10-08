@@ -12,12 +12,13 @@ import {
   supabase, supabaseReady, saveProfile, compressImageOnly, fileToDataUrl, PHOTO_ERROR_MESSAGE, withoutCredentials, rowToProfile, isRateLimited,
   declareAdult, setHomeLocation, setHomeCity, setMemberInterests, setSensitiveConsent, fetchSensitiveConsentAt, fetchMyInterests, fetchInterestNodes, searchPlaces, onboardingStatus,
 } from './supabase.js';
-import { buildPendingOnboarding, isPendingExpired } from './pending-profile.js';
+import { buildPendingOnboarding, isPendingExpired, dataUrlToFile } from './pending-profile.js';
 import { isUnderReview, shouldWithdrawConsent } from './onboarding-guard.js';
 import {
   MAX_INTERESTS, MODES, emptyBudget, addInterest, removeInterest, stepPoints, setMode, pointsLeft, isComplete, toPayload,
-  counterText, budgetFromRows,
+  counterText, budgetFromRows, budgetGateText, spreadRemaining,
 } from './passion-budget.js';
+import { matchTypedCity } from './area-pick.js';
 import { defaultCoverUrl, normalizeCoverUrl } from './cover-assets.js';
 
 const introBurst = document.querySelector('#intro-burst');
@@ -718,7 +719,6 @@ if (lookingPicker) {
 // ---------------------------------------------------------------------------------------------------------------
 const GEO_OPTIONS = { enableHighAccuracy: false, timeout: 10000, maximumAge: 600000 };
 const AREA_FALLBACK_TEXT = 'No problem. Pick your city instead.';
-const BUDGET_ERROR_TEXT = 'Place all 20 points to continue.';
 // D-038 R3: sensitive interests are never shown to others and do not affect who the member sees yet.
 const PRIVATE_HINT_TEXT = 'Private: never shown on your profile, and does not change who you see';
 // R2: sensitive interests are offered only after the member opens the consent panel and continues (the box ticked).
@@ -881,7 +881,7 @@ areaSearch?.addEventListener('keydown', (event) => {
   } else if (event.key === 'Enter') {
     event.preventDefault(); // never submit the signup form from the city search
     if (cityActive >= 0) chooseCity(cityOptions[cityActive]);
-    else if (cityOptions.length === 1) chooseCity(cityOptions[0]);
+    else chooseCity(matchTypedCity(areaSearch.value, cityOptions));
   } else if (event.key === 'Escape' && areaSearch.getAttribute('aria-expanded') === 'true') {
     event.preventDefault();
     event.stopPropagation();
@@ -908,6 +908,8 @@ const budgetCounter = signupForm?.querySelector('#budget-counter');
 const budgetError = signupForm?.querySelector('#budget-error');
 const budgetEmpty = signupForm?.querySelector('[data-budget-empty]');
 const budgetNext = signupForm?.querySelector('[data-signup-step="3"] .signup-next');
+const budgetSpread = signupForm?.querySelector('[data-budget-spread]');
+let budgetGateShown = false;
 const INTEREST_HELP_TEXT = 'Choose 1 to 12. Select again to remove.';
 const normalizeSearch = (value) => String(value || '').toLowerCase().normalize('NFKD').replace(/[̀-ͯ]/g, '').trim();
 
@@ -1041,9 +1043,13 @@ const syncBudgetState = () => {
   });
   const complete = isComplete(budget);
   budgetNext?.setAttribute('aria-disabled', String(!complete));
-  // Completing the budget clears only the "place all points" error; a save error stays until step 3 is re-entered.
-  if (complete && budgetError?.textContent === BUDGET_ERROR_TEXT) budgetError.textContent = '';
+  // Completing the budget clears only the gate error; a save error stays until step 3 is re-entered. While the
+  // gate error shows, it follows the points still left.
+  if (budgetGateShown && budgetError) {
+    if (complete) { budgetError.textContent = ''; budgetGateShown = false; } else budgetError.textContent = budgetGateText(budget);
+  }
   if (budgetEmpty) budgetEmpty.hidden = budget.items.length > 0;
+  if (budgetSpread) budgetSpread.hidden = !budget.items.length || left <= 0;
 };
 const renderBudget = () => {
   renderKeepingFocus(budgetList, budget.items.map(budgetRow).join(''));
@@ -1060,6 +1066,7 @@ const resetBudget = () => {
   if (interestSearch) interestSearch.value = '';
   if (interestHelp) interestHelp.textContent = INTEREST_HELP_TEXT;
   if (budgetError) budgetError.textContent = '';
+  budgetGateShown = false;
   showBudgetNote('');
   renderBudget();
   if (interestCatalog) renderInterestResults();
@@ -1114,7 +1121,12 @@ budgetList?.addEventListener('change', (event) => {
   const radio = event.target.closest('input[type="radio"][data-id]');
   if (radio) budget = setMode(budget, radio.dataset.id, radio.value);
 });
-const showBudgetError = () => { if (budgetError) budgetError.textContent = BUDGET_ERROR_TEXT; };
+const showBudgetError = () => { if (budgetError) { budgetError.textContent = budgetGateText(budget); budgetGateShown = true; } };
+budgetSpread?.addEventListener('click', () => {
+  setBudget(spreadRemaining(budget));
+  // The button hides once the budget is full: keep keyboard and screen-reader users on the next action.
+  if (isComplete(budget)) budgetNext?.focus();
+});
 renderBudget();
 
 if (authCta && authModal) {
@@ -1173,6 +1185,7 @@ function setSignupStep(step, focusFirst = true) {
   if (signupCurrentStep >= 2 && !interestCatalog) loadInterestCatalog().then(() => { renderBudget(); renderInterestResults(); }).catch(() => {});
   if (signupCurrentStep === 3) {
     if (budgetError) budgetError.textContent = '';
+    budgetGateShown = false;
     renderInterestResults();
   }
   const reduceMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
@@ -1219,7 +1232,10 @@ const validateSignupStep = (step = signupCurrentStep) => {
 const validateOnboardingStep = (step) => {
   if (step === 2) {
     if (areaChoice) return true;
-    setAreaError('Choose your area to continue.');
+    // A typed city that is unambiguous counts as picked (the live walkthrough: members type and press Next).
+    chooseCity(matchTypedCity(areaSearch?.value, cityOptions));
+    if (areaChoice) return true;
+    setAreaError(areaSearch?.value.trim() && !areaPicker?.hidden ? 'Pick your city from the list below.' : 'Choose your area to continue.');
     return false;
   }
   if (step === 3) {
@@ -1229,9 +1245,17 @@ const validateOnboardingStep = (step) => {
   if (step === 1) return validateSignupStep(1) && validateAdultConfirm();
   return validateSignupStep(step);
 };
-signupForm?.querySelectorAll('.signup-next').forEach((button) => button.addEventListener('click', () => {
+signupForm?.querySelectorAll('.signup-next').forEach((button) => button.addEventListener('click', async () => {
   const nextStep = Number(button.dataset.nextStep);
-  if (nextStep && validateOnboardingStep(nextStep - 1)) setSignupStep(nextStep);
+  if (!nextStep) return;
+  // Next pressed right after typing a city: let the pending search finish so the typed name can be matched.
+  if (nextStep === 3 && !areaChoice && areaSearch?.value.trim() && !cityOptions.length) {
+    window.clearTimeout(citySearchTimer);
+    button.setAttribute('aria-busy', 'true');
+    try { await renderCityResults(); } finally { button.removeAttribute('aria-busy'); }
+    if (signupCurrentStep !== 2) return; // the member went Back (or on) while the search ran
+  }
+  if (validateOnboardingStep(nextStep - 1)) setSignupStep(nextStep);
 }));
 signupForm?.querySelectorAll('.signup-step-prev').forEach((button) => button.addEventListener('click', () => {
   setSignupStep(button.dataset.prevStep || 1);
@@ -1553,6 +1577,38 @@ const readPendingProfile = () => {
   return pending && typeof pending === 'object' ? pending : null;
 };
 
+// The signup photo waits in the pending profile as a compressed data:image preview (email confirmation: no session
+// could upload it). Turned back into a File here so saveProfile uploads it to storage; saveProfile never stores a
+// data URL as the photo URL, so without this the photo was silently lost (live walkthrough, 2026-10-08).
+const pendingPhotoFile = (pending) => dataUrlToFile(pending?.photoUrl, pending?.photoName || 'photo');
+// Once uploaded, the preview in the pending profile is replaced by the stored URL (a later login, with the pending
+// profile kept for a retry, rewrites that same URL: it never uploads twice and never writes photo_url = null). With
+// no stored URL (the upload failed) the preview is dropped. Never throws.
+const dropPendingPhoto = (storedUrl = '') => {
+  try {
+    const stored = JSON.parse(window.localStorage.getItem('brivia-pending-profile') || 'null');
+    if (!stored || typeof stored !== 'object' || !String(stored.photoUrl || '').startsWith('data:')) return;
+    if (storedUrl) stored.photoUrl = storedUrl; else delete stored.photoUrl;
+    window.localStorage.setItem('brivia-pending-profile', JSON.stringify(stored));
+  } catch { /* storage unavailable: nothing to drop */ }
+};
+// Saves a pending (or cached) profile after login, uploading its photo preview. A photo that cannot be processed or
+// uploaded never blocks sign-in: the preview is dropped and the profile saved without it (the member adds a photo
+// later in Edit profile). Returns saveProfile's result plus the profile to cache, which never holds a data: preview.
+const savePendingProfile = async (userId, profile, source) => {
+  const photo = pendingPhotoFile(source);
+  let result = await saveProfile(userId, profile, photo);
+  if (result.error && photo) {
+    dropPendingPhoto();
+    result = await saveProfile(userId, { ...profile, photoUrl: '' }, null);
+  } else if (!result.error && photo) {
+    dropPendingPhoto(result.data?.photo_url || '');
+  }
+  const cached = { ...profile };
+  if (String(cached.photoUrl || '').startsWith('data:')) cached.photoUrl = result.data?.photo_url || '';
+  return { ...result, cached };
+};
+
 const restoreCachedMemberProfile = async (user, preferredProfile = null) => {
   if (!user?.id || !supabase) return false;
   const userEmail = String(user.email || '').trim().toLowerCase();
@@ -1580,9 +1636,9 @@ const restoreCachedMemberProfile = async (user, preferredProfile = null) => {
   if (!candidate) return false;
   const profile = withoutOnboarding(withoutCredentials({ ...candidate, name: candidate.name || candidate.full_name }));
   delete profile.id;
-  const { error } = await saveProfile(user.id, profile, null);
+  const { error, cached: saved } = await savePendingProfile(user.id, profile, candidate);
   if (error) return false;
-  window.localStorage.setItem('brivia-member-profile', JSON.stringify({ ...profile, id: user.id, email: user.email }));
+  window.localStorage.setItem('brivia-member-profile', JSON.stringify({ ...saved, id: user.id, email: user.email }));
   return true;
 };
 
@@ -1692,12 +1748,14 @@ loginForm?.addEventListener('submit', async (event) => {
     const pending = readPendingProfile();
     const pendingBelongsToUser = pending?.email?.toLowerCase() === data.user?.email?.toLowerCase();
     let loginPendingResult = null;
+    let savedPending = null;
     if (pending && data.user && pendingBelongsToUser) {
       const safePending = withoutOnboarding(withoutCredentials(pending));
-      const { error: profileError } = await saveProfile(data.user.id, safePending, null);
-      if (profileError) throw profileError;
+      const saved = await savePendingProfile(data.user.id, safePending, pending);
+      if (saved.error) throw saved.error;
+      savedPending = saved.cached;
       loginPendingResult = await applyPendingOnboarding(pending);
-      window.localStorage.setItem('brivia-member-profile', JSON.stringify({ ...safePending, id: data.user.id }));
+      window.localStorage.setItem('brivia-member-profile', JSON.stringify({ ...savedPending, id: data.user.id }));
     } else if (pending && !pendingBelongsToUser) {
       window.localStorage.removeItem('brivia-pending-profile');
     }
@@ -1711,7 +1769,7 @@ loginForm?.addEventListener('submit', async (event) => {
       showProfileCompletion(data.user, pendingBelongsToUser ? withoutOnboarding(pending) : null);
       return;
     }
-    const cachedPendingProfile = pendingBelongsToUser ? withoutOnboarding(withoutCredentials(pending)) : {};
+    const cachedPendingProfile = savedPending || (pendingBelongsToUser ? withoutOnboarding(withoutCredentials(pending)) : {});
     window.localStorage.setItem('brivia-member-profile', JSON.stringify({ ...cachedPendingProfile, id: data.user.id, email: data.user.email || email }));
     if (pendingBelongsToUser && pending?.coverUrl) {
       await supabase.auth.updateUser({ data: { coverUrl: pending.coverUrl } }).catch(() => {});
@@ -1944,7 +2002,7 @@ signupForm?.addEventListener('submit', async (event) => {
     const successTitle = signupSuccess?.querySelector('[data-auth-success-title]');
     const successMessage = signupSuccess?.querySelector('[data-auth-success-message]');
     if (successTitle) successTitle.textContent = 'Check your email.';
-    if (successMessage) successMessage.textContent = 'We sent a verification link. Verify your email, then sign in to finish activating your Brivia profile. Supabase manages your password securely; Brivia never displays it or saves it in your profile.';
+    if (successMessage) successMessage.textContent = 'We sent a link to this address. Open it to finish activating your Brivia profile; it signs you in. It can take a few minutes, so check spam or promotions too.';
     signupForm.setAttribute('hidden', '');
     if (signupFeedback) signupFeedback.textContent = '';
     signupSuccess?.removeAttribute('hidden');

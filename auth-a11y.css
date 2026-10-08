@@ -76,3 +76,18 @@ body.auth-page .auth-shell .auth-signup-form .signup-step-prev {
   border-color: color-mix(in srgb, var(--a11y-wine) 45%, transparent) !important;
   background: transparent !important;
 }
+
+/* Live signup walkthrough (2026-10-08). The "STEP 0n" eyebrow repeated the progress label right above it. */
+body.auth-page .auth-shell .auth-signup-form .signup-step-heading > span { display: none; }
+/* Back and Next sat at different heights at 1440 px: one height, centred labels. */
+body.auth-page .auth-shell .auth-signup-form .signup-step-actions { align-items: stretch; }
+body.auth-page .auth-shell .auth-signup-form .signup-step-actions :is(.auth-secondary, .auth-submit) {
+  min-height: 48px; margin: 0; display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+}
+body.auth-page .auth-shell .auth-signup-form .area-city-hint { margin: 2px 0 6px; color: var(--a11y-ink-soft); font-size: 12px; text-transform: none; letter-spacing: 0; }
+body.auth-page .auth-shell .auth-signup-form .budget-spread {
+  width: 100%; min-height: 44px; margin-top: 10px; padding: 0 14px; border: 1px solid color-mix(in srgb, var(--a11y-wine) 45%, transparent);
+  border-radius: 999px; background: transparent; color: var(--a11y-wine); font-size: 12px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; cursor: pointer;
+}
+body.auth-page .auth-shell .auth-signup-form .budget-spread[hidden] { display: none; }
+body.auth-page .auth-shell .auth-signup-form .budget-spread:hover { background: color-mix(in srgb, var(--a11y-wine) 8%, transparent); }

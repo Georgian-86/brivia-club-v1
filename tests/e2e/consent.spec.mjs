@@ -491,6 +491,13 @@ try {
     assert.ok(!postImages.srcs.some((src) => /tracker\.example/.test(src)), 'a third-party post image auto-loads');
     assert.equal(postImages.missing, 1);
   });
+  // Live walkthrough (2026-10-08): the profile board showed a static "YU", and the header used the first two letters.
+  const avatars = await postsPage.evaluate(() => ({
+    header: document.querySelector('#app-avatar-button')?.textContent.trim(),
+    board: document.querySelector('.profile-board-avatar')?.textContent.trim(),
+    profile: document.querySelector('#profile-avatar')?.textContent.trim(),
+  }));
+  check(`own avatars show my initials, never the "YU" placeholder (${JSON.stringify(avatars)})`, () => assert.deepEqual(avatars, { header: 'AM', board: 'AM', profile: 'AM' }));
   check('post authors loaded via rpc/get_candidates without my id', () => {
     const authorCalls = deckCalls.filter((c) => c.path === '/rest/v1/rpc/get_candidates').map((c) => JSON.parse(c.body || '{}').p_ids || []);
     assert.ok(authorCalls.some((ids) => ids.includes(POST_AUTHOR)), JSON.stringify(authorCalls));

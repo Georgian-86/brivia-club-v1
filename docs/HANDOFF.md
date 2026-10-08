@@ -1,6 +1,6 @@
 # Session handoff (read after CLAUDE.md)
 
-Last updated: 2026-10-07, end of iteration 4 (P0-B), code at `c208bdc` plus the records commit, on branch
+Last updated: 2026-10-08, after the live signup walkthrough and its UI fixes (D-049), on branch
 `claude/jolly-edison-49xvza` (repo `Georgian-86/brivia-club-v1`).
 Update this file at the end of every session. CLAUDE.md holds the aim; this file holds **where we are**.
 
@@ -17,10 +17,14 @@ Update this file at the end of every session. CLAUDE.md holds the aim; this file
 | **Iteration 4, P0-B** (18+ gate, sensitive consent, report, self-serve deletion, retention, privacy notice, honesty/contrast, media fail-closed, 0006 perf policies) | **Done on the branch, reviewed; NOT applied or deployed** | plan `docs/superpowers/plans/2026-10-05-iteration-4-p0b.md`; D-044, D-045 |
 | Iteration 4 arenas (P0-B design; end-of-iteration critique → P0-C backlog) | Done | `docs/arena/2026-10-05-p0b-design.md`, `docs/arena/2026-10-07-iteration-4.md`; D-044, D-046 |
 | Landing page | Yashika's original UI, unchanged (founder rule: optimise, never redesign) | `index.html`, CSS |
-| Decisions | D-001 … D-046, append-only | `docs/DECISIONS.md` |
+| **Live signup walkthrough** (real browser on the live URL; 7 UI bugs fixed incl. lost signup photo, typed-city refusal, invalid phone pattern) | Done, pushed (auto-deploys) | D-049 |
+| Decisions | D-001 … D-049, append-only | `docs/DECISIONS.md` |
 
-Test status at `c208bdc`: SQL harness ALL PASSED (incl. the 0006 drift check); build OK (incl. `dist/privacy.html`);
-`test:unit` 88/88 (also `TZ=Asia/Kolkata`); orbit 86/86; e2e consent 153, onboarding 198, deck 103 (3 runs).
+Test status after D-049: SQL harness ALL PASSED; build OK; `test:unit` 96/96 (also `TZ=Asia/Kolkata`); orbit 86/86;
+e2e consent 154, onboarding 217, deck 103.
+**Live UI testing:** this sandbox cannot reach `*.vercel.app` / `*.supabase.co`. Use a Vercel Sandbox in project
+`brivia-club` (Vercel MCP `create_sandboxes_v4`, no failover regions on this plan, ~45 min max) with Playwright, and a
+Gmail plus-address of the founder's inbox for confirmation emails (disposable inboxes did not receive them).
 Tooling: Playwright **and axe-core** at `/tmp/pw` (`npm install --prefix /tmp/pw playwright axe-core`).
 
 ## 2. Live Supabase state (project `wfbddovczpfdrspmxgfo`, ap-south-1)
@@ -34,8 +38,10 @@ Tooling: Playwright **and axe-core** at `/tmp/pw` (`npm install --prefix /tmp/pw
 - **Client deployed:** Vercel project `brivia-club` (team "Golu's projects") at `https://brivia-club.vercel.app`,
   linked to the repo, so every push to this branch redeploys. The Supabase Auth Site URL and redirect are set to it.
   Vercel Deployment Protection is on by default; turn it off if testers without a Vercel login need access.
-- **Open live checks:** the JWT `amr` shape (delete a throwaway account in the app; if it loops on "confirm it's
-  you", the check needs fixing) and the Google re-auth round trip.
+- **Live checks:** the `amr` re-auth on deletion **works** (D-049: `reauth_required` → password → deleted, zero rows
+  left). Still open: the Google re-auth round trip.
+- **Founder dashboard items from D-049:** custom SMTP and a Brivia-branded confirmation email (the default sender is
+  rate-limited and says "powered by Supabase"); delete the unconfirmed QA user `brivia.qa.muzfgszm@maxxspace.com`.
 - Real members are **not allowed yet**: see the gate table in `docs/arena/2026-10-07-iteration-4.md`.
 
 ## 3. What to do next (in order)
@@ -51,7 +57,7 @@ Tooling: Playwright **and axe-core** at `/tmp/pw` (`npm install --prefix /tmp/pw
    5. R7 under-review notice links Privacy & account.
    6. R8: 0005 is frozen, so instead of collapsing it, the new migration redefines each function once (final form).
    7. R10 honesty copy, starting with the untrue `app.js:1577` profile helper sentence.
-   8. R6 live rehearsal of deletion on a throwaway test member (password + Google re-auth, `amr` shape, zero rows).
+   8. R6 live rehearsal of deletion: password path done (D-049); Google re-auth still to do.
 2. **Apply each new migration** in the SQL editor, verify its last object, and let the linked Vercel project redeploy.
 3. **Founder-only gate items** (remind the founder):
    - auth hardening, recorded with dates (R11): email confirm, CAPTCHA, rate limits, leaked-password protection,
