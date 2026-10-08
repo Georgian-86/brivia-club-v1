@@ -28,19 +28,20 @@ Tooling: Playwright **and axe-core** at `/tmp/pw` (`npm install --prefix /tmp/pw
 - `0001`–`0004` are **applied and frozen**. Never edit or re-run them.
 - **Test-member seed: live** (D-043): 24 `is_test` profiles, all completed. To refresh, purge and re-seed (see
   `supabase/seed/README.md`; the purge leaves storage files, remove them via the Storage API first).
-- **`0005` and `0006` are NOT applied.** `0005` is still **amendable in place** (D-046): the P0-C SQL items go into
-  it before its first apply. `0006` applies after `0005` is verified. Runbook: `supabase/migrations/README.md`.
-- Read-only verified this session: live policies == `supabase/tests/policies-0005.expected.tsv` minus 0005's two
-  storage delete policies; `postgres` BYPASSRLS true and DELETE on `auth.users`; pgcrypto in `extensions`;
-  0 career applications; 0 orphan storage folders. Advisors: as D-043 (+ leaked-password protection is off).
-- **Not done yet:** deploying the client. The new client needs 0005 (it calls `declare_adult` etc.), so deploy
-  them in one window.
+- **`0005` and `0006` are applied (2026-10-08) and frozen** (D-047, D-048), verified read-only: the policies match
+  `supabase/tests/policies-0006.expected.tsv` exactly, and the advisors are as the README expects. New SQL goes in
+  **`0007+`**, starting with the D-046 P0-C items.
+- **Client deployed:** Vercel project `brivia-club` (team "Golu's projects") at `https://brivia-club.vercel.app`,
+  linked to the repo, so every push to this branch redeploys. The Supabase Auth Site URL and redirect are set to it.
+  Vercel Deployment Protection is on by default; turn it off if testers without a Vercel login need access.
+- **Open live checks:** the JWT `amr` shape (delete a throwaway account in the app; if it loops on "confirm it's
+  you", the check needs fixing) and the Google re-auth round trip.
 - Real members are **not allowed yet**: see the gate table in `docs/arena/2026-10-07-iteration-4.md`.
 
 ## 3. What to do next (in order)
 
 1. **P0-C** (D-046; table "P0-C" in `docs/arena/2026-10-07-iteration-4.md`, each item has acceptance criteria).
-   SQL items amend `0005` in place; the alert is a new `0007`:
+   0005 is now live and frozen (D-047), so the SQL items go in **new migrations `0007+`**:
    1. R1 corroborated underage suspension (2 qualifying reporters, or 1 matched); a reporter's own `request`
       rows never qualify; single report → alert + review queue (`reviewed_at`).
    2. R3 ladder: `banned`, Restrict never un-hides, `moderation_remove_member`, rejoin with underage/banned
@@ -48,10 +49,10 @@ Tooling: Playwright **and axe-core** at `/tmp/pw` (`npm install --prefix /tmp/pw
    3. R4 deletion hold (`deletion_held`) for flagged / open-report members.
    4. R5 `0007_moderation_alert.sql` (pg_cron + pg_net webhook, counts only, digest row). Pre-flight `pg_net`.
    5. R7 under-review notice links Privacy & account.
-   6. R8 collapse duplicate function definitions in 0005.
+   6. R8: 0005 is frozen, so instead of collapsing it, the new migration redefines each function once (final form).
    7. R10 honesty copy, starting with the untrue `app.js:1577` profile helper sentence.
    8. R6 live rehearsal of deletion on a throwaway test member (password + Google re-auth, `amr` shape, zero rows).
-2. **Then apply** `0005` → verify → `0006` → deploy the client, per the README runbook.
+2. **Apply each new migration** in the SQL editor, verify its last object, and let the linked Vercel project redeploy.
 3. **Founder-only gate items** (remind the founder):
    - auth hardening, recorded with dates (R11): email confirm, CAPTCHA, rate limits, leaked-password protection,
      anonymous sign-ins off, exact OAuth redirect list;

@@ -706,3 +706,39 @@ supersedes it.
   - none of the 0005 functions exist yet.
 - **Condition:** no real member may join until the P0-C items and the founder gate items in D-046 are met. The
   deletion UI also stays behind the live `amr` check (README gate 2).
+
+## D-048: 0005 and 0006 applied to live and verified; client deployed to Vercel (test members only)
+- **Date:** 2026-10-08. **Applied by:** the founder in the SQL editor (D-047). **Code:** `65e8a09`.
+- **0005 verified read-only:**
+  - `moderation_pepper` has 1 row;
+  - all 24 `is_test` members are declared and still completed;
+  - the triggers are `brivia_profiles_consent_guard` on `profiles` and `brivia_require_adult` on `member_interest`
+    and `member_orbit`;
+  - `declare_adult`, `report_member`, `delete_my_account` and `brivia_notice_version()` (= `2026-10-05`) exist;
+  - the "(city-wide)" label, the new purge, the report lock and `delete_my_account` `search_path=public` are all live;
+  - grants as the README says (`purge_expired_requests` is not client-executable; `delete_my_account` is not `anon`);
+  - the cron jobs are unchanged.
+- **0006:** the first run was a **truncated paste** (lines 100–118 missing: the two `interaction` policies and the 4
+  indexes). The founder then ran the missing tail, unchanged. **Verified read-only:**
+  - live `pg_policies`, normalised, has an md5 equal to `supabase/tests/policies-0006.expected.tsv`
+    (`a8c1fee8…`): 35 policies, 17 wrapped, 0 unwrapped in `public`;
+  - "Members can send connection requests" is absent;
+  - all 4 foreign-key indexes are present.
+  - **Lesson:** after any SQL-editor apply, verify the file's last object before moving on. The README's post-apply
+    checks do this.
+- **Advisors after apply:**
+  - Security: 19 intended definer-RPC WARN (16 + `declare_adult`, `report_member`, `delete_my_account`); 13 "RLS
+    enabled, no policy" INFO (8 + the 5 new owner-only tables); the founder's leaked-password-protection WARN.
+  - Performance: the 17 `auth_rls_initplan` and 4 unindexed-FK findings are **gone**. Left: `report_attempt` "no
+    primary key" (expected) and unused-index INFO (expected while the database is empty).
+- **Client:** Vercel project `brivia-club` (team "Golu's projects"), linked to `Georgian-86/brivia-club-v1`.
+  - Production alias `https://brivia-club.vercel.app`, first deployment from `65e8a09`.
+  - Env: `VITE_SUPABASE_URL`, `VITE_SUPABASE_PUBLISHABLE_KEY` (public by design).
+  - Vercel's default Deployment Protection is on, so the URL may need a Vercel login.
+  - The founder set the Supabase Auth Site URL and the redirect `https://brivia-club.vercel.app/**`.
+- **Still open:**
+  - the JWT `amr` check, done by deleting a throwaway account in the app;
+  - the Google re-auth round trip;
+  - the D-046 P0-C items, now as new migrations from `0007`;
+  - the founder gate items.
+  - **Real members are still not allowed.**
