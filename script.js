@@ -19,6 +19,7 @@ import {
   counterText, budgetFromRows, budgetGateText, spreadRemaining,
 } from './passion-budget.js';
 import { matchTypedCity } from './area-pick.js';
+import { signupErrorCopy } from './signup-errors.js';
 import { defaultCoverUrl, normalizeCoverUrl } from './cover-assets.js';
 
 const introBurst = document.querySelector('#intro-burst');
@@ -2009,7 +2010,7 @@ signupForm?.addEventListener('submit', async (event) => {
     authModal?.querySelector('.auth-back-trigger')?.setAttribute('hidden', '');
     signupSuccess?.querySelector('button')?.focus();
   } catch (error) {
-    const message = error.message || 'Could not create your account. Please try again.';
+    const message = error instanceof OnboardingStepError ? (error.message || 'Could not create your account. Please try again.') : signupErrorCopy(error);
     if (signupFeedback) signupFeedback.textContent = message;
     if (!(error instanceof OnboardingStepError)) {
       if (loginNote) loginNote.textContent = message;

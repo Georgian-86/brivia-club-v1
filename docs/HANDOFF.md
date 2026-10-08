@@ -18,10 +18,10 @@ Update this file at the end of every session. CLAUDE.md holds the aim; this file
 | Iteration 4 arenas (P0-B design; end-of-iteration critique → P0-C backlog) | Done | `docs/arena/2026-10-05-p0b-design.md`, `docs/arena/2026-10-07-iteration-4.md`; D-044, D-046 |
 | Landing page | Yashika's original UI, unchanged (founder rule: optimise, never redesign) | `index.html`, CSS |
 | **Live signup walkthrough** (real browser on the live URL; 7 UI bugs fixed incl. lost signup photo, typed-city refusal, invalid phone pattern) | Done, pushed (auto-deploys) | D-049 |
-| Decisions | D-001 … D-049, append-only | `docs/DECISIONS.md` |
+| Decisions | D-001 … D-050, append-only | `docs/DECISIONS.md` |
 
 Test status after D-049: SQL harness ALL PASSED; build OK; `test:unit` 96/96 (also `TZ=Asia/Kolkata`); orbit 86/86;
-e2e consent 154, onboarding 217, deck 103.
+e2e consent 154, onboarding 219, deck 103; `test:unit` now 99.
 **Live UI testing:** this sandbox cannot reach `*.vercel.app` / `*.supabase.co`. Use a Vercel Sandbox in project
 `brivia-club` (Vercel MCP `create_sandboxes_v4`, no failover regions on this plan, ~45 min max) with Playwright, and a
 Gmail plus-address of the founder's inbox for confirmation emails (disposable inboxes did not receive them).
@@ -35,13 +35,16 @@ Tooling: Playwright **and axe-core** at `/tmp/pw` (`npm install --prefix /tmp/pw
 - **`0005` and `0006` are applied (2026-10-08) and frozen** (D-047, D-048), verified read-only: the policies match
   `supabase/tests/policies-0006.expected.tsv` exactly, and the advisors are as the README expects. New SQL goes in
   **`0007+`**, starting with the D-046 P0-C items.
-- **Client deployed:** Vercel project `brivia-club` (team "Golu's projects") at `https://brivia-club.vercel.app`,
-  linked to the repo, so every push to this branch redeploys. The Supabase Auth Site URL and redirect are set to it.
+- **Client deployed:** Vercel project `brivia-club` (team "Golu's projects") at `https://brivia-club.vercel.app`.
+  **A push builds a preview only**; production moves only with a production deployment (Vercel MCP `create_deployment`
+  with `target: production` and the branch's `gitSource`; `request_promote` is refused on this plan). D-050.
+  The Supabase Auth Site URL and redirect are set to it.
   Vercel Deployment Protection is on by default; turn it off if testers without a Vercel login need access.
 - **Live checks:** the `amr` re-auth on deletion **works** (D-049: `reauth_required` → password → deleted, zero rows
   left). Still open: the Google re-auth round trip.
-- **Founder dashboard items from D-049:** custom SMTP and a Brivia-branded confirmation email (the default sender is
-  rate-limited and says "powered by Supabase"); delete the unconfirmed QA user `brivia.qa.muzfgszm@maxxspace.com`.
+- **Founder dashboard items from D-049/D-050:** **custom SMTP now blocks any public test**: the default sender hit
+  `over_email_send_rate_limit` after 2 sign-ups in an hour. Also: a Brivia-branded confirmation email, and delete the
+  unconfirmed QA user `brivia.qa.muzfgszm@maxxspace.com`.
 - Real members are **not allowed yet**: see the gate table in `docs/arena/2026-10-07-iteration-4.md`.
 
 ## 3. What to do next (in order)

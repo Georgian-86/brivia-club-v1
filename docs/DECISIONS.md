@@ -837,3 +837,32 @@ Left as is:
 - The photo-upload checks were confirmed to fail on the old code.
 - Consent e2e: an avatar-initials check.
 - The step-3 Tab limit was raised for the new button.
+
+## D-050: Production deploys are manual; the default auth email sender rate-limits real sign-ups (2026-10-08)
+
+**Deploys are manual (this corrects D-048 and the handoff).**
+- A push to `claude/jolly-edison-49xvza` builds a **preview** deployment only. Production
+  (`https://brivia-club.vercel.app`) moves only by a production deployment of a commit.
+- Promoting a preview with `request_promote` is refused on this plan (422).
+- `3fe26f4` (D-049) was deployed to production this way, with Vercel MCP `create_deployment`, `target: production`
+  and `gitSource` = the branch and sha.
+- Do the same after each push until the founder sets the Vercel production branch to this branch, or merges to the
+  production branch.
+
+**Live re-test of D-049 on production.** Confirmed:
+- a typed city with Next (no click) moves to step 3;
+- "Pick at least one interest to continue.", then "Place all 20 points to continue (18 left).";
+- "Spread the remaining points evenly" makes it 0 of 20 left;
+- the city hint is shown.
+
+**The submit then failed.** Supabase answered `429 over_email_send_rate_limit`.
+- The default sender allows only a few emails an hour, and this session had already sent 2.
+- The form showed the raw "email rate limit exceeded". No auth user was created, so a later retry works.
+- **Fix:** `signup-errors.js` (`signupErrorCopy`) shows "We can't send the confirmation email right now: too many
+  sign-ups at once. Your account was not created. Please try again in about an hour." An already-registered email
+  points to log in. The form stays usable.
+- **Tests:** 3 unit tests; onboarding e2e block 13c.
+- **Founder action, now a blocker for any public test:** configure custom SMTP in Supabase Auth (for example Resend,
+  Brevo or SES). Raise the email rate limit, and use a Brivia-branded confirmation template.
+- The photo-upload re-test on live waits until the limit resets or SMTP is set. It is covered by the e2e blocks 13
+  and 13b.

@@ -109,6 +109,7 @@ const stubContext = async (context, opts = {}) => {
     const headers = { 'access-control-allow-origin': '*' };
     const json = (status, payload) => route.fulfill({ status, contentType: 'application/json', body: payload === undefined ? '' : JSON.stringify(payload), headers });
     if (method === 'OPTIONS') return route.fulfill({ status: 204, headers: { ...headers, 'access-control-allow-headers': '*', 'access-control-allow-methods': '*' } });
+    if (p === '/auth/v1/signup' && opts.signupStatus === 429) return json(429, { code: 'over_email_send_rate_limit', message: 'email rate limit exceeded' });
     if (p === '/auth/v1/signup') return json(200, opts.signupSession === false ? user : session);
     if (p === '/auth/v1/logout') return route.fulfill({ status: 204, headers });
     if (p.startsWith('/auth/v1/')) return json(200, p.endsWith('/user') ? user : session);
@@ -1502,6 +1503,36 @@ try {
       });
     }
     check(`${variant}: no uncaught page errors`, () => assert.deepEqual(errors, []));
+    await context.close();
+  }
+  // 13c. Live (2026-10-08): Supabase's default sender answered 429 over_email_send_rate_limit and the raw English
+  //      error reached the member. The copy is plain, says nothing was created, and the form stays usable.
+  {
+    const context = await browser.newContext({ viewport: { width: 375, height: 800 } });
+    const stub = await stubContext(context, { signupSession: false, signupStatus: 429 });
+    const { page, errors } = await newPage(context, stub.consoleLines);
+    await openSignup(page);
+    await fillStepOne(page);
+    await page.locator('[data-area-city]').click();
+    await pickCityByKeyboard(page, 'Pun');
+    await page.locator('[data-signup-step="2"] .signup-next').click();
+    await page.waitForSelector('#interest-results [data-interest-group]', { state: 'attached' });
+    await page.locator('#interest-search').fill('Chess');
+    await clickInterest(page, 'Chess');
+    await page.locator('[data-budget-spread]').click();
+    await page.locator('.looking-search').click();
+    await page.locator('#looking-results [data-looking-option]').first().click();
+    await page.locator('[data-signup-step="3"] .signup-next').click();
+    await page.waitForSelector('[data-signup-step="4"]:not([hidden])');
+    await finishStepFour(page);
+    await page.waitForFunction(() => /too many sign-ups/.test(document.body.innerText), null, { timeout: 10000 }).catch(() => {});
+    const shown = await page.evaluate(() => document.body.innerText);
+    const submitEnabled = await page.locator('[data-signup-step="4"] [type="submit"]').isEnabled();
+    check('rate limit: plain copy, "not created", retry hint; never the raw "email rate limit exceeded"', () => {
+      assert.match(shown, /too many sign-ups at once\. Your account was not created\. Please try again in about an hour\./);
+      assert.ok(!/email rate limit exceeded/.test(shown)); assert.ok(submitEnabled);
+    });
+    check('rate limit: no uncaught page errors', () => assert.deepEqual(errors, []));
     await context.close();
   }
 } catch (error) {
