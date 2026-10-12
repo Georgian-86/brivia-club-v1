@@ -189,6 +189,33 @@ try {
       await context.close();
     }
 
+    // 2c. Audio unlock: a gesture BEFORE the hero starts must still unmute it once it starts (the listener is one-shot).
+    // Chromium here cannot decode H.264, so play() is stubbed with the autoplay policy: an unmuted play() needs a prior gesture.
+    for (const tapFirst of [true, false]) {
+      const context = await newContext(browser, viewport, { seen: true });
+      await context.addInitScript(() => {
+        window.requestIdleCallback = undefined; // force the 1200 ms timer path (Safari)
+        window.__unmutedAttempts = 0;
+        HTMLMediaElement.prototype.play = function play() {
+          if (!this.muted) {
+            window.__unmutedAttempts += 1;
+            if (!navigator.userActivation.hasBeenActive) return Promise.reject(new DOMException('autoplay', 'NotAllowedError'));
+          }
+          return Promise.resolve();
+        };
+      });
+      const page = await context.newPage();
+      await page.goto(`${BASE}/index.html`, { waitUntil: 'domcontentloaded' });
+      if (tapFirst) await page.mouse.click(Math.round(viewport.width / 2), Math.round(viewport.height / 2));
+      await page.waitForTimeout(1900);
+      const hero = await page.evaluate(() => ({ muted: document.querySelector('.hero-video').muted, attempts: window.__unmutedAttempts }));
+      await check(`${label}: ${tapFirst ? 'a tap before the hero starts leaves it unmuted once it starts' : 'with no gesture the hero starts muted without an unmuted attempt'}`, () => {
+        if (tapFirst) assert.equal(hero.muted, false, 'hero is muted after an early tap');
+        else { assert.equal(hero.muted, true); assert.equal(hero.attempts, 0, 'unmuted play() attempted before any gesture'); }
+      });
+      await context.close();
+    }
+
     // 3. Arriving from an auth page (sessionStorage flag) skips the intro once.
     {
       const context = await newContext(browser, viewport);
@@ -232,6 +259,8 @@ try {
       const errors = [];
       page.on('pageerror', (error) => errors.push(error.message));
       const tracked = await track(context, page);
+      const bad = [];
+      page.on('response', (response) => { if (response.url().startsWith(BASE) && response.status() >= 400) bad.push(`${response.status()} ${response.url().replace(BASE, '')}`); });
       await page.goto(`${BASE}/index.html`, { waitUntil: 'load' });
       await page.waitForTimeout(2000);
       const modelledBytes = nonHeroBytes(tracked.entries());
@@ -293,6 +322,9 @@ try {
         await page.waitForTimeout(1500);
         assert.equal(tracked.urls.some((url) => pillarRe.test(url)), true, 'PILLARS1 not fetched after scrolling to it');
       });
+      await page.evaluate(async () => { for (let y = 0; y <= document.body.scrollHeight; y += 500) { window.scrollTo(0, y); await new Promise((r) => setTimeout(r, 60)); } });
+      await page.waitForTimeout(800);
+      await check(`${label}: index.html: no same-origin response with status >= 400 after a full scroll`, () => assert.deepEqual(bad, []));
       await context.close();
     }
 
@@ -319,6 +351,19 @@ try {
       });
       await context.close();
     }
+  }
+
+  // 6b. auth.html loads and scrolls without a same-origin 4xx/5xx.
+  {
+    const context = await newContext(browser, VIEWPORTS[0], { seen: true });
+    const page = await context.newPage();
+    const bad = [];
+    page.on('response', (response) => { if (response.url().startsWith(BASE) && response.status() >= 400) bad.push(`${response.status()} ${response.url().replace(BASE, '')}`); });
+    await page.goto(`${BASE}/auth.html`, { waitUntil: 'load' });
+    await page.evaluate(async () => { for (let y = 0; y <= document.body.scrollHeight; y += 500) { window.scrollTo(0, y); await new Promise((r) => setTimeout(r, 60)); } });
+    await page.waitForTimeout(800);
+    await check('auth.html: no same-origin response with status >= 400 after a full scroll', () => assert.deepEqual(bad, []));
+    await context.close();
   }
 
   // 7. careers.html keeps Instrument Sans 400 (its body text and modal inputs rely on it), loaded only from careers.js.

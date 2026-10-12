@@ -80,6 +80,8 @@ const landingVideos = [...document.querySelectorAll('.hero-video, [data-playgrou
 // Until a video has started, the gesture handler leaves it alone, so nothing is force-loaded. Every video keeps
 // `muted` + `playsinline` in the HTML (iOS autoplay); the first user gesture unmutes them as before.
 const startedLandingVideos = new Set();
+// Set by the first user gesture; a video that starts later (idle hero, playground near the viewport) is unmuted on start.
+let landingAudioUnlocked = false;
 const playLandingVideo = (video) => {
   video.muted = false;
   video.defaultMuted = false;
@@ -93,9 +95,13 @@ const startLandingVideo = (video) => {
   if (!landingMotion || startedLandingVideos.has(video)) return;
   startedLandingVideos.add(video);
   video.preload = 'auto';
-  playLandingVideo(video);
+  // After a gesture, start unmuted (the gesture handler has already run, so it cannot do this later); before one, start
+  // muted from the HTML attribute without an unmuted attempt the browser would reject.
+  if (landingAudioUnlocked) playLandingVideo(video);
+  else video.play().catch(() => {});
 };
 const enableLandingVideoAudio = () => {
+  landingAudioUnlocked = true;
   startedLandingVideos.forEach(playLandingVideo);
 };
 const heroLandingVideo = document.querySelector('.hero-video');

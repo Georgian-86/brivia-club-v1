@@ -969,3 +969,9 @@ before (Google Fonts, pre-Phase-B build) and after (static fontsource 500) gives
 tried and rejected: it renders hairline display text and does not match. Also: careers.html's Instrument Sans 400 is
 restored (`fonts-careers.css`, imported only from `careers.js`), and `markLoaded` now clears the skeleton for an image
 that had already failed before the module ran.
+
+### D-054 correction (2026-10-12, final review of Phase B)
+
+Two statements in D-054 above were inaccurate. This block corrects them; the lines above stay as written.
+- "Stored cover identifiers kept" holds only for the default, hidden `coverUrl`. A cover the member picks is stored as the built `/assets/<stem>-<hash>.webp` URL (`coverOptionUrl` in `script.js` reads the `<img src>`), and the stem resolution in `cover-name.js` is what keeps old stored values working. Legacy hashed `.PNG` values and the original `/Images/Cover%20images/<name>.PNG` paths are resolved by `normalizeCoverUrl`, now applied once in `toMemberPerson` so other members' swipe cards resolve them too (before this fix the deck card showed a broken cover for them).
+- `exploreCoverImages` in `app.js` was a dead constant, never referenced; nothing requested those files. It is deleted in this fix.

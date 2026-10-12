@@ -1,12 +1,12 @@
 # Session handoff (read after CLAUDE.md)
 
-Last updated: 2026-10-08, after the live signup walkthrough and its UI fixes (D-049), on branch
+Last updated: 2026-10-12, after Phases A and B of the experience iteration (final review fixes applied), on branch
 `claude/jolly-edison-49xvza` (repo `Georgian-86/brivia-club-v1`).
 Update this file at the end of every session. CLAUDE.md holds the aim; this file holds **where we are**.
 
 ## 1. What is done
 
-**Experience iteration, Phases A and B (2026-10-12): done on `claude/jolly-edison-49xvza`, not yet on `main`** (the founder OKs the fast-forward). See D-053 and D-054.
+**Experience iteration, Phases A and B (2026-10-12): done on `claude/jolly-edison-49xvza` and about to go to `main`** (the founder OKs the fast-forward). See D-053 and D-054.
 - Media pipeline: `npm run media:build` (sharp + ffmpeg write `media/`), `npm run media:repoint` (rewrites references from `media/manifest.json`), `npm run check:assets` (budget on `dist/assets`: image <= 400 KB, video <= 5 MB). Originals stay in `Images/` and `assets/`.
 - Landing e2e: `PLAYWRIGHT_MODULE=/tmp/pw/node_modules/playwright/index.mjs CHROMIUM_PATH=/opt/pw-browsers/chromium node tests/e2e/landing.spec.mjs` (builds, serves `vite preview` on :5196; checks poster-first, intro cap, reduced motion, transfer, CLS, LCP, fonts, skeleton).
 - Lighthouse: `CHROME_PATH=/opt/pw-browsers/chromium npx lighthouse@12 http://127.0.0.1:4173/ --preset=perf --form-factor=mobile --chrome-flags="--headless --no-sandbox"`. Last result 0.86 to 0.89, LCP 2.8 s (target 90 / 2.5 s); next step is splitting the auth CSS off the landing critical path.

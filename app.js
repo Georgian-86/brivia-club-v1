@@ -562,7 +562,7 @@ const toMemberPerson = (row) => {
   const looking = profile.lookingFor.split(',').map((item) => item.trim()).filter(Boolean);
   const tags = [...skills, ...looking];
   const filters = ['all', ...tags.map((item) => item.toLowerCase()), profile.experience?.toLowerCase() || ''];
-  return { ...profile, ...deckFields(safeRow), city: '', state: '', email: '', phone: '', phoneCountryCode: '', phoneNumber: '', age: '', role: profile.experience || 'Brivia member', distance: '', bio: `${profile.name} is open to meaningful connections.`, tags, image: profile.photoUrl || '', filters: filters.filter(Boolean) };
+  return { ...profile, coverUrl: normalizeCoverUrl(profile.coverUrl), ...deckFields(safeRow), city: '', state: '', email: '', phone: '', phoneCountryCode: '', phoneNumber: '', age: '', role: profile.experience || 'Brivia member', distance: '', bio: `${profile.name} is open to meaningful connections.`, tags, image: profile.photoUrl || '', filters: filters.filter(Boolean) };
 };
 // Adds cards not already known to the registry (a known card gains a band or chips it lacked); returns their ids.
 const mergePeople = (rows) => {
@@ -1005,14 +1005,6 @@ bindCardOverflow(async (action, trigger) => {
   dismissCardLikePass(person);
 });
 
-const exploreCoverImages = [
-  './media/assets/chat-reference-room.webp',
-  './media/assets/macbook-roses-cream.webp',
-  './media/assets/macbook-roses-back.webp',
-  './media/assets/guitar-premium.webp',
-  './media/assets/badminton-premium-no-shuttle.webp',
-  './media/assets/sites.webp',
-];
 
 const uniqueFilterValues = (values) => {
   const unique = new Map();

@@ -96,7 +96,7 @@ try {
   // One mutable stub serves every context; tests change it between page loads.
   // onboarding: the my_onboarding_status answers in order (the last one repeats); 'error' answers HTTP 500.
   // matchIds: members I am matched with (GET /rest/v1/matches); search: the rpc/search_members answer.
-  const fresh = () => ({ status: 'caught_up', emptyDeck: false, deckFail: false, matchAll: false, onboarding: [true], onboardingCalls: 0, passed: new Set(), signalled: new Set(), remaining: 30, resetsAt: null, matchIds: [], search: [], report: 'ok' });
+  const fresh = () => ({ status: 'caught_up', emptyDeck: false, deckFail: false, matchAll: false, onboarding: [true], onboardingCalls: 0, passed: new Set(), signalled: new Set(), remaining: 30, resetsAt: null, matchIds: [], search: [], report: 'ok', rows: null });
   const st = { ...fresh(), calls: [], bodies: [] };
   const resetStub = (patch = {}) => Object.assign(st, fresh(), patch);
   const makeContext = async (viewport) => {
@@ -126,7 +126,7 @@ try {
       if (pathName === '/rest/v1/rpc/deck_candidates') {
         if (st.deckFail) return json(500, { code: 'XX000', message: 'stub failure' });
         if (st.emptyDeck) return json(200, []);
-        return json(200, deckRows.filter((row) => !st.passed.has(row.id) && !st.signalled.has(row.id)).slice(0, Number(args.p_limit) || 12));
+        return json(200, (st.rows || deckRows).filter((row) => !st.passed.has(row.id) && !st.signalled.has(row.id)).slice(0, Number(args.p_limit) || 12));
       }
       if (pathName === '/rest/v1/rpc/deck_status') return json(200, st.status);
       if (pathName === '/rest/v1/rpc/my_signal_quota') return json(200, [{ daily_limit: 30, remaining: st.remaining, resets_at: st.resetsAt, live_unanswered: 0, live_limit: 100 }]);
@@ -423,6 +423,27 @@ try {
   const clearedBack = await waitForCard(page, 'Asha Band');
   check('"Clear filters" brings card 1 back', () => assert.equal(clearedBack, true));
   await wide.close();
+
+  // 6a. Legacy stored covers (hashed /assets/<name>-<hash>.PNG, original /Images/Cover%20images/<name>.PNG) must show the
+  // bundled .webp on other members' swipe cards, and the image must actually load.
+  const coverRows = [
+    { id: A, name: 'Legacy Hashed', photo_url: null, cover_url: '/assets/163BDB0C-64AC-44E7-8663-55C323ADB4FE-Bcr88PbJ.PNG', experience: 'Chef', skills: ['Cooking'], looking_for: ['Friends'], distance_band: '~3 km', shared_interests: [] },
+    { id: B, name: 'Legacy Original', photo_url: null, cover_url: '/Images/Cover%20images/2257522A-04B9-4E3E-AB1A-A73D7BB8CCBF.PNG', experience: 'Pilot', skills: ['Flying'], looking_for: ['Friends'], distance_band: '~4 km', shared_interests: [] },
+  ];
+  resetStub({ rows: coverRows });
+  const coverCtx = await makeContext({ width: 1440, height: 900 });
+  page = await open(coverCtx);
+  for (const name of ['Legacy Hashed', 'Legacy Original']) {
+    await waitForCard(page, name);
+    await page.waitForFunction(() => { const i = document.querySelector('#swipe-image'); return i && i.complete; }, null, { timeout: 8000 }).catch(() => {});
+    const img = await page.evaluate(() => { const i = document.querySelector('#swipe-image'); return { src: i.getAttribute('src'), w: i.naturalWidth }; });
+    check(`legacy cover on "${name}" resolves to a bundled .webp that loads (${img.src}, ${img.w}px)`, () => {
+      assert.match(img.src, /\.webp(\?|$)/);
+      assert.ok(img.w > 0, 'cover image did not load');
+    });
+    await page.locator('[data-action="pass"]').click();
+  }
+  await coverCtx.close();
 
   // 6b. Minor 2: search results join the deck, except members already matched with me or already swiped this session.
   resetStub({ matchIds: [M], search: searchRows });
