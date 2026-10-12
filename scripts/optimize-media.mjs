@@ -16,17 +16,23 @@ import { fileURLToPath } from 'node:url';
 import { execFileSync } from 'node:child_process';
 import sharp from 'sharp';
 import { siteFiles } from './repoint-media.mjs';
+import { collectRefs } from './media-manifest.mjs';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const FFMPEG = existsSync('/usr/bin/ffmpeg') ? '/usr/bin/ffmpeg' : 'ffmpeg';
 const FFPROBE = existsSync('/usr/bin/ffprobe') ? '/usr/bin/ffprobe' : 'ffprobe';
 const IMAGE = { maxWidth: 1600, quality: 78 };
-// crf is the starting quality; if an encode is over its size cap (plan Global Constraints: hero 1080p <= 3 MB,
+// crf is the starting quality; if an encode is over its size cap (plan Global Constraints: 1080p <= 3 MB,
 // 720p <= 1.5 MB) the crf is raised one step at a time until it fits.
 const VIDEO = [
   { height: 1080, crf: 28, maxBytes: 3 * 1048576 },
   { height: 720, crf: 30, maxBytes: 1.5 * 1048576 },
 ];
+// Per-video overrides. Ruling F: the hero 1080p is a fixed crf 30 (no auto-raise; at crf 34 it was visibly soft),
+// allowed up to 4.8 MB (check:assets caps video at 5 MB). The poster is the LCP and the video starts after idle.
+const VIDEO_OVERRIDES = {
+  'hero-section-video': { 1080: { crf: 30, maxBytes: 4.8 * 1048576, fixedCrf: true } },
+};
 const MAX_CRF = 40;
 
 // Every ref to Images/ or assets/ media in the site's own files (not refs already under media/).
@@ -61,7 +67,10 @@ const encodeVideo = (src, out, { height, crf }, audio) => {
 
 const main = async () => {
   const manifest = {};
-  const refs = scanRefs();
+  const manifestPath = join(root, 'media', 'manifest.json');
+  const previous = existsSync(manifestPath) ? JSON.parse(readFileSync(manifestPath, 'utf8')) : {};
+  // Re-runnable after repoint: keep building every previous entry whose source still exists.
+  const refs = collectRefs(scanRefs(), previous, (rel) => existsSync(join(root, rel)));
   const outputs = new Map();
   const claim = (out, ref) => {
     if (outputs.has(out) && outputs.get(out) !== ref) throw new Error(`Output collision: ${out} <- ${outputs.get(out)} and ${ref}`);
@@ -91,8 +100,13 @@ const main = async () => {
     const src = join(root, master);
     const info = probe(src);
     const made = [];
-    for (const variant of VIDEO) {
-      if (variant.height > info.height) continue; // never upscale
+    const hasMaster4k = master.endsWith('-4k.mp4');
+    // Never upscale. A video with a -4k master ships both sizes (desktop and small-screen sources); any other
+    // video has one <source> per ref, so only its largest variant is emitted.
+    const fitting = VIDEO.filter((v) => v.height <= info.height);
+    const variants = (hasMaster4k ? fitting : fitting.slice(0, 1))
+      .map((v) => ({ ...v, ...(VIDEO_OVERRIDES[name]?.[v.height] || {}) }));
+    for (const variant of variants) {
       const outRel = `media/video/${name}-${variant.height}.mp4`;
       claim(outRel, master);
       const out = join(root, outRel);
@@ -100,7 +114,7 @@ const main = async () => {
         mkdirSync(dirname(out), { recursive: true });
         let crf = variant.crf;
         encodeVideo(src, out, { ...variant, crf }, info.audio);
-        while (statSync(out).size > variant.maxBytes && crf < MAX_CRF) {
+        while (!variant.fixedCrf && statSync(out).size > variant.maxBytes && crf < MAX_CRF) {
           crf += 1;
           encodeVideo(src, out, { ...variant, crf }, info.audio);
         }
@@ -121,7 +135,6 @@ const main = async () => {
     if (!made.length) throw new Error(`No variant for ${master} (height ${info.height})`);
     // The -4k ref (desktop source) gets the largest variant. When a -4k sibling exists, the plain ref is the
     // small-screen default and gets the smallest; otherwise the plain ref gets the largest.
-    const hasMaster4k = master.endsWith('-4k.mp4');
     for (const ref of videoRefs) {
       const base = posix.basename(ref).replace(/\.mp4$/i, '');
       if (base === `${name}-4k`) manifest[`/${ref}`] = `/${made[0]}`;
@@ -130,7 +143,7 @@ const main = async () => {
   }
 
   const sorted = Object.fromEntries(Object.entries(manifest).sort(([a], [b]) => a.localeCompare(b)));
-  writeFileSync(join(root, 'media', 'manifest.json'), `${JSON.stringify(sorted, null, 2)}\n`);
+  writeFileSync(manifestPath, `${JSON.stringify(sorted, null, 2)}\n`);
   console.log(`media/manifest.json: ${Object.keys(sorted).length} refs`);
 };
 

@@ -34,3 +34,11 @@ test('matches case-sensitively and returns null for unknown names', () => {
   assert.equal(resolveCoverKey('/assets/other-Bcr88PbJ.PNG', keys), null);
   assert.equal(resolveCoverKey('', keys), null);
 });
+
+test('an exact key whose tail looks like a Vite hash is resolved by exact match, never mis-stripped', () => {
+  const tricky = ['PHOTO-2024-ABCDEFGH.PNG', 'PHOTO-2024.PNG'];
+  assert.equal(resolveCoverKey('/Images/Cover%20images/PHOTO-2024-ABCDEFGH.PNG', tricky), 'PHOTO-2024-ABCDEFGH.PNG');
+  assert.equal(resolveCoverKey('/assets/PHOTO-2024-ABCDEFGH-Bcr88PbJ.PNG', tricky), 'PHOTO-2024-ABCDEFGH.PNG');
+  assert.equal(resolveCoverKey('/assets/UNKNOWN-NAME-Bcr88PbJ.PNG', tricky), null);
+  assert.equal(resolveCoverKey('/assets/UNKNOWN-NAME-Bcr88PbJ.webp', tricky), null);
+});

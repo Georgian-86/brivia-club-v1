@@ -63,3 +63,26 @@ test('never rewrites stored identifiers (data-* and value attributes), only wher
     + '<button data-cover-option="/Images/Cover%20images/X.PNG"><img src="/media/Images/Cover%20images/X.webp" /></button>',
   );
 });
+
+test('a rebuild after repoint keeps every manifest entry whose source still exists', async () => {
+  const { collectRefs } = await import('../../scripts/media-manifest.mjs');
+  const manifest = {
+    '/Images/CONNECT.PNG': '/media/Images/CONNECT.webp',
+    '/Images/Cover images/X.PNG': '/media/Images/Cover images/X.webp',
+    '/assets/hero-section-video-4k.mp4': '/media/video/hero-section-video-1080.mp4',
+    '/assets/gone.png': '/media/assets/gone.webp',
+  };
+  // After repoint, a rescan of the site only finds the stored cover identifiers.
+  const scanned = ['Images/Cover images/X.PNG'];
+  const exists = (rel) => rel !== 'assets/gone.png';
+  assert.deepEqual(collectRefs(scanned, manifest, exists), [
+    'assets/hero-section-video-4k.mp4',
+    'Images/CONNECT.PNG',
+    'Images/Cover images/X.PNG',
+  ].sort());
+});
+
+test('collectRefs with no existing manifest is the scan', async () => {
+  const { collectRefs } = await import('../../scripts/media-manifest.mjs');
+  assert.deepEqual(collectRefs(['b.png', 'a.png', 'a.png'], {}, () => true), ['a.png', 'b.png']);
+});
