@@ -1535,6 +1535,56 @@ try {
     check('rate limit: no uncaught page errors', () => assert.deepEqual(errors, []));
     await context.close();
   }
+  // 14. Founder screenshots 2026-10-12: uneven gender tiles, near-invisible "Check your email." panel, and the
+  //     Back / Create buttons overlapping on step 4 near 1330 px.
+  for (const w of [375, 1024, 1280, 1330, 1440]) {
+    const context = await browser.newContext({ viewport: { width: w, height: 900 } });
+    const stub = await stubContext(context, { signupSession: false });
+    const { page, errors } = await newPage(context, stub.consoleLines);
+    await openSignup(page);
+    const tiles = await page.evaluate(() => [...document.querySelectorAll('[data-signup-step="1"] .gender-option span')].map((el) => { const r = el.getBoundingClientRect(); return { w: r.width, h: r.height }; }));
+    check(`gender: three tiles share one width (±1 px) and one height (±1 px) at ${w} (${tiles.map((t) => `${t.w.toFixed(1)}x${t.h.toFixed(1)}`).join(', ')})`, () => {
+      assert.equal(tiles.length, 3);
+      const ws = tiles.map((t) => t.w), hs = tiles.map((t) => t.h);
+      assert.ok(Math.max(...ws) - Math.min(...ws) <= 1, `widths ${ws}`);
+      assert.ok(Math.max(...hs) - Math.min(...hs) <= 1, `heights ${hs}`);
+    });
+    await fillStepOne(page);
+    await page.locator('[data-area-city]').click();
+    await pickCityByKeyboard(page, 'Pun');
+    await page.locator('[data-signup-step="2"] .signup-next').click();
+    await page.waitForSelector('#interest-results [data-interest-group]', { state: 'attached' });
+    await page.locator('#interest-search').fill('Chess');
+    await clickInterest(page, 'Chess');
+    await page.locator('[data-budget-spread]').click();
+    await page.locator('.looking-search').click();
+    await page.locator('#looking-results [data-looking-option]').first().click();
+    await page.locator('[data-signup-step="3"] .signup-next').click();
+    await page.waitForSelector('[data-signup-step="4"]:not([hidden])');
+    const boxes = await page.evaluate(() => {
+      const box = document.querySelector('[data-signup-step="4"] .signup-step-actions');
+      const rect = (el) => { const r = el.getBoundingClientRect(); return { l: r.left, t: r.top, r: r.right, b: r.bottom }; };
+      return { container: rect(box), kids: [...box.children].filter((el) => el.getBoundingClientRect().width > 0).map(rect) };
+    });
+    check(`actions: Back and Create do not overlap at ${w} (${JSON.stringify(boxes.kids.map((k) => [Math.round(k.l), Math.round(k.r)]))} in ${Math.round(boxes.container.l)}-${Math.round(boxes.container.r)})`, () => {
+      const [a, b] = boxes.kids;
+      assert.equal(boxes.kids.length, 2);
+      const overlap = a.l < b.r - 0.5 && b.l < a.r - 0.5 && a.t < b.b - 0.5 && b.t < a.b - 0.5;
+      assert.ok(!overlap, 'rectangles intersect');
+      const c = boxes.container;
+      for (const k of boxes.kids) assert.ok(k.l >= c.l - 0.5 && k.r <= c.r + 0.5 && k.t >= c.t - 0.5 && k.b <= c.b + 0.5, 'outside container');
+    });
+    await finishStepFour(page);
+    await page.waitForSelector('#auth-success:not([hidden])', { timeout: 10000 });
+    await page.waitForTimeout(500);
+    const contrast = await axeViolations(page, { rules: ['color-contrast'], include: '#auth-success' });
+    const titleColor = await page.locator('[data-auth-success-title]').evaluate((el) => getComputedStyle(el).color);
+    check(`success: title and message pass axe color-contrast at ${w} (${contrast.join(' | ')}; title ${titleColor})`, () => {
+      assert.deepEqual(contrast, []); assert.notEqual(titleColor, 'rgb(255, 250, 241)');
+    });
+    check(`founder fixes ${w}: no uncaught page errors`, () => assert.deepEqual(errors, []));
+    await context.close();
+  }
 } catch (error) {
   results.push(['FAIL', `harness: ${error.stack || error.message}`]);
 } finally {

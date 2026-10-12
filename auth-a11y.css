@@ -91,3 +91,27 @@ body.auth-page .auth-shell .auth-signup-form .budget-spread {
 }
 body.auth-page .auth-shell .auth-signup-form .budget-spread[hidden] { display: none; }
 body.auth-page .auth-shell .auth-signup-form .budget-spread:hover { background: color-mix(in srgb, var(--a11y-wine) 8%, transparent); }
+
+/* Hotfix 2026-10-12 (founder screenshots) */
+/* Success panel: cream text on the cream panel was near-invisible. */
+body.auth-page .auth-shell .auth-panel .auth-success h2 { color: var(--a11y-wine); }
+body.auth-page .auth-shell .auth-panel .auth-success p { color: var(--a11y-ink-soft); }
+body.auth-page .auth-shell .auth-panel .credential-row { border-color: rgba(94, 11, 40, .2); background: rgba(94, 11, 40, .04); }
+/* Gender tiles: one width and one height (the long label no longer makes its tile taller). */
+body.auth-page .auth-shell .auth-signup-form .gender-options { grid-template-columns: repeat(3, minmax(0, 1fr)); align-items: stretch; }
+body.auth-page .auth-shell .auth-signup-form .gender-option { display: flex; }
+body.auth-page .auth-shell .auth-signup-form .gender-option span { flex: 1; width: 100%; min-height: 48px; box-sizing: border-box; overflow-wrap: anywhere; }
+@media (max-width: 480px) {
+  body.auth-page .auth-shell .auth-signup-form .gender-options { grid-template-columns: 1fr; }
+}
+/* Step actions: two equal columns, buttons never wider than their cell; stacked with Create first on narrow screens. */
+body.auth-page .auth-shell .auth-signup-form .signup-step-actions { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+body.auth-page .auth-shell .auth-signup-form .signup-step-actions :is(.auth-secondary, .auth-submit) {
+  width: 100%; min-width: 0; max-width: 100%; box-sizing: border-box; white-space: normal; overflow-wrap: anywhere; text-align: center;
+}
+@media (max-width: 780px) {
+  body.auth-page .auth-shell .auth-signup-form .signup-step-actions { grid-template-columns: minmax(0, 1fr); }
+  body.auth-page .auth-shell .auth-signup-form .signup-step-actions .auth-submit,
+  body.auth-page .auth-shell .auth-signup-form .signup-step-actions .signup-next { order: 1; }
+  body.auth-page .auth-shell .auth-signup-form .signup-step-actions .auth-secondary { order: 2; justify-self: stretch; }
+}
