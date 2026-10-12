@@ -1,7 +1,11 @@
 {
   "app-navigation.css": {
-    "hex": 37,
-    "fontFamily": 6
+    "hex": 19,
+    "fontFamily": 2
+  },
+  "app-shell.css": {
+    "hex": 0,
+    "fontFamily": 0
   },
   "app.css": {
     "hex": 69,
@@ -41,7 +45,7 @@
   },
   "chat-sidebar-fix.css": {
     "hex": 3,
-    "fontFamily": 5
+    "fontFamily": 3
   },
   "chat-wallpaper.css": {
     "hex": 8,
@@ -124,8 +128,8 @@
     "fontFamily": 0
   },
   "profile-theme.css": {
-    "hex": 164,
-    "fontFamily": 11
+    "hex": 149,
+    "fontFamily": 10
   },
   "report-dialog.css": {
     "hex": 14,

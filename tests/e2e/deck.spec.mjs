@@ -25,23 +25,18 @@
 // * at 375 px the chips wrap without clipping and the action buttons are at least 44 px tall.
 // E2E_SCREENSHOTS=<dir> saves 375 px and 1440 px screenshots: card with band and chips (with the quota counter), the
 // zero-quota state, and the caught-up and no-members-yet empty states.
-import { readFileSync } from 'node:fs';
 import { axeViolations, smallText, photoContrast } from './a11y.mjs';
-import { spawn } from 'node:child_process';
+import { startAppStub, ME, PHOTO } from './app-stub.mjs';
 import assert from 'node:assert/strict';
-import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 
 const { chromium } = await import(process.env.PLAYWRIGHT_MODULE || 'playwright');
-const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const PORT = Number(process.env.E2E_PORT || 5197);
-const ORIGIN = 'https://stub.supabase.local';
 const BASE = `http://127.0.0.1:${PORT}`;
 const EXECUTABLE = process.env.CHROMIUM_PATH || '/opt/pw-browsers/chromium';
 const SHOTS = process.env.E2E_SCREENSHOTS || '';
 const shot = async (page, name) => { if (SHOTS) await page.screenshot({ path: path.join(SHOTS, name) }); };
 
-const ME = '11111111-1111-4111-8111-111111111111';
 const A = 'aaaaaaaa-aaaa-4aaa-8aaa-000000000001';
 const B = 'aaaaaaaa-aaaa-4aaa-8aaa-000000000002';
 const C = 'aaaaaaaa-aaaa-4aaa-8aaa-000000000003';
@@ -52,8 +47,6 @@ const N = 'aaaaaaaa-aaaa-4aaa-8aaa-000000000006';
 // The stub wrongly adds city / state to deck rows: none of these strings may ever reach the page.
 const LEAK = { city: 'Zanzibarton', state: 'Ungujastate' };
 const LEAK_RE = /Zanzibarton|Ungujastate/;
-const STILL = readFileSync(path.join(repoRoot, 'assets/badminton-premium-no-shuttle.png'));
-const PHOTO = (id) => `${ORIGIN}/storage/v1/object/public/profile-photos/${id}/p.jpg`;
 const deckRows = [
   { id: A, name: 'Asha Band', photo_url: PHOTO(A), cover_url: null, experience: 'Product designer', skills: ['Badminton', 'Chess', 'Long-distance running', 'Poetry', 'Jazz piano'], looking_for: ['Friends'], distance_band: '~3 km', shared_interests: ['Badminton', 'Chess'], ...LEAK },
   { id: B, name: 'Bilal Place', photo_url: PHOTO(B), cover_url: null, experience: 'Engineer', skills: ['Badminton'], looking_for: ['Mentor'], distance_band: 'Pune', shared_interests: ['Badminton'], ...LEAK },
@@ -65,96 +58,21 @@ const searchRows = [
   { id: M, name: 'Kai Matched', photo_url: null, cover_url: null, experience: 'Chef', skills: ['Cooking'], looking_for: ['Friends'] },
   { id: N, name: 'Kai New', photo_url: null, cover_url: null, experience: 'Pilot', skills: ['Flying'], looking_for: ['Friends'] },
 ];
-const ownRow = { id: ME, name: 'Alex Me', full_name: 'Alex Me', email: 'alex@test.brivia.club', phone: '', city: null, state: null, experience: 'Founder', skills: ['Badminton'], looking_for: ['Friends'], created_at: new Date(Date.now() - 9e6).toISOString() };
-
-const b64url = (value) => Buffer.from(JSON.stringify(value)).toString('base64url');
-const exp = Math.floor(Date.now() / 1000) + 3600;
-const accessToken = `${b64url({ alg: 'HS256', typ: 'JWT' })}.${b64url({ sub: ME, role: 'authenticated', exp, aud: 'authenticated' })}.sig`;
-const user = { id: ME, aud: 'authenticated', role: 'authenticated', email: ownRow.email, user_metadata: { name: 'Alex Me' }, app_metadata: {}, created_at: ownRow.created_at };
-const session = { access_token: accessToken, refresh_token: 'stub-refresh', token_type: 'bearer', expires_in: 3600, expires_at: exp, user };
 
 const results = [];
 const check = (name, fn) => { try { fn(); results.push(['PASS', name]); } catch (error) { results.push(['FAIL', `${name}: ${error.message}`]); } };
-const waitForServer = async () => {
-  for (let i = 0; i < 100; i += 1) {
-    try { const res = await fetch(`${BASE}/app.html`); if (res.ok) return; } catch { /* not up yet */ }
-    await new Promise((resolve) => setTimeout(resolve, 200));
-  }
-  throw new Error('vite did not start');
-};
 
-const vite = spawn('npx', ['vite', '--port', String(PORT), '--strictPort', '--host', '127.0.0.1'], {
-  cwd: repoRoot,
-  env: { ...process.env, VITE_SUPABASE_URL: ORIGIN, VITE_SUPABASE_ANON_KEY: 'stub-anon-key' },
-  stdio: ['ignore', 'pipe', 'pipe'],
-  detached: true,
-});
+// One mutable stub serves every context; tests change it between page loads (tests/e2e/app-stub.mjs).
+// onboarding: the my_onboarding_status answers in order (the last one repeats); 'error' answers HTTP 500.
+// matchIds: members I am matched with (GET /rest/v1/matches); search: the rpc/search_members answer.
+const fresh = () => ({ status: 'caught_up', emptyDeck: false, deckFail: false, matchAll: false, onboarding: [true], onboardingCalls: 0, passed: new Set(), signalled: new Set(), remaining: 30, resetsAt: null, matchIds: [], search: [], report: 'ok', rows: null });
+const st = { ...fresh(), calls: [], bodies: [] };
+const resetStub = (patch = {}) => Object.assign(st, fresh(), patch);
+const stub = await startAppStub({ port: PORT, state: st, deckRows });
 let browser;
 try {
-  await waitForServer();
   browser = await chromium.launch({ headless: true, executablePath: EXECUTABLE });
-  // One mutable stub serves every context; tests change it between page loads.
-  // onboarding: the my_onboarding_status answers in order (the last one repeats); 'error' answers HTTP 500.
-  // matchIds: members I am matched with (GET /rest/v1/matches); search: the rpc/search_members answer.
-  const fresh = () => ({ status: 'caught_up', emptyDeck: false, deckFail: false, matchAll: false, onboarding: [true], onboardingCalls: 0, passed: new Set(), signalled: new Set(), remaining: 30, resetsAt: null, matchIds: [], search: [], report: 'ok', rows: null });
-  const st = { ...fresh(), calls: [], bodies: [] };
-  const resetStub = (patch = {}) => Object.assign(st, fresh(), patch);
-  const makeContext = async (viewport) => {
-    const context = await browser.newContext({ viewport });
-    await context.addInitScript(([key, value]) => { window.localStorage.setItem(key, value); }, ['sb-stub-auth-token', JSON.stringify(session)]);
-    await context.grantPermissions(['clipboard-read', 'clipboard-write'], { origin: BASE });
-    await context.route(`${ORIGIN}/**`, async (route) => {
-      const request = route.request();
-      const url = new URL(request.url());
-      const method = request.method();
-      const pathName = url.pathname;
-      const postData = request.postData();
-      st.calls.push({ method, path: pathName, body: postData });
-      const json = (status, payload) => { const body = JSON.stringify(payload); st.bodies.push({ path: pathName, body }); return route.fulfill({ status, contentType: 'application/json', body, headers: { 'access-control-allow-origin': '*' } }); };
-      if (method === 'OPTIONS') return route.fulfill({ status: 204, headers: { 'access-control-allow-origin': '*', 'access-control-allow-headers': '*', 'access-control-allow-methods': '*' } });
-      if (pathName.startsWith('/auth/v1/')) return json(200, pathName.endsWith('/user') ? user : session);
-      // Member photos: a neutral still from the repo (no real person), so screenshots show a real card.
-      if (pathName.startsWith('/storage/v1/object/public/')) return route.fulfill({ status: 200, contentType: 'image/png', body: STILL, headers: { 'access-control-allow-origin': '*' } });
-      if (pathName === '/rest/v1/profiles') return json(200, (request.headers().accept || '').includes('vnd.pgrst.object') ? ownRow : [ownRow]);
-      const args = JSON.parse(postData || '{}');
-      if (pathName === '/rest/v1/rpc/my_onboarding_status') {
-        const answer = st.onboarding[Math.min(st.onboardingCalls, st.onboarding.length - 1)];
-        st.onboardingCalls += 1;
-        if (answer === 'error') return json(500, { code: 'XX000', message: 'stub failure' });
-        return json(200, [{ interests: 2, points: 20, has_cell: true, place_label: 'Kochi', completed: answer }]);
-      }
-      if (pathName === '/rest/v1/rpc/deck_candidates') {
-        if (st.deckFail) return json(500, { code: 'XX000', message: 'stub failure' });
-        if (st.emptyDeck) return json(200, []);
-        return json(200, (st.rows || deckRows).filter((row) => !st.passed.has(row.id) && !st.signalled.has(row.id)).slice(0, Number(args.p_limit) || 12));
-      }
-      if (pathName === '/rest/v1/rpc/deck_status') return json(200, st.status);
-      if (pathName === '/rest/v1/rpc/my_signal_quota') return json(200, [{ daily_limit: 30, remaining: st.remaining, resets_at: st.resetsAt, live_unanswered: 0, live_limit: 100 }]);
-      if (pathName === '/rest/v1/rpc/send_signal') {
-        st.signalled.add(args.p_to); st.remaining = Math.max(0, st.remaining - 1); st.resetsAt = '2026-10-04T15:00:00+00:00';
-        return json(200, [{ status: st.matchAll ? 'matched' : 'sent', remaining: st.remaining, resets_at: st.resetsAt }]);
-      }
-      if (pathName === '/rest/v1/interaction' && method === 'POST') {
-        if (args.event === 'pass') st.passed.add(args.target_id);
-        return route.fulfill({ status: 201, body: '', headers: { 'access-control-allow-origin': '*' } });
-      }
-      if (pathName === '/rest/v1/rpc/report_member') {
-        if (st.reportHold) await st.reportHold;
-        if (st.report === 'cap') return json(429, { code: 'PT429', message: 'report_cap', details: null, hint: null });
-        st.passed.add(args.p_target);
-        return route.fulfill({ status: 204, body: '', headers: { 'access-control-allow-origin': '*' } });
-      }
-      if (pathName === '/rest/v1/brivia_blocks' && method === 'POST') return route.fulfill({ status: 201, body: '', headers: { 'access-control-allow-origin': '*' } });
-      if (pathName === '/rest/v1/rpc/list_members') return json(200, deckRows);
-      if (pathName === '/rest/v1/rpc/search_members') return json(200, st.search);
-      if (pathName === '/rest/v1/matches' && method === 'GET') return json(200, st.matchIds.map((id) => ({ user1_id: ME, user2_id: id })));
-      if (pathName.startsWith('/rest/v1/')) return json(200, []);
-      return json(200, {});
-    });
-    await context.route((url) => !url.href.startsWith(BASE) && !url.href.startsWith(ORIGIN), (route) => route.abort());
-    await context.routeWebSocket(/stub\.supabase\.local/, (ws) => ws.close());
-    return context;
-  };
+  const makeContext = (viewport) => stub.newContext(browser, viewport);
   const pageErrors = [];
   const open = async (context) => {
     const page = await context.newPage();
@@ -791,7 +709,7 @@ try {
   check(`no uncaught page errors (${pageErrors.length})`, () => assert.deepEqual(pageErrors, []));
 } finally {
   await browser?.close();
-  try { process.kill(-vite.pid, 'SIGTERM'); } catch { vite.kill('SIGTERM'); }
+  await stub.close();
 }
 
 results.forEach(([status, name]) => console.log(`${status}  ${name}`));

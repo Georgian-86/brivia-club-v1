@@ -39,6 +39,19 @@ one `interaction` pass POST per Pass, the A5 neutral pitch line, no wrap-around,
 PLAYWRIGHT_MODULE=/tmp/pw/node_modules/playwright/index.mjs node tests/e2e/deck.spec.mjs
 ```
 
+`app-stub.mjs` (Phase C, Task 2) is the shared stubbed Supabase for `app.html` specs, moved out of `deck.spec.mjs`:
+`startAppStub({ port, state })` starts Vite and returns `{ url, close, calls, newContext, open }`; `state` is the deck.spec
+shape plus `my_interests` (3 rows by default), `community_posts`, `brivia_messages`, `own` and `placeLabel`.
+`app-shell.spec.mjs` (Vite on :5195) checks the one member navigation: the header nav at 1440 px and the tab bar at
+375 px (never both), no duplicate navs, 44 px tab targets with 12 px labels, `aria-current` through `?view=`, `#hash`,
+the `home` alias, a tab click without reload and Back, no sideways scroll with a long name and area, keyboard focus,
+the chat badge in both navs, and axe on the nav. `APP_SHOTS=<dir>` only saves home/posts/chat/profile screenshots at
+375 px and 1440 px (the Phase C before/after review).
+
+```bash
+PLAYWRIGHT_MODULE=/tmp/pw/node_modules/playwright/index.mjs node tests/e2e/app-shell.spec.mjs
+```
+
 `consent.spec.mjs` section 10 (Iteration 4, Task 9) also covers PRIVACY & ACCOUNT with mocked Storage `list`/`remove`
 (`/storage/v1/object/list/<bucket>`, `DELETE /storage/v1/object/<bucket>`), `delete_my_account` (`reauth_required` before any
 Storage call, `storage_not_empty` while files remain, then `ok`, a 500), `set_sensitive_consent` and the password / Google re-auth paths; the `deleted=1` landing is stubbed there, and section 11 checks the real page.

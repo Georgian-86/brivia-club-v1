@@ -35,6 +35,9 @@ import './chat-empty-state.css';
 import './deck.css';
 import './report-dialog.css';
 import './privacy-account.css';
+// One member navigation (Phase C, Task 2): the header and tab bar styles load last so they win over the older rules.
+import './app-shell.css';
+import { navMarkup, markCurrentNav, setChatBadges } from './app-nav.js';
 
 document.body.classList.add('app-auth-pending');
 let appBackGuardActive = false;
@@ -390,6 +393,10 @@ const refreshSignalQuota = async () => {
 // A cap may clear in another tab or after the reset: read the quota again whenever this tab is shown (F4).
 document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') refreshSignalQuota(); });
 
+// One member navigation (Phase C, Task 2): the header and the mobile tab bar are filled from the same model before
+// any [data-nav] click handler is bound and before routeFromUrl() marks the current item.
+document.querySelectorAll('[data-nav-host]').forEach((host) => { host.innerHTML = navMarkup(host.dataset.navHost, document.body.dataset.appView || 'explore'); });
+
 const setView = (view) => {
   const renderedView = view === 'explore' ? 'home' : view;
   document.body.dataset.appView = view;
@@ -400,6 +407,7 @@ const setView = (view) => {
     section.classList.toggle('is-active', isActive);
   });
   document.querySelectorAll('[data-nav]').forEach((button) => button.classList.toggle('is-active', button.dataset.nav === view));
+  markCurrentNav(document, view);
   if (view === 'explore') renderExplore();
   if (view === 'posts') {
     loadCommunityPosts();
@@ -1158,16 +1166,16 @@ const renderChats = () => {
     const unread = last?.from === 'them' && !readChatIds.has(person.id);
     const lastPreview = last?.attachment ? `📎 ${last.attachment.name || 'Attachment'}` : (last?.text || 'Start a conversation');
     return `<div class="chat-row${unread ? ' is-unread' : ''}${selectedChat?.id === person.id ? ' is-selected' : ''}"><button class="chat-row-open" type="button" data-chat-id="${escapeHtml(person.id)}"><span class="member-profile-trigger" data-public-profile-id="${escapeHtml(person.id)}" role="button" tabindex="0" aria-label="Open ${escapeHtml(person.name)} profile">${renderAvatar(person)}</span><span class="chat-row-copy"><strong data-public-profile-id="${escapeHtml(person.id)}">${escapeHtml(person.name)}</strong><span>${escapeHtml(lastPreview)}</span></span><span class="chat-row-meta"><time>${escapeHtml(formatChatTime(last?.createdAt))}</time>${unread ? '<b>1</b>' : ''}</span></button><button class="chat-delete" type="button" data-delete-chat-id="${escapeHtml(person.id)}" aria-label="Delete chat with ${escapeHtml(person.name)}" title="Delete chat"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M4.5 6h11M8 3.5h4M6.5 6l.6 10h5.8l-.6-10M8.5 8.5v5M11.5 8.5v5"/></svg></button></div>`;
-  }).join('') : '<div class="inbox-empty"><strong>No threads found</strong><span>Chats open once a connection is mutual. Send a signal from Explore to start one.</span><button type="button" class="inbox-empty-action" data-nav="explore">EXPLORE PEOPLE ↗</button></div>'}`;
+  }).join('') : '<div class="inbox-empty"><strong>No threads found</strong><span>Chats open once a connection is mutual. Send a signal from Connect to start one.</span><button type="button" class="inbox-empty-action" data-nav="explore">CONNECT WITH PEOPLE ↗</button></div>'}`;
   const inboxScroll = list?.querySelector('.chat-inbox-scroll');
   if (list && inboxScroll) {
     inboxScroll.innerHTML = inboxMarkup;
   } else if (list) {
-    list.innerHTML = `<div class="chat-sidebar-brand"><strong>BRIVIA SOCIETY</strong><span></span><small><i>PEOPLE</i><i>IDEAS</i><i>POSSIBILITIES</i></small></div><div class="chat-inbox-scroll">${inboxMarkup}</div>`;
+    list.innerHTML = `<div class="chat-inbox-scroll">${inboxMarkup}</div>`;
     if (inboxToolbar) list.prepend(inboxToolbar);
   }
   document.querySelector('#chat-count').textContent = `${String(conversations.length).padStart(2, '0')} CONVERSATIONS`;
-  document.querySelector('#chat-badge').textContent = conversations.length;
+  setChatBadges(document, conversations.length);
   list?.querySelectorAll('[data-chat-id]').forEach((button) => button.addEventListener('click', (event) => {
     const profileTrigger = event.target.closest('[data-public-profile-id]');
     const person = matches.find((item) => item.id === button.dataset.chatId);
@@ -1829,9 +1837,6 @@ const renderProfile = () => {
     headerAvatar.textContent = headerInitials(profile.name);
     headerAvatar.setAttribute('aria-label', `Open ${profile.name || 'member'} profile`);
   }
-  // The board avatar was a static "YU" placeholder in app.html (live walkthrough, 2026-10-08).
-  const boardAvatar = document.querySelector('.profile-board-avatar');
-  if (boardAvatar) boardAvatar.innerHTML = avatarImage(profile.photoUrl, profile.name) || escapeHtml(initials(profile.name));
   const coverUrl = normalizeCoverUrl(profile.coverUrl || profile.cover_url || profile.cover_image_url) || defaultCoverUrl;
   ensureProfilePhotoEditor();
   document.querySelector('#profile-name').textContent = profile.name || 'New Member';
@@ -1841,8 +1846,6 @@ const renderProfile = () => {
   const profileCover = document.querySelector('#profile-cover-image');
   const safeOwnCover = safeImageUrl(coverUrl) || safeImageUrl(defaultCoverUrl);
   if (profileCover) profileCover.style.backgroundImage = `url("${safeOwnCover}")`;
-  const profileSidebarCover = document.querySelector('#profile-sidebar-cover');
-  if (profileSidebarCover) profileSidebarCover.style.backgroundImage = `url("${safeOwnCover}")`;
   const avatar = document.querySelector('#profile-avatar');
   if (avatar) avatar.innerHTML = avatarImage(profile.photoUrl, profile.name) || escapeHtml(initials(profile.name));
   if (avatar && profile.photoName) avatar.title = profile.photoName;
@@ -2470,7 +2473,6 @@ document.querySelector('#pitch-form')?.addEventListener('submit', async (event) 
   }
 });
 document.querySelector('#logout-button')?.addEventListener('click', logoutMember);
-document.querySelector('#app-logout-button')?.addEventListener('click', logoutMember);
 document.addEventListener('keydown', (event) => {
   if (event.key === 'Escape') { closeOverlays(); closeDiscoveryFilters(); }
   // A like now sends a connection request, so arrow keys must not fire it while typing or with a dialog open.
@@ -2606,22 +2608,3 @@ loadSupabaseCommunity().catch((error) => {
   window.location.replace('/auth.html?profile-check=failed');
 });
 
-/* Keep the internal explore route/data names stable while presenting the
-   member-facing navigation as CONNECT. */
-const renameExploreToConnect = () => {
-  document.querySelectorAll('[data-nav="explore"], .app-nav-button[href="/explore.html"]').forEach((node) => {
-    const label = [...node.childNodes].find((child) => child.nodeType === Node.TEXT_NODE && child.textContent.trim());
-    if (label) label.textContent = 'CONNECT';
-  });
-  document.querySelectorAll('.inbox-empty-action[data-nav="explore"]').forEach((node) => {
-    const label = [...node.childNodes].find((child) => child.nodeType === Node.TEXT_NODE && child.textContent.trim());
-    if (label) label.textContent = 'CONNECT PEOPLE ';
-  });
-  // Write only on change: an unconditional write is itself a mutation and re-triggers this observer forever.
-  document.querySelectorAll('.inbox-empty span').forEach((node) => {
-    const renamed = node.textContent.replace(/\bExplore\b/g, 'Connect');
-    if (renamed !== node.textContent) node.textContent = renamed;
-  });
-};
-renameExploreToConnect();
-new MutationObserver(renameExploreToConnect).observe(document.body, { childList: true, subtree: true });

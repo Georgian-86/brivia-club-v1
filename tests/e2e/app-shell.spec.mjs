@@ -1,0 +1,216 @@
+// Phase C, Task 2: one member navigation (header at desktop, tab bar at <= 780 px), against stubbed Supabase.
+// Never touches a real Supabase project. Playwright is NOT a repo dependency; see tests/e2e/README.md.
+//
+//   PLAYWRIGHT_MODULE=/path/to/node_modules/playwright/index.mjs node tests/e2e/app-shell.spec.mjs
+//
+// Asserts (375 px and 1440 px unless noted):
+// * exactly one visible member nav: the header nav at 1440 px, the tab bar at 375 px, on every view;
+// * no .profile-sidebar, .profile-board-nav, #app-logout-button or .chat-sidebar-brand in the DOM;
+// * tab bar items are at least 44 x 44 px with labels of at least 12 px (375 px);
+// * ?view=chat, #profile, ?view=home, a tab click (no reload) and Back: aria-current matches the visible [data-view];
+// * a long name and area cause no horizontal page scroll (375 px);
+// * Tab reaches each tab bar item and its focus outline is visible (375 px);
+// * a conversation shows the chat badge in header and tab bar; no conversation hides it;
+// * axe (full default rule set): no violations on the nav.
+// APP_SHOTS=<dir> only saves full-page screenshots of home, posts, chat and profile at 375 px and 1440 px, then exits
+// (the Phase C before/after review), and runs no checks.
+import { mkdirSync } from 'node:fs';
+import assert from 'node:assert/strict';
+import path from 'node:path';
+import { axeViolations } from './a11y.mjs';
+import { startAppStub } from './app-stub.mjs';
+
+const { chromium } = await import(process.env.PLAYWRIGHT_MODULE || 'playwright');
+const PORT = Number(process.env.E2E_PORT || 5195);
+const EXECUTABLE = process.env.CHROMIUM_PATH || '/opt/pw-browsers/chromium';
+const SHOTS = process.env.APP_SHOTS || '';
+const A = 'aaaaaaaa-aaaa-4aaa-8aaa-000000000001';
+const NARROW = { width: 375, height: 812 };
+const WIDE = { width: 1440, height: 900 };
+const VIEWS = ['home', 'posts', 'chat', 'profile'];
+// The nav item that is current for a rendered [data-view] section: the deck section is the Connect tab.
+const NAV_FOR_VIEW = { home: 'explore', posts: 'posts', chat: 'chat', profile: 'profile' };
+
+const results = [];
+const check = (name, fn) => { try { fn(); results.push(['PASS', name]); } catch (error) { results.push(['FAIL', `${name}: ${error.message}`]); } };
+
+const st = { matchIds: [] };
+const stub = await startAppStub({ port: PORT, state: st });
+const pageErrors = [];
+let browser;
+try {
+  browser = await chromium.launch({ headless: true, executablePath: EXECUTABLE });
+  const open = async (viewport, pagePath = '/app.html') => {
+    const context = await stub.newContext(browser, viewport, { reducedMotion: 'reduce' });
+    const page = await stub.open(context, { path: pagePath, errors: pageErrors });
+    return { context, page };
+  };
+  const settle = (page) => page.waitForTimeout(700);
+
+  if (SHOTS) {
+    mkdirSync(SHOTS, { recursive: true });
+    st.matchIds = [A];
+    for (const [tag, viewport] of [['375', NARROW], ['1440', WIDE]]) {
+      for (const view of VIEWS) {
+        const { context, page } = await open(viewport, `/app.html?view=${view === 'home' ? 'explore' : view}`);
+        await page.waitForTimeout(1500);
+        await page.screenshot({ path: path.join(SHOTS, `app-${view}-${tag}.png`), fullPage: true });
+        await context.close();
+      }
+    }
+    console.log(`saved ${VIEWS.length * 2} screenshots to ${SHOTS}`);
+  } else {
+    // Which member navs are visible, and which section is shown.
+    const navState = (page) => page.evaluate(() => {
+      const visible = (el) => { if (!el) return false; const s = getComputedStyle(el); const r = el.getBoundingClientRect(); return s.display !== 'none' && s.visibility !== 'hidden' && r.width > 0 && r.height > 0; };
+      const navs = [...document.querySelectorAll('nav, [data-nav-host]')].filter((el) => el.querySelector('[data-nav]') && visible(el));
+      const current = (host) => [...document.querySelectorAll(`[data-nav-host="${host}"] [aria-current="page"]`)].map((el) => el.dataset.nav);
+      const shown = [...document.querySelectorAll('[data-view]')].filter((el) => !el.hidden).map((el) => el.dataset.view);
+      return {
+        visibleNavs: [...new Set(navs.map((el) => el.dataset.navHost || el.className || el.tagName))],
+        headerItems: [...document.querySelectorAll('[data-nav-host="header"] [data-nav]')].map((el) => el.dataset.nav),
+        tabbarItems: [...document.querySelectorAll('[data-nav-host="tabbar"] [data-nav]')].map((el) => el.dataset.nav),
+        header: current('header'), tabbar: current('tabbar'), shown,
+      };
+    });
+    const routeMatches = (s, expectedView) => {
+      assert.deepEqual(s.shown, [expectedView]);
+      assert.deepEqual(s.header, [NAV_FOR_VIEW[expectedView]]);
+      assert.deepEqual(s.tabbar, [NAV_FOR_VIEW[expectedView]]);
+    };
+
+    // 1. Exactly one visible member nav, per viewport and view.
+    for (const [tag, viewport, expected] of [['1440', WIDE, 'header'], ['375', NARROW, 'tabbar']]) {
+      const { context, page } = await open(viewport);
+      for (const view of VIEWS) {
+        await page.evaluate((v) => document.querySelector(`[data-nav-host] [data-nav="${v === 'home' ? 'explore' : v}"]`)?.click(), view);
+        await settle(page);
+        const s = await navState(page);
+        check(`${tag}: ${view} shows exactly one member nav, the ${expected} (${JSON.stringify(s.visibleNavs)})`, () => assert.deepEqual(s.visibleNavs, [expected]));
+      }
+      const s = await navState(page);
+      check(`${tag}: header and tab bar list explore, posts, chat, profile (${JSON.stringify([s.headerItems, s.tabbarItems])})`, () => {
+        assert.deepEqual(s.headerItems, ['explore', 'posts', 'chat', 'profile']);
+        assert.deepEqual(s.tabbarItems, ['explore', 'posts', 'chat', 'profile']);
+      });
+      // 2. The duplicate navs are gone (the chat view has been rendered above).
+      const gone = await page.evaluate(() => ['.profile-sidebar', '.profile-board-nav', '#app-logout-button', '.chat-sidebar-brand'].filter((sel) => document.querySelector(sel)));
+      check(`${tag}: no .profile-sidebar, .profile-board-nav, #app-logout-button or .chat-sidebar-brand (${gone.join(', ')})`, () => assert.deepEqual(gone, []));
+      const filters = await page.evaluate(() => { const b = document.querySelector('#open-discovery-filters'); return { inHeading: Boolean(b?.closest('.home-heading')), controls: b?.getAttribute('aria-controls'), expanded: b?.getAttribute('aria-expanded'), label: b?.getAttribute('aria-label') }; });
+      check(`${tag}: #open-discovery-filters sits in .home-heading with its aria attributes (${JSON.stringify(filters)})`, () => assert.deepEqual(filters, { inHeading: true, controls: 'discovery-filter-drawer', expanded: 'false', label: 'Open discovery filters' }));
+      // 8. axe on the visible nav (full default rule set).
+      await page.evaluate(() => document.querySelector('[data-nav-host] [data-nav="explore"]')?.click());
+      await settle(page);
+      const navSel = expected === 'header' ? '.app-header-nav' : '.app-tabbar';
+      const axe = await axeViolations(page, { include: navSel }).catch((error) => [`axe could not run: ${error.message.split('\n')[0]}`]);
+      check(`${tag}: axe finds no violations on ${navSel} (${axe.join(' | ')})`, () => assert.deepEqual(axe, []));
+      await context.close();
+    }
+
+    // 3. Tab bar targets and labels (375 px).
+    {
+      const { context, page } = await open(NARROW);
+      const items = await page.evaluate(() => [...document.querySelectorAll('.app-tabbar [data-nav]')].map((el) => {
+        const r = el.getBoundingClientRect();
+        const sizes = [...el.querySelectorAll('*')].filter((n) => [...n.childNodes].some((c) => c.nodeType === 3 && c.textContent.trim()) && !n.closest('[hidden]')).map((n) => parseFloat(getComputedStyle(n).fontSize));
+        const own = [...el.childNodes].some((c) => c.nodeType === 3 && c.textContent.trim()) ? [parseFloat(getComputedStyle(el).fontSize)] : [];
+        return { nav: el.dataset.nav, w: Math.round(r.width), h: Math.round(r.height), sizes: [...own, ...sizes], label: el.textContent.trim() };
+      }));
+      check(`375: four tab bar items, each >= 44x44 px with >= 12 px labels (${JSON.stringify(items)})`, () => {
+        assert.equal(items.length, 4);
+        items.forEach((it) => { assert.ok(it.w >= 44 && it.h >= 44, `${it.nav} is ${it.w}x${it.h}`); assert.ok(it.sizes.length >= 1 && it.sizes.every((s) => s >= 12), `${it.nav} label ${it.sizes}`); });
+      });
+      check(`375: tab labels read Connect, Explore, Chat, Profile (${items.map((i) => i.label).join(', ')})`, () => assert.deepEqual(items.map((i) => i.label), ['Connect', 'Explore', 'Chat', 'Profile']));
+      const bar = await page.evaluate(() => { const el = document.querySelector('.app-tabbar'); if (!el) return { missing: true }; const r = el.getBoundingClientRect(); return { bottom: Math.round(r.bottom), vh: window.innerHeight, position: getComputedStyle(el).position }; });
+      check(`375: the tab bar is fixed to the bottom (${JSON.stringify(bar)})`, () => { assert.equal(bar.position, 'fixed'); assert.equal(bar.bottom, bar.vh); });
+
+      // 6. Keyboard: Tab reaches each tab bar item, with a visible outline.
+      await page.evaluate(() => { document.activeElement?.blur(); window.scrollTo(0, 0); });
+      const reached = {};
+      for (let i = 0; i < 120 && Object.keys(reached).length < 4; i += 1) {
+        await page.keyboard.press('Tab');
+        const f = await page.evaluate(() => {
+          const el = document.activeElement;
+          if (!el?.closest('.app-tabbar')) return null;
+          const s = getComputedStyle(el);
+          return { nav: el.dataset.nav, outline: `${s.outlineStyle} ${s.outlineWidth}`, visible: s.outlineStyle !== 'none' && parseFloat(s.outlineWidth) >= 2 };
+        });
+        if (f && !reached[f.nav]) reached[f.nav] = f;
+      }
+      check(`375: Tab reaches every tab bar item with a visible focus outline (${JSON.stringify(reached)})`, () => {
+        assert.deepEqual(Object.keys(reached).sort(), ['chat', 'explore', 'posts', 'profile']);
+        Object.values(reached).forEach((f) => assert.ok(f.visible, `${f.nav}: ${f.outline}`));
+      });
+      await context.close();
+    }
+
+    // 4. Routing: aria-current follows the visible [data-view] (URL entry, hash, alias, click, Back).
+    for (const [tag, viewport] of [['1440', WIDE], ['375', NARROW]]) {
+      const { context, page } = await open(viewport, '/app.html?view=chat');
+      let s = await navState(page);
+      check(`${tag}: ?view=chat shows chat and Chat is current (${JSON.stringify(s)})`, () => routeMatches(s, 'chat'));
+      await page.goto(`${stub.url}/app.html#profile`, { waitUntil: 'domcontentloaded' });
+      await page.waitForFunction(() => !document.body.classList.contains('app-auth-pending'), null, { timeout: 15000 });
+      s = await navState(page);
+      check(`${tag}: #profile shows profile and Profile is current (${JSON.stringify(s)})`, () => routeMatches(s, 'profile'));
+      await page.goto(`${stub.url}/app.html?view=home`, { waitUntil: 'domcontentloaded' });
+      await page.waitForFunction(() => !document.body.classList.contains('app-auth-pending'), null, { timeout: 15000 });
+      await settle(page);
+      s = await navState(page);
+      check(`${tag}: ?view=home shows the deck and Connect is current (${JSON.stringify(s)})`, () => routeMatches(s, 'home'));
+      await page.evaluate(() => { window.__noReload = true; });
+      const host = tag === '1440' ? 'header' : 'tabbar';
+      await page.locator(`[data-nav-host="${host}"] [data-nav="posts"]`).click({ timeout: 5000 }).catch((error) => console.log(`click failed: ${error.message.split('\n')[0]}`));
+      await settle(page);
+      s = await navState(page);
+      const kept = await page.evaluate(() => ({ marker: window.__noReload === true, url: location.search }));
+      check(`${tag}: clicking Explore in the ${host} switches without a reload (${JSON.stringify(kept)}; ${JSON.stringify(s)})`, () => { routeMatches(s, 'posts'); assert.equal(kept.marker, true); assert.equal(kept.url, '?view=posts'); });
+      await page.goBack();
+      await settle(page);
+      s = await navState(page);
+      const back = await page.evaluate(() => ({ marker: window.__noReload === true, url: location.search }));
+      check(`${tag}: Back returns to the deck with Connect current (${JSON.stringify(back)}; ${JSON.stringify(s)})`, () => { routeMatches(s, 'home'); assert.equal(back.marker, true); });
+      await context.close();
+    }
+
+    // 5. A long name and area: no horizontal page scroll at 375 px on any view.
+    st.own = { id: '11111111-1111-4111-8111-111111111111', name: 'Maximiliana Alexandrina Featherstonehaugh-Worthington', full_name: 'Maximiliana Alexandrina Featherstonehaugh-Worthington', email: 'alex@test.brivia.club', phone: '', city: null, state: null, experience: 'Founder', skills: ['Badminton'], looking_for: ['Friends'], created_at: new Date(Date.now() - 9e6).toISOString() };
+    st.placeLabel = 'Thiruvananthapuram Technopark Kazhakkoottam Phase Three';
+    {
+      const { context, page } = await open(NARROW);
+      for (const view of VIEWS) {
+        await page.evaluate((v) => document.querySelector(`.app-tabbar [data-nav="${v === 'home' ? 'explore' : v}"]`)?.click(), view);
+        await settle(page);
+        const sw = await page.evaluate(() => ({ scroll: document.documentElement.scrollWidth, client: document.documentElement.clientWidth }));
+        check(`375: long name and area, ${view}: no horizontal page scroll (${JSON.stringify(sw)})`, () => assert.ok(sw.scroll <= sw.client));
+      }
+      await context.close();
+    }
+    delete st.own; delete st.placeLabel;
+
+    // 7. The chat badge: hidden with no conversation; shown in header and tab bar with one.
+    for (const [label, matchIds, expectShown] of [['no conversation', [], false], ['one conversation', [A], true]]) {
+      st.matchIds = matchIds;
+      const { context, page } = await open(WIDE);
+      if (expectShown) await page.waitForFunction(() => [...document.querySelectorAll('[data-chat-badge]')].some((b) => !b.hidden), null, { timeout: 8000 }).catch(() => {});
+      else await settle(page);
+      const badges = await page.evaluate(() => [...document.querySelectorAll('[data-chat-badge]')].map((b) => ({ host: b.closest('[data-nav-host]')?.dataset.navHost, hidden: b.hidden, text: b.textContent.trim() })));
+      check(`${label}: the chat badge in header and tab bar (${JSON.stringify(badges)})`, () => {
+        assert.deepEqual(badges.map((b) => b.host).sort(), ['header', 'tabbar']);
+        badges.forEach((b) => { assert.equal(b.hidden, !expectShown); if (expectShown) assert.equal(b.text, '1'); });
+        assert.equal(badges.length, 2);
+      });
+      await context.close();
+    }
+    st.matchIds = [];
+    check(`no uncaught page errors (${pageErrors.join(' | ')})`, () => assert.deepEqual(pageErrors, []));
+  }
+} finally {
+  await browser?.close();
+  await stub.close();
+}
+
+results.forEach(([status, name]) => console.log(`${status}  ${name}`));
+const failed = results.filter(([status]) => status === 'FAIL').length;
+if (!SHOTS) console.log(`\n${results.length - failed} passed, ${failed} failed`);
+process.exit(failed ? 1 : 0);

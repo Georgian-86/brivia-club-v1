@@ -31,33 +31,6 @@
   body.app-body[data-app-view="chat"] .app-topbar .app-brand{margin-left:0}
   body.app-body .app-menu-button{top:calc(27px + env(safe-area-inset-top, 0px));left:12px;width:34px;height:34px}
   body.app-body .app-topbar .app-avatar-button{top:calc(27px + env(safe-area-inset-top, 0px));right:12px;width:32px;height:32px}
-  body.app-body .app-header-nav{
-    position:static!important;
-    grid-column:1/-1;
-    grid-row:2;
-    display:flex!important;
-    width:100%;
-    align-items:center;
-    justify-content:space-between;
-    gap:0;
-    padding:0 13px!important;
-    border:0!important;
-    background:transparent!important;
-    box-shadow:none!important;
-    transform:none!important;
-  }
-  body.app-body .app-header-nav .app-nav-button,
-  body.app-body:not(.app-subview) .app-header-nav .app-nav-button{
-    width:auto;
-    min-width:0;
-    height:36px;
-    flex:0 0 auto;
-    padding:8px 2px;
-    font-size:8px;
-    letter-spacing:.12em;
-  }
-  body.app-body .app-header-nav .app-nav-button span{display:none!important}
-  body.app-body .app-header-nav .app-nav-button i{display:none!important}
   body.app-subview .app-view.is-active{min-height:calc(100svh - 96px - env(safe-area-inset-top, 0px));padding-bottom:32px}
   body.app-body .app-view{padding:24px 14px 32px}
   body.app-body .view-topline{font-size:8px;letter-spacing:.12em}
@@ -124,13 +97,7 @@
     background:#b09a7e;
   }
   body:has(.app-view[data-view="profile"]:not([hidden])) .profile-shell{display:block;width:100%;height:auto}
-  body:has(.app-view[data-view="profile"]:not([hidden])) .profile-sidebar{display:none}
   body:has(.app-view[data-view="profile"]:not([hidden])) .profile-board{display:flex;gap:10px;width:100%;min-width:0}
-  body:has(.app-view[data-view="profile"]:not([hidden])) .profile-board-nav{position:sticky;top:10px;z-index:8;min-height:52px;padding:0 11px;border-radius:13px}
-  body:has(.app-view[data-view="profile"]:not([hidden])) .profile-board-nav nav{min-width:0;flex:1;justify-content:space-between;gap:8px}
-  body:has(.app-view[data-view="profile"]:not([hidden])) .profile-board-nav nav a,
-  body:has(.app-view[data-view="profile"]:not([hidden])) .profile-board-nav nav button{font-size:8px;letter-spacing:.1em}
-  body:has(.app-view[data-view="profile"]:not([hidden])) .profile-board-user{margin-left:9px}
   body:has(.app-view[data-view="profile"]:not([hidden])) .profile-board-content{overflow:visible;padding:0}
   body:has(.app-view[data-view="profile"]:not([hidden])) .profile-board-content .profile-hero{
     position:relative;
@@ -169,18 +136,11 @@
 
   body.app-body .app-overlay{padding:10px}
   body.app-body .info-panel,body.app-body .pitch-panel{width:100%;max-height:calc(100svh - 20px);padding:30px 18px calc(24px + env(safe-area-inset-bottom, 0px));-webkit-overflow-scrolling:touch}
-
-  body.app-body .app-bottom-nav{height:calc(78px + env(safe-area-inset-bottom, 0px));padding-bottom:calc(8px + env(safe-area-inset-bottom, 0px))}
 }
 
 @media (max-width:360px){
   body.app-body .app-topbar{height:calc(91px + env(safe-area-inset-top, 0px));grid-template-rows:51px 40px}
-  body.app-body .app-header-nav{padding:0 6px!important}
-  body.app-body .app-header-nav .app-nav-button{font-size:7px;letter-spacing:.08em}
   body.app-body .app-view[data-view="home"]{min-height:calc(100svh - 91px - env(safe-area-inset-top, 0px))}
   body.app-subview .app-view.is-active{min-height:calc(100svh - 91px - env(safe-area-inset-top, 0px))}
   body.app-body .swipe-card{min-height:405px}
-  body:has(.app-view[data-view="profile"]:not([hidden])) .profile-board-nav nav{gap:5px}
-  body:has(.app-view[data-view="profile"]:not([hidden])) .profile-board-nav nav a,
-  body:has(.app-view[data-view="profile"]:not([hidden])) .profile-board-nav nav button{font-size:7px;letter-spacing:.06em}
 }

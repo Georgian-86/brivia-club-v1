@@ -291,13 +291,10 @@
     overflow:visible!important;
   }
   body.app-body .app-brand{min-width:0;overflow:hidden;text-overflow:ellipsis}
-  body.app-body .app-header-nav{min-width:0;overflow:hidden}
-  body.app-body .app-header-nav .app-nav-button{min-height:36px}
   body.app-body .app-menu-button{z-index:40}
   body.app-body .swipe-actions .swipe-pass{font-size:34px!important}
   body.app-body .app-topbar .app-avatar-button,
-  body.app-body .app-topbar .app-notification-button,
-  body.app-body .app-topbar .app-logout-button{
+  body.app-body .app-topbar .app-notification-button{
     top:calc(27px + env(safe-area-inset-top, 0px))!important;
     width:28px!important;
     height:28px!important;
@@ -384,11 +381,6 @@
   body.app-body[data-app-view="profile"] .profile-shell,
   body.app-body[data-app-view="profile"] .profile-board,
   body.app-body[data-app-view="profile"] .profile-board-content{width:100%;min-width:0}
-  body.app-body[data-app-view="profile"] .profile-board-nav{width:100%;min-width:0;overflow:hidden}
-  body.app-body[data-app-view="profile"] .profile-board-nav nav{min-width:0;overflow:hidden}
-  body.app-body[data-app-view="profile"] .profile-board-nav nav a,
-  body.app-body[data-app-view="profile"] .profile-board-nav nav button{min-height:34px;white-space:nowrap}
-  body.app-body[data-app-view="profile"] .profile-board-user{flex:0 0 auto}
   body.app-body[data-app-view="profile"] .profile-board-content .profile-hero{width:100%;min-width:0;overflow:hidden}
   body.app-body[data-app-view="profile"] .profile-board-content .profile-hero-copy{right:12px;left:12px;min-width:0;padding-right:104px!important}
   body.app-body[data-app-view="profile"] .profile-board-content .profile-hero h1{max-width:100%;overflow-wrap:anywhere;font-size:clamp(32px,10.5vw,50px)}
@@ -541,8 +533,6 @@
 }
 
 @media (max-width:360px){
-  body.app-body .app-header-nav{padding-left:2px!important;padding-right:2px!important}
-  body.app-body .app-header-nav .app-nav-button{font-size:7px;letter-spacing:.06em}
   body.app-body .app-brand{font-size:16px}
   body.app-body .swipe-card{min-height:390px}
   body.app-body .chat-compose-tools{gap:2px}
@@ -859,14 +849,6 @@
   }
 }
 
-/* The sidebar masthead is useful on the wider chat layout, but it crowds the
-   mobile inbox. Keep the mobile chat focused on the conversation list. */
-@media (max-width:700px){
-  body.app-body[data-app-view="chat"] .app-view[data-view="chat"] #chat-list .chat-sidebar-brand{
-    display:none!important;
-  }
-}
-
 /* Keep the profile photo fully inside the mobile hero and align the edit
    control with the lower edge of the settings button. */
 @media (max-width:700px){
@@ -889,17 +871,6 @@
   body.app-body:has(.app-view[data-view="profile"]:not([hidden])) .profile-board-content .profile-hero-actions .profile-photo-editor{
     align-self:flex-end!important;
     margin-top:0!important;
-  }
-
-  /* Anchor links do not vertically center their text inside the mobile
-     navigation's fixed-height hit area the way buttons do. */
-  body.app-body:has(.app-view[data-view="profile"]:not([hidden])) .profile-board-nav nav a,
-  body.app-body:has(.app-view[data-view="profile"]:not([hidden])) .profile-board-nav nav button{
-    display:flex!important;
-    align-items:center!important;
-    justify-content:center!important;
-    height:34px!important;
-    line-height:1!important;
   }
 }
 

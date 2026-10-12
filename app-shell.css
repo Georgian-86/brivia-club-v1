@@ -1,0 +1,176 @@
+/* One member navigation (Phase C, Task 2). The header (brand, nav, notifications, avatar) on every view, and a tab bar
+   fixed to the bottom at <= 780 px where the header nav is hidden. Tokens only (tokens.css): no raw colours or fonts.
+   Loaded last in app.js so it wins over the older header rules. */
+
+/* Header ---------------------------------------------------------------------------------------------------------- */
+body.app-body .app-topbar .app-brand{margin-left:0}
+
+body.app-body .app-header-nav{
+  position:absolute;
+  top:50%;
+  left:50%;
+  display:flex;
+  align-items:center;
+  gap:var(--space-5);
+  transform:translate(-50%,-50%);
+  white-space:nowrap;
+}
+body.app-body .app-header-nav .app-nav-button{
+  position:relative;
+  display:inline-flex;
+  min-width:0;
+  min-height:44px;
+  flex-direction:row;
+  align-items:center;
+  gap:var(--space-1);
+  padding:0 var(--space-2);
+  border:0;
+  background:transparent;
+  color:var(--color-ink-soft);
+  font-family:var(--font-body);
+  font-size:var(--text-12);
+  font-weight:600;
+  letter-spacing:.18em;
+  line-height:1;
+  text-decoration:none;
+  text-transform:uppercase;
+  transition:color var(--motion-fast) var(--ease);
+}
+body.app-body .app-header-nav .app-nav-icon{display:none}
+body.app-body .app-header-nav .app-nav-button::after{
+  position:absolute;
+  right:var(--space-2);
+  bottom:var(--space-2);
+  left:var(--space-2);
+  height:1px;
+  background:currentColor;
+  content:"";
+  opacity:0;
+  transition:opacity var(--motion-fast) var(--ease);
+}
+body.app-body .app-header-nav .app-nav-button:hover,
+body.app-body .app-header-nav .app-nav-button[aria-current="page"]{color:var(--color-wine)}
+body.app-body .app-header-nav .app-nav-button[aria-current="page"]::after{opacity:1}
+
+/* Notifications sit just left of the avatar on every view (the header logout button is gone). */
+body.app-body .app-topbar .app-notification-button{display:grid;right:calc(clamp(20px,5vw,72px) + 50px)}
+
+/* Shared item details ---------------------------------------------------------------------------------------------- */
+body.app-body .app-nav-button .nav-badge{
+  position:static;
+  display:inline-grid;
+  min-width:20px;
+  height:20px;
+  place-items:center;
+  padding:0 var(--space-1);
+  border-radius:var(--radius-pill);
+  background:var(--color-wine);
+  color:var(--color-cream);
+  font-family:var(--font-body);
+  font-size:var(--text-12);
+  font-style:normal;
+  font-weight:600;
+  letter-spacing:0;
+  line-height:1;
+}
+body.app-body .app-nav-button .nav-badge[hidden]{display:none}
+/* app.css sizes every .app-nav-button span as a 22 px glyph; the label is text, so it inherits the item's size. */
+body.app-body .app-nav-button .app-nav-label{display:inline;width:auto;height:auto;font-size:inherit;line-height:inherit;transform:none}
+body.app-body .app-nav-button:focus-visible{outline:2px solid var(--color-wine);outline-offset:2px}
+
+/* Tab bar ---------------------------------------------------------------------------------------------------------- */
+.app-tabbar{display:none}
+
+/* Discovery filters: the control lives in the deck heading, not the header. */
+body.app-body .home-heading .app-menu-button{
+  position:relative;
+  top:auto;
+  left:auto;
+  z-index:1;
+  display:grid!important;
+  width:44px;
+  height:44px;
+  margin:0 0 var(--space-4);
+  transform:none;
+}
+body.app-body .home-heading .app-menu-button:hover,
+body.app-body .home-heading .app-menu-button[aria-expanded="true"]{transform:scale(1.04)}
+body.app-body .home-heading .app-menu-button:focus-visible{outline:2px solid var(--color-wine);outline-offset:2px}
+
+/* The profile sits under the shared header now: no full-screen board, no sidebar column. */
+body.app-body .app-view[data-view="profile"]{height:auto;overflow:visible}
+body.app-body .app-view[data-view="profile"] .profile-shell{display:block;height:auto}
+body.app-body .app-view[data-view="profile"] .profile-board-content{overflow:visible}
+
+@media (max-width:780px){
+  body.app-body .app-header-nav{display:none}
+
+  /* One header row: brand, then notifications and avatar. */
+  body.app-body .app-topbar{
+    grid-template-rows:54px;
+    height:calc(54px + env(safe-area-inset-top, 0px));
+  }
+  body.app-body .app-topbar .app-notification-button{right:56px}
+
+  body.app-body .app-tabbar{
+    position:fixed;
+    right:0;
+    bottom:0;
+    left:0;
+    z-index:90;
+    display:grid;
+    grid-template-columns:repeat(4,minmax(0,1fr));
+    padding:var(--space-1) var(--space-2);
+    padding-bottom:env(safe-area-inset-bottom, 0px);
+    border-top:1px solid var(--color-line);
+    background:var(--color-cream);
+  }
+  body.app-body .app-tabbar .app-nav-button{
+    position:relative;
+    display:flex;
+    min-width:44px;
+    min-height:56px;
+    flex-direction:column;
+    align-items:center;
+    justify-content:center;
+    gap:2px;
+    padding:var(--space-1) 0;
+    border:0;
+    border-radius:var(--radius-m);
+    background:transparent;
+    color:var(--color-ink-soft);
+    font-family:var(--font-body);
+    font-size:var(--text-12);
+    font-weight:600;
+    letter-spacing:.04em;
+    line-height:1.2;
+    text-decoration:none;
+    transition:color var(--motion-fast) var(--ease);
+  }
+  body.app-body .app-tabbar .app-nav-icon{
+    width:24px;
+    height:24px;
+    fill:none;
+    stroke:currentColor;
+    stroke-width:1.6;
+    stroke-linecap:round;
+    stroke-linejoin:round;
+  }
+  body.app-body .app-tabbar .app-nav-button[aria-current="page"]{color:var(--color-wine)}
+  body.app-body .app-tabbar .app-nav-button[aria-current="page"] .app-nav-label{font-weight:700}
+  body.app-body .app-tabbar .app-nav-button:focus-visible{outline-offset:-2px}
+  body.app-body .app-tabbar .nav-badge{position:absolute;top:var(--space-1);left:calc(50% + 6px)}
+
+  /* Keep content clear of the fixed tab bar. */
+  body.app-body .app-main{padding-bottom:calc(64px + env(safe-area-inset-bottom, 0px))}
+}
+/* An open thread fills the phone between the one-row header and the tab bar. */
+@media (max-width:700px){
+  body.app-body[data-app-view="chat"]:has(#chat-window:not([hidden])) .app-view[data-view="chat"]{
+    height:calc(100svh - 54px - 64px - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px));
+  }
+}
+/* Between 701 and 780 px the inbox is a fixed full-height panel (app-navigation.css): end it above the tab bar. */
+@media (min-width:701px) and (max-width:780px){
+  body.app-body[data-app-view="chat"] .app-view[data-view="chat"].is-active{bottom:calc(64px + env(safe-area-inset-bottom, 0px))!important}
+}

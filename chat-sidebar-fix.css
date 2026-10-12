@@ -21,11 +21,6 @@
   .app-view[data-view="chat"] #chat-list>.inbox-toolbar .inbox-search{width:100%;}
   .app-view[data-view="chat"] #chat-list{display:flex!important;flex-direction:column!important;padding:18px 0 0!important;overflow:hidden!important}
   .app-view[data-view="chat"] #chat-list:before{display:none!important}
-  .app-view[data-view="chat"] #chat-list .chat-sidebar-brand{display:block;flex:0 0 106px;padding:3px 24px 0;color:var(--brivia-ink)}
-  .app-view[data-view="chat"] #chat-list .chat-sidebar-brand strong{display:block;font-family:Georgia,'Times New Roman',serif;font-size:31px;font-weight:400;letter-spacing:-1.5px;line-height:1}
-  .app-view[data-view="chat"] #chat-list .chat-sidebar-brand span{display:block;width:19px;height:1px;margin:11px 0 7px;background:var(--brivia-line)}
-  .app-view[data-view="chat"] #chat-list .chat-sidebar-brand small{display:block;color:rgba(90,6,31,.67);font-family:Georgia,'Times New Roman',serif;font-size:7px;letter-spacing:.22em;line-height:1.55}
-  .app-view[data-view="chat"] #chat-list .chat-sidebar-brand small i{display:block;font-style:normal}
   .app-view[data-view="chat"] #chat-list .chat-inbox-scroll{display:block;flex:1;min-height:0;overflow-y:scroll;overflow-x:hidden;padding:22px 0 88px;scrollbar-width:thin;scrollbar-color:var(--brivia-wine) rgba(90,6,31,.08)}
   .app-view[data-view="chat"] #chat-list .chat-inbox-scroll::-webkit-scrollbar{width:7px}
   .app-view[data-view="chat"] #chat-list .chat-inbox-scroll::-webkit-scrollbar-track{background:rgba(90,6,31,.08)}

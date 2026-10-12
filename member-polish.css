@@ -295,62 +295,6 @@
   }
 }
 
-/* Keep all four bottom-nav icons visually equal; the native glyphs render smaller than their labels. */
-.app-bottom-nav {
-  height: 84px;
-  padding-top: 8px;
-}
-
-.app-nav-button {
-  min-width: 70px;
-  gap: 4px;
-  font-size: 9px;
-}
-
-.app-nav-button span {
-  display: grid;
-  width: 31px;
-  height: 31px;
-  place-items: center;
-  font-size: 29px;
-  line-height: 31px;
-  transform: scale(1.08);
-  transform-origin: center;
-}
-
-.app-nav-button.is-active span {
-  filter: drop-shadow(0 2px 4px rgba(90, 6, 31, .16));
-}
-
-.app-nav-button i {
-  top: -2px;
-  right: 8px;
-}
-
-@media(max-width:560px) {
-  .app-bottom-nav {
-    height: 84px;
-    gap: 10px;
-    padding-right: 9px;
-    padding-left: 9px;
-  }
-
-  .app-nav-button {
-    min-width: 64px;
-  }
-
-  .app-nav-button span {
-    width: 29px;
-    height: 29px;
-    font-size: 27px;
-    line-height: 29px;
-  }
-
-  .app-nav-button i {
-    right: 3px;
-  }
-}
-
 /* Home actions: keep the icon inside the circle and move the label below it. */
 .app-view[data-view="home"] .swipe-actions {
   align-items: flex-start;
