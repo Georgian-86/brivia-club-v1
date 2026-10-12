@@ -57,3 +57,9 @@ test('markLoaded removes .skeleton at once for a cached image and on error', () 
   broken.handlers.error();
   assert.ok(!broken.classes.has('skeleton'));
 });
+
+test('markLoaded clears .skeleton for an image that already failed (complete, naturalWidth 0)', () => {
+  const failed = fakeImg({ complete: true, naturalWidth: 0 });
+  markLoaded(failed);
+  assert.ok(!failed.classes.has('skeleton'));
+});

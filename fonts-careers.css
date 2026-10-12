@@ -1,0 +1,3 @@
+/* careers.html only: its body text and modal inputs use Instrument Sans 400. Kept out of fonts.css so the landing path is unchanged. */
+@font-face { font-family: 'Instrument Sans'; font-style: normal; font-weight: 400; font-display: swap;
+  src: url('./node_modules/@fontsource/instrument-sans/files/instrument-sans-latin-400-normal.woff2') format('woff2'); }

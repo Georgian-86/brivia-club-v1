@@ -19,7 +19,7 @@ export function markLoaded(img) {
   const wrapper = img?.closest?.('.skeleton');
   if (!wrapper) return;
   const done = () => wrapper.classList.remove('skeleton');
-  if (img.complete && img.naturalWidth > 0) { done(); return; }
+  if (img.complete) { done(); return; } // loaded, or already failed (naturalWidth 0): either way stop shimmering
   img.addEventListener('load', done, { once: true });
   img.addEventListener('error', done, { once: true });
 }

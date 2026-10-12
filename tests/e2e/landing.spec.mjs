@@ -320,6 +320,34 @@ try {
       await context.close();
     }
   }
+
+  // 7. careers.html keeps Instrument Sans 400 (its body text and modal inputs rely on it), loaded only from careers.js.
+  {
+    const context = await newContext(browser, VIEWPORTS[1], { seen: true });
+    const page = await context.newPage();
+    const tracked = await track(context, page);
+    await page.goto(`${BASE}/careers.html`, { waitUntil: 'load' });
+    await page.evaluate(() => document.fonts.ready);
+    await page.waitForTimeout(300);
+    const info = await page.evaluate(() => ({
+      weight: getComputedStyle(document.querySelector('.careers-intro')).fontWeight,
+      loaded400: [...document.fonts].some((f) => f.family.replace(/"/g, '') === 'Instrument Sans' && f.weight === '400' && f.style === 'normal' && f.status === 'loaded'),
+      check: document.fonts.check('400 16px "Instrument Sans"'),
+    }));
+    await check('careers: body text is weight 400 and the 400 face is loaded', () => {
+      assert.equal(info.weight, '400');
+      assert.equal(info.loaded400, true, 'Instrument Sans 400 face not loaded');
+      assert.equal(info.check, true);
+    });
+    await context.close();
+    const landing = await newContext(browser, VIEWPORTS[1], { seen: true });
+    const lp = await landing.newPage();
+    const lt = await track(landing, lp);
+    await lp.goto(`${BASE}/index.html`, { waitUntil: 'load' });
+    await lp.waitForTimeout(800);
+    await check('landing does not fetch the careers-only 400 font', () => assert.deepEqual(lt.urls.filter((url) => /instrument-sans-latin-400/.test(url)), []));
+    await landing.close();
+  }
 } finally {
   await browser?.close();
   try { process.kill(-server.pid, 'SIGTERM'); } catch { /* already gone */ }

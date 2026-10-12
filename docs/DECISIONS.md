@@ -962,3 +962,10 @@ priority preload delayed the poster and CSS), `skeleton.css` (`.skeleton` brand 
 **Deferred:**
 - The Playwright Chromium lacks H.264, so video playback and the gesture-unmute are verified live after deploy.
 - The `app.js` `exploreCoverImages` 404 is pre-existing and goes to Phase C.
+
+**D-054 addendum (2026-10-12):** the Bodoni Moda caveat in D-054 is withdrawn. Rendering the privacy.html h1 at 92 px
+before (Google Fonts, pre-Phase-B build) and after (static fontsource 500) gives pixel-identical output (mean abs diff
+0.000); Google's CSS never exposed the `opsz` axis, so it served the default optical instance. A variable `opsz` file was
+tried and rejected: it renders hairline display text and does not match. Also: careers.html's Instrument Sans 400 is
+restored (`fonts-careers.css`, imported only from `careers.js`), and `markLoaded` now clears the skeleton for an image
+that had already failed before the module ran.

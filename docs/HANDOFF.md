@@ -12,7 +12,7 @@ Update this file at the end of every session. CLAUDE.md holds the aim; this file
 - Lighthouse: `CHROME_PATH=/opt/pw-browsers/chromium npx lighthouse@12 http://127.0.0.1:4173/ --preset=perf --form-factor=mobile --chrome-flags="--headless --no-sandbox"`. Last result 0.86 to 0.89, LCP 2.8 s (target 90 / 2.5 s); next step is splitting the auth CSS off the landing critical path.
 - axe `color-contrast` is blind on the cream auth panel (those nodes come back "incomplete"), so contrast fixes need computed-ratio assertions, not axe alone.
 - The Phase A screenshot checks are geometry and ratio assertions, not pixel baselines.
-- Live checks still owed after deploy: hero video playback and gesture-unmute (the test Chromium has no H.264), the Bodoni Moda heading weight.
+- Live checks still owed after deploy: hero video playback and gesture-unmute (the test Chromium has no H.264) (Bodoni Moda parity was checked: pixel-identical to the Google version).
 
 | Area | State | Where |
 |---|---|---|

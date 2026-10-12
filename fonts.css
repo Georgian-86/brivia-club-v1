@@ -8,5 +8,7 @@
   src: url('./node_modules/@fontsource/instrument-sans/files/instrument-sans-latin-700-normal.woff2') format('woff2'); }
 @font-face { font-family: 'Instrument Sans'; font-style: italic; font-weight: 700; font-display: swap;
   src: url('./node_modules/@fontsource/instrument-sans/files/instrument-sans-latin-700-italic.woff2') format('woff2'); }
+/* Static 500 is pixel-identical to what Google Fonts served (its CSS never exposed the opsz axis; a variable opsz file renders
+   hairline display text and does NOT match). Verified at 92 px against the pre-Phase-B build. */
 @font-face { font-family: 'Bodoni Moda'; font-style: normal; font-weight: 500; font-display: swap;
   src: url('./node_modules/@fontsource/bodoni-moda/files/bodoni-moda-latin-500-normal.woff2') format('woff2'); }
