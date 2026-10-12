@@ -1,3 +1,4 @@
+import './fonts.css';
 import './style.css';
 import './auth-theme.css';
 import './playground.css';
@@ -8,6 +9,7 @@ import './auth-polish.css';
 import './mobile-site.css';
 import './mobile-final-fixes.css';
 import './auth-a11y.css';
+import './skeleton.css';
 import {
   supabase, supabaseReady, saveProfile, compressImageOnly, fileToDataUrl, PHOTO_ERROR_MESSAGE, withoutCredentials, rowToProfile, isRateLimited,
   declareAdult, setHomeLocation, setHomeCity, setMemberInterests, setSensitiveConsent, fetchSensitiveConsentAt, fetchMyInterests, fetchInterestNodes, searchPlaces, onboardingStatus,
@@ -21,7 +23,9 @@ import {
 import { matchTypedCity } from './area-pick.js';
 import { signupErrorCopy } from './signup-errors.js';
 import { defaultCoverUrl, normalizeCoverUrl } from './cover-assets.js';
-import { motionAllowed, introPlan, INTRO_CAP_MS, INTRO_START_GRACE_MS } from './landing-motion.js';
+import { motionAllowed, introPlan, markLoaded, INTRO_CAP_MS, INTRO_START_GRACE_MS } from './landing-motion.js';
+
+document.querySelectorAll('.skeleton img').forEach(markLoaded);
 
 const introBurst = document.querySelector('#intro-burst');
 const introSkip = introBurst?.querySelector('.intro-skip');

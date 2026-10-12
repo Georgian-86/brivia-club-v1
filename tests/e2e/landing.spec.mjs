@@ -46,6 +46,12 @@ const INIT_SCRIPT = () => {
       for (const entry of list.getEntries()) if (!entry.hadRecentInput) window.__cls += entry.value;
     }).observe({ type: 'layout-shift', buffered: true });
   } catch { /* unsupported */ }
+  window.__lcp = null;
+  try {
+    new PerformanceObserver((list) => {
+      for (const entry of list.getEntries()) window.__lcp = { time: Math.round(entry.startTime), url: entry.url || '', tag: entry.element ? entry.element.tagName : '' };
+    }).observe({ type: 'largest-contentful-paint', buffered: true });
+  } catch { /* unsupported */ }
   window.__introEverVisible = false;
   window.__introGoneAt = null;
   const isShown = (el) => {
@@ -237,6 +243,22 @@ try {
       await check(`${label}: initial transfer (hero video excluded) under 3 MB before scroll`, () => assert.ok(modelledBytes < MAX_BYTES, `${modelledBytes} bytes`));
       if (withHero >= MAX_BYTES) console.log(`WARN ${label}: with the whole hero video streamed the initial transfer is ${(withHero / 1e6).toFixed(2)} MB (budget 3 MB)`);
       await check(`${label}: CLS under 0.1 after load + 2 s`, () => assert.ok(cls < 0.1, `CLS ${cls}`));
+      const lcp = await page.evaluate(() => window.__lcp);
+      const posterRequests = tracked.urls.filter((url) => /hero-section-video[^/]*\.webp/.test(url));
+      console.log(`INFO ${label}: LCP ${lcp && lcp.time} ms (${lcp && lcp.tag} ${lcp && lcp.url.replace(BASE, '')}); poster requests: ${posterRequests.length}`);
+      await check(`${label}: LCP under 2500 ms (local preview, unthrottled)`, () => {
+        assert.ok(lcp, 'no largest-contentful-paint entry');
+        assert.ok(lcp.time < 2500, `LCP ${lcp.time} ms`);
+      });
+      await check(`${label}: the hero poster is requested once (preload reused by the <video poster>)`, () => assert.equal(posterRequests.length, 1, posterRequests.join(', ')));
+      await check(`${label}: no request to fonts.googleapis.com or fonts.gstatic.com`, () => assert.deepEqual(tracked.urls.filter((url) => /fonts\.(googleapis|gstatic)\.com/.test(url)), []));
+      await check(`${label}: heading font is preloaded (link rel=preload as=font) and fetched from our own host`, async () => {
+        const link = await page.evaluate(() => { const l = document.querySelector('link[rel="preload"][as="font"]'); return l && { href: l.getAttribute('href'), type: l.type, cross: l.crossOrigin }; });
+        assert.ok(link, 'no font preload link');
+        assert.equal(link.type, 'font/woff2');
+        assert.ok(tracked.urls.some((url) => url.endsWith(link.href)), 'preloaded font was not requested');
+        assert.equal(tracked.urls.filter((url) => url.endsWith(link.href)).length, 1, 'font requested more than once');
+      });
       await check(`${label}: no request for the app bundle (app-*.js) on the landing`, () => {
         assert.deepEqual(beforeScroll.filter((url) => /\/assets\/app-[^/]*\.js/.test(url)), []);
         assert.deepEqual(errors, []);
@@ -270,6 +292,30 @@ try {
         await page.evaluate((selector) => document.querySelector(selector).scrollIntoView({ block: 'center' }), target);
         await page.waitForTimeout(1500);
         assert.equal(tracked.urls.some((url) => pillarRe.test(url)), true, 'PILLARS1 not fetched after scrolling to it');
+      });
+      await context.close();
+    }
+
+    // 6. Image cards show the skeleton tint until their image has loaded.
+    {
+      const context = await newContext(browser, viewport, { seen: true });
+      let release;
+      const gate = new Promise((resolve) => { release = resolve; });
+      await context.route(/CONTEXT1[^/]*\.webp/, async (route) => { await gate; await route.continue(); });
+      const page = await context.newPage();
+      await page.goto(`${BASE}/index.html`, { waitUntil: 'load' });
+      const card = page.locator('.process-step-visual').first();
+      await card.scrollIntoViewIfNeeded();
+      await page.evaluate(() => document.querySelector('.process-step-visual').scrollIntoView({ block: 'center' }));
+      await page.waitForTimeout(500);
+      const before = await card.evaluate((el) => ({ skeleton: el.classList.contains('skeleton'), bg: getComputedStyle(el).backgroundColor }));
+      release();
+      await page.waitForFunction(() => !document.querySelector('.process-step-visual').classList.contains('skeleton'), null, { timeout: 8000 }).catch(() => {});
+      const after = await card.evaluate((el) => el.classList.contains('skeleton'));
+      await check(`${label}: image cards show the skeleton tint until loaded`, () => {
+        assert.equal(before.skeleton, true, 'no .skeleton while the image is pending');
+        assert.equal(before.bg, 'rgb(239, 228, 220)', `tint ${before.bg}`);
+        assert.equal(after, false, '.skeleton still present after the image loaded');
       });
       await context.close();
     }

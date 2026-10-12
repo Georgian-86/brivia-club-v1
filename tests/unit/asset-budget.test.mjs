@@ -37,3 +37,11 @@ test('ok is true when nothing exceeds', () => {
   assert.equal(r.ok, true);
   assert.deepEqual(r.violations, []);
 });
+
+import fs from 'node:fs';
+test('vercel.json sets Cache-Control "public, max-age=31536000, immutable" for /assets/(.*)', () => {
+  const config = JSON.parse(fs.readFileSync(new URL('../../vercel.json', import.meta.url), 'utf8'));
+  const rule = (config.headers || []).find((h) => h.source === '/assets/(.*)');
+  assert.ok(rule, 'no headers rule for /assets/(.*)');
+  assert.deepEqual(rule.headers.find((h) => h.key === 'Cache-Control'), { key: 'Cache-Control', value: 'public, max-age=31536000, immutable' });
+});

@@ -33,3 +33,27 @@ test('intro timing constants', () => {
   assert.equal(INTRO_CAP_MS, 2500);
   assert.equal(INTRO_START_GRACE_MS, 800);
 });
+
+import { markLoaded } from '../../landing-motion.js';
+const fakeImg = ({ complete = false, naturalWidth = 0 } = {}) => {
+  const classes = new Set(['skeleton']);
+  const handlers = {};
+  const wrapper = { classList: { remove: (c) => classes.delete(c), has: (c) => classes.has(c) } };
+  return { complete, naturalWidth, closest: () => wrapper, addEventListener: (t, f) => { handlers[t] = f; }, handlers, classes };
+};
+test('markLoaded removes .skeleton on load', () => {
+  const img = fakeImg();
+  markLoaded(img);
+  assert.ok(img.classes.has('skeleton'));
+  img.handlers.load();
+  assert.ok(!img.classes.has('skeleton'));
+});
+test('markLoaded removes .skeleton at once for a cached image and on error', () => {
+  const cached = fakeImg({ complete: true, naturalWidth: 100 });
+  markLoaded(cached);
+  assert.ok(!cached.classes.has('skeleton'));
+  const broken = fakeImg();
+  markLoaded(broken);
+  broken.handlers.error();
+  assert.ok(!broken.classes.has('skeleton'));
+});

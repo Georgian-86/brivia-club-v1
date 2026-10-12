@@ -13,3 +13,13 @@ export function motionAllowed({ reducedMotion = false, saveData = false } = {}) 
 export function introPlan({ seenBefore = false, fromAuth = false } = {}) {
   return seenBefore || fromAuth ? 'skip' : 'play';
 }
+
+// Drops the `.skeleton` shimmer from an image's wrapper once the image has loaded (or failed, so it never shimmers forever).
+export function markLoaded(img) {
+  const wrapper = img?.closest?.('.skeleton');
+  if (!wrapper) return;
+  const done = () => wrapper.classList.remove('skeleton');
+  if (img.complete && img.naturalWidth > 0) { done(); return; }
+  img.addEventListener('load', done, { once: true });
+  img.addEventListener('error', done, { once: true });
+}

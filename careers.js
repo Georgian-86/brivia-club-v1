@@ -1,3 +1,4 @@
+import './fonts.css';
 import { supabase } from './supabase.js';
 
 const roles = {

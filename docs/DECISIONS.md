@@ -925,3 +925,40 @@ The founder approved, section by section in chat, the design written up in
 **Existing phone and gender values:** kept (not shown to others), unless the founder decides otherwise.
 
 **P0-C moderation stays queued.** Real members remain disallowed until it ships.
+
+## D-054: Phase B landing speed, results and rulings (2026-10-12)
+
+Phase B of the experience iteration (spec §2) is done on the branch (not yet on `main`). Same look, much lighter.
+
+**Results (measured):**
+- `dist/assets`: 159.6 MB -> about 13.6 MB (`npm run check:assets` passes: every image <= 400 KB, every video <= 5 MB).
+- Initial transfer (no scroll, until `load` + 2 s idle, local preview): 0.70 MB at 375 px and 0.73 MB at 1440 px, hero
+  video excluded (Ruling G). With the hero file a real browser would stream: about 2.25 MB (720p) and 5.17 MB (1080p).
+  The 1080p figure is printed as a WARN: the Playwright Chromium has no H.264, so it downloads both `<source>` files.
+- CLS 0.0000 at both widths. LCP (Playwright observer, local, unthrottled): 292 ms at 375 px (hero `<video poster>`),
+  276 ms at 1440 px (the H1). The poster is requested once (the `<link rel=preload as=image fetchpriority=high>` is
+  reused by `<video poster>`; one request, not two).
+- Lighthouse 12.8 mobile (simulated 4G, `vite preview`, first visit so the intro runs): performance 0.86 to 0.89 over two
+  runs after the last change (0.78 before the font preload was set to `fetchpriority="low"`), LCP 2.8 s, FCP 2.8 s,
+  TBT 130 to 230 ms, CLS 0. **Below the 90 / 2.5 s target.** The sandbox CPU is slower than Lighthouse expects (it warned),
+  so TBT is noisy. Top remaining opportunity: render-blocking CSS. `script-*.css` is about 38 KB gzipped (210 KB raw),
+  because the landing page also carries the auth modal and `script.js` imports all the auth styles, plus three small
+  shared CSS chunks. Splitting the auth styles out of the landing critical path is the next step (Phase C).
+  Re-run Lighthouse on the live URL after deploy for the real number.
+
+**Deviation from spec §2.3:** WebP only, AVIF dropped. WebP alone meets the 400 KB budget with one code path.
+
+**Controller rulings:**
+- Ruling F: hero video 1080p at crf 30 (about 4.24 MiB, the sharper version the founder approved).
+- Ruling G: the hero video is excluded from the 3 MB initial budget and reported separately.
+- Ruling D/E: stored cover identifiers are kept, and legacy hashed cover URLs are resolved to the optimized files.
+
+**Also shipped in this task:** self-hosted fonts (`fonts.css`: Instrument Sans 500/600/700 + italic 700, Bodoni Moda 500,
+latin woff2 only; no Google Fonts requests; the Instrument Sans 700 preload is `fetchpriority="low"` because a high
+priority preload delayed the poster and CSS), `skeleton.css` (`.skeleton` brand shimmer, `markLoaded(img)`), and
+`Cache-Control: public, max-age=31536000, immutable` for `/assets/(.*)` in `vercel.json`. Bodoni Moda is now the static
+500 weight, not the Google variable `opsz` axis; check the large home heading against the live site.
+
+**Deferred:**
+- The Playwright Chromium lacks H.264, so video playback and the gesture-unmute are verified live after deploy.
+- The `app.js` `exploreCoverImages` 404 is pre-existing and goes to Phase C.
