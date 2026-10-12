@@ -1598,6 +1598,62 @@ try {
     check(`founder fixes ${w}: no uncaught page errors`, () => assert.deepEqual(errors, []));
     await context.close();
   }
+  // 15. Phase C Task 3: at 375 px the step actions are stacked; Tab must visit them in their visual top-to-bottom order
+  //     (the old CSS `order` put Next / Create above Back while the DOM, and so Tab, has Back first). The success mark
+  //     (a decorative tick) is hidden from assistive tech.
+  {
+    const context = await browser.newContext({ viewport: { width: 375, height: 812 } });
+    const stub = await stubContext(context, { signupSession: false });
+    const { page, errors } = await newPage(context, stub.consoleLines);
+    // Focus the control just before the step's actions, then Tab through them; compare with their on-screen order.
+    const tabVsVisual = async (n) => {
+      await page.evaluate((stepNo) => {
+        const actions = document.querySelector(`[data-signup-step="${stepNo}"] .signup-step-actions`);
+        const focusable = [...document.querySelectorAll('a[href], button, input, select, textarea, summary, [tabindex]')]
+          .filter((el) => !el.disabled && el.tabIndex >= 0 && el.getClientRects().length);
+        const first = focusable.findIndex((el) => actions.contains(el));
+        focusable[first - 1].focus();
+      }, n);
+      const tabbed = [];
+      for (let i = 0; i < 2; i += 1) {
+        await page.keyboard.press('Tab');
+        tabbed.push(await page.evaluate(() => document.activeElement?.textContent.replace(/\s+/g, ' ').trim()));
+      }
+      const visual = await page.evaluate((stepNo) => [...document.querySelectorAll(`[data-signup-step="${stepNo}"] .signup-step-actions > *`)]
+        .filter((el) => el.getClientRects().length).sort((a, b) => a.getBoundingClientRect().top - b.getBoundingClientRect().top)
+        .map((el) => el.textContent.replace(/\s+/g, ' ').trim()), n);
+      return { tabbed, visual };
+    };
+    await openSignup(page);
+    await fillStepOne(page);
+    await page.locator('[data-area-city]').click();
+    await pickCityByKeyboard(page, 'Pun');
+    const order2 = await tabVsVisual(2);
+    check(`375: the Tab order of the step-2 actions matches their visual top-to-bottom order (${JSON.stringify(order2)})`, () => assert.deepEqual(order2.tabbed, order2.visual));
+    await page.locator('[data-signup-step="2"] .signup-next').click();
+    await page.waitForSelector('#interest-results [data-interest-group]', { state: 'attached' });
+    await page.locator('#interest-search').fill('Chess');
+    await clickInterest(page, 'Chess');
+    await page.locator('[data-budget-spread]').click();
+    await page.locator('.looking-search').click();
+    await page.locator('#looking-results [data-looking-option]').first().click();
+    await page.locator('[data-signup-step="3"] .signup-step-heading h2').click();
+    const order3 = await tabVsVisual(3);
+    check(`375: the Tab order of the step-3 actions matches their visual top-to-bottom order (${JSON.stringify(order3)})`, () => assert.deepEqual(order3.tabbed, order3.visual));
+    await page.locator('[data-signup-step="3"] .signup-next').click();
+    await page.waitForSelector('[data-signup-step="4"]:not([hidden])');
+    const order4 = await tabVsVisual(4);
+    check(`at 375 the Tab order of the step-4 actions matches their visual top-to-bottom order (${JSON.stringify(order4)})`, () => {
+      assert.equal(order4.visual.length, 2);
+      assert.deepEqual(order4.tabbed, order4.visual);
+    });
+    await finishStepFour(page);
+    await page.waitForSelector('#auth-success:not([hidden])', { timeout: 10000 });
+    const mark = await page.locator('#auth-success .auth-success-mark').getAttribute('aria-hidden');
+    check(`.auth-success-mark is aria-hidden (got ${mark})`, () => assert.equal(mark, 'true'));
+    check('focus order 375: no uncaught page errors', () => assert.deepEqual(errors, []));
+    await context.close();
+  }
 } catch (error) {
   results.push(['FAIL', `harness: ${error.stack || error.message}`]);
 } finally {

@@ -79,10 +79,5 @@
 .cover-upload-drop:hover{border-color:#5a061f;background:#fffaf1}
 .cover-upload-drop>span{grid-row:1/-1;display:grid;place-items:center;width:29px;height:29px;border:1px solid rgba(90,6,31,.22);border-radius:50%;font-size:18px;font-weight:400}
 .cover-upload-drop strong{font-size:9px;letter-spacing:.07em}.cover-upload-drop small{overflow:hidden;color:#9a777c;font-size:9px;font-weight:500;letter-spacing:0;text-overflow:ellipsis;white-space:nowrap;text-transform:none}
-@media(max-width:480px){.signup-step-actions{grid-template-columns:1fr}.signup-step-actions .auth-secondary{order:2;justify-self:start}.cover-suggestions{grid-auto-columns:145px}.cover-preview{min-height:102px}}
+@media(max-width:480px){.signup-step-actions{grid-template-columns:1fr}.signup-step-actions .auth-secondary{justify-self:start}.cover-suggestions{grid-auto-columns:145px}.cover-preview{min-height:102px}}
 
-/* Landing intro animation uses the same wine/burgundy identity. */
-.intro-burst{background:#5a061f}
-.intro-burst:after{background:radial-gradient(circle at 50% 50%,rgba(255,224,230,.24),transparent 34%)}
-.burst-core{background:#ffe0e6;box-shadow:0 0 50px 12px rgba(255,159,177,.62)}
-.burst-line{background:linear-gradient(90deg,rgba(255,245,247,.92),rgba(255,159,177,0))}

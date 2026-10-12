@@ -1,0 +1,6 @@
+/* Landing intro colours (moved out of auth-theme.css in Phase C Task 3: the auth page has no intro).
+   Loaded right after style.css on the landing only, where auth-theme.css used to sit. */
+.intro-burst{background:#5a061f}
+.intro-burst:after{background:radial-gradient(circle at 50% 50%,rgba(255,224,230,.24),transparent 34%)}
+.burst-core{background:#ffe0e6;box-shadow:0 0 50px 12px rgba(255,159,177,.62)}
+.burst-line{background:linear-gradient(90deg,rgba(255,245,247,.92),rgba(255,159,177,0))}

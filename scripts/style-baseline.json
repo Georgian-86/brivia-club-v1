@@ -15,12 +15,16 @@
     "hex": 3,
     "fontFamily": 0
   },
+  "auth-modal.css": {
+    "hex": 129,
+    "fontFamily": 0
+  },
   "auth-polish.css": {
     "hex": 208,
     "fontFamily": 37
   },
   "auth-theme.css": {
-    "hex": 72,
+    "hex": 70,
     "fontFamily": 3
   },
   "card-reference.css": {
@@ -91,6 +95,10 @@
     "hex": 2,
     "fontFamily": 0
   },
+  "intro-theme.css": {
+    "hex": 2,
+    "fontFamily": 0
+  },
   "letter-theme.css": {
     "hex": 42,
     "fontFamily": 5
@@ -103,12 +111,16 @@
     "hex": 1,
     "fontFamily": 0
   },
+  "mobile-auth.css": {
+    "hex": 1,
+    "fontFamily": 0
+  },
   "mobile-final-fixes.css": {
     "hex": 13,
     "fontFamily": 0
   },
   "mobile-site.css": {
-    "hex": 1,
+    "hex": 0,
     "fontFamily": 0
   },
   "playground.css": {
@@ -140,7 +152,7 @@
     "fontFamily": 0
   },
   "style.css": {
-    "hex": 309,
+    "hex": 180,
     "fontFamily": 5
   }
 }

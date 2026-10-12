@@ -104,16 +104,15 @@ body.auth-page .auth-shell .auth-signup-form .gender-option span { flex: 1; widt
 @media (max-width: 480px) {
   body.auth-page .auth-shell .auth-signup-form .gender-options { grid-template-columns: 1fr; }
 }
-/* Step actions: two equal columns, buttons never wider than their cell; stacked with Create first on narrow screens. */
+/* Step actions: two equal columns, buttons never wider than their cell; stacked on narrow screens in DOM order
+   (Back above Next / Create), so the visual order matches the Tab order (Phase C Task 3; no CSS `order` here). */
 body.auth-page .auth-shell .auth-signup-form .signup-step-actions { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
 body.auth-page .auth-shell .auth-signup-form .signup-step-actions :is(.auth-secondary, .auth-submit) {
   width: 100%; min-width: 0; max-width: 100%; box-sizing: border-box; white-space: normal; overflow-wrap: anywhere; text-align: center;
 }
 @media (max-width: 780px) {
   body.auth-page .auth-shell .auth-signup-form .signup-step-actions { grid-template-columns: minmax(0, 1fr); }
-  body.auth-page .auth-shell .auth-signup-form .signup-step-actions .auth-submit,
-  body.auth-page .auth-shell .auth-signup-form .signup-step-actions .signup-next { order: 1; }
-  body.auth-page .auth-shell .auth-signup-form .signup-step-actions .auth-secondary { order: 2; justify-self: stretch; }
+  body.auth-page .auth-shell .auth-signup-form .signup-step-actions .auth-secondary { justify-self: stretch; }
 }
 /* Hotfix 2026-10-12 (review): the rest of the success panel was cream or pink on cream. */
 body.auth-page .auth-shell .auth-panel .auth-success .auth-secondary {

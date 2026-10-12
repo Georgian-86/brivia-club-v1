@@ -393,6 +393,25 @@ try {
     await check('landing does not fetch the careers-only 400 font', () => assert.deepEqual(lt.urls.filter((url) => /instrument-sans-latin-400/.test(url)), []));
     await landing.close();
   }
+
+  // 8. Phase C Task 3: each page ships only its own CSS. Read the stylesheets each built page links (dist/*.html).
+  {
+    const linkedCss = (html) => {
+      const doc = fs.readFileSync(path.join(repoRoot, 'dist', html), 'utf8');
+      const hrefs = [...doc.matchAll(/<link\b[^>]*rel="stylesheet"[^>]*>/g)].map((m) => (m[0].match(/href="([^"]+)"/) || [])[1]).filter((h) => h && h.startsWith('/assets/'));
+      return { hrefs, css: hrefs.map((h) => fs.readFileSync(path.join(repoRoot, 'dist', h), 'utf8')).join('\n') };
+    };
+    const AUTH_ONLY = /\.signup-step|\.auth-success/g;
+    const landingCss = linkedCss('index.html');
+    const authCss = linkedCss('auth.html');
+    await check(`the landing CSS bundle contains no .signup-step or .auth-success selectors (${landingCss.hrefs.join(', ')})`, () => {
+      assert.ok(landingCss.hrefs.length > 0, 'index.html links no stylesheet');
+      assert.deepEqual([...new Set(landingCss.css.match(AUTH_ONLY) || [])], []);
+    });
+    await check(`the auth CSS bundle still carries the signup and success styles (${authCss.hrefs.join(', ')})`, () => {
+      assert.deepEqual([...new Set(authCss.css.match(AUTH_ONLY) || [])].sort(), ['.auth-success', '.signup-step']);
+    });
+  }
 } finally {
   await browser?.close();
   try { process.kill(-server.pid, 'SIGTERM'); } catch { /* already gone */ }

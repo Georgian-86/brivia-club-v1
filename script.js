@@ -1,16 +1,4 @@
-import './tokens.css';
-import './fonts.css';
-import './style.css';
-import './auth-theme.css';
-import './playground.css';
-import './letter-theme.css';
-import './intro-reference.css';
-import './deep-wine-theme.css';
-import './auth-polish.css';
-import './mobile-site.css';
-import './mobile-final-fixes.css';
-import './auth-a11y.css';
-import './skeleton.css';
+// Shared landing + auth behaviour. Styles come from the page entries (landing-entry.js, auth-entry.js), never from here.
 import {
   supabase, supabaseReady, saveProfile, compressImageOnly, fileToDataUrl, PHOTO_ERROR_MESSAGE, withoutCredentials, rowToProfile, isRateLimited,
   declareAdult, setHomeLocation, setHomeCity, setMemberInterests, setSensitiveConsent, fetchSensitiveConsentAt, fetchMyInterests, fetchInterestNodes, searchPlaces, onboardingStatus,
