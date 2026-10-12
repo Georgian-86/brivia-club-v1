@@ -1,5 +1,10 @@
-// Visual parity guard: `node scripts/visual-parity.mjs capture|compare <dir> [--pages index,auth]`.
-// Serves the existing dist/ (run `npm run build` first); never builds. Playwright lives outside the repo.
+// Visual parity guard: `node scripts/visual-parity.mjs capture|compare <dir> [--pages index,auth] [--expect-diff a,b]`.
+// Serves the existing dist/; never builds. Build it with the stub Supabase baked in, because the auth signup states
+// (steps 2-4, the "Check your email." panel) need Supabase answers, which come from the fixtures below:
+//   VITE_SUPABASE_URL=https://stub.supabase.local VITE_SUPABASE_ANON_KEY=stub npm run build
+// (A build without them shows a different auth step 1 and cannot reach step 3.) Playwright lives outside the repo.
+// --expect-diff names shots (file stem, e.g. auth-375-signup-step4-actions) whose change is intended: compare prints
+// "EXPECTED DIFF <name>" for each and fails if one of them is identical, missing, or any other shot differs.
 import { spawn } from 'node:child_process';
 import { mkdirSync, readdirSync, readFileSync, writeFileSync, existsSync } from 'node:fs';
 import { join, resolve } from 'node:path';
@@ -22,6 +27,35 @@ async function ready(page) {
   await page.evaluate(() => { for (const el of document.querySelectorAll('select')) { el.style.display = 'none'; void el.offsetHeight; el.style.display = ''; } });
   await idle(page);
   await settle(page, 400);
+}
+
+// Supabase fixtures for the auth states (the minimal answers tests/e2e/onboarding.spec.mjs uses): the interest
+// catalogue, the place search, and a signUp without a session (email confirmation, so the success panel shows).
+const STUB = 'https://stub.supabase.local';
+const NODES = [
+  { id: 'games', parent_id: null, level: 1, label: 'Games and puzzles', sensitive: false },
+  { id: 'games.board', parent_id: 'games', level: 2, label: 'Board games', sensitive: false },
+  { id: 'games.board.chess', parent_id: 'games.board', level: 3, label: 'Chess', sensitive: false },
+  { id: 'sports', parent_id: null, level: 1, label: 'Sports and fitness', sensitive: false },
+  { id: 'sports.racket', parent_id: 'sports', level: 2, label: 'Racket sports', sensitive: false },
+  { id: 'sports.racket.tennis', parent_id: 'sports.racket', level: 3, label: 'Tennis', sensitive: false },
+];
+const PLACES = [{ id: 'in-pune', name: 'Pune', region: 'Maharashtra', country: 'India' }];
+const USER = { id: '11111111-1111-4111-8111-111111111111', aud: 'authenticated', role: 'authenticated', email: 'new@test.brivia.club', user_metadata: { name: 'Nia New' }, app_metadata: {}, created_at: '2026-01-15T09:30:00Z' };
+async function stubSupabase(ctx) {
+  await ctx.route(`${STUB}/**`, (route) => {
+    const req = route.request();
+    const p = new URL(req.url()).pathname;
+    const headers = { 'access-control-allow-origin': '*', 'access-control-allow-headers': '*', 'access-control-allow-methods': '*' };
+    const json = (body) => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(body), headers });
+    if (req.method() === 'OPTIONS') return route.fulfill({ status: 204, headers });
+    if (p === '/auth/v1/signup') return json(USER); // no session: email confirmation
+    if (p === '/rest/v1/interest_node') return json(NODES);
+    if (p === '/rest/v1/place') return json(PLACES);
+    if (p.startsWith('/rest/v1/')) return json([]);
+    return json({});
+  });
+  await ctx.routeWebSocket(/stub\.supabase\.local/, (ws) => ws.close());
 }
 
 const PAGES = {
@@ -58,6 +92,58 @@ const PAGES = {
       await ready(page);
       await imagesReady(page);
       await shot('signup-step1');
+      // Each later state: the panel at its top (or at `anchor`), then with the step's Back / Next actions in view.
+      const panelTop = () => page.evaluate(() => document.querySelector('.auth-panel')?.scrollTo({ top: 0, behavior: 'instant' }));
+      const state = async (label, actions, anchor) => {
+        await page.evaluate(() => document.activeElement?.blur());
+        await ready(page);
+        await imagesReady(page);
+        await panelTop();
+        if (anchor) await page.locator(anchor).evaluate((el) => el.scrollIntoView({ block: 'start', behavior: 'instant' }));
+        await settle(page);
+        await shot(label);
+        if (!actions) return;
+        await page.locator(actions).evaluate((el) => el.scrollIntoView({ block: 'end', behavior: 'instant' }));
+        await settle(page);
+        await shot(`${label}-actions`);
+      };
+      const step = (n) => page.locator(`[data-signup-step="${n}"]`);
+      await step(1).locator('input[name="name"]').fill('Nia New');
+      await step(1).locator('input[name="email"]').fill('new@test.brivia.club');
+      await step(1).locator('input[name="phoneNumber"]').fill('98765 43210');
+      await step(1).locator('.gender-option', { hasText: 'FEMALE' }).click();
+      await step(1).locator('select[name="experience"]').selectOption({ index: 2 });
+      await step(1).locator('input[name="adultConfirm"]').check();
+      await step(1).locator('.signup-next').click();
+      await page.waitForSelector('[data-signup-step="2"]:not([hidden])');
+      // Your area: pick a city (no geolocation, so nothing depends on a permission prompt).
+      await page.locator('[data-area-city]').click();
+      await page.locator('#area-city-search').fill('Pun');
+      await page.waitForSelector('#area-city-results [role="option"]');
+      await page.locator('#area-city-search').press('ArrowDown');
+      await page.locator('#area-city-search').press('Enter');
+      await page.waitForFunction(() => /Pune/.test(document.querySelector('[data-area-status]')?.textContent || ''));
+      await state('signup-step2', '[data-signup-step="2"] .signup-step-actions');
+      await step(2).locator('.signup-next').click();
+      await page.waitForSelector('[data-signup-step="3"]:not([hidden])');
+      await page.waitForSelector('#interest-results [data-interest-group]', { state: 'attached' });
+      await page.locator('#interest-search').fill('Chess');
+      await page.locator('#interest-results [data-interest-id]', { hasText: 'Chess' }).first().click();
+      await page.locator('#interest-search').fill('');
+      await page.locator('[data-budget-spread]').click();
+      await page.locator('.looking-search').click();
+      await page.locator('#looking-results [data-looking-option]').first().click();
+      await step(3).locator('.signup-step-heading h2').click(); // an outside click closes the looking-for list
+      await state('signup-step3', '[data-signup-step="3"] .signup-step-actions');
+      await step(3).locator('.signup-next').click();
+      await page.waitForSelector('[data-signup-step="4"]:not([hidden])');
+      await step(4).locator('input[name="password"]').fill('correct horse 1');
+      await step(4).locator('input[name="passwordConfirm"]').fill('correct horse 1');
+      await state('signup-step4', '[data-signup-step="4"] .signup-step-actions');
+      await step(4).locator('[type="submit"]').click();
+      await page.waitForSelector('#auth-success:not([hidden])', { timeout: 15000 });
+      // The success panel sits below the (still visible) form at HEAD 8968f37: shoot it in view.
+      await state('signup-success', null, '#auth-success');
     },
   },
 };
@@ -99,6 +185,7 @@ async function captureAll(dir, pages) {
         const ctx = await browser.newContext({ viewport: { width: vp.w, height: vp.h }, reducedMotion: 'reduce' });
         await ctx.addInitScript(() => { try { localStorage.setItem('brivia-intro-seen', '1'); } catch {} });
         await ctx.route('**/*.mp4', (r) => r.abort());
+        await stubSupabase(ctx);
         const page = await ctx.newPage();
         await page.clock.setFixedTime(new Date('2026-01-15T09:30:00')); // landing shows a live clock/greeting
         await page.goto(ORIGIN + spec.path);
@@ -130,10 +217,11 @@ async function captureAll(dir, pages) {
 
 const [cmd, dirArg] = process.argv.slice(2);
 const pagesArg = arg('--pages');
+const expectDiff = new Set((arg('--expect-diff') || '').split(',').filter(Boolean));
 const pages = pagesArg ? pagesArg.split(',') : Object.keys(PAGES);
 const bad = pages.filter((p) => !PAGES[p]);
 if (!['capture', 'compare'].includes(cmd) || !dirArg || bad.length) {
-  console.error('usage: visual-parity.mjs capture|compare <dir> [--pages index,auth]' + (bad.length ? ` (unknown: ${bad})` : ''));
+  console.error('usage: visual-parity.mjs capture|compare <dir> [--pages index,auth] [--expect-diff name,name]' + (bad.length ? ` (unknown: ${bad})` : ''));
   process.exit(2);
 }
 const dir = resolve(dirArg);
@@ -158,9 +246,11 @@ if (cmd === 'capture') {
   const fresh = readdirSync(tmp).filter((f) => f.endsWith('.png'));
   const all = new Set([...fresh, ...base]);
   const remaining = new Set();
+  const oneSided = new Set();
   for (const f of all) {
     const a = existsSync(join(dir, f)) ? readFileSync(join(dir, f)) : null;
     const b = existsSync(join(tmp, f)) ? readFileSync(join(tmp, f)) : null;
+    if (!a || !b) oneSided.add(f);
     if (!a || !b || !a.equals(b)) {
       remaining.add(f);
       if (b) { mkdirSync(join(dir, '..', 'parity-diff'), { recursive: true }); writeFileSync(join(dir, '..', 'parity-diff', f), b); }
@@ -168,6 +258,14 @@ if (cmd === 'capture') {
   }
   rmSync(tmp, { recursive: true, force: true });
   console.log(`compared ${all.size} screenshots`);
-  if (remaining.size) { console.error('DIFFERENT:\n' + [...remaining].join('\n')); process.exit(1); }
-  console.log('identical');
+  // Intended changes are named one by one; each must really differ (and exist on both sides), nothing else may.
+  const problems = [];
+  for (const name of expectDiff) {
+    const f = `${name}.png`;
+    if (!all.has(f) || oneSided.has(f)) problems.push(`${name} (expected a difference, but there is no such shot on both sides)`);
+    else if (!remaining.has(f)) problems.push(`${name} (expected a difference, but it is identical)`);
+    else { console.log(`EXPECTED DIFF ${name}`); remaining.delete(f); }
+  }
+  if (remaining.size || problems.length) { console.error('DIFFERENT:\n' + [...remaining, ...problems].join('\n')); process.exit(1); }
+  console.log(expectDiff.size ? 'identical apart from the expected differences' : 'identical');
 }
