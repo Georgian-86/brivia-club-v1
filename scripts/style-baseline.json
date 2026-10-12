@@ -1,0 +1,142 @@
+{
+  "app-navigation.css": {
+    "hex": 37,
+    "fontFamily": 6
+  },
+  "app.css": {
+    "hex": 69,
+    "fontFamily": 5
+  },
+  "auth-a11y.css": {
+    "hex": 3,
+    "fontFamily": 0
+  },
+  "auth-polish.css": {
+    "hex": 208,
+    "fontFamily": 37
+  },
+  "auth-theme.css": {
+    "hex": 72,
+    "fontFamily": 3
+  },
+  "card-reference.css": {
+    "hex": 15,
+    "fontFamily": 5
+  },
+  "careers.css": {
+    "hex": 58,
+    "fontFamily": 1
+  },
+  "chat-attachments.css": {
+    "hex": 68,
+    "fontFamily": 7
+  },
+  "chat-empty-state.css": {
+    "hex": 7,
+    "fontFamily": 1
+  },
+  "chat-reference.css": {
+    "hex": 19,
+    "fontFamily": 17
+  },
+  "chat-sidebar-fix.css": {
+    "hex": 3,
+    "fontFamily": 5
+  },
+  "chat-wallpaper.css": {
+    "hex": 8,
+    "fontFamily": 0
+  },
+  "community-feed.css": {
+    "hex": 31,
+    "fontFamily": 0
+  },
+  "deck.css": {
+    "hex": 2,
+    "fontFamily": 3
+  },
+  "deep-wine-theme.css": {
+    "hex": 7,
+    "fontFamily": 0
+  },
+  "discovery-filters.css": {
+    "hex": 29,
+    "fontFamily": 7
+  },
+  "explore-polish.css": {
+    "hex": 19,
+    "fontFamily": 7
+  },
+  "explore-theme.css": {
+    "hex": 0,
+    "fontFamily": 0
+  },
+  "inbox-actions.css": {
+    "hex": 3,
+    "fontFamily": 0
+  },
+  "inbox-linkedin.css": {
+    "hex": 15,
+    "fontFamily": 0
+  },
+  "inbox.css": {
+    "hex": 55,
+    "fontFamily": 2
+  },
+  "intro-reference.css": {
+    "hex": 2,
+    "fontFamily": 0
+  },
+  "letter-theme.css": {
+    "hex": 42,
+    "fontFamily": 5
+  },
+  "member-polish.css": {
+    "hex": 27,
+    "fontFamily": 4
+  },
+  "mobile-app.css": {
+    "hex": 1,
+    "fontFamily": 0
+  },
+  "mobile-final-fixes.css": {
+    "hex": 13,
+    "fontFamily": 0
+  },
+  "mobile-site.css": {
+    "hex": 1,
+    "fontFamily": 0
+  },
+  "playground.css": {
+    "hex": 34,
+    "fontFamily": 0
+  },
+  "privacy-account.css": {
+    "hex": 5,
+    "fontFamily": 4
+  },
+  "privacy.css": {
+    "hex": 7,
+    "fontFamily": 4
+  },
+  "profile-photo.css": {
+    "hex": 0,
+    "fontFamily": 0
+  },
+  "profile-theme.css": {
+    "hex": 164,
+    "fontFamily": 11
+  },
+  "report-dialog.css": {
+    "hex": 14,
+    "fontFamily": 2
+  },
+  "skeleton.css": {
+    "hex": 4,
+    "fontFamily": 0
+  },
+  "style.css": {
+    "hex": 309,
+    "fontFamily": 5
+  }
+}

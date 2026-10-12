@@ -1,3 +1,4 @@
+import './tokens.css';
 import './fonts.css';
 import './app.css';
 import './inbox.css';

@@ -1,0 +1,56 @@
+/* Design tokens (Phase C). Additive: nothing consumes these yet; later tasks migrate rules onto them.
+   Colour values are copied from existing definitions (no new colours):
+   wine-deep/wine/wine-soft = deep-wine-theme.css, ink = style.css/auth --ink, ink-soft = auth-a11y.css,
+   cream = --paper (style.css), line = light --app-line (app.css). */
+:root {
+  --color-wine-deep: #430416;
+  --color-wine: #5e0b28;
+  --color-wine-soft: #76243f;
+  --color-ink: #291d1b;
+  --color-ink-soft: #5f5651;
+  --color-cream: #fffaf1;
+  --color-line: rgba(52, 31, 28, .16);
+
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
+  --space-7: 48px;
+  --space-8: 64px;
+
+  --radius-s: 8px;
+  --radius-m: 12px;
+  --radius-l: 24px;
+  --radius-pill: 99px;
+
+  /* Shadow colour reuses the app's existing rgba(0,0,0,.32). */
+  --shadow-1: 0 6px 18px rgba(0, 0, 0, .32);
+  --shadow-2: 0 28px 80px rgba(0, 0, 0, .32);
+
+  --font-heading: 'Bodoni Moda', serif;
+  --font-body: 'Instrument Sans', sans-serif;
+
+  --text-12: 12px;
+  --text-14: 14px;
+  --text-16: 16px;
+  --text-18: 18px;
+  --text-24: 24px;
+  --text-32: 32px;
+  --text-44: 44px;
+  --text-60: 60px;
+
+  --motion-fast: 150ms;
+  --motion-base: 200ms;
+  --motion-slow: 250ms;
+  --ease: cubic-bezier(.2, .7, .2, 1);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --motion-fast: 0ms;
+    --motion-base: 0ms;
+    --motion-slow: 0ms;
+  }
+}
