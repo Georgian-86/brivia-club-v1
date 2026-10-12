@@ -904,3 +904,24 @@ heterogeneity, disclosed). All four rejected B and C.
   - Trust: let members finish now and stay invisible until their email is verified. This wins if that is cheap
     server-side.
   - UX: an even pre-split. This wins back if the required top pick costs more than about 2 points of completion.
+
+## D-053: Experience iteration spec; D-052 approved (2026-10-12)
+
+**D-052 is approved by the founder:** guided signup with Google or email-OTP first, 18+, name, area, interests and a
+"which matters most?" points screen; phone and gender are no longer collected.
+
+The founder approved, section by section in chat, the design written up in
+`docs/superpowers/specs/2026-10-12-experience-iteration-design.md`:
+- the guided signup (§1);
+- landing speed with the same look (§2);
+- a tester switch and seed v2 for testing matching (§3);
+- a consent-first growth kit: SEO, PostHog, Sentry, UTM, lifecycle email (§4);
+- consistency and a hotfix (§5): one nav with a mobile tab bar, Bodoni Moda for headings and Instrument Sans for the
+  rest, a calmer profile, tokens.
+
+**Build order:** A hotfix → B landing → C consistency → D test world (0008) → E signup (0007, needs SMTP or Google)
+→ F growth kit (needs the founder's accounts).
+
+**Existing phone and gender values:** kept (not shown to others), unless the founder decides otherwise.
+
+**P0-C moderation stays queued.** Real members remain disallowed until it ships.
