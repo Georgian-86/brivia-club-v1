@@ -15,6 +15,10 @@ const idle = (page) => page.waitForLoadState('networkidle', { timeout: 5000 }).c
 
 async function ready(page) {
   await page.evaluate(() => document.fonts.ready);
+  // Chromium sizes a <select>'s inner text with whatever font was loaded at first layout and may not redo it
+  // after the web font swaps in (auth step 1 "Choose one" sat 1px higher or lower depending on that race).
+  // Force one relayout after fonts are ready so every capture shows the post-font state.
+  await page.evaluate(() => { for (const el of document.querySelectorAll('select')) { el.style.display = 'none'; void el.offsetHeight; el.style.display = ''; } });
   await idle(page);
   await settle(page, 400);
 }
@@ -51,7 +55,6 @@ const PAGES = {
     path: '/auth.html#signup',
     async shots(page, vp, shot) {
       await ready(page);
-      await settle(page, 4000);
       await shot('signup-step1');
     },
   },
@@ -79,7 +82,13 @@ async function withServer(fn) {
 async function captureAll(dir, pages) {
   const pw = await import(pathToFileURL(process.env.PLAYWRIGHT_MODULE || '/tmp/pw/node_modules/playwright/index.mjs').href);
   const { chromium } = pw.default || pw;
-  const browser = await chromium.launch({ executablePath: process.env.CHROMIUM_PATH || '/opt/pw-browsers/chromium' });
+  const browser = await chromium.launch({
+    executablePath: process.env.CHROMIUM_PATH || '/opt/pw-browsers/chromium',
+    // Root cause of the old 1px flake in the matching section (index section-07): GPU/partial raster of the
+    // filtered, scroll-driven photo layers is not bit-stable between page loads (DOM state was identical in
+    // every run). Software, non-partial raster is: 10/10 identical vs 4 distinct frames in 10 without these.
+    args: ['--disable-gpu-rasterization', '--disable-zero-copy', '--disable-accelerated-2d-canvas', '--disable-threaded-animation', '--disable-partial-raster', '--enable-features=NoSkiaNondeterminism'],
+  });
   let count = 0;
   try {
     for (const name of pages) {
@@ -103,6 +112,7 @@ async function captureAll(dir, pages) {
             same = next.equals(prev) ? same + 1 : 0;
             prev = next;
           }
+          if (same < 3) throw new Error(`unsettled frame: ${name}-${vp.w}-${label} never gave 3 identical frames`);
           writeFileSync(join(dir, `${name}-${vp.w}-${label}.png`), prev);
           count++;
         };
@@ -132,31 +142,22 @@ if (cmd === 'capture') {
   console.log(`captured ${n} screenshots into ${dir}`);
 } else {
   if (!existsSync(dir)) { console.error(`no baseline at ${dir}`); process.exit(2); }
-  // A shot passes if ANY attempt reproduces the baseline byte for byte (up to 3 attempts): rare single-pixel
-  // timing flakes in scroll-driven sections vanish on retry, a real regression differs on every attempt.
   const tmp = join(dir, '..', `.parity-tmp-${process.pid}`);
   const { rmSync } = await import('node:fs');
+  rmSync(tmp, { recursive: true, force: true });
+  mkdirSync(tmp, { recursive: true });
+  await withServer(() => captureAll(tmp, pages));
   const base = readdirSync(dir).filter((f) => f.endsWith('.png') && pages.some((p) => f.startsWith(p + '-')));
-  let remaining = null;
-  let all = new Set(base);
-  for (let attempt = 1; attempt <= 3; attempt++) {
-    rmSync(tmp, { recursive: true, force: true });
-    mkdirSync(tmp, { recursive: true });
-    await withServer(() => captureAll(tmp, pages));
-    const fresh = readdirSync(tmp).filter((f) => f.endsWith('.png'));
-    all = new Set([...fresh, ...base]);
-    const failing = [];
-    for (const f of (remaining || all)) {
-      const a = existsSync(join(dir, f)) ? readFileSync(join(dir, f)) : null;
-      const b = existsSync(join(tmp, f)) ? readFileSync(join(tmp, f)) : null;
-      if (!a || !b || !a.equals(b)) {
-        failing.push(f);
-        if (b) { mkdirSync(join(dir, '..', 'parity-diff'), { recursive: true }); writeFileSync(join(dir, '..', 'parity-diff', f), b); }
-      }
+  const fresh = readdirSync(tmp).filter((f) => f.endsWith('.png'));
+  const all = new Set([...fresh, ...base]);
+  const remaining = new Set();
+  for (const f of all) {
+    const a = existsSync(join(dir, f)) ? readFileSync(join(dir, f)) : null;
+    const b = existsSync(join(tmp, f)) ? readFileSync(join(tmp, f)) : null;
+    if (!a || !b || !a.equals(b)) {
+      remaining.add(f);
+      if (b) { mkdirSync(join(dir, '..', 'parity-diff'), { recursive: true }); writeFileSync(join(dir, '..', 'parity-diff', f), b); }
     }
-    remaining = new Set(failing);
-    if (!failing.length) break;
-    if (attempt < 3) console.log(`attempt ${attempt}: ${failing.length} differing, retrying: ${failing.join(', ')}`);
   }
   rmSync(tmp, { recursive: true, force: true });
   console.log(`compared ${all.size} screenshots`);
