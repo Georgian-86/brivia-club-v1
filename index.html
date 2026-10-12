@@ -9,10 +9,25 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:ital,wght@0,500;0,600;0,700;1,700&display=swap" rel="stylesheet" />
+    <link rel="preload" as="image" href="./media/posters/hero-section-video.webp" fetchpriority="high" />
+    <script>
+      /* Returning visitors, auth hand-offs, reduced-motion and save-data never see the intro (no flash before script.js
+         runs). Mirrors introPlan()/motionAllowed() in landing-motion.js; keep the two in step. */
+      (function () {
+        try {
+          var seen = false, fromAuth = false;
+          try { seen = localStorage.getItem('brivia-intro-seen') === 'true'; } catch (e) {}
+          try { fromAuth = sessionStorage.getItem('brivia-skip-intro-once') === 'true'; } catch (e) {}
+          var reduced = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
+          var saveData = !!(navigator.connection && navigator.connection.saveData);
+          if (seen || fromAuth || reduced || saveData) document.documentElement.classList.add('no-intro');
+        } catch (e) {}
+      })();
+    </script>
   </head>
   <body>
     <div class="intro-burst" id="intro-burst" role="status" aria-label="Introducing Brivia Club">
-      <video class="intro-video" autoplay muted playsinline preload="auto" poster="./media/posters/intro-video.webp" aria-hidden="true">
+      <video class="intro-video" muted playsinline preload="none" poster="./media/posters/intro-video.webp" aria-hidden="true">
         <source src="./media/video/intro-video-1080.mp4" type="video/mp4" />
       </video>
     </div>
@@ -25,7 +40,7 @@
 
     <main id="top">
       <section class="hero">
-        <video class="hero-video" autoplay loop playsinline preload="metadata" poster="./media/posters/hero-section-video.webp" aria-hidden="true">
+        <video class="hero-video" muted loop playsinline preload="none" poster="./media/posters/hero-section-video.webp" aria-hidden="true">
           <source media="(min-width: 701px)" src="./media/video/hero-section-video-1080.mp4" type="video/mp4" />
           <source src="./media/video/hero-section-video-720.mp4" type="video/mp4" />
         </video>
@@ -45,9 +60,9 @@
       <section class="showreel-section" id="showreel" aria-labelledby="showreel-title">
         <div class="showreel-topline"><span>CONNECTIONS</span></div>
         <div class="showreel-visual" aria-hidden="true">
-          <img class="reel-frame reel-frame--one" src="/media/Images/CONNECTIONS1.webp" alt="" />
-          <img class="reel-frame reel-frame--two" src="/media/Images/CONNECTIONS2.webp" alt="" />
-          <img class="reel-frame reel-frame--three" src="/media/Images/CONNECTIONS3.webp" alt="" />
+          <img class="reel-frame reel-frame--one" src="/media/Images/CONNECTIONS1.webp" alt="" width="1536" height="1024" loading="lazy" decoding="async" />
+          <img class="reel-frame reel-frame--two" src="/media/Images/CONNECTIONS2.webp" alt="" width="1536" height="1024" loading="lazy" decoding="async" />
+          <img class="reel-frame reel-frame--three" src="/media/Images/CONNECTIONS3.webp" alt="" width="1536" height="1024" loading="lazy" decoding="async" />
           <div class="showreel-grain"></div>
         </div>
         <div class="showreel-copy"><p>INTRODUCTIONS<br />HAPPENING RIGHT NOW.</p><h2 id="showreel-title">MEET<br />YOUR KIND.</h2></div>
@@ -57,29 +72,29 @@
 
       <section class="orbit-section" aria-label="Where ideas begin">
         <div class="orbit-stack">
-          <div class="orbit-phone" aria-hidden="true"><img src="./media/assets/vintage-phone-cutout.webp" alt="" /></div>
+          <div class="orbit-phone" aria-hidden="true"><img src="./media/assets/vintage-phone-cutout.webp" alt="" width="1024" height="1536" loading="lazy" decoding="async" /></div>
           <h2 class="orbit-statement"><span>WHERE</span><span>IDEAS</span><span>BEGIN</span></h2>
         </div>
       </section>
 
       <section id="projects" class="project-stack" aria-label="Selected projects">
         <a class="project-card" href="/auth.html" data-project="01">
-          <img src="/media/Images/13DB55C5-4630-4EDC-8094-56FD22BD6331.webp" alt="Curated people waiting to be discovered" />
+          <img src="/media/Images/13DB55C5-4630-4EDC-8094-56FD22BD6331.webp" alt="Curated people waiting to be discovered" width="1536" height="1024" loading="lazy" decoding="async" />
           <div class="project-shade"></div>
           <div class="project-content"><h2>DISCOVER</h2><p>A match opens the door to a genuine introduction, making meaningful conversations feel effortless.</p><span class="project-action">EXPLORE PEOPLE <b>→</b></span></div>
         </a>
         <a class="project-card" href="/auth.html" data-project="02">
-          <img src="/media/Images/SWIPE1.webp" alt="Finding shared interests and perspectives" />
+          <img src="/media/Images/SWIPE1.webp" alt="Finding shared interests and perspectives" width="1448" height="1086" loading="lazy" decoding="async" />
           <div class="project-shade"></div>
           <div class="project-content"><h2>SWIPE</h2><p>Signal genuine intent towards people whose goals or perspective align with yours.</p><span class="project-action">SHOW INTEREST <b>→</b></span></div>
         </a>
         <a class="project-card" href="/auth.html" data-project="03">
-          <img src="/media/Images/CONNECT.webp" alt="Two people starting a private conversation" />
+          <img src="/media/Images/CONNECT.webp" alt="Two people starting a private conversation" width="1600" height="900" loading="lazy" decoding="async" />
           <div class="project-shade"></div>
           <div class="project-content"><h2>CONNECT</h2><p>A match opens a private line for a warm introduction without cold outreach.</p><span class="project-action">START A CONVERSATION <b>→</b></span></div>
         </a>
         <a class="project-card" href="/auth.html" data-project="04">
-          <img src="/media/Images/Swipe.webp" alt="A meaningful connection becoming something more" />
+          <img src="/media/Images/Swipe.webp" alt="A meaningful connection becoming something more" width="1536" height="1024" loading="lazy" decoding="async" />
           <div class="project-shade"></div>
           <div class="project-content"><h2>BUILD</h2><p>Turn meaningful connections into collaborations, opportunities, and something worth building together.</p><span class="project-action">SEE WHAT'S NEXT <b>→</b></span></div>
         </a>
@@ -92,10 +107,10 @@
       <section class="principles-section" id="principles" aria-labelledby="principles-title">
         <div class="principles-visual" aria-hidden="true">
           <div class="principles-visual-track">
-            <img class="principle-image is-active" data-principle-image="results" src="/media/Images/MATCHING1.webp" alt="" />
-            <img class="principle-image" data-principle-image="collaboration" src="/media/Images/MATCHING2.webp" alt="" />
-            <img class="principle-image" data-principle-image="specialists" src="/media/Images/MATCHING3.webp" alt="" />
-            <img class="principle-image" data-principle-image="function" src="/media/Images/MATCHING4.webp" alt="" />
+            <img class="principle-image is-active" data-principle-image="results" src="/media/Images/MATCHING1.webp" alt="" width="1448" height="1086" loading="lazy" decoding="async" />
+            <img class="principle-image" data-principle-image="collaboration" src="/media/Images/MATCHING2.webp" alt="" width="1600" height="900" loading="lazy" decoding="async" />
+            <img class="principle-image" data-principle-image="specialists" src="/media/Images/MATCHING3.webp" alt="" width="1600" height="900" loading="lazy" decoding="async" />
+            <img class="principle-image" data-principle-image="function" src="/media/Images/MATCHING4.webp" alt="" width="1448" height="1086" loading="lazy" decoding="async" />
           </div>
           <div class="matching-hero-layer">
             <div class="matching-hero-word" aria-hidden="true"><span style="--letter-index:0">M</span><span style="--letter-index:1">A</span><span style="--letter-index:2">T</span><span style="--letter-index:3">C</span><span style="--letter-index:4">H</span></div>
@@ -132,28 +147,28 @@
           </div>
           <div class="photo-flight-deck" data-photo-flight-deck>
             <figure class="photo-flight-card photo-flight-card--one is-active" data-principle-photo="results">
-              <div class="photo-card-float"><img src="/media/Images/MATCHING1.webp" alt="" decoding="async" /><figcaption><span>001 / BRIVIA</span><b>SHARED INTERESTS</b></figcaption></div>
+              <div class="photo-card-float"><img src="/media/Images/MATCHING1.webp" alt="" decoding="async" width="1448" height="1086" loading="lazy" /><figcaption><span>001 / BRIVIA</span><b>SHARED INTERESTS</b></figcaption></div>
             </figure>
             <figure class="photo-flight-card photo-flight-card--two" data-principle-photo="collaboration">
-              <div class="photo-card-float"><img src="/media/Images/MATCHING2.webp" alt="" decoding="async" /><figcaption><span>002 / BRIVIA</span><b>GOALS &amp; DIRECTION</b></figcaption></div>
+              <div class="photo-card-float"><img src="/media/Images/MATCHING2.webp" alt="" decoding="async" width="1600" height="900" loading="lazy" /><figcaption><span>002 / BRIVIA</span><b>GOALS &amp; DIRECTION</b></figcaption></div>
             </figure>
             <figure class="photo-flight-card photo-flight-card--three" data-principle-photo="specialists">
-              <div class="photo-card-float"><img src="/media/Images/MATCHING3.webp" alt="" decoding="async" /><figcaption><span>003 / BRIVIA</span><b>CURIOSITY</b></figcaption></div>
+              <div class="photo-card-float"><img src="/media/Images/MATCHING3.webp" alt="" decoding="async" width="1600" height="900" loading="lazy" /><figcaption><span>003 / BRIVIA</span><b>CURIOSITY</b></figcaption></div>
             </figure>
             <figure class="photo-flight-card photo-flight-card--four" data-principle-photo="function">
-              <div class="photo-card-float"><img src="/media/Images/MATCHING4.webp" alt="" decoding="async" /><figcaption><span>004 / BRIVIA</span><b>COMPLEMENTARY</b></figcaption></div>
+              <div class="photo-card-float"><img src="/media/Images/MATCHING4.webp" alt="" decoding="async" width="1448" height="1086" loading="lazy" /><figcaption><span>004 / BRIVIA</span><b>COMPLEMENTARY</b></figcaption></div>
             </figure>
             <figure class="photo-flight-card photo-flight-card--five">
-              <div class="photo-card-float"><img src="/media/Images/MATCHING5.webp" alt="" loading="lazy" decoding="async" /><figcaption><span>005 / BRIVIA</span><b>MEANINGFUL LINKS</b></figcaption></div>
+              <div class="photo-card-float"><img src="/media/Images/MATCHING5.webp" alt="" loading="lazy" decoding="async" width="1448" height="1086" /><figcaption><span>005 / BRIVIA</span><b>MEANINGFUL LINKS</b></figcaption></div>
             </figure>
             <figure class="photo-flight-card photo-flight-card--six">
-              <div class="photo-card-float"><img src="/media/Images/MATCHING6.webp" alt="" loading="lazy" decoding="async" /><figcaption><span>006 / BRIVIA</span><b>OPEN POSSIBILITIES</b></figcaption></div>
+              <div class="photo-card-float"><img src="/media/Images/MATCHING6.webp" alt="" loading="lazy" decoding="async" width="1600" height="900" /><figcaption><span>006 / BRIVIA</span><b>OPEN POSSIBILITIES</b></figcaption></div>
             </figure>
             <figure class="photo-flight-card photo-flight-card--seven">
-              <div class="photo-card-float"><img src="/media/Images/MATCHING7.webp" alt="" loading="lazy" decoding="async" /><figcaption><span>007 / BRIVIA</span><b>FIND YOUR KIND</b></figcaption></div>
+              <div class="photo-card-float"><img src="/media/Images/MATCHING7.webp" alt="" loading="lazy" decoding="async" width="1448" height="1086" /><figcaption><span>007 / BRIVIA</span><b>FIND YOUR KIND</b></figcaption></div>
             </figure>
             <figure class="photo-flight-card photo-flight-card--eight">
-              <div class="photo-card-float"><img src="/media/Images/MATCHING8.webp" alt="" loading="lazy" decoding="async" /><figcaption><span>008 / BRIVIA</span><b>BUILD SOMETHING REAL</b></figcaption></div>
+              <div class="photo-card-float"><img src="/media/Images/MATCHING8.webp" alt="" loading="lazy" decoding="async" width="1600" height="900" /><figcaption><span>008 / BRIVIA</span><b>BUILD SOMETHING REAL</b></figcaption></div>
             </figure>
           </div>
           <div class="matching-marquee-word" aria-hidden="true"><span>BRIVIA CLUB&nbsp;&nbsp; / &nbsp;&nbsp;FIND YOUR KIND&nbsp;&nbsp; / &nbsp;&nbsp;CONNECT WITH INTENT&nbsp;&nbsp; / &nbsp;&nbsp;</span></div>
@@ -191,15 +206,15 @@
         </div>
         <div class="process-steps">
           <article class="process-step process-step--think">
-            <div class="process-step-visual"><img src="/media/Images/CONTEXT1.webp" alt="A relevant introduction with useful context" /></div>
+            <div class="process-step-visual"><img src="/media/Images/CONTEXT1.webp" alt="A relevant introduction with useful context" width="1600" height="895" loading="lazy" decoding="async" /></div>
             <div class="process-step-copy"><span>01</span><h3>CONTEXT.</h3><p>A relevant match arrives with enough context to make the first message feel natural.</p></div>
           </article>
           <article class="process-step process-step--design">
-            <div class="process-step-visual"><img src="/media/Images/CONVERSATION..webp" alt="Two people beginning a conversation" /></div>
+            <div class="process-step-visual"><img src="/media/Images/CONVERSATION..webp" alt="Two people beginning a conversation" width="1452" height="1083" loading="lazy" decoding="async" /></div>
             <div class="process-step-copy"><span>02</span><h3>CONVERSATION.</h3><p>Exchange ideas, ask questions, and see what you have in common.</p></div>
           </article>
           <article class="process-step process-step--deliver">
-            <div class="process-step-visual"><img src="/media/Images/POSSIBILITY1.webp" alt="A connection growing into a possibility" /></div>
+            <div class="process-step-visual"><img src="/media/Images/POSSIBILITY1.webp" alt="A connection growing into a possibility" width="1536" height="1024" loading="lazy" decoding="async" /></div>
             <div class="process-step-copy"><span>03</span><h3>POSSIBILITY.</h3><p>Explore collaboration, stay connected, and let the relationship develop at its own pace.</p></div>
           </article>
         </div>
@@ -208,7 +223,7 @@
       <section class="playground-section" id="playground" aria-labelledby="playground-title">
         <div class="playground-stage" data-playground-stage>
           <div class="playground-video-frame">
-            <video class="playground-video" data-playground-video autoplay loop playsinline preload="auto" poster="./media/posters/write_Its_a_in_black_color.webp" aria-label="Hand-drawn badminton animation transitioning into a guitar">
+            <video class="playground-video" data-playground-video muted loop playsinline preload="none" poster="./media/posters/write_Its_a_in_black_color.webp" aria-label="Hand-drawn badminton animation transitioning into a guitar">
               <source media="(max-width: 700px)" src="./media/video/write_Its_a_in_black_color_mobile-720.mp4" type="video/mp4" />
               <source src="./media/video/write_Its_a_in_black_color-720.mp4" type="video/mp4" />
             </video>
@@ -219,7 +234,7 @@
             </button>
           </div>
           <div class="playground-scene playground-badminton" role="img" aria-label="Two people playing badminton in a premium hand-drawn sketch style">
-              <img class="badminton-premium-art" src="./media/assets/badminton-premium-no-shuttle.webp" alt="Two people playing badminton with rackets" />
+              <img class="badminton-premium-art" src="./media/assets/badminton-premium-no-shuttle.webp" alt="Two people playing badminton with rackets" width="1555" height="1011" loading="lazy" decoding="async" />
             <svg class="badminton-motion" viewBox="0 0 1000 600" aria-hidden="true">
               <path class="shuttle-trail" d="M494 274Q530 220 608 192" />
               <g class="sketch-sparkles"><path d="M166 177v25m-12-12h24M828 389v25m-12-12h24M414 116v19m-9-9h18" /><circle cx="180" cy="400" r="4" /><circle cx="785" cy="157" r="4" /></g>
@@ -236,7 +251,7 @@
                 </g>
             </svg>
           </div>
-          <img class="playground-scene playground-guitar guitar-premium-art" src="./media/assets/guitar-premium.webp" alt="" aria-hidden="true" />
+          <img class="playground-scene playground-guitar guitar-premium-art" src="./media/assets/guitar-premium.webp" alt="" aria-hidden="true" width="1546" height="1017" loading="lazy" decoding="async" />
           <svg class="playground-scene playground-guitar guitar-old-svg" viewBox="0 0 1000 600" aria-hidden="true">
             <path class="guitar-halo" d="M500 116c-170 0-306 78-306 180s136 180 306 180 306-78 306-180-136-180-306-180Z" />
             <g class="guitar-art">
@@ -259,10 +274,10 @@
         <div class="pillars-stage">
           <div class="pillars-stage-top"><p class="section-eyebrow">PILLARS</p><span>SCROLL TO EXPLORE</span></div>
           <div class="pillars-visual">
-            <img class="pillar-image is-active" data-pillar-image="private" src="/media/Images/PILLARS1.webp" alt="" />
-            <img class="pillar-image" data-pillar-image="curated" src="/media/Images/PILLARS2.webp" alt="" />
-            <img class="pillar-image" data-pillar-image="respectful" src="/media/Images/PILLARS3.webp" alt="" />
-            <img class="pillar-image" data-pillar-image="open" src="/media/Images/PILLARS4.webp" alt="" />
+            <img class="pillar-image is-active" data-pillar-image="private" src="/media/Images/PILLARS1.webp" alt="" width="1600" height="900" loading="lazy" decoding="async" />
+            <img class="pillar-image" data-pillar-image="curated" src="/media/Images/PILLARS2.webp" alt="" width="1536" height="1024" loading="lazy" decoding="async" />
+            <img class="pillar-image" data-pillar-image="respectful" src="/media/Images/PILLARS3.webp" alt="" width="1448" height="1086" loading="lazy" decoding="async" />
+            <img class="pillar-image" data-pillar-image="open" src="/media/Images/PILLARS4.webp" alt="" width="1600" height="900" loading="lazy" decoding="async" />
             <div class="pillar-wordset" aria-hidden="true">
               <span class="pillar-word is-active" data-pillar-word="private">PRIVATE</span>
               <span class="pillar-word" data-pillar-word="curated">CURATED</span>
@@ -284,7 +299,7 @@
       <section class="contact-section" hidden>
         <div class="contact-heading"><h2>LET'S TAAA</h2><h2>AAAKKKK!</h2></div>
         <a href="mailto:thebrivia.club@gmail.com" class="cta-button contact-button">CONTACT NOW <span class="button-arrows">→</span></a>
-        <a href="#about" class="portrait-link"><img src="/media/assets/bala.webp" alt="Balavignesh portrait" /></a>
+        <a href="#about" class="portrait-link"><img src="/media/assets/bala.webp" alt="Balavignesh portrait" width="1600" height="1600" loading="lazy" decoding="async" /></a>
         <div class="social-links">
           <a href="https://www.instagram.com/thebriviaclub?stkn=MWZpcWszZzhwOW8xbg==" target="_blank" rel="noreferrer">INSTAGRAM <span>↗</span></a>
           <a href="https://www.linkedin.com/company/the-brivia-club/" target="_blank" rel="noreferrer">LINKEDIN <span>↗</span></a>

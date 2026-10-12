@@ -33,3 +33,8 @@
     animation: intro-video-exit .2s ease .3s forwards;
   }
 }
+
+/* Phase B: the intro never blocks clicks on the page, and returning visitors never see it (see the inline script in index.html). */
+.intro-burst { pointer-events: none; }
+.intro-burst .intro-skip { pointer-events: auto; }
+html.no-intro .intro-burst { display: none !important; }

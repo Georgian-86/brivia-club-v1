@@ -21,48 +21,97 @@ import {
 import { matchTypedCity } from './area-pick.js';
 import { signupErrorCopy } from './signup-errors.js';
 import { defaultCoverUrl, normalizeCoverUrl } from './cover-assets.js';
+import { motionAllowed, introPlan, INTRO_CAP_MS, INTRO_START_GRACE_MS } from './landing-motion.js';
 
 const introBurst = document.querySelector('#intro-burst');
 const introSkip = introBurst?.querySelector('.intro-skip');
 const introVideo = introBurst?.querySelector('.intro-video');
-let skipIntro = false;
+const landingMotion = motionAllowed({
+  reducedMotion: Boolean(window.matchMedia?.('(prefers-reduced-motion: reduce)').matches),
+  saveData: Boolean(navigator.connection?.saveData),
+});
+// First visit only (localStorage, so a new tab or a later visit never replays it). The auth pages set
+// sessionStorage 'brivia-skip-intro-once' to skip it once; reduced-motion and save-data visitors get posters only.
+let plan = 'play';
 try {
-  const introSeen = window.sessionStorage.getItem('brivia-intro-seen') === 'true';
-  const skipFromAuth = window.sessionStorage.getItem('brivia-skip-intro-once') === 'true';
-  skipIntro = introSeen || skipFromAuth;
+  const fromAuth = window.sessionStorage.getItem('brivia-skip-intro-once') === 'true';
   window.sessionStorage.removeItem('brivia-skip-intro-once');
-  if (!introSeen || skipFromAuth) window.sessionStorage.setItem('brivia-intro-seen', 'true');
+  const seenBefore = window.localStorage.getItem('brivia-intro-seen') === 'true';
+  plan = introPlan({ seenBefore, fromAuth });
+  if (plan === 'skip' || fromAuth) window.localStorage.setItem('brivia-intro-seen', 'true');
 } catch {}
-if (introBurst && skipIntro) {
+if (!landingMotion) plan = 'skip';
+if (introBurst && plan === 'skip') {
   introBurst.remove();
 }
-if (introBurst && !skipIntro) {
+if (introBurst && plan === 'play') {
+  try { window.localStorage.setItem('brivia-intro-seen', 'true'); } catch {}
   document.body.classList.add('intro-active');
-  const finishIntro = () => {
+  let introDone = false;
+  const finishIntro = (fast = false) => {
+    if (introDone) return;
+    introDone = true;
     document.body.classList.remove('intro-active');
+    if (fast === true) introBurst.style.animationDuration = '.12s';
     introBurst.classList.add('is-skipped');
-    window.setTimeout(() => introBurst.remove(), 500);
+    window.setTimeout(() => introBurst.remove(), fast === true ? 160 : 500);
   };
   introVideo?.addEventListener('ended', () => window.setTimeout(finishIntro, 400), { once: true });
-  introVideo?.play().catch(() => {});
-  introSkip?.addEventListener('click', finishIntro);
-  window.setTimeout(finishIntro, 5000);
+  if (introVideo) {
+    introVideo.muted = true;
+    introVideo.preload = 'auto';
+    introVideo.play().catch(() => {});
+  }
+  introSkip?.addEventListener('click', () => finishIntro());
+  // Never look stuck: if the video has not started within the grace period, fade out; hard cap either way.
+  window.setTimeout(() => { if (!introVideo || introVideo.currentTime === 0) finishIntro(); }, INTRO_START_GRACE_MS);
+  // The cap counts from navigation start (not from when this script ran) and leaves room for the 120 ms fade.
+  window.setTimeout(() => finishIntro(true), Math.max(0, INTRO_CAP_MS - 150 - Math.round(window.performance?.now?.() || 0)));
 }
 
 /* Keep the landing-page music enabled on desktop and mobile. Browsers may
    reject autoplay with sound, so retry immediately on the first real gesture. */
 const landingVideos = [...document.querySelectorAll('.hero-video, [data-playground-video]')];
-const enableLandingVideoAudio = () => {
-  landingVideos.forEach((video) => {
-    video.muted = false;
-    video.defaultMuted = false;
-    video.volume = 1;
-    video.play().catch(() => {
-      video.muted = true;
-      video.play().catch(() => {});
-    });
+// Videos start late (hero when idle, playground when near the viewport) and never under reduced-motion or save-data.
+// Until a video has started, the gesture handler leaves it alone, so nothing is force-loaded. Every video keeps
+// `muted` + `playsinline` in the HTML (iOS autoplay); the first user gesture unmutes them as before.
+const startedLandingVideos = new Set();
+const playLandingVideo = (video) => {
+  video.muted = false;
+  video.defaultMuted = false;
+  video.volume = 1;
+  video.play().catch(() => {
+    video.muted = true;
+    video.play().catch(() => {});
   });
 };
+const startLandingVideo = (video) => {
+  if (!landingMotion || startedLandingVideos.has(video)) return;
+  startedLandingVideos.add(video);
+  video.preload = 'auto';
+  playLandingVideo(video);
+};
+const enableLandingVideoAudio = () => {
+  startedLandingVideos.forEach(playLandingVideo);
+};
+const heroLandingVideo = document.querySelector('.hero-video');
+if (landingMotion && heroLandingVideo) {
+  if (typeof window.requestIdleCallback === 'function') window.requestIdleCallback(() => startLandingVideo(heroLandingVideo), { timeout: 2000 });
+  else window.setTimeout(() => startLandingVideo(heroLandingVideo), 1200);
+}
+const belowFoldVideos = landingVideos.filter((video) => video !== heroLandingVideo);
+if (landingMotion && belowFoldVideos.length) {
+  if ('IntersectionObserver' in window) {
+    const videoObserver = new IntersectionObserver((entries) => {
+      entries.forEach((entry) => {
+        if (!entry.isIntersecting) return;
+        startLandingVideo(entry.target);
+        videoObserver.unobserve(entry.target);
+      });
+    }, { rootMargin: '200px' });
+    belowFoldVideos.forEach((video) => videoObserver.observe(video));
+  } else belowFoldVideos.forEach(startLandingVideo);
+}
 let landingMusicContext;
 let landingMusicGain;
 let landingMusicTimer;
@@ -103,7 +152,6 @@ const enableLandingExperienceAudio = () => {
   startLandingMusic();
   try { playgroundSoundEnabled = true; } catch { /* The declaration is initialized before user gestures can fire. */ }
 };
-enableLandingVideoAudio();
 ['pointerdown', 'touchstart', 'keydown'].forEach((eventName) => {
   window.addEventListener(eventName, enableLandingExperienceAudio, { once: true, passive: eventName !== 'keydown' });
 });
@@ -392,13 +440,13 @@ if (playgroundStage) {
     event.stopPropagation();
     if (!playgroundVideo) return;
     playgroundVideo.muted = !playgroundVideo.muted;
-    if (!playgroundVideo.muted) playgroundVideo.play().catch(() => {});
+    if (!playgroundVideo.muted && landingMotion) playgroundVideo.play().catch(() => {});
     updatePlaygroundAudioToggle();
   });
   updatePlaygroundAudioToggle();
   playgroundStage.addEventListener('click', (event) => {
     // Keep the animation muted until the user explicitly taps the audio toggle.
-    playgroundVideo?.play().catch(() => {});
+    if (landingMotion) playgroundVideo?.play().catch(() => {});
     startPlaygroundRally();
   });
   if ('IntersectionObserver' in window) {
