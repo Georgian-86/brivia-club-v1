@@ -115,3 +115,12 @@ body.auth-page .auth-shell .auth-signup-form .signup-step-actions :is(.auth-seco
   body.auth-page .auth-shell .auth-signup-form .signup-step-actions .signup-next { order: 1; }
   body.auth-page .auth-shell .auth-signup-form .signup-step-actions .auth-secondary { order: 2; justify-self: stretch; }
 }
+/* Hotfix 2026-10-12 (review): the rest of the success panel was cream or pink on cream. */
+body.auth-page .auth-shell .auth-panel .auth-success .auth-secondary {
+  color: var(--a11y-wine); border-color: color-mix(in srgb, var(--a11y-wine) 45%, transparent); background: transparent; font-size: 12px;
+}
+body.auth-page .auth-shell .auth-panel .auth-success .auth-secondary:hover,
+body.auth-page .auth-shell .auth-panel .auth-success .auth-secondary:focus-visible { color: #fffaf1; background: var(--a11y-wine); border-color: var(--a11y-wine); }
+body.auth-page .auth-shell .auth-panel .credential-row code,
+body.auth-page .auth-shell .auth-panel .credential-row button { color: var(--a11y-wine); font-size: 12px; }
+body.auth-page .auth-shell .auth-panel .credential-row > span { color: var(--a11y-ink-soft); font-size: 12px; }

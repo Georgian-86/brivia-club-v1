@@ -1537,7 +1537,7 @@ try {
   }
   // 14. Founder screenshots 2026-10-12: uneven gender tiles, near-invisible "Check your email." panel, and the
   //     Back / Create buttons overlapping on step 4 near 1330 px.
-  for (const w of [375, 1024, 1280, 1330, 1440]) {
+  for (const w of [375, 600, 1024, 1280, 1330, 1440]) {
     const context = await browser.newContext({ viewport: { width: w, height: 900 } });
     const stub = await stubContext(context, { signupSession: false });
     const { page, errors } = await newPage(context, stub.consoleLines);
@@ -1549,6 +1549,7 @@ try {
       assert.ok(Math.max(...ws) - Math.min(...ws) <= 1, `widths ${ws}`);
       assert.ok(Math.max(...hs) - Math.min(...hs) <= 1, `heights ${hs}`);
     });
+    if (w === 600) { await context.close(); continue; }
     await fillStepOne(page);
     await page.locator('[data-area-city]').click();
     await pickCityByKeyboard(page, 'Pun');
@@ -1577,10 +1578,22 @@ try {
     await finishStepFour(page);
     await page.waitForSelector('#auth-success:not([hidden])', { timeout: 10000 });
     await page.waitForTimeout(500);
-    const contrast = await axeViolations(page, { rules: ['color-contrast'], include: '#auth-success' });
-    const titleColor = await page.locator('[data-auth-success-title]').evaluate((el) => getComputedStyle(el).color);
-    check(`success: title and message pass axe color-contrast at ${w} (${contrast.join(' | ')}; title ${titleColor})`, () => {
-      assert.deepEqual(contrast, []); assert.notEqual(titleColor, 'rgb(255, 250, 241)');
+    const axeSuccess = await axeViolations(page, { rules: ['color-contrast'], include: '#auth-success' });
+    check(`success: axe reports no definite color-contrast violation at ${w} (axe leaves these nodes "incomplete"; the ratio checks below are the proof)`, () => assert.deepEqual(axeSuccess, []));
+    const measured = await page.evaluate(() => {
+      const parse = (c) => { const m = c.match(/[\d.]+/g).map(Number); return { r: m[0], g: m[1], b: m[2], a: m[3] ?? 1 }; };
+      const over = (top, bottom) => ({ r: top.r * top.a + bottom.r * (1 - top.a), g: top.g * top.a + bottom.g * (1 - top.a), b: top.b * top.a + bottom.b * (1 - top.a), a: 1 });
+      const backdrop = (el) => { const layers = []; for (let n = el; n; n = n.parentElement) layers.push(parse(getComputedStyle(n).backgroundColor)); return layers.reduceRight((acc, l) => over(l, acc), { r: 255, g: 255, b: 255, a: 1 }); };
+      const lum = ({ r, g, b }) => { const f = (v) => { v /= 255; return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4; }; return 0.2126 * f(r) + 0.7152 * f(g) + 0.0722 * f(b); };
+      const targets = { title: '[data-auth-success-title]', message: '[data-auth-success-message]', email: '[data-credential="account-email"]', copy: '[data-copy-credential]', loginIdLabel: '.credential-row > span', back: '.auth-close-success' };
+      return Object.fromEntries(Object.entries(targets).map(([name, sel]) => {
+        const el = document.querySelector(`#auth-success ${sel}`); const cs = getComputedStyle(el);
+        const bg = backdrop(el), fg = over(parse(cs.color), bg); const [hi, lo] = [lum(fg), lum(bg)].sort((a, b) => b - a);
+        return [name, { ratio: +((hi + 0.05) / (lo + 0.05)).toFixed(2), size: parseFloat(cs.fontSize) }];
+      }));
+    });
+    check(`success: every text element is >= 4.5:1 on the panel and >= 12 px at ${w} (${Object.entries(measured).map(([k, v]) => `${k} ${v.ratio}:1/${v.size}px`).join(', ')})`, () => {
+      for (const [name, v] of Object.entries(measured)) { assert.ok(v.ratio >= 4.5, `${name} contrast ${v.ratio}`); assert.ok(v.size >= 12, `${name} size ${v.size}`); }
     });
     check(`founder fixes ${w}: no uncaught page errors`, () => assert.deepEqual(errors, []));
     await context.close();
