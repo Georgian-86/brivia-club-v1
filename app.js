@@ -2038,19 +2038,27 @@ document.querySelector('#community-post-form')?.addEventListener('submit', async
   }
 });
 
-document.querySelectorAll('[data-nav]').forEach((button) => button.addEventListener('click', (event) => {
-  if (!validViews.includes(button.dataset.nav)) return;
-  if (button.tagName === 'A') {
-    // The static route bridge handles anchor navigation before this module's
-    // view handler. Reload the shared feed after that bridge has switched the
-    // active view, so posts appear without a full page refresh.
-    if (button.dataset.nav === 'posts') window.setTimeout(() => {
-      if (document.body.dataset.appView === 'posts' && memberProfile.id) loadCommunityPosts();
-    }, 0);
-    return;
+// Every [data-nav] click (header, tab bar, avatar, empty-state actions, including ones rendered later) runs setView, so
+// a nav click leaves the app exactly as setView(view) does. Capture phase on document: this runs before the inline route
+// bridge in app.html, and preventDefault() tells the bridge (which only covers clicks before this module loads) to skip,
+// so one click pushes at most one history entry.
+document.addEventListener('click', (event) => {
+  const item = event.target.closest?.('[data-nav]');
+  if (!item || event.defaultPrevented || event.button > 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+  const view = item.dataset.nav;
+  if (!validViews.includes(view)) return;
+  if (view === 'home' && item.tagName === 'A' && item.getAttribute('href') === '/') return;
+  event.preventDefault();
+  const nextUrl = new URL(window.location.href);
+  if (view === 'home') nextUrl.searchParams.delete('view');
+  else nextUrl.searchParams.set('view', view);
+  if (validViews.includes(nextUrl.hash.slice(1))) nextUrl.hash = '';
+  const next = nextUrl.pathname + nextUrl.search + nextUrl.hash;
+  if (next !== window.location.pathname + window.location.search + window.location.hash) {
+    window.history.pushState({ ...(window.history.state || {}), appView: view }, '', next);
   }
-  setView(button.dataset.nav);
-}));
+  setView(view);
+}, true);
 window.addEventListener('popstate', () => {
   const state = window.history.state || {};
   const hasView = new URLSearchParams(window.location.search).has('view') || Boolean(window.location.hash.slice(1));

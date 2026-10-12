@@ -173,6 +173,46 @@ try {
       await context.close();
     }
 
+    // 4b. A nav click runs setView: the target view re-renders, the page scrolls to the top, one history entry per click.
+    for (const [tag, viewport] of [['1440', WIDE], ['375', NARROW]]) {
+      const { context, page } = await open(viewport);
+      const host = tag === '1440' ? 'header' : 'tabbar';
+      const clickTab = async (view) => {
+        await page.evaluate(() => window.scrollTo(0, 400));
+        // Blank the rendered chat list and profile name just before the click: only a setView re-render (synchronous in
+        // the click) brings them back within 100 ms, before any periodic sync could.
+        await page.evaluate(() => { document.querySelector('#chat-list').innerHTML = ''; document.querySelector('#profile-name').textContent = ''; });
+        await page.locator(`[data-nav-host="${host}"] [data-nav="${view}"]`).click({ timeout: 5000 }).catch((error) => console.log(`click failed: ${error.message.split('\n')[0]}`));
+        await page.waitForTimeout(100);
+        const rendered = await page.evaluate(() => ({ rows: document.querySelectorAll('#chat-list .chat-inbox-scroll').length, name: document.querySelector('#profile-name').textContent.trim() }));
+        await page.waitForTimeout(800);
+        return rendered;
+      };
+      // The app pushes its Back guard entry once the community data has loaded; count clicks only after that.
+      await page.waitForFunction(() => window.history.state?.briviaAppBackGuard === true, null, { timeout: 8000 }).catch(() => {});
+      const startLength = await page.evaluate(() => history.length);
+      const afterChat = await clickTab('chat');
+      const chat = await page.evaluate((r) => ({ rows: r.rows, y: window.scrollY, len: history.length }), afterChat);
+      check(`${tag}: clicking Chat re-renders the chat list and scrolls to the top (${JSON.stringify(chat)})`, () => { assert.equal(chat.rows, 1); assert.equal(chat.y, 0); });
+      const afterProfile = await clickTab('profile');
+      const prof = await page.evaluate((r) => ({ name: r.name, y: window.scrollY, len: history.length }), afterProfile);
+      check(`${tag}: clicking Profile fills the profile name and scrolls to the top (${JSON.stringify(prof)})`, () => { assert.equal(prof.name, 'Alex Me'); assert.equal(prof.y, 0); });
+      await clickTab('posts');
+      await clickTab('explore');
+      const conn = await page.evaluate(() => ({ y: window.scrollY, len: history.length }));
+      check(`${tag}: clicking Connect scrolls to the top (${JSON.stringify(conn)})`, () => assert.equal(conn.y, 0));
+      check(`${tag}: one history entry per click (${startLength} -> ${chat.len}, ${prof.len}, ${conn.len})`, () => { assert.equal(chat.len, startLength + 1); assert.equal(prof.len, startLength + 2); assert.equal(conn.len, startLength + 4); });
+      await page.goBack();
+      await settle(page);
+      let s = await navState(page);
+      check(`${tag}: Back from Connect returns to Explore (${JSON.stringify(s)})`, () => routeMatches(s, 'posts'));
+      await page.goBack();
+      await settle(page);
+      s = await navState(page);
+      check(`${tag}: Back again returns to Profile (${JSON.stringify(s)})`, () => routeMatches(s, 'profile'));
+      await context.close();
+    }
+
     // 5. A long name and area: no horizontal page scroll at 375 px on any view.
     st.own = { id: '11111111-1111-4111-8111-111111111111', name: 'Maximiliana Alexandrina Featherstonehaugh-Worthington', full_name: 'Maximiliana Alexandrina Featherstonehaugh-Worthington', email: 'alex@test.brivia.club', phone: '', city: null, state: null, experience: 'Founder', skills: ['Badminton'], looking_for: ['Friends'], created_at: new Date(Date.now() - 9e6).toISOString() };
     st.placeLabel = 'Thiruvananthapuram Technopark Kazhakkoottam Phase Three';

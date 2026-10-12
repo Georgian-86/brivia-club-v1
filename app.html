@@ -119,6 +119,8 @@
           });
         };
         document.addEventListener('click', (event) => {
+          // app.js handles nav clicks once it has loaded (and prevents the default); this bridge only covers earlier clicks.
+          if (event.defaultPrevented) return;
           const item = event.target.closest('[data-nav]');
           if (!item) return;
           const targetView = item.dataset.nav;
