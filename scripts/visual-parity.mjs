@@ -13,6 +13,22 @@ const settle = (page, ms = 800) => page.waitForTimeout(ms);
 // networkidle can stay busy forever (streaming media); never block on it for more than a few seconds.
 const idle = (page) => page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
 
+// Lazy images (loading="lazy") only start when scrolled near; whether they were decoded before a shot was a race
+// (section-08 sometimes showed the grey skeleton). Make them eager, then require every <img> complete and decoded.
+async function imagesReady(page) {
+  await page.evaluate(() => document.querySelectorAll('img[loading="lazy"]').forEach((i) => { i.loading = 'eager'; }));
+  const ok = await page.evaluate(async () => {
+    const deadline = Date.now() + 15000;
+    while (Date.now() < deadline) {
+      if ([...document.images].every((i) => i.complete)) break;
+      await new Promise((r) => setTimeout(r, 100));
+    }
+    await Promise.all([...document.images].map((i) => i.decode().catch(() => {})));
+    return [...document.images].filter((i) => !i.complete).map((i) => i.currentSrc || i.src);
+  });
+  if (ok.length) throw new Error(`images never finished loading: ${ok.join(', ')}`);
+}
+
 async function ready(page) {
   await page.evaluate(() => document.fonts.ready);
   // Chromium sizes a <select>'s inner text with whatever font was loaded at first layout and may not redo it
@@ -28,23 +44,23 @@ const PAGES = {
     path: '/',
     async shots(page, vp, shot) {
       await ready(page);
-      await shot('hero');
-      // Warm-up pass: lazy images/backgrounds load on first sight; scroll the whole page once so every shot
-      // sees them already decoded (otherwise below-the-fold imagery races the screenshot).
+      // Warm-up: scroll the whole page once (scroll-driven reveals), then load and decode every image.
       const total = await page.evaluate(() => document.documentElement.scrollHeight);
       for (let y = 0; y < total; y += Math.max(300, vp.h / 2)) {
         await page.evaluate((top) => window.scrollTo({ top, behavior: 'instant' }), y);
         await page.waitForTimeout(150);
       }
+      await imagesReady(page);
       await idle(page);
-      await page.evaluate(() => Promise.race([Promise.all([...document.images].map((i) => i.decode().catch(() => {}))), new Promise((r) => setTimeout(r, 5000))]));
       await page.evaluate(() => window.scrollTo({ top: 0, behavior: 'instant' }));
       await settle(page);
+      await shot('hero');
       const n = await page.locator('main > section').count();
       for (let i = 0; i < n; i++) {
         const sec = page.locator('main > section').nth(i);
         if (!(await sec.isVisible())) continue; // hidden at this width: nothing to compare
         await sec.evaluate((el) => el.scrollIntoView({ block: 'start', behavior: 'instant' }));
+        await imagesReady(page);
         await idle(page);
         await settle(page);
         await shot(`section-${String(i + 1).padStart(2, '0')}`);
@@ -55,6 +71,7 @@ const PAGES = {
     path: '/auth.html#signup',
     async shots(page, vp, shot) {
       await ready(page);
+      await imagesReady(page);
       await shot('signup-step1');
     },
   },
@@ -146,7 +163,12 @@ if (cmd === 'capture') {
   const { rmSync } = await import('node:fs');
   rmSync(tmp, { recursive: true, force: true });
   mkdirSync(tmp, { recursive: true });
-  await withServer(() => captureAll(tmp, pages));
+  try {
+    await withServer(() => captureAll(tmp, pages));
+  } catch (e) {
+    rmSync(tmp, { recursive: true, force: true });
+    throw e;
+  }
   const base = readdirSync(dir).filter((f) => f.endsWith('.png') && pages.some((p) => f.startsWith(p + '-')));
   const fresh = readdirSync(tmp).filter((f) => f.endsWith('.png'));
   const all = new Set([...fresh, ...base]);
