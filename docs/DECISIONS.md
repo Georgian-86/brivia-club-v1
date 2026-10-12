@@ -877,3 +877,30 @@ Left as is:
   - Work continues on the working branch, with the full gate before every push.
   - When a change is ready to go live, fast-forward `main` to the branch, with the founder's OK.
   - The manual `create_deployment` step from D-050 is no longer needed.
+
+## D-052: Arena on what signup requires: a D-variant of option A (PROPOSED, awaiting founder approval) (2026-10-12)
+
+The founder asked which signup option is best (A minimum / B everything one-per-screen / C middle). Record:
+`docs/arena/2026-10-12-signup-fields.md`. The panel was 4 independent critics plus a judge, all Claude models (reduced
+heterogeneity, disclosed). All four rejected B and C.
+
+**Judge's verdict (D-variant of A).**
+- **Account first.** Google is primary. The email path signs in with a 6-digit code, so answers save on the server from
+  screen 3 and nobody is left at "check your email".
+- **Screens:** welcome → email → code → 18+ → name → area → interests → "which matters most?" → reveal and deck.
+- **Points:** tier taps with one required "top passion". Weights 4/2/1, converted to 20 points by largest remainder,
+  each interest at least 1 point. "Fine-tune" steppers are optional. Never shown incomplete, never a "points left" count.
+  - An even default split was rejected: it erases the ordering ORBIT's resonance term relies on, and only the first
+    interest save is free.
+- **Later checklist:** photo (nudged at the first like), looking-for (at the first request), mode, experience, cover.
+- **Not collected:** phone and gender. Neither has a working purpose today (DPDP s.6 minimisation; gender is null in
+  every card RPC).
+- **Blockers and order:**
+  1. Custom SMTP (the code email) and Google OAuth production config.
+  2. Migration 0007 to bump the notice version, shipped with `privacy.html` and `notice-version.js` in one window.
+  3. Deletion re-auth for passwordless members.
+  4. UX_SPEC §A and the e2e tests updated in the same commit.
+- **Preserved dissent:**
+  - Trust: let members finish now and stay invisible until their email is verified. This wins if that is cheap
+    server-side.
+  - UX: an even pre-split. This wins back if the required top pick costs more than about 2 points of completion.
