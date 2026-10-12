@@ -866,3 +866,14 @@ Left as is:
   Brevo or SES). Raise the email rate limit, and use a Brivia-branded confirmation template.
 - The photo-upload re-test on live waits until the limit resets or SMTP is set. It is covered by the e2e blocks 13
   and 13b.
+
+## D-051: `main` fast-forwarded to the working branch; production now deploys from `main` (2026-10-12)
+
+- **What happened.** At the founder's request, `main` was fast-forwarded from `9b911d3` to `3a51671`. That is all 116
+  commits of `claude/jolly-edison-49xvza`: no merge commit, and nothing on `main` was lost.
+- **Confirmed.** `main` is the Vercel production branch. The push started a production build of `main` on its own.
+- **From now on:**
+  - A change reaches `https://brivia-club.vercel.app` when it lands on `main`.
+  - Work continues on the working branch, with the full gate before every push.
+  - When a change is ready to go live, fast-forward `main` to the branch, with the founder's OK.
+  - The manual `create_deployment` step from D-050 is no longer needed.

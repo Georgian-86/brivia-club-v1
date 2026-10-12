@@ -18,7 +18,7 @@ Update this file at the end of every session. CLAUDE.md holds the aim; this file
 | Iteration 4 arenas (P0-B design; end-of-iteration critique → P0-C backlog) | Done | `docs/arena/2026-10-05-p0b-design.md`, `docs/arena/2026-10-07-iteration-4.md`; D-044, D-046 |
 | Landing page | Yashika's original UI, unchanged (founder rule: optimise, never redesign) | `index.html`, CSS |
 | **Live signup walkthrough** (real browser on the live URL; 7 UI bugs fixed incl. lost signup photo, typed-city refusal, invalid phone pattern) | Done, pushed (auto-deploys) | D-049 |
-| Decisions | D-001 … D-050, append-only | `docs/DECISIONS.md` |
+| Decisions | D-001 … D-051, append-only | `docs/DECISIONS.md` |
 
 Test status after D-049: SQL harness ALL PASSED; build OK; `test:unit` 96/96 (also `TZ=Asia/Kolkata`); orbit 86/86;
 e2e consent 154, onboarding 219, deck 103; `test:unit` now 99.
@@ -36,8 +36,8 @@ Tooling: Playwright **and axe-core** at `/tmp/pw` (`npm install --prefix /tmp/pw
   `supabase/tests/policies-0006.expected.tsv` exactly, and the advisors are as the README expects. New SQL goes in
   **`0007+`**, starting with the D-046 P0-C items.
 - **Client deployed:** Vercel project `brivia-club` (team "Golu's projects") at `https://brivia-club.vercel.app`.
-  **A push builds a preview only**; production moves only with a production deployment (Vercel MCP `create_deployment`
-  with `target: production` and the branch's `gitSource`; `request_promote` is refused on this plan). D-050.
+  **Production deploys from `main`** (D-051): `main` was fast-forwarded to the working branch on 2026-10-12. A push
+  to the working branch builds a preview only; to go live, fast-forward `main` to it (founder OK) and Vercel deploys.
   The Supabase Auth Site URL and redirect are set to it.
   Vercel Deployment Protection is on by default; turn it off if testers without a Vercel login need access.
 - **Live checks:** the `amr` re-auth on deletion **works** (D-049: `reauth_required` → password → deleted, zero rows
