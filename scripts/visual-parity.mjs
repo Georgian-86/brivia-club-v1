@@ -4,6 +4,7 @@ import { spawn } from 'node:child_process';
 import { mkdirSync, readdirSync, readFileSync, writeFileSync, existsSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
+import { imagesReady } from './parity-images.mjs';
 
 const PORT = 5194;
 const ORIGIN = `http://localhost:${PORT}`;
@@ -12,22 +13,6 @@ const settle = (page, ms = 800) => page.waitForTimeout(ms);
 
 // networkidle can stay busy forever (streaming media); never block on it for more than a few seconds.
 const idle = (page) => page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
-
-// Lazy images (loading="lazy") only start when scrolled near; whether they were decoded before a shot was a race
-// (section-08 sometimes showed the grey skeleton). Make them eager, then require every <img> complete and decoded.
-async function imagesReady(page) {
-  await page.evaluate(() => document.querySelectorAll('img[loading="lazy"]').forEach((i) => { i.loading = 'eager'; }));
-  const ok = await page.evaluate(async () => {
-    const deadline = Date.now() + 15000;
-    while (Date.now() < deadline) {
-      if ([...document.images].every((i) => i.complete)) break;
-      await new Promise((r) => setTimeout(r, 100));
-    }
-    await Promise.all([...document.images].map((i) => i.decode().catch(() => {})));
-    return [...document.images].filter((i) => !i.complete).map((i) => i.currentSrc || i.src);
-  });
-  if (ok.length) throw new Error(`images never finished loading: ${ok.join(', ')}`);
-}
 
 async function ready(page) {
   await page.evaluate(() => document.fonts.ready);
