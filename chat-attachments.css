@@ -89,7 +89,7 @@
   inset:0;
   display:block;
   pointer-events:none;
-  background:linear-gradient(rgba(45,25,20,.08),rgba(45,25,20,.08)),url('./assets/chat-reference-room.png') center center / cover no-repeat;
+  background:linear-gradient(rgba(45,25,20,.08),rgba(45,25,20,.08)),url('./media/assets/chat-reference-room.webp') center center / cover no-repeat;
   background-attachment:fixed;
   filter:blur(4px);
   transform:scale(1.03) translateZ(0);

@@ -57,7 +57,7 @@ body.app-body{background:radial-gradient(circle at 84% 6%,rgba(137,43,73,.09),tr
 .app-main{width:100%;max-width:none}
 
 /* Warm editorial backdrop for the logged-in discovery home. */
-.app-view[data-view="home"]{position:relative;isolation:isolate;min-height:calc(100svh - 76px);overflow:hidden;background:linear-gradient(110deg,rgba(250,246,238,.9) 0%,rgba(250,246,238,.68) 48%,rgba(250,246,238,.2) 100%),url('/Images/after%20login%20bg.jpeg') center/cover no-repeat;border-radius:0 0 28px 28px;box-shadow:inset 0 -80px 100px rgba(89,35,27,.08)}
+.app-view[data-view="home"]{position:relative;isolation:isolate;min-height:calc(100svh - 76px);overflow:hidden;background:linear-gradient(110deg,rgba(250,246,238,.9) 0%,rgba(250,246,238,.68) 48%,rgba(250,246,238,.2) 100%),url('/media/Images/after%20login%20bg.webp') center/cover no-repeat;border-radius:0 0 28px 28px;box-shadow:inset 0 -80px 100px rgba(89,35,27,.08)}
 .app-view[data-view="home"]>*{position:relative;z-index:1}
 .app-view[data-view="home"] .view-topline{color:rgba(52,31,28,.64)}
 .app-view[data-view="home"] .home-heading h1{color:#291d1b}

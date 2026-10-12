@@ -204,7 +204,7 @@ body.app-body[data-app-view="chat"] .app-topbar{width:100%;}
   z-index:-1;
   inset:-12px;
   content:"";
-  background:url('./assets/chat-reference-room.png') center/cover no-repeat;
+  background:url('./media/assets/chat-reference-room.webp') center/cover no-repeat;
   filter:blur(3px);
   opacity:.8;
   transform:scale(1.03);

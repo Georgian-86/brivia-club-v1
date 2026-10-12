@@ -40,7 +40,7 @@
   .app-view[data-view="chat"] .chat-window-head small{color:rgba(51,37,34,.58);font-family:Georgia,'Times New Roman',serif;font-size:9px}
   .app-view[data-view="chat"] .chat-window-head:after{margin-left:auto;color:var(--brivia-wine);content:'•••';font-size:16px;letter-spacing:2px}
   .app-view[data-view="chat"] .chat-back{display:none}
-  .app-view[data-view="chat"] .chat-messages{flex:1;min-height:0;padding:30px 9%;background-color:#6d5548;background-image:linear-gradient(rgba(55,30,25,.12),rgba(55,30,25,.12)),url('./assets/chat-bg-soft.png');background-position:center;background-size:cover}
+  .app-view[data-view="chat"] .chat-messages{flex:1;min-height:0;padding:30px 9%;background-color:#6d5548;background-image:linear-gradient(rgba(55,30,25,.12),rgba(55,30,25,.12)),url('./media/assets/chat-bg-soft.webp');background-position:center;background-size:cover}
   .app-view[data-view="chat"] .message{max-width:min(58%,380px);padding:12px 14px;border-radius:14px;font-family:Georgia,'Times New Roman',serif;font-size:12px;line-height:1.35;box-shadow:0 4px 15px rgba(45,25,21,.14)}
   .app-view[data-view="chat"] .message.them{border:0;border-bottom-left-radius:5px;background:#f4eee6;color:var(--brivia-ink)}
   .app-view[data-view="chat"] .message.me{border-bottom-right-radius:5px;background:var(--brivia-wine);color:#fffaf1}
@@ -49,14 +49,14 @@
   .app-view[data-view="chat"] .chat-compose{flex:0 0 70px;align-items:center;padding:10px 16px;border-top:1px solid var(--brivia-line);background:rgba(247,239,229,.96)}
   .app-view[data-view="chat"] .chat-compose input{height:42px;border:0;background:#f4eee6;font-family:Georgia,'Times New Roman',serif;font-size:11px}
   .app-view[data-view="chat"] .chat-compose button{width:34px;height:34px;flex-basis:34px;background:var(--brivia-wine);font-size:18px}
-  .app-view[data-view="chat"] .inbox-empty-window{position:relative;display:flex!important;align-items:stretch;justify-content:space-between;flex-direction:column;padding:0;background-color:#72594b;background-image:linear-gradient(rgba(55,30,25,.1),rgba(55,30,25,.1)),url('./assets/chat-bg-soft.png');background-position:center;background-size:cover;color:var(--brivia-ink);text-align:left}
+  .app-view[data-view="chat"] .inbox-empty-window{position:relative;display:flex!important;align-items:stretch;justify-content:space-between;flex-direction:column;padding:0;background-color:#72594b;background-image:linear-gradient(rgba(55,30,25,.1),rgba(55,30,25,.1)),url('./media/assets/chat-bg-soft.webp');background-position:center;background-size:cover;color:var(--brivia-ink);text-align:left}
   .app-view[data-view="chat"] .inbox-empty-window>*{display:none}
   .app-view[data-view="chat"] .inbox-empty-window:before{display:block;flex:1;padding:24px 9%;white-space:pre-wrap;color:var(--brivia-ink);content:'✦  Brivia AI\A     Online\A\A Hi! I’m Brivia AI.\A How can I help you today?\A\A                     I’m looking for a co-founder';font-family:Georgia,'Times New Roman',serif;font-size:12px;line-height:2.4;background:linear-gradient(180deg,rgba(247,239,229,.92) 0 64px,transparent 64px)}
   .app-view[data-view="chat"] .inbox-empty-window:after{display:block;flex:0 0 70px;margin:0 16px 12px;padding:25px 14px;border-radius:16px;color:rgba(51,37,34,.58);content:'⌕   Message Brivia AI...                         Press Enter to send     →';font-family:Georgia,'Times New Roman',serif;font-size:10px;background:rgba(247,239,229,.94)}
 }
 
 @media(min-width:701px){
-  .app-view[data-view="chat"] .chat-messages,.app-view[data-view="chat"] .inbox-empty-window .empty-chat-messages{background-image:linear-gradient(rgba(45,25,20,.08),rgba(45,25,20,.08)),url('./assets/chat-reference-room.png')!important;background-position:center center!important;background-size:cover!important}
+  .app-view[data-view="chat"] .chat-messages,.app-view[data-view="chat"] .inbox-empty-window .empty-chat-messages{background-image:linear-gradient(rgba(45,25,20,.08),rgba(45,25,20,.08)),url('./media/assets/chat-reference-room.webp')!important;background-position:center center!important;background-size:cover!important}
 }
 
 @media(min-width:701px){
@@ -111,7 +111,7 @@
   .app-view[data-view="chat"] .empty-chat-head strong{font-size:16px}
   .app-view[data-view="chat"] .empty-chat-head span{margin-top:2px;color:rgba(51,37,34,.58);font-size:10px}
   .app-view[data-view="chat"] .empty-chat-head b{margin-left:auto;color:var(--brivia-wine);font-size:15px;letter-spacing:2px}
-  .app-view[data-view="chat"] .empty-chat-messages{display:flex!important;flex:1;flex-direction:column;justify-content:flex-end;gap:13px;padding:30px 9%;background-color:#72594b;background-image:linear-gradient(rgba(55,30,25,.1),rgba(55,30,25,.1)),url('./assets/chat-bg-soft.png');background-position:center;background-size:cover}
+  .app-view[data-view="chat"] .empty-chat-messages{display:flex!important;flex:1;flex-direction:column;justify-content:flex-end;gap:13px;padding:30px 9%;background-color:#72594b;background-image:linear-gradient(rgba(55,30,25,.1),rgba(55,30,25,.1)),url('./media/assets/chat-bg-soft.webp');background-position:center;background-size:cover}
   .app-view[data-view="chat"] .empty-chat-bubble{display:block!important;width:max-content;max-width:58%;padding:12px 14px;border-radius:14px;font-family:Georgia,'Times New Roman',serif;font-size:12px;line-height:1.35;box-shadow:0 4px 15px rgba(45,25,21,.14)}
   .app-view[data-view="chat"] .empty-chat-bubble small{display:block;margin-top:7px;text-align:right;font-size:8px;opacity:.6}
   .app-view[data-view="chat"] .empty-chat-bubble span{display:block}

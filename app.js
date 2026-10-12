@@ -1004,12 +1004,12 @@ bindCardOverflow(async (action, trigger) => {
 });
 
 const exploreCoverImages = [
-  './assets/chat-reference-room.png',
-  './assets/macbook-roses-cream.png',
-  './assets/macbook-roses-back.png',
-  './assets/guitar-premium.png',
-  './assets/badminton-premium-no-shuttle.png',
-  './assets/sites.jpg',
+  './media/assets/chat-reference-room.webp',
+  './media/assets/macbook-roses-cream.webp',
+  './media/assets/macbook-roses-back.webp',
+  './media/assets/guitar-premium.webp',
+  './media/assets/badminton-premium-no-shuttle.webp',
+  './media/assets/sites.webp',
 ];
 
 const uniqueFilterValues = (values) => {

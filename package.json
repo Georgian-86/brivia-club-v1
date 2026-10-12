@@ -7,9 +7,12 @@
     "build": "vite build",
     "preview": "vite preview",
     "test:unit": "node --test tests/unit/*.test.mjs",
-    "check:assets": "node scripts/check-asset-budget.mjs"
+    "check:assets": "node scripts/check-asset-budget.mjs",
+    "media:build": "node scripts/optimize-media.mjs",
+    "media:repoint": "node scripts/repoint-media.mjs"
   },
   "devDependencies": {
+    "sharp": "^0.35.5",
     "vite": "latest"
   },
   "dependencies": {

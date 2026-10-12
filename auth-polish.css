@@ -567,7 +567,7 @@
 }
 
 /* Landscape envelope transition between the welcome choice and the next auth window. */
-.auth-envelope-transition{position:absolute;z-index:12;inset:0;display:grid;place-items:center;overflow:hidden;visibility:hidden;background:linear-gradient(135deg,rgba(39,3,14,.93),rgba(91,6,31,.91)),url('./assets/chat-bg-soft.png') center/cover;opacity:0;pointer-events:none;transition:opacity .28s ease,visibility .28s ease}
+.auth-envelope-transition{position:absolute;z-index:12;inset:0;display:grid;place-items:center;overflow:hidden;visibility:hidden;background:linear-gradient(135deg,rgba(39,3,14,.93),rgba(91,6,31,.91)),url('./media/assets/chat-bg-soft.webp') center/cover;opacity:0;pointer-events:none;transition:opacity .28s ease,visibility .28s ease}
 .auth-shell.is-envelope-opening .auth-envelope-transition{visibility:visible;opacity:1;pointer-events:auto}
 .auth-shell.is-envelope-opening .auth-panel{opacity:0;transform:scale(.96);transition:opacity .24s ease,transform .24s ease}
 .auth-envelope-scene{display:grid;justify-items:center;gap:25px;width:100%;perspective:1100px}
@@ -945,7 +945,7 @@
   padding: 0;
   overflow: hidden;
   background-color: #430416;
-  background-image: linear-gradient(90deg, rgba(42, 2, 12, .05), rgba(42, 2, 12, .16)), url('./assets/auth-desk-panel.png');
+  background-image: linear-gradient(90deg, rgba(42, 2, 12, .05), rgba(42, 2, 12, .16)), url('./media/assets/auth-desk-panel.webp');
   background-position: center;
   background-repeat: no-repeat;
   background-size: cover;
@@ -1357,7 +1357,7 @@
   min-width: 0;
   min-height: 0;
   background-color: #f3e9df;
-  background-image: url('./assets/vintage-phone.png');
+  background-image: url('./media/assets/vintage-phone.webp');
   background-position: left center;
   background-repeat: no-repeat;
   background-size: auto 100%;
@@ -1594,7 +1594,7 @@
 }
 
 .auth-shell:has(.auth-login.is-active) .auth-phone {
-  background-image: url('./assets/vintage-phone.png'), radial-gradient(rgba(90, 6, 31, .025) .45px, transparent .65px), repeating-linear-gradient(0deg, rgba(255, 255, 255, .07) 0 1px, transparent 1px 4px) !important;
+  background-image: url('./media/assets/vintage-phone.webp'), radial-gradient(rgba(90, 6, 31, .025) .45px, transparent .65px), repeating-linear-gradient(0deg, rgba(255, 255, 255, .07) 0 1px, transparent 1px 4px) !important;
   background-position: left center, 0 0, 0 0 !important;
   background-repeat: no-repeat, repeat, repeat !important;
   background-size: auto 100%, 5px 5px, 100% 4px !important;
@@ -1833,7 +1833,7 @@
   padding: 0;
   overflow: hidden;
   background-color: #430416;
-  background-image: linear-gradient(90deg, rgba(40, 2, 12, .03), rgba(40, 2, 12, .1)), url('./assets/auth-desk-panel.png');
+  background-image: linear-gradient(90deg, rgba(40, 2, 12, .03), rgba(40, 2, 12, .1)), url('./media/assets/auth-desk-panel.webp');
   background-position: center center;
   background-size: cover;
 }
@@ -2246,7 +2246,7 @@
 
 .auth-shell:has(.auth-login.is-active) .auth-visual {
   background-color: #430416;
-  background-image: linear-gradient(90deg, rgba(40, 2, 12, .03), rgba(40, 2, 12, .1)), url('./assets/auth-desk-panel.png');
+  background-image: linear-gradient(90deg, rgba(40, 2, 12, .03), rgba(40, 2, 12, .1)), url('./media/assets/auth-desk-panel.webp');
   background-position: center center;
   background-size: cover;
 }
@@ -2298,7 +2298,7 @@
   grid-area: phone !important;
   min-width: 0;
   min-height: 0;
-  background: #f3e9df url('./assets/vintage-phone.png') clamp(96px, 10.5vw, 202px) center / auto 100% no-repeat;
+  background: #f3e9df url('./media/assets/vintage-phone.webp') clamp(96px, 10.5vw, 202px) center / auto 100% no-repeat;
 }
 
 .auth-shell:has(.auth-login.is-active) .auth-panel {
@@ -2686,7 +2686,7 @@
     grid-area: phone !important;
     min-width: 0;
     min-height: 0;
-    background: #f3e9df url('./assets/vintage-phone.png') clamp(120px, 10.5vw, 202px) center / auto 100% no-repeat;
+    background: #f3e9df url('./media/assets/vintage-phone.webp') clamp(120px, 10.5vw, 202px) center / auto 100% no-repeat;
   }
 
   .auth-shell:has(.auth-signup.is-active) .auth-panel {
