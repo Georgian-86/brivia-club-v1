@@ -1,4 +1,5 @@
 // Phase E guided signup: flow model. Pure, no DOM and no storage.
+import { realName } from './onboarding-guard.js';
 export const SCREENS = {
   email: ['welcome', 'email', 'code', 'adult', 'name', 'area', 'interests', 'reveal'],
   google: ['welcome', 'adult', 'name', 'area', 'interests', 'reveal'],
@@ -81,10 +82,7 @@ export const autoResendAllowed = ({ resendAt = 0, autoResent = false } = {}, now
 // The Reveal (Phase E Task 4). rows: deck_candidates rows (shared_interests: labels this member shares with the card).
 // Qualitative copy only, never a count: with a shared row it names the first of the member's picks that a row shares
 // (else the shared label itself); otherwise the member is one of the first in their area.
-const firstName = (name) => {
-  const clean = String(name || '').trim();
-  return clean && clean !== 'New Member' ? clean.split(/\s+/)[0] : '';
-};
+const firstName = (name) => realName(name).split(/\s+/)[0];
 export const revealCopy = ({ name = '', picks = [], rows = [], area = '' } = {}) => {
   const first = firstName(name);
   const title = first ? `You're in, ${first}.` : "You're in.";

@@ -51,3 +51,21 @@ test('flipTransform moves and scales one rect onto another (origin top left)', (
   assert.equal(flipTransform(from, from), 'translate(0px, 0px) scale(1, 1)');
   assert.equal(flipTransform(from, { left: 10, top: 20, width: 0, height: 0 }), 'translate(0px, 0px) scale(1, 1)', 'a zero rect never scales to 0');
 });
+
+test('fitNewest keeps whole picks only, newest first, leaving room for "+n more"', async () => {
+  const { fitNewest } = await import('../../interest-tray.js');
+  assert.deepEqual(fitNewest([80, 80, 80], 300, 8, 90), { visible: 3, hidden: 0 }, 'all fit: no button');
+  // 4 picks of 80 need 344: with the 90 px button only the newest two fit (80+8+80+8+90 = 266; three would be 354).
+  assert.deepEqual(fitNewest([80, 80, 80, 80], 300, 8, 90), { visible: 2, hidden: 2 });
+  assert.deepEqual(fitNewest([200, 60, 260], 300, 8, 90), { visible: 0, hidden: 3 }, 'a newest pick wider than the room hides behind the button');
+  assert.deepEqual(fitNewest([], 300, 8, 90), { visible: 0, hidden: 0 });
+});
+
+test('parseMs reads a motion token, else the fallback', async () => {
+  const { parseMs } = await import('../../interest-tray.js');
+  assert.equal(parseMs('150ms', 1), 150);
+  assert.equal(parseMs(' 0.2s ', 1), 200);
+  assert.equal(parseMs('0ms', 1), 0);
+  assert.equal(parseMs('', 220), 220);
+  assert.equal(parseMs('fast', 220), 220);
+});

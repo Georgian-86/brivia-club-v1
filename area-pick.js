@@ -27,7 +27,8 @@ export const AREA_RATE_LIMITED = 'Try again later.';
 const GEO_OPTIONS = { enableHighAccuracy: false, timeout: 10000, maximumAge: 600000 };
 const GEO_GUARD_MS = 15000;  // a permission prompt that is never answered must not strand the member
 
-const escapeText = (value) => String(value ?? '').replace(/[&<>"']/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
+// HTML-escapes text for the markup strings here and in script.js.
+export const escapeText = (value) => String(value ?? '').replace(/[&<>"']/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
 const PIN = '<svg class="area-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 21s-6.5-5.6-6.5-11a6.5 6.5 0 0 1 13 0c0 5.4-6.5 11-6.5 11z" /><circle cx="12" cy="10" r="2.4" /></svg>';
 const SEARCH = '<svg class="area-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="11" cy="11" r="6.5" /><path d="M16 16l4.5 4.5" /></svg>';
 const SHIELD = '<svg class="area-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 3l7 3v5c0 4.5-3 8.3-7 10-4-1.7-7-5.5-7-10V6l7-3z" /><path d="M9 12l2 2 4-4" /></svg>';

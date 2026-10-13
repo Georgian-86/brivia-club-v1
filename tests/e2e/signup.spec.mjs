@@ -296,6 +296,55 @@ const trayState = (page) => page.evaluate(() => ({
   next: document.querySelector('#guided-signup .gs-primary')?.disabled,
 }));
 
+// The tray as laid out: every shown pick's box against the tray's and the screen's, the "+n more" button, and how many
+// picks sit behind it.
+const trayLayout = (page) => page.evaluate(() => {
+  const tray = document.querySelector('#guided-signup .gs-tray').getBoundingClientRect();
+  const all = [...document.querySelectorAll('#guided-signup [data-pick-id]')];
+  const shown = all.filter((b) => !b.closest('li').hidden && b.getClientRects().length);
+  const clipped = shown.map((b) => ({ label: b.textContent.trim(), r: b.getBoundingClientRect() }))
+    .filter(({ r }) => r.left < tray.left - 0.5 || r.right > tray.right + 0.5 || r.left < -0.5 || r.right > window.innerWidth + 0.5 || r.top < tray.top - 0.5 || r.bottom > tray.bottom + 0.5)
+    .map(({ label, r }) => `${label}@${Math.round(r.left)}-${Math.round(r.right)}`);
+  const more = document.querySelector('#guided-signup [data-tray-more]');
+  const moreShown = Boolean(more && !more.hidden && more.getClientRects().length);
+  const primary = document.querySelector('#guided-signup .gs-primary').getBoundingClientRect();
+  return {
+    total: all.length, shown: shown.length, newest: shown.map((b) => b.textContent.trim()), clipped,
+    more: moreShown ? { text: more.textContent.trim(), expanded: more.getAttribute('aria-expanded'), h: Math.round(more.getBoundingClientRect().height), tag: more.tagName } : null,
+    primaryOnScreen: primary.top >= 0 && primary.bottom <= window.innerHeight + 0.5,
+  };
+});
+// Phone tray disclosure checks (UX_SPEC rule 3): whole picks only, "+n more" with the right n, expand / collapse.
+const checkTrayDisclosure = async (page, w, expectedLabels) => {
+  const collapsed = await trayLayout(page);
+  check(`${w}: no tray pick is clipped; the newest picks show and "+n more" counts the rest (${JSON.stringify(collapsed)})`, () => {
+    assert.deepEqual(collapsed.clipped, []);
+    assert.equal(collapsed.total, expectedLabels.length);
+    assert.deepEqual(collapsed.newest, expectedLabels.slice(expectedLabels.length - collapsed.shown));
+    if (collapsed.shown < collapsed.total) {
+      assert.ok(collapsed.more, '"+n more" shown');
+      assert.equal(collapsed.more.text, `+${collapsed.total - collapsed.shown} more`);
+      assert.equal(collapsed.more.expanded, 'false');
+      assert.equal(collapsed.more.tag, 'BUTTON');
+      assert.ok(collapsed.more.h >= 44);
+    } else assert.equal(collapsed.more, null);
+  });
+  if (!collapsed.more) return collapsed;
+  await page.locator('#guided-signup [data-tray-more]').click();
+  await page.waitForTimeout(200);
+  const open = await trayLayout(page);
+  check(`${w}: "+n more" expands the tray to every pick, says "Show less" (aria-expanded=true), and Continue stays on screen (${JSON.stringify(open)})`, () => {
+    assert.equal(open.shown, open.total); assert.equal(open.more?.text, 'Show less'); assert.equal(open.more?.expanded, 'true'); assert.ok(open.primaryOnScreen);
+  });
+  await a11yScreen(page, `${w} interests tray expanded`);
+  await shot(page, `signup-${w}-interests-tray-expanded.png`);
+  await page.locator('#guided-signup [data-tray-more]').click();
+  await page.waitForTimeout(200);
+  const back = await trayLayout(page);
+  check(`${w}: "Show less" collapses the tray again (${JSON.stringify(back)})`, () => { assert.equal(back.more?.expanded, 'false'); assert.equal(back.shown, collapsed.shown); assert.deepEqual(back.clipped, []); });
+  return collapsed;
+};
+
 const startVite = (methods) => spawn('npx', ['vite', '--port', String(PORT), '--strictPort', '--host', '127.0.0.1'], {
   cwd: repoRoot,
   env: { ...process.env, VITE_SUPABASE_URL: ORIGIN, VITE_SUPABASE_ANON_KEY: 'stub-anon-key', VITE_SIGNUP_METHODS: methods },
@@ -729,6 +778,7 @@ try {
       for (const id of ['sports.racket.tennis', 'games.board.chess', 'music.listening.jazz', 'games.board.go']) { await pickChip(page, id); await page.waitForTimeout(SETTLE); }
       const four = await trayState(page);
       check(`${w}: four picks in pick order (${JSON.stringify(four)})`, () => { assert.equal(four.count, '4 picked'); assert.deepEqual(four.picks, ['Tennis', 'Chess', 'Jazz', 'Go']); });
+      if (w === 375) await checkTrayDisclosure(page, w, ['Tennis', 'Chess', 'Jazz', 'Go']);
       await a11yScreen(page, `${w} interests 4 picks`);
       await shot(page, `signup-${w}-interests-4-picks.png`);
       if (w === 375) {
@@ -1002,14 +1052,73 @@ try {
       check(`${w} interests details: no uncaught page errors (${errors.join(' | ')})`, () => assert.deepEqual(errors, []));
       await context.close();
     }
+    // 10. Full tray: a private chip shows the cap message and never asks for consent.
+    {
+      const context = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+      await stubContext(context, { signedIn: session, profile: { name: 'Ada', adult_declared_at: '2026-10-13T00:00:00Z' }, hasCell: true });
+      const { page, errors } = await newPage(context);
+      await toInterests(page);
+      for (const id of PUBLIC_IDS.slice(0, 12)) await pickChip(page, id, { settle: 60 });
+      await page.waitForTimeout(SETTLE);
+      await pickChip(page, PRIVATE_ID, { force: true });
+      await page.waitForTimeout(SETTLE);
+      const full = await page.evaluate(() => ({ dialog: Boolean(document.querySelector('#guided-signup dialog[open]')), error: document.querySelector('#guided-signup #signup-error')?.textContent, count: document.querySelector('#guided-signup [data-tray-count]').textContent.trim() }));
+      check(`a private chip tapped with 12 picks shows the cap message and no consent dialog (${JSON.stringify(full)})`, () => {
+        assert.equal(full.dialog, false); assert.equal(full.count, '12 picked'); assert.equal(full.error, 'You can choose up to 12 interests. Remove one to add another.');
+      });
+      // The 12-pick tray ends inside the screen and no lower than the Continue button; its picks scroll inside it.
+      const cap = await page.evaluate(() => {
+        const t = document.querySelector('#guided-signup .gs-tray');
+        const r = t.getBoundingClientRect();
+        return { bottom: Math.round(r.bottom), screen: window.innerHeight, button: Math.round(document.querySelector('#guided-signup .gs-primary').getBoundingClientRect().bottom), scrolls: t.scrollHeight > t.clientHeight };
+      });
+      check(`1440: the 12-pick tray stays inside the screen and the catalogue column, scrolling inside (${JSON.stringify(cap)})`, () => { assert.ok(cap.bottom <= cap.screen); assert.ok(cap.bottom <= cap.button + 1); assert.ok(cap.scrolls); });
+      await shot(page, 'signup-1440-interests-full-private.png');
+      check(`full private: no uncaught page errors (${errors.join(' | ')})`, () => assert.deepEqual(errors, []));
+      await context.close();
+    }
     {
       const context = await browser.newContext({ viewport: { width: 320, height: 640 } });
       await stubContext(context, { signedIn: session, profile: { name: 'Ada', adult_declared_at: '2026-10-13T00:00:00Z' }, hasCell: true });
       const { page, errors } = await newPage(context);
       await toInterests(page);
-      for (const id of ['sports.racket.tennis', 'games.board.chess', 'music.listening.jazz', 'sports.team.basketball']) { await pickChip(page, id); await page.waitForTimeout(SETTLE); }
+      const ids = ['sports.racket.tennis', 'games.board.chess', 'music.listening.jazz', 'sports.team.basketball', 'sports.racket.badminton', 'games.board.go'];
+      for (const id of ids) { await pickChip(page, id); await page.waitForTimeout(SETTLE); }
       await a11yScreen(page, '320 interests');
       await shot(page, 'signup-320-interests.png');
+      const collapsed = await checkTrayDisclosure(page, 320, ['Tennis', 'Chess', 'Jazz', 'Basketball', 'Badminton', 'Go']);
+      check(`320: six picks do not fit one row, so "+n more" shows (${collapsed.shown} shown)`, () => assert.ok(collapsed.shown < 6 && collapsed.more));
+      // Removing from the expanded tray flies the pick back (a clone mid-flight) and keeps the rest whole.
+      await page.locator('#guided-signup [data-tray-more]').click();
+      await page.waitForTimeout(200);
+      await page.locator('#guided-signup [data-pick-id="sports.racket.tennis"]').click();
+      await page.waitForTimeout(60);
+      const flying = await page.evaluate(() => [...document.querySelectorAll('#guided-signup .it-fly')].map((el) => getComputedStyle(el).visibility));
+      await page.waitForTimeout(SETTLE);
+      const after = await trayLayout(page);
+      check(`320: removing a pick from the expanded tray flies it back and leaves five (${JSON.stringify({ flying, after })})`, () => {
+        assert.deepEqual(flying, ['visible']); assert.equal(after.total, 5); assert.deepEqual(after.clipped, []);
+      });
+      await shot(page, 'signup-320-interests-after-remove.png');
+      // A tap within the flight: add, then remove 60 ms later. The reverse clone is visible and nothing stays hidden.
+      await pickChip(page, 'music.listening.classical', { click: false });
+      await page.locator('#guided-signup [data-interest-id="music.listening.classical"]').click();
+      await page.waitForTimeout(60);
+      await page.locator('#guided-signup [data-interest-id="music.listening.classical"]').click();
+      await page.waitForTimeout(40);
+      const rapid = await page.evaluate(() => ({
+        clones: [...document.querySelectorAll('#guided-signup .it-fly')].map((el) => getComputedStyle(el).visibility),
+      }));
+      await page.waitForTimeout(SETTLE);
+      const settledState = await page.evaluate(() => ({
+        clones: document.querySelectorAll('#guided-signup .it-fly').length,
+        hiddenStyle: [...document.querySelectorAll('#guided-signup [data-pick-id], #guided-signup [data-interest-id], #guided-signup [data-tray-more]')].filter((el) => el.style.visibility === 'hidden').length,
+        pressed: document.querySelector('#guided-signup [data-interest-id="music.listening.classical"]').getAttribute('aria-pressed'),
+      }));
+      check(`320: a second tap mid-flight shows the reverse flight and leaves nothing hidden (${JSON.stringify({ rapid, settledState })})`, () => {
+        assert.ok(rapid.clones.length >= 1); for (const v of rapid.clones) assert.equal(v, 'visible');
+        assert.equal(settledState.clones, 0); assert.equal(settledState.hiddenStyle, 0); assert.equal(settledState.pressed, 'false');
+      });
       check(`320 interests: no uncaught page errors (${errors.join(' | ')})`, () => assert.deepEqual(errors, []));
       await context.close();
     }

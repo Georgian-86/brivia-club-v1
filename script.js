@@ -4,12 +4,12 @@ import {
   declareAdult, setHomeLocation, setHomeCity, setMemberInterests, setSensitiveConsent, fetchSensitiveConsentAt, fetchMyInterests, fetchInterestNodes, searchPlaces, onboardingStatus,
 } from './supabase.js';
 import { buildPendingOnboarding, isPendingExpired, dataUrlToFile } from './pending-profile.js';
-import { isUnderReview, shouldWithdrawConsent } from './onboarding-guard.js';
+import { isUnderReview, shouldWithdrawConsent, realName } from './onboarding-guard.js';
 import {
   MAX_INTERESTS, MODES, emptyBudget, addInterest, removeInterest, stepPoints, setMode, pointsLeft, isComplete, toPayload,
   counterText, budgetFromRows, budgetGateText, spreadRemaining,
 } from './passion-budget.js';
-import { areaPickerHtml, createAreaPicker, AREA_SAVE_ERROR } from './area-pick.js';
+import { areaPickerHtml, createAreaPicker, AREA_SAVE_ERROR, escapeText } from './area-pick.js';
 import { buildInterestCatalog, normalizeSearch, PRIVATE_HINT_TEXT, SENSITIVE_CONSENT_ERROR, INTEREST_CAP_TEXT } from './interest-catalog.js';
 import { signupErrorCopy } from './signup-errors.js';
 import { signupMethods } from './signup-flow.js';
@@ -778,7 +778,6 @@ if (lookingPicker) {
 // Their nodes stay in the catalog (as `hidden`) so stored picks still get labels. Consent is sent to the server only
 // when a sensitive pick is submitted (finishOnboarding), never on Continue.
 let privateUnlocked = false;
-const escapeText = (value) => String(value ?? '').replace(/[&<>"']/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
 const svgIcon = (name) => {
   const paths = {
     plus: '<path d="M12 5v14M5 12h14" />',
@@ -1321,7 +1320,6 @@ const showProfileCompletion = (user, savedProfile = null, { startStep = 1, statu
 
 // The first incomplete onboarding step for my_onboarding_status(): 2 without a cell, else 3 (interests / budget).
 // A usable display name: trimmed, not empty and not the 'New Member' placeholder (the server's completion rule).
-const realName = (value) => { const name = String(value || '').trim(); return name && name !== 'New Member' ? name : ''; };
 // The first incomplete onboarding step: 1 without a real name or the 18+ declaration, 2 without a cell, else 3.
 const firstIncompleteStep = (status, profileRow = null) => {
   if (!realName(profileRow?.name)) return 1;

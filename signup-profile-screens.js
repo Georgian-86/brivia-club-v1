@@ -14,8 +14,10 @@ import {
   buildInterestCatalog, searchCatalog, PRIVATE_HINT_TEXT, PRIVATE_TITLE, PRIVATE_PURPOSE, PRIVATE_CONSENT_LABEL,
   SENSITIVE_CONSENT_ERROR, INTEREST_CAP_TEXT,
 } from './interest-catalog.js';
-import { togglePick, canContinue, pickedText, trayAnnouncement, flyChip, flipList, bump, buzz, prefersReducedMotion } from './interest-tray.js';
-import { shouldWithdrawConsent } from './onboarding-guard.js';
+import {
+  togglePick, canContinue, pickedText, trayAnnouncement, flyChip, flipList, settleFlights, fitNewest, bump, buzz, prefersReducedMotion, MAX_PICKS,
+} from './interest-tray.js';
+import { shouldWithdrawConsent, realName } from './onboarding-guard.js';
 import { setBusy } from './app-skeletons.js';
 
 const ADULT_SAVE_ERROR = "We couldn't record your answer. Please try again.";
@@ -40,7 +42,6 @@ const icon = (name, cls = 'gs-icon') => {
   return span;
 };
 const messageEl = () => el('p', { class: 'gs-message', id: 'signup-error', role: 'alert' });
-const realName = (value) => { const name = String(value || '').trim(); return name && name !== 'New Member' ? name : ''; };
 // This visit's answers (ctx.state.profile; the shell clears it on sign-out).
 const answers = (ctx) => {
   ctx.state.profile ||= { name: '', areaLabel: '', picks: [], privateOk: false, serverWantedConsent: false, reveal: null };
@@ -215,12 +216,15 @@ registerScreen('interests', {
     // The tray: label, count pill, picks, and a polite live region that says what changed. The screen's message (the
     // cap, a save error) sits in the tray too, so it is in view beside the picks and the button at every width.
     const count = el('span', { class: 'gs-tray-count', 'data-tray-count': true });
-    const list = el('ul', { class: 'gs-tray-list', 'data-tray-list': true, 'aria-labelledby': 'signup-tray-label' });
+    const list = el('ul', { class: 'gs-tray-list', id: 'signup-tray-list', 'data-tray-list': true, 'aria-labelledby': 'signup-tray-label' });
+    // Phone: one row of whole picks (the newest), and "+n more" for the rest; it expands the tray to wrapped rows.
+    const more = el('button', { type: 'button', class: 'gs-tray-more', 'data-tray-more': true, 'aria-expanded': 'false', 'aria-controls': 'signup-tray-list', hidden: true });
+    const row = el('div', { class: 'gs-tray-row' }, [list, more]);
     const empty = el('p', { class: 'gs-tray-empty', text: 'Tap an interest to add it here.' });
     const live = el('p', { class: 'gs-sr', 'aria-live': 'polite', 'data-tray-live': true });
     const tray = el('section', { class: 'gs-tray', 'aria-labelledby': 'signup-tray-label' }, [
       el('div', { class: 'gs-tray-head' }, [el('h3', { class: 'gs-tray-label', id: 'signup-tray-label', text: 'Your picks' }), count]),
-      message, list, empty, live,
+      message, row, empty, live,
     ]);
     ctx.dock(tray);
     ctx.primary('Continue', { disabled: !canContinue(mine.picks) });
@@ -234,7 +238,7 @@ registerScreen('interests', {
       const picked = isPicked(chip.dataset.interestId);
       chip.setAttribute('aria-pressed', String(picked));
       chip.classList.toggle('is-selected', picked);
-      if (!picked && mine.picks.length >= 12) chip.setAttribute('aria-disabled', 'true'); else chip.removeAttribute('aria-disabled');
+      if (!picked && mine.picks.length >= MAX_PICKS) chip.setAttribute('aria-disabled', 'true'); else chip.removeAttribute('aria-disabled');
       chip.querySelector('.gs-chip-mark')?.replaceWith(icon(picked ? 'check' : 'plus', 'gs-chip-mark gs-icon'));
     };
     const syncTray = () => {
@@ -307,6 +311,43 @@ registerScreen('interests', {
       });
     };
 
+    // The phone tray's collapsed row (see fitNewest): whole picks only, the newest ones; the older ones sit behind
+    // "+n more". Expanded, every pick shows in wrapped rows (capped height, scrolling inside) and the button says
+    // "Show less". Wider screens show every pick and no button.
+    const phone = window.matchMedia?.('(max-width: 780px)');
+    let expanded = false;
+    const layoutTray = () => {
+      const items = [...list.children];
+      items.forEach((li) => { li.hidden = false; });
+      if (!phone?.matches || !items.length) {
+        expanded = false;
+        tray.classList.remove('is-expanded');
+        more.hidden = true;
+        more.setAttribute('aria-expanded', 'false');
+        return;
+      }
+      tray.classList.remove('is-expanded');
+      more.hidden = false;
+      more.textContent = `+${items.length} more`;
+      const gap = parseFloat(getComputedStyle(row).columnGap) || 8;
+      const { hidden } = fitNewest(items.map((li) => li.getBoundingClientRect().width), row.clientWidth, gap, more.getBoundingClientRect().width);
+      if (!hidden) expanded = false;
+      more.hidden = !hidden;
+      more.setAttribute('aria-expanded', String(expanded));
+      if (expanded) { tray.classList.add('is-expanded'); more.textContent = 'Show less'; return; }
+      items.forEach((li, i) => { li.hidden = i < hidden; });
+      more.textContent = `+${hidden} more`;
+    };
+    more.addEventListener('click', () => { expanded = !expanded; layoutTray(); more.focus({ preventScroll: true }); });
+    phone?.addEventListener?.('change', layoutTray);
+    let rowWidth = 0;
+    const resize = typeof ResizeObserver === 'function' ? new ResizeObserver(() => {
+      if (row.clientWidth === rowWidth) return;
+      rowWidth = row.clientWidth;
+      layoutTray();
+    }) : null;
+    resize?.observe(row);
+
     const announce = (text) => { live.textContent = ''; window.setTimeout(() => { live.textContent = text; }, 30); };
     const remove = (id) => {
       const pick = mine.picks.find((p) => p.id === id);
@@ -317,14 +358,17 @@ registerScreen('interests', {
       const target = chipFor(id);
       syncTray();
       if (item) {
-        // The pick flies back to its chip (or fades where it is); the other picks close the gap.
-        void flyChip({ from: item.firstChild, to: target, host: ctx.root, reduced, fade: true });
-        flipList([...list.children].filter((li) => li !== item), () => item.remove(), { reduced });
+        // The pick flies back to its chip (or fades where it is); the other picks close the gap. A pick behind
+        // "+n more" has no slot on screen to fly from: it just leaves.
+        if (!item.hidden) void flyChip({ from: item.firstChild, to: target, host: ctx.root, reduced, fade: true });
+        flipList([...list.children].filter((li) => li !== item && !li.hidden), () => { item.remove(); layoutTray(); }, { reduced });
       }
       bump(count, reduced);
       announce(trayAnnouncement(pick.label, 'removed'));
     };
     const add = async (item, source) => {
+      // Full: the cap message, and no consent asked for a pick that cannot be added.
+      if (mine.picks.length >= MAX_PICKS) { message.textContent = INTEREST_CAP_TEXT; return; }
       if (item.sensitive && !mine.privateOk) {
         if (!(await askPrivateConsent(ctx.root))) return;
         mine.privateOk = true;
@@ -337,16 +381,17 @@ registerScreen('interests', {
       const entry = pill(mine.picks[mine.picks.length - 1]);
       list.append(entry);
       syncTray();
-      // The new pick is the last one in the strip: bring it into view before measuring where it lands.
-      list.scrollLeft = list.scrollWidth;
+      layoutTray();
       buzz();
       bump(count, reduced);
       announce(trayAnnouncement(item.label, 'added'));
-      await flyChip({ from: source, to: entry.firstChild, host: ctx.root, reduced });
+      // The newest pick shows in the row; if even it does not fit, the clone lands on "+n more".
+      await flyChip({ from: source, to: entry.hidden ? more : entry.firstChild, host: ctx.root, reduced });
     };
     results.addEventListener('click', (event) => {
       const node = event.target.closest('[data-interest-id]');
       if (!node || !catalog) return;
+      settleFlights();  // a tap mid-flight first lands the flight in progress (no stale rects, nothing left hidden)
       const id = node.dataset.interestId;
       if (isPicked(id)) { remove(id); return; }
       const item = catalog.groups.flatMap((group) => group.items).find((entry) => entry.id === id);
@@ -355,13 +400,14 @@ registerScreen('interests', {
     list.addEventListener('click', (event) => {
       const node = event.target.closest('[data-pick-id]');
       if (!node) return;
+      settleFlights();
       const id = node.dataset.pickId;
-      // Keep keyboard focus in the tray: the next pick, else the search field.
-      const items = [...list.querySelectorAll('[data-pick-id]')];
-      const at = items.indexOf(node);
+      // Keep keyboard focus in the tray: the next shown pick, else "+n more", else the search field.
+      const shown = () => [...list.querySelectorAll('[data-pick-id]')].filter((b) => b.dataset.pickId !== id && !b.closest('li').hidden);
+      const at = Math.max(0, [...list.querySelectorAll('[data-pick-id]')].filter((b) => !b.closest('li').hidden).indexOf(node));
       remove(id);
-      const rest = [...list.querySelectorAll('[data-pick-id]')].filter((b) => b.dataset.pickId !== id);
-      (rest[Math.min(at, rest.length - 1)] || search).focus({ preventScroll: true });
+      const rest = shown();
+      (rest[Math.min(at, rest.length - 1)] || (more.hidden ? search : more)).focus({ preventScroll: true });
     });
     search.addEventListener('input', () => { renderDomains(); renderResults(); });
     search.addEventListener('keydown', (event) => {
@@ -371,8 +417,9 @@ registerScreen('interests', {
 
     list.replaceChildren(...mine.picks.map(pill));
     syncTray();
+    window.requestAnimationFrame(layoutTray);
     load();
-    return null;
+    return () => { resize?.disconnect(); phone?.removeEventListener?.('change', layoutTray); settleFlights(); };
   },
   async next(ctx) {
     const mine = answers(ctx);

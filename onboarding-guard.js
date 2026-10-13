@@ -7,7 +7,8 @@
 // rewrite). The notice never says why or who reported them.
 export const UNDER_REVIEW_COPY = 'Your profile is being reviewed. This usually takes up to 72 hours. Questions? Email thebrivia.club@gmail.com.';
 
-const realName = (value) => { const name = String(value || '').trim(); return name && name !== 'New Member' ? name : ''; };
+// A name a member chose: trimmed, and never the 'New Member' placeholder (else '').
+export const realName = (value) => { const name = String(value || '').trim(); return name && name !== 'New Member' ? name : ''; };
 
 export const isUnderReview = (status, row) => {
   if (!status || !row || status.completed !== false) return false;

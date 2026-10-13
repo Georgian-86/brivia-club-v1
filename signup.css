@@ -434,7 +434,17 @@ body.auth-page .auth-shell #guided-signup .gs-tray-count {
   font: 600 var(--text-12)/1 var(--font-body); font-variant-numeric: tabular-nums; white-space: nowrap;
 }
 body.auth-page .auth-shell #guided-signup .gs-tray.is-empty .gs-tray-count { background: var(--color-line); color: var(--color-ink); }
-body.auth-page .auth-shell #guided-signup .gs-tray-list { display: flex; flex-wrap: wrap; gap: var(--space-2); margin: 0; padding: 0; list-style: none; }
+body.auth-page .auth-shell #guided-signup .gs-tray-row { display: flex; align-items: center; gap: var(--space-2); min-width: 0; }
+body.auth-page .auth-shell #guided-signup .gs-tray-list { display: flex; flex: 0 1 auto; flex-wrap: wrap; gap: var(--space-2); min-width: 0; margin: 0; padding: 0; list-style: none; }
+body.auth-page .auth-shell #guided-signup .gs-tray-item[hidden] { display: none; }
+/* "+n more" / "Show less" (phone only): a real button with a 44 px target. */
+body.auth-page .auth-shell #guided-signup .gs-tray-more {
+  flex: none; min-height: 44px; padding: 0 var(--space-3);
+  border: 1px solid var(--color-wine); border-radius: var(--radius-pill); background: transparent;
+  color: var(--color-wine); font: 600 var(--text-14)/1 var(--font-body); letter-spacing: 0; text-transform: none; white-space: nowrap; cursor: pointer;
+}
+body.auth-page .auth-shell #guided-signup .gs-tray-more[hidden] { display: none; }
+body.auth-page .auth-shell #guided-signup .gs-tray-more:focus-visible { outline: 2px solid var(--color-wine); outline-offset: 2px; }
 body.auth-page .auth-shell #guided-signup .gs-tray-list:empty { display: none; }
 body.auth-page .auth-shell #guided-signup .gs-tray-item { display: flex; }
 body.auth-page .auth-shell #guided-signup .gs-pick {
@@ -494,7 +504,6 @@ body.auth-page .auth-shell #guided-signup .gs-reveal-line { max-width: 40ch; col
   body.auth-page .auth-shell #guided-signup[data-screen="interests"] {
     display: grid;
     grid-template-columns: minmax(0, 1fr) 216px;
-    grid-template-rows: auto auto auto 1fr;
     align-content: center;
     column-gap: var(--space-6);
     row-gap: var(--space-5);
@@ -504,12 +513,19 @@ body.auth-page .auth-shell #guided-signup .gs-reveal-line { max-width: 40ch; col
   body.auth-page .auth-shell #guided-signup[data-screen="interests"] .gs-host { grid-column: 1; grid-row: 3; }
   body.auth-page .auth-shell #guided-signup[data-screen="interests"] .gs-actions { display: contents; }
   body.auth-page .auth-shell #guided-signup[data-screen="interests"] .gs-primary { grid-column: 1; grid-row: 4; align-self: start; }
-  /* Level with the helper line under the heading; a long list of picks scrolls inside the tray. */
+  /* The dock fills the catalogue column's height without adding to it (contain: size), so the tray never makes the
+     card taller. The tray sits level with the helper line (its --gs-tray-top offset), sticks while the panel scrolls,
+     and is capped to both the column and the screen; a long list of picks scrolls inside it. */
   body.auth-page .auth-shell #guided-signup[data-screen="interests"] .gs-dock {
-    grid-column: 2; grid-row: 3 / span 2; align-self: start;
+    --gs-tray-top: 104px;
+    grid-column: 2; grid-row: 3 / span 2; align-self: stretch; contain: size;
+    display: flex; flex-direction: column;
+  }
+  body.auth-page .auth-shell #guided-signup[data-screen="interests"] .gs-tray {
     position: sticky; top: var(--space-5);
-    max-height: calc(100svh - 2 * var(--space-5)); overflow-y: auto; overscroll-behavior: contain;
-    padding: var(--space-5) var(--space-4); margin-top: 104px;
+    flex: 0 1 auto; min-height: 0; max-height: calc(100svh - 2 * var(--space-5));
+    overflow-y: auto; overscroll-behavior: contain;
+    padding: var(--space-5) var(--space-4); margin-top: var(--gs-tray-top);
     border: 1px solid var(--color-line); border-radius: var(--radius-l); background: var(--color-cream);
   }
   body.auth-page .auth-shell #guided-signup[data-screen="interests"] .gs-tray-head { flex-direction: column; align-items: flex-start; gap: var(--space-2); }
@@ -522,17 +538,20 @@ body.auth-page .auth-shell #guided-signup .gs-reveal-line { max-width: 40ch; col
     border-top: 1px solid var(--color-line); background: var(--color-cream);
   }
 }
-/* Phone: the tray is a strip in the pinned bar, right above the button; the picks scroll sideways in one row. */
+/* Phone: the tray is a strip in the pinned bar, right above the button: one row of whole picks plus "+n more"
+   (signup-profile-screens.js hides the older picks that do not fit); expanded, all picks wrap, scrolling inside a
+   capped height so the button stays in view. */
 @media (max-width: 780px) {
   body.auth-page .auth-shell #guided-signup .gs-dock { margin: 0 calc(-1 * var(--space-5)); padding: 0 var(--space-5); }
   body.auth-page .auth-shell #guided-signup .gs-tray { gap: var(--space-2); }
-  body.auth-page .auth-shell #guided-signup .gs-tray-list {
-    flex-wrap: nowrap; margin: 0 calc(-1 * var(--space-5)); padding: 0 var(--space-5);
-    overflow-x: auto; scroll-snap-type: x proximity; scrollbar-width: none; overscroll-behavior-x: contain;
-  }
-  body.auth-page .auth-shell #guided-signup .gs-tray-list::-webkit-scrollbar { display: none; }
-  body.auth-page .auth-shell #guided-signup .gs-tray-item { flex: none; scroll-snap-align: end; }
+  body.auth-page .auth-shell #guided-signup .gs-tray-list { flex-wrap: nowrap; }
+  body.auth-page .auth-shell #guided-signup .gs-tray-item { flex: none; max-width: 100%; }
   body.auth-page .auth-shell #guided-signup .gs-pick { max-width: 220px; }
+  body.auth-page .auth-shell #guided-signup .gs-tray.is-expanded .gs-tray-row { flex-direction: column; align-items: stretch; }
+  body.auth-page .auth-shell #guided-signup .gs-tray.is-expanded .gs-tray-list {
+    flex-wrap: wrap; max-height: min(152px, 28svh); overflow-y: auto; overscroll-behavior: contain; padding: 3px;
+  }
+  body.auth-page .auth-shell #guided-signup .gs-tray.is-expanded .gs-tray-more { align-self: flex-start; }
   body.auth-page .auth-shell #guided-signup .gs-tray-empty { min-height: 44px; display: flex; align-items: center; }
   body.auth-page .auth-shell #guided-signup .area-options { grid-template-columns: 1fr; }
 }

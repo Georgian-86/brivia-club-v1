@@ -14,6 +14,7 @@ import { signupErrorCopy, codeSendErrorCopy, emailSendErrorCopy, expiredCodeCopy
 import { supabase, sendEmailCode, verifyEmailCode, onboardingStatus } from './supabase.js';
 import { setBusy } from './app-skeletons.js';
 import { fillGoogleMark } from './google-mark.js';
+import { realName } from './onboarding-guard.js';
 
 const RESEND_WAIT_MS = 60 * 1000;
 const LEAVE_MS = 260;  // a little longer than the 200 ms swap, so the outgoing screen has finished fading
@@ -47,7 +48,6 @@ const linkButton = (text, onClick, attrs = {}) => {
 };
 const storePath = (path) => { try { window.sessionStorage.setItem(PATH_KEY, path); } catch { /* storage unavailable */ } };
 const storedPath = () => { try { return window.sessionStorage.getItem(PATH_KEY); } catch { return null; } };
-const realName = (value) => { const name = String(value || '').trim(); return name && name !== 'New Member' ? name : ''; };
 
 export const registerScreen = (name, def) => { registry.set(name, def); };
 // Signs the member out of this visit: the session, the profile answers and the stored path.
