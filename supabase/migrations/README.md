@@ -297,9 +297,12 @@ insert into public.brivia_tester(member_id) select id from auth.users where emai
 Run it after seed v2 is loaded (the order is 0008, seed v2, this insert, then
 `select public.refresh_cell_density();`). It takes effect at once for the deck, search, requests, chat and the deck's
 "Why this person?" button. The k-anonymity density (distance bands) follows at
-the next nightly `refresh_cell_density()` run (01:47 IST); until then the tester's cards may show the place name instead
-of `~3 km` (safe). A manual `select public.refresh_cell_density();` does nothing if that night's run has already
-happened (it keeps one count per day).
+the nightly `refresh_cell_density()` run (01:47 IST), and **not at once**: a card shows `~3 km` or `~10 km` only when
+the target's g7 cell is `ok10` (7 consecutive nightly runs with at least 10 counted members in that cell), and counted
+members must be more than 14 days old. The seed's members are spread over under 2 km per city, so the cards show the
+place name (Thane, Mumbai, ...) instead of a distance for a long time, which is safe and expected, not a fault. A
+manual `select public.refresh_cell_density();` does nothing if that night's run has already happened (it keeps one
+count per day) and never skips the 7-night streak or the 14-day age rule.
 
 The account's real-world requests, matches and messages are kept but hidden from both sides while it is a tester:
 neither side sees them or can accept, decline or message, and they reappear unchanged when it stops being a tester.

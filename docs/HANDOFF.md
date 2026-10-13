@@ -107,8 +107,10 @@ Tooling: Playwright **and axe-core** at `/tmp/pw` (`npm install --prefix /tmp/pw
    2. run seed v2, `supabase/seed/test-members.sql`;
    3. for each of the founder's accounts:
       `insert into public.brivia_tester(member_id) select id from auth.users where email = '<your email>' on conflict do nothing;`
-   4. `select public.refresh_cell_density();` (it does nothing if that night's run already happened; the bands then
-      show place names until the next nightly run).
+   4. `select public.refresh_cell_density();` (it does nothing if that night's run already happened). Cards show
+      `~3 km`/`~10 km` only once the target's g7 cell is `ok10` (7 consecutive nightly runs with at least 10 counted
+      members, who must be over 14 days old); with the seed's under-2 km spread, expect place names (Thane, Mumbai)
+      for a long time. That is safe, not a fault.
    The deck then shows test members near Thane and Bengaluru, and each card has "Why this person?".
    **To stop being a tester:**
    `delete from public.brivia_tester where member_id = (select id from auth.users where email = '<your email>');`
@@ -116,6 +118,10 @@ Tooling: Playwright **and axe-core** at `/tmp/pw` (`npm install --prefix /tmp/pw
    messages and pending requests, but cannot message test members (Ruling 5). The purge
    (`supabase/seed/purge-test-members.sql`) deletes the test members and everything tied to them and empties
    `brivia_tester`; it never deletes a tester's own account.
+   **After 0008, the next live policy comparison must expect a change:** `supabase/tests/policies-0006.expected.tsv`
+   no longer matches the live `matches` and `messages` select policies (0008 rewrites them to add the cross-world pair
+   check). The repo has no generator for a 0008 snapshot, so the comparison must expect exactly those two policy
+   differences (or the next session adds a `policies-0008.expected.tsv`).
    Founder backlog from Phase D: wire ORBIT's far lane into the deck (then flip the harness's "far partner absent from
    deck" assertion).
 1. **P0-C** (D-046; table "P0-C" in `docs/arena/2026-10-07-iteration-4.md`, each item has acceptance criteria).

@@ -1162,3 +1162,9 @@ founder backlog; when it lands, the harness assertion "far partner absent from d
 landing all passed, app-shell 208.
 
 **Commit trailer rule (founder):** Phase D commits end with the `Claude-Session:` line only, with no `Co-Authored-By`.
+
+### D-058 addendum (final review, 2026-10-13): who may call deck_why
+
+`deck_why` stays open to any test-world caller, including logins of test members created by the founder, because the
+seed README's demo flow ("sign in as F") needs it. The extra overlap level it shows reaches only logins the founder
+controls (a tester or a seeded test member), never a real member, so no new exposure is added.
