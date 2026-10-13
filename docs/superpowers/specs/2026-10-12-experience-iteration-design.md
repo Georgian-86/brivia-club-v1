@@ -37,8 +37,8 @@ Decision record: D-052 (signup arena, approved), D-053 (this spec). Arena: `docs
 | 4 | "Are you 18 or older?" | `declare_adult` | Before name, area and interests. The server refuses area and interest writes before it (0005 `brivia_require_adult`). |
 | 5 | "What should members call you?" | profile name | Prefilled from Google. Copy: "Members see this name." |
 | 6 | Your area | `set_home_location` / `set_home_city` | Today's step 2, unchanged (incl. D-049 typed-city match). |
-| 7 | Pick interests (1–12, "3–6 works best") | memory only | Private-interest consent dialog unchanged. Nothing is saved yet: only the first interest save is free (rewrite cap, ORBIT §3.2). |
-| 8 | "Which one matters most?" (points) | `set_member_interests` | See 1.2. The single save. |
+| 7 | Pick interests (1–12, "3–6 works best") | `set_member_interests` on Next (even split, D-056) | Private-interest consent dialog unchanged. Nothing is saved yet: only the first interest save is free (rewrite cap, ORBIT §3.2). |
+| 8 | ~~"Which one matters most?" (points)~~ **Removed by D-056.** The interests screen (7) does the single `set_member_interests` save with an even split. | — | See 1.2. |
 | 9 | Reveal: "N people near you share {top interest}" | — | Then the deck. Shows the "Complete your profile" checklist entry. |
 
 **Every screen has:**
@@ -51,6 +51,15 @@ Decision record: D-052 (signup arena, approved), D-053 (this spec). Arena: `docs
 (`my_onboarding_status`) already routes to it.
 
 ### 1.2 Points screen ("which matters most?")
+
+> **Superseded by D-056 (founder, 2026-10-13).** Signup has **no points distribution**. The member only picks
+> interests; the client sends an even split of the 20-point budget (largest remainder, every interest ≥ 1, e.g. 3
+> picks → 7/7/6) through the existing `set_member_interests`, so no server or ORBIT model change is needed. Weighting a
+> main passion becomes an optional profile action later. The interest picker must feel premium on phone and desktop:
+> a tapped chip visibly animates into a "Your picks" tray (and back out on removal), with a short count/tray
+> confirmation and a light haptic where supported; reduced motion gets a fade. One question per screen on **both**
+> phone and desktop. The text below is kept for history only.
+
 
 - **Copy:**
   - "You have 20 points to share across your interests. The more points an interest has, the more we match you with

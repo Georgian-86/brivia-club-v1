@@ -1048,3 +1048,24 @@ a focus loss to nowhere (Safari and macOS Firefox do not focus a clicked button)
 app form fields are 16 px on phones (no iOS focus zoom), re-tapping Profile keeps the loaded interests, page scrolling (a
 view change, `html{scroll-behavior}`) is instant under reduced motion, and `app.html` (only) has `viewport-fit=cover` so the bar's
 safe-area padding works on notched iPhones.
+
+## D-056: Signup has no points distribution; one question per screen on phone and desktop; premium interest picking (2026-10-13)
+
+**Decided by:** the founder, in chat ("the signup questions should also be 1 ques per screen and no points distribution.
+But interest CTA shall be well animated so that it is felt that one thing is selected and it is now in the list. It
+should give a premium feel both in desktop and mobile").
+
+**What changes in spec §1 (Phase E):**
+- Screen 8 ("Which one matters most?", tiers and weights) is removed. The interests screen saves on Next with an even
+  split of the 20-point Passion Budget (largest remainder, every interest at least 1), using the existing
+  `set_member_interests`, so there is no migration and no ORBIT model change.
+- One question per screen applies to desktop too, not only phones.
+- The interest picker animates each pick into a visible "Your picks" tray (and back out on removal) with a count
+  confirmation and a light haptic where supported; reduced motion gets a fade.
+
+**Cost, recorded honestly:** at signup, matching can no longer tell a member's main passion from a side interest; all
+picks weigh the same until the member changes them. A "Which matters most?" weighting becomes an optional profile action
+in a later phase. The `points_entry` A/B flag in spec §4 is dropped.
+
+**Also:** Phase C was approved by the founder for production ("good to go", 2026-10-13); the fast-forward of `main` is
+pending the founder's own push or permission (the session's auto-mode guard refused a production push).
