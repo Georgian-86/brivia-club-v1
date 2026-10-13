@@ -51,7 +51,8 @@ visible text (and `::before`/`::after` text) is at least 12 px and set in Bodoni
 Bodoni Moda, and the Bodoni Moda 500 italic face (`fonts-app.css`) loads. `a11y.mjs` `textAudit` returns both lists
 (`smallText` is its size half); `onboarding.spec.mjs` runs the family check on signup steps 1-4 too. The pre-review fixes added: the chat badge inside its nav item and the viewport (and the
 bell badge inside the viewport), the deck card's VIEW PROFILE inside the card, the chat compose placeholder inside its
-field, and every profile ⚙ menu item on top and 44 px tall. `APP_SHOTS` also saves the profile edit dialog, the ⚙ menu,
+field, and every profile ⚙ menu item on top and 44 px tall; Enter on ⚙ opens the menu, Tab walks its five items in order,
+Escape closes it and returns focus to ⚙, and a view change or resize closes it. `APP_SHOTS` also saves the profile edit dialog, the ⚙ menu,
 the report dialog and the post composer at 375 px. `APP_SHOTS=<dir>` only saves home/posts/chat/profile screenshots at
 375 px and 1440 px (the Phase C before/after review).
 

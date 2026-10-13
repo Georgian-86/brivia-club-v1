@@ -398,7 +398,60 @@ document.addEventListener('visibilitychange', () => { if (document.visibilitySta
 // any [data-nav] click handler is bound and before routeFromUrl() marks the current item.
 document.querySelectorAll('[data-nav-host]').forEach((host) => { host.innerHTML = navMarkup(host.dataset.navHost, document.body.dataset.appView || 'explore'); });
 
+// The profile ⚙ menu (Phase C Task 4). One menu exists at a time (the current hero's); the document and window
+// listeners below are bound once, here, so rebuilding the profile never stacks them.
+const POPOVER = typeof HTMLElement !== 'undefined' && typeof HTMLElement.prototype.showPopover === 'function';
+let profileSettings = null;
+const profileSettingsOpen = () => {
+  const menu = profileSettings?.menu;
+  if (!menu?.isConnected) return false;
+  return POPOVER ? menu.matches(':popover-open') : !menu.hidden;
+};
+// Top layer: above ⚙ when the five 44 px items fit under the header, otherwise below it, never under the tab bar;
+// its right edge on ⚙'s right edge, inside the page.
+const placeProfileSettingsMenu = () => {
+  const { settings, menu } = profileSettings;
+  const r = settings.getBoundingClientRect();
+  const height = menu.offsetHeight;
+  const headerBottom = document.querySelector('.app-topbar')?.getBoundingClientRect().bottom || 0;
+  const tabbar = document.querySelector('.app-tabbar');
+  const floor = tabbar && tabbar.getClientRects().length ? tabbar.getBoundingClientRect().top : window.innerHeight;
+  let top = r.top - height - 10;
+  if (top < headerBottom + 8) top = Math.max(headerBottom + 8, Math.min(r.bottom + 10, floor - height - 8));
+  const width = document.documentElement.clientWidth;
+  const left = Math.max(8, Math.min(r.right - menu.offsetWidth, width - menu.offsetWidth - 8));
+  Object.assign(menu.style, { top: `${Math.round(top)}px`, left: `${Math.round(left)}px` });
+};
+const openProfileSettingsMenu = () => {
+  if (!profileSettings?.menu.isConnected) return;
+  const { settings, menu } = profileSettings;
+  if (POPOVER) { menu.showPopover(); placeProfileSettingsMenu(); } else menu.hidden = false;
+  settings.setAttribute('aria-expanded', 'true');
+};
+const closeProfileSettingsMenu = ({ returnFocus = false } = {}) => {
+  if (!profileSettingsOpen()) return;
+  const { settings, menu } = profileSettings;
+  if (POPOVER) menu.hidePopover(); else menu.hidden = true;
+  settings.setAttribute('aria-expanded', 'false');
+  if (returnFocus) settings.focus();
+};
+document.addEventListener('click', (event) => {
+  if (profileSettings && !profileSettings.settings.contains(event.target) && !profileSettings.menu.contains(event.target)) closeProfileSettingsMenu();
+});
+document.addEventListener('keydown', (event) => {
+  if (event.key === 'Escape' && profileSettingsOpen()) { event.preventDefault(); closeProfileSettingsMenu({ returnFocus: true }); }
+});
+window.addEventListener('resize', () => closeProfileSettingsMenu());
+// A top-layer menu is fixed: follow ⚙ while the page scrolls, and close once ⚙ has scrolled out of view.
+window.addEventListener('scroll', () => {
+  if (!POPOVER || !profileSettingsOpen()) return;
+  const r = profileSettings.settings.getBoundingClientRect();
+  if (r.bottom < 0 || r.top > window.innerHeight) closeProfileSettingsMenu();
+  else placeProfileSettingsMenu();
+}, { passive: true });
+
 const setView = (view) => {
+  closeProfileSettingsMenu();
   const renderedView = view === 'explore' ? 'home' : view;
   document.body.dataset.appView = view;
   document.body.classList.toggle('app-subview', view !== 'home');
@@ -1540,47 +1593,34 @@ const ensureProfilePhotoEditor = () => {
   settings.setAttribute('aria-label', 'Profile settings');
   settings.setAttribute('aria-expanded', 'false');
   settings.innerHTML = '<span aria-hidden="true">⚙</span>';
-  document.querySelector('#profile-settings-menu')?.remove(); // a menu lifted to <body> by an earlier render
   const menu = document.createElement('div');
   menu.id = 'profile-settings-menu';
   menu.className = 'profile-settings-menu';
-  menu.hidden = true;
   menu.innerHTML = '<button type="button" data-profile-setting="notifications">NOTIFICATIONS</button><button type="button" data-profile-setting="block">BLOCKED USERS</button><button type="button" data-profile-setting="removed">REMOVED CONNECTIONS</button><button type="button" data-profile-setting="privacy">PRIVACY &amp; ACCOUNT</button><button type="button" data-profile-setting="logout">LOG OUT</button>';
+  // The menu follows ⚙ in the DOM, so Tab goes ⚙ -> the five items -> EDIT PROFILE. Where popovers exist it opens in
+  // the top layer (popover="manual"): above the hero's overflow clip and the dashboard, without leaving its tab order.
+  // Without them it toggles `hidden` in place, as before Phase C.
+  if (POPOVER) menu.setAttribute('popover', 'manual'); else menu.hidden = true;
   actions.prepend(settings);
-  actions.append(menu);
-  const close = () => { menu.hidden = true; settings.setAttribute('aria-expanded', 'false'); };
-  // The hero clips its overflow and the five 44 px items are taller than the room above the ⚙ button, so the menu is
-  // placed in the viewport instead: above the button when it fits under the header, otherwise below it, never under the
-  // tab bar (Phase C Task 4). It closes on scroll, since a fixed menu would drift away from its button.
-  const place = () => {
-    const r = settings.getBoundingClientRect();
-    // Lifted to <body>: inside the hero it would sit in the hero's stacking context, under the profile dashboard.
-    if (menu.parentElement !== document.body) document.body.append(menu);
-    const height = menu.offsetHeight;
-    const headerBottom = document.querySelector('.app-topbar')?.getBoundingClientRect().bottom || 0;
-    const tabbar = document.querySelector('.app-tabbar');
-    const floor = tabbar && tabbar.getClientRects().length ? tabbar.getBoundingClientRect().top : window.innerHeight;
-    let top = r.top - height - 10;
-    if (top < headerBottom + 8) top = Math.max(headerBottom + 8, Math.min(r.bottom + 10, floor - height - 8));
-    // Right edge on the button's right edge, kept inside the page (clientWidth leaves out a scrollbar).
-    const width = document.documentElement.clientWidth;
-    const left = Math.min(Math.max(8, r.right - menu.offsetWidth), width - menu.offsetWidth - 8);
-    Object.assign(menu.style, { position: 'fixed', zIndex: '60', top: `${Math.round(top)}px`, bottom: 'auto', right: 'auto', left: `${Math.round(Math.max(8, left))}px` });
-  };
+  settings.after(menu);
+  settings.setAttribute('aria-controls', menu.id);
+  profileSettings = { settings, menu };
   settings.addEventListener('click', (event) => {
     event.stopPropagation();
-    const shouldOpen = menu.hidden;
-    close();
-    if (shouldOpen) { menu.hidden = false; settings.setAttribute('aria-expanded', 'true'); place(); }
+    if (profileSettingsOpen()) closeProfileSettingsMenu();
+    else openProfileSettingsMenu();
   });
-  window.addEventListener('scroll', () => { if (!menu.hidden) close(); }, { passive: true });
-  menu.querySelector('[data-profile-setting="block"]')?.addEventListener('click', () => { close(); openBlockedUsersManager(); });
-  menu.querySelector('[data-profile-setting="notifications"]')?.addEventListener('click', () => { close(); openNotificationSettings(); });
-  menu.querySelector('[data-profile-setting="removed"]')?.addEventListener('click', () => { close(); openRemovedConnectionsManager(); });
-  menu.querySelector('[data-profile-setting="privacy"]')?.addEventListener('click', () => { close(); openPrivacy(settings); });
-  menu.querySelector('[data-profile-setting="logout"]')?.addEventListener('click', () => { close(); logoutMember(); });
-  document.addEventListener('click', (event) => { if (!hero.contains(event.target)) close(); });
+  // Tab past the last item (or Shift+Tab before ⚙) closes it.
+  const leave = (event) => { if (!settings.contains(event.relatedTarget) && !menu.contains(event.relatedTarget)) closeProfileSettingsMenu(); };
+  settings.addEventListener('focusout', leave);
+  menu.addEventListener('focusout', leave);
+  menu.querySelector('[data-profile-setting="block"]')?.addEventListener('click', () => { closeProfileSettingsMenu(); openBlockedUsersManager(); });
+  menu.querySelector('[data-profile-setting="notifications"]')?.addEventListener('click', () => { closeProfileSettingsMenu(); openNotificationSettings(); });
+  menu.querySelector('[data-profile-setting="removed"]')?.addEventListener('click', () => { closeProfileSettingsMenu(); openRemovedConnectionsManager(); });
+  menu.querySelector('[data-profile-setting="privacy"]')?.addEventListener('click', () => { closeProfileSettingsMenu(); openPrivacy(settings); });
+  menu.querySelector('[data-profile-setting="logout"]')?.addEventListener('click', () => { closeProfileSettingsMenu(); logoutMember(); });
 };
+
 
 const openProfileEditor = () => {
   if (!memberProfile.id || document.querySelector('#profile-edit-modal')) return;

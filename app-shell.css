@@ -190,3 +190,8 @@ body.app-body .app-view[data-view="home"] .swipe-card-info{height:auto;min-heigh
   body.app-body .chat-compose input{padding-right:var(--space-3);padding-left:var(--space-3);text-overflow:ellipsis}
   body.app-body .chat-compose input::placeholder{font-size:var(--text-12)}
 }
+/* The profile ⚙ menu opens in the top layer (popover="manual", app.js) so the hero's overflow clip and the dashboard
+   cannot cover it; app.js sets its top/left in viewport pixels. The author `display:grid` would otherwise beat the
+   browser's hiding of a closed popover. */
+body.app-body .profile-hero-actions .profile-settings-menu[popover]{position:fixed;inset:auto;margin:0;z-index:auto}
+body.app-body .profile-hero-actions .profile-settings-menu[popover]:not(:popover-open){display:none}

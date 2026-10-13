@@ -333,6 +333,46 @@ try {
         menuHits.forEach((m) => { assert.ok(m.onTop, `${m.item} is covered`); assert.ok(m.height >= 44, `${m.item} is ${m.height}px`); });
       });
       await page.locator('#profile-settings-button').click();
+      // Keyboard (fix round 1): Enter on ⚙ opens it, Tab walks the five items in order, Escape closes it and focus
+      // returns to ⚙; a view change and a resize close it too.
+      const menuState = () => page.evaluate(() => {
+        const m = document.querySelector('#profile-settings-menu');
+        return { open: m.matches('[popover]') ? m.matches(':popover-open') : !m.hidden, expanded: document.querySelector('#profile-settings-button').getAttribute('aria-expanded'), focus: document.activeElement?.id || document.activeElement?.textContent.trim() };
+      });
+      const closedFirst = await menuState();
+      await page.evaluate(() => document.querySelector('#profile-settings-button').focus());
+      await page.keyboard.press('Enter');
+      await page.waitForTimeout(200);
+      const afterEnter = await menuState();
+      const tabbed = [];
+      for (let i = 0; i < 5; i += 1) { await page.keyboard.press('Tab'); tabbed.push((await menuState()).focus); }
+      const stillOpen = (await menuState()).open;
+      await page.keyboard.press('Escape');
+      await page.waitForTimeout(200);
+      const afterEscape = await menuState();
+      check(`${tag}: keyboard ⚙ menu: Enter opens, Tab reaches each item in order, Escape closes and returns focus to ⚙ (${JSON.stringify({ closedFirst, afterEnter, tabbed, stillOpen, afterEscape })})`, () => {
+        assert.equal(closedFirst.open, false);
+        assert.equal(afterEnter.open, true); assert.equal(afterEnter.expanded, 'true');
+        assert.deepEqual(tabbed, ['NOTIFICATIONS', 'BLOCKED USERS', 'REMOVED CONNECTIONS', 'PRIVACY & ACCOUNT', 'LOG OUT']);
+        assert.equal(stillOpen, true);
+        assert.equal(afterEscape.open, false); assert.equal(afterEscape.expanded, 'false'); assert.equal(afterEscape.focus, 'profile-settings-button');
+      });
+      await page.locator('#profile-settings-button').click();
+      await page.waitForTimeout(150);
+      const beforeNav = (await menuState()).open;
+      await go('posts');
+      const afterNav = (await menuState()).open;
+      await go('profile');
+      await page.locator('#profile-settings-button').click();
+      await page.waitForTimeout(150);
+      await page.setViewportSize({ width: viewport.width - 20, height: viewport.height });
+      await page.waitForTimeout(300);
+      const afterResize = (await menuState()).open;
+      await page.setViewportSize(viewport);
+      await settle(page);
+      check(`${tag}: the ⚙ menu closes on a view change and on resize (${JSON.stringify({ beforeNav, afterNav, afterResize })})`, () => {
+        assert.equal(beforeNav, true); assert.equal(afterNav, false); assert.equal(afterResize, false);
+      });
       const italic = await page.evaluate(async () => {
         await document.fonts.load('italic 500 20px "Bodoni Moda"');
         return [...document.fonts].filter((f) => f.family.replace(/["']/g, '') === 'Bodoni Moda' && f.style === 'italic').map((f) => `${f.weight} ${f.status}`);
