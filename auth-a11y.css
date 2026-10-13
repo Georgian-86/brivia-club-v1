@@ -32,8 +32,8 @@ body.auth-page .auth-shell .auth-signup-form .cover-section-heading span,
 body.auth-page .auth-shell .auth-signup-form .cover-choice span,
 body.auth-page .auth-shell .auth-signup-form .signup-step-actions .auth-secondary,
 body.auth-page .auth-shell .auth-signup-form .signup-step-actions .auth-submit,
-body.auth-page .auth-shell .auth-signup-form .signup-next { font-size: 12px !important; }
-body.auth-page .auth-shell .auth-signup-form .cover-choice.is-selected::after { font-size: 12px !important; }
+body.auth-page .auth-shell .auth-signup-form .signup-next { font-size: var(--text-12) !important; }
+body.auth-page .auth-shell .auth-signup-form .cover-choice.is-selected::after { font-size: var(--text-12) !important; }
 /* Colours: the step label, kickers and eyebrows are deep wine; helper copy is darker than the old grey. */
 body.auth-page .auth-shell .auth-panel .signup-progress,
 body.auth-page .auth-shell .auth-panel .signup-progress span,
@@ -63,7 +63,7 @@ body.auth-page .auth-shell .auth-signup-form .photo-copy strong,
 body.auth-page .auth-shell .auth-signup-form .photo-remove,
 body.auth-page .auth-shell .auth-signup-form .photo-remove span { color: var(--a11y-wine); }
 body.auth-page .auth-shell .auth-signup-form .photo-remove,
-body.auth-page .auth-shell .auth-signup-form .photo-remove span { font-size: 12px !important; }
+body.auth-page .auth-shell .auth-signup-form .photo-remove span { font-size: var(--text-12) !important; }
 body.auth-page .auth-shell .auth-signup-form .photo-copy small,
 body.auth-page .auth-shell .auth-signup-form .cover-picker-label small,
 body.auth-page .auth-shell .auth-signup-form .cover-section-heading span { color: var(--a11y-ink-soft); }
@@ -84,10 +84,10 @@ body.auth-page .auth-shell .auth-signup-form .signup-step-actions { align-items:
 body.auth-page .auth-shell .auth-signup-form .signup-step-actions :is(.auth-secondary, .auth-submit) {
   min-height: 48px; margin: 0; display: inline-flex; align-items: center; justify-content: center; gap: 8px;
 }
-body.auth-page .auth-shell .auth-signup-form .area-city-hint { margin: 2px 0 6px; color: var(--a11y-ink-soft); font-size: 12px; text-transform: none; letter-spacing: 0; }
+body.auth-page .auth-shell .auth-signup-form .area-city-hint { margin: 2px 0 6px; color: var(--a11y-ink-soft); font-size: var(--text-12); text-transform: none; letter-spacing: 0; }
 body.auth-page .auth-shell .auth-signup-form .budget-spread {
   width: 100%; min-height: 44px; margin-top: 10px; padding: 0 14px; border: 1px solid color-mix(in srgb, var(--a11y-wine) 45%, transparent);
-  border-radius: 999px; background: transparent; color: var(--a11y-wine); font-size: 12px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; cursor: pointer;
+  border-radius: 999px; background: transparent; color: var(--a11y-wine); font-size: var(--text-12); font-weight: 700; letter-spacing: .08em; text-transform: uppercase; cursor: pointer;
 }
 body.auth-page .auth-shell .auth-signup-form .budget-spread[hidden] { display: none; }
 body.auth-page .auth-shell .auth-signup-form .budget-spread:hover { background: color-mix(in srgb, var(--a11y-wine) 8%, transparent); }
@@ -116,13 +116,17 @@ body.auth-page .auth-shell .auth-signup-form .signup-step-actions :is(.auth-seco
 }
 /* Hotfix 2026-10-12 (review): the rest of the success panel was cream or pink on cream. */
 body.auth-page .auth-shell .auth-panel .auth-success .auth-secondary {
-  color: var(--a11y-wine); border-color: color-mix(in srgb, var(--a11y-wine) 45%, transparent); background: transparent; font-size: 12px;
+  color: var(--a11y-wine); border-color: color-mix(in srgb, var(--a11y-wine) 45%, transparent); background: transparent; font-size: var(--text-12);
 }
 body.auth-page .auth-shell .auth-panel .auth-success .auth-secondary:hover,
 body.auth-page .auth-shell .auth-panel .auth-success .auth-secondary:focus-visible { color: #fffaf1; background: var(--a11y-wine); border-color: var(--a11y-wine); }
 body.auth-page .auth-shell .auth-panel .credential-row code,
-body.auth-page .auth-shell .auth-panel .credential-row button { color: var(--a11y-wine); font-size: 12px; }
-body.auth-page .auth-shell .auth-panel .credential-row > span { color: var(--a11y-ink-soft); font-size: 12px; }
+body.auth-page .auth-shell .auth-panel .credential-row button { color: var(--a11y-wine); font-size: var(--text-12); }
+body.auth-page .auth-shell .auth-panel .credential-row > span { color: var(--a11y-ink-soft); font-size: var(--text-12); }
 /* Phase C Task 3 (pre-review): after a session-less signup script.js sets `hidden` on the form, but
    `.auth-form{display:flex}` (auth-modal.css) beat the UA [hidden] rule, so the form stayed above "Check your email.". */
 body.auth-page .auth-shell .auth-signup-form[hidden] { display: none; }
+
+/* One type system (Phase C Task 4): form controls take the page's Instrument Sans instead of the browser's default
+   face. Zero specificity, so any rule that sets a family on a control still wins. */
+:where(body.auth-page) :where(button, input, select, textarea) { font-family: inherit; }

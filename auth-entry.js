@@ -2,6 +2,7 @@
 // to import it. The landing has its own entry (landing-entry.js) (Phase C Task 3).
 import './tokens.css';
 import './fonts.css';
+import './fonts-app.css';
 import './style.css';
 import './auth-modal.css';
 import './auth-theme.css';

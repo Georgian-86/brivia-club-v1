@@ -36,8 +36,8 @@ body.app-body {
   color: var(--dk-ink);
   text-align: left;
 }
-.swipe-limit-state .app-eyebrow { margin: 0 0 3px; color: var(--dk-soft); font-size: 9px; letter-spacing: .16em; }
-.swipe-limit-state span { display: block; color: var(--dk-ink); font-size: 13px; font-weight: 600; line-height: 1.35; }
+.swipe-limit-state .app-eyebrow { margin: 0 0 3px; color: var(--dk-soft); font-size: var(--text-12); letter-spacing: .12em; }
+.swipe-limit-state span { display: block; color: var(--dk-ink); font-size: var(--text-12); font-weight: 600; line-height: 1.35; }
 .swipe-limit-icon { flex: 0 0 22px; width: 22px; height: 22px; fill: none; stroke: var(--dk-accent); stroke-width: 1.6; stroke-linecap: round; }
 @media (min-width: 850px) {
   /* Shares the hint's row (no extra grid row, so the card never moves up under the top bar). */
@@ -63,10 +63,10 @@ body.app-body {
   align-items: center;
   gap: 5px;
   color: var(--dk-soft);
-  font-family: 'Instrument Sans', Arial, sans-serif;
-  font-size: 11px;
+  font-family: var(--font-body);
+  font-size: var(--text-12);
   font-weight: 600;
-  letter-spacing: .04em;
+  letter-spacing: .037em;
 }
 .app-view[data-view="home"] #swipe-location.swipe-band::before {
   flex: 0 0 11px;
@@ -109,18 +109,18 @@ body.app-body {
   text-align: center;
 }
 .deck-empty-mark { width: 52px; height: 52px; fill: none; stroke: var(--dk-accent); stroke-width: 1.5; }
-.deck-empty .app-eyebrow { margin: 4px 0 0; color: var(--dk-soft); font-size: 10px; letter-spacing: .16em; }
+.deck-empty .app-eyebrow { margin: 4px 0 0; color: var(--dk-soft); font-size: var(--text-12); letter-spacing: .133em; }
 .deck-empty h2 {
   margin: 0;
   color: var(--dk-ink);
-  font-family: 'Bodoni Moda', Didot, 'Times New Roman', serif;
+  font-family: var(--font-heading);
   font-size: clamp(32px, 4vw, 48px);
   font-weight: 500;
   line-height: 1;
   letter-spacing: -.03em;
   overflow-wrap: anywhere;
 }
-.deck-empty p:not(.app-eyebrow) { max-width: 36ch; margin: 0; color: var(--dk-soft); font-size: 14px; line-height: 1.5; }
+.deck-empty p:not(.app-eyebrow) { max-width: 36ch; margin: 0; color: var(--dk-soft); font-size: var(--text-14); line-height: 1.5; }
 .deck-empty-action {
   min-height: 48px;
   margin-top: 10px;
@@ -129,7 +129,7 @@ body.app-body {
   border-radius: 999px;
   background: var(--dk-ink);
   color: var(--dk-paper);
-  font: 700 12px/1 'Instrument Sans', Arial, sans-serif;
+  font: 700 var(--text-12)/1 var(--font-body);
   letter-spacing: .1em;
   text-transform: uppercase;
   cursor: pointer;
@@ -159,32 +159,32 @@ body.app-body {
 body.app-body .app-view[data-view="home"] .swipe-card-topline span,
 body.app-body .app-view[data-view="home"] #swipe-location.swipe-band,
 body.app-body .app-view[data-view="home"] .member-tags span,
-body.app-body .app-view[data-view="home"] .member-tags span.chip-shared { font-size: 12px; }
-body.app-body .app-view[data-view="home"] .view-info-button::before { font-size: 12px; }
+body.app-body .app-view[data-view="home"] .member-tags span.chip-shared { font-size: var(--text-12); }
+body.app-body .app-view[data-view="home"] .view-info-button::before { font-size: var(--text-12); }
 .app-view[data-view="home"] .swipe-band-note[hidden] { display: none !important; }
 .app-view[data-view="home"] .swipe-band-note {
   margin: 2px 0 0;
   color: var(--dk-soft);
-  font-family: 'Instrument Sans', Arial, sans-serif;
-  font-size: 12px;
+  font-family: var(--font-body);
+  font-size: var(--text-12);
   font-weight: 500;
   line-height: 1.35;
 }
 body.app-body .app-view[data-view="home"] .swipe-hint {
   color: var(--dk-ink);
-  font-size: 12px;
+  font-size: var(--text-12);
   line-height: 1.5;
   letter-spacing: .06em;
 }
-body.app-body .app-view[data-view="home"] .swipe-hint .swipe-left-copy strong { font-size: 12px; letter-spacing: .06em; }
-body.app-body .app-view[data-view="home"] .swipe-action::after { font-size: 12px; letter-spacing: .1em; }
+body.app-body .app-view[data-view="home"] .swipe-hint .swipe-left-copy strong { font-size: var(--text-12); letter-spacing: .06em; }
+body.app-body .app-view[data-view="home"] .swipe-action::after { font-size: var(--text-12); letter-spacing: .1em; }
 body.app-body .app-view[data-view="home"] .swipe-action::before { content: none; }
 .swipe-glyph { display: block; width: 30px; height: 30px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
 .app-view[data-view="home"] .swipe-pass .swipe-glyph { color: #5a061f; }
 .app-view[data-view="home"] .swipe-like .swipe-glyph { color: #fffaf1; }
 .app-view[data-view="home"] .swipe-like.is-capped .swipe-glyph { color: var(--dk-soft); }
 @media (max-width: 560px) { .swipe-glyph { width: 28px; height: 28px; } }
-body.app-body .app-view[data-view="home"] .home-kicker { font-size: 12px; }
+body.app-body .app-view[data-view="home"] .home-kicker { font-size: var(--text-12); }
 .app-view[data-view="home"] .swipe-pass::after { color: var(--dk-ink); }
 
 /* Focus (A-F12): a mouse click on a button or chip leaves no lingering ring; the keyboard ring (:focus-visible) stays.

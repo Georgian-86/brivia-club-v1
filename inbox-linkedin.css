@@ -78,7 +78,7 @@
 }
 
 .inbox-panel-head strong {
-  font-size: 12px;
+  font-size: var(--text-12);
   letter-spacing: .1em;
 }
 
@@ -117,13 +117,13 @@
 }
 
 .chat-row-copy strong {
-  font-size: 14px;
+  font-size: var(--text-14);
   font-weight: 700;
 }
 
 .chat-row-copy span {
   margin-top: 5px;
-  font-size: 11px;
+  font-size: var(--text-12);
 }
 
 .chat-row-meta {
@@ -157,18 +157,18 @@
 }
 
 .chat-window-head strong {
-  font-size: 15px;
+  font-size: var(--text-14);
 }
 
 .chat-window-head span {
   color: #5a061f;
-  font-size: 8px;
-  letter-spacing: .1em;
+  font-size: var(--text-12);
+  letter-spacing: .067em;
 }
 
 .chat-window-head small {
   color: rgba(52, 31, 28, .58);
-  font-size: 10px;
+  font-size: var(--text-12);
 }
 
 .chat-back {
@@ -199,7 +199,7 @@
   padding: 11px 14px 9px;
   border-radius: 17px;
   box-shadow: 0 4px 12px rgba(57, 34, 29, .08);
-  font-size: 12px;
+  font-size: var(--text-12);
   line-height: 1.45;
 }
 
@@ -239,7 +239,7 @@
   height: 42px;
   border-radius: 999px;
   background: #f7efe6;
-  font-size: 12px;
+  font-size: var(--text-12);
 }
 
 .chat-compose input:focus {

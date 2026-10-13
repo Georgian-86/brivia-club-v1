@@ -174,3 +174,9 @@ body.app-body .app-view[data-view="profile"] .profile-board-content{overflow:vis
 @media (min-width:701px) and (max-width:780px){
   body.app-body[data-app-view="chat"] .app-view[data-view="chat"].is-active{bottom:calc(64px + env(safe-area-inset-bottom, 0px))!important}
 }
+
+/* One type system (Phase C Task 4): headings default to Bodoni Moda (the italic face is in fonts-app.css); every other
+   text inherits Instrument Sans from body.app-body. Weight 500 is the one self-hosted Bodoni cut, so headings that took the
+   browser's default bold no longer get a synthetic bold. */
+body.app-body :where(h1, h2, h3){font-family:var(--font-heading);font-weight:500}
+:where(body.app-body) :where(button, input, select, textarea){font-family:inherit}

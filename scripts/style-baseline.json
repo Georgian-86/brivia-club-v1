@@ -1,7 +1,7 @@
 {
   "app-navigation.css": {
     "hex": 19,
-    "fontFamily": 2
+    "fontFamily": 0
   },
   "app-shell.css": {
     "hex": 0,
@@ -9,7 +9,7 @@
   },
   "app.css": {
     "hex": 69,
-    "fontFamily": 5
+    "fontFamily": 0
   },
   "auth-a11y.css": {
     "hex": 3,
@@ -21,15 +21,15 @@
   },
   "auth-polish.css": {
     "hex": 208,
-    "fontFamily": 37
+    "fontFamily": 0
   },
   "auth-theme.css": {
     "hex": 70,
-    "fontFamily": 3
+    "fontFamily": 0
   },
   "card-reference.css": {
     "hex": 15,
-    "fontFamily": 5
+    "fontFamily": 0
   },
   "careers.css": {
     "hex": 58,
@@ -37,19 +37,19 @@
   },
   "chat-attachments.css": {
     "hex": 68,
-    "fontFamily": 7
+    "fontFamily": 0
   },
   "chat-empty-state.css": {
     "hex": 7,
-    "fontFamily": 1
+    "fontFamily": 0
   },
   "chat-reference.css": {
     "hex": 19,
-    "fontFamily": 17
+    "fontFamily": 0
   },
   "chat-sidebar-fix.css": {
     "hex": 3,
-    "fontFamily": 3
+    "fontFamily": 0
   },
   "chat-wallpaper.css": {
     "hex": 8,
@@ -61,7 +61,7 @@
   },
   "deck.css": {
     "hex": 2,
-    "fontFamily": 3
+    "fontFamily": 0
   },
   "deep-wine-theme.css": {
     "hex": 7,
@@ -69,11 +69,11 @@
   },
   "discovery-filters.css": {
     "hex": 29,
-    "fontFamily": 7
+    "fontFamily": 0
   },
   "explore-polish.css": {
     "hex": 19,
-    "fontFamily": 7
+    "fontFamily": 0
   },
   "explore-theme.css": {
     "hex": 0,
@@ -89,7 +89,7 @@
   },
   "inbox.css": {
     "hex": 55,
-    "fontFamily": 2
+    "fontFamily": 0
   },
   "intro-reference.css": {
     "hex": 2,
@@ -105,7 +105,7 @@
   },
   "member-polish.css": {
     "hex": 27,
-    "fontFamily": 4
+    "fontFamily": 0
   },
   "mobile-app.css": {
     "hex": 1,
@@ -129,7 +129,7 @@
   },
   "privacy-account.css": {
     "hex": 5,
-    "fontFamily": 4
+    "fontFamily": 0
   },
   "privacy.css": {
     "hex": 7,
@@ -141,11 +141,11 @@
   },
   "profile-theme.css": {
     "hex": 149,
-    "fontFamily": 10
+    "fontFamily": 0
   },
   "report-dialog.css": {
     "hex": 14,
-    "fontFamily": 2
+    "fontFamily": 0
   },
   "skeleton.css": {
     "hex": 4,

@@ -8,21 +8,21 @@
   body.auth-page .auth-shell{display:flex;width:100%;height:auto;min-height:0;max-height:none;flex-direction:column;overflow:hidden;border-radius:16px}
   body.auth-page .auth-story{display:none}
   body.auth-page .auth-visual{flex:0 0 210px;min-height:210px;height:210px;padding:19px 20px}
-  body.auth-page .auth-visual-top,.auth-page .auth-visual-bottom{font-size:8px}
+  body.auth-page .auth-visual-top,.auth-page .auth-visual-bottom{font-size:var(--text-12)}
   body.auth-page .auth-visual-copy{margin:0;padding:20px 0 8px}
-  body.auth-page .auth-visual-copy p{margin-bottom:10px;font-size:8px}
+  body.auth-page .auth-visual-copy p{margin-bottom:10px;font-size:var(--text-12)}
   body.auth-page .auth-visual-copy h2{font-size:clamp(47px,14vw,64px);line-height:.82;letter-spacing:-3px}
-  body.auth-page .auth-visual-copy>span{margin-top:14px;font-size:8px}
+  body.auth-page .auth-visual-copy>span{margin-top:14px;font-size:var(--text-12)}
   body.auth-page .auth-panel{min-height:560px;padding:24px 18px 30px;overflow:visible}
-  body.auth-page .auth-panel-top{margin-bottom:34px;font-size:8px}
-  body.auth-page .auth-panel-kicker{font-size:8px}
-  body.auth-page .auth-step{font-size:8px}
-  body.auth-page .auth-top-signup{font-size:8px}
+  body.auth-page .auth-panel-top{margin-bottom:34px;font-size:var(--text-12)}
+  body.auth-page .auth-panel-kicker{font-size:var(--text-12)}
+  body.auth-page .auth-step{font-size:var(--text-12)}
+  body.auth-page .auth-top-signup{font-size:var(--text-12)}
   body.auth-page .auth-view h1{font-size:clamp(36px,11vw,50px);letter-spacing:-2.5px}
-  body.auth-page .auth-intro{max-width:100%;margin:15px 0 25px;font-size:12px;line-height:1.45}
+  body.auth-page .auth-intro{max-width:100%;margin:15px 0 25px;font-size:var(--text-12);line-height:1.45}
   body.auth-page .auth-form{gap:13px}
-  body.auth-page .auth-form label{font-size:10px}
-  body.auth-page .auth-form input,body.auth-page .auth-form select{min-height:44px;font-size:13px}
+  body.auth-page .auth-form label{font-size:var(--text-12)}
+  body.auth-page .auth-form input,body.auth-page .auth-form select{min-height:44px;font-size:var(--text-12)}
   body.auth-page .auth-submit,body.auth-page .auth-google-trigger,body.auth-page .auth-secondary{min-height:45px}
   body.auth-page .auth-google-trigger{width:100%;min-width:0}
   body.auth-page .auth-field-grid{grid-template-columns:1fr;gap:13px}
@@ -32,10 +32,10 @@
   body.auth-page .community-preview{padding-top:70px}
   body.auth-page .community-preview-heading{padding-right:18px;padding-left:18px}
   body.auth-page .community-preview-heading h2{font-size:clamp(43px,13vw,62px);letter-spacing:-3px}
-  body.auth-page .community-preview-heading>span{font-size:8px;line-height:1.4}
+  body.auth-page .community-preview-heading>span{font-size:var(--text-12);line-height:1.4}
   body.auth-page .community-card{width:245px;height:100px}
   body.auth-page .community-card-copy{min-width:0}
-  body.auth-page .community-preview-note{padding-right:18px;padding-left:18px;font-size:8px}
+  body.auth-page .community-preview-note{padding-right:18px;padding-left:18px;font-size:var(--text-12)}
 }
 
 @media (max-width:380px){

@@ -41,8 +41,8 @@
 .auth-visual-top,
 .auth-visual-bottom {
   color: rgba(255, 250, 241, .7);
-  font-size: 9px;
-  letter-spacing: .14em;
+  font-size: var(--text-12);
+  letter-spacing: .105em;
 }
 
 .auth-visual-copy {
@@ -52,12 +52,12 @@
 .auth-visual-copy p {
   margin-bottom: 22px;
   color: #ffdbe3;
-  font-size: 10px;
-  letter-spacing: .2em;
+  font-size: var(--text-12);
+  letter-spacing: .167em;
 }
 
 .auth-visual-copy h2 {
-  font-family: Georgia, 'Times New Roman', serif;
+  font-family: var(--font-heading);
   font-size: clamp(70px, 8vw, 118px);
   font-weight: 400;
   line-height: .78;
@@ -72,8 +72,8 @@
 .auth-visual-copy > span {
   margin-top: 32px;
   color: rgba(255, 250, 241, .68);
-  font-size: 10px;
-  letter-spacing: .15em;
+  font-size: var(--text-12);
+  letter-spacing: .125em;
   line-height: 1.5;
 }
 
@@ -108,7 +108,7 @@
 
 .auth-welcome h1,
 .auth-view h1 {
-  font-family: Georgia, 'Times New Roman', serif;
+  font-family: var(--font-heading);
   font-weight: 400;
 }
 
@@ -282,7 +282,7 @@
 
   .auth-visual-copy > span {
     margin-top: 17px;
-    font-size: 8px;
+    font-size: var(--text-12);
   }
 
   .auth-panel {
@@ -297,7 +297,7 @@
   }
 
   .auth-visual-copy h2 {
-    font-size: 53px;
+    font-size: var(--text-60);
   }
 
   .auth-panel {
@@ -306,7 +306,7 @@
 
   .auth-welcome h1,
   .auth-view h1 {
-    font-size: 43px;
+    font-size: var(--text-44);
   }
 }
 
@@ -571,23 +571,23 @@
 .auth-shell.is-envelope-opening .auth-envelope-transition{visibility:visible;opacity:1;pointer-events:auto}
 .auth-shell.is-envelope-opening .auth-panel{opacity:0;transform:scale(.96);transition:opacity .24s ease,transform .24s ease}
 .auth-envelope-scene{display:grid;justify-items:center;gap:25px;width:100%;perspective:1100px}
-.auth-envelope-scene>p{margin:0;color:rgba(255,250,241,.78);font-size:9px;font-weight:700;letter-spacing:.22em;animation:envelope-caption-in .5s ease .36s both}
+.auth-envelope-scene>p{margin:0;color:rgba(255,250,241,.78);font-size:var(--text-12);font-weight:700;letter-spacing:.165em;animation:envelope-caption-in .5s ease .36s both}
 .auth-envelope{position:relative;width:min(380px,66vw);aspect-ratio:1.58;transform-style:preserve-3d;filter:drop-shadow(0 28px 24px rgba(12,0,5,.42));animation:envelope-float-in .72s cubic-bezier(.2,.8,.2,1) both}
 .auth-envelope-back,.auth-envelope-front,.auth-envelope-flap,.auth-envelope-letter{position:absolute;right:0;left:0}
 .auth-envelope-back{inset:0;border:1px solid rgba(255,224,230,.32);border-radius:7px;background:linear-gradient(145deg,#7d1839,#3a0414 75%);box-shadow:inset 0 1px 0 rgba(255,250,241,.16),inset 0 -18px 28px rgba(18,0,7,.22)}
 .auth-envelope-letter{z-index:2;top:13%;left:11%;width:78%;height:65%;display:grid;align-content:center;justify-items:center;gap:10px;border:1px solid rgba(67,4,22,.16);background:linear-gradient(160deg,#fff8ef,#e9d9cf);color:#430416;box-shadow:0 8px 16px rgba(16,0,6,.16);transform:translateY(28%) translateZ(4px);animation:letter-rise 1.02s cubic-bezier(.2,.76,.24,1) .23s forwards}
-.auth-envelope-letter span{font-size:8px;font-weight:700;letter-spacing:.18em}
-.auth-envelope-letter strong{font-family:Georgia,'Times New Roman',serif;font-size:clamp(16px,2.7vw,25px);font-weight:400;letter-spacing:-.5px}
+.auth-envelope-letter span{font-size:var(--text-12);font-weight:700;letter-spacing:.12em}
+.auth-envelope-letter strong{font-family:var(--font-body);font-size:clamp(16px,2.7vw,25px);font-weight:400;letter-spacing:-.5px}
 .auth-envelope-front{z-index:4;bottom:0;height:69%;border-radius:0 0 7px 7px;background:linear-gradient(150deg,#6d102f,#400416 72%);clip-path:polygon(0 0,50% 55%,100% 0,100% 100%,0 100%);box-shadow:inset 0 1px 0 rgba(255,224,230,.14),inset 0 -12px 18px rgba(15,0,6,.16);transform:translateZ(10px)}
 .auth-envelope-flap{z-index:5;top:0;width:100%;height:63%;border-radius:7px 7px 0 0;background:linear-gradient(145deg,#861c42,#4a061a 78%);clip-path:polygon(0 0,100% 0,50% 100%);transform:rotateX(0deg) translateZ(13px);transform-origin:50% 0;backface-visibility:visible;animation:envelope-flap-open 1.02s cubic-bezier(.2,.76,.24,1) .18s forwards}
-.auth-envelope-seal{position:absolute;z-index:6;top:47%;left:50%;display:grid;width:39px;height:39px;place-items:center;border:1px solid rgba(255,224,230,.55);border-radius:50%;background:#5a061f;color:#ffdbe3;font-family:Georgia,'Times New Roman',serif;font-size:15px;box-shadow:0 3px 10px rgba(18,0,7,.3);transform:translate(-50%,-50%) translateZ(18px);animation:seal-fade .35s ease .18s forwards}
+.auth-envelope-seal{position:absolute;z-index:6;top:47%;left:50%;display:grid;width:39px;height:39px;place-items:center;border:1px solid rgba(255,224,230,.55);border-radius:50%;background:#5a061f;color:#ffdbe3;font-family:var(--font-heading);font-size:var(--text-14);box-shadow:0 3px 10px rgba(18,0,7,.3);transform:translate(-50%,-50%) translateZ(18px);animation:seal-fade .35s ease .18s forwards}
 @keyframes envelope-float-in{from{opacity:0;transform:translateY(26px) rotateX(7deg) rotateZ(-2deg) scale(.88)}to{opacity:1;transform:translateY(0) rotateX(0) rotateZ(0) scale(1)}}
 @keyframes envelope-flap-open{0%{transform:rotateX(0deg) translateZ(13px)}100%{transform:rotateX(-168deg) translateZ(13px)}}
 @keyframes letter-rise{0%{transform:translateY(28%) translateZ(4px)}100%{transform:translateY(-22%) translateZ(4px)}}
 @keyframes seal-fade{0%,55%{opacity:1}100%{opacity:0;transform:translate(-50%,-50%) translateZ(18px) scale(.7)}}
 @keyframes envelope-caption-in{from{opacity:0;transform:translateY(7px)}to{opacity:1;transform:none}}
 @media(prefers-reduced-motion:reduce){.auth-envelope,.auth-envelope-flap,.auth-envelope-letter,.auth-envelope-seal,.auth-envelope-scene>p{animation-duration:.01ms;animation-iteration-count:1;animation-delay:0s}}
-@media(max-width:480px){.auth-envelope{width:min(315px,78vw)}.auth-envelope-letter strong{font-size:18px}}
+@media(max-width:480px){.auth-envelope{width:min(315px,78vw)}.auth-envelope-letter strong{font-size:var(--text-16)}}
 
 /* The welcome state itself is the envelope; the form state returns to the dark auth card. */
 .auth-shell:has(.auth-welcome.is-active) {
@@ -677,8 +677,8 @@
   background: #5a061f;
   color: #ffdbe3;
   content: 'B';
-  font-family: Georgia, 'Times New Roman', serif;
-  font-size: 17px;
+  font-family: var(--font-heading);
+  font-size: var(--text-16);
   box-shadow: 0 5px 13px rgba(25, 0, 8, .25);
   transform: translateX(-50%);
 }
@@ -701,7 +701,7 @@
   max-width: 300px;
   margin: 13px auto 19px;
   color: rgba(67, 4, 22, .66);
-  font-size: 11px;
+  font-size: var(--text-12);
 }
 
 .auth-shell:has(.auth-welcome.is-active) .auth-choice-card {
@@ -719,7 +719,7 @@
   grid-column: 1 / -1;
   margin: 0 0 1px;
   color: rgba(67, 4, 22, .55);
-  font-size: 8px;
+  font-size: var(--text-12);
 }
 
 .auth-shell:has(.auth-welcome.is-active) .auth-choice-button {
@@ -730,7 +730,7 @@
   border-color: #5a061f;
   background: #5a061f;
   color: #fffaf1;
-  font-size: 9px;
+  font-size: var(--text-12);
 }
 
 .auth-shell:has(.auth-welcome.is-active) .auth-choice-button:hover {
@@ -757,7 +757,7 @@
   }
 
   .auth-shell:has(.auth-welcome.is-active) .auth-welcome h1 {
-    font-size: 42px;
+    font-size: var(--text-44);
   }
 
   .auth-shell:has(.auth-welcome.is-active) .auth-choice-card {
@@ -896,11 +896,11 @@
 .auth-shell:has(.auth-login.is-active) .auth-story small {
   display: block;
   margin: 0;
-  font-family: 'Instrument Sans', sans-serif;
-  font-size: 8px;
+  font-family: var(--font-body);
+  font-size: var(--text-12);
   font-weight: 700;
   line-height: 1.55;
-  letter-spacing: .19em;
+  letter-spacing: .127em;
   text-transform: uppercase;
 }
 
@@ -917,7 +917,7 @@
 .auth-shell:has(.auth-login.is-active) .auth-story h2 {
   margin: auto 0;
   color: #5a061f;
-  font-family: Georgia, 'Times New Roman', serif;
+  font-family: var(--font-heading);
   font-size: clamp(36px, 4vw, 63px);
   font-weight: 400;
   line-height: .92;
@@ -931,9 +931,9 @@
 
 .auth-shell:has(.auth-login.is-active) .auth-story small {
   margin-top: 18px;
-  font-size: 8px;
+  font-size: var(--text-12);
   font-weight: 500;
-  letter-spacing: .08em;
+  letter-spacing: .053em;
   line-height: 1.5;
   text-transform: none;
 }
@@ -963,11 +963,11 @@
   display: block;
   z-index: 2;
   color: rgba(244, 234, 223, .78);
-  font-family: 'Instrument Sans', sans-serif;
-  font-size: 8px;
+  font-family: var(--font-body);
+  font-size: var(--text-12);
   font-weight: 700;
   line-height: 1.6;
-  letter-spacing: .19em;
+  letter-spacing: .127em;
   text-transform: uppercase;
 }
 
@@ -1027,10 +1027,10 @@
   border: 0;
   background: transparent;
   color: rgba(90, 6, 31, .58);
-  font-family: 'Instrument Sans', sans-serif;
-  font-size: 8px;
+  font-family: var(--font-body);
+  font-size: var(--text-12);
   font-weight: 700;
-  letter-spacing: .15em;
+  letter-spacing: .1em;
   line-height: 1;
   text-transform: uppercase;
   white-space: nowrap;
@@ -1041,8 +1041,8 @@
   border: 1px solid rgba(90, 6, 31, .68);
   border-radius: 999px;
   color: #5a061f;
-  font-size: 8px;
-  letter-spacing: .14em;
+  font-size: var(--text-12);
+  letter-spacing: .093em;
 }
 
 .auth-shell:has(.auth-login.is-active) .auth-top-signup:hover b {
@@ -1062,7 +1062,7 @@
 .auth-shell:has(.auth-login.is-active) .auth-login h1 {
   margin: 0 0 5px;
   color: #3f2228;
-  font-family: Georgia, 'Times New Roman', serif;
+  font-family: var(--font-heading);
   font-size: clamp(42px, 4.3vw, 61px);
   font-weight: 400;
   line-height: .96;
@@ -1077,9 +1077,9 @@
 .auth-shell:has(.auth-login.is-active) .auth-login .auth-intro {
   margin: 0 0 29px;
   color: rgba(90, 6, 31, .65);
-  font-family: Georgia, 'Times New Roman', serif;
-  font-size: 11px;
-  letter-spacing: .02em;
+  font-family: var(--font-body);
+  font-size: var(--text-12);
+  letter-spacing: .018em;
 }
 
 .auth-shell:has(.auth-login.is-active) .auth-form {
@@ -1089,9 +1089,9 @@
 .auth-shell:has(.auth-login.is-active) .auth-form label {
   gap: 7px;
   color: rgba(90, 6, 31, .74);
-  font-size: 8px;
+  font-size: var(--text-12);
   font-weight: 700;
-  letter-spacing: .16em;
+  letter-spacing: .107em;
   text-transform: uppercase;
 }
 
@@ -1101,9 +1101,9 @@
   border-radius: 7px;
   background: rgba(255, 250, 241, .16);
   color: #3f2228;
-  font-family: 'Instrument Sans', sans-serif;
-  font-size: 11px;
-  letter-spacing: .02em;
+  font-family: var(--font-body);
+  font-size: var(--text-12);
+  letter-spacing: .018em;
 }
 
 .auth-shell:has(.auth-login.is-active) .auth-input-shell {
@@ -1123,20 +1123,20 @@
   position: absolute;
   z-index: 1;
   color: rgba(90, 6, 31, .56);
-  font-family: Arial, sans-serif;
-  font-size: 12px;
+  font-family: var(--font-body);
+  font-size: var(--text-12);
   line-height: 1;
   pointer-events: none;
 }
 
 .auth-shell:has(.auth-login.is-active) .auth-field-icon {
   left: 13px;
-  font-size: 11px;
+  font-size: var(--text-12);
 }
 
 .auth-shell:has(.auth-login.is-active) .auth-field-eye {
   right: 13px;
-  font-size: 10px;
+  font-size: var(--text-12);
 }
 
 .auth-shell:has(.auth-login.is-active) .auth-forgot {
@@ -1145,8 +1145,8 @@
   border: 0;
   background: transparent;
   color: rgba(90, 6, 31, .72);
-  font-family: Georgia, 'Times New Roman', serif;
-  font-size: 9px;
+  font-family: var(--font-body);
+  font-size: var(--text-12);
   font-style: italic;
   text-decoration: underline;
   text-underline-offset: 3px;
@@ -1170,13 +1170,13 @@
   border-radius: 999px;
   background: #5a061f;
   color: #fff9f0;
-  font-size: 8px;
-  letter-spacing: .23em;
+  font-size: var(--text-12);
+  letter-spacing: .153em;
 }
 
 .auth-shell:has(.auth-login.is-active) .auth-submit span {
   margin-left: 0;
-  font-size: 15px;
+  font-size: var(--text-14);
   font-weight: 400;
   letter-spacing: 0;
 }
@@ -1191,8 +1191,8 @@
   gap: 10px;
   margin: 24px 0 13px;
   color: rgba(90, 6, 31, .55);
-  font-size: 8px;
-  letter-spacing: .17em;
+  font-size: var(--text-12);
+  letter-spacing: .113em;
 }
 
 .auth-shell:has(.auth-login.is-active) .auth-divider::before,
@@ -1221,8 +1221,8 @@
   background: #fffaf1;
   color: #101010;
   box-shadow: 0 2px 8px rgba(90, 6, 31, .11);
-  font-family: Arial, sans-serif;
-  font-size: 13px;
+  font-family: var(--font-body);
+  font-size: var(--text-12);
   font-weight: 700;
   letter-spacing: 0;
 }
@@ -1252,15 +1252,15 @@
 
 .auth-shell:has(.auth-login.is-active) .auth-google-mark {
   display: block;
-  font-family: Arial, sans-serif;
-  font-size: 14px;
+  font-family: var(--font-body);
+  font-size: var(--text-14);
   font-weight: 700;
   letter-spacing: 0;
 }
 
 .auth-shell:has(.auth-login.is-active) .auth-social-placeholder.auth-linkedin {
   color: #2a75a7;
-  font-size: 12px;
+  font-size: var(--text-12);
 }
 
 .auth-shell:has(.auth-login.is-active) .auth-panel::before {
@@ -1273,8 +1273,8 @@
   color: rgba(90, 6, 31, .62);
   content: '“Build a life\A you’re proud of.”';
   white-space: pre;
-  font-family: Georgia, 'Times New Roman', serif;
-  font-size: 8px;
+  font-family: var(--font-heading);
+  font-size: var(--text-12);
   font-style: italic;
   line-height: 1.45;
   text-align: right;
@@ -1401,10 +1401,10 @@
   border: 0;
   background: transparent;
   color: rgba(90, 6, 31, .58);
-  font-family: 'Instrument Sans', sans-serif;
-  font-size: clamp(7px, .62vw, 9px);
+  font-family: var(--font-body);
+  font-size: var(--text-12);
   font-weight: 700;
-  letter-spacing: .14em;
+  letter-spacing: .082em;
   text-transform: uppercase;
   white-space: nowrap;
 }
@@ -1431,7 +1431,7 @@
 .auth-shell:has(.auth-login.is-active) .auth-login h1 {
   margin: 0 0 clamp(15px, 2.3vh, 24px);
   color: #5a061f;
-  font-family: 'Snell Roundhand', 'Brush Script MT', 'Segoe Script', cursive;
+  font-family: var(--font-heading);
   font-size: clamp(52px, 6.3vw, 105px);
   font-weight: 400;
   line-height: .82;
@@ -1447,9 +1447,9 @@
 .auth-shell:has(.auth-login.is-active) .auth-login .auth-intro {
   margin: 0 0 clamp(27px, 4vh, 42px);
   color: rgba(90, 6, 31, .6);
-  font-family: Georgia, 'Times New Roman', serif;
-  font-size: clamp(9px, .75vw, 12px);
-  letter-spacing: .32em;
+  font-family: var(--font-body);
+  font-size: var(--text-12);
+  letter-spacing: .24em;
   line-height: 1.5;
 }
 
@@ -1463,9 +1463,9 @@
 .auth-shell:has(.auth-login.is-active) .auth-form label {
   gap: 7px;
   color: rgba(90, 6, 31, .72);
-  font-size: clamp(8px, .62vw, 10px);
+  font-size: var(--text-12);
   font-weight: 700;
-  letter-spacing: .14em;
+  letter-spacing: .093em;
   text-transform: uppercase;
 }
 
@@ -1475,8 +1475,8 @@
   border-radius: 6px;
   background: rgba(255, 250, 241, .12);
   color: #3f2228;
-  font-family: 'Instrument Sans', sans-serif;
-  font-size: clamp(11px, .72vw, 14px);
+  font-family: var(--font-body);
+  font-size: clamp(var(--text-12), .72vw, 14px);
 }
 
 .auth-shell:has(.auth-login.is-active) .auth-form input::placeholder {
@@ -1491,20 +1491,20 @@
   border-radius: 999px;
   background: #5a061f;
   color: #fff9f0;
-  font-size: clamp(8px, .65vw, 10px);
-  letter-spacing: .22em;
+  font-size: var(--text-12);
+  letter-spacing: .147em;
 }
 
 .auth-shell:has(.auth-login.is-active) .auth-submit span {
-  font-size: 15px;
+  font-size: var(--text-14);
 }
 
 .auth-shell:has(.auth-login.is-active) .auth-divider {
   width: min(100%, 405px);
   margin: clamp(22px, 3.2vh, 32px) auto 12px;
   color: rgba(90, 6, 31, .55);
-  font-size: clamp(7px, .55vw, 9px);
-  letter-spacing: .18em;
+  font-size: var(--text-12);
+  letter-spacing: .105em;
 }
 
 .auth-shell:has(.auth-login.is-active) .auth-divider::before,
@@ -1523,7 +1523,7 @@
   border-top-color: rgba(90, 6, 31, .25);
   color: rgba(90, 6, 31, .6);
   content: '“Different\A conversations for\A a brighter you.”';
-  font-size: 8px;
+  font-size: var(--text-12);
 }
 
 .auth-shell:has(.auth-login.is-active) .auth-create-trigger,
@@ -1633,8 +1633,8 @@
   border: 0;
   background: transparent;
   color: rgba(90, 6, 31, .72);
-  font-family: Georgia, 'Times New Roman', serif;
-  font-size: clamp(8px, .62vw, 10px);
+  font-family: var(--font-body);
+  font-size: var(--text-12);
   font-style: italic;
   text-decoration: underline;
   text-underline-offset: 3px;
@@ -1672,19 +1672,19 @@
   background: #fffaf1;
   box-shadow: 0 2px 8px rgba(90, 6, 31, .12);
   color: #151515;
-  font-family: Arial, sans-serif;
-  font-size: 13px;
+  font-family: var(--font-body);
+  font-size: var(--text-12);
   font-weight: 700;
   line-height: 1;
 }
 
 .auth-shell:has(.auth-login.is-active) .auth-google-mark {
   display: block;
-  font-size: 15px;
+  font-size: var(--text-14);
 }
 
 .auth-shell:has(.auth-login.is-active) .auth-social-placeholder.auth-apple {
-  font-size: 15px;
+  font-size: var(--text-14);
 }
 
 .auth-shell:has(.auth-login.is-active) .auth-social-placeholder.auth-apple svg {
@@ -1696,7 +1696,7 @@
 
 .auth-shell:has(.auth-login.is-active) .auth-social-placeholder.auth-linkedin {
   color: #2775a7;
-  font-size: 13px;
+  font-size: var(--text-12);
 }
 
 @media(max-width:900px) {
@@ -1711,29 +1711,29 @@
 }
 
 .auth-shell:has(.auth-login.is-active) .auth-login .auth-intro {
-  font-size: 13px;
+  font-size: var(--text-12);
   line-height: 1.4;
 }
 
 .auth-shell:has(.auth-login.is-active) .auth-form label {
-  font-size: 9px;
+  font-size: var(--text-12);
 }
 
 .auth-shell:has(.auth-login.is-active) .auth-form input {
   min-height: 47px;
-  font-size: 13px;
+  font-size: var(--text-12);
 }
 
 .auth-shell:has(.auth-login.is-active) .auth-forgot {
-  font-size: 10px;
+  font-size: var(--text-12);
 }
 
 .auth-shell:has(.auth-login.is-active) .auth-submit {
-  font-size: 9px;
+  font-size: var(--text-12);
 }
 
 .auth-shell:has(.auth-login.is-active) .auth-divider {
-  font-size: 8px;
+  font-size: var(--text-12);
 }
 
 /* Signup keeps the same light reference canvas and burgundy controls. */
@@ -1783,11 +1783,11 @@
 .auth-shell:has(.auth-signup.is-active) .auth-story small {
   display: block;
   margin: 0;
-  font-family: 'Instrument Sans', sans-serif;
-  font-size: 8px;
+  font-family: var(--font-body);
+  font-size: var(--text-12);
   font-weight: 700;
   line-height: 1.55;
-  letter-spacing: .19em;
+  letter-spacing: .127em;
   text-transform: uppercase;
 }
 
@@ -1804,7 +1804,7 @@
 .auth-shell:has(.auth-signup.is-active) .auth-story h2 {
   margin: auto 0;
   color: #5a061f;
-  font-family: Georgia, 'Times New Roman', serif;
+  font-family: var(--font-heading);
   font-size: clamp(36px, 4vw, 63px);
   font-weight: 400;
   line-height: .92;
@@ -1818,9 +1818,9 @@
 
 .auth-shell:has(.auth-signup.is-active) .auth-story small {
   margin-top: 18px;
-  font-size: 8px;
+  font-size: var(--text-12);
   font-weight: 500;
-  letter-spacing: .08em;
+  letter-spacing: .053em;
   line-height: 1.5;
   text-transform: none;
 }
@@ -1849,11 +1849,11 @@
   display: block;
   z-index: 2;
   color: rgba(244, 234, 223, .78);
-  font-family: 'Instrument Sans', sans-serif;
-  font-size: 8px;
+  font-family: var(--font-body);
+  font-size: var(--text-12);
   font-weight: 700;
   line-height: 1.6;
-  letter-spacing: .19em;
+  letter-spacing: .127em;
   text-align: right;
   text-transform: uppercase;
 }
@@ -1916,10 +1916,10 @@
   border: 0;
   background: transparent;
   color: rgba(90, 6, 31, .58);
-  font-family: 'Instrument Sans', sans-serif;
-  font-size: 8px;
+  font-family: var(--font-body);
+  font-size: var(--text-12);
   font-weight: 700;
-  letter-spacing: .15em;
+  letter-spacing: .1em;
   text-transform: uppercase;
   white-space: nowrap;
 }
@@ -1929,8 +1929,8 @@
   border: 1px solid rgba(90, 6, 31, .68);
   border-radius: 999px;
   color: #5a061f;
-  font-size: 8px;
-  letter-spacing: .14em;
+  font-size: var(--text-12);
+  letter-spacing: .093em;
 }
 
 .auth-shell:has(.auth-signup.is-active) .auth-signup {
@@ -1941,7 +1941,7 @@
 .auth-shell:has(.auth-signup.is-active) .auth-signup h1 {
   margin: 0 0 6px;
   color: #3f2228;
-  font-family: Georgia, 'Times New Roman', serif;
+  font-family: var(--font-heading);
   font-size: clamp(38px, 4vw, 56px);
   font-weight: 400;
   line-height: .94;
@@ -1956,8 +1956,8 @@
 .auth-shell:has(.auth-signup.is-active) .auth-signup .auth-intro {
   margin: 0 0 22px;
   color: rgba(90, 6, 31, .65);
-  font-family: Georgia, 'Times New Roman', serif;
-  font-size: 11px;
+  font-family: var(--font-body);
+  font-size: var(--text-12);
 }
 
 .auth-shell:has(.auth-signup.is-active) .auth-signup-form,
@@ -1970,9 +1970,9 @@
 .auth-shell:has(.auth-signup.is-active) .auth-signup-form .skills-picker > label,
 .auth-shell:has(.auth-signup.is-active) .auth-signup-form .looking-picker > label {
   color: rgba(90, 6, 31, .74);
-  font-size: 8px;
+  font-size: var(--text-12);
   font-weight: 700;
-  letter-spacing: .14em;
+  letter-spacing: .093em;
   text-transform: uppercase;
 }
 
@@ -2047,9 +2047,9 @@
 .auth-signup-form .gender-picker legend {
   margin: 0 0 8px;
   color: rgba(90, 6, 31, .74);
-  font-size: 8px;
+  font-size: var(--text-12);
   font-weight: 700;
-  letter-spacing: .14em;
+  letter-spacing: .093em;
   text-transform: uppercase;
 }
 
@@ -2086,9 +2086,9 @@
   border: 1px solid rgba(90, 6, 31, .18);
   background: rgba(255, 250, 241, .42);
   color: #5a061f;
-  font-size: 8px;
+  font-size: var(--text-12);
   font-weight: 700;
-  letter-spacing: .08em;
+  letter-spacing: .053em;
   line-height: 1.2;
   text-align: center;
   transition: border-color .2s ease, background .2s ease, color .2s ease;
@@ -2325,7 +2325,7 @@
 
 .auth-shell:has(.auth-login.is-active) .auth-login h1 {
   color: #5a061f;
-  font-family: 'Snell Roundhand', 'Brush Script MT', 'Segoe Script', cursive;
+  font-family: var(--font-heading);
   font-size: clamp(58px, 7.4vw, 132px) !important;
   font-weight: 400;
   line-height: .82;
@@ -2335,8 +2335,8 @@
 
 .auth-shell:has(.auth-login.is-active) .auth-login .auth-intro {
   margin-bottom: clamp(27px, 4vh, 42px);
-  font-size: clamp(9px, .75vw, 12px) !important;
-  letter-spacing: .32em;
+  font-size: var(--text-12) !important;
+  letter-spacing: .24em;
   margin-left: auto;
   margin-right: auto;
 }
@@ -2402,7 +2402,7 @@
   }
 
   .auth-shell:has(.auth-login.is-active) .auth-login h1 {
-    font-size: 58px !important;
+    font-size: var(--text-60) !important;
   }
 
   .auth-shell:has(.auth-login.is-active) .auth-login {
@@ -2410,8 +2410,8 @@
   }
 
   .auth-shell:has(.auth-login.is-active) .auth-login .auth-intro {
-    font-size: 9px;
-    letter-spacing: .3em;
+    font-size: var(--text-12);
+    letter-spacing: .225em;
   }
 
   .auth-shell:has(.auth-login.is-active) .auth-form input {
@@ -2444,7 +2444,7 @@
 }
 
 .auth-shell:has(.auth-login.is-active) .auth-login h1 {
-  font-family: Georgia, 'Times New Roman', serif !important;
+  font-family: var(--font-heading) !important;
   font-weight: 400;
   line-height: .95;
   letter-spacing: -.045em;
@@ -2480,9 +2480,9 @@
 
 /* Keep the Google sign-in prompt easy to see on the compact login layout. */
 .auth-shell:has(.auth-login.is-active) .auth-login .auth-divider {
-  font-size: clamp(10px, .72vw, 12px);
+  font-size: var(--text-12);
   font-weight: 600;
-  letter-spacing: .14em;
+  letter-spacing: .117em;
 }
 
 .auth-shell:has(.auth-login.is-active) .auth-login .auth-google-trigger {
@@ -2494,7 +2494,7 @@
 }
 
 .auth-shell:has(.auth-login.is-active) .auth-login .auth-google-mark {
-  font-size: 18px;
+  font-size: var(--text-16);
 }
 
 .auth-shell:has(.auth-login.is-active) .auth-panel::-webkit-scrollbar {
@@ -2505,7 +2505,7 @@
 /* Make the lower-right editorial note readable at normal viewing size. */
 .auth-shell:has(.auth-login.is-active) .auth-panel::before {
   width: 190px;
-  font-size: 14px;
+  font-size: var(--text-14);
   line-height: 1.5;
   content: '“Find your kind.\A Build what’s next.”';
 }
@@ -2542,14 +2542,14 @@
 
 /* Improve readability of the top-right account prompt. */
 .auth-shell:has(.auth-login.is-active) .auth-top-signup {
-  font-size: 11px !important;
-  letter-spacing: .13em;
+  font-size: var(--text-12) !important;
+  letter-spacing: .119em;
 }
 
 .auth-shell:has(.auth-login.is-active) .auth-top-signup b {
   padding: 10px 20px;
-  font-size: 11px !important;
-  letter-spacing: .11em;
+  font-size: var(--text-12) !important;
+  letter-spacing: .101em;
 }
 
 .auth-shell:has(.auth-login.is-active) .auth-top-signup {
@@ -2560,15 +2560,15 @@
 /* Upgrade and enlarge the bottom-right brand quote. */
 .auth-shell:has(.auth-login.is-active) .auth-panel::before {
   width: 220px;
-  font-size: 17px !important;
+  font-size: var(--text-16) !important;
   line-height: 1.4;
   content: '\201CMeet your people.\A Build something real.\201D';
 }
 
 .auth-shell:has(.auth-login.is-active) .auth-panel::before {
   right: clamp(14px, 2.5vw, 42px) !important;
-  font-family: 'Instrument Sans', Arial, sans-serif !important;
-  font-size: 19px !important;
+  font-family: var(--font-body) !important;
+  font-size: var(--text-20) !important;
   font-style: normal !important;
   font-weight: 500;
   line-height: 1.35;
@@ -2579,14 +2579,14 @@
   .auth-shell:has(.auth-signup.is-active) .auth-top-signup {
     position: relative;
     right: -95px;
-    font-size: 11px !important;
-    letter-spacing: .13em;
+    font-size: var(--text-12) !important;
+    letter-spacing: .119em;
   }
 
   .auth-shell:has(.auth-signup.is-active) .auth-top-signup b {
     padding: 10px 20px;
-    font-size: 11px !important;
-    letter-spacing: .11em;
+    font-size: var(--text-12) !important;
+    letter-spacing: .101em;
   }
 
   .auth-shell:has(.auth-signup.is-active) .auth-signup {
@@ -2605,7 +2605,7 @@
     max-width: 500px;
     margin-right: auto;
     margin-left: auto;
-    font-size: 13px;
+    font-size: var(--text-12);
     line-height: 1.45;
     text-align: center;
   }
@@ -2622,7 +2622,7 @@
 .community-preview{padding:clamp(64px,8vw,108px) 0 48px;background:#f3f4f3;color:#291d1b}
 .community-preview-heading{max-width:1120px;margin:0 auto;padding:0 24px 34px}
 .community-preview-heading .auth-eyebrow{color:#741f39}
-.community-preview-heading h2{font-family:'Instrument Sans',Arial,sans-serif;font-size:clamp(48px,6vw,84px);font-weight:700;line-height:.88;letter-spacing:-.065em}
+.community-preview-heading h2{font-family:var(--font-heading);font-size:clamp(48px,6vw,84px);font-weight:500;line-height:.88;letter-spacing:-.065em}
 .community-preview-heading h2 em{color:#741f39;font-style:normal}
 .community-preview-heading>span{color:rgba(41,29,27,.5)}
 .community-marquee{max-width:none;margin:0;padding:0;overflow:hidden}
@@ -2635,14 +2635,14 @@
 .community-card--dhruv .community-member-photo img{object-position:center 65%}
 .community-card--siddharth .community-member-photo img{object-position:center 65%}
 .community-card-copy{display:flex!important;min-width:0;flex-direction:column;gap:4px!important;padding:7px 14px 8px}
-.community-card-copy strong{color:#3d4644;font-size:15px;line-height:1.18;letter-spacing:-.25px}
-.community-card-copy span{overflow:visible;color:#8a9491;font-size:11px;font-weight:500;letter-spacing:0;text-overflow:clip;white-space:normal}
-.community-card-copy small{display:block;overflow:visible;color:#7b8783;font-size:11px;font-weight:500;line-height:1.25;letter-spacing:0;text-overflow:clip;white-space:normal}
+.community-card-copy strong{color:#3d4644;font-size:var(--text-14);line-height:1.18;letter-spacing:-.25px}
+.community-card-copy span{overflow:visible;color:#8a9491;font-size:var(--text-12);font-weight:500;letter-spacing:0;text-overflow:clip;white-space:normal}
+.community-card-copy small{display:block;overflow:visible;color:#7b8783;font-size:var(--text-12);font-weight:500;line-height:1.25;letter-spacing:0;text-overflow:clip;white-space:normal}
 .community-card>b{display:none}
 .community-preview-note{margin:28px auto 0;max-width:1120px;padding:0 24px;color:rgba(41,29,27,.45)}
 @media(max-width:780px){
   .community-preview-heading{padding-bottom:28px}
-  .community-preview-heading h2{font-size:54px;letter-spacing:-3px}
+  .community-preview-heading h2{font-size:var(--text-60);letter-spacing:-3px}
   .community-marquee{overflow:hidden;padding-bottom:5px}
   .community-track{display:flex;width:max-content}
   .community-card{flex:0 0 270px;width:270px;grid-template-rows:225px minmax(90px,auto)}
@@ -2716,7 +2716,7 @@
 
   .auth-shell:has(.auth-signup.is-active) .auth-signup h1 {
     color: #5a061f;
-    font-family: Georgia, 'Times New Roman', serif !important;
+    font-family: var(--font-heading) !important;
     font-size: clamp(48px, 4vw, 76px) !important;
     font-weight: 400;
     line-height: .95;
@@ -2727,9 +2727,9 @@
 
   .auth-shell:has(.auth-signup.is-active) .auth-signup .auth-intro {
     margin: 22px auto 30px;
-    font-family: 'Instrument Sans', Arial, sans-serif;
-    font-size: clamp(9px, .75vw, 12px);
-    letter-spacing: .3em;
+    font-family: var(--font-body);
+    font-size: var(--text-12);
+    letter-spacing: .225em;
     line-height: 1.5;
     text-align: center;
   }
@@ -2743,7 +2743,7 @@
   .auth-shell:has(.auth-signup.is-active) .skills-helper,
   .auth-shell:has(.auth-signup.is-active) .looking-helper {
     color: rgba(90, 6, 31, .68) !important;
-    font-size: 11px;
+    font-size: var(--text-12);
   }
 
   .auth-shell:has(.auth-signup.is-active) .signup-step-prev {
@@ -2753,8 +2753,8 @@
     border: 1px solid rgba(90, 6, 31, .35) !important;
     background: rgba(255, 250, 241, .3) !important;
     color: #5a061f !important;
-    font-size: 10px;
-    letter-spacing: .08em;
+    font-size: var(--text-12);
+    letter-spacing: .067em;
   }
 
   .auth-shell:has(.auth-signup.is-active) .auth-panel::before {
@@ -2762,8 +2762,8 @@
     right: clamp(14px, 2.5vw, 42px) !important;
     bottom: 25px;
     width: 220px;
-    font-family: 'Instrument Sans', Arial, sans-serif !important;
-    font-size: 19px !important;
+    font-family: var(--font-body) !important;
+    font-size: var(--text-20) !important;
     font-style: normal !important;
     font-weight: 500;
     line-height: 1.35;
@@ -2803,14 +2803,14 @@
 .auth-signup-form .area-step { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
 .auth-signup-form .area-explainer {
   display: flex; align-items: flex-start; gap: 10px; margin: 0; padding: 12px 14px; border: 1px solid var(--ob-line);
-  border-radius: 10px; background: var(--ob-tint); color: var(--ob-ink); font-size: 12px; font-weight: 600; line-height: 1.45;
+  border-radius: 10px; background: var(--ob-tint); color: var(--ob-ink); font-size: var(--text-12); font-weight: 600; line-height: 1.45;
   text-transform: none; letter-spacing: 0;
 }
 .auth-signup-form .area-options { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
 .auth-signup-form .area-option {
   display: flex; align-items: center; justify-content: center; gap: 8px; min-height: 48px; padding: 10px 14px;
   border: 1px solid var(--ob-ink); border-radius: 999px; background: transparent; color: var(--ob-ink);
-  font: 700 11px/1.2 'Instrument Sans', Arial, sans-serif; letter-spacing: .08em; text-transform: uppercase; cursor: pointer;
+  font: 700 var(--text-12)/1.2 var(--font-body); letter-spacing: .073em; text-transform: uppercase; cursor: pointer;
 }
 .auth-signup-form .area-option[aria-expanded="true"] { background: var(--ob-ink); color: white; }
 .auth-signup-form .area-option[aria-busy="true"] { opacity: .7; cursor: progress; }
@@ -2820,7 +2820,7 @@
 .auth-signup-form .area-status:empty,
 .auth-signup-form .area-error:empty,
 .auth-signup-form .budget-error:empty { display: none; }
-.auth-signup-form .area-fallback { margin: 0; color: var(--ob-ink); font-size: 12px; font-weight: 600; text-transform: none; letter-spacing: 0; }
+.auth-signup-form .area-fallback { margin: 0; color: var(--ob-ink); font-size: var(--text-12); font-weight: 600; text-transform: none; letter-spacing: 0; }
 .auth-signup-form .area-city-results {
   display: flex; flex-direction: column; gap: 2px; max-height: 240px; margin: 0; padding: 4px; overflow-y: auto; list-style: none;
   border: 1px solid var(--ob-line); border-radius: 8px; background: white;
@@ -2829,18 +2829,18 @@
 .auth-signup-form .area-city-results:empty { display: none; }
 .auth-signup-form .area-city-option {
   display: flex; align-items: baseline; justify-content: space-between; gap: 10px; min-height: 44px; padding: 12px; border-radius: 6px;
-  color: var(--ob-ink); font-size: 13px; font-weight: 600; cursor: pointer;
+  color: var(--ob-ink); font-size: var(--text-12); font-weight: 600; cursor: pointer;
 }
-.auth-signup-form .area-city-option small { color: var(--ob-soft); font-size: 11px; font-weight: 500; }
+.auth-signup-form .area-city-option small { color: var(--ob-soft); font-size: var(--text-12); font-weight: 500; }
 .auth-signup-form .area-city-option[aria-selected="true"] { background: var(--ob-tint-strong); }
-.auth-signup-form .area-city-empty { padding: 12px; color: var(--ob-soft); font-size: 12px; }
-.auth-signup-form .area-status { margin: 0; color: var(--ob-ink); font-size: 12px; font-weight: 600; text-transform: none; letter-spacing: 0; }
+.auth-signup-form .area-city-empty { padding: 12px; color: var(--ob-soft); font-size: var(--text-12); }
+.auth-signup-form .area-status { margin: 0; color: var(--ob-ink); font-size: var(--text-12); font-weight: 600; text-transform: none; letter-spacing: 0; }
 .auth-signup-form .area-error,
-.auth-signup-form .budget-error { margin: 0; color: var(--ob-accent); font-size: 12px; font-weight: 700; text-transform: none; letter-spacing: 0; }
+.auth-signup-form .budget-error { margin: 0; color: var(--ob-accent); font-size: var(--text-12); font-weight: 700; text-transform: none; letter-spacing: 0; }
 
 /* Step 3: interest picker */
 .auth-signup-form .interest-picker { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
-.auth-signup-form .interest-help { margin: 0; color: var(--ob-soft); font-size: 11px; text-transform: none; letter-spacing: 0; }
+.auth-signup-form .interest-help { margin: 0; color: var(--ob-soft); font-size: var(--text-12); text-transform: none; letter-spacing: 0; }
 .auth-signup-form .interest-results {
   display: flex; flex-direction: column; gap: 6px; max-height: 340px; overflow-y: auto; padding: 2px; overscroll-behavior: contain;
 }
@@ -2848,17 +2848,17 @@
 .auth-signup-form .interest-group > summary,
 .auth-signup-form .interest-group-title {
   display: flex; align-items: baseline; justify-content: space-between; gap: 10px; min-height: 44px; margin: 0; padding: 12px 14px;
-  color: var(--ob-ink); font-size: 13px; font-weight: 700; cursor: pointer; list-style: none;
+  color: var(--ob-ink); font-size: var(--text-12); font-weight: 700; cursor: pointer; list-style: none;
 }
 .auth-signup-form .interest-group-title { cursor: default; padding-bottom: 4px; }
 .auth-signup-form .interest-group > summary::-webkit-details-marker { display: none; }
 .auth-signup-form .interest-group > summary small,
-.auth-signup-form .interest-group-title small { color: var(--ob-soft); font-size: 10px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; }
+.auth-signup-form .interest-group-title small { color: var(--ob-soft); font-size: var(--text-12); font-weight: 600; letter-spacing: .05em; text-transform: uppercase; }
 .auth-signup-form .interest-chips { display: flex; flex-wrap: wrap; gap: 8px; padding: 4px 12px 12px; }
 .auth-signup-form .interest-chip {
   display: inline-flex; flex-wrap: wrap; align-items: center; gap: 4px 6px; min-height: 44px; max-width: 100%; padding: 8px 14px;
   border: 1px solid var(--ob-line); border-radius: 999px; background: white; color: var(--ob-ink);
-  font: 600 12px/1.25 'Instrument Sans', Arial, sans-serif; text-align: left; cursor: pointer;
+  font: 600 var(--text-12)/1.25 var(--font-body); text-align: left; cursor: pointer;
 }
 .auth-signup-form .interest-chip.is-private { border-radius: 14px; }
 .auth-signup-form .interest-chip.is-selected { border-color: var(--ob-ink); background: var(--ob-ink); color: white; }
@@ -2866,28 +2866,28 @@
 .auth-signup-form .interest-chip .ob-icon { width: 14px; height: 14px; }
 .auth-signup-form .interest-private {
   display: inline-flex; align-items: center; gap: 4px; flex-basis: 100%; color: inherit; opacity: .85;
-  font-size: 10px; font-weight: 500; line-height: 1.3; letter-spacing: 0; text-transform: none;
+  font-size: var(--text-12); font-weight: 500; line-height: 1.3; letter-spacing: 0; text-transform: none;
 }
 .auth-signup-form .interest-private .ob-icon { width: 12px; height: 12px; }
-.auth-signup-form .interest-loading { margin: 0; padding: 12px; color: var(--ob-soft); font-size: 12px; text-transform: none; letter-spacing: 0; }
+.auth-signup-form .interest-loading { margin: 0; padding: 12px; color: var(--ob-soft); font-size: var(--text-12); text-transform: none; letter-spacing: 0; }
 .auth-signup-form .interest-retry {
   min-height: 44px; margin-left: 6px; padding: 0 14px; border: 1px solid var(--ob-ink); border-radius: 999px;
-  background: transparent; color: var(--ob-ink); font: 700 10px 'Instrument Sans', Arial, sans-serif; letter-spacing: .08em; cursor: pointer;
+  background: transparent; color: var(--ob-ink); font: 700 var(--text-12) var(--font-body); letter-spacing: .067em; cursor: pointer;
 }
 
 /* Step 3: Passion Budget */
 .auth-signup-form .budget { display: flex; flex-direction: column; gap: 10px; min-width: 0; padding: 14px; border: 1px solid var(--ob-line); border-radius: 12px; background: var(--ob-paper); }
 .auth-signup-form .budget-head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 4px 12px; }
-.auth-signup-form .budget-head h3 { margin: 0; color: var(--ob-ink); font: 400 20px/1.1 Georgia, 'Times New Roman', serif; letter-spacing: -.02em; }
-.auth-signup-form .budget-counter { margin: 0; color: var(--ob-ink); font-size: 12px; font-weight: 700; letter-spacing: .04em; font-variant-numeric: tabular-nums; }
+.auth-signup-form .budget-head h3 { margin: 0; color: var(--ob-ink); font: 400 var(--text-20)/1.1 var(--font-heading); letter-spacing: -.02em; }
+.auth-signup-form .budget-counter { margin: 0; color: var(--ob-ink); font-size: var(--text-12); font-weight: 700; letter-spacing: .04em; font-variant-numeric: tabular-nums; }
 .auth-signup-form .budget-error { flex-basis: 100%; }
 .auth-signup-form .budget-list { display: flex; flex-direction: column; gap: 10px; margin: 0; padding: 0; list-style: none; }
-.auth-signup-form .budget-empty { margin: 0; color: var(--ob-soft); font-size: 12px; text-transform: none; letter-spacing: 0; }
+.auth-signup-form .budget-empty { margin: 0; color: var(--ob-soft); font-size: var(--text-12); text-transform: none; letter-spacing: 0; }
 .auth-signup-form .budget-empty[hidden] { display: none; }
 .auth-signup-form .budget-row { display: flex; flex-direction: column; gap: 8px; padding: 10px 0 0; border-top: 1px solid var(--ob-line); }
 .auth-signup-form .budget-row:first-child { padding-top: 0; border-top: 0; }
 .auth-signup-form .budget-row-head { display: flex; flex-direction: column; gap: 2px; color: var(--ob-ink); }
-.auth-signup-form .budget-label { font-size: 14px; font-weight: 700; }
+.auth-signup-form .budget-label { font-size: var(--text-14); font-weight: 700; }
 .auth-signup-form .budget-row-head .interest-private { color: var(--ob-soft); }
 .auth-signup-form .budget-controls { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
 .auth-signup-form .budget-stepper { display: inline-flex; align-items: center; gap: 4px; }
@@ -2898,7 +2898,7 @@
 }
 .auth-signup-form .budget-step[aria-disabled="true"] { opacity: .4; cursor: not-allowed; }
 .auth-signup-form .budget-remove { margin-left: auto; border-color: var(--ob-line); }
-.auth-signup-form .budget-points { min-width: 30px; color: var(--ob-ink); font-size: 18px; font-weight: 700; text-align: center; font-variant-numeric: tabular-nums; }
+.auth-signup-form .budget-points { min-width: 30px; color: var(--ob-ink); font-size: var(--text-16); font-weight: 700; text-align: center; font-variant-numeric: tabular-nums; }
 .auth-signup-form .mode-control {
   display: flex; flex: 1 1 188px; min-width: 0; padding: 2px; border: 1px solid var(--ob-line); border-radius: 999px; background: white;
 }
@@ -2911,7 +2911,7 @@
 }
 .auth-shell .auth-signup-form .mode-control .mode-option span {
   display: flex; align-items: center; justify-content: center; min-width: 44px; min-height: 44px; padding: 0 6px; border-radius: 999px;
-  color: var(--ob-ink); font: 700 11px/1 'Instrument Sans', Arial, sans-serif; letter-spacing: .02em; text-transform: none;
+  color: var(--ob-ink); font: 700 var(--text-12)/1 var(--font-body); letter-spacing: .018em; text-transform: none;
 }
 .auth-shell .auth-signup-form .mode-control .mode-option input:checked + span { background: var(--ob-ink); color: white; }
 
@@ -2938,7 +2938,7 @@
   -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.4' stroke-linecap='round'%3E%3Cpath d='M6 6l12 12M18 6L6 18'/%3E%3C/svg%3E") center / contain no-repeat;
   mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.4' stroke-linecap='round'%3E%3Cpath d='M6 6l12 12M18 6L6 18'/%3E%3C/svg%3E") center / contain no-repeat;
 }
-.auth-signup-form .budget-note { margin: 0; color: var(--ob-soft); font-size: 12px; font-weight: 600; text-transform: none; letter-spacing: 0; }
+.auth-signup-form .budget-note { margin: 0; color: var(--ob-soft); font-size: var(--text-12); font-weight: 600; text-transform: none; letter-spacing: 0; }
 .auth-signup-form .budget-note[hidden] { display: none; }
 
 /* Close (×): a 44 × 44 target that never sits on the header controls (it overlapped "Log in" at 375 px and at
@@ -2961,40 +2961,40 @@
 .auth-signup-form .adult-legend { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 .auth-signup-form .adult-row {
   display: flex; align-items: center; gap: 12px; min-height: 48px; padding: 8px 12px; border: 1px solid var(--ob-line, #d9cfc8);
-  border-radius: 10px; background: transparent; color: var(--ob-ink, #5a061f); font-size: 14px; font-weight: 700; line-height: 1.3;
+  border-radius: 10px; background: transparent; color: var(--ob-ink, #5a061f); font-size: var(--text-14); font-weight: 700; line-height: 1.3;
   letter-spacing: 0; text-transform: none; cursor: pointer;
 }
 .auth-signup-form .adult-row input[type="checkbox"] { flex: 0 0 auto; width: 24px; height: 24px; margin: 0; accent-color: var(--ob-ink, #5a061f); cursor: pointer; }
 .auth-signup-form .adult-row:focus-within { outline: 2px solid var(--ob-ink, #5a061f); outline-offset: 2px; }
 .auth-signup-form .adult-row:has(input[aria-invalid="true"]) { border-color: var(--ob-accent); }
-.auth-signup-form .adult-help { margin: 0; color: color-mix(in srgb, var(--brivia-deep-wine) 78%, white); font-size: 12px; line-height: 1.45; text-transform: none; letter-spacing: 0; }
-.auth-signup-form .adult-error { margin: 0; color: var(--ob-accent); font-size: 12px; font-weight: 700; line-height: 1.4; text-transform: none; letter-spacing: 0; }
+.auth-signup-form .adult-help { margin: 0; color: color-mix(in srgb, var(--brivia-deep-wine) 78%, white); font-size: var(--text-12); line-height: 1.45; text-transform: none; letter-spacing: 0; }
+.auth-signup-form .adult-error { margin: 0; color: var(--ob-accent); font-size: var(--text-12); font-weight: 700; line-height: 1.4; text-transform: none; letter-spacing: 0; }
 .auth-signup-form .adult-error:empty { display: none; }
-.auth-signup-form .privacy-link { margin: 0; font-size: 12px; text-transform: none; letter-spacing: 0; }
+.auth-signup-form .privacy-link { margin: 0; font-size: var(--text-12); text-transform: none; letter-spacing: 0; }
 .auth-signup-form .privacy-link a { display: inline-flex; align-items: center; min-height: 44px; color: var(--ob-ink, #5a061f); font-weight: 700; text-decoration: underline; text-underline-offset: 2px; }
 
 /* R2: the private-interests entry and consent panel (UX_SPEC consent panel) */
 .auth-signup-form .private-open {
   align-self: flex-start; min-height: 44px; padding: 0 4px; border: 0; background: transparent; color: var(--ob-ink);
-  font: 600 14px/1.25 'Instrument Sans', Arial, sans-serif; text-decoration: underline; text-underline-offset: 3px; cursor: pointer;
+  font: 600 var(--text-14)/1.25 var(--font-body); text-decoration: underline; text-underline-offset: 3px; cursor: pointer;
 }
 .auth-signup-form .private-open[hidden] { display: none; }
 .auth-signup-form .private-open:focus-visible { outline: 2px solid var(--ob-ink); outline-offset: 2px; }
 .auth-signup-form .private-consent {
   width: min(440px, calc(100vw - 32px)); max-height: calc(100vh - 32px); overflow: auto; padding: 20px;
   border: 1px solid var(--ob-line); border-radius: 14px; background: white; color: var(--ob-ink);
-  font-family: 'Instrument Sans', Arial, sans-serif; text-transform: none; letter-spacing: 0;
+  font-family: var(--font-body); text-transform: none; letter-spacing: 0;
 }
 .auth-signup-form .private-consent::backdrop { background: color-mix(in srgb, var(--brivia-deep-wine) 55%, transparent); }
-.auth-signup-form .private-consent h3 { margin: 0 0 10px; font: 400 22px/1.1 Georgia, 'Times New Roman', serif; }
-.auth-signup-form .private-purpose { margin: 0 0 14px; font-size: 14px; line-height: 1.5; }
-.auth-signup-form .private-message { margin: 0 0 10px; color: var(--ob-accent); font-size: 13px; font-weight: 700; line-height: 1.4; }
+.auth-signup-form .private-consent h3 { margin: 0 0 10px; font: 400 var(--text-20)/1.1 var(--font-heading); }
+.auth-signup-form .private-purpose { margin: 0 0 14px; font-size: var(--text-14); line-height: 1.5; }
+.auth-signup-form .private-message { margin: 0 0 10px; color: var(--ob-accent); font-size: var(--text-12); font-weight: 700; line-height: 1.4; }
 .auth-signup-form .private-message[hidden] { display: none; }
 .auth-signup-form .private-check { display: flex; align-items: flex-start; gap: 12px; min-height: 44px; padding: 10px 12px; border: 1px solid var(--ob-line); border-radius: 10px; }
 .auth-signup-form .private-check input { flex: 0 0 auto; width: 24px; height: 24px; margin: 0; accent-color: var(--ob-ink); cursor: pointer; }
-.auth-signup-form .private-check label { font-size: 14px; line-height: 1.4; cursor: pointer; }
+.auth-signup-form .private-check label { font-size: var(--text-14); line-height: 1.4; cursor: pointer; }
 .auth-signup-form .private-check:focus-within { outline: 2px solid var(--ob-ink); outline-offset: 2px; }
-.auth-signup-form .private-link { margin: 10px 0 0; font-size: 12px; }
+.auth-signup-form .private-link { margin: 10px 0 0; font-size: var(--text-12); }
 .auth-signup-form .private-actions { display: flex; gap: 10px; margin-top: 16px; }
 .auth-signup-form .private-btn { flex: 1 1 0; min-height: 44px; }
 .auth-signup-form .private-btn:disabled { opacity: .5; cursor: not-allowed; }

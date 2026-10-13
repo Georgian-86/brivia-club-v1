@@ -1,5 +1,6 @@
 import './tokens.css';
 import './fonts.css';
+import './fonts-app.css';
 import './app.css';
 import './inbox.css';
 import './inbox-actions.css';

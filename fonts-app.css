@@ -1,0 +1,5 @@
+/* Bodoni Moda 500 italic (Phase C Task 4) for the app and auth only: headings set <em> words in italic ("CURATED.",
+   "yourself."), and without this face Chromium would draw a synthetic slant of the upright cut. Kept out of fonts.css
+   because the landing loads fonts.css and must not change. Latin subset, woff2 only, like fonts.css. */
+@font-face { font-family: 'Bodoni Moda'; font-style: italic; font-weight: 500; font-display: swap;
+  src: url('./node_modules/@fontsource/bodoni-moda/files/bodoni-moda-latin-500-italic.woff2') format('woff2'); }

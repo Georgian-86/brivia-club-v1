@@ -12,12 +12,15 @@
 // * Tab reaches each tab bar item and its focus outline is visible (375 px);
 // * a conversation shows the chat badge in header and tab bar; no conversation hides it;
 // * axe (full default rule set): no violations on the nav.
+// * type (Phase C Task 4): on Connect, Explore, Chat (list and an open conversation), Profile, the notification panel
+//   and the discovery-filter drawer, every visible text node (and ::before/::after text) is >= 12 px and set in
+//   Bodoni Moda or Instrument Sans; visible h1/h2 use Bodoni Moda; a Bodoni Moda 500 italic face is loaded.
 // APP_SHOTS=<dir> only saves full-page screenshots of home, posts, chat and profile at 375 px and 1440 px, then exits
 // (the Phase C before/after review), and runs no checks.
 import { mkdirSync } from 'node:fs';
 import assert from 'node:assert/strict';
 import path from 'node:path';
-import { axeViolations } from './a11y.mjs';
+import { axeViolations, textAudit, TYPE_FAMILIES } from './a11y.mjs';
 import { startAppStub } from './app-stub.mjs';
 
 const { chromium } = await import(process.env.PLAYWRIGHT_MODULE || 'playwright');
@@ -242,6 +245,53 @@ try {
       });
       await context.close();
     }
+    // 9. One type system (Phase C Task 4): 12 px floor, two families, Bodoni headings, a real Bodoni italic.
+    st.matchIds = [A];
+    st.posts = [{ id: 'post-1', author_id: A, image_url: null, image_path: null, caption: 'Morning rally at the club courts', created_at: new Date(Date.now() - 36e5).toISOString() }];
+    st.messages = [{ id: 'msg-1', sender_id: A, recipient_id: '11111111-1111-4111-8111-111111111111', body: 'Shall we play on Saturday?', created_at: new Date(Date.now() - 6e5).toISOString() }];
+    for (const [tag, viewport] of [['375', NARROW], ['1440', WIDE]]) {
+      const { context, page } = await open(viewport);
+      await page.waitForTimeout(1200);
+      const audit = async (state) => {
+        const { small, family } = await textAudit(page, { families: TYPE_FAMILIES });
+        const headings = await page.evaluate(() => [...document.querySelectorAll('h1, h2')].filter((h) => h.getClientRects().length && !h.closest('[hidden],[aria-hidden="true"]') && getComputedStyle(h).visibility !== 'hidden' && h.textContent.trim())
+          .filter((h) => !/^["']?Bodoni Moda/.test(getComputedStyle(h).fontFamily)).map((h) => `${h.tagName.toLowerCase()}${h.className ? `.${String(h.className).trim().split(/\s+/).join('.')}` : ''} {${getComputedStyle(h).fontFamily.split(',')[0]}} "${h.textContent.trim().slice(0, 24)}"`));
+        const uniq = (list) => [...new Set(list)];
+        check(`${tag} ${state}: every visible text is >= 12 px (${uniq(small).join(' | ')})`, () => assert.deepEqual(small, []));
+        check(`${tag} ${state}: every visible text is Bodoni Moda or Instrument Sans (${uniq(family).join(' | ')})`, () => assert.deepEqual(family, []));
+        check(`${tag} ${state}: visible h1/h2 use Bodoni Moda (${uniq(headings).join(' | ')})`, () => assert.deepEqual(headings, []));
+      };
+      const go = async (view) => { await page.evaluate((v) => document.querySelector(`[data-nav-host]:not([hidden]) [data-nav="${v}"], [data-nav-host] [data-nav="${v}"]`)?.click(), view); await settle(page); };
+      await go('explore');
+      await audit('Connect deck');
+      await page.locator('#open-discovery-filters').click();
+      await settle(page);
+      await audit('discovery-filter drawer');
+      await page.locator('.discovery-filter-close').click();
+      await settle(page);
+      await page.locator('#app-notification-button').click();
+      await settle(page);
+      await audit('notification panel');
+      await page.locator('#app-notification-button').click();
+      await settle(page);
+      await go('posts');
+      await audit('Explore posts');
+      await go('chat');
+      await audit('Chat list');
+      await page.locator('#chat-list [data-chat-id]').first().click({ timeout: 5000 }).catch((error) => console.log(`chat open failed: ${error.message.split('\n')[0]}`));
+      await settle(page);
+      await audit('Chat conversation');
+      await go('profile');
+      await audit('Profile');
+      const italic = await page.evaluate(async () => {
+        await document.fonts.load('italic 500 20px "Bodoni Moda"');
+        return [...document.fonts].filter((f) => f.family.replace(/["']/g, '') === 'Bodoni Moda' && f.style === 'italic').map((f) => `${f.weight} ${f.status}`);
+      });
+      check(`${tag}: a Bodoni Moda 500 italic face is declared and loaded (${JSON.stringify(italic)})`, () => assert.ok(italic.includes('500 loaded')));
+      await context.close();
+    }
+    delete st.posts; delete st.messages;
+
     st.matchIds = [];
     check(`no uncaught page errors (${pageErrors.join(' | ')})`, () => assert.deepEqual(pageErrors, []));
   }

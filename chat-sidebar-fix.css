@@ -30,10 +30,10 @@
   .app-view[data-view="chat"] #chat-list .chat-inbox-scroll .brivia-reference-row{min-height:48px;margin-top:58px!important;padding:6px 13px;background:var(--brivia-wine)}
   .app-view[data-view="chat"] #chat-list .chat-inbox-scroll .chat-row.is-selected{background:var(--brivia-wine);box-shadow:none;color:#fffaf1}
   .app-view[data-view="chat"] #chat-list .chat-inbox-scroll .chat-row.is-selected .chat-row-copy strong,.app-view[data-view="chat"] #chat-list .chat-inbox-scroll .chat-row.is-selected .chat-row-copy span,.app-view[data-view="chat"] #chat-list .chat-inbox-scroll .chat-row.is-selected .chat-row-meta time{color:#fffaf1}
-  .app-view[data-view="chat"] #chat-list .chat-inbox-scroll .chat-row .mini-avatar{width:38px;height:38px;flex:0 0 38px;font-size:11px;box-shadow:none}
-  .app-view[data-view="chat"] #chat-list .chat-inbox-scroll .brivia-reference-row .reference-avatar{width:34px;height:34px;flex-basis:34px;background:#fffaf1;color:var(--brivia-wine);font-size:17px}
-  .app-view[data-view="chat"] #chat-list .chat-inbox-scroll .chat-row-copy strong{font-family:Georgia,'Times New Roman',serif;font-size:12px;font-weight:400}
-  .app-view[data-view="chat"] #chat-list .chat-inbox-scroll .chat-row-copy span{margin-top:3px;color:rgba(51,37,34,.62);font-family:Georgia,'Times New Roman',serif;font-size:9px}
-  .app-view[data-view="chat"] #chat-list .chat-inbox-scroll .chat-row-meta time{font-family:Georgia,'Times New Roman',serif;font-size:8px}
+  .app-view[data-view="chat"] #chat-list .chat-inbox-scroll .chat-row .mini-avatar{width:38px;height:38px;flex:0 0 38px;font-size:var(--text-12);box-shadow:none}
+  .app-view[data-view="chat"] #chat-list .chat-inbox-scroll .brivia-reference-row .reference-avatar{width:34px;height:34px;flex-basis:34px;background:#fffaf1;color:var(--brivia-wine);font-size:var(--text-16)}
+  .app-view[data-view="chat"] #chat-list .chat-inbox-scroll .chat-row-copy strong{font-family:var(--font-body);font-size:var(--text-12);font-weight:400}
+  .app-view[data-view="chat"] #chat-list .chat-inbox-scroll .chat-row-copy span{margin-top:3px;color:rgba(51,37,34,.62);font-family:var(--font-body);font-size:var(--text-12)}
+  .app-view[data-view="chat"] #chat-list .chat-inbox-scroll .chat-row-meta time{font-family:var(--font-body);font-size:var(--text-12)}
   .app-view[data-view="chat"] #chat-list .chat-inbox-scroll .chat-delete{display:none}
 }

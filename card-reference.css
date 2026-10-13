@@ -52,11 +52,11 @@
   border-radius: 11px 11px 0 0;
   background: #5a061f;
   color: #fffaf1;
-  font-family: Georgia, 'Times New Roman', serif;
+  font-family: var(--font-body);
 }
 
-.app-view[data-view="home"] .swipe-card-topline span { font-size: 10px; letter-spacing: .22em; }
-.app-view[data-view="home"] .swipe-card-topline b { font-size: 13px; font-weight: 400; letter-spacing: 2px; }
+.app-view[data-view="home"] .swipe-card-topline span { font-size: var(--text-12); letter-spacing: .183em; }
+.app-view[data-view="home"] .swipe-card-topline b { font-size: var(--text-12); font-weight: 400; letter-spacing: 2px; }
 
 .app-view[data-view="home"] .swipe-card-image {
   position: absolute;
@@ -99,7 +99,7 @@
 
 .app-view[data-view="home"] .member-name-row h2 {
   color: #5a061f;
-  font-family: Georgia, 'Times New Roman', serif;
+  font-family: var(--font-heading);
   font-size: clamp(25px, 2.2vw, 31px);
   font-weight: 400;
   letter-spacing: -.8px;
@@ -112,8 +112,8 @@
 .app-view[data-view="home"] #swipe-location {
   margin: 6px 0 0;
   color: rgba(51, 37, 34, .62);
-  font-family: Georgia, 'Times New Roman', serif;
-  font-size: 11px;
+  font-family: var(--font-body);
+  font-size: var(--text-12);
 }
 
 .app-view[data-view="home"] .member-tags { gap: 8px; margin-top: 17px; }
@@ -123,8 +123,8 @@
   border-radius: 999px;
   background: #eadfd2;
   color: #5a061f;
-  font-family: Georgia, 'Times New Roman', serif;
-  font-size: 10px;
+  font-family: var(--font-body);
+  font-size: var(--text-12);
   font-weight: 400;
 }
 
@@ -140,14 +140,14 @@
   border-radius: 12px;
   background: #5a061f;
   color: #fffaf1;
-  font-family: Georgia, 'Times New Roman', serif;
+  font-family: var(--font-body);
   font-size: 0;
   font-weight: 400;
   letter-spacing: .19em;
 }
 
-.app-view[data-view="home"] .view-info-button::before { content: 'VIEW PROFILE'; font-size: 10px; }
-.app-view[data-view="home"] .view-info-button span { margin-left: 9px; color: #fffaf1; font-size: 15px; }
+.app-view[data-view="home"] .view-info-button::before { content: 'VIEW PROFILE'; font-size: var(--text-12); }
+.app-view[data-view="home"] .view-info-button span { margin-left: 9px; color: #fffaf1; font-size: var(--text-14); }
 .app-view[data-view="home"] .view-info-button:hover { transform: translateY(-2px); background: #430416; }
 
 @media(max-width: 560px) {

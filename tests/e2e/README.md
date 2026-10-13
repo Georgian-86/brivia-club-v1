@@ -45,7 +45,11 @@ shape plus `my_interests` (3 rows by default), `community_posts`, `brivia_messag
 `app-shell.spec.mjs` (Vite on :5195) checks the one member navigation: the header nav at 1440 px and the tab bar at
 375 px (never both), no duplicate navs, 44 px tab targets with 12 px labels, `aria-current` through `?view=`, `#hash`,
 the `home` alias, a tab click without reload and Back, no sideways scroll with a long name and area, keyboard focus,
-the chat badge in both navs, and axe on the nav. `APP_SHOTS=<dir>` only saves home/posts/chat/profile screenshots at
+the chat badge in both navs, and axe on the nav. Since Phase C Task 4 it also checks one type system on Connect, Explore,
+Chat (list and an open thread), Profile, the notification panel and the discovery-filter drawer at 375 and 1440 px: every
+visible text (and `::before`/`::after` text) is at least 12 px and set in Bodoni Moda or Instrument Sans, visible h1/h2 use
+Bodoni Moda, and the Bodoni Moda 500 italic face (`fonts-app.css`) loads. `a11y.mjs` `textAudit` returns both lists
+(`smallText` is its size half); `onboarding.spec.mjs` runs the family check on signup steps 1-4 too. `APP_SHOTS=<dir>` only saves home/posts/chat/profile screenshots at
 375 px and 1440 px (the Phase C before/after review).
 
 ```bash

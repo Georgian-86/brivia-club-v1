@@ -4,8 +4,8 @@
 .app-view[data-view="explore"] .view-heading h1 em{color:#5a061f}
 .app-view[data-view="explore"] .explore-search{min-height:48px;margin-bottom:14px;padding:0 16px;border:1px solid rgba(52,31,28,.16);border-radius:999px;background:rgba(255,253,249,.9);box-shadow:0 2px 12px rgba(65,38,31,.04)}
 .app-view[data-view="explore"] .explore-search:focus-within{border-color:rgba(90,6,31,.45);box-shadow:0 0 0 4px rgba(90,6,31,.07)}
-.app-view[data-view="explore"] .explore-search span{font-size:20px;line-height:1}
-.app-view[data-view="explore"] .explore-search input{height:46px;font-size:13px}
+.app-view[data-view="explore"] .explore-search span{font-size:var(--text-20);line-height:1}
+.app-view[data-view="explore"] .explore-search input{height:46px;font-size:var(--text-12)}
 .app-view[data-view="explore"] .explore-filters{gap:7px;padding:2px 0 22px;scrollbar-width:none}
 .app-view[data-view="explore"] .explore-filters::-webkit-scrollbar{display:none}
 .app-view[data-view="explore"] .filter-button{padding:9px 13px;border-radius:999px;background:rgba(255,253,249,.56);transition:background .18s,border-color .18s,color .18s,transform .18s}
@@ -19,13 +19,13 @@
 .app-view[data-view="explore"] .explore-row-avatar .mini-avatar{flex-basis:68px;width:68px;height:68px;border:2px solid rgba(90,6,31,.14);box-shadow:0 4px 12px rgba(90,6,31,.12)}
 .app-view[data-view="explore"] .explore-row-copy{align-self:center}
 .explore-row-name{display:flex;align-items:center;gap:7px}
-.explore-row-name strong{font-size:15px;letter-spacing:-.2px}
-.app-view[data-view="explore"] .explore-row-role{margin-top:4px;color:rgba(52,31,28,.62);font-size:11px}
-.explore-row-intent{display:-webkit-box;margin:6px 0 0;overflow:hidden;color:rgba(52,31,28,.78);font-size:11px;line-height:1.35;-webkit-box-orient:vertical;-webkit-line-clamp:1}
+.explore-row-name strong{font-size:var(--text-14);letter-spacing:-.2px}
+.app-view[data-view="explore"] .explore-row-role{margin-top:4px;color:rgba(52,31,28,.62);font-size:var(--text-12)}
+.explore-row-intent{display:-webkit-box;margin:6px 0 0;overflow:hidden;color:rgba(52,31,28,.78);font-size:var(--text-12);line-height:1.35;-webkit-box-orient:vertical;-webkit-line-clamp:1}
 .app-view[data-view="explore"] .explore-row-tags{gap:5px;margin-top:8px}
-.app-view[data-view="explore"] .explore-row-tags span{padding:4px 8px;border:1px solid rgba(90,6,31,.16);border-radius:999px;background:rgba(90,6,31,.035);color:#5a061f;font-size:8px}
-.app-view[data-view="explore"] .row-action{display:inline-flex;flex:0 0 auto;align-items:center;gap:7px;padding:10px 0 10px 12px;color:#5a061f;font-size:9px;letter-spacing:.08em;transition:color .18s,transform .18s}
-.app-view[data-view="explore"] .row-action b{font-size:15px;font-weight:400}
+.app-view[data-view="explore"] .explore-row-tags span{padding:4px 8px;border:1px solid rgba(90,6,31,.16);border-radius:999px;background:rgba(90,6,31,.035);color:#5a061f;font-size:var(--text-12)}
+.app-view[data-view="explore"] .row-action{display:inline-flex;flex:0 0 auto;align-items:center;gap:7px;padding:10px 0 10px 12px;color:#5a061f;font-size:var(--text-12);letter-spacing:.06em;transition:color .18s,transform .18s}
+.app-view[data-view="explore"] .row-action b{font-size:var(--text-14);font-weight:400}
 .app-view[data-view="explore"] .row-action:hover{color:#430416;transform:translateX(2px)}
 .app-view[data-view="explore"] .row-action:focus-visible,.app-view[data-view="explore"] .filter-button:focus-visible,.app-view[data-view="explore"] .explore-search input:focus-visible{outline:2px solid #5a061f;outline-offset:3px}
 .app-view[data-view="explore"] .empty-state{margin:0;padding:55px 24px;color:rgba(52,31,28,.62);text-align:center}
@@ -34,7 +34,7 @@
   .app-view[data-view="explore"] .explore-row{gap:12px;padding:15px 13px}
   .app-view[data-view="explore"] .explore-row-avatar,.app-view[data-view="explore"] .explore-row-avatar .mini-avatar{flex-basis:56px;width:56px;height:56px;min-width:56px;min-height:56px}
   .app-view[data-view="explore"] .explore-row-avatar::after{right:0;bottom:0;width:8px;height:8px}
-  .app-view[data-view="explore"] .explore-row-name strong{font-size:14px}
+  .app-view[data-view="explore"] .explore-row-name strong{font-size:var(--text-14)}
   .app-view[data-view="explore"] .row-action span{display:none}
   .app-view[data-view="explore"] .row-action{padding-left:5px}
 }
@@ -113,7 +113,7 @@ body.app-body[data-app-view="explore"]{
 
 body .app-view[data-view="explore"] .view-heading h1{
   color:#2f211f;
-  font-family:Georgia,'Times New Roman',serif;
+  font-family:var(--font-heading);
   font-weight:400;
   letter-spacing:-4px;
 }
@@ -189,10 +189,10 @@ body .app-view[data-view="explore"] .explore-card-topline{
   border-radius:12px 12px 0 0;
   background:rgba(90,6,31,.94);
   color:#fffaf1;
-  font-family:Georgia,'Times New Roman',serif;
+  font-family:var(--font-body);
 }
-body .app-view[data-view="explore"] .explore-card-topline span{font-size:9px;letter-spacing:.19em}
-body .app-view[data-view="explore"] .explore-card-topline b{font-size:13px;font-weight:400;letter-spacing:2px}
+body .app-view[data-view="explore"] .explore-card-topline span{font-size:var(--text-12);letter-spacing:.143em}
+body .app-view[data-view="explore"] .explore-card-topline b{font-size:var(--text-12);font-weight:400;letter-spacing:2px}
 body .app-view[data-view="explore"] .explore-card-avatar{
   position:absolute;
   z-index:3;
@@ -226,18 +226,18 @@ body .app.view[data-view="explore"] .explore-card-name h2,
 body .app-view[data-view="explore"] .explore-card-name h2{
   margin:0;
   color:#5a061f;
-  font-family:Georgia,'Times New Roman',serif;
-  font-size:24px;
+  font-family:var(--font-heading);
+  font-size:var(--text-24);
   font-weight:400;
   letter-spacing:-.5px;
   line-height:1.05;
 }
-body .app-view[data-view="explore"] .explore-card-name > span{color:rgba(51,37,34,.55);font-family:Georgia,'Times New Roman',serif;font-size:11px}
-body .app-view[data-view="explore"] .explore-card-meta{margin:7px 0 0;color:rgba(51,37,34,.62);font-family:Georgia,'Times New Roman',serif;font-size:11px;font-style:italic}
+body .app-view[data-view="explore"] .explore-card-name > span{color:rgba(51,37,34,.55);font-family:var(--font-body);font-size:var(--text-12)}
+body .app-view[data-view="explore"] .explore-card-meta{margin:7px 0 0;color:rgba(51,37,34,.62);font-family:var(--font-body);font-size:var(--text-12);font-style:italic}
 body .app-view[data-view="explore"] .explore-card-meta em{padding:0 3px;color:#5a061f;font-style:normal}
-body .app-view[data-view="explore"] .explore-card-intent{display:-webkit-box;margin:14px 0 0;overflow:hidden;color:rgba(51,37,34,.75);font-family:Georgia,'Times New Roman',serif;font-size:12px;line-height:1.42;-webkit-box-orient:vertical;-webkit-line-clamp:2}
+body .app-view[data-view="explore"] .explore-card-intent{display:-webkit-box;margin:14px 0 0;overflow:hidden;color:rgba(51,37,34,.75);font-family:var(--font-body);font-size:var(--text-12);line-height:1.42;-webkit-box-orient:vertical;-webkit-line-clamp:2}
 body .app-view[data-view="explore"] .explore-card-tags{display:flex;flex-wrap:wrap;gap:6px;margin-top:15px;padding-top:13px;border-top:1px solid rgba(90,6,31,.14)}
-body .app-view[data-view="explore"] .explore-card-tags span{padding:7px 10px;border:1px solid rgba(90,6,31,.13);border-radius:999px;background:rgba(90,6,31,.045);color:#5a061f;font-family:Georgia,'Times New Roman',serif;font-size:9px}
+body .app-view[data-view="explore"] .explore-card-tags span{padding:7px 10px;border:1px solid rgba(90,6,31,.13);border-radius:999px;background:rgba(90,6,31,.045);color:#5a061f;font-family:var(--font-body);font-size:var(--text-12)}
 body .app-view[data-view="explore"] .explore-card-action{
   position:absolute;
   right:17px;
@@ -253,7 +253,7 @@ body .app-view[data-view="explore"] .explore-card-action{
   color:#fffaf1;
   transition:transform .2s,background .2s;
 }
-body .app-view[data-view="explore"] .explore-card-action b{font-size:17px;font-weight:400;line-height:1}
+body .app-view[data-view="explore"] .explore-card-action b{font-size:var(--text-16);font-weight:400;line-height:1}
 body .app-view[data-view="explore"] .explore-card-action:hover{background:#430416;transform:translate(2px,-2px) rotate(4deg)}
 .sr-only{position:absolute!important;width:1px!important;height:1px!important;padding:0!important;overflow:hidden!important;clip:rect(0,0,0,0)!important;white-space:nowrap!important;border:0!important}
 

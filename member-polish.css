@@ -12,7 +12,7 @@
 
 .app-view[data-view="home"] .home-heading h1 {
   color: #291d1b;
-  font-family: Georgia, 'Times New Roman', serif;
+  font-family: var(--font-heading);
   font-size: clamp(55px, 7.2vw, 94px);
   font-weight: 400;
   letter-spacing: -5px;
@@ -58,8 +58,8 @@
 }
 
 .app-view[data-view="home"] .member-name-row h2 {
-  font-family: Georgia, 'Times New Roman', serif;
-  font-size: 38px;
+  font-family: var(--font-heading);
+  font-size: var(--text-32);
   font-weight: 400;
   letter-spacing: -1.8px;
 }
@@ -103,8 +103,8 @@
 
 .app-view[data-view="home"] .swipe-action::before {
   display: block;
-  font-family: Georgia, 'Times New Roman', serif;
-  font-size: 30px;
+  font-family: var(--font-heading);
+  font-size: var(--text-32);
   font-weight: 400;
   line-height: .9;
 }
@@ -113,9 +113,9 @@
   display: block;
   margin-top: 5px;
   color: rgba(52, 31, 28, .6);
-  font-size: 8px;
+  font-size: var(--text-12);
   font-weight: 700;
-  letter-spacing: .11em;
+  letter-spacing: .073em;
 }
 
 .app-view[data-view="home"] .swipe-pass::before { content: '×'; color: #5a061f; }
@@ -136,7 +136,7 @@
 .app-view[data-view="home"] .swipe-hint {
   margin-top: 17px;
   color: rgba(52, 31, 28, .56);
-  font-size: 8px;
+  font-size: var(--text-12);
 }
 
 /* Profile */
@@ -206,7 +206,7 @@
 }
 
 .app-view[data-view="profile"] .profile-quick-stats strong {
-  font-size: 27px;
+  font-size: var(--text-24);
 }
 
 .app-view[data-view="profile"] .profile-content-grid .profile-section {
@@ -253,7 +253,7 @@
   border-radius: 50%;
   color: #5a061f;
   content: '✦';
-  font-size: 12px;
+  font-size: var(--text-12);
 }
 
 @media(max-width:700px) {
@@ -262,7 +262,7 @@
   }
 
   .app-view[data-view="home"] .home-heading h1 {
-    font-size: 58px;
+    font-size: var(--text-60);
   }
 
   .app-view[data-view="home"] .swipe-card-info {
@@ -272,7 +272,7 @@
   }
 
   .app-view[data-view="home"] .member-name-row h2 {
-    font-size: 32px;
+    font-size: var(--text-32);
   }
 
   .app-view[data-view="home"] .swipe-action {
@@ -286,12 +286,12 @@
   }
 
   .app-view[data-view="profile"] .profile-quick-stats strong {
-    font-size: 22px;
+    font-size: var(--text-20);
   }
 
   .app-view[data-view="profile"] .profile-quick-stats span {
-    font-size: 7px;
-    letter-spacing: .07em;
+    font-size: var(--text-12);
+    letter-spacing: .041em;
   }
 }
 
@@ -319,8 +319,8 @@
   height: 100%;
   place-items: center;
   margin: 0;
-  font-family: Georgia, 'Times New Roman', serif;
-  font-size: 35px;
+  font-family: var(--font-heading);
+  font-size: var(--text-32);
   line-height: 1;
 }
 
@@ -332,9 +332,9 @@
   display: block;
   margin: 0;
   color: rgba(52, 31, 28, .58);
-  font-size: 8px;
+  font-size: var(--text-12);
   font-weight: 700;
-  letter-spacing: .13em;
+  letter-spacing: .087em;
   text-align: center;
 }
 

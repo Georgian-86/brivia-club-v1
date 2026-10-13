@@ -22,7 +22,7 @@
 import { spawn } from 'node:child_process';
 import assert from 'node:assert/strict';
 import { fileURLToPath } from 'node:url';
-import { axeViolations, smallText } from './a11y.mjs';
+import { axeViolations, smallText, textAudit, TYPE_FAMILIES } from './a11y.mjs';
 import path from 'node:path';
 
 const { chromium } = await import(process.env.PLAYWRIGHT_MODULE || 'playwright');
@@ -244,8 +244,10 @@ const a11yStep = async (page, tag) => {
   const contrast = await axeViolations(page, { rules: ['color-contrast'], include: '.auth-panel', decorative: ['.auth-shell::before'] });
   check(`${tag}: axe color-contrast has no violations (${contrast.join(' | ')})`, () => assert.deepEqual(contrast, []));
   // .auth-shell also covers the visual pane (.auth-visual: aria-hidden brand art, skipped by smallText) at narrow widths.
-  const small = await smallText(page, { root: '.auth-shell' });
+  const { small, family } = await textAudit(page, { root: '.auth-shell', families: TYPE_FAMILIES });
   check(`${tag}: visible text is at least 12 px (${small.join(' | ')})`, () => assert.deepEqual(small, []));
+  // Phase C Task 4: one type system, Bodoni Moda headings and Instrument Sans for the rest.
+  check(`${tag}: visible text is Bodoni Moda or Instrument Sans (${[...new Set(family)].join(' | ')})`, () => assert.deepEqual(family, []));
 };
 const openSignup = async (page) => {
   await page.goto(`${BASE}/auth.html#signup`, { waitUntil: 'domcontentloaded' });

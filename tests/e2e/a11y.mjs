@@ -32,15 +32,19 @@ export const axeViolations = async (page, { rules, include, decorative = [] } = 
   return violations;
 };
 
-// Visible text nodes in a region (default: the whole body) whose computed font-size is below minPx. Hidden,
-// zero-size, clipped (visually-hidden) and aria-hidden elements are skipped.
-export const smallText = async (page, { root = 'body', minPx = 12 } = {}) => page.evaluate(({ root, minPx }) => {
+// Visible text in a region (default: the whole body): text nodes and ::before / ::after text. Hidden, zero-size,
+// clipped (visually-hidden) and aria-hidden elements are skipped. Returns { small, family }: entries whose computed
+// font-size is below minPx, and (when `families` is given) entries whose computed font-family does not start with one
+// of those names (Phase C Task 4). Each entry names the element and up to two ancestors, so a failure names the rule.
+export const textAudit = async (page, { root = 'body', minPx = 12, families = null } = {}) => page.evaluate(({ root, minPx, families }) => {
   const base = document.querySelector(root);
-  if (!base) return [`no element for ${root}`];
+  if (!base) return { small: [`no element for ${root}`], family: [`no element for ${root}`] };
   const small = [];
+  const family = [];
+  const firstFamily = (ff) => ff.split(',')[0].trim().replace(/^["']|["']$/g, '');
+  const offFamily = (ff) => families && !families.includes(firstFamily(ff));
   const walker = document.createTreeWalker(base, NodeFilter.SHOW_TEXT);
   const one = (el) => `${el.tagName.toLowerCase()}${el.id ? `#${el.id}` : ''}${el.className && typeof el.className === 'string' ? `.${el.className.trim().split(/\s+/).join('.')}` : ''}`;
-  // The element and up to two ancestors, so a failure names the rule to fix.
   const label = (el) => [el.parentElement?.parentElement, el.parentElement, el].filter((e) => e && e !== document.body && e !== document.documentElement).map(one).join(' > ');
   while (walker.nextNode()) {
     const node = walker.currentNode;
@@ -60,6 +64,7 @@ export const smallText = async (page, { root = 'body', minPx = 12 } = {}) => pag
     const size = parseFloat(style.fontSize);
     // font-size: 0 is how the theme hides a text node whose visible copy is drawn by ::before/::after (checked below).
     if (size > 0 && size < minPx) small.push(`${label(el)} ${size}px "${node.textContent.trim().slice(0, 30)}"`);
+    if (size > 0 && offFamily(style.fontFamily)) family.push(`${label(el)} {${firstFamily(style.fontFamily)}} "${node.textContent.trim().slice(0, 30)}"`);
   }
   // Text drawn by ::before / ::after (content: 'PASS', a glyph) counts too, once its element is visible.
   for (const el of [base, ...base.querySelectorAll('*')]) {
@@ -77,10 +82,17 @@ export const smallText = async (page, { root = 'body', minPx = 12 } = {}) => pag
       if (!text.trim()) continue;
       const size = parseFloat(ps.fontSize);
       if (size < minPx) small.push(`${label(el)}${pseudo} ${size}px "${text.slice(0, 30)}"`);
+      if (size > 0 && offFamily(ps.fontFamily)) family.push(`${label(el)}${pseudo} {${firstFamily(ps.fontFamily)}} "${text.slice(0, 30)}"`);
     }
   }
-  return small;
-}, { root, minPx });
+  return { small, family };
+}, { root, minPx, families });
+
+// Visible text nodes in a region whose computed font-size is below minPx (see textAudit).
+export const smallText = async (page, options = {}) => (await textAudit(page, options)).small;
+
+// The two type families (Phase C Task 4): headings in Bodoni Moda, everything else in Instrument Sans.
+export const TYPE_FAMILIES = ['Bodoni Moda', 'Instrument Sans'];
 
 // Worst-case contrast of an element's text against what is actually painted behind it (a photo, a gradient), which axe
 // reports as "incomplete". The text is made transparent, the element's box is screenshotted, and the text colour is
