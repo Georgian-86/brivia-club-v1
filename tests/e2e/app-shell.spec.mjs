@@ -23,13 +23,21 @@
 //   item opens the editor; a complete member sees only "Profile complete"; interest bars are points/20 wide and a
 //   private interest is labelled Private; one my_interests call per visit; a failed load offers Retry; a long name
 //   and area cause no horizontal scroll; type audit and axe clean on the profile.
+// * feel (Phase C Task 6, 375 px): a deck_candidates delayed 3 s shows the deck skeleton with the home view aria-busy
+//   within 300 ms, the card replaces it with CLS < 0.1 (counted once the app is shown); a deck_candidates 500 leaves no
+//   skeleton after 2 s and shows Try again, which shows the skeleton while it retries; the chat list and the posts feed
+//   show skeletons and are aria-busy while delayed; the deck caught-up, inbox, posts and notifications empty states each
+//   offer a button ("Write the first post" focuses the caption, "Notification settings" opens them); under reduced
+//   motion .app-nav-button transitions are 0s and the shimmer is off; the post submit is aria-busy while the insert is
+//   pending. Delays and failures use app-stub's per-route `routes` overrides.
 // APP_SHOTS=<dir> only saves full-page screenshots of home, posts, chat and profile at 375 px and 1440 px, then exits
-// (the Phase C before/after review), and runs no checks.
+// (the Phase C before/after review), and runs no checks. It also saves the dialogs, the profile states, the loading
+// states, the deck error and the empty posts and notifications (Phase C Tasks 4-6).
 import { mkdirSync } from 'node:fs';
 import assert from 'node:assert/strict';
 import path from 'node:path';
 import { axeViolations, textAudit, TYPE_FAMILIES } from './a11y.mjs';
-import { startAppStub } from './app-stub.mjs';
+import { startAppStub, STILL } from './app-stub.mjs';
 
 const { chromium } = await import(process.env.PLAYWRIGHT_MODULE || 'playwright');
 const PORT = Number(process.env.E2E_PORT || 5195);
@@ -120,7 +128,41 @@ try {
       }
     }
     clearMember();
-    console.log(`saved ${VIEWS.length * 2 + DIALOGS.length + 4} screenshots to ${SHOTS}`);
+    // Phase C Task 6: the loading states (every first load delayed 6 s, shot after 1.2 s) and the deck error, the empty
+    // posts feed and the empty notifications panel, at 375 px and 1440 px.
+    let extra = 0;
+    for (const [tag, viewport] of [['375', NARROW], ['1440', WIDE]]) {
+      st.routes = { 'rpc/deck_candidates': { delayMs: 6000 }, 'GET brivia_messages': { delayMs: 6000 }, 'GET community_posts': { delayMs: 6000 }, 'rpc/my_interests': { delayMs: 6000 } };
+      for (const view of VIEWS) {
+        const { context, page } = await open(viewport, `/app.html?view=${view === 'home' ? 'explore' : view}`);
+        await page.waitForTimeout(1200);
+        await page.screenshot({ path: path.join(SHOTS, `app-loading-${view}-${tag}.png`) });
+        await context.close();
+        extra += 1;
+      }
+      delete st.routes;
+      st.deckFail = true;
+      {
+        const { context, page } = await open(viewport);
+        await page.waitForTimeout(1500);
+        await page.screenshot({ path: path.join(SHOTS, `app-deck-error-${tag}.png`) });
+        await context.close();
+      }
+      st.deckFail = false;
+      st.matchIds = []; st.posts = [];
+      {
+        const { context, page } = await open(viewport, '/app.html?view=posts');
+        await page.waitForTimeout(1500);
+        await page.screenshot({ path: path.join(SHOTS, `app-posts-empty-${tag}.png`) });
+        await page.locator('#app-notification-button').click();
+        await page.waitForTimeout(400);
+        await page.screenshot({ path: path.join(SHOTS, `app-notifications-empty-${tag}.png`) });
+        await context.close();
+      }
+      delete st.posts; st.matchIds = [A];
+      extra += 3;
+    }
+    console.log(`saved ${VIEWS.length * 2 + DIALOGS.length + 4 + extra} screenshots to ${SHOTS}`);
   } else {
     // Which member navs are visible, and which section is shown.
     const navState = (page) => page.evaluate(() => {
@@ -574,6 +616,156 @@ try {
       delete st.placeLabel;
     }
     clearMember();
+
+    // Phase C Task 6 (feel): skeletons while loading, never after a failure; empty states with a next step; reduced
+    // motion; a busy post button.
+    const visibleSkeletons = (page, scope) => page.evaluate((sel) => [...document.querySelectorAll(`${sel} .skeleton`)].filter((el) => { const r = el.getBoundingClientRect(); return r.width > 0 && r.height > 0 && getComputedStyle(el).visibility !== 'hidden'; }).length, scope);
+    {
+      st.routes = { 'rpc/deck_candidates': { delayMs: 3000 } };
+      const context = await stub.newContext(browser, NARROW, { reducedMotion: 'reduce' });
+      // CLS counts from the moment the app is shown (the auth gate lifts): before that the page is hidden, and the Vite
+      // dev server injects the CSS from JS, which shifts the unstyled markup (a dev-only artefact; the build links it).
+      await context.addInitScript(() => {
+        window.__cls = 0;
+        window.__shownAt = Infinity;
+        new MutationObserver(() => { if (window.__shownAt === Infinity && document.body && !document.body.classList.contains('app-auth-pending')) window.__shownAt = performance.now(); }).observe(document, { attributes: true, subtree: true, attributeFilter: ['class'] });
+        new PerformanceObserver((list) => { for (const entry of list.getEntries()) if (!entry.hadRecentInput && entry.startTime >= window.__shownAt) window.__cls += entry.value; }).observe({ type: 'layout-shift', buffered: true });
+      });
+      const page = await stub.open(context, { errors: pageErrors });
+      const early = await page.waitForFunction(() => {
+        const section = document.querySelector('[data-view="home"]');
+        const sk = [...(section?.querySelectorAll('.skeleton') || [])].some((el) => el.getBoundingClientRect().height > 0);
+        return sk && section.getAttribute('aria-busy') === 'true';
+      }, null, { timeout: 300 }).then(() => true).catch(() => false);
+      const motion = await page.evaluate(() => ({
+        nav: [...document.querySelectorAll('.app-nav-button')].filter((el) => el.getClientRects().length).map((el) => getComputedStyle(el).transitionDuration),
+        shimmer: [...document.querySelectorAll('.skeleton')].map((el) => getComputedStyle(el).animationName),
+      }));
+      await page.waitForFunction(() => !document.querySelector('#swipe-card')?.hidden && document.querySelector('#swipe-name')?.textContent.trim(), null, { timeout: 8000 }).catch(() => {});
+      await settle(page);
+      const after = await page.evaluate(() => ({ busy: document.querySelector('[data-view="home"]')?.getAttribute('aria-busy'), cls: window.__cls, name: document.querySelector('#swipe-name')?.textContent.trim() }));
+      const left = await visibleSkeletons(page, '[data-view="home"]');
+      check(`375: deck_candidates delayed 3 s: skeleton visible and container aria-busy within 300 ms (${early})`, () => assert.equal(early, true));
+      check(`375: the card replaces the skeleton, CLS < 0.1 (${JSON.stringify({ ...after, left })})`, () => {
+        assert.equal(after.name, 'Asha Band'); assert.equal(left, 0); assert.notEqual(after.busy, 'true'); assert.ok(after.cls < 0.1);
+      });
+      check(`reduced motion: transition-duration 0s on .app-nav-button and no shimmer animation (${JSON.stringify(motion)})`, () => {
+        assert.ok(motion.nav.length > 0); motion.nav.forEach((d) => d.split(',').forEach((x) => assert.equal(x.trim(), '0s')));
+        assert.ok(motion.shimmer.length > 0); motion.shimmer.forEach((n) => assert.equal(n, 'none'));
+      });
+      await context.close();
+      delete st.routes;
+    }
+    {
+      st.deckFail = true;
+      const { context, page } = await open(NARROW);
+      await page.waitForTimeout(2000);
+      const state = await page.evaluate(() => {
+        const action = document.querySelector('#deck-empty-action');
+        return { skeletons: [...document.querySelectorAll('.skeleton')].filter((el) => el.getClientRects().length).length, retry: action?.dataset.deckAction, visible: Boolean(action?.getClientRects().length), busy: document.querySelector('[data-view="home"]')?.getAttribute('aria-busy') };
+      });
+      check(`375: deck_candidates 500: no .skeleton after 2 s and the retry action is visible (${JSON.stringify(state)})`, () => {
+        assert.equal(state.skeletons, 0); assert.equal(state.retry, 'retry'); assert.equal(state.visible, true); assert.notEqual(state.busy, 'true');
+      });
+      // Retry while the deck still fails: the skeleton shows while it loads, and the retry state comes back.
+      st.routes = { 'rpc/deck_candidates': { delayMs: 1200, status: 500 } };
+      await page.locator('#deck-empty-action').click();
+      const during = await page.waitForFunction(() => document.querySelector('[data-view="home"]')?.getAttribute('aria-busy') === 'true', null, { timeout: 600 }).then(() => true).catch(() => false);
+      await page.waitForTimeout(2000);
+      const again = await page.evaluate(() => ({ skeletons: [...document.querySelectorAll('.skeleton')].filter((el) => el.getClientRects().length).length, retry: document.querySelector('#deck-empty-action')?.dataset.deckAction }));
+      check(`375: Try again shows the deck skeleton, then the retry state again (${JSON.stringify({ during, ...again })})`, () => {
+        assert.equal(during, true); assert.equal(again.skeletons, 0); assert.equal(again.retry, 'retry');
+      });
+      await context.close();
+      st.deckFail = false;
+      delete st.routes;
+    }
+    {
+      st.matchIds = [A];
+      st.routes = { 'GET brivia_messages': { delayMs: 3000 }, 'GET community_posts': { delayMs: 3000 } };
+      const chat = await open(NARROW, '/app.html?view=chat');
+      const chatState = await chat.page.waitForFunction(() => {
+        const list = document.querySelector('#chat-list');
+        return list?.getAttribute('aria-busy') === 'true' && [...list.querySelectorAll('.skeleton')].some((el) => el.getBoundingClientRect().height > 0);
+      }, null, { timeout: 1500 }).then(() => true).catch(() => false);
+      await chat.page.waitForFunction(() => document.querySelector('#chat-list [data-chat-id]'), null, { timeout: 10000 }).catch(() => {});
+      const chatAfter = await visibleSkeletons(chat.page, '#chat-list');
+      const chatBusy = await chat.page.evaluate(() => document.querySelector('#chat-list')?.getAttribute('aria-busy'));
+      check(`375: the chat list shows a skeleton and is aria-busy while delayed, then the threads (${JSON.stringify({ chatState, chatAfter, chatBusy })})`, () => {
+        assert.equal(chatState, true); assert.equal(chatAfter, 0); assert.notEqual(chatBusy, 'true');
+      });
+      await chat.context.close();
+      st.routes = { 'GET community_posts': { delayMs: 3000 } };
+      const posts = await open(NARROW, '/app.html?view=posts');
+      const postsState = await posts.page.waitForFunction(() => {
+        const list = document.querySelector('#community-post-list');
+        return list?.getAttribute('aria-busy') === 'true' && [...list.querySelectorAll('.skeleton')].some((el) => el.getBoundingClientRect().height > 0);
+      }, null, { timeout: 1500 }).then(() => true).catch(() => false);
+      await posts.page.waitForFunction(() => document.querySelector('#community-post-list .community-post-empty'), null, { timeout: 10000 }).catch(() => {});
+      const postsAfter = await visibleSkeletons(posts.page, '#community-post-list');
+      check(`375: posts show a skeleton and are aria-busy while delayed, then the feed (${JSON.stringify({ postsState, postsAfter })})`, () => {
+        assert.equal(postsState, true); assert.equal(postsAfter, 0);
+      });
+      await posts.context.close();
+      delete st.routes;
+      st.matchIds = [];
+    }
+    {
+      // Every empty state offers a next step: deck caught up, inbox, posts, notifications.
+      st.emptyDeck = true; st.status = 'caught_up'; st.matchIds = []; st.posts = [];
+      const actionIn = (page, sel) => page.evaluate((s) => {
+        const box = document.querySelector(s);
+        const controls = [...(box?.querySelectorAll('button, a[href]') || [])].filter((el) => el.getClientRects().length);
+        return { found: Boolean(box), text: box?.textContent.replace(/\s+/g, ' ').trim().slice(0, 80), actions: controls.map((el) => el.textContent.trim()) };
+      }, sel);
+      const home = await open(NARROW);
+      await home.page.waitForFunction(() => document.querySelector('#home-empty-state')?.dataset.cause === 'caught_up', null, { timeout: 8000 }).catch(() => {});
+      const deckEmpty = await actionIn(home.page, '#home-empty-state');
+      await home.page.locator('#app-notification-button').click();
+      await home.page.waitForTimeout(300);
+      const notes = await actionIn(home.page, '#notification-list');
+      await home.page.locator('#notification-list [data-notification-settings]').click({ timeout: 3000 }).catch(() => {});
+      const settingsOpen = await home.page.evaluate(() => Boolean(document.querySelector('#profile-notification-settings-modal')));
+      await home.context.close();
+      const chat = await open(NARROW, '/app.html?view=chat');
+      await settle(chat.page);
+      const inbox = await actionIn(chat.page, '.inbox-empty');
+      await chat.context.close();
+      const posts = await open(NARROW, '/app.html?view=posts');
+      await posts.page.waitForFunction(() => document.querySelector('#community-post-list .community-post-empty'), null, { timeout: 8000 }).catch(() => {});
+      const postsEmpty = await actionIn(posts.page, '#community-post-list .community-post-empty');
+      await posts.page.locator('#community-post-list [data-post-first]').click({ timeout: 3000 }).catch(() => {});
+      await posts.page.waitForTimeout(200);
+      const focused = await posts.page.evaluate(() => document.activeElement === document.querySelector('#community-post-form textarea'));
+      await posts.context.close();
+      for (const [name, state] of [['deck caught up', deckEmpty], ['inbox', inbox], ['posts', postsEmpty], ['notifications', notes]]) {
+        check(`375: the ${name} empty state contains a button or link (${JSON.stringify(state)})`, () => { assert.equal(state.found, true); assert.ok(state.actions.length >= 1); });
+      }
+      check(`375: "Write the first post" focuses the composer's caption (${focused})`, () => assert.equal(focused, true));
+      check(`375: the notifications empty state opens the notification settings (${settingsOpen})`, () => assert.equal(settingsOpen, true));
+      st.emptyDeck = false; delete st.posts;
+    }
+    {
+      // The post submit button is aria-busy while the insert is pending.
+      st.routes = { 'POST community_posts': { delayMs: 2500 } };
+      const { context, page } = await open(NARROW, '/app.html?view=posts');
+      await settle(page);
+      await page.locator('#open-community-post').click();
+      await page.locator('#community-post-image').setInputFiles({ name: 'still.png', mimeType: 'image/png', buffer: STILL });
+      await page.locator('#community-post-caption').fill('A quiet win today.');
+      await page.locator('.community-post-submit').click();
+      const busy = await page.waitForFunction(() => {
+        const b = document.querySelector('.community-post-submit');
+        return b?.getAttribute('aria-busy') === 'true' && b.disabled;
+      }, null, { timeout: 2000 }).then(() => true).catch(() => false);
+      await page.waitForFunction(() => document.querySelector('.community-post-submit')?.getAttribute('aria-busy') !== 'true', null, { timeout: 8000 }).catch(() => {});
+      const done = await page.evaluate(() => ({ busy: document.querySelector('.community-post-submit')?.getAttribute('aria-busy'), disabled: document.querySelector('.community-post-submit')?.disabled }));
+      check(`375: post submit is aria-busy while the insert is pending, then restored (${JSON.stringify({ busy, ...done })})`, () => {
+        assert.equal(busy, true); assert.notEqual(done.busy, 'true'); assert.equal(done.disabled, false);
+      });
+      await context.close();
+      delete st.routes;
+    }
 
     st.matchIds = [];
     check(`no uncaught page errors (${pageErrors.join(' | ')})`, () => assert.deepEqual(pageErrors, []));

@@ -1,8 +1,8 @@
 /* Brand shimmer for content that is still loading (landing images now; Phase C app views reuse it).
    Remove the class on load: markLoaded(img) in landing-motion.js. Static under reduced motion. */
 .skeleton.skeleton { /* doubled so it beats a wrapper's own background whatever the CSS chunk order */
-  background-color: #efe4dc;
-  background-image: linear-gradient(100deg, #efe4dc 30%, #f7efe9 50%, #efe4dc 70%);
+  background-color: var(--color-skeleton);
+  background-image: linear-gradient(100deg, var(--color-skeleton) 30%, var(--color-skeleton-glint) 50%, var(--color-skeleton) 70%);
   background-size: 250% 100%;
   background-repeat: no-repeat;
   animation: skeleton-shimmer 1.4s ease-in-out infinite;

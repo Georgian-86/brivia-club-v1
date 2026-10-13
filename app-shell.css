@@ -195,3 +195,51 @@ body.app-body .app-view[data-view="home"] .swipe-card-info{height:auto;min-heigh
    browser's hiding of a closed popover. */
 body.app-body .profile-hero-actions .profile-settings-menu[popover]{position:fixed;inset:auto;margin:0;z-index:auto}
 body.app-body .profile-hero-actions .profile-settings-menu[popover]:not(:popover-open){display:none}
+
+/* Feel (Phase C Task 6) ------------------------------------------------------------------------------------------- */
+/* Skeleton shapes (app-skeletons.js skeletonMarkup; the shimmer and its reduced-motion stop are skeleton.css). The deck
+   skeleton fills the card box itself, so the real card replaces it without a layout shift. */
+body.app-body .swipe-card.is-loading>:not(.skeleton-group){visibility:hidden}
+body.app-body .swipe-card>.skeleton-group-deck{position:absolute;inset:0;z-index:3}
+body.app-body .skeleton-deck{width:100%;height:100%}
+body.app-body .skeleton-group-list{display:grid;gap:var(--space-2);padding:var(--space-3) var(--space-4)}
+body.app-body .skeleton-list{height:56px;border-radius:var(--radius-m)}
+body.app-body .skeleton-group-posts{display:grid;grid-column:1/-1;grid-template-columns:inherit;gap:inherit}
+body.app-body .skeleton-posts{height:280px;border-radius:var(--radius-m)}
+body.app-body .skeleton-group-chips{display:flex;flex-wrap:wrap;gap:var(--space-2)}
+body.app-body .skeleton-chips{width:96px;height:32px;border-radius:var(--radius-pill)}
+@media (max-width:700px){body.app-body .skeleton-posts{height:220px}}
+
+/* Button states. Zero-specificity (:where) so every component's own resting look, hover and focus rules still win: this
+   only fills the gaps (press feedback, a visible keyboard focus, a busy cursor) and times them from the motion tokens,
+   which are 0 ms under prefers-reduced-motion. */
+:where(body.app-body) :where(button, [role="button"], a[class*="button"], a[class*="action"]){
+  transition:background-color var(--motion-base) var(--ease),color var(--motion-base) var(--ease),border-color var(--motion-base) var(--ease),box-shadow var(--motion-base) var(--ease),opacity var(--motion-base) var(--ease),transform var(--motion-fast) var(--ease);
+}
+:where(body.app-body) :where(button, [role="button"], a[class*="button"], a[class*="action"]):where(:not(:disabled)){cursor:pointer}
+:where(body.app-body) :where(button, [role="button"], a[class*="button"], a[class*="action"]):where(:active:not(:disabled)){transform:scale(.98)}
+:where(body.app-body) :where(button, [role="button"], a[class*="button"], a[class*="action"]):where(:focus-visible){outline:2px solid var(--color-wine);outline-offset:2px}
+body.app-body [aria-busy="true"]:is(button, a){cursor:progress;opacity:.72}
+
+/* Empty-state actions added in Task 6: the posts feed ("Write the first post", "Try again") and the notifications panel. */
+body.app-body .community-post-empty-action,
+body.app-body .notification-empty-action{
+  display:inline-flex;
+  min-height:44px;
+  align-items:center;
+  justify-content:center;
+  margin-top:var(--space-4);
+  padding:0 var(--space-5);
+  border:1px solid var(--color-wine);
+  border-radius:var(--radius-pill);
+  background:transparent;
+  color:var(--color-wine);
+  font-family:var(--font-body);
+  font-size:var(--text-12);
+  font-weight:600;
+  letter-spacing:.12em;
+  text-transform:uppercase;
+}
+body.app-body .community-post-empty-action:hover,
+body.app-body .notification-empty-action:hover{background:var(--color-wine);color:var(--color-cream)}
+body.app-body .notification-empty p{margin:0}

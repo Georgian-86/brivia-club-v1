@@ -312,17 +312,6 @@ body.app-body .profile-view .profile-board-content .profile-hero h1 {
   background: var(--color-wine-soft);
 }
 
-/* The neutral loading row (Phase C Task 6 replaces it with the shared skeleton). */
-.profile-interest.is-placeholder .profile-interest-placeholder {
-  display: block;
-  width: 40%;
-  height: var(--text-16);
-  border-radius: var(--radius-s);
-  background: color-mix(in srgb, var(--color-ink) 8%, transparent);
-}
-
-.profile-interest.is-placeholder .profile-interest-bar i { width: 0; }
-
 /* Looking for */
 .profile-chips {
   display: flex;

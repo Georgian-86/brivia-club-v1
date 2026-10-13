@@ -10,6 +10,9 @@
   --color-ink-soft: #5f5651;
   --color-cream: #fffaf1;
   --color-line: rgba(52, 31, 28, .16);
+  /* The loading shimmer's two tones, copied from skeleton.css (Phase C Task 6). */
+  --color-skeleton: #efe4dc;
+  --color-skeleton-glint: #f7efe9;
 
   --space-1: 4px;
   --space-2: 8px;

@@ -42,6 +42,7 @@ import './app-shell.css';
 // The calm profile column (Phase C, Task 5): tokens only, loads after app-shell.css.
 import './profile-view.css';
 import { navMarkup, markCurrentNav, setChatBadges } from './app-nav.js';
+import { skeletonMarkup, setBusy } from './app-skeletons.js';
 
 document.body.classList.add('app-auth-pending');
 let appBackGuardActive = false;
@@ -308,13 +309,20 @@ const renderNotifications = () => {
     const disabled = busy ? ' disabled aria-busy="true"' : '';
     return `<div class="notification-request" data-request-from="${escapeHtml(request.fromId)}">${renderAvatar(request.person, 'notification-avatar')}<div class="notification-copy"><strong>${escapeHtml(name)}</strong>${request.note ? `<span class="notification-request-note">${escapeHtml(request.note)}</span>` : '<span class="notification-request-note">Wants to connect with you.</span>'}</div><time>${escapeHtml(formatNotificationTime(request.createdAt))}</time><div class="notification-request-actions"><button type="button" class="notification-request-button" data-request-respond="accept" aria-label="Accept connection request from ${escapeHtml(name)}"${disabled}>ACCEPT</button><button type="button" class="notification-request-button" data-request-respond="decline" aria-label="Decline connection request from ${escapeHtml(name)}"${disabled}>DECLINE</button></div></div>`;
   }).join('')}</section>` : '';
-  const messagesHtml = !enabled ? '<p class="notification-empty">Notifications are off in settings.</p>' : unreadGroups.length ? unreadGroups.map((group) => {
+  // Every empty state offers a next step (Phase C Task 6): here, the notification settings.
+  const settingsAction = '<button type="button" class="notification-empty-action" data-notification-settings>Notification settings</button>';
+  const messagesHtml = !enabled ? `<div class="notification-empty"><p>Notifications are off in settings.</p>${settingsAction}</div>` : unreadGroups.length ? unreadGroups.map((group) => {
     const person = findPersonById(group.personId);
     const title = person?.name || 'a Brivia member';
     const messageLabel = `${group.count} message${group.count === 1 ? '' : 's'} from ${title}`;
     return `<button type="button" class="notification-item is-unread" data-notification-person="${escapeHtml(group.personId)}">${renderAvatar(person, 'notification-avatar')}<span class="notification-copy"><strong>${escapeHtml(messageLabel)}</strong></span><time>${escapeHtml(formatNotificationTime(group.latest.createdAt))}</time></button>`;
-  }).join('') : (requestCount ? '' : '<p class="notification-empty">You are all caught up.</p>');
+  }).join('') : (requestCount ? '' : `<div class="notification-empty"><p>You are all caught up.</p>${settingsAction}</div>`);
   list.innerHTML = requestsHtml + messagesHtml;
+  list.querySelector('[data-notification-settings]')?.addEventListener('click', (event) => {
+    event.stopPropagation();
+    closeNotificationPanel();
+    openNotificationSettings();
+  });
   list.querySelectorAll('[data-request-respond]').forEach((control) => control.addEventListener('click', (event) => {
     event.stopPropagation();
     const fromId = control.closest('[data-request-from]')?.dataset.requestFrom;
@@ -467,6 +475,7 @@ const setView = (view) => {
   markCurrentNav(document, view);
   if (view === 'explore') renderExplore();
   if (view === 'posts') {
+    showCommunityPostsLoading();
     loadCommunityPosts();
     window.setTimeout(() => {
       if (document.body.dataset.appView === 'posts' && memberProfile.id && !communityPostsLoaded && !communityPostsLoading) loadCommunityPosts();
@@ -508,7 +517,7 @@ const filtersActive = () => Boolean(exploreFilters.query || exploreFilters.skill
 // wrap-around: when the queue runs out the deck loads once more, and if nothing new comes back deck_status() says why.
 // `people` stays the registry of every member card known to this page (deck, search, chats, request senders).
 const DECK_PAGE_SIZE = 12;
-const deck = { ready: false, ids: [], seen: new Set(), loading: null, end: null };
+const deck = { ready: false, ids: [], seen: new Set(), loading: null, end: null, refilling: false };
 const deckPeople = () => deck.ids.map((id) => findPersonById(id)).filter(Boolean);
 const getExplorePeople = () => deckPeople().filter(explorePersonMatches);
 // The current card is always the first card of the (filtered) queue, so clearing a filter returns to the server order.
@@ -559,12 +568,35 @@ const renderCardChips = (container, person) => {
   }));
 };
 
+// While the deck loads (first load, a refill, Try again) the card keeps its place and shows one skeleton card, so the
+// real card replaces it without a layout shift; the home view is aria-busy. A failure ends it: deck.end = 'error'.
+const deckLoadingNow = () => !deckEmptyCause() && (!deck.ready || Boolean(deck.loading) || deck.refilling);
+const setDeckLoading = (card, loading) => {
+  const home = document.querySelector('[data-view="home"]');
+  if (loading) home?.setAttribute('aria-busy', 'true');
+  else home?.removeAttribute('aria-busy');
+  if (!card) return;
+  card.classList.toggle('is-loading', loading);
+  const skeleton = card.querySelector(':scope > .skeleton-group');
+  if (loading && !skeleton) card.insertAdjacentHTML('beforeend', skeletonMarkup('deck'));
+  if (!loading) skeleton?.remove();
+};
 const renderHome = (queue = getExplorePeople()) => {
   const card = document.querySelector('#swipe-card');
   const actions = document.querySelector('.swipe-actions');
   const hint = document.querySelector('.swipe-hint');
   const limitState = document.querySelector('#swipe-limit-state');
   const emptyState = document.querySelector('#home-empty-state');
+  if (!currentPerson && deckLoadingNow()) {
+    card?.removeAttribute('hidden');
+    setDeckLoading(card, true);
+    actions?.setAttribute('hidden', '');
+    hint?.setAttribute('hidden', '');
+    limitState?.setAttribute('hidden', '');
+    emptyState?.setAttribute('hidden', '');
+    return;
+  }
+  setDeckLoading(card, false);
   if (!currentPerson) {
     card?.setAttribute('hidden', '');
     actions?.setAttribute('hidden', '');
@@ -714,7 +746,20 @@ const routeIncompleteMember = async (onboarding, ownRow = null) => {
 };
 // When the queue runs out: load once more; if nothing new comes back, ask deck_status() why (never a count).
 const refillDeck = async () => {
-  if (!deck.ready || deckPeople().length) return;
+  if (!deck.ready || deckPeople().length || deck.refilling) return;
+  deck.refilling = true;
+  renderHome();
+  let settled = false;
+  try {
+    settled = await refillDeckOnce();
+  } finally {
+    deck.refilling = false;
+  }
+  // Not settled: the member is being routed to onboarding or the review notice, so the deck must not load again.
+  if (settled) renderExplore();
+};
+// One refill. Resolves true when the deck has cards or deck.end says why not.
+const refillDeckOnce = async () => {
   await Promise.allSettled([...pendingPasses]);
   const { added, error } = await loadDeck();
   if (error) { console.warn('The deck could not load:', error.message); deck.end = 'error'; }
@@ -726,11 +771,11 @@ const refillDeck = async () => {
     if (cause === 'complete_profile') {
       const { data: onboarding, error: onboardingError } = await onboardingStatus();
       if (!onboardingError && onboarding?.completed === true) cause = 'error';
-      else if (!onboardingError && onboarding?.completed === false) { await routeIncompleteMember(onboarding); return; }
+      else if (!onboardingError && onboarding?.completed === false) { await routeIncompleteMember(onboarding); return false; }
     }
     deck.end = cause;
   }
-  renderExplore();
+  return true;
 };
 // Name search reaches members anywhere: their cards join the end of the deck (search reaches everyone, VISION).
 // The server answers only queries with at least 2 non-space characters (D-038 R4), so shorter ones are not sent.
@@ -1218,7 +1263,11 @@ const renderChats = () => {
   const list = document.querySelector('#chat-list');
   const inboxToolbar = list?.querySelector('#inbox-toolbar');
   const referenceRows = '';
-  const inboxMarkup = `<div class="inbox-panel-head"><div><strong>YOUR THREADS</strong><span>Private conversations</span></div><b>${conversations.length}</b></div>${referenceRows}${matches.length ? matches.map((person) => {
+  // Until sign-in has loaded the inbox and the cards of the people in it, the list is a skeleton (Phase C Task 6).
+  const inboxLoading = !deck.ready;
+  if (inboxLoading) list?.setAttribute('aria-busy', 'true');
+  else list?.removeAttribute('aria-busy');
+  const inboxMarkup = `<div class="inbox-panel-head"><div><strong>YOUR THREADS</strong><span>Private conversations</span></div>${inboxLoading ? '' : `<b>${conversations.length}</b>`}</div>${referenceRows}${inboxLoading ? skeletonMarkup('list', 4) : matches.length ? matches.map((person) => {
     const last = chatMessages[person.id]?.at(-1);
     const unread = last?.from === 'them' && !readChatIds.has(person.id);
     const lastPreview = last?.attachment ? `📎 ${last.attachment.name || 'Attachment'}` : (last?.text || 'Start a conversation');
@@ -1676,11 +1725,11 @@ const openProfileEditor = () => {
     const photoError = form.querySelector('#profile-photo-error');
     const coverError = form.querySelector('#profile-cover-error');
     [photoError, coverError].forEach((node) => { node.hidden = true; node.textContent = ''; });
-    submit.disabled = true;
+    setBusy(submit, true);
     feedback.textContent = 'Saving your profile...';
     const { data, error } = await saveProfile(memberProfile.id, nextProfile, photoFile, coverFile, { photoUrl: memberProfile.photoUrl, coverUrl: memberProfile.coverUrl });
     if (error) {
-      submit.disabled = false;
+      setBusy(submit, false);
       if (error instanceof ImageProcessingError) {
         // Inline beside the field that failed (nothing was uploaded); photo is processed first.
         const target = error.field === 'cover' ? coverError : photoError;
@@ -1915,8 +1964,8 @@ const loadProfileInterests = async () => {
   renderProfileInterests();
   renderProfileChecklist();
 };
-// The neutral loading row. Phase C Task 6 swaps this one function for the shared skeleton helper.
-const interestsPlaceholder = () => '<p class="profile-sr" role="status">Loading your interests</p><ul class="profile-interest-list" aria-hidden="true"><li class="profile-interest is-placeholder"><span class="profile-interest-placeholder"></span><span class="profile-interest-bar"><i></i></span></li></ul>';
+// The loading state: the shared chip skeleton (Phase C Task 6); the section is aria-busy meanwhile.
+const interestsPlaceholder = () => `<p class="profile-sr" role="status">Loading your interests</p>${skeletonMarkup('chips', 3)}`;
 const renderProfileChecklist = () => {
   const box = document.querySelector('#profile-checklist');
   if (!box) return;
@@ -2037,7 +2086,7 @@ const renderCommunityPosts = () => {
   });
   if (count) count.textContent = `${String(sorted.length).padStart(2, '0')} ${sorted.length === 1 ? 'POST' : 'POSTS'}`;
   if (!sorted.length) {
-    list.innerHTML = '<div class="community-post-empty"><span>✦</span><h2>Start the<br /><em>conversation.</em></h2><p>Share a thought, image, or small win with the club.</p></div>';
+    list.innerHTML = '<div class="community-post-empty"><span>✦</span><h2>Start the<br /><em>conversation.</em></h2><p>Share a thought, image, or small win with the club.</p><button type="button" class="community-post-empty-action" data-post-first>Write the first post</button></div>';
     return;
   }
   list.innerHTML = sorted.map((post) => {
@@ -2050,11 +2099,19 @@ const renderCommunityPosts = () => {
   bindCommunityProfileTriggers();
 };
 
+// The feed's first load shows post-shaped skeletons and marks the list aria-busy (Phase C Task 6); a reload after a new
+// post keeps the posts on screen.
+const showCommunityPostsLoading = () => {
+  const list = document.querySelector('#community-post-list');
+  if (!list || communityPostsLoaded) return;
+  list.setAttribute('aria-busy', 'true');
+  if (!list.querySelector('.skeleton-group')) list.innerHTML = skeletonMarkup('posts', 3);
+};
 const loadCommunityPosts = async () => {
   if (!supabase || !memberProfile.id || communityPostsLoading) return;
   communityPostsLoading = true;
   const list = document.querySelector('#community-post-list');
-  if (!communityPostsLoaded && list) list.innerHTML = '<div class="community-post-loading">LOADING COMMUNITY POSTS...</div>';
+  showCommunityPostsLoading();
   const { data, error } = await supabase
     .from('community_posts')
     .select('id,author_id,image_url,image_path,caption,created_at')
@@ -2062,9 +2119,10 @@ const loadCommunityPosts = async () => {
   if (error) {
     communityPostsLoading = false;
     communityPostsLoaded = true;
+    list?.removeAttribute('aria-busy');
     if (list) list.innerHTML = /community_posts|relation|schema cache/i.test(error.message || '')
       ? '<div class="community-post-empty"><span>✦</span><h2>Community posts<br /><em>are almost here.</em></h2><p>Run the SQL files in <strong>supabase/migrations/</strong> to enable shared posts.</p></div>'
-      : `<div class="community-post-empty"><span>!</span><h2>Could not load<br /><em>the feed.</em></h2><p>${escapeHtml(error.message || 'Please try again.')}</p></div>`;
+      : `<div class="community-post-empty"><span>!</span><h2>Could not load<br /><em>the feed.</em></h2><p>${escapeHtml(error.message || 'Please try again.')}</p><button type="button" class="community-post-empty-action" data-posts-retry>Try again</button></div>`;
     return;
   }
   communityPosts = data || [];
@@ -2094,6 +2152,7 @@ const loadCommunityPosts = async () => {
   }
   communityPostsLoading = false;
   communityPostsLoaded = true;
+  list?.removeAttribute('aria-busy');
   renderCommunityPosts();
 };
 
@@ -2120,6 +2179,11 @@ document.querySelector('#community-post-sort')?.addEventListener('change', (even
   renderCommunityPosts();
 });
 document.querySelector('#open-community-post')?.addEventListener('click', openCommunityPostComposer);
+// The feed's empty and error states: "Write the first post" opens the composer, "Try again" reloads the feed.
+document.querySelector('#community-post-list')?.addEventListener('click', (event) => {
+  if (event.target.closest('[data-post-first]')) openCommunityPostComposer();
+  else if (event.target.closest('[data-posts-retry]')) { communityPostsLoaded = false; loadCommunityPosts(); }
+});
 document.querySelector('#close-community-post')?.addEventListener('click', closeCommunityPostComposer);
 document.querySelector('#community-post-image')?.addEventListener('change', (event) => {
   const file = event.target.files?.[0];
@@ -2141,7 +2205,7 @@ document.querySelector('#community-post-form')?.addEventListener('submit', async
   if (!file || !caption || !supabase || !memberProfile.id) return;
   if (!file.type.startsWith('image/')) { if (feedback) feedback.textContent = 'Please choose an image file.'; return; }
   if (file.size > 8 * 1024 * 1024) { if (feedback) feedback.textContent = 'Keep the image under 8MB.'; return; }
-  submit.disabled = true;
+  setBusy(submit, true);
   if (feedback) { feedback.textContent = 'Publishing your post...'; feedback.setAttribute('role', 'alert'); }
   let upload = null;
   try {
@@ -2163,7 +2227,7 @@ document.querySelector('#community-post-form')?.addEventListener('submit', async
       ? 'Run the SQL files in supabase/migrations/ (in order), then try again.'
       : (error.message || 'Your post could not be published.');
   } finally {
-    submit.disabled = false;
+    setBusy(submit, false);
   }
 });
 
@@ -2580,7 +2644,7 @@ document.querySelector('#pitch-form')?.addEventListener('submit', async (event) 
   const submit = event.currentTarget.querySelector('.pitch-submit');
   const pending = claimPendingPitch();
   if (!pending) return; // already resolved (double submit) or no like in progress
-  if (submit) { submit.disabled = true; submit.setAttribute('aria-busy', 'true'); }
+  setBusy(submit, true);
   try {
     // The pitch travels as the note of the like's single request; no message is sent until the pair is matched.
     const result = await sendConnectionSignal(pending.person, body);
@@ -2606,7 +2670,7 @@ document.querySelector('#pitch-form')?.addEventListener('submit', async (event) 
     closeOverlays();
     showToast(signalResultToast(pending.person, result));
   } finally {
-    if (submit) { submit.disabled = false; submit.removeAttribute('aria-busy'); }
+    setBusy(submit, false);
   }
 });
 document.querySelector('#logout-button')?.addEventListener('click', logoutMember);
@@ -2669,6 +2733,10 @@ const loadSupabaseCommunity = async () => {
   // Show the authenticated shell as soon as the profile is verified. Optional
   // inbox/notification queries must never leave the whole app invisible.
   document.body.classList.remove('app-auth-pending');
+  // The profile needs only the member's own row: show it now rather than after the inbox and the deck have loaded
+  // (a slow deck left "New Member" and an empty checklist on the profile meanwhile; Phase C Task 6).
+  renderProfile();
+  if (document.body.dataset.appView === 'profile' && profileInterests.status === 'idle') loadProfileInterests();
   await syncBlockedUserIds();
   const { data: matchRows, error: matchError } = await supabase.from('matches').select('user1_id,user2_id').or(`user1_id.eq.${session.user.id},user2_id.eq.${session.user.id}`);
   if (!matchError) {

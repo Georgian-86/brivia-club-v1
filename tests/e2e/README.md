@@ -55,6 +55,13 @@ field, and every profile ⚙ menu item on top and 44 px tall; Enter on ⚙ opens
 Escape closes it and returns focus to ⚙, and a view change or resize closes it. `APP_SHOTS` also saves the profile edit dialog, the ⚙ menu,
 the report dialog and the post composer at 375 px. `APP_SHOTS=<dir>` only saves home/posts/chat/profile screenshots at
 375 px and 1440 px (the Phase C before/after review).
+Phase C Task 6 added `state.routes`, per-route overrides keyed by the path after `/rest/v1/` (optionally prefixed by the
+method, e.g. `'POST community_posts'`): `{ delayMs, status }` delays the answer and/or turns it into an error. The stub
+also accepts Storage uploads. With it `app-shell.spec.mjs` checks the loading states (the deck skeleton and `aria-busy`
+within 300 ms, the card replacing it with CLS < 0.1, no skeleton left after a 500 and a Try again that retries, chat list
+and posts skeletons), an action in every empty state (deck caught up, inbox, posts, notifications), reduced motion
+(0s nav transitions, no shimmer) and a busy post button; `APP_SHOTS` also saves the loading states, the deck error and the
+empty posts and notifications at 375 px and 1440 px.
 
 ```bash
 PLAYWRIGHT_MODULE=/tmp/pw/node_modules/playwright/index.mjs node tests/e2e/app-shell.spec.mjs
