@@ -136,8 +136,8 @@ body.app-body {
   transition: background .2s, color .2s;
 }
 .deck-empty-action:hover { background: var(--dk-accent); }
-#deck-empty-title:focus { outline: none; }
-#deck-empty-title:focus-visible { outline: 2px solid var(--dk-soft); outline-offset: 4px; border-radius: 4px; }
+/* #deck-empty-title takes focus from script (tabindex="-1") for screen readers; it is not a control, so no ring
+   (app-shell.css, Phase C polish). */
 .deck-empty-action:focus-visible,
 .swipe-action:focus-visible,
 .view-info-button:focus-visible { outline: 2px solid var(--dk-soft); outline-offset: 3px; }

@@ -175,6 +175,9 @@ body.app-body .app-view[data-view="profile"] .profile-board-content{overflow:vis
   /* iOS zooms the page when a field under 16 px takes focus: every app text field, textarea and select is 16 px on
      phones (the chat compose placeholder stays 12 px, below). !important: a floor over every component's own size. */
   body.app-body :is(input:not([type="radio"], [type="checkbox"], [type="range"]), textarea, select){font-size:var(--text-16)!important}
+  /* The Explore sort keeps that 16 px but reads as a quiet control beside its SORT label (Phase C polish): regular
+     weight, the option text shown as small caps, the label's letter spacing, and the same 40 px row height. */
+  body.app-body .community-feed-toolbar select{height:40px;padding-block:0;font-weight:400;text-transform:lowercase;font-variant-caps:all-small-caps;letter-spacing:.097em;line-height:normal}
 }
 /* An open thread fills the phone below the one-row header (the tab bar is hidden while it is open). */
 @media (max-width:700px){
@@ -232,6 +235,9 @@ body.app-body .skeleton-chips{width:96px;height:32px;border-radius:var(--radius-
 :where(body.app-body) :where(button, [role="button"], a[class*="button"], a[class*="action"]):where(:not(:disabled)){cursor:pointer}
 :where(body.app-body) :where(button, [role="button"], a[class*="button"], a[class*="action"]):where(:active:not(:disabled)){transform:scale(.98)}
 :where(body.app-body) :where(button, [role="button"], a[class*="button"], a[class*="action"]):where(:focus-visible){outline:2px solid var(--color-wine);outline-offset:2px}
+/* A heading that takes focus from script (tabindex="-1", so screen readers announce it: the deck error title, the
+   under-review notice, the chat heading after a report) is not a control: no ring, whatever the last input was. */
+body.app-body :is(h1, h2, h3)[tabindex="-1"]:focus{outline:none}
 body.app-body [aria-busy="true"]:is(button, a){cursor:progress;opacity:.72}
 
 /* Empty-state actions added in Task 6: the posts feed ("Write the first post", "Try again") and the notifications panel. */

@@ -43,7 +43,8 @@
 // APP_SHOTS=<dir> only saves full-page screenshots of home, posts, chat and profile at 375 px and 1440 px, then exits
 // (the Phase C before/after review), and runs no checks. It also saves the dialogs, the profile states, the loading
 // states, the deck error and the empty posts and notifications (Phase C Tasks 4-6), and the pitch sheet (375, 1440), an
-// open chat thread and the under-review notice (375) (final review).
+// open chat thread and the under-review notice (375) (final review). Shots at <= 780 px emulate a phone (isMobile,
+// hasTouch: overlay scrollbars), so they match what a phone shows.
 import { mkdirSync } from 'node:fs';
 import assert from 'node:assert/strict';
 import path from 'node:path';
@@ -102,8 +103,8 @@ const pageErrors = [];
 let browser;
 try {
   browser = await chromium.launch({ headless: true, executablePath: EXECUTABLE });
-  const open = async (viewport, pagePath = '/app.html') => {
-    const context = await stub.newContext(browser, viewport, { reducedMotion: 'reduce' });
+  const open = async (viewport, pagePath = '/app.html', extra = {}) => {
+    const context = await stub.newContext(browser, viewport, { reducedMotion: 'reduce', ...extra });
     const page = await stub.open(context, { path: pagePath, errors: pageErrors });
     return { context, page };
   };
@@ -111,10 +112,15 @@ try {
 
   if (SHOTS) {
     mkdirSync(SHOTS, { recursive: true });
+    // Phone-width shots emulate a phone (overlay scrollbars, touch): headless desktop Chromium otherwise reserves a
+    // 15 px classic scrollbar at 375 px and the header avatar looks cut off at the right edge (Phase C polish).
+    const PHONE = { isMobile: true, hasTouch: true };
+    const shotOptions = (viewport) => (viewport.width <= 780 ? PHONE : {});
+    const openShot = (viewport, pagePath) => open(viewport, pagePath, shotOptions(viewport));
     st.matchIds = [A];
     for (const [tag, viewport] of [['375', NARROW], ['1440', WIDE]]) {
       for (const view of VIEWS) {
-        const { context, page } = await open(viewport, `/app.html?view=${view === 'home' ? 'explore' : view}`);
+        const { context, page } = await openShot(viewport, `/app.html?view=${view === 'home' ? 'explore' : view}`);
         await page.waitForTimeout(1500);
         await page.screenshot({ path: path.join(SHOTS, `app-${view}-${tag}.png`), fullPage: true });
         await context.close();
@@ -123,7 +129,7 @@ try {
     // The dialogs and menus whose text grew in Phase C Task 4, at 375 px: profile edit, the profile settings menu, the
     // report dialog (deck card overflow) and the post composer.
     for (const [name, view, steps] of DIALOGS) {
-      const { context, page } = await open(NARROW, `/app.html?view=${view}`);
+      const { context, page } = await openShot(NARROW, `/app.html?view=${view}`);
       await page.waitForTimeout(1500);
       for (const sel of steps) { await page.locator(sel).first().click({ timeout: 5000 }); await page.waitForTimeout(500); }
       await page.screenshot({ path: path.join(SHOTS, `app-${name}-375.png`) });
@@ -133,7 +139,7 @@ try {
     // (375 px). The ⚙ menu open at 375 px is app-settings-menu-375.png above.
     let finalShots = 0;
     for (const [tag, viewport] of [['375', NARROW], ['1440', WIDE]]) {
-      const { context, page } = await open(viewport);
+      const { context, page } = await openShot(viewport);
       await page.waitForTimeout(1500);
       await page.locator('[data-action="like"]').click({ timeout: 5000 });
       await page.waitForTimeout(600);
@@ -143,7 +149,7 @@ try {
     }
     st.messages = [{ id: 'msg-1', sender_id: A, recipient_id: ME_ID, body: 'Shall we play on Saturday?', created_at: new Date(Date.now() - 6e5).toISOString() }];
     {
-      const { context, page } = await open(NARROW, '/app.html?view=chat');
+      const { context, page } = await openShot(NARROW, '/app.html?view=chat');
       await page.waitForTimeout(1500);
       await page.locator('#chat-list [data-chat-id]').first().click({ timeout: 5000 });
       await page.waitForTimeout(600);
@@ -154,7 +160,7 @@ try {
     delete st.messages;
     {
       Object.assign(st, { onboarding: [false], onboardingCalls: 0, own: { ...NEW_MEMBER.own, adult_declared_at: new Date(Date.now() - 9e6).toISOString() } });
-      const context = await stub.newContext(browser, NARROW, { reducedMotion: 'reduce' });
+      const context = await stub.newContext(browser, NARROW, { reducedMotion: 'reduce', ...PHONE });
       const page = await context.newPage();
       await page.goto(`${stub.url}/app.html`, { waitUntil: 'domcontentloaded' });
       await page.waitForSelector('[data-under-review]', { timeout: 15000 });
@@ -169,7 +175,7 @@ try {
     for (const [name, member] of [['new', NEW_MEMBER], ['complete', COMPLETE_MEMBER]]) {
       useMember(member);
       for (const [tag, viewport] of [['375', NARROW], ['1440', WIDE]]) {
-        const { context, page } = await open(viewport, '/app.html?view=profile');
+        const { context, page } = await openShot(viewport, '/app.html?view=profile');
         await page.waitForTimeout(1500);
         await page.screenshot({ path: path.join(SHOTS, `app-profile-${name}-${tag}.png`), fullPage: true });
         await context.close();
@@ -182,7 +188,7 @@ try {
     for (const [tag, viewport] of [['375', NARROW], ['1440', WIDE]]) {
       st.routes = { 'rpc/deck_candidates': { delayMs: 6000 }, 'GET brivia_messages': { delayMs: 6000 }, 'GET community_posts': { delayMs: 6000 }, 'rpc/my_interests': { delayMs: 6000 } };
       for (const view of VIEWS) {
-        const { context, page } = await open(viewport, `/app.html?view=${view === 'home' ? 'explore' : view}`);
+        const { context, page } = await openShot(viewport, `/app.html?view=${view === 'home' ? 'explore' : view}`);
         await page.waitForTimeout(1200);
         await page.screenshot({ path: path.join(SHOTS, `app-loading-${view}-${tag}.png`) });
         await context.close();
@@ -191,7 +197,7 @@ try {
       delete st.routes;
       st.deckFail = true;
       {
-        const { context, page } = await open(viewport);
+        const { context, page } = await openShot(viewport);
         await page.waitForTimeout(1500);
         await page.screenshot({ path: path.join(SHOTS, `app-deck-error-${tag}.png`) });
         await context.close();
@@ -199,7 +205,7 @@ try {
       st.deckFail = false;
       st.matchIds = []; st.posts = [];
       {
-        const { context, page } = await open(viewport, '/app.html?view=posts');
+        const { context, page } = await openShot(viewport, '/app.html?view=posts');
         await page.waitForTimeout(1500);
         await page.screenshot({ path: path.join(SHOTS, `app-posts-empty-${tag}.png`) });
         await page.locator('#app-notification-button').click();
@@ -454,6 +460,91 @@ try {
       check(`375: re-tapping Profile on the profile reads my_interests no more and shows no skeleton; a new visit reads it once (${JSON.stringify({ again, flash, revisit })})`, () => {
         assert.equal(again, 0); assert.equal(flash, 0); assert.equal(revisit, 1);
       });
+      await context.close();
+    }
+
+    // Phase C polish (founder screenshot review). P1: a heading that takes focus from script (tabindex="-1", for screen
+    // readers) shows no ring, while a real control reached by Tab still does.
+    const focusRing = (page) => page.evaluate(() => {
+      const el = document.activeElement; const s = getComputedStyle(el);
+      return { el: `${el.tagName.toLowerCase()}${el.id ? `#${el.id}` : ''}`, style: s.outlineStyle, width: s.outlineWidth, ring: s.outlineStyle !== 'none' && parseFloat(s.outlineWidth) > 0 };
+    });
+    {
+      st.deckFail = true;
+      const { context, page } = await open(NARROW);
+      await page.waitForFunction(() => document.activeElement?.id === 'deck-empty-title', null, { timeout: 8000 }).catch(() => {});
+      await page.waitForTimeout(300);
+      const title = await focusRing(page);
+      await page.keyboard.press('Tab');
+      const tabbed = await focusRing(page);
+      check(`P1 375 deck 500: the focused title "Your deck could not load." shows no focus ring (${JSON.stringify(title)})`, () => {
+        assert.equal(title.el, 'h2#deck-empty-title'); assert.equal(title.ring, false);
+      });
+      check(`P1 375 deck 500: Tab to Try again shows a visible ring (${JSON.stringify(tabbed)})`, () => {
+        assert.equal(tabbed.el, 'button#deck-empty-action'); assert.equal(tabbed.ring, true); assert.ok(parseFloat(tabbed.width) >= 2);
+      });
+      // The chat heading takes script focus after a report from an open thread (F7); profile and posts h1 the same way.
+      const headings = [];
+      for (const [view, sel] of [['chat', '[data-view="chat"] .view-heading h1'], ['posts', '[data-view="posts"] h1'], ['profile', '[data-view="profile"] h1']]) {
+        await page.locator(`.app-tabbar [data-nav="${view}"]`).click();
+        await settle(page);
+        headings.push({ view, ...(await page.evaluate((s) => {
+          const h = [...document.querySelectorAll(s)].find((el) => el.getClientRects().length);
+          if (!h) return { found: false };
+          h.setAttribute('tabindex', '-1'); h.focus();
+          const cs = getComputedStyle(h);
+          return { found: document.activeElement === h, ring: cs.outlineStyle !== 'none' && parseFloat(cs.outlineWidth) > 0 };
+        }, sel)) });
+      }
+      check(`P1 375: chat, posts and profile headings focused from script show no ring (${JSON.stringify(headings)})`, () => headings.forEach((h) => { assert.equal(h.found, true, h.view); assert.equal(h.ring, false, h.view); }));
+      await context.close();
+      st.deckFail = false;
+    }
+    {
+      Object.assign(st, { onboarding: [false], onboardingCalls: 0, own: { ...NEW_MEMBER.own, adult_declared_at: new Date(Date.now() - 9e6).toISOString() } });
+      const context = await stub.newContext(browser, NARROW, { reducedMotion: 'reduce' });
+      const page = await context.newPage();
+      await page.goto(`${stub.url}/app.html`, { waitUntil: 'domcontentloaded' });
+      await page.waitForSelector('[data-under-review]', { timeout: 15000 }).catch(() => {});
+      await page.waitForTimeout(600);
+      const review = await focusRing(page);
+      await page.keyboard.press('Tab');
+      const tabbed = await focusRing(page);
+      check(`P1 375 under review: the focused h1 shows no ring; Tab to a control shows one (${JSON.stringify({ review, tabbed })})`, () => {
+        assert.equal(review.el, 'h1#under-review-title'); assert.equal(review.ring, false); assert.equal(tabbed.ring, true);
+      });
+      await context.close();
+      Object.assign(st, { onboarding: [true], onboardingCalls: 0 });
+      delete st.own;
+    }
+    // P3: at 375 px the Explore sort <select> keeps 16 px (no iOS zoom) but reads as a quiet control: regular weight,
+    // small caps like its SORT label, the row's height, and no shift when the value changes.
+    {
+      const { context, page } = await open(NARROW, '/app.html?view=posts');
+      await settle(page);
+      const sortState = () => page.evaluate(() => {
+        const sel = document.querySelector('#community-post-sort'); const s = getComputedStyle(sel);
+        const label = sel.closest('label'); const bar = document.querySelector('.community-feed-toolbar');
+        return { size: s.fontSize, weight: Number(s.fontWeight), caps: s.fontVariantCaps, transform: s.textTransform, height: sel.getBoundingClientRect().height, label: label.getBoundingClientRect().height, bar: bar.getBoundingClientRect().height };
+      });
+      const sort = await sortState();
+      await page.locator('#community-post-sort').selectOption('oldest');
+      await page.waitForTimeout(200);
+      const changed = await sortState();
+      check(`P3 375: the sort select is 16 px, regular weight, small caps, as tall as its row (${JSON.stringify(sort)})`, () => {
+        assert.equal(sort.size, '16px'); assert.ok(sort.weight <= 400); assert.match(sort.caps, /small-caps/); assert.equal(sort.transform, 'lowercase');
+        assert.ok(Math.abs(sort.height - sort.label) <= 1); assert.ok(sort.height <= 40);
+      });
+      check(`P3 375: changing the sort does not shift the toolbar (${JSON.stringify({ before: sort.bar, after: changed.bar })})`, () => assert.equal(changed.bar, sort.bar));
+      await context.close();
+    }
+    // P4: on a phone (mobile emulation: overlay scrollbars), the header avatar sits >= 8 px inside the right edge.
+    {
+      const context = await stub.newContext(browser, NARROW, { reducedMotion: 'reduce', isMobile: true, hasTouch: true });
+      const page = await stub.open(context, { errors: pageErrors });
+      await settle(page);
+      const edge = await page.evaluate(() => ({ right: document.querySelector('.app-topbar .app-avatar-button').getBoundingClientRect().right, client: document.documentElement.clientWidth }));
+      check(`P4 375 phone: the header avatar's right edge <= clientWidth - 8 (${JSON.stringify(edge)})`, () => assert.ok(edge.right <= edge.client - 8));
       await context.close();
     }
 

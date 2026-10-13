@@ -1676,6 +1676,30 @@ try {
     await page.waitForSelector('#auth-success:not([hidden])', { timeout: 10000 });
     const mark = await page.locator('#auth-success .auth-success-mark').getAttribute('aria-hidden');
     check(`.auth-success-mark is aria-hidden (got ${mark})`, () => assert.equal(mark, 'true'));
+    // Phase C polish (P2): the tick circle is the brand wine with a cream tick, >= 3:1 against the panel behind it; and
+    // P1: the success title, focused from script for screen readers, shows no focus ring.
+    await page.waitForTimeout(300);
+    const markLook = await page.evaluate(() => {
+      const rgb = (c) => (c.match(/[\d.]+/g) || []).slice(0, 4).map(Number);
+      const lum = ([r, g, b]) => { const f = (v) => { v /= 255; return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4; }; return 0.2126 * f(r) + 0.7152 * f(g) + 0.0722 * f(b); };
+      const ratio = (a, b) => { const [x, y] = [lum(a), lum(b)].sort((p, q) => q - p); return Math.round(((x + 0.05) / (y + 0.05)) * 100) / 100; };
+      const probe = document.createElement('i'); document.body.append(probe);
+      probe.style.color = 'var(--color-wine)'; const wine = getComputedStyle(probe).color;
+      probe.style.color = 'var(--color-cream)'; const cream = getComputedStyle(probe).color;
+      probe.remove();
+      const m = document.querySelector('#auth-success .auth-success-mark'); const s = getComputedStyle(m);
+      let behind = 'rgb(255, 255, 255)';
+      for (let el = m.parentElement; el; el = el.parentElement) { const bg = getComputedStyle(el).backgroundColor; if (rgb(bg)[3] !== 0 && bg !== 'transparent') { behind = bg; break; } }
+      const title = document.querySelector('[data-auth-success-title]'); const ts = getComputedStyle(title);
+      return { bg: s.backgroundColor, color: s.color, wine, cream, behind, vsPanel: ratio(rgb(s.backgroundColor), rgb(behind)), tick: ratio(rgb(s.color), rgb(s.backgroundColor)), titleFocused: document.activeElement === title, titleRing: ts.outlineStyle !== 'none' && parseFloat(ts.outlineWidth) > 0 };
+    });
+    check(`P2 375: .auth-success-mark is wine with a cream tick, >= 3:1 against the panel (${JSON.stringify(markLook)})`, () => {
+      assert.equal(markLook.bg, markLook.wine); assert.equal(markLook.color, markLook.cream);
+      assert.ok(markLook.vsPanel >= 3); assert.ok(markLook.tick >= 3);
+    });
+    check(`P1 375: "Check your email." is focused and shows no focus ring (${JSON.stringify({ focused: markLook.titleFocused, ring: markLook.titleRing })})`, () => {
+      assert.equal(markLook.titleFocused, true); assert.equal(markLook.titleRing, false);
+    });
     check('focus order 375: no uncaught page errors', () => assert.deepEqual(errors, []));
     await context.close();
   }
