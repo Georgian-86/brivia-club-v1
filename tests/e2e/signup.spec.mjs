@@ -48,15 +48,45 @@ const EXPIRED_COPY = "That code has expired. We've sent you a new one.";
 const CODE_RATE_COPY = 'Too many codes requested. Wait a minute, then tap Resend.';
 const EMAIL_RATE_COPY = "We can't send a code right now. Please try again in a few minutes.";
 const EXPIRED_RESEND_COPY = 'That code has expired. Tap Resend for a new one.';
+const EXPIRED_WAIT_COPY = 'That code has expired. Resend will be available in a moment.';
 
 const results = [];
 const check = (name, fn) => { try { fn(); results.push(['PASS', name]); } catch (error) { results.push(['FAIL', `${name}: ${error.message}`]); } };
 // A step that waits (a click, a screen change): its own named check, so a failure names the step and later checks run.
 const checkStep = async (name, fn) => { try { await fn(); results.push(['PASS', name]); return true; } catch (error) { results.push(['FAIL', `${name}: ${error.message}`]); return false; } };
 
-// Stubbed Supabase for one context. opts.otpStatus: statuses to answer the next /otp POSTs with (429), in order.
+// The taxonomy and places the stub serves (Task 4). 14 public interests (so a 13th pick can be refused) and one private.
+const nodes = [
+  ['sports', 'Sports and fitness'], ['sports.racket', 'Racket sports'], ['sports.racket.tennis', 'Tennis'], ['sports.racket.badminton', 'Badminton'],
+  ['sports.racket.squash', 'Squash'], ['sports.racket.padel', 'Padel'], ['sports.team', 'Team sports'], ['sports.team.cricket', 'Cricket'],
+  ['sports.team.football', 'Football'], ['sports.team.basketball', 'Basketball'],
+  ['games', 'Games and puzzles'], ['games.board', 'Board games'], ['games.board.chess', 'Chess'], ['games.board.chess.blitz', 'Blitz chess'],
+  ['games.board.go', 'Go'], ['games.video', 'Video games'], ['games.video.indie', 'Indie games'],
+  ['music', 'Music'], ['music.listening', 'Listening'], ['music.listening.jazz', 'Jazz'], ['music.listening.indie_rock', 'Indie rock'],
+  ['music.listening.classical', 'Classical music'],
+  ['wellbeing', 'Wellbeing'], ['wellbeing.spirituality', 'Spirituality'], ['wellbeing.spirituality.scripture_study', 'Scripture study'],
+].map(([id, label]) => ({ id, parent_id: id.includes('.') ? id.replace(/\.[^.]+$/, '') : null, level: id.split('.').length, label, sensitive: id === 'wellbeing.spirituality.scripture_study' }));
+const PUBLIC_IDS = nodes.filter((n) => n.level >= 3 && !n.sensitive).map((n) => n.id);
+const PRIVATE_ID = 'wellbeing.spirituality.scripture_study';
+const places = [
+  { id: 'in-bengaluru', name: 'Bengaluru', region: 'Karnataka', country: 'India' },
+  { id: 'in-pune', name: 'Pune', region: 'Maharashtra', country: 'India' },
+];
+
+// Stubbed Supabase for one context, with the member's own state. opts.otpStatus: statuses to answer the next /otp POSTs
+// with (429), in order. Task 4: opts.profile (own row; default none: a new account has no row until 18+), opts.hasCell,
+// opts.fail ({ declare_adult | profiles | set_home_city | set_home_location | set_member_interests: [500, …] }),
+// opts.deckRows (deck_candidates answer).
 const stubContext = async (context, opts = {}) => {
   const otpStatus = [...(opts.otpStatus || [])];
+  const fail = Object.fromEntries(Object.entries(opts.fail || {}).map(([k, v]) => [k, [...v]]));
+  const state = {
+    profile: opts.profile ? { id: ME, email: EMAIL, ...opts.profile } : null,
+    hasCell: Boolean(opts.hasCell),
+    placeLabel: opts.hasCell ? 'Pune' : null,
+    interests: [],
+    consent: false,
+  };
   const calls = [];
   await context.route(`${ORIGIN}/**`, async (route) => {
     const request = route.request();
@@ -67,6 +97,8 @@ const stubContext = async (context, opts = {}) => {
     calls.push({ method, path: p, url: request.url(), body });
     const headers = { 'access-control-allow-origin': '*' };
     const json = (status, payload) => route.fulfill({ status, contentType: 'application/json', body: JSON.stringify(payload), headers });
+    const noContent = () => route.fulfill({ status: 204, body: '', headers });
+    const boom = (key) => (fail[key]?.length ? fail[key].shift() : 0);
     if (method === 'OPTIONS') return route.fulfill({ status: 204, headers: { ...headers, 'access-control-allow-headers': '*', 'access-control-allow-methods': '*' } });
     if (p === '/auth/v1/otp') {
       if (otpStatus.shift() === 429) return json(429, { code: 'over_email_send_rate_limit', message: 'email rate limit exceeded' });
@@ -81,14 +113,65 @@ const stubContext = async (context, opts = {}) => {
     }
     if (p === '/auth/v1/authorize') return route.fulfill({ status: 200, contentType: 'text/html', body: '<!doctype html><title>google</title><p id="stub-google">google</p>' });
     if (p === '/auth/v1/logout') return route.fulfill({ status: 204, headers });
-    if (p === '/auth/v1/user') return json(200, user);
+    if (p === '/auth/v1/user') return json(200, opts.user || user);
     if (p.startsWith('/auth/v1/')) return json(200, session);
     const wantsObject = (request.headers().accept || '').includes('vnd.pgrst.object');
+    const rows = (row) => json(200, wantsObject ? row : (row ? [row] : []));
     if (p === '/rest/v1/profiles') {
-      const row = { id: ME, name: 'New Member', email: EMAIL, adult_declared_at: null };
-      return json(200, wantsObject ? row : [row]);
+      if (method === 'POST') {
+        if (boom('profiles')) return json(500, { code: 'XX000', message: 'boom' });
+        state.profile = { ...JSON.parse(body || '{}'), adult_declared_at: null };
+        return json(201, wantsObject ? state.profile : [state.profile]);
+      }
+      if (method === 'PATCH') {
+        if (boom('profiles')) return json(500, { code: 'XX000', message: 'boom' });
+        if (!state.profile) return rows(null);
+        Object.assign(state.profile, JSON.parse(body || '{}'));
+        return rows(state.profile);
+      }
+      return rows(state.profile ? { name: 'New Member', adult_declared_at: null, ...state.profile } : null);
     }
-    if (p === '/rest/v1/rpc/my_onboarding_status') return json(200, [{ interests: 0, points: 0, has_cell: false, place_label: null, completed: false }]);
+    const rpc = (name) => p === `/rest/v1/rpc/${name}`;
+    if (rpc('declare_adult')) {
+      if (boom('declare_adult')) return json(500, { code: 'XX000', message: 'boom' });
+      if (!state.profile) return json(404, { code: 'P0002', message: 'profile required' });
+      if (JSON.parse(body || '{}').p_notice_version !== '2026-10-20') return json(400, { code: '22023', message: 'stale notice version' });
+      state.profile.adult_declared_at ||= new Date().toISOString();
+      return noContent();
+    }
+    if (['set_home_location', 'set_home_city', 'set_member_interests'].some(rpc) && !state.profile?.adult_declared_at) return json(400, { code: 'P0001', message: 'adult declaration required' });
+    if (rpc('set_home_location')) {
+      if (boom('set_home_location')) return json(500, { code: 'XX000', message: 'boom' });
+      state.hasCell = true; state.placeLabel = 'Bengaluru';
+      return json(200, 'Bengaluru');
+    }
+    if (rpc('set_home_city')) {
+      if (boom('set_home_city')) return json(500, { code: 'XX000', message: 'boom' });
+      const place = places.find((pl) => pl.id === JSON.parse(body || '{}').p_place_id);
+      if (!place) return json(400, { code: '22023', message: 'invalid place' });
+      state.hasCell = true; state.placeLabel = place.name;
+      return json(200, place.name);
+    }
+    if (rpc('set_member_interests')) {
+      if (boom('set_member_interests')) return json(500, { code: 'XX000', message: 'boom' });
+      const items = JSON.parse(body || '{}').p_items || [];
+      if (items.reduce((sum, i) => sum + i.points, 0) !== 20) return json(400, { code: '22023', message: 'invalid interests' });
+      if (!state.consent && items.some((i) => i.interest_id === PRIVATE_ID)) return json(400, { code: '22023', message: 'sensitive consent required' });
+      state.interests = items;
+      return noContent();
+    }
+    if (rpc('set_sensitive_consent')) { state.consent = JSON.parse(body || '{}').p_consent === true; return noContent(); }
+    if (rpc('my_onboarding_status')) {
+      const points = state.interests.reduce((sum, i) => sum + i.points, 0);
+      const named = state.profile && !['', 'New Member'].includes(String(state.profile.name || '').trim());
+      return json(200, [{ interests: state.interests.length, points, has_cell: state.hasCell, place_label: state.placeLabel, completed: Boolean(named && state.profile.adult_declared_at && state.hasCell && points === 20) }]);
+    }
+    if (rpc('deck_candidates')) return json(200, opts.deckRows || []);
+    if (p === '/rest/v1/interest_node') return json(200, nodes);
+    if (p === '/rest/v1/place') {
+      const q = ((url.searchParams.get('or') || '').match(/name\.ilike\.\*([^*]*)\*/) || [])[1] || '';
+      return json(200, places.filter((pl) => !q || pl.name.toLowerCase().includes(q.toLowerCase())));
+    }
     if (p.startsWith('/rest/v1/')) return json(200, []);
     return json(200, {});
   });
@@ -109,8 +192,12 @@ const stubContext = async (context, opts = {}) => {
     };
     Object.defineProperty(window, 'visualViewport', { configurable: true, get: () => vv });
   });
+  if (opts.signedIn) {
+    await context.addInitScript(([key, value]) => { if (!sessionStorage.getItem('seeded')) { localStorage.setItem(key, value); sessionStorage.setItem('seeded', '1'); } }, ['sb-stub-auth-token', JSON.stringify(opts.signedIn)]);
+  }
   const posts = (p) => calls.filter((c) => c.method === 'POST' && c.path === p);
-  return { calls, posts };
+  const patches = (p) => calls.filter((c) => c.method === 'PATCH' && c.path === p);
+  return { calls, posts, patches, state };
 };
 
 const newPage = async (context) => {
@@ -166,7 +253,12 @@ const a11yScreen = async (page, tag) => {
   const sideways = await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1);
   check(`${tag}: no sideways scroll`, () => assert.ok(sideways));
 };
-const shot = async (page, name) => { if (SHOTS) await page.screenshot({ path: path.join(SHOTS, name) }); };
+// The pointer is parked in a corner first, so a button the test just clicked is not shown in its hover state.
+const shot = async (page, name, { now = false } = {}) => {
+  if (!SHOTS) return;
+  if (!now) { await page.mouse.move(1, 1); await page.waitForTimeout(200); }
+  await page.screenshot({ path: path.join(SHOTS, name) });
+};
 
 const openGuided = async (page) => {
   await page.goto(`${BASE}/auth.html#signup`, { waitUntil: 'domcontentloaded' });
@@ -180,6 +272,29 @@ const toCode = async (page) => {
   await page.locator('#signup-email').press('Enter');
   await waitTitle(page, 'Enter the code');
 };
+
+// Task 4 helpers. A member signed in with 18+, name and area done resumes at Interests.
+const toInterests = async (page) => {
+  await openGuided(page);
+  await buttonByText(page, 'Continue').first().click();
+  await waitTitle(page, 'What are you into?');
+};
+// Shows the chip's domain, then taps it (unless click is false).
+// force: a full tray marks the other chips aria-disabled (they still answer a tap with the cap message).
+const pickChip = async (page, id, { click = true, settle = 0, force = false } = {}) => {
+  const domain = page.locator(`#guided-signup [data-domain="${id.split('.')[0]}"]`);
+  if ((await domain.getAttribute('aria-pressed')) !== 'true') await domain.click();
+  if (click) await page.locator(`#guided-signup [data-interest-id="${id}"]`).click({ force });
+  if (settle) await page.waitForTimeout(settle);
+};
+const trayState = (page) => page.evaluate(() => ({
+  count: document.querySelector('#guided-signup [data-tray-count]')?.textContent.trim(),
+  picks: [...document.querySelectorAll('#guided-signup [data-pick-id]')].map((el) => el.textContent.trim()),
+  pressed: [...document.querySelectorAll('#guided-signup [data-interest-id][aria-pressed="true"]')].map((el) => el.dataset.interestId),
+  live: document.querySelector('#guided-signup .gs-tray [aria-live="polite"]')?.textContent.trim(),
+  clones: document.querySelectorAll('#guided-signup .it-fly').length,
+  next: document.querySelector('#guided-signup .gs-primary')?.disabled,
+}));
 
 const startVite = (methods) => spawn('npx', ['vite', '--port', String(PORT), '--strictPort', '--host', '127.0.0.1'], {
   cwd: repoRoot,
@@ -251,7 +366,7 @@ try {
         const overlap = Boolean(step && close && step.l < close.r && close.l < step.r && step.t < close.b && close.t < step.b);
         return { step, close, overlap };
       });
-      check(`${w}: the step label and the page's × close button do not overlap (${JSON.stringify(clash)})`, () => { assert.ok(clash.step, 'step label shown'); assert.equal(clash.overlap, false); });
+      check(`${w}: the step label and the page's × close button do not overlap (${JSON.stringify(clash)})`, () => { assert.ok(clash.step, 'step label shown'); assert.ok(clash.close, 'the × close button exists and is visible'); assert.equal(clash.overlap, false); });
       const helper = await page.locator('#guided-signup').textContent();
       check(`${w}: Email helper copy`, () => assert.match(helper, /We'll send you a 6-digit code\. No password needed\./));
       const emailField = await page.locator('#signup-email').evaluate((el) => ({ type: el.type, ac: el.autocomplete, size: parseFloat(getComputedStyle(el).fontSize), h: el.getBoundingClientRect().height }));
@@ -414,8 +529,9 @@ try {
         await page.waitForFunction((t) => document.querySelector('#guided-signup [role="alert"]')?.textContent === t, copy, { timeout: 5000 }).catch(() => {});
         return page.evaluate(() => ({ alert: document.querySelector('#guided-signup [role="alert"]')?.textContent, inBoxes: Boolean(document.activeElement?.closest('.gs-otp')) }));
       };
-      const early = await typeCode(EXPIRED, EXPIRED_RESEND_COPY);
-      check(`an expired code inside the resend wait sends nothing and says "${EXPIRED_RESEND_COPY}" (${JSON.stringify(early)}, otp POSTs ${stub.posts('/auth/v1/otp').length})`, () => { assert.equal(early.alert, EXPIRED_RESEND_COPY); assert.equal(stub.posts('/auth/v1/otp').length, 1); assert.ok(early.inBoxes); });
+      const early = await typeCode(EXPIRED, EXPIRED_WAIT_COPY);
+      const resendLocked = await page.locator('[data-signup-resend]').isDisabled();
+      check(`an expired code inside the resend wait sends nothing and, with Resend still disabled, says "${EXPIRED_WAIT_COPY}" (${JSON.stringify(early)}, otp POSTs ${stub.posts('/auth/v1/otp').length})`, () => { assert.equal(early.alert, EXPIRED_WAIT_COPY); assert.ok(resendLocked); assert.ok(!early.alert.includes('Tap Resend')); assert.equal(stub.posts('/auth/v1/otp').length, 1); assert.ok(early.inBoxes); });
       await context.clock.fastForward(61000);
       const sent = await typeCode('998888', EXPIRED_COPY);  // a different code: the one that just failed is never re-sent
       check(`an expired code after the wait shows "${EXPIRED_COPY}" and sends a new one (${JSON.stringify(sent)}, otp POSTs ${stub.posts('/auth/v1/otp').length})`, () => { assert.equal(sent.alert, EXPIRED_COPY); assert.equal(stub.posts('/auth/v1/otp').length, 2); assert.ok(sent.inBoxes); });
@@ -517,6 +633,384 @@ try {
       check(`Continue with Google starts the Google sign-in, back to auth.html (${reqUrl?.search || 'no request'})`, () => { assert.ok(reqUrl); assert.equal(reqUrl.searchParams.get('provider'), 'google'); assert.match(reqUrl.searchParams.get('redirect_to') || '', /\/auth\.html$/); });
       check(`google: no uncaught page errors (${errors.join(' | ')})`, () => assert.deepEqual(errors, []));
       void stub;
+      await context.close();
+    }
+
+    // ---- Task 4: the profile screens (18+, Name, Area, Interests, Reveal) -------------------------------------------
+    // 5. The whole email path after verify, at 1440 and 375: 18+ Yes (declare_adult with the notice version), Name saves,
+    //    a city saves once, the interest picks fly into the tray, Next saves the even split, Reveal names a shared pick.
+    for (const w of [1440, 375]) {
+      const context = await browser.newContext({ viewport: { width: w, height: w === 375 ? 812 : 900 } });
+      const deckRows = [{ id: '22222222-2222-4222-8222-222222222222', name: 'Mira', shared_interests: [] }, { id: '33333333-3333-4333-8333-333333333333', name: 'Kai', shared_interests: ['Jazz', 'Chess'] }];
+      const stub = await stubContext(context, { signedIn: session, deckRows });
+      const { page, errors } = await newPage(context);
+      const flowText = [];
+      const grab = async () => flowText.push(await page.locator('#guided-signup').textContent());
+      await openGuided(page);
+      await checkStep(`${w}: a signed-in member continues to 18+`, async () => {
+        await buttonByText(page, 'Continue').first().click();
+        await waitTitle(page, 'Are you 18 or older?');
+      });
+      const adultUi = { yes: await isVisible(page, '#guided-signup .gs-primary:has-text("Yes, I\'m 18 or older")'), no: await isVisible(page, '#guided-signup button:text-is("No")'), step: await stepText(page) };
+      check(`${w}: 18+ offers "Yes, I'm 18 or older" (primary) and "No" (${JSON.stringify(adultUi)})`, () => { assert.ok(adultUi.yes); assert.ok(adultUi.no); assert.equal(adultUi.step, 'Step 3 of 6'); });
+      await a11yScreen(page, `${w} adult`);
+      await shot(page, `signup-${w}-adult.png`);
+      await grab();
+      await checkStep(`${w}: 18+ Yes shows Name`, async () => {
+        await buttonByText(page, "Yes, I'm 18 or older").click();
+        await waitTitle(page, 'What should members call you?');
+      });
+      const declared = stub.posts('/rest/v1/rpc/declare_adult').map((c) => JSON.parse(c.body || '{}'));
+      const created = stub.posts('/rest/v1/profiles').map((c) => JSON.parse(c.body || '{}'));
+      check(`${w}: 18+ Yes creates the own profile row, then calls declare_adult with NOTICE_VERSION 2026-10-20 (${JSON.stringify(declared)})`, () => {
+        assert.deepEqual(declared, [{ p_notice_version: '2026-10-20' }]);
+        assert.equal(created.length, 1);
+        assert.equal(created[0].id, ME);
+        for (const key of ['phone', 'gender', 'phone_number']) assert.ok(!(key in created[0]), key);
+      });
+      const nameUi = await page.evaluate(() => ({ help: document.querySelector('#guided-signup').textContent.includes('Members see this name.'), value: document.querySelector('#signup-name')?.value, ac: document.querySelector('#signup-name')?.autocomplete }));
+      check(`${w}: Name shows the helper and an empty field on the email path (${JSON.stringify(nameUi)})`, () => { assert.ok(nameUi.help); assert.equal(nameUi.value, ''); assert.equal(nameUi.ac, 'name'); });
+      await a11yScreen(page, `${w} name`);
+      await shot(page, `signup-${w}-name.png`);
+      await grab();
+      await page.locator('#signup-name').press('Enter');
+      await page.waitForTimeout(300);
+      check(`${w}: an empty name saves nothing`, () => assert.equal(stub.patches('/rest/v1/profiles').length, 0));
+      await page.locator('#signup-name').fill('Ada Lovelace');
+      await checkStep(`${w}: Name saves on Enter and shows Area`, async () => {
+        await page.locator('#signup-name').press('Enter');
+        await waitTitle(page, 'Where are you based?');
+      });
+      const named = stub.patches('/rest/v1/profiles').map((c) => JSON.parse(c.body || '{}'));
+      check(`${w}: the name is saved to the own row (${JSON.stringify(named)})`, () => { assert.equal(named.length, 1); assert.equal(named[0].name, 'Ada Lovelace'); });
+      const areaHelp = await page.locator('#guided-signup').textContent();
+      check(`${w}: Area helper copy`, () => assert.ok(areaHelp.includes('We show people near you first. Members only ever see a rounded distance.')));
+      await a11yScreen(page, `${w} area`);
+      await shot(page, `signup-${w}-area.png`);
+      await grab();
+      await page.locator('#guided-signup [data-area-city]').click();
+      await page.locator('#signup-area-city-search').fill('Pun');
+      await page.waitForSelector('#guided-signup .area-city-option', { timeout: 5000 });
+      await page.locator('#guided-signup .area-city-option', { hasText: 'Pune' }).click();
+      await shot(page, `signup-${w}-area-city.png`);
+      await a11yScreen(page, `${w} area city picked`);
+      await checkStep(`${w}: Area Continue shows Interests`, async () => {
+        await page.locator('#guided-signup .gs-primary').click();
+        await waitTitle(page, 'What are you into?');
+      });
+      const city = stub.posts('/rest/v1/rpc/set_home_city').map((c) => JSON.parse(c.body || '{}'));
+      check(`${w}: picking a city calls set_home_city once (${JSON.stringify(city)})`, () => assert.deepEqual(city, [{ p_place_id: 'in-pune' }]));
+      const intro = await page.evaluate(() => ({
+        help: document.querySelector('#guided-signup').textContent.includes('Pick what you genuinely care about. 3–6 works best.'),
+        label: document.querySelector('#guided-signup .gs-tray')?.textContent.includes('Your picks'),
+        count: document.querySelector('#guided-signup [data-tray-count]')?.textContent.trim(),
+        live: document.querySelector('#guided-signup .gs-tray [aria-live="polite"]') !== null,
+        next: document.querySelector('#guided-signup .gs-primary')?.disabled,
+      }));
+      check(`${w}: Interests shows the helper, a "Your picks" tray (live region) at "0 picked", and Next disabled (${JSON.stringify(intro)})`, () => { assert.ok(intro.help); assert.ok(intro.label); assert.equal(intro.count, '0 picked'); assert.ok(intro.live); assert.equal(intro.next, true); });
+      await a11yScreen(page, `${w} interests`);
+      await shot(page, `signup-${w}-interests.png`);
+      // A tap: the clone flies (a transform at 100 ms), then the chip is pressed and the tray says "1 picked".
+      await pickChip(page, 'sports.racket.tennis', { click: false });
+      await page.locator('#guided-signup [data-interest-id="sports.racket.tennis"]').click();
+      await page.waitForTimeout(100);
+      const mid = await page.evaluate(() => [...document.querySelectorAll('#guided-signup .it-fly')].map((el) => getComputedStyle(el).transform));
+      await shot(page, `signup-${w}-interests-mid-pick.png`, { now: true });
+      check(`${w}: a cloned chip animates during the pick (transform at 100 ms: ${mid.join(', ')})`, () => { assert.equal(mid.length, 1); assert.notEqual(mid[0], 'none'); assert.notEqual(mid[0], 'matrix(1, 0, 0, 1, 0, 0)'); });
+      await page.waitForTimeout(SETTLE);
+      const one = await trayState(page);
+      check(`${w}: the chip is in the tray ("1 picked"), aria-pressed=true, and the tray announced it (${JSON.stringify(one)})`, () => {
+        assert.equal(one.count, '1 picked'); assert.deepEqual(one.picks, ['Tennis']); assert.deepEqual(one.pressed, ['sports.racket.tennis']); assert.equal(one.live, 'Tennis added'); assert.equal(one.clones, 0); assert.equal(one.next, false);
+      });
+      await page.locator('#guided-signup [data-pick-id="sports.racket.tennis"]').click();
+      await page.waitForTimeout(SETTLE);
+      const none = await trayState(page);
+      check(`${w}: tapping it in the tray removes it (${JSON.stringify(none)})`, () => { assert.equal(none.count, '0 picked'); assert.deepEqual(none.picks, []); assert.deepEqual(none.pressed, []); assert.equal(none.live, 'Tennis removed'); assert.equal(none.next, true); });
+      for (const id of ['sports.racket.tennis', 'games.board.chess', 'music.listening.jazz', 'games.board.go']) { await pickChip(page, id); await page.waitForTimeout(SETTLE); }
+      const four = await trayState(page);
+      check(`${w}: four picks in pick order (${JSON.stringify(four)})`, () => { assert.equal(four.count, '4 picked'); assert.deepEqual(four.picks, ['Tennis', 'Chess', 'Jazz', 'Go']); });
+      await a11yScreen(page, `${w} interests 4 picks`);
+      await shot(page, `signup-${w}-interests-4-picks.png`);
+      if (w === 375) {
+        const strip = await page.evaluate(() => {
+          const tray = document.querySelector('#guided-signup .gs-tray').getBoundingClientRect();
+          const primary = document.querySelector('#guided-signup .gs-primary').getBoundingClientRect();
+          return { trayBottom: Math.round(tray.bottom), primaryTop: Math.round(primary.top), fixed: getComputedStyle(document.querySelector('#guided-signup .gs-actions')).position };
+        });
+        check(`375: the tray is a sticky strip right above the pinned button (${JSON.stringify(strip)})`, () => { assert.equal(strip.fixed, 'fixed'); assert.ok(strip.trayBottom <= strip.primaryTop + 1); assert.ok(strip.primaryTop - strip.trayBottom < 40); });
+        // The page under the auth card can scroll; the pinned bar stays at the bottom of the screen.
+        const pinned = await page.evaluate(async () => {
+          window.scrollTo(0, 80);
+          await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+          const bar = document.querySelector('#guided-signup .gs-actions').getBoundingClientRect();
+          const out = { scrolled: Math.round(window.scrollY), bottom: Math.round(bar.bottom), screen: window.innerHeight };
+          window.scrollTo(0, 0);
+          return out;
+        });
+        check(`375: the pinned bar stays at the bottom of the screen when the page scrolls (${JSON.stringify(pinned)})`, () => { assert.ok(pinned.scrolled > 0, 'the page scrolled'); assert.equal(pinned.bottom, pinned.screen); });
+      } else {
+        const side = await page.evaluate(() => {
+          const tray = document.querySelector('#guided-signup .gs-tray').getBoundingClientRect();
+          const cat = document.querySelector('#guided-signup .gs-catalog').getBoundingClientRect();
+          return { trayLeft: Math.round(tray.left), catRight: Math.round(cat.right), trayTop: Math.round(tray.top), catTop: Math.round(cat.top) };
+        });
+        check(`1440: the tray sits beside the catalogue (${JSON.stringify(side)})`, () => assert.ok(side.trayLeft >= side.catRight - 1));
+      }
+      // The selected chip itself also removes (Go), leaving three picks.
+      await page.locator('#guided-signup [data-interest-id="games.board.go"]').click();
+      await page.waitForTimeout(SETTLE);
+      await grab();
+      await checkStep(`${w}: Interests Next shows the Reveal`, async () => {
+        await page.locator('#guided-signup .gs-primary').click();
+        await waitTitle(page, "You're in, Ada.");
+      });
+      const saved = stub.posts('/rest/v1/rpc/set_member_interests').map((c) => JSON.parse(c.body || '{}').p_items);
+      check(`${w}: Next calls set_member_interests with the even split 7,7,6 and mode play (${JSON.stringify(saved)})`, () => assert.deepEqual(saved, [[
+        { interest_id: 'sports.racket.tennis', points: 7, mode: 'play' }, { interest_id: 'games.board.chess', points: 7, mode: 'play' }, { interest_id: 'music.listening.jazz', points: 6, mode: 'play' },
+      ]]));
+      const reveal = await page.evaluate(() => ({ text: document.querySelector('#guided-signup .gs-host').textContent.replace(/\s+/g, ' ').trim(), back: Boolean(document.querySelector('#guided-signup [data-signup-back]:not([hidden])')), step: document.querySelector('#guided-signup [data-signup-step]').textContent }));
+      check(`${w}: Reveal names the first shared pick, has no Back and no step label, and contains no digits (${JSON.stringify(reveal)})`, () => {
+        assert.ok(reveal.text.includes('People near you are into Chess. Your deck is ready.'));
+        assert.ok(!/\d/.test(reveal.text), 'no member count');
+        assert.equal(reveal.back, false);
+        assert.equal(reveal.step, '');
+      });
+      await a11yScreen(page, `${w} reveal`);
+      await shot(page, `signup-${w}-reveal-shared.png`);
+      await grab();
+      check(`${w}: no points, stepper or "points left" text anywhere in the flow`, () => {
+        for (const t of flowText) { assert.ok(!/points?\b/i.test(t), t.slice(0, 80)); assert.ok(!/points left/i.test(t)); }
+      });
+      const steppers = await page.locator('#guided-signup .budget-step, #guided-signup [data-budget-points]').count();
+      check(`${w}: no stepper controls in the guided flow`, () => assert.equal(steppers, 0));
+      await checkStep(`${w}: See my deck goes to /app.html`, async () => {
+        await buttonByText(page, 'See my deck').click();
+        await page.waitForURL(/\/app\.html/, { timeout: 8000 });
+      });
+      check(`${w}: profile flow has no uncaught page errors (${errors.join(' | ')})`, () => assert.deepEqual(errors, []));
+      await context.close();
+    }
+
+    // 6. Google: the name is prefilled from full_name; "Use my location" sends coordinates only in the POST body; a deck
+    //    with no shared interest gives the "one of the first" Reveal.
+    {
+      const context = await browser.newContext({ viewport: { width: 1440, height: 900 }, geolocation: { latitude: 12.971598, longitude: 77.594566 }, permissions: ['geolocation'] });
+      const gUser = { ...user, user_metadata: { full_name: 'Grace Hopper', name: 'Grace Hopper' }, app_metadata: { provider: 'google' } };
+      const stub = await stubContext(context, { signedIn: { ...session, user: gUser }, user: gUser, profile: { name: 'New Member', adult_declared_at: '2026-10-13T00:00:00Z' }, deckRows: [{ id: '22222222-2222-4222-8222-222222222222', shared_interests: [] }] });
+      const { page, errors } = await newPage(context);
+      await openGuided(page);
+      await checkStep('google: Continue resumes at Name', async () => {
+        await buttonByText(page, 'Continue').first().click();
+        await waitTitle(page, 'What should members call you?');
+      });
+      const pre = await page.evaluate(() => ({ value: document.querySelector('#signup-name')?.value, step: document.querySelector('#guided-signup [data-signup-step]').textContent }));
+      check(`google: Name is prefilled from Google full_name, "Step 2 of 4" (${JSON.stringify(pre)})`, () => { assert.equal(pre.value, 'Grace Hopper'); assert.equal(pre.step, 'Step 2 of 4'); });
+      await checkStep('google: Name saves and shows Area', async () => {
+        await buttonByText(page, 'Continue').first().click();
+        await waitTitle(page, 'Where are you based?');
+      });
+      check('google: the prefilled name is saved', () => assert.equal(JSON.parse(stub.patches('/rest/v1/profiles')[0]?.body || '{}').name, 'Grace Hopper'));
+      await page.locator('#guided-signup [data-area-geo]').click();
+      await page.waitForFunction(() => /Got it/.test(document.querySelector('#guided-signup [data-area-status]')?.textContent || ''), null, { timeout: 8000 }).catch(() => {});
+      await shot(page, 'signup-1440-area-geo.png');
+      await checkStep('google: Area (location) Continue shows Interests', async () => {
+        await page.locator('#guided-signup .gs-primary').click();
+        await waitTitle(page, 'What are you into?');
+      });
+      const loc = stub.posts('/rest/v1/rpc/set_home_location');
+      const leaks = stub.calls.filter((c) => /12\.97|77\.59/.test(c.url));
+      const stored = await page.evaluate(() => JSON.stringify({ ...localStorage }) + JSON.stringify({ ...sessionStorage }) + location.href + document.body.innerHTML);
+      check(`google: geolocation calls set_home_location with coordinates only in the POST body (${loc.map((c) => c.body).join(' | ')})`, () => {
+        assert.equal(loc.length, 1);
+        assert.deepEqual(JSON.parse(loc[0].body), { lat: 12.971598, lng: 77.594566 });
+        assert.equal(leaks.length, 0, 'no coordinates in any URL');
+        assert.ok(!/12\.97|77\.59/.test(stored), 'no coordinates in storage, the URL or the DOM');
+      });
+      await pickChip(page, 'sports.racket.padel');
+      await page.waitForTimeout(SETTLE);
+      await checkStep('google: Interests Next shows the Reveal', async () => {
+        await page.locator('#guided-signup .gs-primary').click();
+        await waitTitle(page, "You're in, Grace.");
+      });
+      const text = (await page.locator('#guided-signup .gs-host').textContent()).replace(/\s+/g, ' ');
+      check(`google: with no shared interest the Reveal says "You're one of the first in Bengaluru…" and has no digits (${text})`, () => {
+        assert.ok(text.includes("You're one of the first in Bengaluru. We'll bring people to you as the club grows."));
+        assert.ok(!/\d/.test(text));
+      });
+      check('google: one pick saves 20 points', () => assert.deepEqual(JSON.parse(stub.posts('/rest/v1/rpc/set_member_interests')[0]?.body || '{}').p_items, [{ interest_id: 'sports.racket.padel', points: 20, mode: 'play' }]));
+      await a11yScreen(page, '1440 reveal first');
+      await shot(page, 'signup-1440-reveal-first.png');
+      check(`google profile: no uncaught page errors (${errors.join(' | ')})`, () => assert.deepEqual(errors, []));
+      await context.close();
+    }
+    {
+      const context = await browser.newContext({ viewport: { width: 375, height: 812 } });
+      await stubContext(context, { signedIn: session, profile: { name: 'Ada', adult_declared_at: '2026-10-13T00:00:00Z' }, hasCell: true });
+      const { page } = await newPage(context);
+      await toInterests(page);
+      await pickChip(page, 'sports.racket.tennis');
+      await page.waitForTimeout(SETTLE);
+      await page.locator('#guided-signup .gs-primary').click();
+      await waitTitle(page, "You're in, Ada.");
+      await shot(page, 'signup-375-reveal-first.png');
+      await context.close();
+    }
+
+    // 7. 18+ "No": the adults-only copy, and the member is signed out.
+    {
+      const context = await browser.newContext({ viewport: { width: 375, height: 812 } });
+      const stub = await stubContext(context, { signedIn: session });
+      const { page, errors } = await newPage(context);
+      await openGuided(page);
+      await buttonByText(page, 'Continue').first().click();
+      await waitTitle(page, 'Are you 18 or older?');
+      await page.locator('#guided-signup button:text-is("No")').click();
+      await page.waitForFunction(() => document.querySelector('#guided-signup')?.textContent.includes("Brivia Club is for adults. Come back when you're 18."), null, { timeout: 5000 }).catch(() => {});
+      await page.waitForTimeout(SETTLE);
+      const after = await page.evaluate(() => ({ text: document.querySelector('#guided-signup').textContent, back: Boolean(document.querySelector('#guided-signup [data-signup-back]:not([hidden])')), token: localStorage.getItem('sb-stub-auth-token') }));
+      check(`No signs out with the adults-only copy (${JSON.stringify({ ...after, text: after.text.slice(0, 120) })})`, () => {
+        assert.ok(after.text.includes("Brivia Club is for adults. Come back when you're 18."));
+        assert.equal(stub.posts('/auth/v1/logout').length, 1);
+        assert.equal(after.token, null);
+        assert.equal(after.back, false);
+        assert.equal(stub.posts('/rest/v1/rpc/declare_adult').length, 0);
+      });
+      await a11yScreen(page, '375 adult no');
+      await shot(page, 'signup-375-adult-no.png');
+      check(`adult no: no uncaught page errors (${errors.join(' | ')})`, () => assert.deepEqual(errors, []));
+      await context.close();
+    }
+
+    // 8. Each save failure (500) keeps the screen, shows a retry message, and leaves no busy button; the retry works.
+    {
+      const context = await browser.newContext({ viewport: { width: 375, height: 812 } });
+      const stub = await stubContext(context, { signedIn: session, fail: { declare_adult: [500], profiles: [0, 500], set_home_city: [500], set_member_interests: [500] } });
+      const { page, errors } = await newPage(context);
+      await openGuided(page);
+      await buttonByText(page, 'Continue').first().click();
+      await waitTitle(page, 'Are you 18 or older?');
+      const failed = async (tag, titleText, press) => {
+        await press();
+        await page.waitForFunction(() => (document.querySelector('#guided-signup #signup-error')?.textContent || '').length > 0, null, { timeout: 8000 }).catch(() => {});
+        await page.waitForTimeout(300);
+        const st = await page.evaluate(() => {
+          const b = document.querySelector('#guided-signup .gs-primary');
+          return { title: document.querySelector('#signup-screen-title')?.textContent, error: document.querySelector('#guided-signup #signup-error')?.textContent, busy: b.getAttribute('aria-busy'), disabled: b.disabled };
+        });
+        check(`${tag}: a 500 keeps the screen, shows a retry message, and the button is not left aria-busy (${JSON.stringify(st)})`, () => {
+          assert.equal(st.title, titleText); assert.match(st.error || '', /try again/i); assert.equal(st.busy, null); assert.equal(st.disabled, false);
+        });
+        await shot(page, `signup-375-${tag}-error.png`);
+      };
+      await failed('adult', 'Are you 18 or older?', () => buttonByText(page, "Yes, I'm 18 or older").click());
+      await checkStep('adult retry shows Name', async () => { await buttonByText(page, "Yes, I'm 18 or older").click(); await waitTitle(page, 'What should members call you?'); });
+      await page.locator('#signup-name').fill('Ada');
+      await failed('name', 'What should members call you?', () => page.locator('#signup-name').press('Enter'));
+      await checkStep('name retry shows Area', async () => { await page.locator('#signup-name').press('Enter'); await waitTitle(page, 'Where are you based?'); });
+      await page.locator('#guided-signup [data-area-city]').click();
+      await page.locator('#signup-area-city-search').fill('Pune');
+      await page.waitForSelector('#guided-signup .area-city-option', { timeout: 5000 });
+      await page.locator('#guided-signup .area-city-option', { hasText: 'Pune' }).click();
+      await failed('area', 'Where are you based?', () => page.locator('#guided-signup .gs-primary').click());
+      await checkStep('area retry shows Interests', async () => { await page.locator('#guided-signup .gs-primary').click(); await waitTitle(page, 'What are you into?'); });
+      await pickChip(page, 'sports.racket.tennis');
+      await page.waitForTimeout(SETTLE);
+      await failed('interests', 'What are you into?', () => page.locator('#guided-signup .gs-primary').click());
+      await checkStep('interests retry shows the Reveal', async () => { await page.locator('#guided-signup .gs-primary').click(); await waitTitle(page, "You're in, Ada."); });
+      check(`failures: every call was retried exactly once (${['declare_adult', 'set_home_city', 'set_member_interests'].map((n) => stub.posts(`/rest/v1/rpc/${n}`).length).join(',')})`, () => {
+        for (const n of ['declare_adult', 'set_home_city', 'set_member_interests']) assert.equal(stub.posts(`/rest/v1/rpc/${n}`).length, 2, n);
+      });
+      check(`failures: no uncaught page errors (${errors.join(' | ')})`, () => assert.deepEqual(errors, []));
+      await context.close();
+    }
+
+    // 9. Interests details: reduced motion (no transform, fades only), the 13th pick, a private pick behind the consent
+    //    dialog, Next disabled until a public pick, and no sideways scroll at 320.
+    {
+      const context = await browser.newContext({ viewport: { width: 375, height: 812 }, reducedMotion: 'reduce' });
+      await stubContext(context, { signedIn: session, profile: { name: 'Ada', adult_declared_at: '2026-10-13T00:00:00Z' }, hasCell: true });
+      const { page, errors } = await newPage(context);
+      await toInterests(page);
+      await pickChip(page, 'sports.racket.tennis', { click: false });
+      await page.locator('#guided-signup [data-interest-id="sports.racket.tennis"]').click();
+      const samples = [];
+      for (const ms of [20, 60, 100]) {
+        await page.waitForTimeout(ms === 20 ? 20 : 40);
+        samples.push(await page.evaluate(() => ({
+          clones: document.querySelectorAll('#guided-signup .it-fly').length,
+          moved: [...document.querySelectorAll('#guided-signup .gs-tray *, #guided-signup .gs-chip')].map((el) => getComputedStyle(el).transform).filter((t) => t !== 'none' && t !== 'matrix(1, 0, 0, 1, 0, 0)'),
+          opacity: Number(getComputedStyle(document.querySelector('#guided-signup [data-pick-id="sports.racket.tennis"]') || document.body).opacity),
+        })));
+      }
+      check(`reduced motion: no transform is applied during a pick, only a fade (${JSON.stringify(samples)})`, () => {
+        for (const sample of samples) { assert.equal(sample.clones, 0); assert.deepEqual(sample.moved, []); }
+        assert.ok(samples.some((sample) => sample.opacity < 1), 'the pick fades in');
+      });
+      await page.waitForTimeout(SETTLE);
+      const landed = await trayState(page);
+      check(`reduced motion: the pick still lands (${JSON.stringify(landed)})`, () => { assert.equal(landed.count, '1 picked'); assert.deepEqual(landed.picks, ['Tennis']); assert.equal(landed.live, 'Tennis added'); });
+      await shot(page, 'signup-375-interests-reduced.png');
+      await context.close();
+      check(`reduced: no uncaught page errors (${errors.join(' | ')})`, () => assert.deepEqual(errors, []));
+    }
+    for (const w of [1440, 375]) {
+      const context = await browser.newContext({ viewport: { width: w, height: w === 375 ? 812 : 900 } });
+      const stub = await stubContext(context, { signedIn: session, profile: { name: 'Ada', adult_declared_at: '2026-10-13T00:00:00Z' }, hasCell: true });
+      const { page, errors } = await newPage(context);
+      await toInterests(page);
+      // A private pick opens the consent dialog first; nothing is added until Continue.
+      await pickChip(page, PRIVATE_ID);
+      await page.waitForSelector('#guided-signup dialog[open]', { timeout: 5000 }).catch(() => {});
+      const dlg = await page.evaluate(() => {
+        const d = document.querySelector('#guided-signup dialog[open]');
+        return d ? { text: d.textContent.replace(/\s+/g, ' '), ticked: d.querySelector('[data-private-checkbox]').checked, cont: d.querySelector('[data-private-continue]').disabled, count: document.querySelector('#guided-signup [data-tray-count]').textContent.trim() } : null;
+      });
+      check(`${w}: a private pick opens the private-interest consent dialog before it is added (${JSON.stringify(dlg)})`, () => {
+        assert.ok(dlg); assert.ok(dlg.text.includes('Private interests (like faith, health or orientation)')); assert.equal(dlg.ticked, false); assert.equal(dlg.cont, true); assert.equal(dlg.count, '0 picked');
+      });
+      await shot(page, `signup-${w}-interests-private-consent.png`);
+      await page.locator('#guided-signup dialog[open] [data-private-checkbox]').check();
+      await page.locator('#guided-signup dialog[open] [data-private-continue]').click();
+      await page.waitForTimeout(SETTLE);
+      const priv = await trayState(page);
+      check(`${w}: Continue adds the private pick, and Next stays disabled until a public pick (${JSON.stringify(priv)})`, () => { assert.deepEqual(priv.picks, ['Scripture study']); assert.equal(priv.next, true); });
+      await pickChip(page, 'sports.racket.tennis');
+      await page.waitForTimeout(SETTLE);
+      const enabled = (await trayState(page)).next === false;
+      check(`${w}: Next is enabled once a public interest is picked`, () => assert.ok(enabled));
+      // Fill to 12, then the 13th shows the cap message.
+      for (const id of PUBLIC_IDS.filter((x) => x !== 'sports.racket.tennis').slice(0, 10)) await pickChip(page, id, { settle: 60 });
+      await page.waitForTimeout(SETTLE);
+      const twelve = await trayState(page);
+      const thirteenth = PUBLIC_IDS.filter((x) => x !== 'sports.racket.tennis')[10];
+      await pickChip(page, thirteenth, { force: true });
+      await page.waitForTimeout(SETTLE);
+      const capped = await page.evaluate(() => ({ error: document.querySelector('#guided-signup #signup-error')?.textContent, count: document.querySelector('#guided-signup [data-tray-count]').textContent.trim() }));
+      check(`${w}: the 13th pick shows the cap message (${JSON.stringify({ twelve: twelve.count, ...capped })})`, () => {
+        assert.equal(twelve.count, '12 picked'); assert.equal(capped.count, '12 picked'); assert.equal(capped.error, 'You can choose up to 12 interests. Remove one to add another.');
+      });
+      await a11yScreen(page, `${w} interests full`);
+      await shot(page, `signup-${w}-interests-full.png`);
+      await page.locator('#guided-signup .gs-primary').click();
+      await page.waitForFunction(() => /You're in/.test(document.querySelector('#signup-screen-title')?.textContent || ''), null, { timeout: 8000 }).catch(() => {});
+      const consent = stub.posts('/rest/v1/rpc/set_sensitive_consent').map((c) => c.body);
+      const items = JSON.parse(stub.posts('/rest/v1/rpc/set_member_interests')[0]?.body || '{}').p_items || [];
+      check(`${w}: a private pick gives the consent before set_member_interests (${consent.join(',')}; ${items.map((i) => i.points).join(',')})`, () => {
+        assert.deepEqual(consent.map((b) => JSON.parse(b)), [{ p_consent: true }]);
+        assert.equal(items.length, 12); assert.equal(items.reduce((sum, i) => sum + i.points, 0), 20); assert.equal(items[0].interest_id, PRIVATE_ID);
+      });
+      check(`${w} interests details: no uncaught page errors (${errors.join(' | ')})`, () => assert.deepEqual(errors, []));
+      await context.close();
+    }
+    {
+      const context = await browser.newContext({ viewport: { width: 320, height: 640 } });
+      await stubContext(context, { signedIn: session, profile: { name: 'Ada', adult_declared_at: '2026-10-13T00:00:00Z' }, hasCell: true });
+      const { page, errors } = await newPage(context);
+      await toInterests(page);
+      for (const id of ['sports.racket.tennis', 'games.board.chess', 'music.listening.jazz', 'sports.team.basketball']) { await pickChip(page, id); await page.waitForTimeout(SETTLE); }
+      await a11yScreen(page, '320 interests');
+      await shot(page, 'signup-320-interests.png');
+      check(`320 interests: no uncaught page errors (${errors.join(' | ')})`, () => assert.deepEqual(errors, []));
       await context.close();
     }
   });

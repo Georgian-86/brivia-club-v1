@@ -24,7 +24,7 @@
     "fontFamily": 0
   },
   "auth-theme.css": {
-    "hex": 70,
+    "hex": 66,
     "fontFamily": 0
   },
   "card-reference.css": {
@@ -149,6 +149,10 @@
   },
   "report-dialog.css": {
     "hex": 14,
+    "fontFamily": 0
+  },
+  "signup.css": {
+    "hex": 0,
     "fontFamily": 0
   },
   "skeleton.css": {

@@ -119,3 +119,25 @@ test('autoResendAllowed: once per Code screen, and only after the resend wait', 
   assert.equal(autoResendAllowed({ resendAt: 60_000, autoResent: false }, 30_000), false);
   assert.equal(autoResendAllowed({ resendAt: 60_000, autoResent: true }, 61_000), false);
 });
+
+test('revealCopy: a deck row sharing an interest names the first pick it shares', async () => {
+  const { revealCopy } = await import('../../signup-flow.js');
+  const picks = [{ label: 'Tennis' }, { label: 'Chess' }, { label: 'Jazz' }];
+  assert.deepEqual(revealCopy({ name: 'Ada Lovelace', picks, rows: [{ shared_interests: [] }, { shared_interests: ['jazz', 'Chess'] }], area: 'Pune' }), {
+    title: "You're in, Ada.",
+    line: 'People near you are into Chess. Your deck is ready.',
+    shared: true,
+  });
+  assert.equal(revealCopy({ name: 'Ada', picks, rows: [{ shared_interests: ['Tennis'] }] }).line, 'People near you are into Tennis. Your deck is ready.');
+  // A shared label that is not among the picks (renamed node): the label itself, never a made-up one.
+  assert.equal(revealCopy({ name: 'Ada', picks, rows: [{ shared_interests: ['Padel'] }] }).line, 'People near you are into Padel. Your deck is ready.');
+});
+
+test('revealCopy: no shared row says the member is one of the first, with no count', async () => {
+  const { revealCopy } = await import('../../signup-flow.js');
+  const none = revealCopy({ name: '  grace  hopper ', picks: [{ label: 'Tennis' }], rows: [{ shared_interests: [] }, {}], area: 'Pune (city-wide)' });
+  assert.deepEqual(none, { title: "You're in, grace.", line: "You're one of the first in Pune. We'll bring people to you as the club grows.", shared: false });
+  assert.equal(revealCopy({ name: 'Ada', picks: [], rows: null, area: '' }).line, "You're one of the first in your area. We'll bring people to you as the club grows.");
+  assert.equal(revealCopy({ name: '', picks: [], rows: [] }).title, "You're in.");
+  assert.equal(revealCopy({ name: 'New Member', picks: [], rows: [] }).title, "You're in.");
+});

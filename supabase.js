@@ -282,6 +282,30 @@ export const verifyEmailCode = async (email, token) => {
   if (!supabase) return notConfigured();
   return supabase.auth.verifyOtp({ email, token, type: 'email' });
 };
+// Guided signup (Phase E Task 4). Profiles are created by the client (0001: no auth trigger), so before the 18+
+// declaration the member's own row is made if it is missing: only id and email (insert-only) and the placeholder name.
+// Never phone, gender or any other field.
+export const ensureOwnProfile = async (user) => {
+  if (!supabase || !user?.id) return notConfigured();
+  const { data, error } = await supabase.from('profiles').select('id').eq('id', user.id).maybeSingle();
+  if (error) return { data: null, error };
+  if (data) return { data, error: null };
+  const inserted = await supabase.from('profiles').insert({ id: user.id, email: user.email || '', name: 'New Member', full_name: 'New Member' });
+  // A row made meanwhile (another tab) is as good as ours.
+  if (inserted.error?.code === '23505') return { data: { id: user.id }, error: null };
+  return { data: inserted.error ? null : { id: user.id }, error: inserted.error || null };
+};
+// The name members see, on the member's own row (name and full_name are owner-writable, 0003).
+export const saveOwnName = async (userId, name) => {
+  if (!supabase || !userId) return notConfigured();
+  const { data, error } = await supabase.from('profiles').update({ name, full_name: name, updated_at: new Date().toISOString() })
+    .eq('id', userId).select('id').maybeSingle();
+  if (error) return { data: null, error };
+  return data ? { data, error: null } : { data: null, error: new Error('profile missing') };
+};
+// The first deck cards (the Reveal reads only whether one shares an interest: shared_interests). The deck orders
+// shared-interest cards first, so one card answers it.
+export const deckPreview = (limit = 1) => rpcCall('deck_candidates', { p_limit: limit });
 // A PostgREST error raised with SQLSTATE PT429 (for example 'try again later': the 3-per-24-h location cap).
 export const isRateLimited = (error, status = 0) => status === 429 || error?.code === 'PT429';
 

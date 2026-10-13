@@ -5,6 +5,9 @@
 
 /* The guided flow brings its own header (Back, step label, progress), so the panel's top row steps aside. */
 body.auth-page .auth-shell.is-guided .auth-panel-top { display: none; }
+/* The auth shell's 3D context (transform-style: preserve-3d, for the other auth views) would make it the containing
+   block of the pinned actions bar, so the bar would scroll away with the page. The guided flow has no 3D. */
+body.auth-page .auth-shell.is-guided { transform-style: flat; }
 
 body.auth-page .auth-shell #guided-signup {
   --gs-keyboard: 0px;
@@ -243,7 +246,9 @@ body.auth-page .auth-shell #guided-signup .gs-primary {
   color: var(--color-cream);
 }
 body.auth-page .auth-shell #guided-signup .gs-primary[hidden] { display: none; }
-body.auth-page .auth-shell #guided-signup .gs-primary:hover:not(:disabled) { border-color: var(--color-wine-deep); background: var(--color-wine-deep); }
+@media (hover: hover) {
+  body.auth-page .auth-shell #guided-signup .gs-primary:hover:not(:disabled) { border-color: var(--color-wine-deep); background: var(--color-wine-deep); }
+}
 body.auth-page .auth-shell #guided-signup .gs-primary:disabled { opacity: .45; cursor: not-allowed; }
 body.auth-page .auth-shell #guided-signup .gs-primary[aria-busy="true"] { opacity: .75; cursor: progress; }
 body.auth-page .auth-shell #guided-signup .gs-secondary-btn {
@@ -251,7 +256,10 @@ body.auth-page .auth-shell #guided-signup .gs-secondary-btn {
   background: transparent;
   color: var(--color-wine);
 }
-body.auth-page .auth-shell #guided-signup .gs-secondary-btn:hover:not(:disabled) { background: var(--color-wine); color: var(--color-cream); }
+/* Hover only where a pointer hovers: on a phone a tapped button must not stay filled (it would read as primary). */
+@media (hover: hover) {
+  body.auth-page .auth-shell #guided-signup .gs-secondary-btn:hover:not(:disabled) { background: var(--color-wine); color: var(--color-cream); }
+}
 body.auth-page .auth-shell #guided-signup :is(.gs-primary, .gs-secondary-btn, .gs-back, .gs-link):focus-visible {
   outline: 2px solid var(--color-wine);
   outline-offset: 3px;
@@ -272,7 +280,7 @@ body.auth-page .auth-shell #guided-signup .gs-member {
     min-height: calc(100svh - 120px);
     justify-content: flex-start;
     gap: var(--space-4);
-    padding-bottom: 136px;
+    padding-bottom: calc(var(--gs-actions-h, 112px) + var(--space-5));
   }
   body.auth-page .auth-shell #guided-signup[data-screen="welcome"] { justify-content: center; padding-bottom: 200px; }
   body.auth-page .auth-shell #guided-signup .gs-title { font-size: var(--text-32); }
@@ -290,4 +298,241 @@ body.auth-page .auth-shell #guided-signup .gs-member {
   }
   body.auth-page .auth-shell #guided-signup .gs-otp { gap: var(--space-2); }
   body.auth-page .auth-shell #guided-signup .gs-otp-box { height: 56px; }
+}
+
+/* ---- Profile screens (Task 4): 18+, Name, Area, Interests, Reveal ------------------------------------------------- */
+
+/* Small print and visually hidden text (the tray's live region). */
+body.auth-page .auth-shell #guided-signup .gs-fine { margin: var(--space-3) 0 0; font: 400 var(--text-14)/1.4 var(--font-body); }
+body.auth-page .auth-shell #guided-signup .gs-fine a { color: var(--color-wine); text-underline-offset: 4px; }
+body.auth-page .auth-shell #guided-signup .gs-sr {
+  position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0;
+}
+body.auth-page .auth-shell #guided-signup .gs-icon { display: inline-flex; flex: none; width: 16px; height: 16px; line-height: 0; }
+body.auth-page .auth-shell #guided-signup .gs-icon svg {
+  width: 100%; height: 100%; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round;
+}
+body.auth-page .auth-shell #guided-signup .gs-underage { margin-top: var(--space-2); color: var(--color-ink); }
+
+/* Area: the shared picker (area-pick.js), dressed for the guided card. */
+body.auth-page .auth-shell #guided-signup .gs-area { display: flex; flex-direction: column; gap: var(--space-3); margin-top: var(--space-5); }
+body.auth-page .auth-shell #guided-signup .area-options { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-3); }
+body.auth-page .auth-shell #guided-signup .area-option {
+  display: inline-flex; align-items: center; justify-content: center; gap: var(--space-2);
+  min-height: 56px; padding: 0 var(--space-4);
+  border: 1px solid var(--color-line); border-radius: var(--radius-m); background: var(--color-cream);
+  color: var(--color-wine); font: 600 var(--text-16)/1.2 var(--font-body); letter-spacing: 0; text-transform: none; cursor: pointer;
+  transition: border-color var(--motion-fast) var(--ease), background-color var(--motion-fast) var(--ease);
+}
+body.auth-page .auth-shell #guided-signup .area-option:hover { border-color: var(--color-wine); }
+body.auth-page .auth-shell #guided-signup .area-option[aria-expanded="true"],
+body.auth-page .auth-shell #guided-signup .area-option[aria-busy="true"] { border-color: var(--color-wine); box-shadow: inset 0 0 0 1px var(--color-wine); }
+body.auth-page .auth-shell #guided-signup .area-icon { flex: none; width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+body.auth-page .auth-shell #guided-signup .area-city { display: flex; flex-direction: column; gap: var(--space-2); }
+body.auth-page .auth-shell #guided-signup .area-city[hidden] { display: none; }
+body.auth-page .auth-shell #guided-signup .area-fallback:empty { display: none; }
+body.auth-page .auth-shell #guided-signup :is(.area-fallback, .area-city-hint) { margin: 0; color: var(--color-ink-soft); font: 400 var(--text-14)/1.45 var(--font-body); }
+body.auth-page .auth-shell #guided-signup .area-city-label { color: var(--color-ink); font: 600 var(--text-14)/1.3 var(--font-body); }
+body.auth-page .auth-shell #guided-signup .area-city-search {
+  width: 100%; min-height: 56px; padding: 0 var(--space-4);
+  border: 1px solid var(--color-line); border-radius: var(--radius-m); background: var(--color-cream);
+  color: var(--color-ink); font: 400 var(--text-20)/1.2 var(--font-body);
+}
+body.auth-page .auth-shell #guided-signup .area-city-search:focus { border-color: var(--color-wine); outline: 2px solid var(--color-wine); outline-offset: 1px; }
+body.auth-page .auth-shell #guided-signup .area-city-results {
+  max-height: 248px; margin: 0; padding: var(--space-1); overflow-y: auto; list-style: none;
+  border: 1px solid var(--color-line); border-radius: var(--radius-m); background: var(--color-cream);
+}
+body.auth-page .auth-shell #guided-signup .area-city-results[hidden],
+body.auth-page .auth-shell #guided-signup .area-city-results:empty { display: none; }
+body.auth-page .auth-shell #guided-signup .area-city-option {
+  display: flex; align-items: baseline; justify-content: space-between; gap: var(--space-3);
+  min-height: 44px; padding: var(--space-3); border-radius: var(--radius-s); cursor: pointer;
+  color: var(--color-ink); font: 500 var(--text-16)/1.3 var(--font-body);
+}
+body.auth-page .auth-shell #guided-signup .area-city-option small { color: var(--color-ink-soft); font-size: var(--text-14); }
+body.auth-page .auth-shell #guided-signup .area-city-option:hover,
+body.auth-page .auth-shell #guided-signup .area-city-option[aria-selected="true"] { background: color-mix(in srgb, var(--color-wine) 8%, transparent); color: var(--color-wine-deep); }
+body.auth-page .auth-shell #guided-signup .area-city-empty { padding: var(--space-3); color: var(--color-ink-soft); font: 400 var(--text-14)/1.4 var(--font-body); }
+body.auth-page .auth-shell #guided-signup .area-status { margin: 0; color: var(--color-ink); font: 500 var(--text-14)/1.45 var(--font-body); }
+body.auth-page .auth-shell #guided-signup .area-status:empty { display: none; }
+body.auth-page .auth-shell #guided-signup .gs-area .gs-message { margin: 0; }
+
+/* Interests: a search field, the category tabs, then the chips of one category (or the search matches). */
+body.auth-page .auth-shell #guided-signup .gs-catalog { display: flex; flex-direction: column; gap: var(--space-3); margin-top: var(--space-5); min-width: 0; }
+body.auth-page .auth-shell #guided-signup .gs-search {
+  display: inline-flex; align-items: center; gap: var(--space-2);
+  color: var(--color-ink-soft); font: 600 var(--text-12)/1 var(--font-body); letter-spacing: .14em; text-transform: uppercase;
+}
+body.auth-page .auth-shell #guided-signup .gs-search-input {
+  width: 100%; min-height: 48px; padding: 0 var(--space-4);
+  border: 1px solid var(--color-line); border-radius: var(--radius-pill); background: var(--color-cream);
+  color: var(--color-ink); font: 400 var(--text-16)/1.2 var(--font-body);
+}
+body.auth-page .auth-shell #guided-signup .gs-search-input::placeholder { color: var(--color-ink-soft); opacity: .7; }
+body.auth-page .auth-shell #guided-signup .gs-search-input:focus { border-color: var(--color-wine); outline: 2px solid var(--color-wine); outline-offset: 1px; }
+body.auth-page .auth-shell #guided-signup .gs-domains {
+  display: flex; gap: var(--space-1); margin: 0 calc(-1 * var(--space-1)); padding: 0 var(--space-1);
+  overflow-x: auto; scroll-snap-type: x proximity; scrollbar-width: none;
+  border-bottom: 1px solid var(--color-line);
+}
+body.auth-page .auth-shell #guided-signup .gs-domains::-webkit-scrollbar { display: none; }
+body.auth-page .auth-shell #guided-signup .gs-domain {
+  flex: none; min-height: 44px; padding: 0 var(--space-3); scroll-snap-align: start;
+  border: 0; border-bottom: 2px solid transparent; border-radius: 0; background: none;
+  color: var(--color-ink-soft); font: 600 var(--text-14)/1 var(--font-body); letter-spacing: 0; text-transform: none; white-space: nowrap; cursor: pointer;
+  transition: color var(--motion-fast) var(--ease), border-color var(--motion-fast) var(--ease);
+}
+body.auth-page .auth-shell #guided-signup .gs-domain:hover { color: var(--color-wine); }
+body.auth-page .auth-shell #guided-signup .gs-domain[aria-pressed="true"] { border-bottom-color: var(--color-wine); color: var(--color-wine-deep); }
+body.auth-page .auth-shell #guided-signup .gs-results { display: flex; flex-direction: column; gap: var(--space-4); padding-top: var(--space-2); }
+body.auth-page .auth-shell #guided-signup .gs-results .gs-note { margin: 0; }
+body.auth-page .auth-shell #guided-signup .gs-group { display: flex; flex-direction: column; gap: var(--space-2); }
+body.auth-page .auth-shell #guided-signup .gs-group-label {
+  margin: 0; color: var(--color-ink-soft); font: 600 var(--text-12)/1.2 var(--font-body); letter-spacing: .14em; text-transform: uppercase;
+}
+body.auth-page .auth-shell #guided-signup .gs-chips { display: flex; flex-wrap: wrap; gap: var(--space-2); }
+body.auth-page .auth-shell #guided-signup .gs-chip {
+  display: inline-flex; align-items: center; gap: var(--space-2);
+  min-height: 44px; padding: 0 var(--space-3) 0 var(--space-4);
+  border: 1px solid var(--color-line); border-radius: var(--radius-pill); background: var(--color-cream);
+  color: var(--color-ink); font: 500 var(--text-14)/1.2 var(--font-body); letter-spacing: 0; text-transform: none; cursor: pointer;
+  transition: background-color var(--motion-fast) var(--ease), border-color var(--motion-fast) var(--ease), color var(--motion-fast) var(--ease);
+  -webkit-tap-highlight-color: transparent;
+}
+body.auth-page .auth-shell #guided-signup .gs-chip .gs-chip-mark { color: var(--color-wine); }
+body.auth-page .auth-shell #guided-signup .gs-chip .gs-chip-lock { width: 14px; height: 14px; color: var(--color-ink-soft); }
+body.auth-page .auth-shell #guided-signup .gs-chip:hover:not(.is-selected):not([aria-disabled="true"]) { border-color: var(--color-wine); }
+body.auth-page .auth-shell #guided-signup .gs-chip:active:not([aria-disabled="true"]) { background: color-mix(in srgb, var(--color-wine) 10%, var(--color-cream)); }
+body.auth-page .auth-shell #guided-signup .gs-chip.is-selected { border-color: var(--color-wine); background: var(--color-wine); color: var(--color-cream); }
+body.auth-page .auth-shell #guided-signup .gs-chip.is-selected :is(.gs-chip-mark, .gs-chip-lock) { color: var(--color-cream); }
+body.auth-page .auth-shell #guided-signup .gs-chip[aria-disabled="true"] { opacity: .5; cursor: not-allowed; }
+body.auth-page .auth-shell #guided-signup .gs-private-note {
+  display: flex; align-items: flex-start; gap: var(--space-2); margin: 0;
+  color: var(--color-ink-soft); font: 400 var(--text-12)/1.4 var(--font-body);
+}
+body.auth-page .auth-shell #guided-signup .gs-private-note .gs-icon { width: 14px; height: 14px; margin-top: 1px; }
+body.auth-page .auth-shell #guided-signup :is(.gs-chip, .gs-domain, .gs-pick, .area-option, .gs-dialog-btn):focus-visible { outline: 2px solid var(--color-wine); outline-offset: 2px; }
+
+/* The flying clone (interest-tray.js): positioned by script, painted like a selected chip. */
+body.auth-page .auth-shell #guided-signup .it-fly {
+  box-shadow: 0 10px 24px color-mix(in srgb, var(--color-wine-deep) 28%, transparent);
+  border-color: var(--color-wine); background: var(--color-wine); color: var(--color-cream); will-change: transform, opacity;
+}
+body.auth-page .auth-shell #guided-signup .it-fly .gs-icon { color: var(--color-cream); }
+
+/* The tray: "Your picks" with the count pill, then the picks (tap to remove). */
+body.auth-page .auth-shell #guided-signup .gs-dock[hidden] { display: none; }
+body.auth-page .auth-shell #guided-signup .gs-tray { display: flex; flex-direction: column; gap: var(--space-2); min-width: 0; }
+body.auth-page .auth-shell #guided-signup .gs-tray-head { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); }
+body.auth-page .auth-shell #guided-signup .gs-tray-label {
+  margin: 0; color: var(--color-wine-deep); font: 600 var(--text-12)/1.2 var(--font-body); letter-spacing: .14em; text-transform: uppercase;
+}
+body.auth-page .auth-shell #guided-signup .gs-tray-count {
+  display: inline-flex; align-items: center; min-height: 24px; padding: 0 var(--space-3);
+  border-radius: var(--radius-pill); background: var(--color-wine); color: var(--color-cream);
+  font: 600 var(--text-12)/1 var(--font-body); font-variant-numeric: tabular-nums; white-space: nowrap;
+}
+body.auth-page .auth-shell #guided-signup .gs-tray.is-empty .gs-tray-count { background: var(--color-line); color: var(--color-ink); }
+body.auth-page .auth-shell #guided-signup .gs-tray-list { display: flex; flex-wrap: wrap; gap: var(--space-2); margin: 0; padding: 0; list-style: none; }
+body.auth-page .auth-shell #guided-signup .gs-tray-list:empty { display: none; }
+body.auth-page .auth-shell #guided-signup .gs-tray-item { display: flex; }
+body.auth-page .auth-shell #guided-signup .gs-pick {
+  display: inline-flex; align-items: center; gap: var(--space-2);
+  min-height: 44px; max-width: 100%; padding: 0 var(--space-3) 0 var(--space-4);
+  border: 1px solid var(--color-wine); border-radius: var(--radius-pill); background: var(--color-wine);
+  color: var(--color-cream); font: 500 var(--text-14)/1.2 var(--font-body); letter-spacing: 0; text-transform: none; cursor: pointer;
+  transition: background-color var(--motion-fast) var(--ease);
+}
+body.auth-page .auth-shell #guided-signup .gs-pick:hover { background: var(--color-wine-deep); }
+body.auth-page .auth-shell #guided-signup .gs-pick-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+body.auth-page .auth-shell #guided-signup .gs-pick .gs-icon { width: 14px; height: 14px; opacity: .85; }
+body.auth-page .auth-shell #guided-signup .gs-tray .gs-message { margin: 0; }
+body.auth-page .auth-shell #guided-signup .gs-tray .gs-message:empty { display: none; }
+body.auth-page .auth-shell #guided-signup .gs-tray-empty { margin: 0; color: var(--color-ink-soft); font: 400 var(--text-14)/1.4 var(--font-body); }
+body.auth-page .auth-shell #guided-signup .gs-tray-empty[hidden] { display: none; }
+
+/* The private-interest consent dialog. */
+body.auth-page .auth-shell #guided-signup .gs-dialog {
+  width: min(440px, calc(100vw - 2 * var(--space-4))); max-height: calc(100svh - 2 * var(--space-4)); overflow-y: auto;
+  padding: var(--space-5); border: 0; border-radius: var(--radius-l); background: var(--color-cream); color: var(--color-ink);
+  box-shadow: var(--shadow-2);
+}
+body.auth-page .auth-shell #guided-signup .gs-dialog::backdrop { background: color-mix(in srgb, var(--color-wine-deep) 55%, transparent); }
+body.auth-page .auth-shell #guided-signup .gs-dialog h3 { margin: 0 0 var(--space-3); color: var(--color-wine-deep); font: 500 var(--text-24)/1.15 var(--font-heading); text-transform: none; }
+body.auth-page .auth-shell #guided-signup .gs-dialog .gs-message { margin: 0 0 var(--space-3); }
+body.auth-page .auth-shell #guided-signup .gs-dialog-purpose { margin: 0 0 var(--space-4); font: 400 var(--text-14)/1.55 var(--font-body); }
+body.auth-page .auth-shell #guided-signup .gs-dialog-check {
+  display: flex; align-items: flex-start; gap: var(--space-3); min-height: 44px; padding: var(--space-3);
+  border: 1px solid var(--color-line); border-radius: var(--radius-m);
+}
+body.auth-page .auth-shell #guided-signup .gs-dialog-check input { flex: none; width: 24px; height: 24px; margin: 0; accent-color: var(--color-wine); cursor: pointer; }
+body.auth-page .auth-shell #guided-signup .gs-dialog-check label { font: 400 var(--text-14)/1.45 var(--font-body); cursor: pointer; }
+body.auth-page .auth-shell #guided-signup .gs-dialog-check:focus-within { outline: 2px solid var(--color-wine); outline-offset: 2px; }
+body.auth-page .auth-shell #guided-signup .gs-dialog-actions { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-3); margin-top: var(--space-4); }
+body.auth-page .auth-shell #guided-signup .gs-dialog-btn {
+  min-height: 48px; border: 1px solid var(--color-wine); border-radius: var(--radius-pill); background: transparent;
+  color: var(--color-wine); font: 600 var(--text-16)/1 var(--font-body); letter-spacing: 0; text-transform: none; cursor: pointer;
+}
+body.auth-page .auth-shell #guided-signup .gs-dialog-btn:disabled { opacity: .45; cursor: not-allowed; }
+
+/* Reveal: a wine seal, the welcome, one line about the deck. */
+body.auth-page .auth-shell #guided-signup .gs-reveal-mark {
+  display: block; width: 64px; height: 64px; margin-bottom: var(--space-5); color: var(--color-wine);
+  animation: gs-seal var(--motion-slow) var(--ease) both;
+}
+body.auth-page .auth-shell #guided-signup .gs-reveal-mark svg { width: 100%; height: 100%; fill: none; stroke: currentColor; stroke-width: 1.4; stroke-linecap: round; stroke-linejoin: round; }
+body.auth-page .auth-shell #guided-signup .gs-reveal-line { max-width: 40ch; color: var(--color-ink); font-size: var(--text-20); line-height: 1.45; }
+@keyframes gs-seal { from { opacity: 0; transform: scale(.85); } to { opacity: 1; transform: scale(1); } }
+@keyframes gs-seal-fade { from { opacity: 0; } to { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) {
+  body.auth-page .auth-shell #guided-signup .gs-reveal-mark { animation: gs-seal-fade var(--motion-fade) linear both; }
+}
+
+/* Interests on a wide desktop: the card widens and the tray sits beside the catalogue, sticky while it scrolls. */
+@media (min-width: 1200px) {
+  body.auth-page .auth-shell #guided-signup[data-screen="interests"] {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 216px;
+    grid-template-rows: auto auto auto 1fr;
+    align-content: center;
+    column-gap: var(--space-6);
+    row-gap: var(--space-5);
+    max-width: 760px;
+  }
+  body.auth-page .auth-shell #guided-signup[data-screen="interests"] :is(.gs-head, .gs-progress) { grid-column: 1 / -1; }
+  body.auth-page .auth-shell #guided-signup[data-screen="interests"] .gs-host { grid-column: 1; grid-row: 3; }
+  body.auth-page .auth-shell #guided-signup[data-screen="interests"] .gs-actions { display: contents; }
+  body.auth-page .auth-shell #guided-signup[data-screen="interests"] .gs-primary { grid-column: 1; grid-row: 4; align-self: start; }
+  /* Level with the helper line under the heading; a long list of picks scrolls inside the tray. */
+  body.auth-page .auth-shell #guided-signup[data-screen="interests"] .gs-dock {
+    grid-column: 2; grid-row: 3 / span 2; align-self: start;
+    position: sticky; top: var(--space-5);
+    max-height: calc(100svh - 2 * var(--space-5)); overflow-y: auto; overscroll-behavior: contain;
+    padding: var(--space-5) var(--space-4); margin-top: 104px;
+    border: 1px solid var(--color-line); border-radius: var(--radius-l); background: var(--color-cream);
+  }
+  body.auth-page .auth-shell #guided-signup[data-screen="interests"] .gs-tray-head { flex-direction: column; align-items: flex-start; gap: var(--space-2); }
+}
+/* Interests on a narrower desktop: the tray and the button stay in view at the bottom of the panel. */
+@media (min-width: 781px) and (max-width: 1199px) {
+  body.auth-page .auth-shell #guided-signup[data-screen="interests"] .gs-actions {
+    position: sticky; bottom: 0; z-index: 5;
+    padding: var(--space-3) 0 var(--space-4);
+    border-top: 1px solid var(--color-line); background: var(--color-cream);
+  }
+}
+/* Phone: the tray is a strip in the pinned bar, right above the button; the picks scroll sideways in one row. */
+@media (max-width: 780px) {
+  body.auth-page .auth-shell #guided-signup .gs-dock { margin: 0 calc(-1 * var(--space-5)); padding: 0 var(--space-5); }
+  body.auth-page .auth-shell #guided-signup .gs-tray { gap: var(--space-2); }
+  body.auth-page .auth-shell #guided-signup .gs-tray-list {
+    flex-wrap: nowrap; margin: 0 calc(-1 * var(--space-5)); padding: 0 var(--space-5);
+    overflow-x: auto; scroll-snap-type: x proximity; scrollbar-width: none; overscroll-behavior-x: contain;
+  }
+  body.auth-page .auth-shell #guided-signup .gs-tray-list::-webkit-scrollbar { display: none; }
+  body.auth-page .auth-shell #guided-signup .gs-tray-item { flex: none; scroll-snap-align: end; }
+  body.auth-page .auth-shell #guided-signup .gs-pick { max-width: 220px; }
+  body.auth-page .auth-shell #guided-signup .gs-tray-empty { min-height: 44px; display: flex; align-items: center; }
+  body.auth-page .auth-shell #guided-signup .area-options { grid-template-columns: 1fr; }
 }

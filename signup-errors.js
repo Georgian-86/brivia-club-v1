@@ -39,9 +39,10 @@ export const codeSendErrorCopy = (error) => (isRateLimited(error) ? CODE_RATE_LI
 export const emailSendErrorCopy = (error) => (isRateLimited(error) ? EMAIL_RATE_LIMITED : signupErrorCopy(error));
 
 // An expired code: a new one went out (sent), the send failed (error), or none was sent (inside the resend wait, or the
-// automatic resend already ran on this screen).
-export const expiredCodeCopy = ({ sent = false, error = null } = {}) => {
+// automatic resend already ran on this screen). resendReady false: Resend is still counting down, so the copy never
+// asks for a tap on a disabled button.
+export const expiredCodeCopy = ({ sent = false, error = null, resendReady = true } = {}) => {
   if (sent) return OTP_EXPIRED;
   if (error) return `That code has expired. ${codeSendErrorCopy(error)}`;
-  return 'That code has expired. Tap Resend for a new one.';
+  return resendReady ? 'That code has expired. Tap Resend for a new one.' : 'That code has expired. Resend will be available in a moment.';
 };

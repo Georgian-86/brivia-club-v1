@@ -9,11 +9,13 @@ import {
   MAX_INTERESTS, MODES, emptyBudget, addInterest, removeInterest, stepPoints, setMode, pointsLeft, isComplete, toPayload,
   counterText, budgetFromRows, budgetGateText, spreadRemaining,
 } from './passion-budget.js';
-import { matchTypedCity } from './area-pick.js';
+import { areaPickerHtml, createAreaPicker, AREA_SAVE_ERROR } from './area-pick.js';
+import { buildInterestCatalog, normalizeSearch, PRIVATE_HINT_TEXT, SENSITIVE_CONSENT_ERROR, INTEREST_CAP_TEXT } from './interest-catalog.js';
 import { signupErrorCopy } from './signup-errors.js';
 import { signupMethods } from './signup-flow.js';
 import { fillGoogleMark } from './google-mark.js';
 import { initGuidedSignup, openGuidedSignup, showGuidedFromHistory, guidedScreen } from './signup-screens.js';
+import './signup-profile-screens.js';  // registers 18+, Name, Area, Interests and Reveal into the shell
 import { defaultCoverUrl, normalizeCoverUrl } from './cover-assets.js';
 import { motionAllowed, introPlan, markLoaded, INTRO_CAP_MS, INTRO_START_GRACE_MS } from './landing-motion.js';
 
@@ -768,13 +770,10 @@ if (lookingPicker) {
 
 // ---------------------------------------------------------------------------------------------------------------
 // ORBIT onboarding (UX_SPEC flow A). Step 2 "Your area" and step 3 "What you care about" (interests + Passion Budget).
-// Privacy (CLAUDE.md, Review Focus 4): coordinates live only in `areaChoice` below, in memory. They are never written
-// to localStorage / sessionStorage, the URL, the DOM or a log, and are dropped as soon as the server has the cell.
+// Privacy (CLAUDE.md, Review Focus 4): coordinates live only in the area picker's choice (area-pick.js), in memory.
+// They are never written to localStorage / sessionStorage, the URL, the DOM or a log, and are dropped as soon as the
+// server has the cell.
 // ---------------------------------------------------------------------------------------------------------------
-const GEO_OPTIONS = { enableHighAccuracy: false, timeout: 10000, maximumAge: 600000 };
-const AREA_FALLBACK_TEXT = 'No problem. Pick your city instead.';
-// D-038 R3: sensitive interests are never shown to others and do not affect who the member sees yet.
-const PRIVATE_HINT_TEXT = 'Private: never shown on your profile, and does not change who you see';
 // R2: sensitive interests are offered only after the member opens the consent panel and continues (the box ticked).
 // Their nodes stay in the catalog (as `hidden`) so stored picks still get labels. Consent is sent to the server only
 // when a sensitive pick is submitted (finishOnboarding), never on Continue.
@@ -799,154 +798,14 @@ const renderKeepingFocus = (container, html) => {
   if (key) [...container.querySelectorAll('[data-focus-key]')].find((el) => el.dataset.focusKey === key)?.focus({ preventScroll: true });
 };
 
-// { kind: 'geo', lat, lng } | { kind: 'city', placeId, label } | { kind: 'keep', label } (a cell is already stored)
-let areaChoice = null;
+// "Your area" (area-pick.js, shared with the guided signup). The markup comes from areaPickerHtml so the old step 2
+// and the guided Area screen stay the same picker.
 const areaRoot = signupForm?.querySelector('[data-area]');
-const areaGeoButton = areaRoot?.querySelector('[data-area-geo]');
-const areaCityButton = areaRoot?.querySelector('[data-area-city]');
-const areaPicker = areaRoot?.querySelector('[data-area-picker]');
-const areaFallback = areaRoot?.querySelector('[data-area-fallback]');
-const areaSearch = areaRoot?.querySelector('#area-city-search');
-const areaResults = areaRoot?.querySelector('#area-city-results');
-const areaStatus = areaRoot?.querySelector('[data-area-status]');
-const areaError = areaRoot?.querySelector('[data-area-error]');
-let cityOptions = [];
-let cityActive = -1;
-let citySearchSeq = 0;
-let citySearchTimer;
-let geoPending = false;
-
-const setAreaStatus = (text) => { if (areaStatus) areaStatus.textContent = text; };
-const setAreaError = (text) => { if (areaError) areaError.textContent = text; };
-const setCityListOpen = (open) => {
-  areaSearch?.setAttribute('aria-expanded', String(open));
-  areaResults?.toggleAttribute('hidden', !open);
-  if (!open) { cityActive = -1; areaSearch?.removeAttribute('aria-activedescendant'); }
-};
-const highlightCity = (index) => {
-  const options = [...(areaResults?.querySelectorAll('[role="option"]') || [])];
-  if (!options.length) return;
-  cityActive = (index + options.length) % options.length;
-  options.forEach((option, i) => option.setAttribute('aria-selected', String(i === cityActive)));
-  areaSearch?.setAttribute('aria-activedescendant', options[cityActive].id);
-  options[cityActive].scrollIntoView({ block: 'nearest' });
-};
-const renderCityResults = async () => {
-  if (!areaSearch || !areaResults) return;
-  const seq = ++citySearchSeq;
-  const { data, error } = await searchPlaces(areaSearch.value);
-  if (seq !== citySearchSeq) return;
-  cityOptions = error ? [] : data;
-  areaResults.innerHTML = cityOptions.length
-    ? cityOptions.map((place, i) => `<li class="area-city-option" role="option" id="area-city-option-${i}" aria-selected="false" data-place-index="${i}"><span>${escapeText(place.name)}</span><small>${escapeText(place.region)}</small></li>`).join('')
-    : `<li class="area-city-empty" role="presentation">${error ? 'Cities could not load. Check your connection and try again.' : 'No city found. Try the nearest larger city.'}</li>`;
-  setCityListOpen(true);
-  cityActive = -1;
-};
-const chooseCity = (place) => {
-  if (!place) return;
-  areaChoice = { kind: 'city', placeId: place.id, label: `${place.name}, ${place.region}` };
-  if (areaSearch) areaSearch.value = place.name;
-  setCityListOpen(false);
-  setAreaError('');
-  setAreaStatus(`Your area: ${place.name}, ${place.region}. We use the city's centre, never your address.`);
-};
-const openCityPicker = (fallbackText = '') => {
-  if (!areaPicker) return;
-  areaPicker.hidden = false;
-  areaCityButton?.setAttribute('aria-expanded', 'true');
-  if (areaFallback) areaFallback.textContent = fallbackText;
-  areaSearch?.focus();
-  void renderCityResults();
-};
-const useMyLocation = () => {
-  if (geoPending) return;
-  setAreaError('');
-  const geo = window.isSecureContext ? navigator.geolocation : undefined;
-  if (!geo || typeof geo.getCurrentPosition !== 'function') { setAreaStatus(''); openCityPicker(AREA_FALLBACK_TEXT); return; }
-  geoPending = true;
-  areaGeoButton?.setAttribute('aria-busy', 'true');
-  setAreaStatus('Finding your area…');
-  let settled = false;
-  const fallBack = () => {
-    if (settled) return;
-    settled = true;
-    geoPending = false;
-    areaGeoButton?.removeAttribute('aria-busy');
-    setAreaStatus('');
-    openCityPicker(AREA_FALLBACK_TEXT);
-  };
-  // A permission prompt that is never answered must not strand the member either.
-  const guard = window.setTimeout(fallBack, 15000);
-  try {
-    geo.getCurrentPosition((position) => {
-      window.clearTimeout(guard);
-      if (settled) return;
-      const lat = Number(position?.coords?.latitude);
-      const lng = Number(position?.coords?.longitude);
-      if (!Number.isFinite(lat) || !Number.isFinite(lng)) { fallBack(); return; }
-      settled = true;
-      geoPending = false;
-      areaGeoButton?.removeAttribute('aria-busy');
-      areaChoice = { kind: 'geo', lat, lng };
-      if (areaPicker) areaPicker.hidden = true;
-      areaCityButton?.setAttribute('aria-expanded', 'false');
-      setAreaStatus("Got it. We keep only the ~2 km square you're in.");
-    }, () => { window.clearTimeout(guard); fallBack(); }, GEO_OPTIONS);
-  } catch {
-    window.clearTimeout(guard);
-    fallBack();
-  }
-};
-const resetArea = () => {
-  areaChoice = null;
-  geoPending = false;
-  areaGeoButton?.removeAttribute('aria-busy');
-  if (areaPicker) areaPicker.hidden = true;
-  areaCityButton?.setAttribute('aria-expanded', 'false');
-  if (areaFallback) areaFallback.textContent = '';
-  if (areaSearch) areaSearch.value = '';
-  if (areaResults) areaResults.innerHTML = '';
-  setCityListOpen(false);
-  setAreaStatus('');
-  setAreaError('');
-};
-const keepCurrentArea = (label) => {
-  areaChoice = { kind: 'keep', label: label || '' };
-  setAreaStatus(label ? `Your area: ${label}. Choose again to change it.` : 'Your area is set. Choose again to change it.');
-};
-areaGeoButton?.addEventListener('click', useMyLocation);
-areaCityButton?.addEventListener('click', () => openCityPicker(''));
-areaSearch?.addEventListener('input', () => {
-  // The visible options no longer match what was typed: drop them so Enter cannot pick a stale city.
-  citySearchSeq += 1;
-  cityOptions = [];
-  if (areaResults) areaResults.innerHTML = '';
-  setCityListOpen(false);
-  window.clearTimeout(citySearchTimer);
-  citySearchTimer = window.setTimeout(() => void renderCityResults(), 150);
-});
-areaSearch?.addEventListener('focus', () => { if (!areaResults?.children.length) void renderCityResults(); });
-areaSearch?.addEventListener('keydown', (event) => {
-  if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
-    event.preventDefault();
-    if (areaSearch.getAttribute('aria-expanded') !== 'true') { void renderCityResults(); return; }
-    highlightCity(cityActive + (event.key === 'ArrowDown' ? 1 : -1) + (cityActive < 0 && event.key === 'ArrowUp' ? 1 : 0));
-  } else if (event.key === 'Enter') {
-    event.preventDefault(); // never submit the signup form from the city search
-    if (cityActive >= 0) chooseCity(cityOptions[cityActive]);
-    else chooseCity(matchTypedCity(areaSearch.value, cityOptions));
-  } else if (event.key === 'Escape' && areaSearch.getAttribute('aria-expanded') === 'true') {
-    event.preventDefault();
-    event.stopPropagation();
-    setCityListOpen(false);
-  }
-});
-areaResults?.addEventListener('mousedown', (event) => event.preventDefault()); // keep focus in the input
-areaResults?.addEventListener('click', (event) => {
-  const option = event.target.closest('[data-place-index]');
-  if (option) chooseCity(cityOptions[Number(option.dataset.placeIndex)]);
-});
+if (areaRoot) areaRoot.innerHTML = areaPickerHtml({ prefix: 'area', explainer: true });
+const areaPicker = createAreaPicker(areaRoot, { searchPlaces });
+const setAreaError = (text) => areaPicker.setError(text);
+const keepCurrentArea = (label) => areaPicker.keep(label);
+const resetArea = () => areaPicker.reset();
 
 // Step 3: interests and the Passion Budget.
 let budget = emptyBudget();
@@ -965,31 +824,13 @@ const budgetNext = signupForm?.querySelector('[data-signup-step="3"] .signup-nex
 const budgetSpread = signupForm?.querySelector('[data-budget-spread]');
 let budgetGateShown = false;
 const INTEREST_HELP_TEXT = 'Choose 1 to 12. Select again to remove.';
-const normalizeSearch = (value) => String(value || '').toLowerCase().normalize('NFKD').replace(/[̀-ͯ]/g, '').trim();
 
-const buildInterestCatalog = (nodes) => {
-  const byId = new Map(nodes.map((node) => [node.id, node]));
-  const groups = new Map();
-  const hidden = [];
-  nodes.filter((node) => node.level === 2).forEach((node) => {
-    groups.set(node.id, { id: node.id, label: node.label, domain: byId.get(node.parent_id)?.label || '', items: [] });
-  });
-  nodes.filter((node) => node.level >= 3).forEach((node) => {
-    const group = groups.get(node.id.split('.').slice(0, 2).join('.'));
-    if (!group) return;
-    const parent = node.level === 4 ? byId.get(node.parent_id)?.label || '' : '';
-    const item = { id: node.id, label: node.label, sensitive: Boolean(node.sensitive), search: normalizeSearch(`${node.label} ${parent} ${group.label}`) };
-    if (item.sensitive && !privateUnlocked) hidden.push(item);
-    else group.items.push(item);
-  });
-  return { groups: [...groups.values()].filter((group) => group.items.length), hidden };
-};
 let interestNodes = [];
 const loadInterestCatalog = () => {
   interestCatalogPromise ||= fetchInterestNodes().then(({ data, error }) => {
     if (error) throw error;
     interestNodes = data || [];
-    interestCatalog = buildInterestCatalog(interestNodes);
+    interestCatalog = buildInterestCatalog(interestNodes, { unlocked: privateUnlocked });
     return interestCatalog;
   }).catch((error) => { interestCatalogPromise = null; throw error; });
   return interestCatalogPromise;
@@ -1056,7 +897,7 @@ const closePrivateConsent = () => {
 };
 const unlockPrivate = () => {
   privateUnlocked = true;
-  if (interestCatalog) interestCatalog = buildInterestCatalog(interestNodes);
+  if (interestCatalog) interestCatalog = buildInterestCatalog(interestNodes, { unlocked: privateUnlocked });
   if (privateOpenButton) privateOpenButton.hidden = true;
   renderInterestResults();
 };
@@ -1130,7 +971,7 @@ const toggleInterest = (id) => {
   if (!item) return;
   if (budget.items.some((chosen) => chosen.id === id)) { setBudget(removeInterest(budget, id)); return; }
   const next = addInterest(budget, { id: item.id, label: item.label });
-  if (next === budget) { if (interestHelp) interestHelp.textContent = `You can choose up to ${MAX_INTERESTS} interests. Remove one to add another.`; return; }
+  if (next === budget) { if (interestHelp) interestHelp.textContent = INTEREST_CAP_TEXT; return; }
   if (interestHelp) interestHelp.textContent = INTEREST_HELP_TEXT;
   setBudget(next);
 };
@@ -1285,12 +1126,8 @@ const validateSignupStep = (step = signupCurrentStep) => {
 // "looking for" choice.
 const validateOnboardingStep = (step) => {
   if (step === 2) {
-    if (areaChoice) return true;
     // A typed city that is unambiguous counts as picked (the live walkthrough: members type and press Next).
-    chooseCity(matchTypedCity(areaSearch?.value, cityOptions));
-    if (areaChoice) return true;
-    setAreaError(areaSearch?.value.trim() && !areaPicker?.hidden ? 'Pick your city from the list below.' : 'Choose your area to continue.');
-    return false;
+    return Boolean(areaPicker.commit());
   }
   if (step === 3) {
     if (!isComplete(budget)) { showBudgetError(); return false; }
@@ -1303,10 +1140,9 @@ signupForm?.querySelectorAll('.signup-next').forEach((button) => button.addEvent
   const nextStep = Number(button.dataset.nextStep);
   if (!nextStep) return;
   // Next pressed right after typing a city: let the pending search finish so the typed name can be matched.
-  if (nextStep === 3 && !areaChoice && areaSearch?.value.trim() && !cityOptions.length) {
-    window.clearTimeout(citySearchTimer);
+  if (nextStep === 3 && areaPicker.needsSettle()) {
     button.setAttribute('aria-busy', 'true');
-    try { await renderCityResults(); } finally { button.removeAttribute('aria-busy'); }
+    try { await areaPicker.settle(); } finally { button.removeAttribute('aria-busy'); }
     if (signupCurrentStep !== 2) return; // the member went Back (or on) while the search ran
   }
   if (validateOnboardingStep(nextStep - 1)) setSignupStep(nextStep);
@@ -1493,11 +1329,9 @@ const firstIncompleteStep = (status, profileRow = null) => {
   return status?.has_cell ? 3 : 2;
 };
 const PRIVATE_OMITTED_NOTE = "Private interests aren't kept while you confirm your email. Please pick them again.";
-const AREA_SAVE_ERROR = "We couldn't save your area. Please try again.";
 const INTERESTS_SAVE_ERROR = 'Your interests could not be saved. Please try again.';
 // The server refuses a private (sensitive) interest until the member gives the separate consent (D-038 R3, R2). The
 // client then opens the consent panel with this message.
-const SENSITIVE_CONSENT_ERROR = 'Private interests need your consent first.';
 const isSensitiveConsentError = (error) => /sensitive consent required/i.test(String(error?.message || ''));
 
 // After a profile exists: the app when onboarding is complete, else the completion flow at the first incomplete step.
@@ -1880,8 +1714,8 @@ const declareAdultStep = async () => {
 };
 const finishOnboarding = async (userId) => {
   await declareAdultStep();
-  if (areaChoice && areaChoice.kind !== 'keep') {
-    const choice = areaChoice;
+  const choice = areaPicker.choice;
+  if (choice && choice.kind !== 'keep') {
     const { data, error, status } = choice.kind === 'geo' ? await setHomeLocation(choice.lat, choice.lng) : await setHomeCity(choice.placeId);
     if (error) {
       setSignupStep(2);
@@ -2066,9 +1900,9 @@ signupForm?.addEventListener('submit', async (event) => {
     // Email confirmation: nothing can be written before a session exists. Keep the interests and only the KIND of
     // area choice (a city id, or "ask for my location again"); the coordinates are dropped here.
     // Interests as { id, points, mode } only, sensitive ones left out (asked for again after login), plus savedAt.
-    const pendingOnboarding = buildPendingOnboarding(budget, isSensitiveInterest, areaChoice);
+    const pendingOnboarding = buildPendingOnboarding(budget, isSensitiveInterest, areaPicker.choice);
     window.localStorage.setItem('brivia-pending-profile', JSON.stringify({ ...profile, ...pendingOnboarding, adultDeclared: true }));
-    areaChoice = null;
+    areaPicker.reset();
     const accountEmail = signupSuccess?.querySelector('[data-credential="account-email"]');
     if (accountEmail) accountEmail.textContent = profile.email;
     const successTitle = signupSuccess?.querySelector('[data-auth-success-title]');

@@ -77,3 +77,24 @@ export const reuseSentCode = (email, { sentTo = '', resendAt = 0 } = {}, now = D
 
 // An expired code sends a new one by itself at most once per Code screen, and never inside the resend wait.
 export const autoResendAllowed = ({ resendAt = 0, autoResent = false } = {}, now = Date.now()) => !autoResent && now >= resendAt;
+
+// The Reveal (Phase E Task 4). rows: deck_candidates rows (shared_interests: labels this member shares with the card).
+// Qualitative copy only, never a count: with a shared row it names the first of the member's picks that a row shares
+// (else the shared label itself); otherwise the member is one of the first in their area.
+const firstName = (name) => {
+  const clean = String(name || '').trim();
+  return clean && clean !== 'New Member' ? clean.split(/\s+/)[0] : '';
+};
+export const revealCopy = ({ name = '', picks = [], rows = [], area = '' } = {}) => {
+  const first = firstName(name);
+  const title = first ? `You're in, ${first}.` : "You're in.";
+  const shared = (Array.isArray(rows) ? rows : []).flatMap((row) => (Array.isArray(row?.shared_interests) ? row.shared_interests : []))
+    .map((label) => String(label || '').trim()).filter(Boolean);
+  if (shared.length) {
+    const keys = new Set(shared.map((label) => label.toLowerCase()));
+    const pick = (Array.isArray(picks) ? picks : []).find((item) => keys.has(String(item?.label || '').trim().toLowerCase()));
+    return { title, line: `People near you are into ${pick ? pick.label : shared[0]}. Your deck is ready.`, shared: true };
+  }
+  const place = String(area || '').replace(/\s*\(city-wide\)$/, '').trim();
+  return { title, line: `You're one of the first in ${place || 'your area'}. We'll bring people to you as the club grows.`, shared: false };
+};

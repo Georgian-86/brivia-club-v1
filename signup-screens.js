@@ -1,10 +1,13 @@
 // Phase E guided signup: one question per screen inside #guided-signup (auth.html). This module owns the shell (step
-// label, progress bar, Back, the pinned primary button) and the account screens: Welcome, Email, Code. Task 4 adds
-// the profile screens with registerScreen(name, { render, next }).
+// label, progress bar, Back, the pinned primary button) and the account screens: Welcome, Email, Code. The profile
+// screens (18+, Name, Area, Interests, Reveal) live in signup-profile-screens.js and register with
+// registerScreen(name, { render, next }).
 //
 // Screen contract: render(ctx) builds the screen into ctx.body under the heading ctx.title, sets the primary action
 // with ctx.primary(label, { onClick, disabled }) and may return a cleanup function. When a screen has next(ctx) and no
 // onClick, the primary button runs next (busy while pending); next resolves to the screen to show, or null to stay.
+// ctx.dock(node) puts a node in the dock: above the pinned primary on phones, beside the screen on wide desktops (the
+// Interests tray). ctx.hideBack() hides Back for the rest of the screen. ctx.root is #guided-signup.
 import { stepLabel, backTarget, resumeScreen, screenToShow, reuseSentCode, autoResendAllowed } from './signup-flow.js';
 import { otpBoxesAfterInput } from './otp-input.js';
 import { signupErrorCopy, codeSendErrorCopy, emailSendErrorCopy, expiredCodeCopy, otpErrorKind, OTP_WRONG } from './signup-errors.js';
@@ -16,24 +19,17 @@ const RESEND_WAIT_MS = 60 * 1000;
 const LEAVE_MS = 260;  // a little longer than the 200 ms swap, so the outgoing screen has finished fading
 const PATH_KEY = 'brivia-signup-path';
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
-// Headings for screens Task 4 has not registered yet (the shell still shows them, with the step label).
-const TITLES = {
-  adult: 'Are you 18 or older?',
-  name: 'What should members call you?',
-  area: 'Where are you based?',
-  interests: 'What are you into?',
-  reveal: "You're in.",
-};
 
 const registry = new Map();
-const state = { path: 'email', screen: null, email: '', sentAt: 0, resendAt: 0, session: null, methods: [] };
+// profile: the answers of the profile screens in this visit (signup-profile-screens.js); cleared on sign-out.
+const state = { path: 'email', screen: null, email: '', sentAt: 0, resendAt: 0, session: null, methods: [], profile: null };
 let deps = { activate: () => {}, login: () => {}, startGoogle: async () => null };
 let root = null;
 let shell = {};
 let primaryAction = null;
 let cleanup = null;
 
-const el = (tag, attrs = {}, children = []) => {
+export const el = (tag, attrs = {}, children = []) => {
   const node = document.createElement(tag);
   for (const [key, value] of Object.entries(attrs)) {
     if (value === false || value == null) continue;
@@ -54,6 +50,13 @@ const storedPath = () => { try { return window.sessionStorage.getItem(PATH_KEY);
 const realName = (value) => { const name = String(value || '').trim(); return name && name !== 'New Member' ? name : ''; };
 
 export const registerScreen = (name, def) => { registry.set(name, def); };
+// Signs the member out of this visit: the session, the profile answers and the stored path.
+export const signOutGuided = async () => {
+  try { await supabase?.auth.signOut(); } catch { /* signed out locally either way */ }
+  state.session = null;
+  state.profile = null;
+  try { window.sessionStorage.removeItem(PATH_KEY); } catch { /* storage unavailable */ }
+};
 export const guidedScreen = () => state.screen;
 
 const refreshSession = async () => {
@@ -136,19 +139,25 @@ export const showScreen = (requested, { history = 'push' } = {}) => {
   const body = el('div', { class: 'gs-body' });
   const inner = el('div', { class: 'gs-screen-inner', 'data-screen': name }, [title, body]);
   shell.secondary.replaceChildren();
+  shell.dock.replaceChildren();
+  shell.dock.hidden = true;
   setPrimary('');
-  const def = registry.get(name) || placeholder(name);
+  const def = registry.get(name) || registry.get('welcome');
+  let backHidden = false;
   const ctx = {
-    state, title, body,
+    state, title, body, root,
     primary: (label, opts = {}) => setPrimary(label, { ...opts, onClick: opts.onClick || (def.next ? () => runNext(def, ctx) : null) }),
     secondary: (...nodes) => shell.secondary.replaceChildren(...nodes.filter(Boolean)),
     go: (target, opts) => showScreen(target, opts),
     busy: (flag) => setBusy(shell.primary, flag),
     primaryButton: () => shell.primary,
+    dock: (node) => { shell.dock.replaceChildren(node); shell.dock.hidden = false; },
+    hideBack: () => { backHidden = true; shell.back.hidden = true; },
   };
   cleanup = def.render(ctx) || null;
   swapIn(inner);
   updateShell(name);
+  if (backHidden) shell.back.hidden = true;
   if (history !== 'none' && document.body.classList.contains('auth-page')) {
     const entry = { briviaAuthView: 'guided', signupScreen: name };
     const url = new URL(window.location.href);
@@ -168,13 +177,6 @@ const runNext = async (def, ctx) => {
   if (target) showScreen(target);
 };
 
-const placeholder = (name) => ({
-  render(ctx) {
-    ctx.title.textContent = TITLES[name] || '';
-    ctx.primary('Continue', { disabled: true });
-  },
-});
-
 // ---- Welcome ----------------------------------------------------------------------------------------------------------
 
 const googleMark = () => fillGoogleMark(el('span', { class: 'gs-google-mark', 'aria-hidden': 'true' }));
@@ -187,9 +189,7 @@ registerScreen('welcome', {
       const email = state.session.user?.email || '';
       const signOut = linkButton('Sign out', async () => {
         setBusy(signOut, true);
-        try { await supabase?.auth.signOut(); } catch { /* signed out locally either way */ }
-        state.session = null;
-        try { window.sessionStorage.removeItem(PATH_KEY); } catch { /* storage unavailable */ }
+        await signOutGuided();
         showScreen('welcome', { history: 'replace' });
       });
       ctx.body.append(
@@ -382,7 +382,7 @@ registerScreen('code', {
           const sendError = await sendAgain();
           message.textContent = expiredCodeCopy({ sent: !sendError, error: sendError });
         } else {
-          message.textContent = expiredCodeCopy({ sent: false });
+          message.textContent = expiredCodeCopy({ sent: false, resendReady: Date.now() >= state.resendAt });
         }
         inputs[0].focus();
         return;
@@ -451,7 +451,13 @@ export const initGuidedSignup = ({ activate, login, startGoogle, methods = [] } 
     host: root.querySelector('[data-signup-host]'),
     primary: root.querySelector('[data-signup-primary]'),
     secondary: root.querySelector('[data-signup-secondary]'),
+    dock: root.querySelector('[data-signup-dock]'),
+    actions: root.querySelector('[data-signup-actions]'),
   };
+  // The pinned actions bar's height (it grows with the dock): the phone layout keeps that much room under the screen.
+  if (typeof ResizeObserver === 'function') {
+    new ResizeObserver(() => root.style.setProperty('--gs-actions-h', `${Math.round(shell.actions.getBoundingClientRect().height)}px`)).observe(shell.actions);
+  }
   shell.primary.addEventListener('click', () => { if (!shell.primary.disabled) primaryAction?.(); });
   shell.back.addEventListener('click', () => {
     const target = backTarget(state.path, state.screen, Boolean(state.session));

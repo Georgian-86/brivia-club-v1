@@ -51,3 +51,10 @@ test('expiredCodeCopy says whether a new code went out', async () => {
   assert.equal(expiredCodeCopy({ sent: false, error: { status: 429, message: 'email rate limit exceeded' } }), `That code has expired. ${CODE_RATE_LIMITED}`);
   assert.equal(expiredCodeCopy({ sent: false }), 'That code has expired. Tap Resend for a new one.');
 });
+
+test('expiredCodeCopy never asks for a tap on Resend while it is still counting down', async () => {
+  const { expiredCodeCopy } = await import('../../signup-errors.js');
+  assert.equal(expiredCodeCopy({ sent: false, resendReady: false }), 'That code has expired. Resend will be available in a moment.');
+  assert.equal(expiredCodeCopy({ sent: false, resendReady: true }), 'That code has expired. Tap Resend for a new one.');
+  assert.equal(expiredCodeCopy({ sent: true, resendReady: false }), "That code has expired. We've sent you a new one.");
+});

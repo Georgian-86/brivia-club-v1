@@ -66,3 +66,14 @@ test('dataUrlToFile refuses anything that is not a base64 image data URL', () =>
   assert.equal(dataUrlToFile('data:image/png;base64,***'), null);
   assert.equal(dataUrlToFile(null), null);
 });
+
+test('areaPickerHtml prefixes every id and wires the combobox to its list', async () => {
+  const { areaPickerHtml } = await import('../../area-pick.js');
+  const html = areaPickerHtml({ prefix: 'signup-area' });
+  for (const id of ['signup-area-city-panel', 'signup-area-city-search', 'signup-area-city-hint', 'signup-area-city-results']) assert.ok(html.includes(`id="${id}"`), id);
+  assert.ok(html.includes('aria-controls="signup-area-city-results"'));
+  assert.ok(html.includes('aria-controls="signup-area-city-panel"'));
+  assert.ok(!html.includes('data-area-explainer'), 'no explainer unless asked');
+  assert.ok(areaPickerHtml({ prefix: 'area', explainer: true }).includes('data-area-explainer'));
+  assert.ok(!/id="area-/.test(html), 'no unprefixed ids');
+});
