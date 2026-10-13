@@ -21,6 +21,8 @@
 --     Pairs without a tester behave exactly as before.
 --   * Section 4 (Phase D, Task 2): the 0003 post-image CHECK becomes a trigger with the same rule for everyone, plus a
 --     preset illustration (empty image_path) for an is_test author only, so the seed's posts show an image.
+--   * Section 5 (Phase D, Task 3): deck_why(target), "Why this person?" for callers in the test world only: the deck
+--     card's shared interests and band and the deck's order keys for that target; no row for anyone else.
 --   * cell_density keeps its column name is_test, but refresh_cell_density fills it from brivia_in_test_world, so a
 --     tester is counted in the test world's density while a tester.
 -- Semantics are unchanged for everyone who is not a tester. A tester sees only the test world and is seen only by it.
@@ -714,3 +716,88 @@ alter table public.community_posts drop constraint if exists community_posts_ima
 drop trigger if exists brivia_zz_posts_image_rule on public.community_posts;
 create trigger brivia_zz_posts_image_rule before insert or update on public.community_posts
   for each row execute function public.brivia_posts_image_rule();
+
+
+-- =============================================================================================
+-- 5. "Why this person?" for the test world (Phase D, Task 3)
+-- =============================================================================================
+-- deck_why(p_target): why the interim deck shows p_target to the caller, for testers checking the deck. It answers
+-- only when the caller is in the test world (a tester or a test member) and p_target is a member the caller's deck
+-- admits: the same `me`, `near` and admission rules as deck_candidates above, the single visibility rule
+-- (brivia_visible_to: completed, same world, no block either way), and the same band, labels and order keys. It
+-- leaves out only the caller's own-history hides (matched, signalled, passed), which say why a card is gone, not why
+-- it is shown. Anyone else (a real member, an invisible, unknown or own id, a target outside the deck's 60 km pool)
+-- gets no row, never an error, so a client cannot tell "not a tester" from "no answer".
+--   * shared_interests and distance_band: exactly the deck card's (at most 2 labels; '~3 km', '~10 km', a place
+--     name or 'Abroad'; never a km figure, cell, ring distance or coordinate).
+--   * rank_keys: the deck's order keys for this pair, in order: has_shared (key 1), ring (key 2: the display ring,
+--     0 '~3 km', 1 '~10 km', 2 the place tier), overlap_level (key 3: 0 none, 1 low, 2 mid, 3 high), tie_break (key 4,
+--     always 'daily': the rotating md5 tie key itself is not returned), plus shared_count (the shared-id count the
+--     deck's impression row logs). The exact overlap is not returned.
+-- Stable: it writes no impression (it is not a serving surface). Executable by authenticated only.
+-- (supabase/tests/d-tester-world.test.sql, sections 2b and 3b)
+create or replace function public.deck_why(p_target uuid)
+returns table(shared_interests text[], distance_band text, rank_keys jsonb)
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  with me as (
+    select p.id, public.brivia_in_test_world(p.id) as in_test_world, o.home_cell, o.precision, vp.country, vp.lat as place_lat, vp.lng as place_lng,
+           substring(o.home_cell from '^g7:(\d+):')::int as g7row
+      from public.profiles p
+      join public.member_orbit o on o.member_id = p.id and o.cell_scheme = 'grid1'
+      join public.place vp on vp.id = o.place_id
+     where p.id = auth.uid() and public.brivia_member_completed(p.id) and public.brivia_in_test_world(p.id)
+  ),
+  near as (  -- deck_candidates' near, for the one target
+    select o.member_id as tid, tp.name as place_name, tp.country,
+           case when me.precision = 'cell' and o.precision = 'cell' and o.home_cell ~ '^g7:'
+                     and abs(substring(o.home_cell from '^g7:(\d+):')::int - me.g7row) <= 8
+                     and public.brivia_cell_ok(o.home_cell, me.in_test_world, 10)
+                then public.brivia_ring(public.brivia_cell_km(me.home_cell, o.home_cell)) end as fine_ring,
+           public.brivia_haversine_km(me.place_lat, me.place_lng, tp.lat, tp.lng) as place_km
+      from me
+      join public.member_orbit o on o.member_id = p_target and o.member_id <> me.id and o.cell_scheme = 'grid1'
+      join public.profiles t on t.id = o.member_id and public.brivia_in_test_world(t.id) = me.in_test_world
+      join public.place tp on tp.id = o.place_id
+  ),
+  pool as (  -- deck_candidates' admission rules and the single visibility rule (not its own-history hides)
+    select n.* from near n, me
+     where (n.fine_ring <= 1 or n.place_km <= 60)
+       and public.brivia_visible_to(me.id, n.tid)
+  ),
+  shared as (
+    select pool.tid, count(*)::int as n, sum(least(mv.points, mt.points))::numeric / 20 as overlap,
+           (array_agg(nd.label order by mv.points + mt.points desc, nd.label))[1:2] as labels
+      from pool
+      join public.member_interest mt on mt.member_id = pool.tid
+      join public.member_interest mv on mv.member_id = (select me.id from me) and mv.interest_id = mt.interest_id
+      join public.interest_node nd on nd.id = mt.interest_id and nd.status = 'active' and not nd.sensitive
+     group by pool.tid
+  ),
+  banded as (
+    select pool.tid, pool.place_name, coalesce(s.n, 0) as shared_n,
+           case when coalesce(s.overlap, 0) = 0 then 0 when s.overlap <= 0.25 then 1 when s.overlap <= 0.5 then 2
+                else 3 end as overlap_level,
+           coalesce(s.labels, '{}'::text[]) as labels,
+           case when pool.fine_ring <= 1 then pool.fine_ring else 2 end as display_ring,
+           pool.country is distinct from me.country as abroad
+      from pool
+      cross join me
+      left join shared s on s.tid = pool.tid
+  )
+  select b.labels,
+         case
+           when b.abroad then 'Abroad'
+           when b.display_ring = 0 then '~3 km'
+           when b.display_ring = 1 then '~10 km'
+           else b.place_name
+         end,
+         jsonb_build_object('has_shared', b.shared_n > 0, 'shared_count', b.shared_n, 'ring', b.display_ring,
+                            'overlap_level', b.overlap_level, 'tie_break', 'daily')
+    from banded b
+$$;
+revoke all on function public.deck_why(uuid) from public, anon;
+grant execute on function public.deck_why(uuid) to authenticated;

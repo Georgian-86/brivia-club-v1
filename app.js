@@ -29,6 +29,7 @@ import { postImageSrc } from './post-image.js';
 import { profileChecklist } from './profile-checklist.js';
 import { quotaLabel, quotaErrorText, quotaBlocked, quotaNotice } from './signal-quota.js';
 import { pitchLine, deckChips, deckEmptyState, deckFields, bandNote } from './deck-view.js';
+import { whyPanelMarkup, whyRow } from './why-panel.js';
 import { chatEmojiCategories } from './chat-emoji-data.js';
 import { chatGifCatalog } from './chat-gif-data.js';
 import './chat-attachments.css';
@@ -588,6 +589,61 @@ const setDeckLoading = (card, loading) => {
   if (loading && !skeleton) card.insertAdjacentHTML('beforeend', skeletonMarkup('deck'));
   if (!loading) skeleton?.remove();
 };
+// "Why this person?" (Phase D, Task 3): testers only. rpc/deck_why (0008 section 5) answers a row only to a caller in
+// the test world. The first card shown asks once; no row (or an error, e.g. before 0008 is applied) means "not a
+// tester" for this page (memory only) and the client never asks again. A tester's cards each ask once (cached by id);
+// a card with no row shows no button. The panel shows the band label, the shared interests and the deck's order keys.
+const why = { tester: null, rows: new Map(), pending: new Set() };
+const setWhyOpen = (open) => {
+  const toggle = document.querySelector('#why-toggle');
+  const panel = document.querySelector('#why-panel');
+  if (!toggle || !panel) return;
+  toggle.setAttribute('aria-expanded', String(open));
+  panel.hidden = !open;
+};
+const renderWhy = (person) => {
+  const toggle = document.querySelector('#why-toggle');
+  const panel = document.querySelector('#why-panel');
+  if (!toggle || !panel) return;
+  const id = person?.id ? String(person.id) : '';
+  const row = id ? why.rows.get(id) : null;
+  if (!row) {
+    if (toggle === document.activeElement) toggle.blur();
+    toggle.hidden = true;
+    setWhyOpen(false);
+    panel.replaceChildren();
+    delete panel.dataset.for;
+  } else if (panel.dataset.for !== id) {
+    panel.innerHTML = `<p class="why-title">Why ${escapeHtml(person.name || 'this person')}?</p>${whyPanelMarkup(row)}`;
+    panel.dataset.for = id;
+    setWhyOpen(false);
+    toggle.hidden = false;
+  }
+  if (!id || !supabase || why.tester === false || why.rows.has(id) || why.pending.has(id)) return;
+  if (why.tester === null && why.pending.size) return;   // the first answer decides whether to ask at all
+  why.pending.add(id);
+  supabase.rpc('deck_why', { p_target: id }).then(({ data, error }) => {
+    const found = error ? null : whyRow(data);
+    if (found) why.tester = true;
+    else if (why.tester === null) why.tester = false;
+    why.rows.set(id, found);
+  }, () => {
+    if (why.tester === null) why.tester = false;
+    why.rows.set(id, null);
+  }).finally(() => {
+    why.pending.delete(id);
+    if (why.tester) renderWhy(currentPerson);
+  });
+};
+document.querySelector('#why-toggle')?.addEventListener('click', (event) => {
+  setWhyOpen(event.currentTarget.getAttribute('aria-expanded') !== 'true');
+});
+document.querySelector('#swipe-card')?.addEventListener('keydown', (event) => {
+  if (event.key !== 'Escape' || document.querySelector('#why-panel')?.hidden !== false) return;
+  if (!event.target.closest?.('#why-toggle, #why-panel')) return;
+  setWhyOpen(false);
+  document.querySelector('#why-toggle')?.focus();
+});
 const renderHome = (queue = getExplorePeople()) => {
   const card = document.querySelector('#swipe-card');
   const actions = document.querySelector('.swipe-actions');
@@ -595,6 +651,7 @@ const renderHome = (queue = getExplorePeople()) => {
   const limitState = document.querySelector('#swipe-limit-state');
   const emptyState = document.querySelector('#home-empty-state');
   if (!currentPerson && deckLoadingNow()) {
+    renderWhy(null);
     card?.removeAttribute('hidden');
     setDeckLoading(card, true);
     actions?.setAttribute('hidden', '');
@@ -605,6 +662,7 @@ const renderHome = (queue = getExplorePeople()) => {
   }
   setDeckLoading(card, false);
   if (!currentPerson) {
+    renderWhy(null);
     card?.setAttribute('hidden', '');
     actions?.setAttribute('hidden', '');
     hint?.setAttribute('hidden', '');
@@ -647,6 +705,7 @@ const renderHome = (queue = getExplorePeople()) => {
   const count = document.querySelector('#queue-count');
   if (count) count.textContent = `${String(currentIndex + 1).padStart(2, '0')} / ${String(queue.length).padStart(2, '0')}`;
   card?.classList.remove('is-passing', 'is-liking');
+  renderWhy(currentPerson);
 };
 
 // Mutual consent (docs/VISION.md, CLAUDE.md): the client never writes `matches`. A like or a pitch sends one signal

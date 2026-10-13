@@ -16,6 +16,8 @@
 //   myInterests   rpc/my_interests rows (default 3)         posts                  GET community_posts rows (default [])
 //   messages      GET brivia_messages rows (default [])     own, placeLabel        my profiles row / my area label
 //   myInterestsFail  rpc/my_interests answers 500
+//   why           rpc/deck_why (Phase D Task 3): null (default) answers [] for every target (a real member); an object
+//                 { [target id]: row } answers [row] for a listed target and [] otherwise (a tester)
 //   routes        per-route overrides (Phase C Task 6), keyed by the path after /rest/v1/ ('rpc/deck_candidates',
 //                 'community_posts'), optionally prefixed by a method ('POST community_posts'; the method key wins):
 //                 { delayMs, status } waits delayMs before answering, and a status >= 400 answers that error instead;
@@ -47,7 +49,7 @@ const accessToken = `${b64url({ alg: 'HS256', typ: 'JWT' })}.${b64url({ sub: ME,
 export const user = { id: ME, aud: 'authenticated', role: 'authenticated', email: ownRow.email, user_metadata: { name: 'Alex Me' }, app_metadata: {}, created_at: ownRow.created_at };
 export const session = { access_token: accessToken, refresh_token: 'stub-refresh', token_type: 'bearer', expires_in: 3600, expires_at: exp, user };
 
-export const freshState = () => ({ status: 'caught_up', emptyDeck: false, deckFail: false, matchAll: false, onboarding: [true], onboardingCalls: 0, passed: new Set(), signalled: new Set(), remaining: 30, resetsAt: null, matchIds: [], search: [], report: 'ok', rows: null });
+export const freshState = () => ({ status: 'caught_up', emptyDeck: false, deckFail: false, matchAll: false, onboarding: [true], onboardingCalls: 0, passed: new Set(), signalled: new Set(), remaining: 30, resetsAt: null, matchIds: [], search: [], report: 'ok', rows: null, why: null });
 
 export const startAppStub = async ({ port, state = {}, deckRows = defaultDeckRows } = {}) => {
   const st = state;
@@ -108,6 +110,7 @@ export const startAppStub = async ({ port, state = {}, deckRows = defaultDeckRow
         return json(200, (st.rows || deckRows).filter((row) => !st.passed.has(row.id) && !st.signalled.has(row.id)).slice(0, Number(args.p_limit) || 12));
       }
       if (pathName === '/rest/v1/rpc/deck_status') return json(200, st.status);
+      if (pathName === '/rest/v1/rpc/deck_why') return json(200, st.why && st.why[args.p_target] ? [st.why[args.p_target]] : []);
       if (pathName === '/rest/v1/rpc/my_signal_quota') return json(200, [{ daily_limit: 30, remaining: st.remaining, resets_at: st.resetsAt, live_unanswered: 0, live_limit: 100 }]);
       if (pathName === '/rest/v1/rpc/send_signal') {
         st.signalled.add(args.p_to); st.remaining = Math.max(0, st.remaining - 1); st.resetsAt = '2026-10-04T15:00:00+00:00';

@@ -188,6 +188,30 @@ end $$;
 create or replace function pg_temp.ids(variadic n int[]) returns uuid[] language sql immutable as $$
   select coalesce(array_agg(pg_temp.tw(x) order by pg_temp.tw(x)), '{}') from unnest(n) u(x) $$;
 
+-- deck_why (Task 3) as the viewer: the one row as jsonb, or null when it returns nothing; '{"rows":n}' when n > 1.
+create or replace function pg_temp.why(p_viewer uuid, p_target uuid) returns jsonb language plpgsql as $$
+declare r jsonb; n int;
+begin
+  set local role authenticated;
+  perform set_config('request.jwt.claims', json_build_object('sub', p_viewer)::text, true);
+  select count(*), (array_agg(to_jsonb(w)))[1] into n, r from public.deck_why(p_target) w;
+  reset role;
+  if n > 1 then return jsonb_build_object('rows', n); end if;
+  return r;
+end $$;
+
+-- the deck_candidates row for p_target as the viewer (band and labels only), or null
+create or replace function pg_temp.deck_row(p_viewer uuid, p_target uuid) returns jsonb language plpgsql as $$
+declare r jsonb;
+begin
+  set local role authenticated;
+  perform set_config('request.jwt.claims', json_build_object('sub', p_viewer)::text, true);
+  select jsonb_build_object('distance_band', d.distance_band, 'shared_interests', d.shared_interests) into r
+    from public.deck_candidates(20) d where d.id = p_target;
+  reset role;
+  return r;
+end $$;
+
 
 -- 1. Shape and privileges: brivia_tester is owner-only; brivia_in_test_world is an internal definer helper.
 do $$
@@ -250,6 +274,22 @@ begin
   if pg_temp.deck_ids(pg_temp.tw(1)) <> pg_temp.ids(2) then raise exception 'FAIL before: T1 deck %', pg_temp.deck_ids(pg_temp.tw(1)); end if;
 end $$;
 
+-- 2b. deck_why (Task 3): a real member gets nothing, even for a member on its own deck; only definer, authenticated.
+do $$
+declare r1 uuid := pg_temp.tw(3); r2 uuid := pg_temp.tw(4);
+begin
+  if to_regprocedure('public.deck_why(uuid)') is null then raise exception 'FAIL why: public.deck_why(uuid) missing'; end if;
+  if not (select prosecdef from pg_proc where oid = 'public.deck_why(uuid)'::regprocedure) then
+    raise exception 'FAIL why: deck_why must be security definer'; end if;
+  if has_function_privilege('anon', 'public.deck_why(uuid)', 'execute')
+     or not has_function_privilege('authenticated', 'public.deck_why(uuid)', 'execute') then
+    raise exception 'FAIL why: deck_why must be executable by authenticated only'; end if;
+  if pg_temp.deck_row(r1, r2) is null then raise exception 'FAIL why setup: R2 is not on real R1''s deck'; end if;
+  if pg_temp.why(r1, r2) is not null then
+    raise exception 'FAIL why: deck_why returns nothing for a real member, got %', pg_temp.why(r1, r2); end if;
+  if pg_temp.why(r2, r1) is not null then raise exception 'FAIL why: real R2 got a row for R1'; end if;
+end $$;
+
 -- 3. R1 becomes a tester (the founder's one-line insert). is_test is untouched.
 insert into public.brivia_tester(member_id) values ('de7e57e7-e7e7-4e7e-a7e7-e7e7e7e7e703') on conflict do nothing;
 
@@ -279,6 +319,47 @@ begin
   if pg_temp.deck_ids(pg_temp.tw(1)) <> pg_temp.ids(2, 3) then raise exception 'FAIL test: T1 deck %', pg_temp.deck_ids(pg_temp.tw(1)); end if;
   if pg_temp.cand_ids(pg_temp.tw(1)) <> pg_temp.ids(2, 3) then raise exception 'FAIL test: T1 candidates %', pg_temp.cand_ids(pg_temp.tw(1)); end if;
   if pg_temp.search_ids(pg_temp.tw(1)) <> pg_temp.ids(2, 3) then raise exception 'FAIL test: T1 search %', pg_temp.search_ids(pg_temp.tw(1)); end if;
+end $$;
+
+-- 3b. deck_why (Task 3): a tester viewing a test member gets the same band and shared interests as its deck card,
+-- with the deck's order keys; an invisible target (another world, blocked, unknown, itself) gets nothing; no row is
+-- logged (deck_why is not a serving surface).
+do $$
+declare r1 uuid := pg_temp.tw(3); r2 uuid := pg_temp.tw(4); t2 uuid := pg_temp.tw(2); w jsonb; d jsonb; n0 int; n1 int;
+begin
+  select count(*) into n0 from public.interaction where viewer_id = r1;
+  w := pg_temp.why(r1, t2);
+  select count(*) into n1 from public.interaction where viewer_id = r1;
+  if w is null then raise exception 'FAIL why: tester R1 got no row for test member T2'; end if;
+  if n1 <> n0 then raise exception 'FAIL why: deck_why wrote % interaction rows', n1 - n0; end if;
+  d := pg_temp.deck_row(r1, t2);
+  if d is null then raise exception 'FAIL why setup: T2 is not on tester R1''s deck'; end if;
+  if w -> 'shared_interests' <> d -> 'shared_interests' or w ->> 'distance_band' <> d ->> 'distance_band' then
+    raise exception 'FAIL why: deck_why % differs from the deck card %', w, d; end if;
+  -- no cell_density rows here, so the band is the place tier (the place name), as on the deck card
+  if w ->> 'distance_band' <> (select pl.name from public.member_orbit o join public.place pl on pl.id = o.place_id
+                                where o.member_id = t2)
+     or w -> 'shared_interests' <> to_jsonb(array[(select label from public.interest_node where id = 'sports.racket.badminton')]) then
+    raise exception 'FAIL why: expected T2''s place and the badminton label, got %', w; end if;
+  if (select array_agg(k order by k) from jsonb_object_keys(w -> 'rank_keys') k)
+     <> array['has_shared', 'overlap_level', 'ring', 'shared_count', 'tie_break'] then
+    raise exception 'FAIL why: rank_keys %', w -> 'rank_keys'; end if;
+  if (w #>> '{rank_keys,has_shared}')::boolean is not true or (w #>> '{rank_keys,shared_count}')::int <> 1
+     or (w #>> '{rank_keys,ring}')::int <> 2 or (w #>> '{rank_keys,overlap_level}')::int <> 3
+     or w #>> '{rank_keys,tie_break}' <> 'daily' then
+    raise exception 'FAIL why: rank_keys values %', w -> 'rank_keys'; end if;
+  -- nothing for an invisible target
+  if pg_temp.why(r1, r2) is not null then raise exception 'FAIL why: tester R1 got a row for real R2'; end if;
+  if pg_temp.why(r1, r1) is not null then raise exception 'FAIL why: R1 got a row for itself'; end if;
+  if pg_temp.why(r1, '00000000-0000-4000-8000-0000000000ff') is not null then
+    raise exception 'FAIL why: a row for an unknown id'; end if;
+  if pg_temp.why(r1, null) is not null then raise exception 'FAIL why: a row for null'; end if;
+  insert into public.brivia_blocks (blocker_id, blocked_id) values (t2, r1);
+  if pg_temp.why(r1, t2) is not null then raise exception 'FAIL why: a row for a test member who blocked R1'; end if;
+  delete from public.brivia_blocks where blocker_id = t2 and blocked_id = r1;
+  -- real R2 still gets nothing, for anyone
+  if pg_temp.why(r2, t2) is not null or pg_temp.why(r2, r1) is not null then
+    raise exception 'FAIL why: real R2 got a row'; end if;
 end $$;
 
 -- 4. T1 can request R1, and a match forms only by mutual consent; then both can message.

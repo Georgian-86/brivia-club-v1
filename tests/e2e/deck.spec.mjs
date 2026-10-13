@@ -65,7 +65,7 @@ const check = (name, fn) => { try { fn(); results.push(['PASS', name]); } catch 
 // One mutable stub serves every context; tests change it between page loads (tests/e2e/app-stub.mjs).
 // onboarding: the my_onboarding_status answers in order (the last one repeats); 'error' answers HTTP 500.
 // matchIds: members I am matched with (GET /rest/v1/matches); search: the rpc/search_members answer.
-const fresh = () => ({ status: 'caught_up', emptyDeck: false, deckFail: false, matchAll: false, onboarding: [true], onboardingCalls: 0, passed: new Set(), signalled: new Set(), remaining: 30, resetsAt: null, matchIds: [], search: [], report: 'ok', rows: null });
+const fresh = () => ({ status: 'caught_up', emptyDeck: false, deckFail: false, matchAll: false, onboarding: [true], onboardingCalls: 0, passed: new Set(), signalled: new Set(), remaining: 30, resetsAt: null, matchIds: [], search: [], report: 'ok', rows: null, why: null });
 const st = { ...fresh(), calls: [], bodies: [] };
 const resetStub = (patch = {}) => Object.assign(st, fresh(), patch);
 const stub = await startAppStub({ port: PORT, state: st, deckRows });
@@ -694,6 +694,122 @@ try {
     assert.match(chatFocus.toast, /won't see Asha Band again/);
   });
   await chatCtx.close();
+
+  // 7d. Phase D, Task 3: "Why this person?" for testers only (rpc/deck_why answers a row only in the test world).
+  const WHY_SHOTS = process.env.WHY_SHOTS || '';
+  const whyCalls = () => st.calls.filter((c) => c.path === '/rest/v1/rpc/deck_why');
+  const whyRowA = { shared_interests: ['Badminton', 'Chess'], distance_band: '~3 km', rank_keys: { has_shared: true, shared_count: 2, ring: 0, overlap_level: 3, tie_break: 'daily' } };
+  const whyRowB = { shared_interests: ['Badminton'], distance_band: 'Pune', rank_keys: { has_shared: true, shared_count: 1, ring: 2, overlap_level: 2, tie_break: 'daily' } };
+  const whyState = (page) => page.evaluate(() => {
+    const toggle = document.querySelector('#why-toggle');
+    const panel = document.querySelector('#why-panel');
+    const box = (el) => { const r = el?.getBoundingClientRect(); return r ? { top: r.top, bottom: r.bottom, left: r.left, right: r.right, height: r.height, width: r.width } : null; };
+    const visible = (el) => Boolean(el) && !el.hidden && getComputedStyle(el).display !== 'none' && el.getBoundingClientRect().height > 0;
+    return {
+      toggle: visible(toggle), text: toggle?.textContent?.trim() || '', expanded: toggle?.getAttribute('aria-expanded'),
+      controls: toggle?.getAttribute('aria-controls'), panel: visible(panel), panelText: panel?.innerText?.replace(/\s+/g, ' ').trim() || '',
+      toggleBox: box(toggle), panelBox: box(panel), cardBox: box(document.querySelector('#swipe-card')),
+      actions: [...document.querySelectorAll('.swipe-actions button')].map(box),
+      fonts: panel ? [...panel.querySelectorAll('*')].filter((el) => el.childNodes.length && [...el.childNodes].some((n) => n.nodeType === 3 && n.textContent.trim())).map((el) => parseFloat(getComputedStyle(el).fontSize)) : [],
+      toggleFont: toggle ? parseFloat(getComputedStyle(toggle).fontSize) : 0,
+      pageScroll: document.documentElement.scrollWidth - window.innerWidth,
+    };
+  });
+  const overlaps = (a, b) => a && b && a.left < b.right && b.left < a.right && a.top < b.bottom && b.top < a.bottom;
+  for (const [label, viewport] of [['1440', { width: 1440, height: 900 }], ['375', { width: 375, height: 812 }]]) {
+    resetStub({ why: { [A]: whyRowA, [B]: whyRowB } });
+    const whyStart = whyCalls().length;
+    const testerCtx = await makeContext(viewport);
+    const tp = await open(testerCtx);
+    await waitForCard(tp, 'Asha Band');
+    const shown = await tp.waitForFunction(() => { const t = document.querySelector('#why-toggle'); return t && !t.hidden && t.getBoundingClientRect().height > 0; }, null, { timeout: 5000 }).then(() => true, () => false);
+    let w = await whyState(tp);
+    check(`${label}: a tester sees "Why this person?" on the card, collapsed (${JSON.stringify([shown, w.text, w.expanded, w.controls])})`, () => {
+      assert.equal(shown, true); assert.equal(w.text, 'Why this person?'); assert.equal(w.expanded, 'false');
+      assert.equal(w.controls, 'why-panel'); assert.equal(w.panel, false);
+    });
+    check(`${label}: deck_why was asked for the shown card (${JSON.stringify(whyCalls().slice(whyStart).map((c) => c.body))})`, () => {
+      assert.ok(whyCalls().length > whyStart); assert.deepEqual(JSON.parse(whyCalls()[whyStart].body), { p_target: A });
+    });
+    check(`${label}: the toggle is a 44 px target with text >= 12 px (${JSON.stringify([w.toggleBox?.height, w.toggleFont])})`, () => {
+      assert.ok(w.toggleBox.height >= 44); assert.ok(w.toggleFont >= 12);
+    });
+    if (WHY_SHOTS) await tp.locator('#swipe-card').screenshot({ path: path.join(WHY_SHOTS, `why-closed-${label}.png`) });
+    await tp.locator('#why-toggle').click();
+    await tp.waitForTimeout(300);
+    w = await whyState(tp);
+    check(`${label}: the panel opens and lists the shared interests, the band and the rank keys (${w.panelText.slice(0, 160)})`, () => {
+      assert.equal(w.expanded, 'true'); assert.equal(w.panel, true);
+      assert.match(w.panelText, /You both: Badminton, Chess/);
+      assert.match(w.panelText, /Distance: ~3 km/);
+      assert.match(w.panelText, /Shares an interest Yes, 2 in common/);
+      assert.match(w.panelText, /Interest overlap High/);
+    });
+    check(`${label}: the open panel stays inside the card, covers neither Pass nor Pitch, text >= 12 px, no page scroll (${JSON.stringify({ panel: w.panelBox, card: w.cardBox, fonts: [...new Set(w.fonts)], scroll: w.pageScroll })})`, () => {
+      assert.ok(w.panelBox.top >= w.cardBox.top - 0.5 && w.panelBox.bottom <= w.cardBox.bottom + 0.5);
+      assert.ok(w.panelBox.left >= w.cardBox.left - 0.5 && w.panelBox.right <= w.cardBox.right + 0.5);
+      w.actions.forEach((a) => assert.ok(!overlaps(a, w.panelBox) && !overlaps(a, w.toggleBox)));
+      assert.ok(w.fonts.length > 0); w.fonts.forEach((f) => assert.ok(f >= 12));
+      assert.ok(w.pageScroll <= 1);
+    });
+    const whyAxe = await axeViolations(tp, { include: '#swipe-card', decorative: ['.swipe-card-info::before'] });
+    check(`${label}: axe finds nothing on the card with the panel open (${whyAxe.join(' | ').slice(0, 300)})`, () => assert.deepEqual(whyAxe, []));
+    if (WHY_SHOTS) await tp.locator('#swipe-card').screenshot({ path: path.join(WHY_SHOTS, `why-panel-${label}.png`) });
+    if (WHY_SHOTS) await tp.screenshot({ path: path.join(WHY_SHOTS, `why-panel-page-${label}.png`) });
+    // Keyboard: Enter on the focused toggle closes it, Space opens it again, Escape closes and keeps focus on it.
+    await tp.locator('#why-toggle').focus();
+    await tp.keyboard.press('Enter');
+    const afterEnter = (await whyState(tp)).expanded;
+    await tp.keyboard.press(' ');
+    const afterSpace = (await whyState(tp)).expanded;
+    await tp.keyboard.press('Escape');
+    const afterEsc = await tp.evaluate(() => ({ expanded: document.querySelector('#why-toggle').getAttribute('aria-expanded'), focus: document.activeElement?.id, panelHidden: document.querySelector('#why-panel').hidden }));
+    check(`${label}: keyboard toggles the panel; Escape closes it and keeps focus (${JSON.stringify([afterEnter, afterSpace, afterEsc])})`, () => {
+      assert.equal(afterEnter, 'false'); assert.equal(afterSpace, 'true');
+      assert.deepEqual(afterEsc, { expanded: 'false', focus: 'why-toggle', panelHidden: true });
+    });
+    // The next card: the panel starts closed and explains that card.
+    await tp.locator('#why-toggle').click();
+    await tp.locator('[data-action="pass"]').click();
+    await waitForCard(tp, 'Bilal Place');
+    await tp.waitForFunction(() => document.querySelector('#why-panel')?.dataset.for === 'aaaaaaaa-aaaa-4aaa-8aaa-000000000002', null, { timeout: 5000 }).catch(() => {});
+    w = await whyState(tp);
+    const bExpanded = w.expanded;
+    await tp.locator('#why-toggle').click();
+    w = await whyState(tp);
+    check(`${label}: the next card's panel starts closed and explains that card (${JSON.stringify([bExpanded, w.panelText.slice(0, 120)])})`, () => {
+      assert.equal(bExpanded, 'false'); assert.match(w.panelText, /You both: Badminton/); assert.match(w.panelText, /Distance: Pune/);
+      assert.match(w.panelText, /Distance tier Same area/); assert.doesNotMatch(w.panelText, /Chess/);
+    });
+    // A card deck_why has no row for (C): no button, the tester is still a tester.
+    await tp.locator('[data-action="pass"]').click();
+    await waitForCard(tp, 'Chen Abroad');
+    await tp.waitForFunction(() => [...performance.getEntriesByType('resource')].filter((e) => e.name.includes('/rpc/deck_why')).length >= 3, null, { timeout: 5000 }).catch(() => {});
+    await tp.waitForTimeout(300);
+    w = await whyState(tp);
+    check(`${label}: no button on a card deck_why has no row for (${JSON.stringify([w.toggle, whyCalls().length])})`, () => { assert.equal(w.toggle, false); assert.equal(w.panel, false); });
+    await testerCtx.close();
+  }
+
+  // A real member: deck_why answers [] once; the client never asks again this session and shows no button.
+  resetStub();
+  const whyBefore = whyCalls().length;   // st.calls spans the whole run
+  const realCtx = await makeContext({ width: 1440, height: 900 });
+  const rp = await open(realCtx);
+  await waitForCard(rp, 'Asha Band');
+  await rp.waitForFunction(() => performance.getEntriesByType('resource').some((e) => e.name.includes('/rpc/deck_why')), null, { timeout: 5000 }).catch(() => {});
+  await rp.waitForTimeout(300);
+  const firstCalls = whyCalls().length - whyBefore;
+  for (const next of ['Bilal Place', 'Chen Abroad', 'Dana Blank']) {
+    await rp.locator('[data-action="pass"]').click();
+    await waitForCard(rp, next);
+  }
+  await rp.waitForTimeout(500);
+  const realWhy = await whyState(rp);
+  check(`a real member asks rpc/deck_why once, never again after the negative, and sees no button (${JSON.stringify([firstCalls, whyCalls().length - whyBefore, realWhy.toggle])})`, () => {
+    assert.equal(firstCalls, 1); assert.equal(whyCalls().length - whyBefore, 1); assert.equal(realWhy.toggle, false); assert.equal(realWhy.panel, false);
+  });
+  await realCtx.close();
 
   // 8. Privacy across the run.
   const storedKeys = await (async () => { const ctx = await makeContext({ width: 800, height: 600 }); const p2 = await open(ctx); await p2.waitForTimeout(800); const keys = await p2.evaluate(() => Object.entries(window.localStorage).map(([k, v]) => `${k}=${v}`)); await ctx.close(); return keys; })();

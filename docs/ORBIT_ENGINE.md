@@ -553,6 +553,13 @@ saturated, the outer rings relax first, instead of the deck repeating saturated 
     `~3 km` (fine, ring 0), `~10 km` (fine, ring 1) or the target's place name (every place-rule admission). So
     `~3 km` / `~10 km` appear only between two `cell`-precision members when the target's own g7 cell is `ok10`. The
     g6 / g5 band levels of D-034 are gone (J2: any coarsened card already showed a place-level label).
+  - **`deck_why(p_target)`** (0008 section 5, Phase D) explains one card, for the test world only: a row only when
+    the caller is in the test world (`brivia_in_test_world`) and the deck's pool rules admit the target (the same
+    `me`/`near`/admission and `brivia_visible_to`; the own-history hides are left out). It returns the card's own
+    `shared_interests` and `distance_band` and `rank_keys` = the order keys above for that pair: `has_shared` (1),
+    `ring` (2, the display ring), `overlap_level` (3), `tie_break: 'daily'` (4; the md5 key is not returned), plus
+    `shared_count`. Never a km figure, the exact overlap, a cell or a coordinate. `stable`: it logs no impression.
+    Anyone else gets no row (not an error). The client asks once per page for a real member and caches the negative.
   - **`deck_status()`** says why the deck is empty, never with a count: `complete_profile` (caller not completed),
     `no_members_yet` (no member of the caller's world is visible to the caller), otherwise `caught_up`.
   - **Client use (Iteration 3, Task 10).** The v1 deck reads only `deck_candidates({ p_limit: 12 })` and keeps the
