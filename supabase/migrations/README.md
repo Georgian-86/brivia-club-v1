@@ -247,6 +247,13 @@ other world are hidden from both sides while that holds (`brivia_pair_world_ok`:
 policies, `brivia_incoming_request_visible`, `respond_connection_request`, and `send_signal`'s `matched` answer). Nothing changes for anyone who is not a tester. A tester sees only
 test members and is seen only by them; no real member sees a tester's account while it is a tester.
 
+Section 5 (Phase D, Task 3): `public.deck_why(p_target uuid)` (security definer, `stable`, executable by `authenticated`
+only) answers "Why this person?" for the deck: one row (`shared_interests`, `distance_band`, `rank_keys`) only when the
+caller is in the test world and the deck's pool admits the target; anyone else gets no row, never an error. It is a new
+intended RPC, so the security advisor lists it with the other definer RPCs `authenticated` may execute (expected, like
+`deck_candidates`). The client asks it once per page for a real member and caches the negative; a client deployed before
+0008 gets a 404 once and shows no button.
+
 Section 4 (Phase D, Task 2): the 0003 post-image CHECK `community_posts_image_storage` is replaced by the trigger
 `brivia_zz_posts_image_rule` (function `brivia_posts_image_rule`). The rule is the same for everyone (the author's own
 `community-posts` Storage file, 23514 otherwise), with one addition: an author whose profile `is_test` may store a
@@ -263,6 +270,8 @@ select has_table_privilege('authenticated', 'public.brivia_tester', 'select'),
        has_function_privilege('authenticated', 'public.brivia_in_test_world(uuid)', 'execute'),
        has_function_privilege('anon', 'public.brivia_in_test_world(uuid)', 'execute'),
        has_function_privilege('authenticated', 'public.brivia_pair_world_ok(uuid, uuid)', 'execute');  -- f, f, f, f, f
+select has_function_privilege('authenticated', 'public.deck_why(uuid)', 'execute'),
+       has_function_privilege('anon', 'public.deck_why(uuid)', 'execute');                   -- t, f
 -- No function compares is_test between two members any more. Expect exactly 5 rows:
 -- brivia_cell_ok, brivia_guard_is_test, brivia_in_test_world, brivia_posts_image_rule, refresh_cell_density.
 -- (brivia_posts_image_rule reads only the post author's own flag.) The post CHECK is gone and the trigger is there:
@@ -272,7 +281,7 @@ select p.proname from pg_proc p join pg_namespace n on n.oid = p.pronamespace
  where n.nspname in ('public', 'brivia_private') and p.prosrc ~ 'is_test' order by 1;
 ```
 
-If a row other than those five appears, or a privilege query answers `t`, stop and report it. In the security advisor,
+If a row other than those five appears, or a privilege query answers other than its comment, stop and report it. In the security advisor,
 `brivia_in_test_world` and `public.brivia_pair_world_ok` must not appear as executable by `authenticated` or `anon`
 (they are revoked; they run only inside the definer functions above). The new policy wrapper
 `brivia_private.brivia_pair_world_ok` is in the non-exposed schema, like the other wrappers (the same intended case).
@@ -285,7 +294,9 @@ One line in the SQL editor (put the account's sign-in email in place of `<founde
 insert into public.brivia_tester(member_id) select id from auth.users where email = '<founder email>' on conflict do nothing;
 ```
 
-It takes effect at once for the deck, search, requests and chat. The k-anonymity density (distance bands) follows at
+Run it after seed v2 is loaded (the order is 0008, seed v2, this insert, then
+`select public.refresh_cell_density();`). It takes effect at once for the deck, search, requests, chat and the deck's
+"Why this person?" button. The k-anonymity density (distance bands) follows at
 the next nightly `refresh_cell_density()` run (01:47 IST); until then the tester's cards may show the place name instead
 of `~3 km` (safe). A manual `select public.refresh_cell_density();` does nothing if that night's run has already
 happened (it keeps one count per day).

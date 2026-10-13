@@ -1092,3 +1092,73 @@ pending the founder's own push or permission (the session's auto-mode guard refu
    the top overlap level in their area, so they lead the deck whatever the daily tie-break. Three v1 members are
    flagged and two are blocked (their rows are unchanged). The purge deletes test members' `consent_event` rows
    explicitly (no foreign key) and reports `member_flag` and `consent_event`.
+
+## D-058: Phase D, the test world: results, rulings and the founder's apply order (2026-10-13)
+
+Phase D of the experience iteration (spec §3, plan `docs/superpowers/plans/2026-10-13-phase-d-test-world.md`) is done on
+the branch `claude/jolly-edison-49xvza` (commits 4346936..HEAD). Nothing is applied live and nothing is pushed.
+
+**Founder ask (2026-10-13):** "deck should not be empty; I want the test profiles over there". At plan time the live
+project had 24 completed test members (6 each in Bengaluru, Mumbai, Delhi and Pune), and the founder's two real accounts
+(Thane, Bengaluru) saw an empty deck, because the test world and the real world are isolated by design.
+
+**What was built:**
+- **`0008_tester_world.sql`** (one idempotent transaction; still unapplied):
+  - an owner-only `public.brivia_tester` (RLS on, no policies, no client grants) and
+    `public.brivia_in_test_world(uid)` (`is_test`, or a `brivia_tester` row). A tester is a real account that joins
+    the test world without becoming `is_test`, so the purge never deletes it.
+  - 14 functions that compared two members' worlds (enumerated from the catalogue, including
+    `brivia_private.brivia_can_message`) are redefined verbatim except for the world check, with the same grants.
+  - Cross-world requests, matches and messages are hidden only when a tester is on one side (`brivia_pair_world_ok`;
+    Ruling 4). After a tester stops, it again sees its old test-world match, messages and pending requests until the
+    purge, but cannot message test members (Ruling 5, documented truthfully in the file and the runbook).
+  - The 0003 `community_posts` image CHECK becomes an equally strict trigger that also accepts a preset cover
+    identifier, only for an `is_test` author (Ruling 7, D-057).
+  - `deck_why(p_target)` (section 5): for a caller in the test world only, the deck card's shared interests and band
+    and the interim deck's order keys for that target (same pool and visibility rules as `deck_candidates`, `stable`,
+    no impression). Anyone else gets no row, not an error. Executable by `authenticated` only.
+- **Seed v2** (`supabase/seed/test-members.sql`): 60 members (Mumbai 12, Thane 10, Pune 10, Bengaluru 14, Delhi 14),
+  t01-t24 unchanged; 30 posts on preset illustrations; 11 requests (6 accepted, 5 pending); 3 matches with 15 messages;
+  10 flagged (2 per city in 5 cities); 5 blocks; 15 private-interest consent rows. The purge removes all of it
+  (including `consent_event` and `member_flag`), empties `brivia_tester` and keeps every tester's own account.
+- **"Why this person?"** (`why-panel.js`, `app.js`, `deck.css`): on a deck card, a tester sees a 44 px "Why this
+  person?" toggle (`aria-expanded`, `aria-controls`, Escape closes) that opens a panel over the card face (never over
+  Pass/Pitch): "You both: …", the band label (never a km figure) and the order keys as a definition list with plain
+  labels (Shares an interest, Distance tier, Interest overlap, Tie-break). A real member's client asks `deck_why`
+  once per page and caches the negative in memory, so it never asks again.
+
+**Far matches (Ruling 8):** the server deck has no escape-velocity lane yet (its pool stops at 60 km). The strong far
+member is found by search, and a unit test proves the ORBIT library's gate passes the seed's strong far pairs (R
+0.88-0.94 against the 0.86 cut) and rejects weak ones. Wiring ORBIT's far lane into `deck_candidates` stays on the
+founder backlog; when it lands, the harness assertion "far partner absent from deck" must flip.
+
+**Rulings (Phase D ledger, `.superpowers/sdd/2026-10-13-phase-d-test-world/progress.md`):**
+1. Phase D runs before Phase E: the empty deck is the immediate ask, and E's Reveal screen benefits from a populated
+   tester deck.
+2. Flagged count: 2 per city in 5 cities (Delhi excluded) = 10, as the result row states.
+3. The session never writes the live database; the founder applies 0008, seed v2 and the tester insert in the SQL editor.
+4. Cross-world hiding of requests, matches and messages applies only when a tester is on one side; pairs without a
+   tester keep the pre-0008 behaviour (e.g. a legacy real-test match stays 'matched').
+5. After stopping, an ex-tester again sees its test-world match, messages and pending requests until the purge (deck
+   and search stay real-world); this is documented and pinned by assertions rather than tracked with a `removed_at`.
+6. Seeded posts use preset cover URLs, and the feed renders a URL that `isPresetCoverUrl()` accepts (a same-origin
+   static asset).
+7. Posts: in 0008 the image CHECK becomes an equivalent trigger that additionally allows a preset cover identifier
+   only when the author `is_test`; the real-member rule is unchanged.
+8. Far match: the harness asserts the far-strong member is absent from the deck but found by search (3+ shared
+   interests, more than 350 km); a unit test runs the seed pair through ORBIT's gate. Wiring the far lane is later.
+9. Each city's "first member" is its first new member (t25/t33/t39/t49/t53); some v1 members (t12, t20, t24 flagged;
+   t11, t23 blocked) take flag and block roles through new rows only; t01, the demo login, is untouched.
+
+**Founder's apply order (SQL editor, as `postgres`, in the same window as the client deploy):**
+1. `0008_tester_world.sql` (with `set lock_timeout = '5s';` on the first line);
+2. seed v2, `supabase/seed/test-members.sql`;
+3. `insert into public.brivia_tester(member_id) select id from auth.users where email = '<your email>' on conflict do nothing;`
+   for each of the founder's accounts;
+4. `select public.refresh_cell_density();` (the name in the plan, `brivia_refresh_cell_density`, does not exist).
+
+**Verified (local):** SQL harness ALL PASSED (every migration twice); build OK; `test:unit` 173/173; orbit 86/86;
+`check:assets` and `check:styles` OK; landing parity identical (22 shots); e2e onboarding 269, consent 154, deck 123,
+landing all passed, app-shell 208.
+
+**Commit trailer rule (founder):** Phase D commits end with the `Claude-Session:` line only, with no `Co-Authored-By`.

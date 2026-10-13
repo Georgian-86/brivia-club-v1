@@ -1,11 +1,26 @@
 # Session handoff (read after CLAUDE.md)
 
-Last updated: 2026-10-13, after Phase C of the experience iteration (consistency), on branch
-`claude/jolly-edison-49xvza` (repo `Georgian-86/brivia-club-v1`). Phase C is not on `main` yet: the founder sees the
-before/after screenshots and OKs the fast-forward.
+Last updated: 2026-10-13, after Phase D of the experience iteration (the test world), on branch
+`claude/jolly-edison-49xvza` (repo `Georgian-86/brivia-club-v1`). Phases C and D are not on `main` yet, and Phase D's SQL
+is not applied: the founder applies it in the SQL editor (section 3, item 0).
 Update this file at the end of every session. CLAUDE.md holds the aim; this file holds **where we are**.
 
 ## 1. What is done
+
+**Experience iteration, Phase D (2026-10-13): done on `claude/jolly-edison-49xvza`, NOT applied live, not pushed.**
+See D-057 and D-058.
+- `supabase/migrations/0008_tester_world.sql`: the tester switch (`brivia_tester`, `brivia_in_test_world`, 14
+  world-checked functions, cross-world pair hiding when a tester is on one side), the post-image trigger (preset
+  illustrations for `is_test` authors only), and `deck_why` (section 5).
+- Seed v2 (`supabase/seed/test-members.sql`): 60 test members in Mumbai, Thane, Pune, Bengaluru and Delhi, with posts,
+  requests, matches and chats, flags, blocks and consent rows; the role table is in `supabase/seed/README.md`. The purge
+  removes all of it, empties `brivia_tester` and never deletes a tester's own account.
+- "Why this person?" on the deck card, testers only (`why-panel.js`, `app.js`, `deck.css`): the band label, "You both:
+  …" and the deck's order keys. A real member's client asks `rpc/deck_why` once per page and never again.
+- Far matches: the deck still has no escape-velocity lane (60 km pool); the far-strong member is found by search, and
+  a unit test runs it through ORBIT's gate. Wiring ORBIT's far lane into the deck is founder backlog (the harness
+  assertion "far partner absent from deck" must flip then).
+- Commit trailer rule (founder, Phase D on): commits end with the `Claude-Session:` line only, **no `Co-Authored-By`**.
 
 **Experience iteration, Phase C (2026-10-13): done on `claude/jolly-edison-49xvza`** (not yet on `main`). See D-055.
 - One member nav (`app-nav.js`: header at desktop, tab bar at <= 780 px; Connect · Explore · Chat · Profile), one set of
@@ -51,11 +66,12 @@ Update this file at the end of every session. CLAUDE.md holds the aim; this file
 | Landing page | Yashika's original UI, unchanged (founder rule: optimise, never redesign) | `index.html`, CSS |
 | **Live signup walkthrough** (real browser on the live URL; 7 UI bugs fixed incl. lost signup photo, typed-city refusal, invalid phone pattern) | Done, pushed (auto-deploys) | D-049 |
 | Experience iteration A-C (signup guide, landing speed, consistency) | Done on the branch; A and B on `main`, C awaiting the founder's OK | D-053, D-054, D-055 |
-| Decisions | D-001 … D-055, append-only | `docs/DECISIONS.md` |
+| Experience iteration D (test world: 0008, seed v2, "Why this person?") | Done on the branch; SQL not applied, not pushed | D-057, D-058 |
+| Decisions | D-001 … D-058, append-only | `docs/DECISIONS.md` |
 
-Test status after D-055 (2026-10-13): SQL harness ALL PASSED; build OK; `test:unit` 155/155; orbit 86/86;
-`check:assets` and `check:styles` OK; landing parity identical (22 shots); e2e onboarding 262, consent 154, deck 104,
-landing all passed, app-shell 155.
+Test status after D-058 (2026-10-13): SQL harness ALL PASSED; build OK; `test:unit` 173/173; orbit 86/86;
+`check:assets` and `check:styles` OK; landing parity identical (22 shots); e2e onboarding 269, consent 154, deck 123,
+landing all passed, app-shell 208.
 **Live UI testing:** this sandbox cannot reach `*.vercel.app` / `*.supabase.co`. Use a Vercel Sandbox in project
 `brivia-club` (Vercel MCP `create_sandboxes_v4`, no failover regions on this plan, ~45 min max) with Playwright, and a
 Gmail plus-address of the founder's inbox for confirmation emails (disposable inboxes did not receive them).
@@ -68,7 +84,8 @@ Tooling: Playwright **and axe-core** at `/tmp/pw` (`npm install --prefix /tmp/pw
   `supabase/seed/README.md`; the purge leaves storage files, remove them via the Storage API first).
 - **`0005` and `0006` are applied (2026-10-08) and frozen** (D-047, D-048), verified read-only: the policies match
   `supabase/tests/policies-0006.expected.tsv` exactly, and the advisors are as the README expects. New SQL goes in
-  **`0007+`**, starting with the D-046 P0-C items.
+  **`0007+`**, starting with the D-046 P0-C items. **`0008_tester_world.sql` is written but NOT applied** (Phase D;
+  section 3, item 0, has the order). Until it is, the deck stays empty for the founder's real accounts.
 - **Client deployed:** Vercel project `brivia-club` (team "Golu's projects") at `https://brivia-club.vercel.app`.
   **Production deploys from `main`** (D-051): `main` was fast-forwarded to the working branch on 2026-10-12. A push
   to the working branch builds a preview only; to go live, fast-forward `main` to it (founder OK) and Vercel deploys.
@@ -83,13 +100,24 @@ Tooling: Playwright **and axe-core** at `/tmp/pw` (`npm install --prefix /tmp/pw
 
 ## 3. What to do next (in order)
 
-0. **Experience iteration Phase D, the test world** (spec `docs/superpowers/specs/2026-10-12-experience-iteration-design.md`
-   §3: migration 0008, seed v2, the why panel; the founder applies the SQL in the editor). Done locally, not applied:
-   Task 1 (0008 tester switch) and Task 2 (seed v2: 60 members with ORBIT roles per city, 30 preset-illustrated posts,
-   3 matches with chats; 0008 section 4 lets only test members post a preset image, D-057; `supabase/seed/README.md`
-   has the role table). Next: Task 3, the why panel. Going live: apply 0008 and deploy the client in one window, then
-   run the seed, then add the founder's accounts to `brivia_tester`. Before that: the founder
-   reviews the Phase C before/after screenshots and OKs fast-forwarding `main`.
+0. **Go live with Phase D, the test world** (D-058; all three tasks are done on the branch). First the founder reviews
+   the Phase C before/after screenshots and OKs pushing and fast-forwarding `main`. Then, in the SQL editor as
+   `postgres`, in the same window as the client deploy (details in `supabase/migrations/README.md`, "0008"):
+   1. apply `0008_tester_world.sql` (with `set lock_timeout = '5s';` on the first line) and run its read-only checks;
+   2. run seed v2, `supabase/seed/test-members.sql`;
+   3. for each of the founder's accounts:
+      `insert into public.brivia_tester(member_id) select id from auth.users where email = '<your email>' on conflict do nothing;`
+   4. `select public.refresh_cell_density();` (it does nothing if that night's run already happened; the bands then
+      show place names until the next nightly run).
+   The deck then shows test members near Thane and Bengaluru, and each card has "Why this person?".
+   **To stop being a tester:**
+   `delete from public.brivia_tester where member_id = (select id from auth.users where email = '<your email>');`
+   The account is back in the real world at once; until the purge it can still read its old test-world matches,
+   messages and pending requests, but cannot message test members (Ruling 5). The purge
+   (`supabase/seed/purge-test-members.sql`) deletes the test members and everything tied to them and empties
+   `brivia_tester`; it never deletes a tester's own account.
+   Founder backlog from Phase D: wire ORBIT's far lane into the deck (then flip the harness's "far partner absent from
+   deck" assertion).
 1. **P0-C** (D-046; table "P0-C" in `docs/arena/2026-10-07-iteration-4.md`, each item has acceptance criteria).
    0005 is now live and frozen (D-047), so the SQL items go in **new migrations `0007+`**:
    1. R1 corroborated underage suspension (2 qualifying reporters, or 1 matched); a reporter's own `request`
@@ -159,6 +187,7 @@ install it).
 | SQL behaviour tests | `supabase/tests/*.test.sql` (run with `run.sh`) |
 | Signup (4 steps) | `auth.html`, `script.js`, `passion-budget.js`, `pending-profile.js` |
 | App, deck, quota | `app.html`, `app.js`, `deck-view.js`, `signal-quota.js` |
+| Test world (tester switch, why panel) | `supabase/migrations/0008_tester_world.sql`, `why-panel.js`, `supabase/tests/d-tester-world.test.sql`, `supabase/seed/README.md` |
 | App nav, tokens, skeletons, profile checklist | `app-nav.js`, `app-shell.css`, `tokens.css`, `app-skeletons.js`, `profile-checklist.js`, `profile-view.css` |
 | e2e (stubbed Supabase) | `tests/e2e/*.spec.mjs` |
 | Old engine to reuse plumbing from | repo `brivia-club`, `server/src/engine/` |
