@@ -163,16 +163,25 @@ body.app-body .app-view[data-view="profile"] .profile-board-content{overflow:vis
 
   /* Keep content clear of the fixed tab bar. */
   body.app-body .app-main{padding-bottom:calc(64px + env(safe-area-inset-bottom, 0px))}
+
+  /* No tab bar over anything that takes the phone (final review, D-055 addendum): an overlay or dialog (the pitch sheet,
+     the filter drawer, a profile, the editor, the settings dialogs, the camera, any modal <dialog>), the "Profile under
+     review" notice, and an open chat thread (messaging-app pattern: the composer owns the bottom edge and the on-screen
+     keyboard). The bar sat above the z-50/z-80 overlays and took their bottom controls' taps (SEND PITCH). */
+  body.app-body:has(.app-overlay:not([hidden]), .discovery-filter-drawer:not([hidden]), .public-profile-modal, .profile-edit-modal, .profile-settings-modal, .chat-camera-modal:not([hidden]), dialog[open], [data-under-review]) .app-tabbar,
+  body.app-body[data-app-view="chat"]:has(#chat-window:not([hidden])) .app-tabbar{display:none}
+  body.app-body[data-app-view="chat"]:has(#chat-window:not([hidden])) .app-main{padding-bottom:env(safe-area-inset-bottom, 0px)}
 }
-/* An open thread fills the phone between the one-row header and the tab bar. */
+/* An open thread fills the phone below the one-row header (the tab bar is hidden while it is open). */
 @media (max-width:700px){
   body.app-body[data-app-view="chat"]:has(#chat-window:not([hidden])) .app-view[data-view="chat"]{
-    height:calc(100svh - 54px - 64px - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px));
+    height:calc(100svh - 54px - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px));
   }
 }
 /* Between 701 and 780 px the inbox is a fixed full-height panel (app-navigation.css): end it above the tab bar. */
 @media (min-width:701px) and (max-width:780px){
   body.app-body[data-app-view="chat"] .app-view[data-view="chat"].is-active{bottom:calc(64px + env(safe-area-inset-bottom, 0px))!important}
+  body.app-body[data-app-view="chat"]:has(#chat-window:not([hidden])) .app-view[data-view="chat"].is-active{bottom:env(safe-area-inset-bottom, 0px)!important}
 }
 
 /* One type system (Phase C Task 4): headings default to Bodoni Moda (the italic face is in fonts-app.css); every other
