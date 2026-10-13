@@ -19,6 +19,8 @@
 --     does not hide test-world rows after the row is deleted: the ex-tester can then read its old test matches and
 --     messages and see (and accept) pending requests from test members until the purge, but cannot message them.
 --     Pairs without a tester behave exactly as before.
+--   * Section 4 (Phase D, Task 2): the 0003 post-image CHECK becomes a trigger with the same rule for everyone, plus a
+--     preset illustration (empty image_path) for an is_test author only, so the seed's posts show an image.
 --   * cell_density keeps its column name is_test, but refresh_cell_density fills it from brivia_in_test_world, so a
 --     tester is counted in the test world's density while a tester.
 -- Semantics are unchanged for everyone who is not a tester. A tester sees only the test world and is seen only by it.
@@ -674,3 +676,41 @@ end;
 $$;
 revoke all on function public.send_signal(uuid, text) from public, anon;
 grant execute on function public.send_signal(uuid, text) to authenticated;
+
+
+-- =============================================================================================
+-- 4. Post images: the 0003 CHECK as a trigger, plus preset illustrations for test members (Phase D, Task 2)
+-- =============================================================================================
+-- 0003 (community_posts_image_storage) required every post image to be the author's own community-posts Storage file
+-- (brivia_is_storage_url) with image_path = '<author>/<file name>'. SQL cannot upload a Storage file, so the test-world
+-- seed (supabase/seed/test-members.sql) could not show an image. The CHECK becomes this trigger:
+--   * the 0003 rule, unchanged, for every author and every writer (the owner included, as a CHECK binds the owner);
+--   * one addition: an author whose profile is_test may store a preset illustration identifier
+--     (brivia_is_preset_cover: the shape of isPresetCoverUrl in supabase.js, same-site, never a third-party host) with
+--     an empty image_path. A tester (a real account in brivia_tester) is not is_test, so its rule is unchanged.
+-- Same error as the CHECK (23514). It runs on every insert and every update, as the CHECK did. Its name sorts after
+-- brivia_posts_keep_immutable and brivia_posts_server_created_at, so it sees the row those triggers leave, as a CHECK
+-- (evaluated after all BEFORE triggers) did. Existing rows are not re-checked (the CHECK was NOT VALID too).
+-- (supabase/tests/d-post-presets.test.sql)
+create or replace function public.brivia_posts_image_rule()
+returns trigger
+language plpgsql
+security definer
+set search_path = public, pg_catalog
+as $$
+begin
+  if (public.brivia_is_storage_url(new.image_url, 'community-posts', new.author_id)
+      and new.image_path = new.author_id::text || '/' || regexp_replace(new.image_url, '^.*/', ''))
+     or (public.brivia_is_preset_cover(new.image_url) and new.image_path = ''
+         and coalesce((select p.is_test from public.profiles p where p.id = new.author_id), false)) then
+    return new;
+  end if;
+  raise exception 'new row for relation "community_posts" violates check constraint "community_posts_image_storage"'
+    using errcode = '23514';
+end;
+$$;
+revoke all on function public.brivia_posts_image_rule() from public, anon, authenticated;
+alter table public.community_posts drop constraint if exists community_posts_image_storage;
+drop trigger if exists brivia_zz_posts_image_rule on public.community_posts;
+create trigger brivia_zz_posts_image_rule before insert or update on public.community_posts
+  for each row execute function public.brivia_posts_image_rule();

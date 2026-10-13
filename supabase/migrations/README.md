@@ -231,7 +231,9 @@ connection requests" (0004 dropped it on purpose).
 ## 0008: the tester switch (Phase D)
 
 Apply **only `0008_tester_world.sql`**, as `postgres` in the SQL editor, **after 0006 is applied and verified live**. It
-does not depend on 0007 (either order works). No client change is needed: every RPC keeps its signature and columns.
+does not depend on 0007 (either order works). Every RPC keeps its signature and columns; deploy the client in the same
+window anyway, because the feed now renders the seed's preset post illustrations (section 4 below; an older client shows
+"Image unavailable" for them, nothing breaks).
 The file is idempotent and is one transaction. Put `set lock_timeout = '5s';` on the first line, above the file, and
 avoid the cron window **20:17–20:37 UTC (01:47–02:07 IST)**.
 
@@ -245,6 +247,12 @@ other world are hidden from both sides while that holds (`brivia_pair_world_ok`:
 policies, `brivia_incoming_request_visible`, `respond_connection_request`, and `send_signal`'s `matched` answer). Nothing changes for anyone who is not a tester. A tester sees only
 test members and is seen only by them; no real member sees a tester's account while it is a tester.
 
+Section 4 (Phase D, Task 2): the 0003 post-image CHECK `community_posts_image_storage` is replaced by the trigger
+`brivia_zz_posts_image_rule` (function `brivia_posts_image_rule`). The rule is the same for everyone (the author's own
+`community-posts` Storage file, 23514 otherwise), with one addition: an author whose profile `is_test` may store a
+preset illustration path (`/Images/Cover%20images/<file>`, empty `image_path`), which is how the seed's 30 posts show
+an image without an upload. A real member or a tester posting a preset is still refused.
+
 ### Post-apply checks (read-only)
 
 ```sql
@@ -255,13 +263,16 @@ select has_table_privilege('authenticated', 'public.brivia_tester', 'select'),
        has_function_privilege('authenticated', 'public.brivia_in_test_world(uuid)', 'execute'),
        has_function_privilege('anon', 'public.brivia_in_test_world(uuid)', 'execute'),
        has_function_privilege('authenticated', 'public.brivia_pair_world_ok(uuid, uuid)', 'execute');  -- f, f, f, f, f
--- No function compares is_test between two members any more. Expect exactly 4 rows:
--- brivia_cell_ok, brivia_guard_is_test, brivia_in_test_world, refresh_cell_density.
+-- No function compares is_test between two members any more. Expect exactly 5 rows:
+-- brivia_cell_ok, brivia_guard_is_test, brivia_in_test_world, brivia_posts_image_rule, refresh_cell_density.
+-- (brivia_posts_image_rule reads only the post author's own flag.) The post CHECK is gone and the trigger is there:
+select count(*) from pg_constraint where conname = 'community_posts_image_storage';            -- 0
+select count(*) from pg_trigger where tgname = 'brivia_zz_posts_image_rule';                   -- 1
 select p.proname from pg_proc p join pg_namespace n on n.oid = p.pronamespace
  where n.nspname in ('public', 'brivia_private') and p.prosrc ~ 'is_test' order by 1;
 ```
 
-If a row other than those four appears, or a privilege query answers `t`, stop and report it. In the security advisor,
+If a row other than those five appears, or a privilege query answers `t`, stop and report it. In the security advisor,
 `brivia_in_test_world` and `public.brivia_pair_world_ok` must not appear as executable by `authenticated` or `anon`
 (they are revoked; they run only inside the definer functions above). The new policy wrapper
 `brivia_private.brivia_pair_world_ok` is in the non-exposed schema, like the other wrappers (the same intended case).

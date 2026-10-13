@@ -465,11 +465,13 @@ begin
   if (select prosrc from pg_proc where oid = 'public.refresh_cell_density(date)'::regprocedure) ~ '\mp\.is_test'
      or (select prosrc from pg_proc where oid = 'public.refresh_cell_density(date)'::regprocedure) !~ 'brivia_in_test_world\(p\.id\)' then
     raise exception 'FAIL guard: refresh_cell_density does not key the world on brivia_in_test_world'; end if;
-  -- the only functions that still mention is_test at all
+  -- the only functions that still mention is_test at all (brivia_posts_image_rule, 0008 section 4: a test member's
+  -- preset post image; it reads the author's own flag and compares no two members' worlds)
   select string_agg(n.nspname || '.' || p.proname, ', ' order by p.proname) into bad
     from pg_proc p join pg_namespace n on n.oid = p.pronamespace
    where n.nspname in ('public', 'brivia_private') and p.prosrc ~ 'is_test'
-     and p.proname not in ('brivia_guard_is_test', 'brivia_in_test_world', 'brivia_cell_ok', 'refresh_cell_density');
+     and p.proname not in ('brivia_guard_is_test', 'brivia_in_test_world', 'brivia_cell_ok', 'refresh_cell_density',
+                           'brivia_posts_image_rule');
   if bad is not null then raise exception 'FAIL guard: is_test still read by %', bad; end if;
   select string_agg(schemaname || '.' || tablename || '.' || policyname, ', ') into bad
     from pg_policies where coalesce(qual, '') || coalesce(with_check, '') ~ 'is_test';
