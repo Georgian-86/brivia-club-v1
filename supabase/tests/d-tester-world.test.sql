@@ -375,6 +375,18 @@ begin
   end if;
 end $$;
 
+-- 6b. While R1 is a tester, test member T2 sends R1 a request that stays pending (T1 and R1 are already matched).
+do $$
+declare st text;
+begin
+  st := pg_temp.signal(pg_temp.tw(2), pg_temp.tw(3));
+  if st is distinct from 'sent'
+     or not exists (select 1 from public.connection_requests where from_id = pg_temp.tw(2) and to_id = pg_temp.tw(3) and status = 'pending') then
+    raise exception 'FAIL setup: T2 -> tester R1 answered %, request pending: %', st,
+      exists (select 1 from public.connection_requests where from_id = pg_temp.tw(2) and to_id = pg_temp.tw(3) and status = 'pending'); end if;
+  if not (pg_temp.tw(2) = any(pg_temp.incoming(pg_temp.tw(3)))) then raise exception 'FAIL: tester R1 does not see T2''s request'; end if;
+end $$;
+
 -- 7. Removing R1's tester row restores R1 <-> R2 and hides the test members again.
 delete from public.brivia_tester where member_id = 'de7e57e7-e7e7-4e7e-a7e7-e7e7e7e7e703';
 
@@ -385,7 +397,7 @@ begin
   -- R1 signalled R2 in step 5 (30-day deck exclusion): R1 reads R2 through search and candidates; the deck stays empty
   if pg_temp.search_ids(r1) <> pg_temp.ids(4) then raise exception 'FAIL restore: R1 search %', pg_temp.search_ids(r1); end if;
   if pg_temp.cand_ids(r1) <> pg_temp.ids(4) then raise exception 'FAIL restore: R1 candidates %', pg_temp.cand_ids(r1); end if;
-  if pg_temp.deck_ids(r1) <> '{}' then raise exception 'FAIL restore: R1 deck %', pg_temp.deck_ids(r1); end if;
+  if pg_temp.deck_ids(r1) <> '{}' then raise exception 'FAIL restore: R1 deck % (no test member, and R2 was signalled)', pg_temp.deck_ids(r1); end if;
   -- R2 signalled R1 in step 5 too (30-day deck exclusion): R2 reads R1 through search and candidates
   if pg_temp.search_ids(r2) <> pg_temp.ids(3) then raise exception 'FAIL restore: R2 search %', pg_temp.search_ids(r2); end if;
   if pg_temp.cand_ids(r2) <> pg_temp.ids(3) then raise exception 'FAIL restore: R2 candidates %', pg_temp.cand_ids(r2); end if;
@@ -394,6 +406,15 @@ begin
   if pg_temp.msg_count(r2, r1) <> 1 or pg_temp.msg_count(r1, r2) <> 1 then
     raise exception 'FAIL restore: the real-world message is not readable again'; end if;
   if pg_temp.can_send(r1, pg_temp.tw(1)) then raise exception 'FAIL restore: R1 can still message test member T1'; end if;
+  -- Pinned behaviour (fix round 1): the rule needs a tester row, so the ex-tester's test-world rows are NOT hidden
+  -- after it stops. Until the purge, R1 still reads its match and messages with T1 and sees T2's pending request,
+  -- while the deck and search show no test member and messaging them stays refused (above).
+  if not pg_temp.sees_match(r1, pg_temp.tw(1)) then raise exception 'FAIL restore: ex-tester R1 no longer reads its T1 match'; end if;
+  if pg_temp.msg_count(r1, pg_temp.tw(1)) <> 2 then
+    raise exception 'FAIL restore: ex-tester R1 reads % of its 2 messages with T1', pg_temp.msg_count(r1, pg_temp.tw(1)); end if;
+  if not (pg_temp.tw(2) = any(pg_temp.incoming(r1))) then raise exception 'FAIL restore: ex-tester R1 does not see T2''s pending request'; end if;
+  if pg_temp.tw(1) = any(pg_temp.search_ids(r1)) or pg_temp.tw(2) = any(pg_temp.search_ids(r1)) then
+    raise exception 'FAIL restore: ex-tester R1 finds test members in search'; end if;
   select home_cell into v_cell from public.member_orbit where member_id = r1;
   perform public.refresh_cell_density(current_date + 1);
   if (select n from public.cell_density where cell_density.cell = v_cell and is_test) is distinct from 2

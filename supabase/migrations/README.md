@@ -281,6 +281,8 @@ happened (it keeps one count per day).
 
 The account's real-world requests, matches and messages are kept but hidden from both sides while it is a tester:
 neither side sees them or can accept, decline or message, and they reappear unchanged when it stops being a tester.
+While you are a tester, a real member's report against you is still recorded and still blocks you, but it does not
+count toward the review thresholds (only reports from your current world qualify).
 
 ### Stop being a tester
 
@@ -288,9 +290,12 @@ neither side sees them or can accept, decline or message, and they reappear unch
 delete from public.brivia_tester where member_id = (select id from auth.users where email = '<founder email>');
 ```
 
-The account is back in the real world at once: its interests, area and real-world requests, matches and messages are
-visible again, unchanged. Its matches and messages with test members are hidden from then on and go at the purge. The purge
-(`supabase/seed/purge-test-members.sql`) also empties `brivia_tester`, so after a purge nobody is a tester; the
-tester's own account is never deleted.
+The account is back in the real world at once: the deck and search show real members only, and its real-world
+requests, matches and messages are visible again, unchanged. Its **test-world rows are not hidden** after it stops:
+until the purge runs, the account can still read its old matches and messages with test members and see pending
+requests from test members (notes included), and accepting one still creates a match. It cannot message test members.
+If that matters, keep the tester row until you purge, or run the purge
+(`supabase/seed/purge-test-members.sql`), which deletes the test members and everything tied to them and also empties
+`brivia_tester`, so after a purge nobody is a tester. The tester's own account is never deleted.
 
 Incident response (suspected data breach, pausing the purge cron, notices): see `docs/BREACH_RUNBOOK.md`.

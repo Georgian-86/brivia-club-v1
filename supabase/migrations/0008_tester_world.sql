@@ -14,9 +14,11 @@
 --     pg_policies mentioning is_test); no policy reads is_test directly. Not redefined: brivia_guard_is_test (it keeps
 --     is_test owner-only) and brivia_cell_ok (it reads a cell_density row for the world it is given; deck_candidates
 --     now passes the caller's world).
---   * Section 3: requests, matches and messages between a tester and a member of the other world (rows made before
---     the switch, or with test members after it ends) are hidden from both sides while that holds
---     (brivia_pair_world_ok). Pairs without a tester behave exactly as before.
+--   * Section 3: a tester's requests, matches and messages with real members (rows made before the switch) are
+--     hidden from both sides while the tester row exists (brivia_pair_world_ok). The rule needs a tester row, so it
+--     does not hide test-world rows after the row is deleted: the ex-tester can then read its old test matches and
+--     messages and see (and accept) pending requests from test members until the purge, but cannot message them.
+--     Pairs without a tester behave exactly as before.
 --   * cell_density keeps its column name is_test, but refresh_cell_density fills it from brivia_in_test_world, so a
 --     tester is counted in the test world's density while a tester.
 -- Semantics are unchanged for everyone who is not a tester. A tester sees only the test world and is seen only by it.
@@ -400,7 +402,7 @@ as $$
   select case
     when not public.brivia_member_completed(auth.uid()) then 'complete_profile'
     when not exists (select 1 from public.profiles t
-                      where public.brivia_in_test_world(t.id) = public.brivia_in_test_world(auth.uid())
+                      where public.brivia_in_test_world(t.id) = (select public.brivia_in_test_world(auth.uid()))
                         and public.brivia_visible_to(auth.uid(), t.id)) then 'no_members_yet'
     else 'caught_up'
   end
@@ -500,12 +502,13 @@ grant execute on function public.report_member(uuid, text, text) to authenticate
 -- =============================================================================================
 -- 3. Requests, matches and messages with a tester across worlds
 -- =============================================================================================
--- A tester's world is not fixed: requests, matches and messages made before the switch (or with test members, after
--- it ends) can sit across worlds. While a tester sits across worlds from the other member, neither side can read the
--- pair's match, messages or pending requests, accept or decline the request, or learn of the match through
--- send_signal. Everything reappears unchanged when both are in one world again (rows with test members go at the
--- purge). Pairs without a tester keep their exact 0001-0006 behaviour, including a legacy cross-world match between
--- a real and a test member (trust.test.sql I6).
+-- A tester's world is not fixed: requests, matches and messages made before the switch can sit across worlds. While a
+-- tester row exists and the tester sits across worlds from the other member, neither side can read the pair's match,
+-- messages or pending requests, accept or decline the request, or learn of the match through send_signal. Everything
+-- reappears unchanged when the row is deleted. After that the ex-tester is an ordinary real member: its rows with test
+-- members are no longer hidden (it can read them and accept a pending request from a test member; brivia_can_message
+-- still refuses messages) until the purge deletes the test members. Pairs without a tester keep their exact 0001-0006
+-- behaviour, including a legacy cross-world match between a real and a test member (trust.test.sql I6).
 
 -- brivia_pair_world_ok(a, b): false only when a or b is a tester and they are in different worlds. Internal.
 create or replace function public.brivia_pair_world_ok(p_a uuid, p_b uuid)
