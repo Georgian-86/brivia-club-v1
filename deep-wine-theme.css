@@ -12,13 +12,6 @@ body.app-body { --app-violet: var(--brivia-deep-wine); }
   background: linear-gradient(132deg, var(--brivia-deep-wine) 0%, var(--brivia-wine) 62%, #6b1837 100%);
   box-shadow: 0 24px 54px rgba(67, 4, 22, .2);
 }
-.profile-kicker,
-.profile-quick-stats strong,
-.profile-content-grid .profile-section-heading span,
-.profile-login-card>div>span { color: var(--brivia-deep-wine) !important; }
-.profile-content-grid .profile-pills span,
-.profile-looking span { color: var(--brivia-deep-wine); border-color: rgba(67, 4, 22, .2); }
-.profile-login-card { border-color: rgba(67, 4, 22, .2); background: rgba(67, 4, 22, .065); }
 
 /* Login / signup. */
 .auth-visual {

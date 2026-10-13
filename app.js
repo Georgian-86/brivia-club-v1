@@ -19,12 +19,13 @@ import './app-navigation.css';
 import './discovery-filters.css';
 import './mobile-app.css';
 import './skeleton.css';
-import { supabase, rowToProfile, saveProfile, onboardingStatus, sendSignal, fetchSignalQuota, isRateLimited, isStorageImageUrl, withoutCredentials, uploadMessageAttachment, removeMessageAttachment, uploadCommunityPostImage, removeCommunityPostImage, ImageProcessingError, compressAttachmentFiles, attachmentKind, reportMember, setSensitiveConsent, fetchSensitiveConsentAt } from './supabase.js';
+import { supabase, rowToProfile, saveProfile, onboardingStatus, sendSignal, fetchSignalQuota, isRateLimited, isStorageImageUrl, withoutCredentials, uploadMessageAttachment, removeMessageAttachment, uploadCommunityPostImage, removeCommunityPostImage, ImageProcessingError, compressAttachmentFiles, attachmentKind, reportMember, setSensitiveConsent, fetchSensitiveConsentAt, fetchMyInterests } from './supabase.js';
 import { deleteAccount, clearBriviaKeys, DELETE_BUCKETS, reauthMarker, reauthMarkerMatches } from './account-deletion.js';
 import { openPrivacyAccount } from './privacy-account.js';
 import { isUnderReview, UNDER_REVIEW_COPY } from './onboarding-guard.js';
 import { openReportDialog, bindCardOverflow, cardOverflowOpen, reportSuccessCopy } from './report-dialog.js';
 import { defaultCoverUrl, normalizeCoverUrl } from './cover-assets.js';
+import { profileChecklist } from './profile-checklist.js';
 import { quotaLabel, quotaErrorText, quotaBlocked, quotaNotice } from './signal-quota.js';
 import { pitchLine, deckChips, deckEmptyState, deckFields, bandNote } from './deck-view.js';
 import { chatEmojiCategories } from './chat-emoji-data.js';
@@ -38,6 +39,8 @@ import './report-dialog.css';
 import './privacy-account.css';
 // One member navigation (Phase C, Task 2): the header and tab bar styles load last so they win over the older rules.
 import './app-shell.css';
+// The calm profile column (Phase C, Task 5): tokens only, loads after app-shell.css.
+import './profile-view.css';
 import { navMarkup, markCurrentNav, setChatBadges } from './app-nav.js';
 
 document.body.classList.add('app-auth-pending');
@@ -470,7 +473,7 @@ const setView = (view) => {
     }, 450);
   }
   if (view === 'chat') renderChats();
-  if (view === 'profile') renderProfile();
+  if (view === 'profile') { renderProfile(); loadProfileInterests(); }
   window.scrollTo({ top: 0, behavior: 'smooth' });
 };
 
@@ -1596,7 +1599,8 @@ const ensureProfilePhotoEditor = () => {
   const menu = document.createElement('div');
   menu.id = 'profile-settings-menu';
   menu.className = 'profile-settings-menu';
-  menu.innerHTML = '<button type="button" data-profile-setting="notifications">NOTIFICATIONS</button><button type="button" data-profile-setting="block">BLOCKED USERS</button><button type="button" data-profile-setting="removed">REMOVED CONNECTIONS</button><button type="button" data-profile-setting="privacy">PRIVACY &amp; ACCOUNT</button><button type="button" data-profile-setting="logout">LOG OUT</button>';
+  // "Signed in as" (Phase C Task 5): the only place the member's own email is shown. A <p>, so Tab skips it.
+  menu.innerHTML = '<p class="profile-settings-account">Signed in as <strong></strong></p><button type="button" data-profile-setting="notifications">NOTIFICATIONS</button><button type="button" data-profile-setting="block">BLOCKED USERS</button><button type="button" data-profile-setting="removed">REMOVED CONNECTIONS</button><button type="button" data-profile-setting="privacy">PRIVACY &amp; ACCOUNT</button><button type="button" data-profile-setting="logout">LOG OUT</button>';
   // The menu follows ⚙ in the DOM, so Tab goes ⚙ -> the five items -> EDIT PROFILE. Where popovers exist it opens in
   // the top layer (popover="manual"): above the hero's overflow clip and the dashboard, without leaving its tab order.
   // Without them it toggles `hidden` in place, as before Phase C.
@@ -1708,6 +1712,7 @@ const privacyDeps = (session) => ({
   onWithdrawn: async () => {
     const { data } = await supabase.from('profiles').select('*').eq('id', session.user.id).maybeSingle();
     if (data) { memberProfile = { ...memberProfile, skills: rowToProfile(data).skills }; window.localStorage.setItem('brivia-member-profile', JSON.stringify(memberProfile)); renderProfile(); }
+    loadProfileInterests(); // the private ones are gone and their points moved
   },
   runDeletion: () => deleteAccount({
     storage: supabase.storage,
@@ -1891,6 +1896,82 @@ const openRemovedConnectionsManager = () => {
   renderList();
 };
 
+// The profile column (Phase C, Task 5): "Complete your profile", "Your interests", "Looking for", "Experience".
+// my_interests() is read once per profile visit (setView), and once after sign-in when the page opens on the profile.
+let profileInterests = { status: 'idle', rows: [] };
+let profileInterestsTicket = 0;
+const PASSION_BUDGET = 20;
+const splitList = (value) => (Array.isArray(value) ? value : String(value || '').split(',')).map((item) => String(item).trim()).filter(Boolean);
+// Interests the checklist counts: the loaded my_interests() rows, or the public display copy (profiles.skills) until then.
+const checklistInterests = () => (profileInterests.status === 'ready' ? profileInterests.rows : splitList(memberProfile.skills));
+const loadProfileInterests = async () => {
+  if (!memberProfile.id) return; // signed-in data is not here yet: loadSupabaseCommunity() loads them
+  const ticket = ++profileInterestsTicket;
+  profileInterests = { status: 'loading', rows: profileInterests.rows };
+  renderProfileInterests();
+  const { data, error } = await fetchMyInterests();
+  if (ticket !== profileInterestsTicket) return;
+  profileInterests = error ? { status: 'error', rows: [] } : { status: 'ready', rows: Array.isArray(data) ? data : [] };
+  renderProfileInterests();
+  renderProfileChecklist();
+};
+// The neutral loading row. Phase C Task 6 swaps this one function for the shared skeleton helper.
+const interestsPlaceholder = () => '<p class="profile-sr" role="status">Loading your interests</p><ul class="profile-interest-list" aria-hidden="true"><li class="profile-interest is-placeholder"><span class="profile-interest-placeholder"></span><span class="profile-interest-bar"><i></i></span></li></ul>';
+const renderProfileChecklist = () => {
+  const box = document.querySelector('#profile-checklist');
+  if (!box) return;
+  const result = profileChecklist(memberProfile, checklistInterests(), defaultCoverUrl, normalizeCoverUrl);
+  box.classList.toggle('is-complete', result.complete);
+  if (result.complete) { box.innerHTML = '<p class="profile-checklist-done" id="profile-checklist-title">Profile complete</p>'; return; }
+  const items = result.items.map((item) => `<li><button type="button" class="profile-checklist-item" data-checklist-item="${item.key}" data-done="${item.done}"><span class="profile-checklist-mark" aria-hidden="true"></span><span class="profile-checklist-label">${escapeHtml(item.label)}</span>${item.done ? '<span class="profile-sr">, done</span>' : ''}</button></li>`).join('');
+  box.innerHTML = `<div class="profile-card-head"><h2 class="profile-card-title" id="profile-checklist-title">Complete your profile</h2><span class="profile-checklist-count">${result.done} of ${result.total}</span></div><div class="profile-progress" role="progressbar" aria-labelledby="profile-checklist-title" aria-valuemin="0" aria-valuemax="${result.total}" aria-valuenow="${result.done}" aria-valuetext="${result.done} of ${result.total} done"><i></i></div><ul class="profile-checklist-items">${items}</ul>`;
+  box.querySelector('.profile-progress i').style.width = `${Math.round((result.done / result.total) * 100)}%`;
+};
+const renderProfileInterests = () => {
+  const body = document.querySelector('#profile-interests-body');
+  if (!body) return;
+  const section = body.closest('section');
+  section?.setAttribute('aria-busy', String(profileInterests.status === 'loading' || profileInterests.status === 'idle'));
+  if (profileInterests.status === 'error') {
+    body.innerHTML = '<p class="profile-card-empty" role="alert">Couldn\'t load your interests</p><button type="button" class="profile-card-action" data-interests-retry>Retry</button>';
+    return;
+  }
+  if (profileInterests.status !== 'ready') { body.innerHTML = interestsPlaceholder(); return; }
+  const rows = profileInterests.rows;
+  if (!rows.length) {
+    body.innerHTML = '<p class="profile-card-empty">No interests yet. Your interests and passion points drive who you meet.</p><button type="button" class="profile-card-action" data-profile-edit>Edit your interests</button>';
+    return;
+  }
+  body.innerHTML = `<ul class="profile-interest-list">${rows.map((row) => {
+    const points = Math.max(0, Number(row.points) || 0);
+    return `<li class="profile-interest" data-interest-row><span class="profile-interest-label">${escapeHtml(row.label || row.interest_id || '')}</span>${row.mode === 'private' ? '<span class="profile-interest-private">Private</span>' : ''}<span class="profile-interest-points">${points} ${points === 1 ? 'point' : 'points'}</span><span class="profile-interest-bar" aria-hidden="true"><i></i></span></li>`;
+  }).join('')}</ul>`;
+  body.querySelectorAll('.profile-interest-bar i').forEach((bar, index) => {
+    const share = Math.min(1, Math.max(0, Number(rows[index].points) || 0) / PASSION_BUDGET);
+    bar.style.width = `${Math.round(share * 10000) / 100}%`;
+  });
+};
+const renderProfileLookingFor = () => {
+  const body = document.querySelector('#profile-looking-for-body');
+  if (!body) return;
+  const items = splitList(memberProfile.lookingFor);
+  body.innerHTML = items.length
+    ? `<ul class="profile-chips">${items.map((item) => `<li>${escapeHtml(item)}</li>`).join('')}</ul>`
+    : '<p class="profile-card-empty">Tell members what you are open to.</p><button type="button" class="profile-card-action" data-profile-edit>Say what you\'re looking for</button>';
+};
+const renderProfileExperience = () => {
+  const body = document.querySelector('#profile-experience-body');
+  if (!body) return;
+  const experience = String(memberProfile.experience || '').trim();
+  body.innerHTML = experience
+    ? `<p class="profile-experience-text">${escapeHtml(experience)}</p>`
+    : '<p class="profile-card-empty">Your role, craft or what you are building.</p><button type="button" class="profile-card-action" data-profile-edit>Add your experience</button>';
+};
+document.querySelector('[data-view="profile"]')?.addEventListener('click', (event) => {
+  if (event.target.closest('[data-interests-retry]')) { loadProfileInterests(); return; }
+  if (event.target.closest('[data-checklist-item], [data-profile-edit]')) openProfileEditor();
+});
+
 const renderProfile = () => {
   const profile = memberProfile;
   const headerAvatar = document.querySelector('#app-avatar-button');
@@ -1910,25 +1991,12 @@ const renderProfile = () => {
   const avatar = document.querySelector('#profile-avatar');
   if (avatar) avatar.innerHTML = avatarImage(profile.photoUrl, profile.name) || escapeHtml(initials(profile.name));
   if (avatar && profile.photoName) avatar.title = profile.photoName;
-  document.querySelector('#profile-email').textContent = profile.email || '—';
-  document.querySelector('#profile-login-email').textContent = profile.email || '—';
-  document.querySelector('#profile-phone').textContent = profile.phone || '—';
-  const skills = (profile.skills || '').split(',').map((skill) => skill.trim()).filter(Boolean);
-  const lookingFor = (profile.lookingFor || '').split(',').map((item) => item.trim()).filter(Boolean);
-  const statEmail = document.querySelector('#profile-stat-email');
-  const statArea = document.querySelector('#profile-stat-area');
-  if (statEmail) statEmail.textContent = profile.email || '—';
-  if (statArea) statArea.textContent = memberPlaceLabel || '—';
-  document.querySelector('#profile-skills').innerHTML = skills.length ? skills.map((skill) => `<span>${escapeHtml(skill)}</span>`).join('') : '<span>Pick interests in your profile setup</span>';
-  document.querySelector('#profile-looking').innerHTML = lookingFor.length ? lookingFor.map((item) => `<span>${escapeHtml(item)}</span>`).join('') : '<span>Add your intentions to find better connections.</span>';
-  const statLooking = document.querySelector('#profile-stat-looking');
-  const statSkills = document.querySelector('#profile-stat-skills');
-  if (statLooking) statLooking.innerHTML = lookingFor.length ? lookingFor.map((item) => `<span>${escapeHtml(item)}</span>`).join('') : '<span>Add your intentions</span>';
-  if (statSkills) statSkills.innerHTML = skills.length ? skills.map((skill) => `<span>${escapeHtml(skill)}</span>`).join('') : '<span>Pick interests in your profile setup</span>';
-  document.querySelector('#profile-skill-count').textContent = String(skills.length).padStart(2, '0');
-  document.querySelector('#profile-looking-count').textContent = String(lookingFor.length).padStart(2, '0');
-  document.querySelector('#profile-experience-short').textContent = profile.experience ? profile.experience.replace('Student / just starting', 'STARTING').replace(' years', 'Y') : '—';
-  document.querySelector('#profile-summary').textContent = profile.experience ? `${profile.experience} and open to meaningful connections inside the club.` : 'Your profile is your first introduction inside the club.';
+  const account = document.querySelector('#profile-settings-menu .profile-settings-account');
+  if (account) { account.querySelector('strong').textContent = profile.email || ''; account.hidden = !profile.email; }
+  renderProfileChecklist();
+  renderProfileInterests();
+  renderProfileLookingFor();
+  renderProfileExperience();
 };
 
 let communityPosts = [];
@@ -2644,6 +2712,7 @@ const loadSupabaseCommunity = async () => {
   renderExplore();
   renderChats();
   renderProfile();
+  if (document.body.dataset.appView === 'profile' && profileInterests.status === 'idle') loadProfileInterests();
   try { ensureNotificationControls(); renderNotifications(); } catch (error) { console.warn('Notification controls could not load:', error.message); }
   refreshSignalQuota();
   subscribeToMessages();

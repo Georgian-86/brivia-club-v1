@@ -104,7 +104,7 @@
     "fontFamily": 5
   },
   "member-polish.css": {
-    "hex": 27,
+    "hex": 23,
     "fontFamily": 0
   },
   "mobile-app.css": {
@@ -140,7 +140,11 @@
     "fontFamily": 0
   },
   "profile-theme.css": {
-    "hex": 149,
+    "hex": 110,
+    "fontFamily": 0
+  },
+  "profile-view.css": {
+    "hex": 0,
     "fontFamily": 0
   },
   "report-dialog.css": {

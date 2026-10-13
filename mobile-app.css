@@ -117,13 +117,6 @@
   body:has(.app-view[data-view="profile"]:not([hidden])) .profile-board-content .profile-hero-copy>p:not(.app-eyebrow){margin:7px 0;color:rgba(255,247,237,.82);font-size:var(--text-12)}
   body:has(.app-view[data-view="profile"]:not([hidden])) .profile-board-content .profile-status{font-size:var(--text-12)}
   body:has(.app-view[data-view="profile"]:not([hidden])) .profile-board-content .profile-photo-editor{right:15px;bottom:17px;padding:8px 10px;font-size:var(--text-12)}
-  body:has(.app-view[data-view="profile"]:not([hidden])) .profile-board-content .profile-stat-grid{grid-template-columns:1fr 1fr;gap:8px;margin-bottom:9px}
-  body:has(.app-view[data-view="profile"]:not([hidden])) .profile-stat-card{min-height:108px;padding:12px;border-radius:11px}
-  body:has(.app-view[data-view="profile"]:not([hidden])) .profile-stat-icon{width:29px;height:29px;margin-bottom:10px;font-size:var(--text-12)}
-  body:has(.app-view[data-view="profile"]:not([hidden])) .profile-stat-card p{font-size:var(--text-12)}
-  body:has(.app-view[data-view="profile"]:not([hidden])) .profile-stat-card>strong{font-size:var(--text-12)}
-  body:has(.app-view[data-view="profile"]:not([hidden])) .profile-board-content .profile-dashboard{margin:0;padding:38px 18px 45px}
-  body:has(.app-view[data-view="profile"]:not([hidden])) .profile-board-content .profile-dashboard h2{font-size:clamp(35px,10vw,50px);line-height:1.08!important}
 
   /* Filters remain usable on narrow phones and never overflow the viewport. */
   body.app-body .discovery-filter-panel{width:calc(100% - 10px);padding:25px 18px 18px}

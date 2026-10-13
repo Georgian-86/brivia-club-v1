@@ -483,17 +483,15 @@ try {
   const ownArea = await wpage.evaluate(() => document.querySelector('#profile-location')?.textContent?.trim() || '');
   check(`own profile location line is place_label "Kochi" (got "${ownArea}")`, () => assert.equal(ownArea, 'Kochi'));
   // I-1 (D-036): my own details are private, the area is read-only, and the editor has no City/State; saving works.
+  // Phase C Task 5: the details card and the stat tiles are gone; my area shows only as the hero's place_label line.
   const ownCard = await wpage.evaluate(() => ({
-    details: document.querySelector('.profile-details-card')?.textContent || '',
-    statArea: document.querySelector('#profile-stat-area')?.textContent?.trim() || '',
+    removed: ['.profile-details-card', '#profile-stat-area', '#profile-email', '#profile-phone'].filter((sel) => document.querySelector(sel)),
     cityNodes: document.querySelectorAll('#profile-city, #profile-state, #profile-stat-city, #profile-stat-state').length,
   }));
-  check(`own details card is marked private, not "visible to members" (${JSON.stringify(ownCard)})`, () => {
-    assert.ok(!/VISIBLE TO MEMBERS/i.test(ownCard.details));
-    assert.match(ownCard.details, /PRIVATE/);
+  check(`own profile has no details card, stat tiles or City/State nodes (${JSON.stringify(ownCard)})`, () => {
+    assert.deepEqual(ownCard.removed, []);
     assert.equal(ownCard.cityNodes, 0);
   });
-  check(`own location stat is the place_label (got "${ownCard.statArea}")`, () => assert.equal(ownCard.statArea, 'Kochi'));
   await wpage.locator('#profile-photo-editor').click();
   await wpage.waitForSelector('#profile-edit-form');
   const editor = await wpage.evaluate(() => ({

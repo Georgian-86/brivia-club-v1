@@ -387,10 +387,7 @@
   body.app-body[data-app-view="profile"] .profile-board-content .profile-hero-copy>p:not(.app-eyebrow){overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   body.app-body[data-app-view="profile"] .profile-board-content .profile-hero-actions{right:12px;bottom:14px;gap:6px}
   body.app-body[data-app-view="profile"] .profile-board-content .profile-hero-actions .profile-photo-editor{padding:8px 9px;font-size:var(--text-12)}
-  body.app-body[data-app-view="profile"] .profile-board-content .profile-stat-grid{width:100%;min-width:0}
-  body.app-body[data-app-view="profile"] .profile-stat-card{min-width:0;overflow:hidden}
-  body.app-body[data-app-view="profile"] .profile-stat-card>strong{max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-  body.app-body[data-app-view="profile"] .profile-board-content .profile-dashboard{width:100%;min-height:190px;box-sizing:border-box}
+
   body.app-body[data-app-view="profile"] .profile-settings-menu{right:0;max-width:calc(100vw - 30px)}
   body.app-body .profile-settings-dialog{width:calc(100vw - 24px);max-height:calc(100svh - 24px);padding:28px 18px 22px}
 

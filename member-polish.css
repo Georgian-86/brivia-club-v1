@@ -163,99 +163,6 @@
   overflow-wrap: anywhere;
 }
 
-.app-view[data-view="profile"] .profile-dashboard {
-  position: relative;
-  overflow: hidden;
-  border-color: rgba(90, 6, 31, .18);
-  background: linear-gradient(135deg, #fffaf1, #f8eee5);
-}
-
-.app-view[data-view="profile"] .profile-dashboard::after {
-  position: absolute;
-  right: 23px;
-  bottom: -33px;
-  width: 105px;
-  height: 105px;
-  border: 1px solid rgba(90, 6, 31, .12);
-  border-radius: 50%;
-  box-shadow: 0 0 0 13px rgba(90, 6, 31, .03), 0 0 0 26px rgba(90, 6, 31, .025);
-  content: '';
-  pointer-events: none;
-}
-
-.app-view[data-view="profile"] .profile-dashboard-top,
-.app-view[data-view="profile"] .profile-summary,
-.app-view[data-view="profile"] .profile-quick-stats {
-  position: relative;
-  z-index: 1;
-}
-
-.app-view[data-view="profile"] .profile-quick-stats {
-  gap: 0;
-}
-
-.app-view[data-view="profile"] .profile-quick-stats div {
-  min-height: 48px;
-  padding-left: 15px;
-  border-left: 1px solid rgba(90, 6, 31, .14);
-}
-
-.app-view[data-view="profile"] .profile-quick-stats div:first-child {
-  padding-left: 0;
-  border-left: 0;
-}
-
-.app-view[data-view="profile"] .profile-quick-stats strong {
-  font-size: var(--text-24);
-}
-
-.app-view[data-view="profile"] .profile-content-grid .profile-section {
-  transition: transform .2s, box-shadow .2s, border-color .2s;
-}
-
-.app-view[data-view="profile"] .profile-content-grid .profile-section:hover {
-  border-color: rgba(90, 6, 31, .25);
-  box-shadow: 0 9px 24px rgba(69, 41, 34, .06);
-  transform: translateY(-2px);
-}
-
-.app-view[data-view="profile"] .profile-section-heading small {
-  white-space: nowrap;
-}
-
-.app-view[data-view="profile"] .profile-pills span,
-.app-view[data-view="profile"] .profile-looking span {
-  transition: background .18s, border-color .18s, transform .18s;
-}
-
-.app-view[data-view="profile"] .profile-pills span:hover,
-.app-view[data-view="profile"] .profile-looking span:hover {
-  border-color: rgba(90, 6, 31, .38);
-  background: #f7e8e3;
-  transform: translateY(-1px);
-}
-
-.app-view[data-view="profile"] .profile-login-card {
-  position: relative;
-  min-height: 70px;
-  padding-left: 56px;
-  background: rgba(90, 6, 31, .055);
-}
-
-.app-view[data-view="profile"] .profile-login-card::before {
-  position: absolute;
-  left: 19px;
-  display: grid;
-  width: 25px;
-  height: 25px;
-  place-items: center;
-  border: 1px solid rgba(90, 6, 31, .23);
-  border-radius: 50%;
-  color: #5a061f;
-  content: '✦';
-  font-size: var(--text-12);
-}
-
 @media(max-width:700px) {
   .app-view[data-view="home"] .home-heading {
     margin-top: 34px;
@@ -278,20 +185,6 @@
   .app-view[data-view="home"] .swipe-action {
     width: 68px;
     height: 68px;
-  }
-
-  .app-view[data-view="profile"] .profile-quick-stats div {
-    min-height: 42px;
-    padding-left: 9px;
-  }
-
-  .app-view[data-view="profile"] .profile-quick-stats strong {
-    font-size: var(--text-20);
-  }
-
-  .app-view[data-view="profile"] .profile-quick-stats span {
-    font-size: var(--text-12);
-    letter-spacing: .041em;
   }
 }
 

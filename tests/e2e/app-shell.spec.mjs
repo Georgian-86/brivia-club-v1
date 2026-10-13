@@ -17,6 +17,12 @@
 //   Bodoni Moda or Instrument Sans; visible h1/h2 use Bodoni Moda; a Bodoni Moda 500 italic face is loaded.
 // * nothing clipped: the chat badge inside its nav item and the viewport, the deck card's VIEW PROFILE inside the card,
 //   the chat compose placeholder inside its field (375 px and 1440 px).
+// * profile (Phase C Task 5), new and complete member, 375 px and 1440 px: hero, "Complete your profile", interests,
+//   looking for, experience in DOM order; the removed stat grid, dashboard, quick stats, details and login cards are
+//   gone; the own email appears only in the ⚙ menu's "Signed in as" line; the checklist reads "1 of 5" and its first
+//   item opens the editor; a complete member sees only "Profile complete"; interest bars are points/20 wide and a
+//   private interest is labelled Private; one my_interests call per visit; a failed load offers Retry; a long name
+//   and area cause no horizontal scroll; type audit and axe clean on the profile.
 // APP_SHOTS=<dir> only saves full-page screenshots of home, posts, chat and profile at 375 px and 1440 px, then exits
 // (the Phase C before/after review), and runs no checks.
 import { mkdirSync } from 'node:fs';
@@ -43,8 +49,32 @@ const DIALOGS = [
   ['post-composer', 'posts', ['#open-community-post']],
 ];
 
+// Phase C Task 5: two profile states. A new member has 3 interests and nothing else; a complete member has a photo, a
+// chosen (non-default) cover, 4 interests (one private), what they are looking for and their experience.
+const ME_ID = '11111111-1111-4111-8111-111111111111';
+const OWN_EMAIL = 'alex@test.brivia.club';
+const NEW_MEMBER = {
+  own: { id: ME_ID, name: 'Alex Me', full_name: 'Alex Me', email: OWN_EMAIL, phone: '+91 98765 43210', city: null, state: null, experience: '', skills: ['Badminton', 'Chess', 'Poetry'], looking_for: [], photo_url: null, cover_url: null, created_at: new Date(Date.now() - 9e6).toISOString() },
+  myInterests: [
+    { interest_id: 'sports.racket.badminton', label: 'Badminton', points: 10, mode: 'play' },
+    { interest_id: 'games.board.chess', label: 'Chess', points: 6, mode: 'learn' },
+    { interest_id: 'arts.writing.poetry', label: 'Poetry', points: 4, mode: 'play' },
+  ],
+};
+const COMPLETE_MEMBER = {
+  own: { ...NEW_MEMBER.own, experience: 'Product designer, 6 years', looking_for: ['Friends', 'Mentor', 'Co-founder'], photo_url: `https://stub.supabase.local/storage/v1/object/public/profile-photos/${ME_ID}/p.jpg`, cover_url: '/Images/Cover%20images/2257522A-04B9-4E3E-AB1A-A73D7BB8CCBF.PNG' },
+  myInterests: [
+    { interest_id: 'sports.racket.badminton', label: 'Badminton', points: 8, mode: 'play' },
+    { interest_id: 'games.board.chess', label: 'Chess', points: 5, mode: 'teach' },
+    { interest_id: 'wellbeing.private.meditation', label: 'Meditation', points: 4, mode: 'private' },
+    { interest_id: 'arts.writing.poetry', label: 'Poetry', points: 3, mode: 'learn' },
+  ],
+};
+const useMember = (member) => { st.own = member.own; st.myInterests = member.myInterests; };
+const clearMember = () => { delete st.own; delete st.myInterests; };
+
 const results = [];
-const check = (name, fn) => { try { fn(); results.push(['PASS', name]); } catch (error) { results.push(['FAIL', `${name}: ${error.message}`]); } };
+const check =(name, fn) => { try { fn(); results.push(['PASS', name]); } catch (error) { results.push(['FAIL', `${name}: ${error.message}`]); } };
 
 const st = { matchIds: [] };
 const stub = await startAppStub({ port: PORT, state: st });
@@ -79,7 +109,18 @@ try {
       await page.screenshot({ path: path.join(SHOTS, `app-${name}-375.png`) });
       await context.close();
     }
-    console.log(`saved ${VIEWS.length * 2 + DIALOGS.length} screenshots to ${SHOTS}`);
+    // Phase C Task 5: the profile of a new member and of a complete member, at 375 px and 1440 px.
+    for (const [name, member] of [['new', NEW_MEMBER], ['complete', COMPLETE_MEMBER]]) {
+      useMember(member);
+      for (const [tag, viewport] of [['375', NARROW], ['1440', WIDE]]) {
+        const { context, page } = await open(viewport, '/app.html?view=profile');
+        await page.waitForTimeout(1500);
+        await page.screenshot({ path: path.join(SHOTS, `app-profile-${name}-${tag}.png`), fullPage: true });
+        await context.close();
+      }
+    }
+    clearMember();
+    console.log(`saved ${VIEWS.length * 2 + DIALOGS.length + 4} screenshots to ${SHOTS}`);
   } else {
     // Which member navs are visible, and which section is shown.
     const navState = (page) => page.evaluate(() => {
@@ -399,6 +440,140 @@ try {
       await context.close();
     }
     delete st.posts; delete st.messages;
+
+    // 11. Profile (Phase C Task 5): hero, then "Complete your profile", then interests, looking for, experience.
+    st.matchIds = [];
+    const interestCalls = () => st.calls.filter((c) => c.path === '/rest/v1/rpc/my_interests').length;
+    const profileOrder = (page) => page.evaluate(() => {
+      const ids = ['.profile-hero', '#profile-checklist', '#profile-interests', '#profile-looking-for', '#profile-experience'];
+      const nodes = ids.map((sel) => document.querySelector(sel));
+      const follows = nodes.every((n, i) => n && (i === 0 || (nodes[i - 1].compareDocumentPosition(n) & Node.DOCUMENT_POSITION_FOLLOWING)));
+      return { found: ids.filter((_, i) => nodes[i]), follows };
+    });
+    for (const [tag, viewport] of [['375', NARROW], ['1440', WIDE]]) {
+      useMember(NEW_MEMBER);
+      const before = interestCalls();
+      const { context, page } = await open(viewport, '/app.html?view=profile');
+      await page.waitForFunction(() => document.querySelector('#profile-interests [data-interest-row]'), null, { timeout: 8000 }).catch(() => {});
+      await settle(page);
+      const order = await profileOrder(page);
+      check(`${tag}: profile shows hero, then checklist, then interests, looking for, experience, in DOM order (${JSON.stringify(order)})`, () => { assert.equal(order.found.length, 5); assert.equal(order.follows, true); });
+      const removed = await page.evaluate(() => ['.profile-stat-grid', '.profile-dashboard', '.profile-quick-stats', '.profile-details-card', '.profile-login-card'].filter((sel) => document.querySelector(sel)));
+      check(`${tag}: none of the removed sections is in the DOM (${removed.join(', ')})`, () => assert.deepEqual(removed, []));
+      // The member's own email: only in the ⚙ menu's "Signed in as" line (never in text or attributes elsewhere).
+      const email = await page.evaluate((own) => {
+        const menu = document.querySelector('#profile-settings-menu');
+        const hits = [];
+        for (const el of document.querySelectorAll('body *')) {
+          if (menu && (el === menu || menu.contains(el))) continue;
+          const ownText = [...el.childNodes].filter((n) => n.nodeType === 3).map((n) => n.textContent).join('');
+          if (ownText.includes(own)) hits.push(`${el.tagName.toLowerCase()}#${el.id} text`);
+          for (const attr of el.attributes) if (attr.value.includes(own)) hits.push(`${el.tagName.toLowerCase()}#${el.id} [${attr.name}]`);
+          if ('value' in el && String(el.value || '').includes(own)) hits.push(`${el.tagName.toLowerCase()}#${el.id} value`);
+        }
+        const line = menu?.querySelector('.profile-settings-account');
+        return { hits, line: line?.textContent.replace(/\s+/g, ' ').trim() || '', lineTag: line?.tagName, lineTabIndex: line?.tabIndex, first: menu?.firstElementChild === line };
+      }, OWN_EMAIL);
+      check(`${tag}: no element contains the member's email outside the ⚙ menu; the menu starts with "Signed in as" (${JSON.stringify(email)})`, () => {
+        assert.deepEqual(email.hits, []);
+        assert.equal(email.line, `Signed in as ${OWN_EMAIL}`);
+        assert.equal(email.lineTag, 'P'); assert.equal(email.first, true); assert.ok(email.lineTabIndex < 0);
+      });
+      const list = await page.evaluate(() => {
+        const box = document.querySelector('#profile-checklist');
+        return {
+          text: box?.textContent.replace(/\s+/g, ' ').trim() || '',
+          items: [...(box?.querySelectorAll('[data-checklist-item]') || [])].map((b) => ({ key: b.dataset.checklistItem, tag: b.tagName, done: b.dataset.done, text: b.textContent.replace(/\s+/g, ' ').trim() })),
+          bar: box?.querySelector('[role="progressbar"]')?.getAttribute('aria-valuenow') || null,
+        };
+      });
+      check(`${tag}: checklist reads "1 of 5" for a new member (${JSON.stringify(list)})`, () => {
+        assert.match(list.text, /Complete your profile/);
+        assert.match(list.text, /1 of 5/);
+        assert.equal(list.bar, '1');
+        assert.deepEqual(list.items.map((i) => i.key), ['photo', 'cover', 'interests', 'looking', 'experience']);
+        assert.ok(list.items.every((i) => i.tag === 'BUTTON'));
+        assert.deepEqual(list.items.filter((i) => i.done === 'true').map((i) => i.key), ['interests']);
+      });
+      await page.locator('#profile-checklist [data-checklist-item]').first().click({ timeout: 5000 }).catch((error) => console.log(`checklist click failed: ${error.message.split('\n')[0]}`));
+      const editorOpen = await page.waitForSelector('#profile-edit-modal', { timeout: 3000 }).then(() => true).catch(() => false);
+      check(`${tag}: the checklist's first item opens the profile editor`, () => assert.equal(editorOpen, true));
+      await page.evaluate(() => document.querySelector('#profile-edit-modal [data-profile-edit-close]')?.click());
+      const rows = await page.evaluate(() => [...document.querySelectorAll('#profile-interests [data-interest-row]')].map((r) => ({ label: r.querySelector('.profile-interest-label')?.textContent.trim(), bar: r.querySelector('.profile-interest-bar i')?.style.width || '', private: Boolean(r.querySelector('.profile-interest-private')) })));
+      check(`${tag}: interests list each label with a bar whose width is points/20 (${JSON.stringify(rows)})`, () => assert.deepEqual(rows, [
+        { label: 'Badminton', bar: '50%', private: false }, { label: 'Chess', bar: '30%', private: false }, { label: 'Poetry', bar: '20%', private: false },
+      ]));
+      check(`${tag}: one my_interests call for the profile visit (${interestCalls() - before})`, () => assert.equal(interestCalls() - before, 1));
+      const empties = await page.evaluate(() => ({
+        looking: document.querySelector('#profile-looking-for')?.textContent.replace(/\s+/g, ' ').trim(),
+        experience: document.querySelector('#profile-experience')?.textContent.replace(/\s+/g, ' ').trim(),
+      }));
+      check(`${tag}: empty Looking for and Experience offer an action (${JSON.stringify(empties)})`, () => {
+        assert.match(empties.looking, /Looking for/); assert.match(empties.experience, /Experience/);
+      });
+      const { small, family } = await textAudit(page, { root: '[data-view="profile"]', families: TYPE_FAMILIES });
+      check(`${tag} new member profile: every visible text is >= 12 px in the two families (${[...small, ...family].join(' | ')})`, () => { assert.deepEqual(small, []); assert.deepEqual(family, []); });
+      const axe = await axeViolations(page, { include: '[data-view="profile"]' }).catch((error) => [`axe could not run: ${error.message.split('\n')[0]}`]);
+      check(`${tag}: axe clean on the new member's profile (${axe.join(' | ')})`, () => assert.deepEqual(axe, []));
+      await context.close();
+
+      // A complete member: a single "Profile complete" line; a private interest is labelled Private.
+      useMember(COMPLETE_MEMBER);
+      const done = await open(viewport, '/app.html?view=profile');
+      await done.page.waitForFunction(() => document.querySelectorAll('#profile-interests [data-interest-row]').length === 4, null, { timeout: 8000 }).catch(() => {});
+      await settle(done.page);
+      const full = await done.page.evaluate(() => {
+        const box = document.querySelector('#profile-checklist');
+        return {
+          text: box?.textContent.replace(/\s+/g, ' ').trim() || '',
+          items: box?.querySelectorAll('[data-checklist-item]').length ?? -1,
+          bar: Boolean(box?.querySelector('[role="progressbar"]')),
+          rows: [...document.querySelectorAll('#profile-interests [data-interest-row]')].map((r) => ({ label: r.querySelector('.profile-interest-label')?.textContent.trim(), bar: r.querySelector('.profile-interest-bar i')?.style.width || '', private: r.querySelector('.profile-interest-private')?.textContent.trim() || '' })),
+          chips: [...document.querySelectorAll('#profile-looking-for li')].map((li) => li.textContent.trim()),
+          experience: document.querySelector('#profile-experience p')?.textContent.trim(),
+        };
+      });
+      check(`${tag}: a complete member sees only "Profile complete" (${JSON.stringify({ text: full.text, items: full.items, bar: full.bar })})`, () => {
+        assert.equal(full.text, 'Profile complete'); assert.equal(full.items, 0); assert.equal(full.bar, false);
+      });
+      check(`${tag}: a private interest is labelled Private; bars follow points/20 (${JSON.stringify(full.rows)})`, () => assert.deepEqual(full.rows, [
+        { label: 'Badminton', bar: '40%', private: '' }, { label: 'Chess', bar: '25%', private: '' }, { label: 'Meditation', bar: '20%', private: 'Private' }, { label: 'Poetry', bar: '15%', private: '' },
+      ]));
+      check(`${tag}: Looking for shows chips and Experience the member's text (${JSON.stringify({ chips: full.chips, experience: full.experience })})`, () => {
+        assert.deepEqual(full.chips, ['Friends', 'Mentor', 'Co-founder']); assert.equal(full.experience, 'Product designer, 6 years');
+      });
+      const axe2 = await axeViolations(done.page, { include: '[data-view="profile"]' }).catch((error) => [`axe could not run: ${error.message.split('\n')[0]}`]);
+      check(`${tag}: axe clean on the complete member's profile (${axe2.join(' | ')})`, () => assert.deepEqual(axe2, []));
+      await done.context.close();
+    }
+    // Interests that fail to load: "Couldn't load your interests" with a Retry that loads them.
+    {
+      useMember(NEW_MEMBER);
+      st.myInterestsFail = true;
+      const { context, page } = await open(NARROW, '/app.html?view=profile');
+      await page.waitForFunction(() => /Couldn.t load your interests/.test(document.querySelector('#profile-interests')?.textContent || ''), null, { timeout: 8000 }).catch(() => {});
+      const failed = await page.evaluate(() => ({ text: document.querySelector('#profile-interests')?.textContent.replace(/\s+/g, ' ').trim(), retry: Boolean(document.querySelector('#profile-interests [data-interests-retry]')) }));
+      st.myInterestsFail = false;
+      await page.locator('#profile-interests [data-interests-retry]').click({ timeout: 5000 }).catch(() => {});
+      await page.waitForFunction(() => document.querySelectorAll('#profile-interests [data-interest-row]').length === 3, null, { timeout: 8000 }).catch(() => {});
+      const retried = await page.evaluate(() => document.querySelectorAll('#profile-interests [data-interest-row]').length);
+      check(`375: interests that fail show "Couldn't load your interests" with Retry, and Retry loads them (${JSON.stringify({ failed, retried })})`, () => {
+        assert.match(failed.text, /Couldn.t load your interests/); assert.equal(failed.retry, true); assert.equal(retried, 3);
+      });
+      await context.close();
+    }
+    // Long name and area: no horizontal scroll at 375 on the profile.
+    {
+      useMember({ ...NEW_MEMBER, own: { ...NEW_MEMBER.own, name: 'Maximiliana Alexandrina Featherstonehaugh-Worthington', experience: 'Principal interdisciplinary-design-and-research-practitioner at a very long company name', looking_for: ['Weekend badminton partners for doubles', 'A co-founder for a climate-tech venture'] } });
+      st.placeLabel = 'Thiruvananthapuram Technopark Kazhakkoottam Phase Three';
+      const { context, page } = await open(NARROW, '/app.html?view=profile');
+      await settle(page);
+      const sw = await page.evaluate(() => ({ scroll: document.documentElement.scrollWidth, client: document.documentElement.clientWidth }));
+      check(`375: long name and area on the profile: no horizontal scroll (${JSON.stringify(sw)})`, () => assert.ok(sw.scroll <= sw.client));
+      await context.close();
+      delete st.placeLabel;
+    }
+    clearMember();
 
     st.matchIds = [];
     check(`no uncaught page errors (${pageErrors.join(' | ')})`, () => assert.deepEqual(pageErrors, []));

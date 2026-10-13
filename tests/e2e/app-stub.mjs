@@ -15,6 +15,7 @@
 //   reportHold    a promise report_member waits on          calls, bodies          every request / every JSON answer
 //   myInterests   rpc/my_interests rows (default 3)         posts                  GET community_posts rows (default [])
 //   messages      GET brivia_messages rows (default [])     own, placeLabel        my profiles row / my area label
+//   myInterestsFail  rpc/my_interests answers 500
 import { readFileSync } from 'node:fs';
 import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
@@ -88,7 +89,7 @@ export const startAppStub = async ({ port, state = {}, deckRows = defaultDeckRow
         if (answer === 'error') return json(500, { code: 'XX000', message: 'stub failure' });
         return json(200, [{ interests: 2, points: 20, has_cell: true, place_label: st.placeLabel || 'Kochi', completed: answer }]);
       }
-      if (pathName === '/rest/v1/rpc/my_interests') return json(200, st.myInterests || defaultInterests);
+      if (pathName === '/rest/v1/rpc/my_interests') return st.myInterestsFail ? json(500, { code: 'XX000', message: 'stub failure' }) : json(200, st.myInterests || defaultInterests);
       if (pathName === '/rest/v1/rpc/deck_candidates') {
         if (st.deckFail) return json(500, { code: 'XX000', message: 'stub failure' });
         if (st.emptyDeck) return json(200, []);

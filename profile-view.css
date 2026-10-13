@@ -1,0 +1,400 @@
+/* The member's own profile (Phase C, Task 5): one calm, centred column under the shared header: the hero (cover,
+   photo, name, area, Edit profile, ⚙), then "Complete your profile", "Your interests", "Looking for" and "Experience".
+   Tokens only (tokens.css): no raw colours, no font stacks. Loads after app-shell.css. The hero keeps its existing
+   cover, photo and wine treatment from profile-theme.css / mobile-app.css; this file only places it in the column. */
+
+body.app-body .app-view.profile-view[data-view="profile"]:not([hidden]) {
+  display: block;
+  width: 100%;
+  max-width: calc(880px + 2 * var(--space-5));
+  height: auto;
+  min-height: 0;
+  margin: 0 auto;
+  padding: var(--space-5) var(--space-5) var(--space-7);
+  overflow: visible;
+  background: transparent;
+  color: var(--color-ink);
+}
+
+body.app-body .profile-view .profile-shell,
+body.app-body .profile-view .profile-board {
+  display: block;
+  width: 100%;
+  min-width: 0;
+  height: auto;
+}
+
+body.app-body .profile-view .profile-board-content {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  width: 100%;
+  min-width: 0;
+  padding: 0;
+  overflow: visible;
+}
+
+body.app-body .profile-view .profile-board-content .profile-hero {
+  width: 100%;
+  margin: 0;
+}
+
+/* A long name stays on two lines (ellipsis) so it never runs into the photo or the hero actions; the line height
+   leaves room for the second line's descenders inside the clip. */
+body.app-body .profile-view .profile-board-content .profile-hero h1 {
+  display: -webkit-box;
+  max-width: 100%;
+  overflow: hidden;
+  line-height: 1.08;
+  overflow-wrap: anywhere;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+}
+
+/* The column under the hero. */
+.profile-column {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  min-width: 0;
+}
+
+.profile-card {
+  min-width: 0;
+  padding: var(--space-5);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-m);
+  background: var(--color-cream);
+  color: var(--color-ink);
+}
+
+.profile-card-title {
+  margin: 0 0 var(--space-4);
+  color: var(--color-wine-deep);
+  font-family: var(--font-heading);
+  font-size: var(--text-24);
+  font-weight: 500;
+  line-height: 1.15;
+  letter-spacing: 0;
+}
+
+.profile-card-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-2) var(--space-4);
+  margin-bottom: var(--space-3);
+}
+
+.profile-card-head .profile-card-title { margin: 0; }
+
+.profile-card-empty {
+  margin: 0 0 var(--space-3);
+  color: var(--color-ink-soft);
+  font-family: var(--font-body);
+  font-size: var(--text-14);
+  line-height: 1.5;
+}
+
+.profile-card-action {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  padding: 0 var(--space-4);
+  border: 1px solid var(--color-wine);
+  border-radius: var(--radius-pill);
+  background: transparent;
+  color: var(--color-wine);
+  font-family: var(--font-body);
+  font-size: var(--text-14);
+  font-weight: 600;
+  cursor: pointer;
+  transition: background var(--motion-fast) var(--ease), color var(--motion-fast) var(--ease);
+}
+
+.profile-card-action:hover { background: var(--color-wine); color: var(--color-cream); }
+
+.profile-card-action:focus-visible,
+.profile-checklist-item:focus-visible {
+  outline: 2px solid var(--color-wine);
+  outline-offset: 2px;
+}
+
+/* Complete your profile */
+.profile-checklist-count {
+  color: var(--color-ink-soft);
+  font-family: var(--font-body);
+  font-size: var(--text-14);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.profile-progress {
+  height: 6px;
+  margin-bottom: var(--space-3);
+  overflow: hidden;
+  border-radius: var(--radius-pill);
+  background: color-mix(in srgb, var(--color-wine) 12%, transparent);
+}
+
+.profile-progress i {
+  display: block;
+  width: 0;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--color-wine);
+  transition: width var(--motion-slow) var(--ease);
+}
+
+.profile-checklist-items {
+  display: grid;
+  gap: var(--space-1);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.profile-checklist-item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  width: 100%;
+  min-height: 44px;
+  padding: var(--space-2) var(--space-3);
+  border: 0;
+  border-radius: var(--radius-s);
+  background: transparent;
+  color: var(--color-ink);
+  font-family: var(--font-body);
+  font-size: var(--text-16);
+  text-align: left;
+  cursor: pointer;
+  transition: background var(--motion-fast) var(--ease);
+}
+
+.profile-checklist-item:hover { background: color-mix(in srgb, var(--color-wine) 6%, transparent); }
+
+/* An open item ends in a small chevron; a done one is muted with a filled check. */
+.profile-checklist-item::after {
+  flex: 0 0 auto;
+  width: 7px;
+  height: 7px;
+  margin-left: auto;
+  border-top: 1.5px solid var(--color-wine-soft);
+  border-right: 1.5px solid var(--color-wine-soft);
+  transform: rotate(45deg);
+  content: '';
+}
+
+.profile-checklist-item[data-done="true"] { color: var(--color-ink-soft); }
+.profile-checklist-item[data-done="true"]::after { visibility: hidden; }
+
+.profile-checklist-mark,
+.profile-checklist-done::before {
+  position: relative;
+  box-sizing: border-box;
+  flex: 0 0 20px;
+  width: 20px;
+  height: 20px;
+  border: 1.5px solid var(--color-wine-soft);
+  border-radius: 50%;
+}
+
+.profile-checklist-item[data-done="true"] .profile-checklist-mark,
+.profile-checklist-done::before {
+  border-color: var(--color-wine);
+  background: var(--color-wine);
+}
+
+.profile-checklist-item[data-done="true"] .profile-checklist-mark::after {
+  position: absolute;
+  top: 3px;
+  left: 6px;
+  width: 4px;
+  height: 8px;
+  border-right: 2px solid var(--color-cream);
+  border-bottom: 2px solid var(--color-cream);
+  transform: rotate(45deg);
+  content: '';
+}
+
+.profile-checklist-label { min-width: 0; overflow-wrap: anywhere; }
+
+.profile-checklist.is-complete { padding-block: var(--space-4); }
+
+.profile-checklist-done {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  margin: 0;
+  color: var(--color-wine-deep);
+  font-family: var(--font-body);
+  font-size: var(--text-16);
+  font-weight: 600;
+}
+
+.profile-checklist-done { position: relative; }
+.profile-checklist-done::before { content: ''; }
+
+.profile-checklist-done::after {
+  position: absolute;
+  top: calc(50% - 6px);
+  left: 8px;
+  width: 4px;
+  height: 8px;
+  border-right: 2px solid var(--color-cream);
+  border-bottom: 2px solid var(--color-cream);
+  transform: rotate(45deg);
+  content: '';
+}
+
+/* Your interests: each label with a thin bar, points / 20 of its width (the Passion Budget). */
+.profile-interest-list {
+  display: grid;
+  gap: var(--space-4);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.profile-interest {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--space-1) var(--space-2);
+  min-width: 0;
+}
+
+.profile-interest-label {
+  min-width: 0;
+  color: var(--color-ink);
+  font-family: var(--font-body);
+  font-size: var(--text-16);
+  font-weight: 500;
+  overflow-wrap: anywhere;
+}
+
+.profile-interest-private {
+  padding: 0 var(--space-2);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-pill);
+  color: var(--color-wine-soft);
+  font-family: var(--font-body);
+  font-size: var(--text-12);
+  font-weight: 600;
+  line-height: 1.6;
+}
+
+.profile-interest-points {
+  margin-left: auto;
+  color: var(--color-ink-soft);
+  font-family: var(--font-body);
+  font-size: var(--text-14);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.profile-interest-bar {
+  flex: 0 0 100%;
+  height: 4px;
+  overflow: hidden;
+  border-radius: var(--radius-pill);
+  background: color-mix(in srgb, var(--color-wine) 10%, transparent);
+}
+
+.profile-interest-bar i {
+  display: block;
+  width: 0;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--color-wine-soft);
+}
+
+/* The neutral loading row (Phase C Task 6 replaces it with the shared skeleton). */
+.profile-interest.is-placeholder .profile-interest-placeholder {
+  display: block;
+  width: 40%;
+  height: var(--text-16);
+  border-radius: var(--radius-s);
+  background: color-mix(in srgb, var(--color-ink) 8%, transparent);
+}
+
+.profile-interest.is-placeholder .profile-interest-bar i { width: 0; }
+
+/* Looking for */
+.profile-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.profile-chips li {
+  max-width: 100%;
+  padding: var(--space-1) var(--space-3);
+  border: 1px solid color-mix(in srgb, var(--color-wine) 18%, transparent);
+  border-radius: var(--radius-pill);
+  background: color-mix(in srgb, var(--color-wine) 6%, var(--color-cream));
+  color: var(--color-wine-deep);
+  font-family: var(--font-body);
+  font-size: var(--text-14);
+  font-weight: 500;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
+/* Experience (fills the "about" slot until a real bio exists). */
+.profile-experience-text {
+  margin: 0;
+  color: var(--color-ink);
+  font-family: var(--font-body);
+  font-size: var(--text-16);
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
+/* "Signed in as": the first line of the ⚙ menu, not focusable. */
+.profile-settings-menu .profile-settings-account {
+  margin: 0 0 var(--space-1);
+  padding: var(--space-2) var(--space-3) var(--space-3);
+  border-bottom: 1px solid var(--color-line);
+  color: var(--color-ink-soft);
+  font-family: var(--font-body);
+  font-size: var(--text-12);
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+
+.profile-settings-menu .profile-settings-account[hidden] { display: none; }
+
+.profile-settings-menu .profile-settings-account strong {
+  display: block;
+  color: var(--color-ink);
+  font-weight: 600;
+}
+
+.profile-sr {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+  border: 0;
+  white-space: nowrap;
+}
+
+@media (max-width: 700px) {
+  body.app-body .app-view.profile-view[data-view="profile"]:not([hidden]) {
+    padding: var(--space-3) var(--space-4) var(--space-6);
+  }
+
+  .profile-card { padding: var(--space-4); }
+  .profile-card-title { margin-bottom: var(--space-3); font-size: var(--text-20); }
+}
