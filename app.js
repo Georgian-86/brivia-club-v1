@@ -590,10 +590,13 @@ const setDeckLoading = (card, loading) => {
   if (!loading) skeleton?.remove();
 };
 // "Why this person?" (Phase D, Task 3): testers only. rpc/deck_why (0008 section 5) answers a row only to a caller in
-// the test world. The first card shown asks once; no row (or an error, e.g. before 0008 is applied) means "not a
-// tester" for this page (memory only) and the client never asks again. A tester's cards each ask once (cached by id);
-// a card with no row shows no button. The panel shows the band label, the shared interests and the deck's order keys.
-const why = { tester: null, rows: new Map(), pending: new Set() };
+// the test world. "Not a tester" is cached (memory only, this page) only for an empty successful answer or a missing
+// function (HTTP 404 / PGRST202, e.g. before 0008 is applied). Any other error leaves the state unknown: each card asks
+// at most once (why.tried), and after 3 consecutive errors the client stops asking for the session. A tester's cards each
+// ask once (cached by id); a card with no row shows no button. The panel shows the band label, the shared interests
+// and the deck's order keys.
+const WHY_MAX_ERRORS = 3;
+const why = { tester: null, rows: new Map(), pending: new Set(), tried: new Set(), errors: 0 };
 const setWhyOpen = (open) => {
   const toggle = document.querySelector('#why-toggle');
   const panel = document.querySelector('#why-panel');
@@ -619,17 +622,27 @@ const renderWhy = (person) => {
     setWhyOpen(false);
     toggle.hidden = false;
   }
-  if (!id || !supabase || why.tester === false || why.rows.has(id) || why.pending.has(id)) return;
+  if (!id || !supabase || why.tester === false || why.rows.has(id) || why.pending.has(id) || why.tried.has(id)) return;
+  if (why.errors >= WHY_MAX_ERRORS) return;
   if (why.tester === null && why.pending.size) return;   // the first answer decides whether to ask at all
   why.pending.add(id);
-  supabase.rpc('deck_why', { p_target: id }).then(({ data, error }) => {
-    const found = error ? null : whyRow(data);
+  why.tried.add(id);
+  supabase.rpc('deck_why', { p_target: id }).then(({ data, error, status }) => {
+    if (error) {
+      if (status === 404 || error.code === 'PGRST202') {   // the function does not exist: not a tester, never ask again
+        why.errors = 0;
+        if (why.tester === null) why.tester = false;
+        why.rows.set(id, null);
+      } else why.errors += 1;                              // unknown: the next card asks again
+      return;
+    }
+    why.errors = 0;
+    const found = whyRow(data);
     if (found) why.tester = true;
     else if (why.tester === null) why.tester = false;
     why.rows.set(id, found);
   }, () => {
-    if (why.tester === null) why.tester = false;
-    why.rows.set(id, null);
+    why.errors += 1;
   }).finally(() => {
     why.pending.delete(id);
     if (why.tester) renderWhy(currentPerson);

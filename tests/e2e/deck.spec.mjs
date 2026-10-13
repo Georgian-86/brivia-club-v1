@@ -65,7 +65,7 @@ const check = (name, fn) => { try { fn(); results.push(['PASS', name]); } catch 
 // One mutable stub serves every context; tests change it between page loads (tests/e2e/app-stub.mjs).
 // onboarding: the my_onboarding_status answers in order (the last one repeats); 'error' answers HTTP 500.
 // matchIds: members I am matched with (GET /rest/v1/matches); search: the rpc/search_members answer.
-const fresh = () => ({ status: 'caught_up', emptyDeck: false, deckFail: false, matchAll: false, onboarding: [true], onboardingCalls: 0, passed: new Set(), signalled: new Set(), remaining: 30, resetsAt: null, matchIds: [], search: [], report: 'ok', rows: null, why: null });
+const fresh = () => ({ status: 'caught_up', emptyDeck: false, deckFail: false, matchAll: false, onboarding: [true], onboardingCalls: 0, passed: new Set(), signalled: new Set(), remaining: 30, resetsAt: null, matchIds: [], search: [], report: 'ok', rows: null, why: null, whyStatuses: null });
 const st = { ...fresh(), calls: [], bodies: [] };
 const resetStub = (patch = {}) => Object.assign(st, fresh(), patch);
 const stub = await startAppStub({ port: PORT, state: st, deckRows });
@@ -810,6 +810,47 @@ try {
     assert.equal(firstCalls, 1); assert.equal(whyCalls().length - whyBefore, 1); assert.equal(realWhy.toggle, false); assert.equal(realWhy.panel, false);
   });
   await realCtx.close();
+
+  // Final fix 2: a transient deck_why error must not make a tester look like a non-tester for the whole session.
+  // First answer 500, then 200-with-row: the next card asks again and the button appears.
+  resetStub({ why: { [A]: whyRowA, [B]: whyRowB }, whyStatuses: [500] });
+  const errBefore = whyCalls().length;
+  const errCtx = await makeContext({ width: 1440, height: 900 });
+  const ep = await open(errCtx);
+  await waitForCard(ep, 'Asha Band');
+  await ep.waitForFunction((n) => [...performance.getEntriesByType('resource')].filter((e) => e.name.includes('/rpc/deck_why')).length >= n, 1, { timeout: 5000 }).catch(() => {});
+  await ep.waitForTimeout(300);
+  let ew = await whyState(ep);
+  check(`a deck_why 500 shows no button on that card (${JSON.stringify([ew.toggle, whyCalls().length - errBefore])})`, () => { assert.equal(ew.toggle, false); assert.equal(whyCalls().length - errBefore, 1); });
+  await ep.locator('[data-action="pass"]').click();
+  await waitForCard(ep, 'Bilal Place');
+  const recovered = await ep.waitForFunction(() => { const t = document.querySelector('#why-toggle'); return t && !t.hidden && t.getBoundingClientRect().height > 0; }, null, { timeout: 5000 }).then(() => true, () => false);
+  check(`after a 500 the next card asks again and the button appears (${JSON.stringify([recovered, whyCalls().length - errBefore])})`, () => { assert.equal(recovered, true); assert.equal(whyCalls().length - errBefore, 2); });
+  await errCtx.close();
+
+  // 404 / PGRST202 (0008 not applied): "not a tester", never asked again.
+  resetStub({ why: { [A]: whyRowA, [B]: whyRowB }, whyStatuses: [404] });
+  const nfBefore = whyCalls().length;
+  const nfCtx = await makeContext({ width: 1440, height: 900 });
+  const np = await open(nfCtx);
+  await waitForCard(np, 'Asha Band');
+  await np.waitForTimeout(500);
+  for (const next of ['Bilal Place', 'Chen Abroad']) { await np.locator('[data-action="pass"]').click(); await waitForCard(np, next); }
+  await np.waitForTimeout(500);
+  const nfw = await whyState(np);
+  check(`a deck_why 404 is asked once and never again (${JSON.stringify([whyCalls().length - nfBefore, nfw.toggle])})`, () => { assert.equal(whyCalls().length - nfBefore, 1); assert.equal(nfw.toggle, false); });
+  await nfCtx.close();
+
+  // Three consecutive errors in a session stop the asking (at most once per card until then).
+  resetStub({ why: { [A]: whyRowA, [B]: whyRowB }, whyStatuses: [500, 500, 500, 500, 500] });
+  const capBefore = whyCalls().length;
+  const capCtx = await makeContext({ width: 1440, height: 900 });
+  const cp = await open(capCtx);
+  await waitForCard(cp, 'Asha Band');
+  await cp.waitForTimeout(400);
+  for (const next of ['Bilal Place', 'Chen Abroad', 'Dana Blank']) { await cp.locator('[data-action="pass"]').click(); await waitForCard(cp, next); await cp.waitForTimeout(400); }
+  check(`after 3 consecutive deck_why errors the client stops asking (${whyCalls().length - capBefore} calls over 4 cards)`, () => assert.equal(whyCalls().length - capBefore, 3));
+  await capCtx.close();
 
   // 8. Privacy across the run.
   const storedKeys = await (async () => { const ctx = await makeContext({ width: 800, height: 600 }); const p2 = await open(ctx); await p2.waitForTimeout(800); const keys = await p2.evaluate(() => Object.entries(window.localStorage).map(([k, v]) => `${k}=${v}`)); await ctx.close(); return keys; })();

@@ -1,5 +1,6 @@
 -- Seed + purge of marked test members (Ruling P7; v2 test world: Phase D, Task 2).
--- Run by run.sh in three phases: -v phase=seeded (after the seed), extras (adds rows to purge), purged (after the purge).
+-- Run by run.sh in four phases: -v phase=seeded (after the seed), extras (adds rows to purge), tester (the founder path:
+-- a real account becomes a tester, then the purge runs), purged (after the purge).
 -- NOT picked up by the generic tests loop: it needs the seed, so it runs in its own database.
 --
 -- The v2 world (supabase/seed/test-members.sql): 60 members (t01-t60), Mumbai 12, Thane 10, Pune 10, Bengaluru 14,
@@ -80,7 +81,7 @@ select 'eeeeeeee-0000-0000-0000-0000000000e1', c, public.brivia_grid_parent(c, 6
   from (select public.brivia_grid_cell(12.9716, 77.5946, 7) as c) x
 on conflict (member_id) do nothing;
 
-select :'phase' = 'seeded' as seeded, :'phase' = 'extras' as extras \gset
+select :'phase' = 'seeded' as seeded, :'phase' = 'extras' as extras, :'phase' = 'tester' as tester \gset
 \if :seeded
 
 do $$
@@ -417,6 +418,46 @@ begin
   insert into auth.users(id, email) values ('eeeeeeee-0000-0000-0000-0000000000e2', 'someone@test.brivia.club');
 end $$;
 select 'seed.test extras inserted';
+\elif :tester
+-- Founder path (0008 is applied in this harness; the v2 seed is the only seed state, v1 is not separable). Two completed
+-- real accounts: R1 (the real member above, becomes the tester) and R2 (stays a plain real member).
+do $$
+declare r1 uuid := 'eeeeeeee-0000-0000-0000-0000000000e1'; r2 uuid := 'eeeeeeee-0000-0000-0000-0000000000e3';
+        n int; d uuid[]; s uuid[];
+begin
+  insert into auth.users(id) values (r2) on conflict do nothing;
+  insert into public.profiles (id, name, full_name, email, city, state, skills, adult_declared_at)
+  values (r2, 'Other Founder', 'Other Founder', 'other@example.com', 'Bengaluru', 'Karnataka', '{Python}', now())
+  on conflict (id) do nothing;
+  insert into public.member_interest (member_id, interest_id, points, mode) values
+    (r2, 'tech.ai_data.data_analysis', 12, 'play'), (r2, 'sports.racket.badminton', 8, 'play') on conflict do nothing;
+  insert into public.member_orbit (member_id, home_cell, home_cell_g6, home_cell_g5, place_id)
+  select r2, c, public.brivia_grid_parent(c, 6), public.brivia_grid_parent(c, 5), 'in-bengaluru'
+    from (select public.brivia_grid_cell(12.9716, 77.5946, 7) as c) x on conflict (member_id) do nothing;
+  if not public.brivia_member_completed(r1) or not public.brivia_member_completed(r2) then
+    raise exception 'FAIL T0: both real accounts must be completed'; end if;
+
+  -- before: R2 finds R1 by search (positive control), neither is a tester, R1's deck has no test member
+  if not (r1 = any(pg_temp.search_ids(r2, 'Real Member'))) then raise exception 'FAIL T1: control: R2 cannot find R1 before the switch'; end if;
+  d := pg_temp.deck_ids(r1);
+  if exists (select 1 from unnest(d) x join public.profiles p on p.id = x where p.is_test) then
+    raise exception 'FAIL T1: a non-tester deck holds a test member'; end if;
+
+  insert into public.brivia_tester(member_id) values (r1);
+
+  -- after: R1's deck is non-empty and holds only test members; R2 can no longer find R1
+  d := pg_temp.deck_ids(r1);
+  if coalesce(array_length(d, 1), 0) = 0 then raise exception 'FAIL T2: the tester deck is empty'; end if;
+  if exists (select 1 from unnest(d) x join public.profiles p on p.id = x where not p.is_test) then
+    raise exception 'FAIL T2: the tester deck holds a real member'; end if;
+  if r1 = any(pg_temp.search_ids(r2, 'Real Member')) then raise exception 'FAIL T3: a real account finds the tester'; end if;
+  s := pg_temp.search_ids(r2, 'Real Member');
+  if exists (select 1 from unnest(s) x join public.profiles p on p.id = x where p.is_test) then
+    raise exception 'FAIL T3: a real account sees a test member in search'; end if;
+  if exists (select 1 from unnest(pg_temp.deck_ids(r2)) x where x = r1) then raise exception 'FAIL T3: R2 deck holds the tester'; end if;
+end $$;
+select 'seed.test T1-T3 founder path (tester deck is test-only, tester hidden from real accounts) OK';
+
 \else
 -- phase = purged: zero rows remain for the test ids in every table; the real member is untouched.
 do $$
@@ -445,6 +486,11 @@ begin
   select count(*) into n from public.community_posts where author_id = 'eeeeeeee-0000-0000-0000-0000000000e1'; if n <> 1 then raise exception 'FAIL P2: real post purged'; end if;
   if not public.brivia_member_completed('eeeeeeee-0000-0000-0000-0000000000e1') then raise exception 'FAIL P2: real member interests or cell purged'; end if;
   select count(*) into n from public.location_change where member_id = 'eeeeeeee-0000-0000-0000-0000000000e1'; if n <> 1 then raise exception 'FAIL P2: real location_change purged'; end if;
+  -- the founder path: both real accounts survive the purge, are not test, are still completed; nobody is a tester
+  select count(*) into n from public.profiles where id in ('eeeeeeee-0000-0000-0000-0000000000e1', 'eeeeeeee-0000-0000-0000-0000000000e3') and not is_test;
+  if n <> 2 then raise exception 'FAIL P4: both real accounts must survive the purge with is_test false (% do)', n; end if;
+  if not public.brivia_member_completed('eeeeeeee-0000-0000-0000-0000000000e3') then raise exception 'FAIL P4: the second real account is no longer completed'; end if;
+  select count(*) into n from public.brivia_tester; if n <> 0 then raise exception 'FAIL P4: brivia_tester not empty after the purge (% rows)', n; end if;
   select count(*) into n from public.signal_ledger where sender_id = 'eeeeeeee-0000-0000-0000-0000000000e1'; if n <> 1 then raise exception 'FAIL P2: real signal_ledger rows: % (want 1)', n; end if;
   select count(*) into n from public.consent_event where member_id = 'eeeeeeee-0000-0000-0000-0000000000e1'; if n <> 1 then raise exception 'FAIL P2: real consent_event rows: % (want 1)', n; end if;
 end $$;

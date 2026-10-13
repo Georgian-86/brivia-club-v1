@@ -88,6 +88,7 @@ grep -q 'try again later' "$DATA/log" || { echo "FAIL: the over-cap probe error 
   run seed/test-members.sql; run seed/test-members.sql
   "${PSQL[@]}" -d $DB -v phase=seeded -f "$STAGE/tests/seed.test.sql"
   "${PSQL[@]}" -d $DB -v phase=extras -f "$STAGE/tests/seed.test.sql"
+  "${PSQL[@]}" -d $DB -v phase=tester -f "$STAGE/tests/seed.test.sql"   # founder path: a real account becomes a tester
   run seed/purge-test-members.sql; run seed/purge-test-members.sql
   "${PSQL[@]}" -d $DB -v phase=purged -f "$STAGE/tests/seed.test.sql" )
 echo "ALL PASSED"
