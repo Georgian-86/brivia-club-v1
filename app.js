@@ -1663,8 +1663,13 @@ const ensureProfilePhotoEditor = () => {
     if (profileSettingsOpen()) closeProfileSettingsMenu();
     else openProfileSettingsMenu();
   });
-  // Tab past the last item (or Shift+Tab before ⚙) closes it.
-  const leave = (event) => { if (!settings.contains(event.relatedTarget) && !menu.contains(event.relatedTarget)) closeProfileSettingsMenu(); };
+  // Tab past the last item (or Shift+Tab before ⚙) closes it. Focus going nowhere (relatedTarget null) is not a Tab out:
+  // Safari and macOS Firefox do not focus a clicked button, and a click on the "Signed in as" line focuses nothing, so
+  // closing then would swallow the click. Outside clicks close it through the document click listener instead.
+  const leave = (event) => {
+    if (!event.relatedTarget) return;
+    if (!settings.contains(event.relatedTarget) && !menu.contains(event.relatedTarget)) closeProfileSettingsMenu();
+  };
   settings.addEventListener('focusout', leave);
   menu.addEventListener('focusout', leave);
   menu.querySelector('[data-profile-setting="block"]')?.addEventListener('click', () => { closeProfileSettingsMenu(); openBlockedUsersManager(); });
