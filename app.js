@@ -463,6 +463,7 @@ window.addEventListener('scroll', () => {
 
 const setView = (view) => {
   closeProfileSettingsMenu();
+  const previousView = document.body.dataset.appView;
   const renderedView = view === 'explore' ? 'home' : view;
   document.body.dataset.appView = view;
   document.body.classList.toggle('app-subview', view !== 'home');
@@ -482,8 +483,13 @@ const setView = (view) => {
     }, 450);
   }
   if (view === 'chat') renderChats();
-  if (view === 'profile') { renderProfile(); loadProfileInterests(); }
-  window.scrollTo({ top: 0, behavior: 'smooth' });
+  // Re-tapping Profile on the profile keeps the loaded (or loading) interests: no second read, no skeleton flash.
+  if (view === 'profile') {
+    renderProfile();
+    if (previousView !== 'profile' || !['ready', 'loading'].includes(profileInterests.status)) loadProfileInterests();
+  }
+  // Reduced motion: jump, never glide ('instant' also beats html{scroll-behavior:smooth}).
+  window.scrollTo({ top: 0, behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'instant' : 'smooth' });
 };
 
 const validViews = ['home', 'explore', 'posts', 'chat', 'profile'];
@@ -752,6 +758,11 @@ const refillDeck = async () => {
   let settled = false;
   try {
     settled = await refillDeckOnce();
+  } catch (error) {
+    // A refill that throws (e.g. a malformed answer) ends in the retry state, never an endless skeleton.
+    console.warn('The deck could not refill:', error?.message || error);
+    deck.end = 'error';
+    settled = true;
   } finally {
     deck.refilling = false;
   }

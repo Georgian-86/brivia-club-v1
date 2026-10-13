@@ -30,19 +30,31 @@
 //   offer a button ("Write the first post" focuses the caption, "Notification settings" opens them); under reduced
 //   motion .app-nav-button transitions are 0s and the shimmer is off; the post submit is aria-busy while the insert is
 //   pending. Delays and failures use app-stub's per-route `routes` overrides.
+// * final review fixes (run alone with APP_SHELL_FINAL_ONLY=1): at 375x667 and 390x844 the tab bar is hidden while the
+//   filter drawer, a public profile, the report dialog, the profile editor, the notification / blocked / removed /
+//   privacy dialogs or the pitch sheet is open, and every visible control in them is the top element at its centre; a
+//   tap at SEND PITCH's centre sends exactly one rpc/send_signal; the "Profile under review" notice (at the gate and after
+//   a deck refill) shows no tab bar; at 375 px an open chat thread hides the tab bar (the composer and Send on top) and
+//   Back to the list shows it; the ⚙ menu stays open after a blur to nowhere or a click on "Signed in as" and the next
+//   item click runs (PRIVACY & ACCOUNT, LOG OUT) while Tab / Shift+Tab out close it; a refill that throws (a malformed
+//   deck_candidates answer) ends in Try again with no skeleton or uncaught error; at 375 px every visible text field,
+//   textarea and select is >= 16 px (no iOS focus zoom) in each view and dialog; re-tapping Profile on the profile reads
+//   my_interests no more and shows no skeleton.
 // APP_SHOTS=<dir> only saves full-page screenshots of home, posts, chat and profile at 375 px and 1440 px, then exits
 // (the Phase C before/after review), and runs no checks. It also saves the dialogs, the profile states, the loading
-// states, the deck error and the empty posts and notifications (Phase C Tasks 4-6).
+// states, the deck error and the empty posts and notifications (Phase C Tasks 4-6), and the pitch sheet (375, 1440), an
+// open chat thread and the under-review notice (375) (final review).
 import { mkdirSync } from 'node:fs';
 import assert from 'node:assert/strict';
 import path from 'node:path';
 import { axeViolations, textAudit, TYPE_FAMILIES } from './a11y.mjs';
-import { startAppStub, STILL } from './app-stub.mjs';
+import { startAppStub, STILL, defaultDeckRows } from './app-stub.mjs';
 
 const { chromium } = await import(process.env.PLAYWRIGHT_MODULE || 'playwright');
 const PORT = Number(process.env.E2E_PORT || 5195);
 const EXECUTABLE = process.env.CHROMIUM_PATH || '/opt/pw-browsers/chromium';
 const SHOTS = process.env.APP_SHOTS || '';
+const FINAL_ONLY = Boolean(process.env.APP_SHELL_FINAL_ONLY);
 const A = 'aaaaaaaa-aaaa-4aaa-8aaa-000000000001';
 const NARROW = { width: 375, height: 812 };
 const WIDE = { width: 1440, height: 900 };
@@ -117,6 +129,42 @@ try {
       await page.screenshot({ path: path.join(SHOTS, `app-${name}-375.png`) });
       await context.close();
     }
+    // Phase C final review: the pitch sheet (375 and 1440 px), an open chat thread and the "Profile under review" notice
+    // (375 px). The ⚙ menu open at 375 px is app-settings-menu-375.png above.
+    let finalShots = 0;
+    for (const [tag, viewport] of [['375', NARROW], ['1440', WIDE]]) {
+      const { context, page } = await open(viewport);
+      await page.waitForTimeout(1500);
+      await page.locator('[data-action="like"]').click({ timeout: 5000 });
+      await page.waitForTimeout(600);
+      await page.screenshot({ path: path.join(SHOTS, `app-pitch-sheet-${tag}.png`) });
+      await context.close();
+      finalShots += 1;
+    }
+    st.messages = [{ id: 'msg-1', sender_id: A, recipient_id: ME_ID, body: 'Shall we play on Saturday?', created_at: new Date(Date.now() - 6e5).toISOString() }];
+    {
+      const { context, page } = await open(NARROW, '/app.html?view=chat');
+      await page.waitForTimeout(1500);
+      await page.locator('#chat-list [data-chat-id]').first().click({ timeout: 5000 });
+      await page.waitForTimeout(600);
+      await page.screenshot({ path: path.join(SHOTS, 'app-chat-thread-375.png') });
+      await context.close();
+      finalShots += 1;
+    }
+    delete st.messages;
+    {
+      Object.assign(st, { onboarding: [false], onboardingCalls: 0, own: { ...NEW_MEMBER.own, adult_declared_at: new Date(Date.now() - 9e6).toISOString() } });
+      const context = await stub.newContext(browser, NARROW, { reducedMotion: 'reduce' });
+      const page = await context.newPage();
+      await page.goto(`${stub.url}/app.html`, { waitUntil: 'domcontentloaded' });
+      await page.waitForSelector('[data-under-review]', { timeout: 15000 });
+      await page.waitForTimeout(800);
+      await page.screenshot({ path: path.join(SHOTS, 'app-under-review-375.png') });
+      await context.close();
+      Object.assign(st, { onboarding: [true], onboardingCalls: 0 });
+      delete st.own;
+      finalShots += 1;
+    }
     // Phase C Task 5: the profile of a new member and of a complete member, at 375 px and 1440 px.
     for (const [name, member] of [['new', NEW_MEMBER], ['complete', COMPLETE_MEMBER]]) {
       useMember(member);
@@ -162,8 +210,256 @@ try {
       delete st.posts; st.matchIds = [A];
       extra += 3;
     }
-    console.log(`saved ${VIEWS.length * 2 + DIALOGS.length + 4 + extra} screenshots to ${SHOTS}`);
+    console.log(`saved ${VIEWS.length * 2 + DIALOGS.length + 4 + extra + finalShots} screenshots to ${SHOTS}`);
   } else {
+    // Phase C final review fixes (one fix wave). APP_SHELL_FINAL_ONLY=1 runs only this section (a quicker loop).
+    // Is the tab bar drawn? (display, visibility and a box).
+    const tabbarShown = (page) => page.evaluate(() => {
+      const bar = document.querySelector('.app-tabbar');
+      if (!bar) return false;
+      const s = getComputedStyle(bar);
+      return s.display !== 'none' && s.visibility !== 'hidden' && bar.getBoundingClientRect().height > 0;
+    });
+    // Every visible interactive control inside `root`, scrolled into view, is the top element at its centre
+    // (elementFromPoint): nothing (the fixed tab bar above all) covers it. Full-screen backdrops are not controls.
+    const coveredControls = (page, root) => page.evaluate((sel) => {
+      const box = document.querySelector(sel);
+      if (!box) return { found: false, count: 0, covered: [] };
+      const name = (el) => (el ? `${el.tagName.toLowerCase()}${el.id ? `#${el.id}` : ''}${typeof el.className === 'string' && el.className.trim() ? `.${el.className.trim().split(/\s+/).join('.')}` : ''} "${(el.textContent || el.placeholder || el.value || '').replace(/\s+/g, ' ').trim().slice(0, 24)}"` : 'null');
+      const controls = [...box.querySelectorAll('button, a[href], input, textarea, select, [role="button"], summary')].filter((el) => {
+        if (el.closest('[hidden]') || /backdrop/.test(String(el.className))) return false;
+        const s = getComputedStyle(el); const r = el.getBoundingClientRect();
+        return r.width > 1 && r.height > 1 && s.visibility !== 'hidden' && s.display !== 'none' && Number(s.opacity) > 0;
+      });
+      const covered = [];
+      for (const el of controls) {
+        el.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+        const r = el.getBoundingClientRect();
+        const hit = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
+        const ok = hit && (el === hit || el.contains(hit) || [...(el.labels || [])].some((label) => label.contains(hit)));
+        if (!ok) covered.push(`${name(el)} under ${name(hit)}`);
+      }
+      return { found: true, count: controls.length, covered };
+    }, root);
+    const sendSignals = () => st.calls.filter((c) => c.path === '/rest/v1/rpc/send_signal').length;
+
+    // F1 (critical) + F3: at 375x667 and 390x844 the tab bar is hidden while any overlay or dialog is open, and every
+    // control inside it is on top; tapping SEND PITCH sends exactly one signal.
+    const OVERLAYS = [
+      ['discovery filter drawer', 'explore', ['#open-discovery-filters'], '#discovery-filter-drawer'],
+      ['public profile', 'explore', ['#swipe-card .view-info-button'], '#public-profile-modal'],
+      ['report dialog', 'explore', ['#card-more', '#card-more-menu [data-card-action="report"]'], 'dialog.report-dialog'],
+      ['profile edit', 'profile', ['#profile-photo-editor'], '#profile-edit-modal'],
+      ['notification settings', 'profile', ['#profile-settings-button', '[data-profile-setting="notifications"]'], '#profile-notification-settings-modal'],
+      ['blocked users', 'profile', ['#profile-settings-button', '[data-profile-setting="block"]'], '#profile-blocked-modal'],
+      ['removed connections', 'profile', ['#profile-settings-button', '[data-profile-setting="removed"]'], '#profile-removed-connections-modal'],
+      ['privacy & account', 'profile', ['#profile-settings-button', '[data-profile-setting="privacy"]'], 'dialog.privacy-dialog'],
+      ['pitch sheet', 'explore', ['[data-action="like"]'], '#pitch-modal'],
+    ];
+    for (const viewport of [{ width: 375, height: 667 }, { width: 390, height: 844 }]) {
+      const tag = `${viewport.width}x${viewport.height}`;
+      const { context, page } = await open(viewport);
+      for (const [label, view, steps, root] of OVERLAYS) {
+        st.passed.clear(); st.signalled.clear();
+        await page.goto(`${stub.url}/app.html?view=${view}`, { waitUntil: 'domcontentloaded' });
+        await page.waitForFunction(() => !document.body.classList.contains('app-auth-pending'), null, { timeout: 15000 });
+        if (view === 'explore') await page.waitForFunction(() => document.querySelector('#swipe-name')?.textContent.trim() && !document.querySelector('#swipe-card')?.hidden, null, { timeout: 8000 }).catch(() => {});
+        await settle(page);
+        for (const sel of steps) await page.locator(sel).first().click({ timeout: 5000 }).catch((error) => console.log(`${label}: ${sel} failed: ${error.message.split('\n')[0]}`));
+        await page.waitForFunction((sel) => { const el = document.querySelector(sel); return el && !el.hidden; }, root, { timeout: 5000 }).catch(() => {});
+        await page.waitForTimeout(450);
+        const result = await coveredControls(page, root);
+        const bar = await tabbarShown(page);
+        check(`${tag} ${label} open: the tab bar is hidden and every control in it is on top (${JSON.stringify({ bar, ...result })})`, () => {
+          assert.equal(result.found, true); assert.ok(result.count >= 1); assert.deepEqual(result.covered, []); assert.equal(bar, false);
+        });
+        if (label === 'pitch sheet') {
+          // A real tap at SEND PITCH's centre (no actionability wait, so a covering tab bar would take it).
+          const before = sendSignals();
+          const box = await page.locator('.pitch-submit').boundingBox();
+          await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
+          await page.waitForTimeout(800);
+          const after = await page.evaluate(() => ({ sheet: !document.querySelector('#pitch-modal')?.hidden, view: document.body.dataset.appView }));
+          check(`${tag}: tapping SEND PITCH sends exactly one rpc/send_signal and stays on Connect (${JSON.stringify({ signals: sendSignals() - before, ...after })})`, () => {
+            assert.equal(sendSignals() - before, 1); assert.equal(after.sheet, false); assert.equal(after.view, 'explore');
+          });
+          const back = await tabbarShown(page);
+          check(`${tag}: the tab bar shows again after the pitch sheet closes (${back})`, () => assert.equal(back, true));
+        }
+      }
+      await context.close();
+    }
+    st.passed.clear(); st.signalled.clear(); st.remaining = 30;
+
+    // F3: the "Profile under review" notice (375 px) shows no tab bar, at the sign-in gate and when a deck refill finds
+    // the member under review.
+    for (const [label, state] of [['at the gate', { onboarding: [false] }], ['after a deck refill', { onboarding: [true, false], emptyDeck: true, status: 'complete_profile' }]]) {
+      Object.assign(st, state, { onboardingCalls: 0, own: { ...NEW_MEMBER.own, adult_declared_at: new Date(Date.now() - 9e6).toISOString() } });
+      const context = await stub.newContext(browser, { width: 375, height: 667 }, { reducedMotion: 'reduce' });
+      const page = await context.newPage();
+      page.on('pageerror', (error) => pageErrors.push(String(error)));
+      await page.goto(`${stub.url}/app.html`, { waitUntil: 'domcontentloaded' });
+      await page.waitForSelector('[data-under-review]', { timeout: 15000 }).catch(() => {});
+      await page.waitForTimeout(1200);
+      const review = await page.evaluate(() => {
+        const hit = document.elementFromPoint(window.innerWidth / 2, window.innerHeight - 30);
+        return { notice: Boolean(document.querySelector('[data-under-review]')), bottomHit: Boolean(hit?.closest('[data-under-review]')) };
+      });
+      const bar = await tabbarShown(page);
+      check(`375 under review ${label}: no tab bar over the notice (${JSON.stringify({ bar, ...review })})`, () => {
+        assert.equal(review.notice, true); assert.equal(bar, false); assert.equal(review.bottomHit, true);
+      });
+      await context.close();
+      Object.assign(st, { onboarding: [true], onboardingCalls: 0, emptyDeck: false, status: 'caught_up' });
+      delete st.own;
+    }
+
+    // F7: an open chat thread at 375 px hides the tab bar (the composer and Send are on top); Back to the list shows it.
+    st.matchIds = [A];
+    st.messages = [{ id: 'msg-1', sender_id: A, recipient_id: ME_ID, body: 'Shall we play on Saturday?', created_at: new Date(Date.now() - 6e5).toISOString() }];
+    {
+      const { context, page } = await open(NARROW, '/app.html?view=chat');
+      await page.waitForFunction(() => document.querySelector('#chat-list [data-chat-id]'), null, { timeout: 8000 }).catch(() => {});
+      await settle(page);
+      const listBar = await tabbarShown(page);
+      await page.locator('#chat-list [data-chat-id]').first().click({ timeout: 5000 }).catch((error) => console.log(`chat open failed: ${error.message.split('\n')[0]}`));
+      await settle(page);
+      const threadBar = await tabbarShown(page);
+      const compose = await page.evaluate(() => ['#chat-input', '#chat-form button[type="submit"]'].map((sel) => {
+        const el = document.querySelector(sel); const r = el.getBoundingClientRect();
+        const hit = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
+        return { sel, onTop: Boolean(hit && (el === hit || el.contains(hit))), inViewport: r.bottom <= window.innerHeight + 0.5 && r.top >= 0 };
+      }));
+      await page.locator('#chat-back').click({ timeout: 5000 }).catch(() => {});
+      await settle(page);
+      const backBar = await tabbarShown(page);
+      check(`375 chat: the list shows the tab bar, an open thread hides it, Back shows it again (${JSON.stringify({ listBar, threadBar, backBar })})`, () => {
+        assert.equal(listBar, true); assert.equal(threadBar, false); assert.equal(backBar, true);
+      });
+      check(`375 chat thread: the composer and Send are on top and inside the viewport (${JSON.stringify(compose)})`, () => compose.forEach((c) => { assert.ok(c.onTop, `${c.sel} covered`); assert.ok(c.inViewport, `${c.sel} off screen`); }));
+      await context.close();
+    }
+    delete st.messages; st.matchIds = [];
+
+    // F2: the ⚙ menu survives a focus loss to nowhere (Safari and macOS Firefox do not focus a clicked button; a click
+    // on the "Signed in as" line focuses nothing): it stays open and the next click runs its item. Tab out still closes.
+    for (const [tag, viewport] of [['375', NARROW], ['1440', WIDE]]) {
+      const { context, page } = await open(viewport, '/app.html?view=profile');
+      await settle(page);
+      const menuOpen = () => page.evaluate(() => { const m = document.querySelector('#profile-settings-menu'); return m.matches('[popover]') ? m.matches(':popover-open') : !m.hidden; });
+      const openByKeyboard = async () => { await page.evaluate(() => document.querySelector('#profile-settings-button').focus()); await page.keyboard.press('Enter'); await page.waitForTimeout(150); };
+      await openByKeyboard();
+      for (let i = 0; i < 6; i += 1) await page.keyboard.press('Tab');
+      await page.waitForTimeout(150);
+      const tabOut = await menuOpen();
+      await openByKeyboard();
+      await page.keyboard.press('Shift+Tab');
+      await page.waitForTimeout(150);
+      const shiftTabOut = await menuOpen();
+      await openByKeyboard();
+      await page.evaluate(() => document.activeElement.blur());
+      await page.waitForTimeout(150);
+      const afterBlur = await menuOpen();
+      await page.locator('[data-profile-setting="privacy"]').click({ timeout: 2000 }).catch(() => {});
+      const privacy = await page.waitForSelector('dialog.privacy-dialog[open]', { timeout: 3000 }).then(() => true).catch(() => false);
+      await page.keyboard.press('Escape');
+      await page.waitForTimeout(200);
+      await openByKeyboard();
+      const line = await page.locator('#profile-settings-menu .profile-settings-account').boundingBox();
+      if (line) { await page.mouse.move(line.x + line.width / 2, line.y + line.height / 2); await page.mouse.down(); await page.mouse.up(); }
+      await page.waitForTimeout(150);
+      const afterLine = await menuOpen();
+      await page.locator('[data-profile-setting="logout"]').click({ timeout: 2000 }).catch(() => {});
+      const loggedOut = await page.waitForURL(/\/auth\.html/, { timeout: 5000 }).then(() => true).catch(() => false);
+      check(`${tag}: ⚙ menu: Tab out and Shift+Tab out close it (${JSON.stringify({ tabOut, shiftTabOut })})`, () => { assert.equal(tabOut, false); assert.equal(shiftTabOut, false); });
+      check(`${tag}: ⚙ menu: a blur to nowhere keeps it open and PRIVACY & ACCOUNT then opens its dialog (${JSON.stringify({ afterBlur, privacy })})`, () => { assert.equal(afterBlur, true); assert.equal(privacy, true); });
+      check(`${tag}: ⚙ menu: a click on "Signed in as" keeps it open and LOG OUT then signs out (${JSON.stringify({ afterLine, loggedOut })})`, () => { assert.equal(afterLine, true); assert.equal(loggedOut, true); });
+      await context.close();
+    }
+
+    // F4: a refill that throws (a malformed deck_candidates answer) ends in the retry state, never an endless skeleton.
+    {
+      st.rows = [defaultDeckRows[0]];
+      const errors = [];
+      const context = await stub.newContext(browser, NARROW, { reducedMotion: 'reduce' });
+      const page = await stub.open(context, { errors });
+      await page.waitForFunction(() => document.querySelector('#swipe-name')?.textContent.trim(), null, { timeout: 8000 }).catch(() => {});
+      await settle(page);
+      st.routes = { 'rpc/deck_candidates': { body: { malformed: true } } };
+      await page.locator('[data-action="pass"]').click({ timeout: 5000 }).catch(() => {});
+      await page.waitForTimeout(2000);
+      const state = await page.evaluate(() => {
+        const action = document.querySelector('#deck-empty-action');
+        return { skeletons: [...document.querySelectorAll('[data-view="home"] .skeleton')].filter((el) => el.getClientRects().length).length, retry: action?.dataset.deckAction, visible: Boolean(action?.getClientRects().length), busy: document.querySelector('[data-view="home"]')?.getAttribute('aria-busy') };
+      });
+      check(`375: a refill that throws: no skeleton after 2 s, not busy, Try again visible, no uncaught error (${JSON.stringify({ ...state, errors })})`, () => {
+        assert.equal(state.skeletons, 0); assert.notEqual(state.busy, 'true'); assert.equal(state.retry, 'retry'); assert.equal(state.visible, true); assert.deepEqual(errors, []);
+      });
+      await context.close();
+      delete st.routes; st.rows = null; st.passed.clear();
+    }
+
+    // F5: no iOS focus zoom: at 375 px every visible text field, textarea and select is >= 16 px, in every view and dialog.
+    {
+      const smallFields = (page) => page.evaluate(() => {
+        const fields = [...document.querySelectorAll('input, textarea, select')].filter((el) => {
+          if (el.tagName === 'INPUT' && ['radio', 'checkbox', 'range', 'file', 'hidden', 'button', 'submit', 'reset', 'color', 'image'].includes(el.type)) return false;
+          const s = getComputedStyle(el); const r = el.getBoundingClientRect();
+          return !el.closest('[hidden]') && r.width > 1 && r.height > 1 && s.visibility !== 'hidden' && s.display !== 'none';
+        });
+        return { count: fields.length, small: fields.filter((el) => parseFloat(getComputedStyle(el).fontSize) < 16).map((el) => `${el.tagName.toLowerCase()}#${el.id || el.className} ${getComputedStyle(el).fontSize}`), scroll: document.documentElement.scrollWidth > document.documentElement.clientWidth };
+      });
+      st.matchIds = [A];
+      st.messages = [{ id: 'msg-1', sender_id: A, recipient_id: ME_ID, body: 'Shall we play on Saturday?', created_at: new Date(Date.now() - 6e5).toISOString() }];
+      const STATES = [
+        ['Connect', 'explore', []], ['discovery filters', 'explore', ['#open-discovery-filters']], ['pitch sheet', 'explore', ['[data-action="like"]']],
+        ['report dialog', 'explore', ['#card-more', '#card-more-menu [data-card-action="report"]']],
+        ['Explore posts', 'posts', []], ['post composer', 'posts', ['#open-community-post']],
+        ['Chat list', 'chat', []], ['Chat thread', 'chat', ['#chat-list [data-chat-id]']],
+        ['Profile', 'profile', []], ['profile edit', 'profile', ['#profile-photo-editor']],
+      ];
+      const { context, page } = await open(NARROW);
+      let seen = 0;
+      for (const [label, view, steps] of STATES) {
+        await page.goto(`${stub.url}/app.html?view=${view}`, { waitUntil: 'domcontentloaded' });
+        await page.waitForFunction(() => !document.body.classList.contains('app-auth-pending'), null, { timeout: 15000 });
+        await page.waitForTimeout(900);
+        for (const sel of steps) { await page.locator(sel).first().click({ timeout: 5000 }).catch((error) => console.log(`${label}: ${sel} failed: ${error.message.split('\n')[0]}`)); await page.waitForTimeout(400); }
+        const fields = await smallFields(page);
+        seen += fields.count;
+        check(`375 ${label}: every visible text field is >= 16 px, no sideways scroll (${JSON.stringify(fields)})`, () => { assert.deepEqual(fields.small, []); assert.equal(fields.scroll, false); });
+      }
+      check(`375: the field-size audit saw text fields (${seen})`, () => assert.ok(seen >= 8));
+      await context.close();
+      delete st.messages; st.matchIds = []; st.passed.clear(); st.signalled.clear(); st.remaining = 30;
+    }
+
+    // F10: tapping Profile while on the profile does not read my_interests again or flash the skeleton.
+    {
+      const calls = () => st.calls.filter((c) => c.path === '/rest/v1/rpc/my_interests').length;
+      const { context, page } = await open(NARROW, '/app.html?view=profile');
+      await page.waitForFunction(() => document.querySelectorAll('#profile-interests [data-interest-row]').length === 3, null, { timeout: 8000 }).catch(() => {});
+      await settle(page);
+      const before = calls();
+      await page.locator('.app-tabbar [data-nav="profile"]').click();
+      const flash = await page.evaluate(() => document.querySelectorAll('#profile-interests .skeleton').length);
+      await page.waitForTimeout(600);
+      const again = calls() - before;
+      await page.locator('.app-tabbar [data-nav="posts"]').click();
+      await settle(page);
+      await page.locator('.app-tabbar [data-nav="profile"]').click();
+      await page.waitForFunction(() => document.querySelectorAll('#profile-interests [data-interest-row]').length === 3, null, { timeout: 8000 }).catch(() => {});
+      await settle(page);
+      const revisit = calls() - before;
+      check(`375: re-tapping Profile on the profile reads my_interests no more and shows no skeleton; a new visit reads it once (${JSON.stringify({ again, flash, revisit })})`, () => {
+        assert.equal(again, 0); assert.equal(flash, 0); assert.equal(revisit, 1);
+      });
+      await context.close();
+    }
+
+    // Everything before the final fixes; APP_SHELL_FINAL_ONLY=1 skips it.
+    earlier: {
+    if (FINAL_ONLY) break earlier;
     // Which member navs are visible, and which section is shown.
     const navState = (page) => page.evaluate(() => {
       const visible = (el) => { if (!el) return false; const s = getComputedStyle(el); const r = el.getBoundingClientRect(); return s.display !== 'none' && s.visibility !== 'hidden' && r.width > 0 && r.height > 0; };
@@ -643,10 +939,12 @@ try {
       }));
       await page.waitForFunction(() => !document.querySelector('#swipe-card')?.hidden && document.querySelector('#swipe-name')?.textContent.trim(), null, { timeout: 8000 }).catch(() => {});
       await settle(page);
-      const after = await page.evaluate(() => ({ busy: document.querySelector('[data-view="home"]')?.getAttribute('aria-busy'), cls: window.__cls, name: document.querySelector('#swipe-name')?.textContent.trim() }));
+      const after = await page.evaluate(() => ({ busy: document.querySelector('[data-view="home"]')?.getAttribute('aria-busy'), cls: window.__cls, shownAt: window.__shownAt, name: document.querySelector('#swipe-name')?.textContent.trim() }));
       const left = await visibleSkeletons(page, '[data-view="home"]');
       check(`375: deck_candidates delayed 3 s: skeleton visible and container aria-busy within 300 ms (${early})`, () => assert.equal(early, true));
       check(`375: the card replaces the skeleton, CLS < 0.1 (${JSON.stringify({ ...after, left })})`, () => {
+        // CLS is counted from __shownAt: it must be a real time, or the sum is vacuously 0 (final review 6a).
+        assert.ok(Number.isFinite(after.shownAt), `__shownAt is ${after.shownAt}`);
         assert.equal(after.name, 'Asha Band'); assert.equal(left, 0); assert.notEqual(after.busy, 'true'); assert.ok(after.cls < 0.1);
       });
       check(`reduced motion: transition-duration 0s on .app-nav-button and no shimmer animation (${JSON.stringify(motion)})`, () => {
@@ -767,6 +1065,7 @@ try {
       delete st.routes;
     }
 
+    } // earlier
     st.matchIds = [];
     check(`no uncaught page errors (${pageErrors.join(' | ')})`, () => assert.deepEqual(pageErrors, []));
   }

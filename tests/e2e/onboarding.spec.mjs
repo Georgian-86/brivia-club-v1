@@ -1626,12 +1626,28 @@ try {
         .map((el) => el.textContent.replace(/\s+/g, ' ').trim()), n);
       return { tabbed, visual };
     };
+    // Phase C final review (5): no iOS focus zoom: every visible text field, textarea and select on each step >= 16 px.
+    const fieldSizes = (stepNo) => page.evaluate((n) => {
+      const step = document.querySelector(`[data-signup-step="${n}"]`);
+      const fields = [...step.querySelectorAll('input, textarea, select')].filter((el) => {
+        if (el.tagName === 'INPUT' && ['radio', 'checkbox', 'range', 'file', 'hidden', 'button', 'submit', 'reset', 'color', 'image'].includes(el.type)) return false;
+        const st = getComputedStyle(el); const r = el.getBoundingClientRect();
+        return !el.closest('[hidden]') && r.width > 1 && r.height > 1 && st.visibility !== 'hidden' && st.display !== 'none';
+      });
+      return { count: fields.length, small: fields.filter((el) => parseFloat(getComputedStyle(el).fontSize) < 16).map((el) => `${el.tagName.toLowerCase()}#${el.id || el.name || el.className} ${getComputedStyle(el).fontSize}`) };
+    }, stepNo);
+    const fieldChecks = [];
     await openSignup(page);
+    fieldChecks.push([1, await fieldSizes(1)]);
     await fillStepOne(page);
     await page.locator('[data-area-city]').click();
+    fieldChecks.push([2, await fieldSizes(2)]);
     await pickCityByKeyboard(page, 'Pun');
     const order2 = await tabVsVisual(2);
-    check(`375: the Tab order of the step-2 actions matches their visual top-to-bottom order (${JSON.stringify(order2)})`, () => assert.deepEqual(order2.tabbed, order2.visual));
+    check(`375: the Tab order of the step-2 actions matches their visual top-to-bottom order (${JSON.stringify(order2)})`, () => {
+      assert.equal(order2.visual.length, 2);
+      assert.deepEqual(order2.tabbed, order2.visual);
+    });
     await page.locator('[data-signup-step="2"] .signup-next').click();
     await page.waitForSelector('#interest-results [data-interest-group]', { state: 'attached' });
     await page.locator('#interest-search').fill('Chess');
@@ -1640,10 +1656,17 @@ try {
     await page.locator('.looking-search').click();
     await page.locator('#looking-results [data-looking-option]').first().click();
     await page.locator('[data-signup-step="3"] .signup-step-heading h2').click();
+    fieldChecks.push([3, await fieldSizes(3)]);
     const order3 = await tabVsVisual(3);
-    check(`375: the Tab order of the step-3 actions matches their visual top-to-bottom order (${JSON.stringify(order3)})`, () => assert.deepEqual(order3.tabbed, order3.visual));
+    check(`375: the Tab order of the step-3 actions matches their visual top-to-bottom order (${JSON.stringify(order3)})`, () => {
+      assert.equal(order3.visual.length, 2);
+      assert.deepEqual(order3.tabbed, order3.visual);
+    });
     await page.locator('[data-signup-step="3"] .signup-next').click();
     await page.waitForSelector('[data-signup-step="4"]:not([hidden])');
+    fieldChecks.push([4, await fieldSizes(4)]);
+    for (const [n, f] of fieldChecks) check(`375 step ${n}: every visible text field is >= 16 px (no iOS focus zoom) (${JSON.stringify(f)})`, () => assert.deepEqual(f.small, []));
+    check(`375: the step field audit saw text fields (${fieldChecks.map(([n, f]) => `${n}:${f.count}`).join(' ')})`, () => assert.ok(fieldChecks.reduce((sum, [, f]) => sum + f.count, 0) >= 4));
     const order4 = await tabVsVisual(4);
     check(`at 375 the Tab order of the step-4 actions matches their visual top-to-bottom order (${JSON.stringify(order4)})`, () => {
       assert.equal(order4.visual.length, 2);

@@ -18,7 +18,8 @@
 //   myInterestsFail  rpc/my_interests answers 500
 //   routes        per-route overrides (Phase C Task 6), keyed by the path after /rest/v1/ ('rpc/deck_candidates',
 //                 'community_posts'), optionally prefixed by a method ('POST community_posts'; the method key wins):
-//                 { delayMs, status } waits delayMs before answering, and a status >= 400 answers that error instead.
+//                 { delayMs, status } waits delayMs before answering, and a status >= 400 answers that error instead;
+//                 { body } answers 200 with that JSON as is (e.g. a malformed deck_candidates answer; Phase C final fixes).
 import { readFileSync } from 'node:fs';
 import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
@@ -87,6 +88,7 @@ export const startAppStub = async ({ port, state = {}, deckRows = defaultDeckRow
       const override = st.routes?.[`${method} ${short}`] || st.routes?.[short];
       if (override?.delayMs) await new Promise((resolve) => setTimeout(resolve, override.delayMs));
       if (override?.status >= 400) return json(override.status, { code: 'XX000', message: 'stub failure' });
+      if (override && 'body' in override) return json(200, override.body);
       const own = st.own || ownRow;
       if (pathName === '/rest/v1/profiles') return json(200, (request.headers().accept || '').includes('vnd.pgrst.object') ? own : [own]);
       // Storage uploads and removals (multipart bodies): accepted, nothing stored.

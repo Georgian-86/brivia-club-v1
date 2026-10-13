@@ -171,6 +171,10 @@ body.app-body .app-view[data-view="profile"] .profile-board-content{overflow:vis
   body.app-body:has(.app-overlay:not([hidden]), .discovery-filter-drawer:not([hidden]), .public-profile-modal, .profile-edit-modal, .profile-settings-modal, .chat-camera-modal:not([hidden]), dialog[open], [data-under-review]) .app-tabbar,
   body.app-body[data-app-view="chat"]:has(#chat-window:not([hidden])) .app-tabbar{display:none}
   body.app-body[data-app-view="chat"]:has(#chat-window:not([hidden])) .app-main{padding-bottom:env(safe-area-inset-bottom, 0px)}
+
+  /* iOS zooms the page when a field under 16 px takes focus: every app text field, textarea and select is 16 px on
+     phones (the chat compose placeholder stays 12 px, below). !important: a floor over every component's own size. */
+  body.app-body :is(input:not([type="radio"], [type="checkbox"], [type="range"]), textarea, select){font-size:var(--text-16)!important}
 }
 /* An open thread fills the phone below the one-row header (the tab bar is hidden while it is open). */
 @media (max-width:700px){
@@ -252,3 +256,7 @@ body.app-body .notification-empty-action{
 body.app-body .community-post-empty-action:hover,
 body.app-body .notification-empty-action:hover{background:var(--color-wine);color:var(--color-cream)}
 body.app-body .notification-empty p{margin:0}
+
+/* Reduced motion: the page jumps instead of gliding (app.css sets html{scroll-behavior:smooth}; setView scrolls with
+   'instant' then too). Final review: a glide still running when a tab was tapped could leave the new view part-scrolled. */
+@media (prefers-reduced-motion:reduce){html{scroll-behavior:auto}}
