@@ -55,6 +55,8 @@ field, and every profile ⚙ menu item on top and 44 px tall; Enter on ⚙ opens
 Escape closes it and returns focus to ⚙, and a view change or resize closes it. `APP_SHOTS` also saves the profile edit dialog, the ⚙ menu,
 the report dialog and the post composer at 375 px. `APP_SHOTS=<dir>` only saves home/posts/chat/profile screenshots at
 375 px and 1440 px (the Phase C before/after review).
+Phase D Task 2 added a post-image check to `app-shell.spec.mjs`: a preset illustration path renders the shipped asset (an
+`<img>` under `/media/` or `/assets/` that loads), an external URL and an unknown preset name show the placeholder.
 Phase C Task 6 added `state.routes`, per-route overrides keyed by the path after `/rest/v1/` (optionally prefixed by the
 method, e.g. `'POST community_posts'`): `{ delayMs, status }` delays the answer and/or turns it into an error. The stub
 also accepts Storage uploads. With it `app-shell.spec.mjs` checks the loading states (the deck skeleton and `aria-busy`

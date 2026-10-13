@@ -870,6 +870,39 @@ try {
     }
     delete st.posts; delete st.messages;
 
+    // 12. Post images (Phase D Task 2): a preset illustration identifier (the seed's posts) renders the shipped asset
+    // through normalizeCoverUrl; an external URL and a preset-shaped name with no asset show the placeholder.
+    {
+      const before = st.posts;
+      const ago = (h) => new Date(Date.now() - h * 36e5).toISOString();
+      st.posts = [
+        { id: 'post-preset', author_id: A, image_url: '/Images/Cover%20images/163BDB0C-64AC-44E7-8663-55C323ADB4FE.PNG', image_path: '', caption: 'Preset illustration', created_at: ago(1) },
+        { id: 'post-external', author_id: A, image_url: 'https://tracker.example/p.jpg', image_path: '', caption: 'External image', created_at: ago(2) },
+        { id: 'post-unknown', author_id: A, image_url: '/Images/Cover%20images/NOT-A-PRESET.PNG', image_path: '', caption: 'Unknown preset', created_at: ago(3) },
+      ];
+      const { context, page } = await open(WIDE, '/app.html?view=posts');
+      await page.waitForFunction(() => document.querySelectorAll('#community-post-list .community-post-card').length >= 3, null, { timeout: 8000 }).catch(() => {});
+      await page.waitForTimeout(800);
+      const cards = await page.evaluate(() => Object.fromEntries([...document.querySelectorAll('#community-post-list .community-post-card')].map((c) => {
+        const img = c.querySelector('.community-post-image-wrap img');
+        return [c.querySelector('h3')?.textContent, { src: img?.getAttribute('src') || null, loaded: Boolean(img && img.complete && img.naturalWidth > 0), missing: Boolean(c.querySelector('.community-post-image-missing')) }];
+      })));
+      check(`posts: a preset identifier renders the shipped asset; external and unknown show the placeholder (${JSON.stringify(cards)})`, () => {
+        const preset = cards['Preset illustration'];
+        assert.ok(preset && preset.src, 'the preset post has an <img>');
+        assert.match(preset.src, /^\/(assets|media)\//);
+        assert.ok(/\.webp$/.test(preset.src) || /163BDB0C/.test(preset.src), preset.src);
+        assert.equal(preset.loaded, true, 'the preset image loads');
+        assert.equal(preset.missing, false);
+        for (const caption of ['External image', 'Unknown preset']) {
+          assert.equal(cards[caption]?.src, null, `${caption} has no <img>`);
+          assert.equal(cards[caption]?.missing, true, `${caption} shows the placeholder`);
+        }
+      });
+      await context.close();
+      st.posts = before;
+    }
+
     // 11. Profile (Phase C Task 5): hero, then "Complete your profile", then interests, looking for, experience.
     st.matchIds = [];
     const interestCalls = () => st.calls.filter((c) => c.path === '/rest/v1/rpc/my_interests').length;

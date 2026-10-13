@@ -19,12 +19,13 @@ import './app-navigation.css';
 import './discovery-filters.css';
 import './mobile-app.css';
 import './skeleton.css';
-import { supabase, rowToProfile, saveProfile, onboardingStatus, sendSignal, fetchSignalQuota, isRateLimited, isStorageImageUrl, withoutCredentials, uploadMessageAttachment, removeMessageAttachment, uploadCommunityPostImage, removeCommunityPostImage, ImageProcessingError, compressAttachmentFiles, attachmentKind, reportMember, setSensitiveConsent, fetchSensitiveConsentAt, fetchMyInterests } from './supabase.js';
+import { supabase, rowToProfile, saveProfile, isPresetCoverUrl, onboardingStatus, sendSignal, fetchSignalQuota, isRateLimited, isStorageImageUrl, withoutCredentials, uploadMessageAttachment, removeMessageAttachment, uploadCommunityPostImage, removeCommunityPostImage, ImageProcessingError, compressAttachmentFiles, attachmentKind, reportMember, setSensitiveConsent, fetchSensitiveConsentAt, fetchMyInterests } from './supabase.js';
 import { deleteAccount, clearBriviaKeys, DELETE_BUCKETS, reauthMarker, reauthMarkerMatches } from './account-deletion.js';
 import { openPrivacyAccount } from './privacy-account.js';
 import { isUnderReview, UNDER_REVIEW_COPY } from './onboarding-guard.js';
 import { openReportDialog, bindCardOverflow, cardOverflowOpen, reportSuccessCopy } from './report-dialog.js';
 import { defaultCoverUrl, normalizeCoverUrl } from './cover-assets.js';
+import { postImageSrc } from './post-image.js';
 import { profileChecklist } from './profile-checklist.js';
 import { quotaLabel, quotaErrorText, quotaBlocked, quotaNotice } from './signal-quota.js';
 import { pitchLine, deckChips, deckEmptyState, deckFields, bandNote } from './deck-view.js';
@@ -2108,8 +2109,9 @@ const renderCommunityPosts = () => {
   list.innerHTML = sorted.map((post) => {
     const author = communityPostAuthors[post.author_id] || { id: post.author_id, name: 'Brivia member', image: '' };
     const authorId = author.id || post.author_id;
-    // Only the author's own community-posts Storage file auto-loads; any other URL shows a placeholder.
-    const postImage = isStorageImageUrl(post.image_url, 'community-posts', post.author_id) ? post.image_url : '';
+    // Only the author's own community-posts Storage file or a shipped preset illustration auto-loads (post-image.js);
+    // any other URL shows a placeholder.
+    const postImage = postImageSrc(post, { isStorageImageUrl, isPresetCoverUrl, normalizeCoverUrl });
     return `<article class="community-post-card"><div class="community-post-image-wrap community-post-profile-trigger" data-public-profile-id="${escapeHtml(authorId)}" role="button" tabindex="0" aria-label="Open ${escapeHtml(author.name)} profile"><span class="community-post-media-label">COMMUNITY</span>${postImage ? `<img src="${escapeHtml(postImage)}" alt="Post by ${escapeHtml(author.name)}" loading="lazy" />` : '<span class="community-post-image-missing" role="img" aria-label="Image unavailable"></span>'}</div><div class="community-post-card-body"><div class="community-post-card-top"><span class="community-post-pill">POST</span><span class="community-post-more" aria-hidden="true">•••</span></div><h3>${escapeHtml(post.caption)}</h3><div class="community-post-author" data-public-profile-id="${escapeHtml(authorId)}" role="button" tabindex="0" aria-label="Open ${escapeHtml(author.name)} profile">${renderAvatar({ name: author.name, image: author.image }, 'community-post-avatar')}<div><strong>POSTED BY ${escapeHtml(author.name).toUpperCase()}</strong><span>${formatCommunityPostDate(post.created_at)}</span></div></div></div></article>`;
   }).join('');
   bindCommunityProfileTriggers();

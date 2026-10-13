@@ -1,5 +1,6 @@
 import { createClient } from '@supabase/supabase-js';
 import { NOTICE_VERSION } from './notice-version.js';
+import { isPresetCoverUrl } from './preset-cover.js';
 import { compressImageOnly, compressAttachmentFiles, attachmentKind, replacedObjectPath, ImageProcessingError } from './image-compress.js';
 
 export { ImageProcessingError, PHOTO_ERROR_MESSAGE, compressImageOnly, compressAttachmentFiles, attachmentKind } from './image-compress.js';
@@ -29,11 +30,8 @@ export const isStorageImageUrl = (value, bucket = '', ownerId = '') => {
     return Boolean(parts[5] && parts[6]) && STORAGE_FILE.test(parts[7]);
   } catch { return false; }
 };
-// Bundled preset covers (cover-assets.js): same-site paths, never a third-party host.
-export const isPresetCoverUrl = (value) => {
-  const raw = String(value || '').trim();
-  return !raw.includes('..') && /^\/(assets\/|Images\/Cover(%20| )images\/)[A-Za-z0-9][A-Za-z0-9._ -]*$/.test(raw);
-};
+// Bundled preset covers (cover-assets.js): same-site paths, never a third-party host (pure: preset-cover.js).
+export { isPresetCoverUrl };
 
 // Passwords are never kept client-side (Ruling I11). Older builds cached the signup password in the stored
 // profile ("loginPassword"); strip any such field from every cached profile on load.
