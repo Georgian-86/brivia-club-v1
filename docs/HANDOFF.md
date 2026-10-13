@@ -1,10 +1,29 @@
 # Session handoff (read after CLAUDE.md)
 
-Last updated: 2026-10-12, after Phases A and B of the experience iteration (final review fixes applied), on branch
-`claude/jolly-edison-49xvza` (repo `Georgian-86/brivia-club-v1`).
+Last updated: 2026-10-13, after Phase C of the experience iteration (consistency), on branch
+`claude/jolly-edison-49xvza` (repo `Georgian-86/brivia-club-v1`). Phase C is not on `main` yet: the founder sees the
+before/after screenshots and OKs the fast-forward.
 Update this file at the end of every session. CLAUDE.md holds the aim; this file holds **where we are**.
 
 ## 1. What is done
+
+**Experience iteration, Phase C (2026-10-13): done on `claude/jolly-edison-49xvza`** (not yet on `main`). See D-055.
+- One member nav (`app-nav.js`: header at desktop, tab bar at <= 780 px; Connect · Explore · Chat · Profile), one set of
+  tokens (`tokens.css`), one type system (Bodoni Moda headings, Instrument Sans body, 12 px floor), a calm profile
+  column, and skeletons, busy buttons and an action in every empty state (`app-skeletons.js`).
+- Landing CSS split (`landing-entry.js`, `auth-entry.js`): Lighthouse mobile 0.89 -> 0.93 (median of 3), LCP 2.6 s, CLS 0.
+- Style ratchet: `npm run check:styles` (per-file hex and font-family counts may only fall; after a cleanup,
+  `node scripts/check-style-ratchet.mjs --write` lowers the baseline and refuses if anything rose).
+- Visual parity guard (byte-exact; the landing stayed identical through every Phase C task). It serves the existing
+  `dist/`, so build with the stub Supabase first:
+  `VITE_SUPABASE_URL=https://stub.supabase.local VITE_SUPABASE_ANON_KEY=stub npm run build`, then
+  `PLAYWRIGHT_MODULE=/tmp/pw/node_modules/playwright/index.mjs node scripts/visual-parity.mjs compare .superpowers/sdd/2026-10-12-phase-c-consistency/landing-before --pages index`
+  (`capture <dir>` takes a new baseline; `--pages index,auth`; `--expect-diff a,b` names intended changes).
+- App shell e2e (Vite on **:5195**, stubbed Supabase with per-route `routes` delay/status overrides):
+  `PLAYWRIGHT_MODULE=/tmp/pw/node_modules/playwright/index.mjs node tests/e2e/app-shell.spec.mjs`;
+  `APP_SHOTS=<dir>` saves the views, dialogs, profile, loading and empty-state screenshots instead (final set:
+  `.superpowers/sdd/2026-10-12-phase-c-consistency/app-after/`).
+- Founder backlog surfaced (not Phase C) is listed at the end of D-055.
 
 **Experience iteration, Phases A and B (2026-10-12): done on `claude/jolly-edison-49xvza` and about to go to `main`** (the founder OKs the fast-forward). See D-053 and D-054.
 - Media pipeline: `npm run media:build` (sharp + ffmpeg write `media/`), `npm run media:repoint` (rewrites references from `media/manifest.json`), `npm run check:assets` (budget on `dist/assets`: image <= 400 KB, video <= 5 MB). Originals stay in `Images/` and `assets/`.
@@ -26,10 +45,12 @@ Update this file at the end of every session. CLAUDE.md holds the aim; this file
 | Iteration 4 arenas (P0-B design; end-of-iteration critique → P0-C backlog) | Done | `docs/arena/2026-10-05-p0b-design.md`, `docs/arena/2026-10-07-iteration-4.md`; D-044, D-046 |
 | Landing page | Yashika's original UI, unchanged (founder rule: optimise, never redesign) | `index.html`, CSS |
 | **Live signup walkthrough** (real browser on the live URL; 7 UI bugs fixed incl. lost signup photo, typed-city refusal, invalid phone pattern) | Done, pushed (auto-deploys) | D-049 |
-| Decisions | D-001 … D-051, append-only | `docs/DECISIONS.md` |
+| Experience iteration A-C (signup guide, landing speed, consistency) | Done on the branch; A and B on `main`, C awaiting the founder's OK | D-053, D-054, D-055 |
+| Decisions | D-001 … D-055, append-only | `docs/DECISIONS.md` |
 
-Test status after D-049: SQL harness ALL PASSED; build OK; `test:unit` 96/96 (also `TZ=Asia/Kolkata`); orbit 86/86;
-e2e consent 154, onboarding 219, deck 103; `test:unit` now 99.
+Test status after D-055 (2026-10-13): SQL harness ALL PASSED; build OK; `test:unit` 155/155; orbit 86/86;
+`check:assets` and `check:styles` OK; landing parity identical (22 shots); e2e onboarding 262, consent 154, deck 104,
+landing all passed, app-shell 155.
 **Live UI testing:** this sandbox cannot reach `*.vercel.app` / `*.supabase.co`. Use a Vercel Sandbox in project
 `brivia-club` (Vercel MCP `create_sandboxes_v4`, no failover regions on this plan, ~45 min max) with Playwright, and a
 Gmail plus-address of the founder's inbox for confirmation emails (disposable inboxes did not receive them).
@@ -57,6 +78,9 @@ Tooling: Playwright **and axe-core** at `/tmp/pw` (`npm install --prefix /tmp/pw
 
 ## 3. What to do next (in order)
 
+0. **Experience iteration Phase D, the test world** (spec `docs/superpowers/specs/2026-10-12-experience-iteration-design.md`
+   §3: migration 0008, seed v2, the why panel; the founder applies the SQL in the editor). Before that: the founder
+   reviews the Phase C before/after screenshots and OKs fast-forwarding `main`.
 1. **P0-C** (D-046; table "P0-C" in `docs/arena/2026-10-07-iteration-4.md`, each item has acceptance criteria).
    0005 is now live and frozen (D-047), so the SQL items go in **new migrations `0007+`**:
    1. R1 corroborated underage suspension (2 qualifying reporters, or 1 matched); a reporter's own `request`
@@ -126,6 +150,7 @@ install it).
 | SQL behaviour tests | `supabase/tests/*.test.sql` (run with `run.sh`) |
 | Signup (4 steps) | `auth.html`, `script.js`, `passion-budget.js`, `pending-profile.js` |
 | App, deck, quota | `app.html`, `app.js`, `deck-view.js`, `signal-quota.js` |
+| App nav, tokens, skeletons, profile checklist | `app-nav.js`, `app-shell.css`, `tokens.css`, `app-skeletons.js`, `profile-checklist.js`, `profile-view.css` |
 | e2e (stubbed Supabase) | `tests/e2e/*.spec.mjs` |
 | Old engine to reuse plumbing from | repo `brivia-club`, `server/src/engine/` |
 | Skills manifest | `docs/SKILLS.md` (vendored in `.claude/skills/`) |

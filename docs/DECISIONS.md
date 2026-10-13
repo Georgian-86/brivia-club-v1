@@ -975,3 +975,65 @@ that had already failed before the module ran.
 Two statements in D-054 above were inaccurate. This block corrects them; the lines above stay as written.
 - "Stored cover identifiers kept" holds only for the default, hidden `coverUrl`. A cover the member picks is stored as the built `/assets/<stem>-<hash>.webp` URL (`coverOptionUrl` in `script.js` reads the `<img src>`), and the stem resolution in `cover-name.js` is what keeps old stored values working. Legacy hashed `.PNG` values and the original `/Images/Cover%20images/<name>.PNG` paths are resolved by `normalizeCoverUrl`, now applied once in `toMemberPerson` so other members' swipe cards resolve them too (before this fix the deck card showed a broken cover for them).
 - `exploreCoverImages` in `app.js` was a dead constant, never referenced; nothing requested those files. It is deleted in this fix.
+
+## D-055: Phase C consistency, results and rulings (2026-10-13)
+
+Phase C of the experience iteration (spec §4, plan `docs/superpowers/plans/2026-10-12-phase-c-consistency.md`) is done on
+the branch (not yet on `main`). One app: one nav, one set of tokens, one type system, a calm profile, and loading, busy and
+empty states that always offer a next step. The landing page stayed byte-identical throughout.
+
+**Founder decisions:** the plan was approved; **four tabs, Connect · Explore · Chat · Profile** (the wordmark goes to the
+landing; `?view=home` is an alias of Connect); subagent-driven execution.
+
+**Results (measured):**
+- Tokens: `tokens.css` (colour, space, radius, shadow, type 12/14/16/20/24/32/44/60, motion 150/200/250 ms, 0 under
+  reduced motion) is imported first by every entry. Style ratchet `npm run check:styles` (`scripts/style-ratchet.js`,
+  `check-style-ratchet.mjs`, `style-baseline.json`): per-file hex and font-family counts may only fall.
+  font-family declarations 134 -> 15 (only the landing, careers and privacy files keep theirs).
+- Landing parity guard: `scripts/visual-parity.mjs` (+ `parity-images.mjs`) takes byte-exact screenshots of index
+  (22 shots) and auth (16 shots, including steps 2-4 and the success panel, from in-guard Supabase fixtures). It is
+  deterministic (software raster, lazy images forced and decoded with a bounded wait, 3 identical frames or it throws,
+  no retries); `--expect-diff` names an intended change. **The landing stayed byte-identical through every Phase C task.**
+- Nav: `app-nav.js` is the single model; it renders the desktop header and the <= 780 px bottom tab bar. The profile
+  sidebar and board nav, the header logout, the chat sidebar brand and the `renameExploreToConnect` MutationObserver are
+  gone; `explore.html`, `chat.html` and `profile.html` are redirects. Every `[data-nav]` click runs `setView` once with one
+  history entry. Checked by `tests/e2e/app-shell.spec.mjs` (port 5195).
+- CSS split: `landing-entry.js` / `auth-entry.js`; landing CSS 245 KB -> 134 KB. **Lighthouse mobile (median of 3,
+  `vite preview`) 0.89 -> 0.93, LCP 2.6 s, CLS 0**: meets Ruling H's 0.90 target.
+- Auth: focus order matches the visual order on steps 2-4 at <= 780 px; `.auth-success-mark` is aria-hidden; the signup
+  form is hidden after a session-less signup (it stayed visible above "Check your email"); the success panel scrolls to
+  the top and focuses its title.
+- Type: Bodoni Moda headings (500 italic self-hosted in `fonts-app.css`, app and auth only), Instrument Sans body, a 12 px
+  floor in app and auth; Georgia, Arial and the script fonts are gone from app and auth CSS.
+- Profile: one calm column: hero, a "Complete your profile" checklist (`profile-checklist.js`, 5 items), interests with
+  points bars (`my_interests`), Looking for, Experience. The stat tiles, the duplicate email and login cards and "Show up as
+  yourself" are gone; the own email appears once ("Signed in as" in the ⚙ menu). The ⚙ menu is a keyboard-reachable
+  popover (Tab order, Escape returns focus).
+- Feel (Task 6): `app-skeletons.js` (`skeletonMarkup`, `setBusy`). The deck card keeps its box and shows a skeleton while
+  the deck loads, refills or retries (home view `aria-busy`; CLS 0 once the app is shown); a failure ends in the existing
+  Try again state, never a skeleton. The chat list, posts feed and profile interests show skeletons with `aria-busy`.
+  Pitch, post and profile-save buttons are `aria-busy` and disabled while pending. Press, focus and busy states with
+  motion-token transitions are zero-specificity, so no resting look changed. Every empty state has an action ("Write the
+  first post", posts "Try again", "Notification settings"). `skeleton.css` takes its two tones from tokens
+  (`--color-skeleton`, `--color-skeleton-glint`, the same values, so no new colours; landing parity identical). The
+  profile now renders as soon as the member's own row is read, not after the deck (a slow deck showed "New Member").
+
+**Controller rulings (Phase C ledger):**
+1. Screenshot dirs live in the plan workspace (`.superpowers/sdd/2026-10-12-phase-c-consistency/`).
+2. One reusable visual-parity guard (index and auth), not per-task scripts.
+3. The chat badge keeps `conversations.length` and is hidden at 0.
+4. The header stays cream with wine type (the spec's "deep-wine header" was read as the palette).
+5. Auth parity is extended with `--expect-diff` for the intended changes.
+6. The focus-order fix applies to steps 2-4 (the same WCAG 2.4.3 fault on each).
+7. The hidden-form bug was fixed in Task 3.
+8. The Bodoni italic lives in `fonts-app.css` only, so the landing's fonts stay as they were.
+9. The profile is a centred ~880 px column.
+10. The interests empty-state action is accepted: the state is unreachable after onboarding (server-enforced >= 3).
+11. The 'private' interest label is inert (the server has no such mode).
+
+**Founder backlog surfaced (not Phase C):** interest editing after onboarding; a real bio/about field (needs a
+migration); a private/sensitive interest flag; the test cover "badminton" art has a baked-in grey checkerboard; the
+success panel alignment at 1440 px (Phase E rebuilds signup); the header avatar is clipped under a classic 15 px
+scrollbar at 375 px in desktop Chromium.
+
+**Next:** Phase D, the test world (spec §3: migration 0008, seed v2, the why panel).
