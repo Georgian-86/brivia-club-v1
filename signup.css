@@ -256,17 +256,9 @@ body.auth-page .auth-shell #guided-signup :is(.gs-primary, .gs-secondary-btn, .g
   outline: 2px solid var(--color-wine);
   outline-offset: 3px;
 }
-body.auth-page .auth-shell #guided-signup .gs-google-mark {
-  display: inline-grid;
-  place-items: center;
-  width: 24px;
-  height: 24px;
-  border-radius: var(--radius-pill);
-  background: var(--color-cream);
-  color: var(--color-wine);
-  font: 700 var(--text-14)/1 var(--font-body);
-}
-body.auth-page .auth-shell #guided-signup .gs-secondary-btn .gs-google-mark { background: var(--color-wine); color: var(--color-cream); }
+/* Google's four-colour G on its own white disc (google-mark.js; the colours are SVG fill attributes, not CSS). */
+body.auth-page .auth-shell #guided-signup .gs-google-mark { display: block; flex: none; width: 24px; height: 24px; line-height: 0; }
+body.auth-page .auth-shell #guided-signup .gs-google-mark svg { display: block; width: 100%; height: 100%; }
 body.auth-page .auth-shell #guided-signup .gs-member {
   margin: var(--space-2) 0 0;
   color: var(--color-ink-soft);

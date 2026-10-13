@@ -49,7 +49,9 @@ export const parseOtp = (text) => {
 };
 
 // VITE_SIGNUP_METHODS: a comma list of 'google' and 'email' (order kept, duplicates and unknown names dropped). Empty or
-// unset means public signup is closed (Welcome shows "Signups open soon" and Log in).
+// unset only hides the signup buttons (Welcome shows "Signups open soon" and Log in); it does not close signup. To close
+// it, also turn off Supabase Auth "Allow new users to sign up" (the login Google button and direct API calls can
+// otherwise still create accounts).
 export const signupMethods = (raw) => {
   const out = [];
   for (const name of String(raw ?? '').split(',').map((s) => s.trim().toLowerCase())) {
@@ -57,3 +59,21 @@ export const signupMethods = (raw) => {
   }
   return out;
 };
+
+// The screen showScreen really shows. Once a session exists, Email and Code turn into Welcome (it says who is signed
+// in); Code without an address to send to turns into Email.
+export const screenToShow = (requested, { hasSession = false, email = '' } = {}) => {
+  if (hasSession && (requested === 'email' || requested === 'code')) return 'welcome';
+  if (requested === 'code' && !String(email || '').trim()) return 'email';
+  return requested;
+};
+
+const sameEmail = (a, b) => String(a || '').trim().toLowerCase() === String(b || '').trim().toLowerCase();
+
+// "Send code" again for the address a code just went to, inside the resend wait: reuse that code (go to Code) instead
+// of sending, so the Email screen is no way around the Resend countdown.
+export const reuseSentCode = (email, { sentTo = '', resendAt = 0 } = {}, now = Date.now()) =>
+  Boolean(String(sentTo || '').trim()) && sameEmail(email, sentTo) && now < resendAt;
+
+// An expired code sends a new one by itself at most once per Code screen, and never inside the resend wait.
+export const autoResendAllowed = ({ resendAt = 0, autoResent = false } = {}, now = Date.now()) => !autoResent && now >= resendAt;

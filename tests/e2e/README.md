@@ -32,10 +32,11 @@ PLAYWRIGHT_MODULE=/tmp/pw/node_modules/playwright/index.mjs node tests/e2e/onboa
 `signup.spec.mjs` (Phase E, Task 3) checks the guided signup on `auth.html#signup` (Vite on :5193, stubbed Supabase
 including `/auth/v1/otp`, `/auth/v1/verify` and `/auth/v1/authorize`). One command runs three Vite servers in turn, one per
 `VITE_SIGNUP_METHODS` value (`google,email`, `google`, empty). It covers Welcome, Email, the six-box Code screen (typing,
-paste of "123 456", a wrong and an expired code, Resend's 60 s countdown with Playwright's fake clock and a 429), Back and
+paste of "123 456", a wrong and an expired code, Resend's 60 s countdown with Playwright's fake clock and a 429, a 429 on
+the Email screen's first send, and no new send for the same address inside the countdown), the four-colour Google mark, Back and
 browser Back after verification (Welcome "Signed in as …", never Email or Code), the pinned primary button above a simulated
 300 px keyboard (a fake `visualViewport`), reduced motion, and axe (full rule set), 12 px text and one heading plus one
-primary action on every screen at 375 and 1440 px. `E2E_SCREENSHOTS=<dir>` saves every screen. Until Phase E Task 5 retires
+primary action on every screen at 320, 375 and 1440 px (at 320 the step label must not overlap the page's ×). `E2E_SCREENSHOTS=<dir>` saves every screen. Until Phase E Task 5 retires
 the old 4-step form, `onboarding.spec.mjs` reaches it with `auth.html?legacy-signup=1#signup` (dev server only).
 
 ```bash

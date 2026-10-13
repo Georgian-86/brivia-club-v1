@@ -10,10 +10,13 @@
 //   375 and 1440 px; Enter submits the email screen; the code request POSTs that email with create_user true;
 // * Code: six boxes (autocomplete="one-time-code" on the first, inputmode="numeric" on all); typing six digits or
 //   pasting "123 456" verifies by itself; a wrong code shows the copy and keeps focus in the boxes; an expired code
-//   sends a new one; Resend waits 60 s (fake clock) and a 429 shows the rate-limit copy;
+//   sends a new one once (never inside the 60 s wait, never again on later tries); Resend waits 60 s (fake clock) and a
+//   429 shows the Code-screen rate-limit copy; a 429 on the first send stays on Email with the Email-screen copy; the
+//   same address inside the wait goes to Code without a new send;
 // * after verify: "Step 3 of 6" on 18+; Back (and browser Back) goes to Welcome with "Signed in as …", never to Code;
 // * the switch: 'google' hides the email option; '' shows "Signups open soon" and Log in;
-// * phone: the primary button stays above a simulated 300 px keyboard (visualViewport); reduced motion: no transform;
+// * phone: the primary button stays above a simulated 300 px keyboard (visualViewport); at 320 px the step label and the
+//   page's × do not overlap; reduced motion: no transform; the Google buttons show the four-colour G (SVG);
 // * axe (full rule set) clean and text >= 12 px in Instrument Sans / Bodoni Moda on every screen.
 // E2E_SCREENSHOTS=<dir> saves every screen at 375 and 1440 px.
 import { spawn } from 'node:child_process';
@@ -42,10 +45,14 @@ const session = { access_token: accessToken, refresh_token: 'stub-refresh', toke
 
 const WRONG_COPY = "That code didn't work. Check it, or send a new one.";
 const EXPIRED_COPY = "That code has expired. We've sent you a new one.";
-const RATE_COPY = "We can't send the confirmation email right now: too many sign-ups at once. Your account was not created. Please try again in about an hour.";
+const CODE_RATE_COPY = 'Too many codes requested. Wait a minute, then tap Resend.';
+const EMAIL_RATE_COPY = "We can't send a code right now. Please try again in a few minutes.";
+const EXPIRED_RESEND_COPY = 'That code has expired. Tap Resend for a new one.';
 
 const results = [];
 const check = (name, fn) => { try { fn(); results.push(['PASS', name]); } catch (error) { results.push(['FAIL', `${name}: ${error.message}`]); } };
+// A step that waits (a click, a screen change): its own named check, so a failure names the step and later checks run.
+const checkStep = async (name, fn) => { try { await fn(); results.push(['PASS', name]); return true; } catch (error) { results.push(['FAIL', `${name}: ${error.message}`]); return false; } };
 
 // Stubbed Supabase for one context. opts.otpStatus: statuses to answer the next /otp POSTs with (429), in order.
 const stubContext = async (context, opts = {}) => {
@@ -68,7 +75,8 @@ const stubContext = async (context, opts = {}) => {
     if (p === '/auth/v1/verify') {
       const token = JSON.parse(body || '{}').token;
       if (token === GOOD) return json(200, session);
-      if (token === EXPIRED) return json(403, { code: 'otp_expired', error_code: 'otp_expired', msg: 'Token has expired', message: 'Token has expired' });
+      // Every code starting 99 has expired (the client never re-sends the code that just failed, so tests vary it).
+      if (/^99/.test(token)) return json(403, { code: 'otp_expired', error_code: 'otp_expired', msg: 'Token has expired', message: 'Token has expired' });
       return json(403, { code: 'otp_expired', error_code: 'otp_expired', msg: 'Token has expired or is invalid', message: 'Token has expired or is invalid' });
     }
     if (p === '/auth/v1/authorize') return route.fulfill({ status: 200, contentType: 'text/html', body: '<!doctype html><title>google</title><p id="stub-google">google</p>' });
@@ -206,8 +214,8 @@ try {
 
   await withServer('google,email', async () => {
     // 1. The email path at both widths: Welcome, Email, Code, 18+, Back to Welcome signed in.
-    for (const w of [1440, 375]) {
-      const context = await browser.newContext({ viewport: { width: w, height: w === 375 ? 812 : 900 } });
+    for (const w of [1440, 375, 320]) {
+      const context = await browser.newContext({ viewport: { width: w, height: w <= 375 ? 812 : 900 } });
       const stub = await stubContext(context);
       const { page, errors } = await newPage(context);
       await openGuided(page);
@@ -217,6 +225,15 @@ try {
       check(`${w}: Welcome shows Continue with Google and Continue with email, and no step label (step "${step0}")`, () => { assert.ok(google); assert.ok(email); assert.equal(step0, ''); });
       const body0 = await page.locator('#guided-signup').textContent();
       check(`${w}: Welcome copy and "Already a member? Log in"`, () => { assert.match(body0, /Join in a minute\. One question at a time\./); assert.match(body0, /Already a member\?\s*Log in/); });
+      const mark = await page.locator('#guided-signup .gs-google-mark').evaluate((el) => ({ hidden: el.getAttribute('aria-hidden'), fills: [...el.querySelectorAll('svg [fill]')].map((n) => n.getAttribute('fill').toUpperCase()), text: el.textContent.trim(), w: el.getBoundingClientRect().width }));
+      const googleLabel = (await buttonByText(page, 'Continue with Google').first().textContent()).trim();
+      check(`${w}: Continue with Google shows the four-colour G on a white disc, aria-hidden, with the text label (${JSON.stringify(mark)})`, () => {
+        assert.equal(mark.hidden, 'true');
+        for (const c of ['#FFFFFF', '#4285F4', '#34A853', '#FBBC05', '#EA4335']) assert.ok(mark.fills.includes(c), c);
+        assert.equal(mark.text, '');
+        assert.ok(mark.w >= 20);
+        assert.equal(googleLabel, 'Continue with Google');
+      });
       const backHidden = !(await isVisible(page, '#guided-signup [data-signup-back]'));
       check(`${w}: no Back on Welcome`, () => assert.ok(backHidden));
       await a11yScreen(page, `${w} welcome`);
@@ -227,6 +244,14 @@ try {
       const step1 = await stepText(page);
       const focused1 = await page.evaluate(() => document.activeElement?.id);
       check(`${w}: Email shows "Step 1 of 6" and focus moves to the heading (${step1}, ${focused1})`, () => { assert.equal(step1, 'Step 1 of 6'); assert.equal(focused1, 'signup-screen-title'); });
+      const clash = await page.evaluate(() => {
+        const box = (sel) => { const el = document.querySelector(sel); if (!el || !el.getClientRects().length) return null; const r = el.getBoundingClientRect(); return { l: r.left, r: r.right, t: r.top, b: r.bottom }; };
+        const step = box('#guided-signup [data-signup-step]');
+        const close = box('#auth-modal .auth-close');
+        const overlap = Boolean(step && close && step.l < close.r && close.l < step.r && step.t < close.b && close.t < step.b);
+        return { step, close, overlap };
+      });
+      check(`${w}: the step label and the page's × close button do not overlap (${JSON.stringify(clash)})`, () => { assert.ok(clash.step, 'step label shown'); assert.equal(clash.overlap, false); });
       const helper = await page.locator('#guided-signup').textContent();
       check(`${w}: Email helper copy`, () => assert.match(helper, /We'll send you a 6-digit code\. No password needed\./));
       const emailField = await page.locator('#signup-email').evaluate((el) => ({ type: el.type, ac: el.autocomplete, size: parseFloat(getComputedStyle(el).fontSize), h: el.getBoundingClientRect().height }));
@@ -278,6 +303,7 @@ try {
       const verify1 = stub.posts('/auth/v1/verify').map((c) => JSON.parse(c.body || '{}'));
       check(`${w}: typing 6 digits verifies automatically (${JSON.stringify(verify1)})`, () => { assert.equal(verify1.length, 1); assert.equal(verify1[0].token, '111111'); assert.equal(verify1[0].email, EMAIL); assert.equal(verify1[0].type, 'email'); });
       check(`${w}: a wrong code shows "${WRONG_COPY}" and keeps focus in the boxes (${JSON.stringify(wrong)})`, () => { assert.ok(wrong.shown); assert.ok(wrong.inBoxes); assert.equal(wrong.title, 'Enter the code'); });
+      await page.waitForTimeout(SETTLE);  // let Verify finish fading back from busy before the contrast check
       await shot(page, `signup-${w}-code-wrong.png`);
       await a11yScreen(page, `${w} code wrong`);
 
@@ -317,9 +343,10 @@ try {
       check(`${w}: Back from 18+ goes to Welcome with "Signed in as ${EMAIL}", never to Code`, () => { assert.ok(signedIn.includes(`Signed in as ${EMAIL}`)); assert.ok(methodsGone); assert.ok(!signedIn.includes('Enter the code')); });
       await a11yScreen(page, `${w} welcome signed in`);
       await shot(page, `signup-${w}-welcome-signed-in.png`);
-      await buttonByText(page, 'Continue').first().click();
-      await waitTitle(page, 'Are you 18 or older?');
-      check(`${w}: Continue resumes at 18+`, () => assert.ok(true));
+      await checkStep(`${w}: Continue resumes at 18+`, async () => {
+        await buttonByText(page, 'Continue').first().click();
+        await waitTitle(page, 'Are you 18 or older?');
+      });
       // Browser Back walks history: through 18+ and Welcome entries, but never shows Email or Code again.
       const seenTitles = [];
       for (let i = 0; i < 4; i += 1) {
@@ -350,33 +377,99 @@ try {
       const t3 = await page.locator('[data-signup-resend]').evaluate((el) => ({ disabled: el.disabled, text: el.textContent.trim() }));
       check(`Resend is enabled after 60 s (${JSON.stringify(t3)})`, () => { assert.equal(t3.disabled, false); assert.equal(t3.text, 'Resend code'); });
       await page.locator('[data-signup-resend]').click();
-      await page.waitForFunction((t) => document.querySelector('#guided-signup')?.textContent.includes(t), RATE_COPY, { timeout: 5000 }).catch(() => {});
+      await page.waitForFunction((t) => document.querySelector('#guided-signup')?.textContent.includes(t), CODE_RATE_COPY, { timeout: 5000 }).catch(() => {});
       const rate = await page.locator('#guided-signup').textContent();
-      check('a 429 on resend shows the rate-limit copy', () => { assert.ok(rate.includes(RATE_COPY)); assert.equal(stub.posts('/auth/v1/otp').length, 2); });
+      check(`a 429 on Resend shows "${CODE_RATE_COPY}"`, () => { assert.ok(rate.includes(CODE_RATE_COPY)); assert.ok(!rate.includes('not created')); assert.equal(stub.posts('/auth/v1/otp').length, 2); });
       await shot(page, 'signup-1440-code-rate-limited.png');
-      await page.locator('#guided-signup button:has-text("Wrong email?")').click();
-      await waitTitle(page, "What's your email?");
+      await checkStep('Wrong email? goes back to Email', async () => {
+        await page.locator('#guided-signup button:has-text("Wrong email?")').click();
+        await waitTitle(page, "What's your email?");
+      });
       const kept = await page.locator('#signup-email').inputValue();
-      check(`Wrong email? goes back to Email with the address kept (${kept})`, () => assert.equal(kept, EMAIL));
+      check(`Wrong email? keeps the address (${kept})`, () => assert.equal(kept, EMAIL));
+      // The same address inside the resend wait: straight to Code, no new send (no way around the countdown).
+      await checkStep('Send code for the same address inside the resend wait goes to Code', async () => {
+        await page.locator('#signup-email').press('Enter');
+        await waitTitle(page, 'Enter the code');
+      });
+      check(`the same address inside the wait sends nothing (${stub.posts('/auth/v1/otp').length} otp POSTs)`, () => assert.equal(stub.posts('/auth/v1/otp').length, 2));
+      const still = await page.locator('[data-signup-resend]').evaluate((el) => ({ disabled: el.disabled, text: el.textContent.trim() }));
+      check(`Resend is still counting down after the round trip (${JSON.stringify(still)})`, () => { assert.equal(still.disabled, true); assert.match(still.text, /^Resend in [01]:\d\d$/); });
       check(`resend: no uncaught page errors (${errors.join(' | ')})`, () => assert.deepEqual(errors, []));
       await context.close();
     }
 
-    // 3. An expired code: the expired copy, and a new code is sent automatically.
+    // 3. An expired code: inside the 60 s wait nothing is sent; after it a new code goes out once, and later tries never
+    //    send again. Fake clock.
     {
       const context = await browser.newContext({ viewport: { width: 375, height: 812 } });
+      await context.clock.install();
       const stub = await stubContext(context);
       const { page, errors } = await newPage(context);
       await openGuided(page);
       await toCode(page);
+      const typeCode = async (code, copy) => {
+        await page.locator('#guided-signup .gs-otp input').first().focus();
+        await page.keyboard.type(code);
+        await page.waitForFunction((t) => document.querySelector('#guided-signup [role="alert"]')?.textContent === t, copy, { timeout: 5000 }).catch(() => {});
+        return page.evaluate(() => ({ alert: document.querySelector('#guided-signup [role="alert"]')?.textContent, inBoxes: Boolean(document.activeElement?.closest('.gs-otp')) }));
+      };
+      const early = await typeCode(EXPIRED, EXPIRED_RESEND_COPY);
+      check(`an expired code inside the resend wait sends nothing and says "${EXPIRED_RESEND_COPY}" (${JSON.stringify(early)}, otp POSTs ${stub.posts('/auth/v1/otp').length})`, () => { assert.equal(early.alert, EXPIRED_RESEND_COPY); assert.equal(stub.posts('/auth/v1/otp').length, 1); assert.ok(early.inBoxes); });
+      await context.clock.fastForward(61000);
+      const sent = await typeCode('998888', EXPIRED_COPY);  // a different code: the one that just failed is never re-sent
+      check(`an expired code after the wait shows "${EXPIRED_COPY}" and sends a new one (${JSON.stringify(sent)}, otp POSTs ${stub.posts('/auth/v1/otp').length})`, () => { assert.equal(sent.alert, EXPIRED_COPY); assert.equal(stub.posts('/auth/v1/otp').length, 2); assert.ok(sent.inBoxes); });
+      await shot(page, 'signup-375-code-expired.png');
+      await context.clock.fastForward(61000);
+      const again = await typeCode('997777', EXPIRED_RESEND_COPY);
+      check(`a later expired try does not send again (${JSON.stringify(again)}, otp POSTs ${stub.posts('/auth/v1/otp').length})`, () => { assert.equal(again.alert, EXPIRED_RESEND_COPY); assert.equal(stub.posts('/auth/v1/otp').length, 2); });
+      check(`expired: no uncaught page errors (${errors.join(' | ')})`, () => assert.deepEqual(errors, []));
+      await context.close();
+    }
+
+    // 3b. The automatic resend for an expired code hits a 429: the expired copy together with the send error.
+    {
+      const context = await browser.newContext({ viewport: { width: 375, height: 812 } });
+      await context.clock.install();
+      const stub = await stubContext(context, { otpStatus: [200, 429] });
+      const { page, errors } = await newPage(context);
+      await openGuided(page);
+      await toCode(page);
+      await context.clock.fastForward(61000);
+      const both = `That code has expired. ${CODE_RATE_COPY}`;
       await page.locator('#guided-signup .gs-otp input').first().focus();
       await page.keyboard.type(EXPIRED);
-      await page.waitForFunction((t) => document.querySelector('#guided-signup')?.textContent.includes(t), EXPIRED_COPY, { timeout: 5000 }).catch(() => {});
-      const text = await page.locator('#guided-signup').textContent();
-      const inBoxes = await page.evaluate(() => Boolean(document.activeElement?.closest('.gs-otp')));
-      check(`an expired code shows "${EXPIRED_COPY}" and sends a new one (otp POSTs ${stub.posts('/auth/v1/otp').length})`, () => { assert.ok(text.includes(EXPIRED_COPY)); assert.equal(stub.posts('/auth/v1/otp').length, 2); assert.ok(inBoxes); });
-      await shot(page, 'signup-375-code-expired.png');
-      check(`expired: no uncaught page errors (${errors.join(' | ')})`, () => assert.deepEqual(errors, []));
+      await page.waitForFunction((t) => document.querySelector('#guided-signup [role="alert"]')?.textContent === t, both, { timeout: 5000 }).catch(() => {});
+      const alert = await page.locator('#guided-signup [role="alert"]').textContent();
+      check(`a failed automatic resend shows "${both}" (${alert}, otp POSTs ${stub.posts('/auth/v1/otp').length})`, () => { assert.equal(alert, both); assert.equal(stub.posts('/auth/v1/otp').length, 2); });
+      await shot(page, 'signup-375-code-expired-rate-limited.png');
+      await page.locator('#guided-signup .gs-otp input').first().focus();
+      await page.keyboard.type('111111');
+      await page.waitForFunction((t) => document.querySelector('#guided-signup [role="alert"]')?.textContent === t, WRONG_COPY, { timeout: 5000 }).catch(() => {});
+      check(`a wrong code after that sends no new code (otp POSTs ${stub.posts('/auth/v1/otp').length})`, () => assert.equal(stub.posts('/auth/v1/otp').length, 2));
+      check(`expired 429: no uncaught page errors (${errors.join(' | ')})`, () => assert.deepEqual(errors, []));
+      await context.close();
+    }
+
+    // 3c. A 429 on the Email screen's first "Send code": the Email-screen copy, and the member stays on Email.
+    {
+      const context = await browser.newContext({ viewport: { width: 375, height: 812 } });
+      const stub = await stubContext(context, { otpStatus: [429] });
+      const { page, errors } = await newPage(context);
+      await openGuided(page);
+      await checkStep('email 429: Continue with email opens Email', async () => {
+        await buttonByText(page, 'Continue with email').click();
+        await waitTitle(page, "What's your email?");
+      });
+      await page.locator('#signup-email').fill(EMAIL);
+      await page.locator('#signup-email').press('Enter');
+      await page.waitForFunction((t) => document.querySelector('#guided-signup [role="alert"]')?.textContent === t, EMAIL_RATE_COPY, { timeout: 5000 }).catch(() => {});
+      await page.waitForTimeout(SETTLE);
+      const shown = await page.evaluate(() => ({ alert: document.querySelector('#guided-signup [role="alert"]')?.textContent, title: document.querySelector('#signup-screen-title')?.textContent }));
+      check(`a 429 on the first Send code shows "${EMAIL_RATE_COPY}" and stays on Email (${JSON.stringify(shown)})`, () => { assert.equal(shown.alert, EMAIL_RATE_COPY); assert.equal(shown.title, "What's your email?"); assert.equal(stub.posts('/auth/v1/otp').length, 1); });
+      await a11yScreen(page, '375 email rate limited');
+      await shot(page, 'signup-375-email-rate-limited.png');
+      check(`email 429: no uncaught page errors (${errors.join(' | ')})`, () => assert.deepEqual(errors, []));
       await context.close();
     }
 
@@ -388,18 +481,29 @@ try {
       await page.goto(`${BASE}/auth.html#login`, { waitUntil: 'domcontentloaded' });
       await page.waitForSelector('[data-auth-view="login"]:not([hidden])', { timeout: 15000 });
       await page.waitForTimeout(600);
-      await page.evaluate(() => document.querySelector('.auth-create-trigger').click());  // hidden in this layout; still wired
-      await waitTitle(page, 'Find your people.');
-      check('"Create an account" opens the guided flow', () => assert.ok(true));
+      const loginMark = await page.locator('.auth-login .auth-google-mark').evaluate((el) => ({ hidden: el.getAttribute('aria-hidden'), fills: [...el.querySelectorAll('svg [fill]')].map((n) => n.getAttribute('fill').toUpperCase()), text: el.textContent.trim(), label: el.closest('button')?.getAttribute('aria-label') }));
+      check(`the login view's Google button shows the same four-colour G (${JSON.stringify(loginMark)})`, () => {
+        assert.equal(loginMark.hidden, 'true');
+        for (const c of ['#FFFFFF', '#4285F4', '#34A853', '#FBBC05', '#EA4335']) assert.ok(loginMark.fills.includes(c), c);
+        assert.equal(loginMark.text, '');
+        assert.equal(loginMark.label, 'Continue with Google');
+      });
+      await shot(page, 'signup-1440-login-google.png');
+      await checkStep('"Create an account" opens the guided flow', async () => {
+        await page.evaluate(() => document.querySelector('.auth-create-trigger').click());  // hidden in this layout; still wired
+        await waitTitle(page, 'Find your people.');
+      });
       const hash = await page.evaluate(() => window.location.hash);
       check(`the guided flow is at #signup (${hash})`, () => assert.equal(hash, '#signup'));
-      await page.locator('#guided-signup button:has-text("Log in")').click();
-      await page.waitForSelector('[data-auth-view="login"]:not([hidden])');
-      check('"Already a member? Log in" shows the login view', () => assert.ok(true));
+      await checkStep('"Already a member? Log in" shows the login view', async () => {
+        await page.locator('#guided-signup button:has-text("Log in")').click();
+        await page.waitForSelector('[data-auth-view="login"]:not([hidden])', { timeout: 8000 });
+      });
       await page.waitForTimeout(400);
-      await page.locator('.auth-top-signup').click();
-      await waitTitle(page, 'Find your people.');
-      check('"New here? Create account" opens the guided flow', () => assert.ok(true));
+      await checkStep('"New here? Create account" opens the guided flow', async () => {
+        await page.locator('.auth-top-signup').click();
+        await waitTitle(page, 'Find your people.');
+      });
       await buttonByText(page, 'Continue with email').click();
       const transform = await page.evaluate(() => [...document.querySelectorAll('#guided-signup .gs-screen-inner')].map((el) => getComputedStyle(el).transform));
       check(`reduced motion: a screen change moves nothing (${transform.join(', ')})`, () => { for (const t of transform) assert.equal(t, 'none'); });

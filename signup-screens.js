@@ -5,11 +5,12 @@
 // Screen contract: render(ctx) builds the screen into ctx.body under the heading ctx.title, sets the primary action
 // with ctx.primary(label, { onClick, disabled }) and may return a cleanup function. When a screen has next(ctx) and no
 // onClick, the primary button runs next (busy while pending); next resolves to the screen to show, or null to stay.
-import { stepLabel, backTarget, resumeScreen } from './signup-flow.js';
+import { stepLabel, backTarget, resumeScreen, screenToShow, reuseSentCode, autoResendAllowed } from './signup-flow.js';
 import { otpBoxesAfterInput } from './otp-input.js';
-import { signupErrorCopy, otpErrorKind, OTP_WRONG, OTP_EXPIRED } from './signup-errors.js';
+import { signupErrorCopy, codeSendErrorCopy, emailSendErrorCopy, expiredCodeCopy, otpErrorKind, OTP_WRONG } from './signup-errors.js';
 import { supabase, sendEmailCode, verifyEmailCode, onboardingStatus } from './supabase.js';
 import { setBusy } from './app-skeletons.js';
+import { fillGoogleMark } from './google-mark.js';
 
 const RESEND_WAIT_MS = 60 * 1000;
 const LEAVE_MS = 260;  // a little longer than the 200 ms swap, so the outgoing screen has finished fading
@@ -126,8 +127,8 @@ const swapIn = (inner) => {
 export const showScreen = (requested, { history = 'push' } = {}) => {
   if (!root) return;
   if (requested === 'done') { window.location.replace('/app.html'); return; }
-  // Once a session exists, Email and Code are never shown again: Welcome says who is signed in.
-  const name = state.session && (requested === 'email' || requested === 'code') ? 'welcome' : requested;
+  // Once a session exists, Email and Code are never shown again: Welcome says who is signed in. Code needs an address.
+  const name = screenToShow(requested, { hasSession: Boolean(state.session), email: state.email });
   if (typeof cleanup === 'function') { try { cleanup(); } catch { /* a screen's cleanup never blocks the next one */ } }
   cleanup = null;
   state.screen = name;
@@ -176,7 +177,7 @@ const placeholder = (name) => ({
 
 // ---- Welcome ----------------------------------------------------------------------------------------------------------
 
-const googleMark = () => el('span', { class: 'gs-google-mark', 'aria-hidden': 'true', text: 'G' });
+const googleMark = () => fillGoogleMark(el('span', { class: 'gs-google-mark', 'aria-hidden': 'true' }));
 
 registerScreen('welcome', {
   render(ctx) {
@@ -266,10 +267,13 @@ registerScreen('email', {
           return;
         }
         message.textContent = '';
+        // The same address inside the resend wait: the code already sent still works, so no new send (the Email screen
+        // is no way around the Resend countdown).
+        if (reuseSentCode(email, { sentTo: state.email, resendAt: state.resendAt })) { showScreen('code'); return; }
         ctx.busy(true);
         const { error } = await sendEmailCode(email);
         ctx.busy(false);
-        if (error) { message.textContent = signupErrorCopy(error); return; }
+        if (error) { message.textContent = emailSendErrorCopy(error); return; }
         state.email = email;
         state.sentAt = Date.now();
         state.resendAt = state.sentAt + RESEND_WAIT_MS;
@@ -311,6 +315,7 @@ registerScreen('code', {
     let verifying = false;
     let lastTried = '';
     let timer = 0;
+    let autoResent = false;  // the automatic resend for an expired code runs at most once on this screen
     const paint = (focus) => {
       inputs.forEach((input, i) => { input.value = boxes[i]; });
       ctx.primaryButton().disabled = verifying || boxes.join('').length !== 6;
@@ -327,22 +332,24 @@ registerScreen('code', {
       if (left <= 0) { window.clearInterval(timer); timer = 0; }
     };
     const startCountdown = () => { window.clearInterval(timer); tick(); if (resend.disabled) timer = window.setInterval(tick, 1000); };
+    // Resolves to the send error, or null once a new code went out.
     const sendAgain = async () => {
       const { error } = await sendEmailCode(state.email);
       state.resendAt = Date.now() + RESEND_WAIT_MS;
       startCountdown();
-      if (error) { message.textContent = signupErrorCopy(error); return false; }
+      if (error) return error;
       state.sentAt = Date.now();
-      return true;
+      return null;
     };
     resend.addEventListener('click', async () => {
       message.textContent = '';
       note.textContent = '';
       setBusy(resend, true);
-      const ok = await sendAgain();
+      const error = await sendAgain();
       setBusy(resend, false);
       tick();
-      if (ok) note.textContent = `We sent a new code to ${state.email}.`;
+      if (error) message.textContent = codeSendErrorCopy(error);
+      else { autoResent = false; note.textContent = `We sent a new code to ${state.email}.`; }
     });
 
     const verify = async () => {
@@ -369,7 +376,14 @@ registerScreen('code', {
       if (kind === 'expired') {
         boxes = ['', '', '', '', '', ''];
         paint(0);
-        if (await sendAgain()) message.textContent = OTP_EXPIRED;
+        // A new code goes out by itself once, and never inside the resend wait; otherwise the member taps Resend.
+        if (autoResendAllowed({ resendAt: state.resendAt, autoResent })) {
+          autoResent = true;
+          const sendError = await sendAgain();
+          message.textContent = expiredCodeCopy({ sent: !sendError, error: sendError });
+        } else {
+          message.textContent = expiredCodeCopy({ sent: false });
+        }
         inputs[0].focus();
         return;
       }

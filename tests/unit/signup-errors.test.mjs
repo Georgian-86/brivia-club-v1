@@ -30,3 +30,24 @@ test('otpErrorKind tells a wrong code from an expired one', () => {
   assert.equal(OTP_WRONG, "That code didn't work. Check it, or send a new one.");
   assert.equal(OTP_EXPIRED, "That code has expired. We've sent you a new one.");
 });
+
+// Phase E Task 3 review (I1, M1): a 429 on the Code screen (Resend or the automatic resend) says how long to wait and
+// where to tap; on the Email screen it never claims whether an account exists.
+test('code and email send errors get screen-specific rate-limit copy', async () => {
+  const { codeSendErrorCopy, emailSendErrorCopy, CODE_RATE_LIMITED, EMAIL_RATE_LIMITED } = await import('../../signup-errors.js');
+  assert.equal(CODE_RATE_LIMITED, 'Too many codes requested. Wait a minute, then tap Resend.');
+  assert.equal(EMAIL_RATE_LIMITED, "We can't send a code right now. Please try again in a few minutes.");
+  const limited = { code: 'over_email_send_rate_limit', status: 429, message: 'email rate limit exceeded' };
+  assert.equal(codeSendErrorCopy(limited), CODE_RATE_LIMITED);
+  assert.equal(codeSendErrorCopy({ status: 429, message: 'Too many requests' }), CODE_RATE_LIMITED);
+  assert.equal(emailSendErrorCopy(limited), EMAIL_RATE_LIMITED);
+  assert.ok(!/not created/.test(emailSendErrorCopy(limited)));
+  assert.equal(emailSendErrorCopy({ message: 'Signups not allowed for otp' }), 'Signups not allowed for otp');
+  assert.equal(codeSendErrorCopy({ message: 'Failed to fetch' }), 'Failed to fetch');
+});
+test('expiredCodeCopy says whether a new code went out', async () => {
+  const { expiredCodeCopy, CODE_RATE_LIMITED } = await import('../../signup-errors.js');
+  assert.equal(expiredCodeCopy({ sent: true }), OTP_EXPIRED);
+  assert.equal(expiredCodeCopy({ sent: false, error: { status: 429, message: 'email rate limit exceeded' } }), `That code has expired. ${CODE_RATE_LIMITED}`);
+  assert.equal(expiredCodeCopy({ sent: false }), 'That code has expired. Tap Resend for a new one.');
+});

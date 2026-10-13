@@ -89,3 +89,33 @@ test('signupMethods reads the feature switch', () => {
   assert.deepEqual(signupMethods(undefined), []);
   assert.deepEqual(signupMethods('phone,apple'), []);
 });
+
+// Phase E Task 3 review (M2): Code needs an address to show; once signed in, Email and Code turn into Welcome.
+test('screenToShow redirects Code without an email, and Email/Code once signed in', async () => {
+  const { screenToShow } = await import('../../signup-flow.js');
+  assert.equal(screenToShow('code', { hasSession: false, email: '' }), 'email');
+  assert.equal(screenToShow('code', { hasSession: false, email: 'a@b.co' }), 'code');
+  assert.equal(screenToShow('code', { hasSession: true, email: 'a@b.co' }), 'welcome');
+  assert.equal(screenToShow('email', { hasSession: true }), 'welcome');
+  assert.equal(screenToShow('email', { hasSession: false }), 'email');
+  assert.equal(screenToShow('adult', { hasSession: true }), 'adult');
+});
+
+// Phase E Task 3 review (I1): sending the same address again inside the resend wait reuses the code already sent.
+test('reuseSentCode skips a send to the same address inside the resend wait', async () => {
+  const { reuseSentCode } = await import('../../signup-flow.js');
+  const sent = { sentTo: 'new@test.brivia.club', resendAt: 60_000 };
+  assert.equal(reuseSentCode('new@test.brivia.club', sent, 30_000), true);
+  assert.equal(reuseSentCode(' New@Test.Brivia.Club ', sent, 30_000), true);
+  assert.equal(reuseSentCode('new@test.brivia.club', sent, 60_000), false);
+  assert.equal(reuseSentCode('other@test.brivia.club', sent, 30_000), false);
+  assert.equal(reuseSentCode('new@test.brivia.club', { sentTo: '', resendAt: 60_000 }, 30_000), false);
+});
+
+// Phase E Task 3 review (M1): an expired code sends a new one by itself at most once, and never inside the resend wait.
+test('autoResendAllowed: once per Code screen, and only after the resend wait', async () => {
+  const { autoResendAllowed } = await import('../../signup-flow.js');
+  assert.equal(autoResendAllowed({ resendAt: 60_000, autoResent: false }, 61_000), true);
+  assert.equal(autoResendAllowed({ resendAt: 60_000, autoResent: false }, 30_000), false);
+  assert.equal(autoResendAllowed({ resendAt: 60_000, autoResent: true }, 61_000), false);
+});

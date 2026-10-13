@@ -40,7 +40,7 @@
 - **Motion:** 150–250 ms from the `--motion-*` tokens. Under reduced motion, screen changes and interest picks fade, with no movement.
 - **Feature switch:** `VITE_SIGNUP_METHODS` (comma list of `google`, `email`).
   - Welcome shows only the configured methods.
-  - Empty or unset shows "Signups open soon" plus Log in (the spec §1.5 fallback).
+  - Empty or unset shows "Signups open soon" plus Log in (the spec §1.5 fallback). This only hides the signup buttons; it does not close signup. To close it, also turn off Supabase Auth → "Allow new users to sign up" (the login Google button and direct API calls can otherwise still create accounts).
   - Stub e2e runs with `google,email`.
 - **Migrations:** 0001–0008 are frozen. The only new SQL is `0009`. The founder applies it in the SQL editor in the same window as the client deploy.
 - **DECISIONS** is append-only.
@@ -278,5 +278,5 @@
 ## Founder dependencies (unchanged from spec §1.5)
 
 - **Custom SMTP** in Supabase Auth: the "Magic Link"/OTP template must contain `{{ .Token }}` (6 digits), with Brivia branding and a raised rate limit. Without it, ship with `VITE_SIGNUP_METHODS=google`.
-- **Google OAuth** production configuration (Supabase and Google Cloud). Without either, keep `VITE_SIGNUP_METHODS` empty: public signup stays closed, and testers use test accounts.
+- **Google OAuth** production configuration (Supabase and Google Cloud). Without either, keep `VITE_SIGNUP_METHODS` empty and also turn off Supabase Auth → "Allow new users to sign up": the empty switch only hides the signup buttons, and the login Google button and direct API calls can otherwise still create accounts. Testers use test accounts.
 - **Apply `0009`** in the SQL editor when the client ships. The 14-day window makes the order safe in either direction.

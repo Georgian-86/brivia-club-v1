@@ -3,10 +3,12 @@
 const RATE_LIMITED = "We can't send the confirmation email right now: too many sign-ups at once. Your account was not created. Please try again in about an hour.";
 const ALREADY_REGISTERED = 'An account with this email already exists. Log in instead, or reset your password.';
 
+const isRateLimited = (error) => error?.code === 'over_email_send_rate_limit' || error?.status === 429 || /rate limit/i.test(String(error?.message || ''));
+
 export const signupErrorCopy = (error) => {
   const code = String(error?.code || '');
   const message = String(error?.message || '');
-  if (code === 'over_email_send_rate_limit' || error?.status === 429 || /rate limit/i.test(message)) return RATE_LIMITED;
+  if (isRateLimited(error)) return RATE_LIMITED;
   if (code === 'user_already_exists' || code === 'email_exists' || /already registered/i.test(message)) return ALREADY_REGISTERED;
   return message || 'Could not create your account. Please try again.';
 };
@@ -26,4 +28,20 @@ export const otpErrorKind = (error, msSinceSent = 0) => {
   if (!otpError || (!error?.status && !code)) return 'other';
   if (/expired/i.test(message) && !/invalid/i.test(message)) return 'expired';
   return Number(msSinceSent) >= OTP_TTL_MS ? 'expired' : 'wrong';
+};
+
+// Sending a code (Phase E Task 3 review). On the Code screen (Resend and the automatic resend) a 429 says what to do
+// next. On the Email screen it makes no claim about the account: signInWithOtp with shouldCreateUser may or may not
+// have created the user before the send failed.
+export const CODE_RATE_LIMITED = 'Too many codes requested. Wait a minute, then tap Resend.';
+export const EMAIL_RATE_LIMITED = "We can't send a code right now. Please try again in a few minutes.";
+export const codeSendErrorCopy = (error) => (isRateLimited(error) ? CODE_RATE_LIMITED : signupErrorCopy(error));
+export const emailSendErrorCopy = (error) => (isRateLimited(error) ? EMAIL_RATE_LIMITED : signupErrorCopy(error));
+
+// An expired code: a new one went out (sent), the send failed (error), or none was sent (inside the resend wait, or the
+// automatic resend already ran on this screen).
+export const expiredCodeCopy = ({ sent = false, error = null } = {}) => {
+  if (sent) return OTP_EXPIRED;
+  if (error) return `That code has expired. ${codeSendErrorCopy(error)}`;
+  return 'That code has expired. Tap Resend for a new one.';
 };

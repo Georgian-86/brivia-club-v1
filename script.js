@@ -12,6 +12,7 @@ import {
 import { matchTypedCity } from './area-pick.js';
 import { signupErrorCopy } from './signup-errors.js';
 import { signupMethods } from './signup-flow.js';
+import { fillGoogleMark } from './google-mark.js';
 import { initGuidedSignup, openGuidedSignup, showGuidedFromHistory, guidedScreen } from './signup-screens.js';
 import { defaultCoverUrl, normalizeCoverUrl } from './cover-assets.js';
 import { motionAllowed, introPlan, markLoaded, INTRO_CAP_MS, INTRO_START_GRACE_MS } from './landing-motion.js';
@@ -1792,6 +1793,8 @@ authModal?.querySelector('.auth-top-signup')?.addEventListener('click', () => {
 });
 authModal?.querySelector('.auth-create-trigger')?.addEventListener('click', () => { void openGuidedSignup(); });
 authModal?.querySelectorAll('.auth-google-trigger').forEach((button) => button.addEventListener('click', startGoogleAuth));
+// The login view's Google button shows the same four-colour mark as the guided Welcome (google-mark.js, one source).
+if (isStandaloneAuthPage) authModal?.querySelectorAll('.auth-google-mark').forEach(fillGoogleMark);
 authModal?.querySelector('.auth-back-trigger')?.addEventListener('click', async () => {
   if (profileCompletionUser && supabase) {
     await supabase.auth.signOut();

@@ -30,7 +30,7 @@
 .auth-google-trigger{display:flex;align-items:center;justify-content:center;gap:11px;width:100%;min-height:46px;padding:0 15px;border:1px solid #d8d0c6;border-radius:2px;background:#fff;color:#291d1b;font:700 var(--text-12) var(--font-body);letter-spacing:.067em;cursor:pointer;transition:border-color .2s,background .2s,transform .2s}
 .auth-google-trigger:hover{transform:translateY(-1px);border-color:#5a061f;background:#fbf7f2}
 .auth-google-trigger:disabled{cursor:wait;opacity:.65;transform:none}
-.auth-google-mark{font:700 var(--text-16) var(--font-body);background:conic-gradient(from -45deg,#4285f4 0 25%,#34a853 25% 50%,#fbbc05 50% 75%,#ea4335 75%);background-clip:text;color:transparent}
+.auth-google-mark{display:block;flex:none;width:24px;height:24px;line-height:0}.auth-google-mark svg{display:block;width:100%;height:100%}
 .auth-login .auth-divider{margin:21px 0 14px}
 .auth-login .auth-create-trigger{margin-top:13px}
 .auth-google-signup{margin:0 0 22px}
