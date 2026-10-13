@@ -1,6 +1,6 @@
 # Migrations: apply and deploy runbook
 
-The files here are applied **by hand in the Supabase SQL editor, as `postgres`, in order** (`0001` → `0006`). Each
+The files here are applied **by hand in the Supabase SQL editor, as `postgres`, in order** (`0001` → `0009`). Each
 file is idempotent: the local harness (`bash supabase/tests/run.sh`) applies every file twice. Verify locally with
 the harness before touching the live project. `supabase/legacy/` is archive only and is never applied.
 
@@ -324,3 +324,30 @@ If that matters, keep the tester row until you purge, or run the purge
 `brivia_tester`, so after a purge nobody is a tester. The tester's own account is never deleted.
 
 Incident response (suspected data breach, pausing the purge cron, notices): see `docs/BREACH_RUNBOOK.md`.
+
+## 0009: the notice version with a 14-day grace window (Phase E)
+
+Apply **only `0009_signup_minimisation.sql`**, as `postgres` in the SQL editor, **after 0008 is live**, in the same window
+as the Phase E client deploy. The file is idempotent and small; avoid the cron window 20:17-20:37 UTC.
+
+Pre-flight (read-only): `select public.brivia_notice_version();` must answer `2026-10-05` (0005 still current), and
+`select pg_get_functiondef('public.declare_adult(text)'::regprocedure);` must show the tombstone check
+(`rejoin_review`); 0009 starts from that definition.
+
+What it does: `brivia_notice_version()` becomes `2026-10-20` (the placeholder release date; change it together in 0009,
+`notice-version.js` and `privacy.html`). New `public.brivia_notice_accepted(p_version, p_at default now())` is true for
+the current version, and for `2026-10-05` until `2026-10-20 + 14 days` (2026-11-03 00:00), so a client still sending the
+old version keeps working through the deploy window. `declare_adult` refuses (`22023 stale notice version`) only when
+`not brivia_notice_accepted(...)`. The consent row stores what the client declared; server-written rows
+(`sensitive_give`, `sensitive_withdraw`, `account_deleted`) store the new version.
+
+Post-apply checks (read-only):
+
+```sql
+select public.brivia_notice_version();                                    -- 2026-10-20
+select public.brivia_notice_accepted('2026-10-05');                       -- t until 2026-11-03, f after
+select public.brivia_notice_accepted('1999-01-01');                       -- f
+select has_function_privilege('authenticated', 'public.brivia_notice_accepted(text, timestamptz)', 'execute'),
+       has_function_privilege('anon', 'public.brivia_notice_accepted(text, timestamptz)', 'execute');  -- t, f
+```
+
