@@ -3,7 +3,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   BUDGET, MAX_INTERESTS, MODES, emptyBudget, addInterest, removeInterest, stepPoints, setMode,
-  pointsLeft, isComplete, toPayload, counterText, budgetFromRows,
+  pointsLeft, isComplete, toPayload, counterText, budgetFromRows, evenSplit,
 } from '../../passion-budget.js';
 
 const node = (n) => ({ id: `d.c.i${n}`, label: `Interest ${n}` });
@@ -166,4 +166,27 @@ test('budgetFromRows trims the largest items until the total is at most 20', () 
   assert.equal(huge.items.reduce((sum, item) => sum + item.points, 0), 20);
   assert.ok(huge.items.every((item) => item.points >= 1));
   assert.equal(isComplete(huge), true);
+});
+
+test('evenSplit: largest remainder, each at least 1, ties to earlier picks', () => {
+  const items = (n) => Array.from({ length: n }, (_, i) => ({ id: `i${i}`, label: `L${i}` }));
+  const pts = (n) => evenSplit(items(n)).map((r) => r.points);
+  assert.deepEqual(pts(3), [7, 7, 6]);
+  assert.deepEqual(pts(1), [20]);
+  assert.deepEqual(pts(12), [2, 2, 2, 2, 2, 2, 2, 2, 1, 1, 1, 1]);
+  assert.deepEqual(pts(7), [3, 3, 3, 3, 3, 3, 2]);
+  for (let n = 1; n <= 12; n += 1) assert.equal(pts(n).reduce((a, b) => a + b, 0), 20);
+  assert.throws(() => evenSplit([]));
+  assert.throws(() => evenSplit(items(13)));
+});
+
+test('evenSplit output matches toPayload shape and defaults the mode', () => {
+  const out = evenSplit([{ id: 'a', label: 'A' }, { id: 'b', label: 'B', mode: 'teach' }, { id: 'c', mode: 'bogus' }]);
+  assert.deepEqual(out, [
+    { interest_id: 'a', points: 7, mode: 'play' },
+    { interest_id: 'b', points: 7, mode: 'teach' },
+    { interest_id: 'c', points: 6, mode: 'play' },
+  ]);
+  const state = { items: [{ id: 'a', label: 'A', points: 7, mode: 'play' }] };
+  assert.deepEqual(Object.keys(toPayload(state)[0]), Object.keys(out[0]));
 });

@@ -88,3 +88,13 @@ export const budgetFromRows = (rows) => {
   }
   return { items };
 };
+
+// Even split for the guided signup: shares `budget` points across the picks by largest remainder. Every pick gets at
+// least 1 and the earlier picks take the remainder. Output matches toPayload(). Throws on 0 or more than 12 picks.
+export const evenSplit = (items, budget = BUDGET) => {
+  const list = Array.isArray(items) ? items : [];
+  if (list.length < 1 || list.length > MAX_INTERESTS) throw new Error(`evenSplit needs 1 to ${MAX_INTERESTS} interests`);
+  const share = Math.floor(budget / list.length);
+  const extra = budget % list.length;
+  return list.map((item, index) => ({ interest_id: item.id, points: share + (index < extra ? 1 : 0), mode: validMode(item.mode) }));
+};
