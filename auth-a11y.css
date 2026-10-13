@@ -123,3 +123,6 @@ body.auth-page .auth-shell .auth-panel .auth-success .auth-secondary:focus-visib
 body.auth-page .auth-shell .auth-panel .credential-row code,
 body.auth-page .auth-shell .auth-panel .credential-row button { color: var(--a11y-wine); font-size: 12px; }
 body.auth-page .auth-shell .auth-panel .credential-row > span { color: var(--a11y-ink-soft); font-size: 12px; }
+/* Phase C Task 3 (pre-review): after a session-less signup script.js sets `hidden` on the form, but
+   `.auth-form{display:flex}` (auth-modal.css) beat the UA [hidden] rule, so the form stayed above "Check your email.". */
+body.auth-page .auth-shell .auth-signup-form[hidden] { display: none; }

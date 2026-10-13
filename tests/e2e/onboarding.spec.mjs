@@ -1654,6 +1654,44 @@ try {
     check('focus order 375: no uncaught page errors', () => assert.deepEqual(errors, []));
     await context.close();
   }
+  // 16. Phase C Task 3 (pre-review): after a session-less signup only "Check your email." is left: the form is hidden
+  //     (its `hidden` attribute used to lose to `.auth-form{display:flex}`) and the panel sits in the first viewport.
+  for (const w of [375, 1440]) {
+    const context = await browser.newContext({ viewport: { width: w, height: w === 375 ? 812 : 900 } });
+    const stub = await stubContext(context, { signupSession: false });
+    const { page, errors } = await newPage(context, stub.consoleLines);
+    await openSignup(page);
+    await fillStepOne(page);
+    await page.locator('[data-area-city]').click();
+    await pickCityByKeyboard(page, 'Pun');
+    await page.locator('[data-signup-step="2"] .signup-next').click();
+    await page.waitForSelector('#interest-results [data-interest-group]', { state: 'attached' });
+    await page.locator('#interest-search').fill('Chess');
+    await clickInterest(page, 'Chess');
+    await page.locator('[data-budget-spread]').click();
+    await page.locator('.looking-search').click();
+    await page.locator('#looking-results [data-looking-option]').first().click();
+    await page.locator('[data-signup-step="3"] .signup-next').click();
+    await page.waitForSelector('[data-signup-step="4"]:not([hidden])');
+    await finishStepFour(page);
+    await page.waitForSelector('#auth-success:not([hidden])', { timeout: 10000 });
+    await page.waitForTimeout(400);
+    const seen = await page.evaluate(() => {
+      const form = document.querySelector('#signup-form');
+      const r = (sel) => { const b = document.querySelector(sel).getBoundingClientRect(); return { top: Math.round(b.top), bottom: Math.round(b.bottom) }; };
+      return {
+        formHidden: form.hasAttribute('hidden'), formRendered: form.getClientRects().length > 0, formDisplay: getComputedStyle(form).display,
+        title: r('#auth-success [data-auth-success-title]'), back: r('#auth-success .auth-close-success'), vh: window.innerHeight,
+      };
+    });
+    check(`after a session-less signup the form is hidden and the success panel is in the first viewport at ${w} (${JSON.stringify(seen)})`, () => {
+      assert.equal(seen.formHidden, true);
+      assert.equal(seen.formRendered, false, `form still rendered (display ${seen.formDisplay})`);
+      for (const box of [seen.title, seen.back]) assert.ok(box.top >= 0 && box.bottom <= seen.vh, `outside the viewport: ${JSON.stringify(box)}`);
+    });
+    check(`success ${w}: no uncaught page errors`, () => assert.deepEqual(errors, []));
+    await context.close();
+  }
 } catch (error) {
   results.push(['FAIL', `harness: ${error.stack || error.message}`]);
 } finally {

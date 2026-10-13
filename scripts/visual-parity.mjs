@@ -92,14 +92,13 @@ const PAGES = {
       await ready(page);
       await imagesReady(page);
       await shot('signup-step1');
-      // Each later state: the panel at its top (or at `anchor`), then with the step's Back / Next actions in view.
+      // Each later state: the panel at its top (or left where the page put it), then with the step's actions in view.
       const panelTop = () => page.evaluate(() => document.querySelector('.auth-panel')?.scrollTo({ top: 0, behavior: 'instant' }));
-      const state = async (label, actions, anchor) => {
+      const state = async (label, actions, { keepScroll = false } = {}) => {
         await page.evaluate(() => document.activeElement?.blur());
         await ready(page);
         await imagesReady(page);
-        await panelTop();
-        if (anchor) await page.locator(anchor).evaluate((el) => el.scrollIntoView({ block: 'start', behavior: 'instant' }));
+        if (!keepScroll) await panelTop();
         await settle(page);
         await shot(label);
         if (!actions) return;
@@ -142,8 +141,8 @@ const PAGES = {
       await state('signup-step4', '[data-signup-step="4"] .signup-step-actions');
       await step(4).locator('[type="submit"]').click();
       await page.waitForSelector('#auth-success:not([hidden])', { timeout: 15000 });
-      // The success panel sits below the (still visible) form at HEAD 8968f37: shoot it in view.
-      await state('signup-success', null, '#auth-success');
+      // The first viewport right after the submit, exactly as the member sees it (no scrolling by the guard).
+      await state('signup-success', null, { keepScroll: true });
     },
   },
 };
