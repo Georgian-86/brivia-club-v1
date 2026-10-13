@@ -15,6 +15,8 @@
 // * type (Phase C Task 4): on Connect, Explore, Chat (list and an open conversation), Profile, the notification panel
 //   and the discovery-filter drawer, every visible text node (and ::before/::after text) is >= 12 px and set in
 //   Bodoni Moda or Instrument Sans; visible h1/h2 use Bodoni Moda; a Bodoni Moda 500 italic face is loaded.
+// * nothing clipped: the chat badge inside its nav item and the viewport, the deck card's VIEW PROFILE inside the card,
+//   the chat compose placeholder inside its field (375 px and 1440 px).
 // APP_SHOTS=<dir> only saves full-page screenshots of home, posts, chat and profile at 375 px and 1440 px, then exits
 // (the Phase C before/after review), and runs no checks.
 import { mkdirSync } from 'node:fs';
@@ -33,6 +35,13 @@ const WIDE = { width: 1440, height: 900 };
 const VIEWS = ['home', 'posts', 'chat', 'profile'];
 // The nav item that is current for a rendered [data-view] section: the deck section is the Connect tab.
 const NAV_FOR_VIEW = { home: 'explore', posts: 'posts', chat: 'chat', profile: 'profile' };
+// Dialogs and menus opened by clicking these selectors in order (Phase C Task 4 pre-review).
+const DIALOGS = [
+  ['profile-edit', 'profile', ['#profile-photo-editor']],
+  ['settings-menu', 'profile', ['#profile-settings-button']],
+  ['report-dialog', 'explore', ['#card-more', '#card-more-menu [data-card-action="report"]']],
+  ['post-composer', 'posts', ['#open-community-post']],
+];
 
 const results = [];
 const check = (name, fn) => { try { fn(); results.push(['PASS', name]); } catch (error) { results.push(['FAIL', `${name}: ${error.message}`]); } };
@@ -61,7 +70,16 @@ try {
         await context.close();
       }
     }
-    console.log(`saved ${VIEWS.length * 2} screenshots to ${SHOTS}`);
+    // The dialogs and menus whose text grew in Phase C Task 4, at 375 px: profile edit, the profile settings menu, the
+    // report dialog (deck card overflow) and the post composer.
+    for (const [name, view, steps] of DIALOGS) {
+      const { context, page } = await open(NARROW, `/app.html?view=${view}`);
+      await page.waitForTimeout(1500);
+      for (const sel of steps) { await page.locator(sel).first().click({ timeout: 5000 }); await page.waitForTimeout(500); }
+      await page.screenshot({ path: path.join(SHOTS, `app-${name}-375.png`) });
+      await context.close();
+    }
+    console.log(`saved ${VIEWS.length * 2 + DIALOGS.length} screenshots to ${SHOTS}`);
   } else {
     // Which member navs are visible, and which section is shown.
     const navState = (page) => page.evaluate(() => {
@@ -264,6 +282,25 @@ try {
       const go = async (view) => { await page.evaluate((v) => document.querySelector(`[data-nav-host]:not([hidden]) [data-nav="${v}"], [data-nav-host] [data-nav="${v}"]`)?.click(), view); await settle(page); };
       await go('explore');
       await audit('Connect deck');
+      // 10a. (before the notification panel marks the bell read) the badges sit inside their controls and the viewport.
+      await page.waitForFunction(() => [...document.querySelectorAll('[data-chat-badge]')].some((b) => !b.hidden), null, { timeout: 8000 }).catch(() => {});
+      const badge = await page.evaluate(() => {
+        const r = (e) => { const b = e.getBoundingClientRect(); return { l: b.left, t: b.top, r: b.right, b: b.bottom }; };
+        const inside = (a, o) => a.l >= o.l - 0.5 && a.t >= o.t - 0.5 && a.r <= o.r + 0.5 && a.b <= o.b + 0.5;
+        const vp = { l: 0, t: 0, r: document.documentElement.clientWidth, b: window.innerHeight };
+        const shown = [...document.querySelectorAll('[data-chat-badge]')].filter((b) => !b.hidden && b.getClientRects().length && b.getBoundingClientRect().width);
+        const bell = document.querySelector('#notification-badge');
+        return {
+          chat: shown.map((b) => ({ host: b.closest('[data-nav-host]').dataset.navHost, inItem: inside(r(b), r(b.closest('[data-nav]'))), inViewport: inside(r(b), vp), box: r(b) })),
+          bell: bell && !bell.hidden && bell.getClientRects().length ? { inViewport: inside(r(bell), vp), box: r(bell) } : null,
+        };
+      });
+      check(`${tag}: the chat badge's box is fully inside its nav item and the viewport, the bell badge inside the viewport (${JSON.stringify(badge)})`, () => {
+        assert.equal(badge.chat.length, 1);
+        badge.chat.forEach((b) => { assert.ok(b.inItem, `${b.host} badge outside its nav item`); assert.ok(b.inViewport, `${b.host} badge outside the viewport`); });
+        assert.ok(badge.bell, 'the unread notification badge is shown');
+        assert.ok(badge.bell.inViewport, 'notification badge outside the viewport');
+      });
       await page.locator('#open-discovery-filters').click();
       await settle(page);
       await audit('discovery-filter drawer');
@@ -283,11 +320,42 @@ try {
       await audit('Chat conversation');
       await go('profile');
       await audit('Profile');
+      // The ⚙ menu's five 44 px items are all on screen and on top (the hero used to clip the first one).
+      await page.locator('#profile-settings-button').click();
+      await settle(page);
+      await audit('profile settings menu');
+      const menuHits = await page.evaluate(() => [...document.querySelectorAll('#profile-settings-menu button')].map((b) => {
+        const r = b.getBoundingClientRect(); const hit = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
+        return { item: b.textContent.trim(), onTop: b.contains(hit), height: Math.round(r.height) };
+      }));
+      check(`${tag}: every profile settings menu item is visible and on top, >= 44 px (${JSON.stringify(menuHits)})`, () => {
+        assert.equal(menuHits.length, 5);
+        menuHits.forEach((m) => { assert.ok(m.onTop, `${m.item} is covered`); assert.ok(m.height >= 44, `${m.item} is ${m.height}px`); });
+      });
+      await page.locator('#profile-settings-button').click();
       const italic = await page.evaluate(async () => {
         await document.fonts.load('italic 500 20px "Bodoni Moda"');
         return [...document.fonts].filter((f) => f.family.replace(/["']/g, '') === 'Bodoni Moda' && f.style === 'italic').map((f) => `${f.weight} ${f.status}`);
       });
       check(`${tag}: a Bodoni Moda 500 italic face is declared and loaded (${JSON.stringify(italic)})`, () => assert.ok(italic.includes('500 loaded')));
+      // 10. Nothing clipped (Phase C Task 4 pre-review): the chat badge, the deck card's VIEW PROFILE, the compose placeholder.
+      await go('explore');
+      await page.evaluate(() => window.scrollTo(0, 0));
+      const card = await page.evaluate(() => {
+        const c = document.querySelector('#swipe-card').getBoundingClientRect();
+        const b = document.querySelector('#swipe-card .view-info-button').getBoundingClientRect();
+        return { cardBottom: Math.round(c.bottom), buttonBottom: Math.round(b.bottom), cardRight: Math.round(c.right), buttonRight: Math.round(b.right) };
+      });
+      check(`${tag}: the deck card's VIEW PROFILE is not cut off by the card (${JSON.stringify(card)})`, () => { assert.ok(card.buttonBottom <= card.cardBottom, 'button below the card edge'); assert.ok(card.buttonRight <= card.cardRight); });
+      await go('chat');
+      await page.locator('#chat-list [data-chat-id]').first().click({ timeout: 5000 }).catch(() => {});
+      await settle(page);
+      const ph = await page.evaluate(() => {
+        const i = document.querySelector('.chat-compose input'); const s = getComputedStyle(i); const ps = getComputedStyle(i, '::placeholder');
+        const ctx = document.createElement('canvas').getContext('2d'); ctx.font = `${ps.fontStyle} ${ps.fontWeight} ${ps.fontSize} ${ps.fontFamily}`;
+        return { text: Math.ceil(ctx.measureText(i.placeholder).width), room: Math.floor(i.clientWidth - parseFloat(s.paddingLeft) - parseFloat(s.paddingRight)), size: ps.fontSize };
+      });
+      check(`${tag}: the chat compose placeholder fits its field (${JSON.stringify(ph)})`, () => { assert.ok(ph.text <= ph.room); assert.ok(parseFloat(ph.size) >= 12); });
       await context.close();
     }
     delete st.posts; delete st.messages;

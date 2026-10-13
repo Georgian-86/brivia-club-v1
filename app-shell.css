@@ -180,3 +180,13 @@ body.app-body .app-view[data-view="profile"] .profile-board-content{overflow:vis
    browser's default bold no longer get a synthetic bold. */
 body.app-body :where(h1, h2, h3){font-family:var(--font-heading);font-weight:500}
 :where(body.app-body) :where(button, input, select, textarea){font-family:inherit}
+/* The deck card's info panel grows with its content (12 px chips can wrap to a second row) instead of a fixed share of
+   the card, so VIEW PROFILE is never cut off by the card's overflow (Phase C Task 4). It is anchored to the bottom, so
+   extra height overlaps the photo, not the card edge. */
+body.app-body .app-view[data-view="home"] .swipe-card-info{height:auto;min-height:calc(51% - 53px)}
+/* Phones: the compose field keeps 16 px input text (no iOS focus zoom) but its placeholder is 12 px with tighter
+   padding, so "Write a thoughtful message..." fits at 375 px; narrower phones end it with an ellipsis, not a clip. */
+@media (max-width:700px){
+  body.app-body .chat-compose input{padding-right:var(--space-3);padding-left:var(--space-3);text-overflow:ellipsis}
+  body.app-body .chat-compose input::placeholder{font-size:var(--text-12)}
+}

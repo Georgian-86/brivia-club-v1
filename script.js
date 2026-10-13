@@ -2055,7 +2055,7 @@ signupForm?.addEventListener('submit', async (event) => {
     if (signupFeedback) signupFeedback.textContent = '';
     signupSuccess?.removeAttribute('hidden');
     authModal?.querySelector('.auth-back-trigger')?.setAttribute('hidden', '');
-    signupSuccess?.querySelector('button')?.focus();
+    showSignupSuccessTop(successTitle);
   } catch (error) {
     const message = error instanceof OnboardingStepError ? (error.message || 'Could not create your account. Please try again.') : signupErrorCopy(error);
     if (signupFeedback) signupFeedback.textContent = message;
@@ -2067,6 +2067,21 @@ signupForm?.addEventListener('submit', async (event) => {
     if (submit) { submit.disabled = false; submit.removeAttribute('aria-busy'); }
   }
 });
+
+// The success panel replaces a long step 4, so whatever scrolled (the auth panel, the shell, the page) still holds
+// step 4's offset and "Check your email." can start above the viewport. Jump every scrolling ancestor to the top at
+// once (also cancelling a step change's smooth scroll still running), then focus the title so screen readers
+// announce it (Phase C Task 4 pre-review fix).
+function showSignupSuccessTop(title) {
+  for (let el = signupSuccess?.parentElement; el; el = el.parentElement) {
+    if (el.scrollTop) el.scrollTo({ top: 0, behavior: 'instant' });
+  }
+  window.scrollTo({ top: 0, behavior: 'instant' });
+  if (title) {
+    title.setAttribute('tabindex', '-1');
+    title.focus({ preventScroll: false });
+  }
+}
 
 if (document.body.classList.contains('auth-page')) void restoreAuthPageSession();
 

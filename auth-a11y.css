@@ -130,3 +130,5 @@ body.auth-page .auth-shell .auth-signup-form[hidden] { display: none; }
 /* One type system (Phase C Task 4): form controls take the page's Instrument Sans instead of the browser's default
    face. Zero specificity, so any rule that sets a family on a control still wins. */
 :where(body.auth-page) :where(button, input, select, textarea) { font-family: inherit; }
+/* The success title takes focus (tabindex="-1") only so screen readers announce it; it is not a control. */
+body.auth-page .auth-success [data-auth-success-title]:focus { outline: none; }

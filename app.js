@@ -1540,6 +1540,7 @@ const ensureProfilePhotoEditor = () => {
   settings.setAttribute('aria-label', 'Profile settings');
   settings.setAttribute('aria-expanded', 'false');
   settings.innerHTML = '<span aria-hidden="true">⚙</span>';
+  document.querySelector('#profile-settings-menu')?.remove(); // a menu lifted to <body> by an earlier render
   const menu = document.createElement('div');
   menu.id = 'profile-settings-menu';
   menu.className = 'profile-settings-menu';
@@ -1548,12 +1549,31 @@ const ensureProfilePhotoEditor = () => {
   actions.prepend(settings);
   actions.append(menu);
   const close = () => { menu.hidden = true; settings.setAttribute('aria-expanded', 'false'); };
+  // The hero clips its overflow and the five 44 px items are taller than the room above the ⚙ button, so the menu is
+  // placed in the viewport instead: above the button when it fits under the header, otherwise below it, never under the
+  // tab bar (Phase C Task 4). It closes on scroll, since a fixed menu would drift away from its button.
+  const place = () => {
+    const r = settings.getBoundingClientRect();
+    // Lifted to <body>: inside the hero it would sit in the hero's stacking context, under the profile dashboard.
+    if (menu.parentElement !== document.body) document.body.append(menu);
+    const height = menu.offsetHeight;
+    const headerBottom = document.querySelector('.app-topbar')?.getBoundingClientRect().bottom || 0;
+    const tabbar = document.querySelector('.app-tabbar');
+    const floor = tabbar && tabbar.getClientRects().length ? tabbar.getBoundingClientRect().top : window.innerHeight;
+    let top = r.top - height - 10;
+    if (top < headerBottom + 8) top = Math.max(headerBottom + 8, Math.min(r.bottom + 10, floor - height - 8));
+    // Right edge on the button's right edge, kept inside the page (clientWidth leaves out a scrollbar).
+    const width = document.documentElement.clientWidth;
+    const left = Math.min(Math.max(8, r.right - menu.offsetWidth), width - menu.offsetWidth - 8);
+    Object.assign(menu.style, { position: 'fixed', zIndex: '60', top: `${Math.round(top)}px`, bottom: 'auto', right: 'auto', left: `${Math.round(Math.max(8, left))}px` });
+  };
   settings.addEventListener('click', (event) => {
     event.stopPropagation();
     const shouldOpen = menu.hidden;
     close();
-    if (shouldOpen) { menu.hidden = false; settings.setAttribute('aria-expanded', 'true'); }
+    if (shouldOpen) { menu.hidden = false; settings.setAttribute('aria-expanded', 'true'); place(); }
   });
+  window.addEventListener('scroll', () => { if (!menu.hidden) close(); }, { passive: true });
   menu.querySelector('[data-profile-setting="block"]')?.addEventListener('click', () => { close(); openBlockedUsersManager(); });
   menu.querySelector('[data-profile-setting="notifications"]')?.addEventListener('click', () => { close(); openNotificationSettings(); });
   menu.querySelector('[data-profile-setting="removed"]')?.addEventListener('click', () => { close(); openRemovedConnectionsManager(); });

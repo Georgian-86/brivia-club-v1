@@ -1684,12 +1684,15 @@ try {
       return {
         formHidden: form.hasAttribute('hidden'), formRendered: form.getClientRects().length > 0, formDisplay: getComputedStyle(form).display,
         title: r('#auth-success [data-auth-success-title]'), back: r('#auth-success .auth-close-success'), vh: window.innerHeight,
+        titleFocused: document.activeElement?.hasAttribute('data-auth-success-title') === true,
       };
     });
     check(`after a session-less signup the form is hidden and the success panel is in the first viewport at ${w} (${JSON.stringify(seen)})`, () => {
       assert.equal(seen.formHidden, true);
       assert.equal(seen.formRendered, false, `form still rendered (display ${seen.formDisplay})`);
       for (const box of [seen.title, seen.back]) assert.ok(box.top >= 0 && box.bottom <= seen.vh, `outside the viewport: ${JSON.stringify(box)}`);
+      // Phase C Task 4 pre-review: the title takes focus so screen readers announce "Check your email."
+      assert.equal(seen.titleFocused, true, 'the success title is not focused');
     });
     check(`success ${w}: no uncaught page errors`, () => assert.deepEqual(errors, []));
     await context.close();
