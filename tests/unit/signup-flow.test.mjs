@@ -35,7 +35,7 @@ test('resumeScreen: first undone question', () => {
   assert.equal(resumeScreen({ session: s, status: { ...full, interests: 0, points: 0 }, path: 'email' }), 'interests');
   assert.equal(resumeScreen({ session: s, status: { ...full, points: 12 }, path: 'google' }), 'interests');
   assert.equal(resumeScreen({ session: s, status: { ...full, interests: 13 }, path: 'google' }), 'interests');
-  assert.equal(resumeScreen({ session: s, status: full, path: 'google' }), 'reveal');
+  assert.equal(resumeScreen({ session: s, status: full, path: 'google' }), 'done');
 });
 test('resumeScreen: missing status counts as nothing done', () => {
   assert.equal(resumeScreen({ session: {}, status: null, path: 'email' }), 'adult');
@@ -43,6 +43,8 @@ test('resumeScreen: missing status counts as nothing done', () => {
 
 test('backTarget', () => {
   assert.equal(backTarget('email', 'welcome', false), null);
+  assert.equal(backTarget('email', 'reveal', false), null);
+  assert.equal(backTarget('google', 'reveal', true), null);
   assert.equal(backTarget('email', 'email', false), 'welcome');
   assert.equal(backTarget('email', 'code', false), 'email');
   assert.equal(backTarget('email', 'adult', false), 'code');

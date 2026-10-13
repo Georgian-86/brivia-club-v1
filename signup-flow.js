@@ -23,14 +23,14 @@ export const resumeScreen = ({ session, status } = {}) => {
   if (!s.has_cell) return 'area';
   const count = Number(s.interests) || 0;
   if (!(count >= 1 && count <= 12 && Number(s.points) === 20)) return 'interests';
-  return 'reveal';
+  return 'done';
 };
 
-// The screen Back goes to. Null on Welcome. Once a session exists Back never lands on Email or Code.
+// The screen Back goes to. Null on Welcome and Reveal (interests are already saved). Once a session exists Back never lands on Email or Code.
 export const backTarget = (path, screen, hasSession) => {
   const list = SCREENS[path] || [];
   const at = list.indexOf(screen);
-  if (at <= 0) return null;
+  if (at <= 0 || screen === 'reveal') return null;
   const target = list[at - 1];
   return hasSession && (target === 'email' || target === 'code') ? 'welcome' : target;
 };
