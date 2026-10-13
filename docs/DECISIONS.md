@@ -1037,3 +1037,14 @@ success panel alignment at 1440 px (Phase E rebuilds signup); the header avatar 
 scrollbar at 375 px in desktop Chromium.
 
 **Next:** Phase D, the test world (spec §3: migration 0008, seed v2, the why panel).
+
+**D-055 addendum (2026-10-13, final review of Phase C):** the <= 780 px tab bar is hidden whenever something takes the
+phone: any overlay or modal dialog (the pitch sheet, the discovery-filter drawer, a public profile, the profile editor,
+the notification / blocked / removed / privacy dialogs, the chat camera, any `dialog[open]`), the "Profile under review"
+notice, and an open chat thread (the messaging-app pattern; the chat list keeps the bar, and the thread's Back returns to
+it). Reason: the fixed bar (z-index 90) sat above the z-50 pitch sheet and took the tap meant for SEND PITCH. One CSS
+`:has()` rule in `app-shell.css`, so a new overlay class must be added to that list. Also in this wave: the ⚙ menu ignores
+a focus loss to nowhere (Safari and macOS Firefox do not focus a clicked button), a refill that throws ends in Try again,
+app form fields are 16 px on phones (no iOS focus zoom), re-tapping Profile keeps the loaded interests, page scrolling (a
+view change, `html{scroll-behavior}`) is instant under reduced motion, and `app.html` (only) has `viewport-fit=cover` so the bar's
+safe-area padding works on notched iPhones.

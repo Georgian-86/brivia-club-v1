@@ -62,6 +62,14 @@ within 300 ms, the card replacing it with CLS < 0.1, no skeleton left after a 50
 and posts skeletons), an action in every empty state (deck caught up, inbox, posts, notifications), reduced motion
 (0s nav transitions, no shimmer) and a busy post button; `APP_SHOTS` also saves the loading states, the deck error and the
 empty posts and notifications at 375 px and 1440 px.
+The Phase C final review added `{ body }` to `state.routes` (answer 200 with that JSON as is) and checks, at 375x667 and
+390x844, that the tab bar is hidden and every control is on top while each overlay or dialog is open (filter drawer, public
+profile, report, profile editor, notification / blocked / removed / privacy dialogs, pitch sheet), that a tap at SEND
+PITCH's centre sends exactly one `rpc/send_signal`, that the under-review notice and an open chat thread (375 px) show no
+tab bar, that the ⚙ menu survives a blur to nowhere and a click on "Signed in as", that a refill that throws ends in Try
+again, that every visible text field is >= 16 px at 375 px (also each signup step in `onboarding.spec.mjs`), and that
+re-tapping Profile reads `my_interests` no more. `APP_SHELL_FINAL_ONLY=1` runs only those checks. `APP_SHOTS` also saves
+the pitch sheet (375, 1440), an open chat thread and the under-review notice (375).
 
 ```bash
 PLAYWRIGHT_MODULE=/tmp/pw/node_modules/playwright/index.mjs node tests/e2e/app-shell.spec.mjs

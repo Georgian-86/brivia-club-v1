@@ -11,6 +11,11 @@ Update this file at the end of every session. CLAUDE.md holds the aim; this file
 - One member nav (`app-nav.js`: header at desktop, tab bar at <= 780 px; Connect · Explore · Chat · Profile), one set of
   tokens (`tokens.css`), one type system (Bodoni Moda headings, Instrument Sans body, 12 px floor), a calm profile
   column, and skeletons, busy buttons and an action in every empty state (`app-skeletons.js`).
+- Final review fixes (D-055 addendum): the tab bar hides over overlays, dialogs, the review notice and an open chat
+  thread; the ⚙ menu survives a focus loss to nowhere; a refill that throws ends in Try again; 16 px app fields on phones;
+  no my_interests re-read on a Profile re-tap. `APP_SHELL_FINAL_ONLY=1` runs only those app-shell checks.
+  Known, not fixed: between 701 and 780 px the header bell sits behind the avatar and the chat panel's right edge is
+  clipped (seen in review screenshots; also on 03d1062).
 - Landing CSS split (`landing-entry.js`, `auth-entry.js`): Lighthouse mobile 0.89 -> 0.93 (median of 3), LCP 2.6 s, CLS 0.
 - Style ratchet: `npm run check:styles` (per-file hex and font-family counts may only fall; after a cleanup,
   `node scripts/check-style-ratchet.mjs --write` lowers the baseline and refuses if anything rose).
@@ -25,7 +30,7 @@ Update this file at the end of every session. CLAUDE.md holds the aim; this file
   `.superpowers/sdd/2026-10-12-phase-c-consistency/app-after/`).
 - Founder backlog surfaced (not Phase C) is listed at the end of D-055.
 
-**Experience iteration, Phases A and B (2026-10-12): done on `claude/jolly-edison-49xvza` and about to go to `main`** (the founder OKs the fast-forward). See D-053 and D-054.
+**Experience iteration, Phases A and B (2026-10-12): done and on `main`.** See D-053 and D-054.
 - Media pipeline: `npm run media:build` (sharp + ffmpeg write `media/`), `npm run media:repoint` (rewrites references from `media/manifest.json`), `npm run check:assets` (budget on `dist/assets`: image <= 400 KB, video <= 5 MB). Originals stay in `Images/` and `assets/`.
 - Landing e2e: `PLAYWRIGHT_MODULE=/tmp/pw/node_modules/playwright/index.mjs CHROMIUM_PATH=/opt/pw-browsers/chromium node tests/e2e/landing.spec.mjs` (builds, serves `vite preview` on :5196; checks poster-first, intro cap, reduced motion, transfer, CLS, LCP, fonts, skeleton).
 - Lighthouse: `CHROME_PATH=/opt/pw-browsers/chromium npx lighthouse@12 http://127.0.0.1:4173/ --preset=perf --form-factor=mobile --chrome-flags="--headless --no-sandbox"`. Last result 0.86 to 0.89, LCP 2.8 s (target 90 / 2.5 s); next step is splitting the auth CSS off the landing critical path.
