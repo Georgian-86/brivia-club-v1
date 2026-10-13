@@ -483,7 +483,8 @@ saturated, the outer rings relax first, instead of the deck repeating saturated 
   completed, different members, same world and no block in either direction. A member's world is
   `brivia_in_test_world(member)`: `is_test`, or a row in the owner-only tester list `brivia_tester` (0008, a real
   account moved into the test world without becoming `is_test`); every function that compares two members' worlds
-  compares that, never `is_test` directly. `get_candidates`,
+  compares that, never `is_test` directly. Requests, matches and messages between a tester and a member of the other
+  world are hidden from both while that holds (`brivia_pair_world_ok`). `get_candidates`,
   `search_members`, `list_members` and `brivia_can_see_author` are built on it (signatures, caps, ordering and
   escaping unchanged), and every later candidate RPC (the interim deck, ORBIT's `orbit_cards`) must use it too.
   `brivia_member_completed` and `brivia_visible_to` are internal: no client role may execute them. The same holds for

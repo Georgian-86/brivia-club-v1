@@ -14,6 +14,9 @@
 --     pg_policies mentioning is_test); no policy reads is_test directly. Not redefined: brivia_guard_is_test (it keeps
 --     is_test owner-only) and brivia_cell_ok (it reads a cell_density row for the world it is given; deck_candidates
 --     now passes the caller's world).
+--   * Section 3: requests, matches and messages between a tester and a member of the other world (rows made before
+--     the switch, or with test members after it ends) are hidden from both sides while that holds
+--     (brivia_pair_world_ok). Pairs without a tester behave exactly as before.
 --   * cell_density keeps its column name is_test, but refresh_cell_density fills it from brivia_in_test_world, so a
 --     tester is counted in the test world's density while a tester.
 -- Semantics are unchanged for everyone who is not a tester. A tester sees only the test world and is seen only by it.
@@ -492,3 +495,179 @@ end;
 $$;
 revoke all on function public.report_member(uuid, text, text) from public, anon;
 grant execute on function public.report_member(uuid, text, text) to authenticated;
+
+
+-- =============================================================================================
+-- 3. Requests, matches and messages with a tester across worlds
+-- =============================================================================================
+-- A tester's world is not fixed: requests, matches and messages made before the switch (or with test members, after
+-- it ends) can sit across worlds. While a tester sits across worlds from the other member, neither side can read the
+-- pair's match, messages or pending requests, accept or decline the request, or learn of the match through
+-- send_signal. Everything reappears unchanged when both are in one world again (rows with test members go at the
+-- purge). Pairs without a tester keep their exact 0001-0006 behaviour, including a legacy cross-world match between
+-- a real and a test member (trust.test.sql I6).
+
+-- brivia_pair_world_ok(a, b): false only when a or b is a tester and they are in different worlds. Internal.
+create or replace function public.brivia_pair_world_ok(p_a uuid, p_b uuid)
+returns boolean
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select public.brivia_in_test_world(p_a) = public.brivia_in_test_world(p_b)
+      or not exists (select 1 from public.brivia_tester t where t.member_id in (p_a, p_b))
+$$;
+revoke all on function public.brivia_pair_world_ok(uuid, uuid) from public, anon, authenticated;
+
+-- brivia_private.brivia_pair_world_ok(p_user1, p_user2): the policy wrapper, pinned to the caller (it answers only when
+-- the caller is one of the two members), in the non-exposed schema like the other wrappers (M-1).
+create or replace function brivia_private.brivia_pair_world_ok(p_user1 uuid, p_user2 uuid)
+returns boolean
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select coalesce(auth.uid() in (p_user1, p_user2) and public.brivia_pair_world_ok(p_user1, p_user2), false);
+$$;
+revoke all on function brivia_private.brivia_pair_world_ok(uuid, uuid) from public, anon;
+grant execute on function brivia_private.brivia_pair_world_ok(uuid, uuid) to authenticated;
+
+-- The two select policies, copied from 0006_perf_policies.sql:77 and :88 plus the rule. Delete (0006:82) is unchanged:
+-- a DELETE with a WHERE clause also needs the row to pass the select policy.
+drop policy if exists "Completed members can view their matches" on public.matches;
+create policy "Completed members can view their matches"
+  on public.matches for select to authenticated
+  using ((select public.brivia_has_completed_profile()) and (select auth.uid()) in (user1_id, user2_id)
+         and brivia_private.brivia_pair_world_ok(user1_id, user2_id));
+
+drop policy if exists "Completed members can view their messages" on public.brivia_messages;
+create policy "Completed members can view their messages"
+  on public.brivia_messages for select to authenticated
+  using ((select public.brivia_has_completed_profile()) and (select auth.uid()) in (sender_id, recipient_id)
+         and brivia_private.brivia_pair_world_ok(sender_id, recipient_id));
+
+-- brivia_incoming_request_visible (the incoming-request select policy, 0006_perf_policies.sql:66): copied from
+-- 0004_orbit_onboarding.sql:1284; only the rule is added.
+create or replace function brivia_private.brivia_incoming_request_visible(p_from uuid)
+returns boolean
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select exists (select 1 from public.connection_requests r where r.from_id = p_from and r.to_id = auth.uid())
+     and public.brivia_member_completed(p_from)
+     and not public.brivia_pair_is_blocked(p_from, auth.uid())
+     and public.brivia_pair_world_ok(p_from, auth.uid());
+$$;
+revoke all on function brivia_private.brivia_incoming_request_visible(uuid) from public, anon;
+grant execute on function brivia_private.brivia_incoming_request_visible(uuid) to authenticated;
+
+-- respond_connection_request: copied from 0004_orbit_onboarding.sql:1399; only the rule is added (no_data_found, like a
+-- request that does not exist, for accept and decline alike).
+create or replace function public.respond_connection_request(p_from uuid, p_accept boolean)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  me uuid := auth.uid();
+begin
+  if me is null or p_from is null or p_accept is null then
+    raise exception 'no pending connection request' using errcode = 'no_data_found';
+  end if;
+  if not public.brivia_member_completed(me) then
+    raise exception 'complete your profile' using errcode = '22023';
+  end if;
+  perform public.brivia_lock_pair(p_from, me);
+  -- A request from a sender who is no longer completed is hidden by the select policy below, so it answers like
+  -- one that does not exist (the like-back path, send_signal, writes nothing to such a member either).
+  if not exists (
+    select 1 from public.connection_requests
+    where from_id = p_from and to_id = me and status = 'pending'
+      and public.brivia_request_is_live(status, created_at)
+  ) or not public.brivia_member_completed(p_from)
+    or not public.brivia_pair_world_ok(p_from, me) then   -- 0008: a tester across worlds answers like a request that does not exist
+    raise exception 'no pending connection request' using errcode = 'no_data_found';
+  end if;
+  if not p_accept or public.brivia_pair_is_blocked(p_from, me) then
+    update public.connection_requests set status = 'declined' where from_id = p_from and to_id = me;
+    return;
+  end if;
+  update public.connection_requests set status = 'accepted'
+   where (from_id = p_from and to_id = me) or (from_id = me and to_id = p_from and status = 'pending');
+  perform public.brivia_create_match(p_from, me);
+end;
+$$;
+revoke all on function public.respond_connection_request(uuid, boolean) from public, anon;
+grant execute on function public.respond_connection_request(uuid, boolean) to authenticated;
+
+-- send_signal: copied from 0004_orbit_onboarding.sql:1100; only the 'matched' check gains the rule (and its comment).
+create or replace function public.send_signal(p_to uuid, p_note text default null)
+returns table(status text, remaining int, resets_at timestamptz)
+language plpgsql
+volatile
+security definer
+set search_path = public
+as $$
+declare
+  me uuid := auth.uid();
+  s record;
+  v_status text := 'sent';
+begin
+  -- 1. Caller checks (the caller's own state and input: honest, not charged).
+  if me is null or not public.brivia_member_completed(me) then
+    raise exception 'complete your profile' using errcode = '22023';
+  end if;
+  if p_to is null or p_to = me then
+    raise exception 'invalid signal' using errcode = '22023';
+  end if;
+  if char_length(p_note) > 500 then
+    raise exception 'note too long' using errcode = '22001';
+  end if;
+  -- 2. One send per sender at a time (parallel sends cannot overshoot the caps), then the pair lock, so a
+  --    concurrent reverse request is seen by the completion check below.
+  perform pg_advisory_xact_lock(hashtextextended('brivia_request_caps:' || me::text, 0));
+  perform public.brivia_lock_pair(me, p_to);
+  -- 3. Quota.
+  select * into s from public.brivia_signal_state(me);
+  if s.used >= s.daily_limit or s.live_unanswered >= s.live_limit then
+    if not (public.brivia_visible_to(me, p_to)
+            and exists (select 1 from public.connection_requests r
+                         where r.from_id = p_to and r.to_id = me and r.status in ('pending', 'declined')
+                           and public.brivia_request_is_live(r.status, r.created_at))) then
+      if s.used >= s.daily_limit then
+        raise exception 'signal_quota_exhausted' using errcode = 'PT429';
+      end if;
+      raise exception 'signal_live_cap' using errcode = 'PT429';
+    end if;
+  end if;
+  -- 4. Charge, before anything about the recipient is looked at.
+  insert into public.signal_ledger (sender_id, to_id) values (me, p_to);
+  -- 5. Recipient side: every outcome below answers the same way. Only a visible target gets a request row, so a
+  --    NEW match can only come from this branch (the completion trigger).
+  if public.brivia_visible_to(me, p_to) then
+    begin
+      insert into public.connection_requests (from_id, to_id, note) values (me, p_to, p_note);
+    exception when unique_violation or foreign_key_violation then
+      null;  -- a live earlier request (pending or declined) or a recipient that just vanished: still 'sent'
+    end;
+  end if;
+  -- 'matched' reflects a match row the sender can already read, whatever the partner's state now (blocked, other
+  -- world, no longer completed). Checking it only on the visible path would leak a block or a completion change.
+  -- 0008: a match with a tester across worlds is not readable (the matches select policy), so it answers 'sent'.
+  if exists (select 1 from public.matches m
+              where (m.user1_id = me and m.user2_id = p_to) or (m.user1_id = p_to and m.user2_id = me))
+     and public.brivia_pair_world_ok(me, p_to) then
+    v_status := 'matched';
+  end if;
+  -- 6. No interaction row. 7. The post-charge quota.
+  select * into s from public.brivia_signal_state(me);
+  return query select v_status, greatest(s.daily_limit - s.used, 0), s.resets_at;
+end;
+$$;
+revoke all on function public.send_signal(uuid, text) from public, anon;
+grant execute on function public.send_signal(uuid, text) to authenticated;

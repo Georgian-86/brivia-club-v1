@@ -126,6 +126,65 @@ begin
   return ok;
 end $$;
 
+-- pending requests addressed to the viewer that the viewer can read (the client's request and notification list)
+create or replace function pg_temp.incoming(p_viewer uuid) returns uuid[] language plpgsql as $$
+declare r uuid[];
+begin
+  set local role authenticated;
+  perform set_config('request.jwt.claims', json_build_object('sub', p_viewer)::text, true);
+  select coalesce(array_agg(c.from_id order by c.from_id), '{}') into r from public.connection_requests c
+   where c.status = 'pending';
+  reset role;
+  return r;
+end $$;
+
+-- the policy helper behind that list, evaluated as the viewer
+create or replace function pg_temp.req_visible(p_viewer uuid, p_from uuid) returns boolean language plpgsql as $$
+declare r boolean;
+begin
+  set local role authenticated;
+  perform set_config('request.jwt.claims', json_build_object('sub', p_viewer)::text, true);
+  r := brivia_private.brivia_incoming_request_visible(p_from);
+  reset role;
+  return r;
+end $$;
+
+-- respond_connection_request as the viewer: 'ok' or the SQLSTATE
+create or replace function pg_temp.respond(p_viewer uuid, p_from uuid, p_accept boolean) returns text language plpgsql as $$
+declare r text := 'ok';
+begin
+  set local role authenticated;
+  perform set_config('request.jwt.claims', json_build_object('sub', p_viewer)::text, true);
+  begin
+    perform public.respond_connection_request(p_from, p_accept);
+  exception when others then r := sqlstate;
+  end;
+  reset role;
+  return r;
+end $$;
+
+-- can the viewer read a match row with p_other (the client's match and chat list)?
+create or replace function pg_temp.sees_match(p_viewer uuid, p_other uuid) returns boolean language plpgsql as $$
+declare r boolean;
+begin
+  set local role authenticated;
+  perform set_config('request.jwt.claims', json_build_object('sub', p_viewer)::text, true);
+  r := exists (select 1 from public.matches m where p_other in (m.user1_id, m.user2_id));
+  reset role;
+  return r;
+end $$;
+
+-- messages between the viewer and p_other that the viewer can read
+create or replace function pg_temp.msg_count(p_viewer uuid, p_other uuid) returns int language plpgsql as $$
+declare r int;
+begin
+  set local role authenticated;
+  perform set_config('request.jwt.claims', json_build_object('sub', p_viewer)::text, true);
+  select count(*) into r from public.brivia_messages m where p_other in (m.sender_id, m.recipient_id);
+  reset role;
+  return r;
+end $$;
+
 create or replace function pg_temp.ids(variadic n int[]) returns uuid[] language sql immutable as $$
   select coalesce(array_agg(pg_temp.tw(x) order by pg_temp.tw(x)), '{}') from unnest(n) u(x) $$;
 
@@ -167,6 +226,19 @@ begin
     if has_function_privilege(r, 'public.brivia_in_test_world(uuid)', 'execute') then
       raise exception 'FAIL: % can execute brivia_in_test_world', r; end if;
   end loop;
+  -- the pair rule: internal in public; its caller-pinned policy wrapper in brivia_private (authenticated only)
+  foreach r in array array['public', 'anon', 'authenticated'] loop
+    if has_function_privilege(r, 'public.brivia_pair_world_ok(uuid, uuid)', 'execute') then
+      raise exception 'FAIL: % can execute public.brivia_pair_world_ok', r; end if;
+  end loop;
+  if has_function_privilege('anon', 'brivia_private.brivia_pair_world_ok(uuid, uuid)', 'execute')
+     or has_function_privilege('public', 'brivia_private.brivia_pair_world_ok(uuid, uuid)', 'execute')
+     or not has_function_privilege('authenticated', 'brivia_private.brivia_pair_world_ok(uuid, uuid)', 'execute') then
+    raise exception 'FAIL: brivia_private.brivia_pair_world_ok grants'; end if;
+  if not (select bool_and(prosecdef and proconfig @> array['search_path=public']) from pg_proc
+           where oid in ('public.brivia_pair_world_ok(uuid, uuid)'::regprocedure,
+                         'brivia_private.brivia_pair_world_ok(uuid, uuid)'::regprocedure)) then
+    raise exception 'FAIL: brivia_pair_world_ok must be security definer with search_path=public'; end if;
 end $$;
 
 -- 2. Before the switch: two separate worlds.
@@ -239,15 +311,56 @@ begin
   st := pg_temp.signal(r2, r1);
   if exists (select 1 from public.connection_requests where from_id = r2 and to_id = r1) then
     raise exception 'FAIL: real R2 wrote a request to tester R1'; end if;
-  -- a match and a request made before the switch (owner writes): no messages either way, and R1's outgoing
-  -- list hides the request to the other world
+  -- A match and messages from before the switch (owner writes): no new messages either way, and while R1 is a
+  -- tester neither side can read the match or the old messages.
   perform public.brivia_create_match(r1, r2);
+  insert into public.brivia_messages (sender_id, recipient_id, body) values (r1, r2, 'before the switch');
   if pg_temp.can_send(r1, r2) then raise exception 'FAIL: tester R1 can message real R2'; end if;
   if pg_temp.can_send(r2, r1) then raise exception 'FAIL: real R2 can message tester R1'; end if;
+  if pg_temp.sees_match(r2, r1) or pg_temp.sees_match(r1, r2) then
+    raise exception 'FAIL: a real-world match is readable while R1 is a tester'; end if;
+  if pg_temp.msg_count(r2, r1) <> 0 or pg_temp.msg_count(r1, r2) <> 0 then
+    raise exception 'FAIL: real-world messages are readable while R1 is a tester'; end if;
+  -- send_signal answers like for any unreadable pair: 'sent', never 'matched'
+  st := pg_temp.signal(r2, r1);
+  if st <> 'sent' then raise exception 'FAIL: R2 -> tester R1 with a hidden match answered %', st; end if;
   -- (deleting a match also deletes the pair's requests, 0002 brivia_on_match_deleted: the request comes after)
   delete from public.matches where r1 in (user1_id, user2_id) and r2 in (user1_id, user2_id);
+  -- A pending request R1 -> R2 from before the switch: R1's outgoing list hides it, R2 does not see it (list and
+  -- visibility helper) and cannot accept it.
   insert into public.connection_requests (from_id, to_id, note) values (r1, r2, 'from before the switch');
   if r2 = any(pg_temp.outgoing(r1)) then raise exception 'FAIL: R1 outgoing shows real R2 while a tester'; end if;
+  if r1 = any(pg_temp.incoming(r2)) then raise exception 'FAIL: R2 sees tester R1''s pending request'; end if;
+  if pg_temp.req_visible(r2, r1) then raise exception 'FAIL: brivia_incoming_request_visible shows R1 to R2'; end if;
+  st := pg_temp.respond(r2, r1, true);
+  if st <> 'P0002' then raise exception 'FAIL: R2 accepting tester R1''s request answered %', st; end if;
+  if exists (select 1 from public.matches where r1 in (user1_id, user2_id) and r2 in (user1_id, user2_id))
+     or (select status from public.connection_requests where from_id = r1 and to_id = r2) <> 'pending' then
+    raise exception 'FAIL: R2 accepted a request across worlds'; end if;
+  st := pg_temp.respond(r2, r1, false);
+  if st <> 'P0002' or (select status from public.connection_requests where from_id = r1 and to_id = r2) <> 'pending' then
+    raise exception 'FAIL: R2 declined a request across worlds (%)', st; end if;
+end $$;
+
+-- 5b. The other direction: a pending request R2 -> R1 from before the switch is invisible to tester R1 too.
+do $$
+declare r1 uuid := pg_temp.tw(3); r2 uuid := pg_temp.tw(4); st text;
+begin
+  delete from public.connection_requests where from_id = r1 and to_id = r2;   -- else the insert below matches them
+  insert into public.connection_requests (from_id, to_id, note) values (r2, r1, 'also from before the switch');
+  if r2 = any(pg_temp.incoming(r1)) then raise exception 'FAIL: tester R1 sees R2''s pending request'; end if;
+  if pg_temp.req_visible(r1, r2) then raise exception 'FAIL: brivia_incoming_request_visible shows R2 to tester R1'; end if;
+  st := pg_temp.respond(r1, r2, true);
+  if st <> 'P0002' then raise exception 'FAIL: tester R1 accepting R2''s request answered %', st; end if;
+  if exists (select 1 from public.matches where r1 in (user1_id, user2_id) and r2 in (user1_id, user2_id)) then
+    raise exception 'FAIL: tester R1 accepted a request across worlds'; end if;
+  if r1 = any(pg_temp.outgoing(r2)) then raise exception 'FAIL: R2 outgoing shows tester R1'; end if;
+  -- Pairs without a tester keep their 0001-0006 behaviour: a legacy match between real R2 and test member T2 stays
+  -- readable to both (trust.test.sql I6 covers its 'matched' signal answer).
+  perform public.brivia_create_match(r2, pg_temp.tw(2));
+  if not pg_temp.sees_match(r2, pg_temp.tw(2)) or not pg_temp.sees_match(pg_temp.tw(2), r2) then
+    raise exception 'FAIL: a legacy cross-world match without a tester became unreadable'; end if;
+  delete from public.matches where r2 in (user1_id, user2_id) and pg_temp.tw(2) in (user1_id, user2_id);
 end $$;
 
 -- 6. Cell density counts R1 in the test world while a tester, and in the real world after.
@@ -277,7 +390,9 @@ begin
   if pg_temp.search_ids(r2) <> pg_temp.ids(3) then raise exception 'FAIL restore: R2 search %', pg_temp.search_ids(r2); end if;
   if pg_temp.cand_ids(r2) <> pg_temp.ids(3) then raise exception 'FAIL restore: R2 candidates %', pg_temp.cand_ids(r2); end if;
   if pg_temp.cand_ids(pg_temp.tw(1)) <> pg_temp.ids(2) then raise exception 'FAIL restore: T1 candidates %', pg_temp.cand_ids(pg_temp.tw(1)); end if;
-  if not (r2 = any(pg_temp.outgoing(r1))) then raise exception 'FAIL restore: R1 outgoing lost the request to R2'; end if;
+  if not (r1 = any(pg_temp.outgoing(r2))) then raise exception 'FAIL restore: R2 outgoing lost the request to R1'; end if;
+  if pg_temp.msg_count(r2, r1) <> 1 or pg_temp.msg_count(r1, r2) <> 1 then
+    raise exception 'FAIL restore: the real-world message is not readable again'; end if;
   if pg_temp.can_send(r1, pg_temp.tw(1)) then raise exception 'FAIL restore: R1 can still message test member T1'; end if;
   select home_cell into v_cell from public.member_orbit where member_id = r1;
   perform public.refresh_cell_density(current_date + 1);
@@ -285,6 +400,12 @@ begin
      or (select n from public.cell_density where cell_density.cell = v_cell and not is_test) is distinct from 2 then
     raise exception 'FAIL density: R1 not back in the real world: %', (select json_agg(d) from public.cell_density d where d.cell = v_cell);
   end if;
+  -- the pending request R2 -> R1 is visible and acceptable again (it is not expired), and the match forms
+  if not (r2 = any(pg_temp.incoming(r1))) or not pg_temp.req_visible(r1, r2) then
+    raise exception 'FAIL restore: R1 does not see R2''s pending request again'; end if;
+  if pg_temp.respond(r1, r2, true) <> 'ok' then raise exception 'FAIL restore: R1 cannot accept R2''s request'; end if;
+  if not pg_temp.sees_match(r1, r2) or not pg_temp.sees_match(r2, r1) then
+    raise exception 'FAIL restore: the accepted match is not readable by both'; end if;
 end $$;
 delete from public.cell_density;
 
@@ -332,6 +453,22 @@ begin
   select string_agg(schemaname || '.' || tablename || '.' || policyname, ', ') into bad
     from pg_policies where coalesce(qual, '') || coalesce(with_check, '') ~ 'is_test';
   if bad is not null then raise exception 'FAIL guard: a policy reads is_test: %', bad; end if;
+  -- Pair paths: every client-executable definer function (public or brivia_private) that reads requests, matches or
+  -- messages applies a world rule, and so does every select or insert policy on those tables.
+  select string_agg(n.nspname || '.' || p.proname, ', ' order by p.proname) into bad
+    from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+   where n.nspname in ('public', 'brivia_private') and p.prosecdef
+     and has_function_privilege('authenticated', p.oid, 'execute')
+     and p.prosrc ~ '\m(connection_requests|matches|brivia_messages)\M'
+     and p.prosrc !~ '(brivia_in_test_world|brivia_same_world|brivia_visible_to|brivia_pair_world_ok)\(';
+  if bad is not null then raise exception 'FAIL guard: pair paths without a world rule: %', bad; end if;
+  select string_agg(tablename || '.' || policyname, ', ') into bad
+    from pg_policies
+   where schemaname = 'public' and tablename in ('connection_requests', 'matches', 'brivia_messages')
+     and cmd in ('SELECT', 'INSERT')
+     and coalesce(qual, '') || coalesce(with_check, '')
+         !~ '(brivia_incoming_request_visible|brivia_pair_world_ok|brivia_can_message)\(';
+  if bad is not null then raise exception 'FAIL guard: pair policies without a world rule: %', bad; end if;
 end $$;
 
 -- 10. The purge deletes the test members and R1's test match and messages, empties brivia_tester, and keeps R1's
@@ -342,8 +479,8 @@ begin
      or exists (select 1 from auth.users where id::text like 'a7e57000-0000-4000-8000-%') then
     raise exception 'FAIL setup: another suite left test members behind; the purge would remove them';
   end if;
-  if not exists (select 1 from public.brivia_messages where pg_temp.tw(3) in (sender_id, recipient_id))
-     or not exists (select 1 from public.matches where pg_temp.tw(3) in (user1_id, user2_id)) then
+  if not exists (select 1 from public.brivia_messages where pg_temp.tw(3) in (sender_id, recipient_id) and pg_temp.tw(1) in (sender_id, recipient_id))
+     or not exists (select 1 from public.matches where pg_temp.tw(3) in (user1_id, user2_id) and pg_temp.tw(1) in (user1_id, user2_id)) then
     raise exception 'FAIL setup: R1 has no test match or messages to purge';
   end if;
 end $$;
@@ -356,8 +493,13 @@ begin
   if exists (select 1 from public.profiles where id in (pg_temp.tw(1), pg_temp.tw(2)))
      or exists (select 1 from auth.users where id in (pg_temp.tw(1), pg_temp.tw(2))) then
     raise exception 'FAIL purge: test members remain'; end if;
-  if exists (select 1 from public.matches where r1 in (user1_id, user2_id)) then raise exception 'FAIL purge: R1 test match remains'; end if;
-  if exists (select 1 from public.brivia_messages where r1 in (sender_id, recipient_id)) then raise exception 'FAIL purge: R1 test messages remain'; end if;
+  if exists (select 1 from public.matches where r1 in (user1_id, user2_id) and pg_temp.tw(4) not in (user1_id, user2_id)) then
+    raise exception 'FAIL purge: R1 test match remains'; end if;
+  if exists (select 1 from public.brivia_messages where r1 in (sender_id, recipient_id) and pg_temp.tw(4) not in (sender_id, recipient_id)) then
+    raise exception 'FAIL purge: R1 test messages remain'; end if;
+  if not exists (select 1 from public.matches where r1 in (user1_id, user2_id) and pg_temp.tw(4) in (user1_id, user2_id))
+     or not exists (select 1 from public.brivia_messages where sender_id = r1 and recipient_id = pg_temp.tw(4)) then
+    raise exception 'FAIL purge: R1''s real match or message with R2 was deleted'; end if;
   if exists (select 1 from public.connection_requests where from_id in (pg_temp.tw(1), pg_temp.tw(2)) or to_id in (pg_temp.tw(1), pg_temp.tw(2))) then
     raise exception 'FAIL purge: test requests remain'; end if;
   if exists (select 1 from public.brivia_tester) then raise exception 'FAIL purge: brivia_tester not emptied'; end if;

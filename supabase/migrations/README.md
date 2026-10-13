@@ -240,7 +240,9 @@ test members) **without becoming `is_test`**, so the purge never deletes it. `pu
 `is_test` or a `brivia_tester` row, and every function that compared two members' `is_test` (`brivia_same_world`,
 `brivia_visible_to`, `get_candidates`, `search_members`, `list_members`, `deck_candidates`, `deck_status`,
 `my_outgoing_requests`, `report_member`, `brivia_private.brivia_can_message`, and the world key of
-`refresh_cell_density`) now compares that instead. Nothing changes for anyone who is not a tester. A tester sees only
+`refresh_cell_density`) now compares that instead. Requests, matches and messages between a tester and a member of the
+other world are hidden from both sides while that holds (`brivia_pair_world_ok`: the match and message select
+policies, `brivia_incoming_request_visible`, `respond_connection_request`, and `send_signal`'s `matched` answer). Nothing changes for anyone who is not a tester. A tester sees only
 test members and is seen only by them; no real member sees a tester's account while it is a tester.
 
 ### Post-apply checks (read-only)
@@ -251,7 +253,8 @@ select relrowsecurity from pg_class where oid = 'public.brivia_tester'::regclass
 select has_table_privilege('authenticated', 'public.brivia_tester', 'select'),
        has_table_privilege('anon', 'public.brivia_tester', 'select'),
        has_function_privilege('authenticated', 'public.brivia_in_test_world(uuid)', 'execute'),
-       has_function_privilege('anon', 'public.brivia_in_test_world(uuid)', 'execute');      -- f, f, f, f
+       has_function_privilege('anon', 'public.brivia_in_test_world(uuid)', 'execute'),
+       has_function_privilege('authenticated', 'public.brivia_pair_world_ok(uuid, uuid)', 'execute');  -- f, f, f, f, f
 -- No function compares is_test between two members any more. Expect exactly 4 rows:
 -- brivia_cell_ok, brivia_guard_is_test, brivia_in_test_world, refresh_cell_density.
 select p.proname from pg_proc p join pg_namespace n on n.oid = p.pronamespace
@@ -259,8 +262,9 @@ select p.proname from pg_proc p join pg_namespace n on n.oid = p.pronamespace
 ```
 
 If a row other than those four appears, or a privilege query answers `t`, stop and report it. In the security advisor,
-`brivia_in_test_world` must not appear as executable by `authenticated` or `anon` (it is revoked; it runs only inside
-the definer functions above).
+`brivia_in_test_world` and `public.brivia_pair_world_ok` must not appear as executable by `authenticated` or `anon`
+(they are revoked; they run only inside the definer functions above). The new policy wrapper
+`brivia_private.brivia_pair_world_ok` is in the non-exposed schema, like the other wrappers (the same intended case).
 
 ### Become a tester (the founder's account)
 
@@ -275,12 +279,8 @@ the next nightly `refresh_cell_density()` run (01:47 IST); until then the tester
 of `~3 km` (safe). A manual `select public.refresh_cell_density();` does nothing if that night's run has already
 happened (it keeps one count per day).
 
-Before switching, note that requests and matches with **real** members made before the switch stay as rows: while a
-tester, the account cannot message those matches or request real members, and its own outgoing list hides them, but
-a real member who already has a pending request from the account still sees that request (without a profile card).
-Check with
-`select count(*) from public.connection_requests r join auth.users u on u.id in (r.from_id, r.to_id) where u.email = '<founder email>';`
-and clear anything you do not want to keep first.
+The account's real-world requests, matches and messages are kept but hidden from both sides while it is a tester:
+neither side sees them or can accept, decline or message, and they reappear unchanged when it stops being a tester.
 
 ### Stop being a tester
 
@@ -288,8 +288,8 @@ and clear anything you do not want to keep first.
 delete from public.brivia_tester where member_id = (select id from auth.users where email = '<founder email>');
 ```
 
-The account is back in the real world at once (its interests, area and real matches are untouched). Its matches and
-messages with test members stay until the purge (or remove the match in the app). The purge
+The account is back in the real world at once: its interests, area and real-world requests, matches and messages are
+visible again, unchanged. Its matches and messages with test members are hidden from then on and go at the purge. The purge
 (`supabase/seed/purge-test-members.sql`) also empties `brivia_tester`, so after a purge nobody is a tester; the
 tester's own account is never deleted.
 
