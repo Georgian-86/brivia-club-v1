@@ -1,7 +1,7 @@
 // Phase E guided signup: flow model. Run: node --test tests/unit
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { SCREENS, stepLabel, resumeScreen, backTarget, parseOtp } from '../../signup-flow.js';
+import { SCREENS, stepLabel, resumeScreen, backTarget, parseOtp, signupMethods } from '../../signup-flow.js';
 
 test('screen order per path', () => {
   assert.deepEqual(SCREENS.email, ['welcome', 'email', 'code', 'adult', 'name', 'area', 'interests', 'reveal']);
@@ -67,4 +67,25 @@ test('parseOtp', () => {
   assert.equal(parseOtp('1234567'), null);
   assert.equal(parseOtp(''), null);
   assert.equal(parseOtp(null), null);
+});
+
+// Phase E Task 3: a code written with one internal space or dash inside a sentence (an SMS or email preview).
+test('parseOtp finds a spaced or dashed code inside a sentence, never a 7-digit run', () => {
+  assert.equal(parseOtp('Your code is 123 456.'), '123456');
+  assert.equal(parseOtp('Your Brivia code: 123-456 (valid 1 hour)'), '123456');
+  assert.equal(parseOtp('Your code is 1234567.'), null);
+  assert.equal(parseOtp('Your code is 123 4567.'), null);
+  assert.equal(parseOtp('Your code is 1234 567.'), null);
+  assert.equal(parseOtp('Call 12 34 56 now'), null);
+  assert.equal(parseOtp('On 2026-10-13 your code is 654 321.'), '654321');
+});
+
+// Phase E Task 3: VITE_SIGNUP_METHODS, a comma list of google and email; anything else is dropped.
+test('signupMethods reads the feature switch', () => {
+  assert.deepEqual(signupMethods('google,email'), ['google', 'email']);
+  assert.deepEqual(signupMethods(' Email , google ,email'), ['email', 'google']);
+  assert.deepEqual(signupMethods('google'), ['google']);
+  assert.deepEqual(signupMethods(''), []);
+  assert.deepEqual(signupMethods(undefined), []);
+  assert.deepEqual(signupMethods('phone,apple'), []);
 });

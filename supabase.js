@@ -272,6 +272,16 @@ const rpcCall = async (name, args) => {
   const { data, error, status } = await supabase.rpc(name, args);
   return { data, error, status };
 };
+// Phase E guided signup: a 6-digit email code instead of a password. signInWithOtp creates the account on first use
+// (shouldCreateUser); verifyOtp returns the session. Both answer { data, error } like supabase-js.
+export const sendEmailCode = async (email) => {
+  if (!supabase) return notConfigured();
+  return supabase.auth.signInWithOtp({ email, options: { shouldCreateUser: true } });
+};
+export const verifyEmailCode = async (email, token) => {
+  if (!supabase) return notConfigured();
+  return supabase.auth.verifyOtp({ email, token, type: 'email' });
+};
 // A PostgREST error raised with SQLSTATE PT429 (for example 'try again later': the 3-per-24-h location cap).
 export const isRateLimited = (error, status = 0) => status === 429 || error?.code === 'PT429';
 

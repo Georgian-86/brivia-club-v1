@@ -48,6 +48,8 @@
   --motion-base: 200ms;
   --motion-slow: 250ms;
   --ease: cubic-bezier(.2, .7, .2, 1);
+  /* An opacity-only fade (Phase E): stays on under reduced motion, which allows fades but no movement. */
+  --motion-fade: 200ms;
 }
 
 @media (prefers-reduced-motion: reduce) {

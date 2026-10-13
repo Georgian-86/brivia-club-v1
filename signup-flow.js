@@ -35,11 +35,25 @@ export const backTarget = (path, screen, hasSession) => {
   return hasSession && (target === 'email' || target === 'code') ? 'welcome' : target;
 };
 
-// Exactly six digits after stripping spaces and dashes; or the first 6-digit run inside a longer text.
+// Exactly six digits after stripping spaces and dashes; or, inside a longer text, the first run of exactly six digits
+// written with at most one internal space or dash ("Your code is 123 456."). A longer run (7+ digits) never counts.
 export const parseOtp = (text) => {
   const raw = String(text ?? '');
   const stripped = raw.replace(/[\s-]/g, '');
   if (/^\d{6}$/.test(stripped)) return stripped;
-  const run = raw.match(/(?<!\d)\d{6}(?!\d)/);
-  return run ? run[0] : null;
+  for (const [run] of raw.matchAll(/\d+(?:[ -]\d+)*/g)) {
+    const digits = run.replace(/[ -]/g, '');
+    if (digits.length === 6 && run.length - digits.length <= 1) return digits;
+  }
+  return null;
+};
+
+// VITE_SIGNUP_METHODS: a comma list of 'google' and 'email' (order kept, duplicates and unknown names dropped). Empty or
+// unset means public signup is closed (Welcome shows "Signups open soon" and Log in).
+export const signupMethods = (raw) => {
+  const out = [];
+  for (const name of String(raw ?? '').split(',').map((s) => s.trim().toLowerCase())) {
+    if ((name === 'google' || name === 'email') && !out.includes(name)) out.push(name);
+  }
+  return out;
 };

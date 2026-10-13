@@ -17,6 +17,13 @@ export const otpBoxesAfterInput = (boxes, index, value) => {
     next[at] = '';
     return { boxes: next, focus: at };
   }
+  // Typing over a filled box: an IME can ignore maxlength and hand over the old digit with the new one ("17" over
+  // "1"). The new digit replaces the old one.
+  if (text.length === 2 && next[at] !== '' && /^\d\d$/.test(text) && text.includes(next[at])) {
+    const fresh = text[0] === next[at] ? text[1] : text[0];
+    next[at] = fresh;
+    return { boxes: next, focus: Math.min(at + 1, LENGTH - 1) };
+  }
   if (text.length === 1) {
     if (!/^\d$/.test(text)) return { boxes: next, focus: at };
     next[at] = text;

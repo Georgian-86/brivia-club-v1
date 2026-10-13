@@ -249,8 +249,10 @@ const a11yStep = async (page, tag) => {
   // Phase C Task 4: one type system, Bodoni Moda headings and Instrument Sans for the rest.
   check(`${tag}: visible text is Bodoni Moda or Instrument Sans (${[...new Set(family)].join(' | ')})`, () => assert.deepEqual(family, []));
 };
+// Phase E: #signup now opens the guided flow; the old 4-step form stays reachable on the dev server with
+// ?legacy-signup=1 until Phase E Task 5 retires it (and these checks).
 const openSignup = async (page) => {
-  await page.goto(`${BASE}/auth.html#signup`, { waitUntil: 'domcontentloaded' });
+  await page.goto(`${BASE}/auth.html?legacy-signup=1#signup`, { waitUntil: 'domcontentloaded' });
   await page.waitForSelector('[data-signup-step="1"]:not([hidden])', { timeout: 15000 });
   await page.waitForTimeout(300);
 };

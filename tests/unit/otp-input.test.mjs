@@ -34,3 +34,11 @@ test('never mutates its input', () => {
   otpBoxesAfterInput(b, 2, '5'); otpBoxesAfterInput(b, 1, ''); otpBoxesAfterInput(b, 0, '123456'); otpBoxesAfterInput(b, 2, '');
   assert.equal(JSON.stringify(b), frozen);
 });
+// Phase E Task 3: typing over a filled box replaces its digit. The caller passes only the new character, but an IME
+// (Android) can ignore maxlength and hand over the old and the new digit together; either way the new digit wins.
+test('typing over a filled box replaces it with the new digit', () => {
+  assert.deepEqual(otpBoxesAfterInput(['1', '2', '', '', '', ''], 0, '7'), { boxes: ['7', '2', '', '', '', ''], focus: 1 });
+  assert.deepEqual(otpBoxesAfterInput(['1', '2', '', '', '', ''], 0, '17'), { boxes: ['7', '2', '', '', '', ''], focus: 1 });
+  assert.deepEqual(otpBoxesAfterInput(['1', '2', '', '', '', ''], 0, '71'), { boxes: ['7', '2', '', '', '', ''], focus: 1 });
+  assert.deepEqual(otpBoxesAfterInput(['1', '2', '3', '4', '5', '6'], 5, '69'), { boxes: ['1', '2', '3', '4', '5', '9'], focus: 5 });
+});

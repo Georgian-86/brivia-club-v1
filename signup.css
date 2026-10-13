@@ -1,0 +1,301 @@
+/* Phase E guided signup (signup-screens.js, #guided-signup in auth.html): one question per screen. Tokens only
+   (tokens.css): deep wine on cream, Bodoni Moda headings, Instrument Sans for everything else. Desktop (>= 781 px): a
+   single-question card, at most 560 px wide, beside the auth image panel. Phone: a full-height card whose primary
+   button is pinned above the on-screen keyboard (--gs-keyboard, set from visualViewport by signup-screens.js). */
+
+/* The guided flow brings its own header (Back, step label, progress), so the panel's top row steps aside. */
+body.auth-page .auth-shell.is-guided .auth-panel-top { display: none; }
+
+body.auth-page .auth-shell #guided-signup {
+  --gs-keyboard: 0px;
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 560px;
+  min-height: 100%;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: var(--space-5);
+  color: var(--color-ink);
+  font-family: var(--font-body);
+  text-align: left;
+}
+body.auth-page .auth-shell #guided-signup[hidden] { display: none; }
+body.auth-page .auth-shell #guided-signup *,
+body.auth-page .auth-shell #guided-signup *::before,
+body.auth-page .auth-shell #guided-signup *::after { box-sizing: border-box; }
+
+/* Header: Back on the left, "Step n of N" on the right, the wine progress bar under them. Welcome shows neither. */
+body.auth-page .auth-shell #guided-signup .gs-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+  min-height: 44px;
+  margin-bottom: calc(-1 * var(--space-3));
+}
+body.auth-page .auth-shell #guided-signup[data-screen="welcome"] .gs-head,
+body.auth-page .auth-shell #guided-signup[data-screen="welcome"] .gs-progress { display: none; }
+body.auth-page .auth-shell #guided-signup .gs-back {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 44px;
+  min-height: 44px;
+  margin: 0 0 0 calc(-1 * var(--space-2));
+  padding: 0 var(--space-3) 0 var(--space-2);
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: none;
+  color: var(--color-wine);
+  font: 600 var(--text-14)/1 var(--font-body);
+  letter-spacing: .02em;
+  text-transform: none;
+  cursor: pointer;
+}
+body.auth-page .auth-shell #guided-signup .gs-back[hidden] { display: none; }
+body.auth-page .auth-shell #guided-signup .gs-back:hover { color: var(--color-wine-deep); }
+body.auth-page .auth-shell #guided-signup .gs-step {
+  margin: 0 0 0 auto;
+  color: var(--color-wine);
+  font: 600 var(--text-12)/1.2 var(--font-body);
+  letter-spacing: .14em;
+  text-transform: uppercase;
+}
+body.auth-page .auth-shell #guided-signup .gs-progress {
+  height: 4px;
+  overflow: hidden;
+  border-radius: var(--radius-pill);
+  background: var(--color-line);
+}
+body.auth-page .auth-shell #guided-signup .gs-progress span {
+  display: block;
+  width: 0;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--color-wine);
+  transition: width var(--motion-slow) var(--ease);
+}
+
+/* The screen: the outgoing one fades and slides 8 px while the incoming one fades in (200 ms). Under reduced motion
+   only the opacity changes (--motion-fade stays on; transforms are dropped). */
+body.auth-page .auth-shell #guided-signup .gs-host { position: relative; }
+body.auth-page .auth-shell #guided-signup .gs-screen-inner {
+  transition: opacity var(--motion-fade) var(--ease), transform var(--motion-base) var(--ease);
+}
+body.auth-page .auth-shell #guided-signup .gs-screen-inner.is-entering { opacity: 0; transform: translateX(8px); }
+body.auth-page .auth-shell #guided-signup .gs-screen-inner.is-leaving {
+  position: absolute;
+  inset: 0 0 auto 0;
+  opacity: 0;
+  transform: translateX(-8px);
+  pointer-events: none;
+}
+@media (prefers-reduced-motion: reduce) {
+  body.auth-page .auth-shell #guided-signup .gs-screen-inner,
+  body.auth-page .auth-shell #guided-signup .gs-screen-inner.is-entering,
+  body.auth-page .auth-shell #guided-signup .gs-screen-inner.is-leaving { transform: none; }
+}
+
+body.auth-page .auth-shell #guided-signup .gs-title {
+  margin: 0 0 var(--space-4);
+  color: var(--color-wine-deep);
+  font: 500 var(--text-44)/1.08 var(--font-heading);
+  letter-spacing: -.015em;
+  text-transform: none;
+}
+/* The heading takes focus from script (tabindex="-1") so screen readers announce it; it is not a control: no ring. */
+body.auth-page .auth-shell #guided-signup .gs-title[tabindex="-1"]:focus { outline: none; }
+body.auth-page .auth-shell #guided-signup .gs-lead,
+body.auth-page .auth-shell #guided-signup .gs-help {
+  max-width: 44ch;
+  margin: 0;
+  color: var(--color-ink-soft);
+  font: 400 var(--text-16)/1.55 var(--font-body);
+  letter-spacing: 0;
+  text-transform: none;
+}
+body.auth-page .auth-shell #guided-signup .gs-help strong { color: var(--color-ink); font-weight: 600; overflow-wrap: anywhere; }
+
+/* Fields: 16 px or more everywhere (no iOS zoom), 56 px tall, a wine ring on focus. */
+body.auth-page .auth-shell #guided-signup .gs-input,
+body.auth-page .auth-shell #guided-signup .gs-otp-box {
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-m);
+  background: var(--color-cream);
+  color: var(--color-ink);
+  box-shadow: none;
+  transition: border-color var(--motion-fast) var(--ease), box-shadow var(--motion-fast) var(--ease);
+}
+body.auth-page .auth-shell #guided-signup .gs-input {
+  width: 100%;
+  min-height: 56px;
+  margin-top: var(--space-5);
+  padding: 0 var(--space-4);
+  font: 400 var(--text-20)/1.2 var(--font-body);
+}
+body.auth-page .auth-shell #guided-signup .gs-input::placeholder { color: var(--color-ink-soft); opacity: .7; }
+body.auth-page .auth-shell #guided-signup .gs-input:focus,
+body.auth-page .auth-shell #guided-signup .gs-otp-box:focus {
+  border-color: var(--color-wine);
+  outline: 2px solid var(--color-wine);
+  outline-offset: 1px;
+}
+body.auth-page .auth-shell #guided-signup .gs-input[aria-invalid="true"] { border-color: var(--color-wine); }
+
+/* The code: six boxes in one row. */
+body.auth-page .auth-shell #guided-signup .gs-otp {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(44px, 64px));
+  gap: var(--space-2);
+  margin-top: var(--space-5);
+}
+body.auth-page .auth-shell #guided-signup .gs-otp-box {
+  width: 100%;
+  height: 64px;
+  padding: 0;
+  text-align: center;
+  font: 500 var(--text-24)/1 var(--font-body);
+  font-variant-numeric: tabular-nums;
+  caret-color: var(--color-wine);
+}
+body.auth-page .auth-shell #guided-signup .gs-otp[aria-busy="true"] .gs-otp-box { opacity: .6; }
+
+/* Messages: errors and notes sit right under the field they are about. */
+body.auth-page .auth-shell #guided-signup .gs-message,
+body.auth-page .auth-shell #guided-signup .gs-note {
+  margin: var(--space-3) 0 0;
+  font: 600 var(--text-14)/1.45 var(--font-body);
+  letter-spacing: 0;
+  text-transform: none;
+}
+body.auth-page .auth-shell #guided-signup .gs-message { color: var(--color-wine); }
+body.auth-page .auth-shell #guided-signup .gs-note { color: var(--color-ink-soft); font-weight: 400; }
+body.auth-page .auth-shell #guided-signup :is(.gs-message, .gs-note):empty { margin: 0; }
+
+/* Text buttons ("Wrong email?", "Resend code", "Log in", "Sign out"): 44 px tall targets. */
+body.auth-page .auth-shell #guided-signup .gs-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0 var(--space-5);
+  margin-top: var(--space-3);
+}
+body.auth-page .auth-shell #guided-signup .gs-link {
+  min-height: 44px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--color-wine);
+  font: 600 var(--text-14)/1 var(--font-body);
+  letter-spacing: 0;
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 4px;
+  text-transform: none;
+  cursor: pointer;
+}
+body.auth-page .auth-shell #guided-signup .gs-link:hover { color: var(--color-wine-deep); }
+body.auth-page .auth-shell #guided-signup .gs-link:disabled { color: var(--color-ink-soft); text-decoration: none; cursor: default; }
+body.auth-page .auth-shell #guided-signup .gs-signed-in {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0 var(--space-2);
+  margin: var(--space-5) 0 0;
+  padding: 0 var(--space-4);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-m);
+  background: var(--color-cream);
+  color: var(--color-ink);
+  font: 400 var(--text-14)/1.4 var(--font-body);
+  overflow-wrap: anywhere;
+}
+body.auth-page .auth-shell #guided-signup .gs-dot { color: var(--color-ink-soft); }
+
+/* Actions: the primary button (wine, full width), an optional secondary, and the small "Already a member?" line. */
+body.auth-page .auth-shell #guided-signup .gs-actions {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+body.auth-page .auth-shell #guided-signup .gs-secondary { display: flex; flex-direction: column; gap: var(--space-3); }
+body.auth-page .auth-shell #guided-signup .gs-secondary:empty { display: none; }
+body.auth-page .auth-shell #guided-signup :is(.gs-primary, .gs-secondary-btn) {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-3);
+  width: 100%;
+  min-height: 56px;
+  margin: 0;
+  padding: 0 var(--space-5);
+  border-radius: var(--radius-pill);
+  font: 600 var(--text-16)/1 var(--font-body);
+  letter-spacing: .01em;
+  text-transform: none;
+  cursor: pointer;
+  transition: background-color var(--motion-fast) var(--ease), color var(--motion-fast) var(--ease), opacity var(--motion-fast) var(--ease);
+}
+body.auth-page .auth-shell #guided-signup .gs-primary {
+  border: 1px solid var(--color-wine);
+  background: var(--color-wine);
+  color: var(--color-cream);
+}
+body.auth-page .auth-shell #guided-signup .gs-primary[hidden] { display: none; }
+body.auth-page .auth-shell #guided-signup .gs-primary:hover:not(:disabled) { border-color: var(--color-wine-deep); background: var(--color-wine-deep); }
+body.auth-page .auth-shell #guided-signup .gs-primary:disabled { opacity: .45; cursor: not-allowed; }
+body.auth-page .auth-shell #guided-signup .gs-primary[aria-busy="true"] { opacity: .75; cursor: progress; }
+body.auth-page .auth-shell #guided-signup .gs-secondary-btn {
+  border: 1px solid var(--color-wine);
+  background: transparent;
+  color: var(--color-wine);
+}
+body.auth-page .auth-shell #guided-signup .gs-secondary-btn:hover:not(:disabled) { background: var(--color-wine); color: var(--color-cream); }
+body.auth-page .auth-shell #guided-signup :is(.gs-primary, .gs-secondary-btn, .gs-back, .gs-link):focus-visible {
+  outline: 2px solid var(--color-wine);
+  outline-offset: 3px;
+}
+body.auth-page .auth-shell #guided-signup .gs-google-mark {
+  display: inline-grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border-radius: var(--radius-pill);
+  background: var(--color-cream);
+  color: var(--color-wine);
+  font: 700 var(--text-14)/1 var(--font-body);
+}
+body.auth-page .auth-shell #guided-signup .gs-secondary-btn .gs-google-mark { background: var(--color-wine); color: var(--color-cream); }
+body.auth-page .auth-shell #guided-signup .gs-member {
+  margin: var(--space-2) 0 0;
+  color: var(--color-ink-soft);
+  font: 400 var(--text-14)/1.4 var(--font-body);
+  text-align: center;
+}
+
+/* Phone: a full-height card, the step header at the top, and the actions pinned to the bottom, above the keyboard. */
+@media (max-width: 780px) {
+  body.auth-page .auth-shell #guided-signup {
+    min-height: calc(100svh - 120px);
+    justify-content: flex-start;
+    gap: var(--space-4);
+    padding-bottom: 136px;
+  }
+  body.auth-page .auth-shell #guided-signup[data-screen="welcome"] { justify-content: center; padding-bottom: 200px; }
+  body.auth-page .auth-shell #guided-signup .gs-title { font-size: var(--text-32); }
+  /* Keep the step label clear of the page's close button (top right). */
+  body.auth-page .auth-shell #guided-signup .gs-head { padding-right: calc(var(--space-7) + var(--space-2)); }
+  body.auth-page .auth-shell #guided-signup .gs-actions {
+    position: fixed;
+    right: 0;
+    bottom: var(--gs-keyboard);
+    left: 0;
+    z-index: 30;
+    padding: var(--space-3) var(--space-5) calc(var(--space-4) + env(safe-area-inset-bottom));
+    border-top: 1px solid var(--color-line);
+    background: var(--color-cream);
+  }
+  body.auth-page .auth-shell #guided-signup .gs-otp { gap: var(--space-2); }
+  body.auth-page .auth-shell #guided-signup .gs-otp-box { height: 56px; }
+}

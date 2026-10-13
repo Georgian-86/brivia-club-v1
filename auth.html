@@ -195,6 +195,19 @@
             <div class="auth-success" id="auth-success" hidden><span class="auth-success-mark" aria-hidden="true">✓</span><h2 data-auth-success-title>Check your email.</h2><p data-auth-success-message>We sent a verification link. Your email is your login ID; your password stays private and is never shown here.</p><div class="credential-list"><div class="credential-row"><span>LOGIN ID</span><code data-credential="account-email">you@example.com</code><button type="button" data-copy-credential="account-email">COPY</button></div></div><button class="auth-secondary auth-close-success" type="button">BACK TO BRIVIA <span>↗</span></button></div>
             <button class="auth-back-trigger" type="button">← BACK TO LOGIN</button>
           </div>
+
+          <section class="auth-view auth-signup guided-signup" id="guided-signup" data-auth-view="guided" aria-labelledby="signup-screen-title" data-screen="welcome" hidden>
+            <div class="gs-head">
+              <button class="gs-back" type="button" data-signup-back hidden><span aria-hidden="true">&larr;</span> Back</button>
+              <p class="gs-step" data-signup-step aria-live="polite"></p>
+            </div>
+            <div class="gs-progress" role="progressbar" aria-label="Signup progress" aria-valuemin="0" aria-valuemax="6" aria-valuenow="0"><span data-signup-progress-fill></span></div>
+            <div class="gs-host" data-signup-host></div>
+            <div class="gs-actions" data-signup-actions>
+              <button class="gs-primary" type="button" data-signup-primary></button>
+              <div class="gs-secondary" data-signup-secondary></div>
+            </div>
+          </section>
         </div>
       </section>
     </div>

@@ -11,6 +11,8 @@ import {
 } from './passion-budget.js';
 import { matchTypedCity } from './area-pick.js';
 import { signupErrorCopy } from './signup-errors.js';
+import { signupMethods } from './signup-flow.js';
+import { initGuidedSignup, openGuidedSignup, showGuidedFromHistory, guidedScreen } from './signup-screens.js';
 import { defaultCoverUrl, normalizeCoverUrl } from './cover-assets.js';
 import { motionAllowed, introPlan, markLoaded, INTRO_CAP_MS, INTRO_START_GRACE_MS } from './landing-motion.js';
 
@@ -503,7 +505,10 @@ if (showreelSection && showreelToggle) {
 const authModal = document.querySelector('#auth-modal');
 const authCta = document.querySelector('.hero-nav .cta-button');
 const isStandaloneAuthPage = document.body.classList.contains('auth-page');
-const requestedAuthView = window.location.hash === '#signup' ? 'signup' : 'login';
+// #signup opens the guided signup (Phase E). Until Task 5 retires the old 4-step form, a dev server can still reach it
+// with ?legacy-signup=1#signup (tests/e2e/onboarding.spec.mjs); production builds drop this branch.
+const legacySignup = import.meta.env.DEV && new URLSearchParams(window.location.search).has('legacy-signup');
+const requestedAuthView = window.location.hash === '#signup' ? (legacySignup ? 'signup' : 'guided') : 'login';
 let authHistoryView = isStandaloneAuthPage ? requestedAuthView : 'welcome';
 if (isStandaloneAuthPage) {
   window.history.replaceState({ briviaAuthView: requestedAuthView }, '', window.location.href);
@@ -1345,7 +1350,7 @@ const setAuthView = (view, historyMode = 'push') => {
   if (isStandaloneAuthPage && view !== authHistoryView && historyMode !== 'none') {
     const state = { briviaAuthView: view };
     const nextUrl = new URL(window.location.href);
-    nextUrl.hash = view === 'signup' ? '#signup' : view === 'login' ? '#login' : '';
+    nextUrl.hash = view === 'signup' || view === 'guided' ? '#signup' : view === 'login' ? '#login' : '';
     if (historyMode === 'replace') window.history.replaceState(state, '', nextUrl);
     else window.history.pushState(state, '', nextUrl);
   }
@@ -1355,29 +1360,34 @@ const setAuthView = (view, historyMode = 'push') => {
     item.classList.toggle('is-active', isActive);
     item.toggleAttribute('hidden', !isActive);
   });
+  authShell?.classList.toggle('is-guided', view === 'guided');  // the guided flow has its own header (signup.css)
   if (authStep) {
+    const noCounter = view === 'signup' || view === 'guided';  // the counter means nothing beside a signup flow
     authStep.textContent = view === 'welcome' ? 'WELCOME' : view === 'login' ? '01 / 02' : '02 / 02';
-    authStep.toggleAttribute('hidden', view === 'signup');  // the counter means nothing beside the 4-step signup
-    authStep.style.display = view === 'signup' ? 'none' : '';
+    authStep.toggleAttribute('hidden', noCounter);
+    authStep.style.display = noCounter ? 'none' : '';
   }
   if (authPanelKicker) authPanelKicker.textContent = view === 'welcome' ? 'THE BRIVIA CLUB' : view === 'login' ? 'RETURNING MEMBER' : 'YOUR APPLICATION';
   const authTopSignup = authModal?.querySelector('.auth-top-signup');
-  if (authTopSignup) authTopSignup.innerHTML = view === 'signup' ? 'ALREADY A MEMBER? <b>LOG IN</b>' : 'NEW HERE? <b>CREATE ACCOUNT</b>';
-  if (authShell) authShell.setAttribute('aria-labelledby', view === 'welcome' ? 'auth-welcome-title' : view === 'login' ? 'auth-title' : 'signup-title');
+  if (authTopSignup) authTopSignup.innerHTML = view === 'signup' || view === 'guided' ? 'ALREADY A MEMBER? <b>LOG IN</b>' : 'NEW HERE? <b>CREATE ACCOUNT</b>';
+  if (authShell) authShell.setAttribute('aria-labelledby', view === 'welcome' ? 'auth-welcome-title' : view === 'login' ? 'auth-title' : view === 'guided' ? 'signup-screen-title' : 'signup-title');
   if (view === 'signup') signupForm?.querySelector('input')?.focus();
 };
 
 if (isStandaloneAuthPage) {
   window.addEventListener('popstate', (event) => {
-    setAuthView(event.state?.briviaAuthView || 'welcome', 'none');
+    const view = event.state?.briviaAuthView || 'welcome';
+    setAuthView(view, 'none');
+    if (view === 'guided') showGuidedFromHistory(event.state?.signupScreen);
   });
 }
 
+// Resolves to null once the Google redirect has started, or to the error message shown (the guided Welcome shows it).
 const startGoogleAuth = async () => {
   if (!supabaseReady || !supabase) {
     if (loginNote) loginNote.textContent = 'Google sign-in is not configured yet. Please use email and password.';
     if (signupFeedback) signupFeedback.textContent = 'Google sign-in is not configured yet. Please use email and password.';
-    return;
+    return 'Google sign-in is not configured yet.';
   }
   const buttons = authModal?.querySelectorAll('.auth-google-trigger') || [];
   buttons.forEach((button) => { button.disabled = true; });
@@ -1388,16 +1398,25 @@ const startGoogleAuth = async () => {
       provider: 'google',
       options: { redirectTo: `${window.location.origin}/auth.html`, queryParams: { prompt: 'select_account' } },
     });
-    if (!error) return;
+    if (!error) return null;
     buttons.forEach((button) => { button.disabled = false; });
     if (loginNote) loginNote.textContent = error.message || 'Google sign-in could not start.';
     if (signupFeedback) signupFeedback.textContent = error.message || 'Google sign-in could not start.';
+    return error.message || 'Google sign-in could not start.';
   } catch (error) {
     buttons.forEach((button) => { button.disabled = false; });
     if (loginNote) loginNote.textContent = error.message || 'Google sign-in could not start.';
     if (signupFeedback) signupFeedback.textContent = error.message || 'Google sign-in could not start.';
+    return error.message || 'Google sign-in could not start.';
   }
 };
+
+initGuidedSignup({
+  activate: (mode) => setAuthView('guided', mode),
+  login: () => setAuthView('login'),
+  startGoogle: startGoogleAuth,
+  methods: signupMethods(import.meta.env.VITE_SIGNUP_METHODS),
+});
 
 const getPhoneParts = (profile = {}, metadata = {}) => {
   const rawPhone = String(profile.phone || metadata.phone || '').trim();
@@ -1558,6 +1577,11 @@ const withoutOnboarding = (profile) => {
 
 const restoreAuthPageSession = async () => {
   if (!document.body.classList.contains('auth-page')) return;
+  if (requestedAuthView === 'guided' && !new URLSearchParams(window.location.search).has('complete-profile')) {
+    // The guided Welcome reads the session itself: signed in, it offers Continue (and Sign out), never Email or Code.
+    void openGuidedSignup({ history: 'none' });
+    return;
+  }
   if (!supabaseReady || !supabase) { setAuthView(requestedAuthView, 'none'); return; }
   const params = new URLSearchParams(window.location.search);
   const oauthError = params.get('error_description') || params.get('error');
@@ -1750,6 +1774,7 @@ const openAuthEnvelope = (view) => {
   window.clearTimeout(authEnvelopeTimer);
   authShell.classList.add('is-envelope-opening');
   authEnvelopeTimer = window.setTimeout(() => {
+    if (view === 'guided') { authShell.classList.remove('is-envelope-opening'); void openGuidedSignup(); return; }
     setAuthView(view);
     authShell.classList.remove('is-envelope-opening');
   }, 1420);
@@ -1758,18 +1783,14 @@ const openAuthEnvelope = (view) => {
 authModal?.querySelector('.auth-close')?.addEventListener('click', closeAuth);
 authModal?.querySelector('[data-auth-close]')?.addEventListener('click', closeAuth);
 authModal?.querySelector('.auth-welcome-login')?.addEventListener('click', () => openAuthEnvelope('login'));
-authModal?.querySelector('.auth-welcome-signup')?.addEventListener('click', () => openAuthEnvelope('signup'));
-authModal?.querySelector('.auth-top-signup')?.addEventListener('click', async () => {
-  if (authHistoryView === 'signup') { setAuthView('login'); return; }
-  await supabase?.auth.signOut().catch(() => {});
-  resetSignup();
-  setAuthView('signup');
+// Every signup entry point opens the guided flow (Phase E). Its Welcome handles an existing session (Continue or
+// Sign out), so nothing is signed out here.
+authModal?.querySelector('.auth-welcome-signup')?.addEventListener('click', () => openAuthEnvelope('guided'));
+authModal?.querySelector('.auth-top-signup')?.addEventListener('click', () => {
+  if (authHistoryView === 'signup' || authHistoryView === 'guided') { setAuthView('login'); return; }
+  void openGuidedSignup();
 });
-authModal?.querySelector('.auth-create-trigger')?.addEventListener('click', async () => {
-  await supabase?.auth.signOut().catch(() => {});
-  resetSignup();
-  setAuthView('signup');
-});
+authModal?.querySelector('.auth-create-trigger')?.addEventListener('click', () => { void openGuidedSignup(); });
 authModal?.querySelectorAll('.auth-google-trigger').forEach((button) => button.addEventListener('click', startGoogleAuth));
 authModal?.querySelector('.auth-back-trigger')?.addEventListener('click', async () => {
   if (profileCompletionUser && supabase) {
@@ -2092,5 +2113,7 @@ document.addEventListener('keydown', (event) => {
   const inSignup = signupForm && event.target instanceof Node && signupForm.contains(event.target);
   if (inSignup && (event.target.closest?.('input, select, textarea') || signupCurrentStep > 1)) return;
   if (!signupForm?.hasAttribute('hidden') && authHistoryView === 'signup' && signupCurrentStep > 1) return;
+  // The guided flow: Escape never throws away progress past Welcome, nor a half-typed field.
+  if (authHistoryView === 'guided' && (guidedScreen() !== 'welcome' || event.target.closest?.('input'))) return;
   closeAuth();
 });
