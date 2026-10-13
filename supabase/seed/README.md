@@ -37,6 +37,21 @@ seed id prefix `a7e57000-0000-4000-8000-`, so a real signup using that domain is
 Nobody can log in as a test member: each has a random password that is never stored. To act as one, reset that user's
 password in Authentication, Users. A member who signs in sees only the test world, so use it to see the demo data.
 
+## The tester switch (see your own account in the test world)
+
+After migration `0008`, a real account can be moved into the test world without becoming a test member: add it to the
+owner-only `public.brivia_tester` table (exact steps: `supabase/migrations/README.md`, section "0008").
+
+```sql
+insert into public.brivia_tester(member_id) select id from auth.users where email = '<founder email>' on conflict do nothing;
+```
+
+While listed, that account sees only test members (deck, search, requests, chat) and only test members see it; real
+members never see it. It stays a real account (`is_test` is never set), so the purge keeps it. Stop with
+`delete from public.brivia_tester where member_id = (select id from auth.users where email = '<founder email>');`.
+The purge also empties `brivia_tester` and removes the tester's matches, requests and messages with test members (they
+go with the test members), keeping the tester's own profile, interests and area.
+
 ## Verify
 
 ```sql
@@ -52,7 +67,8 @@ of this (including that a real member sees nothing and cannot request or message
 ## Purge before launch
 
 Paste `supabase/seed/purge-test-members.sql` into the SQL editor and Run (as `postgres`). It is one transaction and prints
-rows deleted and rows remaining per table; every `remaining` must be 0. It deletes `is_test` profiles (plus orphan
+rows deleted and rows remaining per table; every `remaining` must be 0. It empties `brivia_tester` (0008; testers keep their
+accounts and are back in the real world) and deletes `is_test` profiles (plus orphan
 auth users with the seed id prefix from a half-finished seed), and their `auth.identities`, cascading to matches, requests, blocks, messages, posts,
 interaction, `member_interest`, `member_orbit` and `location_change`, and removes `storage.objects` under their folders. Running it with nothing seeded is safe (all zeros).
 Supabase refuses SQL deletes on `storage.objects`; if test members ever uploaded files, the script prints a notice and you

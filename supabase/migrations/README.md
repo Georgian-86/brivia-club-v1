@@ -228,4 +228,69 @@ connection requests" (0004 dropped it on purpose).
 - The harness proves no drift (`supabase/tests/run.sh`, database `brivia_test_drift`): the snapshot before and after 0006
   is equal, no public policy keeps a bare `auth.uid()`, and the request-insert policy stays absent.
 
+## 0008: the tester switch (Phase D)
+
+Apply **only `0008_tester_world.sql`**, as `postgres` in the SQL editor, **after 0006 is applied and verified live**. It
+does not depend on 0007 (either order works). No client change is needed: every RPC keeps its signature and columns.
+The file is idempotent and is one transaction. Put `set lock_timeout = '5s';` on the first line, above the file, and
+avoid the cron window **20:17–20:37 UTC (01:47–02:07 IST)**.
+
+What it does: a real account listed in the owner-only table `public.brivia_tester` joins the test world (the seeded
+test members) **without becoming `is_test`**, so the purge never deletes it. `public.brivia_in_test_world(member)` is
+`is_test` or a `brivia_tester` row, and every function that compared two members' `is_test` (`brivia_same_world`,
+`brivia_visible_to`, `get_candidates`, `search_members`, `list_members`, `deck_candidates`, `deck_status`,
+`my_outgoing_requests`, `report_member`, `brivia_private.brivia_can_message`, and the world key of
+`refresh_cell_density`) now compares that instead. Nothing changes for anyone who is not a tester. A tester sees only
+test members and is seen only by them; no real member sees a tester's account while it is a tester.
+
+### Post-apply checks (read-only)
+
+```sql
+select count(*) from public.brivia_tester;                                                   -- 0
+select relrowsecurity from pg_class where oid = 'public.brivia_tester'::regclass;            -- t
+select has_table_privilege('authenticated', 'public.brivia_tester', 'select'),
+       has_table_privilege('anon', 'public.brivia_tester', 'select'),
+       has_function_privilege('authenticated', 'public.brivia_in_test_world(uuid)', 'execute'),
+       has_function_privilege('anon', 'public.brivia_in_test_world(uuid)', 'execute');      -- f, f, f, f
+-- No function compares is_test between two members any more. Expect exactly 4 rows:
+-- brivia_cell_ok, brivia_guard_is_test, brivia_in_test_world, refresh_cell_density.
+select p.proname from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+ where n.nspname in ('public', 'brivia_private') and p.prosrc ~ 'is_test' order by 1;
+```
+
+If a row other than those four appears, or a privilege query answers `t`, stop and report it. In the security advisor,
+`brivia_in_test_world` must not appear as executable by `authenticated` or `anon` (it is revoked; it runs only inside
+the definer functions above).
+
+### Become a tester (the founder's account)
+
+One line in the SQL editor (put the account's sign-in email in place of `<founder email>`):
+
+```sql
+insert into public.brivia_tester(member_id) select id from auth.users where email = '<founder email>' on conflict do nothing;
+```
+
+It takes effect at once for the deck, search, requests and chat. The k-anonymity density (distance bands) follows at
+the next nightly `refresh_cell_density()` run (01:47 IST); until then the tester's cards may show the place name instead
+of `~3 km` (safe). A manual `select public.refresh_cell_density();` does nothing if that night's run has already
+happened (it keeps one count per day).
+
+Before switching, note that requests and matches with **real** members made before the switch stay as rows: while a
+tester, the account cannot message those matches or request real members, and its own outgoing list hides them, but
+a real member who already has a pending request from the account still sees that request (without a profile card).
+Check with
+`select count(*) from public.connection_requests r join auth.users u on u.id in (r.from_id, r.to_id) where u.email = '<founder email>';`
+and clear anything you do not want to keep first.
+
+### Stop being a tester
+
+```sql
+delete from public.brivia_tester where member_id = (select id from auth.users where email = '<founder email>');
+```
+
+The account is back in the real world at once (its interests, area and real matches are untouched). Its matches and
+messages with test members stay until the purge (or remove the match in the app). The purge
+(`supabase/seed/purge-test-members.sql`) also empties `brivia_tester`, so after a purge nobody is a tester; the
+tester's own account is never deleted.
+
 Incident response (suspected data breach, pausing the purge cron, notices): see `docs/BREACH_RUNBOOK.md`.

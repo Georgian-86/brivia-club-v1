@@ -480,7 +480,10 @@ saturated, the outer rings relax first, instead of the deck repeating saturated 
   It reads `member_interest` and `member_orbit` only, never `profiles.skills` (a display copy written only by
   `set_member_interests`, D-035).
 - **One visibility rule.** Every member-facing visibility check goes through `brivia_visible_to(viewer, target)`: both
-  completed, different members, same world (`is_test` equal) and no block in either direction. `get_candidates`,
+  completed, different members, same world and no block in either direction. A member's world is
+  `brivia_in_test_world(member)`: `is_test`, or a row in the owner-only tester list `brivia_tester` (0008, a real
+  account moved into the test world without becoming `is_test`); every function that compares two members' worlds
+  compares that, never `is_test` directly. `get_candidates`,
   `search_members`, `list_members` and `brivia_can_see_author` are built on it (signatures, caps, ordering and
   escaping unchanged), and every later candidate RPC (the interim deck, ORBIT's `orbit_cards`) must use it too.
   `brivia_member_completed` and `brivia_visible_to` are internal: no client role may execute them. The same holds for
@@ -824,7 +827,8 @@ select log_impressions($1, $4);
   `precision = 'place'` are counted in g5 density only.
 - **No band flips:** a cell's coarsening level only goes up quickly and comes down slowly. Populations live in the
   owner-only `cell_density(cell, is_test, n, streak10, streak5, ok10, ok5, as_of)` table (RLS on, no client grants),
-  one row per g7, g6 and g5 cell and world. `refresh_cell_density(p_as_of date default current_date)` (owner only;
+  one row per g7, g6 and g5 cell and world (the column keeps the name `is_test` but holds
+  `brivia_in_test_world(member)`, so a tester is counted in the test world, 0008). `refresh_cell_density(p_as_of date default current_date)` (owner only;
   scheduled nightly with pg_cron by `brivia_schedule_nightly_jobs()`, together with `purge_expired_requests()`;
   runbook: `supabase/migrations/README.md`) recounts every cell that has members, plus every existing row. Counts group by
   the **stored** `home_cell`, `home_cell_g6` and `home_cell_g5` columns of `member_orbit`; parents are never

@@ -12,6 +12,11 @@
 -- member are deleted explicitly below. Storage objects are removed
 -- explicitly below. Note: on Supabase, SQL cannot delete files from Storage (it refuses direct deletes), so if
 -- test members ever uploaded files, delete them via the Storage UI/API; the script tells you when this applies.
+--
+-- The tester switch (0008): public.brivia_tester lists REAL accounts moved into the test world. Testers are never
+-- in _purge_ids (they are not is_test and do not carry the seed prefix), so their own profile, interests and area
+-- are kept; their matches, requests, messages and interactions with test members go with the test members. The list
+-- itself is emptied, so every tester is back in the real world after a purge. (A database without 0008 skips it.)
 
 begin;
 
@@ -24,7 +29,7 @@ create temp table _purge_ids on commit drop as
 create temp table _purge_report (tbl text, deleted bigint default 0, remaining bigint default 0) on commit drop;
 insert into _purge_report(tbl) values
   ('auth.users'), ('auth.identities'), ('profiles'), ('connection_requests'), ('matches'), ('brivia_blocks'),
-  ('brivia_messages'), ('community_posts'), ('interaction'), ('signal_ledger'), ('storage.objects');
+  ('brivia_messages'), ('community_posts'), ('interaction'), ('signal_ledger'), ('storage.objects'), ('brivia_tester');
 
 create temp table _purge_before on commit drop as
   select 'auth.users' as tbl, count(*) as n from auth.users where id in (select id from _purge_ids)
@@ -68,6 +73,19 @@ delete from public.connection_requests where from_id in (select id from _purge_i
 delete from public.profiles where id in (select id from _purge_ids);
 delete from auth.identities where user_id in (select id from _purge_ids);
 delete from auth.users where id in (select id from _purge_ids);
+-- Empty the tester list (0008): every tester returns to the real world; their own rows are untouched. Dynamic SQL,
+-- so the purge still runs on a database without 0008 (the brivia_tester row then reports 0 and 0).
+do $$
+declare n bigint;
+begin
+  if to_regclass('public.brivia_tester') is not null then
+    execute 'select count(*) from public.brivia_tester' into n;
+    execute 'delete from public.brivia_tester';
+    update _purge_report set deleted = n where tbl = 'brivia_tester';
+    execute 'select count(*) from public.brivia_tester' into n;
+    update _purge_report set remaining = n where tbl = 'brivia_tester';
+  end if;
+end $$;
 
 update _purge_report r set deleted = b.n from _purge_before b where b.tbl = r.tbl;
 update _purge_report set remaining = case tbl
@@ -81,6 +99,7 @@ update _purge_report set remaining = case tbl
   when 'community_posts' then (select count(*) from public.community_posts where author_id in (select id from _purge_ids))
   when 'interaction' then (select count(*) from public.interaction where viewer_id in (select id from _purge_ids) or target_id in (select id from _purge_ids))
   when 'signal_ledger' then (select count(*) from public.signal_ledger where sender_id in (select id from _purge_ids) or to_id in (select id from _purge_ids))
+  when 'brivia_tester' then remaining   -- set by the tester block above
   else (select count(*) from storage.objects where owner in (select id from _purge_ids) or (storage.foldername(name))[1] in (select id::text from _purge_ids))
 end;
 
