@@ -8,14 +8,14 @@
 - **Navigation:** a pure flow model (`signup-flow.js`) decides the screen list per path (email code or Google) and where a returning member resumes. It reads `my_onboarding_status` and the session.
 - **Screens:** `signup-screens.js` renders one screen at a time into a new `#guided-signup` section of `auth.html`. It reuses the existing area picker and interest catalogue.
 - **Saving:** each answer saves on Next through the existing RPCs. Interests save with an even split of the 20-point budget (D-056), so no server-side matching change is needed.
-- **Migration:** `0007` only bumps the privacy-notice version, with a 14-day grace window.
+- **Migration:** `0009` only bumps the privacy-notice version, with a 14-day grace window.
 
 **Tech Stack:**
 - Vite, vanilla JS/CSS, and supabase-js auth: `signInWithOtp`/`verifyOtp` (email code) and `signInWithOAuth` (Google).
 - SQL migration with the existing harness.
 - `node --test` unit tests, and Playwright e2e against a stubbed Supabase (Playwright at `/tmp/pw`, Chromium `/opt/pw-browsers/chromium`).
 
-**Spec:** `docs/superpowers/specs/2026-10-12-experience-iteration-design.md` §1, as amended by **D-056** (no points screen; one question per screen on all sizes; animated interest picking). See also D-052 (arena: what signup requires) and D-055 (Phase C tokens, type and guards).
+**Spec:** `docs/superpowers/specs/2026-10-12-experience-iteration-design.md` §1, as amended by **D-056** (and renumbered: Phase D shipped 0008 first, so this migration is 0009 to keep filename order equal to apply order) (no points screen; one question per screen on all sizes; animated interest picking). See also D-052 (arena: what signup requires) and D-055 (Phase C tokens, type and guards).
 
 ## Global Constraints
 
@@ -42,7 +42,7 @@
   - Welcome shows only the configured methods.
   - Empty or unset shows "Signups open soon" plus Log in (the spec §1.5 fallback).
   - Stub e2e runs with `google,email`.
-- **Migrations:** 0001–0006 are frozen. The only new SQL is `0007`. The founder applies it in the SQL editor in the same window as the client deploy.
+- **Migrations:** 0001–0008 are frozen. The only new SQL is `0009`. The founder applies it in the SQL editor in the same window as the client deploy.
 - **DECISIONS** is append-only.
 - **Commits:** end every commit message with the line `Claude-Session: https://claude.ai/code/session_01BPtSsvGbTkCpzEXTbQkfEX` and **no `Co-Authored-By` line** (founder, 2026-10-13).
 - **Gate before every push** (suites one at a time):
@@ -71,15 +71,15 @@
 
 ---
 
-### Task 1: Migration 0007 — the notice version with a 14-day grace window
+### Task 1: Migration 0009 — the notice version with a 14-day grace window
 
 **Files:**
-- Create: `supabase/migrations/0007_signup_minimisation.sql`, `supabase/tests/p0e-notice.test.sql`
-- Modify: `notice-version.js`, `privacy.html` ("What we collect": phone and gender removed for new members; "older accounts only" note; the new version date), `supabase/migrations/README.md` (0007 apply steps and pre-flight), `supabase/tests/p0b-adult.test.sql` (only if it pins the old version literal)
+- Create: `supabase/migrations/0009_signup_minimisation.sql`, `supabase/tests/p0e-notice.test.sql`
+- Modify: `notice-version.js`, `privacy.html` ("What we collect": phone and gender removed for new members; "older accounts only" note; the new version date), `supabase/migrations/README.md` (0009 apply steps and pre-flight), `supabase/tests/p0b-adult.test.sql` (only if it pins the old version literal)
 
 **Interfaces:**
 - Produces:
-  - SQL `public.brivia_notice_version() returns text` → the new date (use `'2026-10-20'` as the placeholder release date; the founder can change it, and if they do, change it in `0007`, `notice-version.js` and `privacy.html` together).
+  - SQL `public.brivia_notice_version() returns text` → the new date (use `'2026-10-20'` as the placeholder release date; the founder can change it, and if they do, change it in `0009`, `notice-version.js` and `privacy.html` together).
   - SQL `public.brivia_notice_accepted(p_version text) returns boolean`: true for the current version, and for `'2026-10-05'` until `'2026-10-20'::date + 14`.
   - `declare_adult(p_notice_version text)` is redefined **once**, refusing with `22023 'stale notice version'` only when `not brivia_notice_accepted(...)`.
   - JS: `NOTICE_VERSION = '2026-10-20'`.
@@ -89,11 +89,11 @@
   - `declare_adult accepts 2026-10-05 inside the window` (freeze `now()` via the harness's existing time helper, or test `brivia_notice_accepted` with an explicit `p_at timestamptz default now()` parameter);
   - `refuses 2026-10-05 after the window`;
   - `refuses an unknown version`;
-  - `consent rows written after 0007 record the new version`.
+  - `consent rows written after 0009 record the new version`.
 - [ ] **Step 2: Run** `bash supabase/tests/run.sh`. Expect FAIL (function missing).
-- [ ] **Step 3: Implement 0007.** It must be idempotent: running the harness twice passes, as it does for 0001–0006. Do not touch 0001–0006.
+- [ ] **Step 3: Implement 0009.** It must be idempotent: running the harness twice passes, as it does for 0001–0008. Do not touch 0001–0008.
 - [ ] **Step 4: Run** the harness twice, then `npm run test:unit` (notice-version test updated) and the consent e2e. Expect PASS.
-- [ ] **Step 5: Commit** `feat(db): 0007 notice version with a 14-day grace window (Phase E)`.
+- [ ] **Step 5: Commit** `feat(db): 0009 notice version with a 14-day grace window (Phase E)`.
 
 ### Task 2: Flow model, even split and code-input helpers (pure)
 
@@ -264,14 +264,14 @@
   - `docs/UX_SPEC.md` §A (signup screens);
   - `docs/ORBIT_ENGINE.md` (a note: signup interests enter with an even split, model unchanged);
   - `privacy.html` (if not complete in Task 1);
-  - `docs/DECISIONS.md` (append D-057: Phase E results, the 0007 apply steps, the switch values for production, the founder dependencies);
+  - `docs/DECISIONS.md` (append D-057: Phase E results, the 0009 apply steps, the switch values for production, the founder dependencies);
   - `docs/HANDOFF.md` (Phase E state, the signup e2e command and port 5193, the commit-trailer rule);
   - `.env.example` (`VITE_SIGNUP_METHODS`).
 
 - [ ] **Step 1:** Capture founder screenshots of every screen at 375 and 1440, including mid-animation frames of a pick, into the scratchpad, and look at them.
 - [ ] **Step 2:** Full gate (Global Constraints).
 - [ ] **Step 3: Commit** `docs: D-057 Phase E guided signup; HANDOFF, UX_SPEC, ORBIT note`. Push to `claude/jolly-edison-49xvza`. Ask the founder before `main`. Production needs, in the same window:
-  1. apply `0007`;
+  1. apply `0009`;
   2. set `VITE_SIGNUP_METHODS` in Vercel;
   3. SMTP with the `{{ .Token }}` template, and/or Google OAuth live.
 
@@ -279,4 +279,4 @@
 
 - **Custom SMTP** in Supabase Auth: the "Magic Link"/OTP template must contain `{{ .Token }}` (6 digits), with Brivia branding and a raised rate limit. Without it, ship with `VITE_SIGNUP_METHODS=google`.
 - **Google OAuth** production configuration (Supabase and Google Cloud). Without either, keep `VITE_SIGNUP_METHODS` empty: public signup stays closed, and testers use test accounts.
-- **Apply `0007`** in the SQL editor when the client ships. The 14-day window makes the order safe in either direction.
+- **Apply `0009`** in the SQL editor when the client ships. The 14-day window makes the order safe in either direction.
