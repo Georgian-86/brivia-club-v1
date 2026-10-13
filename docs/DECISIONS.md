@@ -1069,3 +1069,26 @@ in a later phase. The `points_entry` A/B flag in spec §4 is dropped.
 
 **Also:** Phase C was approved by the founder for production ("good to go", 2026-10-13); the fast-forward of `main` is
 pending the founder's own push or permission (the session's auto-mode guard refused a production push).
+
+## D-057: Test world v2: preset post images for test members only; the far match is checked through ORBIT's gate (2026-10-13)
+
+**Decided by:** the Phase D coordinator's rulings on the Task 2 NEEDS_CONTEXT report (the brief could not be met as written).
+
+1. **Post images.** The 0003 CHECK `community_posts_image_storage` refused any post image that is not the author's own
+   Storage file, for every writer, so a SQL seed could not show an image. 0008 (still unapplied, so open) replaces the
+   CHECK with the trigger `brivia_zz_posts_image_rule`: the same rule for everyone (same 23514 error, every insert and
+   update, the owner included), plus a preset illustration path with an empty `image_path` **only when the author's
+   profile `is_test`**. Real members and testers keep exactly the 0003 rule. The feed renders a preset path through
+   `normalizeCoverUrl` (`post-image.js`); anything else still shows the placeholder. Rejected: relaxing the rule for
+   everyone (changes real members' behaviour), storage-shaped URLs with no file (every seed post "Image unavailable"),
+   and DDL inside the seed.
+2. **The far-but-strong match.** The interim deck has no escape-velocity gate (its pool stops at 60 km), so no server
+   path can show a far match. Accepted interpretation: the harness checks the far partner is never in the deck and is
+   found by search (3+ shared interests, more than 350 km apart), and a unit test runs the seed's far pairs through the
+   ORBIT library's gate (each is Worth-the-Distance from both sides, R 0.88-0.94; a one-interest far pair is not even
+   eligible at L = 0). ORBIT is not wired into the deck.
+3. **Roles.** Each city's "first member" is its first v2 member (t25, t33, t39, t49, t53): the v1 members' interests
+   are fixed and share nothing with a city-mate, and Pune has only 4 new slots. Neighbours are the only members at
+   the top overlap level in their area, so they lead the deck whatever the daily tie-break. Three v1 members are
+   flagged and two are blocked (their rows are unchanged). The purge deletes test members' `consent_event` rows
+   explicitly (no foreign key) and reports `member_flag` and `consent_event`.

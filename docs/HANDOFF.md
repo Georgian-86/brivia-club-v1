@@ -84,7 +84,11 @@ Tooling: Playwright **and axe-core** at `/tmp/pw` (`npm install --prefix /tmp/pw
 ## 3. What to do next (in order)
 
 0. **Experience iteration Phase D, the test world** (spec `docs/superpowers/specs/2026-10-12-experience-iteration-design.md`
-   §3: migration 0008, seed v2, the why panel; the founder applies the SQL in the editor). Before that: the founder
+   §3: migration 0008, seed v2, the why panel; the founder applies the SQL in the editor). Done locally, not applied:
+   Task 1 (0008 tester switch) and Task 2 (seed v2: 60 members with ORBIT roles per city, 30 preset-illustrated posts,
+   3 matches with chats; 0008 section 4 lets only test members post a preset image, D-057; `supabase/seed/README.md`
+   has the role table). Next: Task 3, the why panel. Going live: apply 0008 and deploy the client in one window, then
+   run the seed, then add the founder's accounts to `brivia_tester`. Before that: the founder
    reviews the Phase C before/after screenshots and OKs fast-forwarding `main`.
 1. **P0-C** (D-046; table "P0-C" in `docs/arena/2026-10-07-iteration-4.md`, each item has acceptance criteria).
    0005 is now live and frozen (D-047), so the SQL items go in **new migrations `0007+`**:

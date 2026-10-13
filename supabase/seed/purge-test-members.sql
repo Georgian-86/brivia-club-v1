@@ -9,7 +9,9 @@
 -- member_interest, member_orbit and location_change also reference profiles with "on delete cascade", so deleting
 -- the profiles below removes their rows too (seed.test.sql checks that 0 remain). signal_ledger (0004 section 6)
 -- cascades from its sender, but its to_id deliberately has no foreign key, so a real member's attempts at a test
--- member are deleted explicitly below. Storage objects are removed
+-- member are deleted explicitly below. consent_event (0005) has no foreign key on purpose (a real member's consent
+-- history outlives the account), so the test members' rows (the seed's 'sensitive_give') are deleted explicitly too;
+-- only rows of _purge_ids are touched. member_flag cascades from profiles. Storage objects are removed
 -- explicitly below. Note: on Supabase, SQL cannot delete files from Storage (it refuses direct deletes), so if
 -- test members ever uploaded files, delete them via the Storage UI/API; the script tells you when this applies.
 --
@@ -29,7 +31,8 @@ create temp table _purge_ids on commit drop as
 create temp table _purge_report (tbl text, deleted bigint default 0, remaining bigint default 0) on commit drop;
 insert into _purge_report(tbl) values
   ('auth.users'), ('auth.identities'), ('profiles'), ('connection_requests'), ('matches'), ('brivia_blocks'),
-  ('brivia_messages'), ('community_posts'), ('interaction'), ('signal_ledger'), ('storage.objects'), ('brivia_tester');
+  ('brivia_messages'), ('community_posts'), ('interaction'), ('signal_ledger'), ('storage.objects'), ('brivia_tester'),
+  ('member_flag'), ('consent_event');
 
 create temp table _purge_before on commit drop as
   select 'auth.users' as tbl, count(*) as n from auth.users where id in (select id from _purge_ids)
@@ -49,7 +52,9 @@ create temp table _purge_before on commit drop as
   union all select 'signal_ledger', count(*) from public.signal_ledger
     where sender_id in (select id from _purge_ids) or to_id in (select id from _purge_ids)
   union all select 'storage.objects', count(*) from storage.objects
-    where owner in (select id from _purge_ids) or (storage.foldername(name))[1] in (select id::text from _purge_ids);
+    where owner in (select id from _purge_ids) or (storage.foldername(name))[1] in (select id::text from _purge_ids)
+  union all select 'member_flag', count(*) from public.member_flag where member_id in (select id from _purge_ids)
+  union all select 'consent_event', count(*) from public.consent_event where member_id in (select id from _purge_ids);
 
 -- Storage rows first (folder "<uid>/..." or owner).
 do $$
@@ -65,6 +70,8 @@ end $$;
 -- Explicit deletes from the dependants (belt and braces; the cascade would do the same), then the users.
 delete from public.interaction where viewer_id in (select id from _purge_ids) or target_id in (select id from _purge_ids);
 delete from public.signal_ledger where sender_id in (select id from _purge_ids) or to_id in (select id from _purge_ids);
+delete from public.consent_event where member_id in (select id from _purge_ids);
+delete from public.member_flag where member_id in (select id from _purge_ids);
 delete from public.brivia_messages where sender_id in (select id from _purge_ids) or recipient_id in (select id from _purge_ids);
 delete from public.community_posts where author_id in (select id from _purge_ids);
 delete from public.brivia_blocks where blocker_id in (select id from _purge_ids) or blocked_id in (select id from _purge_ids);
@@ -99,6 +106,8 @@ update _purge_report set remaining = case tbl
   when 'community_posts' then (select count(*) from public.community_posts where author_id in (select id from _purge_ids))
   when 'interaction' then (select count(*) from public.interaction where viewer_id in (select id from _purge_ids) or target_id in (select id from _purge_ids))
   when 'signal_ledger' then (select count(*) from public.signal_ledger where sender_id in (select id from _purge_ids) or to_id in (select id from _purge_ids))
+  when 'member_flag' then (select count(*) from public.member_flag where member_id in (select id from _purge_ids))
+  when 'consent_event' then (select count(*) from public.consent_event where member_id in (select id from _purge_ids))
   when 'brivia_tester' then remaining   -- set by the tester block above
   else (select count(*) from storage.objects where owner in (select id from _purge_ids) or (storage.foldername(name))[1] in (select id::text from _purge_ids))
 end;
