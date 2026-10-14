@@ -35,7 +35,96 @@ New components reuse these tokens. **No raw hex in new components**, and no new 
 
 ## Flow changes
 
-### A. Onboarding: 4 steps with "Your area" and the Passion Budget (shipped in Iteration 3, Task 8)
+### A. Signup: the guided flow, one question per screen (Phase E, D-060)
+
+The signup on `auth.html#signup` (`signup-screens.js`, `signup-profile-screens.js`, `signup-flow.js`, `signup.css`,
+`area-pick.js`, `passion-budget.js` `evenSplit`) replaced the 4-step form described in "A (retired)" below. It collects
+only a verified account, the 18+ declaration, a name, an area and 1–12 interests. **No phone, no gender, no points
+screen** (the 2026-10-20 notice, `0009`).
+
+**Screens and order.** Email path: Welcome → Email → Code → 18+ → Name → Area → Interests → Reveal. Google path:
+Welcome → 18+ → Name → Area → Interests → Reveal. "STEP n OF N" counts the question screens only (N = 6 by email, 4 by
+Google). Welcome and Reveal have no step label. A wine progress bar (`role=progressbar`) and an `aria-live` step label
+sit in the header. On every change, focus moves to the screen heading (`tabindex=-1`, no visible ring).
+
+**Layout.** Every screen is one card with one heading and one primary action. Desktop (≥ 781 px): the card is at most
+560 px wide and vertically centred beside the existing auth image panel. The only exception is Interests at ≥ 1200 px,
+which is up to 760 px wide so the picks tray fits beside the catalogue. Between 781 and 1199 px the tray sits in a
+sticky bar above the button. Phone: a full-height card, with the primary button pinned above the on-screen keyboard
+(`visualViewport`). Text is 12 px or more, form controls are 16 px on phones, and targets are 44 px or more.
+
+**Navigation.** Enter means Next. Back is visible on every screen except Welcome and the Reveal. Once a session
+exists, Back and browser Back never return to Email or Code: the earliest Back target is 18+, and Back from 18+ shows
+Welcome as "Signed in as … · Sign out" with Continue. After the Reveal (the interests are saved), browser Back to a
+profile screen shows the Reveal again. A member who already has a session resumes at the first unanswered screen
+(`my_onboarding_status` plus their own row). After each save, the flow moves on to the next unanswered screen, so a
+resumed member is never asked an answer twice. A completed member lands on `/app.html`.
+
+**Motion.** Screen changes and picks take 150–250 ms from the `--motion-*` tokens. Under reduced motion they only fade,
+using `--motion-fade` (200 ms), the one token that stays on under reduced motion.
+
+1. **Welcome**: "Find your people." / "Join in a minute. One question at a time." The methods come from
+   `VITE_SIGNUP_METHODS` (comma list of `google`, `email`). Google is the primary when configured ("Continue with
+   Google", with the official four-colour G on a white disc, the only third-party colours allowed). Email is the outline
+   secondary ("Continue with email"). Below: "Already a member? Log in". **Empty or unset:** "Signups open soon.
+   Members can log in below." and a primary "Log in". This only hides buttons; see D-060 for the Supabase setting
+   that actually closes signups.
+2. **Email**: "What's your email?", helper "We'll send you a 6-digit code. No password needed.", primary "Send code"
+   (`signInWithOtp`, `shouldCreateUser: true`). A malformed address shows "Enter your email address, like
+   name@example.com." A 429 shows "Too many codes requested. Wait a minute, then tap Resend." Coming back to the same
+   address while the Resend wait runs goes straight to Code, with no new send.
+3. **Code**: "Enter the code", "We sent a 6-digit code to **email**." Six boxes (`inputmode=numeric`,
+   `autocomplete=one-time-code`). The first box accepts 6 characters so iOS autofill can deliver the whole code, and
+   every box keeps one digit. Paste accepts "123 456" and a code inside a sentence. Verification runs on its own when
+   the last box is filled or a whole code is pasted. A primary "Verify" (disabled until six digits) does the same. A
+   code that just failed is never sent again. "Wrong email?" goes back to Email. "Resend code" waits 60 s ("Resend in
+   1:00"). There is separate copy for a wrong code, an expired code, and the verify 429 ("Too many attempts. Wait a
+   minute, then try the code again.").
+4. **18+**: "Are you 18 or older?", "Brivia Club is for adults. We don't ask for your date of birth.", a "How we use
+   your data" link, primary "Yes, I'm 18 or older" and secondary "No". Yes creates the member's own profile row (id,
+   email, placeholder name) if none exists, then calls `rpc/declare_adult` with the notice version. No shows "Brivia
+   Club is for adults. Come back when you're 18." and "Back to Brivia".
+5. **Name**: "What should members call you?", "Members see this name." Saved to `name` and `full_name`. Empty shows
+   "Enter the name members should see."
+6. **Area**: "Where are you based?", "We show people near you first." The privacy explainer **"We keep only a rough ~2
+   km square, never your exact location. Other members see a rounded distance once enough people are nearby; until
+   then they see your city."** (shield icon) and the "How we use your data" link sit **above** "Use my location" and
+   "Pick my city", so they are read before the browser's location prompt (informed consent; Phase E Ruling 12). The
+   picker's behaviour, copy, privacy and fallbacks are as in "A (retired)", step 2 (`area-pick.js`, moved, not
+   changed): the low-accuracy options, the 15 s guard, "No problem. Pick your city instead." with focus on the city
+   search, coordinates only in the `set_home_location` body, and "Try again later." on a `PT429`.
+7. **Interests**: "What are you into?", "Pick what you genuinely care about. 3–6 works best." A search ("Find an
+   interest"), domain tabs (they scroll sideways: 13 domains), and wrapped chip groups. A pick flies into the "Your
+   picks" tray (220 ms, or a fade under reduced motion) with a count pill ("4 picked"). At 12 picks the rest are
+   `aria-disabled` and the tray says "You can choose up to 12 interests. Remove one to add another." Continue needs at
+   least one non-sensitive pick. Private interests use the same consent as before (a native `<dialog>` in this flow:
+   unticked box, Continue and Not now of equal weight; `set_sensitive_consent(true)` only when a private pick is
+   saved, and withdrawn on a failed save only when this submit created it). The picks save with `evenSplit` (20
+   points by largest remainder, each at least 1, earlier picks take the remainder, mode `play`; ORBIT_ENGINE §3.2).
+   - **Phone tray: the "+n more" rule (an application of rule 3, "chips wrap, never clip").** Collapsed, the tray is
+     one row of **whole** chips (the newest picks that fit, never a clipped chip) plus an operable **"+n more"**
+     button (`aria-expanded`, `aria-controls`). Expanded, every pick wraps into rows with a capped height and internal
+     scroll; the newest pick is scrolled into view, and the button reads "Show less". Wider screens show every pick and
+     no button.
+8. **Reveal**: a check mark, "You're in, <first name>." and one qualitative line. When the first deck card shares an
+   interest: "People near you are into <interest>. Your deck is ready." Otherwise: "You're one of the first in
+   <area>. We'll bring people to you as the club grows." Primary "See my deck". **Never a count** (the same rule as
+   `deck_status`). It reads one deck card (`deck_candidates`, which logs one impression for that card, deduped per day).
+
+**Login and deletion with a code.** On login, "Email me a code instead" (`shouldCreateUser: false`, so it never
+creates an account, and the copy never reveals whether an account exists) opens the same Code screen without a step
+label. In Privacy and account → Delete, an email member sees both their password and "Send me a code" (Supabase does
+not say whether a password exists, so we never lock anyone out). A Google member re-authenticates with Google.
+
+**App profile editor (Phase E).** It no longer shows or writes phone. It saves with `{ contact: false }`, so the stored
+phone and gender columns are never overwritten by an edit.
+
+### A (retired). Onboarding: 4 steps with "Your area" and the Passion Budget (Iteration 3, Task 8 to Phase D)
+
+_Retired in Phase E (D-060): Task 5 deleted the form. Kept for history and for the parts still in force: the area
+picker (step 2, now on the guided Area screen), the private-interest consent semantics, completion re-entry, the
+under-review notice and the consent rollback. Phone and gender are no longer collected._
+
 
 The signup (`auth.html`, `script.js`, `passion-budget.js`) has **4 steps**. The progress reads `STEP n OF 4 · …` and the
 progress bar has `aria-valuemax="4"`. Every step has Back (except step 1); Next validates only its own step.

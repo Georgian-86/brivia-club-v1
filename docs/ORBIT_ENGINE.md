@@ -128,6 +128,16 @@ profile" toggle is P2). After the rules above, `set_member_interests` checks, ea
 Fixed budgets stop "interest inflation". A member who lists 40 interests can't out-match everyone, and the budget
 says what each person *actually* cares about most.
 
+**Signup entry: an even split (Phase E, D-060). The model is unchanged.** The guided signup (UX_SPEC §A) asks only
+which interests a member cares about (1–12, at least one non-sensitive) and no longer shows a points screen. The client
+(`passion-budget.js` `evenSplit`) turns n picks into points that sum to exactly 20 by largest remainder: each gets
+`floor(20 / n)` (at least 1), and the `20 mod n` leftover points go one each to the earliest picks (pick order breaks
+the ties). Every mode is `play`. Example: 3 picks become 7 + 7 + 6. The request is the same `set_member_interests`
+call as before, so every rule above still applies (the 20-point sum, the 1–12 range, consent, the completion floor
+and the rewrite cap). The resonance formula, `p_u(i)`, the modes and every other factor are untouched. An even split
+simply says "these matter about equally"; a member who wants to weight them differently can do so once the in-app
+budget editor ships (backlog).
+
 ### 3.3 Local rarity
 
 The more uncommon an interest is **in the viewer's region** (rings 0–2), the more it means to share it:
@@ -780,7 +790,8 @@ select log_impressions($1, $4);
   member gets the bare name), so the client can show "Your area: Mumbai (city-wide)" (R9). There is no in-app upgrade to a ~2 km area yet: the
   profile says "Change your area: coming soon.". Clients read place
   names from `place(id, name, region, country, is_launch)`; its centroid columns are never granted.
-- **Client capture (UX_SPEC §A, D-035).** The signup asks for geolocation only after the privacy explainer, with
+- **Client capture (UX_SPEC §A, D-035; the guided Area screen since Phase E, D-060).** The signup asks for
+  geolocation only after the privacy explainer, which is on screen above "Use my location" before the prompt, with
   `{ enableHighAccuracy: false, timeout: 10000, maximumAge: 600000 }`; denial, timeout, a missing API or an insecure
   context opens "Pick my city". The coordinates stay in one in-memory variable until `set_home_location` succeeds,
   then are dropped; they never reach `localStorage` / `sessionStorage`, a URL, the DOM or a log. A signup that waits

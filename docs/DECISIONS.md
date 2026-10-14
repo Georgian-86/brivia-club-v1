@@ -1190,3 +1190,141 @@ switch is `0010`. Phase E's decision entry becomes D-060.
 
 **Tests.** `supabase/tests/d-open-world.test.sql` (closed, open, closed again; deck_why gate; no client privilege).
 The 0008 guard's allow-list gains `brivia_tester_world`.
+
+## D-060: Phase E, the guided signup: results, rulings, accepted deviations and the founder's go-live (2026-10-14)
+
+Phase E of the experience iteration (spec §1 as amended by D-056, plan
+`docs/superpowers/plans/2026-10-13-phase-e-guided-signup.md`, ledger
+`.superpowers/sdd/2026-10-13-phase-e-guided-signup/progress.md`) is done on `claude/jolly-edison-49xvza` (commits
+18403e6..HEAD). It is not on `main`. `0009` is live (the founder, 2026-10-14).
+
+**What was built:**
+- **The guided signup** on `auth.html#signup`: one question per screen at every width (UX_SPEC §A). Email path:
+  Welcome → Email → 6-digit code → 18+ → Name → Area → Interests → Reveal (6 question steps). Google path: Welcome → 18+
+  → Name → Area → Interests → Reveal (4). It collects a verified account, the 18+ declaration, a name, an area and 1–12
+  interests (at least one non-sensitive). **No phone, no gender, no points screen.** The interests are saved with
+  `evenSplit` (20 points by largest remainder, each at least 1, earlier picks take the remainder, mode `play`). ORBIT's
+  model is unchanged (ORBIT_ENGINE §3.2 note).
+- **Resume anywhere:** a session lands on the first unanswered screen, and after each save the flow moves on to the
+  next unanswered one. **Login by code:** "Email me a code instead" (`shouldCreateUser: false`). **Deletion re-auth by
+  code:** "Send me a code" beside the password. The old 4-step form and the landing's hidden form are deleted.
+- **`0009_signup_minimisation.sql`:** `brivia_notice_version()` is `2026-10-20`, and `brivia_notice_accepted` still
+  takes `2026-10-05` until `'2026-10-20'::date + 14` (2026-11-03 00:00 in the session time zone, UTC on Supabase).
+  Server-written consent rows (`sensitive_give`, `sensitive_withdraw`, `account_deleted`) record the current version
+  during the window (Task 1 review note). `privacy.html` says phone and gender are not asked of new members, and that
+  older accounts may still hold them.
+- **Carried fixes in Task 6:**
+  - The guided Area screen shows the full privacy explainer ("We keep only a rough ~2 km square, never your exact
+    location…") and the "How we use your data" link above "Use my location", so it is read before the browser's
+    prompt. This is informed consent (Ruling 12). Task 4 had dropped it in favour of a short helper.
+  - The app's profile editor no longer shows or writes phone. It saves with `{ contact: false }`, so stored phone and
+    gender columns are never overwritten by an edit (Ruling 12, matching the 2026-10-20 notice).
+
+**Controller rulings (Phase E ledger):**
+1. The migration is `0009`, because Phase D shipped `0008` first. Filename order is apply order.
+2. "Passwordless" means a member with no `email` identity that has a password set. When the client cannot tell, it
+   offers **both** the password and "Send me a code", so nobody is ever locked out.
+3. The decision entry takes the next free number. (It became D-060, because D-059 is the open-test-world switch, `0010`.)
+4. `resumeScreen` with all four answers done but `completed = false` goes to the app, whose gate shows the
+   under-review notice.
+5. `backTarget('reveal')` is null: the interests are already saved, and the rewrite cap makes a re-save costly.
+6. Back from 18+ with a session shows Welcome, "Signed in as … · Sign out", with Continue. Email and Code are never
+   shown again.
+7. Task 3 also fixed the carried code-input minors: overwriting a filled box, and a code inside a sentence with a
+   space.
+8. Task 3's deviations are accepted (listed below), and `?legacy-signup=1` is dev-only until Task 5 deletes it.
+9. Task 3 fixes:
+   - a 429 on the Code screen says "Too many codes requested. Wait a minute, then tap Resend.";
+   - the Email screen does not re-send to the same address while the wait runs;
+   - the empty switch is UI-only (the wording is in the plan and README);
+   - the official four-colour Google G (an exception, below);
+   - automatic resends respect the wait;
+   - a code without an email goes back to Email;
+   - a 429 on the first send;
+   - a 320 px check.
+10. Phone tray: one row of whole chips and an operable "+n more" that expands into wrapped rows (capped height,
+    internal scroll) with "Show less". This is UX_SPEC rule 3 applied, so no founder exception is needed. Task 4 minors
+    were also fixed: the cap check before consent, `MAX_PICKS`, in-flight clone visibility, the 1440 tray height,
+    `realName` exported once, and durations read from `--motion-*`. The Reveal's impression is accepted (below).
+11. Task 5 fixes:
+    - The Area geolocation fallback e2e is ported to the guided flow: denied, unavailable and timeout each fall back
+      to "Pick my city" with focus on the city search, and none of them calls `set_home_location`.
+    - There is no login-view flash when a session exists.
+    - Phone and gender are no longer written from metadata, the cache or the pending profile.
+    - The delete dialog's send-code error copy no longer says "log in with your password".
+    - The unused `buildPendingOnboarding` is removed.
+    - The live `amr` check is carried to HANDOFF (below).
+12. Task 6: put the Area explainer back before the location prompt, and stop the profile editor from collecting phone.
+    Both are done.
+
+**Accepted deviations (from the task reports):**
+- Task 3:
+  - The first code box has `maxlength=6`, because iOS truncates a one-time-code autofill to the field's maxlength.
+    Each box still keeps one digit.
+  - Auto-verify runs only when the last box is filled, or on a paste or autofill of several digits. A code that just
+    failed is never re-sent.
+  - The Code screen has a primary "Verify" button, so that it has one primary action.
+  - A new `--motion-fade` token (200 ms) stays on under reduced motion, so screens can fade instead of moving.
+  - **The official Google "G" mark** (four colours on a white disc) is an exception to "add no new colours": it is a
+    third-party brand mark that must not be recoloured. The exception covers third-party marks only.
+  - Wrong and expired codes both come back from Supabase as 403 `otp_expired`. A code is called expired only when it is
+    older than `OTP_TTL_MS` (1 hour, the Supabase default), or when the message says "expired" without "invalid". If
+    the OTP expiry changes in Supabase, change `signup-errors.js` too.
+- Task 4:
+  - **The profile row is created before `declare_adult`** (`ensureOwnProfile`: id, email and a placeholder name only).
+    `declare_adult` raises `P0002 profile required` without a row, and OTP and Google signups have none.
+  - **The name is saved to `name` and `full_name`.** Member search matches on `full_name`.
+  - **The interests card is up to 760 px wide at ≥ 1200 px**, so the tray fits beside the catalogue. Every other screen
+    is at most 560 px.
+  - **The guided flow has its own consent dialog** (a native `<dialog>`). The copy is shared through
+    `interest-catalog.js`.
+  - **The Reveal reads one deck card** (`deck_candidates` with a limit of 1) to choose its qualitative line. That logs
+    one impression for that card, deduped per day. Impressions never hide cards. A non-logging check would need SQL
+    (backlog).
+  - **The fixed bar's `preserve-3d` fix:** `.auth-shell` has `transform-style: preserve-3d` (`auth-polish.css`). That
+    made the shell the containing block of the "fixed" phone action bar, so the bar scrolled away with the page.
+    `.auth-shell.is-guided` is now `transform-style: flat`. An e2e checks that at 375 px the bar stays at the bottom of
+    the viewport after an 80 px scroll.
+  - **The phone tray's "+n more" disclosure** (Ruling 10).
+  - Primary labels read "Continue". The interests save errors and the cap message sit in the tray, so they are visible
+    above the pinned bar on phones.
+- Task 5:
+  - **Deletion offers both the password and "Send me a code" to every email member.** Supabase does not expose
+    `has_password`, and nothing sets `user_metadata.has_password` yet (follow-up: set it at code signup and whenever a
+    password is added).
+  - **Profile screens advance to the next unanswered screen** after each save, so a resumed member is never asked
+    twice, and an area is never re-sent (only 3 location changes are allowed per day).
+  - **The landing's hidden legacy form is deleted.** It was dead markup, and landing parity stays identical.
+  - **The pending-profile path is kept for one release**, for accounts made with the old form that confirm their
+    email later. It no longer writes phone or gender. Remove `pending-profile.js`, its `script.js` block and the
+    `brivia-pending-profile` cleanups next release.
+
+**Switch values for production (`VITE_SIGNUP_METHODS`, Vercel Production env):**
+- `google,email`: custom SMTP with the `{{ .Token }}` template **and** Google OAuth production config are both done.
+- `google`: only Google is ready (the default sender cannot carry a public test, D-049).
+- `email`: only SMTP is ready.
+- empty: neither is ready. Welcome then shows "Signups open soon" with Log in. **This only hides the buttons.** To
+  close signups for real, also turn off Supabase Auth → "Allow new users to sign up": the login Google button and
+  direct API calls can otherwise still create accounts. Testers then use test accounts.
+
+**Founder dependencies, in one window, before 2026-11-03** (after that date the deployed Phase D client's
+`2026-10-05` declaration is refused):
+1. Custom SMTP in Supabase Auth, with a "Magic Link"/OTP template that contains `{{ .Token }}` (6 digits), Brivia
+   branding and a raised rate limit.
+2. Google OAuth production config (the Supabase provider and Google Cloud): list the testers as consent-screen test
+   users, or publish the app.
+3. Set `VITE_SIGNUP_METHODS` in Vercel, as above.
+4. Fast-forward `main` to the branch (our pushes to `main` were blocked). `0009` is already live; its window makes
+   either order safe until 2026-11-03.
+5. **One live check:** after a code login, delete a test account through "Send me a code". OTP verify must write an
+   `amr` entry whose timestamp passes `delete_my_account`'s 600 s freshness check (`0005_p0b.sql`, around line 563).
+6. The open test world switch (D-059, `0010`) is on for today's live test. **Close it and run the purge before real
+   launch.**
+
+**Tests (Task 6 gate, 2026-10-14):** SQL harness ALL PASSED; `npm run build` OK; `test:unit` 216/216; orbit 86/86;
+`check:assets` and `check:styles` OK; e2e signup 516, onboarding 89, consent 170, deck 127, landing all passed,
+app-shell 208 (0 failed each); landing parity against `6c65816` identical (22 shots, index).
+
+**Repair (Task 6):** `6c65816` had corrupted this file: an empty-pattern replace inserted D-059's numbering paragraph
+before every character (31.9 MB). Commit `0800319` removed only the inserted copies. Every line as of `767d616` is
+restored unchanged, and D-059 reads as `6c65816` intended. No earlier entry was edited.

@@ -1,13 +1,34 @@
 # Session handoff (read after CLAUDE.md)
 
-Last updated: 2026-10-13, after Phase D of the experience iteration (the test world), on branch
-`claude/jolly-edison-49xvza` (repo `Georgian-86/brivia-club-v1`). Phases C and D are not on `main` yet, and Phase D's SQL
-is not applied: the founder applies it in the SQL editor (section 3, item 0).
+Last updated: 2026-10-14, after Phase E of the experience iteration (the guided signup), on branch
+`claude/jolly-edison-49xvza` (repo `Georgian-86/brivia-club-v1`). `origin/main` is at `741b77b` (Phases C and D;
+checked with `git ls-remote` on 2026-10-14). Phase E and `0010` are on the branch only. Live SQL: `0008`, seed v2 and
+`0009` are applied, and `0010` is being applied today for the founder's live test (section 2).
 Update this file at the end of every session. CLAUDE.md holds the aim; this file holds **where we are**.
 
 ## 1. What is done
 
-**Experience iteration, Phase D (2026-10-13): done on `claude/jolly-edison-49xvza`, NOT applied live, not pushed.**
+**Experience iteration, Phase E (2026-10-14): the guided signup. Done on `claude/jolly-edison-49xvza`, NOT on `main`.**
+See D-060 (and UX_SPEC §A).
+- One question per screen at every width. Email path: Welcome → Email → 6-digit code → 18+ → Name → Area →
+  Interests → Reveal. Google path: Welcome → 18+ → Name → Area → Interests → Reveal. It collects no phone, no gender and
+  no points screen; interests are saved with an even split (`passion-budget.js` `evenSplit`, ORBIT_ENGINE §3.2).
+  Files: `signup-screens.js`, `signup-profile-screens.js`, `signup-flow.js`, `signup-errors.js`, `signup.css`,
+  `area-pick.js`.
+- Resume anywhere (a session lands on the first unanswered screen). Login has "Email me a code instead". Deletion
+  re-auth offers both the password and "Send me a code". The old 4-step form and the landing's hidden form are deleted.
+  The app profile editor no longer collects or writes phone (`saveProfile { contact: false }`).
+- `VITE_SIGNUP_METHODS` (comma list of `google`, `email`) picks the Welcome buttons. Empty shows "Signups open soon"
+  and only hides the buttons (D-060 has what really closes signups).
+- `0009_signup_minimisation.sql` (notice version `2026-10-20`; `2026-10-05` is still accepted until 2026-11-03).
+  **Applied live by the founder on 2026-10-14.**
+- Signup e2e (Vite on **:5193**; one command runs three servers in turn, one per switch value):
+  `PLAYWRIGHT_MODULE=/tmp/pw/node_modules/playwright/index.mjs node tests/e2e/signup.spec.mjs`
+  (`E2E_SCREENSHOTS=<dir>` saves every screen). Final screenshots: the session scratchpad, `phase-e-shots/final/`.
+- Commit trailer rule (founder, 2026-10-13): commits end with the `Claude-Session:` line only, **no `Co-Authored-By`**.
+- `0010_open_test_world.sql` (D-059, the founder's live test): an owner switch that puts every member in the test world.
+
+**Experience iteration, Phase D (2026-10-13): on `main` (`741b77b`); 0008 and seed v2 applied live (2026-10-14).**
 See D-057 and D-058.
 - `supabase/migrations/0008_tester_world.sql`: the tester switch (`brivia_tester`, `brivia_in_test_world`, 14
   world-checked functions, cross-world pair hiding when a tester is on one side), the post-image trigger (preset
@@ -22,7 +43,7 @@ See D-057 and D-058.
   assertion "far partner absent from deck" must flip then).
 - Commit trailer rule (founder, Phase D on): commits end with the `Claude-Session:` line only, **no `Co-Authored-By`**.
 
-**Experience iteration, Phase C (2026-10-13): done on `claude/jolly-edison-49xvza`** (not yet on `main`). See D-055.
+**Experience iteration, Phase C (2026-10-13): on `main`.** See D-055.
 - One member nav (`app-nav.js`: header at desktop, tab bar at <= 780 px; Connect · Explore · Chat · Profile), one set of
   tokens (`tokens.css`), one type system (Bodoni Moda headings, Instrument Sans body, 12 px floor), a calm profile
   column, and skeletons, busy buttons and an action in every empty state (`app-skeletons.js`).
@@ -65,13 +86,15 @@ See D-057 and D-058.
 | Iteration 4 arenas (P0-B design; end-of-iteration critique → P0-C backlog) | Done | `docs/arena/2026-10-05-p0b-design.md`, `docs/arena/2026-10-07-iteration-4.md`; D-044, D-046 |
 | Landing page | Yashika's original UI, unchanged (founder rule: optimise, never redesign) | `index.html`, CSS |
 | **Live signup walkthrough** (real browser on the live URL; 7 UI bugs fixed incl. lost signup photo, typed-city refusal, invalid phone pattern) | Done, pushed (auto-deploys) | D-049 |
-| Experience iteration A-C (signup guide, landing speed, consistency) | Done on the branch; A and B on `main`, C awaiting the founder's OK | D-053, D-054, D-055 |
-| Experience iteration D (test world: 0008, seed v2, "Why this person?") | Done on the branch; SQL not applied, not pushed | D-057, D-058 |
-| Decisions | D-001 … D-058, append-only | `docs/DECISIONS.md` |
+| Experience iteration A-C (signup guide, landing speed, consistency) | On `main` | D-053, D-054, D-055 |
+| Experience iteration D (test world: 0008, seed v2, "Why this person?") | On `main`; 0008 and seed v2 live | D-057, D-058 |
+| Open test world switch (0010) | On the branch; the founder applies it for today's live test | D-059 |
+| Experience iteration E (guided signup, 0009) | On the branch, NOT on `main`; 0009 live | D-060 |
+| Decisions | D-001 … D-060, append-only | `docs/DECISIONS.md` |
 
-Test status after D-058 (2026-10-13): SQL harness ALL PASSED; build OK; `test:unit` 173/173; orbit 86/86;
-`check:assets` and `check:styles` OK; landing parity identical (22 shots); e2e onboarding 269, consent 154, deck 123,
-landing all passed, app-shell 208.
+Test status after D-060 (2026-10-14): see the D-060 entry for the exact counts (SQL harness ALL PASSED; build OK;
+`test:unit` and orbit green; `check:assets` and `check:styles` OK; landing parity identical; e2e signup, onboarding,
+consent, deck, landing and app-shell all passed).
 **Live UI testing:** this sandbox cannot reach `*.vercel.app` / `*.supabase.co`. Use a Vercel Sandbox in project
 `brivia-club` (Vercel MCP `create_sandboxes_v4`, no failover regions on this plan, ~45 min max) with Playwright, and a
 Gmail plus-address of the founder's inbox for confirmation emails (disposable inboxes did not receive them).
@@ -84,15 +107,22 @@ Tooling: Playwright **and axe-core** at `/tmp/pw` (`npm install --prefix /tmp/pw
   `supabase/seed/README.md`; the purge leaves storage files, remove them via the Storage API first).
 - **`0005` and `0006` are applied (2026-10-08) and frozen** (D-047, D-048), verified read-only: the policies match
   `supabase/tests/policies-0006.expected.tsv` exactly, and the advisors are as the README expects. New SQL goes in
-  **`0007+`**, starting with the D-046 P0-C items. **`0008_tester_world.sql` is written but NOT applied** (Phase D;
-  section 3, item 0, has the order). Until it is, the deck stays empty for the founder's real accounts.
+  **`0007+`**, starting with the D-046 P0-C items.
+- **`0008_tester_world.sql` and seed v2 are applied (founder, 2026-10-14)** and frozen.
+- **`0009_signup_minimisation.sql` is applied (founder, 2026-10-14)** and frozen. The server's notice version is now
+  `2026-10-20`. The deployed client (`main`, Phase D) still declares `2026-10-05`, which `brivia_notice_accepted`
+  accepts only **until 2026-11-03 00:00 UTC**. The Phase E client must be on `main` before then, or new members'
+  18+ declarations fail with `stale notice version`.
+- **`0010_open_test_world.sql` is written; the founder is applying it today** and turning the switch on for a live test
+  (every member's deck also shows the test members). **Close it and run the purge before real launch** (section 3).
 - **Client deployed:** Vercel project `brivia-club` (team "Golu's projects") at `https://brivia-club.vercel.app`.
-  **Production deploys from `main`** (D-051): `main` was fast-forwarded to the working branch on 2026-10-12. A push
+  **Production deploys from `main`** (D-051): `origin/main` is at `741b77b` (Phase D). Phase E is not deployed. A push
   to the working branch builds a preview only; to go live, fast-forward `main` to it (founder OK) and Vercel deploys.
   The Supabase Auth Site URL and redirect are set to it.
   Vercel Deployment Protection is on by default; turn it off if testers without a Vercel login need access.
 - **Live checks:** the `amr` re-auth on deletion **works** (D-049: `reauth_required` → password → deleted, zero rows
-  left). Still open: the Google re-auth round trip.
+  left). Still open: the Google re-auth round trip, and the email-code re-auth (Phase E; section 3, "Phase E
+  go-live", item 5).
 - **Founder dashboard items from D-049/D-050:** **custom SMTP now blocks any public test**: the default sender hit
   `over_email_send_rate_limit` after 2 sign-ups in an hour. Also: a Brivia-branded confirmation email, and delete the
   unconfirmed QA user `brivia.qa.muzfgszm@maxxspace.com`.
@@ -100,9 +130,33 @@ Tooling: Playwright **and axe-core** at `/tmp/pw` (`npm install --prefix /tmp/pw
 
 ## 3. What to do next (in order)
 
-0. **Go live with Phase D, the test world** (D-058; all three tasks are done on the branch). First the founder reviews
-   the Phase C before/after screenshots and OKs pushing and fast-forwarding `main`. Then, in the SQL editor as
-   `postgres`, in the same window as the client deploy (details in `supabase/migrations/README.md`, "0008"):
+**Now (the founder's live test, 2026-10-14):** apply `0010` and switch it on (`supabase/migrations/README.md`, "0010").
+Then check that `origin/main` at `741b77b` has deployed on Vercel. Our pushes to `main` were blocked, so the founder
+fast-forwards `main` or allows the push. **Before real launch:** set
+`open_test_world = false`, run `select public.refresh_cell_density();`, then run the purge
+(`supabase/seed/purge-test-members.sql`).
+
+**Phase E go-live (D-060), before 2026-11-03.** The founder must do all of these, in one window:
+1. **Custom SMTP** in Supabase Auth, with a "Magic Link"/OTP email template that contains `{{ .Token }}` (the 6
+   digits), Brivia branding and a raised rate limit. Without it, ship with `VITE_SIGNUP_METHODS=google`.
+2. **Google OAuth production config** (Supabase provider plus Google Cloud): either list the testers as consent-screen
+   test users, or publish the app.
+3. **`VITE_SIGNUP_METHODS` in Vercel** (Production): `google,email` when both 1 and 2 are done, `google` or `email`
+   when only one is, and empty when neither is. **Empty only hides the buttons.** If signups must really be closed, also
+   turn off Supabase Auth → "Allow new users to sign up": the login Google button and direct API calls can otherwise
+   still create accounts.
+4. Fast-forward `main` to the branch (the founder's OK), so that Vercel deploys Phase E (0009 is already live).
+5. **One live check:** sign up or log in with an email code, then delete a test account through "Send me a code".
+   This confirms that OTP verify writes an `amr` entry with a `timestamp` that `delete_my_account`'s freshness check
+   accepts (`0005_p0b.sql`, around line 563: the latest `amr` timestamp must be within 600 s). If deletion still answers
+   `reauth_required` right after a code login, the code re-auth path needs a fix.
+6. Follow-ups: the pending-profile path (`pending-profile.js`, its `script.js` block, and the
+   `brivia-pending-profile` cleanups) is due for removal next release. Setting `user_metadata.has_password` would let
+   the delete dialog stop offering a password to members who never set one.
+
+0. **Phase D, the test world (D-058): steps 1 and 2 were done live on 2026-10-14, and the client is on `main`
+   (`741b77b`).** Kept for reference (step 3 adds a tester account; the switch in step 5 is today's live test). The
+   steps, in the SQL editor as `postgres` (details in `supabase/migrations/README.md`, "0008"):
    1. apply `0008_tester_world.sql` (with `set lock_timeout = '5s';` on the first line) and run its read-only checks;
    2. run seed v2, `supabase/seed/test-members.sql`;
    3. for each of the founder's accounts:
@@ -195,7 +249,7 @@ install it).
 | Data breach response (containment, notices, orphan-folder report) | `docs/BREACH_RUNBOOK.md` |
 | Daily moderation (new reports, flags, the 72 h suspension queue, rejoin reviews; SQL editor as owner) | `docs/MODERATION.md` |
 | SQL behaviour tests | `supabase/tests/*.test.sql` (run with `run.sh`) |
-| Signup (4 steps) | `auth.html`, `script.js`, `passion-budget.js`, `pending-profile.js` |
+| Signup (guided, Phase E) | `auth.html`, `signup-screens.js`, `signup-profile-screens.js`, `signup-flow.js`, `signup-errors.js`, `signup.css`, `area-pick.js`, `passion-budget.js` (`evenSplit`); old-account path `script.js`, `pending-profile.js` |
 | App, deck, quota | `app.html`, `app.js`, `deck-view.js`, `signal-quota.js` |
 | Test world (tester switch, why panel) | `supabase/migrations/0008_tester_world.sql`, `why-panel.js`, `supabase/tests/d-tester-world.test.sql`, `supabase/seed/README.md` |
 | App nav, tokens, skeletons, profile checklist | `app-nav.js`, `app-shell.css`, `tokens.css`, `app-skeletons.js`, `profile-checklist.js`, `profile-view.css` |

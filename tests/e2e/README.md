@@ -43,7 +43,9 @@ primary action on every screen at 320, 375 and 1440 px (at 320 the step label mu
 Area) or lands a completed member on `/app.html`; login's "Email me a code instead" (`create_user: false`, the same
 Code screen without a step label); the verify 429 copy; no phone, gender or points input in `auth.html`; browser Back
 after the Reveal never shows a profile screen again; and the expanded phone tray scrolling a new pick into view.
-`consent.spec.mjs` covers the passwordless member's "Send me a code" delete re-auth.
+`consent.spec.mjs` covers the passwordless member's "Send me a code" delete re-auth, and (Phase E Task 6) a profile
+editor with no phone field whose PATCH carries no phone or gender key. `onboarding.spec.mjs` 9c checks that the Area
+screen's ~2 km privacy explainer is visible when the browser's location prompt is requested.
 
 ```bash
 PLAYWRIGHT_MODULE=/tmp/pw/node_modules/playwright/index.mjs node tests/e2e/signup.spec.mjs
