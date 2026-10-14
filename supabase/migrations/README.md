@@ -351,3 +351,31 @@ select has_function_privilege('authenticated', 'public.brivia_notice_accepted(te
        has_function_privilege('anon', 'public.brivia_notice_accepted(text, timestamptz)', 'execute');  -- t, f
 ```
 
+
+## 0010: the open test world switch (D-059)
+
+`0010_open_test_world.sql` adds one owner-only switch, `public.brivia_world_switch.open_test_world` (off after the
+apply). While it is on, every member is in the test world, so real members' decks, search and candidates also show
+the seeded test members (and testers), and test members see real members. Matching stays mutual-consent, location
+stays coarse, and "Why this person?" stays limited to testers and test members. Apply after 0008, 0009 and the seed, in the
+SQL editor as `postgres`:
+
+```sql
+set lock_timeout = '5s';
+-- paste and run 0010_open_test_world.sql, then:
+update public.brivia_world_switch set open_test_world = true, changed_at = now();
+select public.refresh_cell_density();
+```
+
+Read-only check: `select open_test_world from public.brivia_world_switch;` is `true`, and a real member's deck shows
+test members (seed names, `@test.brivia.club`).
+
+Close it (real members see only real members again):
+
+```sql
+update public.brivia_world_switch set open_test_world = false, changed_at = now();
+select public.refresh_cell_density();
+```
+
+After closing, a real member's existing requests, matches and messages with test members stay readable until the
+purge (`supabase/seed/purge-test-members.sql`) deletes the test members. Run the purge before real launch.

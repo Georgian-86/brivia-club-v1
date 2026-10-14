@@ -112,6 +112,10 @@ Tooling: Playwright **and axe-core** at `/tmp/pw` (`npm install --prefix /tmp/pw
       members, who must be over 14 days old); with the seed's under-2 km spread, expect place names (Thane, Mumbai)
       for a long time. That is safe, not a fault.
    The deck then shows test members near Thane and Bengaluru, and each card has "Why this person?".
+   5. **Optional, for a live test with real members (D-059):** apply `0010_open_test_world.sql`, then
+      `update public.brivia_world_switch set open_test_world = true, changed_at = now();` and
+      `select public.refresh_cell_density();`. Every member's deck then also shows test members. Close it with
+      `... set open_test_world = false ...` and run the purge before real launch.
    **To stop being a tester:**
    `delete from public.brivia_tester where member_id = (select id from auth.users where email = '<your email>');`
    The account is back in the real world at once; until the purge it can still read its old test-world matches,
