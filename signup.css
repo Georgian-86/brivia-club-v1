@@ -316,6 +316,13 @@ body.auth-page .auth-shell #guided-signup .gs-underage { margin-top: var(--space
 
 /* Area: the shared picker (area-pick.js), dressed for the guided card. */
 body.auth-page .auth-shell #guided-signup .gs-area { display: flex; flex-direction: column; gap: var(--space-3); margin-top: var(--space-5); }
+body.auth-page .auth-shell #guided-signup .area-explainer {
+  display: flex; align-items: flex-start; gap: var(--space-2); margin: 0;
+  color: var(--color-ink); font: 400 var(--text-14)/1.5 var(--font-body);
+}
+body.auth-page .auth-shell #guided-signup .area-explainer .area-icon { margin-top: 1px; color: var(--color-wine); }
+body.auth-page .auth-shell #guided-signup .privacy-link { margin: calc(var(--space-2) * -1) 0 0; font: 400 var(--text-14)/1.4 var(--font-body); }
+body.auth-page .auth-shell #guided-signup .privacy-link a { display: inline-block; padding: var(--space-2) 0; color: var(--color-wine); text-underline-offset: 4px; }
 body.auth-page .auth-shell #guided-signup .area-options { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-3); }
 body.auth-page .auth-shell #guided-signup .area-option {
   display: inline-flex; align-items: center; justify-content: center; gap: var(--space-2);

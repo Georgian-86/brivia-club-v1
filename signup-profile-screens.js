@@ -147,13 +147,14 @@ registerScreen('area', {
   render(ctx) {
     ctx.title.textContent = 'Where are you based?';
     const box = el('div', { class: 'gs-area area-step' });
-    box.innerHTML = areaPickerHtml({ prefix: 'signup-area' });
+    // The privacy explainer sits above "Use my location" so it is read before the browser's prompt (informed consent).
+    box.innerHTML = areaPickerHtml({ prefix: 'signup-area', explainer: true });
     // The picker's error line is the screen's message (selection and save errors alike).
     const error = box.querySelector('[data-area-error]');
     error.id = 'signup-error';
     error.setAttribute('role', 'alert');
     error.removeAttribute('aria-live');
-    ctx.body.append(el('p', { class: 'gs-help', id: 'signup-area-help', text: 'We show people near you first. Members only ever see a rounded distance.' }), box);
+    ctx.body.append(el('p', { class: 'gs-help', id: 'signup-area-help', text: 'We show people near you first.' }), box);
     areaPicker = createAreaPicker(box, { searchPlaces });
     if (answers(ctx).areaLabel) areaPicker.keep(answers(ctx).areaLabel);
     const notice = takeNotice(ctx, 'area');

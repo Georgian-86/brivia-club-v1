@@ -196,8 +196,8 @@ const removeReplacedImage = async (bucket, userId, previousUrl, newUrl) => {
   try { await supabase.storage.from(bucket).remove([objectPath]); } catch { /* ignored */ }
 };
 
-// options.contact false (the old pending-profile path, Task 5 review): phone and gender are left out of the write, so the
-// columns keep whatever they hold. The 2026-10-20 notice no longer lists them as collected.
+// options.contact false (the old pending-profile path and the app's profile editor, Phase E): phone and gender are
+// left out of the write, so the columns keep whatever they hold. The 2026-10-20 notice no longer lists them.
 export const CONTACT_COLUMNS = ['phone', 'phone_country_code', 'phone_number', 'gender'];
 export const saveProfile = async (userId, profile, photoFile, coverFile = null, previous = {}, { contact = true } = {}) => {
   if (!supabase) return { data: null, error: new Error('Supabase is not configured.') };

@@ -860,6 +860,10 @@ try {
   // still succeeds with a row that carries no skills key.
   const skillsInputs = await hardPage.locator('#profile-edit-form [name="skills"]').count();
   check('profile editor has no editable skills field (server-owned)', () => assert.equal(skillsInputs, 0));
+  // Phase E Ruling 12: the 2026-10-20 notice no longer lists phone, so the editor neither shows nor writes it.
+  const phoneInputs = await hardPage.locator('#profile-edit-form [name="phone"], #profile-edit-form input[type="tel"]').count();
+  const phoneLabel = /PHONE/i.test(await hardPage.locator('#profile-edit-form').textContent());
+  check(`profile editor has no phone field (${phoneInputs} inputs, label ${phoneLabel})`, () => { assert.equal(phoneInputs, 0); assert.equal(phoneLabel, false); });
   await hardPage.setInputFiles('#profile-edit-form [name="photoFile"]', []);
   await hardPage.locator('#profile-edit-form [name="name"]').fill('Alex Renamed');
   const writesBeforeSave = hard.calls.length;
@@ -873,6 +877,8 @@ try {
     const row = JSON.parse(saveWrites[0].body || '{}');
     assert.equal(row.name, 'Alex Renamed');
     assert.ok(!('skills' in row));
+    // Stored contact columns are never overwritten by an edit (saveProfile { contact: false }).
+    ['phone', 'phone_country_code', 'phone_number', 'gender'].forEach((key) => assert.ok(!(key in row), `${key} in the PATCH body`));
     assert.match(saveToast, /Profile updated and saved/);
   });
   // 8g. Blocking someone who is already blocked server-side: insert (never upsert) and 23505 counts as success.

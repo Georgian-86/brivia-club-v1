@@ -182,16 +182,18 @@ const stubContext = async (context, opts = {}) => {
     // The app itself is out of scope here: a landing on /app.html is the end of the onboarding flow.
     await context.route(`${BASE}/app.html*`, (route) => route.fulfill({ status: 200, contentType: 'text/html', body: '<!doctype html><title>app</title><p id="stub-app">app</p>' }));
   }
-  // Records each getCurrentPosition call: its options and whether the guided Area screen's privacy line was visible at
-  // that moment (it must be read before the browser's location prompt).
+  // Records each getCurrentPosition call: its options and whether the guided Area screen's privacy explainer ("We keep
+  // only a rough ~2 km square, never your exact location…") was visible at that moment (read before the browser prompt).
   await context.addInitScript(() => {
     window.__geoCalls = [];
     const geo = navigator.geolocation;
     if (!geo) return;
     const original = geo.getCurrentPosition.bind(geo);
     geo.getCurrentPosition = (ok, fail, options) => {
-      const help = document.querySelector('#signup-area-help');
-      window.__geoCalls.push({ options, privacyVisible: Boolean(help && help.getClientRects().length && /Members only ever see a rounded distance\./.test(help.textContent)) });
+      // Informed consent (Ruling 12): the full explainer, not only the helper line, is on screen at prompt time.
+      const help = document.querySelector('#guided-signup [data-area-explainer]');
+      const shown = Boolean(help && help.getClientRects().length && getComputedStyle(help).visibility !== 'hidden');
+      window.__geoCalls.push({ options, privacyVisible: shown && /We keep only a rough ~2 km square, never your exact location\./.test(help.textContent) });
       return original(ok, fail, options);
     };
   });
@@ -537,7 +539,7 @@ try {
     await context.close();
   }
 
-  // 9c. Area on the guided flow (area-pick.js): before the location prompt the privacy line is on screen and the browser
+  // 9c. Area on the guided flow (area-pick.js): before the location prompt the ~2 km privacy explainer is on screen and the browser
   //     is asked with { enableHighAccuracy: false, timeout: 10000, maximumAge: 600000 }; granted, the coordinate goes
   //     only into set_home_location's body; denied, unavailable or timed out, "Pick my city" opens with
   //     "No problem. Pick your city instead." and focus on the city search, and nothing is sent; Area buttons are 44 px.
@@ -565,7 +567,7 @@ try {
     if (variant === 'granted') {
       await page.waitForFunction(() => /~2 km square/.test(document.querySelector('#guided-signup [data-area-status]')?.textContent || ''), null, { timeout: 8000 }).catch(() => {});
       const geo = await page.evaluate(() => ({ calls: window.__geoCalls, status: document.querySelector('#guided-signup [data-area-status]')?.textContent.trim() }));
-      check(`area granted: the privacy line was visible before the one location request, with the low-accuracy options (${JSON.stringify(geo)})`, () => {
+      check(`area granted: the ~2 km privacy explainer was visible before the one location request, with the low-accuracy options (${JSON.stringify(geo)})`, () => {
         assert.equal(before, 0); assert.equal(geo.calls.length, 1); assert.equal(geo.calls[0].privacyVisible, true);
         assert.deepEqual(geo.calls[0].options, { enableHighAccuracy: false, timeout: 10000, maximumAge: 600000 });
         assert.match(geo.status, /We keep only the ~2 km square/);

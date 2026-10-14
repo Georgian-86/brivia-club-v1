@@ -1779,7 +1779,6 @@ const openProfileEditor = () => {
       <div class="profile-edit-grid">
         <label><span>FULL NAME</span><input name="name" value="${escapeHtml(profile.name || '')}" required /></label>
         <label><span>EMAIL</span><input value="${escapeHtml(profile.email || '')}" readonly /></label>
-        <label><span>PHONE</span><input name="phone" value="${escapeHtml(profile.phone || '')}" /></label>
         <label><span>EXPERIENCE / ROLE</span><input name="experience" value="${escapeHtml(profile.experience || '')}" /></label>
         <div class="profile-edit-wide profile-edit-readonly" data-profile-area><span>YOUR AREA</span><p>${escapeHtml(memberPlaceLabel || 'Not set yet')}</p><small class="profile-edit-helper">Change your area: coming soon. Other members only ever see a rough distance, never your area's name.</small></div>
         <div class="profile-edit-wide profile-edit-readonly"><span>SKILLS / INTERESTS</span><p>${escapeHtml(profile.skills || 'Pick interests in your profile setup')}</p><small class="profile-edit-helper">These come from your interests and passion points. Private interests are never shown.</small></div>
@@ -1804,7 +1803,6 @@ const openProfileEditor = () => {
     const nextProfile = {
       ...memberProfile,
       name: String(formData.get('name') || '').trim(),
-      phone: String(formData.get('phone') || '').trim(),
       experience: String(formData.get('experience') || '').trim(),
       lookingFor: String(formData.get('lookingFor') || '').trim(),
     };
@@ -1816,7 +1814,9 @@ const openProfileEditor = () => {
     [photoError, coverError].forEach((node) => { node.hidden = true; node.textContent = ''; });
     setBusy(submit, true);
     feedback.textContent = 'Saving your profile...';
-    const { data, error } = await saveProfile(memberProfile.id, nextProfile, photoFile, coverFile, { photoUrl: memberProfile.photoUrl, coverUrl: memberProfile.coverUrl });
+    // { contact: false }: the editor no longer collects phone (2026-10-20 notice), so the stored contact columns are
+    // left out of the write and keep whatever they hold.
+    const { data, error } = await saveProfile(memberProfile.id, nextProfile, photoFile, coverFile, { photoUrl: memberProfile.photoUrl, coverUrl: memberProfile.coverUrl }, { contact: false });
     if (error) {
       setBusy(submit, false);
       if (error instanceof ImageProcessingError) {

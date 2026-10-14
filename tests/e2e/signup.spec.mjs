@@ -734,7 +734,7 @@ try {
       const named = stub.patches('/rest/v1/profiles').map((c) => JSON.parse(c.body || '{}'));
       check(`${w}: the name is saved to the own row (${JSON.stringify(named)})`, () => { assert.equal(named.length, 1); assert.equal(named[0].name, 'Ada Lovelace'); });
       const areaHelp = await page.locator('#guided-signup').textContent();
-      check(`${w}: Area helper copy`, () => assert.ok(areaHelp.includes('We show people near you first. Members only ever see a rounded distance.')));
+      check(`${w}: Area helper copy and the ~2 km privacy explainer above the options`, () => { assert.ok(areaHelp.includes('We show people near you first.')); assert.ok(areaHelp.includes('We keep only a rough ~2 km square, never your exact location.')); });
       await a11yScreen(page, `${w} area`);
       await shot(page, `signup-${w}-area.png`);
       await grab();
