@@ -149,6 +149,8 @@ export const showScreen = (requested, { history = 'push' } = {}) => {
   if (typeof cleanup === 'function') { try { cleanup(); } catch { /* a screen's cleanup never blocks the next one */ } }
   cleanup = null;
   state.screen = name;
+  root.classList.remove('is-pending');
+  root.removeAttribute('aria-busy');
   if (name !== 'code') state.mode = 'signup';
   if (name === 'reveal') state.revealed = true;
   const title = el('h2', { id: 'signup-screen-title', class: 'gs-title', tabindex: '-1' });
@@ -520,6 +522,15 @@ export const openGuidedSignup = async ({ path, screen, history = 'push' } = {}) 
     if (target === 'done') { window.location.replace('/app.html'); return; }
   }
   showScreen(target, { history: history === 'none' ? 'none' : 'replace' });
+};
+
+// A signed-in member is being routed (auth.html on load): the guided view shows busy, with no screen and no form, until
+// openGuidedSignup shows the first open question (Task 5 review: the login form never flashes).
+export const showGuidedPending = () => {
+  if (!root) return;
+  deps.activate('none');
+  root.classList.add('is-pending');
+  root.setAttribute('aria-busy', 'true');
 };
 
 // Login by code (Task 5): "Email me a code instead" sends a code that never creates an account and opens the same Code

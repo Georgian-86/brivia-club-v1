@@ -240,3 +240,18 @@ test('reauthOptions: password, code, both, or Google', async () => {
   assert.deepEqual(reauthOptions({ app_metadata: { provider: 'google', providers: ['google', 'email'] }, user_metadata: {} }), { password: true, code: true, google: false });
   assert.deepEqual(reauthOptions({ app_metadata: {} }), { password: true, code: true, google: false });
 });
+
+// Task 5 review, Minor 3: the delete dialog's "Send me a code" failure has its own copy. A member with no password must
+// never be told to "log in with your password"; a 429 keeps the wait copy.
+test('reauthCodeErrorCopy: the dialog never points a code-only member at a password', async () => {
+  const { reauthCodeErrorCopy, REAUTH_CODE_UNAVAILABLE, REAUTH_CODE_RATE_LIMITED } = await import('../../account-deletion.js');
+  assert.equal(REAUTH_CODE_UNAVAILABLE, "We couldn't send a code right now. Please try again in a few minutes.");
+  assert.equal(REAUTH_CODE_RATE_LIMITED, "We can't send a code right now. Please try again in a few minutes.");
+  assert.equal(reauthCodeErrorCopy({ status: 429, code: 'over_email_send_rate_limit' }), REAUTH_CODE_RATE_LIMITED);
+  assert.equal(reauthCodeErrorCopy({ message: 'email rate limit exceeded' }), REAUTH_CODE_RATE_LIMITED);
+  for (const error of [{ status: 422, code: 'otp_disabled', message: 'Signups not allowed for otp' }, { status: 400, message: 'User not found' }, { status: 500 }, null]) {
+    const copy = reauthCodeErrorCopy(error);
+    assert.equal(copy, REAUTH_CODE_UNAVAILABLE);
+    assert.ok(!/password/i.test(copy));
+  }
+});

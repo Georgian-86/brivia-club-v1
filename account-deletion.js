@@ -128,6 +128,15 @@ export const reauthOptions = (user) => {
   return { password: true, code: true, google: false };
 };
 
+// "Send me a code" failed in the delete dialog (Task 5 review). Its own copy: the login copy's "…or log in with your
+// password" is wrong for a member who has none. A 429 keeps the wait copy.
+export const REAUTH_CODE_RATE_LIMITED = "We can't send a code right now. Please try again in a few minutes.";
+export const REAUTH_CODE_UNAVAILABLE = "We couldn't send a code right now. Please try again in a few minutes.";
+export const reauthCodeErrorCopy = (error) => {
+  const limited = error?.status === 429 || /rate_limit/.test(String(error?.code || '')) || /rate limit|too many/i.test(String(error?.message || ''));
+  return limited ? REAUTH_CODE_RATE_LIMITED : REAUTH_CODE_UNAVAILABLE;
+};
+
 // The sessionStorage marker that reopens the delete dialog after "Sign in with Google again" (final fix F3). It names
 // the member who asked: Google's account chooser can bring back a different account, and that account must never
 // see its own delete dialog open by itself.

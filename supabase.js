@@ -196,7 +196,10 @@ const removeReplacedImage = async (bucket, userId, previousUrl, newUrl) => {
   try { await supabase.storage.from(bucket).remove([objectPath]); } catch { /* ignored */ }
 };
 
-export const saveProfile = async (userId, profile, photoFile, coverFile = null, previous = {}) => {
+// options.contact false (the old pending-profile path, Task 5 review): phone and gender are left out of the write, so the
+// columns keep whatever they hold. The 2026-10-20 notice no longer lists them as collected.
+export const CONTACT_COLUMNS = ['phone', 'phone_country_code', 'phone_number', 'gender'];
+export const saveProfile = async (userId, profile, photoFile, coverFile = null, previous = {}, { contact = true } = {}) => {
   if (!supabase) return { data: null, error: new Error('Supabase is not configured.') };
   let photoUrl;
   let coverUrl;
@@ -214,6 +217,7 @@ export const saveProfile = async (userId, profile, photoFile, coverFile = null, 
     return { data: null, error };
   }
   const row = profileToRow({ ...profile, coverUrl }, userId, photoUrl);
+  if (!contact) CONTACT_COLUMNS.forEach((column) => { delete row[column]; });
   // Only this member's own Storage files (or a bundled preset cover) are stored (0003 CHECK constraints). Local
   // data:/blob: previews, OAuth avatars and any other URL are never stored: an update leaves the column
   // unchanged, an insert stores null.

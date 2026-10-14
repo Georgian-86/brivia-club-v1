@@ -99,7 +99,7 @@ const stubContext = async (context, opts = {}) => {
     if (p === '/auth/v1/signup' && opts.signupStatus === 429) return json(429, { code: 'over_email_send_rate_limit', message: 'email rate limit exceeded' });
     if (p === '/auth/v1/signup') return json(200, opts.signupSession === false ? user : session);
     if (p === '/auth/v1/logout') return route.fulfill({ status: 204, headers });
-    if (p.startsWith('/auth/v1/')) return json(200, p.endsWith('/user') ? user : session);
+    if (p.startsWith('/auth/v1/')) return json(200, p.endsWith('/user') ? (opts.user || user) : session);
     const wantsObject = (request.headers().accept || '').includes('vnd.pgrst.object');
     if (p === '/rest/v1/profiles') {
       const own = () => ({ ...state.profile, adult_declared_at: state.adultAt, sensitive_consent_at: state.consentAt });
@@ -182,15 +182,16 @@ const stubContext = async (context, opts = {}) => {
     // The app itself is out of scope here: a landing on /app.html is the end of the onboarding flow.
     await context.route(`${BASE}/app.html*`, (route) => route.fulfill({ status: 200, contentType: 'text/html', body: '<!doctype html><title>app</title><p id="stub-app">app</p>' }));
   }
-  // Records each getCurrentPosition call: its options and whether the privacy explainer was visible at that moment.
+  // Records each getCurrentPosition call: its options and whether the guided Area screen's privacy line was visible at
+  // that moment (it must be read before the browser's location prompt).
   await context.addInitScript(() => {
     window.__geoCalls = [];
     const geo = navigator.geolocation;
     if (!geo) return;
     const original = geo.getCurrentPosition.bind(geo);
     geo.getCurrentPosition = (ok, fail, options) => {
-      const explainer = document.querySelector('[data-area-explainer]');
-      window.__geoCalls.push({ options, explainerVisible: Boolean(explainer && explainer.getClientRects().length && /We keep only a rough ~2 km square, never your exact location\. Other members see a rounded distance once enough people are nearby; until then they see your city\./.test(explainer.textContent)) });
+      const help = document.querySelector('#signup-area-help');
+      window.__geoCalls.push({ options, privacyVisible: Boolean(help && help.getClientRects().length && /Members only ever see a rounded distance\./.test(help.textContent)) });
       return original(ok, fail, options);
     };
   });
@@ -288,6 +289,10 @@ try {
     check(`pending: profile, then declare_adult, then city, then interests (${order.join(',')})`, () => { assert.ok(order.every((i) => i >= 0)); assert.deepEqual([...order].sort((a, b) => a - b), order); });
     const profileBodies = stub.calls.filter((c) => c.path === '/rest/v1/profiles' && ['POST', 'PATCH'].includes(c.method)).map((c) => c.body);
     check('pending: adultDeclared / adult_declared_at never reach a profiles body', () => assert.ok(!profileBodies.some((b) => /adult/i.test(b))));
+    const contactKeys = profileBodies.flatMap((b) => Object.keys(JSON.parse(b || '{}')).filter((k) => /phone|gender/i.test(k)));
+    check(`pending: the profiles write carries no phone or gender (the 2026-10-20 notice no longer lists them) (${JSON.stringify(contactKeys)}; ${profileBodies.length} writes)`, () => { assert.ok(profileBodies.length >= 1); assert.deepEqual(contactKeys, []); });
+    const cachedMember = JSON.parse((await storageDump(page).catch(() => ({})))['local:brivia-member-profile'] || '{}');
+    check(`pending: the cached member profile holds no phone or gender (${Object.keys(cachedMember).join(',')})`, () => assert.ok(!Object.keys(cachedMember).some((k) => /phone|gender/i.test(k))));
     const after = await storageDump(page).catch(() => ({}));
     check('pending: the applied pending profile is removed', () => assert.ok(!('local:brivia-pending-profile' in after)));
     check('pending: no uncaught page errors', () => assert.deepEqual(errors, []));
@@ -508,6 +513,101 @@ try {
       });
     }
     check(`photo ${variant}: no uncaught page errors`, () => assert.deepEqual(errors, []));
+    await context.close();
+  }
+
+  // 9b. An old-form account confirmed in another browser (no row, no pending profile here): its row is rebuilt from the
+  //     sign-up metadata the old form stored, but phone and gender are no longer written (Task 5 review, Minor 2).
+  {
+    const context = await fresh();
+    const oldUser = { ...user, user_metadata: { name: 'Nia New', full_name: 'Nia New', phone: '+91 9876543210', phoneCountryCode: '+91', phoneNumber: '9876543210', gender: 'Female', experience: '1–3 years', lookingFor: 'Friends' } };
+    await seedSession(context, { ...session, user: oldUser });
+    const stub = await stubContext(context, { user: oldUser });
+    const { page, errors } = await newPage(context, stub.consoleLines);
+    await page.goto(`${BASE}/auth.html?complete-profile=1`, { waitUntil: 'domcontentloaded' });
+    const ok = await waitScreen(page, 'adult').then(() => true, () => false);
+    const writes = stub.calls.filter((c) => c.path === '/rest/v1/profiles' && ['POST', 'PATCH'].includes(c.method)).map((c) => JSON.parse(c.body || '{}'));
+    const contactKeys = writes.flatMap((b) => Object.keys(b).filter((k) => /phone|gender/i.test(k)));
+    check(`metadata restore: the row is rebuilt with the name and experience, without phone or gender (${JSON.stringify(writes.map((w) => Object.keys(w)))})`, () => {
+      assert.ok(ok); assert.ok(writes.length >= 1);
+      assert.ok(writes.some((w) => w.name === 'Nia New' && w.experience === '1–3 years'));
+      assert.deepEqual(contactKeys, []);
+    });
+    check('metadata restore: no uncaught page errors', () => assert.deepEqual(errors, []));
+    await context.close();
+  }
+
+  // 9c. Area on the guided flow (area-pick.js): before the location prompt the privacy line is on screen and the browser
+  //     is asked with { enableHighAccuracy: false, timeout: 10000, maximumAge: 600000 }; granted, the coordinate goes
+  //     only into set_home_location's body; denied, unavailable or timed out, "Pick my city" opens with
+  //     "No problem. Pick your city instead." and focus on the city search, and nothing is sent; Area buttons are 44 px.
+  for (const variant of ['granted', 'denied', 'missing', 'timeout']) {
+    const width = variant === 'denied' ? 375 : variant === 'granted' ? 1440 : 1024;
+    const context = await browser.newContext({ viewport: { width, height: 812 }, ...(variant === 'denied' ? { hasTouch: true, isMobile: true } : {}) });
+    if (variant === 'granted') { await context.grantPermissions(['geolocation'], { origin: BASE }); await context.setGeolocation({ latitude: 12.971598, longitude: 77.594566 }); }
+    if (variant === 'denied') await context.grantPermissions([], { origin: BASE });  // getCurrentPosition fails with PERMISSION_DENIED
+    // Registered before the stub's recording hook, so the hook wraps the simulated failure.
+    await context.addInitScript((kind) => {
+      if (kind === 'missing') { try { delete Navigator.prototype.geolocation; } catch { /* ignore */ } Object.defineProperty(navigator, 'geolocation', { value: undefined, configurable: true }); }
+      if (kind === 'timeout') navigator.geolocation.getCurrentPosition = (ok, fail) => setTimeout(() => fail({ code: 3, message: 'Timeout expired', TIMEOUT: 3 }), 50);
+    }, variant);
+    await seedSession(context);
+    const stub = await stubContext(context, { profileExists: true });
+    const { page, errors } = await newPage(context, stub.consoleLines);
+    await page.goto(`${BASE}/auth.html#signup`, { waitUntil: 'domcontentloaded' });
+    const ok = await waitScreen(page, 'area').then(() => true, () => false);
+    check(`area ${variant}: a member with 18+ and a name resumes at Area (${ok})`, () => assert.ok(ok));
+    if (!ok) { await context.close(); continue; }
+    const before = await page.evaluate(() => window.__geoCalls.length);
+    const buttons = await page.locator('#guided-signup [data-area-geo], #guided-signup [data-area-city]').evaluateAll((els) => els.map((el) => Math.round(el.getBoundingClientRect().height)));
+    check(`area ${variant}: "Use my location" and "Pick my city" are at least 44 px tall (${buttons.join(',')})`, () => { assert.equal(buttons.length, 2); buttons.forEach((h) => assert.ok(h >= 44)); });
+    await page.locator('#guided-signup [data-area-geo]').click();
+    if (variant === 'granted') {
+      await page.waitForFunction(() => /~2 km square/.test(document.querySelector('#guided-signup [data-area-status]')?.textContent || ''), null, { timeout: 8000 }).catch(() => {});
+      const geo = await page.evaluate(() => ({ calls: window.__geoCalls, status: document.querySelector('#guided-signup [data-area-status]')?.textContent.trim() }));
+      check(`area granted: the privacy line was visible before the one location request, with the low-accuracy options (${JSON.stringify(geo)})`, () => {
+        assert.equal(before, 0); assert.equal(geo.calls.length, 1); assert.equal(geo.calls[0].privacyVisible, true);
+        assert.deepEqual(geo.calls[0].options, { enableHighAccuracy: false, timeout: 10000, maximumAge: 600000 });
+        assert.match(geo.status, /We keep only the ~2 km square/);
+      });
+      await primary(page).click();
+      await waitScreen(page, 'interests').catch(() => {});
+      const located = stub.posts('/rest/v1/rpc/set_home_location');
+      const stored = await storageDump(page);
+      check(`area granted: the coordinate is only in set_home_location's body (${located.length} calls)`, () => {
+        assert.equal(located.length, 1); assert.match(located[0].body, /12\.97/);
+        assert.ok(!stub.calls.some((c) => c !== located[0] && (COORD_RE.test(c.url) || COORD_RE.test(c.body))));
+        assert.ok(!Object.values(stored).some((v) => COORD_RE.test(v || '')));
+        assert.ok(!stub.consoleLines.some((l) => COORD_RE.test(l)));
+      });
+    } else {
+      await page.waitForSelector('#guided-signup [data-area-picker]:not([hidden])', { timeout: 15000 }).catch(() => {});
+      await page.waitForTimeout(200);
+      const seen = await page.evaluate(() => ({
+        fallback: document.querySelector('#guided-signup [data-area-fallback]')?.textContent.trim(),
+        focused: document.activeElement?.id,
+        calls: window.__geoCalls,
+      }));
+      check(`area ${variant}: falls back to "No problem. Pick your city instead." with focus on the city search (${JSON.stringify(seen)})`, () => {
+        assert.equal(seen.fallback, 'No problem. Pick your city instead.');
+        assert.equal(seen.focused, 'signup-area-city-search');
+        if (variant !== 'missing') { assert.equal(before, 0); assert.equal(seen.calls.length, 1); assert.equal(seen.calls[0].privacyVisible, true); }
+      });
+      check(`area ${variant}: no set_home_location call`, () => assert.equal(stub.posts('/rest/v1/rpc/set_home_location').length, 0));
+      if (variant === 'denied') {
+        await page.keyboard.type('Beng');
+        await page.waitForSelector('#signup-area-city-results [role="option"]');
+        await page.keyboard.press('ArrowDown');
+        await page.keyboard.press('Enter');
+        await primary(page).click();
+        await waitScreen(page, 'interests').catch(() => {});
+        const city = stub.posts('/rest/v1/rpc/set_home_city').map((c) => JSON.parse(c.body || '{}'));
+        check(`area denied: the keyboard-picked city goes to set_home_city (${JSON.stringify(city)})`, () => assert.deepEqual(city, [{ p_place_id: 'in-bengaluru' }]));
+        const noH = await noHorizontalScroll(page);
+        check('area denied: no horizontal scroll at 375 px', () => assert.ok(noH));
+      }
+    }
+    check(`area ${variant}: no uncaught page errors`, () => assert.deepEqual(errors, []));
     await context.close();
   }
 

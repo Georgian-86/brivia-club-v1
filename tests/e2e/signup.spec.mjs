@@ -1163,6 +1163,50 @@ try {
       await context.close();
     }
 
+    // 11b. Task 5 review (Minor 1): with a session the login view never flashes while the session is routed (the
+    //      profile read is slowed to 1.5 s); every frame is sampled from the first one.
+    for (const url of ['/auth.html', '/auth.html#signup', '/auth.html?complete-profile=1']) {
+      const context = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+      await stubContext(context, { signedIn: session, profile: { name: 'Ada', adult_declared_at: '2026-10-13T00:00:00Z' } });
+      await context.route(`${ORIGIN}/rest/v1/profiles*`, async (route) => {
+        if (route.request().method() === 'GET') await new Promise((resolve) => setTimeout(resolve, 1500));
+        return route.fallback();
+      });
+      await context.addInitScript(() => {
+        window.__loginSeen = [];
+        const sample = () => {
+          const form = document.querySelector('#login-form');
+          if (form) {
+            const view = form.closest('[data-auth-view]');
+            const shown = Boolean(form.getClientRects().length) && getComputedStyle(form).visibility !== 'hidden' && !view?.hidden;
+            window.__loginSeen.push(shown);
+          }
+          if (performance.now() < 6000) requestAnimationFrame(sample);
+        };
+        requestAnimationFrame(sample);
+      });
+      const { page, errors } = await newPage(context);
+      await page.goto(`${BASE}${url}`, { waitUntil: 'domcontentloaded' });
+      const ok = await waitTitle(page, 'Where are you based?').then(() => true, () => false);
+      const seen = await page.evaluate(() => ({ frames: window.__loginSeen.length, visible: window.__loginSeen.filter(Boolean).length }));
+      check(`${url}: a signed-in member never sees the login form while the session is routed (${JSON.stringify(seen)}, area ${ok})`, () => {
+        assert.ok(ok); assert.ok(seen.frames > 10, 'too few frames sampled'); assert.equal(seen.visible, 0);
+      });
+      check(`no flash ${url}: no uncaught page errors (${errors.join(' | ')})`, () => assert.deepEqual(errors, []));
+      await context.close();
+    }
+    // Without a session, auth.html still opens on the login form.
+    {
+      const context = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+      await stubContext(context);
+      const { page, errors } = await newPage(context);
+      await page.goto(`${BASE}/auth.html`, { waitUntil: 'domcontentloaded' });
+      const shown = await page.locator('#login-form').waitFor({ state: 'visible', timeout: 8000 }).then(() => true, () => false);
+      check(`no session: auth.html shows the login form (${shown})`, () => assert.ok(shown));
+      check(`login: no uncaught page errors (${errors.join(' | ')})`, () => assert.deepEqual(errors, []));
+      await context.close();
+    }
+
     // 12. Task 5: login gains "Email me a code instead" (the same Code screen, shouldCreateUser false).
     for (const w of [1440, 375]) {
       const context = await browser.newContext({ viewport: { width: w, height: w === 375 ? 812 : 900 } });

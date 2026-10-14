@@ -9,7 +9,7 @@ import { AREA_SAVE_ERROR, AREA_RATE_LIMITED } from './area-pick.js';
 import { signupMethods } from './signup-flow.js';
 import { fillGoogleMark } from './google-mark.js';
 import { setBusy } from './app-skeletons.js';
-import { initGuidedSignup, openGuidedSignup, openLoginCode, showGuidedFromHistory, guidedScreen, guidedAnswers } from './signup-screens.js';
+import { initGuidedSignup, openGuidedSignup, openLoginCode, showGuidedFromHistory, showGuidedPending, guidedScreen, guidedAnswers } from './signup-screens.js';
 // Registers 18+, Name, Area, Interests and Reveal into the shell.
 import { ADULT_SAVE_ERROR, INTERESTS_SAVE_ERROR } from './signup-profile-screens.js';
 import { motionAllowed, introPlan, markLoaded, INTRO_CAP_MS, INTRO_START_GRACE_MS } from './landing-motion.js';
@@ -531,6 +531,7 @@ const setAuthView = (view, historyMode = 'push') => {
   // Never leave a view hidden if the envelope transition was interrupted.
   authShell?.classList.remove('is-envelope-opening');
   authModal?.classList.add('is-open');
+  document.documentElement.classList.remove('auth-routing');  // a view is chosen: auth.html's pre-script hold ends
   if (isStandaloneAuthPage && view !== authHistoryView && historyMode !== 'none') {
     const state = { briviaAuthView: view };
     const nextUrl = new URL(window.location.href);
@@ -662,7 +663,9 @@ const applyPendingOnboarding = async (pending) => {
   if (result.ok) window.localStorage.removeItem('brivia-pending-profile');
   return result;
 };
-const PENDING_ONBOARDING_KEYS = ['interests', 'orbit', 'privateOmitted', 'savedAt', 'adultDeclared'];
+// Never written or cached from the pending path: the onboarding answers (applied through their RPCs) and phone and
+// gender (no longer collected: the 2026-10-20 notice does not list them; stored values are kept as they are).
+const PENDING_ONBOARDING_KEYS = ['interests', 'orbit', 'privateOmitted', 'savedAt', 'adultDeclared', 'phone', 'phoneCountryCode', 'phoneNumber', 'gender'];
 const withoutOnboarding = (profile) => {
   const clean = { ...(profile || {}) };
   PENDING_ONBOARDING_KEYS.forEach((key) => { delete clean[key]; });
@@ -700,10 +703,10 @@ const dropPendingPhoto = (storedUrl = '') => {
 // later in Edit profile). Returns saveProfile's result plus the profile to cache, which never holds a data: preview.
 const savePendingProfile = async (userId, profile, source) => {
   const photo = pendingPhotoFile(source);
-  let result = await saveProfile(userId, profile, photo);
+  let result = await saveProfile(userId, profile, photo, null, {}, { contact: false });
   if (result.error && photo) {
     dropPendingPhoto();
-    result = await saveProfile(userId, { ...profile, photoUrl: '' }, null);
+    result = await saveProfile(userId, { ...profile, photoUrl: '' }, null, null, {}, { contact: false });
   } else if (!result.error && photo) {
     dropPendingPhoto(result.data?.photo_url || '');
   }
@@ -721,14 +724,11 @@ const restoreCachedMemberProfile = async (user, preferredProfile = null) => {
   let cached = null;
   try { cached = JSON.parse(window.localStorage.getItem('brivia-member-profile') || 'null'); } catch { cached = null; }
   const metadata = user.user_metadata || {};
+  // Phone and gender in an old account's metadata are neither read nor written (no longer collected).
   const metadataProfile = {
     name: metadata.name || metadata.full_name || '',
     email: user.email || '',
-    phone: metadata.phone || '',
-    phoneCountryCode: metadata.phoneCountryCode || metadata.phone_country_code || '',
-    phoneNumber: metadata.phoneNumber || metadata.phone_number || '',
     experience: metadata.experience || '',
-    gender: metadata.gender || '',
     lookingFor: metadata.lookingFor || metadata.looking_for || '',
     coverUrl: metadata.coverUrl || metadata.cover_url || '',
   };
@@ -736,7 +736,7 @@ const restoreCachedMemberProfile = async (user, preferredProfile = null) => {
   const candidate = candidates.find((item) => {
     const email = String(item.email || user.email || '').trim().toLowerCase();
     const name = String(item.name || item.full_name || '').trim();
-    const hasProfileSignals = item !== metadataProfile || Boolean(item.phone || item.experience || item.gender || item.lookingFor || item.coverUrl);
+    const hasProfileSignals = item !== metadataProfile || Boolean(item.experience || item.lookingFor || item.coverUrl);
     return email === userEmail && name && name !== 'New Member' && hasProfileSignals;
   });
   if (!candidate) return false;
@@ -809,6 +809,9 @@ const restoreAuthPageSession = async () => {
   }
   const { data: { session }, error: sessionError } = await supabase.auth.getSession();
   if (sessionError || !session?.user) { void showRequested(); return; }
+  // Signed in: the guided view (busy, no form) shows while the profile and any old pending profile are read, so the
+  // login form never flashes.
+  showGuidedPending();
   await routeSession(session.user);
 };
 

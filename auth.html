@@ -14,6 +14,17 @@
         window.location.replace(target.toString());
       })();
     </script>
+    <script>
+      // A signed-in member (a stored Supabase session) or #signup is routed to the guided flow: the login view stays
+      // hidden until script.js shows a view, so it never flashes (Phase E Task 5 review).
+      (() => {
+        try {
+          const signedIn = Object.keys(window.localStorage).some((key) => /^sb-.*-auth-token$/.test(key));
+          if (signedIn || window.location.hash === '#signup') document.documentElement.classList.add('auth-routing');
+        } catch { /* storage unavailable: the login view shows as usual */ }
+      })();
+    </script>
+    <style>html.auth-routing [data-auth-view="login"] { visibility: hidden; }</style>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="theme-color" content="#f5f1e9" />

@@ -1,8 +1,8 @@
 // PRIVACY & ACCOUNT (Iteration 4, Task 9; rulings R2 withdraw and R5 delete). UX_SPEC §G.
 // Real <dialog> elements opened with showModal(): a Tab trap, Escape (ignored while a request is in flight), focus
 // returned to the trigger. Everything that touches Supabase is injected by app.js, so this file only builds the UI.
-import { consentStatusCopy, reauthOptions, deletionErrorCopy, DELETE_DISCLOSURE } from './account-deletion.js';
-import { verifyErrorCopy, loginCodeErrorCopy, otpErrorKind } from './signup-errors.js';
+import { consentStatusCopy, reauthOptions, reauthCodeErrorCopy, deletionErrorCopy, DELETE_DISCLOSURE } from './account-deletion.js';
+import { verifyErrorCopy, otpErrorKind } from './signup-errors.js';
 
 const CONTACT = 'thebrivia.club@gmail.com';
 const WITHDRAW_ERROR = `We couldn't withdraw your consent. Try again, or email ${CONTACT}.`;
@@ -139,7 +139,7 @@ const openDeleteDialog = ({ trigger, fallbackFocus, deps }) => {
     let sent;
     try { sent = await deps.sendCode(deps.user?.email); } catch (error) { sent = { error }; }
     setBusy(false);
-    if (sent?.error) { errorBox.textContent = loginCodeErrorCopy(sent.error); sendCode.focus(); return; }
+    if (sent?.error) { errorBox.textContent = reauthCodeErrorCopy(sent.error); sendCode.focus(); return; }
     codeSent = true;
     codeField.hidden = false;
     sendCode.textContent = 'Send a new code';
