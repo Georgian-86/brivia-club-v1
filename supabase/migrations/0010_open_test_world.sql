@@ -8,7 +8,14 @@
 --   * Off by default. The founder turns it on and off in the SQL editor:
 --       update public.brivia_world_switch set open_test_world = true,  changed_at = now();   -- open
 --       update public.brivia_world_switch set open_test_world = false, changed_at = now();   -- close
---     then `select public.refresh_cell_density();` so the ~3 km / ~10 km bands count the new world at once.
+--     `select public.refresh_cell_density();` is a no-op if that night's run already happened (0008's global
+--     watermark: a date not newer than the last run returns 0), so the ~3 km / ~10 km bands do not change at once;
+--     they follow the next nightly runs and the 7-night hysteresis.
+--   * Density while open: cell_density is keyed by brivia_in_test_world, so every member counts in the open world's
+--     cells and seeded test members count toward a real member's 10-member floor. The real-world cells get no
+--     members, so their streaks reset; after closing, real members have no ~3 km / ~10 km band for at least 7 nights.
+--     Close within 6 nights, so no band is ever earned on test members. (Backlog: 0011 keys density on
+--     brivia_tester_world, so is_test members never satisfy a real member's floor.)
 --   * "Why this person?" (deck_why) stays limited to testers and test members: the open world does not show real
 --     members the ranking keys. Only that gate is redefined below; deck_why is otherwise copied verbatim from 0008.
 --   * After closing: a real member's requests, matches and messages with test members stay readable (0008 hides

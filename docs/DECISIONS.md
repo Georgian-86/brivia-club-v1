@@ -1328,3 +1328,24 @@ app-shell 208 (0 failed each); landing parity against `6c65816` identical (22 sh
 **Repair (Task 6):** `6c65816` had corrupted this file: an empty-pattern replace inserted D-059's numbering paragraph
 before every character (31.9 MB). Commit `0800319` removed only the inserted copies. Every line as of `767d616` is
 restored unchanged, and D-059 reads as `6c65816` intended. No earlier entry was edited.
+
+## D-059 addendum: what the open test world does to density bands (Phase E final review, 2026-10-14)
+
+Appended; D-059 above is unchanged. Three corrections to how D-059 and `0010`'s first runbook described the switch:
+
+1. **The manual refresh is not "at once".** `select public.refresh_cell_density();` is a no-op when that night's run
+   already happened: `refresh_cell_density` keeps a global watermark (`0008_tester_world.sql`, the
+   `as_of >= p_as_of` check) and returns `0`. The ~3 km / ~10 km bands follow the next nightly runs and the
+   7-night hysteresis.
+2. **While the switch is open, seeded test members count toward a real member's 10-member floor.** `cell_density` is
+   keyed by `brivia_in_test_world`, which is true for every member while the switch is on, so everyone is counted in
+   the test world's rows. After 7 nights such a row can grant a real member a `~3 km` / `~10 km` band that test members
+   earned.
+3. **Closing costs real members their bands for at least 7 nights.** While open, the real-world rows get no members, so
+   their streaks drop to 0. After closing they restart from 0, and real members show place names until 7 consecutive
+   nightly counts rebuild `ok10`.
+
+**Ruling.** Close the switch within 6 nights, so no band is ever earned on test members. `0010` changes only in its
+header comment (its SQL is live and frozen); `supabase/migrations/README.md` "0010" and `docs/ORBIT_ENGINE.md` say the same.
+**Backlog:** a later migration (`0011`) keys density on `brivia_tester_world`, so `is_test` members never satisfy a
+real member's floor, whatever the switch says. No new SQL in this fix wave.

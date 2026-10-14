@@ -370,6 +370,14 @@ select public.refresh_cell_density();
 Read-only check: `select open_test_world from public.brivia_world_switch;` is `true`, and a real member's deck shows
 test members (seed names, `@test.brivia.club`).
 
+The `refresh_cell_density()` call is a no-op if that night's run already happened (a global watermark, `0008`
+`refresh_cell_density`): it returns `0` and the ~3 km / ~10 km bands do not change at once. They follow the nightly
+runs and the 7-night hysteresis. While the switch is open, density cells are keyed by `brivia_in_test_world`, so every
+member counts in the open world's cells and **seeded test members count toward a real member's 10-member floor**. The
+real-world cells get no members, so their streaks reset: after closing, real members have no ~3 km / ~10 km band for
+at least 7 nights. **Close it within 6 nights**, so no band is ever earned on test members. (Backlog: `0011` keys
+density on `brivia_tester_world`, so test members never count toward a real member's floor. D-059 addendum.)
+
 Close it (real members see only real members again):
 
 ```sql

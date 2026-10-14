@@ -134,7 +134,12 @@ Tooling: Playwright **and axe-core** at `/tmp/pw` (`npm install --prefix /tmp/pw
 Then check that `origin/main` at `741b77b` has deployed on Vercel. Our pushes to `main` were blocked, so the founder
 fast-forwards `main` or allows the push. **Before real launch:** set
 `open_test_world = false`, run `select public.refresh_cell_density();`, then run the purge
-(`supabase/seed/purge-test-members.sql`).
+(`supabase/seed/purge-test-members.sql`). **Close the switch within 6 nights** (D-059 addendum): while it is open,
+seeded test members count toward a real member's 10-member density floor, and closing resets the real-world streaks,
+so real members show place names instead of `~3 km`/`~10 km` for at least 7 nights. The manual refresh is a no-op
+if that night's run already happened, so bands never change "at once".
+**Backlog (SQL, `0011`):** key `refresh_cell_density` on `brivia_tester_world` instead of `brivia_in_test_world`, so
+`is_test` members never satisfy a real member's floor whatever the switch says.
 
 **Phase E go-live (D-060), before 2026-11-03.** The founder must do all of these, in one window:
 1. **Custom SMTP** in Supabase Auth, with a "Magic Link"/OTP email template that contains `{{ .Token }}` (the 6
@@ -150,9 +155,19 @@ fast-forwards `main` or allows the push. **Before real launch:** set
    This confirms that OTP verify writes an `amr` entry with a `timestamp` that `delete_my_account`'s freshness check
    accepts (`0005_p0b.sql`, around line 563: the latest `amr` timestamp must be within 600 s). If deletion still answers
    `reauth_required` right after a code login, the code re-auth path needs a fix.
-6. Follow-ups: the pending-profile path (`pending-profile.js`, its `script.js` block, and the
+6. **Privacy notice date (founder decision, I4).** `privacy.html` says "Version 2026-10-20 · effective 20 October
+   2026". Either deploy the Phase E client on or after 20 October 2026, or change that visible date to the deploy
+   date. Leave the version string (`2026-10-20`, `notice-version.js` and `brivia_notice_version()`) unchanged either
+   way.
+7. **18+ "No" deletes the account (final fix I3).** It calls `delete_my_account('DELETE')` right after the code was
+   verified, then signs out. The live check in item 5 covers the same `amr` freshness. On the Google path an older
+   session can answer `reauth_required`: the member is still signed out and sees the adults-only copy, but that
+   account (and its email) stays in `auth.users` until removed by hand.
+8. Follow-ups: the pending-profile path (`pending-profile.js`, its `script.js` block, and the
    `brivia-pending-profile` cleanups) is due for removal next release. Setting `user_metadata.has_password` would let
    the delete dialog stop offering a password to members who never set one.
+9. **Repository history note (accepted, not rewritten):** commit `6c65816` holds a 31.9 MB `docs/DECISIONS.md` blob
+   (the corrupted file, repaired in `0800319`). The founder accepted keeping it; history is not rewritten.
 
 0. **Phase D, the test world (D-058): steps 1 and 2 were done live on 2026-10-14, and the client is on `main`
    (`741b77b`).** Kept for reference (step 3 adds a tester account; the switch in step 5 is today's live test). The
@@ -169,7 +184,7 @@ fast-forwards `main` or allows the push. **Before real launch:** set
    5. **Optional, for a live test with real members (D-059):** apply `0010_open_test_world.sql`, then
       `update public.brivia_world_switch set open_test_world = true, changed_at = now();` and
       `select public.refresh_cell_density();`. Every member's deck then also shows test members. Close it with
-      `... set open_test_world = false ...` and run the purge before real launch.
+      `... set open_test_world = false ...` within 6 nights (D-059 addendum) and run the purge before real launch.
    **To stop being a tester:**
    `delete from public.brivia_tester where member_id = (select id from auth.users where email = '<your email>');`
    The account is back in the real world at once; until the purge it can still read its old test-world matches,

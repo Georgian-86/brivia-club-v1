@@ -494,7 +494,12 @@ saturated, the outer rings relax first, instead of the deck repeating saturated 
   `brivia_in_test_world(member)`: `is_test`, or a row in the owner-only tester list `brivia_tester` (0008, a real
   account moved into the test world without becoming `is_test`); every function that compares two members' worlds
   compares that, never `is_test` directly. Requests, matches and messages between a tester and a member of the other
-  world are hidden from both while that holds (`brivia_pair_world_ok`). `get_candidates`,
+  world are hidden from both while that holds (`brivia_pair_world_ok`). **Open test world switch (0010, D-059):** the
+  owner-only, single-row `brivia_world_switch.open_test_world` (off by default; no client role can read or change it).
+  While it is on, `brivia_in_test_world` is true for every existing profile, so real members, testers and seeded
+  test members share one world (deck, search, candidates, requests, matches, messages, posts); an unknown id stays
+  false. 0008's helper body survives as `brivia_tester_world(member)` (`is_test`, or a `brivia_tester` row), also
+  internal. Closing the switch restores 0008 exactly. `get_candidates`,
   `search_members`, `list_members` and `brivia_can_see_author` are built on it (signatures, caps, ordering and
   escaping unchanged), and every later candidate RPC (the interim deck, ORBIT's `orbit_cards`) must use it too.
   `brivia_member_completed` and `brivia_visible_to` are internal: no client role may execute them. The same holds for
@@ -563,8 +568,10 @@ saturated, the outer rings relax first, instead of the deck repeating saturated 
     `~3 km` (fine, ring 0), `~10 km` (fine, ring 1) or the target's place name (every place-rule admission). So
     `~3 km` / `~10 km` appear only between two `cell`-precision members when the target's own g7 cell is `ok10`. The
     g6 / g5 band levels of D-034 are gone (J2: any coarsened card already showed a place-level label).
-  - **`deck_why(p_target)`** (0008 section 5, Phase D) explains one card, for the test world only: a row only when
-    the caller is in the test world (`brivia_in_test_world`) and the deck's pool rules admit the target (the same
+  - **`deck_why(p_target)`** (0008 section 5, Phase D; caller gate redefined in 0010) explains one card, for testers
+    and test members only: a row only when the caller is in the tester world (`brivia_tester_world`: `is_test` or a
+    `brivia_tester` row; never a real member, even while the open test world switch is on, so ranking keys never reach
+    a real member's client) and the deck's pool rules admit the target (the same
     `me`/`near`/admission and `brivia_visible_to`; the own-history hides are left out). It returns the card's own
     `shared_interests` and `distance_band` and `rank_keys` = the order keys above for that pair: `has_shared` (1),
     `ring` (2, the display ring), `overlap_level` (3), `tie_break: 'daily'` (4; the md5 key is not returned), plus
@@ -847,7 +854,10 @@ select log_impressions($1, $4);
 - **No band flips:** a cell's coarsening level only goes up quickly and comes down slowly. Populations live in the
   owner-only `cell_density(cell, is_test, n, streak10, streak5, ok10, ok5, as_of)` table (RLS on, no client grants),
   one row per g7, g6 and g5 cell and world (the column keeps the name `is_test` but holds
-  `brivia_in_test_world(member)`, so a tester is counted in the test world, 0008). `refresh_cell_density(p_as_of date default current_date)` (owner only;
+  `brivia_in_test_world(member)`, so a tester is counted in the test world, 0008; while the open test world switch
+  is on (0010), every member is counted in the test world's rows, so seeded test members count toward a real
+  member's 10-member floor and the real-world rows lose their streaks; see D-059's addendum, and backlog: key density
+  on `brivia_tester_world`). `refresh_cell_density(p_as_of date default current_date)` (owner only;
   scheduled nightly with pg_cron by `brivia_schedule_nightly_jobs()`, together with `purge_expired_requests()`;
   runbook: `supabase/migrations/README.md`) recounts every cell that has members, plus every existing row. Counts group by
   the **stored** `home_cell`, `home_cell_g6` and `home_cell_g5` columns of `member_orbit`; parents are never
