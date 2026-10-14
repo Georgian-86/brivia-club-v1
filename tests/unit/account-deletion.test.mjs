@@ -227,3 +227,16 @@ test('F3: the re-auth marker records the user id and time; only the same user wi
   assert.equal(reauthMarkerMatches('{bad json', 'u-1', now), false);
   assert.equal(reauthMarkerMatches(raw, '', now), false);
 });
+
+// Phase E Task 5 (Ruling 2): a member may have no password (email code signup). Known passwordless: a code only.
+// Known password: the password field only. Unsure (an email account without the flag): both, never a lock-out.
+test('reauthOptions: password, code, both, or Google', async () => {
+  const { reauthOptions } = await import('../../account-deletion.js');
+  const email = (meta) => ({ app_metadata: { provider: 'email', providers: ['email'] }, user_metadata: meta });
+  assert.deepEqual(reauthOptions(email({ has_password: true })), { password: true, code: false, google: false });
+  assert.deepEqual(reauthOptions(email({ has_password: false })), { password: false, code: true, google: false });
+  assert.deepEqual(reauthOptions(email({})), { password: true, code: true, google: false });
+  assert.deepEqual(reauthOptions({ app_metadata: { provider: 'google', providers: ['google'] } }), { password: false, code: false, google: true });
+  assert.deepEqual(reauthOptions({ app_metadata: { provider: 'google', providers: ['google', 'email'] }, user_metadata: {} }), { password: true, code: true, google: false });
+  assert.deepEqual(reauthOptions({ app_metadata: {} }), { password: true, code: true, google: false });
+});

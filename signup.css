@@ -555,3 +555,24 @@ body.auth-page .auth-shell #guided-signup .gs-reveal-line { max-width: 40ch; col
   body.auth-page .auth-shell #guided-signup .gs-tray-empty { min-height: 44px; display: flex; align-items: center; }
   body.auth-page .auth-shell #guided-signup .area-options { grid-template-columns: 1fr; }
 }
+
+/* Login: "Email me a code instead" (Phase E Task 5). A full-width text action under the password button, 44 px tall. */
+body.auth-page .auth-shell .auth-login .auth-code-login {
+  order: 5;
+  align-self: stretch;
+  min-height: 44px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--color-wine);
+  font: 600 var(--text-14)/1 var(--font-body);
+  letter-spacing: 0;
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 4px;
+  cursor: pointer;
+}
+body.auth-page .auth-shell .auth-login .auth-code-login:hover { color: var(--color-wine-deep); }
+body.auth-page .auth-shell .auth-login .auth-code-login:focus-visible { outline: 2px solid var(--color-wine); outline-offset: 3px; }
+body.auth-page .auth-shell .auth-login .auth-code-login[aria-busy="true"] { cursor: progress; opacity: .7; }

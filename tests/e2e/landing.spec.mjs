@@ -408,8 +408,10 @@ try {
       assert.ok(landingCss.hrefs.length > 0, 'index.html links no stylesheet');
       assert.deepEqual([...new Set(landingCss.css.match(AUTH_ONLY) || [])], []);
     });
-    await check(`the auth CSS bundle still carries the signup and success styles (${authCss.hrefs.join(', ')})`, () => {
-      assert.deepEqual([...new Set(authCss.css.match(AUTH_ONLY) || [])].sort(), ['.auth-success', '.signup-step']);
+    // Phase E Task 5 retired the 4-step form: the auth bundle carries the guided signup, and none of the old form's styles.
+    await check(`the auth CSS bundle carries the guided signup and none of the retired form's styles (${authCss.hrefs.join(', ')})`, () => {
+      assert.ok(/#guided-signup/.test(authCss.css), 'no #guided-signup styles in the auth bundle');
+      assert.deepEqual([...new Set(authCss.css.match(AUTH_ONLY) || [])], []);
     });
   }
 } finally {

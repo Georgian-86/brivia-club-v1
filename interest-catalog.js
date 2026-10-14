@@ -1,5 +1,5 @@
-// The interest taxonomy as the signup shows it (spec §3.1): pure, no DOM. Shared by the guided signup's Interests
-// screen (signup-profile-screens.js) and the old 4-step form (script.js, until Phase E Task 5 retires it).
+// The interest taxonomy as the signup shows it (spec §3.1): pure, no DOM. Used by the guided signup's Interests
+// screen (signup-profile-screens.js).
 // Levels 1-2 group (domain, category), levels 3-4 are selectable.
 
 // D-038 R3: sensitive interests are never shown to others and do not affect who the member sees yet.

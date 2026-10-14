@@ -141,3 +141,16 @@ test('revealCopy: no shared row says the member is one of the first, with no cou
   assert.equal(revealCopy({ name: '', picks: [], rows: [] }).title, "You're in.");
   assert.equal(revealCopy({ name: 'New Member', picks: [], rows: [] }).title, "You're in.");
 });
+
+// Phase E Task 5: once the Reveal was reached (interests saved), a history step back onto a profile screen shows the
+// Reveal again instead of a stale question; Welcome, Email and Code keep their own rules.
+test('historyScreen: after the Reveal, profile screens turn back into the Reveal', async () => {
+  const { historyScreen } = await import('../../signup-flow.js');
+  for (const s of ['adult', 'name', 'area', 'interests']) {
+    assert.equal(historyScreen(s, { revealed: true }), 'reveal');
+    assert.equal(historyScreen(s, { revealed: false }), s);
+  }
+  assert.equal(historyScreen('welcome', { revealed: true }), 'welcome');
+  assert.equal(historyScreen('reveal', { revealed: true }), 'reveal');
+  assert.equal(historyScreen(undefined, {}), 'welcome');
+});

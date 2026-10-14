@@ -1126,9 +1126,9 @@ try {
 
   // 10. Iteration 4, Task 9 (R2 withdraw, R5 client): PRIVACY & ACCOUNT in the profile settings menu. Own context per
   // sign-in method so the stub can answer as a password member or a Google-only member.
-  const makePrivacyContext = async (provider, label) => {
-    const ctx = await browser.newContext({ viewport: { width: 375, height: 800 } });
-    const pUser = { ...user, app_metadata: { provider, providers: [provider] } };
+  const makePrivacyContext = async (provider, label, { meta, width = 375 } = {}) => {
+    const ctx = await browser.newContext({ viewport: { width, height: 800 } });
+    const pUser = { ...user, app_metadata: { provider, providers: [provider] }, ...(meta ? { user_metadata: { ...(user.user_metadata || {}), ...meta } } : {}) };
     const pSession = { ...session, user: pUser };
     await ctx.addInitScript(([key, value]) => { window.localStorage.setItem(key, value); }, ['sb-stub-auth-token', JSON.stringify(pSession)]);
     const st = {
@@ -1146,6 +1146,16 @@ try {
       const json = (status, payload) => route.fulfill({ status, contentType: 'application/json', body: JSON.stringify(payload), headers: { 'access-control-allow-origin': '*' } });
       if (method === 'OPTIONS') return route.fulfill({ status: 204, headers: { 'access-control-allow-origin': '*', 'access-control-allow-headers': '*', 'access-control-allow-methods': '*' } });
       if (pathName === '/auth/v1/token' && url.searchParams.get('grant_type') === 'password') { st.tokenCalls += 1; st.reauthed = true; return json(200, pSession); }
+      // Task 5: code re-auth (signInWithOtp with shouldCreateUser false, then verifyOtp). 123456 is the right code.
+      if (pathName === '/auth/v1/otp') { st.otpBodies = [...(st.otpBodies || []), JSON.parse(postData || '{}')]; return json(200, {}); }
+      if (pathName === '/auth/v1/verify') {
+        const body = JSON.parse(postData || '{}');
+        st.verifyTokens = [...(st.verifyTokens || []), body.token];
+        if (body.token === '429429') return json(429, { code: 'over_request_rate_limit', message: 'Request rate limit reached' });
+        if (body.token !== '123456') return json(403, { code: 'otp_expired', message: 'Token has expired or is invalid' });
+        st.reauthed = true;
+        return json(200, pSession);
+      }
       if (pathName === '/auth/v1/authorize') return route.fulfill({ status: 200, contentType: 'text/html', body: '<!doctype html><title>oauth stub</title>' });
       if (pathName.startsWith('/auth/v1/')) return json(200, pathName.endsWith('/user') ? pUser : pSession);
       const listMatch = pathName.match(/^\/storage\/v1\/object\/list\/([^/]+)$/);
@@ -1303,6 +1313,8 @@ try {
   await pw.page.locator('[data-privacy-confirm-delete]').click();
   await pw.page.waitForSelector('#privacy-delete-password', { timeout: 10000 }).catch(() => {});
   const reauthUi = await pw.page.evaluate(() => ({ label: document.querySelector('label[for="privacy-delete-password"]')?.textContent.trim(), type: document.querySelector('#privacy-delete-password')?.type, google: Boolean(document.querySelector('[data-privacy-google]:not([hidden])')), url: location.pathname }));
+  const bothUi = await pw.page.evaluate(() => ({ code: Boolean(document.querySelector('[data-privacy-send-code]:not([hidden])')) && !document.querySelector('[data-privacy-send-code]').closest('[hidden]') }));
+  check(`Ruling 2: an email member without a known password also gets "Send me a code" beside the password (${JSON.stringify(bothUi)})`, () => assert.equal(bothUi.code, true));
   check(`reauth_required asks a password member for their password (${JSON.stringify(reauthUi)})`, () => { assert.equal(reauthUi.label, 'Confirm your password'); assert.equal(reauthUi.type, 'password'); assert.equal(reauthUi.google, false); assert.equal(reauthUi.url, '/app.html'); });
   check(`F1: reauth_required comes before any Storage list or remove; every file is still there (${storageCalls() - storageBefore} storage calls, files ${JSON.stringify(Object.values(pw.st.files).map((f) => f.length))})`, () => {
     assert.equal(storageCalls(), storageBefore);
@@ -1351,6 +1363,62 @@ try {
   check(`signOut ran only after the RPC succeeded (local scope)`, () => { const logout = pw.st.calls.filter((c) => c.path === '/auth/v1/logout'); assert.equal(logout.length, 1); assert.match(logout[0].search, /scope=local/); });
   check('privacy context (password): no uncaught page errors', () => assert.deepEqual(pw.errors, []));
   await pw.ctx.close();
+
+
+  // Task 5: a passwordless member (email code signup, user_metadata.has_password false) re-authenticates with a code:
+  // "Send me a code" (shouldCreateUser false), then the code, then the deletion runs. No password field at all.
+  for (const width of [375, 1440]) {
+    const pl = await makePrivacyContext('email', `passwordless ${width}`, { meta: { has_password: false }, width });
+    Object.keys(pl.st.files).forEach((k) => { pl.st.files[k] = []; });
+    pl.st.rpcMode = ['reauth'];
+    await openSettingsItem(pl.page, 'privacy');
+    await pl.page.locator('[data-privacy-delete]').click();
+    await pl.page.locator('#privacy-delete-confirm').fill('DELETE');
+    await pl.page.locator('[data-privacy-confirm-delete]').click();
+    await pl.page.waitForSelector('[data-privacy-send-code]:visible', { timeout: 10000 }).catch(() => {});
+    const ui = await pl.page.evaluate(() => {
+      const shown = (sel) => { const el = document.querySelector(sel); return Boolean(el && el.getClientRects().length && !el.closest('[hidden]')); };
+      return { send: shown('[data-privacy-send-code]'), sendText: document.querySelector('[data-privacy-send-code]')?.textContent.trim(), password: shown('#privacy-delete-password'), google: shown('[data-privacy-google]'), alert: document.querySelector('[data-privacy-error]')?.textContent.trim() };
+    });
+    check(`${width}: a passwordless member's delete dialog offers "Send me a code" and no password field (${JSON.stringify(ui)})`, () => {
+      assert.equal(ui.send, true); assert.equal(ui.sendText, 'Send me a code'); assert.equal(ui.password, false); assert.equal(ui.google, false);
+    });
+    const empty = await (async () => { await pl.page.locator('[data-privacy-confirm-delete]').click(); await pl.page.waitForTimeout(200); return pl.page.evaluate(() => document.querySelector('[data-privacy-error]')?.textContent.trim()); })();
+    check(`${width}: Delete before a code asks for one and calls nothing (${empty})`, () => { assert.match(empty, /code/i); assert.equal(pl.st.rpcCalls.length, 1); assert.equal((pl.st.otpBodies || []).length, 0); });
+    await pl.page.locator('[data-privacy-send-code]').click();
+    await pl.page.waitForSelector('#privacy-delete-code:visible', { timeout: 10000 }).catch(() => {});
+    const sent = pl.st.otpBodies || [];
+    const codeUi = await pl.page.evaluate(() => ({ label: document.querySelector('label[for="privacy-delete-code"]')?.textContent.trim(), ac: document.querySelector('#privacy-delete-code')?.autocomplete, mode: document.querySelector('#privacy-delete-code')?.inputMode, focused: document.activeElement?.id, status: document.querySelector('[data-privacy-code-status]')?.textContent.trim() }));
+    check(`${width}: "Send me a code" sends one code with shouldCreateUser false to the member's own email (${JSON.stringify(sent)}; ${JSON.stringify(codeUi)})`, () => {
+      assert.equal(sent.length, 1); assert.equal(sent[0].email, user.email); assert.equal(sent[0].create_user, false);
+      assert.equal(codeUi.ac, 'one-time-code'); assert.equal(codeUi.mode, 'numeric'); assert.equal(codeUi.focused, 'privacy-delete-code');
+      assert.ok(codeUi.label); assert.match(codeUi.status || '', /sent/i);
+    });
+    const contrast = await axeViolations(pl.page, { include: 'dialog[data-privacy="delete"]' });
+    check(`${width}: the code re-auth dialog passes axe (${contrast.join(' | ')})`, () => assert.deepEqual(contrast, []));
+    if (SHOTS) await pl.page.screenshot({ path: path.join(SHOTS, `delete-${width}-code-reauth.png`) });
+    if (width === 375) {
+      await pl.page.locator('#privacy-delete-code').fill('429429');
+      await pl.page.locator('[data-privacy-confirm-delete]').click();
+      await pl.page.waitForFunction(() => /Too many attempts/.test(document.querySelector('[data-privacy-error]')?.textContent || ''), null, { timeout: 8000 }).catch(() => {});
+      const limited = await pl.page.evaluate(() => document.querySelector('[data-privacy-error]')?.textContent.trim());
+      check(`${width}: a 429 on the code shows the verify rate-limit copy (${limited})`, () => assert.equal(limited, 'Too many attempts. Wait a minute, then try the code again.'));
+      await pl.page.locator('#privacy-delete-code').fill('000111');
+      await pl.page.locator('[data-privacy-confirm-delete]').click();
+      await pl.page.waitForFunction(() => /didn't work/.test(document.querySelector('[data-privacy-error]')?.textContent || ''), null, { timeout: 8000 }).catch(() => {});
+      const wrong = await pl.page.evaluate(() => document.querySelector('[data-privacy-error]')?.textContent.trim());
+      check(`${width}: a wrong code says so and deletes nothing (${wrong}; rpc ${pl.st.rpcCalls.length})`, () => { assert.match(wrong, /That code didn't work/); assert.equal(pl.st.rpcCalls.length, 1); });
+    }
+    const navigated = pl.page.waitForURL(/\/privacy\.html\?deleted=1$/, { timeout: 15000 }).then(() => true, () => false);
+    await pl.page.locator('#privacy-delete-code').fill('123456');
+    await pl.page.locator('[data-privacy-confirm-delete]').click();
+    const landed = await navigated;
+    check(`${width}: a passwordless member deletes after verifying the code (${landed}; verify ${JSON.stringify(pl.st.verifyTokens)}; rpc ${pl.st.rpcCalls.length}; password logins ${pl.st.tokenCalls})`, () => {
+      assert.equal(landed, true); assert.equal(pl.st.verifyTokens.at(-1), '123456'); assert.equal(pl.st.rpcCalls.length, 2); assert.equal(pl.st.tokenCalls, 0);
+    });
+    check(`passwordless ${width}: no uncaught page errors`, () => assert.deepEqual(pl.errors, []));
+    await pl.ctx.close();
+  }
 
   // Google-only member: "Sign in with Google again" with a return marker; the delete dialog reopens after return.
   const gg = await makePrivacyContext('google', 'google member');

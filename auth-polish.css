@@ -226,10 +226,6 @@
   background: #5a061f;
 }
 
-.auth-back-trigger:hover {
-  color: #5a061f;
-}
-
 .auth-note {
   color: #5a061f;
 }
@@ -380,10 +376,7 @@
   color: #e8a1b1;
 }
 
-.auth-panel .auth-intro,
-.auth-panel .signup-password-hint,
-.auth-panel .looking-helper,
-.auth-panel .skills-helper {
+.auth-panel .auth-intro {
   color: rgba(255, 250, 241, .62);
 }
 
@@ -405,36 +398,23 @@
   color: #2d0712;
 }
 
-.auth-panel .auth-form label,
-.auth-panel .photo-upload > label:first-child,
-.auth-panel .skills-picker > label,
-.auth-panel .looking-picker > label {
+.auth-panel .auth-form label {
   color: rgba(255, 250, 241, .68);
 }
 
 .auth-panel .auth-form input,
-.auth-panel .auth-form select,
-.auth-panel .skills-search,
-.auth-panel .looking-search,
-.auth-panel .skills-other-input,
-.auth-panel .looking-other-input {
+.auth-panel .auth-form select {
   border-color: rgba(255, 224, 230, .2);
   background: rgba(255, 250, 241, .07);
   color: #fffaf1;
 }
 
-.auth-panel .auth-form input::placeholder,
-.auth-panel .skills-search::placeholder,
-.auth-panel .looking-search::placeholder,
-.auth-panel .skills-other-input::placeholder,
-.auth-panel .looking-other-input::placeholder {
+.auth-panel .auth-form input::placeholder {
   color: rgba(255, 250, 241, .42);
 }
 
 .auth-panel .auth-form input:focus,
-.auth-panel .auth-form select:focus,
-.auth-panel .skills-search:focus,
-.auth-panel .looking-search:focus {
+.auth-panel .auth-form select:focus {
   border-color: #e8a1b1;
   background: rgba(255, 250, 241, .11);
   box-shadow: 0 0 0 3px rgba(232, 161, 177, .13);
@@ -479,73 +459,7 @@
   color: #fffaf1;
 }
 
-.auth-panel .auth-back-trigger {
-  color: rgba(255, 250, 241, .55);
-}
-
-.auth-panel .auth-back-trigger:hover {
-  color: #e8a1b1;
-}
-
 .auth-panel .auth-note {
-  color: #e8a1b1;
-}
-
-.auth-panel .signup-progress,
-.auth-panel .signup-progress-track span {
-  color: #e8a1b1;
-}
-
-.auth-panel .signup-progress-track {
-  background: rgba(255, 224, 230, .14);
-}
-
-.auth-panel .signup-progress-track span {
-  background: #e8a1b1;
-}
-
-.auth-panel .photo-drop {
-  border-color: rgba(232, 161, 177, .35);
-  background: rgba(232, 161, 177, .08);
-  color: #e8a1b1 !important;
-}
-
-.auth-panel .photo-drop:hover {
-  border-color: #e8a1b1;
-  background: rgba(232, 161, 177, .14);
-}
-
-.auth-panel .photo-preview {
-  border-color: rgba(232, 161, 177, .4);
-  background: rgba(232, 161, 177, .12);
-  color: #e8a1b1;
-}
-
-.auth-panel .skills-results,
-.auth-panel .looking-results {
-  border-color: rgba(255, 224, 230, .2);
-  background: #1e1216;
-}
-
-.auth-panel .skills-selected span,
-.auth-panel .looking-selected span {
-  border-color: rgba(232, 161, 177, .3);
-  background: rgba(232, 161, 177, .1);
-  color: #ffdbe3;
-}
-
-.auth-panel .auth-success h2,
-.auth-panel .auth-success p {
-  color: #fffaf1;
-}
-
-.auth-panel .credential-row {
-  border-color: rgba(255, 224, 230, .2);
-  background: rgba(255, 250, 241, .06);
-}
-
-.auth-panel .credential-row code,
-.auth-panel .credential-row button {
   color: #e8a1b1;
 }
 
@@ -1960,223 +1874,20 @@
   font-size: var(--text-12);
 }
 
-.auth-shell:has(.auth-signup.is-active) .auth-signup-form,
-.auth-shell:has(.auth-signup.is-active) .auth-field-grid {
-  gap: 12px;
-}
-
-.auth-shell:has(.auth-signup.is-active) .auth-signup-form label,
-.auth-shell:has(.auth-signup.is-active) .auth-signup-form > .photo-upload > label:first-child,
-.auth-shell:has(.auth-signup.is-active) .auth-signup-form .skills-picker > label,
-.auth-shell:has(.auth-signup.is-active) .auth-signup-form .looking-picker > label {
-  color: rgba(90, 6, 31, .74);
-  font-size: var(--text-12);
-  font-weight: 700;
-  letter-spacing: .093em;
-  text-transform: uppercase;
-}
-
-.auth-shell:has(.auth-signup.is-active) .auth-signup-form input,
-.auth-shell:has(.auth-signup.is-active) .auth-signup-form select,
-.auth-shell:has(.auth-signup.is-active) .auth-signup-form .skills-search,
-.auth-shell:has(.auth-signup.is-active) .auth-signup-form .looking-search,
-.auth-shell:has(.auth-signup.is-active) .auth-signup-form .skills-other-input,
-.auth-shell:has(.auth-signup.is-active) .auth-signup-form .looking-other-input {
-  border-color: rgba(90, 6, 31, .18);
-  border-radius: 7px;
-  background: rgba(255, 250, 241, .22);
-  color: #3f2228;
-}
-
-.auth-shell:has(.auth-signup.is-active) .auth-signup-form input::placeholder,
-.auth-shell:has(.auth-signup.is-active) .auth-signup-form .skills-search::placeholder,
-.auth-shell:has(.auth-signup.is-active) .auth-signup-form .looking-search::placeholder {
-  color: rgba(90, 6, 31, .38);
-}
-
-.auth-shell:has(.auth-signup.is-active) .auth-signup-form .auth-submit {
-  justify-content: center;
-  gap: 8px;
-  margin-top: 6px;
-  border-color: #5a061f;
-  border-radius: 999px;
-  background: #5a061f;
-  color: #fff9f0;
-}
-
 /* Signup identity fields */
-.auth-signup-form .phone-input-group {
-  display: grid;
-  grid-template-columns: minmax(104px, .38fr) minmax(0, 1fr);
-  gap: 8px;
-}
-
-.auth-signup-form .phone-input-group select,
-.auth-signup-form .phone-input-group input {
-  width: 100%;
-  min-width: 0;
-}
-
-.auth-signup-form [data-signup-step="1"] .phone-field {
-  grid-column: 1 / -1;
-}
-
-.auth-signup-form .phone-input-group select,
-.auth-signup-form .phone-input-group input {
-  height: 43px;
-  min-height: 43px;
-}
-
-.auth-signup-form .signals-identity-grid {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-  gap: 12px;
-  align-items: end;
-}
-
-.auth-signup-form .signals-identity-grid .gender-picker {
-  min-width: 0;
-}
-
-.auth-signup-form .gender-picker {
-  margin: 0;
-  padding: 0;
-  border: 0;
-}
-
-.auth-signup-form .gender-picker legend {
-  margin: 0 0 8px;
-  color: rgba(90, 6, 31, .74);
-  font-size: var(--text-12);
-  font-weight: 700;
-  letter-spacing: .093em;
-  text-transform: uppercase;
-}
-
-.auth-signup-form .gender-options {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 8px;
-}
-
-.auth-signup-form .gender-option {
-  position: relative;
-  display: block;
-  margin: 0;
-  color: #5a061f;
-  cursor: pointer;
-}
-
-.auth-signup-form .gender-option input {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  overflow: hidden;
-  clip: rect(0 0 0 0);
-  clip-path: inset(50%);
-  white-space: nowrap;
-}
-
-.auth-signup-form .gender-option span {
-  display: flex;
-  min-height: 42px;
-  align-items: center;
-  justify-content: center;
-  padding: 8px 6px;
-  border: 1px solid rgba(90, 6, 31, .18);
-  background: rgba(255, 250, 241, .42);
-  color: #5a061f;
-  font-size: var(--text-12);
-  font-weight: 700;
-  letter-spacing: .053em;
-  line-height: 1.2;
-  text-align: center;
-  transition: border-color .2s ease, background .2s ease, color .2s ease;
-}
-
-.auth-signup-form .gender-option input:focus-visible + span,
-.auth-signup-form .gender-option input:checked + span {
-  border-color: #5a061f;
-  background: #5a061f;
-  color: #fffaf1;
-}
-
-@media (max-width: 480px) {
-  .auth-signup-form .gender-options { grid-template-columns: 1fr; }
-  .auth-signup-form .signals-identity-grid { grid-template-columns: 1fr; }
-}
 
 /* Keep the skills and looking-for pickers light and readable. */
-.auth-shell:has(.auth-signup.is-active) .auth-signup-form .skills-search,
-.auth-shell:has(.auth-signup.is-active) .auth-signup-form .looking-search,
-.auth-shell:has(.auth-signup.is-active) .auth-signup-form .skills-other-input,
-.auth-shell:has(.auth-signup.is-active) .auth-signup-form .looking-other-input,
-.auth-shell:has(.auth-signup.is-active) .auth-signup-form .skills-results,
-.auth-shell:has(.auth-signup.is-active) .auth-signup-form .looking-results {
-  background: #fff !important;
-  color: #111 !important;
-}
-
-.auth-shell:has(.auth-signup.is-active) .auth-signup-form .skills-search::placeholder,
-.auth-shell:has(.auth-signup.is-active) .auth-signup-form .looking-search::placeholder,
-.auth-shell:has(.auth-signup.is-active) .auth-signup-form .skills-other-input::placeholder,
-.auth-shell:has(.auth-signup.is-active) .auth-signup-form .looking-other-input::placeholder {
-  color: #777 !important;
-}
-
-.auth-shell:has(.auth-signup.is-active) .auth-signup-form .skill-option,
-.auth-shell:has(.auth-signup.is-active) .auth-signup-form .skill-option:hover,
-.auth-shell:has(.auth-signup.is-active) .auth-signup-form .skill-option.is-selected,
-.auth-shell:has(.auth-signup.is-active) .auth-signup-form .skills-selected .skill-chip,
-.auth-shell:has(.auth-signup.is-active) .auth-signup-form .looking-selected .skill-chip {
-  color: #111 !important;
-}
-
-.auth-shell:has(.auth-signup.is-active) .auth-signup-form .skills-selected .skill-chip,
-.auth-shell:has(.auth-signup.is-active) .auth-signup-form .looking-selected .skill-chip {
-  background: #fff !important;
-}
-
-.auth-shell:has(.auth-signup.is-active) .auth-signup-form .skills-selected .skill-chip span,
-.auth-shell:has(.auth-signup.is-active) .auth-signup-form .looking-selected .skill-chip span {
-  border: 0 !important;
-  background: transparent !important;
-  color: #111 !important;
-}
 
 /* Keep the option list open while either picker has focus. */
-.auth-shell:has(.auth-signup.is-active) .auth-signup-form .skills-picker:focus-within,
-.auth-shell:has(.auth-signup.is-active) .auth-signup-form .looking-picker:focus-within {
-  z-index: 5;
-}
-
-.auth-shell:has(.auth-signup.is-active) .auth-signup-form .skills-picker:focus-within .skills-results,
-.auth-shell:has(.auth-signup.is-active) .auth-signup-form .looking-picker:focus-within .looking-results {
-  display: flex;
-  flex-direction: column;
-  padding: 5px;
-}
-
-.auth-shell:has(.auth-signup.is-active) .auth-back-trigger {
-  color: rgba(90, 6, 31, .7);
-}
 
 /* The cover rail has many cards, but it must scroll inside the signup panel.
    Without an explicit min-width, its grid min-content size pushes the whole
    desktop panel off-screen as soon as Step 3 becomes visible. */
 .auth-shell:has(.auth-signup.is-active),
 .auth-shell:has(.auth-signup.is-active) .auth-panel,
-.auth-shell:has(.auth-signup.is-active) .auth-signup,
-.auth-shell:has(.auth-signup.is-active) .auth-signup-form,
-.auth-shell:has(.auth-signup.is-active) .cover-picker,
-.auth-shell:has(.auth-signup.is-active) .cover-picker-section,
-.auth-shell:has(.auth-signup.is-active) .cover-suggestions {
+.auth-shell:has(.auth-signup.is-active) .auth-signup {
   min-width: 0 !important;
   max-width: 100%;
-}
-
-.auth-shell:has(.auth-signup.is-active) .cover-suggestions {
-  width: 100%;
 }
 
 @media(max-width:800px) {
@@ -2609,13 +2320,6 @@
     line-height: 1.45;
     text-align: center;
   }
-
-  .auth-shell:has(.auth-signup.is-active) .auth-signup-form {
-    width: min(100%, 560px);
-    margin-right: auto;
-    margin-left: auto;
-    text-align: left;
-  }
 }
 
 /* Login community cards styled like the supplied marketplace reference. */
@@ -2734,29 +2438,6 @@
     text-align: center;
   }
 
-  .auth-shell:has(.auth-signup.is-active) .auth-signup-form {
-    width: min(100%, 560px) !important;
-    margin: 0 auto !important;
-    text-align: left;
-  }
-
-  .auth-shell:has(.auth-signup.is-active) .skills-helper,
-  .auth-shell:has(.auth-signup.is-active) .looking-helper {
-    color: rgba(90, 6, 31, .68) !important;
-    font-size: var(--text-12);
-  }
-
-  .auth-shell:has(.auth-signup.is-active) .signup-step-prev {
-    display: flex !important;
-    min-height: 42px;
-    margin-top: 12px;
-    border: 1px solid rgba(90, 6, 31, .35) !important;
-    background: rgba(255, 250, 241, .3) !important;
-    color: #5a061f !important;
-    font-size: var(--text-12);
-    letter-spacing: .067em;
-  }
-
   .auth-shell:has(.auth-signup.is-active) .auth-panel::before {
     display: none !important;
     right: clamp(14px, 2.5vw, 42px) !important;
@@ -2775,171 +2456,16 @@
    ORBIT onboarding (UX_SPEC flow A): step 2 "Your area", step 3 interests + Passion Budget.
    Brand tokens only (--brivia-*; tints via color-mix), SVG icons, 44 px targets, visible focus, reduced motion.
    --------------------------------------------------------------------------------------------------------------- */
-.auth-signup-form {
-  --ob-ink: var(--brivia-deep-wine);
-  --ob-accent: var(--brivia-wine);
-  --ob-soft: var(--brivia-wine-soft);
-  --ob-line: color-mix(in srgb, var(--brivia-deep-wine) 20%, transparent);
-  --ob-tint: color-mix(in srgb, var(--brivia-deep-wine) 6%, transparent);
-  --ob-tint-strong: color-mix(in srgb, var(--brivia-deep-wine) 12%, transparent);
-  --ob-paper: color-mix(in srgb, var(--brivia-deep-wine) 3%, white);
-}
-.auth-signup-form .sr-only {
-  position: absolute !important; width: 1px !important; height: 1px !important; padding: 0 !important; margin: -1px !important;
-  overflow: hidden !important; clip: rect(0 0 0 0) !important; white-space: nowrap !important; border: 0 !important;
-}
-.auth-signup-form .ob-icon,
-.auth-signup-form .area-icon {
-  width: 18px; height: 18px; flex: 0 0 auto; fill: none; stroke: currentColor; stroke-width: 1.8;
-  stroke-linecap: round; stroke-linejoin: round;
-}
-.auth-signup-form .signup-next[aria-disabled="true"] { opacity: .55; cursor: not-allowed; }
-.auth-signup-form :is(.area-option, .interest-chip, .budget-step, .budget-remove, .interest-retry, .interest-group > summary):focus-visible,
-.auth-signup-form .mode-option input:focus-visible + span {
-  outline: 2px solid var(--ob-ink); outline-offset: 2px;
-}
 
 /* Step 2: Your area */
-.auth-signup-form .area-step { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
-.auth-signup-form .area-explainer {
-  display: flex; align-items: flex-start; gap: 10px; margin: 0; padding: 12px 14px; border: 1px solid var(--ob-line);
-  border-radius: 10px; background: var(--ob-tint); color: var(--ob-ink); font-size: var(--text-12); font-weight: 600; line-height: 1.45;
-  text-transform: none; letter-spacing: 0;
-}
-.auth-signup-form .area-options { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
-.auth-signup-form .area-option {
-  display: flex; align-items: center; justify-content: center; gap: 8px; min-height: 48px; padding: 10px 14px;
-  border: 1px solid var(--ob-ink); border-radius: 999px; background: transparent; color: var(--ob-ink);
-  font: 700 var(--text-12)/1.2 var(--font-body); letter-spacing: .073em; text-transform: uppercase; cursor: pointer;
-}
-.auth-signup-form .area-option[aria-expanded="true"] { background: var(--ob-ink); color: white; }
-.auth-signup-form .area-option[aria-busy="true"] { opacity: .7; cursor: progress; }
-.auth-signup-form .area-city { position: relative; display: flex; flex-direction: column; gap: 8px; }
-.auth-signup-form .area-city[hidden] { display: none; }
-.auth-signup-form .area-fallback:empty,
-.auth-signup-form .area-status:empty,
-.auth-signup-form .area-error:empty,
-.auth-signup-form .budget-error:empty { display: none; }
-.auth-signup-form .area-fallback { margin: 0; color: var(--ob-ink); font-size: var(--text-12); font-weight: 600; text-transform: none; letter-spacing: 0; }
-.auth-signup-form .area-city-results {
-  display: flex; flex-direction: column; gap: 2px; max-height: 240px; margin: 0; padding: 4px; overflow-y: auto; list-style: none;
-  border: 1px solid var(--ob-line); border-radius: 8px; background: white;
-}
-.auth-signup-form .area-city-results[hidden],
-.auth-signup-form .area-city-results:empty { display: none; }
-.auth-signup-form .area-city-option {
-  display: flex; align-items: baseline; justify-content: space-between; gap: 10px; min-height: 44px; padding: 12px; border-radius: 6px;
-  color: var(--ob-ink); font-size: var(--text-12); font-weight: 600; cursor: pointer;
-}
-.auth-signup-form .area-city-option small { color: var(--ob-soft); font-size: var(--text-12); font-weight: 500; }
-.auth-signup-form .area-city-option[aria-selected="true"] { background: var(--ob-tint-strong); }
-.auth-signup-form .area-city-empty { padding: 12px; color: var(--ob-soft); font-size: var(--text-12); }
-.auth-signup-form .area-status { margin: 0; color: var(--ob-ink); font-size: var(--text-12); font-weight: 600; text-transform: none; letter-spacing: 0; }
-.auth-signup-form .area-error,
-.auth-signup-form .budget-error { margin: 0; color: var(--ob-accent); font-size: var(--text-12); font-weight: 700; text-transform: none; letter-spacing: 0; }
 
 /* Step 3: interest picker */
-.auth-signup-form .interest-picker { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
-.auth-signup-form .interest-help { margin: 0; color: var(--ob-soft); font-size: var(--text-12); text-transform: none; letter-spacing: 0; }
-.auth-signup-form .interest-results {
-  display: flex; flex-direction: column; gap: 6px; max-height: 340px; overflow-y: auto; padding: 2px; overscroll-behavior: contain;
-}
-.auth-signup-form .interest-group { border: 1px solid var(--ob-line); border-radius: 10px; background: var(--ob-paper); }
-.auth-signup-form .interest-group > summary,
-.auth-signup-form .interest-group-title {
-  display: flex; align-items: baseline; justify-content: space-between; gap: 10px; min-height: 44px; margin: 0; padding: 12px 14px;
-  color: var(--ob-ink); font-size: var(--text-12); font-weight: 700; cursor: pointer; list-style: none;
-}
-.auth-signup-form .interest-group-title { cursor: default; padding-bottom: 4px; }
-.auth-signup-form .interest-group > summary::-webkit-details-marker { display: none; }
-.auth-signup-form .interest-group > summary small,
-.auth-signup-form .interest-group-title small { color: var(--ob-soft); font-size: var(--text-12); font-weight: 600; letter-spacing: .05em; text-transform: uppercase; }
-.auth-signup-form .interest-chips { display: flex; flex-wrap: wrap; gap: 8px; padding: 4px 12px 12px; }
-.auth-signup-form .interest-chip {
-  display: inline-flex; flex-wrap: wrap; align-items: center; gap: 4px 6px; min-height: 44px; max-width: 100%; padding: 8px 14px;
-  border: 1px solid var(--ob-line); border-radius: 999px; background: white; color: var(--ob-ink);
-  font: 600 var(--text-12)/1.25 var(--font-body); text-align: left; cursor: pointer;
-}
-.auth-signup-form .interest-chip.is-private { border-radius: 14px; }
-.auth-signup-form .interest-chip.is-selected { border-color: var(--ob-ink); background: var(--ob-ink); color: white; }
-.auth-signup-form .interest-chip[aria-disabled="true"] { opacity: .5; cursor: not-allowed; }
-.auth-signup-form .interest-chip .ob-icon { width: 14px; height: 14px; }
-.auth-signup-form .interest-private {
-  display: inline-flex; align-items: center; gap: 4px; flex-basis: 100%; color: inherit; opacity: .85;
-  font-size: var(--text-12); font-weight: 500; line-height: 1.3; letter-spacing: 0; text-transform: none;
-}
-.auth-signup-form .interest-private .ob-icon { width: 12px; height: 12px; }
-.auth-signup-form .interest-loading { margin: 0; padding: 12px; color: var(--ob-soft); font-size: var(--text-12); text-transform: none; letter-spacing: 0; }
-.auth-signup-form .interest-retry {
-  min-height: 44px; margin-left: 6px; padding: 0 14px; border: 1px solid var(--ob-ink); border-radius: 999px;
-  background: transparent; color: var(--ob-ink); font: 700 var(--text-12) var(--font-body); letter-spacing: .067em; cursor: pointer;
-}
 
 /* Step 3: Passion Budget */
-.auth-signup-form .budget { display: flex; flex-direction: column; gap: 10px; min-width: 0; padding: 14px; border: 1px solid var(--ob-line); border-radius: 12px; background: var(--ob-paper); }
-.auth-signup-form .budget-head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 4px 12px; }
-.auth-signup-form .budget-head h3 { margin: 0; color: var(--ob-ink); font: 400 var(--text-20)/1.1 var(--font-heading); letter-spacing: -.02em; }
-.auth-signup-form .budget-counter { margin: 0; color: var(--ob-ink); font-size: var(--text-12); font-weight: 700; letter-spacing: .04em; font-variant-numeric: tabular-nums; }
-.auth-signup-form .budget-error { flex-basis: 100%; }
-.auth-signup-form .budget-list { display: flex; flex-direction: column; gap: 10px; margin: 0; padding: 0; list-style: none; }
-.auth-signup-form .budget-empty { margin: 0; color: var(--ob-soft); font-size: var(--text-12); text-transform: none; letter-spacing: 0; }
-.auth-signup-form .budget-empty[hidden] { display: none; }
-.auth-signup-form .budget-row { display: flex; flex-direction: column; gap: 8px; padding: 10px 0 0; border-top: 1px solid var(--ob-line); }
-.auth-signup-form .budget-row:first-child { padding-top: 0; border-top: 0; }
-.auth-signup-form .budget-row-head { display: flex; flex-direction: column; gap: 2px; color: var(--ob-ink); }
-.auth-signup-form .budget-label { font-size: var(--text-14); font-weight: 700; }
-.auth-signup-form .budget-row-head .interest-private { color: var(--ob-soft); }
-.auth-signup-form .budget-controls { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
-.auth-signup-form .budget-stepper { display: inline-flex; align-items: center; gap: 4px; }
-.auth-signup-form .budget-step,
-.auth-signup-form .budget-remove {
-  display: inline-flex; align-items: center; justify-content: center; width: 44px; height: 44px; padding: 0;
-  border: 1px solid var(--ob-ink); border-radius: 50%; background: white; color: var(--ob-ink); cursor: pointer;
-}
-.auth-signup-form .budget-step[aria-disabled="true"] { opacity: .4; cursor: not-allowed; }
-.auth-signup-form .budget-remove { margin-left: auto; border-color: var(--ob-line); }
-.auth-signup-form .budget-points { min-width: 30px; color: var(--ob-ink); font-size: var(--text-16); font-weight: 700; text-align: center; font-variant-numeric: tabular-nums; }
-.auth-signup-form .mode-control {
-  display: flex; flex: 1 1 188px; min-width: 0; padding: 2px; border: 1px solid var(--ob-line); border-radius: 999px; background: white;
-}
-.auth-shell .auth-signup-form .mode-control .mode-option {
-  position: relative; display: block; flex: 1 1 0; min-width: 44px; margin: 0; color: var(--ob-ink); cursor: pointer;
-}
-.auth-shell .auth-signup-form .mode-control .mode-option input {
-  position: absolute !important; width: 1px !important; height: 1px !important; min-height: 0 !important; padding: 0 !important;
-  margin: 0 !important; overflow: hidden; clip: rect(0 0 0 0); clip-path: inset(50%); border: 0 !important; opacity: 0;
-}
-.auth-shell .auth-signup-form .mode-control .mode-option span {
-  display: flex; align-items: center; justify-content: center; min-width: 44px; min-height: 44px; padding: 0 6px; border-radius: 999px;
-  color: var(--ob-ink); font: 700 var(--text-12)/1 var(--font-body); letter-spacing: .018em; text-transform: none;
-}
-.auth-shell .auth-signup-form .mode-control .mode-option input:checked + span { background: var(--ob-ink); color: white; }
 
 /* Hover only where a pointer can hover (no sticky hover after a tap). */
-@media (hover: hover) {
-  .auth-signup-form .area-option:hover { background: var(--ob-ink); color: white; }
-  .auth-signup-form .area-city-option:hover { background: var(--ob-tint-strong); }
-  .auth-signup-form .budget-step:hover:not([aria-disabled="true"]) { background: var(--ob-ink); color: white; }
-  .auth-signup-form .budget-remove:hover { border-color: var(--ob-ink); }
-  .auth-signup-form .interest-chip:not(.is-selected):not([aria-disabled="true"]):hover { border-color: var(--ob-ink); }
-}
-@media (max-width: 480px) {
-  .auth-signup-form .area-options { grid-template-columns: 1fr; }
-  .auth-signup-form .mode-control { flex-basis: 100%; order: 3; }
-}
-@media (prefers-reduced-motion: no-preference) {
-  .auth-signup-form :is(.area-option, .interest-chip, .budget-step, .budget-remove, .area-city-option),
-  .auth-signup-form .mode-option span { transition: background-color .15s ease, color .15s ease, border-color .15s ease; }
-}
 
 /* Interest search: the native clear button in the wine token (a mask, so no raw colour). */
-.auth-signup-form .interest-search::-webkit-search-cancel-button {
-  -webkit-appearance: none; appearance: none; width: 16px; height: 16px; cursor: pointer; background-color: var(--brivia-wine);
-  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.4' stroke-linecap='round'%3E%3Cpath d='M6 6l12 12M18 6L6 18'/%3E%3C/svg%3E") center / contain no-repeat;
-  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.4' stroke-linecap='round'%3E%3Cpath d='M6 6l12 12M18 6L6 18'/%3E%3C/svg%3E") center / contain no-repeat;
-}
-.auth-signup-form .budget-note { margin: 0; color: var(--ob-soft); font-size: var(--text-12); font-weight: 600; text-transform: none; letter-spacing: 0; }
-.auth-signup-form .budget-note[hidden] { display: none; }
 
 /* Close (×): a 44 × 44 target that never sits on the header controls (it overlapped "Log in" at 375 px and at
    desktop widths). The signup header row reserves room for it. */
@@ -2957,45 +2483,5 @@
 }
 
 /* R1: the 18+ declaration (signup step 1, last field above Next). Reuses the signup palette; 44 px row, 12 px+ text. */
-.auth-signup-form .adult-confirm { display: flex; flex-direction: column; gap: 4px; min-width: 0; margin: 0; padding: 0; border: 0; }
-.auth-signup-form .adult-legend { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
-.auth-signup-form .adult-row {
-  display: flex; align-items: center; gap: 12px; min-height: 48px; padding: 8px 12px; border: 1px solid var(--ob-line, #d9cfc8);
-  border-radius: 10px; background: transparent; color: var(--ob-ink, #5a061f); font-size: var(--text-14); font-weight: 700; line-height: 1.3;
-  letter-spacing: 0; text-transform: none; cursor: pointer;
-}
-.auth-signup-form .adult-row input[type="checkbox"] { flex: 0 0 auto; width: 24px; height: 24px; margin: 0; accent-color: var(--ob-ink, #5a061f); cursor: pointer; }
-.auth-signup-form .adult-row:focus-within { outline: 2px solid var(--ob-ink, #5a061f); outline-offset: 2px; }
-.auth-signup-form .adult-row:has(input[aria-invalid="true"]) { border-color: var(--ob-accent); }
-.auth-signup-form .adult-help { margin: 0; color: color-mix(in srgb, var(--brivia-deep-wine) 78%, white); font-size: var(--text-12); line-height: 1.45; text-transform: none; letter-spacing: 0; }
-.auth-signup-form .adult-error { margin: 0; color: var(--ob-accent); font-size: var(--text-12); font-weight: 700; line-height: 1.4; text-transform: none; letter-spacing: 0; }
-.auth-signup-form .adult-error:empty { display: none; }
-.auth-signup-form .privacy-link { margin: 0; font-size: var(--text-12); text-transform: none; letter-spacing: 0; }
-.auth-signup-form .privacy-link a { display: inline-flex; align-items: center; min-height: 44px; color: var(--ob-ink, #5a061f); font-weight: 700; text-decoration: underline; text-underline-offset: 2px; }
 
 /* R2: the private-interests entry and consent panel (UX_SPEC consent panel) */
-.auth-signup-form .private-open {
-  align-self: flex-start; min-height: 44px; padding: 0 4px; border: 0; background: transparent; color: var(--ob-ink);
-  font: 600 var(--text-14)/1.25 var(--font-body); text-decoration: underline; text-underline-offset: 3px; cursor: pointer;
-}
-.auth-signup-form .private-open[hidden] { display: none; }
-.auth-signup-form .private-open:focus-visible { outline: 2px solid var(--ob-ink); outline-offset: 2px; }
-.auth-signup-form .private-consent {
-  width: min(440px, calc(100vw - 32px)); max-height: calc(100vh - 32px); overflow: auto; padding: 20px;
-  border: 1px solid var(--ob-line); border-radius: 14px; background: white; color: var(--ob-ink);
-  font-family: var(--font-body); text-transform: none; letter-spacing: 0;
-}
-.auth-signup-form .private-consent::backdrop { background: color-mix(in srgb, var(--brivia-deep-wine) 55%, transparent); }
-.auth-signup-form .private-consent h3 { margin: 0 0 10px; font: 400 var(--text-20)/1.1 var(--font-heading); }
-.auth-signup-form .private-purpose { margin: 0 0 14px; font-size: var(--text-14); line-height: 1.5; }
-.auth-signup-form .private-message { margin: 0 0 10px; color: var(--ob-accent); font-size: var(--text-12); font-weight: 700; line-height: 1.4; }
-.auth-signup-form .private-message[hidden] { display: none; }
-.auth-signup-form .private-check { display: flex; align-items: flex-start; gap: 12px; min-height: 44px; padding: 10px 12px; border: 1px solid var(--ob-line); border-radius: 10px; }
-.auth-signup-form .private-check input { flex: 0 0 auto; width: 24px; height: 24px; margin: 0; accent-color: var(--ob-ink); cursor: pointer; }
-.auth-signup-form .private-check label { font-size: var(--text-14); line-height: 1.4; cursor: pointer; }
-.auth-signup-form .private-check:focus-within { outline: 2px solid var(--ob-ink); outline-offset: 2px; }
-.auth-signup-form .private-link { margin: 10px 0 0; font-size: var(--text-12); }
-.auth-signup-form .private-actions { display: flex; gap: 10px; margin-top: 16px; }
-.auth-signup-form .private-btn { flex: 1 1 0; min-height: 44px; }
-.auth-signup-form .private-btn:disabled { opacity: .5; cursor: not-allowed; }
-@media (prefers-reduced-motion: reduce) { .auth-signup-form .private-consent { transition: none; animation: none; } }

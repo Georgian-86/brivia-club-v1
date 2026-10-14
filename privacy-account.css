@@ -47,3 +47,7 @@
 .under-review-actions { display: flex; }
 .under-review-signout { min-width: 44px; min-height: 44px; padding: 0 20px; border: 1px solid var(--app-line); border-radius: 99px; background: transparent; color: var(--brivia-deep-wine); font: inherit; font-size: var(--text-14); font-weight: 700; cursor: pointer; }
 .under-review a:focus-visible, .under-review-signout:focus-visible { outline: 2px solid var(--brivia-deep-wine); outline-offset: 2px; }
+/* Code re-auth (Phase E Task 5): "Send me a code", then the code field. */
+.privacy-code { display: flex; flex-direction: column; align-items: flex-start; gap: 10px; }
+.privacy-code > div { align-self: stretch; display: flex; flex-direction: column; gap: 10px; }
+.privacy-code-status:empty { display: none; }

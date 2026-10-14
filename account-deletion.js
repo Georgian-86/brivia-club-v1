@@ -116,6 +116,18 @@ export const reauthMethod = (user) => {
   return providers.length ? 'oauth' : 'password';
 };
 
+// Phase E Task 5 (Ruling 2): which re-auth the delete dialog offers. Supabase does not say whether an email account
+// has a password: a code signup has none, an older form signup has one. user_metadata.has_password settles it when
+// set (true: the password field; false: "Send me a code"); otherwise the dialog offers both, so no one is locked out.
+// A Google-only account signs in with Google again.
+export const reauthOptions = (user) => {
+  if (reauthMethod(user) === 'oauth') return { password: false, code: false, google: true };
+  const flag = user?.user_metadata?.has_password;
+  if (flag === true) return { password: true, code: false, google: false };
+  if (flag === false) return { password: false, code: true, google: false };
+  return { password: true, code: true, google: false };
+};
+
 // The sessionStorage marker that reopens the delete dialog after "Sign in with Google again" (final fix F3). It names
 // the member who asked: Google's account chooser can bring back a different account, and that account must never
 // see its own delete dialog open by itself.

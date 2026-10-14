@@ -1,7 +1,8 @@
 // PRIVACY & ACCOUNT (Iteration 4, Task 9; rulings R2 withdraw and R5 delete). UX_SPEC §G.
 // Real <dialog> elements opened with showModal(): a Tab trap, Escape (ignored while a request is in flight), focus
 // returned to the trigger. Everything that touches Supabase is injected by app.js, so this file only builds the UI.
-import { consentStatusCopy, reauthMethod, deletionErrorCopy, DELETE_DISCLOSURE } from './account-deletion.js';
+import { consentStatusCopy, reauthOptions, deletionErrorCopy, DELETE_DISCLOSURE } from './account-deletion.js';
+import { verifyErrorCopy, loginCodeErrorCopy, otpErrorKind } from './signup-errors.js';
 
 const CONTACT = 'thebrivia.club@gmail.com';
 const WITHDRAW_ERROR = `We couldn't withdraw your consent. Try again, or email ${CONTACT}.`;
@@ -72,7 +73,10 @@ const openWithdrawDialog = ({ trigger, fallbackFocus, withdraw }) => new Promise
   dialog.querySelector('[data-privacy-keep]').focus();
 });
 
-// R5: the delete dialog. deps: { user, runDeletion, signInWithPassword, startGoogle, onDeleted }.
+// R5: the delete dialog. deps: { user, runDeletion, signInWithPassword, sendCode, verifyCode, startGoogle, onDeleted }.
+// Re-auth (Phase E Task 5, Ruling 2): reauthOptions says what to offer. A member known to have no password gets "Send me
+// a code" (a code that never creates an account) and the code field; one we cannot tell about gets both the password
+// field and the code, so no one is locked out; a Google-only member signs in with Google again.
 const openDeleteDialog = ({ trigger, fallbackFocus, deps }) => {
   const list = (items) => `<ul>${items.map((item) => `<li>${escapeText(item)}</li>`).join('')}</ul>`;
   // F3: name the account being deleted (the current session user's own email only; never another member's).
@@ -91,6 +95,12 @@ const openDeleteDialog = ({ trigger, fallbackFocus, deps }) => {
     <input id="privacy-delete-confirm" type="text" autocomplete="off" autocapitalize="characters" spellcheck="false" />
     <div class="privacy-reauth" data-privacy-reauth hidden>
       <div data-privacy-password-row hidden><label class="privacy-field" for="privacy-delete-password">Confirm your password</label><input id="privacy-delete-password" type="password" autocomplete="current-password" /></div>
+      <div class="privacy-code" data-privacy-code-row hidden>
+        <p data-privacy-code-or hidden>Or confirm with a code we email you.</p>
+        <button type="button" class="privacy-secondary" data-privacy-send-code>Send me a code</button>
+        <p class="privacy-code-status" data-privacy-code-status role="status"></p>
+        <div data-privacy-code-field hidden><label class="privacy-field" for="privacy-delete-code">Enter the 6-digit code</label><input id="privacy-delete-code" type="text" inputmode="numeric" pattern="[0-9]*" maxlength="6" autocomplete="one-time-code" spellcheck="false" /></div>
+      </div>
       <button type="button" class="privacy-secondary" data-privacy-google hidden>Sign in with Google again</button>
     </div>
     <p class="privacy-error" data-privacy-error role="alert"></p>
@@ -104,7 +114,15 @@ const openDeleteDialog = ({ trigger, fallbackFocus, deps }) => {
   const passwordRow = dialog.querySelector('[data-privacy-password-row]');
   const password = dialog.querySelector('#privacy-delete-password');
   const google = dialog.querySelector('[data-privacy-google]');
+  const codeRow = dialog.querySelector('[data-privacy-code-row]');
+  const codeOr = dialog.querySelector('[data-privacy-code-or]');
+  const sendCode = dialog.querySelector('[data-privacy-send-code]');
+  const codeStatus = dialog.querySelector('[data-privacy-code-status]');
+  const codeField = dialog.querySelector('[data-privacy-code-field]');
+  const code = dialog.querySelector('#privacy-delete-code');
   let needsPassword = false;
+  let needsCode = false;
+  let codeSent = false;
   const typed = () => input.value.trim().toUpperCase() === 'DELETE';
   const sync = () => confirm.setAttribute('aria-disabled', typed() ? 'false' : 'true');
   input.addEventListener('input', sync);
@@ -114,26 +132,68 @@ const openDeleteDialog = ({ trigger, fallbackFocus, deps }) => {
     setBusy(true);
     try { await deps.startGoogle(); } catch { errorBox.textContent = "Google sign-in couldn't start. Try again."; setBusy(false); }
   });
+  sendCode.addEventListener('click', async () => {
+    if (dialog.hasAttribute('aria-busy')) return;
+    setBusy(true);
+    errorBox.textContent = '';
+    let sent;
+    try { sent = await deps.sendCode(deps.user?.email); } catch (error) { sent = { error }; }
+    setBusy(false);
+    if (sent?.error) { errorBox.textContent = loginCodeErrorCopy(sent.error); sendCode.focus(); return; }
+    codeSent = true;
+    codeField.hidden = false;
+    sendCode.textContent = 'Send a new code';
+    codeStatus.textContent = `We sent a code to ${deps.user?.email || 'your email'}.`;
+    code.value = '';
+    code.focus();
+  });
   const showReauth = () => {
     reauthBox.hidden = false;
     errorBox.textContent = deletionErrorCopy('reauth');
-    if (reauthMethod(deps.user) === 'password') { needsPassword = true; passwordRow.hidden = false; password.focus(); }
-    else { google.hidden = false; confirm.hidden = true; google.focus(); }
+    const offer = reauthOptions(deps.user);
+    if (offer.google) { google.hidden = false; confirm.hidden = true; google.focus(); return; }
+    needsPassword = offer.password;
+    needsCode = offer.code;
+    passwordRow.hidden = !offer.password;
+    codeRow.hidden = !offer.code;
+    codeOr.hidden = !(offer.password && offer.code);
+    (offer.password ? password : sendCode).focus();
+  };
+  // Signs in again with whatever the member gave: the password when typed, else the code. Resolves true when signed in.
+  const reauthenticate = async () => {
+    if (needsPassword && password.value) {
+      let signIn;
+      try { signIn = await deps.signInWithPassword(deps.user?.email, password.value); } catch (error) { signIn = { error }; }
+      if (signIn?.error) { errorBox.textContent = "That password didn't work. Try again."; password.focus(); return false; }
+      return true;
+    }
+    let verified;
+    try { verified = await deps.verifyCode(deps.user?.email, code.value.trim()); } catch (error) { verified = { error }; }
+    if (verified?.error || !verified?.data?.session) {
+      const kind = otpErrorKind(verified?.error || {}, 0);
+      errorBox.textContent = kind === 'rate_limited' ? verifyErrorCopy(verified.error) : "That code didn't work. Try again, or send a new one.";
+      code.focus();
+      return false;
+    }
+    // A code works once: the fresh sign-in now covers the retries of this dialog.
+    needsCode = false; needsPassword = false; codeRow.hidden = true; passwordRow.hidden = true;
+    return true;
   };
   confirm.addEventListener('click', async () => {
     if (dialog.hasAttribute('aria-busy') || !typed()) return;
-    if (needsPassword && !password.value) { errorBox.textContent = 'Enter your password to continue.'; password.focus(); return; }
+    const hasPassword = needsPassword && password.value;
+    const hasCode = needsCode && codeSent && /^\d{6}$/.test(code.value.trim());
+    if ((needsPassword || needsCode) && !hasPassword && !hasCode) {
+      if (needsPassword && !needsCode) { errorBox.textContent = 'Enter your password to continue.'; password.focus(); }
+      else if (needsCode && !needsPassword) { errorBox.textContent = codeSent ? 'Enter the 6-digit code we emailed you.' : 'Send yourself a code, then enter it to continue.'; (codeSent ? code : sendCode).focus(); }
+      else { errorBox.textContent = 'Enter your password, or send yourself a code.'; password.focus(); }
+      return;
+    }
     setBusy(true);
     confirm.setAttribute('aria-disabled', 'true');
     errorBox.textContent = '';
-    if (needsPassword) {
-      let signIn;
-      try { signIn = await deps.signInWithPassword(deps.user?.email, password.value); } catch (error) { signIn = { error }; }
-      if (signIn?.error) {
-        errorBox.textContent = "That password didn't work. Try again.";
-        setBusy(false); sync(); password.focus();
-        return;
-      }
+    if (needsPassword || needsCode) {
+      if (!(await reauthenticate())) { setBusy(false); sync(); return; }
     }
     let result;
     try { result = await deps.runDeletion(); } catch (error) { result = { ok: false, stage: 'rpc', error }; }

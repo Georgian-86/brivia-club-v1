@@ -19,11 +19,13 @@ the script asserts it is never made. A separate context checks the honest quota:
 `PT429 signal_quota_exhausted` race and 20 free passes. `E2E_SCREENSHOTS=<dir>` saves the quota states. A second browser context serves a 41-member directory in keyset pages to check load-more, name search and
 post authors.
 
-`onboarding.spec.mjs` (Iteration 3, Task 8) loads `auth.html` the same way (Vite on :5198, stubbed Supabase) and checks
-the 4-step signup: "STEP n OF 4" at 375 px and 1440 px, geolocation granted / denied / missing / timed out, the
-keyboard-only Passion Budget, the submit order, the email-confirmation pending profile (no coordinates) and the
-`my_onboarding_status` gate from `app.html`, including the "Profile under review" notice for a member whose every step
-is done but `completed` is false, and that a failed save never withdraws a consent given before it (final fix F2). `E2E_SCREENSHOTS=<dir>` also saves screenshots of the key states.
+`onboarding.spec.mjs` loads `auth.html` the same way (Vite on :5198, stubbed Supabase). Phase E Task 5 retired the
+4-step form it used to drive; it now checks the old pending profile (an account made with that form that confirmed its
+email later) applied once at the next login (declaration, then city, then interests; never a coordinate; a second login
+never re-applies the city; an 8-day-old one is dropped; its photo preview uploads once), what the guided flow shows when
+part of it fails, and the `my_onboarding_status` gate from `app.html` (to the first incomplete guided screen), including
+the "Profile under review" notice for a member whose every step is done but `completed` is false, and that a failed save
+never withdraws a consent given before it (final fix F2).
 
 ```bash
 PLAYWRIGHT_MODULE=/tmp/pw/node_modules/playwright/index.mjs node tests/e2e/onboarding.spec.mjs
@@ -36,8 +38,12 @@ paste of "123 456", a wrong and an expired code, Resend's 60 s countdown with Pl
 the Email screen's first send, and no new send for the same address inside the countdown), the four-colour Google mark, Back and
 browser Back after verification (Welcome "Signed in as …", never Email or Code), the pinned primary button above a simulated
 300 px keyboard (a fake `visualViewport`), reduced motion, and axe (full rule set), 12 px text and one heading plus one
-primary action on every screen at 320, 375 and 1440 px (at 320 the step label must not overlap the page's ×). `E2E_SCREENSHOTS=<dir>` saves every screen. Until Phase E Task 5 retires
-the old 4-step form, `onboarding.spec.mjs` reaches it with `auth.html?legacy-signup=1#signup` (dev server only).
+primary action on every screen at 320, 375 and 1440 px (at 320 the step label must not overlap the page's ×). `E2E_SCREENSHOTS=<dir>` saves every screen. Task 5 added: a session on
+`auth.html` (`#signup`, `?complete-profile=1`) resumes at the first incomplete screen ("Step 5 of 6" / "Step 3 of 4" on
+Area) or lands a completed member on `/app.html`; login's "Email me a code instead" (`create_user: false`, the same
+Code screen without a step label); the verify 429 copy; no phone, gender or points input in `auth.html`; browser Back
+after the Reveal never shows a profile screen again; and the expanded phone tray scrolling a new pick into view.
+`consent.spec.mjs` covers the passwordless member's "Send me a code" delete re-auth.
 
 ```bash
 PLAYWRIGHT_MODULE=/tmp/pw/node_modules/playwright/index.mjs node tests/e2e/signup.spec.mjs

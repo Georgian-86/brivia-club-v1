@@ -278,6 +278,11 @@ export const sendEmailCode = async (email) => {
   if (!supabase) return notConfigured();
   return supabase.auth.signInWithOtp({ email, options: { shouldCreateUser: true } });
 };
+// Login and deletion re-auth by code (Phase E Task 5): never creates an account.
+export const sendLoginCode = async (email) => {
+  if (!supabase) return notConfigured();
+  return supabase.auth.signInWithOtp({ email, options: { shouldCreateUser: false } });
+};
 export const verifyEmailCode = async (email, token) => {
   if (!supabase) return notConfigured();
   return supabase.auth.verifyOtp({ email, token, type: 'email' });

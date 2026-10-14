@@ -37,6 +37,7 @@ const ME = '11111111-1111-4111-8111-111111111111';
 const EMAIL = 'new@test.brivia.club';
 const GOOD = '123456';
 const EXPIRED = '999999';
+const VERIFY_429 = '429429';
 const b64url = (value) => Buffer.from(JSON.stringify(value)).toString('base64url');
 const exp = Math.floor(Date.now() / 1000) + 3600 * 24;
 const accessToken = `${b64url({ alg: 'HS256', typ: 'JWT' })}.${b64url({ sub: ME, role: 'authenticated', exp, aud: 'authenticated' })}.sig`;
@@ -49,6 +50,7 @@ const CODE_RATE_COPY = 'Too many codes requested. Wait a minute, then tap Resend
 const EMAIL_RATE_COPY = "We can't send a code right now. Please try again in a few minutes.";
 const EXPIRED_RESEND_COPY = 'That code has expired. Tap Resend for a new one.';
 const EXPIRED_WAIT_COPY = 'That code has expired. Resend will be available in a moment.';
+const VERIFY_RATE_COPY = 'Too many attempts. Wait a minute, then try the code again.';
 
 const results = [];
 const check = (name, fn) => { try { fn(); results.push(['PASS', name]); } catch (error) { results.push(['FAIL', `${name}: ${error.message}`]); } };
@@ -84,7 +86,7 @@ const stubContext = async (context, opts = {}) => {
     profile: opts.profile ? { id: ME, email: EMAIL, ...opts.profile } : null,
     hasCell: Boolean(opts.hasCell),
     placeLabel: opts.hasCell ? 'Pune' : null,
-    interests: [],
+    interests: opts.interests ? [...opts.interests] : [],
     consent: false,
   };
   const calls = [];
@@ -106,7 +108,8 @@ const stubContext = async (context, opts = {}) => {
     }
     if (p === '/auth/v1/verify') {
       const token = JSON.parse(body || '{}').token;
-      if (token === GOOD) return json(200, session);
+      if (token === GOOD) return json(200, opts.verifySession || session);
+      if (token === VERIFY_429) return json(429, { code: 'over_request_rate_limit', error_code: 'over_request_rate_limit', msg: 'Request rate limit reached', message: 'Request rate limit reached' });
       // Every code starting 99 has expired (the client never re-sends the code that just failed, so tests vary it).
       if (/^99/.test(token)) return json(403, { code: 'otp_expired', error_code: 'otp_expired', msg: 'Token has expired', message: 'Token has expired' });
       return json(403, { code: 'otp_expired', error_code: 'otp_expired', msg: 'Token has expired or is invalid', message: 'Token has expired or is invalid' });
@@ -274,11 +277,13 @@ const toCode = async (page) => {
 };
 
 // Task 4 helpers. A member signed in with 18+, name and area done resumes at Interests.
-const toInterests = async (page) => {
-  await openGuided(page);
-  await buttonByText(page, 'Continue').first().click();
-  await waitTitle(page, 'What are you into?');
+// Task 5: auth.html#signup with a session opens the first incomplete screen at once (no Welcome first).
+const openResumed = async (page, expected, url = '/auth.html#signup') => {
+  await page.goto(`${BASE}${url}`, { waitUntil: 'domcontentloaded' });
+  await page.waitForSelector('#guided-signup:not([hidden])', { timeout: 15000 });
+  await waitTitle(page, expected);
 };
+const toInterests = (page) => openResumed(page, 'What are you into?');
 // Shows the chip's domain, then taps it (unless click is false).
 // force: a full tray marks the other chips aria-disabled (they still answer a tap with the cap message).
 const pickChip = async (page, id, { click = true, settle = 0, force = false } = {}) => {
@@ -695,11 +700,7 @@ try {
       const { page, errors } = await newPage(context);
       const flowText = [];
       const grab = async () => flowText.push(await page.locator('#guided-signup').textContent());
-      await openGuided(page);
-      await checkStep(`${w}: a signed-in member continues to 18+`, async () => {
-        await buttonByText(page, 'Continue').first().click();
-        await waitTitle(page, 'Are you 18 or older?');
-      });
+      await checkStep(`${w}: a signed-in member opening #signup resumes at 18+`, () => openResumed(page, 'Are you 18 or older?'));
       const adultUi = { yes: await isVisible(page, '#guided-signup .gs-primary:has-text("Yes, I\'m 18 or older")'), no: await isVisible(page, '#guided-signup button:text-is("No")'), step: await stepText(page) };
       check(`${w}: 18+ offers "Yes, I'm 18 or older" (primary) and "No" (${JSON.stringify(adultUi)})`, () => { assert.ok(adultUi.yes); assert.ok(adultUi.no); assert.equal(adultUi.step, 'Step 3 of 6'); });
       await a11yScreen(page, `${w} adult`);
@@ -848,11 +849,7 @@ try {
       const gUser = { ...user, user_metadata: { full_name: 'Grace Hopper', name: 'Grace Hopper' }, app_metadata: { provider: 'google' } };
       const stub = await stubContext(context, { signedIn: { ...session, user: gUser }, user: gUser, profile: { name: 'New Member', adult_declared_at: '2026-10-13T00:00:00Z' }, deckRows: [{ id: '22222222-2222-4222-8222-222222222222', shared_interests: [] }] });
       const { page, errors } = await newPage(context);
-      await openGuided(page);
-      await checkStep('google: Continue resumes at Name', async () => {
-        await buttonByText(page, 'Continue').first().click();
-        await waitTitle(page, 'What should members call you?');
-      });
+      await checkStep('google: #signup resumes at Name', () => openResumed(page, 'What should members call you?'));
       const pre = await page.evaluate(() => ({ value: document.querySelector('#signup-name')?.value, step: document.querySelector('#guided-signup [data-signup-step]').textContent }));
       check(`google: Name is prefilled from Google full_name, "Step 2 of 4" (${JSON.stringify(pre)})`, () => { assert.equal(pre.value, 'Grace Hopper'); assert.equal(pre.step, 'Step 2 of 4'); });
       await checkStep('google: Name saves and shows Area', async () => {
@@ -911,9 +908,7 @@ try {
       const context = await browser.newContext({ viewport: { width: 375, height: 812 } });
       const stub = await stubContext(context, { signedIn: session });
       const { page, errors } = await newPage(context);
-      await openGuided(page);
-      await buttonByText(page, 'Continue').first().click();
-      await waitTitle(page, 'Are you 18 or older?');
+      await openResumed(page, 'Are you 18 or older?');
       await page.locator('#guided-signup button:text-is("No")').click();
       await page.waitForFunction(() => document.querySelector('#guided-signup')?.textContent.includes("Brivia Club is for adults. Come back when you're 18."), null, { timeout: 5000 }).catch(() => {});
       await page.waitForTimeout(SETTLE);
@@ -936,9 +931,7 @@ try {
       const context = await browser.newContext({ viewport: { width: 375, height: 812 } });
       const stub = await stubContext(context, { signedIn: session, fail: { declare_adult: [500], profiles: [0, 500], set_home_city: [500], set_member_interests: [500] } });
       const { page, errors } = await newPage(context);
-      await openGuided(page);
-      await buttonByText(page, 'Continue').first().click();
-      await waitTitle(page, 'Are you 18 or older?');
+      await openResumed(page, 'Are you 18 or older?');
       const failed = async (tag, titleText, press) => {
         await press();
         await page.waitForFunction(() => (document.querySelector('#guided-signup #signup-error')?.textContent || '').length > 0, null, { timeout: 8000 }).catch(() => {});
@@ -1120,6 +1113,203 @@ try {
         assert.equal(settledState.clones, 0); assert.equal(settledState.hiddenStyle, 0); assert.equal(settledState.pressed, 'false');
       });
       check(`320 interests: no uncaught page errors (${errors.join(' | ')})`, () => assert.deepEqual(errors, []));
+      await context.close();
+    }
+
+    // 11. Task 5: resume anywhere. A session on auth.html (#signup, ?complete-profile=1) opens the first incomplete
+    //     screen; a completed member goes to the app.
+    const DONE = [{ interest_id: 'games.board.chess', points: 20, mode: 'play' }];
+    for (const w of [1440, 375]) {
+      const context = await browser.newContext({ viewport: { width: w, height: w === 375 ? 812 : 900 } });
+      const stub = await stubContext(context, { signedIn: session, profile: { name: 'Ada', adult_declared_at: '2026-10-13T00:00:00Z' } });
+      const { page, errors } = await newPage(context);
+      const ok = await checkStep(`${w}: a session with adult+name but no area opens #signup at Area`, () => openResumed(page, 'Where are you based?'));
+      const step = ok ? await stepText(page) : '';
+      check(`${w}: resumed Area shows "Step 5 of 6" on the email path (${step})`, () => assert.equal(step, 'Step 5 of 6'));
+      check(`${w}: resuming sends no answer again`, () => { for (const n of ['declare_adult', 'set_home_city', 'set_member_interests']) assert.equal(stub.posts(`/rest/v1/rpc/${n}`).length, 0, n); });
+      if (ok) { await a11yScreen(page, `${w} resume area`); await shot(page, `signup-${w}-resume-area.png`); }
+      check(`resume ${w}: no uncaught page errors (${errors.join(' | ')})`, () => assert.deepEqual(errors, []));
+      await context.close();
+    }
+    {
+      const context = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+      const gUser = { ...user, user_metadata: { full_name: 'Grace Hopper' }, app_metadata: { provider: 'google' } };
+      await stubContext(context, { signedIn: { ...session, user: gUser }, user: gUser, profile: { name: 'Grace Hopper', adult_declared_at: '2026-10-13T00:00:00Z' } });
+      const { page, errors } = await newPage(context);
+      const ok = await checkStep('google: a session with adult+name but no area opens #signup at Area', () => openResumed(page, 'Where are you based?'));
+      const step = ok ? await stepText(page) : '';
+      check(`google: resumed Area shows "Step 3 of 4" (${step})`, () => assert.equal(step, 'Step 3 of 4'));
+      check(`google resume: no uncaught page errors (${errors.join(' | ')})`, () => assert.deepEqual(errors, []));
+      await context.close();
+    }
+    {
+      const context = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+      await stubContext(context, { signedIn: session, profile: { name: 'Ada', adult_declared_at: '2026-10-13T00:00:00Z' }, hasCell: true, interests: DONE });
+      const { page, errors } = await newPage(context);
+      await page.goto(`${BASE}/auth.html#signup`, { waitUntil: 'domcontentloaded' });
+      const landed = await page.waitForURL(/\/app\.html/, { timeout: 15000 }).then(() => true, () => false);
+      check(`a completed member opening auth.html#signup lands on /app.html (${page.url()})`, () => assert.ok(landed));
+      check(`completed: no uncaught page errors (${errors.join(' | ')})`, () => assert.deepEqual(errors, []));
+      await context.close();
+    }
+    {
+      const context = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+      await stubContext(context, { signedIn: session, profile: { name: 'New Member', adult_declared_at: '2026-10-13T00:00:00Z' }, hasCell: true, interests: DONE });
+      const { page, errors } = await newPage(context);
+      const ok = await checkStep('?complete-profile=1 resumes at the first incomplete screen (Name)', () => openResumed(page, 'What should members call you?', '/auth.html?complete-profile=1'));
+      const ui = ok ? await page.evaluate(() => ({ value: document.querySelector('#signup-name')?.value, step: document.querySelector('#guided-signup [data-signup-step]').textContent })) : {};
+      check(`complete-profile: "New Member" is not prefilled, "Step 4 of 6" (${JSON.stringify(ui)})`, () => { assert.equal(ui.value, ''); assert.equal(ui.step, 'Step 4 of 6'); });
+      check(`complete-profile: no uncaught page errors (${errors.join(' | ')})`, () => assert.deepEqual(errors, []));
+      await context.close();
+    }
+
+    // 12. Task 5: login gains "Email me a code instead" (the same Code screen, shouldCreateUser false).
+    for (const w of [1440, 375]) {
+      const context = await browser.newContext({ viewport: { width: w, height: w === 375 ? 812 : 900 } });
+      const stub = await stubContext(context, { profile: { name: 'Ada', adult_declared_at: '2026-10-13T00:00:00Z' }, hasCell: true, interests: DONE });
+      const { page, errors } = await newPage(context);
+      await page.goto(`${BASE}/auth.html#login`, { waitUntil: 'domcontentloaded' });
+      await page.waitForSelector('#login-form', { timeout: 15000 });
+      const codeButton = page.locator('[data-login-code]');
+      const shown = await codeButton.isVisible().catch(() => false);
+      const label = shown ? (await codeButton.textContent()).trim() : '';
+      check(`${w}: login offers "Email me a code instead" (${label})`, () => assert.equal(label, 'Email me a code instead'));
+      if (shown) {
+        const box = await codeButton.boundingBox();
+        check(`${w}: the code button is at least 44 px tall (${box?.height})`, () => assert.ok(box && box.height >= 44));
+        await shot(page, `login-${w}-code-option.png`);
+        await codeButton.click();
+        await page.waitForTimeout(300);
+        const note = (await page.locator('#login-note').textContent()).trim();
+        check(`${w}: without an email the code button asks for one and sends nothing (${note})`, () => { assert.match(note, /Enter your email/); assert.equal(stub.posts('/auth/v1/otp').length, 0); });
+        await page.locator('#login-form input[name="email"]').fill(EMAIL);
+        const ok = await checkStep(`${w}: "Email me a code instead" opens the Code screen`, async () => { await codeButton.click(); await waitTitle(page, 'Enter the code'); });
+        const sent = stub.posts('/auth/v1/otp').map((c) => JSON.parse(c.body || '{}'));
+        check(`${w}: the login code goes out with shouldCreateUser false (${JSON.stringify(sent)})`, () => { assert.equal(sent.length, 1); assert.equal(sent[0].email, EMAIL); assert.equal(sent[0].create_user, false); });
+        if (ok) {
+          const ui = { step: await stepText(page), text: await page.locator('#guided-signup').textContent() };
+          check(`${w}: the login Code screen shows no signup step label and names the address`, () => { assert.equal(ui.step, ''); assert.ok(ui.text.includes(EMAIL)); });
+          await a11yScreen(page, `${w} login code`);
+          await shot(page, `login-${w}-code-screen.png`);
+          if (w === 375) {
+            await page.locator('#guided-signup .gs-otp input').first().click();
+            await page.keyboard.type(VERIFY_429);
+            await page.waitForFunction((t) => document.querySelector('#guided-signup #signup-error')?.textContent.trim() === t, VERIFY_RATE_COPY, { timeout: 8000 }).catch(() => {});
+            const msg = (await page.locator('#guided-signup #signup-error').textContent()).trim();
+            check(`login verify 429: its own copy, never "not created" (${msg})`, () => assert.equal(msg, VERIFY_RATE_COPY));
+            for (let i = 0; i < 6; i += 1) await page.keyboard.press('Backspace');
+            await page.locator('#guided-signup .gs-otp input').first().click();
+          } else await page.locator('#guided-signup .gs-otp input').first().click();
+          await page.keyboard.type(GOOD);
+          const landed = await page.waitForURL(/\/app\.html/, { timeout: 15000 }).then(() => true, () => false);
+          check(`${w}: verifying the login code signs in and opens the app (${page.url()})`, () => assert.ok(landed));
+        }
+      }
+      check(`login code ${w}: no uncaught page errors (${errors.join(' | ')})`, () => assert.deepEqual(errors, []));
+      await context.close();
+    }
+
+    // 13. Task 5: verify 429 on the signup Code screen has its own copy (not the sign-up "account was not created").
+    {
+      const context = await browser.newContext({ viewport: { width: 375, height: 812 } });
+      await stubContext(context);
+      const { page, errors } = await newPage(context);
+      await openGuided(page);
+      await toCode(page);
+      await page.locator('#guided-signup .gs-otp input').first().click();
+      await page.keyboard.type(VERIFY_429);
+      await page.waitForFunction(() => (document.querySelector('#guided-signup #signup-error')?.textContent || '').length > 0, null, { timeout: 8000 }).catch(() => {});
+      await page.waitForTimeout(SETTLE);
+      const msg = (await page.locator('#guided-signup #signup-error').textContent()).trim();
+      check(`signup verify 429 shows "${VERIFY_RATE_COPY}" (got "${msg}")`, () => { assert.equal(msg, VERIFY_RATE_COPY); assert.ok(!/not created/.test(msg)); });
+      await shot(page, 'signup-375-verify-rate-limited.png');
+      check(`verify 429: no uncaught page errors (${errors.join(' | ')})`, () => assert.deepEqual(errors, []));
+      await context.close();
+    }
+
+    // 14. Task 5: the old 4-step form is gone: no phone, gender or points input anywhere in auth.html.
+    {
+      const context = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+      await stubContext(context);
+      const { page, errors } = await newPage(context);
+      const raw = await (await fetch(`${BASE}/auth.html`)).text();
+      await page.goto(`${BASE}/auth.html#login`, { waitUntil: 'domcontentloaded' });
+      await page.waitForSelector('#login-form', { timeout: 15000 });
+      const dom = await page.evaluate(() => ({
+        inputs: [...document.querySelectorAll('input, select, textarea')].map((el) => `${el.name || ''}|${el.type || ''}|${el.id || ''}`).filter((s) => /phone|tel|gender|point|budget/i.test(s)),
+        oldForm: Boolean(document.querySelector('#signup-form, [data-signup-step-label], .budget, .gender-picker, .phone-field')),
+      }));
+      check(`no phone, gender or points input exists anywhere in auth.html (${JSON.stringify(dom)})`, () => {
+        assert.deepEqual(dom.inputs, []); assert.equal(dom.oldForm, false);
+        assert.ok(!/type="tel"|name="phone|name="gender"|passion points|budget-|signup-form/i.test(raw), 'the served auth.html still has old-form markup');
+      });
+      check(`old form: no uncaught page errors (${errors.join(' | ')})`, () => assert.deepEqual(errors, []));
+      await context.close();
+    }
+
+    // 15. Task 5: once the Reveal is reached, browser Back onto a profile screen shows the Reveal again (the interests are
+    //     saved: no stale Interests screen and no second save).
+    {
+      const context = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+      const stub = await stubContext(context, { signedIn: session, profile: { name: 'Ada', adult_declared_at: '2026-10-13T00:00:00Z' } });
+      const { page, errors } = await newPage(context);
+      // Area, then Interests, then the Reveal: two profile screens behind it in history.
+      await openResumed(page, 'Where are you based?');
+      await page.locator('#guided-signup [data-area-city]').click();
+      await page.locator('#signup-area-city-search').pressSequentially('Pun', { delay: 20 });
+      await page.waitForSelector('#signup-area-city-results [role="option"]');
+      await page.keyboard.press('ArrowDown');
+      await page.keyboard.press('Enter');
+      await buttonByText(page, 'Continue').first().click();
+      await waitTitle(page, 'What are you into?');
+      await pickChip(page, 'games.board.chess', { settle: SETTLE });
+      const ok = await checkStep('back-from-reveal: Continue saves and shows the Reveal', async () => {
+        await buttonByText(page, 'Continue').first().click();
+        await page.waitForSelector('#guided-signup[data-screen="reveal"]', { timeout: 8000 });
+        await page.waitForTimeout(SETTLE);
+      });
+      const seen = [];
+      if (ok) {
+        for (let i = 0; i < 2; i += 1) {
+          await page.goBack({ waitUntil: 'commit' }).catch(() => {});
+          await page.waitForTimeout(SETTLE);
+          seen.push(await page.evaluate(() => (/\/app\.html/.test(location.pathname) ? 'app' : document.querySelector('#guided-signup')?.dataset.screen)));
+        }
+      }
+      check(`browser Back after the Reveal never shows a profile screen again (${seen.join(' / ')})`, () => { assert.equal(seen.length, 2); for (const s of seen) assert.ok(['reveal', 'app'].includes(s), s); });
+      check('back-from-reveal: the interests were saved once', () => assert.equal(stub.posts('/rest/v1/rpc/set_member_interests').length, 1));
+      check(`back-from-reveal: no uncaught page errors (${errors.join(' | ')})`, () => assert.deepEqual(errors, []));
+      await context.close();
+    }
+
+    // 16. Task 5: in the expanded phone tray (it scrolls inside), a newly added pick is scrolled into view, so the flight
+    //     lands on a visible slot.
+    {
+      const context = await browser.newContext({ viewport: { width: 375, height: 812 } });
+      await stubContext(context, { signedIn: session, profile: { name: 'Ada', adult_declared_at: '2026-10-13T00:00:00Z' }, hasCell: true });
+      const { page, errors } = await newPage(context);
+      await toInterests(page);
+      const first = ['sports.racket.tennis', 'sports.racket.badminton', 'sports.racket.squash', 'sports.racket.padel', 'sports.team.cricket', 'sports.team.football', 'sports.team.basketball', 'games.board.chess', 'games.board.go'];
+      for (const id of first) { await pickChip(page, id); await page.waitForTimeout(SETTLE); }
+      await page.locator('#guided-signup [data-tray-more]').click();
+      await page.waitForTimeout(SETTLE);
+      const scrolls = await page.evaluate(() => { const l = document.querySelector('#guided-signup .gs-tray-list'); return { sh: l.scrollHeight, ch: l.clientHeight }; });
+      const results = [];
+      for (const id of ['music.listening.jazz', 'music.listening.classical', 'music.listening.indie_rock']) {
+        await pickChip(page, id);
+        await page.waitForTimeout(SETTLE);
+        results.push(await page.evaluate((pid) => {
+          const list = document.querySelector('#guided-signup .gs-tray-list').getBoundingClientRect();
+          const r = document.querySelector(`#guided-signup [data-pick-id="${pid}"]`)?.getBoundingClientRect();
+          return { pid, expanded: document.querySelector('#guided-signup .gs-tray').classList.contains('is-expanded'), inView: Boolean(r) && r.top >= list.top - 1 && r.bottom <= list.bottom + 1 };
+        }, id));
+      }
+      check(`expanded tray scrolls inside (${JSON.stringify(scrolls)}) and each new pick is in view (${JSON.stringify(results)})`, () => {
+        assert.ok(scrolls.sh > scrolls.ch, 'the expanded tray needs to scroll for this check');
+        for (const r of results) { assert.ok(r.expanded, `${r.pid}: still expanded`); assert.ok(r.inView, `${r.pid}: below the tray's scroll`); }
+      });
+      await shot(page, 'signup-375-interests-tray-expanded-newest.png');
+      check(`expanded tray: no uncaught page errors (${errors.join(' | ')})`, () => assert.deepEqual(errors, []));
       await context.close();
     }
   });

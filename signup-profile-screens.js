@@ -2,7 +2,7 @@
 // Reveal, registered into the shell (signup-screens.js). Each answer saves on Next through the existing RPCs; a failed
 // save keeps the member on the screen with a retry message (runNext never leaves the button busy).
 // Imported by script.js after signup-screens.js, so the shell exists before these register.
-import { registerScreen, signOutGuided, el } from './signup-screens.js';
+import { registerScreen, signOutGuided, el, freshAnswers, resumeTarget } from './signup-screens.js';
 import {
   supabase, declareAdult, setHomeLocation, setHomeCity, setMemberInterests, setSensitiveConsent, fetchSensitiveConsentAt,
   fetchInterestNodes, searchPlaces, onboardingStatus, isRateLimited, ensureOwnProfile, saveOwnName, deckPreview,
@@ -20,11 +20,11 @@ import {
 import { shouldWithdrawConsent, realName } from './onboarding-guard.js';
 import { setBusy } from './app-skeletons.js';
 
-const ADULT_SAVE_ERROR = "We couldn't record your answer. Please try again.";
+export const ADULT_SAVE_ERROR = "We couldn't record your answer. Please try again.";
 const UNDER_18_COPY = "Brivia Club is for adults. Come back when you're 18.";
 const NAME_REQUIRED = 'Enter the name members should see.';
 const NAME_SAVE_ERROR = "We couldn't save your name. Please try again.";
-const INTERESTS_SAVE_ERROR = "We couldn't save your interests. Please try again.";
+export const INTERESTS_SAVE_ERROR = "We couldn't save your interests. Please try again.";
 const INTERESTS_LOAD_ERROR = "Interests couldn't load. Check your connection and try again.";
 const NAME_MAX = 60;
 
@@ -44,10 +44,26 @@ const icon = (name, cls = 'gs-icon') => {
 const messageEl = () => el('p', { class: 'gs-message', id: 'signup-error', role: 'alert' });
 // This visit's answers (ctx.state.profile; the shell clears it on sign-out).
 const answers = (ctx) => {
-  ctx.state.profile ||= { name: '', areaLabel: '', picks: [], privateOk: false, serverWantedConsent: false, reveal: null };
+  ctx.state.profile ||= freshAnswers();
   return ctx.state.profile;
 };
 const userOf = (ctx) => ctx.state.session?.user || null;
+// A notice left for this screen (an old pending profile's answer that failed to save, Task 5): shown once.
+const takeNotice = (ctx, screen) => {
+  const mine = answers(ctx);
+  if (mine.notice?.screen !== screen) return '';
+  const { text } = mine.notice;
+  mine.notice = null;
+  return text;
+};
+
+// After a save, the member goes on to the first question still open (a resumed member may have answered later ones
+// already: Task 5 "resume anywhere"), or to the Reveal when everything is done. A failed read falls back to `next`.
+const goOn = async (ctx, next) => {
+  const target = await resumeTarget(next);
+  if (target === 'done') return prepareReveal(ctx);
+  return target === 'welcome' ? next : target;
+};
 
 // ---- 18+ ------------------------------------------------------------------------------------------------------------
 
@@ -60,6 +76,7 @@ registerScreen('adult', {
       el('p', { class: 'gs-fine' }, [el('a', { href: '/privacy.html', target: '_blank', rel: 'noopener', text: 'How we use your data' })]),
       message,
     );
+    message.textContent = takeNotice(ctx, 'adult');
     ctx.primary("Yes, I'm 18 or older");
     const no = el('button', { type: 'button', class: 'gs-secondary-btn', text: 'No' });
     no.addEventListener('click', async () => {
@@ -82,7 +99,7 @@ registerScreen('adult', {
     const made = await ensureOwnProfile(userOf(ctx));
     const { error } = made.error ? made : await declareAdult();
     if (error) { message.textContent = ADULT_SAVE_ERROR; return null; }
-    return 'name';
+    return goOn(ctx, 'name');
   },
 });
 
@@ -119,7 +136,7 @@ registerScreen('name', {
     const { error } = await saveOwnName(userOf(ctx)?.id, name);
     if (error) { message.textContent = NAME_SAVE_ERROR; return null; }
     answers(ctx).name = name;
-    return 'area';
+    return goOn(ctx, 'area');
   },
 });
 
@@ -139,6 +156,8 @@ registerScreen('area', {
     ctx.body.append(el('p', { class: 'gs-help', id: 'signup-area-help', text: 'We show people near you first. Members only ever see a rounded distance.' }), box);
     areaPicker = createAreaPicker(box, { searchPlaces });
     if (answers(ctx).areaLabel) areaPicker.keep(answers(ctx).areaLabel);
+    const notice = takeNotice(ctx, 'area');
+    if (notice) areaPicker.setError(notice);
     ctx.primary('Continue');
     const picker = areaPicker;
     return () => { picker.destroy(); if (areaPicker === picker) areaPicker = null; };
@@ -149,14 +168,14 @@ registerScreen('area', {
     if (picker.needsSettle()) await picker.settle();
     const choice = picker.commit();
     if (!choice) return null;
-    if (choice.kind === 'keep') return 'interests';
+    if (choice.kind === 'keep') return goOn(ctx, 'interests');
     const { data, error, status } = choice.kind === 'geo' ? await setHomeLocation(choice.lat, choice.lng) : await setHomeCity(choice.placeId);
     if (error) { picker.setError(isRateLimited(error, status) ? AREA_RATE_LIMITED : AREA_SAVE_ERROR); return null; }
     // The server has the cell: forget the coordinates, keep the label for the Reveal.
     const label = typeof data === 'string' && data ? data : String(choice.label || '').split(',')[0];
     answers(ctx).areaLabel = label;
     picker.keep(label);
-    return 'interests';
+    return goOn(ctx, 'interests');
   },
 });
 
@@ -300,6 +319,14 @@ registerScreen('interests', {
         catalog = built;
         domain ||= catalog.domains[0]?.id || '';
         results.removeAttribute('aria-busy');
+        // Picks kept from an old pending profile (Task 5): preselected once, in their stored order.
+        if (mine.seedIds?.length && !mine.picks.length) {
+          const byId = new Map(catalog.groups.flatMap((group) => group.items).map((item) => [item.id, item]));
+          mine.picks = mine.seedIds.map((id) => byId.get(id)).filter(Boolean).slice(0, MAX_PICKS);
+          list.replaceChildren(...mine.picks.map(pill));
+          window.requestAnimationFrame(layoutTray);
+        }
+        mine.seedIds = [];
         renderDomains();
         renderResults();
       }).catch(() => {
@@ -382,6 +409,8 @@ registerScreen('interests', {
       list.append(entry);
       syncTray();
       layoutTray();
+      // The expanded phone tray scrolls inside: bring the new pick into view first, so the flight lands on a visible slot.
+      if (tray.classList.contains('is-expanded')) list.scrollTop = list.scrollHeight;
       buzz();
       bump(count, reduced);
       announce(trayAnnouncement(item.label, 'added'));
@@ -416,6 +445,7 @@ registerScreen('interests', {
     });
 
     list.replaceChildren(...mine.picks.map(pill));
+    message.textContent = takeNotice(ctx, 'interests');
     syncTray();
     window.requestAnimationFrame(layoutTray);
     load();
@@ -450,22 +480,30 @@ registerScreen('interests', {
       message.textContent = INTERESTS_SAVE_ERROR;
       return null;
     }
-    // The Reveal: one deck card says whether someone near shares an interest (the deck orders those first). A resumed
-    // visit fills in the name and area it did not ask for. Any failure here only changes the Reveal's wording.
-    const [deck, row, status] = await Promise.all([
-      deckPreview(1).catch(() => ({ data: [] })),
-      mine.name || !supabase ? null : supabase.from('profiles').select('name').eq('id', userId).maybeSingle().then((r) => r.data).catch(() => null),
-      mine.areaLabel ? null : onboardingStatus().then((r) => r.data).catch(() => null),
-    ]);
-    mine.reveal = revealCopy({
-      name: mine.name || row?.name || userOf(ctx)?.user_metadata?.full_name || '',
-      picks: mine.picks,
-      rows: deck?.error ? [] : deck?.data,
-      area: mine.areaLabel || status?.place_label || '',
-    });
-    return 'reveal';
+    // Saved: an old pending profile has nothing left to apply (Task 5 keeps that path for one release).
+    try { window.localStorage.removeItem('brivia-pending-profile'); } catch { /* storage unavailable */ }
+    return prepareReveal(ctx);
   },
 });
+
+// The Reveal: one deck card says whether someone near shares an interest (the deck orders those first). A resumed
+// visit fills in the name and area it did not ask for. Any failure here only changes the Reveal's wording.
+const prepareReveal = async (ctx) => {
+  const mine = answers(ctx);
+  const userId = userOf(ctx)?.id;
+  const [deck, row, status] = await Promise.all([
+    deckPreview(1).catch(() => ({ data: [] })),
+    mine.name || !supabase ? null : supabase.from('profiles').select('name').eq('id', userId).maybeSingle().then((r) => r.data).catch(() => null),
+    mine.areaLabel ? null : onboardingStatus().then((r) => r.data).catch(() => null),
+  ]);
+  mine.reveal = revealCopy({
+    name: mine.name || row?.name || userOf(ctx)?.user_metadata?.full_name || '',
+    picks: mine.picks,
+    rows: deck?.error ? [] : deck?.data,
+    area: mine.areaLabel || status?.place_label || '',
+  });
+  return 'reveal';
+};
 
 // ---- Reveal ---------------------------------------------------------------------------------------------------------
 

@@ -46,3 +46,22 @@ export const expiredCodeCopy = ({ sent = false, error = null, resendReady = true
   if (error) return `That code has expired. ${codeSendErrorCopy(error)}`;
   return resendReady ? 'That code has expired. Tap Resend for a new one.' : 'That code has expired. Resend will be available in a moment.';
 };
+
+// Verifying a code too often (Phase E Task 5). Its own copy: "too many codes requested" would be untrue, and the
+// sign-up copy ("…Your account was not created…") is wrong once the account may exist. Used on the signup and login
+// Code screens and by the deletion re-auth.
+export const VERIFY_RATE_LIMITED = 'Too many attempts. Wait a minute, then try the code again.';
+const VERIFY_FAILED = "We couldn't check the code. Check your connection and try again.";
+const tooMany = (error) => isRateLimited(error) || /rate_limit/.test(String(error?.code || '')) || /too many/i.test(String(error?.message || ''));
+export const verifyErrorCopy = (error) => (tooMany(error) ? VERIFY_RATE_LIMITED : VERIFY_FAILED);
+
+// Login by code (signInWithOtp with shouldCreateUser false). An unknown address is refused by the server; the copy
+// never says whether an account exists for it.
+export const LOGIN_CODE_RATE_LIMITED = EMAIL_RATE_LIMITED;
+export const LOGIN_CODE_UNAVAILABLE = "We couldn't send a code to that address. Check it, or log in with your password.";
+export const loginCodeErrorCopy = (error) => {
+  if (tooMany(error)) return LOGIN_CODE_RATE_LIMITED;
+  const text = `${error?.code || ''} ${error?.message || ''}`;
+  if ([400, 404, 422].includes(error?.status) || /otp_disabled|not allowed|not found|signup/i.test(text)) return LOGIN_CODE_UNAVAILABLE;
+  return "We couldn't send a code. Check your connection and try again.";
+};

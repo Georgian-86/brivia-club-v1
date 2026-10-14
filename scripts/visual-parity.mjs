@@ -1,9 +1,10 @@
 // Visual parity guard: `node scripts/visual-parity.mjs capture|compare <dir> [--pages index,auth] [--expect-diff a,b]`.
-// Serves the existing dist/; never builds. Build it with the stub Supabase baked in, because the auth signup states
-// (steps 2-4, the "Check your email." panel) need Supabase answers, which come from the fixtures below:
-//   VITE_SUPABASE_URL=https://stub.supabase.local VITE_SUPABASE_ANON_KEY=stub npm run build
-// (A build without them shows a different auth step 1 and cannot reach step 3.) Playwright lives outside the repo.
-// --expect-diff names shots (file stem, e.g. auth-375-signup-step4-actions) whose change is intended: compare prints
+// Serves the existing dist/; never builds. Build it with the stub Supabase and both signup methods baked in, because
+// the auth page's guided screens need Supabase answers (the fixtures below) and VITE_SIGNUP_METHODS decides Welcome:
+//   VITE_SUPABASE_URL=https://stub.supabase.local VITE_SUPABASE_ANON_KEY=stub VITE_SIGNUP_METHODS=google,email npm run build
+// --pages auth (Phase E Task 5) shoots the login view, then the guided Welcome, Email and Code screens at 375 and 1440.
+// Playwright lives outside the repo.
+// --expect-diff names shots (file stem, e.g. auth-375-login) whose change is intended: compare prints
 // "EXPECTED DIFF <name>" for each and fails if one of them is identical, missing, or any other shot differs.
 import { spawn } from 'node:child_process';
 import { mkdirSync, readdirSync, readFileSync, writeFileSync, existsSync } from 'node:fs';
@@ -22,26 +23,15 @@ const idle = (page) => page.waitForLoadState('networkidle', { timeout: 5000 }).c
 async function ready(page) {
   await page.evaluate(() => document.fonts.ready);
   // Chromium sizes a <select>'s inner text with whatever font was loaded at first layout and may not redo it
-  // after the web font swaps in (auth step 1 "Choose one" sat 1px higher or lower depending on that race).
+  // after the web font swaps in (a select's text sat 1px higher or lower depending on that race).
   // Force one relayout after fonts are ready so every capture shows the post-font state.
   await page.evaluate(() => { for (const el of document.querySelectorAll('select')) { el.style.display = 'none'; void el.offsetHeight; el.style.display = ''; } });
   await idle(page);
   await settle(page, 400);
 }
 
-// Supabase fixtures for the auth states (the minimal answers tests/e2e/onboarding.spec.mjs uses): the interest
-// catalogue, the place search, and a signUp without a session (email confirmation, so the success panel shows).
+// Supabase fixtures for the auth states: no session, and a code request that succeeds (the guided Code screen).
 const STUB = 'https://stub.supabase.local';
-const NODES = [
-  { id: 'games', parent_id: null, level: 1, label: 'Games and puzzles', sensitive: false },
-  { id: 'games.board', parent_id: 'games', level: 2, label: 'Board games', sensitive: false },
-  { id: 'games.board.chess', parent_id: 'games.board', level: 3, label: 'Chess', sensitive: false },
-  { id: 'sports', parent_id: null, level: 1, label: 'Sports and fitness', sensitive: false },
-  { id: 'sports.racket', parent_id: 'sports', level: 2, label: 'Racket sports', sensitive: false },
-  { id: 'sports.racket.tennis', parent_id: 'sports.racket', level: 3, label: 'Tennis', sensitive: false },
-];
-const PLACES = [{ id: 'in-pune', name: 'Pune', region: 'Maharashtra', country: 'India' }];
-const USER = { id: '11111111-1111-4111-8111-111111111111', aud: 'authenticated', role: 'authenticated', email: 'new@test.brivia.club', user_metadata: { name: 'Nia New' }, app_metadata: {}, created_at: '2026-01-15T09:30:00Z' };
 async function stubSupabase(ctx) {
   await ctx.route(`${STUB}/**`, (route) => {
     const req = route.request();
@@ -49,9 +39,7 @@ async function stubSupabase(ctx) {
     const headers = { 'access-control-allow-origin': '*', 'access-control-allow-headers': '*', 'access-control-allow-methods': '*' };
     const json = (body) => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(body), headers });
     if (req.method() === 'OPTIONS') return route.fulfill({ status: 204, headers });
-    if (p === '/auth/v1/signup') return json(USER); // no session: email confirmation
-    if (p === '/rest/v1/interest_node') return json(NODES);
-    if (p === '/rest/v1/place') return json(PLACES);
+    if (p === '/auth/v1/otp') return json({}); // the code goes out; there is still no session
     if (p.startsWith('/rest/v1/')) return json([]);
     return json({});
   });
@@ -87,62 +75,32 @@ const PAGES = {
     },
   },
   auth: {
-    path: '/auth.html#signup',
+    // Phase E Task 5: the old 4-step form is gone. The auth page is the login view (with "Email me a code instead")
+    // and the guided signup's account screens: Welcome, Email, and Code (no session, so nothing else is reachable).
+    path: '/auth.html#login',
     async shots(page, vp, shot) {
-      await ready(page);
-      await imagesReady(page);
-      await shot('signup-step1');
-      // Each later state: the panel at its top (or left where the page put it), then with the step's actions in view.
-      const panelTop = () => page.evaluate(() => document.querySelector('.auth-panel')?.scrollTo({ top: 0, behavior: 'instant' }));
-      const state = async (label, actions, { keepScroll = false } = {}) => {
+      const view = async (label) => {
         await page.evaluate(() => document.activeElement?.blur());
+        await page.mouse.move(1, 1);
         await ready(page);
         await imagesReady(page);
-        if (!keepScroll) await panelTop();
         await settle(page);
         await shot(label);
-        if (!actions) return;
-        await page.locator(actions).evaluate((el) => el.scrollIntoView({ block: 'end', behavior: 'instant' }));
-        await settle(page);
-        await shot(`${label}-actions`);
       };
-      const step = (n) => page.locator(`[data-signup-step="${n}"]`);
-      await step(1).locator('input[name="name"]').fill('Nia New');
-      await step(1).locator('input[name="email"]').fill('new@test.brivia.club');
-      await step(1).locator('input[name="phoneNumber"]').fill('98765 43210');
-      await step(1).locator('.gender-option', { hasText: 'FEMALE' }).click();
-      await step(1).locator('select[name="experience"]').selectOption({ index: 2 });
-      await step(1).locator('input[name="adultConfirm"]').check();
-      await step(1).locator('.signup-next').click();
-      await page.waitForSelector('[data-signup-step="2"]:not([hidden])');
-      // Your area: pick a city (no geolocation, so nothing depends on a permission prompt).
-      await page.locator('[data-area-city]').click();
-      await page.locator('#area-city-search').fill('Pun');
-      await page.waitForSelector('#area-city-results [role="option"]');
-      await page.locator('#area-city-search').press('ArrowDown');
-      await page.locator('#area-city-search').press('Enter');
-      await page.waitForFunction(() => /Pune/.test(document.querySelector('[data-area-status]')?.textContent || ''));
-      await state('signup-step2', '[data-signup-step="2"] .signup-step-actions');
-      await step(2).locator('.signup-next').click();
-      await page.waitForSelector('[data-signup-step="3"]:not([hidden])');
-      await page.waitForSelector('#interest-results [data-interest-group]', { state: 'attached' });
-      await page.locator('#interest-search').fill('Chess');
-      await page.locator('#interest-results [data-interest-id]', { hasText: 'Chess' }).first().click();
-      await page.locator('#interest-search').fill('');
-      await page.locator('[data-budget-spread]').click();
-      await page.locator('.looking-search').click();
-      await page.locator('#looking-results [data-looking-option]').first().click();
-      await step(3).locator('.signup-step-heading h2').click(); // an outside click closes the looking-for list
-      await state('signup-step3', '[data-signup-step="3"] .signup-step-actions');
-      await step(3).locator('.signup-next').click();
-      await page.waitForSelector('[data-signup-step="4"]:not([hidden])');
-      await step(4).locator('input[name="password"]').fill('correct horse 1');
-      await step(4).locator('input[name="passwordConfirm"]').fill('correct horse 1');
-      await state('signup-step4', '[data-signup-step="4"] .signup-step-actions');
-      await step(4).locator('[type="submit"]').click();
-      await page.waitForSelector('#auth-success:not([hidden])', { timeout: 15000 });
-      // The first viewport right after the submit, exactly as the member sees it (no scrolling by the guard).
-      await state('signup-success', null, { keepScroll: true });
+      await page.waitForSelector('#login-form');
+      await view('login');
+      await page.goto(ORIGIN + '/auth.html?signup=1#signup'); // a new document: a hash change alone does not reload
+      await page.waitForSelector('#guided-signup:not([hidden]) #signup-screen-title');
+      await view('signup-welcome');
+      const email = page.locator('#guided-signup button', { hasText: 'Continue with email' });
+      if (!(await email.count())) return; // a build without VITE_SIGNUP_METHODS shows only "Signups open soon"
+      await email.first().click();
+      await page.waitForSelector('#signup-email');
+      await view('signup-email');
+      await page.locator('#signup-email').fill('new@test.brivia.club');
+      await page.locator('#signup-email').press('Enter');
+      await page.waitForSelector('#guided-signup .gs-otp');
+      await view('signup-code');
     },
   },
 };

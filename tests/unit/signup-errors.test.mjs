@@ -58,3 +58,21 @@ test('expiredCodeCopy never asks for a tap on Resend while it is still counting 
   assert.equal(expiredCodeCopy({ sent: false, resendReady: true }), 'That code has expired. Tap Resend for a new one.');
   assert.equal(expiredCodeCopy({ sent: true, resendReady: false }), "That code has expired. We've sent you a new one.");
 });
+
+// Phase E Task 5: too many verify attempts is not "too many codes" and never says the account was not created.
+test('a 429 on verifying a code has its own copy, for signup and login alike', async () => {
+  const { verifyErrorCopy, VERIFY_RATE_LIMITED } = await import('../../signup-errors.js');
+  assert.equal(VERIFY_RATE_LIMITED, 'Too many attempts. Wait a minute, then try the code again.');
+  assert.equal(verifyErrorCopy({ status: 429, code: 'over_request_rate_limit', message: 'Request rate limit reached' }), VERIFY_RATE_LIMITED);
+  assert.equal(verifyErrorCopy({ message: 'too many requests' }), VERIFY_RATE_LIMITED);
+  assert.ok(!/not created/.test(verifyErrorCopy({ status: 429 })));
+});
+
+// Login by code: shouldCreateUser false refuses an unknown address. The copy never says whether an account exists.
+test('login code send errors: rate limit, unknown address and other failures', async () => {
+  const { loginCodeErrorCopy, LOGIN_CODE_RATE_LIMITED, LOGIN_CODE_UNAVAILABLE } = await import('../../signup-errors.js');
+  assert.equal(loginCodeErrorCopy({ status: 429, code: 'over_email_send_rate_limit' }), LOGIN_CODE_RATE_LIMITED);
+  assert.equal(loginCodeErrorCopy({ status: 422, code: 'otp_disabled', message: 'Signups not allowed for otp' }), LOGIN_CODE_UNAVAILABLE);
+  assert.equal(loginCodeErrorCopy({ status: 400, message: 'User not found' }), LOGIN_CODE_UNAVAILABLE);
+  assert.ok(!/not created|already exists/i.test(loginCodeErrorCopy({ status: 500, message: 'boom' })));
+});

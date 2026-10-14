@@ -19,7 +19,7 @@ import './app-navigation.css';
 import './discovery-filters.css';
 import './mobile-app.css';
 import './skeleton.css';
-import { supabase, rowToProfile, saveProfile, isPresetCoverUrl, onboardingStatus, sendSignal, fetchSignalQuota, isRateLimited, isStorageImageUrl, withoutCredentials, uploadMessageAttachment, removeMessageAttachment, uploadCommunityPostImage, removeCommunityPostImage, ImageProcessingError, compressAttachmentFiles, attachmentKind, reportMember, setSensitiveConsent, fetchSensitiveConsentAt, fetchMyInterests } from './supabase.js';
+import { supabase, sendLoginCode, verifyEmailCode, rowToProfile, saveProfile, isPresetCoverUrl, onboardingStatus, sendSignal, fetchSignalQuota, isRateLimited, isStorageImageUrl, withoutCredentials, uploadMessageAttachment, removeMessageAttachment, uploadCommunityPostImage, removeCommunityPostImage, ImageProcessingError, compressAttachmentFiles, attachmentKind, reportMember, setSensitiveConsent, fetchSensitiveConsentAt, fetchMyInterests } from './supabase.js';
 import { deleteAccount, clearBriviaKeys, DELETE_BUCKETS, reauthMarker, reauthMarkerMatches } from './account-deletion.js';
 import { openPrivacyAccount } from './privacy-account.js';
 import { isUnderReview, UNDER_REVIEW_COPY } from './onboarding-guard.js';
@@ -1861,6 +1861,9 @@ const privacyDeps = (session) => ({
     uid: session.user.id,
   }),
   signInWithPassword: (email, password) => supabase.auth.signInWithPassword({ email, password }),
+  // Code re-auth for a member without a password (Phase E Task 5): never creates an account.
+  sendCode: (email) => sendLoginCode(email),
+  verifyCode: (email, token) => verifyEmailCode(email, token),
   startGoogle: async () => {
     try { window.sessionStorage.setItem(REAUTH_DELETE_KEY, reauthMarker(session.user.id)); } catch { /* the member can reopen the dialog by hand */ }
     const { error } = await supabase.auth.signInWithOAuth({ provider: 'google', options: { redirectTo: `${window.location.origin}/auth.html`, queryParams: { prompt: 'select_account' } } });

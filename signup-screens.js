@@ -8,10 +8,10 @@
 // onClick, the primary button runs next (busy while pending); next resolves to the screen to show, or null to stay.
 // ctx.dock(node) puts a node in the dock: above the pinned primary on phones, beside the screen on wide desktops (the
 // Interests tray). ctx.hideBack() hides Back for the rest of the screen. ctx.root is #guided-signup.
-import { stepLabel, backTarget, resumeScreen, screenToShow, reuseSentCode, autoResendAllowed } from './signup-flow.js';
+import { stepLabel, backTarget, resumeScreen, screenToShow, reuseSentCode, autoResendAllowed, historyScreen } from './signup-flow.js';
 import { otpBoxesAfterInput } from './otp-input.js';
-import { signupErrorCopy, codeSendErrorCopy, emailSendErrorCopy, expiredCodeCopy, otpErrorKind, OTP_WRONG } from './signup-errors.js';
-import { supabase, sendEmailCode, verifyEmailCode, onboardingStatus } from './supabase.js';
+import { codeSendErrorCopy, emailSendErrorCopy, expiredCodeCopy, otpErrorKind, verifyErrorCopy, loginCodeErrorCopy, OTP_WRONG } from './signup-errors.js';
+import { supabase, sendEmailCode, sendLoginCode, verifyEmailCode, onboardingStatus } from './supabase.js';
 import { setBusy } from './app-skeletons.js';
 import { fillGoogleMark } from './google-mark.js';
 import { realName } from './onboarding-guard.js';
@@ -23,8 +23,15 @@ const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
 
 const registry = new Map();
 // profile: the answers of the profile screens in this visit (signup-profile-screens.js); cleared on sign-out.
-const state = { path: 'email', screen: null, email: '', sentAt: 0, resendAt: 0, session: null, methods: [], profile: null };
-let deps = { activate: () => {}, login: () => {}, startGoogle: async () => null };
+// mode: 'signup', or 'login' while the Code screen serves "Email me a code instead" (Task 5). revealed: the Reveal was
+// shown in this visit (the interests are saved), so history never goes back to a profile question.
+const state = { path: 'email', screen: null, email: '', sentAt: 0, resendAt: 0, session: null, methods: [], profile: null, mode: 'signup', revealed: false };
+let deps = { activate: () => {}, login: () => {}, startGoogle: async () => null, afterLogin: null };
+
+// The profile screens' answers for this visit. seedIds: interest ids to preselect once the catalogue is loaded (an old
+// pending profile, Task 5); notice: { screen, text } shown once on that screen (a pending answer that failed to save).
+export const freshAnswers = () => ({ name: '', areaLabel: '', picks: [], privateOk: false, serverWantedConsent: false, reveal: null, seedIds: [], notice: null });
+export const guidedAnswers = () => { state.profile ||= freshAnswers(); return state.profile; };
 let root = null;
 let shell = {};
 let primaryAction = null;
@@ -55,6 +62,7 @@ export const signOutGuided = async () => {
   try { await supabase?.auth.signOut(); } catch { /* signed out locally either way */ }
   state.session = null;
   state.profile = null;
+  state.revealed = false;
   try { window.sessionStorage.removeItem(PATH_KEY); } catch { /* storage unavailable */ }
 };
 export const guidedScreen = () => state.screen;
@@ -72,17 +80,19 @@ const refreshSession = async () => {
 };
 
 // Where a signed-in member continues: the first incomplete question, or 'done'. Reads my_onboarding_status and the
-// member's own profile row (adult_declared_at, name). A failed read lands on 18+, the first question.
-const resumeTarget = async () => {
+// member's own profile row (adult_declared_at, name). A failed read lands on `fallback` (18+, the first question, unless
+// a profile screen that just saved names the next one).
+export const resumeTarget = async (fallback = 'adult') => {
   if (!state.session || !supabase) return 'welcome';
   try {
     const [{ data: status }, { data: row }] = await Promise.all([
       onboardingStatus(),
       supabase.from('profiles').select('name, adult_declared_at').eq('id', state.session.user.id).maybeSingle(),
     ]);
-    return resumeScreen({ session: state.session, status: { ...(status || {}), adult_declared: Boolean(row?.adult_declared_at), has_name: Boolean(realName(row?.name)) } });
+    if (!status) return fallback;
+    return resumeScreen({ session: state.session, status: { ...status, adult_declared: Boolean(row?.adult_declared_at), has_name: Boolean(realName(row?.name)) } });
   } catch {
-    return 'adult';
+    return fallback;
   }
 };
 
@@ -90,7 +100,11 @@ const resumeTarget = async () => {
 
 const updateShell = (name) => {
   root.dataset.screen = name;
-  const label = stepLabel(state.path, name);
+  // Login by code borrows the Code screen: no signup step label or progress there.
+  const login = state.mode === 'login';
+  root.classList.toggle('is-login', login);
+  shell.progress.hidden = login;
+  const label = login ? null : stepLabel(state.path, name);
   shell.step.textContent = label || '';
   const total = state.path === 'google' ? 4 : 6;
   const at = label ? Number(label.match(/^Step (\d+)/)[1]) : name === 'reveal' ? total : 0;
@@ -98,7 +112,7 @@ const updateShell = (name) => {
   shell.progress.setAttribute('aria-valuenow', String(at));
   shell.progress.setAttribute('aria-valuetext', label || (name === 'reveal' ? 'Done' : 'Not started'));
   shell.fill.style.width = `${(at / total) * 100}%`;
-  shell.back.hidden = !backTarget(state.path, name, Boolean(state.session));
+  shell.back.hidden = !(login || backTarget(state.path, name, Boolean(state.session)));
 };
 
 const setPrimary = (label, { onClick = null, disabled = false, hidden = false } = {}) => {
@@ -135,6 +149,8 @@ export const showScreen = (requested, { history = 'push' } = {}) => {
   if (typeof cleanup === 'function') { try { cleanup(); } catch { /* a screen's cleanup never blocks the next one */ } }
   cleanup = null;
   state.screen = name;
+  if (name !== 'code') state.mode = 'signup';
+  if (name === 'reveal') state.revealed = true;
   const title = el('h2', { id: 'signup-screen-title', class: 'gs-title', tabindex: '-1' });
   const body = el('div', { class: 'gs-body' });
   const inner = el('div', { class: 'gs-screen-inner', 'data-screen': name }, [title, body]);
@@ -308,7 +324,10 @@ registerScreen('code', {
     const message = el('p', { class: 'gs-message', id: 'signup-error', role: 'alert' });
     const note = el('p', { class: 'gs-note', role: 'status' });
     const resend = el('button', { type: 'button', class: 'gs-link', 'data-signup-resend': true, text: 'Resend code' });
-    const links = el('div', { class: 'gs-links' }, [linkButton('Wrong email?', () => showScreen('email')), resend]);
+    const login = state.mode === 'login';
+    const send = login ? sendLoginCode : sendEmailCode;
+    // Login by code: "Wrong email?" goes back to the login form, where the address was typed.
+    const links = el('div', { class: 'gs-links' }, [linkButton('Wrong email?', () => (login ? deps.login() : showScreen('email'))), resend]);
     ctx.body.append(lead, group, message, note, links);
 
     let boxes = ['', '', '', '', '', ''];
@@ -334,7 +353,7 @@ registerScreen('code', {
     const startCountdown = () => { window.clearInterval(timer); tick(); if (resend.disabled) timer = window.setInterval(tick, 1000); };
     // Resolves to the send error, or null once a new code went out.
     const sendAgain = async () => {
-      const { error } = await sendEmailCode(state.email);
+      const { error } = await send(state.email);
       state.resendAt = Date.now() + RESEND_WAIT_MS;
       startCountdown();
       if (error) return error;
@@ -348,7 +367,7 @@ registerScreen('code', {
       const error = await sendAgain();
       setBusy(resend, false);
       tick();
-      if (error) message.textContent = codeSendErrorCopy(error);
+      if (error) message.textContent = login ? loginCodeErrorCopy(error) : codeSendErrorCopy(error);
       else { autoResent = false; note.textContent = `We sent a new code to ${state.email}.`; }
     });
 
@@ -364,6 +383,13 @@ registerScreen('code', {
       const { data, error } = await verifyEmailCode(state.email, token);
       if (!error && data?.session) {
         state.session = data.session;
+        if (login && deps.afterLogin) {
+          // A login: the page routes the member (an old pending profile first, then the app or the first open question).
+          state.mode = 'signup';
+          await deps.afterLogin(data.session.user);
+          verifying = false;
+          return;
+        }
         const target = await resumeTarget();
         verifying = false;
         showScreen(target === 'welcome' ? 'adult' : target);
@@ -387,7 +413,8 @@ registerScreen('code', {
         inputs[0].focus();
         return;
       }
-      if (kind === 'rate_limited') message.textContent = signupErrorCopy(error);
+      // Too many tries is not "too many codes", and never "your account was not created" (Task 5).
+      if (kind === 'rate_limited') message.textContent = verifyErrorCopy(error);
       else if (kind === 'wrong') message.textContent = OTP_WRONG;
       else message.textContent = "We couldn't check the code. Check your connection and try again.";
       if (kind !== 'wrong') lastTried = '';
@@ -438,10 +465,10 @@ const updateKeyboard = () => {
   root?.style.setProperty('--gs-keyboard', `${Math.round(covered)}px`);
 };
 
-export const initGuidedSignup = ({ activate, login, startGoogle, methods = [] } = {}) => {
+export const initGuidedSignup = ({ activate, login, startGoogle, afterLogin, methods = [] } = {}) => {
   root = document.querySelector('#guided-signup');
   if (!root) return;
-  deps = { activate: activate || deps.activate, login: login || deps.login, startGoogle: startGoogle || deps.startGoogle };
+  deps = { activate: activate || deps.activate, login: login || deps.login, startGoogle: startGoogle || deps.startGoogle, afterLogin: afterLogin || null };
   state.methods = methods;
   shell = {
     step: root.querySelector('[data-signup-step]'),
@@ -460,6 +487,7 @@ export const initGuidedSignup = ({ activate, login, startGoogle, methods = [] } 
   }
   shell.primary.addEventListener('click', () => { if (!shell.primary.disabled) primaryAction?.(); });
   shell.back.addEventListener('click', () => {
+    if (state.mode === 'login') { deps.login(); return; }
     const target = backTarget(state.path, state.screen, Boolean(state.session));
     if (target) showScreen(target);
   });
@@ -477,13 +505,43 @@ export const initGuidedSignup = ({ activate, login, startGoogle, methods = [] } 
 };
 
 // Opens the guided flow (the 'guided' auth view, at #signup). Defaults to Welcome; `path` presets email or google.
+// screen 'resume' (Task 5): a signed-in member lands on the first incomplete question, or in the app when done;
+// without a session it is Welcome.
 export const openGuidedSignup = async ({ path, screen, history = 'push' } = {}) => {
   if (!root) return;
   deps.activate(history);
   await refreshSession();
   if (path === 'email' || path === 'google') state.path = path;
-  showScreen(screen || 'welcome', { history: history === 'none' ? 'none' : 'replace' });
+  let target = screen || 'welcome';
+  if (target === 'resume') {
+    root.setAttribute('aria-busy', 'true');  // the shell shows while the answers so far are read
+    target = state.session ? await resumeTarget() : 'welcome';
+    root.removeAttribute('aria-busy');
+    if (target === 'done') { window.location.replace('/app.html'); return; }
+  }
+  showScreen(target, { history: history === 'none' ? 'none' : 'replace' });
 };
 
-// Browser Back/Forward onto a guided history entry (Email and Code turn into Welcome once signed in).
-export const showGuidedFromHistory = (name) => showScreen(name || 'welcome', { history: 'none' });
+// Login by code (Task 5): "Email me a code instead" sends a code that never creates an account and opens the same Code
+// screen. Resolves to the error copy, or null once the Code screen shows. The same address inside the resend wait goes
+// straight to Code (the code already sent still works).
+export const openLoginCode = async (email) => {
+  if (!root) return 'Login is not available right now.';
+  const address = String(email || '').trim();
+  if (!(state.mode === 'login' && reuseSentCode(address, { sentTo: state.email, resendAt: state.resendAt }))) {
+    const { error } = await sendLoginCode(address);
+    if (error) return loginCodeErrorCopy(error);
+    state.sentAt = Date.now();
+    state.resendAt = state.sentAt + RESEND_WAIT_MS;
+  }
+  state.email = address;
+  state.session = null;
+  state.mode = 'login';
+  deps.activate('push');
+  showScreen('code', { history: 'replace' });
+  return null;
+};
+
+// Browser Back/Forward onto a guided history entry (Email and Code turn into Welcome once signed in; after the Reveal,
+// a profile question turns back into the Reveal).
+export const showGuidedFromHistory = (name) => showScreen(historyScreen(name, { revealed: state.revealed }), { history: 'none' });

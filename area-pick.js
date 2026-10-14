@@ -1,5 +1,5 @@
-// "Your area": the city picker and "Use my location", shared by the guided signup (signup-profile-screens.js) and the
-// old 4-step form (script.js, until Phase E Task 5 retires it). No DOM or storage at import time, so the pure parts
+// "Your area": the city picker and "Use my location", used by the guided signup's Area screen
+// (signup-profile-screens.js). No DOM or storage at import time, so the pure parts
 // (matchTypedCity, areaPickerHtml) are unit-tested under node.
 //
 // Privacy (CLAUDE.md, Review Focus 4): coordinates live only in the picker's in-memory choice. They are never written

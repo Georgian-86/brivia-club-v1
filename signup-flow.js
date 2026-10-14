@@ -96,3 +96,11 @@ export const revealCopy = ({ name = '', picks = [], rows = [], area = '' } = {})
   const place = String(area || '').replace(/\s*\(city-wide\)$/, '').trim();
   return { title, line: `You're one of the first in ${place || 'your area'}. We'll bring people to you as the club grows.`, shared: false };
 };
+
+// Browser Back/Forward onto a guided history entry (Phase E Task 5). Once the Reveal was reached the interests are
+// saved, so a profile screen from earlier in history shows the Reveal again (never a stale question and a re-save).
+const PROFILE_SCREENS = ['adult', 'name', 'area', 'interests'];
+export const historyScreen = (screen, { revealed = false } = {}) => {
+  const name = screen || 'welcome';
+  return revealed && PROFILE_SCREENS.includes(name) ? 'reveal' : name;
+};

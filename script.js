@@ -1,22 +1,17 @@
 // Shared landing + auth behaviour. Styles come from the page entries (landing-entry.js, auth-entry.js), never from here.
 import {
-  supabase, supabaseReady, saveProfile, compressImageOnly, fileToDataUrl, PHOTO_ERROR_MESSAGE, withoutCredentials, rowToProfile, isRateLimited,
-  declareAdult, setHomeLocation, setHomeCity, setMemberInterests, setSensitiveConsent, fetchSensitiveConsentAt, fetchMyInterests, fetchInterestNodes, searchPlaces, onboardingStatus,
+  supabase, supabaseReady, saveProfile, withoutCredentials, isRateLimited, declareAdult, setHomeCity, setMemberInterests,
 } from './supabase.js';
-import { buildPendingOnboarding, isPendingExpired, dataUrlToFile } from './pending-profile.js';
-import { isUnderReview, shouldWithdrawConsent, realName } from './onboarding-guard.js';
-import {
-  MAX_INTERESTS, MODES, emptyBudget, addInterest, removeInterest, stepPoints, setMode, pointsLeft, isComplete, toPayload,
-  counterText, budgetFromRows, budgetGateText, spreadRemaining,
-} from './passion-budget.js';
-import { areaPickerHtml, createAreaPicker, AREA_SAVE_ERROR, escapeText } from './area-pick.js';
-import { buildInterestCatalog, normalizeSearch, PRIVATE_HINT_TEXT, SENSITIVE_CONSENT_ERROR, INTEREST_CAP_TEXT } from './interest-catalog.js';
-import { signupErrorCopy } from './signup-errors.js';
+import { isPendingExpired, dataUrlToFile } from './pending-profile.js';
+import { realName } from './onboarding-guard.js';
+import { isComplete, toPayload, budgetFromRows } from './passion-budget.js';
+import { AREA_SAVE_ERROR, AREA_RATE_LIMITED } from './area-pick.js';
 import { signupMethods } from './signup-flow.js';
 import { fillGoogleMark } from './google-mark.js';
-import { initGuidedSignup, openGuidedSignup, showGuidedFromHistory, guidedScreen } from './signup-screens.js';
-import './signup-profile-screens.js';  // registers 18+, Name, Area, Interests and Reveal into the shell
-import { defaultCoverUrl, normalizeCoverUrl } from './cover-assets.js';
+import { setBusy } from './app-skeletons.js';
+import { initGuidedSignup, openGuidedSignup, openLoginCode, showGuidedFromHistory, guidedScreen, guidedAnswers } from './signup-screens.js';
+// Registers 18+, Name, Area, Interests and Reveal into the shell.
+import { ADULT_SAVE_ERROR, INTERESTS_SAVE_ERROR } from './signup-profile-screens.js';
 import { motionAllowed, introPlan, markLoaded, INTRO_CAP_MS, INTRO_START_GRACE_MS } from './landing-motion.js';
 
 document.querySelectorAll('.skeleton img').forEach(markLoaded);
@@ -508,10 +503,8 @@ if (showreelSection && showreelToggle) {
 const authModal = document.querySelector('#auth-modal');
 const authCta = document.querySelector('.hero-nav .cta-button');
 const isStandaloneAuthPage = document.body.classList.contains('auth-page');
-// #signup opens the guided signup (Phase E). Until Task 5 retires the old 4-step form, a dev server can still reach it
-// with ?legacy-signup=1#signup (tests/e2e/onboarding.spec.mjs); production builds drop this branch.
-const legacySignup = import.meta.env.DEV && new URLSearchParams(window.location.search).has('legacy-signup');
-const requestedAuthView = window.location.hash === '#signup' ? (legacySignup ? 'signup' : 'guided') : 'login';
+// #signup opens the guided signup (Phase E); anything else opens the login view. The old 4-step form is gone (Task 5).
+const requestedAuthView = window.location.hash === '#signup' ? 'guided' : 'login';
 let authHistoryView = isStandaloneAuthPage ? requestedAuthView : 'welcome';
 if (isStandaloneAuthPage) {
   window.history.replaceState({ briviaAuthView: requestedAuthView }, '', window.location.href);
@@ -522,506 +515,10 @@ const authPanelKicker = authModal?.querySelector('.auth-panel-kicker');
 const authShell = authModal?.querySelector('.auth-shell');
 const authPanel = authModal?.querySelector('.auth-panel');
 const authScrollbarThumb = authModal?.querySelector('.auth-scrollbar span');
-const signupForm = document.querySelector('#signup-form');
-const signupSuccess = document.querySelector('#auth-success');
 const loginForm = document.querySelector('#login-form');
 const loginNote = document.querySelector('#login-note');
-const signupPasswordFields = signupForm?.querySelector('.signup-password-fields');
-const signupStepLabel = signupForm?.querySelector('[data-signup-step-label]');
-const signupProgress = signupForm?.querySelector('.signup-progress-track');
-const signupProgressFill = signupForm?.querySelector('[data-signup-progress-fill]');
-let signupCurrentStep = 1;
-let adultAlreadyDeclared = false;  // the member row already has adult_declared_at (completion re-entry): no second declare_adult
-let profileCompletionUser = null;
 let authCloseTimer;
 let authEnvelopeTimer;
-let resetLooking = () => {};
-let resetPhoto = () => {};
-let resetCover = () => {};
-let fillLooking = () => {};
-let profileCompletionPhotoUrl = '';
-let profileCompletionCoverUrl = '';
-
-const photoUpload = document.querySelector('[data-photo-upload]');
-if (photoUpload) {
-  const photoInput = photoUpload.querySelector('.photo-input');
-  const photoPreview = photoUpload.querySelector('.photo-preview');
-  const photoFileName = photoUpload.querySelector('.photo-file-name');
-  const photoRemove = photoUpload.querySelector('.photo-remove');
-  const photoTitle = photoUpload.querySelector('.photo-copy strong');
-  let previewUrl = '';
-  const defaultPhotoText = 'Optional · A clear photo helps people recognise you.';
-  const imageExtension = /\.(jpg|jpeg|png|webp|gif|svg|avif|heic|heif|bmp|tif|tiff)$/i;
-
-  photoInput?.addEventListener('change', () => {
-    const file = photoInput.files?.[0];
-    if (!file) return;
-    if (previewUrl) URL.revokeObjectURL(previewUrl);
-    previewUrl = URL.createObjectURL(file);
-    photoUpload.classList.add('has-file');
-    photoRemove?.removeAttribute('hidden');
-    if (photoTitle) photoTitle.textContent = 'CHANGE PROFILE PHOTO';
-    if (file.type.startsWith('image/') || imageExtension.test(file.name)) {
-      if (photoPreview) {
-        photoPreview.textContent = '';
-        photoPreview.style.backgroundImage = `url("${previewUrl}")`;
-      }
-    } else if (photoPreview) {
-      photoPreview.textContent = 'FILE';
-      photoPreview.style.backgroundImage = '';
-    }
-    if (photoFileName) photoFileName.textContent = file.name;
-  });
-
-  resetPhoto = () => {
-    if (previewUrl) URL.revokeObjectURL(previewUrl);
-    previewUrl = '';
-    if (photoInput) photoInput.value = '';
-    photoUpload.classList.remove('has-file');
-    photoRemove?.setAttribute('hidden', '');
-    if (photoTitle) photoTitle.textContent = 'ADD A PROFILE PHOTO';
-    if (photoPreview) {
-      photoPreview.textContent = '＋';
-      photoPreview.style.backgroundImage = '';
-    }
-    if (photoFileName) photoFileName.textContent = defaultPhotoText;
-  };
-  photoRemove?.addEventListener('click', () => {
-    resetPhoto();
-    photoInput?.focus();
-  });
-}
-
-const coverPicker = document.querySelector('[data-cover-picker]');
-const coverOptionUrl = (button) => normalizeCoverUrl(button?.querySelector('img')?.getAttribute('src') || button?.dataset.coverOption || '');
-if (coverPicker) {
-  const coverValue = coverPicker.querySelector('.cover-value');
-  const coverPreview = coverPicker.querySelector('[data-cover-preview]');
-  const coverInput = coverPicker.querySelector('.cover-input');
-  const coverFileName = coverPicker.querySelector('.cover-file-name');
-  let coverPreviewUrl = '';
-  const defaultCover = defaultCoverUrl;
-
-  const setCover = (url, button = null) => {
-    if (coverValue) coverValue.value = url || '';
-    if (coverPreview) {
-      coverPreview.style.backgroundImage = url ? `url("${url}")` : '';
-      coverPreview.classList.toggle('has-cover', Boolean(url));
-      coverPreview.querySelector('span')?.toggleAttribute('hidden', Boolean(url));
-    }
-    coverPicker.querySelectorAll('.cover-choice').forEach((choice) => choice.classList.toggle('is-selected', choice === button));
-  };
-
-  coverPicker.querySelectorAll('.cover-choice').forEach((button) => {
-    button.addEventListener('click', () => {
-      if (coverPreviewUrl) {
-        URL.revokeObjectURL(coverPreviewUrl);
-        coverPreviewUrl = '';
-      }
-      if (coverInput) coverInput.value = '';
-      if (coverFileName) coverFileName.textContent = 'Recommended: a wide image with room for your profile details.';
-      setCover(coverOptionUrl(button) || defaultCover, button);
-    });
-  });
-  coverInput?.addEventListener('change', () => {
-    const file = coverInput.files?.[0];
-    if (!file) return;
-    if (coverPreviewUrl) URL.revokeObjectURL(coverPreviewUrl);
-    coverPreviewUrl = URL.createObjectURL(file);
-    setCover(coverPreviewUrl);
-    coverPicker.querySelectorAll('.cover-choice').forEach((choice) => choice.classList.remove('is-selected'));
-    if (coverFileName) coverFileName.textContent = file.name;
-  });
-  resetCover = () => {
-    if (coverPreviewUrl) URL.revokeObjectURL(coverPreviewUrl);
-    coverPreviewUrl = '';
-    if (coverInput) coverInput.value = '';
-    if (coverFileName) coverFileName.textContent = 'Recommended: a wide image with room for your profile details.';
-    const defaultChoice = coverPicker.querySelector('.cover-choice');
-    setCover(coverOptionUrl(defaultChoice) || defaultCover, defaultChoice);
-  };
-  resetCover();
-}
-
-const lookingOptions = [
-  'Hackathon Buddy', 'SIH Buddy', 'Travelling Buddy', 'Study Partner', 'Project Partner', 'Coding Partner', 'Startup Partner',
-  'Co-founder', 'Teammate', 'Mentor', 'Mentee', 'Freelancer', 'Intern', 'Research Partner', 'Open Source Contributor',
-  'Developer', 'Designer', 'AI Enthusiast', 'ML Enthusiast', 'Entrepreneur', 'Photographer', 'Content Creator', 'Video Editor',
-  'UI/UX Designer', 'Data Analyst', 'Business Analyst', 'Marketer', 'Public Speaker', 'Writer', 'Volunteer', 'Event Participant',
-  'Networking Contact', 'Career Mentor', 'Job Referral', 'Internship Referral', 'Accountability Partner', 'Language Exchange Partner',
-  'Travel Companion', 'Trekking Partner', 'Sports Partner', 'Gaming Partner', 'Photography Partner', 'Event Companion',
-  'Conference Companion', 'Workshop Partner', 'Competition Teammate', 'Roommate', 'Local Guide', 'Community Member', 'Collaborator', 'Other',
-];
-
-const lookingPicker = document.querySelector('[data-looking-picker]');
-if (lookingPicker) {
-  const lookingSearch = lookingPicker.querySelector('.looking-search');
-  const lookingOtherInput = lookingPicker.querySelector('.looking-other-input');
-  const lookingResults = lookingPicker.querySelector('.looking-results');
-  const lookingSelected = lookingPicker.querySelector('.looking-selected');
-  const lookingValue = lookingPicker.querySelector('.looking-value');
-  const selectedLooking = [];
-  let customLookingMode = false;
-
-  const syncLooking = () => {
-    if (lookingValue) lookingValue.value = selectedLooking.join(', ');
-    if (lookingSearch) lookingSearch.setCustomValidity(selectedLooking.length ? '' : 'Choose at least one option.');
-    if (lookingSelected) {
-      lookingSelected.innerHTML = selectedLooking.map((item) => `<button type="button" class="skill-chip" data-remove-looking="${item.replace(/"/g, '&quot;')}">${item}<span aria-hidden="true">×</span></button>`).join('');
-      lookingSelected.querySelectorAll('[data-remove-looking]').forEach((button) => {
-        button.addEventListener('click', () => {
-          const index = selectedLooking.indexOf(button.dataset.removeLooking);
-          if (index > -1) selectedLooking.splice(index, 1);
-          syncLooking();
-          renderLooking();
-          lookingSearch?.focus();
-        });
-      });
-    }
-  };
-
-  const addLooking = (value) => {
-    const cleanValue = value.trim();
-    if (!cleanValue || selectedLooking.some((item) => item.toLowerCase() === cleanValue.toLowerCase())) return;
-    selectedLooking.push(cleanValue);
-    customLookingMode = false;
-    lookingOtherInput?.setAttribute('hidden', '');
-    if (lookingOtherInput) lookingOtherInput.value = '';
-    if (lookingSearch) {
-      lookingSearch.value = '';
-      lookingSearch.placeholder = 'Search what brings you here...';
-    }
-    syncLooking();
-    renderLooking();
-    lookingSearch?.focus();
-  };
-
-  const renderLooking = () => {
-    if (!lookingResults || !lookingSearch) return;
-    const query = lookingSearch.value.trim().toLowerCase();
-    const matches = lookingOptions.filter((item) => item.toLowerCase().includes(query));
-    const hasExactMatch = lookingOptions.some((item) => item.toLowerCase() === query);
-    if (query && !hasExactMatch) matches.push(`__custom__${lookingSearch.value.trim()}`);
-    lookingResults.innerHTML = matches.length ? matches.map((item) => {
-      if (item.startsWith('__custom__')) return `<button type="button" class="skill-option skill-option--custom" data-custom-looking="${item.slice(10).replace(/"/g, '&quot;')}">ADD “${item.slice(10)}” AS OTHER <span>＋</span></button>`;
-      const isSelected = selectedLooking.includes(item);
-      return `<button type="button" class="skill-option${isSelected ? ' is-selected' : ''}" data-looking-option="${item.replace(/"/g, '&quot;')}" role="option" aria-selected="${isSelected}">${item}<span>${isSelected ? '✓' : '＋'}</span></button>`;
-    }).join('') : '<p class="skills-empty">No match. Type your own option and press Enter.</p>';
-    lookingResults.querySelectorAll('[data-looking-option]').forEach((button) => {
-      button.addEventListener('click', () => {
-        const item = button.dataset.lookingOption;
-        if (item === 'Other') {
-          customLookingMode = true;
-          lookingPicker.classList.remove('is-open');
-          lookingOtherInput?.removeAttribute('hidden');
-          lookingOtherInput?.focus();
-          return;
-        }
-        customLookingMode = false;
-        lookingSearch.placeholder = 'Search what brings you here...';
-        const index = selectedLooking.indexOf(item);
-        if (index > -1) selectedLooking.splice(index, 1); else selectedLooking.push(item);
-        syncLooking();
-        renderLooking();
-        lookingSearch.focus();
-      });
-    });
-    lookingResults.querySelectorAll('[data-custom-looking]').forEach((button) => button.addEventListener('click', () => addLooking(button.dataset.customLooking)));
-  };
-
-  resetLooking = () => {
-    selectedLooking.splice(0, selectedLooking.length);
-    customLookingMode = false;
-    lookingOtherInput?.setAttribute('hidden', '');
-    if (lookingOtherInput) lookingOtherInput.value = '';
-    if (lookingSearch) {
-      lookingSearch.value = '';
-      lookingSearch.placeholder = 'Search what brings you here...';
-    }
-    syncLooking();
-    renderLooking();
-  };
-  fillLooking = (value) => {
-    selectedLooking.splice(0, selectedLooking.length, ...String(value || '').split(',').map((item) => item.trim()).filter(Boolean));
-    syncLooking();
-    renderLooking();
-  };
-  lookingSearch?.addEventListener('focus', () => { lookingPicker.classList.add('is-open'); renderLooking(); });
-  lookingSearch?.addEventListener('input', () => { lookingPicker.classList.add('is-open'); renderLooking(); });
-  lookingSearch?.addEventListener('keydown', (event) => {
-    if (event.key !== 'Enter' || !lookingSearch.value.trim()) return;
-    event.preventDefault();
-    addLooking(lookingSearch.value);
-  });
-  lookingOtherInput?.addEventListener('keydown', (event) => {
-    if (event.key !== 'Enter' || !lookingOtherInput.value.trim()) return;
-    event.preventDefault();
-    addLooking(lookingOtherInput.value);
-  });
-  document.addEventListener('click', (event) => {
-    const clickedInsidePicker = event.composedPath().includes(lookingPicker);
-    if (!clickedInsidePicker) {
-      lookingPicker.classList.remove('is-open');
-      lookingSearch?.setAttribute('aria-expanded', 'false');
-    } else lookingSearch?.setAttribute('aria-expanded', String(lookingPicker.classList.contains('is-open')));
-  });
-  renderLooking();
-}
-
-// ---------------------------------------------------------------------------------------------------------------
-// ORBIT onboarding (UX_SPEC flow A). Step 2 "Your area" and step 3 "What you care about" (interests + Passion Budget).
-// Privacy (CLAUDE.md, Review Focus 4): coordinates live only in the area picker's choice (area-pick.js), in memory.
-// They are never written to localStorage / sessionStorage, the URL, the DOM or a log, and are dropped as soon as the
-// server has the cell.
-// ---------------------------------------------------------------------------------------------------------------
-// R2: sensitive interests are offered only after the member opens the consent panel and continues (the box ticked).
-// Their nodes stay in the catalog (as `hidden`) so stored picks still get labels. Consent is sent to the server only
-// when a sensitive pick is submitted (finishOnboarding), never on Continue.
-let privateUnlocked = false;
-const svgIcon = (name) => {
-  const paths = {
-    plus: '<path d="M12 5v14M5 12h14" />',
-    minus: '<path d="M5 12h14" />',
-    close: '<path d="M6 6l12 12M18 6L6 18" />',
-    check: '<path d="M5 12.5l4.5 4.5L19 7.5" />',
-    lock: '<rect x="5" y="11" width="14" height="9" rx="2" /><path d="M8 11V8a4 4 0 0 1 8 0v3" />',
-  };
-  return `<svg class="ob-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">${paths[name] || ''}</svg>`;
-};
-// Re-renders a container and puts focus back on the element with the same data-focus-key (keyboard users keep place).
-const renderKeepingFocus = (container, html) => {
-  if (!container) return;
-  const active = document.activeElement;
-  const key = active && container.contains(active) ? active.dataset?.focusKey : null;
-  container.innerHTML = html;
-  if (key) [...container.querySelectorAll('[data-focus-key]')].find((el) => el.dataset.focusKey === key)?.focus({ preventScroll: true });
-};
-
-// "Your area" (area-pick.js, shared with the guided signup). The markup comes from areaPickerHtml so the old step 2
-// and the guided Area screen stay the same picker.
-const areaRoot = signupForm?.querySelector('[data-area]');
-if (areaRoot) areaRoot.innerHTML = areaPickerHtml({ prefix: 'area', explainer: true });
-const areaPicker = createAreaPicker(areaRoot, { searchPlaces });
-const setAreaError = (text) => areaPicker.setError(text);
-const keepCurrentArea = (label) => areaPicker.keep(label);
-const resetArea = () => areaPicker.reset();
-
-// Step 3: interests and the Passion Budget.
-let budget = emptyBudget();
-let interestCatalog = null; // { groups: [{ id, label, domain, items: [{ id, label, sensitive, search }] }] }
-let interestCatalogPromise = null;
-const openInterestGroups = new Set();
-const interestPicker = signupForm?.querySelector('[data-interest-picker]');
-const interestSearch = interestPicker?.querySelector('#interest-search');
-const interestHelp = interestPicker?.querySelector('#interest-help');
-const interestResults = interestPicker?.querySelector('#interest-results');
-const budgetList = signupForm?.querySelector('#budget-list');
-const budgetCounter = signupForm?.querySelector('#budget-counter');
-const budgetError = signupForm?.querySelector('#budget-error');
-const budgetEmpty = signupForm?.querySelector('[data-budget-empty]');
-const budgetNext = signupForm?.querySelector('[data-signup-step="3"] .signup-next');
-const budgetSpread = signupForm?.querySelector('[data-budget-spread]');
-let budgetGateShown = false;
-const INTEREST_HELP_TEXT = 'Choose 1 to 12. Select again to remove.';
-
-let interestNodes = [];
-const loadInterestCatalog = () => {
-  interestCatalogPromise ||= fetchInterestNodes().then(({ data, error }) => {
-    if (error) throw error;
-    interestNodes = data || [];
-    interestCatalog = buildInterestCatalog(interestNodes, { unlocked: privateUnlocked });
-    return interestCatalog;
-  }).catch((error) => { interestCatalogPromise = null; throw error; });
-  return interestCatalogPromise;
-};
-const interestChip = (item) => {
-  const selected = budget.items.some((chosen) => chosen.id === item.id);
-  const full = !selected && budget.items.length >= MAX_INTERESTS;
-  return `<button type="button" class="interest-chip${selected ? ' is-selected' : ''}${item.sensitive ? ' is-private' : ''}" data-interest-id="${escapeText(item.id)}" data-focus-key="chip:${escapeText(item.id)}" aria-pressed="${selected}"${full ? ' aria-disabled="true"' : ''}><span class="interest-chip-label">${escapeText(item.label)}</span>${svgIcon(selected ? 'check' : 'plus')}${item.sensitive ? `<small class="interest-private">${svgIcon('lock')}${PRIVATE_HINT_TEXT}</small>` : ''}</button>`;
-};
-const renderInterestResults = () => {
-  if (!interestResults) return;
-  if (!interestCatalog) {
-    interestResults.innerHTML = '<p class="interest-loading">Loading interests…</p>';
-    loadInterestCatalog().then(() => { renderBudget(); renderInterestResults(); }).catch(() => {
-      interestResults.innerHTML = '<p class="interest-loading">Interests could not load. <button type="button" class="interest-retry" data-interest-retry>TRY AGAIN</button></p>';
-    });
-    return;
-  }
-  const query = normalizeSearch(interestSearch?.value);
-  // A short result count in the polite live region (only when it changes, so re-renders do not re-announce).
-  const setHelp = (text) => { if (interestHelp && interestHelp.textContent !== text) interestHelp.textContent = text; };
-  if (query) {
-    const total = interestCatalog.groups.reduce((sum, group) => sum + group.items.filter((item) => item.search.includes(query)).length, 0);
-    setHelp(total === 0 ? 'No matches' : total === 1 ? '1 match' : `${total} matches`);
-  } else if (/match/.test(interestHelp?.textContent || '')) setHelp(INTEREST_HELP_TEXT);
-  if (!query) {
-    // Browse: one collapsible group per category (level 2); chips (levels 3-4) inside.
-    renderKeepingFocus(interestResults, interestCatalog.groups.map((group) => `<details class="interest-group" data-interest-group="${escapeText(group.id)}"${openInterestGroups.has(group.id) ? ' open' : ''}><summary data-focus-key="group:${escapeText(group.id)}"><span>${escapeText(group.label)}</span><small>${escapeText(group.domain)}</small></summary><div class="interest-chips">${group.items.map(interestChip).join('')}</div></details>`).join(''));
-    return;
-  }
-  let shown = 0;
-  const html = interestCatalog.groups.map((group) => {
-    const items = group.items.filter((item) => item.search.includes(query)).slice(0, Math.max(0, 40 - shown));
-    shown += items.length;
-    if (!items.length) return '';
-    return `<div class="interest-group is-match" data-interest-group="${escapeText(group.id)}"><p class="interest-group-title"><span>${escapeText(group.label)}</span><small>${escapeText(group.domain)}</small></p><div class="interest-chips">${items.map(interestChip).join('')}</div></div>`;
-  }).join('');
-  renderKeepingFocus(interestResults, html || '<p class="interest-loading">No interest matches that yet. Try a broader word.</p>');
-};
-const catalogNode = (id) => interestCatalog?.groups.flatMap((group) => group.items).find((node) => node.id === id)
-  || interestCatalog?.hidden?.find((node) => node.id === id) || null;
-const isSensitiveInterest = (id) => Boolean(catalogNode(id)?.sensitive);
-// The consent panel (R2): a real <dialog> (focus trap, Escape, focus return are the platform's). Nothing is pre-ticked;
-// "Not now" and "Continue" weigh the same. Continue unlocks the private chips; the server call happens at submit.
-const privateDialog = signupForm?.querySelector('#private-consent');
-const privateOpenButton = signupForm?.querySelector('[data-private-open]');
-const privateCheck = privateDialog?.querySelector('[data-private-checkbox]');
-const privateContinue = privateDialog?.querySelector('[data-private-continue]');
-const privateMessage = privateDialog?.querySelector('[data-private-message]');
-let serverWantedConsent = false;
-const openPrivateConsent = (message = '') => {
-  if (!privateDialog || privateDialog.open) return;
-  if (privateCheck) privateCheck.checked = false;
-  if (privateContinue) privateContinue.disabled = true;
-  if (privateMessage) { privateMessage.textContent = message; privateMessage.hidden = !message; }
-  if (typeof privateDialog.showModal === 'function') privateDialog.showModal(); else privateDialog.setAttribute('open', '');
-  privateCheck?.focus();
-};
-const closePrivateConsent = () => {
-  if (privateDialog?.open) privateDialog.close();
-  // The platform returns focus to the opener; if that is gone (hidden after Continue, or a refusal opened the panel)
-  // focus lands on the interest search.
-  if (!document.activeElement || document.activeElement === document.body || privateOpenButton?.hidden) interestSearch?.focus();
-};
-const unlockPrivate = () => {
-  privateUnlocked = true;
-  if (interestCatalog) interestCatalog = buildInterestCatalog(interestNodes, { unlocked: privateUnlocked });
-  if (privateOpenButton) privateOpenButton.hidden = true;
-  renderInterestResults();
-};
-privateOpenButton?.addEventListener('click', () => openPrivateConsent());
-privateCheck?.addEventListener('change', () => { if (privateContinue) privateContinue.disabled = !privateCheck.checked; });
-privateDialog?.querySelector('[data-private-cancel]')?.addEventListener('click', closePrivateConsent);
-privateContinue?.addEventListener('click', () => { if (!privateCheck?.checked) return; unlockPrivate(); closePrivateConsent(); });
-const budgetNote = signupForm?.querySelector('[data-budget-note]');
-const showBudgetNote = (text) => { if (budgetNote) { budgetNote.textContent = text; budgetNote.hidden = !text; } };
-const budgetRow = (item) => {
-  const id = escapeText(item.id);
-  // A pending list carries no labels: the taxonomy names them once it is loaded.
-  const label = escapeText(catalogNode(item.id)?.label || item.label);
-  const sensitive = isSensitiveInterest(item.id);
-  return `<li class="budget-row" data-budget-row="${id}">
-    <div class="budget-row-head"><span class="budget-label">${label}</span>${sensitive ? `<small class="interest-private">${svgIcon('lock')}${PRIVATE_HINT_TEXT}</small>` : ''}</div>
-    <div class="budget-controls">
-      <div class="budget-stepper" role="group" aria-label="Points for ${label}">
-        <button type="button" class="budget-step" data-step="-1" data-id="${id}" data-focus-key="minus:${id}" aria-label="Remove a point from ${label}">${svgIcon('minus')}</button>
-        <span class="budget-points"><span data-budget-points>${item.points}</span><span class="sr-only"> points</span></span>
-        <button type="button" class="budget-step" data-step="1" data-id="${id}" data-focus-key="plus:${id}" aria-label="Add a point to ${label}">${svgIcon('plus')}</button>
-      </div>
-      <div class="mode-control" role="radiogroup" aria-label="How you take part in ${label}">${MODES.map((mode) => `<label class="mode-option"><input type="radio" name="mode-${id}" value="${mode}" data-id="${id}" data-focus-key="mode:${id}:${mode}"${item.mode === mode ? ' checked' : ''} /><span>${mode[0].toUpperCase()}${mode.slice(1)}</span></label>`).join('')}</div>
-      <button type="button" class="budget-remove" data-remove-interest="${id}" data-focus-key="remove:${id}" aria-label="Remove ${label}">${svgIcon('close')}</button>
-    </div>
-  </li>`;
-};
-// Updates the counter, the stepper states and Next without rebuilding the rows.
-const syncBudgetState = () => {
-  const left = pointsLeft(budget);
-  if (budgetCounter) budgetCounter.textContent = counterText(budget);
-  budget.items.forEach((item) => {
-    const row = [...(budgetList?.querySelectorAll('[data-budget-row]') || [])].find((el) => el.dataset.budgetRow === item.id);
-    if (!row) return;
-    row.querySelector('[data-budget-points]').textContent = String(item.points);
-    row.querySelector('[data-step="-1"]').setAttribute('aria-disabled', String(item.points <= 1));
-    row.querySelector('[data-step="1"]').setAttribute('aria-disabled', String(left <= 0));
-  });
-  const complete = isComplete(budget);
-  budgetNext?.setAttribute('aria-disabled', String(!complete));
-  // Completing the budget clears only the gate error; a save error stays until step 3 is re-entered. While the
-  // gate error shows, it follows the points still left.
-  if (budgetGateShown && budgetError) {
-    if (complete) { budgetError.textContent = ''; budgetGateShown = false; } else budgetError.textContent = budgetGateText(budget);
-  }
-  if (budgetEmpty) budgetEmpty.hidden = budget.items.length > 0;
-  if (budgetSpread) budgetSpread.hidden = !budget.items.length || left <= 0;
-};
-const renderBudget = () => {
-  renderKeepingFocus(budgetList, budget.items.map(budgetRow).join(''));
-  syncBudgetState();
-};
-const setBudget = (next, { rerenderChips = false } = {}) => {
-  const rowsChanged = next.items.length !== budget.items.length || next.items.some((item, i) => item.id !== budget.items[i]?.id);
-  budget = next;
-  if (rowsChanged) renderBudget(); else syncBudgetState();
-  if (rowsChanged || rerenderChips) renderInterestResults();
-};
-const resetBudget = () => {
-  budget = emptyBudget();
-  if (interestSearch) interestSearch.value = '';
-  if (interestHelp) interestHelp.textContent = INTEREST_HELP_TEXT;
-  if (budgetError) budgetError.textContent = '';
-  budgetGateShown = false;
-  showBudgetNote('');
-  renderBudget();
-  if (interestCatalog) renderInterestResults();
-};
-const toggleInterest = (id) => {
-  const item = catalogNode(id);
-  if (!item) return;
-  if (budget.items.some((chosen) => chosen.id === id)) { setBudget(removeInterest(budget, id)); return; }
-  const next = addInterest(budget, { id: item.id, label: item.label });
-  if (next === budget) { if (interestHelp) interestHelp.textContent = INTEREST_CAP_TEXT; return; }
-  if (interestHelp) interestHelp.textContent = INTEREST_HELP_TEXT;
-  setBudget(next);
-};
-interestSearch?.addEventListener('input', renderInterestResults);
-interestSearch?.addEventListener('keydown', (event) => {
-  if (event.key === 'Enter') event.preventDefault();
-  if (event.key === 'Escape') {
-    // Escape clears the search (and is consumed: the global Escape never closes the signup from here).
-    event.preventDefault();
-    if (interestSearch.value) { interestSearch.value = ''; renderInterestResults(); }
-  }
-});
-interestResults?.addEventListener('click', (event) => {
-  if (event.target.closest('[data-interest-retry]')) { renderInterestResults(); return; }
-  const chip = event.target.closest('[data-interest-id]');
-  if (chip) toggleInterest(chip.dataset.interestId);
-});
-interestResults?.addEventListener('toggle', (event) => {
-  const group = event.target.closest?.('[data-interest-group]');
-  if (!group || group.tagName !== 'DETAILS') return;
-  if (group.open) openInterestGroups.add(group.dataset.interestGroup); else openInterestGroups.delete(group.dataset.interestGroup);
-}, true);
-budgetList?.addEventListener('click', (event) => {
-  const step = event.target.closest('[data-step]');
-  if (step) {
-    if (step.getAttribute('aria-disabled') === 'true') return;
-    setBudget(stepPoints(budget, step.dataset.id, Number(step.dataset.step)));
-    return;
-  }
-  const remove = event.target.closest('[data-remove-interest]');
-  if (remove) {
-    const id = remove.dataset.removeInterest;
-    const rows = [...budgetList.querySelectorAll('[data-budget-row]')];
-    const index = rows.findIndex((row) => row.dataset.budgetRow === id);
-    setBudget(removeInterest(budget, id));
-    // Keep keyboard focus in the list: the next row's remove button, else the search field.
-    const nextRow = budgetList.querySelectorAll('[data-budget-row]')[Math.min(index, budget.items.length - 1)];
-    (nextRow?.querySelector('[data-remove-interest]') || interestSearch)?.focus({ preventScroll: true });
-  }
-});
-budgetList?.addEventListener('change', (event) => {
-  const radio = event.target.closest('input[type="radio"][data-id]');
-  if (radio) budget = setMode(budget, radio.dataset.id, radio.value);
-});
-const showBudgetError = () => { if (budgetError) { budgetError.textContent = budgetGateText(budget); budgetGateShown = true; } };
-budgetSpread?.addEventListener('click', () => {
-  setBudget(spreadRemaining(budget));
-  // The button hides once the budget is full: keep keyboard and screen-reader users on the next action.
-  if (isComplete(budget)) budgetNext?.focus();
-});
-renderBudget();
 
 if (authCta && authModal) {
   authCta.classList.add('auth-trigger');
@@ -1030,155 +527,6 @@ if (authCta && authModal) {
   authCta.innerHTML = '<span class="button-label">START SWIPING</span><span class="button-arrows">→</span>';
 }
 
-const resetSignup = () => {
-  signupForm?.reset();
-  resetArea();
-  resetBudget();
-  resetLooking();
-  resetPhoto();
-  resetCover();
-  setAdultError('');
-  adultAlreadyDeclared = false;
-  profileCompletionUser = null;
-  profileCompletionPhotoUrl = '';
-  profileCompletionCoverUrl = '';
-  signupForm?.elements.namedItem('email')?.removeAttribute('readonly');
-  setSignupPasswordMode(true);
-  setSignupStep(1, false);
-  const submit = signupForm?.querySelector('[type="submit"]');
-  if (submit) submit.innerHTML = 'CREATE MY PROFILE <span>→</span>';
-  signupForm?.removeAttribute('hidden');
-  signupSuccess?.setAttribute('hidden', '');
-  const backButton = authModal?.querySelector('.auth-back-trigger');
-  if (backButton) {
-    backButton.removeAttribute('hidden');
-    backButton.textContent = '← BACK TO LOGIN';
-  }
-};
-
-function setSignupPasswordMode(enabled, required = enabled) {
-  if (!signupPasswordFields) return;
-  signupPasswordFields.toggleAttribute('hidden', !enabled);
-  signupPasswordFields.querySelectorAll('input').forEach((input) => {
-    input.required = required;
-    if (!enabled) input.value = '';
-  });
-}
-
-const SIGNUP_STEPS = 4;
-const SIGNUP_STEP_LABELS = ['THE BASICS', 'YOUR AREA', 'WHAT YOU CARE ABOUT', 'SECURITY & PRESENCE'];
-function setSignupStep(step, focusFirst = true) {
-  signupCurrentStep = Math.min(SIGNUP_STEPS, Math.max(1, Number(step) || 1));
-  signupForm?.querySelectorAll('[data-signup-step]').forEach((panel) => {
-    panel.toggleAttribute('hidden', Number(panel.dataset.signupStep) !== signupCurrentStep);
-  });
-  if (signupProgress) { signupProgress.setAttribute('aria-valuemax', String(SIGNUP_STEPS)); signupProgress.setAttribute('aria-valuenow', String(signupCurrentStep)); }
-  if (signupProgressFill) signupProgressFill.style.width = `${(signupCurrentStep / SIGNUP_STEPS) * 100}%`;
-  if (signupStepLabel) signupStepLabel.textContent = `STEP ${signupCurrentStep} OF ${SIGNUP_STEPS} · ${SIGNUP_STEP_LABELS[signupCurrentStep - 1]}`;
-  // The taxonomy is fetched while the member is on "Your area", so "What you care about" opens ready.
-  if (signupCurrentStep >= 2 && !interestCatalog) loadInterestCatalog().then(() => { renderBudget(); renderInterestResults(); }).catch(() => {});
-  if (signupCurrentStep === 3) {
-    if (budgetError) budgetError.textContent = '';
-    budgetGateShown = false;
-    renderInterestResults();
-  }
-  const reduceMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
-  authPanel?.scrollTo({ top: 0, behavior: reduceMotion ? 'auto' : 'smooth' });
-  if (focusFirst) {
-    const activeStep = signupForm?.querySelector(`[data-signup-step="${signupCurrentStep}"]`);
-    const firstVisibleField = [...(activeStep?.querySelectorAll('input:not([type="hidden"]):not([type="file"]), select, textarea, button:not(.signup-step-prev)') || [])]
-      .find((field) => field.getClientRects().length && !field.disabled);
-    firstVisibleField?.focus({ preventScroll: true });
-  }
-}
-
-// R1: the 18+ confirmation. The error is inline (aria-describedby on the box), never a reportValidity bubble.
-const adultBox = signupForm?.elements.namedItem('adultConfirm');
-const adultError = document.getElementById('adult-error');
-const ADULT_REQUIRED_TEXT = 'You need to be 18 or older to join Brivia.';
-const ADULT_SAVE_ERROR = "We couldn't record your confirmation. Please try again.";
-const setAdultError = (message) => {
-  if (adultError) adultError.textContent = message || '';
-  adultBox?.setAttribute('aria-invalid', message ? 'true' : 'false');
-};
-const validateAdultConfirm = () => {
-  if (adultBox?.checked) { setAdultError(''); return true; }
-  setAdultError(ADULT_REQUIRED_TEXT);
-  adultBox?.focus();
-  return false;
-};
-adultBox?.addEventListener('change', () => { if (adultBox.checked) setAdultError(''); });
-
-const validateSignupStep = (step = signupCurrentStep) => {
-  const activeStep = signupForm?.querySelector(`[data-signup-step="${step}"]`);
-  if (!activeStep) return true;
-  const fields = [...activeStep.querySelectorAll('input, select, textarea')].filter((field) => field.type !== 'hidden' && field.type !== 'file' && !field.disabled);
-  for (const field of fields) {
-    if (!field.checkValidity()) {
-      field.reportValidity();
-      return false;
-    }
-  }
-  return true;
-};
-// Step gates. Step 2 needs an area; step 3 needs a complete Passion Budget (error beside the counter) and one
-// "looking for" choice.
-const validateOnboardingStep = (step) => {
-  if (step === 2) {
-    // A typed city that is unambiguous counts as picked (the live walkthrough: members type and press Next).
-    return Boolean(areaPicker.commit());
-  }
-  if (step === 3) {
-    if (!isComplete(budget)) { showBudgetError(); return false; }
-    return validateSignupStep(3);
-  }
-  if (step === 1) return validateSignupStep(1) && validateAdultConfirm();
-  return validateSignupStep(step);
-};
-signupForm?.querySelectorAll('.signup-next').forEach((button) => button.addEventListener('click', async () => {
-  const nextStep = Number(button.dataset.nextStep);
-  if (!nextStep) return;
-  // Next pressed right after typing a city: let the pending search finish so the typed name can be matched.
-  if (nextStep === 3 && areaPicker.needsSettle()) {
-    button.setAttribute('aria-busy', 'true');
-    try { await areaPicker.settle(); } finally { button.removeAttribute('aria-busy'); }
-    if (signupCurrentStep !== 2) return; // the member went Back (or on) while the search ran
-  }
-  if (validateOnboardingStep(nextStep - 1)) setSignupStep(nextStep);
-}));
-signupForm?.querySelectorAll('.signup-step-prev').forEach((button) => button.addEventListener('click', () => {
-  setSignupStep(button.dataset.prevStep || 1);
-}));
-
-const signupFeedback = signupForm ? document.createElement('p') : null;
-if (signupFeedback && signupForm) {
-  signupFeedback.className = 'auth-note';
-  signupFeedback.id = 'signup-feedback';
-  signupFeedback.setAttribute('aria-live', 'polite');
-  signupForm.setAttribute('novalidate', '');
-  signupForm.after(signupFeedback);
-}
-
-const signupSuccessTitle = signupSuccess?.querySelector('h2');
-const signupSuccessMessage = signupSuccess?.querySelector('p');
-signupSuccessTitle?.setAttribute('data-auth-success-title', '');
-signupSuccessMessage?.setAttribute('data-auth-success-message', '');
-if (signupSuccessMessage) signupSuccessMessage.textContent = 'We sent a verification link. Your email is your login ID; your password stays private and is never shown here.';
-
-signupSuccess?.querySelectorAll('[data-copy-credential]').forEach((button) => {
-  button.addEventListener('click', async () => {
-    const key = button.dataset.copyCredential;
-    const value = signupSuccess.querySelector(`[data-credential="${key}"]`)?.textContent || '';
-    try {
-      await navigator.clipboard.writeText(value);
-      button.textContent = 'COPIED';
-      window.setTimeout(() => { button.textContent = 'COPY'; }, 1600);
-    } catch {
-      button.textContent = 'SELECT & COPY';
-    }
-  });
-});
-
 const setAuthView = (view, historyMode = 'push') => {
   // Never leave a view hidden if the envelope transition was interrupted.
   authShell?.classList.remove('is-envelope-opening');
@@ -1186,7 +534,7 @@ const setAuthView = (view, historyMode = 'push') => {
   if (isStandaloneAuthPage && view !== authHistoryView && historyMode !== 'none') {
     const state = { briviaAuthView: view };
     const nextUrl = new URL(window.location.href);
-    nextUrl.hash = view === 'signup' || view === 'guided' ? '#signup' : view === 'login' ? '#login' : '';
+    nextUrl.hash = view === 'guided' ? '#signup' : view === 'login' ? '#login' : '';
     if (historyMode === 'replace') window.history.replaceState(state, '', nextUrl);
     else window.history.pushState(state, '', nextUrl);
   }
@@ -1198,16 +546,15 @@ const setAuthView = (view, historyMode = 'push') => {
   });
   authShell?.classList.toggle('is-guided', view === 'guided');  // the guided flow has its own header (signup.css)
   if (authStep) {
-    const noCounter = view === 'signup' || view === 'guided';  // the counter means nothing beside a signup flow
+    const noCounter = view === 'guided';  // the counter means nothing beside the signup flow
     authStep.textContent = view === 'welcome' ? 'WELCOME' : view === 'login' ? '01 / 02' : '02 / 02';
     authStep.toggleAttribute('hidden', noCounter);
     authStep.style.display = noCounter ? 'none' : '';
   }
   if (authPanelKicker) authPanelKicker.textContent = view === 'welcome' ? 'THE BRIVIA CLUB' : view === 'login' ? 'RETURNING MEMBER' : 'YOUR APPLICATION';
   const authTopSignup = authModal?.querySelector('.auth-top-signup');
-  if (authTopSignup) authTopSignup.innerHTML = view === 'signup' || view === 'guided' ? 'ALREADY A MEMBER? <b>LOG IN</b>' : 'NEW HERE? <b>CREATE ACCOUNT</b>';
-  if (authShell) authShell.setAttribute('aria-labelledby', view === 'welcome' ? 'auth-welcome-title' : view === 'login' ? 'auth-title' : view === 'guided' ? 'signup-screen-title' : 'signup-title');
-  if (view === 'signup') signupForm?.querySelector('input')?.focus();
+  if (authTopSignup) authTopSignup.innerHTML = view === 'guided' ? 'ALREADY A MEMBER? <b>LOG IN</b>' : 'NEW HERE? <b>CREATE ACCOUNT</b>';
+  if (authShell) authShell.setAttribute('aria-labelledby', view === 'welcome' ? 'auth-welcome-title' : view === 'login' ? 'auth-title' : 'signup-screen-title');
 };
 
 if (isStandaloneAuthPage) {
@@ -1222,13 +569,11 @@ if (isStandaloneAuthPage) {
 const startGoogleAuth = async () => {
   if (!supabaseReady || !supabase) {
     if (loginNote) loginNote.textContent = 'Google sign-in is not configured yet. Please use email and password.';
-    if (signupFeedback) signupFeedback.textContent = 'Google sign-in is not configured yet. Please use email and password.';
     return 'Google sign-in is not configured yet.';
   }
   const buttons = authModal?.querySelectorAll('.auth-google-trigger') || [];
   buttons.forEach((button) => { button.disabled = true; });
   if (loginNote) loginNote.textContent = 'Connecting to Google...';
-  if (signupFeedback) signupFeedback.textContent = 'Connecting to Google...';
   try {
     const { error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
@@ -1237,127 +582,48 @@ const startGoogleAuth = async () => {
     if (!error) return null;
     buttons.forEach((button) => { button.disabled = false; });
     if (loginNote) loginNote.textContent = error.message || 'Google sign-in could not start.';
-    if (signupFeedback) signupFeedback.textContent = error.message || 'Google sign-in could not start.';
     return error.message || 'Google sign-in could not start.';
   } catch (error) {
     buttons.forEach((button) => { button.disabled = false; });
     if (loginNote) loginNote.textContent = error.message || 'Google sign-in could not start.';
-    if (signupFeedback) signupFeedback.textContent = error.message || 'Google sign-in could not start.';
     return error.message || 'Google sign-in could not start.';
   }
 };
 
-initGuidedSignup({
-  activate: (mode) => setAuthView('guided', mode),
-  login: () => setAuthView('login'),
-  startGoogle: startGoogleAuth,
-  methods: signupMethods(import.meta.env.VITE_SIGNUP_METHODS),
-});
-
-const getPhoneParts = (profile = {}, metadata = {}) => {
-  const rawPhone = String(profile.phone || metadata.phone || '').trim();
-  let countryCode = String(profile.phoneCountryCode || profile.phone_country_code || metadata.phoneCountryCode || metadata.phone_country_code || '').trim();
-  let number = String(profile.phoneNumber || profile.phone_number || metadata.phoneNumber || metadata.phone_number || '').trim();
-  if (!number && rawPhone) {
-    const match = rawPhone.match(/^(\+\d{1,4})[\s.-]*(.*)$/);
-    if (match) { countryCode = countryCode || match[1]; number = match[2]; }
-    else number = rawPhone;
-  }
-  return { phoneCountryCode: countryCode || '+91', phoneNumber: number };
+const redirectToApp = () => {
+  window.location.replace('/app.html');
 };
 
-const normalizeSignupGender = (value) => {
-  const gender = String(value || '').trim().toLowerCase();
-  if (gender === 'male') return 'Male';
-  if (gender === 'female') return 'Female';
-  if (['prefer not to say', 'prefer_not_to_say', 'prefer not say'].includes(gender)) return 'Prefer not to say';
-  return '';
-};
-
-// Completion (re-entry): the same 4-step form, prefilled, opened at `startStep`. `status` is my_onboarding_status():
-// an existing cell is kept unless the member picks a new area; existing interests prefill the Passion Budget.
-const showProfileCompletion = (user, savedProfile = null, { startStep = 1, status = null, adultDeclared = false } = {}) => {
-  if (!signupForm || !user) return;
-  resetSignup();
-  profileCompletionUser = user;
-  const metadata = user.user_metadata || {};
-  const profile = savedProfile || {};
-  const phoneParts = getPhoneParts(profile, metadata);
-  const values = {
-    name: realName(profile.name) || realName(metadata.name) || realName(metadata.full_name),
-    email: user.email || profile.email || '',
-    phoneCountryCode: phoneParts.phoneCountryCode,
-    phoneNumber: phoneParts.phoneNumber,
-    phone: profile.phone || metadata.phone || '',
-    experience: profile.experience || metadata.experience || '',
-    gender: normalizeSignupGender(profile.gender || metadata.gender),
-  };
-  Object.entries(values).forEach(([name, value]) => {
-    const field = signupForm.elements.namedItem(name);
-    if (field && value) field.value = value;
-  });
-  const emailField = signupForm.elements.namedItem('email');
-  emailField?.setAttribute('readonly', '');
-  fillLooking(profile.lookingFor || profile.looking_for || metadata.lookingFor || metadata.looking_for || '');
-  profileCompletionPhotoUrl = profile.photoUrl || metadata.avatar_url || metadata.picture || '';
-  profileCompletionCoverUrl = normalizeCoverUrl(profile.coverUrl || profile.cover_url || metadata.coverUrl || '');
-  const savedCover = profileCompletionCoverUrl && [...(coverPicker?.querySelectorAll('.cover-choice') || [])].find((choice) => choice.dataset.coverOption === profileCompletionCoverUrl || coverOptionUrl(choice) === profileCompletionCoverUrl);
-  if (savedCover) savedCover.click();
-  setSignupPasswordMode(true, false);
-  const submit = signupForm.querySelector('[type="submit"]');
-  if (submit) submit.innerHTML = 'COMPLETE MY PROFILE <span>→</span>';
-  const backButton = authModal?.querySelector('.auth-back-trigger');
-  if (backButton) backButton.textContent = 'SIGN OUT / BACK TO LOGIN';
-  if (signupFeedback) signupFeedback.textContent = 'Finish your Brivia profile to unlock the club.';
-  if (status?.has_cell) keepCurrentArea(status.place_label || '');
-  // R1: a member whose own row already has adult_declared_at sees the box ticked and is not asked again.
-  if (adultDeclared && adultBox) { adultBox.checked = true; adultAlreadyDeclared = true; }
-  setAuthView('signup');
-  setSignupStep(startStep);
-  // An OAuth or older account with no declaration yet lands on step 1 with only the box missing: focus it.
-  if (startStep === 1 && !adultDeclared && realName(values.name)) adultBox?.focus();
-};
-
-// The first incomplete onboarding step for my_onboarding_status(): 2 without a cell, else 3 (interests / budget).
-// A usable display name: trimmed, not empty and not the 'New Member' placeholder (the server's completion rule).
-// The first incomplete onboarding step: 1 without a real name or the 18+ declaration, 2 without a cell, else 3.
-const firstIncompleteStep = (status, profileRow = null) => {
-  if (!realName(profileRow?.name)) return 1;
-  if (!profileRow?.adult_declared_at) return 1;  // R1: OAuth, old accounts and a failed declaration start at the box
-  return status?.has_cell ? 3 : 2;
-};
+// ---------------------------------------------------------------------------------------------------------------
+// After sign-in (Phase E Task 5): every route (a password or code login, a session on auth.html, a Google return,
+// ?complete-profile=1 from the app gate) opens the guided flow at the first incomplete screen, or the app when done.
+// The guided Reveal and resumeScreen (signup-flow.js) replace the old 4-step completion form.
+//
+// The old pending profile (kept for one release, spec §1.4, D-053 follow-up): an account made with the retired 4-step
+// form that needed email confirmation stored its answers in localStorage 'brivia-pending-profile' (never coordinates;
+// only { kind: 'city', placeId } or { kind: 'geo' }, interests as { id, points, mode }, the 18+ declaration). At the
+// next login it is saved and applied once; whatever could not be applied is left for the guided screens (the stored
+// picks preselected, the failure shown once on its screen). Remove this block, pending-profile.js and the
+// 'brivia-pending-profile' cleanups one release after Phase E.
+// ---------------------------------------------------------------------------------------------------------------
 const PRIVATE_OMITTED_NOTE = "Private interests aren't kept while you confirm your email. Please pick them again.";
-const INTERESTS_SAVE_ERROR = 'Your interests could not be saved. Please try again.';
-// The server refuses a private (sensitive) interest until the member gives the separate consent (D-038 R3, R2). The
-// client then opens the consent panel with this message.
-const isSensitiveConsentError = (error) => /sensitive consent required/i.test(String(error?.message || ''));
 
-// After a profile exists: the app when onboarding is complete, else the completion flow at the first incomplete step.
-// An unknown status (RPC error) goes to the app, whose server-side visibility still requires completion (D-030).
-// `pendingResult` (from applyPendingOnboarding) carries what happened to a pending signup's area and interests.
-const routeAfterProfile = async (user, row = null, pendingResult = null) => {
-  const { data: status, error } = await onboardingStatus();
-  if (error || !status || status.completed !== false) { redirectToApp(); return; }
-  let profileRow = row;
-  if (!profileRow) ({ data: profileRow } = await supabase.from('profiles').select('*').eq('id', user.id).maybeSingle());
-  // F2: every step done but not completed = under review; the app shows the notice (no onboarding loop here).
-  if (isUnderReview(status, profileRow)) { redirectToApp(); return; }
-  let startStep = firstIncompleteStep(status, profileRow);
-  if (pendingResult?.orbitError && startStep > 2) startStep = 2;
-  showProfileCompletion(user, profileRow ? rowToProfile(profileRow) : null, { startStep, status, adultDeclared: Boolean(profileRow?.adult_declared_at) });
-  if (pendingResult?.adultError) setAdultError(ADULT_SAVE_ERROR);
-  if (pendingResult?.orbitError) setAreaError(isRateLimited(pendingResult.orbitError.error, pendingResult.orbitError.status) ? 'Try again later.' : AREA_SAVE_ERROR);
-  if (status.interests > 0) {
-    const { data: rows } = await fetchMyInterests();
-    if (Array.isArray(rows) && rows.length && !budget.items.length) setBudget(budgetFromRows(rows), { rerenderChips: true });
-  }
-  if (!budget.items.length && pendingResult?.budget?.items.length) {
-    setBudget(pendingResult.budget, { rerenderChips: true });
-    if (pendingResult.privateOmitted) showBudgetNote(PRIVATE_OMITTED_NOTE);
-  }
-  if (pendingResult?.interestsFailed && budgetError) budgetError.textContent = INTERESTS_SAVE_ERROR;
-  window.history.replaceState({ briviaAuthView: 'signup' }, '', '/auth.html');
+// Hands what the pending profile left undone to the guided screens: its picks, its name, and one notice.
+const seedGuidedFromPending = (pending, result) => {
+  const answers = guidedAnswers();
+  const name = realName(pending?.name);
+  if (name && !answers.name) answers.name = name;
+  const ids = (result?.budget?.items || []).map((item) => item.id);
+  if (ids.length && !answers.picks.length) answers.seedIds = ids;
+  if (!result) return;
+  if (result.adultError) answers.notice = { screen: 'adult', text: ADULT_SAVE_ERROR };
+  else if (result.orbitError) answers.notice = { screen: 'area', text: isRateLimited(result.orbitError.error, result.orbitError.status) ? AREA_RATE_LIMITED : AREA_SAVE_ERROR };
+  else if (result.interestsFailed) answers.notice = { screen: 'interests', text: INTERESTS_SAVE_ERROR };
+  else if (result.privateOmitted) answers.notice = { screen: 'interests', text: PRIVATE_OMITTED_NOTE };
 };
+
+// Opens the guided flow at the first incomplete screen (the app when done or under review: resumeScreen).
+const routeSignedIn = () => openGuidedSignup({ screen: 'resume', history: 'replace' });
 
 // Removes the area choice from the stored pending profile once set_home_city has applied it, keeping the rest (for
 // example interests that still have to be retried). Never throws.
@@ -1370,18 +636,16 @@ const dropPendingOrbit = () => {
   } catch { /* storage unavailable: nothing to drop */ }
 };
 
-// A signup that needed email confirmation stored { interests, orbit } with the pending profile (never coordinates,
-// never labels or sensitive interests). After login: a city choice and complete interests are applied; a geo choice is
-// asked for again (step 2). Nothing fails silently: the result tells routeAfterProfile what to show, and the pending
-// profile is removed only when every call that was made succeeded.
+// Applies a pending profile's onboarding: the 18+ declaration first (the server refuses location and interests before
+// it), then a city choice, then complete interests. A geo choice is asked for again on Area (no coordinate was stored).
+// Nothing fails silently: the result says what is left, and the pending profile is removed only when every call that
+// was made succeeded.
 const applyPendingOnboarding = async (pending) => {
   const result = { orbitError: null, interestsFailed: false, budget: null, privateOmitted: false, ok: true };
   if (!pending || typeof pending !== 'object') return result;
-  // R1: the declaration comes first (the server refuses location and interests before it). A pending profile from an
-  // older build has none: nothing is applied and the member is asked on step 1; the pending data is kept.
-  // The stored interests still prefill step 3 on these early returns.
   result.budget = budgetFromRows(pending.interests);
   result.privateOmitted = pending.privateOmitted === true;
+  // A pending profile from an older build has no declaration: nothing is applied (18+ asks), the pending data is kept.
   if (pending.adultDeclared !== true) { result.ok = false; return result; }
   const declared = await declareAdult();
   if (declared.error) { result.adultError = true; result.ok = false; return result; }
@@ -1390,11 +654,8 @@ const applyPendingOnboarding = async (pending) => {
     if (error) result.orbitError = { error, status };
     else dropPendingOrbit();  // applied: a later login must not spend another of the 3 daily location changes
   }
-  const stored = budgetFromRows(pending.interests);
-  result.budget = stored;
-  result.privateOmitted = pending.privateOmitted === true;
-  if (isComplete(stored)) {
-    const { error } = await setMemberInterests(toPayload(stored));
+  if (isComplete(result.budget)) {
+    const { error } = await setMemberInterests(toPayload(result.budget));
     if (error) result.interestsFailed = true;
   }
   result.ok = !result.orbitError && !result.interestsFailed;
@@ -1406,69 +667,6 @@ const withoutOnboarding = (profile) => {
   const clean = { ...(profile || {}) };
   PENDING_ONBOARDING_KEYS.forEach((key) => { delete clean[key]; });
   return clean;
-};
-
-const restoreAuthPageSession = async () => {
-  if (!document.body.classList.contains('auth-page')) return;
-  if (requestedAuthView === 'guided' && !new URLSearchParams(window.location.search).has('complete-profile')) {
-    // The guided Welcome reads the session itself: signed in, it offers Continue (and Sign out), never Email or Code.
-    void openGuidedSignup({ history: 'none' });
-    return;
-  }
-  if (!supabaseReady || !supabase) { setAuthView(requestedAuthView, 'none'); return; }
-  const params = new URLSearchParams(window.location.search);
-  const oauthError = params.get('error_description') || params.get('error');
-  if (oauthError) {
-    setAuthView('login');
-    if (loginNote) loginNote.textContent = oauthError.replaceAll('+', ' ');
-    window.history.replaceState({ briviaAuthView: 'login' }, '', '/auth.html');
-    return;
-  }
-  const isAuthCallback = Boolean(params.get('code') || params.get('access_token') || window.location.hash.includes('access_token'));
-  if (requestedAuthView === 'signup' && !isAuthCallback) {
-    await supabase.auth.signOut().catch(() => {});
-    resetSignup();
-    setAuthView('signup', 'none');
-    return;
-  }
-  const { data: { session }, error: sessionError } = await supabase.auth.getSession();
-  if (sessionError || !session?.user) {
-    setAuthView(requestedAuthView, 'none');
-    return;
-  }
-  const { data: profile, error } = await supabase.from('profiles').select('*').eq('id', session.user.id).maybeSingle();
-  if (error) {
-    setAuthView('login');
-    if (loginNote) loginNote.textContent = `We couldn't verify your Brivia profile: ${error.message}`;
-    return;
-  }
-  if (profile) {
-    await routeAfterProfile(session.user, profile);
-    return;
-  }
-  const pending = readPendingProfile();
-  const pendingMatches = pending?.email?.toLowerCase() === session.user.email?.toLowerCase();
-  if (await restoreCachedMemberProfile(session.user, pendingMatches ? pending : null)) {
-    const pendingResult = pendingMatches ? await applyPendingOnboarding(pending) : null;
-    await routeAfterProfile(session.user, null, pendingResult);
-    return;
-  }
-  showProfileCompletion(session.user, pendingMatches ? withoutOnboarding(pending) : null);
-  window.history.replaceState({ briviaAuthView: 'signup' }, '', '/auth.html');
-};
-
-const updateAuthScrollbar = () => {
-  if (!authPanel || !authScrollbarThumb) return;
-  const scrollable = authPanel.scrollHeight - authPanel.clientHeight;
-  const visibleRatio = scrollable > 0 ? authPanel.clientHeight / authPanel.scrollHeight : 1;
-  const thumbSize = Math.max(18, visibleRatio * 100);
-  const scrollRatio = scrollable > 0 ? authPanel.scrollTop / scrollable : 0;
-  authScrollbarThumb.style.height = `${thumbSize}%`;
-  authScrollbarThumb.style.top = `${scrollRatio * (100 - thumbSize)}%`;
-};
-
-const redirectToApp = () => {
-  window.location.replace('/app.html');
 };
 
 // The pending signup profile, or null. One older than 7 days (or without savedAt) is removed, never applied.
@@ -1514,6 +712,9 @@ const savePendingProfile = async (userId, profile, source) => {
   return { ...result, cached };
 };
 
+// An account made with the old form whose row was never written (email confirmed in another browser): its profile is
+// rebuilt from the pending profile, the cached member profile or the sign-up metadata the old form stored. A
+// metadata-only account (no old-form answers, e.g. Google) has nothing to restore: the guided flow asks.
 const restoreCachedMemberProfile = async (user, preferredProfile = null) => {
   if (!user?.id || !supabase) return false;
   const userEmail = String(user.email || '').trim().toLowerCase();
@@ -1547,22 +748,96 @@ const restoreCachedMemberProfile = async (user, preferredProfile = null) => {
   return true;
 };
 
+// A login (password, or "Email me a code instead"): a pending profile for this address is saved and applied once; one
+// for another address is dropped. Throws a save or read error for the caller to show.
+const routeAfterLogin = async (user) => {
+  const pending = readPendingProfile();
+  const pendingBelongsToUser = Boolean(pending) && pending?.email?.toLowerCase() === user?.email?.toLowerCase();
+  let pendingResult = null;
+  let savedPending = null;
+  if (pendingBelongsToUser) {
+    const saved = await savePendingProfile(user.id, withoutOnboarding(withoutCredentials(pending)), pending);
+    if (saved.error) throw saved.error;
+    savedPending = saved.cached;
+    pendingResult = await applyPendingOnboarding(pending);
+    window.localStorage.setItem('brivia-member-profile', JSON.stringify({ ...savedPending, id: user.id }));
+  } else if (pending) {
+    window.localStorage.removeItem('brivia-pending-profile');
+  }
+  const { data: ownProfile, error: ownProfileError } = await supabase.from('profiles').select('id').eq('id', user.id).maybeSingle();
+  if (ownProfileError) throw ownProfileError;
+  if (!ownProfile) await restoreCachedMemberProfile(user);
+  else {
+    const cachedPendingProfile = savedPending || (pendingBelongsToUser ? withoutOnboarding(withoutCredentials(pending)) : {});
+    window.localStorage.setItem('brivia-member-profile', JSON.stringify({ ...cachedPendingProfile, id: user.id, email: user.email || '' }));
+    if (pendingBelongsToUser && pending?.coverUrl) await supabase.auth.updateUser({ data: { coverUrl: pending.coverUrl } }).catch(() => {});
+  }
+  if (pendingBelongsToUser) seedGuidedFromPending(pending, pendingResult);
+  await routeSignedIn();
+};
+
+// auth.html with a session (a Google return, ?complete-profile=1, #signup, or an earlier sign-in): a member without a
+// profile row whose pending profile matches gets it applied; then the guided flow resumes, or the app opens.
+const routeSession = async (user) => {
+  const { data: profile, error } = await supabase.from('profiles').select('id').eq('id', user.id).maybeSingle();
+  if (error) {
+    setAuthView('login');
+    if (loginNote) loginNote.textContent = `We couldn't verify your Brivia profile: ${error.message}`;
+    return;
+  }
+  if (!profile) {
+    const pending = readPendingProfile();
+    const pendingMatches = pending?.email?.toLowerCase() === user.email?.toLowerCase();
+    if (await restoreCachedMemberProfile(user, pendingMatches ? pending : null)) {
+      if (pendingMatches) seedGuidedFromPending(pending, await applyPendingOnboarding(pending));
+    } else if (pendingMatches) seedGuidedFromPending(pending, null);
+  }
+  await routeSignedIn();
+};
+
+const restoreAuthPageSession = async () => {
+  if (!isStandaloneAuthPage) return;
+  const showRequested = () => (requestedAuthView === 'guided' ? openGuidedSignup({ history: 'none' }) : setAuthView(requestedAuthView, 'none'));
+  if (!supabaseReady || !supabase) { void showRequested(); return; }
+  const params = new URLSearchParams(window.location.search);
+  const oauthError = params.get('error_description') || params.get('error');
+  if (oauthError) {
+    setAuthView('login');
+    if (loginNote) loginNote.textContent = oauthError.replaceAll('+', ' ');
+    window.history.replaceState({ briviaAuthView: 'login' }, '', '/auth.html');
+    return;
+  }
+  const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+  if (sessionError || !session?.user) { void showRequested(); return; }
+  await routeSession(session.user);
+};
+
+initGuidedSignup({
+  activate: (mode) => setAuthView('guided', mode),
+  login: () => setAuthView('login'),
+  startGoogle: startGoogleAuth,
+  // "Email me a code instead": after the code, the same route as a password login (an old pending profile first).
+  afterLogin: async (user) => {
+    try { await routeAfterLogin(user); } catch (error) {
+      setAuthView('login');
+      if (loginNote) loginNote.textContent = error.message || 'Could not sign you in. Please try again.';
+    }
+  },
+  methods: signupMethods(import.meta.env.VITE_SIGNUP_METHODS),
+});
+
+const updateAuthScrollbar = () => {
+  if (!authPanel || !authScrollbarThumb) return;
+  const scrollable = authPanel.scrollHeight - authPanel.clientHeight;
+  const visibleRatio = scrollable > 0 ? authPanel.clientHeight / authPanel.scrollHeight : 1;
+  const thumbSize = Math.max(18, visibleRatio * 100);
+  const scrollRatio = scrollable > 0 ? authPanel.scrollTop / scrollable : 0;
+  authScrollbarThumb.style.height = `${thumbSize}%`;
+  authScrollbarThumb.style.top = `${scrollRatio * (100 - thumbSize)}%`;
+};
 authPanel?.addEventListener('scroll', updateAuthScrollbar, { passive: true });
 window.addEventListener('resize', updateAuthScrollbar);
 window.requestAnimationFrame(updateAuthScrollbar);
-
-const openAuth = () => {
-  if (!authModal) return;
-  window.clearTimeout(authCloseTimer);
-  window.clearTimeout(authEnvelopeTimer);
-  authShell?.classList.remove('is-envelope-opening');
-  resetSignup();
-  setAuthView(authModal.querySelector('[data-auth-view="login"]') ? 'login' : 'welcome');
-  authModal.removeAttribute('hidden');
-  document.body.classList.add('auth-open');
-  window.requestAnimationFrame(() => authModal.classList.add('is-open'));
-  window.setTimeout(() => authModal.querySelector('input')?.focus(), 350);
-};
 
 document.querySelectorAll('[data-menu-auth]').forEach((button) => button.addEventListener('click', () => {
   setMenuOpen(false);
@@ -1585,7 +860,7 @@ const closeAuth = () => {
   if (!authModal) return;
   window.clearTimeout(authEnvelopeTimer);
   authShell?.classList.remove('is-envelope-opening');
-  if (document.body.classList.contains('auth-page')) {
+  if (isStandaloneAuthPage) {
     try { window.sessionStorage.setItem('brivia-skip-intro-once', 'true'); } catch {}
     window.location.href = '/';
     return;
@@ -1596,7 +871,7 @@ const closeAuth = () => {
   authCta?.focus();
 };
 
-if (document.body.classList.contains('auth-page')) {
+if (isStandaloneAuthPage) {
   window.addEventListener('pagehide', () => {
     try { window.sessionStorage.setItem('brivia-skip-intro-once', 'true'); } catch {}
   });
@@ -1620,22 +895,13 @@ authModal?.querySelector('.auth-welcome-login')?.addEventListener('click', () =>
 // Sign out), so nothing is signed out here.
 authModal?.querySelector('.auth-welcome-signup')?.addEventListener('click', () => openAuthEnvelope('guided'));
 authModal?.querySelector('.auth-top-signup')?.addEventListener('click', () => {
-  if (authHistoryView === 'signup' || authHistoryView === 'guided') { setAuthView('login'); return; }
+  if (authHistoryView === 'guided') { setAuthView('login'); return; }
   void openGuidedSignup();
 });
 authModal?.querySelector('.auth-create-trigger')?.addEventListener('click', () => { void openGuidedSignup(); });
 authModal?.querySelectorAll('.auth-google-trigger').forEach((button) => button.addEventListener('click', startGoogleAuth));
 // The login view's Google button shows the same four-colour mark as the guided Welcome (google-mark.js, one source).
 if (isStandaloneAuthPage) authModal?.querySelectorAll('.auth-google-mark').forEach(fillGoogleMark);
-authModal?.querySelector('.auth-back-trigger')?.addEventListener('click', async () => {
-  if (profileCompletionUser && supabase) {
-    await supabase.auth.signOut();
-    window.localStorage.removeItem('brivia-pending-profile');
-  }
-  resetSignup();
-  setAuthView('login');
-});
-authModal?.querySelector('.auth-close-success')?.addEventListener('click', closeAuth);
 
 loginForm?.addEventListener('submit', async (event) => {
   event.preventDefault();
@@ -1649,36 +915,7 @@ loginForm?.addEventListener('submit', async (event) => {
     if (!supabaseReady || !supabase) throw new Error('Supabase is not configured.');
     const { data, error } = await supabase.auth.signInWithPassword({ email, password });
     if (error) throw error;
-    const pending = readPendingProfile();
-    const pendingBelongsToUser = pending?.email?.toLowerCase() === data.user?.email?.toLowerCase();
-    let loginPendingResult = null;
-    let savedPending = null;
-    if (pending && data.user && pendingBelongsToUser) {
-      const safePending = withoutOnboarding(withoutCredentials(pending));
-      const saved = await savePendingProfile(data.user.id, safePending, pending);
-      if (saved.error) throw saved.error;
-      savedPending = saved.cached;
-      loginPendingResult = await applyPendingOnboarding(pending);
-      window.localStorage.setItem('brivia-member-profile', JSON.stringify({ ...savedPending, id: data.user.id }));
-    } else if (pending && !pendingBelongsToUser) {
-      window.localStorage.removeItem('brivia-pending-profile');
-    }
-    const { data: ownProfile, error: ownProfileError } = await supabase.from('profiles').select('*').eq('id', data.user.id).maybeSingle();
-    if (ownProfileError) throw ownProfileError;
-    if (!ownProfile) {
-      if (await restoreCachedMemberProfile(data.user)) {
-        await routeAfterProfile(data.user);
-        return;
-      }
-      showProfileCompletion(data.user, pendingBelongsToUser ? withoutOnboarding(pending) : null);
-      return;
-    }
-    const cachedPendingProfile = savedPending || (pendingBelongsToUser ? withoutOnboarding(withoutCredentials(pending)) : {});
-    window.localStorage.setItem('brivia-member-profile', JSON.stringify({ ...cachedPendingProfile, id: data.user.id, email: data.user.email || email }));
-    if (pendingBelongsToUser && pending?.coverUrl) {
-      await supabase.auth.updateUser({ data: { coverUrl: pending.coverUrl } }).catch(() => {});
-    }
-    await routeAfterProfile(data.user, ownProfile, loginPendingResult);
+    await routeAfterLogin(data.user);
   } catch (error) {
     if (loginNote) loginNote.textContent = error.message || 'Could not sign you in. Check your email and password.';
   } finally {
@@ -1686,269 +923,31 @@ loginForm?.addEventListener('submit', async (event) => {
   }
 });
 
-// The profile fields a signup stores (an allowlist: no password, no picker inputs, no coordinates).
-const SIGNUP_PROFILE_FIELDS = ['name', 'email', 'phoneCountryCode', 'phoneNumber', 'gender', 'experience', 'lookingFor', 'coverUrl'];
-const collectSignupProfile = (formData) => {
-  const profile = {};
-  SIGNUP_PROFILE_FIELDS.forEach((key) => { profile[key] = String(formData.get(key) || '').trim(); });
-  return profile;
-};
-
-class OnboardingStepError extends Error {}
-// After saveProfile: the home area (location or city), then the Passion Budget. A failure returns the member to the
-// step that failed with the error beside it; the profile row already saved is simply updated on the next try.
-const cityWideLabel = (label) => (!label || /\(city-wide\)$/.test(label) ? label : `${label} (city-wide)`);
-// R1: record the 18+ declaration right after the profile row exists and before any location or interest call.
-const declareAdultStep = async () => {
-  if (adultAlreadyDeclared) return;
-  const { error } = await declareAdult();
-  if (error) {
-    setSignupStep(1, false);
-    setAdultError(ADULT_SAVE_ERROR);
-    adultBox?.focus();
-    throw new OnboardingStepError(ADULT_SAVE_ERROR);
-  }
-  adultAlreadyDeclared = true;
-};
-const finishOnboarding = async (userId) => {
-  await declareAdultStep();
-  const choice = areaPicker.choice;
-  if (choice && choice.kind !== 'keep') {
-    const { data, error, status } = choice.kind === 'geo' ? await setHomeLocation(choice.lat, choice.lng) : await setHomeCity(choice.placeId);
-    if (error) {
-      setSignupStep(2);
-      const message = isRateLimited(error, status) ? 'Try again later.' : AREA_SAVE_ERROR;
-      setAreaError(message);
-      throw new OnboardingStepError(message);
-    }
-    // The server has the cell: forget the coordinates.
-    // set_home_city is always a city pick (precision 'place'): the label says so; a location result gets no suffix.
-    const savedLabel = typeof data === 'string' && data ? data : choice.label || '';
-    keepCurrentArea(choice.kind === 'city' ? cityWideLabel(savedLabel) : savedLabel);
-  }
-  // R2: consent is given only when a private interest is in the budget (or the server asked for it and the member agreed
-  // in the panel), and is withdrawn again if the save then fails.
-  const wantsConsent = budget.items.some((item) => isSensitiveInterest(item.id)) || (serverWantedConsent && privateUnlocked);
-  let gaveConsent = false;
-  // F2b: the member's own consent before this submit. A failed save withdraws only a consent this submit created;
-  // an earlier one (or an unreadable state: undefined) is kept.
-  let consentBefore;
-  if (wantsConsent) {
-    try { consentBefore = await fetchSensitiveConsentAt(userId); } catch { consentBefore = undefined; }
-    const { error: consentError } = await setSensitiveConsent(true);
-    if (consentError) {
-      setSignupStep(3);
-      if (budgetError) budgetError.textContent = INTERESTS_SAVE_ERROR;
-      throw new OnboardingStepError(INTERESTS_SAVE_ERROR);
-    }
-    gaveConsent = true;
-  }
-  const { error } = await setMemberInterests(toPayload(budget));
-  if (error) {
-    if (shouldWithdrawConsent({ gaveConsent, consentBefore })) await setSensitiveConsent(false).catch(() => {});
-    setSignupStep(3);
-    if (isSensitiveConsentError(error)) {
-      serverWantedConsent = true;
-      if (budgetError) budgetError.textContent = '';
-      openPrivateConsent(SENSITIVE_CONSENT_ERROR);
-      throw new OnboardingStepError(SENSITIVE_CONSENT_ERROR);
-    }
-    if (budgetError) budgetError.textContent = INTERESTS_SAVE_ERROR;
-    throw new OnboardingStepError(INTERESTS_SAVE_ERROR);
-  }
-};
-
-signupForm?.addEventListener('submit', async (event) => {
-  event.preventDefault();
-  if (signupCurrentStep < SIGNUP_STEPS) {
-    if (validateOnboardingStep(signupCurrentStep)) setSignupStep(signupCurrentStep + 1);
+// "Email me a code instead" (Phase E Task 5): the guided Code screen, with a code that never creates an account.
+const LOGIN_EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
+const loginCodeButton = loginForm?.querySelector('[data-login-code]');
+loginCodeButton?.addEventListener('click', async () => {
+  const emailField = loginForm.elements.namedItem('email');
+  const email = String(emailField?.value || '').trim();
+  if (!LOGIN_EMAIL_RE.test(email)) {
+    if (loginNote) loginNote.textContent = 'Enter your email address first, and we will email you a code.';
+    emailField?.focus();
     return;
   }
-  signupForm.elements.namedItem('passwordConfirm')?.setCustomValidity('');
-  for (const step of [1, 2, 3]) {
-    if (!validateOnboardingStep(step)) {
-      setSignupStep(step, false);
-      validateOnboardingStep(step);
-      if (signupFeedback) signupFeedback.textContent = 'Please complete this step first.';
-      return;
-    }
-  }
-  if (!signupForm.checkValidity()) {
-    signupForm.reportValidity();
-    if (signupFeedback) signupFeedback.textContent = 'Please complete all required fields.';
-    return;
-  }
-  const formData = new FormData(signupForm);
-  const password = String(formData.get('password') || '');
-  const passwordConfirm = String(formData.get('passwordConfirm') || '');
-  if (!profileCompletionUser && password !== passwordConfirm) {
-    const confirmField = signupForm.elements.namedItem('passwordConfirm');
-    confirmField?.setCustomValidity('Passwords do not match.');
-    confirmField?.reportValidity();
-    confirmField?.addEventListener('input', () => confirmField.setCustomValidity(''), { once: true });
-    if (signupFeedback) signupFeedback.textContent = 'Your passwords do not match.';
-    return;
-  }
-  if (profileCompletionUser && (password || passwordConfirm)) {
-    if (password.length < 8 || passwordConfirm.length < 8) {
-      if (signupFeedback) signupFeedback.textContent = 'Use at least 8 characters for your password.';
-      return;
-    }
-    if (password !== passwordConfirm) {
-      const confirmField = signupForm.elements.namedItem('passwordConfirm');
-      confirmField?.setCustomValidity('Passwords do not match.');
-      confirmField?.reportValidity();
-      confirmField?.addEventListener('input', () => confirmField.setCustomValidity(''), { once: true });
-      if (signupFeedback) signupFeedback.textContent = 'Your passwords do not match.';
-      return;
-    }
-  }
-  // The password goes to Supabase Auth only; it is never part of the stored or cached profile (Ruling I11).
-  const profile = collectSignupProfile(formData);
-  profile.gender = normalizeSignupGender(profile.gender);
-  const phoneCountryCode = profile.phoneCountryCode || '+91';
-  const phoneNumber = profile.phoneNumber.replace(/\D/g, '');
-  profile.phoneCountryCode = phoneCountryCode;
-  profile.phoneNumber = phoneNumber;
-  profile.phone = `${phoneCountryCode} ${phoneNumber}`.trim();
-  let photoFile = signupForm.querySelector('.photo-input')?.files?.[0] || null;
-  profile.photoName = photoFile?.name || '';
-  const mediaErrors = { photo: signupForm.querySelector('#profile-photo-error'), cover: signupForm.querySelector('#profile-cover-error') };
-  const setMediaError = (which, message) => {
-    const node = mediaErrors[which];
-    if (!node) return;
-    node.textContent = message || '';
-    node.hidden = !message;
-  };
-  setMediaError('photo', ''); setMediaError('cover', '');
-  // A photo that cannot be re-encoded is never used as-is (its EXIF could carry a location): stop BEFORE any account
-  // or profile write, go back to the photo step and say so beside the field.
-  const failMedia = (which) => {
-    setSignupStep(4, false);
-    setMediaError(which, PHOTO_ERROR_MESSAGE);
-    if (signupFeedback) signupFeedback.textContent = '';
-    signupForm.querySelector(which === 'photo' ? '.photo-input' : '.cover-input')?.focus();
-  };
-  if (photoFile) {
-    try { photoFile = await compressImageOnly(photoFile); profile.photoUrl = await fileToDataUrl(photoFile); } catch { failMedia('photo'); return; }
-  } else if (profileCompletionPhotoUrl) profile.photoUrl = profileCompletionPhotoUrl;
-  let coverFile = signupForm.querySelector('.cover-input')?.files?.[0] || null;
-  profile.coverName = coverFile?.name || (profile.coverUrl?.startsWith('/assets/') || profile.coverUrl?.startsWith('/Images/Cover%20images/') ? 'Brivia suggestion' : '');
-  if (coverFile) {
-    try { coverFile = await compressImageOnly(coverFile); profile.coverUrl = await fileToDataUrl(coverFile); } catch { failMedia('cover'); return; }
-  } else if (profileCompletionCoverUrl) profile.coverUrl = normalizeCoverUrl(profileCompletionCoverUrl);
-  const submit = signupForm.querySelector('[type="submit"]');
-  if (submit) { submit.disabled = true; submit.setAttribute('aria-busy', 'true'); }
-  if (signupFeedback) signupFeedback.textContent = 'Saving your profile...';
-  try {
-    if (!supabaseReady || !supabase) throw new Error('Supabase is not configured.');
-    let sessionUser = profileCompletionUser;
-    if (sessionUser) {
-      const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
-      if (sessionError) throw sessionError;
-      if (!sessionData.session?.user || sessionData.session.user.id !== sessionUser.id) throw new Error('Your sign-in session expired. Please continue with Google or log in again.');
-      sessionUser = sessionData.session.user;
-      if (profile.email.toLowerCase() !== sessionUser.email?.toLowerCase()) throw new Error('Use the verified email attached to this account.');
-      if (password) {
-        const { error: passwordError } = await supabase.auth.updateUser({ password });
-        if (passwordError) throw passwordError;
-      }
-      const { error: profileError } = await saveProfile(sessionUser.id, profile, photoFile, coverFile);
-      if (profileError) throw profileError;
-      await finishOnboarding(sessionUser.id);
-      window.localStorage.removeItem('brivia-pending-profile');
-      window.localStorage.setItem('brivia-member-profile', JSON.stringify({ ...profile, id: sessionUser.id }));
-      redirectToApp();
-      return;
-    }
-
-    const { data, error } = await supabase.auth.signUp({
-      email: profile.email,
-      password,
-      options: {
-        emailRedirectTo: `${window.location.origin}/auth.html`,
-        // Auth metadata holds contact basics only: never interests (some are private) or any location.
-        data: {
-          name: profile.name,
-          full_name: profile.name,
-          phone: profile.phone,
-          phoneCountryCode: profile.phoneCountryCode,
-          phoneNumber: profile.phoneNumber,
-          experience: profile.experience,
-          gender: profile.gender,
-          lookingFor: profile.lookingFor,
-          coverUrl: profile.coverUrl,
-        },
-      },
-    });
-    if (error) throw error;
-    if (!data.user) throw new Error('We could not create your account. Please try again.');
-    if (data.session) {
-      profileCompletionUser = data.user;
-      signupForm.elements.namedItem('email')?.setAttribute('readonly', '');
-      setSignupPasswordMode(false);
-      if (submit) submit.innerHTML = 'COMPLETE MY PROFILE <span>→</span>';
-      const { error: profileError } = await saveProfile(data.user.id, profile, photoFile, coverFile);
-      if (profileError) throw profileError;
-      await finishOnboarding(data.user.id);
-      window.localStorage.setItem('brivia-member-profile', JSON.stringify({ ...profile, id: data.user.id }));
-      redirectToApp();
-      return;
-    }
-    // Email confirmation: nothing can be written before a session exists. Keep the interests and only the KIND of
-    // area choice (a city id, or "ask for my location again"); the coordinates are dropped here.
-    // Interests as { id, points, mode } only, sensitive ones left out (asked for again after login), plus savedAt.
-    const pendingOnboarding = buildPendingOnboarding(budget, isSensitiveInterest, areaPicker.choice);
-    window.localStorage.setItem('brivia-pending-profile', JSON.stringify({ ...profile, ...pendingOnboarding, adultDeclared: true }));
-    areaPicker.reset();
-    const accountEmail = signupSuccess?.querySelector('[data-credential="account-email"]');
-    if (accountEmail) accountEmail.textContent = profile.email;
-    const successTitle = signupSuccess?.querySelector('[data-auth-success-title]');
-    const successMessage = signupSuccess?.querySelector('[data-auth-success-message]');
-    if (successTitle) successTitle.textContent = 'Check your email.';
-    if (successMessage) successMessage.textContent = 'We sent a link to this address. Open it to finish activating your Brivia profile; it signs you in. It can take a few minutes, so check spam or promotions too.';
-    signupForm.setAttribute('hidden', '');
-    if (signupFeedback) signupFeedback.textContent = '';
-    signupSuccess?.removeAttribute('hidden');
-    authModal?.querySelector('.auth-back-trigger')?.setAttribute('hidden', '');
-    showSignupSuccessTop(successTitle);
-  } catch (error) {
-    const message = error instanceof OnboardingStepError ? (error.message || 'Could not create your account. Please try again.') : signupErrorCopy(error);
-    if (signupFeedback) signupFeedback.textContent = message;
-    if (!(error instanceof OnboardingStepError)) {
-      if (loginNote) loginNote.textContent = message;
-      if (authPanelKicker) authPanelKicker.textContent = message;
-    }
-  } finally {
-    if (submit) { submit.disabled = false; submit.removeAttribute('aria-busy'); }
-  }
+  if (!supabaseReady || !supabase) { if (loginNote) loginNote.textContent = 'Login is not configured yet.'; return; }
+  setBusy(loginCodeButton, true);
+  if (loginNote) loginNote.textContent = '';
+  const error = await openLoginCode(email);
+  setBusy(loginCodeButton, false);
+  if (error && loginNote) loginNote.textContent = error;
 });
 
-// The success panel replaces a long step 4, so whatever scrolled (the auth panel, the shell, the page) still holds
-// step 4's offset and "Check your email." can start above the viewport. Jump every scrolling ancestor to the top at
-// once (also cancelling a step change's smooth scroll still running), then focus the title so screen readers
-// announce it (Phase C Task 4 pre-review fix).
-function showSignupSuccessTop(title) {
-  for (let el = signupSuccess?.parentElement; el; el = el.parentElement) {
-    if (el.scrollTop) el.scrollTo({ top: 0, behavior: 'instant' });
-  }
-  window.scrollTo({ top: 0, behavior: 'instant' });
-  if (title) {
-    title.setAttribute('tabindex', '-1');
-    title.focus({ preventScroll: false });
-  }
-}
+if (isStandaloneAuthPage) void restoreAuthPageSession();
 
-if (document.body.classList.contains('auth-page')) void restoreAuthPageSession();
-
-// Escape closes the auth modal (on auth.html it leaves the page), but never when a control already handled it, never
-// from a field of the signup form, and never once a signup is past step 1: progress must not be lost to one key.
+// Escape closes the auth modal (on auth.html it leaves the page), but never when a control already handled it, and in
+// the guided flow never past Welcome or from a half-typed field: progress must not be lost to one key.
 document.addEventListener('keydown', (event) => {
   if (event.key !== 'Escape' || event.defaultPrevented || !authModal?.classList.contains('is-open')) return;
-  const inSignup = signupForm && event.target instanceof Node && signupForm.contains(event.target);
-  if (inSignup && (event.target.closest?.('input, select, textarea') || signupCurrentStep > 1)) return;
-  if (!signupForm?.hasAttribute('hidden') && authHistoryView === 'signup' && signupCurrentStep > 1) return;
-  // The guided flow: Escape never throws away progress past Welcome, nor a half-typed field.
   if (authHistoryView === 'guided' && (guidedScreen() !== 'welcome' || event.target.closest?.('input'))) return;
   closeAuth();
 });
