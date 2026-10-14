@@ -103,7 +103,10 @@ const stubContext = async (context, opts = {}) => {
     const boom = (key) => (fail[key]?.length ? fail[key].shift() : 0);
     if (method === 'OPTIONS') return route.fulfill({ status: 204, headers: { ...headers, 'access-control-allow-headers': '*', 'access-control-allow-methods': '*' } });
     if (p === '/auth/v1/otp') {
-      if (otpStatus.shift() === 429) return json(429, { code: 'over_email_send_rate_limit', message: 'email rate limit exceeded' });
+      const otpNext = otpStatus.shift();
+      if (otpNext === 429) return json(429, { code: 'over_email_send_rate_limit', message: 'email rate limit exceeded' });
+      // 422: login by code for an address with no account (shouldCreateUser false), as Supabase answers it.
+      if (otpNext === 422) return json(422, { code: 'otp_disabled', error_code: 'otp_disabled', msg: 'Signups not allowed for otp', message: 'Signups not allowed for otp' });
       return json(200, {});
     }
     if (p === '/auth/v1/verify') {
@@ -161,6 +164,13 @@ const stubContext = async (context, opts = {}) => {
       if (items.reduce((sum, i) => sum + i.points, 0) !== 20) return json(400, { code: '22023', message: 'invalid interests' });
       if (!state.consent && items.some((i) => i.interest_id === PRIVATE_ID)) return json(400, { code: '22023', message: 'sensitive consent required' });
       state.interests = items;
+      return noContent();
+    }
+    if (rpc('delete_my_account')) {
+      // Final fix I3: 18+ "No" deletes the just-created account. opts.fail.delete_my_account: e.g. a stale Google session.
+      if (boom('delete_my_account')) return json(400, { code: 'P0001', message: 'reauth_required' });
+      if (JSON.parse(body || '{}').p_confirm !== 'DELETE') return json(400, { code: '22023', message: 'confirmation required' });
+      state.deleted = true;
       return noContent();
     }
     if (rpc('set_sensitive_consent')) { state.consent = JSON.parse(body || '{}').p_consent === true; return noContent(); }
@@ -903,10 +913,11 @@ try {
       await context.close();
     }
 
-    // 7. 18+ "No": the adults-only copy, and the member is signed out.
-    {
+    // 7. 18+ "No" (final fix I3): delete_my_account('DELETE') runs first, while the fresh session exists, then the member
+    //    is signed out and sees the adults-only copy. 7b: a refused deletion (reauth_required) still signs out with the copy.
+    for (const refused of [false, true]) {
       const context = await browser.newContext({ viewport: { width: 375, height: 812 } });
-      const stub = await stubContext(context, { signedIn: session });
+      const stub = await stubContext(context, { signedIn: session, fail: refused ? { delete_my_account: [400] } : {} });
       const { page, errors } = await newPage(context);
       await openResumed(page, 'Are you 18 or older?');
       await page.locator('#guided-signup button:text-is("No")').click();
@@ -920,9 +931,18 @@ try {
         assert.equal(after.back, false);
         assert.equal(stub.posts('/rest/v1/rpc/declare_adult').length, 0);
       });
-      await a11yScreen(page, '375 adult no');
-      await shot(page, 'signup-375-adult-no.png');
-      check(`adult no: no uncaught page errors (${errors.join(' | ')})`, () => assert.deepEqual(errors, []));
+      const order = stub.calls.filter((c) => c.method === 'POST' && ['/rest/v1/rpc/delete_my_account', '/auth/v1/logout'].includes(c.path)).map((c) => c.path);
+      const deletes = stub.posts('/rest/v1/rpc/delete_my_account').map((c) => JSON.parse(c.body || '{}'));
+      check(`No${refused ? ' (deletion refused)' : ''} calls delete_my_account({ p_confirm: 'DELETE' }) once, before sign-out (${JSON.stringify({ order, deletes })})`, () => {
+        assert.deepEqual(deletes, [{ p_confirm: 'DELETE' }]);
+        assert.deepEqual(order, ['/rest/v1/rpc/delete_my_account', '/auth/v1/logout']);
+        assert.equal(Boolean(stub.state.deleted), !refused);
+      });
+      if (!refused) {
+        await a11yScreen(page, '375 adult no');
+        await shot(page, 'signup-375-adult-no.png');
+      }
+      check(`adult no${refused ? ' (deletion refused)' : ''}: no uncaught page errors (${errors.join(' | ')})`, () => assert.deepEqual(errors, []));
       await context.close();
     }
 
@@ -1112,6 +1132,23 @@ try {
         assert.ok(rapid.clones.length >= 1); for (const v of rapid.clones) assert.equal(v, 'visible');
         assert.equal(settledState.clones, 0); assert.equal(settledState.hiddenStyle, 0); assert.equal(settledState.pressed, 'false');
       });
+      // Final fix Minor 3: a tap on "+n more"/"Show less" mid-flight lands the flight first, like the other tray taps.
+      await pickChip(page, 'sports.team.cricket', { click: false });
+      const moreMid = await page.evaluate(async () => {
+        document.querySelector('#guided-signup [data-interest-id="sports.team.cricket"]').click();
+        await new Promise((r) => setTimeout(r, 30));
+        const before = document.querySelectorAll('#guided-signup .it-fly').length;
+        document.querySelector('#guided-signup [data-tray-more]').click();
+        return {
+          before,
+          after: document.querySelectorAll('#guided-signup .it-fly').length,
+          hiddenStyle: [...document.querySelectorAll('#guided-signup [data-pick-id], #guided-signup [data-tray-more]')].filter((el) => el.style.visibility === 'hidden').length,
+        };
+      });
+      check(`320: tapping "+n more" mid-flight settles the flight at once (${JSON.stringify(moreMid)})`, () => {
+        assert.ok(moreMid.before >= 1, 'a flight must be in progress for this check');
+        assert.equal(moreMid.after, 0); assert.equal(moreMid.hiddenStyle, 0);
+      });
       check(`320 interests: no uncaught page errors (${errors.join(' | ')})`, () => assert.deepEqual(errors, []));
       await context.close();
     }
@@ -1233,6 +1270,7 @@ try {
         if (ok) {
           const ui = { step: await stepText(page), text: await page.locator('#guided-signup').textContent() };
           check(`${w}: the login Code screen shows no signup step label and names the address`, () => { assert.equal(ui.step, ''); assert.ok(ui.text.includes(EMAIL)); });
+          check(`${w}: the login Code screen never says whether the account exists`, () => assert.ok(ui.text.includes('If an account exists for that email, we sent a code.')));
           await a11yScreen(page, `${w} login code`);
           await shot(page, `login-${w}-code-screen.png`);
           if (w === 375) {
@@ -1250,6 +1288,66 @@ try {
         }
       }
       check(`login code ${w}: no uncaught page errors (${errors.join(' | ')})`, () => assert.deepEqual(errors, []));
+      await context.close();
+    }
+
+    // 12b. Final fix Minor 1: login by code for an address with no account (422 otp_disabled) still opens the Code
+    //      screen with the same words as a sent code; a genuine 429 keeps its copy on the login form.
+    for (const status of [422, 429]) {
+      const context = await browser.newContext({ viewport: { width: 375, height: 812 } });
+      const stub = await stubContext(context, { otpStatus: status === 422 ? [422, 422] : [429] });
+      const { page, errors } = await newPage(context);
+      await page.goto(`${BASE}/auth.html#login`, { waitUntil: 'domcontentloaded' });
+      await page.waitForSelector('#login-form', { timeout: 15000 });
+      await page.locator('#login-form input[name="email"]').fill('nobody@example.com');
+      await page.locator('[data-login-code]').click();
+      if (status === 422) {
+        const ok = await checkStep('login code, no such account: the Code screen opens anyway', () => waitTitle(page, 'Enter the code'));
+        const text = ok ? await page.locator('#guided-signup').textContent() : '';
+        check(`login code, no such account: "If an account exists for that email, we sent a code." (${text.slice(0, 160)})`, () => {
+          assert.ok(text.includes('If an account exists for that email, we sent a code.'));
+          assert.ok(!/couldn't send|not found|not allowed|no account/i.test(text));
+          assert.equal(stub.posts('/auth/v1/otp').length, 1);
+        });
+        if (ok) {
+          await page.locator('[data-signup-resend]').evaluate((b) => { b.disabled = false; });
+          await page.locator('[data-signup-resend]').click();
+          await page.waitForTimeout(SETTLE);
+          const after = await page.evaluate(() => ({ note: document.querySelector('#guided-signup .gs-note')?.textContent.trim(), error: document.querySelector('#guided-signup #signup-error')?.textContent.trim() }));
+          check(`login code, no such account: a resend reads like a sent code (${JSON.stringify(after)})`, () => { assert.equal(after.note, 'If an account exists for that email, we sent a code.'); assert.equal(after.error, ''); });
+        }
+      } else {
+        await page.waitForFunction(() => (document.querySelector('#login-note')?.textContent || '').trim().length > 0, null, { timeout: 8000 }).catch(() => {});
+        const note = (await page.locator('#login-note').textContent()).trim();
+        const onCode = await page.evaluate(() => document.querySelector('#signup-screen-title')?.textContent.trim() === 'Enter the code' && document.querySelector('#guided-signup')?.getClientRects().length > 0);
+        check(`login code 429: keeps its rate-limit copy on the login form (${note})`, () => { assert.equal(note, "We can't send a code right now. Please try again in a few minutes."); assert.equal(onCode, false); });
+      }
+      check(`login code ${status}: no uncaught page errors (${errors.join(' | ')})`, () => assert.deepEqual(errors, []));
+      await context.close();
+    }
+
+    // 12c. Final fix Minor 2: the auth-routing hold has a failsafe. With script.js blocked and a stored session, the
+    //      login view is hidden at first (the hold works) and visible again by 5 s.
+    {
+      const context = await browser.newContext({ viewport: { width: 375, height: 812 } });
+      await stubContext(context, { signedIn: session });
+      await context.route(/\/script\.js(\?|$)/, (route) => route.abort());
+      const { page } = await newPage(context);
+      await page.goto(`${BASE}/auth.html#login`, { waitUntil: 'domcontentloaded' });
+      const vis = () => page.evaluate(() => {
+        const login = document.querySelector('[data-auth-view="login"]');
+        return { routing: document.documentElement.classList.contains('auth-routing'), visibility: login ? getComputedStyle(login).visibility : null };
+      });
+      const early = await vis();
+      const late = await page.waitForFunction(() => {
+        const login = document.querySelector('[data-auth-view="login"]');
+        return login && getComputedStyle(login).visibility !== 'hidden' && !document.documentElement.classList.contains('auth-routing');
+      }, null, { timeout: 5000 }).then(() => true, () => false);
+      check(`routing failsafe: with script.js blocked the login view is held at first, then visible by 5 s (${JSON.stringify({ early, late })})`, () => {
+        assert.equal(early.routing, true);
+        assert.equal(early.visibility, 'hidden');
+        assert.ok(late);
+      });
       await context.close();
     }
 

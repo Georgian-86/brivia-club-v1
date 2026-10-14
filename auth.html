@@ -20,7 +20,11 @@
       (() => {
         try {
           const signedIn = Object.keys(window.localStorage).some((key) => /^sb-.*-auth-token$/.test(key));
-          if (signedIn || window.location.hash === '#signup') document.documentElement.classList.add('auth-routing');
+          if (signedIn || window.location.hash === '#signup') {
+            document.documentElement.classList.add('auth-routing');
+            // Failsafe (final fix Minor 2): if script.js never ends the hold (it failed to load), show the login view.
+            window.setTimeout(() => document.documentElement.classList.remove('auth-routing'), 4000);
+          }
         } catch { /* storage unavailable: the login view shows as usual */ }
       })();
     </script>

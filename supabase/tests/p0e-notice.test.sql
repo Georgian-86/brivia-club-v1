@@ -8,6 +8,7 @@ set brivia.harness_autocomplete = 'off';
 --   N4 declare_adult accepts the old version while the window is open (the real clock decides: skipped when closed)
 --      and refuses it once the window is shut (also decided by the real clock, so exactly one of the two runs);
 --   N5 other consent rows (sensitive_give) record the new version.
+--   N6 privileges: anon and PUBLIC cannot execute the three 0009 functions; authenticated can.
 -- One transaction, rolled back.
 begin;
 insert into auth.users(id) values
@@ -82,6 +83,18 @@ begin
   if (select notice_version from public.consent_event where member_id = n and kind = 'sensitive_give') is distinct from '2026-10-20' then
     raise exception 'FAIL N5: sensitive_give does not record the new version';
   end if;
+end $$;
+-- N6 (final fix Minor 4): privileges, exactly as 0009 grants them. anon (and PUBLIC) cannot execute any of the three;
+-- authenticated can execute all three (the client calls declare_adult; 0009 grants the two notice helpers too).
+do $$
+declare f text;
+begin
+  foreach f in array array['public.brivia_notice_accepted(text, timestamptz)', 'public.brivia_notice_version()',
+                           'public.declare_adult(text)'] loop
+    if has_function_privilege('anon', f, 'execute') then raise exception 'FAIL N6: anon can execute %', f; end if;
+    if has_function_privilege('public', f, 'execute') then raise exception 'FAIL N6: PUBLIC can execute %', f; end if;
+    if not has_function_privilege('authenticated', f, 'execute') then raise exception 'FAIL N6: authenticated cannot execute %', f; end if;
+  end loop;
 end $$;
 rollback;
 select 'p0e-notice ok';

@@ -6,6 +6,7 @@ import { registerScreen, signOutGuided, el, freshAnswers, resumeTarget } from '.
 import {
   supabase, declareAdult, setHomeLocation, setHomeCity, setMemberInterests, setSensitiveConsent, fetchSensitiveConsentAt,
   fetchInterestNodes, searchPlaces, onboardingStatus, isRateLimited, ensureOwnProfile, saveOwnName, deckPreview,
+  deleteJustCreatedAccount,
 } from './supabase.js';
 import { evenSplit } from './passion-budget.js';
 import { revealCopy } from './signup-flow.js';
@@ -81,8 +82,13 @@ registerScreen('adult', {
     const no = el('button', { type: 'button', class: 'gs-secondary-btn', text: 'No' });
     no.addEventListener('click', async () => {
       setBusy(no, true);
+      // Final fix I3: the account was created a moment ago (the code was just verified, so the 600 s re-auth check in
+      // delete_my_account passes); delete it, with its email, while the session exists. It needs no profile row (the
+      // harness proves it: p0e-underage-delete). If the deletion is refused (e.g. reauth_required on an older Google
+      // session) or fails, the member is still signed out and sees the same copy.
+      try { await deleteJustCreatedAccount(); } catch { /* signed out below either way */ }
       await signOutGuided();
-      // The member stays on this page with the reason; nothing was recorded.
+      // The member stays on this page with the reason; nothing else was recorded.
       ctx.body.replaceChildren(el('p', { class: 'gs-lead gs-underage', role: 'status', text: UNDER_18_COPY }));
       ctx.secondary();
       ctx.hideBack();
@@ -366,7 +372,12 @@ registerScreen('interests', {
       items.forEach((li, i) => { li.hidden = i < hidden; });
       more.textContent = `+${hidden} more`;
     };
-    more.addEventListener('click', () => { expanded = !expanded; layoutTray(); more.focus({ preventScroll: true }); });
+    more.addEventListener('click', () => {
+      settleFlights();  // like the other tray taps: land a flight in progress before the layout changes (final fix Minor 3)
+      expanded = !expanded;
+      layoutTray();
+      more.focus({ preventScroll: true });
+    });
     phone?.addEventListener?.('change', layoutTray);
     let rowWidth = 0;
     const resize = typeof ResizeObserver === 'function' ? new ResizeObserver(() => {

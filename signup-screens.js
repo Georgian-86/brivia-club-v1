@@ -10,7 +10,7 @@
 // Interests tray). ctx.hideBack() hides Back for the rest of the screen. ctx.root is #guided-signup.
 import { stepLabel, backTarget, resumeScreen, screenToShow, reuseSentCode, autoResendAllowed, historyScreen } from './signup-flow.js';
 import { otpBoxesAfterInput } from './otp-input.js';
-import { codeSendErrorCopy, emailSendErrorCopy, expiredCodeCopy, otpErrorKind, verifyErrorCopy, loginCodeErrorCopy, OTP_WRONG } from './signup-errors.js';
+import { codeSendErrorCopy, emailSendErrorCopy, expiredCodeCopy, otpErrorKind, verifyErrorCopy, loginCodeErrorCopy, LOGIN_CODE_MAYBE_SENT, OTP_WRONG } from './signup-errors.js';
 import { supabase, sendEmailCode, sendLoginCode, verifyEmailCode, onboardingStatus } from './supabase.js';
 import { setBusy } from './app-skeletons.js';
 import { fillGoogleMark } from './google-mark.js';
@@ -314,7 +314,11 @@ const resendLabel = (msLeft) => {
 registerScreen('code', {
   render(ctx) {
     ctx.title.textContent = 'Enter the code';
-    const lead = el('p', { class: 'gs-help', id: 'signup-code-help' }, ['We sent a 6-digit code to ', el('strong', { text: state.email }), '.']);
+    const login = state.mode === 'login';
+    // Login by code (final fix Minor 1): the same words whether or not an account exists for the address.
+    const lead = login
+      ? el('p', { class: 'gs-help', id: 'signup-code-help' }, [LOGIN_CODE_MAYBE_SENT, ' ', el('strong', { text: state.email })])
+      : el('p', { class: 'gs-help', id: 'signup-code-help' }, ['We sent a 6-digit code to ', el('strong', { text: state.email }), '.']);
     const group = el('div', { class: 'gs-otp', role: 'group', 'aria-labelledby': 'signup-screen-title', 'aria-describedby': 'signup-code-help signup-error' });
     // The first box takes the whole code from the OS one-time-code autofill (iOS truncates autofill to maxlength, so
     // it allows 6); the input handler keeps one digit per box. The others hold one digit each.
@@ -326,7 +330,6 @@ registerScreen('code', {
     const message = el('p', { class: 'gs-message', id: 'signup-error', role: 'alert' });
     const note = el('p', { class: 'gs-note', role: 'status' });
     const resend = el('button', { type: 'button', class: 'gs-link', 'data-signup-resend': true, text: 'Resend code' });
-    const login = state.mode === 'login';
     const send = login ? sendLoginCode : sendEmailCode;
     // Login by code: "Wrong email?" goes back to the login form, where the address was typed.
     const links = el('div', { class: 'gs-links' }, [linkButton('Wrong email?', () => (login ? deps.login() : showScreen('email'))), resend]);
@@ -369,7 +372,9 @@ registerScreen('code', {
       const error = await sendAgain();
       setBusy(resend, false);
       tick();
-      if (error) message.textContent = login ? loginCodeErrorCopy(error) : codeSendErrorCopy(error);
+      const copy = error && (login ? loginCodeErrorCopy(error) : codeSendErrorCopy(error));
+      if (copy) message.textContent = copy;
+      else if (login) { autoResent = false; note.textContent = LOGIN_CODE_MAYBE_SENT; }
       else { autoResent = false; note.textContent = `We sent a new code to ${state.email}.`; }
     });
 
@@ -407,7 +412,9 @@ registerScreen('code', {
         // A new code goes out by itself once, and never inside the resend wait; otherwise the member taps Resend.
         if (autoResendAllowed({ resendAt: state.resendAt, autoResent })) {
           autoResent = true;
-          const sendError = await sendAgain();
+          let sendError = await sendAgain();
+          // Login: an unknown address reads like a sent code here too (final fix Minor 1).
+          if (sendError && login && loginCodeErrorCopy(sendError) === null) sendError = null;
           message.textContent = expiredCodeCopy({ sent: !sendError, error: sendError });
         } else {
           message.textContent = expiredCodeCopy({ sent: false, resendReady: Date.now() >= state.resendAt });
@@ -541,7 +548,9 @@ export const openLoginCode = async (email) => {
   const address = String(email || '').trim();
   if (!(state.mode === 'login' && reuseSentCode(address, { sentTo: state.email, resendAt: state.resendAt }))) {
     const { error } = await sendLoginCode(address);
-    if (error) return loginCodeErrorCopy(error);
+    // An unknown address (loginCodeErrorCopy null) goes on to the Code screen like a sent code (final fix Minor 1).
+    const copy = error ? loginCodeErrorCopy(error) : null;
+    if (copy) return copy;
     state.sentAt = Date.now();
     state.resendAt = state.sentAt + RESEND_WAIT_MS;
   }

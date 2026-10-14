@@ -320,6 +320,8 @@ export const isRateLimited = (error, status = 0) => status === 429 || error?.cod
 
 // R1: the 18+ declaration. Must run before set_home_* and set_member_interests (the server refuses them otherwise).
 export const declareAdult = () => rpcCall('declare_adult', { p_notice_version: NOTICE_VERSION });
+// 18+ "No" (Phase E final fix I3): delete the account that was just created, while its fresh session exists.
+export const deleteJustCreatedAccount = () => rpcCall('delete_my_account', { p_confirm: 'DELETE' });
 export const setHomeLocation = (lat, lng) => rpcCall('set_home_location', { lat, lng });
 export const setHomeCity = (placeId) => rpcCall('set_home_city', { p_place_id: placeId });
 export const setMemberInterests = (items) => rpcCall('set_member_interests', { p_items: items });

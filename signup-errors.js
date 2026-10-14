@@ -2,6 +2,7 @@
 // "email rate limit exceeded" to the member; with the default sender the limit is a few emails an hour.
 const RATE_LIMITED = "We can't send the confirmation email right now: too many sign-ups at once. Your account was not created. Please try again in about an hour.";
 const ALREADY_REGISTERED = 'An account with this email already exists. Log in instead, or reset your password.';
+export const SOMETHING_WRONG = 'Something went wrong. Please try again.';
 
 const isRateLimited = (error) => error?.code === 'over_email_send_rate_limit' || error?.status === 429 || /rate limit/i.test(String(error?.message || ''));
 
@@ -10,7 +11,8 @@ export const signupErrorCopy = (error) => {
   const message = String(error?.message || '');
   if (isRateLimited(error)) return RATE_LIMITED;
   if (code === 'user_already_exists' || code === 'email_exists' || /already registered/i.test(message)) return ALREADY_REGISTERED;
-  return message || 'Could not create your account. Please try again.';
+  // Final fix Minor 5: anything else gets a generic line, never Supabase's raw message.
+  return SOMETHING_WRONG;
 };
 
 // Email code (Phase E Task 3). Supabase answers a wrong code and an expired one alike (403 otp_expired, "Token has
@@ -55,13 +57,16 @@ const VERIFY_FAILED = "We couldn't check the code. Check your connection and try
 const tooMany = (error) => isRateLimited(error) || /rate_limit/.test(String(error?.code || '')) || /too many/i.test(String(error?.message || ''));
 export const verifyErrorCopy = (error) => (tooMany(error) ? VERIFY_RATE_LIMITED : VERIFY_FAILED);
 
-// Login by code (signInWithOtp with shouldCreateUser false). An unknown address is refused by the server; the copy
-// never says whether an account exists for it.
+// Login by code (signInWithOtp with shouldCreateUser false). An unknown address is refused by the server (400/404/422,
+// otp_disabled, "Signups not allowed for otp", "User not found"). Final fix Minor 1: that refusal must not reveal whether
+// an account exists, so it resolves to null exactly like a sent code, and the Code screen says LOGIN_CODE_MAYBE_SENT in
+// both cases. A genuine 429 and a network failure keep their copy.
 export const LOGIN_CODE_RATE_LIMITED = EMAIL_RATE_LIMITED;
-export const LOGIN_CODE_UNAVAILABLE = "We couldn't send a code to that address. Check it, or log in with your password.";
+export const LOGIN_CODE_MAYBE_SENT = 'If an account exists for that email, we sent a code.';
 export const loginCodeErrorCopy = (error) => {
+  if (!error) return null;
   if (tooMany(error)) return LOGIN_CODE_RATE_LIMITED;
   const text = `${error?.code || ''} ${error?.message || ''}`;
-  if ([400, 404, 422].includes(error?.status) || /otp_disabled|not allowed|not found|signup/i.test(text)) return LOGIN_CODE_UNAVAILABLE;
+  if ([400, 404, 422].includes(error?.status) || /otp_disabled|not allowed|not found|signup/i.test(text)) return null;
   return "We couldn't send a code. Check your connection and try again.";
 };
