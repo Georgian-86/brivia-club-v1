@@ -126,6 +126,49 @@ insert into _seed_members (n, name, gender, city, state, experience, interests, 
 -- v1 offsets (k = 0..5 within a city: about 0.6 km steps), exactly as v1 computed them.
 update _seed_members set dy = ((n - 1) % 6) - 2.5, dx = (((n - 1) * 5) % 6) - 2.5 where n <= 24;
 
+-- Preset covers for the members that had none (t01-t24 and the flagged/blocked v2 members t30-t32, t38, t46-t48,
+-- t58-t60), picked from the app's shipped illustration set to fit each member's interests. Same-site preset paths
+-- only: no upload, no photo, no external URL. supabase/seed/test-member-covers.sql sets the same values on a live
+-- database that was seeded before this existed; keep the two lists identical (the harness compares the results).
+update _seed_members m set cover = c.cover
+  from (values
+  (1, '3157077F-6C3B-4D85-BC8B-4646C85B33D1.PNG'),
+  (2, '7423007B-E17D-4D46-A19F-499CC9A8DB99.PNG'),
+  (3, '95DC81FA-C91B-46AE-BAF3-9EE71551A8D7.PNG'),
+  (4, '163BDB0C-64AC-44E7-8663-55C323ADB4FE.PNG'),
+  (5, 'DEB7869C-E852-450F-A371-65E2BF6167A2.PNG'),
+  (6, '3EBA748D-DAD8-4128-97A0-047E251FDAF4.PNG'),
+  (7, '9358893B-8EAB-4FD2-8E2E-A4812398D008.PNG'),
+  (8, '9dc8500a-2dcf-47e6-a6b9-02e441edff68.png'),
+  (9, '95DC81FA-C91B-46AE-BAF3-9EE71551A8D7.PNG'),
+  (10, '2da16686-88d5-49d6-8ac7-afbf37ec69d9.jpg.jpeg'),
+  (11, 'AE983BB0-AF28-41D3-AA72-B03B4C7F7D8C.PNG'),
+  (12, 'b66eff76-068e-4f2a-b789-a27051a11f5a.png'),
+  (13, '71EFFB34-6301-4196-A085-967D12BF30CE.PNG'),
+  (14, 'F28EA63E-1BEB-49E9-BA01-F62127017DB1.PNG'),
+  (15, '95DC81FA-C91B-46AE-BAF3-9EE71551A8D7.PNG'),
+  (16, '163BDB0C-64AC-44E7-8663-55C323ADB4FE.PNG'),
+  (17, 'DEB7869C-E852-450F-A371-65E2BF6167A2.PNG'),
+  (18, '5ae622b1-88f5-481b-8856-eb2eba35e606.png'),
+  (19, '9358893B-8EAB-4FD2-8E2E-A4812398D008.PNG'),
+  (20, '9dc8500a-2dcf-47e6-a6b9-02e441edff68.png'),
+  (21, '163BDB0C-64AC-44E7-8663-55C323ADB4FE.PNG'),
+  (22, 'BDADEBC8-0C14-4E36-806F-9D23E61E3BD4.PNG'),
+  (23, 'AE983BB0-AF28-41D3-AA72-B03B4C7F7D8C.PNG'),
+  (24, 'b66eff76-068e-4f2a-b789-a27051a11f5a.png'),
+  (30, '3EBA748D-DAD8-4128-97A0-047E251FDAF4.PNG'),
+  (31, 'E7E0AFAA-B547-4228-97C0-88E527151123.PNG'),
+  (32, '2257522A-04B9-4E3E-AB1A-A73D7BB8CCBF.PNG'),
+  (38, '5ae622b1-88f5-481b-8856-eb2eba35e606.png'),
+  (46, '2da16686-88d5-49d6-8ac7-afbf37ec69d9.jpg.jpeg'),
+  (47, 'b66eff76-068e-4f2a-b789-a27051a11f5a.png'),
+  (48, '9358893B-8EAB-4FD2-8E2E-A4812398D008.PNG'),
+  (58, '5ae622b1-88f5-481b-8856-eb2eba35e606.png'),
+  (59, 'E7E0AFAA-B547-4228-97C0-88E527151123.PNG'),
+  (60, '9dc8500a-2dcf-47e6-a6b9-02e441edff68.png')
+  ) as c(n, cover)
+ where m.n = c.n and m.cover is null;
+
 -- Flags (2 per city): complete members under review, invisible to everyone (0005 brivia_member_completed).
 create temp table _seed_flags (n int primary key) on commit drop;
 insert into _seed_flags values (30), (31), (38), (12), (46), (47), (20), (24), (58), (59);
@@ -153,7 +196,7 @@ from auth.users u
 where u.id::text like 'a7e57000-0000-4000-8000-%'
   and not exists (select 1 from auth.identities i where i.user_id = u.id and i.provider = 'email');
 
--- Profiles. A new member's cover is a preset illustration (brivia_is_preset_cover); nobody has a photo (monograms).
+-- Profiles. Every member's cover is a preset illustration (brivia_is_preset_cover); nobody has a photo (monograms).
 -- created_at: v1 members keep "now"; new members are spread over the last weeks (an owner session may set it).
 insert into public.profiles (id, name, full_name, email, gender, city, state, experience, skills, looking_for, cover_url, is_test, created_at)
 select ('a7e57000-0000-4000-8000-' || lpad(n::text, 12, '0'))::uuid,

@@ -184,6 +184,8 @@ begin
     raise exception 'FAIL S2: a test member has a photo (monograms only)'; end if;
   if exists (select 1 from public.profiles where is_test and cover_url is not null and not public.brivia_is_preset_cover(cover_url)) then
     raise exception 'FAIL S2: a test cover is not a preset'; end if;
+  select count(*) into n from public.profiles where is_test and (cover_url is null or btrim(cover_url) = '');
+  if n <> 0 then raise exception 'FAIL S2: % test members have no cover (every one gets a preset)', n; end if;
   if (select is_test from public.profiles where id = 'eeeeeeee-0000-0000-0000-0000000000e1') then
     raise exception 'FAIL S2: real member flagged test'; end if;
 

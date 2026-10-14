@@ -4,6 +4,7 @@ The test world (v2, Phase D): 60 clearly marked test members with posts, matches
 and QA'd before real members arrive, and so every ORBIT role can be seen end to end. Two scripts:
 
 - `test-members.sql` creates them (idempotent: fixed ids, `on conflict do nothing` or `not exists` guards; a re-run changes nothing).
+- `test-member-covers.sql` is a one-off for a database seeded before every member had a cover (see below).
 - `purge-test-members.sql` removes every row tied to them in one transaction.
 
 **WARNING: the SQL editor runs against the LIVE Supabase project.** Seed only when you mean to, and purge before launch.
@@ -38,7 +39,7 @@ where the founder's own accounts live, get the richest coverage (Thane is all ne
   `consent_event`. Private labels never reach `skills`.
 - **Area:** a home cell (`member_orbit`) snapped with `brivia_grid_cell` from the city centroid in `place` plus a small
   per-member offset (under 2 km); no coordinate is stored and no `location_change` row is written.
-- **Looks:** monogram avatars (no photo); new members have a preset cover illustration.
+- **Looks:** monogram avatars (no photo); every member has a preset cover illustration chosen from the app's shipped set to fit their interests (several share one).
 - **Content:** 30 community posts by unflagged members of all five cities. Each post's image is a preset illustration
   path (`/Images/Cover%20images/<file>`, empty `image_path`), allowed for test members only (0008 section 4) and
   rendered by the feed from the shipped assets; nothing is uploaded. 3 matches (t01-t02 Bengaluru, t43-t44 Thane,
@@ -89,6 +90,21 @@ members never see it. It stays a real account (`is_test` is never set), so the p
 `delete from public.brivia_tester where member_id = (select id from auth.users where email = '<founder email>');`.
 The purge also empties `brivia_tester` and removes the tester's matches, requests and messages with test members (they
 go with the test members), keeping the tester's own profile, interests and area.
+
+## One-off: covers for an already-seeded live database
+
+Seed v2 left t01-t24, t30-t32, t38, t46-t48 and t58-t60 (34 members) without a cover, so their deck cards showed the
+placeholder. A fresh run of `test-members.sql` now gives all 60 a preset cover, but on a database that is already seeded
+a re-run changes nothing (`on conflict do nothing`), so run **`supabase/seed/test-member-covers.sql`** once instead:
+
+1. Supabase dashboard, SQL editor, new query, paste the whole file, Run (as `postgres`, the editor default). One transaction.
+2. The result row reads `covers_set = 34`, `test_members_without_cover = 0`. Running it again reads `0 | 0`.
+
+It touches only rows that are `is_test` **and** have the seed id prefix `a7e57000-0000-4000-8000-`, and only where
+`cover_url` is null or empty, so a cover a member (or you) already set is never overwritten and real members are never
+touched. Covers are the app's shipped preset paths (`/Images/Cover%20images/<file>`): nothing is uploaded and no photo or
+external URL is used. The harness runs it after the seed and checks 0 changes, exact restoration of cleared covers,
+no overwrite and no effect on a real or non-test row. Keep its list identical to the one in `test-members.sql`.
 
 ## Verify
 

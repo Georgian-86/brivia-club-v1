@@ -363,6 +363,34 @@ try {
   }
   await coverCtx.close();
 
+  // 6a2. Seeded test members (supabase/seed/test-members.sql) carry a preset cover path in its stored form. Three shapes:
+  // upper-case .PNG, lower-case .png and the double extension .jpg.jpeg. Each must render the <img> (visible, loaded),
+  // never the branded placeholder.
+  const seededCovers = [
+    ['Seeded Upper', '/Images/Cover%20images/3157077F-6C3B-4D85-BC8B-4646C85B33D1.PNG'],
+    ['Seeded Lower', '/Images/Cover%20images/b66eff76-068e-4f2a-b789-a27051a11f5a.png'],
+    ['Seeded Double', '/Images/Cover%20images/2da16686-88d5-49d6-8ac7-afbf37ec69d9.jpg.jpeg'],
+  ];
+  resetStub({ rows: seededCovers.map(([name, cover_url], i) => ({ id: [A, B, C][i], name, photo_url: null, cover_url, experience: 'Tester', skills: ['Chess'], looking_for: ['Friends'], distance_band: '~3 km', shared_interests: [] })) });
+  const seedCtx = await makeContext({ width: 1440, height: 900 });
+  page = await open(seedCtx);
+  for (const [name] of seededCovers) {
+    await waitForCard(page, name);
+    await page.waitForFunction(() => { const i = document.querySelector('#swipe-image'); return i && i.complete; }, null, { timeout: 8000 }).catch(() => {});
+    const img = await page.evaluate(() => {
+      const i = document.querySelector('#swipe-image'); const cs = getComputedStyle(i); const r = i.getBoundingClientRect();
+      return { tag: i.tagName, src: i.getAttribute('src'), w: i.naturalWidth, shown: !i.hidden && cs.display !== 'none' && cs.visibility !== 'hidden' && r.width > 0 && r.height > 0 };
+    });
+    check(`seeded preset cover on "${name}" renders an <img> that loads, not the placeholder (${img.src}, ${img.w}px)`, () => {
+      assert.equal(img.tag, 'IMG');
+      assert.match(img.src, /\.webp(\?|$)/);
+      assert.ok(img.w > 0, 'cover image did not load');
+      assert.ok(img.shown, 'the cover <img> is hidden, so the placeholder shows');
+    });
+    await page.locator('[data-action="pass"]').click();
+  }
+  await seedCtx.close();
+
   // 6b. Minor 2: search results join the deck, except members already matched with me or already swiped this session.
   resetStub({ matchIds: [M], search: searchRows });
   const searchCtx = await makeContext({ width: 1440, height: 900 });

@@ -87,6 +87,36 @@ grep -q 'try again later' "$DATA/log" || { echo "FAIL: the over-cap probe error 
   run seed/purge-test-members.sql   # safe when nothing is seeded
   run seed/test-members.sql; run seed/test-members.sql
   "${PSQL[@]}" -d $DB -v phase=seeded -f "$STAGE/tests/seed.test.sql"
+  # test-member-covers.sql (the one-off for an already-seeded live database): 0 changes after a fresh seed; with two
+  # covers cleared it restores exactly those two with the seeded values, never overwrites a set cover, and never
+  # touches a real member or a row that is not is_test, even one holding a seed-prefix id.
+  ids="('a7e57000-0000-4000-8000-000000000001','a7e57000-0000-4000-8000-000000000060')"
+  real=eeeeeeee-0000-0000-0000-0000000000e1
+  covers_run() { "${PSQL[@]}" -d $DB -At -F'|' -f "$STAGE/seed/test-member-covers.sql"; }
+  digest() { "${PSQL[@]}" -d $DB -At -c "select md5(string_agg(id::text || coalesce(cover_url,''), ',' order by id)) from public.profiles"; }
+  out=$(covers_run); [ "$out" = "0|0" ] || { echo "FAIL: covers script after the seed: '$out' (want 0|0)"; exit 1; }
+  before=$(digest)
+  "${PSQL[@]}" -d $DB -c "update public.profiles set cover_url = null where id in $ids"
+  out=$(covers_run); [ "$out" = "2|0" ] || { echo "FAIL: covers script restored '$out' (want 2|0)"; exit 1; }
+  [ "$before" = "$(digest)" ] || { echo "FAIL: covers script restored values that differ from the seed"; exit 1; }
+  # an already-set cover is never overwritten
+  "${PSQL[@]}" -d $DB -c "update public.profiles set cover_url = '/assets/keep-me.png' where id = 'a7e57000-0000-4000-8000-000000000002'"
+  out=$(covers_run); [ "$out" = "0|0" ] || { echo "FAIL: covers script overwrote a set cover ('$out')"; exit 1; }
+  [ "$("${PSQL[@]}" -d $DB -At -c "select cover_url from public.profiles where id = 'a7e57000-0000-4000-8000-000000000002'")" = '/assets/keep-me.png' ] \
+    || { echo "FAIL: a set cover was overwritten"; exit 1; }
+  # a seed-prefix row that is not is_test (owner session flips it) stays untouched
+  "${PSQL[@]}" -d $DB -c "update public.profiles set is_test = false, cover_url = null where id = 'a7e57000-0000-4000-8000-000000000004'"
+  out=$(covers_run); [ "$out" = "0|0" ] || { echo "FAIL: covers script touched a non-test row ('$out')"; exit 1; }
+  [ "$("${PSQL[@]}" -d $DB -At -c "select cover_url is null from public.profiles where id = 'a7e57000-0000-4000-8000-000000000004'")" = t ] \
+    || { echo "FAIL: covers script filled a row that is not is_test"; exit 1; }
+  [ "$("${PSQL[@]}" -d $DB -At -c "select cover_url is null from public.profiles where id = '$real'")" = t ] \
+    || { echo "FAIL: covers script touched a real member"; exit 1; }
+  # restore the fixture so the later phases see the seeded world
+  "${PSQL[@]}" -d $DB -c "update public.profiles set is_test = true where id = 'a7e57000-0000-4000-8000-000000000004'"
+  "${PSQL[@]}" -d $DB -c "update public.profiles set cover_url = null where id = 'a7e57000-0000-4000-8000-000000000002'"
+  out=$(covers_run); [ "$out" = "2|0" ] || { echo "FAIL: covers script after the fixture restore: '$out' (want 2|0)"; exit 1; }
+  [ "$before" = "$(digest)" ] || { echo "FAIL: covers differ from the seeded values after the covers script"; exit 1; }
+  echo "covers script ok: 0 changes after the seed, restores seeded values, set and real/non-test rows untouched"
   "${PSQL[@]}" -d $DB -v phase=extras -f "$STAGE/tests/seed.test.sql"
   "${PSQL[@]}" -d $DB -v phase=tester -f "$STAGE/tests/seed.test.sql"   # founder path: a real account becomes a tester
   run seed/purge-test-members.sql; run seed/purge-test-members.sql
