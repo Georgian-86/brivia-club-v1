@@ -69,3 +69,16 @@ test('deckEmptyState: caught_up no longer promises "you have met your orbit for 
   assert.doesNotMatch(state.copy, /met your orbit/i);
   assert.match(state.copy, /New people near you show up as they join\./);
 });
+
+// Founder live test (2026-10-14): a seeded member with no cover and no photo (Kabir Shetty) showed the img alt text.
+test('deckCoverSrc: the cover, else the photo, else "" (the card then shows the branded placeholder)', async () => {
+  const { deckCoverSrc } = await import('../../deck-view.js');
+  const safe = (value) => (typeof value === 'string' && value.startsWith('/') ? value : '');
+  assert.equal(deckCoverSrc({ coverUrl: '/assets/c.webp', image: '/p.jpg' }, safe), '/assets/c.webp');
+  assert.equal(deckCoverSrc({ coverUrl: '', image: '/p.jpg' }, safe), '/p.jpg');
+  assert.equal(deckCoverSrc({ coverUrl: 'https://evil.example/x.png', image: '' }, safe), '');
+  assert.equal(deckCoverSrc({ coverUrl: null, image: null }, safe), '');
+  assert.equal(deckCoverSrc(null, safe), '');
+  // A preset path the build does not ship (normalizeCoverUrl left it unresolved) is not trusted to load.
+  assert.equal(deckCoverSrc({ coverUrl: '/Images/Cover%20images/MISSING.PNG', image: '' }, safe), '');
+});

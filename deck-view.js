@@ -55,3 +55,18 @@ const EMPTY_STATES = {
   error: { title: 'Your deck could not load.', copy: 'Check your connection and try again.', action: 'Try again', kind: 'retry' },
 };
 export const deckEmptyState = (cause) => ({ ...(EMPTY_STATES[cause] || EMPTY_STATES.caught_up) });
+
+// The card's image (founder live test, 2026-10-14): the cover, else the photo, else '' and the card shows its branded
+// placeholder (never the img alt text). A preset path still in its stored form (/Images/Cover%20images/<name>) means
+// normalizeCoverUrl found no shipped asset for it, and the build serves no /Images folder, so it would not load.
+// `safe` is app.js safeImageUrl (allowed origins only).
+const UNSHIPPED_PRESET = /^\/Images\/Cover(%20| )images\//;
+export const deckCoverSrc = (person, safe) => {
+  for (const value of [person?.coverUrl, person?.image]) {
+    const raw = typeof value === 'string' ? value.trim() : '';
+    if (!raw || UNSHIPPED_PRESET.test(raw)) continue;
+    const src = safe(raw);
+    if (src) return src;
+  }
+  return '';
+};

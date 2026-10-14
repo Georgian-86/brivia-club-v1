@@ -28,7 +28,8 @@ import { defaultCoverUrl, normalizeCoverUrl } from './cover-assets.js';
 import { postImageSrc } from './post-image.js';
 import { profileChecklist } from './profile-checklist.js';
 import { quotaLabel, quotaErrorText, quotaBlocked, quotaNotice } from './signal-quota.js';
-import { pitchLine, deckChips, deckEmptyState, deckFields, bandNote } from './deck-view.js';
+import { pitchLine, deckChips, deckEmptyState, deckFields, bandNote, deckCoverSrc } from './deck-view.js';
+import { createDeckSwipe, SWIPE } from './deck-swipe.js';
 import { whyPanelMarkup, whyRow } from './why-panel.js';
 import { chatEmojiCategories } from './chat-emoji-data.js';
 import { chatGifCatalog } from './chat-gif-data.js';
@@ -77,6 +78,7 @@ let suppressChatAutoOpen = false;
 let pitchPerson = null;
 // Ruling P13: a like opens the pitch sheet and defers its single request until the sheet resolves.
 let pendingPitch = null; // { person, resolved }
+let deckSwipe = null; // deck-swipe.js controller, bound once the DOM handlers are wired
 // The sheet covers the deck as soon as it opens, so the second click of a double-click can land on its
 // backdrop: backdrop clicks during the opening window are ignored (Task 3b).
 const PITCH_OPENING_MS = 400;
@@ -657,12 +659,40 @@ document.querySelector('#swipe-card')?.addEventListener('keydown', (event) => {
   setWhyOpen(false);
   document.querySelector('#why-toggle')?.focus();
 });
+// The card's cover (founder live test, 2026-10-14): no usable cover or photo, or one that fails to load, shows the
+// branded placeholder instead of the img alt text. The listener is bound once per img.
+const setCardImage = (image, src, alt) => {
+  if (!image) return;
+  const frame = image.parentElement;
+  const showPlaceholder = () => { image.hidden = true; frame?.classList.add('is-placeholder'); };
+  if (!image.dataset.fallbackBound) {
+    image.addEventListener('error', () => { if (image.getAttribute('src')) showPlaceholder(); });
+    image.dataset.fallbackBound = '1';
+  }
+  image.alt = alt;
+  if (!src) { image.removeAttribute('src'); showPlaceholder(); return; }
+  image.hidden = false;
+  frame?.classList.remove('is-placeholder');
+  if (image.getAttribute('src') !== src) image.src = src;
+};
+// The card underneath (the stack): the next member's cover and name, decorative (aria-hidden), shown only when there is one.
+const renderNextCard = (queue) => {
+  const next = document.querySelector('#swipe-card-next');
+  if (!next) return;
+  const index = queue.findIndex((person) => String(person.id) === String(currentPerson?.id));
+  const person = index >= 0 ? queue[index + 1] : null;
+  next.hidden = !person;
+  if (!person) return;
+  setCardImage(next.querySelector('#swipe-next-image'), deckCoverSrc(person, safeImageUrl), '');
+  const name = next.querySelector('#swipe-next-name'); if (name) name.textContent = person.name || '';
+};
 const renderHome = (queue = getExplorePeople()) => {
   const card = document.querySelector('#swipe-card');
   const actions = document.querySelector('.swipe-actions');
   const hint = document.querySelector('.swipe-hint');
   const limitState = document.querySelector('#swipe-limit-state');
   const emptyState = document.querySelector('#home-empty-state');
+  if (!currentPerson) document.querySelector('#swipe-card-next')?.setAttribute('hidden', '');
   if (!currentPerson && deckLoadingNow()) {
     renderWhy(null);
     card?.removeAttribute('hidden');
@@ -689,8 +719,13 @@ const renderHome = (queue = getExplorePeople()) => {
   hint?.removeAttribute('hidden');
   emptyState?.setAttribute('hidden', '');
   renderSignalQuota();
-  const image = document.querySelector('#swipe-image');
-  if (image) { image.src = safeImageUrl(currentPerson.coverUrl) || safeImageUrl(currentPerson.image); image.alt = `${currentPerson.name} cover image`; }
+  // A new member on the card: drop any drag / park pose left from the previous one (no motion).
+  if (card && card.dataset.personId !== String(currentPerson.id)) {
+    if (card.dataset.personId !== undefined) deckSwipe?.reset();
+    card.dataset.personId = String(currentPerson.id);
+  }
+  setCardImage(document.querySelector('#swipe-image'), deckCoverSrc(currentPerson, safeImageUrl), `${currentPerson.name} cover image`);
+  renderNextCard(queue);
   if (card) card.style.setProperty('--card-avatar-image', `url("${safeImageUrl(currentPerson.image).replace(/["\\\n]/g, encodeURIComponent)}")`);
   const name = document.querySelector('#swipe-name'); if (name) name.textContent = currentPerson.name;
   document.querySelector('#card-more')?.setAttribute('aria-label', `More options for ${currentPerson.name}`);
@@ -717,7 +752,6 @@ const renderHome = (queue = getExplorePeople()) => {
   const tags = document.querySelector('#swipe-tags'); if (tags) renderCardChips(tags, currentPerson);
   const count = document.querySelector('#queue-count');
   if (count) count.textContent = `${String(currentIndex + 1).padStart(2, '0')} / ${String(queue.length).padStart(2, '0')}`;
-  card?.classList.remove('is-passing', 'is-liking');
   renderWhy(currentPerson);
 };
 
@@ -1083,6 +1117,8 @@ const claimPendingPitch = () => {
   return pending;
 };
 // Close, Escape, backdrop or moving on: send the like's request without a note.
+// The pitched card stayed on screen while the sheet was open; it leaves to the right now that the like is sent
+// (a failure brings it back to the front, as before).
 const dismissPendingPitch = () => {
   const pending = claimPendingPitch();
   if (!pending) return;
@@ -1091,6 +1127,7 @@ const dismissPendingPitch = () => {
     if (result.error) requeuePerson(pending.person);
     showToast(signalResultToast(pending.person, result));
   });
+  advanceCard(pending.person, 'pitch');
 };
 const openPitch = (person) => {
   dismissPendingPitch();
@@ -1119,6 +1156,7 @@ const requeuePerson = (person) => {
   deck.end = null;
   currentPerson = findPersonById(id);
   renderExplore();
+  deckSwipe?.settle();
 };
 const quotaBlockedToast = () => quotaErrorText({ code: 'PT429', message: quotaBlocked(signalQuota) === 'live' ? 'signal_live_cap' : 'signal_quota_exhausted' }, signalQuota);
 // A swiped card leaves the queue for this session (passed or liked): the deck never wraps around.
@@ -1131,11 +1169,40 @@ const consumeCard = (person) => {
 let deckAdvancing = false;
 let capCheckInFlight = false;
 
-const swipe = (type) => {
-  if (!currentPerson || deckAdvancing || capCheckInFlight) return;
+// The card leaves in the swipe direction (deck-swipe.js), then the next member takes its place. A card put back at the
+// front meanwhile (a failed signal, F5) is not consumed.
+const advanceCard = (person, direction, { vx = 0, duration } = {}) => {
+  if (!person?.id) return;
+  const id = String(person.id);
+  const generation = requeueGeneration.get(id) || 0;
+  deckAdvancing = true;
+  const onCard = currentPerson && String(currentPerson.id) === id;
+  const flight = onCard && deckSwipe ? deckSwipe.flyOut(direction, { vx, duration: vx ? undefined : (duration || SWIPE.buttonFly) }) : Promise.resolve();
+  flight.then(async () => {
+    deckAdvancing = false;
+    if ((requeueGeneration.get(id) || 0) !== generation) { renderExplore(); deckSwipe?.settle(); return; }
+    consumeCard(person);
+    if (currentPerson && String(currentPerson.id) === id) currentPerson = null;
+    renderExplore();
+    if (onCard && currentPerson) deckSwipe?.enter();
+    // Every pass is stored before the next deck_candidates call (refillDeck waits for them).
+    if (!deckPeople().length) await refillDeck();
+  });
+};
+
+// type: 'pass' | 'like'. Returns false when nothing happened (the dragged card springs back).
+const swipe = (type, { vx = 0 } = {}) => {
+  if (!currentPerson || deckAdvancing || capCheckInFlight) return false;
   // A Like while the pitch sheet is opening or open is ignored: a repeated click/keypress must not resolve
   // the pending like as a plain like and drop the note (Task 3b).
-  if (type === 'like' && pendingPitch && pitchSheetVisible()) return;
+  if (type === 'like' && pendingPitch && pitchSheetVisible()) return false;
+  // Moving on with the sheet open resolves it as a plain like (D-018): the pitched card leaves to the right and no
+  // pass is recorded for it.
+  if (pendingPitch) {
+    document.querySelector('#pitch-modal')?.setAttribute('hidden', '');
+    dismissPendingPitch();
+    return true;
+  }
   // At a cached cap, read the quota again first: the cap may have cleared (F4). Still capped: a Like sends nothing,
   // opens no pitch and keeps the card (D-026). Passing is always free.
   if (type === 'like' && quotaBlocked(signalQuota)) {
@@ -1145,43 +1212,26 @@ const swipe = (type) => {
       if (quotaBlocked(signalQuota)) { renderSignalQuota(); showToast(quotaBlockedToast()); return; }
       swipe('like');
     });
-    return;
+    return false;
   }
-  deckAdvancing = true;
-  // Moving to the next card resolves an open pitch sheet as a plain like.
-  if (pendingPitch) { document.querySelector('#pitch-modal')?.setAttribute('hidden', ''); dismissPendingPitch(); }
   const person = currentPerson;
-  const id = String(person.id);
-  const generation = requeueGeneration.get(id) || 0;
-  const card = document.querySelector('#swipe-card');
-  card?.classList.add(type === 'like' ? 'is-liking' : 'is-passing');
-  // The request is sent when the pitch sheet resolves (submit with a note, or dismiss without one).
-  if (type === 'like') openPitch(person);
-  if (type === 'pass') recordPass(person.id);
-  window.setTimeout(async () => {
-    deckAdvancing = false;
-    if ((requeueGeneration.get(id) || 0) !== generation) { renderExplore(); return; }
-    consumeCard(person);
-    currentPerson = null;
-    renderExplore();
-    // Every pass is stored before the next deck_candidates call (refillDeck waits for them).
-    if (!deckPeople().length) await refillDeck();
-  }, 280);
+  // A pitch keeps its card on screen (parked right) until the sheet resolves: sent -> it leaves; a failed send ->
+  // it springs back. The request is sent when the sheet resolves (submit with a note, or dismiss without one).
+  if (type === 'like') {
+    deckSwipe?.park();
+    openPitch(person);
+    return true;
+  }
+  recordPass(person.id);
+  advanceCard(person, 'pass', { vx });
+  return true;
 };
 
 // Report or block from the card (R4). The server already blocked the member (report) or the block flow just did, so the
 // card leaves like a Pass visually but sends no pass interaction.
 const dismissCardLikePass = (person) => {
   if (deckAdvancing) return;
-  deckAdvancing = true;
-  document.querySelector('#swipe-card')?.classList.add('is-passing');
-  window.setTimeout(async () => {
-    deckAdvancing = false;
-    consumeCard(person);
-    if (currentPerson && String(currentPerson.id) === String(person.id)) currentPerson = null;
-    renderExplore();
-    if (!deckPeople().length) await refillDeck();
-  }, 280);
+  advanceCard(person, 'pass');
 };
 bindCardOverflow(async (action, trigger) => {
   const person = currentPerson;
@@ -2358,46 +2408,14 @@ window.addEventListener('hashchange', routeFromUrl);
 document.querySelector('[data-action="pass"]')?.addEventListener('click', () => swipe('pass'));
 document.querySelector('[data-action="like"]')?.addEventListener('click', () => swipe('like'));
 document.querySelector('[data-action="full-info"]')?.addEventListener('click', () => openPublicProfile(currentPerson));
-const swipeCard = document.querySelector('#swipe-card');
-let swipePointer = null;
-const resetSwipeDrag = () => {
-  if (!swipeCard) return;
-  swipeCard.classList.remove('is-dragging');
-  swipeCard.style.transform = '';
-  swipeCard.style.opacity = '';
-};
-swipeCard?.addEventListener('pointerdown', (event) => {
-  if (event.button !== 0 || event.target.closest('button, a, input, textarea, select, [data-no-swipe]')) return;
-  if (!currentPerson || swipeCard.classList.contains('is-passing') || swipeCard.classList.contains('is-liking')) return;
-  swipePointer = { id: event.pointerId, startX: event.clientX, startY: event.clientY };
-  swipeCard.classList.add('is-dragging');
-  swipeCard.setPointerCapture(event.pointerId);
-  event.preventDefault();
+// The heavy swipe (deck-swipe.js): left = Pass, right = Pitch (opens the sheet; never sends on its own).
+deckSwipe = createDeckSwipe({
+  card: document.querySelector('#swipe-card'),
+  stack: document.querySelector('#swipe-stack'),
+  canDrag: () => Boolean(currentPerson) && !deckAdvancing && !capCheckInFlight && !pitchSheetVisible() && !cardOverflowOpen()
+    && !document.querySelector('#swipe-card')?.classList.contains('is-loading'),
+  onCommit: (direction, { vx }) => swipe(direction === 'pitch' ? 'like' : 'pass', { vx }),
 });
-swipeCard?.addEventListener('pointermove', (event) => {
-  if (!swipePointer || event.pointerId !== swipePointer.id) return;
-  const offsetX = event.clientX - swipePointer.startX;
-  const offsetY = event.clientY - swipePointer.startY;
-  if (event.pointerType !== 'mouse' && Math.abs(offsetY) > 12 && Math.abs(offsetY) > Math.abs(offsetX)) {
-    swipePointer = null;
-    resetSwipeDrag();
-    return;
-  }
-  const rotation = Math.max(-12, Math.min(12, offsetX / 18));
-  swipeCard.style.transform = `translate(${offsetX}px, ${offsetY * 0.12}px) rotate(${rotation}deg)`;
-  swipeCard.style.opacity = String(Math.max(.68, 1 - Math.abs(offsetX) / 500));
-});
-const finishSwipeDrag = (event, cancelled = false) => {
-  if (!swipePointer || event.pointerId !== swipePointer.id) return;
-  const offsetX = event.clientX - swipePointer.startX;
-  swipePointer = null;
-  resetSwipeDrag();
-  if (cancelled) return;
-  const swipeThreshold = Math.max(100, Math.min(150, swipeCard.clientWidth * .22));
-  if (Math.abs(offsetX) >= swipeThreshold) swipe(offsetX > 0 ? 'like' : 'pass');
-};
-swipeCard?.addEventListener('pointerup', (event) => finishSwipeDrag(event));
-swipeCard?.addEventListener('pointercancel', (event) => finishSwipeDrag(event, true));
 document.querySelectorAll('[data-close-overlay]').forEach((button) => button.addEventListener('click', (event) => {
   const pitchBackdrop = event.currentTarget.classList.contains('app-overlay-backdrop') && event.currentTarget.closest('#pitch-modal');
   if (pitchBackdrop && performance.now() - pitchOpenedAt < PITCH_OPENING_MS) return;
@@ -2762,6 +2780,7 @@ document.querySelector('#pitch-form')?.addEventListener('submit', async (event) 
     pitchPerson = null;
     closeOverlays();
     showToast(signalResultToast(pending.person, result));
+    advanceCard(pending.person, 'pitch');
   } finally {
     setBusy(submit, false);
   }

@@ -282,6 +282,17 @@ labelled "PRIVATE · ONLY YOU SEE THESE", and the hero and the area stat show th
     looking-for filters apply to the loaded deck.
   - A passed or liked card leaves the deck for the session: there is no wrap-around. When the queue runs out, the deck
     loads once more; if nothing new comes back, `deck_status()` picks the empty state.
+  - **Swipe, stack and layout (D-061, founder live test 2026-10-14; `deck-swipe.js`, `deck.css`).** Drag left = Pass,
+    drag right = Pitch (it only opens the pitch sheet; it never sends on its own). The card follows the pointer with a
+    rotation up to 12 deg and a lift; PASS / PITCH stamps fade in; commit past 30% of the card width or on a fling over
+    0.6 px/ms, else a spring back with overshoot; fly-off 260-420 ms from the release speed (buttons and arrows 280 ms).
+    Only horizontal drags are captured (`touch-action: pan-y`, 8 px axis lock); a drag never clicks through. Reduced
+    motion: no rotation or fling, a short fade. The next member waits underneath as a decorative stacked card. The
+    pitched card stays on screen (parked right) until the sheet resolves, then leaves (or springs back on a failed
+    send). A card with no usable or loadable cover shows the deep-wine orbit placeholder, never the alt text. Desktop:
+    headline left; card, Pass / Pitch (centred under the card) and the hint in the right column; the card's height
+    follows the viewport so it never sits under the top bar (1280x720 to 1920x1080). The hint reads on two lines:
+    "PASS WITH INTENTION · PITCH WITH PURPOSE", then the signal counter.
 - **Deck empty states (final copy).** Each says why the deck is empty and offers exactly one action (`#deck-empty-action`,
   at least 44 px tall, visible focus). Pass/Pitch and the hint are hidden while it shows. When the deck empties, focus
   moves to the title (`#deck-empty-title`, `tabindex="-1"`); if the pitch sheet is open over it, focus moves when the

@@ -121,3 +121,12 @@ prints what axe could not decide.
 
 Unit tests for the pure client helpers: `npm run test:unit` (`node --test tests/unit/*.test.mjs`; Node 22 does not
 expand a bare directory argument).
+The founder live-test hotfix (D-061) added the heavy swipe to `deck.spec.mjs`: a short drag springs back and sends
+nothing; mid-drag the card turns (<= 12 deg) with the PASS / PITCH stamp; a drag right past 30% opens the pitch for the
+card that stays on screen (nothing sent until the sheet resolves; sending carries the note); a drag left past 30% and an
+80 px fling (raw CDP mouse events with timestamps) pass; no click-through from VIEW PROFILE; the Pitch button keeps the
+card behind the sheet and Escape then sends the plain like (D-018); ArrowLeft / ArrowRight; the buttons fly the card;
+reduced motion has no rotation; at 1920x1080, 1366x768, 1440x900 and 1280x720 the card is below the top bar and Pass /
+Pitch are centred under it (axe clean); a missing or broken cover shows the placeholder; touch (CDP touch events at 390
+px): a vertical drag scrolls, a horizontal one passes. `SWIPE_SHOTS=<dir>` saves the stack, mid-drag, pitch-behind-sheet,
+layout and broken-cover screenshots.

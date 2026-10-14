@@ -8,6 +8,15 @@ Update this file at the end of every session. CLAUDE.md holds the aim; this file
 
 ## 1. What is done
 
+**Founder live-test hotfix (2026-10-14): on `main` (`07d1f45`), merged into the working branch.** See D-061.
+- The deck: card and Pass / Pitch aligned on desktop (controls centred under the card, card never under the top bar),
+  the heavy left/right swipe (`deck-swipe.js`, unit-tested maths in `tests/unit/deck-swipe.test.mjs`), the stacked next
+  card, the pitched card staying until the sheet resolves, and a branded placeholder for a missing or broken cover.
+- Seed follow-up for the founder: 34 seeded test members have no cover and no photo (rows 1-24, and 30-32, 38, 46-48,
+  58-60); the client now shows the placeholder, but giving them preset covers in `supabase/seed/test-members.sql` would
+  make the test deck look finished. Open question: should cancelling a pitch send nothing and keep the card (changes
+  D-018)? Today it sends the plain like, as D-018 says.
+
 **Experience iteration, Phase E (2026-10-14): the guided signup. Done on `claude/jolly-edison-49xvza`, NOT on `main`.**
 See D-060 (and UX_SPEC §A).
 - One question per screen at every width. Email path: Welcome → Email → 6-digit code → 18+ → Name → Area →

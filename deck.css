@@ -248,3 +248,221 @@ body.app-body :is(button, [role="button"], .filter-button, .discovery-filter-sug
 @media (prefers-reduced-motion: reduce) {
   .app-view[data-view="home"] .why-panel { animation: none; }
 }
+
+/* ---- Founder live test (2026-10-14): the deck stack, the heavy swipe, the cover placeholder and the desktop
+   layout. Tokens only (no raw colours). deck-swipe.js drives --swipe-pass / --swipe-pitch (stamp opacity, 0-1) on the
+   card and --swipe-rise (how far the card underneath has risen, 0-1) on the stack. ---- */
+.app-view[data-view="home"] .swipe-stack {
+  --swipe-rise: 0;
+  --swipe-rise-speed: 0ms;
+  position: relative;
+  z-index: 1;
+  width: min(100%, 380px);
+  margin: 0 auto;
+}
+.app-view[data-view="home"] .swipe-stack .swipe-card {
+  position: relative;
+  z-index: 2;
+  top: auto;
+  left: auto;
+  width: 100%;
+  max-width: none;
+  margin: 0;
+  touch-action: pan-y;
+  user-select: none;
+  -webkit-user-select: none;
+  will-change: transform;
+  cursor: grab;
+}
+.app-view[data-view="home"] .swipe-stack .swipe-card img { -webkit-user-drag: none; }
+.app-view[data-view="home"] .swipe-stack .swipe-card.is-held {
+  cursor: grabbing;
+  box-shadow: 0 30px 60px color-mix(in srgb, var(--brivia-deep-wine) 28%, transparent), 0 2px 0 var(--dk-paper);
+}
+.app-view[data-view="home"] .swipe-stack .swipe-card.is-entering { animation: deck-card-in .24s cubic-bezier(.34, 1.56, .64, 1); }
+@keyframes deck-card-in { from { transform: translateY(8px) scale(.975); } to { transform: none; } }
+
+/* The card underneath: the next member, slightly smaller and lower; it rises as the top card leaves. */
+.app-view[data-view="home"] .swipe-card-next[hidden] { display: none !important; }
+.app-view[data-view="home"] .swipe-card-next {
+  position: absolute;
+  z-index: 1;
+  inset: 0;
+  overflow: hidden;
+  border: 2px solid var(--dk-ink);
+  border-radius: 18px;
+  background: var(--dk-paper);
+  box-shadow: 0 10px 24px var(--dk-line);
+  pointer-events: none;
+  transform: translateY(calc((1 - var(--swipe-rise)) * 14px)) scale(calc(.955 + var(--swipe-rise) * .045));
+  transform-origin: 50% 100%;
+  opacity: calc(.72 + var(--swipe-rise) * .28);
+  transition: transform var(--swipe-rise-speed) cubic-bezier(.2, .7, .2, 1), opacity var(--swipe-rise-speed) linear;
+}
+.app-view[data-view="home"] .swipe-stack.is-dragging .swipe-card-next { transition: none; }
+.app-view[data-view="home"] .swipe-stack.is-restacking .swipe-card-next { opacity: 0; transition: none; }
+.app-view[data-view="home"] .swipe-card-next::before {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  left: 10px;
+  height: 33px;
+  border-radius: 9px;
+  background: var(--dk-ink);
+  content: '';
+}
+.app-view[data-view="home"] .swipe-card-next-image { position: absolute; top: 53px; right: 10px; left: 10px; height: 49%; overflow: hidden; }
+.app-view[data-view="home"] .swipe-card-next-image img { display: block; width: 100%; height: 100%; object-fit: cover; }
+.app-view[data-view="home"] .swipe-card-next-name {
+  position: absolute;
+  top: calc(49% + 120px);
+  left: 30px;
+  margin: 0;
+  color: var(--dk-ink);
+  font-family: var(--font-heading);
+  font-size: var(--text-32);
+  line-height: 1;
+}
+
+/* PASS / PITCH stamps: fade in with the drag (left = PASS, right = PITCH). */
+.app-view[data-view="home"] .swipe-stamp {
+  position: absolute;
+  z-index: 6;
+  top: 84px;
+  padding: 8px 16px 7px;
+  border: 3px solid currentColor;
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--dk-paper) 88%, transparent);
+  font-family: var(--font-body);
+  font-size: var(--text-24);
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: .14em;
+  pointer-events: none;
+  opacity: 0;
+}
+.app-view[data-view="home"] .swipe-stamp-pass {
+  right: 24px;
+  color: var(--dk-ink);
+  opacity: var(--swipe-pass, 0);
+  transform: rotate(12deg);
+}
+.app-view[data-view="home"] .swipe-stamp-pitch {
+  left: 24px;
+  border-color: var(--dk-ink);
+  background: var(--dk-ink);
+  color: var(--dk-paper);
+  opacity: var(--swipe-pitch, 0);
+  transform: rotate(-12deg);
+}
+
+/* A missing or failed cover: a branded placeholder (deep wine with the orbit mark), never the img alt text. */
+.app-view[data-view="home"] .swipe-card-image.is-placeholder,
+.app-view[data-view="home"] .swipe-card-next-image:has(img[hidden]) {
+  background:
+    radial-gradient(circle at 72% 28%, color-mix(in srgb, var(--dk-paper) 16%, transparent), transparent 42%),
+    linear-gradient(140deg, var(--brivia-deep-wine) 0%, var(--brivia-wine) 58%, var(--brivia-wine-soft) 100%);
+}
+.app-view[data-view="home"] .swipe-card-image.is-placeholder::after,
+.app-view[data-view="home"] .swipe-card-next-image:has(img[hidden])::after {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 96px;
+  height: 96px;
+  background: var(--dk-paper);
+  content: '';
+  opacity: .5;
+  transform: translate(-50%, -50%);
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 48 48' fill='none' stroke='black' stroke-width='1.5'%3E%3Ccircle cx='24' cy='24' r='6'/%3E%3Cellipse cx='24' cy='24' rx='19' ry='9'/%3E%3Ccircle cx='41' cy='21' r='2.2'/%3E%3C/svg%3E") center / contain no-repeat;
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 48 48' fill='none' stroke='black' stroke-width='1.5'%3E%3Ccircle cx='24' cy='24' r='6'/%3E%3Cellipse cx='24' cy='24' rx='19' ry='9'/%3E%3Ccircle cx='41' cy='21' r='2.2'/%3E%3C/svg%3E") center / contain no-repeat;
+}
+.app-view[data-view="home"] .swipe-card-image img[hidden],
+.app-view[data-view="home"] .swipe-card-next-image img[hidden] { display: none !important; }
+
+@media (max-width: 700px) {
+  .app-view[data-view="home"] .swipe-stack { width: 100%; }
+  .app-view[data-view="home"] .swipe-card-next { border-radius: 17px; }
+  .app-view[data-view="home"] .swipe-stamp { top: 70px; font-size: var(--text-20); }
+}
+
+/* Desktop: the editorial headline on the left; the card with Pass / Pitch directly under it (centred on the card) on
+   the right. The card's height comes from the viewport, so its top never goes under the top bar (1280x720 to
+   1920x1080) and the controls stay on screen. */
+@media (min-width: 850px) {
+  body.app-body .app-view[data-view="home"] {
+    --deck-col: 475px;
+    --deck-card-h: clamp(400px, calc(100svh - 262px), 650px);
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, var(--deck-col));
+    grid-template-rows: auto auto auto auto;
+    align-content: center;
+    align-items: start;
+    column-gap: clamp(32px, 6vw, 120px);
+    row-gap: 0;
+    height: calc(100svh - 76px);
+    min-height: 0;
+    padding-top: 16px;
+    padding-bottom: 16px;
+  }
+  body.app-body .app-view[data-view="home"]:has(.swipe-limit-state:not([hidden])) { --deck-card-h: clamp(380px, calc(100svh - 318px), 600px); }
+  body.app-body .app-view[data-view="home"] .home-layout-spacer { display: none; }
+  body.app-body .app-view[data-view="home"] .home-heading {
+    position: static;
+    grid-column: 1;
+    grid-row: 1 / -1;
+    align-self: center;
+    top: auto;
+    left: auto;
+    justify-self: center;
+    max-width: 100%;
+    margin: 0;
+    transform: none !important;
+  }
+  body.app-body .app-view[data-view="home"] .swipe-stack { grid-column: 2; grid-row: 1; width: 100%; margin: 0; }
+  body.app-body .app-view[data-view="home"] .swipe-stack .swipe-card { height: var(--deck-card-h); min-height: 0; }
+  body.app-body .app-view[data-view="home"] .swipe-actions {
+    position: static;
+    grid-column: 2;
+    grid-row: 2;
+    justify-self: center;
+    top: auto;
+    margin: 22px 0 0;
+  }
+  body.app-body .app-view[data-view="home"] .swipe-hint {
+    position: static;
+    grid-column: 2;
+    grid-row: 3;
+    justify-self: center;
+    top: auto;
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    column-gap: 0;
+    row-gap: 2px;
+    max-width: 100%;
+    margin: 32px 0 0;
+    text-align: center;
+  }
+  /* Two deliberate lines: "PASS WITH INTENTION · PITCH WITH PURPOSE", then the signal counter. */
+  body.app-body .app-view[data-view="home"] .swipe-hint .swipe-left-copy:not([hidden]) { order: 2; flex-basis: 100%; font-weight: inherit; }
+  body.app-body .app-view[data-view="home"] .swipe-hint .swipe-left-copy > span[aria-hidden] { display: none; }
+  body.app-body .app-view[data-view="home"] .swipe-limit-state { grid-column: 2; grid-row: 4; align-self: start; justify-self: center; margin: 10px 0 0; }
+  body.app-body .app-view[data-view="home"] .deck-empty { grid-column: 2; grid-row: 1 / -1; align-self: center; }
+}
+/* Shorter desktop screens (1366x768, 1280x720): a more compact info block so the cover keeps room. */
+@media (min-width: 850px) and (max-height: 820px) {
+  body.app-body .app-view[data-view="home"] .swipe-card-info { padding-top: 40px; }
+  body.app-body .app-view[data-view="home"] .swipe-card-info::before { top: -40px; width: 80px; height: 80px; }
+  body.app-body .app-view[data-view="home"] .member-name-row { margin-top: 2px; }
+  body.app-body .app-view[data-view="home"] .member-tags { margin-top: 10px; gap: 6px; }
+  body.app-body .app-view[data-view="home"] .view-info-button { margin-top: 12px; }
+  body.app-body .app-view[data-view="home"] .swipe-action { width: 64px; height: 64px; }
+  body.app-body .app-view[data-view="home"] .swipe-actions { margin-top: 18px; }
+}
+
+/* Reduced motion: no rotation and no fling; deck-swipe.js cross-fades instead. */
+@media (prefers-reduced-motion: reduce) {
+  .app-view[data-view="home"] .swipe-card-next { transition: none; }
+  .app-view[data-view="home"] .swipe-stack .swipe-card.is-entering { animation: none; }
+}
