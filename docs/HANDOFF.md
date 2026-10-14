@@ -7,6 +7,15 @@ Update this file at the end of every session. CLAUDE.md holds the aim; this file
 
 ## 1. What is done
 
+**Founder live-test hotfix (2026-10-14): branch `claude/deck-swipe-hotfix` off `main` 741b77b, not pushed.** See D-061 (D-059 is the open-test-world switch and D-060 Phase E, both on the working branch).
+- The deck: card and Pass / Pitch aligned on desktop (controls centred under the card, card never under the top bar),
+  the heavy left/right swipe (`deck-swipe.js`, unit-tested maths in `tests/unit/deck-swipe.test.mjs`), the stacked next
+  card, the pitched card staying until the sheet resolves, and a branded placeholder for a missing or broken cover.
+- Seed follow-up for the founder: 34 seeded test members have no cover and no photo (rows 1-24, and 30-32, 38, 46-48,
+  58-60); the client now shows the placeholder, but giving them preset covers in `supabase/seed/test-members.sql` would
+  make the test deck look finished. Open question: should cancelling a pitch send nothing and keep the card (changes
+  D-018)? Today it sends the plain like, as D-018 says.
+
 **Experience iteration, Phase D (2026-10-13): done on `claude/jolly-edison-49xvza`, NOT applied live, not pushed.**
 See D-057 and D-058.
 - `supabase/migrations/0008_tester_world.sql`: the tester switch (`brivia_tester`, `brivia_in_test_world`, 14

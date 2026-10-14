@@ -1168,3 +1168,34 @@ landing all passed, app-shell 208.
 `deck_why` stays open to any test-world caller, including logins of test members created by the founder, because the
 seed README's demo flow ("sign in as F") needs it. The extra overlap level it shows reaches only logins the founder
 controls (a tester or a seeded test member), never a real member, so no new exposure is added.
+
+## D-061: The deck for the founder's live test: aligned layout, the heavy swipe, the pitched card stays (2026-10-14)
+- Accepted 2026-10-14 (founder live-test hotfix, branch `claude/deck-swipe-hotfix`). No agent-arena round: a same-day
+  hotfix; the one open product question is flagged below for the founder instead.
+- **Layout (desktop >= 850 px).** The editorial headline stays in the left column; the card, Pass / Pitch and the hint
+  sit stacked in the right column, Pass / Pitch centred under the card. The card's height comes from the viewport
+  (`clamp(400px, 100svh - 262px, 650px)`), so its top is below the top bar from 1280x720 to 1920x1080. The old
+  `top: -76px` / `translate(-128px, 200px)` offsets are overridden in `deck.css`. Phones are unchanged.
+- **The heavy swipe (`deck-swipe.js`).** Pointer events (mouse, touch, pen); the card follows 1:1 with a rotation up to
+  12 deg at half the card width and lifts while held; PASS / PITCH stamps fade in with the drag. Commit past 30% of
+  the card width or on a fling over 0.6 px/ms in the drag's direction; otherwise it springs back with an overshoot.
+  The fly-off time comes from the release speed (260-420 ms; buttons and arrow keys 280 ms). Only horizontal drags
+  are captured (`touch-action: pan-y`, 8 px axis lock), so the page still scrolls. A drag never clicks through to
+  VIEW PROFILE or "Why this person?". Reduced motion: no rotation, no fling, a 140 ms fade. `navigator.vibrate(10)` on
+  commit. The next member waits underneath as a decorative stacked card (`aria-hidden`).
+- **Left = Pass, right = Pitch, and consent is unchanged.** A right swipe does exactly what the Pitch button does: it
+  opens the pitch sheet and sends nothing. D-018 (P13) is unchanged: submit sends one signal with the note; close /
+  Escape / backdrop / next card sends one with `note: null`. Signal counts and caps are unchanged.
+- **The pitched card stays.** It used to advance to the next member 280 ms after Pitch, under the open sheet. Now it
+  stays on screen, parked a little to the right with the PITCH stamp, until the sheet resolves: on a send (with or
+  without a note, per D-018) it flies off and the next card rises; on a failed send it springs back to the centre
+  (F1). consent.spec's quota checks that asserted the old advance-under-the-sheet now assert the card stays.
+- **Cover placeholder.** A card with no usable cover or photo, or one that fails to load, shows a branded deep-wine
+  placeholder with the orbit mark, never the img alt text (`deckCoverSrc` in `deck-view.js`, `setCardImage` in
+  `app.js`). Cause on the live deck: 34 seeded test members have no `cover_url` and no photo (v1 rows 1-24 have no
+  cover column at all; 30, 31, 32, 38, 46, 47, 48, 58, 59, 60 have `null`), so the card set `<img src="">`. The seed is
+  not changed here (the live database is never written from a session); giving those rows preset covers is a seed
+  follow-up for the founder.
+- **Open for the founder (NEEDS_CONTEXT).** The brief also said a cancelled pitch should leave the card "staying". Under
+  D-018 cancelling *is* a plain like (one signal, note null), so the card leaves after a cancel. Making cancel send
+  nothing and keep the card would change D-018 and the consent suite; it needs the founder's ruling first.

@@ -852,6 +852,271 @@ try {
   check(`after 3 consecutive deck_why errors the client stops asking (${whyCalls().length - capBefore} calls over 4 cards)`, () => assert.equal(whyCalls().length - capBefore, 3));
   await capCtx.close();
 
+  {
+  // 9. Founder live test (2026-10-14): the heavy swipe, the pitched card staying put, the cover placeholder and the
+  // desktop alignment. SWIPE_SHOTS=<dir> saves mid-drag, stack, pitch-behind-sheet and layout screenshots.
+  const SWIPE_SHOTS = process.env.SWIPE_SHOTS || '';
+  const swipeShot = async (pg, name) => { if (SWIPE_SHOTS) await pg.screenshot({ path: path.join(SWIPE_SHOTS, name) }); };
+  const signals = () => st.calls.filter((c) => c.method === 'POST' && c.path === '/rest/v1/rpc/send_signal');
+  const cardBox = (pg) => pg.evaluate(() => { const r = document.querySelector('#swipe-card').getBoundingClientRect(); return { x: r.x, y: r.y, w: r.width, h: r.height, cx: r.x + r.width / 2, cy: r.y + r.height / 2 }; });
+  // A slow mouse drag (each step 16 ms apart), held still before the release so the fling velocity is ~0.
+  const slowDrag = async (pg, dx, { hold = true, from = null, release = true } = {}) => {
+    const box = await cardBox(pg);
+    const start = from || { x: box.cx, y: box.y + box.h * 0.3 };
+    await pg.mouse.move(start.x, start.y);
+    await pg.mouse.down();
+    const steps = 14;
+    for (let i = 1; i <= steps; i += 1) { await pg.mouse.move(start.x + (dx * i) / steps, start.y + i); await pg.waitForTimeout(16); }
+    if (hold) await pg.waitForTimeout(160);
+    if (release) await pg.mouse.up();
+    return box;
+  };
+  const sheetOpen = (pg) => pg.evaluate(() => !document.querySelector('#pitch-modal')?.hidden);
+  const rotationOf = (pg) => pg.evaluate(() => {
+    const t = getComputedStyle(document.querySelector('#swipe-card')).transform;
+    if (!t || t === 'none') return 0;
+    const [a, b] = t.match(/matrix\(([^)]+)\)/)[1].split(',').map(Number);
+    return Math.round(Math.atan2(b, a) * (180 / Math.PI) * 10) / 10;
+  });
+
+  resetStub();
+  const sw = await makeContext({ width: 1440, height: 900 });
+  const sp = await open(sw);
+  await waitForCard(sp, 'Asha Band');
+  await sp.waitForTimeout(500);
+  const stackState = await sp.evaluate(() => ({ next: !document.querySelector('#swipe-card-next')?.hidden, nextName: document.querySelector('#swipe-next-name')?.textContent?.trim(), aria: document.querySelector('#swipe-card-next')?.getAttribute('aria-hidden') }));
+  check(`the next card waits underneath as a stack, decorative (${JSON.stringify(stackState)})`, () => assert.deepEqual(stackState, { next: true, nextName: 'Bilal Place', aria: 'true' }));
+  await swipeShot(sp, 'stack-1440.png');
+
+  // A short drag springs back: nothing sent, same card, no stamp left.
+  let signalsBefore = signals().length;
+  let passesBefore = passes().length;
+  const w = (await cardBox(sp)).w;
+  await slowDrag(sp, w * 0.2);
+  await sp.waitForTimeout(600);
+  const springState = await sp.evaluate(() => ({ name: document.querySelector('#swipe-name').textContent.trim(), transform: document.querySelector('#swipe-card').style.transform, pitch: document.querySelector('#swipe-card').style.getPropertyValue('--swipe-pitch'), sheet: !document.querySelector('#pitch-modal').hidden }));
+  check(`a short drag (20% of the width) springs back and sends nothing (${JSON.stringify(springState)})`, () => {
+    assert.equal(springState.name, 'Asha Band');
+    assert.equal(springState.transform, '');
+    assert.equal(springState.pitch, '0');
+    assert.equal(springState.sheet, false);
+    assert.equal(signals().length, signalsBefore);
+    assert.equal(passes().length, passesBefore);
+  });
+
+  // Mid-drag: the card follows the pointer with a rotation and the stamp of the side.
+  await slowDrag(sp, -w * 0.28, { release: false });
+  const midLeft = await sp.evaluate(() => ({ pass: Number(getComputedStyle(document.querySelector('.swipe-stamp-pass')).opacity), pitch: Number(getComputedStyle(document.querySelector('.swipe-stamp-pitch')).opacity), held: document.querySelector('#swipe-card').classList.contains('is-held') }));
+  const midLeftTurn = await rotationOf(sp);
+  await swipeShot(sp, 'drag-left-1440.png');
+  check(`mid-drag left: PASS stamp shows, the card turns left and lifts (${JSON.stringify({ ...midLeft, turn: midLeftTurn })})`, () => {
+    assert.ok(midLeft.pass > 0.8 && midLeft.pitch === 0);
+    assert.ok(midLeftTurn < -5 && midLeftTurn >= -12);
+    assert.equal(midLeft.held, true);
+  });
+  await sp.mouse.move((await cardBox(sp)).cx, 300); // back near the centre, then let go: springs back
+  await sp.waitForTimeout(200);
+  await sp.mouse.up();
+  await sp.waitForTimeout(600);
+  await slowDrag(sp, w * 0.28, { release: false });
+  const midRight = await sp.evaluate(() => Number(getComputedStyle(document.querySelector('.swipe-stamp-pitch')).opacity));
+  const midRightTurn = await rotationOf(sp);
+  await swipeShot(sp, 'drag-right-1440.png');
+  check(`mid-drag right: PITCH stamp shows and the card turns right (${midRight}, ${midRightTurn})`, () => { assert.ok(midRight > 0.8); assert.ok(midRightTurn > 5 && midRightTurn <= 12); });
+  await sp.mouse.up();
+  await sp.waitForTimeout(600);
+
+  // Drag right past 30%: the pitch sheet opens about this card, the card stays the current card, nothing is sent.
+  const rightName = await cardName(sp);
+  signalsBefore = signals().length;
+  await slowDrag(sp, w * 0.45);
+  await sp.waitForSelector('#pitch-modal:not([hidden])', { timeout: 3000 }).catch(() => {});
+  await sp.waitForTimeout(700);
+  const pitched = await sp.evaluate(() => ({ name: document.querySelector('#swipe-card:not([hidden]) #swipe-name')?.textContent?.trim(), pitchName: document.querySelector('#pitch-name')?.textContent?.trim(), parked: document.querySelector('#swipe-card').classList.contains('is-parked'), visible: (() => { const r = document.querySelector('#swipe-card').getBoundingClientRect(); return r.right > 0 && r.left < innerWidth; })() }));
+  await swipeShot(sp, 'pitch-behind-sheet-1440.png');
+  const sheetOpenNow = await sheetOpen(sp);
+  check(`drag right past 30% opens the pitch for that card, which stays on screen (${JSON.stringify(pitched)})`, () => {
+    assert.equal(sheetOpenNow, true);
+    assert.equal(pitched.name, rightName);
+    assert.equal(pitched.pitchName, rightName);
+    assert.equal(pitched.parked, true);
+    assert.equal(pitched.visible, true);
+  });
+  check('a right swipe alone sends nothing (mutual consent: only the sheet resolving sends)', () => assert.equal(signals().length, signalsBefore));
+  // Sending the pitch: one signal with the note, then the card leaves.
+  await sp.locator('#pitch-message').fill('Hello from a swipe');
+  await sp.locator('.pitch-submit').click();
+  await waitForCard(sp, 'Bilal Place');
+  const swipeSent = signals().slice(signalsBefore).map((c) => JSON.parse(c.body || '{}'));
+  check(`sending the pitch sends one signal with the note, then the deck advances (${JSON.stringify(swipeSent)})`, () => assert.deepEqual(swipeSent, [{ p_to: A, p_note: 'Hello from a swipe' }]));
+
+  // Drag left past 30%: a Pass (one interaction POST) and the next card shows.
+  passesBefore = passes().length;
+  await sp.waitForTimeout(400);
+  await slowDrag(sp, -w * 0.45);
+  const leftOk = await waitForCard(sp, 'Chen Abroad');
+  const passBodies = passes().slice(passesBefore).map((c) => JSON.parse(c.body || '{}'));
+  check(`drag left past 30% passes and the next card shows (${JSON.stringify(passBodies)})`, () => { assert.equal(leftOk, true); assert.equal(passBodies.length, 1); assert.equal(passBodies[0].target_id, B); assert.equal(passBodies[0].event, 'pass'); });
+  await sp.waitForTimeout(400);
+  const settled = await sp.evaluate(() => ({ transform: document.querySelector('#swipe-card').style.transform, opacity: getComputedStyle(document.querySelector('#swipe-card')).opacity }));
+  check(`the next card takes the front at rest (${JSON.stringify(settled)})`, () => { assert.equal(settled.transform, ''); assert.equal(settled.opacity, '1'); });
+
+  // A fast short fling commits.
+  await sp.waitForTimeout(200);
+  {
+    const box = await cardBox(sp);
+    passesBefore = passes().length;
+    // Raw CDP mouse events with timestamps 12 ms apart (Playwright's own moves are too slow to fling headless).
+    const mcdp = await sw.newCDPSession(sp);
+    const t0 = Date.now() / 1000;
+    const ev = (type, x, dt, extra = {}) => mcdp.send('Input.dispatchMouseEvent', { type, x, y: box.y + 200, button: 'left', buttons: type === 'mouseReleased' ? 0 : 1, clickCount: 1, timestamp: t0 + dt, ...extra });
+    await ev('mouseMoved', box.cx, 0, { buttons: 0, button: 'none' });
+    await ev('mousePressed', box.cx, 0.01);
+    for (let i = 1; i <= 4; i += 1) await ev('mouseMoved', box.cx - i * 20, 0.01 + i * 0.012);
+    await ev('mouseReleased', box.cx - 80, 0.07);
+    await mcdp.detach();
+    const flung = await waitForCard(sp, 'Dana Blank');
+    check(`a fast short fling left (80 px) commits a Pass (${passes().length - passesBefore})`, () => { assert.equal(flung, true); assert.equal(passes().length - passesBefore, 1); });
+  }
+
+  // No click-through: a drag that starts on VIEW PROFILE never opens the profile.
+  await sp.waitForTimeout(400);
+  {
+    const btn = await sp.locator('#swipe-card .view-info-button').boundingBox();
+    await slowDrag(sp, 70, { from: { x: btn.x + btn.width / 2, y: btn.y + btn.height / 2 } });
+    await sp.waitForTimeout(500);
+    const opened = await sp.evaluate(() => Boolean(document.querySelector('#public-profile-modal')));
+    check('a drag starting on VIEW PROFILE does not open the profile (no click-through)', () => assert.equal(opened, false));
+    await sp.locator('#swipe-card .view-info-button').click();
+    const tapped = await sp.waitForSelector('#public-profile-modal', { timeout: 3000 }).then(() => true, () => false);
+    check('a plain click on VIEW PROFILE still opens the profile', () => assert.equal(tapped, true));
+    await sp.evaluate(() => document.querySelector('#public-profile-modal [data-public-profile-close]')?.click());
+  }
+  // Dana has no cover and no photo: the branded placeholder, never the alt text.
+  const dana = await sp.evaluate(() => { const img = document.querySelector('#swipe-image'); return { name: document.querySelector('#swipe-name').textContent.trim(), placeholder: img.parentElement.classList.contains('is-placeholder'), imgShown: img.getClientRects().length > 0, src: img.getAttribute('src') }; });
+  check(`no cover and no photo: the placeholder shows, the img (and its alt text) does not (${JSON.stringify(dana)})`, () => { assert.equal(dana.name, 'Dana Blank'); assert.equal(dana.placeholder, true); assert.equal(dana.imgShown, false); });
+  await sw.close();
+
+  // Buttons and arrow keys use the same motion; Pitch keeps the card until the sheet resolves.
+  resetStub();
+  const kb = await makeContext({ width: 1440, height: 900 });
+  const kp = await open(kb);
+  await waitForCard(kp, 'Asha Band');
+  await kp.waitForTimeout(500);
+  signalsBefore = signals().length;
+  await kp.locator('[data-action="like"]').click();
+  await kp.waitForSelector('#pitch-modal:not([hidden])');
+  await kp.waitForTimeout(700);
+  const btnPitch = { name: await cardName(kp), parked: await kp.evaluate(() => document.querySelector('#swipe-card').classList.contains('is-parked')) };
+  check(`the Pitch button keeps the pitched card on screen behind the sheet (${JSON.stringify(btnPitch)})`, () => { assert.equal(btnPitch.name, 'Asha Band'); assert.equal(btnPitch.parked, true); assert.equal(signals().length, signalsBefore); });
+  await kp.keyboard.press('Escape');
+  const afterEsc = await waitForCard(kp, 'Bilal Place');
+  const escSignals = signals().slice(signalsBefore).map((c) => JSON.parse(c.body || '{}'));
+  check(`closing the sheet sends the plain like (D-018) and only then the card leaves (${JSON.stringify(escSignals)})`, () => { assert.equal(afterEsc, true); assert.deepEqual(escSignals, [{ p_to: A, p_note: null }]); });
+  await kp.waitForTimeout(400);
+  passesBefore = passes().length;
+  await kp.locator('#swipe-card').focus().catch(() => {});
+  await kp.keyboard.press('ArrowLeft');
+  const arrowLeft = await waitForCard(kp, 'Chen Abroad');
+  check(`ArrowLeft passes (${passes().length - passesBefore})`, () => { assert.equal(arrowLeft, true); assert.equal(passes().length - passesBefore, 1); });
+  await kp.waitForTimeout(400);
+  await kp.keyboard.press('ArrowRight');
+  const arrowRight = await kp.waitForSelector('#pitch-modal:not([hidden])', { timeout: 3000 }).then(() => true, () => false);
+  await kp.waitForTimeout(500);
+  const arrowRightName = await cardName(kp);
+  check(`ArrowRight opens the pitch for the current card, which stays (${arrowRightName})`, () => { assert.equal(arrowRight, true); assert.equal(arrowRightName, 'Chen Abroad'); });
+  await kp.keyboard.press('Escape');
+  await waitForCard(kp, 'Dana Blank');
+  await kp.waitForTimeout(400);
+  passesBefore = passes().length;
+  await kp.locator('[data-action="pass"]').click();
+  await kp.waitForTimeout(150);
+  const midFly = await kp.evaluate(() => document.querySelector('#swipe-card').style.transform);
+  await kp.waitForTimeout(500);
+  check(`the Pass button flies the card off with the same motion (${midFly.slice(0, 60)})`, () => { assert.match(midFly, /translate3d\(-\d/); assert.equal(passes().length - passesBefore, 1); });
+  await kb.close();
+
+  // Reduced motion: no rotation while dragging, and a commit is a quick cross-fade.
+  resetStub();
+  const rm = await stub.newContext(browser, { width: 1440, height: 900 }, { reducedMotion: 'reduce' });
+  const rp2 = await open(rm);
+  await waitForCard(rp2, 'Asha Band');
+  await rp2.waitForTimeout(500);
+  await slowDrag(rp2, -w * 0.4, { release: false });
+  const rmTurn = await rotationOf(rp2);
+  await rp2.mouse.up();
+  const rmNext = await waitForCard(rp2, 'Bilal Place');
+  const rmAfter = await rp2.evaluate(() => getComputedStyle(document.querySelector('#swipe-card')).transform);
+  check(`reduced motion: no rotation mid-drag (${rmTurn}) and the pass still works`, () => { assert.equal(rmTurn, 0); assert.equal(rmNext, true); });
+  check(`reduced motion: the card rests with no transform (${rmAfter})`, () => assert.equal(rmAfter, 'none'));
+  await rm.close();
+
+  // Desktop alignment: the card top is below the top bar and Pass / Pitch sit centred under the card.
+  for (const [vw, vh] of [[1920, 1080], [1366, 768], [1440, 900], [1280, 720]]) {
+    resetStub();
+    const lc = await makeContext({ width: vw, height: vh });
+    const lp = await open(lc);
+    await waitForCard(lp, 'Asha Band');
+    await lp.waitForTimeout(600);
+    const m = await lp.evaluate(() => {
+      const r = (s) => document.querySelector(s).getBoundingClientRect();
+      const nav = r('.app-topbar'); const card = r('#swipe-card'); const pass = r('.swipe-pass'); const like = r('.swipe-like'); const hint = r('.swipe-hint');
+      return { navBottom: Math.round(nav.bottom), cardTop: Math.round(card.top), cardBottom: Math.round(card.bottom), cardCx: Math.round(card.left + card.width / 2), actionsCx: Math.round((pass.left + like.right) / 2), actionsTop: Math.round(pass.top), hintBottom: Math.round(hint.bottom), vh: innerHeight };
+    });
+    if ([1920, 1366].includes(vw)) await swipeShot(lp, `layout-${vw}x${vh}.png`);
+    check(`${vw}x${vh}: card top ${m.cardTop} is below the top bar (${m.navBottom}); controls under the card, centred (${m.actionsCx} vs ${m.cardCx}), all on screen (${m.hintBottom} <= ${m.vh})`, () => {
+      assert.ok(m.cardTop >= m.navBottom);
+      assert.ok(Math.abs(m.actionsCx - m.cardCx) <= 40);
+      assert.ok(m.actionsTop > m.cardBottom);
+      assert.ok(m.hintBottom <= m.vh);
+    });
+    if (vw === 1920) {
+      const ax = await axeViolations(lp, { include: '.app-view[data-view="home"]', decorative: ['.swipe-card-info::before'] });
+      check(`axe: the deck with the stack and stamps is clean (${ax.join(' | ')})`, () => assert.deepEqual(ax, []));
+    }
+    await lc.close();
+  }
+
+  // A cover that fails to load (a broken path) falls back to the placeholder, never the alt text.
+  resetStub({ rows: [{ ...deckRows[0], photo_url: null, cover_url: '/assets/no-such-cover-xyz.webp' }, deckRows[1]] });
+  const bc = await makeContext({ width: 1440, height: 900 });
+  const bp = await open(bc);
+  await waitForCard(bp, 'Asha Band');
+  await bp.waitForFunction(() => document.querySelector('#swipe-image')?.parentElement?.classList.contains('is-placeholder'), null, { timeout: 4000 }).catch(() => {});
+  const broken = await bp.evaluate(() => { const img = document.querySelector('#swipe-image'); return { placeholder: img.parentElement.classList.contains('is-placeholder'), imgShown: img.getClientRects().length > 0 }; });
+  await swipeShot(bp, 'broken-cover-1440.png');
+  check(`a broken cover shows the placeholder and no alt text (${JSON.stringify(broken)})`, () => { assert.equal(broken.placeholder, true); assert.equal(broken.imgShown, false); });
+  await bc.close();
+
+  // Touch: a horizontal touch drag swipes; a vertical one scrolls the page and leaves the card alone.
+  resetStub();
+  const tc = await stub.newContext(browser, { width: 390, height: 844 }, { hasTouch: true, isMobile: true });
+  const tp2 = await open(tc);
+  await waitForCard(tp2, 'Asha Band');
+  await tp2.waitForTimeout(500);
+  const cdp = await tc.newCDPSession(tp2);
+  const touch = async (points) => {
+    const [first, ...rest] = points;
+    await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [first] });
+    for (const point of rest) { await cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [point] }); await tp2.waitForTimeout(16); }
+    await tp2.waitForTimeout(150);
+    await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+  };
+  const tbox = await cardBox(tp2);
+  const scrollBefore = await tp2.evaluate(() => window.scrollY);
+  const touchPassesBefore = passes().length;
+  await touch(Array.from({ length: 12 }, (_, i) => ({ x: tbox.cx, y: Math.min(tbox.y + 300, 800) - i * 20 })));
+  await tp2.waitForTimeout(500);
+  const vertical = { name: await cardName(tp2), scrolled: (await tp2.evaluate(() => window.scrollY)) - scrollBefore, passes: passes().length - touchPassesBefore };
+  check(`touch: a vertical drag scrolls the page and keeps the card (${JSON.stringify(vertical)})`, () => { assert.equal(vertical.name, 'Asha Band'); assert.ok(vertical.scrolled > 0); assert.equal(vertical.passes, 0); });
+  const tbox2 = await cardBox(tp2);
+  const ty = Math.max(tbox2.y + 120, 120);
+  await touch(Array.from({ length: 14 }, (_, i) => ({ x: tbox2.cx - i * (tbox2.w * 0.04), y: ty + i })));
+  const touchPass = await waitForCard(tp2, 'Bilal Place');
+  check(`touch: a horizontal drag left past 30% passes (${passes().length - touchPassesBefore})`, () => { assert.equal(touchPass, true); assert.equal(passes().length - touchPassesBefore, 1); });
+  await tc.close();
+  }
+
   // 8. Privacy across the run.
   const storedKeys = await (async () => { const ctx = await makeContext({ width: 800, height: 600 }); const p2 = await open(ctx); await p2.waitForTimeout(800); const keys = await p2.evaluate(() => Object.entries(window.localStorage).map(([k, v]) => `${k}=${v}`)); await ctx.close(); return keys; })();
   check(`no localStorage entry holds a quota, a swipe count, a band or coordinates (${storedKeys.length} keys)`, () => {

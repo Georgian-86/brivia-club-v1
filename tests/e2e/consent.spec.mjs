@@ -22,6 +22,8 @@
 // Honest signal quota (Iteration 3, Task 9, D-026/D-032; copy R7, Iteration 4): the counter reads my_signal_quota
 // ("30 of 30 signals left · 24-hour window", then 29 after one like); at 0 a Like keeps the card, sends nothing and shows "More at 3 PM"; a PT429 race
 // puts the card back at the front; passes never call send_signal and nothing is kept in localStorage.
+// Founder live test (2026-10-14): the pitched card stays on screen (parked) while the sheet is open and leaves only
+// when the sheet resolves (D-018 unchanged: submit = note, close / Escape / backdrop / next card = note null).
 import { readFileSync } from 'node:fs';
 import { spawn } from 'node:child_process';
 import assert from 'node:assert/strict';
@@ -1012,8 +1014,10 @@ try {
     await quotaPage.waitForTimeout(300);
     q[flag] = false;
     const failState = { card: await qCard(), toast: await quotaPage.locator('#app-toast').textContent() };
+    // Founder live test (2026-10-14): the pitched card stays on screen while the sheet is open (it no longer advances
+    // under the sheet); after the failed send it is still the card at the front.
     check(`${label} from send_signal brings the card back to the front (${failCard} -> ${advancedPast} -> ${failState.card})`, () => {
-      assert.notEqual(advancedPast, failCard);
+      assert.equal(advancedPast, failCard, 'the pitched card stays on screen while the sheet is open');
       assert.equal(failState.card, failCard);
       assert.equal(failState.toast, "Your signal could not be sent. They're back at the front so you can try again.");
     });
@@ -1034,7 +1038,7 @@ try {
   await quotaPage.waitForTimeout(400);
   const raceState = { card: await qCard(), toast: await quotaPage.locator('#app-toast').textContent(), counter: await qCounter() };
   check(`PT429 signal_quota_exhausted puts the card back at the front (${raceCard} -> ${advancedTo} -> ${raceState.card})`, () => {
-    assert.notEqual(advancedTo, raceCard, 'the like did not advance the deck');
+    assert.equal(advancedTo, raceCard, 'the pitched card stays on screen while the sheet is open');
     assert.equal(raceState.card, raceCard);
   });
   check(`PT429 shows the honest toast and refreshes the counter (${JSON.stringify(raceState)})`, () => {
