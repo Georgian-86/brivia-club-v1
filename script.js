@@ -12,7 +12,10 @@ import {
 import { matchTypedCity } from './area-pick.js';
 import { signupErrorCopy } from './signup-errors.js';
 import { defaultCoverUrl, normalizeCoverUrl } from './cover-assets.js';
-import { motionAllowed, introPlan, markLoaded, INTRO_CAP_MS, INTRO_START_GRACE_MS } from './landing-motion.js';
+import { motionAllowed, introPlan, pickHeroSource, markLoaded, INTRO_CAP_MS, INTRO_START_GRACE_MS } from './landing-motion.js';
+import { SOUND_LIMIT_MS, SOUND_STORAGE_KEY, soundPreference, soundPlan, isUnlockEvent, barsToSchedule } from './landing-sound.js';
+import Lenis from 'lenis';
+import 'lenis/dist/lenis.css';
 
 document.querySelectorAll('.skeleton img').forEach(markLoaded);
 
@@ -22,7 +25,31 @@ const introVideo = introBurst?.querySelector('.intro-video');
 const landingMotion = motionAllowed({
   reducedMotion: Boolean(window.matchMedia?.('(prefers-reduced-motion: reduce)').matches),
   saveData: Boolean(navigator.connection?.saveData),
+  effectiveType: String(navigator.connection?.effectiveType || ''),
 });
+// Smooth scrolling (D-063), the arovas.in feel: Lenis eases the wheel and trackpad (lerp 0.1) on the landing only.
+// Phones and tablets keep the browser's own momentum scrolling (Lenis leaves touch alone), and reduced motion keeps
+// plain scrolling. Scroll events still fire on window, so every scroll-linked effect below keeps working.
+const isLandingPage = Boolean(document.querySelector('.hero')) && !document.body.classList.contains('auth-page');
+const prefersReducedMotion = Boolean(window.matchMedia?.('(prefers-reduced-motion: reduce)').matches);
+const smoothScroll = isLandingPage && !prefersReducedMotion && window.matchMedia?.('(pointer: fine)').matches
+  ? new Lenis({ lerp: 0.1, anchors: { offset: -72 }, autoRaf: true })
+  : null;
+if (smoothScroll) document.documentElement.classList.add('has-smooth-scroll');
+// While the page is moving, the matching scene's decorative loops (constellation, scan, blobs) pause
+// (landing-smooth.css): the eye is on the content, and the constellation SVG re-rasterizes on every animated frame.
+// Only the scene carries the class, and only while it is on screen: a class on <html> restyled the whole page twice
+// per gesture.
+const scrollPausedScene = isLandingPage ? document.querySelector('.principles-section') : null;
+if (scrollPausedScene) {
+  let scrollIdleTimer;
+  window.addEventListener('scroll', () => {
+    if (!scrollPausedScene.classList.contains('is-visible')) return;
+    if (!scrollPausedScene.classList.contains('is-scrolling')) scrollPausedScene.classList.add('is-scrolling');
+    window.clearTimeout(scrollIdleTimer);
+    scrollIdleTimer = window.setTimeout(() => scrollPausedScene.classList.remove('is-scrolling'), 180);
+  }, { passive: true });
+}
 // First visit only (localStorage, so a new tab or a later visit never replays it). The auth pages set
 // sessionStorage 'brivia-skip-intro-once' to skip it once; reduced-motion and save-data visitors get posters only.
 let plan = 'play';
@@ -94,9 +121,32 @@ const enableLandingVideoAudio = () => {
   startedLandingVideos.forEach(playLandingVideo);
 };
 const heroLandingVideo = document.querySelector('.hero-video');
+// The 4K hero (D-062) lists AV1, HEVC and H.264 for each frame (portrait crop / full frame). The browser takes the
+// first type it can play; MediaCapabilities can say a decode would not be smooth (e.g. 4K AV1 in software on a slow
+// laptop), so before the first byte is fetched the hero keeps only the best smooth source of the frame in use.
+// Anything missing or failing leaves the browser's own choice alone.
+const keepSmoothHeroSource = async (video) => {
+  try {
+    if (!navigator.mediaCapabilities?.decodingInfo) return;
+    const sources = [...video.querySelectorAll('source')].filter((source) => !source.media || window.matchMedia(source.media).matches);
+    if (sources.length < 2) return;
+    const infos = await Promise.all(sources.map((source) => navigator.mediaCapabilities.decodingInfo({
+      type: 'file',
+      video: { contentType: source.type, width: Number(source.dataset.width) || 3840, height: Number(source.dataset.height) || 2160, bitrate: Number(source.dataset.bitrate) || 6e6, framerate: 30 },
+    }).catch(() => ({ supported: false }))));
+    const keep = pickHeroSource(infos);
+    if (keep <= 0) return;
+    video.querySelectorAll('source').forEach((source) => { if (source !== sources[keep]) source.remove(); });
+    video.load();
+  } catch { /* keep the browser's choice */ }
+};
+const startHeroVideo = async () => {
+  await keepSmoothHeroSource(heroLandingVideo);
+  startLandingVideo(heroLandingVideo);
+};
 if (landingMotion && heroLandingVideo) {
-  if (typeof window.requestIdleCallback === 'function') window.requestIdleCallback(() => startLandingVideo(heroLandingVideo), { timeout: 2000 });
-  else window.setTimeout(() => startLandingVideo(heroLandingVideo), 1200);
+  if (typeof window.requestIdleCallback === 'function') window.requestIdleCallback(startHeroVideo, { timeout: 2000 });
+  else window.setTimeout(startHeroVideo, 1200);
 }
 const belowFoldVideos = landingVideos.filter((video) => video !== heroLandingVideo);
 if (landingMotion && belowFoldVideos.length) {
@@ -111,60 +161,180 @@ if (landingMotion && belowFoldVideos.length) {
     belowFoldVideos.forEach((video) => videoObserver.observe(video));
   } else belowFoldVideos.forEach(startLandingVideo);
 }
-let landingMusicContext;
-let landingMusicGain;
-let landingMusicTimer;
-const startLandingMusic = () => {
-  if (landingMusicContext) {
-    if (landingMusicContext.state === 'suspended') landingMusicContext.resume().catch(() => {});
-    return;
+// ---- Landing sound (D-063) ----
+// The music (a soft chord every 3.2 s) starts as early as the browser allows: at load when the browser permits it,
+// otherwise on the visitor's first real gesture (any of them, retried until it works: scrolling alone can never
+// start audio in a browser). It fades in, plays for at most 5 minutes of visible time, then fades out. The sound
+// button (bottom right) turns everything off or on, and the choice is remembered.
+const soundButton = document.querySelector('[data-landing-sound]');
+const MUSIC_VOLUME = 0.045;
+const BAR_SECONDS = 3.2;
+const MUSIC_CHORD = [220, 277.18, 329.63, 440];
+let musicPreference = 'on';
+try { musicPreference = soundPreference(window.localStorage.getItem(SOUND_STORAGE_KEY)); } catch { /* private mode */ }
+let musicContext;
+let musicBus;
+let musicScheduler;
+let musicNextBarAt = 0;
+let musicPlayedMs = 0;
+let musicPlayingSince = 0;
+let musicState = 'wait'; // 'wait' | 'play' | 'off' | 'ended'
+let gestureSeen = false;
+const setPlaygroundSound = (on) => { try { playgroundSoundEnabled = on; } catch { /* declared below; set once it exists */ } };
+const renderSoundButton = () => {
+  if (!soundButton) return;
+  const playing = musicState === 'play';
+  soundButton.classList.toggle('is-playing', playing);
+  soundButton.setAttribute('aria-pressed', String(playing));
+  soundButton.setAttribute('aria-label', playing ? 'Mute sound' : 'Play sound');
+  soundButton.title = playing ? 'Mute sound' : 'Play sound';
+};
+const playMusicBar = (start) => {
+  MUSIC_CHORD.forEach((frequency, index) => {
+    const oscillator = musicContext.createOscillator();
+    const gain = musicContext.createGain();
+    oscillator.type = index % 2 ? 'sine' : 'triangle';
+    oscillator.frequency.setValueAtTime(frequency, start);
+    gain.gain.setValueAtTime(0.0001, start);
+    gain.gain.exponentialRampToValueAtTime(index === 0 ? 0.22 : 0.12, start + 0.18);
+    gain.gain.exponentialRampToValueAtTime(0.0001, start + BAR_SECONDS);
+    oscillator.connect(gain).connect(musicBus);
+    oscillator.start(start);
+    oscillator.stop(start + BAR_SECONDS + 0.05);
+  });
+};
+const musicElapsedMs = () => musicPlayedMs + (musicState === 'play' && !document.hidden ? performance.now() - musicPlayingSince : 0);
+// Queues bars on the audio clock a second ahead (a busy main thread never leaves a gap), and ends at 5 minutes.
+const scheduleMusic = () => {
+  if (!musicContext || musicState !== 'play') return;
+  if (musicElapsedMs() >= SOUND_LIMIT_MS) { stopMusic('ended'); return; }
+  for (const start of barsToSchedule({ now: musicContext.currentTime, nextBarAt: musicNextBarAt, barLength: BAR_SECONDS, lookahead: 1 })) {
+    playMusicBar(start);
+    musicNextBarAt = start + BAR_SECONDS;
   }
+};
+const ensureMusicContext = () => {
+  if (musicContext) return musicContext;
   const AudioContextClass = window.AudioContext || window.webkitAudioContext;
-  if (!AudioContextClass) return;
-  landingMusicContext = new AudioContextClass();
-  landingMusicGain = landingMusicContext.createGain();
-  landingMusicGain.gain.value = 0.045;
-  landingMusicGain.connect(landingMusicContext.destination);
-  const chord = [220, 277.18, 329.63, 440];
-  const playBar = () => {
-    if (!landingMusicContext || !landingMusicGain) return;
-    const start = landingMusicContext.currentTime + 0.04;
-    chord.forEach((frequency, index) => {
-      const oscillator = landingMusicContext.createOscillator();
-      const gain = landingMusicContext.createGain();
-      oscillator.type = index % 2 ? 'sine' : 'triangle';
-      oscillator.frequency.setValueAtTime(frequency, start);
-      gain.gain.setValueAtTime(0.0001, start);
-      gain.gain.exponentialRampToValueAtTime(index === 0 ? 0.22 : 0.12, start + 0.18);
-      gain.gain.exponentialRampToValueAtTime(0.0001, start + 3.2);
-      oscillator.connect(gain).connect(landingMusicGain);
-      oscillator.start(start);
-      oscillator.stop(start + 3.25);
-    });
-  };
-  playBar();
-  landingMusicTimer = window.setInterval(playBar, 3200);
+  if (!AudioContextClass) return null;
+  musicContext = new AudioContextClass();
+  musicBus = musicContext.createGain();
+  musicBus.gain.value = 0.0001;
+  musicBus.connect(musicContext.destination);
+  musicContext.addEventListener?.('statechange', () => { if (musicContext.state === 'running' && musicState === 'wait') beginMusic(); });
+  return musicContext;
+};
+const beginMusic = () => {
+  if (soundPlan({ preference: musicPreference, unlocked: musicContext?.state === 'running', playedMs: musicPlayedMs }) !== 'play') return;
+  if (musicState === 'play') return;
+  musicState = 'play';
+  musicPlayingSince = performance.now();
+  const now = musicContext.currentTime;
+  musicBus.gain.cancelScheduledValues(now);
+  musicBus.gain.setValueAtTime(Math.max(musicBus.gain.value, 0.0001), now);
+  musicBus.gain.exponentialRampToValueAtTime(MUSIC_VOLUME, now + 1.2); // a soft fade-in, never a jolt
+  musicNextBarAt = now + 0.05;
+  scheduleMusic();
+  window.clearInterval(musicScheduler);
+  musicScheduler = window.setInterval(scheduleMusic, 250);
   window.__briviaLandingAudioEnabled = true;
+  renderSoundButton();
 };
-const enableLandingExperienceAudio = () => {
-  enableLandingVideoAudio();
-  startLandingMusic();
-  try { playgroundSoundEnabled = true; } catch { /* The declaration is initialized before user gestures can fire. */ }
+function stopMusic(next) {
+  if (musicState === 'play') musicPlayedMs = musicElapsedMs();
+  musicState = next;
+  window.clearInterval(musicScheduler);
+  if (musicContext && musicBus) {
+    const now = musicContext.currentTime;
+    musicBus.gain.cancelScheduledValues(now);
+    musicBus.gain.setValueAtTime(Math.max(musicBus.gain.value, 0.0001), now);
+    musicBus.gain.exponentialRampToValueAtTime(0.0001, now + (next === 'ended' ? 2.5 : 0.6));
+  }
+  renderSoundButton();
+}
+// Tries to start the sound. Inside a gesture the browser lets the context run; outside one it stays suspended and
+// the statechange listener starts the music the moment it is allowed.
+const tryStartMusic = () => {
+  if (musicPreference === 'off' || musicState === 'play' || musicState === 'ended') return;
+  const context = ensureMusicContext();
+  if (!context) return;
+  if (context.state === 'running') { beginMusic(); return; }
+  context.resume().then(() => { if (context.state === 'running') beginMusic(); }).catch(() => {});
 };
-['pointerdown', 'touchstart', 'keydown'].forEach((eventName) => {
-  window.addEventListener(eventName, enableLandingExperienceAudio, { once: true, passive: eventName !== 'keydown' });
-});
+// Every gesture a browser accepts for audio, until the sound has really started (not once: a touchstart or a
+// scroll used to spend the one-shot listener without starting anything).
+const UNLOCK_EVENTS = ['pointerdown', 'pointerup', 'mousedown', 'touchend', 'click', 'keydown'];
+const onUnlockGesture = (event) => {
+  if (!isUnlockEvent(event) || soundButton?.contains(event.target)) return;
+  if (!gestureSeen) {
+    gestureSeen = true;
+    if (musicPreference === 'on') { enableLandingVideoAudio(); setPlaygroundSound(true); }
+  }
+  tryStartMusic();
+  if (musicState !== 'wait' || musicPreference === 'off') UNLOCK_EVENTS.forEach((name) => window.removeEventListener(name, onUnlockGesture, true));
+};
+if (isLandingPage) {
+  UNLOCK_EVENTS.forEach((name) => window.addEventListener(name, onUnlockGesture, { capture: true, passive: true }));
+  if (musicPreference === 'on') tryStartMusic(); // some browsers (a returning visitor, a site with sound allowed) allow it at once
+  document.addEventListener('visibilitychange', () => {
+    if (!musicContext) return;
+    if (document.hidden) {
+      if (musicState === 'play') musicPlayedMs += performance.now() - musicPlayingSince;
+      musicContext.suspend().catch(() => {});
+    } else if (musicState === 'play') {
+      musicPlayingSince = performance.now();
+      musicContext.resume().catch(() => {});
+    }
+  });
+  soundButton?.addEventListener('click', () => {
+    if (musicState === 'play') {
+      musicPreference = 'off';
+      stopMusic('off');
+      landingAudioUnlocked = false; // a video that starts later stays muted too
+      landingVideos.forEach((video) => { video.muted = true; });
+      setPlaygroundSound(false);
+    } else {
+      musicPreference = 'on';
+      if (musicState === 'ended') musicPlayedMs = 0; // a deliberate replay gets a fresh 5 minutes
+      musicState = 'wait';
+      gestureSeen = true;
+      enableLandingVideoAudio();
+      setPlaygroundSound(true);
+      tryStartMusic();
+    }
+    try { window.localStorage.setItem(SOUND_STORAGE_KEY, musicPreference); } catch { /* private mode */ }
+  });
+  renderSoundButton();
+  // The button fades in once the intro has gone, so it never sits on top of it.
+  const revealSoundButton = () => soundButton?.classList.add('is-ready');
+  if (document.getElementById('intro-burst')) {
+    new MutationObserver((_, observer) => { if (!document.getElementById('intro-burst')) { revealSoundButton(); observer.disconnect(); } }).observe(document.body, { childList: true });
+  } else revealSoundButton();
+}
 
 const cursor = document.querySelector('.cursor');
+// One write per frame, as a transform (no layout), however fast the pointer moves (D-063).
+let cursorX = 0;
+let cursorY = 0;
+let cursorFrame = 0;
 window.addEventListener('pointermove', (event) => {
   if (!cursor) return;
-  cursor.classList.add('active');
-  cursor.style.left = `${event.clientX}px`;
-  cursor.style.top = `${event.clientY}px`;
-});
+  cursorX = event.clientX;
+  cursorY = event.clientY;
+  if (cursorFrame) return;
+  cursorFrame = window.requestAnimationFrame(() => {
+    cursorFrame = 0;
+    cursor.classList.add('active');
+    cursor.style.transform = `translate3d(${cursorX}px, ${cursorY}px, 0) translate(-50%, -50%)`;
+  });
+}, { passive: true });
 
 const overlay = document.querySelector('.menu-overlay');
-const setMenuOpen = (isOpen) => { overlay?.classList.toggle('open', isOpen); overlay?.setAttribute('aria-hidden', String(!isOpen)); };
+const setMenuOpen = (isOpen) => {
+  overlay?.classList.toggle('open', isOpen);
+  overlay?.setAttribute('aria-hidden', String(!isOpen));
+  if (isOpen) smoothScroll?.stop(); else smoothScroll?.start();
+};
 document.querySelector('.menu-trigger')?.addEventListener('click', () => setMenuOpen(true));
 document.querySelector('.menu-close')?.addEventListener('click', () => setMenuOpen(false));
 overlay?.querySelectorAll('a').forEach((link) => link.addEventListener('click', () => setMenuOpen(false)));
@@ -199,8 +369,14 @@ const updateMenuContrast = () => {
   heroNav.classList.toggle('is-over-dark', isOverDark);
 };
 updateMenuContrast();
-window.addEventListener('scroll', updateMenuContrast, { passive: true });
-window.addEventListener('resize', updateMenuContrast);
+// At most once per frame (it reads layout), not once per scroll event.
+let menuContrastFrame = 0;
+const requestMenuContrast = () => {
+  if (menuContrastFrame) return;
+  menuContrastFrame = window.requestAnimationFrame(() => { menuContrastFrame = 0; updateMenuContrast(); });
+};
+window.addEventListener('scroll', requestMenuContrast, { passive: true });
+window.addEventListener('resize', requestMenuContrast);
 
 document.querySelectorAll('.project-card').forEach((card) => {
   card.addEventListener('mouseenter', () => cursor?.classList.add('active'));
@@ -294,27 +470,34 @@ if (principlesSection && 'IntersectionObserver' in window) {
   }, { threshold: 0.12 });
   principlesRevealObserver.observe(principlesSection);
 }
+// Pointer parallax (D-063): eased toward the pointer in one rAF loop that stops when it arrives. It replaces the CSS
+// transform transitions that the per-frame scroll drift kept restarting on these large layers.
+const pointerTarget = { x: 0, y: 0 };
+const pointerNow = { x: 0, y: 0 };
+const applyMatchingPointer = () => {
+  pointerNow.x += (pointerTarget.x - pointerNow.x) * 0.12;
+  pointerNow.y += (pointerTarget.y - pointerNow.y) * 0.12;
+  const settled = Math.abs(pointerTarget.x - pointerNow.x) < 0.05 && Math.abs(pointerTarget.y - pointerNow.y) < 0.05;
+  if (settled) { pointerNow.x = pointerTarget.x; pointerNow.y = pointerTarget.y; }
+  const x = `${pointerNow.x.toFixed(2)}px`;
+  const y = `${pointerNow.y.toFixed(2)}px`;
+  principlesConstellation?.style.setProperty('--pointer-x', x);
+  principlesConstellation?.style.setProperty('--pointer-y', y);
+  photoFlightDeck?.style.setProperty('--pointer-x', x);
+  photoFlightDeck?.style.setProperty('--pointer-y', y);
+  matchingPointerFrame = settled ? undefined : window.requestAnimationFrame(applyMatchingPointer);
+};
+const aimMatchingPointer = (x, y) => {
+  pointerTarget.x = x;
+  pointerTarget.y = y;
+  if (!matchingPointerFrame) matchingPointerFrame = window.requestAnimationFrame(applyMatchingPointer);
+};
 principlesVisual?.addEventListener('pointermove', (event) => {
   matchingPointerEvent = event;
-  if (matchingPointerFrame) return;
-  matchingPointerFrame = window.requestAnimationFrame(() => {
-    matchingPointerFrame = undefined;
-    if (!matchingPointerEvent) return;
-    const bounds = principlesVisual.getBoundingClientRect();
-    const x = ((matchingPointerEvent.clientX - bounds.left) / bounds.width - .5) * 18;
-    const y = ((matchingPointerEvent.clientY - bounds.top) / bounds.height - .5) * 18;
-    principlesConstellation?.style.setProperty('--pointer-x', `${x}px`);
-    principlesConstellation?.style.setProperty('--pointer-y', `${y}px`);
-    photoFlightDeck?.style.setProperty('--pointer-x', `${x}px`);
-    photoFlightDeck?.style.setProperty('--pointer-y', `${y}px`);
-  });
-});
-principlesVisual?.addEventListener('pointerleave', () => {
-  principlesConstellation?.style.setProperty('--pointer-x', '0px');
-  principlesConstellation?.style.setProperty('--pointer-y', '0px');
-  photoFlightDeck?.style.setProperty('--pointer-x', '0px');
-  photoFlightDeck?.style.setProperty('--pointer-y', '0px');
-});
+  const bounds = principlesVisual.getBoundingClientRect();
+  aimMatchingPointer(((event.clientX - bounds.left) / bounds.width - .5) * 18, ((event.clientY - bounds.top) / bounds.height - .5) * 18);
+}, { passive: true });
+principlesVisual?.addEventListener('pointerleave', () => aimMatchingPointer(0, 0));
 if (principleItems.length && principleImages.length && 'IntersectionObserver' in window) {
   const principleObserver = new IntersectionObserver((entries) => {
     entries.forEach((entry) => {
@@ -488,6 +671,10 @@ if (serviceSection && serviceRows.length) {
 
 const showreelSection = document.querySelector('.showreel-section');
 const showreelToggle = document.querySelector('.showreel-toggle');
+// Its endless frame cycle and grain stop while it is off screen (landing-smooth.css).
+if (showreelSection && 'IntersectionObserver' in window) {
+  new IntersectionObserver(([entry]) => showreelSection.classList.toggle('is-offscreen', !entry.isIntersecting)).observe(showreelSection);
+}
 if (showreelSection && showreelToggle) {
   showreelToggle.addEventListener('click', () => {
     const paused = showreelSection.classList.toggle('is-paused');
@@ -1703,6 +1890,7 @@ const openAuth = () => {
   setAuthView(authModal.querySelector('[data-auth-view="login"]') ? 'login' : 'welcome');
   authModal.removeAttribute('hidden');
   document.body.classList.add('auth-open');
+  smoothScroll?.stop();
   window.requestAnimationFrame(() => authModal.classList.add('is-open'));
   window.setTimeout(() => authModal.querySelector('input')?.focus(), 350);
 };
@@ -1735,6 +1923,7 @@ const closeAuth = () => {
   }
   authModal.classList.remove('is-open');
   document.body.classList.remove('auth-open');
+  smoothScroll?.start();
   authCloseTimer = window.setTimeout(() => authModal.setAttribute('hidden', ''), 420);
   authCta?.focus();
 };

@@ -14,6 +14,19 @@
   --color-skeleton: #efe4dc;
   --color-skeleton-glint: #f7efe9;
 
+  /* The founder's design references (2026-10-16, D-062), sampled from the supplied images:
+     oxblood = the Canva deck card's header and button, chat-wine = the "Brivia Society" chat's selected row and
+     sent bubble, card-paper / chip / name-ink = the Canva card's face, its interest pills and its name. */
+  --color-oxblood: #4c1315;
+  --color-oxblood-deep: #3e0d0e;
+  --color-chat-wine: #5a061e;
+  --color-card-paper: #f3e9dd;
+  --color-card-edge: #e9dccd;
+  --color-chip: #e6d7c8;
+  --color-name-ink: #2f1d1b;
+  --color-chat-paper: #f8eee6;
+  --color-chat-head: #f7f0e5;
+
   --space-1: 4px;
   --space-2: 8px;
   --space-3: 12px;

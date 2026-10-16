@@ -18,7 +18,8 @@
           try { fromAuth = sessionStorage.getItem('brivia-skip-intro-once') === 'true'; } catch (e) {}
           var reduced = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
           var saveData = !!(navigator.connection && navigator.connection.saveData);
-          if (seen || fromAuth || reduced || saveData) document.documentElement.classList.add('no-intro');
+          var slow = !!(navigator.connection && /^(slow-2g|2g|3g)$/.test(navigator.connection.effectiveType || ''));
+          if (seen || fromAuth || reduced || saveData || slow) document.documentElement.classList.add('no-intro');
         } catch (e) {}
       })();
     </script>
@@ -30,6 +31,8 @@
       </video>
     </div>
     <div class="cursor" aria-hidden="true"></div>
+    <!-- D-063: one sound control for the whole landing (music, playground video and its hits). -->
+    <button class="sound-toggle" type="button" data-landing-sound aria-pressed="false" aria-label="Play sound" title="Play sound"><span class="sound-toggle-bars" aria-hidden="true"><i></i><i></i><i></i><i></i></span></button>
     <header class="hero-nav">
       <button class="menu-trigger" aria-label="Open menu"><span></span><span></span><span></span></button>
       <div class="nav-spacer" aria-hidden="true"></div>
@@ -39,8 +42,14 @@
     <main id="top">
       <section class="hero">
         <video class="hero-video" muted loop playsinline preload="none" poster="./media/posters/hero-section-video.webp" aria-hidden="true">
-          <source media="(min-width: 701px)" src="./media/video/hero-section-video-1080.mp4" type="video/mp4" />
-          <source src="./media/video/hero-section-video-720.mp4" type="video/mp4" />
+          <!-- D-062: 4K only. Portrait phones get the 4K master's centre 9:16 crop at native density; everything else the
+               full 3840x2160 frame. Each frame in AV1, then HEVC (Safari), then H.264; the browser fetches exactly one. -->
+          <source media="(max-aspect-ratio: 10/16)" src="./media/video/hero-portrait-4k-av1.mp4" type='video/mp4; codecs="av01.0.12M.08"' data-width="1216" data-height="2160" data-bitrate="2500000" />
+          <source media="(max-aspect-ratio: 10/16)" src="./media/video/hero-portrait-4k-hevc.mp4" type='video/mp4; codecs="hvc1.1.6.L150.90"' data-width="1216" data-height="2160" data-bitrate="2500000" />
+          <source media="(max-aspect-ratio: 10/16)" src="./media/video/hero-portrait-4k-h264.mp4" type='video/mp4; codecs="avc1.640033"' data-width="1216" data-height="2160" data-bitrate="5000000" />
+          <source src="./media/video/hero-4k-av1.mp4" type='video/mp4; codecs="av01.0.12M.08"' data-width="3840" data-height="2160" data-bitrate="4000000" />
+          <source src="./media/video/hero-4k-hevc.mp4" type='video/mp4; codecs="hvc1.1.6.L150.90"' data-width="3840" data-height="2160" data-bitrate="6000000" />
+          <source src="./media/video/hero-4k-h264.mp4" type='video/mp4; codecs="avc1.640033"' data-width="3840" data-height="2160" data-bitrate="12000000" />
         </video>
         <div class="hero-video-overlay" aria-hidden="true"></div>
         <div class="hero-copy">

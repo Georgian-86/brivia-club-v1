@@ -1,11 +1,31 @@
 # Session handoff (read after CLAUDE.md)
 
-Last updated: 2026-10-13, after Phase D of the experience iteration (the test world), on branch
+Last updated: 2026-10-16 (design references, D-062). Before that: 2026-10-13, after Phase D of the experience iteration (the test world), on branch
 `claude/jolly-edison-49xvza` (repo `Georgian-86/brivia-club-v1`). Phases C and D are not on `main` yet, and Phase D's SQL
 is not applied: the founder applies it in the SQL editor (section 3, item 0).
 Update this file at the end of every session. CLAUDE.md holds the aim; this file holds **where we are**.
 
 ## 1. What is done
+
+**Landing smoothness and sound (2026-10-16), same branch.** See D-063. Lenis smooth scroll (desktop pointer only),
+cheaper matching-scene layers, sound that starts on the first real gesture and stops after 5 minutes, and a sound
+button. Checks: `node tests/e2e/landing-sound.spec.mjs` (15 checks, after a stub build) and the frame-time probe
+`node tests/e2e/landing-smoothness.mjs` (`SMOOTH_ASSERT=1` fails on a p95 frame over 34 ms; this container has no GPU,
+so judge desktop smoothness on a real laptop). Open: the original `Images/Videos/HEROSECTIONVI.MOV` carries a real
+soundtrack (the 4K master has none); the landing still plays its synthesized chord. Ask the founder before swapping.
+
+**Design references (2026-10-16): branch `claude/focused-johnson-pev1j6` off `main` 07d1f45 (the live build).** See D-062.
+- Deck card restyled to the founder's Canva card, chat to the "Brivia Society" screenshot (sharp room photo, #5a061e
+  wine, serif type), the discovery filter drawer suggests a full catalog (chess, music, guitar, hackathons...) plus
+  popular picks, and the landing hero is 4K only (AV1 / HEVC / H.264, a portrait crop for phones). Look-only CSS lives
+  in `reference-design.css` (loads last); colours are tokens in `tokens.css`. No backend, RPC or data-flow change.
+- Review screenshots: `PLAYWRIGHT_MODULE=/tmp/pw/node_modules/playwright/index.mjs node tests/e2e/design-shots.mjs`
+  (deck card, filter drawer and an open chat at 390, 1024 and 1440 px into `.superpowers/shots/`, git-ignored).
+- Re-encode the hero: `npm run media:hero4k` (about 15 minutes on 4 cores). The poster
+  `media/posters/hero-section-video.webp` is unchanged and stays the LCP.
+- To go live: the founder reviews the preview deployment of this branch, then fast-forwards `main` (D-051).
+- Open for the founder: the chat masthead says "BRIVIA SOCIETY" as in the reference (product name is Brivia Club);
+  one `content` string in `reference-design.css` changes it.
 
 **Founder live-test hotfix (2026-10-14): branch `claude/deck-swipe-hotfix` off `main` 741b77b, not pushed.** See D-061 (D-059 is the open-test-world switch and D-060 Phase E, both on the working branch).
 - The deck: card and Pass / Pitch aligned on desktop (controls centred under the card, card never under the top bar),
