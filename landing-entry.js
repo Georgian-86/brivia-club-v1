@@ -11,4 +11,6 @@ import './deep-wine-theme.css';
 import './mobile-site.css';
 import './mobile-final-fixes.css';
 import './skeleton.css';
+// Smooth scrolling, cheaper scene layers and the sound button (D-063); loads last.
+import './landing-smooth.css';
 import './script.js';

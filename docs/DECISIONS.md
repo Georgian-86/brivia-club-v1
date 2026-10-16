@@ -1236,3 +1236,38 @@ controls (a tester or a seeded test member), never a real member, so no new expo
   kept by what was already there: the poster is the LCP, the video starts only after idle, +faststart streams it, and
   reduced-motion, save-data and now 2g/3g links get the poster only. `check:assets` gives `hero-4k-*` /
   `hero-portrait-4k-*` their own 20 MB cap (every other video keeps 5 MB; AV1 is 11.6 MB, HEVC 12.5, the H.264 last resort 17.8; the portrait crop 4.2 / 4.6 / 6.3). The old 1080/720 hero files are removed.
+
+## D-063: A smoother landing (Lenis, cheaper scene layers) and sound that starts on the first gesture, stops after 5 minutes, with a mute button (2026-10-16)
+- Accepted 2026-10-16 (founder: "super smooth like arovas.in; the audio starts way later than it should; stop it
+  after 5 minutes; a mute button that does not spoil the look"). Branch `claude/focused-johnson-pev1j6`. No
+  agent-arena round: the founder named the reference and the behaviour; the landing's look is unchanged (founder rule:
+  optimise, never redesign), apart from the new sound button.
+- **Why the sound was late (root cause).** The music (a soft synthesized chord every 3.2 s; the hero video has no audio
+  track) waited for `pointerdown` / `touchstart` / `keydown` with `{ once: true }`. Browsers start audio only on an
+  activation gesture, and scrolling never is one, so a visitor who only scrolled heard nothing until a click. On
+  phones `touchstart` is not an activation either: the one-shot listener was spent, the AudioContext stayed suspended,
+  and nothing retried. Fix (`landing-sound.js`, unit-tested; `script.js`): listen for every activation gesture
+  (keydown except Escape, mousedown, a mouse pointerdown, a touch/pen pointerup, touchend, click) until the music has
+  really started; also try at load, so a browser that allows it plays at once. A 1.2 s fade-in, bars queued on the
+  audio clock a second ahead (no gaps when the main thread is busy), paused with the tab hidden.
+- **5 minutes, then it stops.** Counted in visible time; then a 2.5 s fade-out. The sound button plays it again (a
+  fresh 5 minutes).
+- **The sound button.** Bottom right, 44 px, the playground toggle's cream-and-wine family, four thin bars that move
+  while playing and lie flat when not. It mutes everything (music, the playground video, its hits) and the choice is
+  remembered (`localStorage` `brivia-landing-sound`); it fades in after the intro and hides under the menu and the
+  auth modal. Honest limit: no browser lets a page start sound before a first tap, click or key; scrolling alone can
+  never start it.
+- **Smooth scroll = arovas.in's.** Their bundle runs Lenis (`lerp: 0.1`, anchor offset -72). The landing now does the
+  same (`lenis@1.3.26`, pinned; the 2026-10-15 1.3.27 was too new), for a mouse or trackpad only: phones keep the
+  browser's momentum scrolling, reduced motion keeps plain scrolling, and the auth page is untouched. The menu and the
+  auth modal stop it while open. `html { scroll-behavior: smooth }` is switched off under Lenis.
+- **Cheaper frames (measured, `tests/e2e/landing-smoothness.mjs` and a Chrome trace).** The only janky region was the
+  matching scene: its endless loops re-rasterized a 1,500 px SVG, and the scroll drift restarted 0.8-1.2 s CSS
+  transform transitions on large layers every frame. Now: the drift and pointer values are non-inherited registered
+  properties (an update restyles one element, not the SVG subtree); the CSS transform transitions are gone (Lenis
+  smooths the scroll, a rAF loop eases the pointer); the moving layers have their own GPU layer; the scene's
+  decorative loops pause while it is scrolling and when it is off screen (the showreel's too); the nav-contrast check
+  and the custom cursor write once per frame (the cursor as a transform). Result in the scene, per rendered frame:
+  3.7 ms of main/raster work instead of 5.7 (style halved, raster -38%), while rendering about 50 % more frames
+  (the Lenis glide). The phone probe is a steady 60 fps. The container has no GPU, so desktop headless frame times
+  still drop in that scene; check it on a real laptop.

@@ -108,3 +108,11 @@ reduced motion has no rotation; at 1920x1080, 1366x768, 1440x900 and 1280x720 th
 Pitch are centred under it (axe clean); a missing or broken cover shows the placeholder; touch (CDP touch events at 390
 px): a vertical drag scrolls, a horizontal one passes. `SWIPE_SHOTS=<dir>` saves the stack, mid-drag, pitch-behind-sheet,
 layout and broken-cover screenshots.
+
+`landing-sound.spec.mjs` (D-063) builds nothing itself: run it after a stub build (`VITE_SUPABASE_URL=https://stub.supabase.local
+VITE_SUPABASE_ANON_KEY=stub npm run build`). It serves `vite preview` on :5179 and makes the autoplay rule explicit (an
+AudioContext runs only after a trusted gesture; a time shift jumps the 5-minute limit): scroll alone never starts the
+music, a click (1440) and a tap (390, touch) do, the sound button mutes and the choice survives a reload, the music
+ends after 5 minutes and the button replays it, Lenis runs on a desktop pointer only (not on a phone, not with
+reduced motion), and the open menu stops it and hides the button. `landing-smoothness.mjs` is a frame-time probe
+(wheel-scrolls the page at 1440 and 390; `SMOOTH_GL=0` uses plain software compositing).

@@ -7,6 +7,13 @@ Update this file at the end of every session. CLAUDE.md holds the aim; this file
 
 ## 1. What is done
 
+**Landing smoothness and sound (2026-10-16), same branch.** See D-063. Lenis smooth scroll (desktop pointer only),
+cheaper matching-scene layers, sound that starts on the first real gesture and stops after 5 minutes, and a sound
+button. Checks: `node tests/e2e/landing-sound.spec.mjs` (15 checks, after a stub build) and the frame-time probe
+`node tests/e2e/landing-smoothness.mjs` (`SMOOTH_ASSERT=1` fails on a p95 frame over 34 ms; this container has no GPU,
+so judge desktop smoothness on a real laptop). Open: the original `Images/Videos/HEROSECTIONVI.MOV` carries a real
+soundtrack (the 4K master has none); the landing still plays its synthesized chord. Ask the founder before swapping.
+
 **Design references (2026-10-16): branch `claude/focused-johnson-pev1j6` off `main` 07d1f45 (the live build).** See D-062.
 - Deck card restyled to the founder's Canva card, chat to the "Brivia Society" screenshot (sharp room photo, #5a061e
   wine, serif type), the discovery filter drawer suggests a full catalog (chess, music, guitar, hackathons...) plus
