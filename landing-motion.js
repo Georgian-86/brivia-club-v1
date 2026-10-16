@@ -4,9 +4,19 @@
 export const INTRO_CAP_MS = 2500;
 export const INTRO_START_GRACE_MS = 800;
 
-// Posters only (no video requests) for reduced-motion and save-data visitors.
-export function motionAllowed({ reducedMotion = false, saveData = false } = {}) {
-  return !reducedMotion && !saveData;
+// Posters only (no video requests) for reduced-motion and save-data visitors, and on a slow link (2g / 3g): the hero
+// is 4K (D-062) and would stall there, so the poster stays.
+const SLOW_LINKS = new Set(['slow-2g', '2g', '3g']);
+export function motionAllowed({ reducedMotion = false, saveData = false, effectiveType = '' } = {}) {
+  return !reducedMotion && !saveData && !SLOW_LINKS.has(effectiveType);
+}
+
+// The hero's <source> to keep (D-062), from MediaCapabilities answers in source order: the first one the device
+// decodes smoothly, else the first it can decode at all, else -1 (leave the browser's own choice alone).
+export function pickHeroSource(infos) {
+  const list = Array.isArray(infos) ? infos : [];
+  const smooth = list.findIndex((info) => info?.supported && info?.smooth);
+  return smooth >= 0 ? smooth : list.findIndex((info) => info?.supported);
 }
 
 // The intro plays on a first visit only; arriving back from an auth page also skips it.

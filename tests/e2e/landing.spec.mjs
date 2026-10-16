@@ -26,11 +26,12 @@ const BASE = `http://127.0.0.1:${PORT}`;
 const EXECUTABLE = process.env.CHROMIUM_PATH || '/opt/pw-browsers/chromium';
 const VIEWPORTS = [{ name: '375', width: 375, height: 812 }, { name: '1440', width: 1440, height: 900 }];
 const MAX_BYTES = 3_000_000;
-// This Chromium build cannot decode H.264, so it downloads BOTH hero <source> files; a real browser fetches one (and, on
-// a fast link, buffers all of it). So the hard 3 MB check counts everything except the hero video files exactly as
-// received, and a separate line reports the total with the hero file the viewport would really stream (a WARN, see below).
-const HERO_FILE = (viewport) => (viewport.width > 700 ? 'hero-section-video-1080.mp4' : 'hero-section-video-720.mp4');
-const isHeroVideo = (url) => /hero-section-video-(1080|720)[^/]*\.mp4/.test(url);
+// D-062: the hero is 4K only, AV1 / HEVC / H.264 for a portrait crop (phones) and the full frame. This Chromium decodes
+// AV1 (not H.264), so it fetches the AV1 file of the viewport's frame, exactly one. The hard 3 MB check counts
+// everything except the hero video (it starts after idle, behind the poster), and a separate line reports the total
+// with the hero file the viewport would really stream (a WARN, see below).
+const HERO_FILE = (viewport) => (viewport.width / viewport.height <= 10 / 16 ? 'hero-portrait-4k-av1.mp4' : 'hero-4k-av1.mp4');
+const isHeroVideo = (url) => /hero-(portrait-)?4k-(av1|hevc|h264)[^/]*\.mp4/.test(url);
 const nonHeroBytes = (entries) => entries.filter(({ url }) => !isHeroVideo(url)).reduce((sum, { size }) => sum + size, 0);
 
 let failures = 0;
@@ -306,7 +307,9 @@ try {
       });
 
       await check(`${label}: hero video starts on its own after load, the playground video waits until it is near`, async () => {
-        assert.equal(beforeScroll.some((url) => /hero-section-video[^/]*\.mp4/.test(url)), true, 'hero video never requested');
+        const heroRequests = [...new Set(beforeScroll.filter(isHeroVideo).map((url) => url.replace(/-[\w-]{8}\.mp4$|\.mp4$/, '')))];
+        assert.equal(heroRequests.length, 1, `one hero file, got ${heroRequests.join(', ') || 'none'}`);
+        assert.ok(heroRequests[0].includes(HERO_FILE(viewport).replace(/\.mp4$/, '')), `${heroRequests[0]} is not ${HERO_FILE(viewport)}`);
         assert.equal(beforeScroll.some((url) => /write_Its_a_in_black_color[^/]*\.mp4/.test(url)), false, 'playground video fetched before scrolling');
         await page.evaluate(() => document.querySelector('[data-playground-video]').scrollIntoView({ block: 'center' }));
         await page.waitForTimeout(1500);

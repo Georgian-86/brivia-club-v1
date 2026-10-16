@@ -1,7 +1,7 @@
 // Landing motion helpers (Phase B landing speed). Run: node --test tests/unit
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { motionAllowed, introPlan, INTRO_CAP_MS, INTRO_START_GRACE_MS } from '../../landing-motion.js';
+import { motionAllowed, introPlan, pickHeroSource, INTRO_CAP_MS, INTRO_START_GRACE_MS } from '../../landing-motion.js';
 
 test('motionAllowed is false for reduced motion', () => {
   assert.equal(motionAllowed({ reducedMotion: true, saveData: false }), false);
@@ -62,4 +62,19 @@ test('markLoaded clears .skeleton for an image that already failed (complete, na
   const failed = fakeImg({ complete: true, naturalWidth: 0 });
   markLoaded(failed);
   assert.ok(!failed.classes.has('skeleton'));
+});
+
+// D-062: the 4K hero. A slow link keeps the poster (a 4K stream would stall); the source picker prefers a smooth decode.
+test('motionAllowed is false on a slow link (2g / 3g), true on 4g or unknown', () => {
+  for (const effectiveType of ['slow-2g', '2g', '3g']) assert.equal(motionAllowed({ effectiveType }), false, effectiveType);
+  for (const effectiveType of ['4g', '', undefined]) assert.equal(motionAllowed({ effectiveType }), true, String(effectiveType));
+});
+
+test('pickHeroSource takes the first smooth decode, else the first supported one, else none', () => {
+  assert.equal(pickHeroSource([{ supported: true, smooth: false }, { supported: true, smooth: true }]), 1);
+  assert.equal(pickHeroSource([{ supported: false, smooth: false }, { supported: true, smooth: false }]), 1);
+  assert.equal(pickHeroSource([{ supported: true, smooth: true }, { supported: true, smooth: true }]), 0);
+  assert.equal(pickHeroSource([{ supported: false }, { supported: false }]), -1);
+  assert.equal(pickHeroSource([]), -1);
+  assert.equal(pickHeroSource(undefined), -1);
 });

@@ -12,7 +12,7 @@ import {
 import { matchTypedCity } from './area-pick.js';
 import { signupErrorCopy } from './signup-errors.js';
 import { defaultCoverUrl, normalizeCoverUrl } from './cover-assets.js';
-import { motionAllowed, introPlan, markLoaded, INTRO_CAP_MS, INTRO_START_GRACE_MS } from './landing-motion.js';
+import { motionAllowed, introPlan, pickHeroSource, markLoaded, INTRO_CAP_MS, INTRO_START_GRACE_MS } from './landing-motion.js';
 
 document.querySelectorAll('.skeleton img').forEach(markLoaded);
 
@@ -22,6 +22,7 @@ const introVideo = introBurst?.querySelector('.intro-video');
 const landingMotion = motionAllowed({
   reducedMotion: Boolean(window.matchMedia?.('(prefers-reduced-motion: reduce)').matches),
   saveData: Boolean(navigator.connection?.saveData),
+  effectiveType: String(navigator.connection?.effectiveType || ''),
 });
 // First visit only (localStorage, so a new tab or a later visit never replays it). The auth pages set
 // sessionStorage 'brivia-skip-intro-once' to skip it once; reduced-motion and save-data visitors get posters only.
@@ -94,9 +95,32 @@ const enableLandingVideoAudio = () => {
   startedLandingVideos.forEach(playLandingVideo);
 };
 const heroLandingVideo = document.querySelector('.hero-video');
+// The 4K hero (D-062) lists AV1, HEVC and H.264 for each frame (portrait crop / full frame). The browser takes the
+// first type it can play; MediaCapabilities can say a decode would not be smooth (e.g. 4K AV1 in software on a slow
+// laptop), so before the first byte is fetched the hero keeps only the best smooth source of the frame in use.
+// Anything missing or failing leaves the browser's own choice alone.
+const keepSmoothHeroSource = async (video) => {
+  try {
+    if (!navigator.mediaCapabilities?.decodingInfo) return;
+    const sources = [...video.querySelectorAll('source')].filter((source) => !source.media || window.matchMedia(source.media).matches);
+    if (sources.length < 2) return;
+    const infos = await Promise.all(sources.map((source) => navigator.mediaCapabilities.decodingInfo({
+      type: 'file',
+      video: { contentType: source.type, width: Number(source.dataset.width) || 3840, height: Number(source.dataset.height) || 2160, bitrate: Number(source.dataset.bitrate) || 6e6, framerate: 30 },
+    }).catch(() => ({ supported: false }))));
+    const keep = pickHeroSource(infos);
+    if (keep <= 0) return;
+    video.querySelectorAll('source').forEach((source) => { if (source !== sources[keep]) source.remove(); });
+    video.load();
+  } catch { /* keep the browser's choice */ }
+};
+const startHeroVideo = async () => {
+  await keepSmoothHeroSource(heroLandingVideo);
+  startLandingVideo(heroLandingVideo);
+};
 if (landingMotion && heroLandingVideo) {
-  if (typeof window.requestIdleCallback === 'function') window.requestIdleCallback(() => startLandingVideo(heroLandingVideo), { timeout: 2000 });
-  else window.setTimeout(() => startLandingVideo(heroLandingVideo), 1200);
+  if (typeof window.requestIdleCallback === 'function') window.requestIdleCallback(startHeroVideo, { timeout: 2000 });
+  else window.setTimeout(startHeroVideo, 1200);
 }
 const belowFoldVideos = landingVideos.filter((video) => video !== heroLandingVideo);
 if (landingMotion && belowFoldVideos.length) {

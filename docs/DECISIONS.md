@@ -1199,3 +1199,40 @@ controls (a tester or a seeded test member), never a real member, so no new expo
 - **Open for the founder (NEEDS_CONTEXT).** The brief also said a cancelled pitch should leave the card "staying". Under
   D-018 cancelling *is* a plain like (one signal, note null), so the card leaves after a cancel. Making cancel send
   nothing and keep the card would change D-018 and the consent suite; it needs the founder's ruling first.
+
+## D-062: The founder's design references: the Canva deck card, the "Brivia Society" chat, the full filter catalog, a 4K-only hero (2026-10-16)
+- Accepted 2026-10-16 (founder request with four reference images: the Canva "Dating, but professionally" card, the
+  "Brivia Society" chat screenshot, a photo of the live card and the landing mock-up). Branch
+  `claude/focused-johnson-pev1j6`. No agent-arena round: the founder supplied the target look; nothing in matching,
+  ranking, consent, location or privacy changes. Process: superpowers (brainstorming → bounded change, TDD for the new
+  helpers, verification), ui-ux-pro-max rules (44 px targets, 12 px floor, contrast, reduced motion).
+- **Look only, one new sheet.** `reference-design.css` loads last in `app.js`; tokens for the sampled colours are in
+  `tokens.css` (`--color-oxblood` #4c1315 from the Canva card, `--color-chat-wine` #5a061e from the chat screenshot,
+  paper, chip and name ink). No element, id, handler or RPC changed; the backend is untouched.
+- **Deck card = the Canva card.** Paper face with a thin oxblood edge; an inset oxblood title bar (Bodoni small caps);
+  the cover flush under it; a large ringed avatar over the cover's lower-left corner; the name in Bodoni Moda; a quiet
+  line and a short rule; beige pills; a full-width oxblood VIEW PROFILE. The card is now a flex column, so the cover
+  takes the free height and the info never overlaps it (1280x720 to phones). Desktop keeps the Canva proportions
+  (width about 0.58 x height, never under 352 px). **The Canva @handle is not copied:** members have no handle field,
+  and inventing one from the name would look like a real username. The distance band ("~3 km", a place) sits in its
+  place, as the location-first rule wants. On phones the headline is a little smaller so the card shows on arrival.
+- **Chat = the reference.** The live chat used the right wine (#5a061f) but drew the room photo at 3 px blur and 80 %
+  opacity over cream (`app-navigation.css`), which washed it out; the new rule paints the photo sharp, at full
+  strength, as the scroller's own background (it stays put while messages scroll). Selected row and sent bubble use
+  #5a061e; serif (Bodoni Moda) names, header and bubbles; the sidebar masthead reads "BRIVIA SOCIETY" with "PEOPLE /
+  IDEAS / POSSIBILITIES" exactly as in the reference (one CSS `content` string to change if the founder prefers
+  "Brivia Club"). The old "BRIVIA AI · THOUGHTFUL CONNECTIONS" footer and the desktop back arrow are hidden.
+- **Filters suggest everything.** `discovery-catalog.js` (unit-tested): a standard interest list (chess, music,
+  guitar, hackathons, sport, arts, tech, life) and looking-for list, merged with the labels on loaded cards and the
+  live taxonomy's selectable, **non-sensitive** labels (read once when the drawer opens; a failure keeps the
+  standard list). A row of 12 popular picks sits above the box; an empty focused box lists the whole catalog in a
+  scrolling list. Matching is unchanged (a value with no card shows "0 people match"). Fixed a mojibake "Ã—" on the
+  selected-chip remove mark.
+- **The hero is 4K only.** The 1080p downscale (crf 30) was soft. `npm run media:hero4k` (`scripts/encode-hero-4k.mjs`)
+  encodes the 4K master into a full 3840x2160 frame and a 1216x2160 centre crop for portrait phones (object-fit:cover
+  only ever shows that slice there, so phones get native 4K pixels for about a third of the bytes), each in AV1, HEVC
+  (Safari) and H.264. `index.html` lists them with exact codec types, so a browser fetches exactly one; before the
+  first byte, MediaCapabilities drops a source the device would not decode smoothly (`pickHeroSource`). Load speed is
+  kept by what was already there: the poster is the LCP, the video starts only after idle, +faststart streams it, and
+  reduced-motion, save-data and now 2g/3g links get the poster only. `check:assets` gives `hero-4k-*` /
+  `hero-portrait-4k-*` their own 20 MB cap (every other video keeps 5 MB; AV1 is 11.6 MB, HEVC 12.5, the H.264 last resort 17.8; the portrait crop 4.2 / 4.6 / 6.3). The old 1080/720 hero files are removed.

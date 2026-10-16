@@ -45,3 +45,11 @@ test('vercel.json sets Cache-Control "public, max-age=31536000, immutable" for /
   assert.ok(rule, 'no headers rule for /assets/(.*)');
   assert.deepEqual(rule.headers.find((h) => h.key === 'Cache-Control'), { key: 'Cache-Control', value: 'public, max-age=31536000, immutable' });
 });
+
+// D-062: the 4K hero files have their own, larger cap (they start after idle, behind the poster, one per browser).
+test('the 4K hero videos get the hero cap, any other video keeps 5 MB', () => {
+  const ok = checkAssetBudget([{ path: 'dist/assets/hero-4k-av1-AbC123.mp4', bytes: 12 * 1048576 }, { path: 'dist/assets/hero-portrait-4k-h264-x.mp4', bytes: 9 * 1048576 }]);
+  assert.equal(ok.ok, true);
+  const over = checkAssetBudget([{ path: 'dist/assets/hero-4k-h264-x.mp4', bytes: 20 * 1048576 + 1 }, { path: 'dist/assets/other-4k.mp4', bytes: 6 * 1048576 }]);
+  assert.deepEqual(over.violations.map((v) => v.path), ['dist/assets/hero-4k-h264-x.mp4', 'dist/assets/other-4k.mp4']);
+});
