@@ -9,6 +9,7 @@ they are. This spec applies the skill's UX rules to the new ORBIT flows.*
 | Token | Value | Where |
 |---|---|---|
 | Deep wine | `--brivia-deep-wine: #430416`, `--brivia-wine: #5e0b28`, `--brivia-wine-soft: #76243f` | `deep-wine-theme.css` |
+| Reference palette (D-062) | `--color-oxblood: #4c1315` (deck card bar, VIEW PROFILE, Pitch), `--color-chat-wine: #5a061e` (chat selected row, sent bubble), `--color-card-paper`, `--color-chip`, `--color-name-ink`, `--color-chat-paper`, `--color-chat-head` | `tokens.css`, used by `reference-design.css` |
 | App surfaces | `--app-bg`, `--app-panel`, `--app-red`, `--app-green`, `--app-violet` (light and dark pairs) | `app.css` |
 | Type | Display: *Bodoni Moda*. Body/UI: *Instrument Sans*. Editorial accents: *Georgia* | `app.css`, `style.css` |
 | Voice | Uppercase micro-labels ("STEP 02 · YOUR AREA"), short editorial headlines ("Find your people.") | `auth.html` |

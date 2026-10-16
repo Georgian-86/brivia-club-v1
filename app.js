@@ -19,7 +19,8 @@ import './app-navigation.css';
 import './discovery-filters.css';
 import './mobile-app.css';
 import './skeleton.css';
-import { supabase, rowToProfile, saveProfile, isPresetCoverUrl, onboardingStatus, sendSignal, fetchSignalQuota, isRateLimited, isStorageImageUrl, withoutCredentials, uploadMessageAttachment, removeMessageAttachment, uploadCommunityPostImage, removeCommunityPostImage, ImageProcessingError, compressAttachmentFiles, attachmentKind, reportMember, setSensitiveConsent, fetchSensitiveConsentAt, fetchMyInterests } from './supabase.js';
+import { supabase, rowToProfile, saveProfile, isPresetCoverUrl, onboardingStatus, sendSignal, fetchSignalQuota, isRateLimited, isStorageImageUrl, withoutCredentials, uploadMessageAttachment, removeMessageAttachment, uploadCommunityPostImage, removeCommunityPostImage, ImageProcessingError, compressAttachmentFiles, attachmentKind, reportMember, setSensitiveConsent, fetchSensitiveConsentAt, fetchMyInterests, fetchInterestNodes } from './supabase.js';
+import { POPULAR_INTERESTS, INTEREST_CATALOG, LOOKING_FOR_CATALOG, taxonomyLabels, catalogValues, matchOptions } from './discovery-catalog.js';
 import { deleteAccount, clearBriviaKeys, DELETE_BUCKETS, reauthMarker, reauthMarkerMatches } from './account-deletion.js';
 import { openPrivacyAccount } from './privacy-account.js';
 import { isUnderReview, UNDER_REVIEW_COPY } from './onboarding-guard.js';
@@ -44,6 +45,8 @@ import './privacy-account.css';
 import './app-shell.css';
 // The calm profile column (Phase C, Task 5): tokens only, loads after app-shell.css.
 import './profile-view.css';
+// The founder's design references (D-062): the Canva deck card and the "Brivia Society" chat. Loads last.
+import './reference-design.css';
 import { navMarkup, markCurrentNav, setChatBadges } from './app-nav.js';
 import { skeletonMarkup, setBusy } from './app-skeletons.js';
 
@@ -1290,33 +1293,63 @@ const profileEditDatalist = (kind) => {
     .map((value) => `<option value="${escapeHtml(value)}"></option>`)
     .join('');
 };
-const matchingFilterValues = (values, query, selected = new Set()) => {
-  const normalizedQuery = normalizedValue(query);
-  return values.filter((value) => (!normalizedQuery || normalizedValue(value).includes(normalizedQuery)) && !selected.has(normalizedValue(value))).slice(0, 8);
+// D-062: the skills and looking-for boxes suggest the whole catalog (discovery-catalog.js) plus the live taxonomy's
+// non-sensitive labels, read once when the drawer first opens; names still come from member cards only.
+let filterTaxonomy = [];
+let filterTaxonomyRequested = false;
+const loadFilterTaxonomy = async () => {
+  if (filterTaxonomyRequested) return;
+  filterTaxonomyRequested = true;
+  try {
+    const { data, error } = await fetchInterestNodes();
+    if (error) { filterTaxonomyRequested = false; return; }
+    filterTaxonomy = taxonomyLabels(data);
+    renderFilterOptions();
+  } catch { filterTaxonomyRequested = false; }
+};
+const filterCatalog = () => {
+  const { names, skills, lookingFor } = getFilterValues();
+  return {
+    names,
+    skills: catalogValues({ members: skills, standard: INTEREST_CATALOG, taxonomy: filterTaxonomy }),
+    lookingFor: catalogValues({ members: lookingFor, standard: LOOKING_FOR_CATALOG }),
+  };
 };
 const renderSuggestionList = (container, values, query, kind, selected = new Set(), showAll = false) => {
   if (!container) return;
   const normalizedQuery = normalizedValue(query);
   if (!normalizedQuery && !showAll) {
     container.innerHTML = '';
+    container.classList.remove('is-open');
     return;
   }
-  const matches = matchingFilterValues(values, query, selected);
+  // A typed query shows the best 12; a focused empty box lists everything (the list scrolls).
+  const matches = matchOptions(values, query, selected, normalizedQuery ? 12 : Infinity);
+  container.classList.toggle('is-open', matches.length > 0);
   container.innerHTML = matches.length
     ? matches.map((value) => `<button class="discovery-filter-suggestion" type="button" role="option" data-filter-kind="${kind}" data-filter-value="${escapeHtml(value)}">${escapeHtml(value)}</button>`).join('')
-    : '<p class="discovery-filter-empty">No matching member data.</p>';
+    : `<p class="discovery-filter-empty">${kind === 'name' ? 'No member by that name in your deck yet.' : 'No match. Try a shorter word.'}</p>`;
+};
+// The quick-pick row above the skills box: one tap adds the filter; a picked one shows as selected.
+const renderPopularFilters = (container, selected) => {
+  if (!container) return;
+  container.innerHTML = POPULAR_INTERESTS.map((value) => {
+    const on = selected.has(normalizedValue(value));
+    return `<button class="discovery-filter-pop${on ? ' is-on' : ''}" type="button" aria-pressed="${on}" ${on ? `data-remove-filter="skills"` : `data-filter-kind="skills"`} data-filter-value="${escapeHtml(value)}">${escapeHtml(value)}</button>`;
+  }).join('');
 };
 const renderSelectedFilters = (container, values, selected, kind) => {
   if (!container) return;
   const selectedLabels = values.filter((value) => selected.has(normalizedValue(value)));
-  container.innerHTML = selectedLabels.map((value) => `<button class="discovery-filter-selected-chip" type="button" data-remove-filter="${kind}" data-filter-value="${escapeHtml(value)}"><span>${escapeHtml(value)}</span><b aria-hidden="true">Ã—</b><span class="sr-only">Remove ${escapeHtml(value)}</span></button>`).join('');
+  container.innerHTML = selectedLabels.map((value) => `<button class="discovery-filter-selected-chip" type="button" data-remove-filter="${kind}" data-filter-value="${escapeHtml(value)}"><span>${escapeHtml(value)}</span><b aria-hidden="true">×</b><span class="sr-only">Remove ${escapeHtml(value)}</span></button>`).join('');
 };
 const renderFilterOptions = () => {
   const search = document.querySelector('#drawer-filter-search');
   const skillsInput = document.querySelector('#filter-skills-input');
   const lookingInput = document.querySelector('#filter-looking-for-input');
   if (!search || !skillsInput || !lookingInput) return;
-  const { names, skills, lookingFor } = getFilterValues();
+  const { names, skills, lookingFor } = filterCatalog();
+  renderPopularFilters(document.querySelector('#filter-popular'), exploreFilters.skills);
   if (document.activeElement !== search && search.value !== exploreFilters.query) search.value = exploreFilters.query;
   if (document.activeElement !== skillsInput && skillsInput.value !== filterDrafts.skills) skillsInput.value = filterDrafts.skills;
   if (document.activeElement !== lookingInput && lookingInput.value !== filterDrafts.lookingFor) lookingInput.value = filterDrafts.lookingFor;
@@ -2427,6 +2460,7 @@ const closeDiscoveryFilters = () => {
 };
 const openDiscoveryFilters = () => {
   renderFilterOptions();
+  loadFilterTaxonomy();
   discoveryFilterDrawer?.removeAttribute('hidden');
   discoveryFilterButton?.setAttribute('aria-expanded', 'true');
   document.body.classList.add('discovery-filters-open');
