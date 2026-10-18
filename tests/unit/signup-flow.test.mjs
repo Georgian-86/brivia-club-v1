@@ -6,48 +6,55 @@ import { SCREENS, STEP_ICONS, stepLabel, stepStates, resumeScreen, backTarget, s
 import { parseOtp, otpBoxesAfterInput } from '../../site/scripts/otp-input.js';
 import { evenSplit } from '../../site/scripts/passion-budget.js';
 
-test('screen lists: email has 6 question screens, Google 4', () => {
-  assert.deepEqual(SCREENS.email, ['welcome', 'email', 'code', 'adult', 'name', 'area', 'interests', 'reveal']);
-  assert.deepEqual(SCREENS.google, ['welcome', 'adult', 'name', 'area', 'interests', 'reveal']);
+test('screen lists: email has 7 question screens, Google 4; two questions share About and Details', () => {
+  assert.deepEqual(SCREENS.email, ['welcome', 'email', 'code', 'password', 'about', 'details', 'area', 'interests', 'reveal']);
+  assert.deepEqual(SCREENS.google, ['welcome', 'about', 'details', 'area', 'interests', 'reveal']);
   for (const s of [...SCREENS.email, ...SCREENS.google].filter((n) => n !== 'welcome' && n !== 'reveal')) assert.ok(STEP_ICONS[s], `${s} has an icon`);
 });
 
 test('stepLabel counts question screens only', () => {
-  assert.equal(stepLabel('email', 'email'), 'Step 1 of 6');
-  assert.equal(stepLabel('email', 'code'), 'Step 2 of 6');
-  assert.equal(stepLabel('email', 'adult'), 'Step 3 of 6');
-  assert.equal(stepLabel('google', 'interests'), 'Step 4 of 4');
+  assert.equal(stepLabel('email', 'email'), 'Step 1 of 7');
+  assert.equal(stepLabel('email', 'code'), 'Step 2 of 7');
+  assert.equal(stepLabel('email', 'password'), 'Step 3 of 7');
+  assert.equal(stepLabel('email', 'interests'), 'Step 7 of 7');
+  assert.equal(stepLabel('google', 'details'), 'Step 2 of 4');
   assert.equal(stepLabel('email', 'reveal'), null);
   assert.equal(stepLabel('google', 'welcome'), null);
 });
 
 test('stepStates: done before the current step, current, pending after', () => {
-  assert.deepEqual(stepStates('google', 'name'), [
-    { screen: 'adult', state: 'done' }, { screen: 'name', state: 'current' },
+  assert.deepEqual(stepStates('google', 'details'), [
+    { screen: 'about', state: 'done' }, { screen: 'details', state: 'current' },
     { screen: 'area', state: 'pending' }, { screen: 'interests', state: 'pending' },
   ]);
   assert.deepEqual(stepStates('google', 'reveal').map((s) => s.state), ['done', 'done', 'done', 'done']);
-  assert.deepEqual(stepStates('email', 'welcome').map((s) => s.state), ['pending', 'pending', 'pending', 'pending', 'pending', 'pending']);
+  assert.equal(stepStates('email', 'welcome').every((s) => s.state === 'pending'), true);
 });
 
 test('resumeScreen: the first unfinished question', () => {
-  assert.equal(resumeScreen({ session: null, status: {}, path: 'email' }), 'welcome');
+  assert.equal(resumeScreen({ session: null, status: {} }), 'welcome');
   const session = { user: { id: 'u' } };
-  assert.equal(resumeScreen({ session, status: { completed: true }, path: 'email' }), 'done');
-  assert.equal(resumeScreen({ session, status: {}, path: 'email' }), 'adult');
-  assert.equal(resumeScreen({ session, status: { adult_declared: true }, path: 'google' }), 'name');
-  assert.equal(resumeScreen({ session, status: { adult_declared: true, has_name: true }, path: 'email' }), 'area');
-  assert.equal(resumeScreen({ session, status: { adult_declared: true, has_name: true, has_cell: true, interests: 2, points: 15 }, path: 'email' }), 'interests');
-  assert.equal(resumeScreen({ session, status: { adult_declared: true, has_name: true, has_cell: true, interests: 2, points: 20 }, path: 'email' }), 'done');
+  const all = { needs_password: false, adult_declared: true, has_name: true, has_phone: true, has_gender: true, has_cell: true, interests: 2, points: 20 };
+  assert.equal(resumeScreen({ session, status: { completed: true, needs_password: true } }), 'done');
+  assert.equal(resumeScreen({ session, status: { ...all, needs_password: true } }), 'password');
+  assert.equal(resumeScreen({ session, status: {} }), 'about');
+  assert.equal(resumeScreen({ session, status: { ...all, adult_declared: false } }), 'about');
+  assert.equal(resumeScreen({ session, status: { ...all, has_name: false } }), 'about');
+  assert.equal(resumeScreen({ session, status: { ...all, has_phone: false } }), 'details');
+  assert.equal(resumeScreen({ session, status: { ...all, has_gender: false } }), 'details');
+  assert.equal(resumeScreen({ session, status: { ...all, has_cell: false } }), 'area');
+  assert.equal(resumeScreen({ session, status: { ...all, points: 15 } }), 'interests');
+  assert.equal(resumeScreen({ session, status: all }), 'done');
 });
 
-test('backTarget: never back to Email or Code once signed in', () => {
-  assert.equal(backTarget('email', 'adult', true), 'welcome');
-  assert.equal(backTarget('email', 'name', true), 'adult');
+test('backTarget: never back to Email, Code or Password once signed in', () => {
+  assert.equal(backTarget('email', 'about', true), 'welcome');
+  assert.equal(backTarget('email', 'password', true), 'welcome');
+  assert.equal(backTarget('email', 'details', true), 'about');
   assert.equal(backTarget('email', 'code', false), 'email');
   assert.equal(backTarget('email', 'email', false), 'welcome');
   assert.equal(backTarget('google', 'welcome', false), null);
-  assert.equal(backTarget('google', 'adult', true), 'welcome');
+  assert.equal(backTarget('google', 'about', true), 'welcome');
 });
 
 test('signupMethods reads the switch; unknown words are dropped', () => {

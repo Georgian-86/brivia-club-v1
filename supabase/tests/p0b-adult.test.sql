@@ -110,7 +110,7 @@ end $$;
 do $$
 declare n constant uuid := 'ad000000-0000-4000-8000-000000000003'; code text; a1 timestamptz; a2 timestamptz; ev int;
 begin
-  if public.brivia_notice_version() <> '2026-10-20' then raise exception 'FAIL A3: notice version %', public.brivia_notice_version(); end if;
+  if public.brivia_notice_version() <> '2026-10-05' then raise exception 'FAIL A3: notice version %', public.brivia_notice_version(); end if;
   set local session authorization authenticated;
   set local role authenticated;
   perform set_config('request.jwt.claims', json_build_object('sub', n)::text, true);
@@ -122,7 +122,7 @@ begin
   select adult_declared_at into a1 from public.profiles where id = n;
   select count(*) into ev from public.consent_event where member_id = n and kind = 'adult';
   if a1 is null or ev <> 1 then raise exception 'FAIL A3: after declaring: at=%, events=%', a1, ev; end if;
-  if (select notice_version from public.consent_event where member_id = n and kind = 'adult') <> '2026-10-20' then
+  if (select notice_version from public.consent_event where member_id = n and kind = 'adult') <> '2026-10-05' then
     raise exception 'FAIL A3: event notice_version';
   end if;
   perform pg_sleep(0.01);

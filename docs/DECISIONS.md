@@ -1347,3 +1347,21 @@ controls (a tester or a seeded test member), never a real member, so no new expo
   the Magic Link template; until then the email's link still signs the member in and resumes the flow. Custom SMTP
   is strongly advised (the built-in sender is heavily rate limited). (3) Google provider enabled for "Continue with
   Google" (already offered on login). Proof: `node tests/e2e/signup.spec.mjs` (56 checks, port 5193).
+
+## D-068: The guided signup keeps phone, gender and password; only the points screen goes (2026-10-18)
+- Accepted 2026-10-18 (founder, after D-067: "we need these as well... we can add 2 questions per screen, remove only
+  the points, but we will need the interests").
+- **Screens.** Email path: Email → Code → Password (password + confirm) → About you (name + "I'm 18 or older") →
+  Details (phone + gender) → Area → Interests (7 steps). Google path: About you → Details → Area → Interests (4 steps,
+  no password). Two questions share a screen only where they belong together. The points screen stays gone: interests
+  save with the even split (D-067).
+- **Password.** A brand-new account made by the email code is marked passwordless and gets the Password screen next;
+  saving it (`updateUser({ password })`) clears the mark, so login and account deletion use the password as before.
+  "Email me a code instead" stays as a second way in. An existing member who logs in by code keeps their password.
+- **Phone and gender** are written to the same `profiles` columns the classic form used (`phone`,
+  `phone_country_code`, `phone_number` digits, `gender` as Male / Female / Prefer not to say); the phone stays private.
+- **0007 withdrawn.** Its only purpose was a new notice saying new members give no phone or gender. With both collected
+  again, the live notice 2026-10-05 is accurate, so 0007, its test and the client version bump are removed before ever
+  being applied (0007 was never live; 0001–0006 are untouched). The deploy no longer needs a SQL step.
+- **Proof.** `node tests/e2e/signup.spec.mjs`: 68 checks at 1440 and 375 px, including mismatched passwords, the 18+
+  box being required, declare_adult before the name save, and phone + gender saved on the member's own row.

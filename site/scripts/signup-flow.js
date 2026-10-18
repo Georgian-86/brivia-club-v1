@@ -1,13 +1,14 @@
-// Guided signup (Phase E, D-067): one question per screen. Pure navigation: which screens a path has, the step label
+// Guided signup (Phase E, D-067, D-068): one screen at a time (at most two questions on one). Pure navigation: which screens a path has, the step label
 // and the bubble states above the card, where a returning member resumes, and where Back goes.
+// about = name + "I'm 18 or older"; details = phone + gender; password only on the email path.
 export const SCREENS = {
-  email: ['welcome', 'email', 'code', 'adult', 'name', 'area', 'interests', 'reveal'],
-  google: ['welcome', 'adult', 'name', 'area', 'interests', 'reveal'],
+  email: ['welcome', 'email', 'code', 'password', 'about', 'details', 'area', 'interests', 'reveal'],
+  google: ['welcome', 'about', 'details', 'area', 'interests', 'reveal'],
 };
 
 // The icon each question shows in its bubble (signup-screens.js draws them as inline SVG).
-export const STEP_ICONS = { email: 'mail', code: 'key', adult: 'check', name: 'person', area: 'pin', interests: 'spark' };
-const PROFILE = ['adult', 'name', 'area', 'interests'];
+export const STEP_ICONS = { email: 'mail', code: 'key', password: 'lock', about: 'person', details: 'phone', area: 'pin', interests: 'spark' };
+const ACCOUNT = ['email', 'code', 'password'];
 const questions = (path) => (SCREENS[path] || SCREENS.email).filter((s) => s !== 'welcome' && s !== 'reveal');
 
 export const stepLabel = (path, screen) => {
@@ -23,26 +24,26 @@ export const stepStates = (path, screen) => {
   return list.map((s, i) => ({ screen: s, state: i < at ? 'done' : i === at ? 'current' : 'pending' }));
 };
 
-// status: { adult_declared, has_name, has_cell, interests, points, completed } (my_onboarding_status plus the
-// member's own profile row). 'done' means go to the app.
+// status: { needs_password, adult_declared, has_name, has_phone, has_gender, has_cell, interests, points, completed }
+// (my_onboarding_status plus the member's own profile row and auth metadata). 'done' means go to the app.
 export const resumeScreen = ({ session, status = {} }) => {
   if (!session) return 'welcome';
   if (status.completed) return 'done';
-  if (!status.adult_declared) return 'adult';
-  if (!status.has_name) return 'name';
+  if (status.needs_password) return 'password';
+  if (!status.adult_declared || !status.has_name) return 'about';
+  if (!status.has_phone || !status.has_gender) return 'details';
   if (!status.has_cell) return 'area';
   if (!(status.interests > 0 && status.points === 20)) return 'interests';
   return 'done';
 };
 
-// Once the session exists, Back never returns to Email or Code: the earliest target is Welcome.
+// Once the session exists, Back never returns to Email, Code or Password: the earliest target is Welcome.
 export const backTarget = (path, screen, hasSession) => {
   const list = SCREENS[path] || SCREENS.email;
   const at = list.indexOf(screen);
   if (at <= 0) return null;
-  if (hasSession && screen === PROFILE[0]) return 'welcome';
   const prev = list[at - 1];
-  return hasSession && (prev === 'email' || prev === 'code') ? 'welcome' : prev;
+  return hasSession && (ACCOUNT.includes(prev) || ACCOUNT.includes(screen)) ? 'welcome' : prev;
 };
 
 // VITE_SIGNUP_METHODS: a comma list of google and email. Empty means public signup is closed.

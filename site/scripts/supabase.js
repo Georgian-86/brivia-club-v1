@@ -286,6 +286,10 @@ export const sendEmailCode = (email, { create = true } = {}) => (supabase
 export const verifyEmailCode = (email, token) => (supabase
   ? supabase.auth.verifyOtp({ email, token, type: 'email' })
   : Promise.resolve(notConfigured()));
+// The Password screen: sets the member's password and clears the passwordless mark (deletion then asks for it).
+export const setPassword = (password) => (supabase
+  ? supabase.auth.updateUser({ password, data: { passwordless: false, has_password: true } })
+  : Promise.resolve(notConfigured()));
 export const markPasswordless = () => (supabase ? supabase.auth.updateUser({ data: { passwordless: true } }) : Promise.resolve(notConfigured()));
 export const declareAdult = () => rpcCall('declare_adult', { p_notice_version: NOTICE_VERSION });
 export const setHomeLocation = (lat, lng) => rpcCall('set_home_location', { lat, lng });

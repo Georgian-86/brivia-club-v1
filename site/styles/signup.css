@@ -1,4 +1,4 @@
-/* Guided signup (Phase E, D-067): one question per screen beside the auth image on desktop, a full-height card with
+/* Guided signup (Phase E, D-067, D-068): one screen at a time (at most two questions) beside the auth image on desktop, a full-height card with
    the primary button pinned above the keyboard on phones. Tokens only (tokens.css); the deep-wine brand.
    The stepper: one bubble per question with its icon; done = filled wine with a tick, current = a wine ring that
    glows softly, pending = a faint outline. The line between bubbles fills as the member moves on. */
@@ -179,6 +179,65 @@
   transition: border-color var(--motion-fast) var(--ease), box-shadow var(--motion-fast) var(--ease);
 }
 .guided-field input:focus { border-color: var(--g-wine); box-shadow: 0 0 0 4px var(--g-tint); }
+
+/* Two questions on one screen: each gets a small label above it. */
+.guided-field--labelled { margin-bottom: var(--space-4); text-align: left; }
+.guided-field--labelled > span {
+  display: block;
+  margin-bottom: 8px;
+  color: var(--g-deep);
+  font-size: var(--text-12);
+  font-weight: 700;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+}
+.guided-check {
+  display: flex;
+  min-height: 52px;
+  align-items: center;
+  gap: 12px;
+  padding: 0 16px;
+  border: 1.5px solid var(--g-line);
+  border-radius: var(--radius-m);
+  background: var(--g-paper);
+  color: var(--g-deep);
+  font-size: var(--text-16);
+  font-weight: 600;
+  cursor: pointer;
+}
+.guided-check:has(input:checked) { border-color: var(--g-wine); background: var(--g-tint); }
+.guided-check input { width: 20px; height: 20px; margin: 0; accent-color: var(--color-chat-wine); }
+.guided-phone { display: grid; grid-template-columns: 104px minmax(0, 1fr); gap: 8px; }
+.guided-phone select, .guided-phone input {
+  width: 100%;
+  min-height: 56px;
+  padding: 0 14px;
+  border: 1.5px solid var(--g-line);
+  border-radius: var(--radius-m);
+  outline: none;
+  background: var(--g-paper);
+  color: var(--g-ink);
+  font: inherit;
+  font-size: var(--text-16);
+}
+.guided-phone select:focus, .guided-phone input:focus { border-color: var(--g-wine); box-shadow: 0 0 0 4px var(--g-tint); }
+.guided-segments { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.guided-segment {
+  min-height: 52px;
+  padding: 0 10px;
+  border: 1.5px solid var(--g-line);
+  border-radius: var(--radius-m);
+  background: var(--g-paper);
+  color: var(--g-deep);
+  font: inherit;
+  font-size: var(--text-14);
+  font-weight: 600;
+  cursor: pointer;
+  transition: background var(--motion-fast) var(--ease), border-color var(--motion-fast) var(--ease), color var(--motion-fast) var(--ease);
+}
+.guided-segment:hover { border-color: var(--g-wine); }
+.guided-segment[aria-checked="true"] { border-color: var(--g-wine); background: var(--g-wine); color: var(--g-paper); }
+.guided-no[hidden] { display: none; }
 
 .guided-choices { display: grid; gap: var(--space-3); }
 .guided-choice {

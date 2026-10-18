@@ -7,12 +7,13 @@ Update this file at the end of every session. CLAUDE.md holds the aim; this file
 
 ## 1. What is done
 
-**Guided signup (2026-10-18), D-067.** One question per screen with a bubble stepper; email code or Google; no phone,
-gender, password or points. Files: `site/scripts/signup-screens.js`, `signup-flow.js`, `otp-input.js`,
-`site/styles/signup.css`, `#guided-signup` in `site/auth.html`; migration `0007_signup_minimisation.sql`.
-**Before deploying: apply 0007, then add `{{ .Token }}` to the Supabase Magic Link email template** (see D-067).
-Rollback without code: `VITE_SIGNUP_FLOW=classic`. Suite: `node tests/e2e/signup.spec.mjs` (port 5193); the old
-onboarding and consent suites run the classic flow.
+**Guided signup (2026-10-18), D-067 and D-068.** One screen at a time (at most two questions) with a bubble
+stepper: email code or Google, then password (email path), About you (name + 18+), Details (phone + gender), area,
+interests. Only the points screen is gone (interests save with an even split). Files: `site/scripts/signup-screens.js`,
+`signup-flow.js`, `otp-input.js`, `site/styles/signup.css`, `#guided-signup` in `site/auth.html`. No migration: the
+2026-10-05 notice already covers phone and gender (0007 was withdrawn, D-068). Before deploying, add `{{ .Token }}` to
+the Supabase Magic Link email template (D-067). Rollback without code: `VITE_SIGNUP_FLOW=classic`. Suite:
+`node tests/e2e/signup.spec.mjs` (port 5193); the onboarding and consent suites run the classic flow.
 
 **Phones (2026-10-18), D-066.** Hero prefers a hardware-decoded codec, lighter matching cards (`npm run media:cards`),
 one shared scroll frame, no stacked sound buttons. Probe: `node tests/e2e/landing-phone-smoothness.mjs` (after a stub

@@ -133,7 +133,7 @@ const stubContext = async (context, opts = {}) => {
     const ADULT_REQUIRED = { code: 'P0001', message: 'adult declaration required', details: null, hint: null };
     if (p === '/rest/v1/rpc/declare_adult') {
       if (!state.profile) return json(404, { code: 'P0002', message: 'profile required' });
-      if (JSON.parse(body || '{}').p_notice_version !== '2026-10-20') return json(400, { code: '22023', message: 'stale notice version' });
+      if (JSON.parse(body || '{}').p_notice_version !== '2026-10-05') return json(400, { code: '22023', message: 'stale notice version' });
       const forced = state.declareStatus.shift();
       if (forced === 500) return json(500, { code: 'XX000', message: 'boom' });
       state.adultAt = state.adultAt || new Date().toISOString();
@@ -1171,7 +1171,7 @@ try {
     const idx = ['signup', 'profiles', 'rpc/declare_adult', 'rpc/set_home_city', 'rpc/set_member_interests'].map((n) => flow.indexOf(n));
     check(`18+: order profiles -> declare_adult -> set_home_city -> set_member_interests (${flow.join(' | ')})`, () => { assert.ok(idx.every((i) => i >= 0)); assert.deepEqual([...idx].sort((a, b) => a - b), idx); });
     const declareBody = JSON.parse(stub.posts('/rest/v1/rpc/declare_adult')[0]?.body || '{}');
-    check(`18+: declare_adult sends the notice version (${JSON.stringify(declareBody)})`, () => assert.deepEqual(declareBody, { p_notice_version: '2026-10-20' }));
+    check(`18+: declare_adult sends the notice version (${JSON.stringify(declareBody)})`, () => assert.deepEqual(declareBody, { p_notice_version: '2026-10-05' }));
     const adultInBody = stub.calls.filter((c) => c.path === '/rest/v1/profiles' && ['POST', 'PATCH'].includes(c.method) && /adult_declared_at|adultDeclared/.test(c.body));
     check('18+: adult_declared_at is never in a profiles write body', () => assert.equal(adultInBody.length, 0));
     check('R11: the signup step label for step 3 no longer says "signals"', () => assert.ok(!/signals/i.test(label3)));

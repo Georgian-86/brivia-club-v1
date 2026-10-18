@@ -1416,7 +1416,7 @@ try {
   check(`privacy.html: body text is 16 px or more (${page375.bodySize})`, () => assert.ok(page375.bodySize >= 16));
   check('privacy.html without ?deleted=1 shows an empty status region', () => assert.equal(page375.banner, ''));
   check(`privacy.html: version line, region and grievance contact (${page375.version})`, () => {
-    assert.equal(page375.version, 'Version 2026-10-20 · effective 20 October 2026');
+    assert.equal(page375.version, 'Version 2026-10-05 · effective 5 October 2026');
     for (const needle of ['Supabase, Mumbai (ap-south-1), India', 'thebrivia.club@gmail.com', 'We reply within 7 days and resolve within 90 days', 'Data Protection Board of India', 'The founder of Brivia Club', 'call 112', '72 hours', 'Your messages, which disappear from other people']) assert.ok(page375.text.includes(needle), needle);
   });
   const privSmall = await smallText(priv, { root: 'body' });

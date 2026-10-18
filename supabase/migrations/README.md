@@ -228,19 +228,6 @@ connection requests" (0004 dropped it on purpose).
 - The harness proves no drift (`supabase/tests/run.sh`, database `brivia_test_drift`): the snapshot before and after 0006
   is equal, no public policy keeps a bare `auth.uid()`, and the request-insert policy stays absent.
 
-## 0007: the notice version for the guided signup (Phase E, D-067)
-
-Apply **only `0007_signup_minimisation.sql`**, as `postgres` in the SQL editor, **after 0006**, and **before** the client
-that ships the guided signup is deployed (that client declares notice `2026-10-20`; a database without 0007 refuses it
-with "stale notice version"). Apply it the same day. Independent of 0008 (either order).
-- **What it does:** `brivia_notice_version()` returns `2026-10-20`; a new owner-only `brivia_notice_accepted(version)`
-  also accepts `2026-10-05` until 3 November 2026 (14 days), so a tab still on the old client keeps working;
-  `declare_adult` is redefined with that check and nothing else changed (the rejoin-review check from 0005 stays).
-- **Pre-flight:** `select public.brivia_notice_version();` returns `2026-10-05`.
-- **Verify:** it returns `2026-10-20`; `select public.brivia_notice_accepted('2026-10-05');` is true until 3 November.
-- If the release date moves, change it in 0007 (both places), `site/scripts/notice-version.js` and `site/privacy.html`
-  together (`npm run test:unit` checks they agree).
-
 ## 0008: the tester switch (Phase D)
 
 Apply **only `0008_tester_world.sql`**, as `postgres` in the SQL editor, **after 0006 is applied and verified live**. It

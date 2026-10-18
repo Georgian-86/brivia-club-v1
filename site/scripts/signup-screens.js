@@ -1,9 +1,9 @@
-// Guided signup (Phase E, D-067): one question per screen, at every width. Renders into #guided-signup (auth.html):
+// Guided signup (Phase E, D-067, D-068): one screen at a time (at most two questions on one), at every width. Renders into #guided-signup (auth.html):
 // the bubble stepper (done / current / pending), the step label, one screen, and Back + one primary button.
 // Every answer is saved when the member presses the primary button, through the existing RPCs; nothing is kept in
 // storage, and coordinates only ever travel in the body of set_home_location.
 import {
-  supabase, sendEmailCode, verifyEmailCode, markPasswordless, declareAdult, setHomeLocation, setHomeCity,
+  supabase, sendEmailCode, verifyEmailCode, markPasswordless, setPassword, declareAdult, setHomeLocation, setHomeCity,
   setMemberInterests, fetchInterestNodes, searchPlaces, onboardingStatus, saveProfile, isRateLimited,
 } from './supabase.js';
 import { SCREENS, STEP_ICONS, stepLabel, stepStates, resumeScreen, backTarget, signupMethods } from './signup-flow.js';
@@ -19,18 +19,28 @@ const realName = (value) => { const name = String(value || '').trim(); return na
 const escapeHtml = (value) => String(value ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
 const reducedMotion = () => Boolean(window.matchMedia?.('(prefers-reduced-motion: reduce)').matches);
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const MIN_PASSWORD = 8;
+// The stored values (supabase.js normalizeGender), shown as they are.
+const GENDERS = ['Male', 'Female', 'Prefer not to say'];
+const phoneDigits = (value) => String(value || '').replace(/\D/g, '');
+// The country codes the classic form offers (one list in auth.html), else the common ones.
+const countryCodes = () => {
+  const options = [...document.querySelectorAll('#signup-form select[name="phoneCountryCode"] option')].map((o) => o.value).filter(Boolean);
+  return options.length ? options : ['+91', '+1', '+44', '+61', '+65', '+971'];
+};
 
 const ICONS = {
   mail: '<rect x="3" y="5" width="18" height="14" rx="2.5"/><path d="M3.5 7.5l8.5 6 8.5-6"/>',
   key: '<circle cx="8" cy="12" r="3.6"/><path d="M11.6 12H21M17.5 12v3.2M20.5 12v2.4"/>',
-  check: '<path d="M12 3l7 3v5c0 4.5-3 8.3-7 10-4-1.7-7-5.5-7-10V6l7-3z"/><path d="M9 12l2 2 4-4"/>',
+  lock: '<rect x="5" y="10.5" width="14" height="10" rx="2.2"/><path d="M8.5 10.5V7.8a3.5 3.5 0 0 1 7 0v2.7"/><circle cx="12" cy="15.5" r="1.2"/>',
+  phone: '<rect x="7" y="2.8" width="10" height="18.4" rx="2.4"/><path d="M10.5 17.8h3"/>',
   person: '<circle cx="12" cy="8" r="3.8"/><path d="M4.5 20.5c1.4-3.8 4.3-5.8 7.5-5.8s6.1 2 7.5 5.8"/>',
   pin: '<path d="M12 21s-6.5-5.6-6.5-11a6.5 6.5 0 0 1 13 0c0 5.4-6.5 11-6.5 11z"/><circle cx="12" cy="10" r="2.4"/>',
   spark: '<path d="M12 3.5l1.9 5.1 5.1 1.9-5.1 1.9L12 17.5l-1.9-5.1L5 10.5l5.1-1.9z"/><path d="M18.5 16.5l.8 2 2 .8-2 .8-.8 2-.8-2-2-.8 2-.8z"/>',
   tick: '<path d="M5.5 12.5l4.2 4.2L18.5 8"/>',
 };
 const svg = (name, cls = '') => `<svg class="${cls}" viewBox="0 0 24 24" aria-hidden="true" focusable="false">${ICONS[name]}</svg>`;
-const STEP_NAMES = { email: 'Email', code: 'Code', adult: 'Age', name: 'Name', area: 'Area', interests: 'Interests' };
+const STEP_NAMES = { email: 'Email', code: 'Code', password: 'Password', about: 'You', details: 'Details', area: 'Area', interests: 'Interests' };
 
 export const COPY = {
   closed: 'Signups open soon.',
@@ -42,6 +52,9 @@ export const COPY = {
   saveFailed: "That didn't save. Check your connection and try again.",
   under18: "Brivia Club is for adults. Come back when you're 18.",
   nameMissing: 'Enter the name members should see.',
+  passwordMismatch: "The two passwords don't match.",
+  passwordWeak: 'Choose a longer, harder to guess password.',
+  phoneInvalid: 'Enter a mobile number of 7 to 15 digits.',
   areaMissing: 'Use your location or pick your city.',
   geoFailed: "We couldn't get your location. Pick your city instead.",
   interestsLoad: "We couldn't load the interests. Please try again.",
@@ -138,7 +151,7 @@ export const initGuidedSignup = ({ root, startGoogle, onLogin, onSignedOut, redi
   // After a session exists (code verified, Google return, a returning member): the member's own row, created with a
   // placeholder name when missing (declare_adult needs a row), then the first unfinished screen.
   const ensureRow = async (user) => {
-    const { data: row, error } = await supabase.from('profiles').select('id,name,adult_declared_at').eq('id', user.id).maybeSingle();
+    const { data: row, error } = await supabase.from('profiles').select('id,name,adult_declared_at,phone_country_code,phone_number,gender').eq('id', user.id).maybeSingle();
     if (error) throw error;
     if (row) return row;
     const created = await saveProfile(user.id, { name: PLACEHOLDER_NAME, email: user.email || '', coverUrl: DEFAULT_COVER }, null);
@@ -150,9 +163,17 @@ export const initGuidedSignup = ({ root, startGoogle, onLogin, onSignedOut, redi
     if (error) throw error;
     return {
       ...(data || {}),
+      needs_password: state.path === 'email' && state.user?.user_metadata?.passwordless === true,
       adult_declared: Boolean(state.row?.adult_declared_at),
       has_name: Boolean(realName(state.row?.name)),
+      has_phone: phoneDigits(state.row?.phone_number).length >= 7,
+      has_gender: GENDERS.includes(state.row?.gender),
     };
+  };
+  // The next unfinished screen after a save (the Reveal once nothing is left).
+  const upNext = () => {
+    const to = resumeScreen({ session: { user: state.user }, status: { ...state.status, completed: false } });
+    return to === 'done' ? 'reveal' : to;
   };
   const resumeFor = async (user) => {
     state.user = user;
@@ -174,7 +195,7 @@ export const initGuidedSignup = ({ root, startGoogle, onLogin, onSignedOut, redi
         noActions: true,
         html: `${heading(signedIn ? 'Welcome back.' : 'Find your people.', closed ? COPY.closed : signedIn
           ? `You're signed in as <b>${escapeHtml(state.user.email || '')}</b>.`
-          : 'A few quick questions, one at a time. About a minute.')}
+          : 'A few quick steps, one screen at a time. About two minutes.')}
           <div class="guided-choices">
             ${signedIn ? '<button class="guided-choice guided-choice--primary" type="button" data-guided-continue>Continue <span aria-hidden="true">&rarr;</span></button><button class="guided-link" type="button" data-guided-signout>Sign out</button>' : ''}
             ${!signedIn && methods.includes('google') ? '<button class="guided-choice" type="button" data-guided-google><span class="guided-google" aria-hidden="true">G</span>Continue with Google</button>' : ''}
@@ -201,7 +222,7 @@ export const initGuidedSignup = ({ root, startGoogle, onLogin, onSignedOut, redi
 
     email: () => ({
       primary: 'Send my code',
-      html: `${heading(state.login ? 'Log in with a code' : "What's your email?", state.login ? "Enter your account's email and we'll send you a 6-digit code." : "We'll send you a 6-digit code. No password needed.")}
+      html: `${heading(state.login ? 'Log in with a code' : "What's your email?", state.login ? "Enter your account's email and we'll send you a 6-digit code." : "We'll send you a 6-digit code to confirm it's yours.")}
         <label class="guided-field"><span class="sr-only">Email address</span>
           <input type="email" name="guided-email" autocomplete="email" inputmode="email" autocapitalize="off" spellcheck="false" placeholder="you@example.com" value="${escapeHtml(state.email)}" required /></label>`,
       mount: (el) => {
@@ -233,8 +254,15 @@ export const initGuidedSignup = ({ root, startGoogle, onLogin, onSignedOut, redi
         try {
           const { data, error } = await verifyEmailCode(state.email, token);
           if (error || !data?.session) fail(COPY.codeWrong);
-          if (!data.user?.user_metadata?.passwordless) await markPasswordless().catch(() => {});
-          await show(await resumeFor(data.user));
+          // A brand-new account made by the code has no password yet: it gets the Password screen next. A login by
+          // code (or an existing member who used the signup path) keeps the password they have.
+          let user = data.user;
+          const isNew = Date.now() - Date.parse(user?.created_at || 0) < 15 * 60 * 1000;
+          if (!state.login && isNew && !user?.user_metadata?.passwordless && user?.user_metadata?.has_password !== true) {
+            const marked = await markPasswordless().catch(() => null);
+            user = marked?.data?.user || { ...user, user_metadata: { ...user.user_metadata, passwordless: true } };
+          }
+          await show(await resumeFor(user));
         } catch (error) {
           setError(error?.copy || COPY.saveFailed);
           root.querySelector('.guided-otp input')?.focus();
@@ -303,53 +331,132 @@ export const initGuidedSignup = ({ root, startGoogle, onLogin, onSignedOut, redi
       };
     },
 
-    adult: () => ({
-      primary: "Yes, I'm 18 or older",
-      html: `${heading('Are you 18 or older?', "Brivia Club is for adults. We don't ask for your date of birth.")}
-        <button class="guided-link guided-no" type="button" data-guided-under18>No, I'm not</button>
-        <p class="guided-fine"><a href="/privacy.html" target="_blank" rel="noopener">How we use your data</a></p>`,
-      mount: (el) => {
-        el.querySelector('[data-guided-under18]').addEventListener('click', async () => {
-          await supabase?.auth.signOut().catch(() => {});
-          state.user = null; state.row = null;
-          onSignedOut?.();
-          host.innerHTML = `<div class="guided-screen guided-screen--stop">${heading('Thanks for being honest.', COPY.under18)}</div>`;
-          steps.hidden = true; label.hidden = true; actions.hidden = true;
-          root.querySelector('#signup-screen-title')?.focus();
-        });
-      },
-      ready: () => true,
-      submit: async () => {
-        if (!state.row?.adult_declared_at) {
-          const { error } = await declareAdult();
-          if (error) fail(COPY.saveFailed);
-          state.row = { ...state.row, adult_declared_at: new Date().toISOString() };
-        }
-        return 'name';
-      },
-    }),
+    password: () => {
+      let pass = '';
+      let again = '';
+      return {
+        primary: 'Save password',
+        html: `${heading('Create a password', 'Use it to log in next time (an emailed code works too).')}
+          <label class="guided-field guided-field--labelled"><span>Password</span>
+            <input type="password" name="guided-password" autocomplete="new-password" minlength="${MIN_PASSWORD}" placeholder="At least ${MIN_PASSWORD} characters" /></label>
+          <label class="guided-field guided-field--labelled"><span>Confirm password</span>
+            <input type="password" name="guided-password-confirm" autocomplete="new-password" minlength="${MIN_PASSWORD}" placeholder="Type it again" /></label>`,
+        mount: (el) => {
+          const [a, b] = el.querySelectorAll('input');
+          a.addEventListener('input', () => { pass = a.value; refreshNext(); });
+          b.addEventListener('input', () => { again = b.value; refreshNext(); });
+          b.addEventListener('keydown', (event) => { if (event.key === 'Enter') { event.preventDefault(); void goNext(); } });
+          window.setTimeout(() => a.focus({ preventScroll: true }), 60);
+        },
+        ready: () => pass.length >= MIN_PASSWORD && again.length >= MIN_PASSWORD,
+        submit: async () => {
+          if (pass !== again) fail(COPY.passwordMismatch);
+          const { data, error } = await setPassword(pass);
+          if (error) fail(/weak|short|characters/i.test(error.message || '') ? COPY.passwordWeak : COPY.saveFailed);
+          state.user = data?.user || { ...state.user, user_metadata: { ...state.user.user_metadata, passwordless: false, has_password: true } };
+          state.status = { ...state.status, needs_password: false };
+          return upNext();
+        },
+      };
+    },
 
-    name: () => {
+    about: () => {
       const meta = state.user?.user_metadata || {};
       let value = realName(state.row?.name) || realName(meta.full_name) || realName(meta.name);
+      const declared = Boolean(state.row?.adult_declared_at);
+      let adult = declared;
       return {
-        html: `${heading('What should members call you?', 'Members see this name.')}
-          <label class="guided-field"><span class="sr-only">Your name</span>
-            <input type="text" name="guided-name" autocomplete="name" maxlength="60" placeholder="Your name" value="${escapeHtml(value)}" /></label>`,
+        html: `${heading('About you', "Members see your name. Brivia Club is for adults; we never ask for your date of birth.")}
+          <label class="guided-field guided-field--labelled"><span>What should members call you?</span>
+            <input type="text" name="guided-name" autocomplete="name" maxlength="60" placeholder="Your name" value="${escapeHtml(value)}" /></label>
+          <label class="guided-check"><input type="checkbox" name="guided-adult" ${declared ? 'checked disabled' : ''} /><span>I'm 18 or older</span></label>
+          <button class="guided-link guided-no" type="button" data-guided-under18 ${declared ? 'hidden' : ''}>I'm under 18</button>
+          <p class="guided-fine"><a href="/privacy.html" target="_blank" rel="noopener">How we use your data</a></p>`,
         mount: (el) => {
-          const input = el.querySelector('input');
+          const input = el.querySelector('input[name="guided-name"]');
+          const box = el.querySelector('input[name="guided-adult"]');
           input.addEventListener('input', () => { value = input.value; refreshNext(); });
           input.addEventListener('keydown', (event) => { if (event.key === 'Enter') { event.preventDefault(); void goNext(); } });
+          box.addEventListener('change', () => { adult = box.checked; refreshNext(); });
+          el.querySelector('[data-guided-under18]').addEventListener('click', async () => {
+            await supabase?.auth.signOut().catch(() => {});
+            state.user = null; state.row = null;
+            onSignedOut?.();
+            host.innerHTML = `<div class="guided-screen guided-screen--stop">${heading('Thanks for being honest.', COPY.under18)}</div>`;
+            steps.hidden = true; label.hidden = true; actions.hidden = true;
+            root.querySelector('#signup-screen-title')?.focus();
+          });
           window.setTimeout(() => input.focus({ preventScroll: true }), 60);
         },
-        ready: () => Boolean(realName(value)),
+        ready: () => Boolean(realName(value)) && adult,
         submit: async () => {
           const name = realName(value).replace(/\s+/g, ' ');
           if (!name) fail(COPY.nameMissing);
+          // The declaration first: the server refuses everything else until it exists (R1).
+          if (!state.row?.adult_declared_at) {
+            const { error } = await declareAdult();
+            if (error) fail(COPY.saveFailed);
+            state.row = { ...state.row, adult_declared_at: new Date().toISOString() };
+          }
           const { error } = await supabase.from('profiles').update({ name, full_name: name }).eq('id', state.user.id);
           if (error) fail(COPY.saveFailed);
           state.row = { ...state.row, name };
-          return state.status?.has_cell ? (state.status.interests > 0 && state.status.points === 20 ? 'reveal' : 'interests') : 'area';
+          state.status = { ...state.status, adult_declared: true, has_name: true };
+          return upNext();
+        },
+      };
+    },
+
+    details: () => {
+      let code = state.row?.phone_country_code || '+91';
+      let number = phoneDigits(state.row?.phone_number);
+      let gender = GENDERS.includes(state.row?.gender) ? state.row.gender : '';
+      const codes = countryCodes();
+      if (!codes.includes(code)) codes.unshift(code);
+      return {
+        html: `${heading('A little more about you', 'Your phone number stays private: no member ever sees it.')}
+          <div class="guided-field guided-field--labelled"><span id="guided-phone-label">Phone number</span>
+            <div class="guided-phone" role="group" aria-labelledby="guided-phone-label">
+              <select name="guided-phone-code" aria-label="Country code" autocomplete="tel-country-code">${codes.map((c) => `<option ${c === code ? 'selected' : ''}>${escapeHtml(c)}</option>`).join('')}</select>
+              <input type="tel" name="guided-phone" inputmode="tel" autocomplete="tel-national" placeholder="98765 43210" aria-label="Mobile number" value="${escapeHtml(number)}" />
+            </div></div>
+          <div class="guided-field guided-field--labelled"><span id="guided-gender-label">Gender</span>
+            <div class="guided-segments" role="radiogroup" aria-labelledby="guided-gender-label">
+              ${GENDERS.map((g) => `<button type="button" role="radio" class="guided-segment" data-gender="${escapeHtml(g)}" aria-checked="${g === gender}">${escapeHtml(g)}</button>`).join('')}
+            </div></div>`,
+        mount: (el) => {
+          const select = el.querySelector('select');
+          const input = el.querySelector('input[name="guided-phone"]');
+          const radios = [...el.querySelectorAll('.guided-segment')];
+          select.addEventListener('change', () => { code = select.value; });
+          input.addEventListener('input', () => { number = phoneDigits(input.value); refreshNext(); });
+          const pick = (button) => {
+            gender = button.dataset.gender;
+            radios.forEach((r) => { r.setAttribute('aria-checked', String(r === button)); r.tabIndex = r === button ? 0 : -1; });
+            refreshNext();
+          };
+          radios.forEach((r, i) => {
+            r.tabIndex = (gender ? r.dataset.gender === gender : i === 0) ? 0 : -1;
+            r.addEventListener('click', () => pick(r));
+            r.addEventListener('keydown', (event) => {
+              const step = { ArrowRight: 1, ArrowDown: 1, ArrowLeft: -1, ArrowUp: -1 }[event.key];
+              if (!step) return;
+              event.preventDefault();
+              const next = radios[(i + step + radios.length) % radios.length];
+              pick(next); next.focus();
+            });
+          });
+          window.setTimeout(() => input.focus({ preventScroll: true }), 60);
+        },
+        ready: () => number.length >= 7 && number.length <= 15 && Boolean(gender),
+        submit: async () => {
+          if (number.length < 7 || number.length > 15) fail(COPY.phoneInvalid);
+          const row = { phone: `${code} ${number}`, phone_country_code: code, phone_number: number, gender };
+          const { error } = await supabase.from('profiles').update(row).eq('id', state.user.id);
+          if (error) fail(COPY.saveFailed);
+          state.row = { ...state.row, ...row };
+          state.status = { ...state.status, has_phone: true, has_gender: true };
+          return upNext();
         },
       };
     },
@@ -407,7 +514,7 @@ export const initGuidedSignup = ({ root, startGoogle, onLogin, onSignedOut, redi
           if (error) fail(isRateLimited(error, status) ? 'Try again later.' : COPY.saveFailed);
           if (area.kind === 'geo') state.area = { kind: 'geo-saved' };
           state.status = { ...state.status, has_cell: true };
-          return 'interests';
+          return upNext();
         },
       };
     },

@@ -1,12 +1,13 @@
 // Guided signup (Phase E, D-067) against a stubbed Supabase, at 375 and 1440 px. Never touches a real project.
 //   PLAYWRIGHT_MODULE=/tmp/pw/node_modules/playwright/index.mjs node tests/e2e/signup.spec.mjs
 //   E2E_SCREENSHOTS=<dir> also saves a screenshot of every screen (and a mid-flight interest pick).
-// Asserts: one question (one h2, one primary action) per screen; the bubble stepper (done / current / pending) and
+// Asserts: one screen at a time (one h2, one primary action; at most two questions); the bubble stepper and
 // "Step n of N"; email -> code (POST /otp with the email), typed and pasted codes verify by themselves, a wrong code
-// keeps the boxes, Resend waits 60 s; after verify Back never returns to Email or Code; 18+ calls declare_adult with
-// the current notice; the name saves; a city saves through set_home_city, a location only in the body of
-// set_home_location; an interest tap flies a chip into the tray, the 13th is refused, 3 picks save as 7/7/6 "play";
-// the Reveal has no digits and goes to the app; no phone, gender or points input on the way; a returning member
+// keeps the boxes, Resend waits 60 s; a new account then sets a password (two matching fields); after verify Back never
+// returns to Email or Code; About you = name + 18+ (declare_adult first, current notice); Details = phone + gender
+// saved on the own row; a city saves through set_home_city, a location only in the body of set_home_location; an
+// interest tap flies a chip into the tray, the 13th is refused, 3 picks save as 7/7/6 "play"; the Reveal has no digits
+// and goes to the app; no points input anywhere; a returning member
 // resumes at the first unfinished screen and a completed one goes to the app; VITE_SIGNUP_METHODS hides methods;
 // axe finds nothing; the primary button stays above a phone keyboard.
 import { spawn } from 'node:child_process';
@@ -31,7 +32,7 @@ const EMAIL = 'guided@test.brivia.club';
 const b64url = (value) => Buffer.from(JSON.stringify(value)).toString('base64url');
 const exp = Math.floor(Date.now() / 1000) + 3600;
 const accessToken = `${b64url({ alg: 'HS256', typ: 'JWT' })}.${b64url({ sub: ME, role: 'authenticated', exp, aud: 'authenticated' })}.sig`;
-const makeUser = (provider = 'email', meta = {}) => ({ id: ME, aud: 'authenticated', role: 'authenticated', email: EMAIL, user_metadata: meta, app_metadata: { provider, providers: [provider] }, created_at: new Date().toISOString() });
+const makeUser = (provider = 'email', meta = {}, createdAt = new Date().toISOString()) => ({ id: ME, aud: 'authenticated', role: 'authenticated', email: EMAIL, user_metadata: meta, app_metadata: { provider, providers: [provider] }, created_at: createdAt });
 const makeSession = (user) => ({ access_token: accessToken, refresh_token: 'stub-refresh', token_type: 'bearer', expires_in: 3600, expires_at: exp, user });
 
 const nodes = [
@@ -56,7 +57,7 @@ const stopVite = () => { try { process.kill(-vite.pid, 'SIGTERM'); } catch { /* 
 for (let i = 0; i < 120; i += 1) { try { if ((await fetch(`${BASE}/auth.html`)).ok) break; } catch { /* starting */ } await new Promise((r) => setTimeout(r, 250)); }
 
 const setup = async (context, opts = {}) => {
-  const user = makeUser(opts.provider, opts.meta);
+  const user = makeUser(opts.provider, { ...(opts.meta || {}) }, opts.createdAt);
   const state = {
     profile: opts.profile ?? null, adultAt: opts.adultAt ?? null, hasCell: Boolean(opts.hasCell), interests: opts.interests || [],
     otpStatus: opts.otpStatus || [], failRpc: new Set(opts.failRpc || []),
@@ -83,7 +84,8 @@ const setup = async (context, opts = {}) => {
       return json(200, makeSession(user));
     }
     if (p === '/auth/v1/logout') return route.fulfill({ status: 204, headers });
-    if (p.startsWith('/auth/v1/')) return json(200, p.endsWith('/user') ? { ...user, user_metadata: { ...user.user_metadata, passwordless: true } } : makeSession(user));
+    if (p === '/auth/v1/user' && method === 'PUT') { Object.assign(user.user_metadata, JSON.parse(body || '{}').data || {}); return json(200, user); }
+    if (p.startsWith('/auth/v1/')) return json(200, p.endsWith('/user') ? user : makeSession(user));
     const wantsObject = (request.headers().accept || '').includes('vnd.pgrst.object');
     if (p === '/rest/v1/profiles') {
       const own = () => ({ ...state.profile, adult_declared_at: state.adultAt });
@@ -101,7 +103,7 @@ const setup = async (context, opts = {}) => {
     if (rpc && state.failRpc.has(rpc)) return json(500, { code: 'XX000', message: 'boom' });
     if (rpc === 'declare_adult') {
       if (!state.profile) return json(404, { code: 'P0002', message: 'profile required' });
-      if (JSON.parse(body || '{}').p_notice_version !== '2026-10-20') return json(400, { code: '22023', message: 'stale notice version' });
+      if (JSON.parse(body || '{}').p_notice_version !== '2026-10-05') return json(400, { code: '22023', message: 'stale notice version' });
       state.adultAt = state.adultAt || new Date().toISOString();
       return route.fulfill({ status: 204, body: '', headers });
     }
@@ -150,7 +152,7 @@ const ui = (page) => page.evaluate(() => {
     nextDisabled: next?.disabled,
     back: visible(root.querySelector('[data-guided-back]')),
     error: root.querySelector('[data-guided-error]')?.hidden ? '' : root.querySelector('[data-guided-error]')?.textContent,
-    forbidden: [...document.querySelectorAll('#guided-signup input')].filter((i) => /phone|gender|points|tel/i.test(`${i.name} ${i.type} ${i.autocomplete}`)).length,
+    points: [...document.querySelectorAll('#guided-signup input')].filter((i) => /points/i.test(i.name)).length,
     text: root.innerText,
   };
 });
@@ -182,9 +184,9 @@ try {
       await page.locator('[data-guided-email]').click();
       await waitScreen(page, 'email');
       u = await ui(page);
-      check(`${w} email: one question, "Step 1 of 6", first bubble current (${u.bubbles.join(' ')})`, () => {
-        assert.equal(u.h2, 1); assert.equal(u.primaries, 1); assert.equal(u.label, 'Step 1 of 6');
-        assert.deepEqual(u.bubbles, ['email:current', 'code:pending', 'adult:pending', 'name:pending', 'area:pending', 'interests:pending']);
+      check(`${w} email: one question, "Step 1 of 7", first bubble current (${u.bubbles.join(' ')})`, () => {
+        assert.equal(u.h2, 1); assert.equal(u.primaries, 1); assert.equal(u.label, 'Step 1 of 7');
+        assert.deepEqual(u.bubbles, ['email:current', 'code:pending', 'password:pending', 'about:pending', 'details:pending', 'area:pending', 'interests:pending']);
         assert.equal(u.nextDisabled, true);
       });
       await page.locator('input[name="guided-email"]').fill(EMAIL);
@@ -197,7 +199,7 @@ try {
         assert.equal(otp.length, 1); assert.equal(JSON.parse(otp[0].body).email, EMAIL);
         assert.equal(JSON.parse(otp[0].body).create_user, true);
         assert.match(u.text, new RegExp(`6-digit code to ${EMAIL.replace('.', '\\.')}`)); assert.match(u.text, /Wrong email\?/);
-        assert.equal(u.label, 'Step 2 of 6');
+        assert.equal(u.label, 'Step 2 of 7');
       });
       const boxes = await page.evaluate(() => [...document.querySelectorAll('[data-otp]')].map((i) => [i.getAttribute('autocomplete'), i.inputMode]));
       check(`${w} code boxes: 6, the first autocomplete=one-time-code, all numeric`, () => {
@@ -222,35 +224,70 @@ try {
         const data = new DataTransfer(); data.setData('text', 'Your code is 123 456');
         input.dispatchEvent(new ClipboardEvent('paste', { clipboardData: data, bubbles: true, cancelable: true }));
       });
-      const reachedAdult = await waitScreen(page, 'adult');
+      const reachedPassword = await waitScreen(page, 'password');
       u = await ui(page);
-      await shot(page, `${w}-04-adult`);
-      check(`${w} pasting "Your code is 123 456" verifies; 18+ shows "Step 3 of 6" with 2 done bubbles`, () => {
-        assert.equal(reachedAdult, true); assert.equal(u.label, 'Step 3 of 6');
-        assert.deepEqual(u.bubbles.slice(0, 3), ['email:done', 'code:done', 'adult:current']);
+      await shot(page, `${w}-04-password`);
+      check(`${w} pasting "Your code is 123 456" verifies; Password shows "Step 3 of 7" with 2 done bubbles`, () => {
+        assert.equal(reachedPassword, true); assert.equal(u.label, 'Step 3 of 7');
+        assert.deepEqual(u.bubbles.slice(0, 3), ['email:done', 'code:done', 'password:current']);
         assert.ok(state.profile, 'the profile row was created'); assert.equal(state.profile.name, 'New Member');
-        assert.ok(!('phone' in state.profile && state.profile.phone) && !('gender' in state.profile && state.profile.gender));
+        assert.equal(u.h2, 1); assert.equal(u.primaries, 1);
       });
-      const axeAdult = await axeViolations(page, { include: '.auth-shell' });
-      check(`${w} 18+: axe clean (${axeAdult.join(' | ')})`, () => assert.deepEqual(axeAdult, []));
+      const axePassword = await axeViolations(page, { include: '.auth-shell' });
+      check(`${w} password: axe clean (${axePassword.join(' | ')})`, () => assert.deepEqual(axePassword, []));
       // Back after verifying: Welcome ("signed in as"), never Code or Email.
       await page.locator('[data-guided-back]').click();
       await waitScreen(page, 'welcome');
       u = await ui(page);
-      check(`${w} Back from 18+ goes to Welcome with the signed-in line, not to Code`, () => { assert.match(u.text, /signed in as/i); assert.match(u.text, new RegExp(EMAIL.replace('.', '\\.'))); });
+      check(`${w} Back from Password goes to Welcome with the signed-in line, not to Code`, () => { assert.match(u.text, /signed in as/i); assert.match(u.text, new RegExp(EMAIL.replace('.', '\\.'))); });
       await page.locator('[data-guided-continue]').click();
-      await waitScreen(page, 'adult');
+      await waitScreen(page, 'password');
+      await page.locator('input[name="guided-password"]').fill('correct horse 1');
+      await page.locator('input[name="guided-password-confirm"]').fill('correct horse 2');
       await page.locator('[data-guided-next]').click();
-      await waitScreen(page, 'name');
-      const declare = posts('declare_adult');
-      check(`${w} Yes calls declare_adult once with the 2026-10-20 notice`, () => { assert.equal(declare.length, 1); assert.deepEqual(JSON.parse(declare[0].body), { p_notice_version: '2026-10-20' }); });
+      await page.waitForTimeout(300);
       u = await ui(page);
-      check(`${w} name: "Step 4 of 6", Next disabled while empty`, () => { assert.equal(u.label, 'Step 4 of 6'); assert.equal(u.nextDisabled, true); });
+      check(`${w} mismatched passwords are refused on the screen (${u.error})`, () => assert.equal(u.error, "The two passwords don't match."));
+      await page.locator('input[name="guided-password-confirm"]').fill('correct horse 1');
+      await page.locator('input[name="guided-password-confirm"]').press('Enter');
+      await waitScreen(page, 'about');
+      const pw = calls.filter((c) => c.method === 'PUT' && c.path === '/auth/v1/user' && JSON.parse(c.body || '{}').password);
+      check(`${w} the password is set on the account and the passwordless mark cleared`, () => {
+        assert.equal(pw.length, 1); const b = JSON.parse(pw[0].body); assert.equal(b.password, 'correct horse 1'); assert.equal(b.data.passwordless, false);
+      });
+      u = await ui(page);
+      check(`${w} About you: name + 18+ on one screen, "Step 4 of 7", Next disabled until both`, () => {
+        assert.equal(u.label, 'Step 4 of 7'); assert.equal(u.nextDisabled, true); assert.equal(u.h2, 1); assert.match(u.text, /I'm 18 or older/);
+      });
       await page.locator('input[name="guided-name"]').fill('Gia Guided');
-      await shot(page, `${w}-05-name`);
-      await page.locator('input[name="guided-name"]').press('Enter');
+      u = await ui(page);
+      check(`${w} About you: a name alone is not enough (the 18+ box is required)`, () => assert.equal(u.nextDisabled, true));
+      await page.locator('input[name="guided-adult"]').check();
+      await shot(page, `${w}-05-about`);
+      await page.locator('[data-guided-next]').click();
+      await waitScreen(page, 'details');
+      const declare = posts('declare_adult');
+      const declareAt = calls.findIndex((c) => c.path.endsWith('/declare_adult'));
+      const nameAt = calls.findIndex((c) => c.method === 'PATCH' && c.path === '/rest/v1/profiles' && /Gia Guided/.test(c.body));
+      check(`${w} About you: declare_adult (notice 2026-10-05) before the name save (${declareAt} < ${nameAt})`, () => {
+        assert.equal(declare.length, 1); assert.deepEqual(JSON.parse(declare[0].body), { p_notice_version: '2026-10-05' });
+        assert.ok(declareAt >= 0 && nameAt > declareAt); assert.equal(state.profile.name, 'Gia Guided');
+      });
+      u = await ui(page);
+      check(`${w} Details: phone + gender, "Step 5 of 7", Next disabled until both`, () => { assert.equal(u.label, 'Step 5 of 7'); assert.equal(u.nextDisabled, true); assert.match(u.text, /gender/i); });
+      await page.locator('input[name="guided-phone"]').fill('98765 43210');
+      u = await ui(page);
+      check(`${w} Details: a phone alone is not enough (gender is required)`, () => assert.equal(u.nextDisabled, true));
+      await page.locator('.guided-segment[data-gender="Female"]').click();
+      await shot(page, `${w}-06-details`);
+      const axeDetails = await axeViolations(page, { include: '.auth-shell' });
+      check(`${w} details: axe clean (${axeDetails.join(' | ')})`, () => assert.deepEqual(axeDetails, []));
+      await page.locator('[data-guided-next]').click();
       await waitScreen(page, 'area');
-      check(`${w} the name saves on the member's own row`, () => assert.equal(state.profile.name, 'Gia Guided'));
+      check(`${w} Details saved on the member's own row (${state.profile.phone}, ${state.profile.gender})`, () => {
+        assert.equal(state.profile.phone, '+91 9876543210'); assert.equal(state.profile.phone_number, '9876543210');
+        assert.equal(state.profile.phone_country_code, '+91'); assert.equal(state.profile.gender, 'Female');
+      });
       u = await ui(page);
       check(`${w} area: Next disabled until an area is chosen`, () => assert.equal(u.nextDisabled, true));
       if (mobile) {
@@ -275,8 +312,8 @@ try {
         assert.equal(leaked.length, 0); assert.ok(!COORD_RE.test(stored));
       });
       u = await ui(page);
-      check(`${w} interests: "Step 6 of 6", popular first, private ones never offered, Next disabled`, () => {
-        assert.equal(u.label, 'Step 6 of 6'); assert.equal(u.nextDisabled, true);
+      check(`${w} interests: "Step 7 of 7", popular first, private ones never offered, Next disabled`, () => {
+        assert.equal(u.label, 'Step 7 of 7'); assert.equal(u.nextDisabled, true);
         assert.ok(!/A private belief/.test(u.text)); assert.ok(u.text.indexOf('Chess') < u.text.indexOf('Interest A'));
       });
       // Tap: a clone flies (a transform mid-flight), the chip is pressed, the tray says "1 picked".
@@ -312,7 +349,7 @@ try {
         assert.equal(u.title, "You're in, Gia."); assert.ok(u.bubbles.every((b) => b.endsWith(':done')));
         const copy = u.text.replace(/See my deck/, '');
         assert.ok(!/\d/.test(copy), copy); assert.ok(!/points? left|passion points/i.test(u.text));
-        assert.equal(u.forbidden, 0);
+        assert.equal(u.points, 0);
       });
       await page.locator('[data-guided-next]').click();
       const toApp = await page.waitForURL(/\/app\.html/, { timeout: 5000 }).then(() => true).catch(() => false);
@@ -325,13 +362,13 @@ try {
   // ---- Phone: 13th pick refused; the primary button stays above the keyboard; a save failure keeps the screen ----
   {
     const context = await browser.newContext({ viewport: { width: 375, height: 812 }, isMobile: true, hasTouch: true });
-    await setup(context, { signedIn: true, profile: { id: ME, name: 'Ray Resume', email: EMAIL }, adultAt: '2026-10-18T00:00:00Z', hasCell: true, failRpc: ['set_member_interests'] });
+    await setup(context, { signedIn: true, profile: { id: ME, name: 'Ray Resume', email: EMAIL, phone_number: '9876543210', phone_country_code: '+91', gender: 'Male' }, adultAt: '2026-10-18T00:00:00Z', hasCell: true, failRpc: ['set_member_interests'] });
     const page = await context.newPage();
     await page.goto(`${BASE}/auth.html?complete-profile=1`, { waitUntil: 'load' });
     const resumed = await waitScreen(page, 'interests');
     await page.waitForSelector('.guided-option', { timeout: 5000 });
     let u = await ui(page);
-    check(`resume: adult + name + area done opens Interests at "Step 6 of 6" (${u.label})`, () => { assert.equal(resumed, true); assert.equal(u.label, 'Step 6 of 6'); });
+    check(`resume: about + details + area done opens Interests at "Step 7 of 7" (${u.label})`, () => { assert.equal(resumed, true); assert.equal(u.label, 'Step 7 of 7'); });
     for (let i = 0; i < 13; i += 1) await page.locator('.guided-option[aria-pressed="false"]').first().click();
     await page.waitForTimeout(300);
     u = await ui(page);
@@ -356,21 +393,23 @@ try {
     await context.close();
   }
 
-  // ---- Google return: Name prefilled from Google, "Step 2 of 4"; a completed member goes straight to the app ----
+  // ---- Google return: About you prefilled, no password; a completed member goes straight to the app ----
   {
     const context = await browser.newContext({ viewport: { width: 1440, height: 900 } });
     await setup(context, { signedIn: true, provider: 'google', meta: { full_name: 'Gabe Google' } });
     const page = await context.newPage();
     await page.goto(`${BASE}/auth.html`, { waitUntil: 'load' });
-    await waitScreen(page, 'adult');
-    const first = await ui(page);
-    check(`Google: a new account starts at 18+, "Step 1 of 4" (${first.label})`, () => assert.equal(first.label, 'Step 1 of 4'));
-    await page.locator('[data-guided-next]').click();
-    await waitScreen(page, 'name');
+    await waitScreen(page, 'about');
     const u = await ui(page);
     const value = await page.locator('input[name="guided-name"]').inputValue({ timeout: 2000 }).catch(() => '');
-    const where = await screenOf(page);
-    check(`Google: then Name, prefilled from Google (${value}, at ${where}), "Step 2 of 4"`, () => { assert.equal(value, 'Gabe Google'); assert.equal(u.label, 'Step 2 of 4'); });
+    check(`Google: a new account starts at About you, name prefilled (${value}), "Step 1 of 4", no password screen`, () => {
+      assert.equal(value, 'Gabe Google'); assert.equal(u.label, 'Step 1 of 4'); assert.ok(!u.bubbles.some((b) => b.startsWith('password')));
+    });
+    await page.locator('input[name="guided-adult"]').check();
+    await page.locator('[data-guided-next]').click();
+    await waitScreen(page, 'details');
+    const d = await ui(page);
+    check(`Google: then Details, "Step 2 of 4" (${d.label})`, () => assert.equal(d.label, 'Step 2 of 4'));
     await context.close();
   }
   {
@@ -385,7 +424,7 @@ try {
   // ---- Login by code: never creates an account; a verified member who is done goes to the app ----
   {
     const context = await browser.newContext({ viewport: { width: 1440, height: 900 } });
-    const { posts } = await setup(context, { profile: { id: ME, name: 'Code Member', email: EMAIL }, adultAt: '2026-10-18T00:00:00Z', hasCell: true, interests: [{ interest_id: 'games.board.chess', points: 20, mode: 'play' }] });
+    const { posts } = await setup(context, { createdAt: '2026-01-01T00:00:00Z', profile: { id: ME, name: 'Code Member', email: EMAIL }, adultAt: '2026-10-18T00:00:00Z', hasCell: true, interests: [{ interest_id: 'games.board.chess', points: 20, mode: 'play' }] });
     const page = await context.newPage();
     await page.goto(`${BASE}/auth.html`, { waitUntil: 'load' });
     await page.locator('.auth-code-login').click();
