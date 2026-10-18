@@ -1263,23 +1263,6 @@
   font-size: var(--text-12);
 }
 
-.auth-shell:has(.auth-login.is-active) .auth-panel::before {
-  position: absolute;
-  right: clamp(34px, 5.1vw, 76px);
-  bottom: 31px;
-  width: 100px;
-  padding-top: 8px;
-  border-top: 1px solid rgba(90, 6, 31, .22);
-  color: rgba(90, 6, 31, .62);
-  content: '“Build a life\A you’re proud of.”';
-  white-space: pre;
-  font-family: var(--font-heading);
-  font-size: var(--text-12);
-  font-style: italic;
-  line-height: 1.45;
-  text-align: right;
-}
-
 .auth-shell:has(.auth-login.is-active) .auth-create-trigger {
   display: none;
 }
@@ -1514,16 +1497,6 @@
 
 .auth-shell:has(.auth-login.is-active) .auth-socials {
   min-height: 32px;
-}
-
-.auth-shell:has(.auth-login.is-active) .auth-panel::before {
-  right: clamp(28px, 6vw, 110px);
-  bottom: 25px;
-  width: 100px;
-  border-top-color: rgba(90, 6, 31, .25);
-  color: rgba(90, 6, 31, .6);
-  content: '“Different\A conversations for\A a brighter you.”';
-  font-size: var(--text-12);
 }
 
 .auth-shell:has(.auth-login.is-active) .auth-create-trigger,
@@ -2432,9 +2405,6 @@
     min-height: 32px;
   }
 
-  .auth-shell:has(.auth-login.is-active) .auth-panel::before {
-    right: 100px;
-  }
 }
 
 /* Move the complete login section together in the reference composition. */
@@ -2502,14 +2472,6 @@
   width: 0;
 }
 
-/* Make the lower-right editorial note readable at normal viewing size. */
-.auth-shell:has(.auth-login.is-active) .auth-panel::before {
-  width: 190px;
-  font-size: var(--text-14);
-  line-height: 1.5;
-  content: '“Find your kind.\A Build what’s next.”';
-}
-
 @media (min-width: 901px) {
   .auth-shell:has(.auth-login.is-active) .auth-login .auth-intro {
     width: max-content;
@@ -2527,12 +2489,6 @@
   font-size: clamp(50px, 4vw, 76px) !important;
   letter-spacing: -.055em;
   white-space: nowrap;
-}
-
-.auth-shell:has(.auth-login.is-active) .auth-panel::before {
-  right: clamp(28px, 4vw, 64px) !important;
-  width: 190px;
-  max-width: calc(100% - 56px);
 }
 
 /* Center the complete right-side login group lower in the viewport. */
@@ -2557,21 +2513,11 @@
   right: -95px;
 }
 
-/* Upgrade and enlarge the bottom-right brand quote. */
-.auth-shell:has(.auth-login.is-active) .auth-panel::before {
-  width: 220px;
-  font-size: var(--text-16) !important;
-  line-height: 1.4;
-  content: '\201CMeet your people.\A Build something real.\201D';
-}
-
-.auth-shell:has(.auth-login.is-active) .auth-panel::before {
-  right: clamp(14px, 2.5vw, 42px) !important;
-  font-family: var(--font-body) !important;
-  font-size: var(--text-20) !important;
-  font-style: normal !important;
-  font-weight: 500;
-  line-height: 1.35;
+/* The bottom-right brand quote and its rule line are retired (founder, 2026-10-18): no quote on login or signup. */
+.auth-shell:has(.auth-login.is-active) .auth-panel::before,
+.auth-shell:has(.auth-signup.is-active) .auth-panel::before {
+  display: none !important;
+  content: none !important;
 }
 
 /* Keep the create-account view consistent with the polished login view. */
@@ -2757,18 +2703,6 @@
     letter-spacing: .067em;
   }
 
-  .auth-shell:has(.auth-signup.is-active) .auth-panel::before {
-    display: none !important;
-    right: clamp(14px, 2.5vw, 42px) !important;
-    bottom: 25px;
-    width: 220px;
-    font-family: var(--font-body) !important;
-    font-size: var(--text-20) !important;
-    font-style: normal !important;
-    font-weight: 500;
-    line-height: 1.35;
-    content: '\201CMeet your people.\A Build something real.\201D';
-  }
 }
 
 /* ---------------------------------------------------------------------------------------------------------------
