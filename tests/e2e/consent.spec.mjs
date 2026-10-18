@@ -80,7 +80,7 @@ const waitForServer = async () => {
 
 const vite = spawn('npx', ['vite', '--port', String(PORT), '--strictPort', '--host', '127.0.0.1'], {
   cwd: repoRoot,
-  env: { ...process.env, VITE_SUPABASE_URL: ORIGIN, VITE_SUPABASE_ANON_KEY: 'stub-anon-key' },
+  env: { ...process.env, VITE_SUPABASE_URL: ORIGIN, VITE_SUPABASE_ANON_KEY: 'stub-anon-key', VITE_SIGNUP_FLOW: 'classic' },
   stdio: ['ignore', 'pipe', 'pipe'],
   detached: true,
 });
@@ -616,9 +616,9 @@ try {
     assert.ok(!stored.some(([key]) => key === 'loginPassword'), 'the loginPassword key survived');
     assert.ok(!stored.some(([, value]) => /"(loginPassword|password|passwordConfirm)"/.test(value)), 'a password field is cached');
   });
-  const rowKeys = await hardPage.evaluate(async () => Object.keys((await import('/supabase.js')).profileToRow({ name: 'X', createdAt: '2001-01-01T00:00:00.000Z' }, 'id-1')));
+  const rowKeys = await hardPage.evaluate(async () => Object.keys((await import('/scripts/supabase.js')).profileToRow({ name: 'X', createdAt: '2001-01-01T00:00:00.000Z' }, 'id-1')));
   check(`profileToRow never sends created_at (keys ${rowKeys.join(',')})`, () => assert.ok(!rowKeys.includes('created_at')));
-  const staticProfile = readFileSync(path.join(repoRoot, 'profile.html'), 'utf8');
+  const staticProfile = readFileSync(path.join(repoRoot, 'site/profile.html'), 'utf8');
   check('profile.html shows no password and no copy-password button', () => assert.ok(!/password/i.test(staticProfile)));
   const hardPosts = () => hard.calls.filter((c) => c.method === 'POST' && c.path === '/rest/v1/rpc/send_signal');
   const hardSignal = (call) => { const b = JSON.parse(call.body || '{}'); return [b.p_to, b.p_note]; };

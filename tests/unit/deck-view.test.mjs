@@ -1,7 +1,7 @@
 // The interim deck's card copy (UX_SPEC §B, Iteration 3 Task 10). Run: npm run test:unit
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { pitchLine, deckChips, deckEmptyState, deckFields, bandNote, BAND_NOTE } from '../../deck-view.js';
+import { pitchLine, deckChips, deckEmptyState, deckFields, bandNote, BAND_NOTE } from '../../site/scripts/deck-view.js';
 
 test('pitchLine: a shared interest is named, lowercased', () => {
   assert.equal(pitchLine({ name: 'Asha', shared: ['Badminton', 'Chess'], tags: ['Running'] }),
@@ -72,7 +72,7 @@ test('deckEmptyState: caught_up no longer promises "you have met your orbit for 
 
 // Founder live test (2026-10-14): a seeded member with no cover and no photo (Kabir Shetty) showed the img alt text.
 test('deckCoverSrc: the cover, else the photo, else "" (the card then shows the branded placeholder)', async () => {
-  const { deckCoverSrc } = await import('../../deck-view.js');
+  const { deckCoverSrc } = await import('../../site/scripts/deck-view.js');
   const safe = (value) => (typeof value === 'string' && value.startsWith('/') ? value : '');
   assert.equal(deckCoverSrc({ coverUrl: '/assets/c.webp', image: '/p.jpg' }, safe), '/assets/c.webp');
   assert.equal(deckCoverSrc({ coverUrl: '', image: '/p.jpg' }, safe), '/p.jpg');

@@ -2,7 +2,7 @@
 // Run: npm run test:unit
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { POPULAR_INTERESTS, INTEREST_CATALOG, LOOKING_FOR_CATALOG, taxonomyLabels, catalogValues, matchOptions } from '../../discovery-catalog.js';
+import { POPULAR_INTERESTS, INTEREST_CATALOG, LOOKING_FOR_CATALOG, taxonomyLabels, catalogValues, matchOptions } from '../../site/scripts/discovery-catalog.js';
 
 const has = (list, label) => list.some((value) => value.toLowerCase() === label.toLowerCase());
 

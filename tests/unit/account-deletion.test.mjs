@@ -1,7 +1,7 @@
 // Account deletion client logic (Iteration 4, Task 9, R5). Run: npm run test:unit
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { deleteAccount, consentStatusCopy, reauthMethod, clearBriviaKeys, STORAGE_FAILED_COPY, RPC_FAILED_COPY, RPC_NOTHING_REMOVED_COPY, deletionErrorCopy } from '../../account-deletion.js';
+import { deleteAccount, consentStatusCopy, reauthMethod, clearBriviaKeys, STORAGE_FAILED_COPY, RPC_FAILED_COPY, RPC_NOTHING_REMOVED_COPY, deletionErrorCopy } from '../../site/scripts/account-deletion.js';
 
 const UID = 'u-1';
 const BUCKETS = ['profile-photos', 'profile-covers', 'message-attachments', 'community-posts'];
@@ -197,6 +197,12 @@ test('reauthMethod: email identity -> password, Google only -> oauth', () => {
   assert.equal(reauthMethod({ app_metadata: {} }), 'password');
 });
 
+test('reauthMethod: a passwordless (email code) member is re-checked with a code (Phase E, D-067)', () => {
+  assert.equal(reauthMethod({ app_metadata: { provider: 'email', providers: ['email'] }, user_metadata: { passwordless: true } }), 'code');
+  assert.equal(reauthMethod({ app_metadata: { provider: 'email', providers: ['email'] }, user_metadata: { passwordless: false } }), 'password');
+  assert.equal(reauthMethod({ app_metadata: { provider: 'google', providers: ['google'] }, user_metadata: { passwordless: true } }), 'oauth');
+});
+
 test('consentStatusCopy: given on a date, or not given', () => {
   assert.equal(consentStatusCopy(null), 'Private interests: consent not given.');
   assert.match(consentStatusCopy('2026-10-05T10:00:00Z'), /^Private interests: consent given on 5 October 2026\.$/);
@@ -215,7 +221,7 @@ test('clearBriviaKeys removes only brivia-* keys', () => {
 });
 
 test('F3: the re-auth marker records the user id and time; only the same user within 10 minutes reopens the dialog', async () => {
-  const { reauthMarker, reauthMarkerMatches } = await import('../../account-deletion.js');
+  const { reauthMarker, reauthMarkerMatches } = await import('../../site/scripts/account-deletion.js');
   const now = 1_800_000_000_000;
   const raw = reauthMarker('u-1', now);
   assert.deepEqual(JSON.parse(raw), { userId: 'u-1', ts: now });

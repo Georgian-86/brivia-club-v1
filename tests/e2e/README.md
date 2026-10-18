@@ -116,3 +116,11 @@ music, a click (1440) and a tap (390, touch) do, the sound button mutes and the 
 ends after 5 minutes and the button replays it, Lenis runs on a desktop pointer only (not on a phone, not with
 reduced motion), and the open menu stops it and hides the button. `landing-smoothness.mjs` is a frame-time probe
 (wheel-scrolls the page at 1440 and 390; `SMOOTH_GL=0` uses plain software compositing).
+
+## Guided signup (Phase E, D-067)
+
+`node tests/e2e/signup.spec.mjs` (port `E2E_PORT || 5193`, Vite dev with `VITE_SIGNUP_FLOW=guided`): every screen at
+1440 and 375 px, the code input (typed, pasted, wrong, resend), resume, Google, login by code, the keyboard-safe button
+and axe on the auth shell. `E2E_SCREENSHOTS=<dir>` saves each screen and a mid-flight interest pick. The older
+`onboarding.spec.mjs` and `consent.spec.mjs` start Vite with `VITE_SIGNUP_FLOW=classic`, so they keep covering the
+4-step form while it remains as the rollback.

@@ -7,11 +7,34 @@ Update this file at the end of every session. CLAUDE.md holds the aim; this file
 
 ## 1. What is done
 
+**Guided signup (2026-10-18), D-067 and D-068.** One screen at a time (at most two questions) with a bubble
+stepper: email code or Google, then password (email path), About you (name + 18+), Details (phone + gender), area,
+interests. Only the points screen is gone (interests save with an even split). Files: `site/scripts/signup-screens.js`,
+`signup-flow.js`, `otp-input.js`, `site/styles/signup.css`, `#guided-signup` in `site/auth.html`. No migration: the
+2026-10-05 notice already covers phone and gender (0007 was withdrawn, D-068). Before deploying, add `{{ .Token }}` to
+the Supabase Magic Link email template (D-067). Rollback without code: `VITE_SIGNUP_FLOW=classic`. Suite:
+`node tests/e2e/signup.spec.mjs` (port 5193); the onboarding and consent suites run the classic flow.
+
+**Phones (2026-10-18), D-066.** Hero prefers a hardware-decoded codec, lighter matching cards (`npm run media:cards`),
+one shared scroll frame, no stacked sound buttons. Probe: `node tests/e2e/landing-phone-smoothness.mjs` (after a stub
+build). The matching scene still drops frames here only because this container composites in software; check it on a
+real phone. The login/signup bottom quote and its rule line are removed.
+
+**Repository reorganized (2026-10-18), D-065.** The site lives in `site/` (pages at its top, so URLs are unchanged;
+`site/styles/`, `site/scripts/`, `site/media/`), raw originals in `source-media/` (never shipped), the 59 stray root
+screenshots and the old .docx are gone. Vite's root is `site/`, output still `dist/`. Builds are pixel-identical
+(visual parity, 38 shots); every unit and e2e suite passes. File paths below are relative to `site/` unless they start
+with another top-level folder.
+
+**Live-site fixes (2026-10-18), D-064.** PR #2 (D-062, D-063) is merged and live. Follow-up: the hero now plays on
+connections Chrome labels "3g" (only 2g is poster-only), a refused autoplay starts on the first touch, and the chat
+room photo is softly blurred again (baked into `media/assets/chat-room-soft.webp`) with the reference sidebar order.
+
 **Landing smoothness and sound (2026-10-16), same branch.** See D-063. Lenis smooth scroll (desktop pointer only),
 cheaper matching-scene layers, sound that starts on the first real gesture and stops after 5 minutes, and a sound
 button. Checks: `node tests/e2e/landing-sound.spec.mjs` (15 checks, after a stub build) and the frame-time probe
 `node tests/e2e/landing-smoothness.mjs` (`SMOOTH_ASSERT=1` fails on a p95 frame over 34 ms; this container has no GPU,
-so judge desktop smoothness on a real laptop). Open: the original `Images/Videos/HEROSECTIONVI.MOV` carries a real
+so judge desktop smoothness on a real laptop). Open: the original `source-media/Images/Videos/HEROSECTIONVI.MOV` carries a real
 soundtrack (the 4K master has none); the landing still plays its synthesized chord. Ask the founder before swapping.
 
 **Design references (2026-10-16): branch `claude/focused-johnson-pev1j6` off `main` 07d1f45 (the live build).** See D-062.
@@ -220,7 +243,8 @@ install it).
 | Data breach response (containment, notices, orphan-folder report) | `docs/BREACH_RUNBOOK.md` |
 | Daily moderation (new reports, flags, the 72 h suspension queue, rejoin reviews; SQL editor as owner) | `docs/MODERATION.md` |
 | SQL behaviour tests | `supabase/tests/*.test.sql` (run with `run.sh`) |
-| Signup (4 steps) | `auth.html`, `script.js`, `passion-budget.js`, `pending-profile.js` |
+| Signup (guided, D-067) | `site/scripts/signup-screens.js`, `signup-flow.js`, `otp-input.js`, `site/styles/signup.css`, `site/auth.html` |
+| Signup (classic 4 steps, behind `VITE_SIGNUP_FLOW=classic`) | `site/auth.html`, `site/scripts/script.js`, `passion-budget.js`, `pending-profile.js` |
 | App, deck, quota | `app.html`, `app.js`, `deck-view.js`, `signal-quota.js` |
 | Test world (tester switch, why panel) | `supabase/migrations/0008_tester_world.sql`, `why-panel.js`, `supabase/tests/d-tester-world.test.sql`, `supabase/seed/README.md` |
 | App nav, tokens, skeletons, profile checklist | `app-nav.js`, `app-shell.css`, `tokens.css`, `app-skeletons.js`, `profile-checklist.js`, `profile-view.css` |

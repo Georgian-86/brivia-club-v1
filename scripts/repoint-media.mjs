@@ -30,14 +30,14 @@ export const repointReferences = (text, map) => {
   });
 };
 
-// The site's own source files: root-level pages, styles and scripts (no node_modules, dist, media, tests, docs).
-export const siteFiles = (root) => readdirSync(root, { withFileTypes: true })
-  .filter((e) => e.isFile() && /\.(html|css|js|mjs)$/.test(e.name) && !/^vite\.config\./.test(e.name))
-  .map((e) => join(root, e.name));
+// The site's own source files: site/ pages plus site/styles and site/scripts (never site/media).
+export const siteFiles = (site) => ['', 'styles', 'scripts'].flatMap((sub) => readdirSync(join(site, sub), { withFileTypes: true })
+  .filter((e) => e.isFile() && /\.(html|css|js|mjs)$/.test(e.name))
+  .map((e) => join(site, sub, e.name)));
 
 const isMain = process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url);
 if (isMain) {
-  const root = join(dirname(fileURLToPath(import.meta.url)), '..');
+  const root = join(dirname(fileURLToPath(import.meta.url)), '..', 'site');
   const manifestPath = join(root, 'media', 'manifest.json');
   if (!existsSync(manifestPath)) { console.error('media/manifest.json not found. Run `npm run media:build` first.'); process.exit(2); }
   const map = JSON.parse(readFileSync(manifestPath, 'utf8'));

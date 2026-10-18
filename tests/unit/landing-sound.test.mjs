@@ -2,7 +2,7 @@
 // Run: npm run test:unit
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { SOUND_LIMIT_MS, soundPreference, soundPlan, isUnlockEvent, barsToSchedule } from '../../landing-sound.js';
+import { SOUND_LIMIT_MS, soundPreference, soundPlan, isUnlockEvent, barsToSchedule } from '../../site/scripts/landing-sound.js';
 
 test('the music plays for at most 5 minutes', () => {
   assert.equal(SOUND_LIMIT_MS, 5 * 60 * 1000);

@@ -32,7 +32,7 @@ import path from 'node:path';
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 export const ORIGIN = 'https://stub.supabase.local';
 export const ME = '11111111-1111-4111-8111-111111111111';
-export const STILL = readFileSync(path.join(repoRoot, 'assets/badminton-premium-no-shuttle.png'));
+export const STILL = readFileSync(path.join(repoRoot, 'source-media/assets/badminton-premium-no-shuttle.png'));
 export const PHOTO = (id) => `${ORIGIN}/storage/v1/object/public/profile-photos/${id}/p.jpg`;
 export const ownRow = { id: ME, name: 'Alex Me', full_name: 'Alex Me', email: 'alex@test.brivia.club', phone: '', city: null, state: null, experience: 'Founder', skills: ['Badminton'], looking_for: ['Friends'], created_at: new Date(Date.now() - 9e6).toISOString() };
 export const defaultDeckRows = [

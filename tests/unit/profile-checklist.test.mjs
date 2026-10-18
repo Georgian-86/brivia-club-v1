@@ -1,7 +1,7 @@
 // "Complete your profile" (Phase C, Task 5): the pure checklist behind the profile card. Run: node --test tests/unit
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { profileChecklist } from '../../profile-checklist.js';
+import { profileChecklist } from '../../site/scripts/profile-checklist.js';
 
 // The default cover as cover-assets.js resolves it: the dev path, and the hashed optimized build URL.
 const DEFAULT_DEV = '/media/Images/Cover images/163BDB0C-64AC-44E7-8663-55C323ADB4FE.webp';

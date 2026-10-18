@@ -265,7 +265,7 @@ try {
       await page.goto(`${BASE}/index.html`, { waitUntil: 'load' });
       await page.waitForTimeout(2000);
       const modelledBytes = nonHeroBytes(tracked.entries());
-      const heroBytes = fs.statSync(path.join(repoRoot, 'media/video', HERO_FILE(viewport))).size;
+      const heroBytes = fs.statSync(path.join(repoRoot, 'site/media/video', HERO_FILE(viewport))).size;
       const withHero = modelledBytes + heroBytes;
       const cls = await page.evaluate(() => window.__cls);
       const beforeScroll = [...tracked.urls];

@@ -4,9 +4,9 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
-import { DELETE_DISCLOSURE } from '../../account-deletion.js';
+import { DELETE_DISCLOSURE } from '../../site/scripts/account-deletion.js';
 
-const html = readFileSync(path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../privacy.html'), 'utf8');
+const html = readFileSync(path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../site/privacy.html'), 'utf8');
 const list = (heading) => {
   const section = html.slice(html.indexOf(`<h3>${heading}</h3>`));
   const ul = section.slice(section.indexOf('<ul>'), section.indexOf('</ul>'));

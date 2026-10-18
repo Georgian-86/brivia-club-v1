@@ -1,4 +1,4 @@
-// CLI: scans root *.css (not tokens.css, fonts*.css), compares to scripts/style-baseline.json, exits 1 on any
+// CLI: scans site/styles/*.css (not tokens.css, fonts*.css), compares to scripts/style-baseline.json, exits 1 on any
 // increase. `--write` rewrites the baseline but refuses (exit 1) if any count rose.
 import { readdirSync, readFileSync, writeFileSync, existsSync } from 'node:fs';
 import { join, dirname } from 'node:path';
@@ -7,10 +7,11 @@ import { countStyleDebt, compareToBaseline } from './style-ratchet.js';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const baselinePath = join(root, 'scripts', 'style-baseline.json');
-const files = readdirSync(root).filter((f) => f.endsWith('.css') && f !== 'tokens.css' && !f.startsWith('fonts')).sort();
+const stylesDir = join(root, 'site', 'styles');
+const files = readdirSync(stylesDir).filter((f) => f.endsWith('.css') && f !== 'tokens.css' && !f.startsWith('fonts')).sort();
 
 const current = {};
-for (const f of files) current[f] = countStyleDebt(readFileSync(join(root, f), 'utf8'));
+for (const f of files) current[f] = countStyleDebt(readFileSync(join(stylesDir, f), 'utf8'));
 const baseline = existsSync(baselinePath) ? JSON.parse(readFileSync(baselinePath, 'utf8')) : {};
 const { ok, increases } = compareToBaseline(current, baseline);
 

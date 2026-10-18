@@ -1,9 +1,9 @@
 // Fixes from the live signup walkthrough (2026-10-08). Run: npm run test:unit
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { matchTypedCity } from '../../area-pick.js';
-import { budgetGateText, spreadRemaining, addInterest, emptyBudget, isComplete, pointsLeft } from '../../passion-budget.js';
-import { dataUrlToFile } from '../../pending-profile.js';
+import { matchTypedCity } from '../../site/scripts/area-pick.js';
+import { budgetGateText, spreadRemaining, addInterest, emptyBudget, isComplete, pointsLeft } from '../../site/scripts/passion-budget.js';
+import { dataUrlToFile } from '../../site/scripts/pending-profile.js';
 
 const BLR = { id: 'in-bengaluru', name: 'Bengaluru', region: 'Karnataka' };
 const BLG = { id: 'in-belagavi', name: 'Belagavi', region: 'Karnataka' };

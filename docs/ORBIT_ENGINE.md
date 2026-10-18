@@ -99,6 +99,11 @@ atomically and writes the labels into `profiles.skills` (points desc, then label
 and `set_member_interests` is its only writer (a value smuggled into a first insert is overwritten before the member
 can be completed, §7).
 
+**Signup entry (Phase E, D-067).** The guided signup has no points screen: the member only picks 1–12 interests, and
+the client sends them with an even split of the 20 points (`evenSplit`: equal shares, the remainder to the earliest
+picks, every pick ≥ 1, mode `play`; 3 picks → 7/7/6). The model, the server rules above and the formulas are
+unchanged. (Re-weighting after signup has no screen yet.)
+
 **Sensitive interests (D-029, amended by D-038 R3).** The sensitive set is: health and mental health (peer support,
 sober social), religion and spirituality (pilgrimages, kirtan, scripture study, interfaith, devotional singing, and
 the proxy Sufi and qawwali), LGBTQ+, disability (the proxy Indian Sign Language) and women-only safety signals

@@ -2,7 +2,7 @@
 // Run: npm run test:unit
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { NAV_ITEMS, navMarkup } from '../../app-nav.js';
+import { NAV_ITEMS, navMarkup } from '../../site/scripts/app-nav.js';
 
 const items = (html) => [...html.matchAll(/<a\b[^>]*>[\s\S]*?<\/a>/g)].map((m) => m[0]);
 const attr = (tag, name) => (tag.match(new RegExp(`\\s${name}="([^"]*)"`)) || [])[1];

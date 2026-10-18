@@ -1,7 +1,7 @@
 // Landing motion helpers (Phase B landing speed). Run: node --test tests/unit
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { motionAllowed, introPlan, pickHeroSource, INTRO_CAP_MS, INTRO_START_GRACE_MS } from '../../landing-motion.js';
+import { motionAllowed, introPlan, pickHeroSource, INTRO_CAP_MS, INTRO_START_GRACE_MS } from '../../site/scripts/landing-motion.js';
 
 test('motionAllowed is false for reduced motion', () => {
   assert.equal(motionAllowed({ reducedMotion: true, saveData: false }), false);
@@ -34,7 +34,7 @@ test('intro timing constants', () => {
   assert.equal(INTRO_START_GRACE_MS, 800);
 });
 
-import { markLoaded } from '../../landing-motion.js';
+import { markLoaded } from '../../site/scripts/landing-motion.js';
 const fakeImg = ({ complete = false, naturalWidth = 0 } = {}) => {
   const classes = new Set(['skeleton']);
   const handlers = {};
@@ -65,9 +65,11 @@ test('markLoaded clears .skeleton for an image that already failed (complete, na
 });
 
 // D-062: the 4K hero. A slow link keeps the poster (a 4K stream would stall); the source picker prefers a smooth decode.
-test('motionAllowed is false on a slow link (2g / 3g), true on 4g or unknown', () => {
-  for (const effectiveType of ['slow-2g', '2g', '3g']) assert.equal(motionAllowed({ effectiveType }), false, effectiveType);
-  for (const effectiveType of ['4g', '', undefined]) assert.equal(motionAllowed({ effectiveType }), true, String(effectiveType));
+test('motionAllowed is false only on a 2g link; 3g, 4g and unknown play the hero', () => {
+  // Chrome reports "3g" from latency alone (round trip >= 270 ms): Wi-Fi calling and many mobile networks in India
+  // land there with plenty of bandwidth, and the founder's phone lost the hero video (D-064). Only 2g stays poster-only.
+  for (const effectiveType of ['slow-2g', '2g']) assert.equal(motionAllowed({ effectiveType }), false, effectiveType);
+  for (const effectiveType of ['3g', '4g', '', undefined]) assert.equal(motionAllowed({ effectiveType }), true, String(effectiveType));
 });
 
 test('pickHeroSource takes the first smooth decode, else the first supported one, else none', () => {
@@ -77,4 +79,16 @@ test('pickHeroSource takes the first smooth decode, else the first supported one
   assert.equal(pickHeroSource([{ supported: false }, { supported: false }]), -1);
   assert.equal(pickHeroSource([]), -1);
   assert.equal(pickHeroSource(undefined), -1);
+});
+
+test('pickHeroSource prefers a hardware (power-efficient) smooth decode over a software one (D-066)', () => {
+  // AV1 decoded in software on a phone without an AV1 chip: "smooth" but not power-efficient; HEVC or H.264 in hardware.
+  const av1Soft = { supported: true, smooth: true, powerEfficient: false };
+  const hevcHard = { supported: true, smooth: true, powerEfficient: true };
+  const h264Hard = { supported: true, smooth: true, powerEfficient: true };
+  assert.equal(pickHeroSource([av1Soft, hevcHard, h264Hard]), 1);
+  assert.equal(pickHeroSource([av1Soft, { supported: false }, h264Hard]), 2);
+  assert.equal(pickHeroSource([hevcHard, h264Hard]), 0);
+  // power-efficient but not smooth never beats smooth
+  assert.equal(pickHeroSource([av1Soft, { supported: true, smooth: false, powerEfficient: true }]), 0);
 });

@@ -1,7 +1,7 @@
 // The honest signal quota copy (UX_SPEC §B "Signal counter", D-026, D-032). Run: npm run test:unit
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { quotaLabel, quotaErrorText, quotaBlocked, resetTimeLabel, quotaNotice } from '../../signal-quota.js';
+import { quotaLabel, quotaErrorText, quotaBlocked, resetTimeLabel, quotaNotice } from '../../site/scripts/signal-quota.js';
 
 const RESETS = '2026-10-03T15:00:00Z';
 // R7 (iteration 3): the reset time is local, "3 PM" on the hour and "8:30 PM" otherwise. The server rounds to the UTC hour, so

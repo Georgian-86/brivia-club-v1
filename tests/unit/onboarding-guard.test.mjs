@@ -1,7 +1,7 @@
 // Under-review detection and the consent rollback rule (final fix F2). Run: npm run test:unit
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { isUnderReview, shouldWithdrawConsent, UNDER_REVIEW_COPY } from '../../onboarding-guard.js';
+import { isUnderReview, shouldWithdrawConsent, UNDER_REVIEW_COPY } from '../../site/scripts/onboarding-guard.js';
 
 const row = { name: 'Nia New', adult_declared_at: '2026-10-05T00:00:00Z' };
 const status = { interests: 3, points: 20, has_cell: true, place_label: 'Pune', completed: false };

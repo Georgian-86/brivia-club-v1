@@ -1271,3 +1271,97 @@ controls (a tester or a seeded test member), never a real member, so no new expo
   3.7 ms of main/raster work instead of 5.7 (style halved, raster -38%), while rendering about 50 % more frames
   (the Lenis glide). The phone probe is a steady 60 fps. The container has no GPU, so desktop headless frame times
   still drop in that scene; check it on a real laptop.
+
+## D-064: The hero plays on "3g" connections; the chat room photo is softly blurred again (2026-10-18)
+- Accepted 2026-10-18 (founder, from the live site: "the hero video is not playing" on a phone; the chat "a little
+  blur and classy, like the picture, same wine").
+- **Hero root cause.** D-063 made `effectiveType` "2g" and "3g" poster-only. Chrome derives "3g" from latency alone
+  (round trip of 270 ms or more), so Wi-Fi calling and many mobile networks in India report it with plenty of
+  bandwidth; the founder's phone got the poster only. Reproduced in Playwright (navigator.connection stubbed): "3g"
+  requested no hero file before the fix and plays the portrait AV1 after it. Now only "slow-2g" and "2g" are
+  poster-only (`landing-motion.js`, unit-tested; the inline intro check in `index.html` matches). Also: if a muted
+  autoplay is refused (Low Power Mode on iPhone, some Android battery savers), the first touch, click or key starts
+  the hero (it has no audio track, so this never plays sound).
+- **Chat.** The founder's reference is the earlier soft look: the room photo lightly blurred under a cream veil. It is
+  now baked into `media/assets/chat-room-soft.webp` (sharp: blur 5 at 1600 px, a 20 % cream veil; 21 KB), so there is
+  no live CSS filter to repaint while scrolling. The wine stays `#5a061e` (sampled from the reference: identical).
+  Sidebar order as in the reference: search, then "BRIVIA SOCIETY", then the tagline and conversations; the
+  "BRIVIA AI · THOUGHTFUL CONNECTIONS" footer line is back, in the serif face.
+
+## D-065: The repository is organized into site/ and source-media/ (2026-10-18)
+- Accepted 2026-10-18 (founder: "first of all organizing the repository", option "Full reorganize").
+- **Before.** 162 items at the root: 8 pages, 46 stylesheets, 33 scripts, 59 stray review screenshots (25 MB, none
+  referenced) and a product .docx next to the configs, plus `Images/` and `assets/` (raw originals, 258 MB) beside the
+  optimized `media/`.
+- **After.** `site/` is the Vite root: pages at its top (so every URL, the Vercel rewrites and the stored cover paths
+  stay the same), `site/styles/`, `site/scripts/`, `site/media/`. Raw originals moved to `source-media/` and are
+  excluded from deploys (nothing shipped reads them). The screenshots and the .docx are deleted. Only paths changed:
+  relative imports and `url()`s were rewritten, `vite.config.mjs` sets `root: 'site'`, `outDir: '../dist'`,
+  `envDir: '..'`; the media scripts, the style ratchet and the tests point at the new folders.
+- **Proof.** The production build is pixel-identical before and after (`scripts/visual-parity.mjs`, 38 shots of the
+  landing and auth pages at three widths); unit, ORBIT and every e2e suite pass; style and asset budgets unchanged.
+
+## D-066: The landing on phones: hardware video decode, lighter cards, one scroll frame (2026-10-18)
+- Accepted 2026-10-18 (founder: on phones "the animation and scrolling is not looking good"; keep the look).
+- **Measured, not guessed.** New probe `tests/e2e/landing-phone-smoothness.mjs`: a 390x844 phone (touch, DPR 3, CPU
+  slowed 4x), thumb flings top to bottom (raw touch events; `synthesizeScrollGesture` does not scroll headless).
+  Every section but one holds 60 fps; all dropped frames sit in the matching scene. A trace there shows the main
+  thread at ~3 ms per frame (real speed) and the frame time dominated by this container's software compositor (no
+  GPU), so that scene must be judged on a real phone. Switching every animation in the scene off changed nothing
+  measurable, so its look stays as it is.
+- **Fixed (no visual change).**
+  1. The hero kept the first codec the browser called "smooth": AV1. Phones without an AV1 chip (most mid-range
+     Android) decode the 4K portrait stream on the CPU, the same CPU that scrolls the page. `pickHeroSource` now
+     prefers a smooth *and* power-efficient (hardware) decode, so those phones get the same picture in HEVC or
+     H.264 (unit-tested).
+  2. The eight matching-scene cards (~160 px wide on a phone) were decoded from 1,450-1,600 px files mid-scroll.
+     They now offer an 800 px copy through `srcset` (`npm run media:cards`), still sharp on a 3x screen; 60 % fewer
+     bytes. The full-bleed backgrounds keep the full files.
+  3. Three scroll handlers each read layout, and the services counter rewrote its text on every scroll frame of the
+     whole page. Now one scroll frame runs all reads, then all writes, and the counter writes only when its number
+     changes while it is on screen.
+  4. The page sound button and the playground's own sound button stacked in the bottom-right corner as the
+     playground scrolled past; the page button now steps aside while the playground stage is on screen.
+
+## D-067: Guided signup, one question per screen (Phase E, 2026-10-18)
+- Accepted 2026-10-18 (founder: "one question per screen, specially for mobile... similar to the one we will build for
+  the app. With icons above showing the present, done and pending pages in bubbles that go with the theme"; scope
+  "Full Phase E plan": email-code login, Google, no phone or gender, migration 0007).
+- **What ships.** `auth.html#signup` opens the guided flow (UX_SPEC §A0): email code or Google, then 18+, name, area,
+  interests, reveal. A bubble stepper (done / current / pending, with icons) and "Step n of N". Each answer saves on
+  its button through the existing RPCs; a returning member resumes where they stopped. No phone, gender, password or
+  points are asked. Interests are saved with an even split of the 20 points (ORBIT §3.2 note; the engine and the
+  server rules are unchanged). Private (sensitive) interests are not offered during signup (they need their own
+  consent screen); the app has no screen to add them or to re-weight interests yet: a follow-up.
+- **Passwordless members.** They log in with "Email me a code instead" (`shouldCreateUser: false`) and confirm an
+  account deletion with an emailed code (`reauthMethod` → `code`, set by `user_metadata.passwordless`).
+- **0007.** The notice moves to 2026-10-20 (new members give no phone or gender); 2026-10-05 stays accepted for 14 days.
+  Apply it **before** deploying this client (a database without it refuses the new version).
+- **Switches.** `VITE_SIGNUP_METHODS` (default `google,email`; `none` closes signup). `VITE_SIGNUP_FLOW=classic`
+  restores the old 4-step form for one release, as a no-code rollback; its code and its e2e suites (onboarding,
+  consent, pinned to classic) stay until then. The classic form still asks for a phone and gender, so the privacy
+  notice's "we do not ask new members" holds only while the guided flow is on.
+- **Deviations from the plan file.** The old form is kept behind the switch rather than deleted (rollback, and its 269
+  onboarding checks); the Reveal uses qualitative copy without a deck call; private interests are not offered (no consent screen in it).
+- **Founder dependencies.** (1) Apply 0007. (2) Supabase Auth email template: add `{{ .Token }}` (the 6-digit code) to
+  the Magic Link template; until then the email's link still signs the member in and resumes the flow. Custom SMTP
+  is strongly advised (the built-in sender is heavily rate limited). (3) Google provider enabled for "Continue with
+  Google" (already offered on login). Proof: `node tests/e2e/signup.spec.mjs` (56 checks, port 5193).
+
+## D-068: The guided signup keeps phone, gender and password; only the points screen goes (2026-10-18)
+- Accepted 2026-10-18 (founder, after D-067: "we need these as well... we can add 2 questions per screen, remove only
+  the points, but we will need the interests").
+- **Screens.** Email path: Email → Code → Password (password + confirm) → About you (name + "I'm 18 or older") →
+  Details (phone + gender) → Area → Interests (7 steps). Google path: About you → Details → Area → Interests (4 steps,
+  no password). Two questions share a screen only where they belong together. The points screen stays gone: interests
+  save with the even split (D-067).
+- **Password.** A brand-new account made by the email code is marked passwordless and gets the Password screen next;
+  saving it (`updateUser({ password })`) clears the mark, so login and account deletion use the password as before.
+  "Email me a code instead" stays as a second way in. An existing member who logs in by code keeps their password.
+- **Phone and gender** are written to the same `profiles` columns the classic form used (`phone`,
+  `phone_country_code`, `phone_number` digits, `gender` as Male / Female / Prefer not to say); the phone stays private.
+- **0007 withdrawn.** Its only purpose was a new notice saying new members give no phone or gender. With both collected
+  again, the live notice 2026-10-05 is accurate, so 0007, its test and the client version bump are removed before ever
+  being applied (0007 was never live; 0001–0006 are untouched). The deploy no longer needs a SQL step.
+- **Proof.** `node tests/e2e/signup.spec.mjs`: 68 checks at 1440 and 375 px, including mismatched passwords, the 18+
+  box being required, declare_adult before the name save, and phone + gender saved on the member's own row.

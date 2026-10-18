@@ -2,7 +2,7 @@
 // Run: npm run test:unit
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { skeletonMarkup, setBusy } from '../../app-skeletons.js';
+import { skeletonMarkup, setBusy } from '../../site/scripts/app-skeletons.js';
 
 const blocks = (html) => (html.match(/class="skeleton(?: [^"]*)?"/g) || []).length;
 const root = (html) => (html.match(/^<div\b[^>]*>/) || [''])[0];

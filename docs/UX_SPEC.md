@@ -36,6 +36,33 @@ New components reuse these tokens. **No raw hex in new components**, and no new 
 
 ## Flow changes
 
+### A0. Guided signup: one screen at a time (Phase E, D-067, D-068; replaces flow A by default)
+
+`auth.html#signup` opens `#guided-signup` (`signup-screens.js`, `signup-flow.js`, `otp-input.js`, `signup.css`).
+One heading and one primary button per screen, at most two questions on a screen, at every width; Back is always
+there except on Welcome and never returns to Email, Code or Password once signed in.
+- **Email path (7 steps):** Welcome → Email → 6-digit code → Password (password + confirm) → About you (name +
+  "I'm 18 or older") → Details (phone with country code + gender) → Area → Interests → Reveal.
+  **Google path (4 steps):** Welcome → About you (name prefilled from Google) → Details → Area → Interests → Reveal.
+- **Stepper:** one bubble per step with its icon (mail, key, lock, person, phone, pin, spark). Done = filled wine with a
+  tick; current = a wine ring with a soft glow; pending = a faint outline; the line between bubbles fills as the member
+  moves on. Phones show bubbles only; desktop adds a small label under each.
+- **Code:** six boxes, the first `autocomplete="one-time-code"`, all `inputmode="numeric"`; typing, pasting
+  ("123 456", "Your code is 123456") or autofill verifies by itself; a wrong code keeps the boxes; "Send a new code"
+  waits 60 s. The email also carries a sign-in link, which resumes the flow.
+- **About you:** the 18+ declaration (`declare_adult`) is saved before the name. "I'm under 18" signs out with the
+  adults-only copy. **Details:** phone (7–15 digits, private) and gender (Male / Female / Prefer not to say), stored in
+  the same columns as the classic form.
+- **Interests:** search plus the catalogue (popular first; private ones are not offered at signup); a tap flies the
+  chip into a sticky "Your picks" tray (220 ms, fade only under reduced motion); 1–12 picks; saved with an even split.
+  **No points screen.**
+- **Saving:** every screen saves on its button through the existing RPCs and auth calls; a failure keeps the screen
+  with a retry message. A returning member resumes at the first unfinished screen; a completed one goes to the app.
+- **Phones:** a full-height card; the primary button sticks to the bottom edge, above the keyboard (`visualViewport`).
+- **Login:** password as before, or "No password? Email me a code instead" (never creates an account).
+- **Switches:** `VITE_SIGNUP_METHODS` (default `google,email`; `none` closes signup: "Signups open soon"),
+  `VITE_SIGNUP_FLOW=classic` brings back flow A below for one release.
+
 ### A. Onboarding: 4 steps with "Your area" and the Passion Budget (shipped in Iteration 3, Task 8)
 
 The signup (`auth.html`, `script.js`, `passion-budget.js`) has **4 steps**. The progress reads `STEP n OF 4 · …` and the

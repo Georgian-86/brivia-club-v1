@@ -1,7 +1,7 @@
 // The deck's heavy swipe: pure gesture maths (deck-swipe.js). Run: npm run test:unit
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { SWIPE, rotationFor, stampOpacity, commitDecision, flyDuration, axisFor, velocityFrom, flyDistance, stackProgress } from '../../deck-swipe.js';
+import { SWIPE, rotationFor, stampOpacity, commitDecision, flyDuration, axisFor, velocityFrom, flyDistance, stackProgress } from '../../site/scripts/deck-swipe.js';
 
 test('constants: max 12 deg, 30% commit, 0.6 px/ms fling, 8 px axis lock, 260-420 ms fly', () => {
   assert.equal(SWIPE.maxRotate, 12);
@@ -92,7 +92,7 @@ test('stackProgress: the card underneath rises as the top card leaves', () => {
 });
 
 test('releaseVelocity: the move samples\' speed, or 0 when the pointer was held still before letting go', async () => {
-  const { releaseVelocity } = await import('../../deck-swipe.js');
+  const { releaseVelocity } = await import('../../site/scripts/deck-swipe.js');
   const moves = [{ x: 0, t: 0 }, { x: 40, t: 20 }, { x: 80, t: 40 }];
   assert.equal(releaseVelocity(moves, 45), 2, 'let go mid-fling: the fling speed');
   assert.equal(releaseVelocity(moves, 200), 0, 'held still 160 ms: no momentum');
