@@ -68,10 +68,24 @@
               <button class="auth-submit" type="submit">LOG IN <span>→</span></button>
               <button class="auth-forgot" type="button">Forgot password?</button>
             </form>
+            <button class="auth-code-login" type="button" hidden>No password? Email me a code instead</button>
             <p class="auth-note" id="login-note" aria-live="polite"></p>
             <div class="auth-divider"><span>OR CONTINUE WITH</span></div>
             <div class="auth-socials" aria-label="Continue with a social account"><button class="auth-google-trigger" type="button" aria-label="Continue with Google"><span class="auth-google-mark" aria-hidden="true">G</span></button></div>
             <button class="auth-secondary auth-create-trigger" type="button">CREATE AN ACCOUNT <span>↗</span></button>
+          </div>
+
+          <div class="auth-view auth-signup auth-guided" data-auth-view="guided" hidden>
+            <section class="guided" id="guided-signup" aria-labelledby="signup-screen-title">
+              <ol class="guided-steps" data-guided-steps aria-label="Your progress" hidden></ol>
+              <p class="guided-step-label" data-guided-step-label aria-live="polite" hidden></p>
+              <div class="guided-host" data-guided-host></div>
+              <p class="guided-error" data-guided-error role="alert" hidden></p>
+              <div class="guided-actions" data-guided-actions hidden>
+                <button class="guided-back" data-guided-back type="button"><span aria-hidden="true">&larr;</span> Back</button>
+                <button class="guided-next" data-guided-next type="button">Continue</button>
+              </div>
+            </section>
           </div>
 
           <div class="auth-view auth-signup" data-auth-view="signup" hidden>

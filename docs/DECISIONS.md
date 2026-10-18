@@ -1322,3 +1322,28 @@ controls (a tester or a seeded test member), never a real member, so no new expo
      changes while it is on screen.
   4. The page sound button and the playground's own sound button stacked in the bottom-right corner as the
      playground scrolled past; the page button now steps aside while the playground stage is on screen.
+
+## D-067: Guided signup, one question per screen (Phase E, 2026-10-18)
+- Accepted 2026-10-18 (founder: "one question per screen, specially for mobile... similar to the one we will build for
+  the app. With icons above showing the present, done and pending pages in bubbles that go with the theme"; scope
+  "Full Phase E plan": email-code login, Google, no phone or gender, migration 0007).
+- **What ships.** `auth.html#signup` opens the guided flow (UX_SPEC §A0): email code or Google, then 18+, name, area,
+  interests, reveal. A bubble stepper (done / current / pending, with icons) and "Step n of N". Each answer saves on
+  its button through the existing RPCs; a returning member resumes where they stopped. No phone, gender, password or
+  points are asked. Interests are saved with an even split of the 20 points (ORBIT §3.2 note; the engine and the
+  server rules are unchanged). Private (sensitive) interests are not offered during signup (they need their own
+  consent screen); the app has no screen to add them or to re-weight interests yet: a follow-up.
+- **Passwordless members.** They log in with "Email me a code instead" (`shouldCreateUser: false`) and confirm an
+  account deletion with an emailed code (`reauthMethod` → `code`, set by `user_metadata.passwordless`).
+- **0007.** The notice moves to 2026-10-20 (new members give no phone or gender); 2026-10-05 stays accepted for 14 days.
+  Apply it **before** deploying this client (a database without it refuses the new version).
+- **Switches.** `VITE_SIGNUP_METHODS` (default `google,email`; `none` closes signup). `VITE_SIGNUP_FLOW=classic`
+  restores the old 4-step form for one release, as a no-code rollback; its code and its e2e suites (onboarding,
+  consent, pinned to classic) stay until then. The classic form still asks for a phone and gender, so the privacy
+  notice's "we do not ask new members" holds only while the guided flow is on.
+- **Deviations from the plan file.** The old form is kept behind the switch rather than deleted (rollback, and its 269
+  onboarding checks); the Reveal uses qualitative copy without a deck call; private interests are not offered (no consent screen in it).
+- **Founder dependencies.** (1) Apply 0007. (2) Supabase Auth email template: add `{{ .Token }}` (the 6-digit code) to
+  the Magic Link template; until then the email's link still signs the member in and resumes the flow. Custom SMTP
+  is strongly advised (the built-in sender is heavily rate limited). (3) Google provider enabled for "Continue with
+  Google" (already offered on login). Proof: `node tests/e2e/signup.spec.mjs` (56 checks, port 5193).

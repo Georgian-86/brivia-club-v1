@@ -108,11 +108,12 @@ export const consentStatusCopy = (at) => {
   return `Private interests: consent given on ${date.toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })}.`;
 };
 
-// Sign-in method of the current session user: 'password' when an email identity exists, else 'oauth'.
+// Sign-in method of the current session user: 'password' when an email identity exists, 'code' when that identity
+// was made by the guided signup's email code (no password was ever set, Phase E), else 'oauth'.
 export const reauthMethod = (user) => {
   const meta = user?.app_metadata || {};
   const providers = [meta.provider, ...(Array.isArray(meta.providers) ? meta.providers : [])].filter(Boolean);
-  if (providers.includes('email')) return 'password';
+  if (providers.includes('email')) return user?.user_metadata?.passwordless === true ? 'code' : 'password';
   return providers.length ? 'oauth' : 'password';
 };
 

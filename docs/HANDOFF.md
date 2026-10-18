@@ -7,6 +7,13 @@ Update this file at the end of every session. CLAUDE.md holds the aim; this file
 
 ## 1. What is done
 
+**Guided signup (2026-10-18), D-067.** One question per screen with a bubble stepper; email code or Google; no phone,
+gender, password or points. Files: `site/scripts/signup-screens.js`, `signup-flow.js`, `otp-input.js`,
+`site/styles/signup.css`, `#guided-signup` in `site/auth.html`; migration `0007_signup_minimisation.sql`.
+**Before deploying: apply 0007, then add `{{ .Token }}` to the Supabase Magic Link email template** (see D-067).
+Rollback without code: `VITE_SIGNUP_FLOW=classic`. Suite: `node tests/e2e/signup.spec.mjs` (port 5193); the old
+onboarding and consent suites run the classic flow.
+
 **Phones (2026-10-18), D-066.** Hero prefers a hardware-decoded codec, lighter matching cards (`npm run media:cards`),
 one shared scroll frame, no stacked sound buttons. Probe: `node tests/e2e/landing-phone-smoothness.mjs` (after a stub
 build). The matching scene still drops frames here only because this container composites in software; check it on a
@@ -235,7 +242,8 @@ install it).
 | Data breach response (containment, notices, orphan-folder report) | `docs/BREACH_RUNBOOK.md` |
 | Daily moderation (new reports, flags, the 72 h suspension queue, rejoin reviews; SQL editor as owner) | `docs/MODERATION.md` |
 | SQL behaviour tests | `supabase/tests/*.test.sql` (run with `run.sh`) |
-| Signup (4 steps) | `auth.html`, `script.js`, `passion-budget.js`, `pending-profile.js` |
+| Signup (guided, D-067) | `site/scripts/signup-screens.js`, `signup-flow.js`, `otp-input.js`, `site/styles/signup.css`, `site/auth.html` |
+| Signup (classic 4 steps, behind `VITE_SIGNUP_FLOW=classic`) | `site/auth.html`, `site/scripts/script.js`, `passion-budget.js`, `pending-profile.js` |
 | App, deck, quota | `app.html`, `app.js`, `deck-view.js`, `signal-quota.js` |
 | Test world (tester switch, why panel) | `supabase/migrations/0008_tester_world.sql`, `why-panel.js`, `supabase/tests/d-tester-world.test.sql`, `supabase/seed/README.md` |
 | App nav, tokens, skeletons, profile checklist | `app-nav.js`, `app-shell.css`, `tokens.css`, `app-skeletons.js`, `profile-checklist.js`, `profile-view.css` |

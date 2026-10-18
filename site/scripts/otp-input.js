@@ -1,12 +1,14 @@
 // The 6-digit email code (Phase E): parse a typed, pasted or autofilled code, and update the six boxes.
 export const OTP_LENGTH = 6;
 
-// Exactly six digits after dropping spaces and dashes, or the first run of six digits in a longer message.
+// Exactly six digits after dropping spaces and dashes, or the first six-digit code in a longer message, written
+// whole ("123456") or split in two halves ("123 456", "123-456").
 export const parseOtp = (text) => {
   const raw = String(text ?? '');
   const compact = raw.replace(/[\s-]/g, '');
   if (/^\d{6}$/.test(compact)) return compact;
-  return raw.match(/(?<!\d)\d{6}(?!\d)/)?.[0] || null;
+  const found = raw.match(/(?<!\d)(?<!\d[ -])(\d{3})[ -]?(\d{3})(?!\d)(?![ -]\d)/);
+  return found ? found[1] + found[2] : null;
 };
 
 // boxes: six strings. value: what box `index` now holds ('' after a backspace; several digits after a paste or an

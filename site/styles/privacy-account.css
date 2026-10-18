@@ -20,7 +20,7 @@
   box-sizing: border-box; width: 100%; min-height: 44px; padding: 8px 12px; border: 1px solid rgba(67, 4, 22, .32);
   border-radius: 8px; background: #fff; color: #291d1b; font: inherit; font-size: var(--text-16);
 }
-.privacy-reauth { display: flex; flex-direction: column; gap: 10px; }
+.privacy-reauth, .privacy-reauth > [data-privacy-code-row] { display: flex; flex-direction: column; gap: 10px; }
 .privacy-reauth[hidden], .privacy-reauth [hidden], .privacy-body [hidden] { display: none !important; }
 .privacy-error { color: var(--brivia-deep-wine); font-weight: 700; }
 .privacy-error:empty { display: none; }

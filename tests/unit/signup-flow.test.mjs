@@ -73,6 +73,9 @@ test('parseOtp: six digits from a code, a spaced code or a message', () => {
   assert.equal(parseOtp('123 456'), '123456');
   assert.equal(parseOtp('123-456'), '123456');
   assert.equal(parseOtp('Your code is 654321.'), '654321');
+  assert.equal(parseOtp('Your code is 123 456'), '123456');
+  assert.equal(parseOtp('Code: 987-654, valid 10 minutes'), '987654');
+  assert.equal(parseOtp('Call 1234 5678'), null);
   assert.equal(parseOtp('12345'), null);
   assert.equal(parseOtp(''), null);
   assert.equal(parseOtp(null), null);
