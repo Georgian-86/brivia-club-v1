@@ -1,6 +1,6 @@
 // The privacy notice version must be one string in three places (R1, R10): privacy.html (shown to members),
-// notice-version.js (what the client declares against) and brivia_notice_version() in migration 0005 (what the server
-// accepts). Run: npm run test:unit
+// notice-version.js (what the client declares against) and brivia_notice_version() in the latest migration that defines it
+// (0007, what the server accepts). Run: npm run test:unit
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
@@ -13,15 +13,15 @@ const read = (file) => readFileSync(path.join(root, file), 'utf8');
 
 test('privacy.html, notice-version.js and brivia_notice_version() carry the same version', () => {
   const html = read('site/privacy.html');
-  const sql = read('supabase/migrations/0005_p0b_dpdp_safety.sql');
+  const sql = read('supabase/migrations/0007_signup_minimisation.sql');
   const fn = sql.match(/function public\.brivia_notice_version\(\)[\s\S]*?as \$\$ select '([^']+)'::text \$\$/);
-  assert.ok(fn, 'brivia_notice_version() body not found in 0005');
+  assert.ok(fn, 'brivia_notice_version() body not found in 0007');
   const page = html.match(/data-notice-version="([^"]+)"/);
   assert.ok(page, 'privacy.html has no data-notice-version attribute');
   assert.match(NOTICE_VERSION, /^\d{4}-\d{2}-\d{2}$/);
   assert.equal(page[1], NOTICE_VERSION);
   assert.equal(fn[1], NOTICE_VERSION);
-  assert.ok(html.includes(`Version ${NOTICE_VERSION} · effective 5 October 2026`), 'the visible version line is missing or differs');
+  assert.ok(html.includes(`Version ${NOTICE_VERSION} · effective 20 October 2026`), 'the visible version line is missing or differs');
 });
 
 test('privacy.html names the grievance contact and the retention rows the purge implements', () => {
