@@ -13,11 +13,16 @@ export function motionAllowed({ reducedMotion = false, saveData = false, effecti
 }
 
 // The hero's <source> to keep (D-062), from MediaCapabilities answers in source order: the first one the device
-// decodes smoothly, else the first it can decode at all, else -1 (leave the browser's own choice alone).
+// decodes smoothly in hardware (power-efficient), else the first smooth one, else the first it can decode at all,
+// else -1 (leave the browser's own choice alone). D-066: a phone without an AV1 chip reports software AV1 as smooth,
+// and decoding the 4K portrait stream on the CPU starved scrolling; its HEVC or H.264 copy is the same picture.
 export function pickHeroSource(infos) {
   const list = Array.isArray(infos) ? infos : [];
-  const smooth = list.findIndex((info) => info?.supported && info?.smooth);
-  return smooth >= 0 ? smooth : list.findIndex((info) => info?.supported);
+  const first = (test) => list.findIndex((info) => info?.supported && test(info));
+  const hardware = first((info) => info.smooth && info.powerEfficient);
+  if (hardware >= 0) return hardware;
+  const smooth = first((info) => info.smooth);
+  return smooth >= 0 ? smooth : first(() => true);
 }
 
 // The intro plays on a first visit only; arriving back from an auth page also skips it.

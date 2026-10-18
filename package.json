@@ -11,7 +11,8 @@
     "check:assets": "node scripts/check-asset-budget.mjs",
     "media:build": "node scripts/optimize-media.mjs",
     "media:repoint": "node scripts/repoint-media.mjs",
-    "media:hero4k": "node scripts/encode-hero-4k.mjs"
+    "media:hero4k": "node scripts/encode-hero-4k.mjs",
+    "media:cards": "node scripts/encode-card-variants.mjs"
   },
   "devDependencies": {
     "sharp": "^0.35.5",

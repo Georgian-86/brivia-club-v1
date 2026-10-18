@@ -80,3 +80,15 @@ test('pickHeroSource takes the first smooth decode, else the first supported one
   assert.equal(pickHeroSource([]), -1);
   assert.equal(pickHeroSource(undefined), -1);
 });
+
+test('pickHeroSource prefers a hardware (power-efficient) smooth decode over a software one (D-066)', () => {
+  // AV1 decoded in software on a phone without an AV1 chip: "smooth" but not power-efficient; HEVC or H.264 in hardware.
+  const av1Soft = { supported: true, smooth: true, powerEfficient: false };
+  const hevcHard = { supported: true, smooth: true, powerEfficient: true };
+  const h264Hard = { supported: true, smooth: true, powerEfficient: true };
+  assert.equal(pickHeroSource([av1Soft, hevcHard, h264Hard]), 1);
+  assert.equal(pickHeroSource([av1Soft, { supported: false }, h264Hard]), 2);
+  assert.equal(pickHeroSource([hevcHard, h264Hard]), 0);
+  // power-efficient but not smooth never beats smooth
+  assert.equal(pickHeroSource([av1Soft, { supported: true, smooth: false, powerEfficient: true }]), 0);
+});

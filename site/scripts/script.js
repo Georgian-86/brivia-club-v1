@@ -364,8 +364,10 @@ supabase?.auth.onAuthStateChange(() => updateMenuSession());
 
 const heroNav = document.querySelector('.hero-nav');
 const darkNavSections = document.querySelectorAll('.hero, .project-card, .showreel-section, .principles-section, .process-section, .pillars-stage, .site-footer');
-const updateMenuContrast = () => {
-  if (!heroNav) return;
+// Reads layout only; returns the write. The shared scroll frame (below) runs every read before any write, so one
+// scroll frame costs one layout, not one per handler (D-066).
+const readMenuContrast = () => {
+  if (!heroNav) return null;
   const navPoint = Math.max(1, heroNav.getBoundingClientRect().top + heroNav.offsetHeight / 2);
   const isOverDark = [...darkNavSections].some((section) => {
     const bounds = section.getBoundingClientRect();
@@ -374,17 +376,21 @@ const updateMenuContrast = () => {
     const background = getComputedStyle(section).backgroundColor.match(/\d+(?:\.\d+)?/g)?.map(Number) || [];
     return background.length >= 3 && ((background[0] * 299 + background[1] * 587 + background[2] * 114) / 1000) < 145;
   });
-  heroNav.classList.toggle('is-over-dark', isOverDark);
+  return () => { if (heroNav.classList.contains('is-over-dark') !== isOverDark) heroNav.classList.toggle('is-over-dark', isOverDark); };
 };
-updateMenuContrast();
-// At most once per frame (it reads layout), not once per scroll event.
-let menuContrastFrame = 0;
-const requestMenuContrast = () => {
-  if (menuContrastFrame) return;
-  menuContrastFrame = window.requestAnimationFrame(() => { menuContrastFrame = 0; updateMenuContrast(); });
+// One scroll frame for every scroll-linked effect on the page: at most once per frame, all reads, then all writes.
+const scrollReaders = [];
+let scrollFrame = 0;
+const runScrollFrame = () => {
+  scrollFrame = 0;
+  const writes = scrollReaders.map((read) => read());
+  writes.forEach((write) => write?.());
 };
-window.addEventListener('scroll', requestMenuContrast, { passive: true });
-window.addEventListener('resize', requestMenuContrast);
+const requestScrollFrame = () => { if (!scrollFrame) scrollFrame = window.requestAnimationFrame(runScrollFrame); };
+window.addEventListener('scroll', requestScrollFrame, { passive: true });
+window.addEventListener('resize', requestScrollFrame);
+scrollReaders.push(readMenuContrast);
+requestScrollFrame();
 
 document.querySelectorAll('.project-card').forEach((card) => {
   card.addEventListener('mouseenter', () => cursor?.classList.add('active'));
@@ -450,31 +456,25 @@ principlesSection?.addEventListener('pointerup', (event) => {
   matchingTouchStartX = undefined;
 });
 principlesSection?.addEventListener('pointercancel', () => { matchingTouchStartX = undefined; });
-let matchingSceneFrame;
-const updateMatchingScene = () => {
-  if (!principlesSection || !principlesSection.classList.contains('is-visible')) return;
+const readMatchingScene = () => {
+  if (!principlesSection || !principlesSection.classList.contains('is-visible')) return null;
   const bounds = principlesSection.getBoundingClientRect();
   const travel = Math.max(bounds.height - window.innerHeight, 1);
   const progress = Math.max(0, Math.min(1, -bounds.top / travel));
   const drift = (progress - .5) * 90;
   const wordDrift = (progress - .5) * -54;
-  principlesConstellation?.style.setProperty('--scroll-drift', `${drift * .36}px`);
-  photoFlightDeck?.style.setProperty('--scroll-drift', `${drift}px`);
-  matchingHeroWord?.style.setProperty('--word-drift', `${wordDrift}px`);
+  return () => {
+    principlesConstellation?.style.setProperty('--scroll-drift', `${(drift * .36).toFixed(2)}px`);
+    photoFlightDeck?.style.setProperty('--scroll-drift', `${drift.toFixed(2)}px`);
+    matchingHeroWord?.style.setProperty('--word-drift', `${wordDrift.toFixed(2)}px`);
+  };
 };
-const requestMatchingSceneUpdate = () => {
-  if (matchingSceneFrame) return;
-  matchingSceneFrame = window.requestAnimationFrame(() => {
-    matchingSceneFrame = undefined;
-    updateMatchingScene();
-  });
-};
-window.addEventListener('scroll', requestMatchingSceneUpdate, { passive: true });
-window.addEventListener('resize', requestMatchingSceneUpdate);
-requestMatchingSceneUpdate();
+scrollReaders.push(readMatchingScene);
+requestScrollFrame();
 if (principlesSection && 'IntersectionObserver' in window) {
   const principlesRevealObserver = new IntersectionObserver(([entry]) => {
     principlesSection.classList.toggle('is-visible', entry.isIntersecting);
+    requestScrollFrame();
   }, { threshold: 0.12 });
   principlesRevealObserver.observe(principlesSection);
 }
@@ -550,6 +550,10 @@ const playgroundStage = document.querySelector('[data-playground-stage]');
 const playgroundVideo = document.querySelector('[data-playground-video]');
 const playgroundAudioToggle = document.querySelector('[data-playground-audio-toggle]');
 const playgroundShuttle = null;
+// Two round sound buttons never share the corner: the page's own steps aside while the playground stage is on screen.
+if (playgroundStage && soundButton && 'IntersectionObserver' in window) {
+  new IntersectionObserver(([entry]) => soundButton.classList.toggle('is-yielding', entry.isIntersecting)).observe(playgroundStage);
+}
 let playgroundAudioContext;
 let playgroundSoundEnabled = Boolean(window.__briviaLandingAudioEnabled);
 let playgroundStarted = false;
@@ -649,22 +653,19 @@ const serviceSection = document.querySelector('.services-marquee');
 const serviceRows = document.querySelectorAll('.service-row');
 const serviceProgress = document.querySelector('.services-progress');
 if (serviceSection && serviceRows.length) {
-  const updateServiceProgress = () => {
+  // The counter text changes only when its number does, and only while the section is on screen: a text write
+  // invalidates layout, and it used to happen on every scroll frame of the whole page.
+  let shownProgress = '';
+  scrollReaders.push(() => {
+    if (!serviceProgress) return null;
     const bounds = serviceSection.getBoundingClientRect();
+    if (bounds.bottom < 0 || bounds.top > window.innerHeight) return null;
     const travel = Math.max(1, bounds.height - window.innerHeight);
-    const amount = Math.min(100, Math.max(0, (-bounds.top / travel) * 100));
-    if (serviceProgress) serviceProgress.textContent = `${Math.round(amount)}%`;
-  };
-  let progressTick = false;
-  window.addEventListener('scroll', () => {
-    if (progressTick) return;
-    progressTick = true;
-    requestAnimationFrame(() => {
-      updateServiceProgress();
-      progressTick = false;
-    });
-  }, { passive: true });
-  updateServiceProgress();
+    const text = `${Math.round(Math.min(100, Math.max(0, (-bounds.top / travel) * 100)))}%`;
+    if (text === shownProgress) return null;
+    return () => { shownProgress = text; serviceProgress.textContent = text; };
+  });
+  requestScrollFrame();
 
   if ('IntersectionObserver' in window) {
     const serviceObserver = new IntersectionObserver((entries) => {

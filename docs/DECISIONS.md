@@ -1300,3 +1300,25 @@ controls (a tester or a seeded test member), never a real member, so no new expo
   `envDir: '..'`; the media scripts, the style ratchet and the tests point at the new folders.
 - **Proof.** The production build is pixel-identical before and after (`scripts/visual-parity.mjs`, 38 shots of the
   landing and auth pages at three widths); unit, ORBIT and every e2e suite pass; style and asset budgets unchanged.
+
+## D-066: The landing on phones: hardware video decode, lighter cards, one scroll frame (2026-10-18)
+- Accepted 2026-10-18 (founder: on phones "the animation and scrolling is not looking good"; keep the look).
+- **Measured, not guessed.** New probe `tests/e2e/landing-phone-smoothness.mjs`: a 390x844 phone (touch, DPR 3, CPU
+  slowed 4x), thumb flings top to bottom (raw touch events; `synthesizeScrollGesture` does not scroll headless).
+  Every section but one holds 60 fps; all dropped frames sit in the matching scene. A trace there shows the main
+  thread at ~3 ms per frame (real speed) and the frame time dominated by this container's software compositor (no
+  GPU), so that scene must be judged on a real phone. Switching every animation in the scene off changed nothing
+  measurable, so its look stays as it is.
+- **Fixed (no visual change).**
+  1. The hero kept the first codec the browser called "smooth": AV1. Phones without an AV1 chip (most mid-range
+     Android) decode the 4K portrait stream on the CPU, the same CPU that scrolls the page. `pickHeroSource` now
+     prefers a smooth *and* power-efficient (hardware) decode, so those phones get the same picture in HEVC or
+     H.264 (unit-tested).
+  2. The eight matching-scene cards (~160 px wide on a phone) were decoded from 1,450-1,600 px files mid-scroll.
+     They now offer an 800 px copy through `srcset` (`npm run media:cards`), still sharp on a 3x screen; 60 % fewer
+     bytes. The full-bleed backgrounds keep the full files.
+  3. Three scroll handlers each read layout, and the services counter rewrote its text on every scroll frame of the
+     whole page. Now one scroll frame runs all reads, then all writes, and the counter writes only when its number
+     changes while it is on screen.
+  4. The page sound button and the playground's own sound button stacked in the bottom-right corner as the
+     playground scrolled past; the page button now steps aside while the playground stage is on screen.

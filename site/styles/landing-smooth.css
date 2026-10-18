@@ -84,6 +84,8 @@ html.has-smooth-scroll { scroll-behavior: auto !important; }
 /* The menu and the auth modal cover it; it never sits on top of them. */
 body.auth-open .sound-toggle,
 body:has(.menu-overlay.open) .sound-toggle { opacity: 0; pointer-events: none; }
+/* The playground stage has its own sound button, which scrolls through this corner on a phone: step aside (D-066). */
+.sound-toggle.is-ready.is-yielding { opacity: 0; pointer-events: none; transform: translateY(8px); }
 @media (max-width: 700px) {
   .sound-toggle { right: max(14px, env(safe-area-inset-right)); bottom: max(14px, env(safe-area-inset-bottom)); }
 }
