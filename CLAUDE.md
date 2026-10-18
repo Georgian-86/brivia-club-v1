@@ -51,6 +51,12 @@ in `docs/`.
   ui-ux-pro-max for UX rules (keep the existing deep-wine brand, see `docs/UX_SPEC.md`), and webapp-testing for UI checks.
   If `.claude/skills/` is missing, ask the user before reinstalling.
 
+## Layout
+
+`site/` is the Vite root: the 8 pages at its top (URLs unchanged), `site/styles/` (all CSS), `site/scripts/` (all client
+JS), `site/media/` (optimized media the site ships). `source-media/` holds raw originals (Images/, assets/, 4K master;
+never shipped, `.vercelignore`d). Tooling in `scripts/`, tests in `tests/`, engine in `orbit/`, SQL in `supabase/`.
+
 ## Commands
 
 ```bash

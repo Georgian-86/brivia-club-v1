@@ -1,7 +1,7 @@
 // Landing motion helpers (Phase B landing speed). Run: node --test tests/unit
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { motionAllowed, introPlan, pickHeroSource, INTRO_CAP_MS, INTRO_START_GRACE_MS } from '../../landing-motion.js';
+import { motionAllowed, introPlan, pickHeroSource, INTRO_CAP_MS, INTRO_START_GRACE_MS } from '../../site/scripts/landing-motion.js';
 
 test('motionAllowed is false for reduced motion', () => {
   assert.equal(motionAllowed({ reducedMotion: true, saveData: false }), false);
@@ -34,7 +34,7 @@ test('intro timing constants', () => {
   assert.equal(INTRO_START_GRACE_MS, 800);
 });
 
-import { markLoaded } from '../../landing-motion.js';
+import { markLoaded } from '../../site/scripts/landing-motion.js';
 const fakeImg = ({ complete = false, naturalWidth = 0 } = {}) => {
   const classes = new Set(['skeleton']);
   const handlers = {};

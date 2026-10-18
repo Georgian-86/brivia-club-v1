@@ -1,7 +1,7 @@
 // Preset cover name resolution (cover-assets.js), incl. legacy Vite-hashed stored values. Run: node --test tests/unit
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { resolveCoverKey } from '../../cover-name.js';
+import { resolveCoverKey } from '../../site/scripts/cover-name.js';
 
 const keys = [
   '163BDB0C-64AC-44E7-8663-55C323ADB4FE.PNG',

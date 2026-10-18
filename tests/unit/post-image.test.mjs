@@ -1,9 +1,9 @@
 // Which image a community post shows (Phase D Task 2, post-image.js). Run: node --test tests/unit
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { postImageSrc } from '../../post-image.js';
-import { isPresetCoverUrl } from '../../preset-cover.js';
-import { resolveCoverKey } from '../../cover-name.js';
+import { postImageSrc } from '../../site/scripts/post-image.js';
+import { isPresetCoverUrl } from '../../site/scripts/preset-cover.js';
+import { resolveCoverKey } from '../../site/scripts/cover-name.js';
 
 const AUTHOR = 'a7e57000-0000-4000-8000-000000000025';
 const ORIGIN = 'https://proj.supabase.co';

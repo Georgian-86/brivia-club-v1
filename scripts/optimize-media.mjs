@@ -1,6 +1,6 @@
 // Media build (Phase B): writes optimized copies of every image and video the site references into media/,
 // plus media/manifest.json { "<original ref>": "<optimized ref>" } for the repoint codemod.
-// Originals in Images/ and assets/ are source material and are never modified.
+// Originals in source-media/Images/ and source-media/assets/ are source material and are never modified.
 //
 //   images  -> media/<same relative path, extension replaced>.webp  (max width 1600, WebP q78, alpha kept)
 //   videos  -> media/video/<name>-1080.mp4 (crf 28), <name>-720.mp4 (crf 30), H.264 +faststart,
@@ -18,7 +18,10 @@ import sharp from 'sharp';
 import { siteFiles } from './repoint-media.mjs';
 import { collectRefs } from './media-manifest.mjs';
 
-const root = join(dirname(fileURLToPath(import.meta.url)), '..');
+const repo = join(dirname(fileURLToPath(import.meta.url)), '..');
+// Refs read 'Images/X.PNG' (as the site wrote them before repoint); originals live in source-media/, outputs in site/.
+const root = join(repo, 'site');
+const source = join(repo, 'source-media');
 const FFMPEG = existsSync('/usr/bin/ffmpeg') ? '/usr/bin/ffmpeg' : 'ffmpeg';
 const FFPROBE = existsSync('/usr/bin/ffprobe') ? '/usr/bin/ffprobe' : 'ffprobe';
 const IMAGE = { maxWidth: 1600, quality: 78 };
@@ -70,7 +73,7 @@ const main = async () => {
   const manifestPath = join(root, 'media', 'manifest.json');
   const previous = existsSync(manifestPath) ? JSON.parse(readFileSync(manifestPath, 'utf8')) : {};
   // Re-runnable after repoint: keep building every previous entry whose source still exists.
-  const refs = collectRefs(scanRefs(), previous, (rel) => existsSync(join(root, rel)));
+  const refs = collectRefs(scanRefs(), previous, (rel) => existsSync(join(source, rel)));
   const outputs = new Map();
   const claim = (out, ref) => {
     if (outputs.has(out) && outputs.get(out) !== ref) throw new Error(`Output collision: ${out} <- ${outputs.get(out)} and ${ref}`);
@@ -78,7 +81,7 @@ const main = async () => {
   };
 
   for (const rel of refs.filter((r) => !/\.mp4$/i.test(r))) {
-    const src = join(root, rel);
+    const src = join(source, rel);
     if (!existsSync(src)) { console.warn(`missing source, skipped: ${rel}`); continue; }
     const outRel = posix.join('media', rel.replace(/\.[^./]+$/, '.webp'));
     claim(outRel, rel);
@@ -95,9 +98,9 @@ const main = async () => {
   const names = [...new Set(videoRefs.map((r) => posix.basename(r).replace(/\.mp4$/i, '').replace(/-4k$/i, '')))];
   for (const name of names) {
     const dir = posix.dirname(videoRefs.find((r) => posix.basename(r).replace(/\.mp4$/i, '').replace(/-4k$/i, '') === name));
-    const master = [`${dir}/${name}-4k.mp4`, `${dir}/${name}.mp4`].find((r) => existsSync(join(root, r)));
+    const master = [`${dir}/${name}-4k.mp4`, `${dir}/${name}.mp4`].find((r) => existsSync(join(source, r)));
     if (!master) { console.warn(`missing video source, skipped: ${name}`); continue; }
-    const src = join(root, master);
+    const src = join(source, master);
     const info = probe(src);
     const made = [];
     const hasMaster4k = master.endsWith('-4k.mp4');

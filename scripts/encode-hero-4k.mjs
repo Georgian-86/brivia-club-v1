@@ -1,5 +1,5 @@
 // The landing hero in 4K (founder, 2026-10-16, D-062): the 1080p downscale looked soft, so the hero ships the 4K
-// master's own pixels only. Two frames, three codecs each, all from assets/hero-section-video-4k.mp4 (3840x2160):
+// master's own pixels only. Two frames, three codecs each, all from source-media/assets/hero-section-video-4k.mp4 (3840x2160):
 //
 //   landscape  3840x2160, the full frame                          (desktops, laptops, tablets, landscape phones)
 //   portrait   1216x2160, the centre 9:16 crop at native density  (portrait phones: object-fit:cover would only
@@ -21,8 +21,8 @@ import { execFileSync } from 'node:child_process';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const FFMPEG = existsSync('/usr/bin/ffmpeg') ? '/usr/bin/ffmpeg' : 'ffmpeg';
-const master = join(root, 'assets', 'hero-section-video-4k.mp4');
-const outDir = join(root, 'media', 'video');
+const master = join(root, 'source-media', 'assets', 'hero-section-video-4k.mp4');
+const outDir = join(root, 'site', 'media', 'video');
 
 export const HERO_FRAMES = {
   'hero-4k': { filter: null },

@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import {
   BUDGET, MAX_INTERESTS, MODES, emptyBudget, addInterest, removeInterest, stepPoints, setMode,
   pointsLeft, isComplete, toPayload, counterText, budgetFromRows,
-} from '../../passion-budget.js';
+} from '../../site/scripts/passion-budget.js';
 
 const node = (n) => ({ id: `d.c.i${n}`, label: `Interest ${n}` });
 const withItems = (n) => { let s = emptyBudget(); for (let i = 1; i <= n; i += 1) s = addInterest(s, node(i)); return s; };

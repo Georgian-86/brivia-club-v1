@@ -1,17 +1,22 @@
 import { defineConfig } from 'vite';
 
+// The site lives in site/ (pages at its top, so URLs are unchanged); raw originals live in source-media/ (D-065).
 export default defineConfig({
+  root: 'site',
+  envDir: '..',
   build: {
+    outDir: '../dist',
+    emptyOutDir: true,
     rollupOptions: {
       input: {
-        main: 'index.html',
-        auth: 'auth.html',
-        app: 'app.html',
-        explore: 'explore.html',
-        chat: 'chat.html',
-        profile: 'profile.html',
-        careers: 'careers.html',
-        privacy: 'privacy.html',
+        main: 'site/index.html',
+        auth: 'site/auth.html',
+        app: 'site/app.html',
+        explore: 'site/explore.html',
+        chat: 'site/chat.html',
+        profile: 'site/profile.html',
+        careers: 'site/careers.html',
+        privacy: 'site/privacy.html',
       },
     },
   },

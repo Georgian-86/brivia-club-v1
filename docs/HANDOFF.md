@@ -7,6 +7,12 @@ Update this file at the end of every session. CLAUDE.md holds the aim; this file
 
 ## 1. What is done
 
+**Repository reorganized (2026-10-18), D-065.** The site lives in `site/` (pages at its top, so URLs are unchanged;
+`site/styles/`, `site/scripts/`, `site/media/`), raw originals in `source-media/` (never shipped), the 59 stray root
+screenshots and the old .docx are gone. Vite's root is `site/`, output still `dist/`. Builds are pixel-identical
+(visual parity, 38 shots); every unit and e2e suite passes. File paths below are relative to `site/` unless they start
+with another top-level folder.
+
 **Live-site fixes (2026-10-18), D-064.** PR #2 (D-062, D-063) is merged and live. Follow-up: the hero now plays on
 connections Chrome labels "3g" (only 2g is poster-only), a refused autoplay starts on the first touch, and the chat
 room photo is softly blurred again (baked into `media/assets/chat-room-soft.webp`) with the reference sidebar order.
@@ -15,7 +21,7 @@ room photo is softly blurred again (baked into `media/assets/chat-room-soft.webp
 cheaper matching-scene layers, sound that starts on the first real gesture and stops after 5 minutes, and a sound
 button. Checks: `node tests/e2e/landing-sound.spec.mjs` (15 checks, after a stub build) and the frame-time probe
 `node tests/e2e/landing-smoothness.mjs` (`SMOOTH_ASSERT=1` fails on a p95 frame over 34 ms; this container has no GPU,
-so judge desktop smoothness on a real laptop). Open: the original `Images/Videos/HEROSECTIONVI.MOV` carries a real
+so judge desktop smoothness on a real laptop). Open: the original `source-media/Images/Videos/HEROSECTIONVI.MOV` carries a real
 soundtrack (the 4K master has none); the landing still plays its synthesized chord. Ask the founder before swapping.
 
 **Design references (2026-10-16): branch `claude/focused-johnson-pev1j6` off `main` 07d1f45 (the live build).** See D-062.

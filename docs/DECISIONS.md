@@ -1287,3 +1287,16 @@ controls (a tester or a seeded test member), never a real member, so no new expo
   no live CSS filter to repaint while scrolling. The wine stays `#5a061e` (sampled from the reference: identical).
   Sidebar order as in the reference: search, then "BRIVIA SOCIETY", then the tagline and conversations; the
   "BRIVIA AI · THOUGHTFUL CONNECTIONS" footer line is back, in the serif face.
+
+## D-065: The repository is organized into site/ and source-media/ (2026-10-18)
+- Accepted 2026-10-18 (founder: "first of all organizing the repository", option "Full reorganize").
+- **Before.** 162 items at the root: 8 pages, 46 stylesheets, 33 scripts, 59 stray review screenshots (25 MB, none
+  referenced) and a product .docx next to the configs, plus `Images/` and `assets/` (raw originals, 258 MB) beside the
+  optimized `media/`.
+- **After.** `site/` is the Vite root: pages at its top (so every URL, the Vercel rewrites and the stored cover paths
+  stay the same), `site/styles/`, `site/scripts/`, `site/media/`. Raw originals moved to `source-media/` and are
+  excluded from deploys (nothing shipped reads them). The screenshots and the .docx are deleted. Only paths changed:
+  relative imports and `url()`s were rewritten, `vite.config.mjs` sets `root: 'site'`, `outDir: '../dist'`,
+  `envDir: '..'`; the media scripts, the style ratchet and the tests point at the new folders.
+- **Proof.** The production build is pixel-identical before and after (`scripts/visual-parity.mjs`, 38 shots of the
+  landing and auth pages at three widths); unit, ORBIT and every e2e suite pass; style and asset budgets unchanged.

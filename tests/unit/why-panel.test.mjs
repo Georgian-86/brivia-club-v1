@@ -1,7 +1,7 @@
 // "Why this person?" (Phase D, Task 3): the tester-only panel's markup from one rpc/deck_why row. Run: npm run test:unit
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { whyPanelMarkup, whyRow } from '../../why-panel.js';
+import { whyPanelMarkup, whyRow } from '../../site/scripts/why-panel.js';
 
 const row = {
   shared_interests: ['Badminton', 'Chess'],

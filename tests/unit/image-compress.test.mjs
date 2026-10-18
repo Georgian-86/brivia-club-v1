@@ -1,7 +1,7 @@
 // compressImage fails closed (R12): never returns the original (with its EXIF/GPS) on a failure. Run: npm run test:unit
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { compressImage, ImageProcessingError, PHOTO_ERROR_MESSAGE, replacedObjectPath, isImageLike, compressImageOnly, attachmentKind, compressAttachmentFiles } from '../../image-compress.js';
+import { compressImage, ImageProcessingError, PHOTO_ERROR_MESSAGE, replacedObjectPath, isImageLike, compressImageOnly, attachmentKind, compressAttachmentFiles } from '../../site/scripts/image-compress.js';
 
 const MESSAGE = "We couldn't process this photo. Try a JPG or PNG.";
 const file = (name = 'holiday.HEIC.png', type = 'image/png') => ({ name, type, size: 10 });

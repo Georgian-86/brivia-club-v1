@@ -1,7 +1,7 @@
 // Pending onboarding (email confirmation) minimisation. Run: npm run test:unit
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { PENDING_MAX_AGE_MS, buildPendingOnboarding, isPendingExpired } from '../../pending-profile.js';
+import { PENDING_MAX_AGE_MS, buildPendingOnboarding, isPendingExpired } from '../../site/scripts/pending-profile.js';
 
 const state = { items: [
   { id: 'games.board.chess', label: 'Chess', points: 10, mode: 'teach' },

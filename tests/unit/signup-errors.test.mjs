@@ -1,7 +1,7 @@
 // Sign-up error copy (live walkthrough 2026-10-08: the raw "email rate limit exceeded" reached the member).
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { signupErrorCopy } from '../../signup-errors.js';
+import { signupErrorCopy } from '../../site/scripts/signup-errors.js';
 
 test('the auth email rate limit gets plain copy and a when-to-retry', () => {
   const copy = signupErrorCopy({ code: 'over_email_send_rate_limit', status: 429, message: 'email rate limit exceeded' });

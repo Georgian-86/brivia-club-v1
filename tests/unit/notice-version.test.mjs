@@ -6,13 +6,13 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
-import { NOTICE_VERSION } from '../../notice-version.js';
+import { NOTICE_VERSION } from '../../site/scripts/notice-version.js';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const read = (file) => readFileSync(path.join(root, file), 'utf8');
 
 test('privacy.html, notice-version.js and brivia_notice_version() carry the same version', () => {
-  const html = read('privacy.html');
+  const html = read('site/privacy.html');
   const sql = read('supabase/migrations/0005_p0b_dpdp_safety.sql');
   const fn = sql.match(/function public\.brivia_notice_version\(\)[\s\S]*?as \$\$ select '([^']+)'::text \$\$/);
   assert.ok(fn, 'brivia_notice_version() body not found in 0005');
@@ -25,7 +25,7 @@ test('privacy.html, notice-version.js and brivia_notice_version() carry the same
 });
 
 test('privacy.html names the grievance contact and the retention rows the purge implements', () => {
-  const html = read('privacy.html');
+  const html = read('site/privacy.html');
   const sql = read('supabase/migrations/0005_p0b_dpdp_safety.sql');
   assert.ok(html.includes('thebrivia.club@gmail.com'));
   assert.ok(html.includes('Supabase, Mumbai (ap-south-1), India'));

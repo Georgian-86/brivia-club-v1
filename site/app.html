@@ -1,0 +1,137 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="theme-color" content="#101016" />
+    <title>Brivia Club · Discover your kind</title>
+    <style>.app-nav-button{text-decoration:none}.app-view[hidden]{display:none!important}</style>
+  </head>
+  <body class="app-body app-auth-pending">
+    <div class="app-wrap">
+      <header class="app-topbar"><a class="app-brand" href="/"><span class="app-brand-prefix">the</span><strong>Brivia Club</strong></a><nav class="app-header-nav" data-nav-host="header" aria-label="Member navigation"></nav><button class="app-notification-button" id="app-notification-button" type="button" aria-label="Notifications" aria-controls="app-notification-panel" aria-expanded="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6.8 10.4a5.2 5.2 0 0 1 10.4 0c0 5 2 5.7 2 7.1H4.8c0-1.4 2-2.1 2-7.1ZM9.8 20h4.4"/></svg><i id="notification-badge" hidden>0</i></button><button class="app-avatar-button" id="app-avatar-button" data-nav="profile" aria-label="Open profile"></button><div class="notification-panel" id="app-notification-panel" hidden role="dialog" aria-label="Notifications"><div class="notification-panel-head"><strong>NOTIFICATIONS</strong><button type="button" id="notification-mark-all">MARK ALL READ</button></div><div class="notification-list" id="notification-list"></div></div></header>
+      <main class="app-main">
+        <section class="app-view is-active" data-view="home">
+          <div class="view-topline home-layout-spacer" aria-hidden="true"><span>DISCOVERY / 001</span><span id="queue-count">01 / 06</span></div>
+          <div class="home-heading"><button class="app-menu-button" id="open-discovery-filters" type="button" aria-label="Open discovery filters" aria-controls="discovery-filter-drawer" aria-expanded="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 8h16M4 16h16"/><circle cx="10" cy="8" r="1.6"/><circle cx="15" cy="16" r="1.6"/></svg></button><p class="home-kicker"><span>THE BRIVIA CLUB</span></p><h1>CONNECTION<span class="home-comma">,</span><br /><em>CURATED.</em></h1></div>
+          <div class="swipe-stack" id="swipe-stack">
+          <div class="swipe-card-next" id="swipe-card-next" aria-hidden="true" hidden><div class="swipe-card-next-image"><img id="swipe-next-image" alt="" draggable="false" hidden /></div><p class="swipe-card-next-name" id="swipe-next-name"></p></div>
+          <div class="swipe-card" id="swipe-card">
+            <span class="swipe-stamp swipe-stamp-pass" aria-hidden="true">PASS</span><span class="swipe-stamp swipe-stamp-pitch" aria-hidden="true">PITCH</span>
+            <div class="swipe-card-topline"><span id="swipe-card-label">CREATIVE SOUL</span><button class="card-more" id="card-more" type="button" aria-label="More options" aria-haspopup="menu" aria-expanded="false" aria-controls="card-more-menu"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/></svg></button><div class="card-more-menu" id="card-more-menu" role="menu" aria-label="Member options" hidden><button type="button" role="menuitem" data-card-action="report">Report</button><button type="button" role="menuitem" data-card-action="block">Block</button></div></div>
+            <div class="swipe-card-image"><img id="swipe-image" src="./media/assets/bala.webp" alt="Member profile" draggable="false" /><div class="swipe-card-shade"></div><span class="member-active"><i></i> ACTIVE</span></div><button class="why-toggle" id="why-toggle" type="button" aria-expanded="false" aria-controls="why-panel" hidden>Why this person?</button><div class="why-panel" id="why-panel" role="region" aria-label="Why this person" data-no-swipe hidden></div>
+            <div class="swipe-card-info"><div class="member-name-row"><h2 id="swipe-name"></h2><span id="swipe-age">24</span></div><p id="swipe-role"></p><p id="swipe-location" class="swipe-band" hidden></p><p id="swipe-band-note" class="swipe-band-note" hidden></p><div class="member-tags" id="swipe-tags"></div><button class="view-info-button" data-action="full-info">VIEW FULL INFO <span>↗</span></button></div>
+          </div>
+          </div>
+          <div class="deck-empty" id="home-empty-state" role="status" aria-live="polite" hidden><svg class="deck-empty-mark" viewBox="0 0 48 48" aria-hidden="true"><circle cx="24" cy="24" r="6"/><ellipse cx="24" cy="24" rx="19" ry="9"/><circle cx="41" cy="21" r="2.2"/></svg><p class="app-eyebrow">DISCOVERY</p><h2 id="deck-empty-title" tabindex="-1"></h2><p id="deck-empty-copy"></p><button class="deck-empty-action" id="deck-empty-action" type="button"></button></div>
+          <div class="swipe-actions"><button class="swipe-action swipe-pass" data-action="pass" aria-label="Pass"><svg class="swipe-glyph" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M6 6l12 12M18 6L6 18"/></svg></button><button class="swipe-action swipe-like" data-action="like" aria-label="Pitch"><svg class="swipe-glyph" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></button></div>
+          <p class="swipe-hint">PASS WITH INTENTION <span aria-hidden="true">·</span> <b class="swipe-left-copy" hidden><strong id="swipe-left-count"></strong> <span aria-hidden="true">·</span></b> PITCH WITH PURPOSE</p>
+          <span class="swipe-daily-count" id="swipe-daily-count" aria-live="polite"></span>
+          <div class="swipe-limit-state" id="swipe-limit-state" hidden><svg class="swipe-limit-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/></svg><div><p class="app-eyebrow">SIGNALS</p><span id="swipe-limit-copy"></span></div></div>
+        </section>
+
+        <section class="app-view community-feed-view" data-view="posts" hidden>
+          <div class="community-feed-head">
+            <div><p class="app-eyebrow">EXPLORE / COMMUNITY</p><h1>Share what<br /><em>moves you.</em></h1></div>
+            <button class="community-share-button" id="open-community-post" type="button">SHARE A POST <span>↗</span></button>
+          </div>
+          <div class="community-feed-toolbar"><span id="community-post-count">COMMUNITY POSTS</span><label>SORT <select id="community-post-sort" aria-label="Sort community posts"><option value="newest">NEWEST</option><option value="oldest">OLDEST</option></select></label></div>
+          <form class="community-post-composer" id="community-post-form" hidden>
+            <div class="community-post-composer-head"><div><p class="app-eyebrow">YOUR CONTRIBUTION</p><h2>Put it<br /><em>out there.</em></h2></div><button type="button" class="community-post-close" id="close-community-post" aria-label="Close post composer">×</button></div>
+            <label class="community-post-upload"><input id="community-post-image" name="image" type="file" accept="image/*" required /><span>ADD AN IMAGE</span><small>JPG, PNG or WEBP · MAX 8MB</small></label>
+            <div class="community-post-preview" id="community-post-preview" hidden><img id="community-post-preview-image" alt="Selected post preview" /></div>
+            <label class="community-post-caption"><span>CAPTION</span><textarea id="community-post-caption" name="caption" rows="3" maxlength="240" placeholder="What are you thinking about?" required></textarea></label>
+            <div class="community-post-form-footer"><span id="community-post-feedback" role="status"></span><button class="community-post-submit" type="submit">POST TO EXPLORE <span>↗</span></button></div>
+          </form>
+          <div class="community-post-list" id="community-post-list" aria-live="polite"></div>
+        </section>
+
+        <section class="app-view" data-view="chat" hidden>
+          <div class="view-topline"><span>INBOX / PRIVATE</span><span id="chat-count">02 ACTIVE</span></div><div class="view-heading"><p class="app-eyebrow">PRIVATE CONVERSATIONS</p><h1>Keep the thread<br /><em>meaningful.</em></h1></div>
+          <div class="chat-layout"><div class="chat-list" id="chat-list"></div><div class="chat-window" id="chat-window" hidden><div class="chat-window-head"><button class="chat-back" id="chat-back">←</button><div class="mini-avatar" id="chat-avatar">P</div><div><strong id="chat-name">Priya</strong><span id="chat-status">MEMBER / PRIVATE THREAD</span></div></div><div class="chat-messages" id="chat-messages"></div><form class="chat-compose" id="chat-form"><input id="chat-input" placeholder="Write a thoughtful message..." autocomplete="off" /><button type="submit">→</button></form></div><aside class="inbox-empty-window"><span class="empty-chat-mark" aria-hidden="true"><svg viewBox="0 0 48 48"><path d="M14 17.5 34 24 14 30.5l5-6.5-5-6.5Z"/><path d="M19 24h15"/></svg></span><h2 class="empty-chat-title">Your messages</h2><p class="empty-chat-copy">Send private photos and messages to a friend.</p><button class="empty-chat-action" type="button" data-nav="explore">CONNECT <b>↗</b></button></aside></div>
+        </section>
+
+        <section class="app-view profile-view" data-view="profile" hidden>
+          <div class="profile-shell">
+            <div class="profile-board">
+              <div class="profile-board-content">
+          <div class="view-topline"><span>MY PROFILE / PRIVATE</span><button class="logout-button" id="logout-button">LOG OUT ↗</button></div>
+          <div class="profile-hero">
+            <div class="profile-cover-image" id="profile-cover-image" role="img" aria-label="Your cover image"></div>
+            <div class="profile-hero-copy"><p class="app-eyebrow">YOUR PLACE IN THE CLUB</p><h1 id="profile-name">New Member</h1><p id="profile-location">Your area</p><span class="profile-status"><i></i> MEMBER PROFILE</span></div>
+            <div class="profile-avatar" id="profile-avatar"></div>
+          </div>
+          <div class="profile-column">
+            <section class="profile-card profile-checklist" id="profile-checklist" aria-labelledby="profile-checklist-title"></section>
+            <section class="profile-card profile-interests" id="profile-interests" aria-labelledby="profile-interests-title"><h2 class="profile-card-title" id="profile-interests-title">Your interests</h2><div class="profile-interests-body" id="profile-interests-body"></div></section>
+            <section class="profile-card profile-looking-for" id="profile-looking-for" aria-labelledby="profile-looking-for-title"><h2 class="profile-card-title" id="profile-looking-for-title">Looking for</h2><div id="profile-looking-for-body"></div></section>
+            <section class="profile-card profile-experience" id="profile-experience" aria-labelledby="profile-experience-title"><h2 class="profile-card-title" id="profile-experience-title">Experience</h2><div id="profile-experience-body"></div></section>
+          </div>
+              </div>
+            </div>
+          </div>
+        </section>
+      </main>
+      <nav class="app-tabbar" data-nav-host="tabbar" aria-label="Member navigation"></nav>
+    </div>
+
+    <div class="discovery-filter-drawer" id="discovery-filter-drawer" hidden>
+      <button class="discovery-filter-backdrop" type="button" data-close-discovery-filters aria-label="Close filters"></button>
+      <aside class="discovery-filter-panel" role="dialog" aria-modal="true" aria-labelledby="discovery-filter-title">
+        <div class="discovery-filter-head"><div><p class="app-eyebrow">DISCOVERY / FILTERS</p><h2 id="discovery-filter-title">Find your<br /><em>people.</em></h2></div><button class="discovery-filter-close" type="button" data-close-discovery-filters aria-label="Close filters">×</button></div>
+        <p class="discovery-filter-note">Your deck already starts nearby. Narrow it by name, skills and what people are open to.</p>
+        <label class="discovery-filter-search"><span aria-hidden="true">⌕</span><input id="drawer-filter-search" type="search" placeholder="Search names (2+ letters)..." aria-label="Search names, at least 2 letters" autocomplete="off" /></label>
+        <div class="discovery-filter-suggestions" id="filter-name-suggestions" role="listbox" aria-label="Matching names"></div>
+        <fieldset class="discovery-filter-group"><legend>SKILLS &amp; INTERESTS</legend><div class="discovery-filter-popular" id="filter-popular" role="group" aria-label="Popular interests"></div><div class="discovery-filter-selected" id="filter-skills-selected"></div><input class="discovery-filter-input" id="filter-skills-input" type="search" placeholder="Chess, music, guitar, hackathons..." aria-label="Search skills and interests" autocomplete="off" /><div class="discovery-filter-suggestions" id="filter-skills-suggestions" role="listbox" aria-label="Matching skills"></div></fieldset>
+        <fieldset class="discovery-filter-group"><legend>LOOKING FOR</legend><div class="discovery-filter-selected" id="filter-looking-for-selected"></div><input class="discovery-filter-input" id="filter-looking-for-input" type="search" placeholder="Hackathon buddy, co-founder, mentor..." aria-label="Search what people are looking for" autocomplete="off" /><div class="discovery-filter-suggestions" id="filter-looking-for-suggestions" role="listbox" aria-label="Matching intentions"></div></fieldset>
+        <div class="discovery-filter-footer"><span id="discovery-filter-result">All people</span><button class="discovery-filter-clear" id="clear-discovery-filters" type="button">CLEAR</button><button class="discovery-filter-apply" id="apply-discovery-filters" type="button">SHOW PEOPLE <b>↗</b></button></div>
+      </aside>
+    </div>
+
+    <div class="app-overlay" id="pitch-modal" hidden><div class="app-overlay-backdrop" data-close-overlay></div><section class="pitch-panel"><button class="overlay-close" data-close-overlay>×</button><p class="app-eyebrow">A WARM INTRODUCTION</p><h2>Send a pitch<br /><em>with context.</em></h2><p class="pitch-copy">Tell <strong id="pitch-name">them</strong> why you’d like to connect.</p><form id="pitch-form"><textarea id="pitch-message" rows="4" maxlength="500" placeholder="Hey, I noticed we both care about..." required></textarea><button class="pitch-submit" type="submit">SEND PITCH <span>→</span></button></form></section></div>
+    <div class="app-toast" id="app-toast" role="status"></div>
+    <script>
+      (() => {
+        const validViews = ['home', 'explore', 'posts', 'chat', 'profile'];
+        const readView = () => new URLSearchParams(window.location.search).get('view') || window.location.hash.slice(1) || 'explore';
+        const showView = (view) => {
+          if (!validViews.includes(view)) view = 'explore';
+          const renderedView = view === 'explore' ? 'home' : view;
+          document.body.dataset.appView = view;
+          document.body.classList.toggle('app-subview', view !== 'home');
+          document.querySelectorAll('[data-view]').forEach((section) => {
+            section.hidden = section.dataset.view !== renderedView;
+            section.classList.toggle('is-active', section.dataset.view === renderedView);
+          });
+          const current = view === 'home' ? 'explore' : view;
+          document.querySelectorAll('[data-nav]').forEach((item) => item.classList.toggle('is-active', item.dataset.nav === current));
+          document.querySelectorAll('[data-nav-host] [data-nav]').forEach((item) => {
+            if (item.dataset.nav === current) item.setAttribute('aria-current', 'page');
+            else item.removeAttribute('aria-current');
+          });
+        };
+        document.addEventListener('click', (event) => {
+          // app.js handles nav clicks once it has loaded (and prevents the default); this bridge only covers earlier clicks.
+          if (event.defaultPrevented) return;
+          const item = event.target.closest('[data-nav]');
+          if (!item) return;
+          const targetView = item.dataset.nav;
+          if (!validViews.includes(targetView)) return;
+          if (targetView === 'home' && item.tagName === 'A' && item.getAttribute('href') === '/') return;
+          event.preventDefault();
+          showView(targetView);
+          const nextUrl = new URL(window.location.href);
+          if (targetView === 'home') nextUrl.searchParams.delete('view');
+          else nextUrl.searchParams.set('view', targetView);
+          window.history.pushState(
+            { ...(window.history.state || {}), appView: targetView },
+            '',
+            nextUrl.pathname + nextUrl.search + nextUrl.hash
+          );
+        });
+        showView(readView());
+      })();
+    </script>
+    <script type="module" src="/scripts/app.js"></script>
+  </body>
+</html>
