@@ -65,9 +65,11 @@ test('markLoaded clears .skeleton for an image that already failed (complete, na
 });
 
 // D-062: the 4K hero. A slow link keeps the poster (a 4K stream would stall); the source picker prefers a smooth decode.
-test('motionAllowed is false on a slow link (2g / 3g), true on 4g or unknown', () => {
-  for (const effectiveType of ['slow-2g', '2g', '3g']) assert.equal(motionAllowed({ effectiveType }), false, effectiveType);
-  for (const effectiveType of ['4g', '', undefined]) assert.equal(motionAllowed({ effectiveType }), true, String(effectiveType));
+test('motionAllowed is false only on a 2g link; 3g, 4g and unknown play the hero', () => {
+  // Chrome reports "3g" from latency alone (round trip >= 270 ms): Wi-Fi calling and many mobile networks in India
+  // land there with plenty of bandwidth, and the founder's phone lost the hero video (D-064). Only 2g stays poster-only.
+  for (const effectiveType of ['slow-2g', '2g']) assert.equal(motionAllowed({ effectiveType }), false, effectiveType);
+  for (const effectiveType of ['3g', '4g', '', undefined]) assert.equal(motionAllowed({ effectiveType }), true, String(effectiveType));
 });
 
 test('pickHeroSource takes the first smooth decode, else the first supported one, else none', () => {

@@ -1271,3 +1271,19 @@ controls (a tester or a seeded test member), never a real member, so no new expo
   3.7 ms of main/raster work instead of 5.7 (style halved, raster -38%), while rendering about 50 % more frames
   (the Lenis glide). The phone probe is a steady 60 fps. The container has no GPU, so desktop headless frame times
   still drop in that scene; check it on a real laptop.
+
+## D-064: The hero plays on "3g" connections; the chat room photo is softly blurred again (2026-10-18)
+- Accepted 2026-10-18 (founder, from the live site: "the hero video is not playing" on a phone; the chat "a little
+  blur and classy, like the picture, same wine").
+- **Hero root cause.** D-063 made `effectiveType` "2g" and "3g" poster-only. Chrome derives "3g" from latency alone
+  (round trip of 270 ms or more), so Wi-Fi calling and many mobile networks in India report it with plenty of
+  bandwidth; the founder's phone got the poster only. Reproduced in Playwright (navigator.connection stubbed): "3g"
+  requested no hero file before the fix and plays the portrait AV1 after it. Now only "slow-2g" and "2g" are
+  poster-only (`landing-motion.js`, unit-tested; the inline intro check in `index.html` matches). Also: if a muted
+  autoplay is refused (Low Power Mode on iPhone, some Android battery savers), the first touch, click or key starts
+  the hero (it has no audio track, so this never plays sound).
+- **Chat.** The founder's reference is the earlier soft look: the room photo lightly blurred under a cream veil. It is
+  now baked into `media/assets/chat-room-soft.webp` (sharp: blur 5 at 1600 px, a 20 % cream veil; 21 KB), so there is
+  no live CSS filter to repaint while scrolling. The wine stays `#5a061e` (sampled from the reference: identical).
+  Sidebar order as in the reference: search, then "BRIVIA SOCIETY", then the tagline and conversations; the
+  "BRIVIA AI · THOUGHTFUL CONNECTIONS" footer line is back, in the serif face.

@@ -18,7 +18,7 @@
           try { fromAuth = sessionStorage.getItem('brivia-skip-intro-once') === 'true'; } catch (e) {}
           var reduced = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
           var saveData = !!(navigator.connection && navigator.connection.saveData);
-          var slow = !!(navigator.connection && /^(slow-2g|2g|3g)$/.test(navigator.connection.effectiveType || ''));
+          var slow = !!(navigator.connection && /^(slow-2g|2g)$/.test(navigator.connection.effectiveType || ''));
           if (seen || fromAuth || reduced || saveData || slow) document.documentElement.classList.add('no-intro');
         } catch (e) {}
       })();

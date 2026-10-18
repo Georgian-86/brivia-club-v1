@@ -147,6 +147,14 @@ const startHeroVideo = async () => {
 if (landingMotion && heroLandingVideo) {
   if (typeof window.requestIdleCallback === 'function') window.requestIdleCallback(startHeroVideo, { timeout: 2000 });
   else window.setTimeout(startHeroVideo, 1200);
+  // Low Power Mode on iPhone and some Android battery savers refuse even a muted autoplay: the first touch or click then
+  // starts it (D-064). The hero has no audio track, so this never plays sound.
+  const resumeHero = () => {
+    if (!heroLandingVideo.paused) return;
+    if (!startedLandingVideos.has(heroLandingVideo)) startLandingVideo(heroLandingVideo);
+    else heroLandingVideo.play().catch(() => {});
+  };
+  ['touchend', 'click', 'keydown'].forEach((name) => window.addEventListener(name, resumeHero, { once: true, passive: true }));
 }
 const belowFoldVideos = landingVideos.filter((video) => video !== heroLandingVideo);
 if (landingMotion && belowFoldVideos.length) {

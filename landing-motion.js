@@ -4,9 +4,10 @@
 export const INTRO_CAP_MS = 2500;
 export const INTRO_START_GRACE_MS = 800;
 
-// Posters only (no video requests) for reduced-motion and save-data visitors, and on a slow link (2g / 3g): the hero
-// is 4K (D-062) and would stall there, so the poster stays.
-const SLOW_LINKS = new Set(['slow-2g', '2g', '3g']);
+// Posters only (no video requests) for reduced-motion and save-data visitors, and on a 2g link where the 4K hero (D-062)
+// would stall. Not on "3g": Chrome derives it from latency alone (round trip >= 270 ms), so Wi-Fi calling and many
+// mobile networks report it with plenty of bandwidth, and the hero never played there (D-064).
+const SLOW_LINKS = new Set(['slow-2g', '2g']);
 export function motionAllowed({ reducedMotion = false, saveData = false, effectiveType = '' } = {}) {
   return !reducedMotion && !saveData && !SLOW_LINKS.has(effectiveType);
 }

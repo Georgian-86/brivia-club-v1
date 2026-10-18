@@ -7,6 +7,10 @@ Update this file at the end of every session. CLAUDE.md holds the aim; this file
 
 ## 1. What is done
 
+**Live-site fixes (2026-10-18), D-064.** PR #2 (D-062, D-063) is merged and live. Follow-up: the hero now plays on
+connections Chrome labels "3g" (only 2g is poster-only), a refused autoplay starts on the first touch, and the chat
+room photo is softly blurred again (baked into `media/assets/chat-room-soft.webp`) with the reference sidebar order.
+
 **Landing smoothness and sound (2026-10-16), same branch.** See D-063. Lenis smooth scroll (desktop pointer only),
 cheaper matching-scene layers, sound that starts on the first real gesture and stops after 5 minutes, and a sound
 button. Checks: `node tests/e2e/landing-sound.spec.mjs` (15 checks, after a stub build) and the frame-time probe

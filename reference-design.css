@@ -257,11 +257,12 @@ body.app-body .app-view[data-view="home"] .swipe-like { border-color: var(--colo
 }
 
 /* ---------- 2. Chat ---------- */
-/* The room: sharp and full strength (no blur, no wash). It is the scroller's own background, so it stays put while
-   only the messages move. */
+/* The room, softly blurred under a light cream veil (founder's reference, D-064). The blur and veil are baked into
+   media/assets/chat-room-soft.webp (no live CSS filter to repaint), and it is the scroller's own background, so it
+   stays put while only the messages move. */
 body.app-body .app-view[data-view="chat"] .chat-layout .chat-messages {
   background-color: var(--color-chat-paper) !important;
-  background-image: url('./media/assets/chat-reference-room.webp') !important;
+  background-image: url('./media/assets/chat-room-soft.webp') !important;
   background-attachment: scroll !important;
   background-position: center center !important;
   background-repeat: no-repeat !important;
@@ -354,11 +355,15 @@ body.app-body .app-view[data-view="chat"] .chat-compose button[type="submit"] { 
   body.app-body .app-view[data-view="chat"] .chat-layout { border-color: color-mix(in srgb, var(--color-chat-wine) 16%, transparent); background: var(--color-chat-paper); }
   body.app-body .app-view[data-view="chat"] .chat-layout > .chat-list { background: var(--color-chat-paper) !important; }
   /* The masthead: "BRIVIA SOCIETY", a short rule, then PEOPLE / IDEAS / POSSIBILITIES (the reference sidebar). */
+  /* The reference order: the search, then the masthead, then the tagline and the conversations. */
+  body.app-body .app-view[data-view="chat"] #chat-list > .inbox-toolbar { order: 0; }
+  body.app-body .app-view[data-view="chat"] #chat-list .chat-inbox-scroll { order: 2; }
   body.app-body .app-view[data-view="chat"] #chat-list::before {
+    order: 1;
     display: block !important;
     flex: 0 0 auto;
     height: auto;
-    margin: 10px 24px 0;
+    margin: 22px 24px 0;
     padding: 0 0 12px;
     color: var(--color-name-ink);
     content: 'BRIVIA SOCIETY';
@@ -371,9 +376,9 @@ body.app-body .app-view[data-view="chat"] .chat-compose button[type="submit"] { 
     background: linear-gradient(color-mix(in srgb, var(--color-name-ink) 40%, transparent), color-mix(in srgb, var(--color-name-ink) 40%, transparent)) left bottom / 26px 1px no-repeat;
   }
   body.app-body .app-view[data-view="chat"] #chat-list > .inbox-toolbar { display: flex !important; flex-direction: column; align-items: stretch; }
-  body.app-body .app-view[data-view="chat"] #chat-list > .inbox-toolbar::before {
+  body.app-body .app-view[data-view="chat"] #chat-list .chat-inbox-scroll::before {
     display: block;
-    margin: 4px 10px 14px;
+    margin: 6px 24px 22px;
     color: var(--color-name-ink);
     content: 'PEOPLE\A IDEAS\A POSSIBILITIES';
     font-family: var(--font-heading);
@@ -382,7 +387,8 @@ body.app-body .app-view[data-view="chat"] .chat-compose button[type="submit"] { 
     line-height: 1.45;
     white-space: pre;
   }
-  body.app-body .app-view[data-view="chat"] #chat-list::after { content: none !important; display: none !important; }
+  /* The quiet footer line stays, as in the reference. */
+  body.app-body .app-view[data-view="chat"] #chat-list::after { display: block !important; font-family: var(--font-heading); letter-spacing: .16em; }
   body.app-body .app-view[data-view="chat"] #chat-list .inbox-search {
     border: 0;
     border-radius: 999px;
@@ -390,7 +396,7 @@ body.app-body .app-view[data-view="chat"] .chat-compose button[type="submit"] { 
     box-shadow: 0 2px 10px -6px color-mix(in srgb, var(--color-name-ink) 40%, transparent);
   }
   body.app-body .app-view[data-view="chat"] #chat-list .inbox-search input { font-family: var(--font-heading); }
-  body.app-body .app-view[data-view="chat"] #chat-list .chat-inbox-scroll { padding-top: 14px !important; padding-bottom: 20px !important; }
+  body.app-body .app-view[data-view="chat"] #chat-list .chat-inbox-scroll { padding-top: 0 !important; padding-bottom: 88px !important; }
   body.app-body .app-view[data-view="chat"] #chat-list .chat-inbox-scroll .chat-row { min-height: 74px; padding: 12px 18px; }
   body.app-body .app-view[data-view="chat"] #chat-list .chat-inbox-scroll .chat-row .mini-avatar { width: 46px; height: 46px; flex-basis: 46px; }
   body.app-body .app-view[data-view="chat"] .chat-back { display: none !important; }
@@ -398,7 +404,7 @@ body.app-body .app-view[data-view="chat"] .chat-compose button[type="submit"] { 
   body.app-body .app-view[data-view="chat"] .chat-window-head .mini-avatar { width: 46px; height: 46px; flex-basis: 46px; }
   body.app-body .app-view[data-view="chat"] .chat-layout .chat-messages { padding: 30px 6% !important; }
   body.app-body .app-view[data-view="chat"] .chat-compose { border-top: 1px solid color-mix(in srgb, var(--color-chat-wine) 14%, transparent); background: var(--color-chat-head) !important; }
-  body.app-body .app-view[data-view="chat"] .inbox-empty-window .empty-chat-messages { background-image: url('./media/assets/chat-reference-room.webp') !important; }
+  body.app-body .app-view[data-view="chat"] .inbox-empty-window .empty-chat-messages { background-image: url('./media/assets/chat-room-soft.webp') !important; }
   body.app-body .app-view[data-view="chat"] .empty-chat-bubble-me,
   body.app-body .app-view[data-view="chat"] .empty-chat-line-me .empty-chat-bubble { background: var(--color-chat-wine) !important; }
 }
