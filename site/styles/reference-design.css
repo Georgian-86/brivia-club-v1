@@ -527,3 +527,39 @@ body.app-body .app-view[data-view="chat"] .chat-compose button[type="submit"] { 
 @media (max-width: 600px) {
   .profile-cover-options { grid-auto-columns: 112px; }
 }
+
+/* Thread header that holds any name at any text size (founder's phone, 2026-10-19: a large system font pushed the
+   name and a two-line status out of the fixed 66 px bar). The bar grows with its text; name and status stay on one
+   line each and end in an ellipsis; avatar, back and menu never shrink. */
+body.app-body .app-view[data-view="chat"] .chat-window-head {
+  display: flex !important;
+  flex: 0 0 auto !important;
+  height: auto !important;
+  min-height: 64px;
+  align-items: center !important;
+  gap: 12px;
+  padding-top: 10px !important;
+  padding-bottom: 10px !important;
+}
+body.app-body .app-view[data-view="chat"] .chat-window-head > .chat-back,
+body.app-body .app-view[data-view="chat"] .chat-window-head > .mini-avatar,
+body.app-body .app-view[data-view="chat"] .chat-window-head > .chat-more { flex-shrink: 0; }
+body.app-body .app-view[data-view="chat"] .chat-window-head > #chat-avatar + div {
+  display: flex;
+  min-width: 0;
+  flex: 1 1 auto;
+  flex-direction: column;
+  justify-content: center;
+  gap: 3px;
+}
+body.app-body .app-view[data-view="chat"] .chat-window-head #chat-name,
+body.app-body .app-view[data-view="chat"] .chat-window-head #chat-status {
+  display: block;
+  max-width: 100%;
+  margin: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+body.app-body .app-view[data-view="chat"] .chat-window-head #chat-name { line-height: 1.15; }
+body.app-body .app-view[data-view="chat"] .chat-window-head #chat-status { line-height: 1.3; }

@@ -1387,3 +1387,17 @@ controls (a tester or a seeded test member), never a real member, so no new expo
   the stored preset path (`cover-presets.js`, unit-tested against `isPresetCoverUrl`). The profile photo upload stays.
 - A cover uploaded before this keeps showing until the member picks a preset; the save then deletes the uploaded file
   from Storage. No database change (preset paths were always accepted).
+
+## D-071: "Accepted your request" notifications; a chat header that holds any name (2026-10-19)
+- Accepted 2026-10-19 (founder's live test: Aarav got no notification when Golu accepted his request; Golu's photo did
+  not show in the chat; the thread header's name "messing up with margin and padding").
+- **Notification.** The app notified only new messages and incoming requests; nothing told a sender their request was
+  accepted. Now `my_outgoing_requests` (which already reports `accepted`, and keeps a decline looking `pending` to the
+  sender) is read on load and whenever the ~30 s connection sync finds a new match. Each acceptance from the last 7
+  days becomes one notification, "<name> accepted your request. Say hi.", which opens the chat. A per-device seen list
+  stops repeats; a mutual match made by my own swipe is marked seen (its toast already said so). No database change.
+- **Photo.** Not a bug: live data shows two accounts, "Golu Kumar" (the one Aarav is connected with, no photo, so the
+  initials are right) and a newer "Golu" (with a photo, Aarav's request to it still pending).
+- **Header.** It had a fixed 66 px height; with a large system font the name and a two-line status spilled out. It now
+  grows with its text, keeps name and status to one line each with an ellipsis, and never squeezes the avatar, back
+  or menu. Spec: `tests/e2e/accepted-notice.spec.mjs` (5 checks).

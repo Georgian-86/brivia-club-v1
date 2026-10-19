@@ -7,6 +7,10 @@ Update this file at the end of every session. CLAUDE.md holds the aim; this file
 
 ## 1. What is done
 
+**Accepted-request notifications and the chat header (2026-10-19), D-071.** Senders now get "<name> accepted your
+request. Say hi." (on load, or within ~30 s while open). The thread header grows with large system text. Spec:
+`node tests/e2e/accepted-notice.spec.mjs`. Note: live has two Golu accounts ("Golu Kumar" without a photo, "Golu" with one).
+
 **Covers are presets only (2026-10-19), D-070.** Edit profile picks from the 18 Brivia covers (`cover-presets.js`);
 no gallery upload anywhere. The profile photo upload is unchanged.
 

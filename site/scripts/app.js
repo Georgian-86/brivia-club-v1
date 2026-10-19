@@ -262,6 +262,55 @@ const addMessageNotification = (message) => {
   saveNotifications();
   return true;
 };
+// "Accepted your request" (2026-10-19): the sender of an accepted request hears about it. my_outgoing_requests returns
+// 'accepted' for those (a decline stays 'pending' to the sender, R-privacy), and the match row's created_at is when it
+// happened. Each accepted request notifies once per device (a seen list), and only if it happened in the last 7 days.
+const ACCEPTED_NOTICE_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
+const acceptedSeenKey = () => `brivia-accepted-seen:${memberProfile.id || 'anonymous'}`;
+const readAcceptedSeen = () => {
+  try { const saved = JSON.parse(window.localStorage.getItem(acceptedSeenKey()) || '[]'); return new Set(Array.isArray(saved) ? saved.map(String) : []); } catch { return new Set(); }
+};
+const saveAcceptedSeen = (seen) => {
+  try { window.localStorage.setItem(acceptedSeenKey(), JSON.stringify([...seen].slice(-200))); } catch { /* Continue in memory. */ }
+};
+let matchCreatedAt = new Map();
+const rememberMatchTimes = (rows) => {
+  (rows || []).forEach((row) => {
+    const other = String(row.user1_id) === String(memberProfile.id) ? row.user2_id : row.user1_id;
+    if (other && row.created_at) matchCreatedAt.set(String(other), row.created_at);
+  });
+};
+const syncAcceptedRequests = async () => {
+  if (!supabase || !memberProfile.id) return false;
+  const { data, error } = await supabase.rpc('my_outgoing_requests');
+  if (error) { console.warn('Sent requests could not load:', error.message); return false; }
+  const seen = readAcceptedSeen();
+  const fresh = [];
+  (data || []).filter((row) => row?.status === 'accepted' && row.to_id).forEach((row) => {
+    const personId = String(row.to_id);
+    if (seen.has(personId)) return;
+    seen.add(personId);
+    const at = matchCreatedAt.get(personId) || row.created_at || new Date().toISOString();
+    if (Date.now() - new Date(at).getTime() > ACCEPTED_NOTICE_WINDOW_MS) return;
+    fresh.push({ personId, at });
+  });
+  saveAcceptedSeen(seen);
+  if (!fresh.length || !areNotificationsEnabled()) return false;
+  fresh.forEach(({ personId, at }) => {
+    const id = `accepted:${personId}`;
+    if (!notifications.some((item) => String(item.id) === id)) notifications.unshift({ id, type: 'accepted', personId, body: 'Accepted your request. Say hi.', createdAt: at, read: false });
+  });
+  notifications = notifications.slice(0, 80);
+  saveNotifications();
+  const unknown = fresh.map((item) => item.personId).filter((id) => !findPersonById(id));
+  if (unknown.length) {
+    const { data: rows } = await fetchCandidates(unknown);
+    mergePeople(rows);
+    renderChats();
+  }
+  renderNotifications();
+  return true;
+};
 const markNotificationsReadForPerson = (personId) => {
   let changed = false;
   notifications = notifications.map((notification) => {
@@ -305,8 +354,9 @@ const renderNotifications = () => {
   const grouped = new Map();
   notifications.filter((notification) => !notification.read).forEach((notification) => {
     const key = String(notification.personId);
-    const group = grouped.get(key) || { personId: key, count: 0, latest: notification };
+    const group = grouped.get(key) || { personId: key, count: 0, messages: 0, accepted: false, latest: notification };
     group.count += 1;
+    if (notification.type === 'accepted') group.accepted = true; else group.messages += 1;
     if (new Date(notification.createdAt || 0) > new Date(group.latest.createdAt || 0)) group.latest = notification;
     grouped.set(key, group);
   });
@@ -322,7 +372,9 @@ const renderNotifications = () => {
   const messagesHtml = !enabled ? `<div class="notification-empty"><p>Notifications are off in settings.</p>${settingsAction}</div>` : unreadGroups.length ? unreadGroups.map((group) => {
     const person = findPersonById(group.personId);
     const title = person?.name || 'a Brivia member';
-    const messageLabel = `${group.count} message${group.count === 1 ? '' : 's'} from ${title}`;
+    const messageLabel = group.messages
+      ? `${group.messages} message${group.messages === 1 ? '' : 's'} from ${title}${group.accepted ? ' (request accepted)' : ''}`
+      : `${title} accepted your request. Say hi.`;
     return `<button type="button" class="notification-item is-unread" data-notification-person="${escapeHtml(group.personId)}">${renderAvatar(person, 'notification-avatar')}<span class="notification-copy"><strong>${escapeHtml(messageLabel)}</strong></span><time>${escapeHtml(formatNotificationTime(group.latest.createdAt))}</time></button>`;
   }).join('') : (requestCount ? '' : `<div class="notification-empty"><p>You are all caught up.</p>${settingsAction}</div>`);
   list.innerHTML = requestsHtml + messagesHtml;
@@ -959,7 +1011,8 @@ const sendConnectionSignal = async (person, note = null) => {
   }
   refreshSignalQuota();
   const matched = data?.status === 'matched';
-  if (matched) { addConnection(person.id); renderChats(); }
+  // A mutual match I just made shows its toast now, so it never comes back later as "accepted your request".
+  if (matched) { const seen = readAcceptedSeen(); seen.add(String(person.id)); saveAcceptedSeen(seen); addConnection(person.id); renderChats(); }
   return { matched, status: data?.status || null };
 };
 const mutualToast = (person) => `It's mutual. Say hi to ${person?.name || 'your new connection'}.`;
@@ -995,14 +1048,18 @@ const loadConnectionRequests = async () => {
 };
 const refreshConnections = async () => {
   if (!supabase || !memberProfile.id) return;
-  const { data, error } = await supabase.from('matches').select('user1_id,user2_id').or(`user1_id.eq.${memberProfile.id},user2_id.eq.${memberProfile.id}`);
+  const { data, error } = await supabase.from('matches').select('user1_id,user2_id,created_at').or(`user1_id.eq.${memberProfile.id},user2_id.eq.${memberProfile.id}`);
   if (error) { console.warn('Connections could not refresh:', error.message); return; }
+  rememberMatchTimes(data);
   const before = remoteConnectionIds.length;
   // Only newly matched people are added, so chats hidden on this device stay hidden.
   (data || []).map((match) => String(match.user1_id) === String(memberProfile.id) ? match.user2_id : match.user1_id)
     .filter((id) => !remoteConnectionIds.some((known) => String(known) === String(id)))
     .forEach(addConnection);
-  return remoteConnectionIds.length !== before;
+  const changed = remoteConnectionIds.length !== before;
+  // A new match may be someone accepting my request: tell me (never for a request I accepted myself, see respondToRequest).
+  if (changed) syncAcceptedRequests().catch((error) => console.warn('Accepted requests could not sync:', error.message));
+  return changed;
 };
 const respondToRequest = async (fromId, accept) => {
   if (!supabase || respondingRequestIds.has(fromId)) return;
@@ -2922,8 +2979,9 @@ const loadSupabaseCommunity = async () => {
   renderProfile();
   if (document.body.dataset.appView === 'profile' && profileInterests.status === 'idle') loadProfileInterests();
   await syncBlockedUserIds();
-  const { data: matchRows, error: matchError } = await supabase.from('matches').select('user1_id,user2_id').or(`user1_id.eq.${session.user.id},user2_id.eq.${session.user.id}`);
+  const { data: matchRows, error: matchError } = await supabase.from('matches').select('user1_id,user2_id,created_at').or(`user1_id.eq.${session.user.id},user2_id.eq.${session.user.id}`);
   if (!matchError) {
+    rememberMatchTimes(matchRows);
     remoteConnectionIds = (matchRows || []).map((match) => match.user1_id === session.user.id ? match.user2_id : match.user1_id);
     remoteMatchIds = [...remoteConnectionIds];
   }
@@ -2958,6 +3016,8 @@ const loadSupabaseCommunity = async () => {
     if (chatError) console.warn('Connections could not load:', chatError.message);
     mergePeople(chatRows);
   }
+  // Requests I sent that were accepted while I was away (each told once per device).
+  syncAcceptedRequests().catch((error) => console.warn('Accepted requests could not sync:', error.message));
   currentPerson = deckPeople()[0] || null;
   deck.ready = true;
   renderHome();
