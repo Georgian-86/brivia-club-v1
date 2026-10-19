@@ -320,6 +320,11 @@ From a member's point of view (D-015..D-018):
 - **Blocked users** (Profile settings) adds "Unblocking doesn't cancel a report you've made."
 - **Verified by** `tests/e2e/deck.spec.mjs` (section 7b) and `tests/e2e/consent.spec.mjs` (8h).
 
+### F2. Cover image (D-070)
+
+Covers are chosen from the 18 Brivia presets only, at signup (the suggestions row) and in Edit profile (a preview and a
+scrollable radiogroup of the presets, the current one ticked). There is no upload from the gallery.
+
 ### G. Privacy & account (R2 withdraw, R5 delete, Iteration 4)
 
 - **Entry.** The profile settings menu gains **PRIVACY & ACCOUNT** (after Removed connections, before Log out; items are

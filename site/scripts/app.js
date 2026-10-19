@@ -25,7 +25,8 @@ import { deleteAccount, clearBriviaKeys, DELETE_BUCKETS, reauthMarker, reauthMar
 import { openPrivacyAccount } from './privacy-account.js';
 import { isUnderReview, UNDER_REVIEW_COPY } from './onboarding-guard.js';
 import { openReportDialog, bindCardOverflow, cardOverflowOpen, reportSuccessCopy } from './report-dialog.js';
-import { defaultCoverUrl, normalizeCoverUrl } from './cover-assets.js';
+import { defaultCoverUrl, normalizeCoverUrl, coverPresetImage } from './cover-assets.js';
+import { COVER_PRESETS } from './cover-presets.js';
 import { postImageSrc } from './post-image.js';
 import { profileChecklist } from './profile-checklist.js';
 import { quotaLabel, quotaErrorText, quotaBlocked, quotaNotice } from './signal-quota.js';
@@ -1847,6 +1848,46 @@ const ensureProfilePhotoEditor = () => {
 };
 
 
+// D-070: a cover is always one of the presets; there is no upload from the gallery. The picker shows the current cover
+// (a cover uploaded before D-070 stays until the member picks a preset) and a scrollable row of the 18 presets.
+const coverPickerMarkup = (currentUrl) => {
+  const current = normalizeCoverUrl(currentUrl || '') || defaultCoverUrl;
+  const options = COVER_PRESETS.map((preset, i) => {
+    const image = coverPresetImage(preset.key);
+    const selected = image === current;
+    return `<button type="button" class="profile-cover-choice${selected ? ' is-selected' : ''}" role="radio" aria-checked="${selected}" tabindex="${selected || (!COVER_PRESETS.some((p) => coverPresetImage(p.key) === current) && i === 0) ? 0 : -1}" data-cover-stored="${escapeHtml(preset.stored)}" data-cover-image="${escapeHtml(image)}" aria-label="${escapeHtml(preset.label)}"><img src="${escapeHtml(image)}" alt="" loading="lazy" decoding="async" /><span>${escapeHtml(preset.label)}</span></button>`;
+  }).join('');
+  return `<div class="profile-edit-wide profile-cover-picker" data-profile-cover-picker><span id="profile-cover-label">COVER IMAGE</span>
+    <div class="profile-cover-preview" data-profile-cover-preview style="background-image:url(&quot;${escapeHtml(current)}&quot;)"></div>
+    <div class="profile-cover-options" role="radiogroup" aria-labelledby="profile-cover-label">${options}</div>
+    <small class="profile-edit-helper">Choose one of the Brivia covers. It sits behind your photo on your card and profile.</small></div>`;
+};
+const wireCoverPicker = (root) => {
+  const picker = root.querySelector('[data-profile-cover-picker]');
+  if (!picker) return () => null;
+  const preview = picker.querySelector('[data-profile-cover-preview]');
+  const choices = [...picker.querySelectorAll('.profile-cover-choice')];
+  let chosen = null;
+  const pick = (button) => {
+    chosen = button.dataset.coverStored;
+    choices.forEach((c) => { const on = c === button; c.classList.toggle('is-selected', on); c.setAttribute('aria-checked', String(on)); c.tabIndex = on ? 0 : -1; });
+    preview.style.backgroundImage = `url("${button.dataset.coverImage.replace(/["\\\n]/g, encodeURIComponent)}")`;
+  };
+  choices.forEach((button, i) => {
+    button.addEventListener('click', () => pick(button));
+    button.addEventListener('keydown', (event) => {
+      const step = { ArrowRight: 1, ArrowDown: 1, ArrowLeft: -1, ArrowUp: -1 }[event.key];
+      if (!step) return;
+      event.preventDefault();
+      const next = choices[(i + step + choices.length) % choices.length];
+      pick(next);
+      next.focus();
+      next.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+    });
+  });
+  return () => chosen;  // the stored preset path the member picked, or null to keep the current cover
+};
+
 const openProfileEditor = () => {
   if (!memberProfile.id || document.querySelector('#profile-edit-modal')) return;
   const profile = memberProfile;
@@ -1868,13 +1909,14 @@ const openProfileEditor = () => {
         <div class="profile-edit-wide profile-edit-readonly"><span>SKILLS / INTERESTS</span><p>${escapeHtml(profile.skills || 'Pick interests in your profile setup')}</p><small class="profile-edit-helper">These come from your interests and passion points. Private interests are never shown.</small></div>
         <label class="profile-edit-wide"><span>LOOKING FOR</span><input name="lookingFor" list="profile-edit-looking-options" value="${escapeHtml(profile.lookingFor || '')}" placeholder="Search or type what you are looking for" /><datalist id="profile-edit-looking-options">${profileEditDatalist('lookingFor')}</datalist><small class="profile-edit-helper">Choose from suggestions or type your own.</small></label>
         <label><span>PROFILE PHOTO</span><input name="photoFile" type="file" accept="image/*" aria-describedby="profile-photo-error" /><small class="media-inline-error" id="profile-photo-error" role="alert" hidden></small></label>
-        <label><span>COVER PHOTO</span><input name="coverFile" type="file" accept="image/*" aria-describedby="profile-cover-error" /><small class="media-inline-error" id="profile-cover-error" role="alert" hidden></small></label>
+        ${coverPickerMarkup(memberProfile.coverUrl)}
       </div>
       <p class="profile-edit-feedback" id="profile-edit-feedback" role="status"></p>
       <div class="profile-edit-actions"><button type="button" class="profile-edit-cancel" data-profile-edit-close>CANCEL</button><button type="submit" class="profile-edit-save">SAVE CHANGES <span>↗</span></button></div>
     </form>
   </div>`;
   document.body.append(modal);
+  const chosenCover = wireCoverPicker(modal);
   const close = () => modal.remove();
   modal.querySelectorAll('[data-profile-edit-close]').forEach((button) => button.addEventListener('click', close));
   modal.addEventListener('click', (event) => { if (event.target === modal) close(); });
@@ -1890,25 +1932,24 @@ const openProfileEditor = () => {
       phone: String(formData.get('phone') || '').trim(),
       experience: String(formData.get('experience') || '').trim(),
       lookingFor: String(formData.get('lookingFor') || '').trim(),
+      ...(chosenCover() ? { coverUrl: chosenCover() } : {}),
     };
     const photoFile = form.querySelector('[name="photoFile"]')?.files?.[0] || null;
-    const coverFile = form.querySelector('[name="coverFile"]')?.files?.[0] || null;
     if (!nextProfile.name) { feedback.textContent = 'Please add your name.'; return; }
     const photoError = form.querySelector('#profile-photo-error');
-    const coverError = form.querySelector('#profile-cover-error');
-    [photoError, coverError].forEach((node) => { node.hidden = true; node.textContent = ''; });
+    photoError.hidden = true;
+    photoError.textContent = '';
     setBusy(submit, true);
     feedback.textContent = 'Saving your profile...';
-    const { data, error } = await saveProfile(memberProfile.id, nextProfile, photoFile, coverFile, { photoUrl: memberProfile.photoUrl, coverUrl: memberProfile.coverUrl });
+    const { data, error } = await saveProfile(memberProfile.id, nextProfile, photoFile, null, { photoUrl: memberProfile.photoUrl, coverUrl: memberProfile.coverUrl });
     if (error) {
       setBusy(submit, false);
       if (error instanceof ImageProcessingError) {
-        // Inline beside the field that failed (nothing was uploaded); photo is processed first.
-        const target = error.field === 'cover' ? coverError : photoError;
-        target.textContent = error.message;
-        target.hidden = false;
+        // Inline beside the photo field (nothing was uploaded).
+        photoError.textContent = error.message;
+        photoError.hidden = false;
         feedback.textContent = '';
-        form.querySelector(error.field === 'cover' ? '[name="coverFile"]' : '[name="photoFile"]')?.focus();
+        form.querySelector('[name="photoFile"]')?.focus();
         return;
       }
       feedback.textContent = error.message || 'Profile could not be saved.';

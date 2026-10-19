@@ -7,6 +7,9 @@ Update this file at the end of every session. CLAUDE.md holds the aim; this file
 
 ## 1. What is done
 
+**Covers are presets only (2026-10-19), D-070.** Edit profile picks from the 18 Brivia covers (`cover-presets.js`);
+no gallery upload anywhere. The profile photo upload is unchanged.
+
 **Signup back to the classic form (2026-10-19), D-069.** The guided one-question-per-screen signup (D-067, D-068) was
 live for one day and is removed at the founder's request; the 4-step form (UX_SPEC §A) is the only signup. No SQL
 involved. The design and code stay in git history (commits 7a74194, 4e708c8) if it is ever wanted again.

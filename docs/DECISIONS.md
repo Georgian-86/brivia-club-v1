@@ -1377,3 +1377,13 @@ controls (a tester or a seeded test member), never a real member, so no new expo
   (D-068); one who stopped before it can use "Forgot password?" on the login page.
 - **Kept from the same period:** the repository layout (D-065), the removed login/signup quote, and the phone
   smoothness work (D-066).
+
+## D-070: Cover images are Brivia presets only; no upload from the gallery (2026-10-19)
+- Accepted 2026-10-19 (founder: "for cover pictures we will not provide an option for the people to choose from
+  gallery... people shall see only these available cover pics and then apply one they like", as on the reference
+  build club-seven-woad.vercel.app).
+- Signup already offered only the 18 presets. Edit profile had a "Cover photo" file input; it is replaced by the same
+  presets: a large preview and a scrollable row of the 18 covers (a radiogroup, arrow keys move the choice), saved as
+  the stored preset path (`cover-presets.js`, unit-tested against `isPresetCoverUrl`). The profile photo upload stays.
+- A cover uploaded before this keeps showing until the member picks a preset; the save then deletes the uploaded file
+  from Storage. No database change (preset paths were always accepted).

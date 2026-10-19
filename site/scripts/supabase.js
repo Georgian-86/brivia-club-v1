@@ -236,6 +236,8 @@ export const saveProfile = async (userId, profile, photoFile, coverFile = null, 
   if (!result.error) {
     if (photoFile && photoUrl) await removeReplacedImage('profile-photos', userId, previous.photoUrl, photoUrl);
     if (coverFile && coverUrl) await removeReplacedImage('profile-covers', userId, previous.coverUrl, coverUrl);
+    // D-070: switching from an uploaded cover to a preset removes the uploaded file (presets are never in Storage).
+    else if (!coverFile && result.data?.cover_url && isPresetCoverUrl(result.data.cover_url)) await removeReplacedImage('profile-covers', userId, previous.coverUrl, result.data.cover_url);
   }
   return result;
 };
