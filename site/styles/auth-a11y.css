@@ -146,6 +146,7 @@ body.auth-page .auth-shell .auth-signup-form .area-step {
   display: flex; flex-direction: column; gap: 10px; padding-top: 18px;
   border-top: 1px solid color-mix(in srgb, var(--a11y-wine) 14%, transparent);
 }
+body.auth-page .auth-shell .auth-signup-form .area-promise { margin: -4px 0 2px; color: var(--a11y-ink-soft); font-size: var(--text-14); line-height: 1.5; letter-spacing: 0; text-transform: none; }
 body.auth-page .auth-shell .auth-signup-form .area-step-title {
   margin: 0; color: var(--a11y-wine); font-size: var(--text-12); font-weight: 700; letter-spacing: .093em; text-transform: uppercase;
 }

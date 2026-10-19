@@ -1,10 +1,12 @@
-// Iteration 3, Task 8: the 4-step signup (UX_SPEC flow A) and the completion re-entry, against stubbed Supabase.
+// Iteration 3, Task 8 (3 steps since D-072): the signup (UX_SPEC flow A) and the completion re-entry, against stubbed Supabase.
 // Never touches a real Supabase project. Playwright is NOT a repo dependency; see tests/e2e/README.md.
 //
 //   PLAYWRIGHT_MODULE=/path/to/node_modules/playwright/index.mjs node tests/e2e/onboarding.spec.mjs
 //
 // Asserts (Review Focus 4 and 5, client side):
-// * 4 steps reading "STEP n OF 4" (aria-valuemax 4) at 375 px and 1440 px, no City/State inputs, no horizontal scroll;
+// * 3 steps reading "STEP n OF 3" (aria-valuemax 3) at 375 px and 1440 px: The basics (contact, area, 18+), Your
+//   signals (gender, experience, interests, Passion Budget, looking for), Security & presence; no City/State inputs,
+//   no horizontal scroll;
 // * geolocation granted: asked only after the privacy explainer is visible, with { enableHighAccuracy: false,
 //   timeout: 10000, maximumAge: 600000 }; the coordinate appears only in the body of POST rpc/set_home_location, in
 //   no URL, no other body, no console line, and never in localStorage / sessionStorage;
@@ -16,7 +18,7 @@
 // * submit order saveProfile -> set_home_* -> set_member_interests (points sum to 20) -> the app; profile writes carry
 //   no skills, city or state;
 // * sensitive interests show the private hint; email confirmation stores no coordinate (only { kind: 'geo' } or
-//   { kind: 'city', placeId }); after login a city choice is applied silently and a geo choice re-opens step 2;
+//   { kind: 'city', placeId }); after login a city choice is applied silently and a geo choice re-opens step 1 (the area);
 //   an applied pending city is dropped from the kept pending profile, so a second login never re-applies it;
 // * the gate: an app.html member whose my_onboarding_status().completed is false lands on the first incomplete step.
 import { spawn } from 'node:child_process';
@@ -254,16 +256,26 @@ const openSignup = async (page) => {
   await page.waitForSelector('[data-signup-step="1"]:not([hidden])', { timeout: 15000 });
   await page.waitForTimeout(300);
 };
+// Step 1 "The basics": contact fields and the 18+ box. The area (also on step 1) and Next are left to the caller.
 const fillStepOne = async (page) => {
   const step = page.locator('[data-signup-step="1"]');
   await step.locator('input[name="name"]').fill('Nia New');
   await step.locator('input[name="email"]').fill(EMAIL);
   await step.locator('input[name="phoneNumber"]').fill('98765 43210');
-  await step.locator('.gender-option', { hasText: 'FEMALE' }).click();
-  await step.locator('select[name="experience"]').selectOption({ index: 2 });
   await step.locator('input[name="adultConfirm"]').check();
-  await step.locator('.signup-next').click();
+};
+// Step 2 "Your signals": gender and experience, unless already filled (re-entry prefills them).
+const fillSignals = async (page) => {
+  const step = page.locator('[data-signup-step="2"]');
+  if (!(await step.locator('input[name="gender"]:checked').count())) await step.locator('.gender-option', { hasText: 'FEMALE' }).click();
+  if (!(await step.locator('select[name="experience"]').inputValue())) await step.locator('select[name="experience"]').selectOption({ index: 2 });
+  await page.waitForTimeout(300); // the picked tile's 0.2 s colour transition, before any contrast audit
+};
+// Next on step 1 (area chosen), then the signals.
+const goSignals = async (page) => {
+  await page.locator('[data-signup-step="1"] .signup-next').click();
   await page.waitForSelector('[data-signup-step="2"]:not([hidden])');
+  await fillSignals(page);
 };
 const pickCityByKeyboard = async (page, text = 'Beng') => {
   const input = page.locator('#area-city-search');
@@ -279,8 +291,8 @@ const fillBudgetWithMouse = async (page, label) => {
   await clickInterest(page, label);
   for (let i = 0; i < 19; i += 1) await page.getByRole('button', { name: `Add a point to ${label}`, exact: true }).click();
 };
-const finishStepFour = async (page) => {
-  const step = page.locator('[data-signup-step="4"]');
+const finishStepThree = async (page) => {
+  const step = page.locator('[data-signup-step="3"]');
   await step.locator('input[name="password"]').fill('correct horse 1');
   await step.locator('input[name="passwordConfirm"]').fill('correct horse 1');
   await step.locator('[type="submit"]').click();
@@ -316,17 +328,18 @@ try {
     const label1 = await stepLabel(page);
     const valuemax = await page.locator('.signup-progress-track').getAttribute('aria-valuemax');
     const cityInputs = await page.locator('input[name="city"], input[name="state"]').count();
-    const stepOneHasIdentity = await page.locator('[data-signup-step="1"] input[name="gender"]').count() > 0 && await page.locator('[data-signup-step="1"] select[name="experience"]').count() === 1;
-    check(`1440: "STEP 1 OF 4" and aria-valuemax 4 (got "${label1}", ${valuemax})`, () => { assert.match(label1, /^STEP 1 OF 4\b/); assert.equal(valuemax, '4'); });
+    const stepOneHasArea = await page.locator('[data-signup-step="1"] [data-area]').count() === 1 && await page.locator('[data-signup-step="1"] input[name="adultConfirm"]').count() === 1;
+    const stepTwoHasIdentity = await page.locator('[data-signup-step="2"] input[name="gender"]').count() > 0 && await page.locator('[data-signup-step="2"] select[name="experience"]').count() === 1;
+    check(`1440: "STEP 1 OF 3" and aria-valuemax 3 (got "${label1}", ${valuemax})`, () => { assert.match(label1, /^STEP 1 OF 3 · THE BASICS\b/); assert.equal(valuemax, '3'); });
     check('1440: no City or State input anywhere', () => assert.equal(cityInputs, 0));
-    check('1440: step 1 holds gender and experience', () => assert.ok(stepOneHasIdentity));
+    check('1440: step 1 holds the area and the 18+ box; step 2 holds gender and experience', () => { assert.ok(stepOneHasArea); assert.ok(stepTwoHasIdentity); });
     const noScroll1 = await noHorizontalScroll(page);
     check('1440: page does not scroll sideways (step 1)', () => assert.ok(noScroll1));
     await a11yStep(page, '1440 step 1');
     const previewHeadline = await page.evaluate(() => document.querySelector('#community-preview-title')?.textContent.replace(/\s+/g, ' ').trim());
     check(`1440: the preview headline is "THE KIND OF PEOPLE WE'RE BUILDING FOR." (got "${previewHeadline}")`, () => assert.equal(previewHeadline, "THE KIND OF PEOPLE WE'RE BUILDING FOR."));
     const stepLabelStyle = await page.evaluate(() => { const el = document.querySelector('[data-signup-step-label]'); const st = getComputedStyle(el); return { color: st.color, size: parseFloat(st.fontSize) }; });
-    check(`1440: the "STEP n OF 4" label is #5e0b28 at 12 px or more (${JSON.stringify(stepLabelStyle)})`, () => { assert.equal(stepLabelStyle.color, 'rgb(94, 11, 40)'); assert.ok(stepLabelStyle.size >= 12); });
+    check(`1440: the "STEP n OF 3" label is #5e0b28 at 12 px or more (${JSON.stringify(stepLabelStyle)})`, () => { assert.equal(stepLabelStyle.color, 'rgb(94, 11, 40)'); assert.ok(stepLabelStyle.size >= 12); });
     const counterShown = await page.evaluate(() => { const el = document.querySelector('.auth-step'); return Boolean(el && el.getClientRects().length && getComputedStyle(el).visibility !== 'hidden'); });
     check('1440: the "01 / 02" counter is hidden during signup', () => assert.equal(counterShown, false));
     const probeInput = () => page.evaluate(() => { const st = getComputedStyle(document.querySelector('[data-signup-step="1"] input[name="name"]')); return JSON.stringify({ outline: st.outlineStyle, shadow: st.boxShadow, border: st.borderColor }); });
@@ -347,15 +360,15 @@ try {
     const explainerVisible = await page.locator('[data-area-explainer]').isVisible();
     const explainerText = (await page.locator('[data-area-explainer]').textContent()).trim();
     const geoCallsBefore = await page.evaluate(() => window.__geoCalls.length);
-    check(`1440: step 2 reads "STEP 2 OF 4" (got "${label2}")`, () => assert.match(label2, /^STEP 2 OF 4\b/));
-    await a11yStep(page, '1440 step 2');
+    check(`1440: the area is still on step 1 (got "${label2}")`, () => assert.match(label2, /^STEP 1 OF 3\b/));
+    await a11yStep(page, '1440 step 1 (filled)');
     check(`1440: privacy explainer visible before any geolocation call ("${explainerText}")`, () => {
       assert.ok(explainerVisible); assert.match(explainerText, /We keep only a rough ~2 km square, never your exact location\. Other members see a rounded distance once enough people are nearby; until then they see your city\./); assert.equal(geoCallsBefore, 0);
     });
     // Next is blocked until an area is chosen.
-    await page.locator('[data-signup-step="2"] .signup-next').click();
-    const stillTwo = await visibleStep(page);
-    check('1440: Next on step 2 is blocked without an area', () => assert.equal(stillTwo, '2'));
+    await page.locator('[data-signup-step="1"] .signup-next').click();
+    const stillOne = await visibleStep(page);
+    check('1440: Next on step 1 is blocked without an area', () => assert.equal(stillOne, '1'));
     await page.locator('[data-area-geo]').click();
     await page.waitForFunction(() => /Got it\. We keep only the ~2 km square you're in\./.test(document.querySelector('[data-area-status]')?.textContent || ''), null, { timeout: 5000 });
     const geoCalls = await page.evaluate(() => window.__geoCalls);
@@ -369,14 +382,13 @@ try {
     check(`1440: the area status never shows the coordinate ("${areaStatus}")`, () => assert.ok(!COORD_RE.test(areaStatus)));
     const domHasCoord = await page.evaluate((src) => new RegExp(src).test(document.documentElement.outerHTML), COORD_RE.source);
     check('1440: the coordinate is nowhere in the DOM', () => assert.equal(domHasCoord, false));
-    await page.locator('[data-signup-step="2"] .signup-next').click();
-    await page.waitForSelector('[data-signup-step="3"]:not([hidden])');
+    await goSignals(page);
     const label3 = await stepLabel(page);
-    check(`1440: step 3 reads "STEP 3 OF 4" (got "${label3}")`, () => assert.match(label3, /^STEP 3 OF 4\b/));
+    check(`1440: step 2 reads "STEP 2 OF 3 · YOUR SIGNALS" (got "${label3}")`, () => assert.match(label3, /^STEP 2 OF 3 · YOUR SIGNALS\b/));
     await page.waitForSelector('#interest-results [data-interest-group]', { state: 'attached' });
-    await a11yStep(page, '1440 step 3');
-    const heading3 = (await page.locator('[data-signup-step="3"] .signup-step-heading h2').textContent()).trim();
-    check(`1440: step 3 heading is "What you care about" (got "${heading3}")`, () => assert.equal(heading3, 'What you care about'));
+    await a11yStep(page, '1440 step 2');
+    const heading3 = (await page.locator('[data-signup-step="2"] .signup-step-heading h2').textContent()).trim();
+    check(`1440: step 2 heading is "Find your people." (got "${heading3}")`, () => assert.equal(heading3, 'Find your people.'));
     // Escape in the interest search clears it and never leaves the page (the global Escape closes the auth modal).
     await page.locator('#interest-search').fill('chess');
     await page.waitForTimeout(50);
@@ -391,14 +403,14 @@ try {
     await page.waitForTimeout(400);
     const afterEscape = { url: new URL(page.url()).pathname, value: await page.locator('#interest-search').inputValue(), step: await visibleStep(page), label: await stepLabel(page) };
     check(`1440: Escape in #interest-search clears it and keeps the page and progress (${JSON.stringify(afterEscape)})`, () => {
-      assert.equal(afterEscape.url, '/auth.html'); assert.equal(afterEscape.value, ''); assert.equal(afterEscape.step, '3'); assert.match(afterEscape.label, /^STEP 3 OF 4\b/);
+      assert.equal(afterEscape.url, '/auth.html'); assert.equal(afterEscape.value, ''); assert.equal(afterEscape.step, '2'); assert.match(afterEscape.label, /^STEP 2 OF 3\b/);
     });
-    // Escape on a step-3 button (outside a text field) does not leave a signup past step 1 either.
-    await page.locator('[data-signup-step="3"] .signup-step-prev').focus();
+    // Escape on a step-2 button (outside a text field) does not leave a signup past step 1 either.
+    await page.locator('[data-signup-step="2"] .signup-step-prev').focus();
     await page.keyboard.press('Escape');
     await page.waitForTimeout(400);
     const afterEscape2 = { url: new URL(page.url()).pathname, step: await visibleStep(page) };
-    check(`1440: Escape past step 1 keeps the signup open (${JSON.stringify(afterEscape2)})`, () => { assert.equal(afterEscape2.url, '/auth.html'); assert.equal(afterEscape2.step, '3'); });
+    check(`1440: Escape past step 1 keeps the signup open (${JSON.stringify(afterEscape2)})`, () => { assert.equal(afterEscape2.url, '/auth.html'); assert.equal(afterEscape2.step, '2'); });
     // Category grouping (level 2) and selectable levels 3-4 only.
     const groupLabels = await page.locator('#interest-results [data-interest-group]').evaluateAll((els) => els.map((el) => el.dataset.interestGroup));
     const chipIds = await page.locator('#interest-results [data-interest-id]').evaluateAll((els) => els.map((el) => el.dataset.interestId));
@@ -475,12 +487,12 @@ try {
     check('1440: Tab reaches "Add a point to Tennis"', () => assert.ok(reachedPlus));
     for (let i = 0; i < 17; i += 1) await page.keyboard.press('Space');
     const at19 = (await counter.textContent()).trim();
-    const nextThree = page.locator('[data-signup-step="3"] .signup-next');
+    const nextThree = page.locator('[data-signup-step="2"] .signup-next');
     const nextDisabled = await nextThree.getAttribute('aria-disabled');
     check(`1440: 19 points placed, "1 of 20 points left" (got "${at19}")`, () => assert.equal(at19, '1 of 20 points left'));
     check(`1440: Next is disabled at 19 points (aria-disabled ${nextDisabled})`, () => assert.equal(nextDisabled, 'true'));
     // 120: "Spread the remaining points evenly" is one more stop before the long "looking for" list.
-    const reachedNext = await tabTo(page, () => document.activeElement?.matches?.('[data-signup-step="3"] .signup-next'), 120);
+    const reachedNext = await tabTo(page, () => document.activeElement?.matches?.('[data-signup-step="2"] .signup-next'), 120);
     await page.keyboard.press('Enter');
     await page.waitForTimeout(150);
     const errorText = (await page.locator('#budget-error').textContent()).trim();
@@ -488,7 +500,7 @@ try {
     const stepAfterBlocked = await visibleStep(page);
     const errorBesideCounter = await page.evaluate(() => document.querySelector('#budget-error')?.parentElement === document.querySelector('#budget-counter')?.parentElement);
     check(`1440: Enter on the disabled Next shows "Place all 20 points to continue (1 left)." beside the counter (got "${errorText}")`, () => {
-      assert.ok(reachedNext); assert.ok(errorVisible); assert.equal(errorText, 'Place all 20 points to continue (1 left).'); assert.ok(errorBesideCounter); assert.equal(stepAfterBlocked, '3');
+      assert.ok(reachedNext); assert.ok(errorVisible); assert.equal(errorText, 'Place all 20 points to continue (1 left).'); assert.ok(errorBesideCounter); assert.equal(stepAfterBlocked, '2');
     });
     await shot(page, 'onboarding-1440-step3-19-points.png', '#budget-error');
     const plusDisabledTotal = await page.getByRole('button', { name: 'Add a point to Tennis', exact: true }).getAttribute('aria-disabled');
@@ -513,18 +525,18 @@ try {
     check(`1440: keyboard set Tennis's mode to teach (got ${tennisMode})`, () => { assert.ok(reachedMode); assert.equal(tennisMode, 'teach'); });
     const modeLabels = await page.locator('[data-budget-row="sports.racket.tennis"] .mode-option span').allTextContents();
     check(`1440: segmented control has visible labels Learn · Play · Teach · Build (${modeLabels.join('|')})`, () => assert.deepEqual(modeLabels.map((s) => s.trim()), ['Learn', 'Play', 'Teach', 'Build']));
-    // Looking-for, then Next to step 4.
+    // Looking-for, then Next to step 3.
     await page.locator('.looking-search').click();
     await page.locator('#looking-results [data-looking-option]').first().click();
     await nextThree.click();
-    await page.waitForSelector('[data-signup-step="4"]:not([hidden])');
+    await page.waitForSelector('[data-signup-step="3"]:not([hidden])');
     const label4 = await stepLabel(page);
-    check(`1440: step 4 reads "STEP 4 OF 4" (got "${label4}")`, () => assert.match(label4, /^STEP 4 OF 4\b/));
-    await a11yStep(page, '1440 step 4');
+    check(`1440: step 3 reads "STEP 3 OF 3 · SECURITY & PRESENCE" (got "${label4}")`, () => assert.match(label4, /^STEP 3 OF 3 · SECURITY & PRESENCE\b/));
+    await a11yStep(page, '1440 step 3');
     const noScroll4 = await noHorizontalScroll(page);
-    check('1440: page does not scroll sideways (step 4)', () => assert.ok(noScroll4));
+    check('1440: page does not scroll sideways (step 3)', () => assert.ok(noScroll4));
     const callsBeforeSubmit = stub.calls.length;
-    await finishStepFour(page);
+    await finishStepThree(page);
     await page.waitForURL(/\/app\.html/, { timeout: 15000 });
     const flow = stub.calls.slice(callsBeforeSubmit).filter((c) => c.method !== 'GET' && c.method !== 'OPTIONS').map((c) => `${c.method} ${c.path}`);
     const order = ['/auth/v1/signup', '/rest/v1/profiles', '/rest/v1/rpc/declare_adult', '/rest/v1/rpc/set_home_location', '/rest/v1/rpc/set_member_interests'].map((p) => flow.findIndex((f) => f.endsWith(p)));
@@ -575,7 +587,7 @@ try {
     await openSignup(page);
     const label1 = await stepLabel(page);
     const valuemax = await page.locator('.signup-progress-track').getAttribute('aria-valuemax');
-    check(`375: "STEP 1 OF 4", aria-valuemax 4 (got "${label1}", ${valuemax})`, () => { assert.match(label1, /^STEP 1 OF 4\b/); assert.equal(valuemax, '4'); });
+    check(`375: "STEP 1 OF 3", aria-valuemax 3 (got "${label1}", ${valuemax})`, () => { assert.match(label1, /^STEP 1 OF 3\b/); assert.equal(valuemax, '3'); });
     await a11yStep(page, '375 step 1');
     const cityInputs = await page.locator('input[name="city"], input[name="state"]').count();
     check('375: no input[name=city] or input[name=state]', () => assert.equal(cityInputs, 0));
@@ -586,8 +598,8 @@ try {
     check(`375: the close button is 44x44 and overlaps no header control (${JSON.stringify(header375)})`, () => { assert.ok(header375.close.w >= 44 && header375.close.h >= 44); assert.equal(header375.overlap, false); });
     await fillStepOne(page);
     const label2 = await stepLabel(page);
-    check(`375: "STEP 2 OF 4" (got "${label2}")`, () => assert.match(label2, /^STEP 2 OF 4\b/));
-    await a11yStep(page, '375 step 2');
+    check(`375: the area is on step 1 (got "${label2}")`, () => assert.match(label2, /^STEP 1 OF 3\b/));
+    await a11yStep(page, '375 step 1 (filled)');
     const pickerHiddenBefore = await page.locator('[data-area-picker]').isHidden();
     await page.locator('[data-area-geo]').click();
     await page.waitForSelector('[data-area-picker]:not([hidden])', { timeout: 15000 });
@@ -602,13 +614,12 @@ try {
     const areaButtons = await page.locator('[data-area-geo], [data-area-city]').evaluateAll((els) => els.map((el) => el.getBoundingClientRect().height));
     check(`375: area buttons are at least 44 px tall (${areaButtons.join(',')})`, () => areaButtons.forEach((h) => assert.ok(h >= 44)));
     const noScroll2 = await noHorizontalScroll(page);
-    check('375: no horizontal scroll (step 2)', () => assert.ok(noScroll2));
-    await page.locator('[data-signup-step="2"] .signup-next').click();
-    await page.waitForSelector('[data-signup-step="3"]:not([hidden])');
+    check('375: no horizontal scroll (step 1, area)', () => assert.ok(noScroll2));
+    await goSignals(page);
     await page.waitForSelector('#interest-results [data-interest-group]', { state: 'attached' });
     const label3 = await stepLabel(page);
-    check(`375: "STEP 3 OF 4" (got "${label3}")`, () => assert.match(label3, /^STEP 3 OF 4\b/));
-    await a11yStep(page, '375 step 3');
+    check(`375: "STEP 2 OF 3" (got "${label3}")`, () => assert.match(label3, /^STEP 2 OF 3\b/));
+    await a11yStep(page, '375 step 2');
     await fillBudgetWithMouse(page, 'Badminton');
     const sizes = await page.locator('[data-budget-row] .budget-step, [data-budget-row] .mode-option span, [data-budget-row] .budget-remove').evaluateAll((els) => els.map((el) => { const r = el.getBoundingClientRect(); return [Math.round(r.width), Math.round(r.height)]; }));
     check(`375: steppers, mode segments and remove are at least 44x44 px (${JSON.stringify(sizes)})`, () => { assert.ok(sizes.length >= 7); sizes.forEach(([w, h]) => { assert.ok(w >= 44 && h >= 44); }); });
@@ -617,23 +628,23 @@ try {
     await shot(page, 'onboarding-375-step3-private-hint.png', '#interest-results');
     await page.locator('#interest-search').fill('');
     const noScroll3 = await noHorizontalScroll(page);
-    check('375: no horizontal scroll (step 3)', () => assert.ok(noScroll3));
+    check('375: no horizontal scroll (step 2)', () => assert.ok(noScroll3));
     await page.locator('.looking-search').click();
     await page.locator('#looking-results [data-looking-option]').first().click();
-    await page.locator('[data-signup-step="3"] .signup-next').click();
-    await page.waitForSelector('[data-signup-step="4"]:not([hidden])');
+    await page.locator('[data-signup-step="2"] .signup-next').click();
+    await page.waitForSelector('[data-signup-step="3"]:not([hidden])');
     const label4 = await stepLabel(page);
-    check(`375: "STEP 4 OF 4" (got "${label4}")`, () => assert.match(label4, /^STEP 4 OF 4\b/));
-    await a11yStep(page, '375 step 4');
-    // R12: a photo that cannot be re-encoded stops the submit BEFORE any account or profile write, on step 4,
+    check(`375: "STEP 3 OF 3" (got "${label4}")`, () => assert.match(label4, /^STEP 3 OF 3\b/));
+    await a11yStep(page, '375 step 3');
+    // R12: a photo that cannot be re-encoded stops the submit BEFORE any account or profile write, on step 3,
     // with the inline error linked to the photo field.
-    await page.locator('[data-signup-step="4"] input[name="password"]').fill('correct horse 1');
-    await page.locator('[data-signup-step="4"] input[name="passwordConfirm"]').fill('correct horse 1');
+    await page.locator('[data-signup-step="3"] input[name="password"]').fill('correct horse 1');
+    await page.locator('[data-signup-step="3"] input[name="passwordConfirm"]').fill('correct horse 1');
     await page.locator('.photo-input').setInputFiles({ name: 'broken.png', mimeType: 'image/png', buffer: Buffer.from('this is not an image') });
-    await page.locator('[data-signup-step="4"] [type="submit"]').click();
+    await page.locator('[data-signup-step="3"] [type="submit"]').click();
     await page.waitForFunction(() => !document.querySelector('#profile-photo-error')?.hidden, null, { timeout: 8000 });
-    const photoFail = await page.evaluate(() => ({ text: document.querySelector('#profile-photo-error')?.textContent, role: document.querySelector('#profile-photo-error')?.getAttribute('role'), linked: document.querySelector('.photo-input')?.getAttribute('aria-describedby'), step4: !document.querySelector('[data-signup-step="4"]')?.hidden }));
-    check(`375: unprocessable signup photo shows the inline error on step 4 (${JSON.stringify(photoFail)})`, () => {
+    const photoFail = await page.evaluate(() => ({ text: document.querySelector('#profile-photo-error')?.textContent, role: document.querySelector('#profile-photo-error')?.getAttribute('role'), linked: document.querySelector('.photo-input')?.getAttribute('aria-describedby'), step4: !document.querySelector('[data-signup-step="3"]')?.hidden }));
+    check(`375: unprocessable signup photo shows the inline error on step 3 (${JSON.stringify(photoFail)})`, () => {
       assert.equal(photoFail.text, "We couldn't process this photo. Try a JPG or PNG.");
       assert.equal(photoFail.role, 'alert');
       assert.equal(photoFail.linked, 'profile-photo-error');
@@ -644,17 +655,17 @@ try {
       assert.equal(stub.posts('/rest/v1/profiles').length, 0);
     });
     await page.locator('.photo-input').setInputFiles([]);
-    await finishStepFour(page);
-    // The first set_home_city answers PT429: back on step 2 with "Try again later." beside the location step.
-    await page.waitForSelector('[data-signup-step="2"]:not([hidden])', { timeout: 15000 });
+    await finishStepThree(page);
+    // The first set_home_city answers PT429: back on step 1 with "Try again later." beside the location step.
+    await page.waitForSelector('[data-signup-step="1"]:not([hidden])', { timeout: 15000 });
     await page.waitForFunction(() => (document.querySelector('[data-area-error]')?.textContent || '').trim() === 'Try again later.', null, { timeout: 5000 });
-    const errorInStep = await page.evaluate(() => document.querySelector('[data-signup-step="2"]')?.contains(document.querySelector('[data-area-error]')));
+    const errorInStep = await page.evaluate(() => document.querySelector('[data-signup-step="1"]')?.contains(document.querySelector('[data-area-error]')));
     check('375: PT429 shows "Try again later." inside the location step', () => assert.ok(errorInStep));
     check('375: no interests sent after a failed location step', () => assert.equal(stub.posts('/rest/v1/rpc/set_member_interests').length, 0));
+    await goSignals(page);
     await page.locator('[data-signup-step="2"] .signup-next').click();
-    await page.locator('[data-signup-step="3"] .signup-next').click();
-    await page.waitForSelector('[data-signup-step="4"]:not([hidden])');
-    await page.locator('[data-signup-step="4"] [type="submit"]').click();
+    await page.waitForSelector('[data-signup-step="3"]:not([hidden])');
+    await page.locator('[data-signup-step="3"] [type="submit"]').click();
     await page.waitForURL(/\/app\.html/, { timeout: 15000 });
     const cityCalls = stub.posts('/rest/v1/rpc/set_home_city').map((c) => JSON.parse(c.body || '{}'));
     check(`375: the city goes to rpc/set_home_city (${JSON.stringify(cityCalls)})`, () => { assert.equal(cityCalls.length, 2); cityCalls.forEach((b) => assert.deepEqual(b, { p_place_id: 'in-bengaluru' })); });
@@ -690,7 +701,7 @@ try {
 
   // ---------------------------------------------------------------------------------------------------------------
   // 4. Email confirmation (no session) with a geo choice: the pending profile holds no coordinate; after login the
-  //    interests are applied and step 2 re-opens (the coordinate is gone with the page).
+  //    interests are applied and step 1 (with the area) re-opens (the coordinate is gone with the page).
   {
     const context = await browser.newContext({ viewport: { width: 1280, height: 900 } });
     await context.grantPermissions(['geolocation'], { origin: BASE });
@@ -701,13 +712,13 @@ try {
     await fillStepOne(page);
     await page.locator('[data-area-geo]').click();
     await page.waitForFunction(() => /Got it\. We keep only the ~2 km square you're in\./.test(document.querySelector('[data-area-status]')?.textContent || ''), null, { timeout: 5000 });
-    await page.locator('[data-signup-step="2"] .signup-next').click();
+    await goSignals(page);
     await page.waitForSelector('#interest-results [data-interest-group]', { state: 'attached' });
     await fillBudgetWithMouse(page, 'Chess');
     await page.locator('.looking-search').click();
     await page.locator('#looking-results [data-looking-option]').first().click();
-    await page.locator('[data-signup-step="3"] .signup-next').click();
-    await finishStepFour(page);
+    await page.locator('[data-signup-step="2"] .signup-next').click();
+    await finishStepThree(page);
     await page.waitForSelector('#auth-success:not([hidden])', { timeout: 15000 });
     const stored = await storageDump(page);
     const pendingRaw = stored['local:brivia-pending-profile'] || '';
@@ -736,9 +747,9 @@ try {
     await page.locator('#login-form input[name="email"]').fill(EMAIL);
     await page.locator('#login-form input[name="password"]').fill('correct horse 1');
     await page.locator('#login-form .auth-submit').click();
-    await page.waitForSelector('[data-signup-step="2"]:not([hidden])', { timeout: 15000 });
+    await page.waitForSelector('[data-signup-step="1"]:not([hidden])', { timeout: 15000 });
     const label = await stepLabel(page);
-    check(`email path: after login a geo choice re-opens step 2 (got "${label}")`, () => assert.match(label, /^STEP 2 OF 4\b/));
+    check(`email path: after login a geo choice re-opens step 1 with the area (got "${label}")`, () => assert.match(label, /^STEP 1 OF 3\b/));
     const applied = JSON.parse(stub.posts('/rest/v1/rpc/set_member_interests').at(-1)?.body || '{}').p_items || [];
     check(`email path: the stored interests were applied after login (${JSON.stringify(applied)})`, () => assert.deepEqual(applied, [{ interest_id: 'games.board.chess', points: 20, mode: 'play' }]));
     check('email path: no set_home_location without a fresh location', () => assert.equal(stub.posts('/rest/v1/rpc/set_home_location').length, 0));
@@ -747,13 +758,12 @@ try {
     // Finish: pick a city, then the remaining steps are already satisfied; submit lands in the app.
     await page.locator('[data-area-city]').click();
     await pickCityByKeyboard(page, 'Pun');
+    await goSignals(page);
+    const prefilled = await page.locator('#budget-list [data-budget-row]').evaluateAll((els) => els.map((el) => el.dataset.budgetRow));
+    check(`email path: step 2 is prefilled from my_interests (${prefilled.join(',')})`, () => assert.deepEqual(prefilled, ['games.board.chess']));
     await page.locator('[data-signup-step="2"] .signup-next').click();
     await page.waitForSelector('[data-signup-step="3"]:not([hidden])');
-    const prefilled = await page.locator('#budget-list [data-budget-row]').evaluateAll((els) => els.map((el) => el.dataset.budgetRow));
-    check(`email path: step 3 is prefilled from my_interests (${prefilled.join(',')})`, () => assert.deepEqual(prefilled, ['games.board.chess']));
-    await page.locator('[data-signup-step="3"] .signup-next').click();
-    await page.waitForSelector('[data-signup-step="4"]:not([hidden])');
-    await page.locator('[data-signup-step="4"] [type="submit"]').click();
+    await page.locator('[data-signup-step="3"] [type="submit"]').click();
     await page.waitForURL(/\/app\.html/, { timeout: 15000 });
     const city = stub.posts('/rest/v1/rpc/set_home_city').map((c) => JSON.parse(c.body || '{}'));
     check(`email path: completion sends the picked city (${JSON.stringify(city)})`, () => assert.deepEqual(city, [{ p_place_id: 'in-pune' }]));
@@ -786,7 +796,7 @@ try {
   }
 
   // ---------------------------------------------------------------------------------------------------------------
-  // 6. The gate: a signed-in member with a profile but no interests is sent from app.html to step 3 of completion.
+  // 6. The gate: a signed-in member with a profile but no interests is sent from app.html to step 2 of completion.
   {
     const context = await browser.newContext({ viewport: { width: 1280, height: 900 } });
     await context.addInitScript(([key, value]) => { if (!sessionStorage.getItem('seeded')) { localStorage.setItem(key, value); sessionStorage.setItem('seeded', '1'); } }, ['sb-stub-auth-token', JSON.stringify(session)]);
@@ -794,21 +804,21 @@ try {
     const { page, errors } = await newPage(context, stub.consoleLines);
     await page.goto(`${BASE}/app.html`, { waitUntil: 'domcontentloaded' });
     await page.waitForURL(/\/auth\.html/, { timeout: 15000 });
-    await page.waitForSelector('[data-signup-step="3"]:not([hidden])', { timeout: 15000 });
+    await page.waitForSelector('[data-signup-step="2"]:not([hidden])', { timeout: 15000 });
     const label = await stepLabel(page);
-    check(`gate: app.html sends an incomplete member to step 3 (url ${new URL(page.url()).pathname}${new URL(page.url()).search}, "${label}")`, () => assert.match(label, /^STEP 3 OF 4\b/));
-    // Back to step 2 shows the current area, already satisfied.
-    await page.locator('[data-signup-step="3"] .signup-step-prev').click();
+    check(`gate: app.html sends an incomplete member to step 2 (url ${new URL(page.url()).pathname}${new URL(page.url()).search}, "${label}")`, () => assert.match(label, /^STEP 2 OF 3\b/));
+    // Back to step 1 shows the current area, already satisfied.
+    await page.locator('[data-signup-step="2"] .signup-step-prev').click();
     const status = (await page.locator('[data-area-status]').textContent()).trim();
-    check(`gate: step 2 shows the current area (got "${status}")`, () => assert.match(status, /Pune/));
-    await page.locator('[data-signup-step="2"] .signup-next').click();
+    check(`gate: step 1 shows the current area (got "${status}")`, () => assert.match(status, /Pune/));
+    await goSignals(page);
     await page.waitForSelector('#interest-results [data-interest-group]', { state: 'attached' });
     await fillBudgetWithMouse(page, 'Tennis');
-    await page.locator('[data-signup-step="3"] .signup-next').click();
-    await page.waitForSelector('[data-signup-step="4"]:not([hidden])');
+    await page.locator('[data-signup-step="2"] .signup-next').click();
+    await page.waitForSelector('[data-signup-step="3"]:not([hidden])');
     // Stop the real app from loading after submit: from here, /app.html is the end of the flow.
     await context.route(`${BASE}/app.html*`, (route) => route.fulfill({ status: 200, contentType: 'text/html', body: '<!doctype html><title>app</title>' }));
-    await page.locator('[data-signup-step="4"] [type="submit"]').click();
+    await page.locator('[data-signup-step="3"] [type="submit"]').click();
     await page.waitForURL(/\/app\.html/, { timeout: 15000 });
     check('gate: completion keeps the current area (no set_home_* call)', () => { assert.equal(stub.posts('/rest/v1/rpc/set_home_city').length, 0); assert.equal(stub.posts('/rest/v1/rpc/set_home_location').length, 0); });
     const interests = JSON.parse(stub.posts('/rest/v1/rpc/set_member_interests').at(-1)?.body || '{}').p_items || [];
@@ -833,7 +843,7 @@ try {
   const basePending = { name: 'Nia New', email: EMAIL, phone: '+91 9876543210', phoneCountryCode: '+91', phoneNumber: '9876543210', gender: 'Female', experience: '1–3 years', lookingFor: 'Friends', adultDeclared: true };
 
   // 7. Email confirmation with a sensitive pick: it is left out of the pending profile (privateOmitted); after login the
-  //    city is applied, step 3 opens prefilled (labels from the taxonomy) with a one-line note asking for private
+  //    city is applied, step 2 opens prefilled (labels from the taxonomy) with a one-line note asking for private
   //    interests again. Sensitive picks are hidden in the picker until the consent step ships (D-038 R3, fix round 1
   //    M-5), so the pending profile such a signup stores is seeded directly.
   {
@@ -842,12 +852,12 @@ try {
     const stub = await stubContext(context, { signupSession: false });
     const { page, errors } = await newPage(context, stub.consoleLines);
     await loginOnFreshPage(page);
-    await page.waitForSelector('[data-signup-step="3"]:not([hidden])', { timeout: 15000 });
+    await page.waitForSelector('[data-signup-step="2"]:not([hidden])', { timeout: 15000 });
     await page.waitForFunction(() => document.querySelector('[data-budget-row="games.board.chess"] .budget-label')?.textContent === 'Chess', null, { timeout: 5000 }).catch(() => {});
     const note = (await page.locator('[data-budget-note]').textContent()).trim();
     const noteVisible = await page.locator('[data-budget-note]').isVisible();
     const row = { label: (await page.locator('[data-budget-row="games.board.chess"] .budget-label').textContent()).trim(), points: (await page.locator('[data-budget-row="games.board.chess"] [data-budget-points]').textContent()).trim() };
-    check(`private: after login step 3 shows the note ("${note}")`, () => { assert.ok(noteVisible); assert.match(note, /private interests/i); });
+    check(`private: after login step 2 shows the note ("${note}")`, () => { assert.ok(noteVisible); assert.match(note, /private interests/i); });
     check(`private: the budget is prefilled from the pending list with taxonomy labels (${JSON.stringify(row)})`, () => assert.deepEqual(row, { label: 'Chess', points: '19' }));
     check('private: the city was applied silently, the incomplete interests were not sent', () => {
       assert.deepEqual(stub.posts('/rest/v1/rpc/set_home_city').map((c) => JSON.parse(c.body)), [{ p_place_id: 'in-bengaluru' }]);
@@ -870,7 +880,7 @@ try {
     await fillStepOne(page);
     await page.locator('[data-area-city]').click();
     await pickCityByKeyboard(page);
-    await page.locator('[data-signup-step="2"] .signup-next').click();
+    await goSignals(page);
     await page.waitForSelector('#interest-results [data-interest-group]', { state: 'attached' });
     await page.locator('#interest-search').fill('Chess');
     await clickInterest(page, 'Chess');
@@ -879,22 +889,22 @@ try {
     for (let i = 0; i < 18; i += 1) await page.getByRole('button', { name: 'Add a point to Chess', exact: true }).click();
     await page.locator('.looking-search').click();
     await page.locator('#looking-results [data-looking-option]').first().click();
-    await page.locator('[data-signup-step="3"] .signup-next').click();
-    await finishStepFour(page);
+    await page.locator('[data-signup-step="2"] .signup-next').click();
+    await finishStepThree(page);
     await page.waitForSelector('dialog#private-consent[open]', { timeout: 15000 }).catch(() => {});
     const dlgOpen = await page.locator('dialog#private-consent').evaluate((el) => el.open);
     const message = (await page.locator('[data-private-message]').textContent()).trim();
     const consentStep = await stepLabel(page);
     check(`consent: a server refusal opens the consent panel with the message ("${message}")`, () => {
-      assert.ok(dlgOpen); assert.match(consentStep, /^STEP 3 OF 4\b/);
+      assert.ok(dlgOpen); assert.match(consentStep, /^STEP 2 OF 3\b/);
       assert.equal(message, 'Private interests need your consent first.');
     });
     check('consent: the app was not opened', () => assert.ok(!/\/app\.html/.test(page.url())));
     await page.locator('[data-private-checkbox]').check();
     await page.locator('[data-private-continue]').click();
-    await page.locator('[data-signup-step="3"] .signup-next').click();
-    await page.waitForSelector('[data-signup-step="4"]:not([hidden])');
-    await page.locator('[data-signup-step="4"] [type="submit"]').click();
+    await page.locator('[data-signup-step="2"] .signup-next').click();
+    await page.waitForSelector('[data-signup-step="3"]:not([hidden])');
+    await page.locator('[data-signup-step="3"] [type="submit"]').click();
     await page.waitForURL(/\/app\.html/, { timeout: 15000 }).catch(() => {});
     const seq = stub.calls.filter((c) => /set_sensitive_consent|set_member_interests/.test(c.path)).map((c) => `${c.path.split('/').pop()}${c.path.endsWith('consent') ? ':' + JSON.parse(c.body).p_consent : ''}`);
     check(`consent: after Continue the retry gives consent first, then saves (${seq.join(' > ')})`, () => {
@@ -915,7 +925,7 @@ try {
     await fillStepOne(page);
     await page.locator('[data-area-city]').click();
     await pickCityByKeyboard(page);
-    await page.locator('[data-signup-step="2"] .signup-next').click();
+    await goSignals(page);
     await page.waitForSelector('#interest-results [data-interest-group]', { state: 'attached' });
     await page.locator('[data-private-open]').click();
     await page.locator('[data-private-checkbox]').check();
@@ -927,15 +937,15 @@ try {
     for (let i = 0; i < 18; i += 1) await page.getByRole('button', { name: 'Add a point to Chess', exact: true }).click();
     await page.locator('.looking-search').click();
     await page.locator('#looking-results [data-looking-option]').first().click();
-    await page.locator('[data-signup-step="3"] .signup-next').click();
-    await finishStepFour(page);
+    await page.locator('[data-signup-step="2"] .signup-next').click();
+    await finishStepThree(page);
     await page.waitForFunction(() => /could not be saved/.test(document.querySelector('#budget-error')?.textContent || ''), null, { timeout: 15000 }).catch(() => {});
     const seqFail = stub.calls.filter((c) => /set_sensitive_consent|set_member_interests/.test(c.path)).map((c) => `${c.path.split('/').pop()}${c.path.endsWith('consent') ? ':' + JSON.parse(c.body).p_consent : ''}`);
     check(`consent: a failed save after consent withdraws it (${seqFail.join(' > ')})`, () => assert.deepEqual(seqFail, ['set_sensitive_consent:true', 'set_member_interests', 'set_sensitive_consent:false']));
     check('consent: the failed attempt leaves no consent on the server', () => assert.equal(stub.state.consent, false));
-    await page.locator('[data-signup-step="3"] .signup-next').click();
-    await page.waitForSelector('[data-signup-step="4"]:not([hidden])');
-    await page.locator('[data-signup-step="4"] [type="submit"]').click();
+    await page.locator('[data-signup-step="2"] .signup-next').click();
+    await page.waitForSelector('[data-signup-step="3"]:not([hidden])');
+    await page.locator('[data-signup-step="3"] [type="submit"]').click();
     await page.waitForURL(/\/app\.html/, { timeout: 15000 }).catch(() => {});
     const items = JSON.parse(stub.posts('/rest/v1/rpc/set_member_interests').at(-1)?.body || '{}').p_items || [];
     check(`consent: the retry succeeds with the sensitive pick (${items.map((i) => i.interest_id).join(',')})`, () => {
@@ -965,23 +975,23 @@ try {
     await context.close();
   }
 
-  // 9a. Pending city answered with PT429: step 2 says "Try again later." and the pending profile is kept.
+  // 9a. Pending city answered with PT429: step 1 (the area) says "Try again later." and the pending profile is kept.
   {
     const context = await browser.newContext({ viewport: { width: 1280, height: 900 } });
     await seedPending(context, { ...basePending, interests: [{ id: 'sports.racket.tennis', points: 20, mode: 'play' }], orbit: { kind: 'city', placeId: 'in-mumbai' }, savedAt: Date.now() });
     const stub = await stubContext(context, { signupSession: false, homeCityStatus: [429] });
     const { page, errors } = await newPage(context, stub.consoleLines);
     await loginOnFreshPage(page);
-    await page.waitForSelector('[data-signup-step="2"]:not([hidden])', { timeout: 15000 });
+    await page.waitForSelector('[data-signup-step="1"]:not([hidden])', { timeout: 15000 });
     const areaErr = (await page.locator('[data-area-error]').textContent()).trim();
     const after = await storageDump(page);
-    check(`pending 429: step 2 shows "Try again later." (got "${areaErr}")`, () => assert.equal(areaErr, 'Try again later.'));
+    check(`pending 429: step 1 shows "Try again later." (got "${areaErr}")`, () => assert.equal(areaErr, 'Try again later.'));
     check('pending 429: the pending profile is kept for a retry', () => assert.ok('local:brivia-pending-profile' in after));
     check('pending 429: no uncaught page errors', () => assert.deepEqual(errors, []));
     await context.close();
   }
 
-  // 9b. Pending interests rejected: step 3 is prefilled from the pending list with the budget error; pending kept until
+  // 9b. Pending interests rejected: step 2 is prefilled from the pending list with the budget error; pending kept until
   //     the completion succeeds.
   {
     const context = await browser.newContext({ viewport: { width: 1280, height: 900 } });
@@ -989,23 +999,23 @@ try {
     const stub = await stubContext(context, { signupSession: false, interestsStatus: [400] });
     const { page, errors } = await newPage(context, stub.consoleLines);
     await loginOnFreshPage(page);
-    await page.waitForSelector('[data-signup-step="3"]:not([hidden])', { timeout: 15000 });
+    await page.waitForSelector('[data-signup-step="2"]:not([hidden])', { timeout: 15000 });
     await page.waitForFunction(() => document.querySelector('[data-budget-row="sports.racket.tennis"] .budget-label')?.textContent === 'Tennis', null, { timeout: 5000 }).catch(() => {});
     const err = (await page.locator('#budget-error').textContent()).trim();
     const rows = await page.locator('#budget-list [data-budget-row]').evaluateAll((els) => els.map((el) => [el.dataset.budgetRow, el.querySelector('[data-budget-points]').textContent, el.querySelector('input:checked')?.value]));
     const keptDump = await storageDump(page);
     const kept = 'local:brivia-pending-profile' in keptDump;
     const keptPending = JSON.parse(keptDump['local:brivia-pending-profile'] || 'null');
-    check(`pending interests rejected: step 3 with the budget error (got "${err}")`, () => assert.equal(err, 'Your interests could not be saved. Please try again.'));
+    check(`pending interests rejected: step 2 with the budget error (got "${err}")`, () => assert.equal(err, 'Your interests could not be saved. Please try again.'));
     check(`pending interests rejected: budget prefilled from the pending list (${JSON.stringify(rows)})`, () => assert.deepEqual(rows, [['sports.racket.tennis', '20', 'build']]));
     check('pending interests rejected: the pending profile is kept', () => assert.ok(kept));
     check(`pending interests rejected: the applied city is dropped from the kept pending profile (${JSON.stringify(keptPending?.orbit ?? null)})`, () => {
       assert.ok(keptPending && !('orbit' in keptPending));
       assert.deepEqual(keptPending.interests, [{ id: 'sports.racket.tennis', points: 20, mode: 'build' }]);
     });
-    await page.locator('[data-signup-step="3"] .signup-next').click();
-    await page.waitForSelector('[data-signup-step="4"]:not([hidden])');
-    await page.locator('[data-signup-step="4"] [type="submit"]').click();
+    await page.locator('[data-signup-step="2"] .signup-next').click();
+    await page.waitForSelector('[data-signup-step="3"]:not([hidden])');
+    await page.locator('[data-signup-step="3"] [type="submit"]').click();
     await page.waitForURL(/\/app\.html/, { timeout: 15000 });
     const final = await storageDump(page);
     check('pending interests rejected: completion succeeds and clears the pending profile', () => {
@@ -1024,11 +1034,11 @@ try {
     const stub = await stubContext(context, { signupSession: false, interestsStatus: [400, 400] });
     const { page, errors } = await newPage(context, stub.consoleLines);
     await loginOnFreshPage(page);
-    await page.waitForSelector('[data-signup-step="3"]:not([hidden])', { timeout: 15000 });
+    await page.waitForSelector('[data-signup-step="2"]:not([hidden])', { timeout: 15000 });
     // Sign out locally (drop the stored session), then log in again on a fresh page load.
     await page.evaluate(() => { Object.keys(localStorage).filter((k) => k.startsWith('sb-')).forEach((k) => localStorage.removeItem(k)); });
     await loginOnFreshPage(page);
-    await page.waitForSelector('[data-signup-step="3"]:not([hidden])', { timeout: 15000 });
+    await page.waitForSelector('[data-signup-step="2"]:not([hidden])', { timeout: 15000 });
     await page.waitForTimeout(300);
     const cityCalls = stub.posts('/rest/v1/rpc/set_home_city').length;
     const interestCalls = stub.posts('/rest/v1/rpc/set_member_interests').length;
@@ -1040,8 +1050,8 @@ try {
     await context.close();
   }
 
-  // 10. One 22023 from set_member_interests during a session signup: back to step 3 with the error beside the counter;
-  //     the error clears when step 3 is entered again; the retry succeeds without a second location call.
+  // 10. One 22023 from set_member_interests during a session signup: back to step 2 with the error beside the counter;
+  //     the error clears when step 2 is entered again; the retry succeeds without a second location call.
   {
     const context = await browser.newContext({ viewport: { width: 1280, height: 900 } });
     const stub = await stubContext(context, { signupSession: true, interestsStatus: [400] });
@@ -1050,28 +1060,27 @@ try {
     await fillStepOne(page);
     await page.locator('[data-area-city]').click();
     await pickCityByKeyboard(page);
-    await page.locator('[data-signup-step="2"] .signup-next').click();
+    await goSignals(page);
     await page.waitForSelector('#interest-results [data-interest-group]', { state: 'attached' });
     await fillBudgetWithMouse(page, 'Badminton');
     await page.locator('.looking-search').click();
     await page.locator('#looking-results [data-looking-option]').first().click();
-    await page.locator('[data-signup-step="3"] .signup-next').click();
-    await finishStepFour(page);
-    await page.waitForSelector('[data-signup-step="3"]:not([hidden])', { timeout: 15000 });
+    await page.locator('[data-signup-step="2"] .signup-next').click();
+    await finishStepThree(page);
+    await page.waitForSelector('[data-signup-step="2"]:not([hidden])', { timeout: 15000 });
     await page.waitForFunction(() => (document.querySelector('#budget-error')?.textContent || '').trim().length > 0, null, { timeout: 5000 });
     const err = (await page.locator('#budget-error').textContent()).trim();
     const beside = await page.evaluate(() => document.querySelector('#budget-error')?.parentElement === document.querySelector('#budget-counter')?.parentElement);
-    check(`22023: back on step 3 with the error beside the counter (got "${err}")`, () => { assert.equal(err, 'Your interests could not be saved. Please try again.'); assert.ok(beside); });
-    await page.locator('[data-signup-step="3"] .signup-step-prev').click();
+    check(`22023: back on step 2 with the error beside the counter (got "${err}")`, () => { assert.equal(err, 'Your interests could not be saved. Please try again.'); assert.ok(beside); });
+    await page.locator('[data-signup-step="2"] .signup-step-prev').click();
     const cityLabel = (await page.locator('[data-area-status]').textContent()).trim();
     check(`R9: a saved city pick reads "(city-wide)" exactly once (got "${cityLabel}")`, () => assert.equal(cityLabel, 'Your area: Bengaluru (city-wide). Choose again to change it.'));
+    await goSignals(page);
+    const cleared = (await page.locator('#budget-error').textContent()).trim();
+    check(`22023: the error clears when step 2 is entered again (got "${cleared}")`, () => assert.equal(cleared, ''));
     await page.locator('[data-signup-step="2"] .signup-next').click();
     await page.waitForSelector('[data-signup-step="3"]:not([hidden])');
-    const cleared = (await page.locator('#budget-error').textContent()).trim();
-    check(`22023: the error clears when step 3 is entered again (got "${cleared}")`, () => assert.equal(cleared, ''));
-    await page.locator('[data-signup-step="3"] .signup-next').click();
-    await page.waitForSelector('[data-signup-step="4"]:not([hidden])');
-    await page.locator('[data-signup-step="4"] [type="submit"]').click();
+    await page.locator('[data-signup-step="3"] [type="submit"]').click();
     await page.waitForURL(/\/app\.html/, { timeout: 15000 });
     check('22023: the retry succeeds without a second location call', () => {
       assert.equal(stub.posts('/rest/v1/rpc/set_home_city').length, 1);
@@ -1093,14 +1102,14 @@ try {
     await page.waitForFunction(() => document.querySelector('#signup-form')?.dataset.completion === '1' || document.querySelector('[data-auth-view="signup"].is-active'), null, { timeout: 5000 });
     const label = await stepLabel(page);
     const name = await page.locator('[data-signup-step="1"] input[name="name"]').inputValue();
-    check(`no name: re-entry opens step 1 (got "${label}")`, () => assert.match(label, /^STEP 1 OF 4\b/));
+    check(`no name: re-entry opens step 1 (got "${label}")`, () => assert.match(label, /^STEP 1 OF 3\b/));
     check(`no name: "New Member" is not prefilled (got "${name}")`, () => assert.equal(name, ''));
     check('no name: no uncaught page errors', () => assert.deepEqual(errors, []));
     await context.close();
   }
 
   // ---------------------------------------------------------------------------------------------------------------
-  // 12. Iteration 4, R1 + R11 (client): the 18+ step, honest notices, the step-3 rename, declare_adult order.
+  // 12. Iteration 4, R1 + R11 (client): the 18+ box, honest notices, the step names, declare_adult order.
   {
     const context = await browser.newContext({ viewport: { width: 375, height: 800 } });
     const stub = await stubContext(context, { signupSession: true });
@@ -1121,12 +1130,19 @@ try {
     check(`18+: the row is at least 44 px tall (${rowHeight}) and sits last above Next`, () => { assert.ok(rowHeight >= 44); assert.ok(lastBeforeNext); });
     const link1 = await s1.locator('a[href="/privacy.html"]').evaluate((a) => ({ href: a.getAttribute('href'), target: a.target }));
     check(`18+: step 1 privacy link opens /privacy.html in a new tab (${JSON.stringify(link1)})`, () => assert.deepEqual(link1, { href: '/privacy.html', target: '_blank' }));
-    // Without the box: stays on step 1, inline error linked by aria-describedby, box focused, no reportValidity bubble.
+    // The area notice and the Next label on step 1.
+    const promise1 = (await page.locator('[data-signup-step="1"] .area-promise').textContent()).trim();
+    check(`R11: step 1 keeps the location-first promise (got "${promise1}")`, () => assert.match(promise1, /^The club shows you people nearby first, as your area fills up: /));
+    const notice = (await page.locator('[data-area-explainer]').textContent()).trim();
+    check(`R11: the step 1 area notice is the honest copy (got "${notice}")`, () => assert.equal(notice, 'We keep only a rough ~2 km square, never your exact location. Other members see a rounded distance once enough people are nearby; until then they see your city.'));
+    const next1 = (await s1.locator('.signup-next').textContent()).trim().replace(/\s+/g, ' ');
+    check(`the step-1 button reads "NEXT: YOUR SIGNALS" (got "${next1}")`, () => assert.match(next1, /^NEXT: YOUR SIGNALS\b/));
+    // Without the box (area picked): stays on step 1, inline error linked by aria-describedby, box focused, no bubble.
     await s1.locator('input[name="name"]').fill('Nia New');
     await s1.locator('input[name="email"]').fill(EMAIL);
     await s1.locator('input[name="phoneNumber"]').fill('98765 43210');
-    await s1.locator('.gender-option', { hasText: 'FEMALE' }).click();
-    await s1.locator('select[name="experience"]').selectOption({ index: 2 });
+    await page.locator('[data-area-city]').click();
+    await pickCityByKeyboard(page);
     await s1.locator('.signup-next').click();
     await page.waitForTimeout(150);
     const blocked = await page.evaluate(() => {
@@ -1144,28 +1160,17 @@ try {
     await page.waitForSelector('[data-signup-step="2"]:not([hidden])');
     const errAfter = (await page.locator('#adult-error').textContent()).trim();
     check('18+: with the box ticked Next opens step 2 and the error is cleared', () => assert.equal(errAfter, ''));
-    // Step 2 notices and the repeated privacy link.
-    const notice = (await page.locator('[data-area-explainer]').textContent()).trim();
-    const promise = (await page.locator('[data-signup-step="2"] .signup-step-heading p').textContent()).trim();
-    const link2 = await page.locator('[data-signup-step="2"] a[href="/privacy.html"]').evaluate((a) => a.target);
-    check(`R11: step 2 notice is the honest copy (got "${notice}")`, () => assert.equal(notice, 'We keep only a rough ~2 km square, never your exact location. Other members see a rounded distance once enough people are nearby; until then they see your city.'));
-    check(`R11: the promise line says "nearby first, as your area fills up" (got "${promise}")`, () => assert.ok(promise.includes('nearby first, as your area fills up')));
-    const next2 = (await page.locator('[data-signup-step="2"] .signup-next').textContent()).trim().replace(/\s+/g, ' ');
-    check(`R11: the step-2 button reads "NEXT: WHAT YOU CARE ABOUT" (got "${next2}")`, () => assert.match(next2, /^NEXT: WHAT YOU CARE ABOUT\b/));
-    check('18+: step 2 repeats the privacy link with target=_blank', () => assert.equal(link2, '_blank'));
-    await page.locator('[data-area-city]').click();
-    await pickCityByKeyboard(page);
-    await page.locator('[data-signup-step="2"] .signup-next').click();
+    await fillSignals(page);
     await page.waitForSelector('#interest-results [data-interest-group]', { state: 'attached' });
-    const h3 = (await page.locator('[data-signup-step="3"] .signup-step-heading h2').textContent()).trim();
-    const kicker3 = (await page.locator('[data-signup-step="3"] .signup-step-heading > span').textContent()).trim();
-    check(`R11: step 3 heading is "What you care about" (got "${h3}", kicker "${kicker3}")`, () => { assert.equal(h3, 'What you care about'); assert.ok(!/signals/i.test(kicker3)); });
+    const h3 = (await page.locator('[data-signup-step="2"] .signup-step-heading h2').textContent()).trim();
+    const kicker3 = (await page.locator('[data-signup-step="2"] .signup-step-heading > span').textContent()).trim();
+    check(`step 2 heading is "Find your people." (got "${h3}", kicker "${kicker3}")`, () => { assert.equal(h3, 'Find your people.'); assert.equal(kicker3, 'STEP 02 · YOUR SIGNALS'); });
     await fillBudgetWithMouse(page, 'Chess');
     await page.locator('.looking-search').click();
     await page.locator('#looking-results [data-looking-option]').first().click();
-    await page.locator('[data-signup-step="3"] .signup-next').click();
+    await page.locator('[data-signup-step="2"] .signup-next').click();
     const label3 = await stepLabel(page);
-    await finishStepFour(page);
+    await finishStepThree(page);
     await page.waitForURL(/\/app\.html/, { timeout: 15000 });
     const flow = stub.calls.filter((c) => c.method !== 'GET' && c.method !== 'OPTIONS').map((c) => c.path.replace('/rest/v1/', '').replace('/auth/v1/', ''));
     const idx = ['signup', 'profiles', 'rpc/declare_adult', 'rpc/set_home_city', 'rpc/set_member_interests'].map((n) => flow.indexOf(n));
@@ -1174,7 +1179,7 @@ try {
     check(`18+: declare_adult sends the notice version (${JSON.stringify(declareBody)})`, () => assert.deepEqual(declareBody, { p_notice_version: '2026-10-05' }));
     const adultInBody = stub.calls.filter((c) => c.path === '/rest/v1/profiles' && ['POST', 'PATCH'].includes(c.method) && /adult_declared_at|adultDeclared/.test(c.body));
     check('18+: adult_declared_at is never in a profiles write body', () => assert.equal(adultInBody.length, 0));
-    check('R11: the signup step label for step 3 no longer says "signals"', () => assert.ok(!/signals/i.test(label3)));
+    check(`the last step label reads "STEP 3 OF 3 · SECURITY & PRESENCE" (got "${label3}")`, () => assert.match(label3, /^STEP 3 OF 3 · SECURITY & PRESENCE\b/));
     check('18+: no uncaught page errors', () => assert.deepEqual(errors, []));
     await context.close();
   }
@@ -1216,14 +1221,11 @@ try {
     check(`18+ OAuth: an undeclared member lands on step 1 with the unchecked box focused (${JSON.stringify(landed)})`, () => { assert.equal(landed.focused, 'adultConfirm'); assert.equal(landed.checked, false); });
     // Finishing: tick, walk to the end, submit: declare_adult first, no area or interests re-sent for the kept data.
     await page.locator('input[name="adultConfirm"]').check();
-    await page.locator('[data-signup-step="1"] .signup-next').click();
-    await page.waitForSelector('[data-signup-step="2"]:not([hidden])');
+    await goSignals(page);
+    await context.route(`${BASE}/app.html*`, (route) => route.fulfill({ status: 200, contentType: 'text/html', body: '<!doctype html><title>app</title>' }));
     await page.locator('[data-signup-step="2"] .signup-next').click();
     await page.waitForSelector('[data-signup-step="3"]:not([hidden])');
-    await context.route(`${BASE}/app.html*`, (route) => route.fulfill({ status: 200, contentType: 'text/html', body: '<!doctype html><title>app</title>' }));
-    await page.locator('[data-signup-step="3"] .signup-next').click();
-    await page.waitForSelector('[data-signup-step="4"]:not([hidden])');
-    await page.locator('[data-signup-step="4"] [type="submit"]').click();
+    await page.locator('[data-signup-step="3"] [type="submit"]').click();
     await page.waitForURL(/\/app\.html/, { timeout: 15000 });
     check('18+ OAuth: completing declares once (declare_adult POSTed)', () => assert.equal(stub.posts('/rest/v1/rpc/declare_adult').length, 1));
     check('18+ OAuth: no uncaught page errors', () => assert.deepEqual(errors.filter((e) => !/Failed to fetch|NetworkError|aborted/i.test(e)), []));
@@ -1239,13 +1241,13 @@ try {
     await fillStepOne(page);
     await page.locator('[data-area-city]').click();
     await pickCityByKeyboard(page);
-    await page.locator('[data-signup-step="2"] .signup-next').click();
+    await goSignals(page);
     await page.waitForSelector('#interest-results [data-interest-group]', { state: 'attached' });
     await fillBudgetWithMouse(page, 'Chess');
     await page.locator('.looking-search').click();
     await page.locator('#looking-results [data-looking-option]').first().click();
-    await page.locator('[data-signup-step="3"] .signup-next').click();
-    await finishStepFour(page);
+    await page.locator('[data-signup-step="2"] .signup-next').click();
+    await finishStepThree(page);
     await page.waitForSelector('[data-signup-step="1"]:not([hidden])', { timeout: 15000 });
     await page.waitForFunction(() => (document.querySelector('#adult-error')?.textContent || '').trim().length > 0, null, { timeout: 5000 });
     const msg = (await page.locator('#adult-error').textContent()).trim();
@@ -1256,7 +1258,7 @@ try {
   }
 
   // 12e. An old pending profile (no adultDeclared) and a failed declare: after login the member is on step 1, nothing
-  //      was applied, and the stored interests still prefill step 3.
+  //      was applied, and the stored interests still prefill step 2.
   for (const variant of ['old pending', 'declare fails']) {
     const context = await browser.newContext({ viewport: { width: 1280, height: 900 } });
     const pend = { ...basePending, interests: [{ id: 'games.board.chess', points: 20, mode: 'play' }], orbit: { kind: 'city', placeId: 'in-mumbai' }, savedAt: Date.now() };
@@ -1268,15 +1270,12 @@ try {
     await page.waitForSelector('[data-signup-step="1"]:not([hidden])', { timeout: 15000 });
     await page.waitForTimeout(300);
     await page.locator('input[name="adultConfirm"]').check();
-    await page.locator('[data-signup-step="1"] .signup-next').click();
-    await page.waitForSelector('[data-signup-step="2"]:not([hidden])');
     await page.locator('[data-area-city]').click();
     await pickCityByKeyboard(page, 'Pun');
-    await page.locator('[data-signup-step="2"] .signup-next').click();
-    await page.waitForSelector('[data-signup-step="3"]:not([hidden])');
+    await goSignals(page);
     await page.waitForSelector('[data-budget-row="games.board.chess"]', { timeout: 5000 }).catch(() => {});
     const rows = await page.locator('#budget-list [data-budget-row]').evaluateAll((els) => els.map((el) => el.dataset.budgetRow));
-    check(`18+ ${variant}: stored interests prefill step 3 (${rows.join(',')})`, () => assert.deepEqual(rows, ['games.board.chess']));
+    check(`18+ ${variant}: stored interests prefill step 2 (${rows.join(',')})`, () => assert.deepEqual(rows, ['games.board.chess']));
     check(`18+ ${variant}: no location or interests call before the declaration`, () => assert.equal(stub.posts('/rest/v1/rpc/set_home_city').length + stub.posts('/rest/v1/rpc/set_member_interests').length, 0));
     check(`18+ ${variant}: no uncaught page errors`, () => assert.deepEqual(errors, []));
     await context.close();
@@ -1334,7 +1333,7 @@ try {
     const { page, errors } = await newPage(context, stub.consoleLines);
     await page.goto(`${BASE}/app.html`, { waitUntil: 'domcontentloaded' });
     await page.waitForURL(/\/auth\.html/, { timeout: 15000 });
-    await page.waitForSelector('[data-signup-step="3"]:not([hidden])', { timeout: 15000 });
+    await page.waitForSelector('[data-signup-step="2"]:not([hidden])', { timeout: 15000 });
     await page.waitForSelector('#interest-results [data-interest-group]', { state: 'attached' });
     await page.locator('[data-private-open]').click();
     await page.locator('[data-private-checkbox]').check();
@@ -1344,9 +1343,9 @@ try {
     await page.locator('#interest-search').fill('scripture');
     await clickInterest(page, 'Scripture study');
     for (let i = 0; i < 18; i += 1) await page.getByRole('button', { name: 'Add a point to Chess', exact: true }).click();
-    await page.locator('[data-signup-step="3"] .signup-next').click();
-    await page.waitForSelector('[data-signup-step="4"]:not([hidden])');
-    await page.locator('[data-signup-step="4"] [type="submit"]').click();
+    await page.locator('[data-signup-step="2"] .signup-next').click();
+    await page.waitForSelector('[data-signup-step="3"]:not([hidden])');
+    await page.locator('[data-signup-step="3"] [type="submit"]').click();
     await page.waitForFunction(() => /could not be saved/.test(document.querySelector('#budget-error')?.textContent || ''), null, { timeout: 15000 }).catch(() => {});
     const seq = stub.calls.filter((c) => /set_sensitive_consent|set_member_interests/.test(c.path)).map((c) => `${c.path.split('/').pop()}${c.path.endsWith('consent') ? ':' + JSON.parse(c.body).p_consent : ''}`);
     check(`F2b: a PT429 save keeps the consent given before this submit (${seq.join(' > ')})`, () => {
@@ -1358,7 +1357,7 @@ try {
   }
   // ---------------------------------------------------------------------------------------------------------------
   // 13. Live signup walkthrough on brivia-club.vercel.app (2026-10-08): every bug it found, on the email path.
-  //     The phone pattern compiles under the browser's v flag; a typed city with Next (no click) is accepted; step 3
+  //     The phone pattern compiles under the browser's v flag; a typed city with Next (no click) is accepted; step 2
   //     with no interest says so; "Spread the remaining points evenly" completes the budget; the signup photo kept
   //     while the email is confirmed is uploaded to profile-photos after login (it was silently lost).
   {
@@ -1381,14 +1380,15 @@ try {
     await page.locator('[data-area-city]').click();
     const hint = (await page.locator('#area-city-hint').textContent()).trim();
     await page.locator('#area-city-search').pressSequentially('bengaluru', { delay: 20 });
-    await page.locator('[data-signup-step="2"] .signup-next').click();
-    await page.waitForSelector('[data-signup-step="3"]:not([hidden])', { timeout: 5000 }).catch(() => {});
+    await page.locator('[data-signup-step="1"] .signup-next').click();
+    await page.waitForSelector('[data-signup-step="2"]:not([hidden])', { timeout: 5000 }).catch(() => {});
     const afterTyped = await visibleStep(page);
     check(`live: a typed city with Next (no click on the list) moves on (step ${afterTyped}, hint "${hint}")`, () => {
-      assert.equal(afterTyped, '3'); assert.equal(hint, 'Type your city, then pick it from the list.');
+      assert.equal(afterTyped, '2'); assert.equal(hint, 'Type your city, then pick it from the list.');
     });
+    await fillSignals(page);
     await page.waitForSelector('#interest-results [data-interest-group]', { state: 'attached' });
-    await page.locator('[data-signup-step="3"] .signup-next').click({ force: true });
+    await page.locator('[data-signup-step="2"] .signup-next').click({ force: true });
     const noPick = (await page.locator('#budget-error').textContent()).trim();
     check(`live: Next with no interest asks for one (got "${noPick}")`, () => assert.equal(noPick, 'Pick at least one interest to continue.'));
     const spreadHiddenEmpty = await page.locator('[data-budget-spread]').isHidden();
@@ -1401,11 +1401,11 @@ try {
     const spreadShown = await spread.isVisible();
     const spreadHeight = await spread.evaluate((el) => el.getBoundingClientRect().height);
     await spread.click();
-    const focusAfterSpread = await page.evaluate(() => document.activeElement?.matches?.('[data-signup-step="3"] .signup-next'));
+    const focusAfterSpread = await page.evaluate(() => document.activeElement?.matches?.('[data-signup-step="2"] .signup-next'));
     check('live: after spreading, focus moves to Next (the button hides)', () => assert.ok(focusAfterSpread));
     const counter = (await page.locator('#budget-counter').textContent()).trim();
     const points = await page.locator('#budget-list [data-budget-points]').allTextContents();
-    const nextDisabled = await page.locator('[data-signup-step="3"] .signup-next').getAttribute('aria-disabled');
+    const nextDisabled = await page.locator('[data-signup-step="2"] .signup-next').getAttribute('aria-disabled');
     const spreadHiddenFull = await spread.isHidden();
     const errorCleared = (await page.locator('#budget-error').textContent()).trim();
     check(`live: the gate error follows the points left (got "${followed}")`, () => assert.equal(followed, 'Place all 20 points to continue (18 left).'));
@@ -1416,15 +1416,15 @@ try {
     });
     await page.locator('.looking-search').click();
     await page.locator('#looking-results [data-looking-option]').first().click();
-    await page.locator('[data-signup-step="3"] .signup-next').click();
-    await page.waitForSelector('[data-signup-step="4"]:not([hidden])');
-    const actions = await page.locator('[data-signup-step="4"] .signup-step-actions').evaluate((el) => [...el.children].map((c) => Math.round(c.getBoundingClientRect().height)));
+    await page.locator('[data-signup-step="2"] .signup-next').click();
+    await page.waitForSelector('[data-signup-step="3"]:not([hidden])');
+    const actions = await page.locator('[data-signup-step="3"] .signup-step-actions').evaluate((el) => [...el.children].map((c) => Math.round(c.getBoundingClientRect().height)));
     check(`live: Back and Next are the same height (${actions.join(',')})`, () => assert.equal(new Set(actions).size, 1));
-    const eyebrowShown = await page.locator('[data-signup-step="4"] .signup-step-heading > span').isVisible();
-    check('live: the duplicate "STEP 04" eyebrow is hidden (the progress label says it)', () => assert.equal(eyebrowShown, false));
+    const eyebrowShown = await page.locator('[data-signup-step="3"] .signup-step-heading > span').isVisible();
+    check('live: the duplicate "STEP 03" eyebrow is hidden (the progress label says it)', () => assert.equal(eyebrowShown, false));
     const onePixelPng = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==', 'base64');
     await page.locator('.photo-input').setInputFiles({ name: 'me.png', mimeType: 'image/png', buffer: onePixelPng });
-    await finishStepFour(page);
+    await finishStepThree(page);
     await page.waitForSelector('#auth-success:not([hidden])', { timeout: 15000 });
     const successCopy = (await page.locator('[data-auth-success-message]').textContent()).trim();
     check(`live: the check-your-email copy says the link signs you in and to check spam ("${successCopy}")`, () => { assert.match(successCopy, /signs you in/); assert.match(successCopy, /spam/); });
@@ -1458,17 +1458,17 @@ try {
     await fillStepOne(page);
     await page.locator('[data-area-city]').click();
     await pickCityByKeyboard(page, 'Pun');
-    await page.locator('[data-signup-step="2"] .signup-next').click();
+    await goSignals(page);
     await page.waitForSelector('#interest-results [data-interest-group]', { state: 'attached' });
     await page.locator('#interest-search').fill('Chess');
     await clickInterest(page, 'Chess');
     await page.locator('[data-budget-spread]').click();
     await page.locator('.looking-search').click();
     await page.locator('#looking-results [data-looking-option]').first().click();
-    await page.locator('[data-signup-step="3"] .signup-next').click();
-    await page.waitForSelector('[data-signup-step="4"]:not([hidden])');
+    await page.locator('[data-signup-step="2"] .signup-next').click();
+    await page.waitForSelector('[data-signup-step="3"]:not([hidden])');
     await page.locator('.photo-input').setInputFiles({ name: 'me.png', mimeType: 'image/png', buffer: Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==', 'base64') });
-    await finishStepFour(page);
+    await finishStepThree(page);
     await page.waitForSelector('#auth-success:not([hidden])', { timeout: 15000 });
     const login = async () => {
       await page.goto(`${BASE}/auth.html?later=${Date.now()}#login`, { waitUntil: 'domcontentloaded' });
@@ -1517,19 +1517,19 @@ try {
     await fillStepOne(page);
     await page.locator('[data-area-city]').click();
     await pickCityByKeyboard(page, 'Pun');
-    await page.locator('[data-signup-step="2"] .signup-next').click();
+    await goSignals(page);
     await page.waitForSelector('#interest-results [data-interest-group]', { state: 'attached' });
     await page.locator('#interest-search').fill('Chess');
     await clickInterest(page, 'Chess');
     await page.locator('[data-budget-spread]').click();
     await page.locator('.looking-search').click();
     await page.locator('#looking-results [data-looking-option]').first().click();
-    await page.locator('[data-signup-step="3"] .signup-next').click();
-    await page.waitForSelector('[data-signup-step="4"]:not([hidden])');
-    await finishStepFour(page);
+    await page.locator('[data-signup-step="2"] .signup-next').click();
+    await page.waitForSelector('[data-signup-step="3"]:not([hidden])');
+    await finishStepThree(page);
     await page.waitForFunction(() => /too many sign-ups/.test(document.body.innerText), null, { timeout: 10000 }).catch(() => {});
     const shown = await page.evaluate(() => document.body.innerText);
-    const submitEnabled = await page.locator('[data-signup-step="4"] [type="submit"]').isEnabled();
+    const submitEnabled = await page.locator('[data-signup-step="3"] [type="submit"]').isEnabled();
     check('rate limit: plain copy, "not created", retry hint; never the raw "email rate limit exceeded"', () => {
       assert.match(shown, /too many sign-ups at once\. Your account was not created\. Please try again in about an hour\./);
       assert.ok(!/email rate limit exceeded/.test(shown)); assert.ok(submitEnabled);
@@ -1538,34 +1538,37 @@ try {
     await context.close();
   }
   // 14. Founder screenshots 2026-10-12: uneven gender tiles, near-invisible "Check your email." panel, and the
-  //     Back / Create buttons overlapping on step 4 near 1330 px.
+  //     Back / Create buttons overlapping on the last step near 1330 px.
   for (const w of [375, 600, 1024, 1280, 1330, 1440]) {
     const context = await browser.newContext({ viewport: { width: w, height: 900 } });
     const stub = await stubContext(context, { signupSession: false });
     const { page, errors } = await newPage(context, stub.consoleLines);
     await openSignup(page);
-    const tiles = await page.evaluate(() => [...document.querySelectorAll('[data-signup-step="1"] .gender-option span')].map((el) => { const r = el.getBoundingClientRect(); return { w: r.width, h: r.height }; }));
-    check(`gender: three tiles share one width (±1 px) and one height (±1 px) at ${w} (${tiles.map((t) => `${t.w.toFixed(1)}x${t.h.toFixed(1)}`).join(', ')})`, () => {
-      assert.equal(tiles.length, 3);
-      const ws = tiles.map((t) => t.w), hs = tiles.map((t) => t.h);
-      assert.ok(Math.max(...ws) - Math.min(...ws) <= 1, `widths ${ws}`);
-      assert.ok(Math.max(...hs) - Math.min(...hs) <= 1, `heights ${hs}`);
-    });
-    if (w === 600) { await context.close(); continue; }
     await fillStepOne(page);
     await page.locator('[data-area-city]').click();
     await pickCityByKeyboard(page, 'Pun');
-    await page.locator('[data-signup-step="2"] .signup-next').click();
+    await goSignals(page);
+    const tiles = await page.evaluate(() => [...document.querySelectorAll('[data-signup-step="2"] .gender-option span')].map((el) => { const r = el.getBoundingClientRect(); return { w: r.width, h: r.height, t: r.top }; }));
+    // Up to 480 px (D-072) Male and Female share a row and "Prefer not to say" spans the next one; wider, one row of three.
+    check(`gender: the tiles share one width (±1 px; the third spans its row up to 480 px) and one height (±1 px) at ${w} (${tiles.map((t) => `${t.w.toFixed(1)}x${t.h.toFixed(1)}`).join(', ')})`, () => {
+      assert.equal(tiles.length, 3);
+      const ws = (w <= 480 ? tiles.slice(0, 2) : tiles).map((t) => t.w), hs = tiles.map((t) => t.h);
+      assert.ok(Math.max(...ws) - Math.min(...ws) <= 1, `widths ${ws}`);
+      assert.ok(Math.max(...hs) - Math.min(...hs) <= 1, `heights ${hs}`);
+      if (w <= 480) { assert.ok(tiles[2].w > tiles[0].w * 1.8, 'third tile spans the row'); assert.ok(tiles[2].t > tiles[0].t, 'third tile on its own row'); }
+      else assert.ok(Math.abs(tiles[2].t - tiles[0].t) <= 1, 'one row');
+    });
+    if (w === 600) { await context.close(); continue; }
     await page.waitForSelector('#interest-results [data-interest-group]', { state: 'attached' });
     await page.locator('#interest-search').fill('Chess');
     await clickInterest(page, 'Chess');
     await page.locator('[data-budget-spread]').click();
     await page.locator('.looking-search').click();
     await page.locator('#looking-results [data-looking-option]').first().click();
-    await page.locator('[data-signup-step="3"] .signup-next').click();
-    await page.waitForSelector('[data-signup-step="4"]:not([hidden])');
+    await page.locator('[data-signup-step="2"] .signup-next').click();
+    await page.waitForSelector('[data-signup-step="3"]:not([hidden])');
     const boxes = await page.evaluate(() => {
-      const box = document.querySelector('[data-signup-step="4"] .signup-step-actions');
+      const box = document.querySelector('[data-signup-step="3"] .signup-step-actions');
       const rect = (el) => { const r = el.getBoundingClientRect(); return { l: r.left, t: r.top, r: r.right, b: r.bottom }; };
       return { container: rect(box), kids: [...box.children].filter((el) => el.getBoundingClientRect().width > 0).map(rect) };
     });
@@ -1577,7 +1580,7 @@ try {
       const c = boxes.container;
       for (const k of boxes.kids) assert.ok(k.l >= c.l - 0.5 && k.r <= c.r + 0.5 && k.t >= c.t - 0.5 && k.b <= c.b + 0.5, 'outside container');
     });
-    await finishStepFour(page);
+    await finishStepThree(page);
     await page.waitForSelector('#auth-success:not([hidden])', { timeout: 10000 });
     await page.waitForTimeout(500);
     const axeSuccess = await axeViolations(page, { rules: ['color-contrast'], include: '#auth-success' });
@@ -1638,41 +1641,36 @@ try {
     }, stepNo);
     const fieldChecks = [];
     await openSignup(page);
-    fieldChecks.push([1, await fieldSizes(1)]);
+    fieldChecks.push(['1', await fieldSizes(1)]);
     await fillStepOne(page);
     await page.locator('[data-area-city]').click();
-    fieldChecks.push([2, await fieldSizes(2)]);
+    fieldChecks.push(['1 (city search open)', await fieldSizes(1)]);
     await pickCityByKeyboard(page, 'Pun');
-    const order2 = await tabVsVisual(2);
-    check(`375: the Tab order of the step-2 actions matches their visual top-to-bottom order (${JSON.stringify(order2)})`, () => {
-      assert.equal(order2.visual.length, 2);
-      assert.deepEqual(order2.tabbed, order2.visual);
-    });
-    await page.locator('[data-signup-step="2"] .signup-next').click();
+    await goSignals(page);
     await page.waitForSelector('#interest-results [data-interest-group]', { state: 'attached' });
     await page.locator('#interest-search').fill('Chess');
     await clickInterest(page, 'Chess');
     await page.locator('[data-budget-spread]').click();
     await page.locator('.looking-search').click();
     await page.locator('#looking-results [data-looking-option]').first().click();
-    await page.locator('[data-signup-step="3"] .signup-step-heading h2').click();
-    fieldChecks.push([3, await fieldSizes(3)]);
-    const order3 = await tabVsVisual(3);
-    check(`375: the Tab order of the step-3 actions matches their visual top-to-bottom order (${JSON.stringify(order3)})`, () => {
+    await page.locator('[data-signup-step="2"] .signup-step-heading h2').click();
+    fieldChecks.push(['2', await fieldSizes(2)]);
+    const order3 = await tabVsVisual(2);
+    check(`375: the Tab order of the step-2 actions matches their visual top-to-bottom order (${JSON.stringify(order3)})`, () => {
       assert.equal(order3.visual.length, 2);
       assert.deepEqual(order3.tabbed, order3.visual);
     });
-    await page.locator('[data-signup-step="3"] .signup-next').click();
-    await page.waitForSelector('[data-signup-step="4"]:not([hidden])');
-    fieldChecks.push([4, await fieldSizes(4)]);
+    await page.locator('[data-signup-step="2"] .signup-next').click();
+    await page.waitForSelector('[data-signup-step="3"]:not([hidden])');
+    fieldChecks.push(['3', await fieldSizes(3)]);
     for (const [n, f] of fieldChecks) check(`375 step ${n}: every visible text field is >= 16 px (no iOS focus zoom) (${JSON.stringify(f)})`, () => assert.deepEqual(f.small, []));
     check(`375: the step field audit saw text fields (${fieldChecks.map(([n, f]) => `${n}:${f.count}`).join(' ')})`, () => assert.ok(fieldChecks.reduce((sum, [, f]) => sum + f.count, 0) >= 4));
-    const order4 = await tabVsVisual(4);
-    check(`at 375 the Tab order of the step-4 actions matches their visual top-to-bottom order (${JSON.stringify(order4)})`, () => {
+    const order4 = await tabVsVisual(3);
+    check(`at 375 the Tab order of the step-3 actions matches their visual top-to-bottom order (${JSON.stringify(order4)})`, () => {
       assert.equal(order4.visual.length, 2);
       assert.deepEqual(order4.tabbed, order4.visual);
     });
-    await finishStepFour(page);
+    await finishStepThree(page);
     await page.waitForSelector('#auth-success:not([hidden])', { timeout: 10000 });
     const mark = await page.locator('#auth-success .auth-success-mark').getAttribute('aria-hidden');
     check(`.auth-success-mark is aria-hidden (got ${mark})`, () => assert.equal(mark, 'true'));
@@ -1713,16 +1711,16 @@ try {
     await fillStepOne(page);
     await page.locator('[data-area-city]').click();
     await pickCityByKeyboard(page, 'Pun');
-    await page.locator('[data-signup-step="2"] .signup-next').click();
+    await goSignals(page);
     await page.waitForSelector('#interest-results [data-interest-group]', { state: 'attached' });
     await page.locator('#interest-search').fill('Chess');
     await clickInterest(page, 'Chess');
     await page.locator('[data-budget-spread]').click();
     await page.locator('.looking-search').click();
     await page.locator('#looking-results [data-looking-option]').first().click();
-    await page.locator('[data-signup-step="3"] .signup-next').click();
-    await page.waitForSelector('[data-signup-step="4"]:not([hidden])');
-    await finishStepFour(page);
+    await page.locator('[data-signup-step="2"] .signup-next').click();
+    await page.waitForSelector('[data-signup-step="3"]:not([hidden])');
+    await finishStepThree(page);
     await page.waitForSelector('#auth-success:not([hidden])', { timeout: 10000 });
     await page.waitForTimeout(400);
     const seen = await page.evaluate(() => {
