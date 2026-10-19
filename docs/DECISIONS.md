@@ -1401,3 +1401,18 @@ controls (a tester or a seeded test member), never a real member, so no new expo
 - **Header.** It had a fixed 66 px height; with a large system font the name and a two-line status spilled out. It now
   grows with its text, keeps name and status to one line each with an ellipsis, and never squeezes the avatar, back
   or menu. Spec: `tests/e2e/accepted-notice.spec.mjs` (5 checks).
+
+## D-072: The signup in three steps, laid out like the reference build (2026-10-19)
+- Accepted 2026-10-19 (founder, with three screenshots of club-seven-woad.vercel.app/auth.html#signup: "Make the new
+  sign up flow like this and keep it professional and shall look similar but beautiful").
+- **Grouping.** Step 1 *The basics*: name, email, phone, **Your area**, the 18+ box. Step 2 *Your signals*, "Find your
+  people.": gender, experience, interests with the Passion Budget, looking for. Step 3 *Security & presence*, "Make it
+  yours.": password, photo, cover. Button labels follow the reference ("NEXT: YOUR SIGNALS", "← BACK TO DETAILS",
+  "NEXT: SECURITY & COVER").
+- **Where it differs from the reference, on purpose.** The reference asks City and State; we keep *Use my location /
+  Pick my city* in that place, because location-first matching needs a coarse cell and a free-text city cannot give
+  one (VISION rule 2, the privacy rule in CLAUDE.md). The 18+ confirmation (R1) and the Passion Budget (ORBIT input)
+  stay required. No field, RPC or stored value changed; ORBIT behaviour is untouched, so `ORBIT_ENGINE.md` needs no edit.
+- Re-entry opens step 1 when the name, the declaration or the area is missing, else step 2. Styling: the area set off by
+  a hairline and a "YOUR AREA" label, a one-row 18+ checkbox, gender tiles on one row, the looking-for field matching
+  the other fields (`auth-a11y.css`). UX_SPEC §A and `onboarding.spec.mjs` updated.

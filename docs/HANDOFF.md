@@ -7,6 +7,11 @@ Update this file at the end of every session. CLAUDE.md holds the aim; this file
 
 ## 1. What is done
 
+**Signup in 3 steps like the reference (2026-10-19), D-072.** The basics (name, email, phone, area, 18+) · Your signals
+("Find your people.": gender, experience, interests + Passion Budget, looking for) · Security & presence (password,
+photo, cover). Same data and server calls as before; only grouping, labels and styling changed. Spec:
+`node tests/e2e/onboarding.spec.mjs`.
+
 **Accepted-request notifications and the chat header (2026-10-19), D-071.** Senders now get "<name> accepted your
 request. Say hi." (on load, or within ~30 s while open). The thread header grows with large system text. Spec:
 `node tests/e2e/accepted-notice.spec.mjs`. Note: live has two Golu accounts ("Golu Kumar" without a photo, "Golu" with one).
@@ -15,7 +20,7 @@ request. Say hi." (on load, or within ~30 s while open). The thread header grows
 no gallery upload anywhere. The profile photo upload is unchanged.
 
 **Signup back to the classic form (2026-10-19), D-069.** The guided one-question-per-screen signup (D-067, D-068) was
-live for one day and is removed at the founder's request; the 4-step form (UX_SPEC §A) is the only signup. No SQL
+live for one day and is removed at the founder's request; the classic form (UX_SPEC §A) is the only signup. No SQL
 involved. The design and code stay in git history (commits 7a74194, 4e708c8) if it is ever wanted again.
 
 **Phones (2026-10-18), D-066.** Hero prefers a hardware-decoded codec, lighter matching cards (`npm run media:cards`),
@@ -246,7 +251,7 @@ install it).
 | Data breach response (containment, notices, orphan-folder report) | `docs/BREACH_RUNBOOK.md` |
 | Daily moderation (new reports, flags, the 72 h suspension queue, rejoin reviews; SQL editor as owner) | `docs/MODERATION.md` |
 | SQL behaviour tests | `supabase/tests/*.test.sql` (run with `run.sh`) |
-| Signup (4 steps) | `auth.html`, `script.js`, `passion-budget.js`, `pending-profile.js` |
+| Signup (3 steps) | `auth.html`, `script.js`, `passion-budget.js`, `pending-profile.js` |
 | App, deck, quota | `app.html`, `app.js`, `deck-view.js`, `signal-quota.js` |
 | Test world (tester switch, why panel) | `supabase/migrations/0008_tester_world.sql`, `why-panel.js`, `supabase/tests/d-tester-world.test.sql`, `supabase/seed/README.md` |
 | App nav, tokens, skeletons, profile checklist | `app-nav.js`, `app-shell.css`, `tokens.css`, `app-skeletons.js`, `profile-checklist.js`, `profile-view.css` |

@@ -36,10 +36,26 @@ New components reuse these tokens. **No raw hex in new components**, and no new 
 
 ## Flow changes
 
-### A. Onboarding: 4 steps with "Your area" and the Passion Budget (shipped in Iteration 3, Task 8)
+### A. Onboarding: 3 steps with "Your area" and the Passion Budget (Iteration 3, Task 8; regrouped by D-072)
 
-The signup (`auth.html`, `script.js`, `passion-budget.js`) has **4 steps**. The progress reads `STEP n OF 4 · …` and the
-progress bar has `aria-valuemax="4"`. Every step has Back (except step 1); Next validates only its own step.
+The signup (`auth.html`, `script.js`, `passion-budget.js`) has **3 steps** (D-072, laid out like the founder's
+reference build). The progress reads `STEP n OF 3 · …` and the progress bar has `aria-valuemax="3"`. Every step has Back
+(except step 1); Next validates only its own step.
+
+**Layout since D-072.** The content of the four steps below is unchanged; it is regrouped:
+- **Step 1, The basics** (`STEP 1 OF 3 · THE BASICS`): full name, email, phone, then **Your area** (item 2 below, under a
+  hairline and a "YOUR AREA" label, in place of the reference's City / State), then the 18+ confirmation. Next reads
+  **"NEXT: YOUR SIGNALS"** and checks the fields, then the area, then the box.
+- **Step 2, Your signals** (`STEP 2 OF 3 · YOUR SIGNALS`), heading **"Find your people."**: gender tiles (one row; on
+  phones Male | Female with "Prefer not to say" full width beneath) and Experience, then item 3 below (search labelled
+  "Skills & interests", private interests, the Passion Budget, "What are you looking for?"). Buttons **"← BACK TO
+  DETAILS"** and **"NEXT: SECURITY & COVER"**.
+- **Step 3, Security & presence** (`STEP 3 OF 3 · SECURITY & PRESENCE`), "Make it yours.": item 4 below. Back reads
+  "BACK TO YOUR SIGNALS".
+- Re-entry and error returns follow the new numbers: no name, no declaration or no area → step 1; otherwise step 2. A
+  failed area save returns to step 1, a failed interest save or a consent refusal to step 2, a photo that cannot be
+  re-encoded to step 3. In the numbered items and paragraphs below, read "step 2" (the area) as step 1, "step 3" as
+  step 2 and "step 4" as step 3.
 
 **Legibility and focus (Iteration 4, Task 10, R11; `auth-a11y.css`, loaded last).** Informative text on the signup is at
 least 12 px (labels, legends, helper copy, buttons, cover captions; the old 8-11 px rules are overridden). The
@@ -397,7 +413,7 @@ focus ring, a skip link, no raw hex outside the token block, reduced motion resp
 ## Verification (webapp-testing skill)
 
 Use Playwright against `npm run dev`:
-- the 4-step signup at 375 px and 1440 px;
+- the 3-step signup at 375 px and 1440 px;
 - the keyboard-only pass through the passion-budget steppers;
 - that geolocation denial falls back to the city picker;
 - that a Worth-the-Distance card renders with its label;
