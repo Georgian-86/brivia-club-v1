@@ -1151,7 +1151,7 @@ const budgetList = signupForm?.querySelector('#budget-list');
 const budgetCounter = signupForm?.querySelector('#budget-counter');
 const budgetError = signupForm?.querySelector('#budget-error');
 const budgetEmpty = signupForm?.querySelector('[data-budget-empty]');
-const budgetNext = signupForm?.querySelector('[data-signup-step="3"] .signup-next');
+const budgetNext = signupForm?.querySelector('[data-signup-step="2"] .signup-next');
 const budgetSpread = signupForm?.querySelector('[data-budget-spread]');
 let budgetGateShown = false;
 const INTEREST_HELP_TEXT = 'Choose 1 to 12. Select again to remove.';
