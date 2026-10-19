@@ -88,12 +88,3 @@ export const budgetFromRows = (rows) => {
   }
   return { items };
 };
-
-// Guided signup (Phase E, D-056): no points screen. The picks share the budget evenly; the remainder goes to the
-// earliest picks (largest remainder with equal shares), so every pick holds at least 1 point. 1-12 picks.
-export const evenSplit = (items, budget = BUDGET) => {
-  if (!Array.isArray(items) || items.length < 1 || items.length > MAX_INTERESTS) throw new RangeError('pick 1 to 12 interests');
-  const base = Math.floor(budget / items.length);
-  const extra = budget - base * items.length;
-  return items.map((item, i) => ({ interest_id: item.id, points: base + (i < extra ? 1 : 0), mode: validMode(item.mode) }));
-};

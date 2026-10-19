@@ -197,12 +197,6 @@ test('reauthMethod: email identity -> password, Google only -> oauth', () => {
   assert.equal(reauthMethod({ app_metadata: {} }), 'password');
 });
 
-test('reauthMethod: a passwordless (email code) member is re-checked with a code (Phase E, D-067)', () => {
-  assert.equal(reauthMethod({ app_metadata: { provider: 'email', providers: ['email'] }, user_metadata: { passwordless: true } }), 'code');
-  assert.equal(reauthMethod({ app_metadata: { provider: 'email', providers: ['email'] }, user_metadata: { passwordless: false } }), 'password');
-  assert.equal(reauthMethod({ app_metadata: { provider: 'google', providers: ['google'] }, user_metadata: { passwordless: true } }), 'oauth');
-});
-
 test('consentStatusCopy: given on a date, or not given', () => {
   assert.equal(consentStatusCopy(null), 'Private interests: consent not given.');
   assert.match(consentStatusCopy('2026-10-05T10:00:00Z'), /^Private interests: consent given on 5 October 2026\.$/);

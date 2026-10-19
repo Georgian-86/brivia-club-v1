@@ -295,7 +295,7 @@ const tabTo = async (page, predicateSrc, max = 60, key = 'Tab') => {
 
 const vite = spawn('npx', ['vite', '--port', String(PORT), '--strictPort', '--host', '127.0.0.1'], {
   cwd: repoRoot,
-  env: { ...process.env, VITE_SUPABASE_URL: ORIGIN, VITE_SUPABASE_ANON_KEY: 'stub-anon-key', VITE_SIGNUP_FLOW: 'classic' },
+  env: { ...process.env, VITE_SUPABASE_URL: ORIGIN, VITE_SUPABASE_ANON_KEY: 'stub-anon-key' },
   stdio: ['ignore', 'pipe', 'pipe'],
   detached: true,
 });

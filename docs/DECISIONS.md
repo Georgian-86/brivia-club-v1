@@ -1365,3 +1365,15 @@ controls (a tester or a seeded test member), never a real member, so no new expo
   being applied (0007 was never live; 0001–0006 are untouched). The deploy no longer needs a SQL step.
 - **Proof.** `node tests/e2e/signup.spec.mjs`: 68 checks at 1440 and 375 px, including mismatched passwords, the 18+
   box being required, declare_adult before the name save, and phone + gender saved on the member's own row.
+
+## D-069: Back to the classic signup form; the guided one-question-per-screen flow is removed (2026-10-19)
+- Accepted 2026-10-19 (founder: "Revert the sign up flow to the previous form. Remove this one screen one ques").
+- **What changes.** D-067 and D-068 are reverted in code: the 4-step form (UX_SPEC §A, with phone, gender, password,
+  experience and the Passion Budget) is the only signup again. Removed: `signup-screens.js`, `signup-flow.js`,
+  `otp-input.js`, `signup.css`, `#guided-signup`, the email-code login link, the code re-check in the delete dialog,
+  `evenSplit`, the `VITE_SIGNUP_FLOW` / `VITE_SIGNUP_METHODS` switches and the signup e2e suite. The privacy notice stays
+  2026-10-05; no migration was ever applied for D-067, so the database needs nothing.
+- **Members who signed up with the guided flow** keep their accounts. Each set a password on the screen after the code
+  (D-068); one who stopped before it can use "Forgot password?" on the login page.
+- **Kept from the same period:** the repository layout (D-065), the removed login/signup quote, and the phone
+  smoothness work (D-066).

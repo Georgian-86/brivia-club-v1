@@ -72,8 +72,7 @@ const openWithdrawDialog = ({ trigger, fallbackFocus, withdraw }) => new Promise
   dialog.querySelector('[data-privacy-keep]').focus();
 });
 
-// R5: the delete dialog. deps: { user, runDeletion, signInWithPassword, startGoogle, sendCode, verifyCode, onDeleted }.
-// A passwordless member (Phase E) confirms with a 6-digit code emailed to them instead of a password.
+// R5: the delete dialog. deps: { user, runDeletion, signInWithPassword, startGoogle, onDeleted }.
 const openDeleteDialog = ({ trigger, fallbackFocus, deps }) => {
   const list = (items) => `<ul>${items.map((item) => `<li>${escapeText(item)}</li>`).join('')}</ul>`;
   // F3: name the account being deleted (the current session user's own email only; never another member's).
@@ -93,7 +92,6 @@ const openDeleteDialog = ({ trigger, fallbackFocus, deps }) => {
     <div class="privacy-reauth" data-privacy-reauth hidden>
       <div data-privacy-password-row hidden><label class="privacy-field" for="privacy-delete-password">Confirm your password</label><input id="privacy-delete-password" type="password" autocomplete="current-password" /></div>
       <button type="button" class="privacy-secondary" data-privacy-google hidden>Sign in with Google again</button>
-      <div data-privacy-code-row hidden><button type="button" class="privacy-secondary" data-privacy-send-code>Email me a code</button><label class="privacy-field" for="privacy-delete-code">Enter the 6-digit code</label><input id="privacy-delete-code" type="text" inputmode="numeric" autocomplete="one-time-code" maxlength="6" /></div>
     </div>
     <p class="privacy-error" data-privacy-error role="alert"></p>
     <div class="privacy-actions"><button type="button" class="privacy-secondary" data-privacy-cancel>Cancel</button><button type="button" class="privacy-danger" data-privacy-confirm-delete aria-disabled="true">Delete my account</button></div>
@@ -106,19 +104,7 @@ const openDeleteDialog = ({ trigger, fallbackFocus, deps }) => {
   const passwordRow = dialog.querySelector('[data-privacy-password-row]');
   const password = dialog.querySelector('#privacy-delete-password');
   const google = dialog.querySelector('[data-privacy-google]');
-  const codeRow = dialog.querySelector('[data-privacy-code-row]');
-  const code = dialog.querySelector('#privacy-delete-code');
   let needsPassword = false;
-  let needsCode = false;
-  dialog.querySelector('[data-privacy-send-code]').addEventListener('click', async (event) => {
-    const button = event.currentTarget;
-    button.disabled = true;
-    let sent;
-    try { sent = await deps.sendCode(deps.user?.email); } catch (error) { sent = { error }; }
-    errorBox.textContent = sent?.error ? "We couldn't send the code. Try again in a minute." : `We sent a code to ${deps.user?.email || 'your email'}.`;
-    if (sent?.error) button.disabled = false; else window.setTimeout(() => { button.disabled = false; }, 60000);
-    code.focus();
-  });
   const typed = () => input.value.trim().toUpperCase() === 'DELETE';
   const sync = () => confirm.setAttribute('aria-disabled', typed() ? 'false' : 'true');
   input.addEventListener('input', sync);
@@ -131,15 +117,12 @@ const openDeleteDialog = ({ trigger, fallbackFocus, deps }) => {
   const showReauth = () => {
     reauthBox.hidden = false;
     errorBox.textContent = deletionErrorCopy('reauth');
-    const method = reauthMethod(deps.user);
-    if (method === 'password') { needsPassword = true; passwordRow.hidden = false; password.focus(); }
-    else if (method === 'code') { needsCode = true; codeRow.hidden = false; dialog.querySelector('[data-privacy-send-code]').focus(); }
+    if (reauthMethod(deps.user) === 'password') { needsPassword = true; passwordRow.hidden = false; password.focus(); }
     else { google.hidden = false; confirm.hidden = true; google.focus(); }
   };
   confirm.addEventListener('click', async () => {
     if (dialog.hasAttribute('aria-busy') || !typed()) return;
     if (needsPassword && !password.value) { errorBox.textContent = 'Enter your password to continue.'; password.focus(); return; }
-    if (needsCode && !/^\d{6}$/.test(code.value.trim())) { errorBox.textContent = 'Enter the 6-digit code from your email.'; code.focus(); return; }
     setBusy(true);
     confirm.setAttribute('aria-disabled', 'true');
     errorBox.textContent = '';
@@ -152,21 +135,12 @@ const openDeleteDialog = ({ trigger, fallbackFocus, deps }) => {
         return;
       }
     }
-    if (needsCode) {
-      let verified;
-      try { verified = await deps.verifyCode(deps.user?.email, code.value.trim()); } catch (error) { verified = { error }; }
-      if (verified?.error) {
-        errorBox.textContent = "That code didn't work. Check it, or send a new one.";
-        setBusy(false); sync(); code.focus();
-        return;
-      }
-    }
     let result;
     try { result = await deps.runDeletion(); } catch (error) { result = { ok: false, stage: 'rpc', error }; }
     if (result.ok) { deps.onDeleted(); return; } // stay busy: the page is navigating away
     setBusy(false);
     sync();
-    if (result.stage === 'reauth') { needsPassword = false; needsCode = false; showReauth(); return; }
+    if (result.stage === 'reauth') { needsPassword = false; showReauth(); return; }
     errorBox.textContent = deletionErrorCopy(result.stage, result);
   });
   dialog.showModal();
