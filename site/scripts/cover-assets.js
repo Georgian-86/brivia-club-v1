@@ -41,6 +41,8 @@ const coverAssets = {
 };
 
 export const defaultCoverUrl = coverOne;
+// The optimized image for a preset key (cover-presets.js), for pickers.
+export const coverPresetImage = (key) => coverAssets[key] || '';
 
 const coverKeys = Object.keys(coverAssets);
 

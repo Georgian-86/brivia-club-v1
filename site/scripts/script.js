@@ -957,7 +957,7 @@ if (lookingPicker) {
 }
 
 // ---------------------------------------------------------------------------------------------------------------
-// ORBIT onboarding (UX_SPEC flow A). Step 2 "Your area" and step 3 "What you care about" (interests + Passion Budget).
+// ORBIT onboarding (UX_SPEC flow A). Step 1 "The basics" holds the area; step 2 "Your signals" the interests and Passion Budget.
 // Privacy (CLAUDE.md, Review Focus 4): coordinates live only in `areaChoice` below, in memory. They are never written
 // to localStorage / sessionStorage, the URL, the DOM or a log, and are dropped as soon as the server has the cell.
 // ---------------------------------------------------------------------------------------------------------------
@@ -1151,7 +1151,7 @@ const budgetList = signupForm?.querySelector('#budget-list');
 const budgetCounter = signupForm?.querySelector('#budget-counter');
 const budgetError = signupForm?.querySelector('#budget-error');
 const budgetEmpty = signupForm?.querySelector('[data-budget-empty]');
-const budgetNext = signupForm?.querySelector('[data-signup-step="3"] .signup-next');
+const budgetNext = signupForm?.querySelector('[data-signup-step="2"] .signup-next');
 const budgetSpread = signupForm?.querySelector('[data-budget-spread]');
 let budgetGateShown = false;
 const INTEREST_HELP_TEXT = 'Choose 1 to 12. Select again to remove.';
@@ -1287,7 +1287,7 @@ const syncBudgetState = () => {
   });
   const complete = isComplete(budget);
   budgetNext?.setAttribute('aria-disabled', String(!complete));
-  // Completing the budget clears only the gate error; a save error stays until step 3 is re-entered. While the
+  // Completing the budget clears only the gate error; a save error stays until step 2 is re-entered. While the
   // gate error shows, it follows the points still left.
   if (budgetGateShown && budgetError) {
     if (complete) { budgetError.textContent = ''; budgetGateShown = false; } else budgetError.textContent = budgetGateText(budget);
@@ -1415,8 +1415,8 @@ function setSignupPasswordMode(enabled, required = enabled) {
   });
 }
 
-const SIGNUP_STEPS = 4;
-const SIGNUP_STEP_LABELS = ['THE BASICS', 'YOUR AREA', 'WHAT YOU CARE ABOUT', 'SECURITY & PRESENCE'];
+const SIGNUP_STEPS = 3;
+const SIGNUP_STEP_LABELS = ['THE BASICS', 'YOUR SIGNALS', 'SECURITY & PRESENCE'];
 function setSignupStep(step, focusFirst = true) {
   signupCurrentStep = Math.min(SIGNUP_STEPS, Math.max(1, Number(step) || 1));
   signupForm?.querySelectorAll('[data-signup-step]').forEach((panel) => {
@@ -1425,9 +1425,9 @@ function setSignupStep(step, focusFirst = true) {
   if (signupProgress) { signupProgress.setAttribute('aria-valuemax', String(SIGNUP_STEPS)); signupProgress.setAttribute('aria-valuenow', String(signupCurrentStep)); }
   if (signupProgressFill) signupProgressFill.style.width = `${(signupCurrentStep / SIGNUP_STEPS) * 100}%`;
   if (signupStepLabel) signupStepLabel.textContent = `STEP ${signupCurrentStep} OF ${SIGNUP_STEPS} · ${SIGNUP_STEP_LABELS[signupCurrentStep - 1]}`;
-  // The taxonomy is fetched while the member is on "Your area", so "What you care about" opens ready.
-  if (signupCurrentStep >= 2 && !interestCatalog) loadInterestCatalog().then(() => { renderBudget(); renderInterestResults(); }).catch(() => {});
-  if (signupCurrentStep === 3) {
+  // The taxonomy is fetched while the member is on "The basics", so "Your signals" opens ready.
+  if (!interestCatalog) loadInterestCatalog().then(() => { renderBudget(); renderInterestResults(); }).catch(() => {});
+  if (signupCurrentStep === 2) {
     if (budgetError) budgetError.textContent = '';
     budgetGateShown = false;
     renderInterestResults();
@@ -1471,33 +1471,34 @@ const validateSignupStep = (step = signupCurrentStep) => {
   }
   return true;
 };
-// Step gates. Step 2 needs an area; step 3 needs a complete Passion Budget (error beside the counter) and one
-// "looking for" choice.
-const validateOnboardingStep = (step) => {
-  if (step === 2) {
-    if (areaChoice) return true;
-    // A typed city that is unambiguous counts as picked (the live walkthrough: members type and press Next).
-    chooseCity(matchTypedCity(areaSearch?.value, cityOptions));
+// Step gates. Step 1 needs its fields, an area and the 18+ box; step 2 needs a complete Passion Budget (error beside
+// the counter) and one "looking for" choice.
+const validateArea = () => {
+  if (areaChoice) return true;
+  // A typed city that is unambiguous counts as picked (the live walkthrough: members type and press Next).
+  chooseCity(matchTypedCity(areaSearch?.value, cityOptions));
     if (areaChoice) return true;
     setAreaError(areaSearch?.value.trim() && !areaPicker?.hidden ? 'Pick your city from the list below.' : 'Choose your area to continue.');
+    areaRoot?.scrollIntoView?.({ block: 'center' });
     return false;
-  }
-  if (step === 3) {
+};
+const validateOnboardingStep = (step) => {
+  if (step === 2) {
     if (!isComplete(budget)) { showBudgetError(); return false; }
-    return validateSignupStep(3);
+    return validateSignupStep(2);
   }
-  if (step === 1) return validateSignupStep(1) && validateAdultConfirm();
+  if (step === 1) return validateSignupStep(1) && validateArea() && validateAdultConfirm();
   return validateSignupStep(step);
 };
 signupForm?.querySelectorAll('.signup-next').forEach((button) => button.addEventListener('click', async () => {
   const nextStep = Number(button.dataset.nextStep);
   if (!nextStep) return;
   // Next pressed right after typing a city: let the pending search finish so the typed name can be matched.
-  if (nextStep === 3 && !areaChoice && areaSearch?.value.trim() && !cityOptions.length) {
+  if (nextStep === 2 && !areaChoice && areaSearch?.value.trim() && !cityOptions.length) {
     window.clearTimeout(citySearchTimer);
     button.setAttribute('aria-busy', 'true');
     try { await renderCityResults(); } finally { button.removeAttribute('aria-busy'); }
-    if (signupCurrentStep !== 2) return; // the member went Back (or on) while the search ran
+    if (signupCurrentStep !== 1) return; // the member moved on while the search ran
   }
   if (validateOnboardingStep(nextStep - 1)) setSignupStep(nextStep);
 }));
@@ -1615,7 +1616,7 @@ const normalizeSignupGender = (value) => {
   return '';
 };
 
-// Completion (re-entry): the same 4-step form, prefilled, opened at `startStep`. `status` is my_onboarding_status():
+// Completion (re-entry): the same 3-step form, prefilled, opened at `startStep`. `status` is my_onboarding_status():
 // an existing cell is kept unless the member picks a new area; existing interests prefill the Passion Budget.
 const showProfileCompletion = (user, savedProfile = null, { startStep = 1, status = null, adultDeclared = false } = {}) => {
   if (!signupForm || !user) return;
@@ -1659,14 +1660,13 @@ const showProfileCompletion = (user, savedProfile = null, { startStep = 1, statu
   if (startStep === 1 && !adultDeclared && realName(values.name)) adultBox?.focus();
 };
 
-// The first incomplete onboarding step for my_onboarding_status(): 2 without a cell, else 3 (interests / budget).
 // A usable display name: trimmed, not empty and not the 'New Member' placeholder (the server's completion rule).
 const realName = (value) => { const name = String(value || '').trim(); return name && name !== 'New Member' ? name : ''; };
-// The first incomplete onboarding step: 1 without a real name or the 18+ declaration, 2 without a cell, else 3.
+// The first incomplete onboarding step: 1 without a real name, the 18+ declaration or a cell, else 2 (interests).
 const firstIncompleteStep = (status, profileRow = null) => {
   if (!realName(profileRow?.name)) return 1;
   if (!profileRow?.adult_declared_at) return 1;  // R1: OAuth, old accounts and a failed declaration start at the box
-  return status?.has_cell ? 3 : 2;
+  return status?.has_cell ? 2 : 1;
 };
 const PRIVATE_OMITTED_NOTE = "Private interests aren't kept while you confirm your email. Please pick them again.";
 const AREA_SAVE_ERROR = "We couldn't save your area. Please try again.";
@@ -1687,7 +1687,7 @@ const routeAfterProfile = async (user, row = null, pendingResult = null) => {
   // F2: every step done but not completed = under review; the app shows the notice (no onboarding loop here).
   if (isUnderReview(status, profileRow)) { redirectToApp(); return; }
   let startStep = firstIncompleteStep(status, profileRow);
-  if (pendingResult?.orbitError && startStep > 2) startStep = 2;
+  if (pendingResult?.orbitError) startStep = 1;
   showProfileCompletion(user, profileRow ? rowToProfile(profileRow) : null, { startStep, status, adultDeclared: Boolean(profileRow?.adult_declared_at) });
   if (pendingResult?.adultError) setAdultError(ADULT_SAVE_ERROR);
   if (pendingResult?.orbitError) setAreaError(isRateLimited(pendingResult.orbitError.error, pendingResult.orbitError.status) ? 'Try again later.' : AREA_SAVE_ERROR);
@@ -1716,14 +1716,14 @@ const dropPendingOrbit = () => {
 
 // A signup that needed email confirmation stored { interests, orbit } with the pending profile (never coordinates,
 // never labels or sensitive interests). After login: a city choice and complete interests are applied; a geo choice is
-// asked for again (step 2). Nothing fails silently: the result tells routeAfterProfile what to show, and the pending
+// asked for again (step 1). Nothing fails silently: the result tells routeAfterProfile what to show, and the pending
 // profile is removed only when every call that was made succeeded.
 const applyPendingOnboarding = async (pending) => {
   const result = { orbitError: null, interestsFailed: false, budget: null, privateOmitted: false, ok: true };
   if (!pending || typeof pending !== 'object') return result;
   // R1: the declaration comes first (the server refuses location and interests before it). A pending profile from an
   // older build has none: nothing is applied and the member is asked on step 1; the pending data is kept.
-  // The stored interests still prefill step 3 on these early returns.
+  // The stored interests still prefill step 2 on these early returns.
   result.budget = budgetFromRows(pending.interests);
   result.privateOmitted = pending.privateOmitted === true;
   if (pending.adultDeclared !== true) { result.ok = false; return result; }
@@ -2058,7 +2058,7 @@ const finishOnboarding = async (userId) => {
     const choice = areaChoice;
     const { data, error, status } = choice.kind === 'geo' ? await setHomeLocation(choice.lat, choice.lng) : await setHomeCity(choice.placeId);
     if (error) {
-      setSignupStep(2);
+      setSignupStep(1);
       const message = isRateLimited(error, status) ? 'Try again later.' : AREA_SAVE_ERROR;
       setAreaError(message);
       throw new OnboardingStepError(message);
@@ -2079,7 +2079,7 @@ const finishOnboarding = async (userId) => {
     try { consentBefore = await fetchSensitiveConsentAt(userId); } catch { consentBefore = undefined; }
     const { error: consentError } = await setSensitiveConsent(true);
     if (consentError) {
-      setSignupStep(3);
+      setSignupStep(2);
       if (budgetError) budgetError.textContent = INTERESTS_SAVE_ERROR;
       throw new OnboardingStepError(INTERESTS_SAVE_ERROR);
     }
@@ -2088,7 +2088,7 @@ const finishOnboarding = async (userId) => {
   const { error } = await setMemberInterests(toPayload(budget));
   if (error) {
     if (shouldWithdrawConsent({ gaveConsent, consentBefore })) await setSensitiveConsent(false).catch(() => {});
-    setSignupStep(3);
+    setSignupStep(2);
     if (isSensitiveConsentError(error)) {
       serverWantedConsent = true;
       if (budgetError) budgetError.textContent = '';
@@ -2107,7 +2107,7 @@ signupForm?.addEventListener('submit', async (event) => {
     return;
   }
   signupForm.elements.namedItem('passwordConfirm')?.setCustomValidity('');
-  for (const step of [1, 2, 3]) {
+  for (const step of [1, 2]) {
     if (!validateOnboardingStep(step)) {
       setSignupStep(step, false);
       validateOnboardingStep(step);
@@ -2166,7 +2166,7 @@ signupForm?.addEventListener('submit', async (event) => {
   // A photo that cannot be re-encoded is never used as-is (its EXIF could carry a location): stop BEFORE any account
   // or profile write, go back to the photo step and say so beside the field.
   const failMedia = (which) => {
-    setSignupStep(4, false);
+    setSignupStep(3, false);
     setMediaError(which, PHOTO_ERROR_MESSAGE);
     if (signupFeedback) signupFeedback.textContent = '';
     signupForm.querySelector(which === 'photo' ? '.photo-input' : '.cover-input')?.focus();
@@ -2266,8 +2266,8 @@ signupForm?.addEventListener('submit', async (event) => {
   }
 });
 
-// The success panel replaces a long step 4, so whatever scrolled (the auth panel, the shell, the page) still holds
-// step 4's offset and "Check your email." can start above the viewport. Jump every scrolling ancestor to the top at
+// The success panel replaces a long step 3, so whatever scrolled (the auth panel, the shell, the page) still holds
+// step 3's offset and "Check your email." can start above the viewport. Jump every scrolling ancestor to the top at
 // once (also cancelling a step change's smooth scroll still running), then focus the title so screen readers
 // announce it (Phase C Task 4 pre-review fix).
 function showSignupSuccessTop(title) {

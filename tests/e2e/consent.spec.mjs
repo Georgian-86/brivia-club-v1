@@ -838,15 +838,16 @@ try {
     assert.equal(editError.linked, 'profile-photo-error');
     assert.equal(editWrites.length, 0);
   });
-  // 8f1. A good photo with an unprocessable cover: both are compressed before either is uploaded, so nothing is stored.
-  const coverCallsBefore = hard.calls.length;
-  await hardPage.setInputFiles('#profile-edit-form [name="photoFile"]', { name: 'ok.png', mimeType: 'image/png', buffer: Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=', 'base64') });
-  await hardPage.setInputFiles('#profile-edit-form [name="coverFile"]', { name: 'bad-cover.png', mimeType: 'image/png', buffer: Buffer.from('this is not an image') });
-  await hardPage.locator('#profile-edit-form [type="submit"]').click();
-  await hardPage.waitForFunction(() => !document.querySelector('#profile-cover-error')?.hidden, null, { timeout: 8000 });
-  const coverWrites = hard.calls.slice(coverCallsBefore).filter((c) => c.method !== 'GET' && (c.path.startsWith('/storage/') || c.path === '/rest/v1/profiles'));
-  check('bad cover: inline cover error and the good photo was not uploaded either (no orphan)', () => assert.equal(coverWrites.length, 0));
-  await hardPage.setInputFiles('#profile-edit-form [name="coverFile"]', []);
+  // 8f1. D-070: covers are presets only. No file input for a cover; the picker offers the 18 presets.
+  const coverUi = await hardPage.evaluate(() => ({
+    files: document.querySelectorAll('#profile-edit-form input[type="file"]').length,
+    coverFile: document.querySelectorAll('#profile-edit-form [name="coverFile"]').length,
+    choices: document.querySelectorAll('#profile-edit-form .profile-cover-choice').length,
+    group: document.querySelector('#profile-edit-form .profile-cover-options')?.getAttribute('role'),
+  }));
+  check(`cover: no gallery upload, 18 preset choices in a radiogroup (${JSON.stringify(coverUi)})`, () => {
+    assert.equal(coverUi.coverFile, 0); assert.equal(coverUi.files, 1); assert.equal(coverUi.choices, 18); assert.equal(coverUi.group, 'radiogroup');
+  });
   await hardPage.setInputFiles('#profile-edit-form [name="photoFile"]', { name: 'me.png', mimeType: 'image/png', buffer: Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=', 'base64') });
   await hardPage.locator('#profile-edit-form [type="submit"]').click();
   // Settles when the editor shows a result, or closes (the old data-URL fallback "succeeded" and closed it).
@@ -864,6 +865,8 @@ try {
   check('profile editor has no editable skills field (server-owned)', () => assert.equal(skillsInputs, 0));
   await hardPage.setInputFiles('#profile-edit-form [name="photoFile"]', []);
   await hardPage.locator('#profile-edit-form [name="name"]').fill('Alex Renamed');
+  await hardPage.locator('#profile-edit-form .profile-cover-choice').nth(4).click();
+  const pickedPressed = await hardPage.locator('#profile-edit-form .profile-cover-choice').nth(4).getAttribute('aria-checked');
   const writesBeforeSave = hard.calls.length;
   await hardPage.locator('#profile-edit-form [type="submit"]').click();
   await hardPage.waitForFunction(() => !document.querySelector('#profile-edit-form'), null, { timeout: 8000 }).catch(() => {});
@@ -875,6 +878,9 @@ try {
     const row = JSON.parse(saveWrites[0].body || '{}');
     assert.equal(row.name, 'Alex Renamed');
     assert.ok(!('skills' in row));
+    assert.equal(pickedPressed, 'true');
+    assert.equal(row.cover_url, '/Images/Cover%20images/3453059c-4864-46f7-ae45-6f7049939b9f.png');
+    assert.equal(hard.calls.slice(writesBeforeSave).filter((c) => c.method !== 'GET' && c.path.startsWith('/storage/v1/object/profile-covers')).length, 0);
     assert.match(saveToast, /Profile updated and saved/);
   });
   // 8g. Blocking someone who is already blocked server-side: insert (never upsert) and 23505 counts as success.

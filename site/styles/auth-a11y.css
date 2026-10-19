@@ -134,3 +134,43 @@ body.auth-page .auth-shell .auth-signup-form[hidden] { display: none; }
 :where(body.auth-page) :where(button, input, select, textarea) { font-family: inherit; }
 /* The success title takes focus (tabindex="-1") only so screen readers announce it; it is not a control. */
 body.auth-page .auth-success [data-auth-success-title]:focus { outline: none; }
+
+/* Three-step signup (D-072): The basics (with the area) · Your signals · Security & presence. */
+body.auth-page .auth-shell .auth-signup-form .signup-step { display: flex; flex-direction: column; gap: 18px; }
+body.auth-page .auth-shell .auth-signup-form .signup-step[hidden] { display: none; }
+body.auth-page .auth-shell .auth-signup-form .signup-step-heading { display: flex; flex-direction: column; gap: 6px; margin: 0 0 2px; }
+body.auth-page .auth-shell .auth-signup-form .signup-step-heading h2 { margin: 0; }
+body.auth-page .auth-shell .auth-signup-form .signup-step-heading p { margin: 0; max-width: 52ch; }
+/* The area sits under the contact fields, set off by a hairline like a section of one form. */
+body.auth-page .auth-shell .auth-signup-form .area-step {
+  display: flex; flex-direction: column; gap: 10px; padding-top: 18px;
+  border-top: 1px solid color-mix(in srgb, var(--a11y-wine) 14%, transparent);
+}
+body.auth-page .auth-shell .auth-signup-form .area-promise { margin: -4px 0 2px; color: var(--a11y-ink-soft); font-size: var(--text-14); line-height: 1.5; letter-spacing: 0; text-transform: none; }
+body.auth-page .auth-shell .auth-signup-form .area-step-title {
+  margin: 0; color: var(--a11y-wine); font-size: var(--text-12); font-weight: 700; letter-spacing: .093em; text-transform: uppercase;
+}
+/* 18+ confirmation: one row, box first, text left-aligned. */
+body.auth-page .auth-shell .auth-signup-form .adult-row {
+  flex-direction: row; align-items: center; justify-content: flex-start; gap: 12px; text-align: left;
+  padding: 12px 14px; border-radius: 12px;
+}
+body.auth-page .auth-shell .auth-signup-form .adult-row span { color: var(--a11y-wine); letter-spacing: .04em; flex: 1 1 auto; min-width: 0; }
+body.auth-page .auth-shell .auth-signup-form .adult-row input[type="checkbox"] {
+  flex: 0 0 22px; width: 22px !important; min-width: 22px; height: 22px !important; min-height: 22px; margin: 0; padding: 0;
+}
+body.auth-page .auth-shell .auth-signup-form .adult-help { margin: 2px 0 0; }
+/* Your signals: gender tiles on their own row, the experience select beneath, so every label reads in one line. */
+body.auth-page .auth-shell .auth-signup-form .signals-identity-grid { grid-template-columns: minmax(0, 1fr); gap: 18px; }
+body.auth-page .auth-shell .auth-signup-form .gender-picker legend { margin-bottom: 8px; padding: 0; }
+body.auth-page .auth-shell .auth-signup-form .gender-option span { border-radius: 12px; white-space: normal; }
+@media (max-width: 480px) {
+  body.auth-page .auth-shell .auth-signup-form .gender-options { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  body.auth-page .auth-shell .auth-signup-form .gender-option:last-child { grid-column: 1 / -1; }
+}
+/* "What are you looking for?" matches the other fields instead of a white box. */
+body.auth-page .auth-shell .auth-signup-form .looking-picker .looking-search { background-color: rgba(255, 250, 241, .22) !important; color: var(--a11y-ink-soft) !important; }
+body.auth-page .auth-shell .auth-signup-form .looking-picker .looking-search::placeholder { color: rgba(90, 6, 31, .38) !important; }
+body.auth-page .auth-shell .auth-signup-form .signup-step-actions { margin-top: 6px; }
+/* "Remove photo" only once a photo is chosen: its display:inline-flex (auth-modal.css) beat the [hidden] attribute. */
+body.auth-page .auth-shell .auth-signup-form .photo-remove[hidden] { display: none; }

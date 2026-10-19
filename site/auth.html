@@ -79,30 +79,17 @@
             <h1 id="signup-title">FIND YOUR PEOPLE</h1>
             <p class="auth-intro">THOUGHTFUL PEOPLE. REAL MOMENTUM.</p>
             <form class="auth-form auth-signup-form" id="signup-form">
-              <div class="signup-progress"><span data-signup-step-label aria-live="polite">STEP 1 OF 4 · THE BASICS</span><div class="signup-progress-track" role="progressbar" aria-label="Profile form progress" aria-valuemin="1" aria-valuemax="4" aria-valuenow="1"><span data-signup-progress-fill></span></div></div>
+              <div class="signup-progress"><span data-signup-step-label aria-live="polite">STEP 1 OF 3 · THE BASICS</span><div class="signup-progress-track" role="progressbar" aria-label="Profile form progress" aria-valuemin="1" aria-valuemax="3" aria-valuenow="1"><span data-signup-progress-fill></span></div></div>
               <div class="signup-step" data-signup-step="1">
               <div class="auth-field-grid">
                 <label>Full name<input type="text" name="name" autocomplete="name" placeholder="Your name" required /></label>
                 <label>Email address<input type="email" name="email" autocomplete="email" placeholder="you@example.com" required /></label>
                 <label class="phone-field">Phone number<div class="phone-input-group"><select name="phoneCountryCode" autocomplete="tel-country-code" aria-label="Country code" required><option value="+91" selected>+91</option><option value="+1">+1</option><option value="+7">+7</option><option value="+20">+20</option><option value="+27">+27</option><option value="+30">+30</option><option value="+31">+31</option><option value="+32">+32</option><option value="+33">+33</option><option value="+34">+34</option><option value="+36">+36</option><option value="+39">+39</option><option value="+40">+40</option><option value="+41">+41</option><option value="+43">+43</option><option value="+44">+44</option><option value="+45">+45</option><option value="+46">+46</option><option value="+47">+47</option><option value="+48">+48</option><option value="+49">+49</option><option value="+52">+52</option><option value="+55">+55</option><option value="+60">+60</option><option value="+61">+61</option><option value="+62">+62</option><option value="+63">+63</option><option value="+64">+64</option><option value="+65">+65</option><option value="+66">+66</option><option value="+81">+81</option><option value="+82">+82</option><option value="+84">+84</option><option value="+86">+86</option><option value="+90">+90</option><option value="+92">+92</option><option value="+93">+93</option><option value="+94">+94</option><option value="+95">+95</option><option value="+98">+98</option><option value="+212">+212</option><option value="+213">+213</option><option value="+216">+216</option><option value="+218">+218</option><option value="+234">+234</option><option value="+254">+254</option><option value="+255">+255</option><option value="+256">+256</option><option value="+351">+351</option><option value="+352">+352</option><option value="+353">+353</option><option value="+354">+354</option><option value="+358">+358</option><option value="+359">+359</option><option value="+370">+370</option><option value="+371">+371</option><option value="+372">+372</option><option value="+375">+375</option><option value="+380">+380</option><option value="+381">+381</option><option value="+385">+385</option><option value="+386">+386</option><option value="+420">+420</option><option value="+421">+421</option><option value="+852">+852</option><option value="+853">+853</option><option value="+855">+855</option><option value="+880">+880</option><option value="+886">+886</option><option value="+960">+960</option><option value="+961">+961</option><option value="+962">+962</option><option value="+963">+963</option><option value="+964">+964</option><option value="+965">+965</option><option value="+966">+966</option><option value="+967">+967</option><option value="+968">+968</option><option value="+970">+970</option><option value="+971">+971</option><option value="+972">+972</option><option value="+973">+973</option><option value="+974">+974</option><option value="+975">+975</option><option value="+976">+976</option><option value="+977">+977</option><option value="+992">+992</option><option value="+993">+993</option><option value="+994">+994</option><option value="+995">+995</option><option value="+996">+996</option><option value="+998">+998</option></select><input type="tel" name="phoneNumber" autocomplete="tel-national" inputmode="tel" placeholder="98765 43210" pattern="(?=(?:[^0-9]*[0-9]){7})[0-9 \(\)\-]{7,20}" title="7 to 20 digits; spaces, brackets and dashes are fine" aria-label="Mobile number" required /></div><input type="hidden" name="phone" /></label>
               </div>
-              <div class="signals-identity-grid">
-                <fieldset class="gender-picker"><legend>GENDER</legend><div class="gender-options"><label class="gender-option"><input type="radio" name="gender" value="Male" required /><span>MALE</span></label><label class="gender-option"><input type="radio" name="gender" value="Female" /><span>FEMALE</span></label><label class="gender-option"><input type="radio" name="gender" value="Prefer not to say" /><span>PREFER NOT TO SAY</span></label></div></fieldset>
-                <label>Experience<select name="experience" required><option value="" disabled selected>Choose one</option><option>Student / just starting</option><option>1–3 years</option><option>3–7 years</option><option>7–12 years</option><option>12+ years</option></select></label>
-              </div>
-              <fieldset class="adult-confirm"><legend class="adult-legend">Age confirmation</legend>
-                <label class="adult-row"><input type="checkbox" name="adultConfirm" value="yes" aria-describedby="adult-help adult-error" /><span>I confirm I'm 18 or older.</span></label>
-                <p class="adult-help" id="adult-help">Brivia is for adults only. We don't ask for your date of birth.</p>
-                <p class="privacy-link"><a href="/privacy.html" target="_blank" rel="noopener">How we use your data</a></p>
-                <p class="adult-error" id="adult-error" aria-live="polite"></p>
-              </fieldset>
-              <button class="auth-submit signup-next" data-next-step="2" type="button">NEXT: YOUR AREA <span aria-hidden="true">&rarr;</span></button>
-              </div>
-              <div class="signup-step" data-signup-step="2" hidden>
-              <div class="signup-step-heading"><span>STEP 02 · YOUR AREA</span><h2>Where do you spend most weeks?</h2><p>The club shows you people nearby first, as your area fills up: your neighbourhood, then your city, then your region.</p></div>
-              <div class="area-step" data-area>
+              <div class="area-step" data-area role="group" aria-labelledby="area-step-title">
+                <p class="area-step-title" id="area-step-title">YOUR AREA</p>
+                <p class="area-promise">The club shows you people nearby first, as your area fills up: your neighbourhood, then your city, then your region.</p>
                 <p class="area-explainer" data-area-explainer><svg class="area-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 3l7 3v5c0 4.5-3 8.3-7 10-4-1.7-7-5.5-7-10V6l7-3z" /><path d="M9 12l2 2 4-4" /></svg><span>We keep only a rough ~2 km square, never your exact location. Other members see a rounded distance once enough people are nearby; until then they see your city.</span></p>
-                <p class="privacy-link"><a href="/privacy.html" target="_blank" rel="noopener">How we use your data</a></p>
                 <div class="area-options">
                   <button class="area-option" type="button" data-area-geo><svg class="area-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 21s-6.5-5.6-6.5-11a6.5 6.5 0 0 1 13 0c0 5.4-6.5 11-6.5 11z" /><circle cx="12" cy="10" r="2.4" /></svg><span>Use my location</span></button>
                   <button class="area-option" type="button" data-area-city aria-controls="area-city-panel" aria-expanded="false"><svg class="area-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="11" cy="11" r="6.5" /><path d="M16 16l4.5 4.5" /></svg><span>Pick my city</span></button>
@@ -117,12 +104,22 @@
                 <p class="area-status" data-area-status role="status" aria-live="polite"></p>
                 <p class="area-error" data-area-error aria-live="assertive"></p>
               </div>
-              <div class="signup-step-actions"><button class="auth-secondary signup-step-prev" data-prev-step="1" type="button"><span aria-hidden="true">&larr;</span> BACK TO DETAILS</button><button class="auth-submit signup-next" data-next-step="3" type="button">NEXT: WHAT YOU CARE ABOUT <span aria-hidden="true">&rarr;</span></button></div>
+              <fieldset class="adult-confirm"><legend class="adult-legend">Age confirmation</legend>
+                <label class="adult-row"><input type="checkbox" name="adultConfirm" value="yes" aria-describedby="adult-help adult-error" /><span>I confirm I'm 18 or older.</span></label>
+                <p class="adult-help" id="adult-help">Brivia is for adults only. We don't ask for your date of birth.</p>
+                <p class="privacy-link"><a href="/privacy.html" target="_blank" rel="noopener">How we use your data</a></p>
+                <p class="adult-error" id="adult-error" aria-live="polite"></p>
+              </fieldset>
+              <button class="auth-submit signup-next" data-next-step="2" type="button">NEXT: YOUR SIGNALS <span aria-hidden="true">&rarr;</span></button>
               </div>
-              <div class="signup-step" data-signup-step="3" hidden>
-              <div class="signup-step-heading"><span>STEP 03 · WHAT YOU CARE ABOUT</span><h2>What you care about</h2><p>Pick up to 12 interests, then spread 20 passion points across them. More points means it matters more to you.</p></div>
+              <div class="signup-step" data-signup-step="2" hidden>
+              <div class="signup-step-heading"><span>STEP 02 · YOUR SIGNALS</span><h2>Find your people.</h2><p>Tell us a little about you, then what you care about: pick up to 12 interests and spread 20 passion points across them.</p></div>
+              <div class="signals-identity-grid">
+                <fieldset class="gender-picker"><legend>GENDER</legend><div class="gender-options"><label class="gender-option"><input type="radio" name="gender" value="Male" required /><span>MALE</span></label><label class="gender-option"><input type="radio" name="gender" value="Female" /><span>FEMALE</span></label><label class="gender-option"><input type="radio" name="gender" value="Prefer not to say" /><span>PREFER NOT TO SAY</span></label></div></fieldset>
+                <label>Experience<select name="experience" required><option value="" disabled selected>Choose one</option><option>Student / just starting</option><option>1–3 years</option><option>3–7 years</option><option>7–12 years</option><option>12+ years</option></select></label>
+              </div>
               <div class="interest-picker" data-interest-picker>
-                <label class="interest-label" for="interest-search">Interests</label>
+                <label class="interest-label" for="interest-search">Skills &amp; interests</label>
                 <input class="interest-search" id="interest-search" type="search" autocomplete="off" spellcheck="false" placeholder="Search, e.g. chess or hiking" aria-describedby="interest-help" aria-controls="interest-results" />
                 <p class="interest-help" id="interest-help" aria-live="polite">Choose 1 to 12. Select again to remove.</p><button class="private-open" type="button" data-private-open aria-haspopup="dialog">Add private interests (optional)</button>
                 <div class="interest-results" id="interest-results" role="region" aria-label="Interests by category"></div>
@@ -151,10 +148,10 @@
                 <input class="looking-value" type="hidden" name="lookingFor" aria-required="true" />
                 <p class="looking-helper">Choose one or more · Select Other to write your own.</p>
               </div>
-              <div class="signup-step-actions"><button class="auth-secondary signup-step-prev" data-prev-step="2" type="button"><span aria-hidden="true">&larr;</span> BACK TO YOUR AREA</button><button class="auth-submit signup-next" data-next-step="4" type="button" aria-describedby="budget-error">NEXT: SECURITY &amp; PRESENCE <span aria-hidden="true">&rarr;</span></button></div>
+              <div class="signup-step-actions"><button class="auth-secondary signup-step-prev" data-prev-step="1" type="button"><span aria-hidden="true">&larr;</span> BACK TO DETAILS</button><button class="auth-submit signup-next" data-next-step="3" type="button" aria-describedby="budget-error">NEXT: SECURITY &amp; COVER <span aria-hidden="true">&rarr;</span></button></div>
               </div>
-              <div class="signup-step" data-signup-step="4" hidden>
-              <div class="signup-step-heading"><span>STEP 04 · SECURITY &amp; PRESENCE</span><h2>Make it yours.</h2><p>Set your private password, add your circular photo, then choose the scene behind your profile.</p></div>
+              <div class="signup-step" data-signup-step="3" hidden>
+              <div class="signup-step-heading"><span>STEP 03 · SECURITY &amp; PRESENCE</span><h2>Make it yours.</h2><p>Set your private password, add your circular photo, then choose the scene behind your profile.</p></div>
               <div class="signup-password-fields"><p class="signup-password-hint">Set a password here and confirm it below. Use this email and password to log in later.</p><label>Password<input type="password" name="password" autocomplete="new-password" minlength="8" placeholder="At least 8 characters" required /></label><label>Confirm password<input type="password" name="passwordConfirm" autocomplete="new-password" minlength="8" placeholder="Re-enter your password" required /></label></div>
               <div class="photo-upload" data-photo-upload>
                 <label for="profile-photo">PROFILE PHOTO · CIRCULAR AVATAR</label>
@@ -189,7 +186,7 @@
                   <button class="cover-choice" type="button" data-cover-option="/Images/Cover%20images/F28EA63E-1BEB-49E9-BA01-F62127017DB1.PNG" aria-label="Choose cover image 18"><img src="/media/Images/Cover%20images/F28EA63E-1BEB-49E9-BA01-F62127017DB1.webp" alt="Cover image 18" /><span>MAKE IT MATTER</span></button>
                 </div></div>
               </div>
-              <div class="signup-step-actions"><button class="auth-secondary signup-step-prev" data-prev-step="3" type="button"><span aria-hidden="true">&larr;</span> BACK TO WHAT YOU CARE ABOUT</button><button class="auth-submit" type="submit">CREATE MY PROFILE <span>→</span></button></div>
+              <div class="signup-step-actions"><button class="auth-secondary signup-step-prev" data-prev-step="2" type="button"><span aria-hidden="true">&larr;</span> BACK TO YOUR SIGNALS</button><button class="auth-submit" type="submit">CREATE MY PROFILE <span>→</span></button></div>
               </div>
             </form>
             <div class="auth-success" id="auth-success" hidden><span class="auth-success-mark" aria-hidden="true">✓</span><h2 data-auth-success-title>Check your email.</h2><p data-auth-success-message>We sent a verification link. Your email is your login ID; your password stays private and is never shown here.</p><div class="credential-list"><div class="credential-row"><span>LOGIN ID</span><code data-credential="account-email">you@example.com</code><button type="button" data-copy-credential="account-email">COPY</button></div></div><button class="auth-secondary auth-close-success" type="button">BACK TO BRIVIA <span>↗</span></button></div>

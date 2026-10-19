@@ -116,3 +116,8 @@ music, a click (1440) and a tap (390, touch) do, the sound button mutes and the 
 ends after 5 minutes and the button replays it, Lenis runs on a desktop pointer only (not on a phone, not with
 reduced motion), and the open menu stops it and hides the button. `landing-smoothness.mjs` is a frame-time probe
 (wheel-scrolls the page at 1440 and 390; `SMOOTH_GL=0` uses plain software compositing).
+
+## Accepted-request notifications (D-071)
+
+`node tests/e2e/accepted-notice.spec.mjs` (port `E2E_PORT || 5174`, app-stub): the "accepted your request" notification
+on load, once only, and live within the ~30 s connection sync; the thread header at large system text sizes.

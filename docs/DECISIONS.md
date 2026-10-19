@@ -1377,3 +1377,52 @@ controls (a tester or a seeded test member), never a real member, so no new expo
   (D-068); one who stopped before it can use "Forgot password?" on the login page.
 - **Kept from the same period:** the repository layout (D-065), the removed login/signup quote, and the phone
   smoothness work (D-066).
+
+## D-070: Cover images are Brivia presets only; no upload from the gallery (2026-10-19)
+- Accepted 2026-10-19 (founder: "for cover pictures we will not provide an option for the people to choose from
+  gallery... people shall see only these available cover pics and then apply one they like", as on the reference
+  build club-seven-woad.vercel.app).
+- Signup already offered only the 18 presets. Edit profile had a "Cover photo" file input; it is replaced by the same
+  presets: a large preview and a scrollable row of the 18 covers (a radiogroup, arrow keys move the choice), saved as
+  the stored preset path (`cover-presets.js`, unit-tested against `isPresetCoverUrl`). The profile photo upload stays.
+- A cover uploaded before this keeps showing until the member picks a preset; the save then deletes the uploaded file
+  from Storage. No database change (preset paths were always accepted).
+
+## D-071: "Accepted your request" notifications; a chat header that holds any name (2026-10-19)
+- Accepted 2026-10-19 (founder's live test: Aarav got no notification when Golu accepted his request; Golu's photo did
+  not show in the chat; the thread header's name "messing up with margin and padding").
+- **Notification.** The app notified only new messages and incoming requests; nothing told a sender their request was
+  accepted. Now `my_outgoing_requests` (which already reports `accepted`, and keeps a decline looking `pending` to the
+  sender) is read on load and whenever the ~30 s connection sync finds a new match. Each acceptance from the last 7
+  days becomes one notification, "<name> accepted your request. Say hi.", which opens the chat. A per-device seen list
+  stops repeats; a mutual match made by my own swipe is marked seen (its toast already said so). No database change.
+- **Photo.** Not a bug: live data shows two accounts, "Golu Kumar" (the one Aarav is connected with, no photo, so the
+  initials are right) and a newer "Golu" (with a photo, Aarav's request to it still pending).
+- **Header.** It had a fixed 66 px height; with a large system font the name and a two-line status spilled out. It now
+  grows with its text, keeps name and status to one line each with an ellipsis, and never squeezes the avatar, back
+  or menu. Spec: `tests/e2e/accepted-notice.spec.mjs` (5 checks).
+
+## D-072: The signup in three steps, laid out like the reference build (2026-10-19)
+- Accepted 2026-10-19 (founder, with three screenshots of club-seven-woad.vercel.app/auth.html#signup: "Make the new
+  sign up flow like this and keep it professional and shall look similar but beautiful").
+- **Grouping.** Step 1 *The basics*: name, email, phone, **Your area**, the 18+ box. Step 2 *Your signals*, "Find your
+  people.": gender, experience, interests with the Passion Budget, looking for. Step 3 *Security & presence*, "Make it
+  yours.": password, photo, cover. Button labels follow the reference ("NEXT: YOUR SIGNALS", "← BACK TO DETAILS",
+  "NEXT: SECURITY & COVER").
+- **Where it differs from the reference, on purpose.** The reference asks City and State; we keep *Use my location /
+  Pick my city* in that place, because location-first matching needs a coarse cell and a free-text city cannot give
+  one (VISION rule 2, the privacy rule in CLAUDE.md). The 18+ confirmation (R1) and the Passion Budget (ORBIT input)
+  stay required. No field, RPC or stored value changed; ORBIT behaviour is untouched, so `ORBIT_ENGINE.md` needs no edit.
+- Re-entry opens step 1 when the name, the declaration or the area is missing, else step 2. Styling: the area set off by
+  a hairline and a "YOUR AREA" label, a one-row 18+ checkbox, gender tiles on one row, the looking-for field matching
+  the other fields (`auth-a11y.css`). UX_SPEC §A and `onboarding.spec.mjs` updated.
+
+## D-073: Auth emails through Gmail SMTP, in the Brivia theme (2026-10-19)
+- Accepted 2026-10-19 (founder created a Google app password on briviaclub@gmail.com: "add these for email SMTP using
+  app password and the mail shall look professional in our brand theme").
+- Supabase sends auth mail through `smtp.gmail.com:465` as "Brivia Club" <briviaclub@gmail.com>. This lifts the
+  built-in sender's 2-per-hour limit that blocked public tests (D-049/D-050). The app password lives only in the
+  Supabase dashboard, never in git.
+- Six branded templates in `supabase/email-templates/` (wine header with the wordmark, cream card, wine pill button,
+  a plain-link fallback, privacy line), table-based with inline styles for mail clients. Setup steps in its README.
+- Gmail is an interim sender (about 500 mails a day, weaker deliverability); a domain sender comes before launch.

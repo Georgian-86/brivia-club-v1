@@ -25,7 +25,8 @@ import { deleteAccount, clearBriviaKeys, DELETE_BUCKETS, reauthMarker, reauthMar
 import { openPrivacyAccount } from './privacy-account.js';
 import { isUnderReview, UNDER_REVIEW_COPY } from './onboarding-guard.js';
 import { openReportDialog, bindCardOverflow, cardOverflowOpen, reportSuccessCopy } from './report-dialog.js';
-import { defaultCoverUrl, normalizeCoverUrl } from './cover-assets.js';
+import { defaultCoverUrl, normalizeCoverUrl, coverPresetImage } from './cover-assets.js';
+import { COVER_PRESETS } from './cover-presets.js';
 import { postImageSrc } from './post-image.js';
 import { profileChecklist } from './profile-checklist.js';
 import { quotaLabel, quotaErrorText, quotaBlocked, quotaNotice } from './signal-quota.js';
@@ -261,6 +262,55 @@ const addMessageNotification = (message) => {
   saveNotifications();
   return true;
 };
+// "Accepted your request" (2026-10-19): the sender of an accepted request hears about it. my_outgoing_requests returns
+// 'accepted' for those (a decline stays 'pending' to the sender, R-privacy), and the match row's created_at is when it
+// happened. Each accepted request notifies once per device (a seen list), and only if it happened in the last 7 days.
+const ACCEPTED_NOTICE_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
+const acceptedSeenKey = () => `brivia-accepted-seen:${memberProfile.id || 'anonymous'}`;
+const readAcceptedSeen = () => {
+  try { const saved = JSON.parse(window.localStorage.getItem(acceptedSeenKey()) || '[]'); return new Set(Array.isArray(saved) ? saved.map(String) : []); } catch { return new Set(); }
+};
+const saveAcceptedSeen = (seen) => {
+  try { window.localStorage.setItem(acceptedSeenKey(), JSON.stringify([...seen].slice(-200))); } catch { /* Continue in memory. */ }
+};
+let matchCreatedAt = new Map();
+const rememberMatchTimes = (rows) => {
+  (rows || []).forEach((row) => {
+    const other = String(row.user1_id) === String(memberProfile.id) ? row.user2_id : row.user1_id;
+    if (other && row.created_at) matchCreatedAt.set(String(other), row.created_at);
+  });
+};
+const syncAcceptedRequests = async () => {
+  if (!supabase || !memberProfile.id) return false;
+  const { data, error } = await supabase.rpc('my_outgoing_requests');
+  if (error) { console.warn('Sent requests could not load:', error.message); return false; }
+  const seen = readAcceptedSeen();
+  const fresh = [];
+  (data || []).filter((row) => row?.status === 'accepted' && row.to_id).forEach((row) => {
+    const personId = String(row.to_id);
+    if (seen.has(personId)) return;
+    seen.add(personId);
+    const at = matchCreatedAt.get(personId) || row.created_at || new Date().toISOString();
+    if (Date.now() - new Date(at).getTime() > ACCEPTED_NOTICE_WINDOW_MS) return;
+    fresh.push({ personId, at });
+  });
+  saveAcceptedSeen(seen);
+  if (!fresh.length || !areNotificationsEnabled()) return false;
+  fresh.forEach(({ personId, at }) => {
+    const id = `accepted:${personId}`;
+    if (!notifications.some((item) => String(item.id) === id)) notifications.unshift({ id, type: 'accepted', personId, body: 'Accepted your request. Say hi.', createdAt: at, read: false });
+  });
+  notifications = notifications.slice(0, 80);
+  saveNotifications();
+  const unknown = fresh.map((item) => item.personId).filter((id) => !findPersonById(id));
+  if (unknown.length) {
+    const { data: rows } = await fetchCandidates(unknown);
+    mergePeople(rows);
+    renderChats();
+  }
+  renderNotifications();
+  return true;
+};
 const markNotificationsReadForPerson = (personId) => {
   let changed = false;
   notifications = notifications.map((notification) => {
@@ -304,8 +354,9 @@ const renderNotifications = () => {
   const grouped = new Map();
   notifications.filter((notification) => !notification.read).forEach((notification) => {
     const key = String(notification.personId);
-    const group = grouped.get(key) || { personId: key, count: 0, latest: notification };
+    const group = grouped.get(key) || { personId: key, count: 0, messages: 0, accepted: false, latest: notification };
     group.count += 1;
+    if (notification.type === 'accepted') group.accepted = true; else group.messages += 1;
     if (new Date(notification.createdAt || 0) > new Date(group.latest.createdAt || 0)) group.latest = notification;
     grouped.set(key, group);
   });
@@ -321,7 +372,9 @@ const renderNotifications = () => {
   const messagesHtml = !enabled ? `<div class="notification-empty"><p>Notifications are off in settings.</p>${settingsAction}</div>` : unreadGroups.length ? unreadGroups.map((group) => {
     const person = findPersonById(group.personId);
     const title = person?.name || 'a Brivia member';
-    const messageLabel = `${group.count} message${group.count === 1 ? '' : 's'} from ${title}`;
+    const messageLabel = group.messages
+      ? `${group.messages} message${group.messages === 1 ? '' : 's'} from ${title}${group.accepted ? ' (request accepted)' : ''}`
+      : `${title} accepted your request. Say hi.`;
     return `<button type="button" class="notification-item is-unread" data-notification-person="${escapeHtml(group.personId)}">${renderAvatar(person, 'notification-avatar')}<span class="notification-copy"><strong>${escapeHtml(messageLabel)}</strong></span><time>${escapeHtml(formatNotificationTime(group.latest.createdAt))}</time></button>`;
   }).join('') : (requestCount ? '' : `<div class="notification-empty"><p>You are all caught up.</p>${settingsAction}</div>`);
   list.innerHTML = requestsHtml + messagesHtml;
@@ -958,7 +1011,8 @@ const sendConnectionSignal = async (person, note = null) => {
   }
   refreshSignalQuota();
   const matched = data?.status === 'matched';
-  if (matched) { addConnection(person.id); renderChats(); }
+  // A mutual match I just made shows its toast now, so it never comes back later as "accepted your request".
+  if (matched) { const seen = readAcceptedSeen(); seen.add(String(person.id)); saveAcceptedSeen(seen); addConnection(person.id); renderChats(); }
   return { matched, status: data?.status || null };
 };
 const mutualToast = (person) => `It's mutual. Say hi to ${person?.name || 'your new connection'}.`;
@@ -994,14 +1048,18 @@ const loadConnectionRequests = async () => {
 };
 const refreshConnections = async () => {
   if (!supabase || !memberProfile.id) return;
-  const { data, error } = await supabase.from('matches').select('user1_id,user2_id').or(`user1_id.eq.${memberProfile.id},user2_id.eq.${memberProfile.id}`);
+  const { data, error } = await supabase.from('matches').select('user1_id,user2_id,created_at').or(`user1_id.eq.${memberProfile.id},user2_id.eq.${memberProfile.id}`);
   if (error) { console.warn('Connections could not refresh:', error.message); return; }
+  rememberMatchTimes(data);
   const before = remoteConnectionIds.length;
   // Only newly matched people are added, so chats hidden on this device stay hidden.
   (data || []).map((match) => String(match.user1_id) === String(memberProfile.id) ? match.user2_id : match.user1_id)
     .filter((id) => !remoteConnectionIds.some((known) => String(known) === String(id)))
     .forEach(addConnection);
-  return remoteConnectionIds.length !== before;
+  const changed = remoteConnectionIds.length !== before;
+  // A new match may be someone accepting my request: tell me (never for a request I accepted myself, see respondToRequest).
+  if (changed) syncAcceptedRequests().catch((error) => console.warn('Accepted requests could not sync:', error.message));
+  return changed;
 };
 const respondToRequest = async (fromId, accept) => {
   if (!supabase || respondingRequestIds.has(fromId)) return;
@@ -1847,6 +1905,46 @@ const ensureProfilePhotoEditor = () => {
 };
 
 
+// D-070: a cover is always one of the presets; there is no upload from the gallery. The picker shows the current cover
+// (a cover uploaded before D-070 stays until the member picks a preset) and a scrollable row of the 18 presets.
+const coverPickerMarkup = (currentUrl) => {
+  const current = normalizeCoverUrl(currentUrl || '') || defaultCoverUrl;
+  const options = COVER_PRESETS.map((preset, i) => {
+    const image = coverPresetImage(preset.key);
+    const selected = image === current;
+    return `<button type="button" class="profile-cover-choice${selected ? ' is-selected' : ''}" role="radio" aria-checked="${selected}" tabindex="${selected || (!COVER_PRESETS.some((p) => coverPresetImage(p.key) === current) && i === 0) ? 0 : -1}" data-cover-stored="${escapeHtml(preset.stored)}" data-cover-image="${escapeHtml(image)}" aria-label="${escapeHtml(preset.label)}"><img src="${escapeHtml(image)}" alt="" loading="lazy" decoding="async" /><span>${escapeHtml(preset.label)}</span></button>`;
+  }).join('');
+  return `<div class="profile-edit-wide profile-cover-picker" data-profile-cover-picker><span id="profile-cover-label">COVER IMAGE</span>
+    <div class="profile-cover-preview" data-profile-cover-preview style="background-image:url(&quot;${escapeHtml(current)}&quot;)"></div>
+    <div class="profile-cover-options" role="radiogroup" aria-labelledby="profile-cover-label">${options}</div>
+    <small class="profile-edit-helper">Choose one of the Brivia covers. It sits behind your photo on your card and profile.</small></div>`;
+};
+const wireCoverPicker = (root) => {
+  const picker = root.querySelector('[data-profile-cover-picker]');
+  if (!picker) return () => null;
+  const preview = picker.querySelector('[data-profile-cover-preview]');
+  const choices = [...picker.querySelectorAll('.profile-cover-choice')];
+  let chosen = null;
+  const pick = (button) => {
+    chosen = button.dataset.coverStored;
+    choices.forEach((c) => { const on = c === button; c.classList.toggle('is-selected', on); c.setAttribute('aria-checked', String(on)); c.tabIndex = on ? 0 : -1; });
+    preview.style.backgroundImage = `url("${button.dataset.coverImage.replace(/["\\\n]/g, encodeURIComponent)}")`;
+  };
+  choices.forEach((button, i) => {
+    button.addEventListener('click', () => pick(button));
+    button.addEventListener('keydown', (event) => {
+      const step = { ArrowRight: 1, ArrowDown: 1, ArrowLeft: -1, ArrowUp: -1 }[event.key];
+      if (!step) return;
+      event.preventDefault();
+      const next = choices[(i + step + choices.length) % choices.length];
+      pick(next);
+      next.focus();
+      next.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+    });
+  });
+  return () => chosen;  // the stored preset path the member picked, or null to keep the current cover
+};
+
 const openProfileEditor = () => {
   if (!memberProfile.id || document.querySelector('#profile-edit-modal')) return;
   const profile = memberProfile;
@@ -1868,13 +1966,14 @@ const openProfileEditor = () => {
         <div class="profile-edit-wide profile-edit-readonly"><span>SKILLS / INTERESTS</span><p>${escapeHtml(profile.skills || 'Pick interests in your profile setup')}</p><small class="profile-edit-helper">These come from your interests and passion points. Private interests are never shown.</small></div>
         <label class="profile-edit-wide"><span>LOOKING FOR</span><input name="lookingFor" list="profile-edit-looking-options" value="${escapeHtml(profile.lookingFor || '')}" placeholder="Search or type what you are looking for" /><datalist id="profile-edit-looking-options">${profileEditDatalist('lookingFor')}</datalist><small class="profile-edit-helper">Choose from suggestions or type your own.</small></label>
         <label><span>PROFILE PHOTO</span><input name="photoFile" type="file" accept="image/*" aria-describedby="profile-photo-error" /><small class="media-inline-error" id="profile-photo-error" role="alert" hidden></small></label>
-        <label><span>COVER PHOTO</span><input name="coverFile" type="file" accept="image/*" aria-describedby="profile-cover-error" /><small class="media-inline-error" id="profile-cover-error" role="alert" hidden></small></label>
+        ${coverPickerMarkup(memberProfile.coverUrl)}
       </div>
       <p class="profile-edit-feedback" id="profile-edit-feedback" role="status"></p>
       <div class="profile-edit-actions"><button type="button" class="profile-edit-cancel" data-profile-edit-close>CANCEL</button><button type="submit" class="profile-edit-save">SAVE CHANGES <span>↗</span></button></div>
     </form>
   </div>`;
   document.body.append(modal);
+  const chosenCover = wireCoverPicker(modal);
   const close = () => modal.remove();
   modal.querySelectorAll('[data-profile-edit-close]').forEach((button) => button.addEventListener('click', close));
   modal.addEventListener('click', (event) => { if (event.target === modal) close(); });
@@ -1890,25 +1989,24 @@ const openProfileEditor = () => {
       phone: String(formData.get('phone') || '').trim(),
       experience: String(formData.get('experience') || '').trim(),
       lookingFor: String(formData.get('lookingFor') || '').trim(),
+      ...(chosenCover() ? { coverUrl: chosenCover() } : {}),
     };
     const photoFile = form.querySelector('[name="photoFile"]')?.files?.[0] || null;
-    const coverFile = form.querySelector('[name="coverFile"]')?.files?.[0] || null;
     if (!nextProfile.name) { feedback.textContent = 'Please add your name.'; return; }
     const photoError = form.querySelector('#profile-photo-error');
-    const coverError = form.querySelector('#profile-cover-error');
-    [photoError, coverError].forEach((node) => { node.hidden = true; node.textContent = ''; });
+    photoError.hidden = true;
+    photoError.textContent = '';
     setBusy(submit, true);
     feedback.textContent = 'Saving your profile...';
-    const { data, error } = await saveProfile(memberProfile.id, nextProfile, photoFile, coverFile, { photoUrl: memberProfile.photoUrl, coverUrl: memberProfile.coverUrl });
+    const { data, error } = await saveProfile(memberProfile.id, nextProfile, photoFile, null, { photoUrl: memberProfile.photoUrl, coverUrl: memberProfile.coverUrl });
     if (error) {
       setBusy(submit, false);
       if (error instanceof ImageProcessingError) {
-        // Inline beside the field that failed (nothing was uploaded); photo is processed first.
-        const target = error.field === 'cover' ? coverError : photoError;
-        target.textContent = error.message;
-        target.hidden = false;
+        // Inline beside the photo field (nothing was uploaded).
+        photoError.textContent = error.message;
+        photoError.hidden = false;
         feedback.textContent = '';
-        form.querySelector(error.field === 'cover' ? '[name="coverFile"]' : '[name="photoFile"]')?.focus();
+        form.querySelector('[name="photoFile"]')?.focus();
         return;
       }
       feedback.textContent = error.message || 'Profile could not be saved.';
@@ -2881,8 +2979,9 @@ const loadSupabaseCommunity = async () => {
   renderProfile();
   if (document.body.dataset.appView === 'profile' && profileInterests.status === 'idle') loadProfileInterests();
   await syncBlockedUserIds();
-  const { data: matchRows, error: matchError } = await supabase.from('matches').select('user1_id,user2_id').or(`user1_id.eq.${session.user.id},user2_id.eq.${session.user.id}`);
+  const { data: matchRows, error: matchError } = await supabase.from('matches').select('user1_id,user2_id,created_at').or(`user1_id.eq.${session.user.id},user2_id.eq.${session.user.id}`);
   if (!matchError) {
+    rememberMatchTimes(matchRows);
     remoteConnectionIds = (matchRows || []).map((match) => match.user1_id === session.user.id ? match.user2_id : match.user1_id);
     remoteMatchIds = [...remoteConnectionIds];
   }
@@ -2917,6 +3016,8 @@ const loadSupabaseCommunity = async () => {
     if (chatError) console.warn('Connections could not load:', chatError.message);
     mergePeople(chatRows);
   }
+  // Requests I sent that were accepted while I was away (each told once per device).
+  syncAcceptedRequests().catch((error) => console.warn('Accepted requests could not sync:', error.message));
   currentPerson = deckPeople()[0] || null;
   deck.ready = true;
   renderHome();
