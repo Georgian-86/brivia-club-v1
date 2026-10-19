@@ -1944,8 +1944,6 @@ const privacyDeps = (session) => ({
     uid: session.user.id,
   }),
   signInWithPassword: (email, password) => supabase.auth.signInWithPassword({ email, password }),
-  sendCode: (email) => supabase.auth.signInWithOtp({ email, options: { shouldCreateUser: false } }),
-  verifyCode: (email, token) => supabase.auth.verifyOtp({ email, token, type: 'email' }),
   startGoogle: async () => {
     try { window.sessionStorage.setItem(REAUTH_DELETE_KEY, reauthMarker(session.user.id)); } catch { /* the member can reopen the dialog by hand */ }
     const { error } = await supabase.auth.signInWithOAuth({ provider: 'google', options: { redirectTo: `${window.location.origin}/auth.html`, queryParams: { prompt: 'select_account' } } });

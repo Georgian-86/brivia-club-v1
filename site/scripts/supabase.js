@@ -276,21 +276,6 @@ const rpcCall = async (name, args) => {
 export const isRateLimited = (error, status = 0) => status === 429 || error?.code === 'PT429';
 
 // R1: the 18+ declaration. Must run before set_home_* and set_member_interests (the server refuses them otherwise).
-// Guided signup (Phase E, D-067): a 6-digit email code instead of a password. The same email also carries a sign-in
-// link (the default Supabase template); opening it lands on auth.html#signup with a session, which resumes the flow.
-// create: false for "Email me a code instead" on login (never creates an account). A member created this way is
-// marked passwordless (user_metadata), so account deletion re-checks them with a code, not a password.
-export const sendEmailCode = (email, { create = true } = {}) => (supabase
-  ? supabase.auth.signInWithOtp({ email, options: { shouldCreateUser: create, emailRedirectTo: `${window.location.origin}/auth.html#signup` } })
-  : Promise.resolve(notConfigured()));
-export const verifyEmailCode = (email, token) => (supabase
-  ? supabase.auth.verifyOtp({ email, token, type: 'email' })
-  : Promise.resolve(notConfigured()));
-// The Password screen: sets the member's password and clears the passwordless mark (deletion then asks for it).
-export const setPassword = (password) => (supabase
-  ? supabase.auth.updateUser({ password, data: { passwordless: false, has_password: true } })
-  : Promise.resolve(notConfigured()));
-export const markPasswordless = () => (supabase ? supabase.auth.updateUser({ data: { passwordless: true } }) : Promise.resolve(notConfigured()));
 export const declareAdult = () => rpcCall('declare_adult', { p_notice_version: NOTICE_VERSION });
 export const setHomeLocation = (lat, lng) => rpcCall('set_home_location', { lat, lng });
 export const setHomeCity = (placeId) => rpcCall('set_home_city', { p_place_id: placeId });
