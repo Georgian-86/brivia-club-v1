@@ -1416,3 +1416,13 @@ controls (a tester or a seeded test member), never a real member, so no new expo
 - Re-entry opens step 1 when the name, the declaration or the area is missing, else step 2. Styling: the area set off by
   a hairline and a "YOUR AREA" label, a one-row 18+ checkbox, gender tiles on one row, the looking-for field matching
   the other fields (`auth-a11y.css`). UX_SPEC §A and `onboarding.spec.mjs` updated.
+
+## D-073: Auth emails through Gmail SMTP, in the Brivia theme (2026-10-19)
+- Accepted 2026-10-19 (founder created a Google app password on briviaclub@gmail.com: "add these for email SMTP using
+  app password and the mail shall look professional in our brand theme").
+- Supabase sends auth mail through `smtp.gmail.com:465` as "Brivia Club" <briviaclub@gmail.com>. This lifts the
+  built-in sender's 2-per-hour limit that blocked public tests (D-049/D-050). The app password lives only in the
+  Supabase dashboard, never in git.
+- Six branded templates in `supabase/email-templates/` (wine header with the wordmark, cream card, wine pill button,
+  a plain-link fallback, privacy line), table-based with inline styles for mail clients. Setup steps in its README.
+- Gmail is an interim sender (about 500 mails a day, weaker deliverability); a domain sender comes before launch.

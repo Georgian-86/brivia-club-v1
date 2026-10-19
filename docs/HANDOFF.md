@@ -7,6 +7,9 @@ Update this file at the end of every session. CLAUDE.md holds the aim; this file
 
 ## 1. What is done
 
+**Auth email (2026-10-19), D-073.** Gmail SMTP (briviaclub@gmail.com, app password) plus six branded templates in
+`supabase/email-templates/`; the founder pastes them in the dashboard (README there). Pending until confirmed live.
+
 **Signup in 3 steps like the reference (2026-10-19), D-072.** The basics (name, email, phone, area, 18+) · Your signals
 ("Find your people.": gender, experience, interests + Passion Budget, looking for) · Security & presence (password,
 photo, cover). Same data and server calls as before; only grouping, labels and styling changed. Spec:
