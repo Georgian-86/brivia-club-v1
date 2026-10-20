@@ -1,11 +1,15 @@
 # Session handoff (read after CLAUDE.md)
 
-Last updated: 2026-10-20 (live-database correction D-070). Before that: 2026-10-16 (design references, D-062). Before that: 2026-10-13, after Phase D of the experience iteration (the test world), on branch
+Last updated: 2026-10-20 (live-database correction D-070; "Send without a note" D-071). Before that: 2026-10-16 (design references, D-062). Before that: 2026-10-13, after Phase D of the experience iteration (the test world), on branch
 `claude/jolly-edison-49xvza` (repo `Georgian-86/brivia-club-v1`). Phases C and D are not on `main` yet, and Phase D's SQL
 is not applied: the founder applies it in the SQL editor (section 3, item 0).
 Update this file at the end of every session. CLAUDE.md holds the aim; this file holds **where we are**.
 
 ## 1. What is done
+
+**"Send without a note" on the pitch sheet (2026-10-20), D-071.** A secondary button under SEND PITCH sends the like
+with no note, exactly as closing the sheet does (D-018 unchanged), never twice. The × has a 44 px target and an
+aria-label. Client only; proof in `tests/e2e/consent.spec.mjs` section 9b (1440 and 375 px, axe).
 
 **Live database recorded and the notice fixed (2026-10-20), D-070.** D-069 was wrong that the database needed nothing:
 `0009` (notice `2026-10-20`, `2026-10-05` accepted only until 2026-11-03) and `0010` (open-test-world switch) were

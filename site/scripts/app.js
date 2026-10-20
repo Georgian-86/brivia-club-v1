@@ -2784,9 +2784,11 @@ document.querySelector('#pitch-form')?.addEventListener('submit', async (event) 
   const body = input?.value.trim();
   if (!body || !supabase || !memberProfile.id) return;
   const submit = event.currentTarget.querySelector('.pitch-submit');
+  const noNote = event.currentTarget.querySelector('.pitch-no-note');
   const pending = claimPendingPitch();
   if (!pending) return; // already resolved (double submit) or no like in progress
   setBusy(submit, true);
+  if (noNote) noNote.disabled = true; // D-071: no second request while the note is in flight
   try {
     // The pitch travels as the note of the like's single request; no message is sent until the pair is matched.
     const result = await sendConnectionSignal(pending.person, body);
@@ -2814,7 +2816,16 @@ document.querySelector('#pitch-form')?.addEventListener('submit', async (event) 
     advanceCard(pending.person, 'pitch');
   } finally {
     setBusy(submit, false);
+    if (noNote) noNote.disabled = false;
   }
+});
+// D-071: "Send without a note" resolves the sheet exactly as closing it does (D-018, unchanged: one request with note
+// null through dismissPendingPitch, the same quota read and card advance). claimPendingPitch makes a second tap, or a
+// tap while SEND PITCH is in flight, a no-op; a tap inside the opening window (the tap that opened the sheet landing
+// on it) is ignored, as for the backdrop.
+document.querySelector('#pitch-modal .pitch-no-note')?.addEventListener('click', (event) => {
+  if (event.currentTarget.disabled || !pendingPitch || performance.now() - pitchOpenedAt < PITCH_OPENING_MS) return;
+  closeOverlays();
 });
 document.querySelector('#logout-button')?.addEventListener('click', logoutMember);
 document.addEventListener('keydown', (event) => {

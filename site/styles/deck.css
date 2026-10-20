@@ -466,3 +466,47 @@ body.app-body :is(button, [role="button"], .filter-button, .discovery-filter-sug
   .app-view[data-view="home"] .swipe-card-next { transition: none; }
   .app-view[data-view="home"] .swipe-stack .swipe-card.is-entering { animation: none; }
 }
+
+/* The pitch sheet (D-071). "Send without a note": a secondary text button under SEND PITCH, 44 px tall, brand tokens
+   only. It resolves the sheet exactly like closing it (D-018). The × keeps its 29 px circle but gets a 44 px target. */
+#pitch-modal .pitch-no-note {
+  display: block;
+  width: 100%;
+  min-height: 44px;
+  margin: var(--space-2) 0 0;
+  padding: var(--space-2) var(--space-4);
+  border: 0;
+  background: none;
+  color: var(--color-wine);
+  font-family: var(--font-body);
+  font-size: var(--text-14);
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+#pitch-modal .pitch-no-note:hover { color: var(--color-wine-deep); }
+#pitch-modal .pitch-no-note:focus-visible { outline: 2px solid var(--color-wine); outline-offset: 2px; }
+#pitch-modal .pitch-no-note:disabled { opacity: .6; cursor: progress; }
+#pitch-modal .overlay-close {
+  top: 7px;
+  right: 10px;
+  z-index: 1;
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border: 0;
+  border-radius: var(--radius-pill);
+}
+#pitch-modal .overlay-close::before {
+  content: '';
+  position: absolute;
+  inset: 7.5px;
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-pill);
+  pointer-events: none;
+}
+#pitch-modal .overlay-close:focus-visible { outline: 2px solid var(--color-wine); outline-offset: -2px; }
+/* The sheet's line "Tell <name> why..." was 4.42:1 on the cream panel (axe, D-071 review); ink-soft is 7:1. */
+#pitch-modal .pitch-copy, #pitch-modal .pitch-copy strong { color: var(--color-ink-soft); }

@@ -190,6 +190,12 @@ labelled "PRIVATE · ONLY YOU SEE THESE", and the hero and the area stat show th
   - The pitch sheet starts with "Hey {name}, I noticed we both care about {first shared interest, lowercased}. Would
     love to connect and exchange ideas.", or "Hey {name}, I'd love to connect and exchange ideas." when nothing is
     shared (A5: never fails on a card with no tags or shared interests).
+  - Under SEND PITCH sits a secondary text button, "Send without a note" (D-071): deep-wine underlined text on the
+    cream panel, full width, at least 44 px tall, brand tokens only (`deck.css`). It resolves the sheet exactly as
+    closing it does (D-018, unchanged): one request with no note, the same quota read and the same card advance. It
+    never sends twice: a second tap, a tap while SEND PITCH is in flight (it is disabled then) and a tap within 400 ms
+    of the sheet opening (the opening tap landing on it) do nothing. The sheet's × keeps its 29 px circle but has a
+    44 px target and `aria-label="Close and send without a note"`. The "Tell {name} why..." line uses ink-soft (7:1).
   - The PLACE filter is gone (cards carry no City/State; the deck already starts nearby). Name, skills and
     looking-for filters apply to the loaded deck.
   - A passed or liked card leaves the deck for the session: there is no wrap-around. When the queue runs out, the deck
@@ -286,7 +292,7 @@ From a member's point of view (D-015..D-018):
 1. **Unmatching resets the pair.** If either of you deletes the match, earlier requests between you are cleared. You can reconnect only if you both agree again.
 2. **Changing your mind works.** If you declined someone and later like or request them, and they had asked you first, you match straight away. A pending request from them completes the match the same way.
 3. **Blocks stay invisible.** Accepting a request from someone you have blocked (or who blocked you) shows no error and creates no match. It is quietly recorded as declined.
-4. **A like opens the pitch sheet.** Nothing is sent until the sheet closes. Send delivers one request with your note. Closing it, pressing Escape, tapping outside or swiping to the next card delivers one request without a note.
+4. **A like opens the pitch sheet.** Nothing is sent until the sheet closes. Send delivers one request with your note. Closing it, pressing Escape, tapping outside or swiping to the next card delivers one request without a note. "Send without a note" under Send does the same, in one tap (D-071).
 
 ### E. Media (R12, Iteration 4)
 - Every image upload (signup photo/cover, profile editor, chat image, community post) is re-encoded to JPEG (max 1280 px, EXIF dropped). If that fails (decode error, no 2d context, null blob) the original is NEVER used: the action stops and the inline message "We couldn't process this photo. Try a JPG or PNG." shows beside the field (`role="alert"`, linked by `aria-describedby`), in the chat composer, or in the post composer. Not a toast. Signup stops before any account or profile write and returns to step 4. GIFs pass through unchanged.

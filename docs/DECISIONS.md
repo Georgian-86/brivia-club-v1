@@ -1405,3 +1405,24 @@ controls (a tester or a seeded test member), never a real member, so no new expo
   ("0011"). The open-test-world switch is **on** live: close it (it should be open at most 6 nights, so no ~3 km band is
   earned on test members) and run the purge before real launch. The `0010` header's backlog item ("0011 keys density on
   `brivia_tester_world`") moves to a later migration number.
+
+## D-071: "Send without a note" on the pitch sheet; the D-018 close rule is unchanged (2026-10-20)
+- Accepted 2026-10-20 (founder request: a clear way to send the like without writing a note). No agent-arena round:
+  a small additive control that reuses an existing, already-ruled path; consent and quotas are untouched.
+- **What ships.** Under SEND PITCH, a secondary text button "Send without a note" (`.pitch-no-note`, `type="button"`,
+  full width, at least 44 px tall, deep-wine underlined text, tokens only). It calls the same path as closing the sheet
+  (`closeOverlays` → `dismissPendingPitch`): exactly one `send_signal` with `p_note: null`, the same quota decrement and
+  re-read, the same toast and the same card advance; a failed send brings the card back, as for close.
+- **Never twice.** `claimPendingPitch` already resolves a like once; on top of that the button does nothing when no
+  like is pending, while SEND PITCH is in flight (it is disabled then), and within 400 ms of the sheet opening (the
+  same ghost-tap window as the backdrop, since on phones the button sits low where the Pitch tap landed).
+- **D-018 unchanged.** Closing, Escape, the backdrop and moving to the next card still send one request without a note;
+  SEND PITCH still sends one with the note. The founder's open question from D-061 (should cancel send nothing?) stays
+  open; this button makes the no-note send explicit without changing what close does.
+- **Also.** The sheet's × keeps its 29 px circle but gets a 44 px target, `type="button"` and
+  `aria-label="Close and send without a note"` (honest about what closing does). axe flagged the sheet's
+  "Tell {name} why..." line at 4.42:1; it now uses `--color-ink-soft` (7:1).
+- **Proof.** `tests/e2e/consent.spec.mjs` section 9b at 1440 and 375 px: one POST with note null and the card advances
+  and the counter drops; a double tap sends one; a tap in the opening window sends nothing; SEND PITCH with a note
+  still sends the note once even with a tap on the new button in flight; the × is 44 px with a label; no sideways
+  scroll; axe clean on the open sheet. The existing D-018 checks (sections 1-5, 8, 9) pass unchanged.

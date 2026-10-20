@@ -116,3 +116,6 @@ music, a click (1440) and a tap (390, touch) do, the sound button mutes and the 
 ends after 5 minutes and the button replays it, Lenis runs on a desktop pointer only (not on a phone, not with
 reduced motion), and the open menu stops it and hides the button. `landing-smoothness.mjs` is a frame-time probe
 (wheel-scrolls the page at 1440 and 390; `SMOOTH_GL=0` uses plain software compositing).
+
+`consent.spec.mjs` section 9b (D-071) checks "Send without a note" on the pitch sheet at 1440 and 375 px (one note-null
+send, no double send, the 44 px ×, axe). `SHEET_SHOTS=<dir>` saves `pitch-sheet-1440.png` and `pitch-sheet-375.png`.

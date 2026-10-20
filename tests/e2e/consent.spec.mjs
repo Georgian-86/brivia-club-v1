@@ -24,6 +24,7 @@
 // puts the card back at the front; passes never call send_signal and nothing is kept in localStorage.
 // Founder live test (2026-10-14): the pitched card stays on screen (parked) while the sheet is open and leaves only
 // when the sheet resolves (D-018 unchanged: submit = note, close / Escape / backdrop / next card = note null).
+// D-071: "Send without a note" under SEND PITCH resolves the sheet like close (one note-null request), never twice.
 import { readFileSync } from 'node:fs';
 import { spawn } from 'node:child_process';
 import assert from 'node:assert/strict';
@@ -1127,6 +1128,160 @@ try {
   check('quota context: never POSTs /rest/v1/connection_requests', () => assert.equal(q.calls.filter((c) => c.method === 'POST' && c.path === '/rest/v1/connection_requests').length, 0));
   check('quota context: no uncaught page errors', () => assert.deepEqual(quotaErrors, []));
   await quotaContext.close();
+
+  // 9b. "Send without a note" (D-071): a secondary button under SEND PITCH resolves the sheet exactly like close /
+  // Escape / backdrop (one send_signal with note null, same quota decrement, same card advance; D-018 unchanged), never
+  // double-sends (double tap, a tap during an in-flight SEND PITCH, a ghost tap while the sheet opens), and the × has
+  // a 44 px target and an aria-label. Fresh context per width (1440 and 375), each with its own deck.
+  const SHEET_SHOTS = process.env.SHEET_SHOTS || '';
+  const noNoteRun = async (width, height) => {
+    const nnMember = (i) => ({ id: `77777777-7777-4777-8777-${String(width * 100 + i).padStart(12, '0')}`, name: `Note ${i}`, experience: 'Member', skills: ['Chess'], looking_for: ['Friends'], photo_url: '', cover_url: '', distance_band: '~3 km', shared_interests: ['Chess'], created_at: ago(10000 + i * 1000) });
+    const nnDeck = Array.from({ length: 10 }, (_, k) => nnMember(k + 1));
+    const s = { remaining: 30, calls: [], passed: new Set(), signalled: new Set(), hold: null };
+    const ctx = await browser.newContext({ viewport: { width, height } });
+    await ctx.addInitScript(([key, value]) => { window.localStorage.setItem(key, value); }, ['sb-stub-auth-token', JSON.stringify(session)]);
+    await ctx.route(`${ORIGIN}/**`, async (route) => {
+      const request = route.request();
+      const url = new URL(request.url());
+      const method = request.method();
+      const pathName = url.pathname;
+      const postData = request.postData();
+      s.calls.push({ method, path: pathName, body: postData });
+      const json = (status, payload) => route.fulfill({ status, contentType: 'application/json', body: JSON.stringify(payload), headers: { 'access-control-allow-origin': '*' } });
+      if (method === 'OPTIONS') return route.fulfill({ status: 204, headers: { 'access-control-allow-origin': '*', 'access-control-allow-headers': '*', 'access-control-allow-methods': '*' } });
+      if (pathName.startsWith('/auth/v1/')) return json(200, pathName.endsWith('/user') ? user : session);
+      if (pathName === '/rest/v1/profiles') return json(200, (request.headers().accept || '').includes('vnd.pgrst.object') ? ownRow : [ownRow]);
+      const args = JSON.parse(postData || '{}');
+      if (pathName === '/rest/v1/rpc/deck_candidates') return json(200, nnDeck.filter((row) => !s.passed.has(row.id) && !s.signalled.has(row.id)).slice(0, args.p_limit || 12));
+      if (pathName === '/rest/v1/rpc/deck_status') return json(200, 'caught_up');
+      if (pathName === '/rest/v1/rpc/my_onboarding_status') return json(200, [{ interests: 2, points: 20, has_cell: true, place_label: 'Pune', completed: true }]);
+      if (pathName === '/rest/v1/rpc/my_signal_quota') return json(200, [{ daily_limit: 30, remaining: s.remaining, resets_at: null, live_unanswered: 0, live_limit: 100 }]);
+      if (pathName === '/rest/v1/rpc/send_signal') {
+        if (s.hold) await s.hold;
+        s.remaining = Math.max(0, s.remaining - 1); s.signalled.add(args.p_to);
+        return json(200, [{ status: 'sent', remaining: s.remaining, resets_at: '2026-10-04T15:00:00+00:00' }]);
+      }
+      if (pathName === '/rest/v1/interaction' && method === 'POST') { s.passed.add(args.target_id); return route.fulfill({ status: 201, body: '', headers: { 'access-control-allow-origin': '*' } }); }
+      if (pathName.startsWith('/rest/v1/')) return json(200, []);
+      return json(200, {});
+    });
+    await ctx.route((url) => !url.href.startsWith(BASE) && !url.href.startsWith(ORIGIN), (route) => route.abort());
+    await ctx.routeWebSocket(/stub\.supabase\.local/, (ws) => ws.close());
+    const pg = await ctx.newPage();
+    const errs = [];
+    pg.on('pageerror', (error) => errs.push(String(error)));
+    await pg.goto(`${BASE}/app.html`, { waitUntil: 'domcontentloaded' });
+    const card = () => pg.evaluate(() => document.querySelector('#swipe-card:not([hidden]) #swipe-name')?.textContent?.trim() || '');
+    const counter = () => pg.evaluate(() => document.querySelector('#swipe-left-count')?.textContent?.trim() || '');
+    const signals = () => s.calls.filter((c) => c.method === 'POST' && c.path === '/rest/v1/rpc/send_signal').map((c) => JSON.parse(c.body || '{}'));
+    const idOf = (name) => nnDeck.find((row) => row.name === name)?.id;
+    const waitSheetHidden = () => pg.waitForFunction(() => document.querySelector('#pitch-modal')?.hidden, null, { timeout: 6000 });
+    const waitCardNot = (name) => pg.waitForFunction((n) => { const c = document.querySelector('#swipe-card:not([hidden]) #swipe-name')?.textContent?.trim() || ''; return c && c !== n; }, name, { timeout: 6000 }).then(() => true, () => false);
+    const openSheet = async ({ settle = true } = {}) => {
+      await pg.waitForFunction(() => document.querySelector('#pitch-modal')?.hidden && !document.querySelector('#swipe-card')?.classList.contains('is-loading'));
+      await pg.waitForTimeout(400);
+      const name = await card();
+      await pg.locator('[data-action="like"]').click();
+      await pg.waitForSelector('#pitch-modal:not([hidden])');
+      if (settle) await pg.waitForTimeout(500); // past the 400 ms ghost-tap window
+      return name;
+    };
+    const tag = `${width}px`;
+    await pg.waitForFunction(() => document.querySelector('#swipe-card:not([hidden]) #swipe-name')?.textContent?.trim(), null, { timeout: 15000 });
+    await pg.waitForFunction(() => document.querySelector('#swipe-left-count')?.textContent?.trim() === '30 of 30 signals left · 24-hour window', null, { timeout: 6000 }).catch(() => {});
+
+    // Layout and accessibility of the open sheet.
+    const first = await openSheet();
+    const btn = pg.locator('#pitch-modal .pitch-no-note');
+    const geo = await pg.evaluate(() => {
+      const box = (el) => { if (!el) return null; const r = el.getBoundingClientRect(); return { x: r.x, y: r.y, w: r.width, h: r.height, bottom: r.bottom, right: r.right }; };
+      const b = document.querySelector('#pitch-modal .pitch-no-note');
+      const x = document.querySelector('#pitch-modal .overlay-close');
+      return {
+        text: b?.textContent?.trim() || '', type: b?.getAttribute('type') || '', b: box(b), submit: box(document.querySelector('#pitch-modal .pitch-submit')),
+        x: box(x), xLabel: x?.getAttribute('aria-label') || '', xType: x?.getAttribute('type') || '',
+        vw: document.documentElement.clientWidth, sw: document.documentElement.scrollWidth,
+      };
+    });
+    check(`${tag}: the sheet has a "Send without a note" button (got "${geo.text}", type ${geo.type})`, () => { assert.equal(geo.text, 'Send without a note'); assert.equal(geo.type, 'button'); });
+    check(`${tag}: "Send without a note" sits under SEND PITCH and is >= 44 px tall (${JSON.stringify(geo.b)}, submit ${JSON.stringify(geo.submit)})`, () => {
+      assert.ok(geo.b && geo.submit);
+      assert.ok(geo.b.y >= geo.submit.bottom - 0.5, 'below SEND PITCH');
+      assert.ok(geo.b.h >= 44, `height ${geo.b.h}`);
+      assert.ok(geo.b.x >= 0 && geo.b.right <= geo.vw + 0.5, 'inside the viewport');
+    });
+    check(`${tag}: the sheet's × has an aria-label and a >= 44 px target (${geo.xLabel}, ${JSON.stringify(geo.x)})`, () => {
+      assert.match(geo.xLabel, /close/i);
+      assert.equal(geo.xType, 'button');
+      assert.ok(geo.x.w >= 44 && geo.x.h >= 44, `${geo.x.w}x${geo.x.h}`);
+    });
+    check(`${tag}: no sideways scroll with the sheet open (${geo.sw} <= ${geo.vw})`, () => assert.ok(geo.sw <= geo.vw));
+    const sheetAxe = await axeViolations(pg, { include: '#pitch-modal' });
+    check(`${tag}: axe finds nothing on the open pitch sheet (${sheetAxe.join(' | ')})`, () => assert.deepEqual(sheetAxe, []));
+    if (SHEET_SHOTS) await pg.screenshot({ path: path.join(SHEET_SHOTS, `pitch-sheet-${width}.png`) });
+
+    // One tap: one send_signal with note null, the counter drops, the card advances, the sheet closes.
+    let before = signals().length;
+    await btn.click();
+    await waitSheetHidden();
+    const advanced = await waitCardNot(first);
+    await pg.waitForFunction(() => document.querySelector('#swipe-left-count')?.textContent?.trim() === '29 of 30 signals left · 24-hour window', null, { timeout: 6000 }).catch(() => {});
+    await pg.waitForTimeout(300);
+    let sent = signals().slice(before);
+    check(`${tag}: "Send without a note" = exactly one send_signal with note null (${JSON.stringify(sent)})`, () => {
+      assert.equal(sent.length, 1); assert.deepEqual(sent[0], { p_to: idOf(first), p_note: null });
+    });
+    const afterCounter = await counter();
+    check(`${tag}: the quota drops by one, as for close (got "${afterCounter}")`, () => assert.equal(afterCounter, '29 of 30 signals left · 24-hour window'));
+    check(`${tag}: the card advances past ${first} (now "${await card()}")`, () => assert.equal(advanced, true));
+
+    // Double tap: still one request.
+    const second = await openSheet();
+    before = signals().length;
+    await pg.evaluate(() => { const b = document.querySelector('#pitch-modal .pitch-no-note'); b.click(); b.click(); });
+    await btn.dblclick({ force: true }).catch(() => {});
+    await waitSheetHidden();
+    await waitCardNot(second);
+    await pg.waitForTimeout(600);
+    sent = signals().slice(before);
+    check(`${tag}: a double tap on "Send without a note" sends one request (${JSON.stringify(sent)})`, () => {
+      assert.equal(sent.length, 1); assert.deepEqual(sent[0], { p_to: idOf(second), p_note: null });
+    });
+
+    // A ghost tap while the sheet is still opening (the tap that opened it) sends nothing and keeps the sheet.
+    before = signals().length;
+    const third = await openSheet({ settle: false });
+    await pg.evaluate(() => document.querySelector('#pitch-modal .pitch-no-note').click());
+    await pg.waitForTimeout(300);
+    const ghost = { sent: signals().length - before, open: await pg.evaluate(() => !document.querySelector('#pitch-modal')?.hidden) };
+    check(`${tag}: a tap inside the 400 ms opening window sends nothing (${JSON.stringify(ghost)})`, () => { assert.equal(ghost.sent, 0); assert.equal(ghost.open, true); });
+    await pg.waitForTimeout(400);
+
+    // SEND PITCH with a note still sends the note; a tap on "Send without a note" while it is in flight sends nothing.
+    let release;
+    s.hold = new Promise((resolve) => { release = resolve; });
+    await pg.locator('#pitch-message').fill('A note that must arrive');
+    before = signals().length;
+    await pg.locator('.pitch-submit').click();
+    await pg.waitForTimeout(150);
+    const disabledInFlight = await btn.isDisabled();
+    await pg.evaluate(() => document.querySelector('#pitch-modal .pitch-no-note')?.click());
+    await pg.waitForTimeout(150);
+    release(); s.hold = null;
+    await waitSheetHidden();
+    await waitCardNot(third);
+    await pg.waitForTimeout(600);
+    sent = signals().slice(before);
+    check(`${tag}: "Send without a note" is disabled while SEND PITCH is in flight`, () => assert.equal(disabledInFlight, true));
+    check(`${tag}: SEND PITCH still sends its note, once, even with a tap on "Send without a note" in flight (${JSON.stringify(sent)})`, () => {
+      assert.equal(sent.length, 1); assert.deepEqual(sent[0], { p_to: idOf(third), p_note: 'A note that must arrive' });
+    });
+    check(`${tag}: never POSTs /rest/v1/connection_requests`, () => assert.equal(s.calls.filter((c) => c.method === 'POST' && c.path === '/rest/v1/connection_requests').length, 0));
+    check(`${tag}: no uncaught page errors (${errs.join(' | ')})`, () => assert.deepEqual(errs, []));
+    await ctx.close();
+  };
+  await noNoteRun(1440, 900);
+  await noNoteRun(375, 812);
 
   // 10. Iteration 4, Task 9 (R2 withdraw, R5 client): PRIVACY & ACCOUNT in the profile settings menu. Own context per
   // sign-in method so the stub can answer as a password member or a Google-only member.
