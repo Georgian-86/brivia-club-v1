@@ -1,11 +1,18 @@
 # Session handoff (read after CLAUDE.md)
 
-Last updated: 2026-10-16 (design references, D-062). Before that: 2026-10-13, after Phase D of the experience iteration (the test world), on branch
+Last updated: 2026-10-20 (live-database correction D-070). Before that: 2026-10-16 (design references, D-062). Before that: 2026-10-13, after Phase D of the experience iteration (the test world), on branch
 `claude/jolly-edison-49xvza` (repo `Georgian-86/brivia-club-v1`). Phases C and D are not on `main` yet, and Phase D's SQL
 is not applied: the founder applies it in the SQL editor (section 3, item 0).
 Update this file at the end of every session. CLAUDE.md holds the aim; this file holds **where we are**.
 
 ## 1. What is done
+
+**Live database recorded and the notice fixed (2026-10-20), D-070.** D-069 was wrong that the database needed nothing:
+`0009` (notice `2026-10-20`, `2026-10-05` accepted only until 2026-11-03) and `0010` (open-test-world switch) were
+applied live on 2026-10-14 from `claude/jolly-edison-49xvza`. Both are now in `supabase/migrations/` verbatim with their
+tests. New `0011_notice_version_2026_10_05.sql` makes `2026-10-05` current again with no expiry (and keeps `2026-10-20`
+accepted); it must be applied before 2026-11-03 or no new member can finish signup. Proof:
+`supabase/tests/p0f-notice-restore.test.sql`.
 
 **Signup back to the classic form (2026-10-19), D-069.** The guided one-question-per-screen signup (D-067, D-068) was
 live for one day and is removed at the founder's request; the 4-step form (UX_SPEC §A) is the only signup. No SQL
@@ -127,6 +134,14 @@ Tooling: Playwright **and axe-core** at `/tmp/pw` (`npm install --prefix /tmp/pw
 
 ## 2. Live Supabase state (project `wfbddovczpfdrspmxgfo`, ap-south-1)
 
+- **Corrected 2026-10-20 (D-070), verified read-only on the live project:** `0001`–`0006`, `0008`, `0009` and `0010`
+  are applied and frozen (`0009` and `0010` on 2026-10-14 from `claude/jolly-edison-49xvza`; `0010` needs `0008`'s
+  `brivia_tester`, so `0008` is live too). Live `brivia_notice_version()` = `2026-10-20`, and
+  `brivia_notice_accepted('2026-10-05')` = `true` only until 2026-11-03. **`0011` is written, NOT applied: apply it
+  before 2026-11-03** (`supabase/migrations/README.md`, "0011"). The **open-test-world switch is ON**
+  (`brivia_world_switch.open_test_world = true`): real members see seeded test members. Close it (README, "0010"):
+  it was meant to stay open at most 6 nights, and run the purge before real launch. The bullets below are older and
+  are superseded where they disagree.
 - `0001`–`0004` are **applied and frozen**. Never edit or re-run them.
 - **Test-member seed: live** (D-043): 24 `is_test` profiles, all completed. To refresh, purge and re-seed (see
   `supabase/seed/README.md`; the purge leaves storage files, remove them via the Storage API first).
@@ -147,6 +162,14 @@ Tooling: Playwright **and axe-core** at `/tmp/pw` (`npm install --prefix /tmp/pw
 - Real members are **not allowed yet**: see the gate table in `docs/arena/2026-10-07-iteration-4.md`.
 
 ## 3. What to do next (in order)
+
+**Urgent, before 2026-11-03 (D-070):** in the SQL editor as `postgres`, apply `0011_notice_version_2026_10_05.sql`
+and run its read-only check
+`select public.brivia_notice_version(), public.brivia_notice_accepted('2026-10-05', '2026-11-10');` → `2026-10-05`, `t`.
+Then close the open test world
+(`update public.brivia_world_switch set open_test_world = false, changed_at = now();`) and purge the test members
+before real launch. Item 0 below is partly done: `0008`, `0009` and `0010` are live (the seed and tester rows were not
+re-checked).
 
 0. **Go live with Phase D, the test world** (D-058; all three tasks are done on the branch). First the founder reviews
    the Phase C before/after screenshots and OKs pushing and fast-forwarding `main`. Then, in the SQL editor as

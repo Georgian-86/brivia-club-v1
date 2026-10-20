@@ -1,14 +1,23 @@
 # Migrations: apply and deploy runbook
 
-The files here are applied **by hand in the Supabase SQL editor, as `postgres`, in order** (`0001` → `0006`). Each
+The files here are applied **by hand in the Supabase SQL editor, as `postgres`, in order** (`0001` → `0011`; there is
+no `0007`). Each
 file is idempotent: the local harness (`bash supabase/tests/run.sh`) applies every file twice. Verify locally with
 the harness before touching the live project. `supabase/legacy/` is archive only and is never applied.
 
-**Live state (2026-10-07): `0001`–`0004` are applied on the live project and frozen** (D-038: a file applied live is
+**Historical (2026-10-07): `0001`–`0004` are applied on the live project and frozen** (D-038: a file applied live is
 never edited again; later changes go in a new numbered file; `0004` went live on 2026-10-05, D-042). **Next: apply
 `0005`, verify it, then apply `0006`; deploy the new client in the same window as `0005`** (sections "0005" and "0006"
 below). Sections 0–4 are the historical `0004` runbook, kept for reference (pg_cron, log settings and the advisor list
 still apply).
+
+**Live state (2026-10-20, D-070): `0001`–`0006`, `0008`, `0009` and `0010` are applied and frozen.** `0009` and `0010`
+were applied on 2026-10-14 from branch `claude/jolly-edison-49xvza` (`0010` builds on `0008`'s `brivia_tester`, so
+`0008` is live too) and are recorded here verbatim since 2026-10-20. Verified read-only on 2026-10-20:
+`brivia_notice_version()` = `2026-10-20`, `brivia_notice_accepted('2026-10-05')` = `true`, and the open-test-world
+switch is **on** (`brivia_world_switch.open_test_world = true`). **Next: apply `0011` before 2026-11-03** (section
+"0011"): without it, every `declare_adult` from the live client (which sends `2026-10-05`) fails from that date and no
+new member can finish signup. Then **close the open test world** (section "0010").
 
 Daily moderation (reports, suspensions, rejoin reviews) after `0005`: `docs/MODERATION.md`.
 
@@ -324,3 +333,81 @@ If that matters, keep the tester row until you purge, or run the purge
 `brivia_tester`, so after a purge nobody is a tester. The tester's own account is never deleted.
 
 Incident response (suspected data breach, pausing the purge cron, notices): see `docs/BREACH_RUNBOOK.md`.
+
+## 0009: the notice version with a 14-day grace window (Phase E). **Live since 2026-10-14, frozen**
+
+Applied on the live project on 2026-10-14 from branch `claude/jolly-edison-49xvza`; the file here is a verbatim copy
+(D-070). Never edit or re-run it; `0011` supersedes its two notice functions.
+
+What it did: `brivia_notice_version()` became `2026-10-20`. New `public.brivia_notice_accepted(p_version, p_at default
+now())` is true for the current version, and for `2026-10-05` only until `2026-10-20 + 14 days` (2026-11-03 00:00 UTC).
+`declare_adult` refuses (`22023 stale notice version`) only when `not brivia_notice_accepted(...)`. The consent row
+stores what the client declared; server-written rows (`sensitive_give`, `sensitive_withdraw`, `account_deleted`) store
+the current version. The guided signup that needed `2026-10-20` was removed (D-069), so the window would lock out the
+live client: see `0011`.
+
+## 0010: the open test world switch (D-059). **Live since 2026-10-14, frozen; the switch is ON**
+
+Applied on the live project on 2026-10-14 from branch `claude/jolly-edison-49xvza`; the file here is a verbatim copy
+(D-070). It adds one owner-only switch, `public.brivia_world_switch.open_test_world`, the internal helpers
+`brivia_test_world_open()` and `brivia_tester_world(uuid)`, redefines `brivia_in_test_world(uuid)`, and limits
+`deck_why`'s caller to testers and test members. While the switch is on, every member is in the test world, so real
+members' decks, search and candidates also show the seeded test members (and testers), and test members see real
+members. Matching stays mutual-consent, location stays coarse. **It was on when checked read-only on 2026-10-20.**
+
+Read-only check: `select open_test_world, changed_at from public.brivia_world_switch;`
+
+While the switch is open, density cells are keyed by `brivia_in_test_world`, so **seeded test members count toward a
+real member's 10-member floor**, and the real-world cells' streaks reset: after closing, real members have no ~3 km /
+~10 km band for at least 7 nights. **Close it within 6 nights of opening**, so no band is ever earned on test members
+(if it has been open since 2026-10-14, the 6 nights are already up: close it now). `refresh_cell_density()` is a
+no-op if that night's run already happened; the bands follow the nightly runs. (The `0010` header's backlog item
+"0011 keys density on `brivia_tester_world`" now needs a later number: `0011` is the notice fix.)
+
+Close it (real members see only real members again):
+
+```sql
+update public.brivia_world_switch set open_test_world = false, changed_at = now();
+select public.refresh_cell_density();
+```
+
+After closing, a real member's existing requests, matches and messages with test members stay readable until the
+purge (`supabase/seed/purge-test-members.sql`) deletes the test members. **Close within 6 nights, and run the purge
+before real launch.**
+
+## 0011: the 2026-10-05 notice is current again (D-070). **Apply before 2026-11-03**
+
+Why: the live client (`site/scripts/notice-version.js`) sends `2026-10-05` and `site/privacy.html` is version
+2026-10-05, but live `0009` accepts `2026-10-05` only until 2026-11-03 00:00 UTC. From then on every `declare_adult`
+fails and no new member can finish signup. `0011` makes `brivia_notice_version()` return `2026-10-05` again and
+`brivia_notice_accepted` true for `2026-10-05` and `2026-10-20` at any date (members who declared `2026-10-20` during
+14–20 Oct stay valid), false otherwise. Same signatures, volatility and grants as `0009`; `declare_adult` is not
+touched (it already calls `brivia_notice_accepted`). No client deploy is needed: the client already sends `2026-10-05`.
+
+Pre-flight (read-only):
+
+```sql
+select public.brivia_notice_version();                                         -- 2026-10-20 (0009 is current)
+select pg_get_functiondef('public.declare_adult(text)'::regprocedure) ~ 'brivia_notice_accepted';  -- t
+```
+
+Apply, as `postgres` in the SQL editor (small and idempotent; avoid the cron window 20:17–20:37 UTC):
+
+```sql
+set lock_timeout = '5s';
+-- paste and run 0011_notice_version_2026_10_05.sql
+```
+
+Post-apply check (read-only):
+
+```sql
+select public.brivia_notice_version(), public.brivia_notice_accepted('2026-10-05', '2026-11-10');
+-- 2026-10-05 | t
+select public.brivia_notice_accepted('2026-10-20', '2026-11-10'),             -- t
+       public.brivia_notice_accepted('1999-01-01');                            -- f
+select has_function_privilege('authenticated', 'public.brivia_notice_accepted(text, timestamptz)', 'execute'),
+       has_function_privilege('anon', 'public.brivia_notice_accepted(text, timestamptz)', 'execute');  -- t, f
+```
+
+Then sign up one test account on the live site and confirm the 18+ step succeeds. Local proof:
+`supabase/tests/p0f-notice-restore.test.sql` (it simulates a date after 2026-11-03).

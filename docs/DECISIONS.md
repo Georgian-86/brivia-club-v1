@@ -1377,3 +1377,31 @@ controls (a tester or a seeded test member), never a real member, so no new expo
   (D-068); one who stopped before it can use "Forgot password?" on the login page.
 - **Kept from the same period:** the repository layout (D-065), the removed login/signup quote, and the phone
   smoothness work (D-066).
+
+## D-070: The database did need a change after D-069: 0009 and 0010 are live; 0011 restores the 2026-10-05 notice (2026-10-20)
+- Accepted 2026-10-20 (founder-directed correction). No agent-arena round: a factual correction of D-069 with one
+  forced fix; the only design choice (keep accepting `2026-10-20`) is recorded below.
+- **What D-069 got wrong.** It said "no migration was ever applied for D-067, so the database needs nothing". In fact
+  the founder applied `0009_signup_minimisation.sql` and `0010_open_test_world.sql` on the live project on 2026-10-14
+  from branch `claude/jolly-edison-49xvza`, and neither file was on `main`. Verified read-only on 2026-10-20: live
+  `brivia_notice_version()` = `2026-10-20` and `brivia_notice_accepted('2026-10-05')` = `true`, but only until
+  `'2026-10-20'::date + 14` = 2026-11-03. `main`'s client sends `2026-10-05` (`site/scripts/notice-version.js`) and
+  `site/privacy.html` is 2026-10-05, so from 2026-11-03 every `declare_adult` on the live site would fail with 22023
+  and no new member could finish signup. D-069 itself stays as written (append-only); this entry corrects it.
+- **Recorded.** `0009` and `0010` are copied into `supabase/migrations/` verbatim from that branch (they are live, so
+  frozen), with their tests (`p0e-notice`, `d-open-world`, `p0e-underage-delete`) and the `d-tester-world` guard
+  allow-list entry for `brivia_tester_world`. `p0e-notice` is changed only where `0011` supersedes it (each change is
+  commented). `0010` needs `0008`'s `brivia_tester`, so `0008` is live too.
+- **Fixed in `0011_notice_version_2026_10_05.sql`.** `brivia_notice_version()` returns `2026-10-05` again, the accurate
+  notice now that the classic form collects phone and gender (D-068/D-069). `brivia_notice_accepted(v, at)` is true for
+  `2026-10-05` and for `2026-10-20` at any date, false otherwise. `2026-10-20` stays accepted so the members who
+  declared it during 14–20 Oct (and any cached guided-signup tab) are never treated as stale; nothing else compares a
+  stored `notice_version` (consent rows are append-only history; deletion and retention never read it), so their rows
+  stay as declared. Same signatures, volatility, invoker security and grants as `0009`; `declare_adult` is unchanged
+  (it already defers to `brivia_notice_accepted`). Server-written consent rows record `2026-10-05` from then on. No
+  client change. Proof: `supabase/tests/p0f-notice-restore.test.sql`, which simulates a date after 2026-11-03 and fails
+  against `0009` alone.
+- **Founder actions.** Apply `0011` before 2026-11-03 and run the read-only check in `supabase/migrations/README.md`
+  ("0011"). The open-test-world switch is **on** live: close it (it should be open at most 6 nights, so no ~3 km band is
+  earned on test members) and run the purge before real launch. The `0010` header's backlog item ("0011 keys density on
+  `brivia_tester_world`") moves to a later migration number.
