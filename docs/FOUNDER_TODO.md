@@ -127,12 +127,3 @@ The safety gate from the iteration-4 arena (`docs/arena/2026-10-07-iteration-4.m
 example, suspending someone only after a second reporter corroborates a report. A closed test with people you invite
 is fine; open public sign-ups are not, until P0-C ships.
 
----
-
-## 7. Let my session test the live site
-
-My cloud session's network policy blocks `brivia-club.vercel.app` and `wfbddovczpfdrspmxgfo.supabase.co`, so I can't
-open the live site or create live accounts. In the session's title bar open the cloud environment menu → **Edit** →
-**Network access**, and either choose a broader level or add these under **Allowed domains** (keep "Allow package
-managers" ticked): `brivia-club.vercel.app`, `wfbddovczpfdrspmxgfo.supabase.co`, `fonts.googleapis.com`,
-`fonts.gstatic.com`. Steps: https://code.claude.com/docs/en/cloud-environments#network-access
