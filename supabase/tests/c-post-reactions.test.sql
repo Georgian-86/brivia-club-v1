@@ -3,7 +3,8 @@
 -- client treats it as done); P3 another member sees none of a's rows; P4 an incomplete member cannot insert;
 -- P5 a like on a non-existent post is refused; P6 deleting the post or the member removes the rows (cascade);
 -- anon has no privilege, and nobody can update.
--- Ids: c0120000-0000-4000-8000-0000000000NN: 01 A (completed), 02 B (completed), 03 I (incomplete).
+-- Ids: c0120000-0000-4000-8000-0000000000NN: 01 A (completed), 02 B (completed), 03 I (incomplete), 04 K (A blocked K),
+-- 05 L (L blocked A), 06 T (test-world author, seen by a real viewer only while the open-test-world switch is on).
 set brivia.harness_autocomplete = 'off';
 
 create or replace function pg_temp.cp(n int) returns uuid language sql immutable as $$
@@ -12,14 +13,14 @@ create or replace function pg_temp.cp(n int) returns uuid language sql immutable
 do $$
 declare g int; mid uuid; cell text := public.brivia_grid_cell(19.2183, 72.9781, 7);
 begin
-  for g in 1..3 loop
+  for g in 1..6 loop
     mid := pg_temp.cp(g);
     insert into auth.users(id) values (mid) on conflict do nothing;
-    insert into public.profiles (id, name, full_name, email, experience, looking_for)
-    values (mid, 'Cpost ' || g, 'Cpost ' || g, 'cpost' || g || '@example.com', 'Some years', array['Friends'])
+    insert into public.profiles (id, name, full_name, email, is_test, experience, looking_for)
+    values (mid, 'Cpost ' || g, 'Cpost ' || g, 'cpost' || g || '@example.com', g = 6, 'Some years', array['Friends'])
     on conflict (id) do nothing;
     update public.profiles set adult_declared_at = now() where profiles.id = mid;
-    if g <= 2 then
+    if g <> 3 then
       insert into public.member_orbit (member_id, home_cell, home_cell_g6, home_cell_g5, place_id)
       values (mid, cell, public.brivia_grid_parent(cell, 6), public.brivia_grid_parent(cell, 5), public.brivia_nearest_place(cell))
       on conflict (member_id) do nothing;
@@ -104,7 +105,8 @@ begin
   reset role;
 end $$;
 
--- P4 an incomplete member cannot insert; P5 a post that does not exist is refused; anon is refused.
+-- P4 an incomplete member cannot insert (the refusal comes from brivia_visible_to, which needs a completed viewer, via
+-- the posts select policy; the has-completed-profile check is a second guard); P5 a post that does not exist is refused; anon is refused.
 do $$
 declare i uuid := pg_temp.cp(3); a uuid := pg_temp.cp(1); refused boolean; t text;
 begin
@@ -145,6 +147,60 @@ begin
   reset role;
   if not refused then raise exception 'FAIL P0: update was allowed'; end if;
 end $$;
+
+-- P7 a completed member is refused (42501, both tables) on a post by an author they cannot see: an author A blocked,
+-- an author who blocked A, and a test-world author while the open-test-world switch is closed. Existing rows stay
+-- readable and deletable by A after the block.
+do $$
+declare a uuid := pg_temp.cp(1); k uuid := pg_temp.cp(4); l uuid := pg_temp.cp(5); tw uuid := pg_temp.cp(6);
+  pk uuid := 'c0120000-0000-4000-8000-0000000000e4'; pl uuid := 'c0120000-0000-4000-8000-0000000000e5';
+  pt uuid := 'c0120000-0000-4000-8000-0000000000e6'; prior boolean; t text; pid uuid; refused boolean; n int;
+begin
+  select open_test_world into prior from public.brivia_world_switch;
+  update public.brivia_world_switch set open_test_world = false;
+  insert into public.community_posts (id, author_id, image_url, image_path)
+  select v.id, v.au, 'https://proj.supabase.co/storage/v1/object/public/community-posts/' || v.au || '/x.jpg', v.au || '/x.jpg'
+    from (values (pk, k), (pl, l), (pt, tw)) v(id, au);
+  -- A likes and saves K's post before blocking K (the block is made as A, who owns the row)
+  set local role authenticated;
+  perform set_config('request.jwt.claims', json_build_object('sub', a)::text, true);
+  insert into public.community_post_likes (post_id) values (pk);
+  insert into public.community_post_saves (post_id) values (pk);
+  insert into public.brivia_blocks (blocker_id, blocked_id) values (a, k);
+  reset role;
+  insert into public.brivia_blocks (blocker_id, blocked_id) values (l, a);
+
+  foreach t in array array['community_post_likes', 'community_post_saves'] loop
+    foreach pid in array array[pk, pl, pt] loop
+      refused := false;
+      set local role authenticated;
+      perform set_config('request.jwt.claims', json_build_object('sub', a)::text, true);
+      begin execute format('insert into public.%I (post_id) values (%L)', t, pid);
+      exception when insufficient_privilege then refused := true;
+        when unique_violation then refused := false; end;
+      reset role;
+      -- pk is already liked/saved (before the block), so a repeat there collides only if the policy let it through
+      if not refused then raise exception 'FAIL P7: % accepted a row on post % the viewer cannot see', t, pid; end if;
+    end loop;
+  end loop;
+
+  -- the earlier rows remain visible and deletable
+  set local role authenticated;
+  perform set_config('request.jwt.claims', json_build_object('sub', a)::text, true);
+  select count(*) into n from public.community_post_likes where post_id = pk;
+  if n <> 1 then raise exception 'FAIL P7: A lost sight of the like after the block'; end if;
+  select count(*) into n from public.community_post_saves where post_id = pk;
+  if n <> 1 then raise exception 'FAIL P7: A lost sight of the save after the block'; end if;
+  delete from public.community_post_likes where post_id = pk;
+  delete from public.community_post_saves where post_id = pk;
+  select count(*) into n from public.community_post_likes where post_id = pk;
+  if n <> 0 or exists (select 1 from public.community_post_saves where post_id = pk) then
+    raise exception 'FAIL P7: A could not delete the rows after the block'; end if;
+  reset role;
+  update public.brivia_world_switch set open_test_world = prior;
+  delete from public.brivia_blocks where blocker_id::text like 'c0120000-%' or blocked_id::text like 'c0120000-%';
+end $$;
+select 'c-post-reactions.test P7 blocked and cross-world refusals OK';
 
 -- P6 cascade: deleting the post removes its rows; deleting the member removes the rest.
 do $$
