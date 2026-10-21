@@ -11,4 +11,6 @@ import '../styles/auth-polish.css';
 import '../styles/mobile-auth.css';
 import '../styles/mobile-final-fixes.css';
 import '../styles/auth-a11y.css';
+import '../styles/signup.css';
+import '../styles/auth-refresh.css';
 import './script.js';

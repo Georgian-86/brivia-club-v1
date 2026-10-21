@@ -47,6 +47,11 @@ import '../styles/app-shell.css';
 import '../styles/profile-view.css';
 // The founder's design references (D-062): the Canva deck card and the "Brivia Society" chat. Loads last.
 import '../styles/reference-design.css';
+// Polish wave scaffolding: each file is owned by one later task.
+import '../styles/chat-fit.css';
+import '../styles/menus-fit.css';
+import '../styles/explore-cards.css';
+import '../styles/chat-extras.css';
 import { navMarkup, markCurrentNav, setChatBadges } from './app-nav.js';
 import { skeletonMarkup, setBusy } from './app-skeletons.js';
 

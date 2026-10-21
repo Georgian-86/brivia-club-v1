@@ -411,3 +411,19 @@ select has_function_privilege('authenticated', 'public.brivia_notice_accepted(te
 
 Then sign up one test account on the live site and confirm the 18+ step succeeds. Local proof:
 `supabase/tests/p0f-notice-restore.test.sql` (it simulates a date after 2026-11-03).
+
+## 0012: the polish wave (not yet applied)
+
+Filled by later tasks; each subsection is written by the task named in it.
+
+### A5: blocked sends are withheld
+
+(empty)
+
+### C: post likes and saves
+
+(empty)
+
+### D: resumes, resume messages, typing, deletion
+
+(empty)
