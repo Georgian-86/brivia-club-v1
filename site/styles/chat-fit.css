@@ -1,1 +1,74 @@
-/* Owner: Task A (chat fits the viewport). Empty scaffold. */
+/* Owner: Task A (chat fits the viewport), polish wave A2.
+   A 13" laptop (about 1440x780 of app area) showed three faults in an open thread:
+   1. photo bubbles grew to the full 300 px cap beside 12 px of text, and the first bubble sat cropped under the header;
+   2. the inbox kept a 6 px gutter on each side (and 100vw widths that also spill by the scrollbar width on Windows);
+   3. a late-loading picture grew the thread after "is-short" had bottom-aligned it with justify-content:flex-end, which
+      cannot be scrolled back to the top (the clipped start of the scrollable overflow).
+   Everything is sized from the viewport (dvh with a vh fallback), never from the picture. */
+
+/* The chat view is one column from the header down to the bottom edge, flush with both sides. */
+body.app-body[data-app-view="chat"] .app-view[data-view="chat"].is-active{
+  right:0!important;
+  left:0!important;
+  width:auto!important;
+  padding:0!important;
+}
+body.app-body[data-app-view="chat"] .app-view[data-view="chat"].is-active .chat-layout{
+  width:100%!important;
+  border-right-width:0;
+  border-left-width:0;
+  border-bottom-width:0;
+  border-radius:0;
+}
+@media (min-width:701px){
+  body.app-body[data-app-view="chat"]{width:auto!important;min-width:0!important}
+  body.app-body[data-app-view="chat"] .app-wrap,
+  body.app-body[data-app-view="chat"] .app-main{width:100%!important}
+}
+
+/* The thread is the only part that scrolls; the header and composer keep their height. */
+.app-view[data-view="chat"] .chat-layout>.chat-window>.chat-window-head,
+.app-view[data-view="chat"] .chat-layout>.chat-window>.chat-compose,
+.app-view[data-view="chat"] .chat-layout>.chat-window>.chat-attachment-preview{flex-shrink:0}
+.app-view[data-view="chat"] .chat-layout>.chat-window .chat-messages{min-height:0;flex:1 1 0;overflow-y:auto!important}
+
+/* Bubbles keep their own height: the thread scrolls, a bubble never squeezes to fit (a clipped bubble showed as a sliver). */
+.app-view[data-view="chat"] .chat-layout>.chat-window .chat-messages>*{flex-shrink:0}
+
+/* A short thread sits at the bottom with an auto margin, which never clips: when the thread grows (a picture loads
+   late) the margin collapses to zero and the first bubble stays reachable under the header. */
+.app-view[data-view="chat"] .chat-layout>.chat-window .chat-messages.is-short{justify-content:flex-start!important}
+.app-view[data-view="chat"] .chat-layout>.chat-window .chat-messages>:first-child{margin-top:auto}
+
+/* Bubbles never pass 72% of the thread (560 px at most). A photo bubble is the picture, not a card around it. */
+.app-view[data-view="chat"] .chat-layout .chat-messages .message{max-width:min(72%,560px)}
+.app-view[data-view="chat"] .chat-layout .chat-messages .message.has-attachment{gap:0;padding:4px 4px 6px!important;overflow:hidden}
+.app-view[data-view="chat"] .chat-layout .chat-messages .message.has-attachment .message-copy{max-width:100%;padding:8px 8px 0;background:transparent!important;border-radius:0}
+.app-view[data-view="chat"] .chat-layout .chat-messages .message.has-attachment small{margin:4px 6px 0 0}
+
+/* Pictures and videos: as big as the picture is, never more than 45% of the screen tall (420 px at most) or the bubble
+   wide. width and height stay auto so the ratio holds; cover keeps a rounded, full tile. The link makes a tap open
+   the original in a new tab. A floor stops a picture that has not loaded yet from collapsing the bubble. */
+.app-view[data-view="chat"] .chat-messages .message-attachment-image-link{display:block;max-width:100%;border-radius:9px;cursor:zoom-in}
+.app-view[data-view="chat"] .chat-messages .message-attachment-image-link:focus-visible{outline:2px solid currentColor;outline-offset:3px}
+.app-view[data-view="chat"] .chat-messages .message-attachment-image,
+.app-view[data-view="chat"] .chat-messages .message-attachment-video{
+  display:block;
+  width:auto;
+  height:auto;
+  min-width:min(120px,100%);
+  min-height:120px;
+  max-width:100%;
+  max-height:min(45vh,420px);
+  max-height:min(45dvh,420px);
+  object-fit:cover;
+  background:var(--brivia-wine-soft);
+}
+.app-view[data-view="chat"] .chat-messages .message-attachment-video{width:100%;object-fit:contain}
+
+/* The thread never scrolls the page, so no scrollbar gutter is kept beside it (the inbox met the window edge 15 px short). */
+html:has(body.app-body[data-app-view="chat"]){scrollbar-gutter:auto}
+
+/* Phone rules elsewhere give text bubbles 84-88%; a bubble that holds a picture keeps the 72% limit so the picture never
+   fills the thread edge to edge. */
+body.app-body[data-app-view="chat"] .app-view[data-view="chat"] .chat-layout .chat-messages .message.has-attachment{max-width:min(72%,560px)!important}
