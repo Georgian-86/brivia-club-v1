@@ -21,7 +21,7 @@
 // opens the chat with the composer prefilled `Re: “<caption, first 60 chars>” `) or "View profile" (not matched);
 // ?post=<id> opens the detail once posts load, and /explore.html?post=<id> forwards there; when 0012 is absent
 // (relation does not exist) Like and Save are hidden; "New post" is a wide wine button that opens the composer.
-// EXPLORE_SHOTS=<dir> only saves screenshots (loaded at 320, 375, 768, 1280x800, 1440x900, 1920x1080; the skeleton;
+// EXPLORE_SHOTS=<dir> only saves screenshots (loaded at 320, 375, 390, 768, 1280x800, 1440x900, 1920x1080; the skeleton;
 // liked and saved; the detail sheet), then exits.
 import { mkdirSync } from 'node:fs';
 import assert from 'node:assert/strict';
@@ -97,7 +97,7 @@ try {
   if (SHOTS) {
     mkdirSync(SHOTS, { recursive: true });
     st.matchIds = [A];
-    for (const width of [320, 375, 768, 1280, 1440, 1920]) {
+    for (const width of [320, 375, 390, 768, 1280, 1440, 1920]) {
       const { context, page } = await open(width);
       await page.waitForTimeout(800);
       await page.screenshot({ path: path.join(SHOTS, `explore-${width}.png`) });
@@ -449,7 +449,16 @@ try {
       const { context, page } = await open(375);
       const visible = await page.evaluate(() => [...document.querySelectorAll('.post-card[data-post-id="post-1"] [data-post-action]')].filter((b) => b.getClientRects().length).map((b) => b.dataset.postAction));
       check(`without 0012 Like and Save are hidden (${JSON.stringify(visible)})`, () => assert.deepEqual(visible, ['comment', 'share']));
+      const cards = await page.evaluate(() => document.querySelectorAll('.post-card').length);
+      check(`without 0012 every post card still renders (${cards})`, () => assert.equal(cards, POSTS.length));
       await context.close();
+      // PostgREST schema-cache wording for a missing table (PGRST205) degrades the same way.
+      const cache = (table) => ({ status: 404, code: 'PGRST205', message: `Could not find the table 'public.${table}' in the schema cache` });
+      st.routes = { ...baseRoutes(), 'GET community_post_likes': cache('community_post_likes'), 'GET community_post_saves': cache('community_post_saves') };
+      const second = await open(375);
+      const visible2 = await second.page.evaluate(() => [...document.querySelectorAll('.post-card[data-post-id="post-1"] [data-post-action]')].filter((b) => b.getClientRects().length).map((b) => b.dataset.postAction));
+      check(`PGRST205 (schema cache) hides Like and Save too (${JSON.stringify(visible2)})`, () => assert.deepEqual(visible2, ['comment', 'share']));
+      await second.context.close();
       st.routes = baseRoutes();
     });
 

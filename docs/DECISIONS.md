@@ -1426,3 +1426,43 @@ controls (a tester or a seeded test member), never a real member, so no new expo
   and the counter drops; a double tap sends one; a tap in the opening window sends nothing; SEND PITCH with a note
   still sends the note once even with a tap on the new button in flight; the × is 44 px with a label; no sideways
   scroll; axe clean on the open sheet. The existing D-018 checks (sections 1-5, 8, 9) pass unchanged.
+
+## D-074: Explore post cards, private likes and saves, and the clean badminton illustration (release C of the polish wave, 2026-10-21)
+- Accepted 2026-10-21 (founder request: Explore posts become wine cards with Like, Comment, Share and Save). Spec:
+  `docs/superpowers/specs/2026-10-21-polish-wave-design.md`, part C. D-072 (A), D-073 (B) and D-075 (D) are separate.
+- **Card anatomy.** A cream sheet (24 px radius, soft wine shadow) with a `--brivia-wine` header bar (avatar, the author's
+  name in Bodoni Moda as a 44 px profile trigger, the date), a 4:5 image, a fixed two-line caption so every card in a row
+  is the same height, and a `--brivia-wine` action bar of four cream icon buttons with 12 px labels (Like, Comment,
+  Share, Save), each at least 44 px. Tokens only. Reduced motion: no movement. `site/scripts/post-card.js`,
+  `site/styles/explore-cards.css`.
+- **Grid.** One column up to 480 px, two from 640 px, three from 1024 px. No sideways scroll from 320 to 2560 px.
+  "New post" is a wide wine button above the feed. Loading shows card-shaped skeletons of the same size.
+- **Name, not a handle.** Cards show the member's display name. Profiles have no `@handle`, so none is invented.
+- **Persistence (own rows only, no counts).** `community_post_likes` and `community_post_saves` hold one row per
+  (member, post); RLS lets a member read, insert and delete only their own rows. There is no count, no RPC and no
+  public total: a member sees only their own Liked and Saved state, and nobody sees who liked what. Blocked and
+  cross-world posts are refused (tests in `supabase/tests`). Taps are optimistic with an in-flight guard (a double tap
+  sends one request); a failure rolls back to the server truth, with the toast "That didn't save. Please try again."
+  except for a 42501 refusal, which rolls back silently.
+- **Share is a link only.** `navigator.share({ title, url })` with the post's `?post=<id>` link (no caption, no name);
+  without it the link is copied and "Link copied." shows. `explore.html` forwards `?post=` so the link opens the post.
+- **Comment opens the detail sheet; no comment storage in this wave.** The sheet shows the image, caption, author and
+  date. Its one action is "Reply in chat" when the two members are matched (the chat opens with the composer prefilled
+  `Re: "<start of caption>"`), otherwise "View profile". Mutual consent is unchanged: a stranger's post never opens a
+  chat. Public comments are a later decision.
+- **The 0012 tables are applied once by the founder.** The likes/saves tables live in `0012_polish_wave.sql` section C.
+  The founder applies 0012 once, after parts A, C and D are on `main` (the file holds A's, C's and D's SQL). Until
+  then, Explore hides Like and Save gracefully: a missing table (`42P01` "does not exist" or PostgREST `PGRST205`
+  schema-cache error) hides those two buttons, Comment and Share stay, every card still renders and nothing throws.
+  Proof: `tests/e2e/explore-cards.spec.mjs` scenario 11 (both error shapes, card count, no page errors).
+- **Clean badminton illustration.** `site/media/assets/badminton-premium-no-shuttle.webp` (landing hero art and a
+  sample post image) had a grey checkerboard, the fake-transparency pattern, baked into its pixels behind the players.
+  Rebuilt in this session with Python and Pillow: the low-saturation grey checker cells (including those showing
+  through the racket meshes) are replaced by the solid brand cream `#fffaf1` (`--color-cream`), the anti-aliased grey
+  fringe is blended away, and specks are removed; the player art is untouched. Same name, same 1555x1011 size, now 75 KB
+  (was 258 KB); the source original `source-media/assets/badminton-premium-no-shuttle.png` was replaced the same way.
+  The other presets were checked visually: the 18 cover photos and `guitar-premium.webp` (true alpha) have no
+  checkerboard. `badminton-premium.png` (with shuttle) is not shipped. `npm run check:assets` passes.
+- **Proof.** Unit tests for the card markup and reaction helpers; `tests/e2e/explore-cards.spec.mjs` (columns, 4:5
+  media, wine bars and contrast computed, targets, double tap, rollback, persistence across reload, share, detail,
+  deep link, skeletons, axe at 375 and 1440). Screenshots at 320, 375, 390, 768, 1280, 1440 and 1920.

@@ -7,6 +7,13 @@ Update this file at the end of every session. CLAUDE.md holds the aim; this file
 
 ## 1. What is done
 
+**Explore post cards (2026-10-21, release C of the polish wave), D-074.** Explore posts are wine cards (header bar,
+4:5 image, two-line caption, action bar: Like, Comment, Share, Save); one, two or three columns. Like and Save are
+private to the member (no counts) and live in `0012_polish_wave.sql` section C, which the founder applies once after
+parts A, C and D are on `main`; until then Like and Save are hidden and the rest works. Share sends a link only; Comment
+opens the detail sheet (no comment storage yet). Also: the badminton illustration lost its baked-in grey checkerboard
+(solid cream, same file name). Proof: `tests/e2e/explore-cards.spec.mjs`.
+
 **"Send without a note" on the pitch sheet (2026-10-20), D-071.** A secondary button under SEND PITCH sends the like
 with no note, exactly as closing the sheet does (D-018 unchanged), never twice. The × has a 44 px target and an
 aria-label. Client only; proof in `tests/e2e/consent.spec.mjs` section 9b (1440 and 375 px, axe).
