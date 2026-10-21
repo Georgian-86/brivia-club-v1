@@ -14,7 +14,7 @@ export const PROMPT_GRACE_MS = 30000;
 export const STILL_WAITING_TEXT = 'Still waiting for your browser…';
 const PLAIN = 'No problem. Pick your city instead.';
 const COPY = {
-  denied: "Location is blocked for this site. Allow it in your browser's site settings, or pick your city.",
+  denied: "Location is blocked. Allow it in your browser's site settings (on a Mac or phone, also check that location is on for your browser), or pick your city.",
   unavailable: "Your device couldn't find a location. Check that location services are on, or pick your city.",
   timeout: 'Finding your location took too long. Try again, or pick your city.',
 };

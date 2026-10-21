@@ -7,7 +7,8 @@
 // * L1 granted at once: "Got it. We keep only the ~2 km square you're in.", the city list stays closed, the submit
 //   POSTs rpc/set_home_location with finite lat/lng, and the coordinate is in no other request, no storage, no DOM.
 // * L2 the permission prompt answered late (success after 16 s, past the 15 s "still waiting" guard): the location
-//   still counts. L2b: a city picked while the browser was still thinking wins over a late answer.
+//   still counts. L2b/L2c: a city picked while the browser was still thinking wins over a late answer and clears the
+//   waiting line. L2d: a second press while waiting says "Still looking…". L2e: Back cancels a pending attempt.
 // * L3 PERMISSION_DENIED (1), L4 POSITION_UNAVAILABLE (2), L5 TIMEOUT (3): the city list opens with a line that says
 //   why; after a timeout a "Try again" button asks the browser once more.
 // * L6 no navigator.geolocation, or an insecure context: the plain "No problem. Pick your city instead."
@@ -32,7 +33,7 @@ const shot = async (page, name) => { if (SHOTS) await page.screenshot({ path: pa
 
 const GOT_IT = "Got it. We keep only the ~2 km square you're in.";
 const COPY = {
-  denied: "Location is blocked for this site. Allow it in your browser's site settings, or pick your city.",
+  denied: "Location is blocked. Allow it in your browser's site settings (on a Mac or phone, also check that location is on for your browser), or pick your city.",
   unavailable: "Your device couldn't find a location. Check that location services are on, or pick your city.",
   timeout: 'Finding your location took too long. Try again, or pick your city.',
   plain: 'No problem. Pick your city instead.',
@@ -263,8 +264,57 @@ try {
     const s = await areaState(page);
     check(`L2: a success after 16 s still counts (${JSON.stringify(s)})`, () => { assert.equal(s.status, GOT_IT); assert.equal(s.pickerOpen, false); assert.equal(s.calls, 1); });
     await page.locator('[data-signup-step="2"] .signup-next').click();
-    await page.waitForSelector('[data-signup-step="3"]:not([hidden])', { timeout: 3000 });
-    check('L2: Next moves on with the late location', () => assert.ok(true));
+    await page.waitForSelector('[data-signup-step="3"]:not([hidden])', { timeout: 3000 }).catch(() => {});
+    const step3 = await page.locator('[data-signup-step="3"]').isVisible();
+    check('L2: Next moves on to step 3 with the late location', () => assert.equal(step3, true));
+  });
+
+  // L2c: the guard opened the list ("Still waiting…") and the member picks Mumbai; the 20 s answer is ignored and the
+  // waiting line goes away.
+  await run('L2c', { plan: { answers: ['ok'], delayMs: 20000 } }, async (page) => {
+    await page.locator('[data-area-geo]').click();
+    await waitForPicker(page, 16000);
+    const input = page.locator('#area-city-search');
+    await input.focus();
+    await page.keyboard.type('Mum');
+    await page.waitForSelector('#area-city-results [role="option"]');
+    await page.keyboard.press('ArrowDown');
+    await page.keyboard.press('Enter');
+    const afterPick = await areaState(page);
+    check(`L2c: picking a city clears "Still waiting…" (${JSON.stringify(afterPick)})`, () => { assert.equal(afterPick.fallback, ''); assert.match(afterPick.status, /^Your area: Mumbai, Maharashtra\./); });
+    await page.waitForTimeout(5500); // past the 20 s answer
+    const s = await areaState(page);
+    check(`L2c: after the late answer the fallback is empty and Mumbai stays (${JSON.stringify(s)})`, () => { assert.equal(s.fallback, ''); assert.match(s.status, /^Your area: Mumbai, Maharashtra\./); assert.equal(s.calls, 1); });
+  });
+
+  // L2d: pressing "Use my location" again while the browser is still answering says so (no silent drop, no 2nd call),
+  // and the answer still counts.
+  await run('L2d', { plan: { answers: ['ok'], delayMs: 3000 } }, async (page) => {
+    await page.locator('[data-area-geo]').click();
+    await page.waitForTimeout(500);
+    await page.locator('[data-area-geo]').click();
+    const s = await areaState(page);
+    check(`L2d: a second press reads "Still looking for your location…" (${JSON.stringify(s)})`, () => { assert.equal(s.status, 'Still looking for your location…'); assert.equal(s.calls, 1); });
+    await waitForStatus(page, GOT_IT);
+    const after = await areaState(page);
+    check(`L2d: the answer still counts after the second press (${JSON.stringify(after)})`, () => { assert.equal(after.status, GOT_IT); assert.equal(after.calls, 1); });
+  });
+
+  // L2e: Back while the browser is still answering cancels the attempt: the late answer is not used, and on return
+  // the button works again.
+  await run('L2e', { plan: { answers: ['ok'], delayMs: 2000 } }, async (page) => {
+    await page.locator('[data-area-geo]').click();
+    await page.locator('[data-signup-step="2"] .signup-step-prev').click();
+    await page.waitForSelector('[data-signup-step="1"]:not([hidden])');
+    await page.waitForTimeout(2500);
+    await page.locator('[data-signup-step="1"] .signup-next').click();
+    await page.waitForSelector('[data-signup-step="2"]:not([hidden])');
+    const back = await areaState(page);
+    check(`L2e: the answer that came after Back is not used (${JSON.stringify(back)})`, () => { assert.notEqual(back.status, GOT_IT); assert.equal(back.calls, 1); });
+    await page.locator('[data-area-geo]').click();
+    await waitForStatus(page, GOT_IT).catch(() => {});
+    const again = await areaState(page);
+    check(`L2e: on return "Use my location" works again (${JSON.stringify(again)})`, () => { assert.equal(again.status, GOT_IT); assert.equal(again.calls, 2); });
   });
 
   // L2b: the member picks a city while the browser is still thinking; the late answer does not overwrite it.

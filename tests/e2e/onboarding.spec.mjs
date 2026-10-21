@@ -592,7 +592,7 @@ try {
     await page.locator('[data-area-geo]').click();
     await page.waitForSelector('[data-area-picker]:not([hidden])', { timeout: 15000 });
     const fallback = (await page.locator('[data-area-fallback]').textContent()).trim();
-    check(`375: denial opens "Pick my city" with the denied copy (got "${fallback}")`, () => { assert.ok(pickerHiddenBefore); assert.equal(fallback, "Location is blocked for this site. Allow it in your browser's site settings, or pick your city."); });
+    check(`375: denial opens "Pick my city" with the denied copy (got "${fallback}")`, () => { assert.ok(pickerHiddenBefore); assert.equal(fallback, "Location is blocked. Allow it in your browser's site settings (on a Mac or phone, also check that location is on for your browser), or pick your city."); });
     const comboAttrs = await page.locator('#area-city-search').evaluate((el) => ({ role: el.getAttribute('role'), controls: el.getAttribute('aria-controls'), label: el.labels?.[0]?.textContent?.trim() || '' }));
     check(`375: the city search is a labelled combobox over a listbox (${JSON.stringify(comboAttrs)})`, () => { assert.equal(comboAttrs.role, 'combobox'); assert.equal(comboAttrs.controls, 'area-city-results'); assert.ok(comboAttrs.label.length > 0); });
     await shot(page, 'onboarding-375-step2-fallback.png', '[data-area-fallback]');

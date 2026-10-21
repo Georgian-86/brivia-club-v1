@@ -1045,6 +1045,7 @@ const chooseCity = (place) => {
   if (areaSearch) areaSearch.value = place.name;
   setCityListOpen(false);
   setAreaError('');
+  if (areaFallback) areaFallback.textContent = ''; // the "why" (or "Still waiting…") line no longer applies
   setAreaStatus(`Your area: ${place.name}, ${place.region}. We use the city's centre, never your address.`);
 };
 // The line above the city search, with an optional "Try again" (asks the browser once more) after a timeout.
@@ -1070,14 +1071,27 @@ const openCityPicker = (fallbackText = '', { retry = false } = {}) => {
   areaSearch?.focus();
   void renderCityResults();
 };
+const FINDING_TEXT = 'Finding your area…';
+const STILL_LOOKING_TEXT = 'Still looking for your location…';
+// Stops listening to the current attempt (Back, a reset, the form gone): a later answer changes nothing.
+const cancelGeo = () => {
+  geoSeq += 1;
+  window.clearTimeout(geoGuard);
+  if (!geoPending) return;
+  geoPending = false;
+  areaGeoButton?.removeAttribute('aria-busy');
+  if ([FINDING_TEXT, STILL_LOOKING_TEXT].includes(areaStatus?.textContent)) setAreaStatus('');
+  if (areaFallback?.textContent === STILL_WAITING_TEXT) setAreaFallback('');
+};
 const useMyLocation = async () => {
-  if (geoPending) return;
+  // Pressed again while the browser is still answering (e.g. in the 15-30 s window): say so instead of doing nothing.
+  if (geoPending) { setAreaStatus(STILL_LOOKING_TEXT); return; }
   setAreaError('');
   const seq = ++geoSeq;
   const choiceAtStart = areaChoice;
   geoPending = true;
   areaGeoButton?.setAttribute('aria-busy', 'true');
-  setAreaStatus('Finding your area…');
+  setAreaStatus(FINDING_TEXT);
   // A permission prompt answered slowly (or never) must not strand the member: offer the city list, keep listening.
   window.clearTimeout(geoGuard);
   geoGuard = window.setTimeout(() => {
@@ -1090,7 +1104,10 @@ const useMyLocation = async () => {
   window.clearTimeout(geoGuard);
   geoPending = false;
   areaGeoButton?.removeAttribute('aria-busy');
-  if (areaChoice !== choiceAtStart) return; // the member picked an area while the browser was thinking: theirs wins
+  if (areaChoice !== choiceAtStart) { // the member picked an area while the browser was thinking: theirs wins
+    if (areaFallback?.textContent === STILL_WAITING_TEXT) setAreaFallback('');
+    return;
+  }
   if (result.ok) {
     areaChoice = { kind: 'geo', lat: result.lat, lng: result.lng };
     const focusInPicker = areaPicker?.contains(document.activeElement);
@@ -1106,10 +1123,7 @@ const useMyLocation = async () => {
 };
 const resetArea = () => {
   areaChoice = null;
-  geoSeq += 1;
-  window.clearTimeout(geoGuard);
-  geoPending = false;
-  areaGeoButton?.removeAttribute('aria-busy');
+  cancelGeo();
   if (areaPicker) areaPicker.hidden = true;
   areaCityButton?.setAttribute('aria-expanded', 'false');
   if (areaFallback) areaFallback.textContent = '';
@@ -1436,7 +1450,9 @@ function setSignupPasswordMode(enabled, required = enabled) {
 const SIGNUP_STEPS = 4;
 const SIGNUP_STEP_LABELS = ['THE BASICS', 'YOUR AREA', 'WHAT YOU CARE ABOUT', 'SECURITY & PRESENCE'];
 function setSignupStep(step, focusFirst = true) {
+  const previousStep = signupCurrentStep;
   signupCurrentStep = Math.min(SIGNUP_STEPS, Math.max(1, Number(step) || 1));
+  if (previousStep === 2 && signupCurrentStep !== 2) cancelGeo(); // A1: leaving the area step stops a pending lookup
   signupForm?.querySelectorAll('[data-signup-step]').forEach((panel) => {
     panel.toggleAttribute('hidden', Number(panel.dataset.signupStep) !== signupCurrentStep);
   });
@@ -2261,6 +2277,7 @@ signupForm?.addEventListener('submit', async (event) => {
     const pendingOnboarding = buildPendingOnboarding(budget, isSensitiveInterest, areaChoice);
     window.localStorage.setItem('brivia-pending-profile', JSON.stringify({ ...profile, ...pendingOnboarding, adultDeclared: true }));
     areaChoice = null;
+    cancelGeo(); // a late answer must not put coordinates back in memory after the form is gone
     const accountEmail = signupSuccess?.querySelector('[data-credential="account-email"]');
     if (accountEmail) accountEmail.textContent = profile.email;
     const successTitle = signupSuccess?.querySelector('[data-auth-success-title]');

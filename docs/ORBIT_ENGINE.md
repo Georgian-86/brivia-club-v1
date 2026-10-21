@@ -783,13 +783,15 @@ select log_impressions($1, $4);
 - **Client capture (UX_SPEC §A, D-035).** The signup asks for geolocation only after the privacy explainer, with
   `{ enableHighAccuracy: false, timeout: 10000, maximumAge: 600000 }`; denial, timeout, a missing API or an insecure
   context opens "Pick my city" (polish wave A1, `site/scripts/geo-locate.js` `locateOnce`) with a line that says why:
-  code 1 → "Location is blocked for this site. Allow it in your browser's site settings, or pick your city."; code 2 →
+  code 1 → "Location is blocked. Allow it in your browser's site settings (on a Mac or phone, also check that location is on for your browser), or pick your city."; code 2 →
   "Your device couldn't find a location. Check that location services are on, or pick your city."; code 3 →
   "Finding your location took too long. Try again, or pick your city." plus a "Try again" button (one more call); a
   missing API or an insecure context (the API is never called) → "No problem. Pick your city instead.". After 15 s
   without an answer the city list opens ("Still waiting for your browser…") but the attempt keeps listening for 30 s
   from the click, so an "Allow" answered late still counts unless the member picked an area meanwhile (their pick
-  wins). The coordinates stay in one in-memory variable until `set_home_location` succeeds,
+  wins, and the waiting line goes). Pressing the button again while waiting shows "Still looking for your location…";
+  leaving the area step (Back, or the form closing for email confirmation) cancels the attempt, so a later answer is
+  ignored. The coordinates stay in one in-memory variable until `set_home_location` succeeds,
   then are dropped; they never reach `localStorage` / `sessionStorage`, a URL, the DOM or a log. A signup that waits
   for email confirmation stores only `{ kind: 'city', placeId }` or `{ kind: 'geo' }` (with interests as
   `{ id, points, mode }`, sensitive ones left out, and a 7-day `savedAt` expiry); after login a city is applied

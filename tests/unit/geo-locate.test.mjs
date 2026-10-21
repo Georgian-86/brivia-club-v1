@@ -30,10 +30,17 @@ test('a success after the 15 s guard (the prompt answered late) still resolves o
 
 test('no answer within promptGraceMs resolves timeout, and a later answer is ignored', async (t) => {
   t.mock.timers.enable({ apis: ['setTimeout'] });
-  const p = locateOnce(okAt(31000), { secure: true, promptGraceMs: 30000 });
+  const geo = okAt(31000);
+  const p = locateOnce(geo, { secure: true, promptGraceMs: 30000 });
+  let settledWith = null;
+  p.then((r) => { settledWith = r; });
   t.mock.timers.tick(30000);
   assert.deepEqual(await p, { ok: false, reason: 'timeout' });
-  t.mock.timers.tick(1000); // the late success must not throw or change anything
+  t.mock.timers.tick(1000); // the late success fires now
+  await Promise.resolve();
+  assert.deepEqual(settledWith, { ok: false, reason: 'timeout' }); // nothing changed: still the timeout
+  assert.deepEqual(await p, { ok: false, reason: 'timeout' });
+  assert.equal(geo.calls.length, 1); // and no second call
 });
 
 test('error codes map to reasons: 1 denied, 2 unavailable, 3 timeout, anything else unavailable', async () => {
@@ -70,7 +77,7 @@ test('a missing API is unsupported', async () => {
 });
 
 test('fallbackCopy says why, in the exact words', () => {
-  assert.equal(fallbackCopy('denied'), "Location is blocked for this site. Allow it in your browser's site settings, or pick your city.");
+  assert.equal(fallbackCopy('denied'), "Location is blocked. Allow it in your browser's site settings (on a Mac or phone, also check that location is on for your browser), or pick your city.");
   assert.equal(fallbackCopy('unavailable'), "Your device couldn't find a location. Check that location services are on, or pick your city.");
   assert.equal(fallbackCopy('timeout'), 'Finding your location took too long. Try again, or pick your city.');
   assert.equal(fallbackCopy('insecure'), 'No problem. Pick your city instead.');
