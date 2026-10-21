@@ -1,7 +1,8 @@
 -- Polish wave, Task D2 (0012 section D): typing broadcast authorization on realtime.messages.
 -- T1 matched a and b can both send and receive on typing:<lower>:<higher>
 -- T2 c (not in the pair) can neither send nor receive on a/b's topic, nor build a topic with a as the other side
--- T3 after a block in either direction, neither a nor b can send or receive; unblocking restores it
+-- T3 a block cuts off the BLOCKER only (send and receive); the blocked member's results are unchanged (a block is never
+--    revealed); unblocking restores it; an unmatch cuts both
 -- T4 malformed topics fail: wrong order, missing/extra parts, extra suffix, other prefix, upper case, self pair, null
 -- T5 anon can neither send nor receive; a non-broadcast extension fails; no match means no access
 -- Ids: d1300000-0000-4000-8000-0000000000NN: 01 A, 02 B, 03 C. One transaction, rolled back.
@@ -70,6 +71,8 @@ end $$;
 do $$
 declare a uuid := pg_temp.rm(1); b uuid := pg_temp.rm(2); t text := 'typing:' || pg_temp.rm(1) || ':' || pg_temp.rm(2);
 begin
+  -- a broadcast row exists, so a receive check that sees 0 rows is the policy talking, not an empty table
+  insert into realtime.messages (topic, extension, event, payload) values (t, 'broadcast', 'typing', '{}'::jsonb);
   perform pg_temp.as_member(a);
   if pg_temp.can_send(t) then raise exception 'FAIL T5: a sends without a match'; end if;
   if pg_temp.can_recv(t) then raise exception 'FAIL T5: a receives without a match'; end if;
@@ -89,6 +92,13 @@ begin
   if not pg_temp.can_recv(t) then raise exception 'FAIL T1: b cannot receive on the pair topic'; end if;
   -- a non-broadcast extension is never allowed
   if pg_temp.can_send(t, 'presence') then raise exception 'FAIL T5: a non-broadcast extension is allowed'; end if;
+  -- a presence row is never readable, even on the live pair topic
+  perform pg_temp.as_owner();
+  insert into realtime.messages (topic, extension, event, payload) values (t, 'presence', 'x', '{}'::jsonb);
+  perform pg_temp.as_member(b);
+  perform set_config('realtime.topic', t, true);
+  if exists (select 1 from realtime.messages where extension = 'presence') then
+    raise exception 'FAIL T5: presence rows are readable'; end if;
   perform pg_temp.as_owner();
 end $$;
 
@@ -112,24 +122,35 @@ begin
   perform pg_temp.as_owner();
 end $$;
 
--- T3: a block in either direction closes it; unblocking restores it.
+-- T3: only the blocker is cut off; the blocked member sees no difference; unmatch cuts both.
 do $$
-declare a uuid := pg_temp.rm(1); b uuid := pg_temp.rm(2); t text := 'typing:' || pg_temp.rm(1) || ':' || pg_temp.rm(2); who uuid;
+declare a uuid := pg_temp.rm(1); b uuid := pg_temp.rm(2); t text := 'typing:' || pg_temp.rm(1) || ':' || pg_temp.rm(2);
+        blocker uuid; blocked uuid; i int;
 begin
   for i in 1..2 loop
-    if i = 1 then insert into public.brivia_blocks (blocker_id, blocked_id) values (b, a);
-    else insert into public.brivia_blocks (blocker_id, blocked_id) values (a, b); end if;
-    foreach who in array array[a, b] loop
-      perform pg_temp.as_member(who);
-      if pg_temp.can_send(t) then raise exception 'FAIL T3: % sends after block direction %', who, i; end if;
-      if pg_temp.can_recv(t) then raise exception 'FAIL T3: % receives after block direction %', who, i; end if;
-    end loop;
+    blocker := case i when 1 then b else a end;
+    blocked := case i when 1 then a else b end;
+    insert into public.brivia_blocks (blocker_id, blocked_id) values (blocker, blocked);
+    perform pg_temp.as_member(blocker);
+    if pg_temp.can_send(t) then raise exception 'FAIL T3: blocker % sends', blocker; end if;
+    if pg_temp.can_recv(t) then raise exception 'FAIL T3: blocker % receives', blocker; end if;
+    perform pg_temp.as_member(blocked);
+    if not pg_temp.can_send(t) then raise exception 'FAIL T3: blocked % lost sending (block revealed)', blocked; end if;
+    if not pg_temp.can_recv(t) then raise exception 'FAIL T3: blocked % lost receiving (block revealed)', blocked; end if;
     perform pg_temp.as_owner();
     delete from public.brivia_blocks where blocker_id in (a, b) and blocked_id in (a, b);
+    perform pg_temp.as_member(blocker);
+    if not (pg_temp.can_send(t) and pg_temp.can_recv(t)) then raise exception 'FAIL T3: unblocking did not restore %', blocker; end if;
+    perform pg_temp.as_owner();
   end loop;
+  -- unmatch: both fail
+  delete from public.matches where (user1_id, user2_id) = (least(a, b), greatest(a, b));
   perform pg_temp.as_member(a);
-  if not pg_temp.can_send(t) then raise exception 'FAIL T3: unblocking did not restore sending'; end if;
+  if pg_temp.can_send(t) or pg_temp.can_recv(t) then raise exception 'FAIL T3: a still has typing after unmatch'; end if;
+  perform pg_temp.as_member(b);
+  if pg_temp.can_send(t) or pg_temp.can_recv(t) then raise exception 'FAIL T3: b still has typing after unmatch'; end if;
   perform pg_temp.as_owner();
+  insert into public.matches (user1_id, user2_id) values (least(a, b), greatest(a, b));
 end $$;
 
 -- T4: malformed topics, as a member of a live match.

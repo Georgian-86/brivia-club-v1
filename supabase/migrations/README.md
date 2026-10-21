@@ -469,11 +469,13 @@ shows `false | 5242880 | {application/pdf}`, and Storage → Policies lists the 
 Authorization is not present. The chat sends "typing" as a broadcast on a private channel named
 `typing:<lower member id>:<higher member id>` (lower case, text order). Adds
 `brivia_private.brivia_typing_topic_ok(p_topic text)` (stable, security definer, execute for `authenticated` only):
-true only when the caller is one of the two ids, the topic matches that format exactly, and
-`brivia_private.brivia_can_message(<other id>)` holds (matched, not blocked either way, same world). Two policies on
+true only when the caller is one of the two ids, the topic matches that format exactly, the pair is matched in the same
+world (the `brivia_can_message` checks) and the CALLER has not blocked the other (one direction only: the blocked
+member is never told, their sends reach no one and they receive nothing, identical to "not typing"). Two policies on
 `realtime.messages`, for `authenticated` only, `extension = 'broadcast'` and the helper on `realtime.topic()`:
-"Matched members can receive typing" (select) and "Matched members can send typing" (insert). A block or unmatch ends
-typing both ways with no signal; anon and every non-pair member get nothing.
+"Matched members can receive typing" (select) and "Matched members can send typing" (insert). A block ends typing for the
+blocker, an unmatch for both, on the next channel join (Realtime caches authorization per connection until rejoin or
+JWT refresh); the client (D5) also drops typing for a blocked pair immediately. anon and every non-pair member get nothing.
 
 No setting change is needed: the founder keeps Realtime "private channels" working (the client joins with
 `private: true`). Verify after applying:
@@ -482,6 +484,7 @@ No setting change is needed: the founder keeps Realtime "private channels" worki
 select policyname, cmd, roles from pg_policies where schemaname = 'realtime' and tablename = 'messages' order by 1;
 ```
 
-lists exactly "Matched members can receive typing" (SELECT) and "Matched members can send typing" (INSERT), both for
-`{authenticated}`. Idempotent (`create or replace`, `drop policy if exists`). Tested by
+includes "Matched members can receive typing" (SELECT) and "Matched members can send typing" (INSERT), both for
+`{authenticated}`. Any other broad permissive `realtime.messages` policy already on the project would also open typing
+topics, so check that none exists. Idempotent (`create or replace`, `drop policy if exists`). Tested by
 `supabase/tests/d-typing.test.sql` (T1-T5).

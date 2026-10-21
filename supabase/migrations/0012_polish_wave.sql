@@ -176,8 +176,10 @@ grant execute on function public.delete_my_account(text) to authenticated;
 -- is typing:<lower member id>:<higher member id> (lower case, text order, so both members build the same string).
 -- Realtime Authorization checks realtime.messages policies when a socket joins (select = receive) and sends (insert).
 -- Only the two members of a live pair may do either: the caller is one of the two ids, the topic matches the format
--- exactly, and brivia_can_message(other) holds (matched, not blocked either way, same world). A block therefore ends
--- typing both ways without any signal. anon gets nothing. A topic names exactly one pair, so no member can join another
+-- exactly, the pair is matched in the same world, and the CALLER has not blocked the other (one direction only, so a
+-- blocked member sees no difference: their sends reach no one and they receive nothing, as if the other never typed).
+-- A block or unmatch takes effect on the next channel join (Realtime caches authorization per connection until
+-- rejoin or JWT refresh); the client also drops typing for a blocked pair at once. anon gets nothing. A topic names exactly one pair, so no member can join another
 -- pair's channel. Guarded: a no-op where Realtime Authorization (realtime.messages) is not present.
 do $typing$
 begin
@@ -198,6 +200,7 @@ begin
       me uuid := auth.uid();
       lo uuid;
       hi uuid;
+      other uuid;
     begin
       if me is null or p_topic is null then
         return false;
@@ -210,10 +213,22 @@ begin
       lo := m[1]::uuid;
       hi := m[2]::uuid;
       if me = lo then
-        return coalesce(brivia_private.brivia_can_message(hi), false);
+        other := hi;
       elsif me = hi then
-        return coalesce(brivia_private.brivia_can_message(lo), false);
+        other := lo;
+      else
+        return false;
       end if;
+      -- Same checks as brivia_can_message (matched, same world) but only the CALLER's own block counts, so the
+      -- blocked member is never told: their join and sends behave exactly as before, only the blocker is cut off.
+      return coalesce(
+        exists (select 1 from public.matches mt
+                 where (mt.user1_id = me and mt.user2_id = other) or (mt.user1_id = other and mt.user2_id = me))
+        and not exists (select 1 from public.brivia_blocks bl where bl.blocker_id = me and bl.blocked_id = other)
+        and exists (select 1 from public.profiles a join public.profiles b
+                      on public.brivia_in_test_world(a.id) = public.brivia_in_test_world(b.id)
+                     where a.id = me and b.id = other),
+        false);
       return false;
     end;
     $b$
@@ -224,10 +239,10 @@ begin
   drop policy if exists "Matched members can receive typing" on realtime.messages;
   create policy "Matched members can receive typing"
     on realtime.messages for select to authenticated
-    using (extension = 'broadcast' and brivia_private.brivia_typing_topic_ok((select realtime.topic())));
+    using (extension = 'broadcast' and (select brivia_private.brivia_typing_topic_ok((select realtime.topic()))));
   drop policy if exists "Matched members can send typing" on realtime.messages;
   create policy "Matched members can send typing"
     on realtime.messages for insert to authenticated
-    with check (extension = 'broadcast' and brivia_private.brivia_typing_topic_ok((select realtime.topic())));
+    with check (extension = 'broadcast' and (select brivia_private.brivia_typing_topic_ok((select realtime.topic()))));
 end
 $typing$;
