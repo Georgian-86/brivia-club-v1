@@ -7,11 +7,13 @@ body .notification-panel[popover]{position:fixed;inset:auto;margin:0;z-index:aut
 body .notification-panel[popover]:not(:popover-open){display:none}
 body .notification-panel[popover]:popover-open{display:flex;flex-direction:column}
 body .notification-panel[popover] .notification-list{min-height:0;flex:1 1 auto}
-/* Without popover support: fixed, above .chat-window and every view (the header is its stacking context). */
-body .notification-panel:not([popover]){position:fixed;z-index:200}
-@supports not selector(:popover-open){
-  body.app-body .app-topbar{z-index:200}
-}
+/* Without popover support: fixed, above .chat-window; the header (the panel's stacking context) is raised only while
+   the panel is open, just over the active view (.app-view.is-active is z 100). The panel closes on any other click,
+   so it is never up while a div modal opens. */
+body .notification-panel:not([popover]){position:fixed;z-index:90;max-width:calc(100vw - 16px)}
+body .notification-panel:not([popover]):not([hidden]){display:flex;flex-direction:column}
+body .notification-panel:not([popover]) .notification-list{min-height:0;flex:1 1 auto}
+html.notifications-open body.app-body .app-topbar{z-index:101}
 /* The bell is 27-30 px; give it a 44 px touch target without moving it. */
 body.app-body .app-topbar .app-notification-button::before{content:"";position:absolute;inset:-8px}
 /* 701-780 px: the avatar is 37 px wide and 5vw from the edge, so the bell sits a full avatar width further in (it was

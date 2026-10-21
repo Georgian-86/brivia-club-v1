@@ -123,11 +123,12 @@ try {
   }
   const NOTE_VIEWPORTS = [[375, 812], [768, 1024], [1440, 900], ...(SHOTS ? [[1280, 800], [1920, 1080]] : [])];
   const VIEWS = ['chat', 'explore', 'posts', 'profile'];
-  for (const [width, height] of NOTE_VIEWPORTS) {
-    const tag = `${width}x${height}`;
+  for (const mode of ['popover', 'fallback']) for (const [width, height] of NOTE_VIEWPORTS) {
+    const tag = `${width}x${height}${mode === 'fallback' ? ' no-popover' : ''}`;
     for (const view of VIEWS) {
-      if (!SHOTS && view !== 'chat') continue;
+      if ((!SHOTS || mode === 'fallback') && view !== 'chat') continue;
       const context = await browser.newContext({ viewport: { width, height }, deviceScaleFactor: 1 });
+      if (mode === 'fallback') await context.addInitScript(() => { delete HTMLElement.prototype.showPopover; });
       await stub.attach(context);
       const page = await stub.open(context, { path: `/app.html?view=${view}`, errors: pageErrors });
       if (view === 'chat') {
@@ -176,6 +177,22 @@ try {
         await bell.click();
         const afterToggle = await page.evaluate(() => document.querySelector('#app-notification-panel').hidden);
         check(`notifications ${tag}: the bell toggles the panel closed`, () => assert.equal(afterToggle, true));
+        // Controls that stopPropagation still close the panel: the chat "..." menu and a chat row's avatar (public profile).
+        await bell.click();
+        await page.waitForSelector('#app-notification-panel:not([hidden])', { timeout: 3000 });
+        await page.locator('#chat-more').dispatchEvent('click'); // the panel may cover the button at phone widths
+        const afterMore = await page.evaluate(() => ({ hidden: document.querySelector('#app-notification-panel').hidden, menu: !document.querySelector('#chat-more-menu').hidden }));
+        check(`notifications ${tag}: opening the chat "..." menu closes the panel`, () => { assert.equal(afterMore.hidden, true); assert.equal(afterMore.menu, true); });
+        await page.keyboard.press('Escape');
+        await bell.click();
+        await page.waitForSelector('#app-notification-panel:not([hidden])', { timeout: 3000 });
+        const avatar = page.locator('#chat-list [data-public-profile-id]').first();
+        if (await avatar.isVisible()) {
+          await avatar.click({ force: true });
+          const afterAvatar = await page.evaluate(() => document.querySelector('#app-notification-panel').hidden);
+          check(`notifications ${tag}: opening a public profile from a chat row closes the panel`, () => assert.equal(afterAvatar, true));
+          await page.keyboard.press('Escape');
+        }
       }
       await context.close();
     }

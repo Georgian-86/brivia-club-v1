@@ -310,6 +310,7 @@ const openNotificationPanel = () => {
   const button = document.querySelector('#app-notification-button');
   if (!panel || !button) return;
   panel.removeAttribute('hidden');
+  document.documentElement.classList.add('notifications-open');
   if (POPOVER && !panel.matches(':popover-open')) panel.showPopover();
   button.setAttribute('aria-expanded', 'true');
   placeNotificationPanel();
@@ -319,6 +320,7 @@ const closeNotificationPanel = ({ returnFocus = false } = {}) => {
   const button = document.querySelector('#app-notification-button');
   if (POPOVER && panel?.matches(':popover-open')) panel.hidePopover();
   panel?.setAttribute('hidden', '');
+  document.documentElement.classList.remove('notifications-open');
   button?.setAttribute('aria-expanded', 'false');
   if (returnFocus) button?.focus();
 };
@@ -405,18 +407,24 @@ const ensureNotificationControls = () => {
     saveNotifications();
     renderNotifications();
   });
+  // Capture phase: controls that stopPropagation (chat rows, menus, dialogs) must still close the top-layer panel.
   document.addEventListener('click', (event) => {
     if (!notificationPanelOpen() || panel?.contains(event.target) || button?.contains(event.target)) return;
     const active = document.activeElement;
     // Focus goes back to the bell unless the click landed on something else that took it.
     closeNotificationPanel({ returnFocus: !active || active === document.body || panel?.contains(active) });
-  });
+  }, true);
   document.addEventListener('keydown', (event) => {
-    if (event.key === 'Escape' && notificationPanelOpen()) { event.preventDefault(); closeNotificationPanel({ returnFocus: true }); }
+    if (event.key === 'Escape' && !event.defaultPrevented && notificationPanelOpen()) { event.preventDefault(); closeNotificationPanel({ returnFocus: true }); }
   });
   // The panel is fixed: follow the bell as the page resizes (a rotated phone) or scrolls.
   window.addEventListener('resize', placeNotificationPanel);
-  window.addEventListener('scroll', placeNotificationPanel, { passive: true });
+  window.addEventListener('scroll', () => {
+    if (!notificationPanelOpen()) return;
+    const r = button.getBoundingClientRect();
+    if (r.bottom < 0 || r.top > window.innerHeight) closeNotificationPanel();
+    else placeNotificationPanel();
+  }, { passive: true });
 };
 
 // The honest signal quota (UX_SPEC §B "Signal counter", D-026, D-032). The server quota is the only signal limit:
