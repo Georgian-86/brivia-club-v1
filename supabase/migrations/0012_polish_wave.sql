@@ -40,3 +40,114 @@ begin
 end $c$;
 
 -- §D resumes, resume messages, typing, deletion
+-- Resumes (D1). One PDF per member at resumes/<uid>/resume.pdf in a private bucket (5 MB, PDF only, enforced by
+-- Storage). Only the owner writes it. Anyone else reads it (and so can create a short-lived signed URL, which Storage
+-- authorises through the select policy) only while a 'resume' message from the owner to them exists AND the pair can
+-- still message (matched, not blocked either way, same world): an unmatch or a block closes every old link at once.
+-- The bucket is never public; no public URL exists.
+insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+values ('resumes', 'resumes', false, 5242880, array['application/pdf'])
+on conflict (id) do update set public = false, file_size_limit = 5242880, allowed_mime_types = array['application/pdf'];
+
+drop policy if exists "Members can upload their resume" on storage.objects;
+create policy "Members can upload their resume"
+  on storage.objects for insert to authenticated
+  with check (bucket_id = 'resumes' and name = (select auth.uid())::text || '/resume.pdf');
+drop policy if exists "Members can replace their resume" on storage.objects;
+create policy "Members can replace their resume"
+  on storage.objects for update to authenticated
+  using (bucket_id = 'resumes' and name = (select auth.uid())::text || '/resume.pdf')
+  with check (bucket_id = 'resumes' and name = (select auth.uid())::text || '/resume.pdf');
+drop policy if exists "Members can delete their resume" on storage.objects;
+create policy "Members can delete their resume"
+  on storage.objects for delete to authenticated
+  using (bucket_id = 'resumes' and name = (select auth.uid())::text || '/resume.pdf');
+drop policy if exists "Members can read their resume or one shared with them" on storage.objects;
+create policy "Members can read their resume or one shared with them"
+  on storage.objects for select to authenticated
+  using (
+    bucket_id = 'resumes'
+    and (
+      name = (select auth.uid())::text || '/resume.pdf'
+      or exists (
+        select 1 from public.brivia_messages m
+         where m.message_type = 'resume'
+           and m.attachment_path = storage.objects.name
+           and m.recipient_id = (select auth.uid())
+           and brivia_private.brivia_can_message(m.sender_id)
+      )
+    )
+  );
+
+-- profiles.resume_path: the member's own resume path, or null. Readable only by the owner (profiles select is
+-- own-row only; public_profiles and the member RPCs do not carry it). Editable by the owner, own path only.
+alter table public.profiles add column if not exists resume_path text;
+alter table public.profiles drop constraint if exists profiles_resume_path_own;
+alter table public.profiles add constraint profiles_resume_path_own
+  check (resume_path is null or resume_path = id::text || '/resume.pdf');
+grant update (resume_path) on public.profiles to authenticated;
+
+-- A resume message points at its sender's own resume, nothing else (brivia_messages_attachment_path_owner, 0003,
+-- already pins the sender's folder).
+alter table public.brivia_messages drop constraint if exists brivia_messages_resume_path;
+alter table public.brivia_messages add constraint brivia_messages_resume_path
+  check (message_type <> 'resume' or attachment_path = sender_id::text || '/resume.pdf');
+
+-- delete_my_account, redefined: the 0005 body unchanged except that 'resumes' joins the member-folder bucket list, so
+-- a stored resume blocks deletion (storage_not_empty) until the client removes it through the Storage API.
+-- Same signature, grants and errors.
+create or replace function public.delete_my_account(p_confirm text)
+returns void
+language plpgsql
+volatile
+security definer
+set search_path = public
+as $$
+declare
+  uid uuid := auth.uid();
+  v_amr jsonb := auth.jwt() -> 'amr';
+  v_last bigint;
+  v_email text;
+  v_reasons text[];
+  v_reports bigint[];
+begin
+  if uid is null then
+    raise exception 'profile required' using errcode = 'P0002';
+  end if;
+  if p_confirm is distinct from 'DELETE' then
+    raise exception 'confirmation required' using errcode = '22023';
+  end if;
+  if jsonb_typeof(v_amr) = 'array' then
+    select max((e ->> 'timestamp')::bigint) into v_last
+      from jsonb_array_elements(v_amr) e
+     where jsonb_typeof(e) = 'object' and e ->> 'timestamp' ~ '^[0-9]{1,12}$';
+  end if;
+  if v_last is null or v_last < extract(epoch from now())::bigint - 600 then
+    raise exception 'reauth_required' using errcode = 'P0001';
+  end if;
+  if exists (select 1 from storage.objects o
+              where (o.bucket_id in ('profile-photos', 'profile-covers', 'message-attachments', 'community-posts', 'resumes')
+                     and (storage.foldername(o.name))[1] = uid::text)
+                 or (o.bucket_id <> 'career-resumes' and (o.owner_id = uid::text or o.owner = uid))) then
+    raise exception 'storage_not_empty' using errcode = 'P0001';
+  end if;
+  select u.email into v_email from auth.users u where u.id = uid;
+  select coalesce(array_agg(r.id order by r.id), '{}'::bigint[]) into v_reports from public.member_report r where r.target_id = uid;
+  select array(select distinct x from (select r.reason as x from public.member_report r where r.target_id = uid
+                                       union all select f.reason from public.member_flag f where f.member_id = uid) q order by x)
+    into v_reasons;
+  if v_email is not null and (cardinality(v_reports) > 0 or exists (select 1 from public.member_flag f where f.member_id = uid)) then
+    insert into public.moderation_tombstone (digest, reasons, report_ids, expires_at)
+    values (public.brivia_email_digest(v_email), v_reasons, v_reports, now() + interval '365 days')
+    on conflict (digest) do update
+      set reasons = array(select distinct x from unnest(public.moderation_tombstone.reasons || excluded.reasons) x order by x),
+          report_ids = array(select distinct x from unnest(public.moderation_tombstone.report_ids || excluded.report_ids) x order by x),
+          deleted_at = now(),
+          expires_at = greatest(public.moderation_tombstone.expires_at, excluded.expires_at);
+  end if;
+  insert into public.consent_event (member_id, kind, notice_version) values (uid, 'account_deleted', public.brivia_notice_version());
+  delete from auth.users where id = uid;
+end;
+$$;
+revoke all on function public.delete_my_account(text) from public, anon;
+grant execute on function public.delete_my_account(text) to authenticated;

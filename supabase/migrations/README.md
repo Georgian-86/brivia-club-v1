@@ -432,4 +432,33 @@ No pre-flight needed; it adds two tables and touches nothing existing.
 
 ### D: resumes, resume messages, typing, deletion
 
-(empty)
+**Resumes (D1).** Creates (or resets) the Storage bucket `resumes`: `public = false`, `file_size_limit = 5242880`
+(5 MB), `allowed_mime_types = {application/pdf}`; Storage itself refuses anything larger or not a PDF. One file per
+member, always at `resumes/<uid>/resume.pdf`. Policies on `storage.objects` for `authenticated`:
+
+- insert, update (replace) and delete: only `bucket_id = 'resumes'` and `name = <own uid>/resume.pdf`;
+- select "Members can read their resume or one shared with them": the owner's own path, or a `brivia_messages` row of
+  type `resume` that points at this file, is addressed to the reader, and whose sender the reader can still message
+  (`brivia_private.brivia_can_message`: matched, not blocked either way, same world). The client opens a shared
+  resume with a 60 s signed URL, which Storage authorises through this select policy, so an unmatch or a block ends
+  access through every old resume message at once. There is no public URL.
+
+Adds `profiles.resume_path text` (null, or exactly `<id>/resume.pdf`: constraint `profiles_resume_path_own`) with
+`grant update (resume_path)` to `authenticated`. Only the owner reads it (profiles select is own-row only;
+`public_profiles` and the member RPCs do not return it). Adds `brivia_messages_resume_path`: a `resume` message must
+carry its sender's own `<sender_id>/resume.pdf` path. Redefines `delete_my_account(p_confirm)` with the 0005 body,
+adding `resumes` to the member-folder buckets: a stored resume raises `storage_not_empty` until the client removes it
+through the Storage API (same signature, grants and errors). The test-member purge (`seed/purge-test-members.sql`)
+already removes every object under a purged member's folder in any bucket, resumes included.
+
+Pre-flight (must return 0 before applying, else adding the message constraint fails):
+
+```sql
+select count(*) from public.brivia_messages
+ where message_type = 'resume' and attachment_path <> sender_id::text || '/resume.pdf';
+```
+
+Verify after applying: `select id, public, file_size_limit, allowed_mime_types from storage.buckets where id = 'resumes';`
+shows `false | 5242880 | {application/pdf}`, and Storage → Policies lists the four resume policies. Idempotent
+(`on conflict do update`, `drop ... if exists`, `add column if not exists`). Tested by
+`supabase/tests/d-resume.test.sql` (R1-R8).
