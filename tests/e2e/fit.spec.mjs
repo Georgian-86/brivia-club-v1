@@ -15,7 +15,11 @@
 // Section "notifications" (375x812, 768x1024, 1440x900; E2E_SCREENSHOTS also 1280x800 and 1920x1080 in Chat, Explore, Connect
 // and Profile): with a thread open in Chat, the bell opens the panel in the top layer: it is on top at its centre, starts
 // under the bell, ends inside 8 px of the viewport; Escape and an outside click close it and focus returns to the bell.
-// Sections "menu" and "blocked send" belong to later tasks of the wave and are added to this file by them.
+// Section "menu" (320x568, 375x812, 390x844, 768x1024, 1280x800, 1440x900, 1920x1080; E2E_SCREENSHOTS saves each): the Profile
+// ⚙ account menu keeps natural items (44-52 px, never stretched) and is at most 320 px wide; at 600 px and under it is a
+// bottom sheet (flush with the left, right and bottom edges, a grabber, backdrop click closes). Tab order, Escape + focus,
+// and the menu and the notification panel close each other.
+// Section "blocked send" belong to later tasks of the wave and are added to this file by them.
 import assert from 'node:assert/strict';
 import { mkdirSync } from 'node:fs';
 import path from 'node:path';
@@ -196,6 +200,81 @@ try {
       }
       await context.close();
     }
+  }
+  const MENU_VIEWPORTS = [[320, 568], [375, 812], [390, 844], [768, 1024], [1280, 800], [1440, 900], [1920, 1080]];
+  for (const [width, height] of MENU_VIEWPORTS) {
+    const tag = `${width}x${height}`;
+    const phone = width <= 780;
+    const context = await stub.newContext(browser, { width, height }, { reducedMotion: 'reduce', ...(phone ? { isMobile: true, hasTouch: true } : {}) });
+    const page = await stub.open(context, { path: '/app.html?view=profile', errors: pageErrors });
+    await page.waitForSelector('#profile-settings-button', { state: 'attached', timeout: 10000 });
+    await page.waitForTimeout(500);
+    const state = () => page.evaluate(() => {
+      const m = document.querySelector('#profile-settings-menu');
+      const n = document.querySelector('#app-notification-panel');
+      return { menu: m.matches('[popover]') ? m.matches(':popover-open') : !m.hidden, panel: !n.hidden, expanded: document.querySelector('#profile-settings-button').getAttribute('aria-expanded'), focus: document.activeElement?.id || document.activeElement?.textContent.trim() };
+    });
+    await page.evaluate(() => document.querySelector('#profile-settings-button').scrollIntoView({ block: 'center' }));
+    await page.locator('#profile-settings-button').click();
+    await page.waitForTimeout(250);
+    const m = await page.evaluate(() => {
+      const menu = document.querySelector('#profile-settings-menu');
+      const r = menu.getBoundingClientRect();
+      const items = [...menu.querySelectorAll('button')].map((b) => { const q = b.getBoundingClientRect(); const hit = document.elementFromPoint(q.left + q.width / 2, q.top + q.height / 2); return { text: b.textContent.trim(), height: q.height, onTop: b.contains(hit), inside: q.left >= 0 && q.right <= innerWidth && q.bottom <= innerHeight && q.top >= 0 }; });
+      return { left: r.left, right: r.right, top: r.top, bottom: r.bottom, width: r.width, height: r.height, items, innerWidth, innerHeight, label: menu.getAttribute('aria-label'), grabber: (() => { const g = menu.querySelector('.profile-settings-grabber'); return !!g && g.getBoundingClientRect().height > 0; })(), scrollWidth: document.documentElement.scrollWidth, clientWidth: document.documentElement.clientWidth };
+    });
+    if (SHOTS) await page.screenshot({ path: path.join(SHOTS, `menu-${tag}.png`) });
+    const layout = width <= 600 ? 'sheet' : 'popover';
+    const hint = JSON.stringify({ w: Math.round(m.width), h: Math.round(m.height), top: Math.round(m.top), bottom: Math.round(m.bottom), items: m.items.map((i) => Math.round(i.height)) });
+    check(`menu ${tag}: five items at their natural height, 44-52 px ${hint}`, () => { assert.equal(m.items.length, 5); for (const item of m.items) assert.ok(item.height >= 44 && item.height <= 52, `${item.text} is ${item.height}px`); });
+    check(`menu ${tag}: every item is on screen and on top ${hint}`, () => m.items.forEach((i) => { assert.ok(i.onTop, `${i.text} covered`); assert.ok(i.inside, `${i.text} off screen`); }));
+    check(`menu ${tag}: at most 320 px wide unless it is a sheet ${hint}`, () => assert.ok(m.width <= 320.5 || layout === 'sheet'));
+    check(`menu ${tag}: no horizontal overflow`, () => assert.ok(m.scrollWidth <= m.clientWidth));
+    check(`menu ${tag}: labelled "Account menu"`, () => assert.equal(m.label, 'Account menu'));
+    if (layout === 'sheet') {
+      check(`menu ${tag}: a bottom sheet, flush left, right and bottom ${hint}`, () => { assert.ok(Math.abs(m.bottom - m.innerHeight) <= 1, `bottom ${m.bottom}/${m.innerHeight}`); assert.equal(m.left, 0); assert.equal(m.width, m.innerWidth); assert.ok(m.grabber, 'grabber'); assert.ok(m.height < m.innerHeight * 0.6, 'sheet too tall'); });
+    } else {
+      check(`menu ${tag}: a popover inside the viewport, no grabber ${hint}`, () => { assert.ok(m.left >= 8 - 0.5 && m.right <= m.innerWidth - 8 + 0.5, `${m.left}-${m.right}`); assert.ok(m.top >= 0 && m.bottom <= m.innerHeight, 'vertical'); assert.equal(m.grabber, false); });
+    }
+    // Backdrop (sheet) or any outside click closes it.
+    await page.mouse.click(Math.round(width / 2), 6);
+    await page.waitForTimeout(150);
+    const afterOutside = await state();
+    check(`menu ${tag}: a click outside the menu (the backdrop on a phone) closes it`, () => { assert.equal(afterOutside.menu, false); assert.equal(afterOutside.expanded, 'false'); });
+    // Keyboard: Tab order and Escape.
+    await page.evaluate(() => document.querySelector('#profile-settings-button').focus());
+    await page.keyboard.press('Enter');
+    await page.waitForTimeout(150);
+    const tabbed = [];
+    for (let i = 0; i < 5; i += 1) { await page.keyboard.press('Tab'); tabbed.push((await state()).focus); }
+    await page.keyboard.press('Escape');
+    await page.waitForTimeout(150);
+    const afterEsc = await state();
+    check(`menu ${tag}: Tab walks the five items in order; Escape closes and focus returns to the gear`, () => {
+      assert.deepEqual(tabbed, ['NOTIFICATIONS', 'BLOCKED USERS', 'REMOVED CONNECTIONS', 'PRIVACY & ACCOUNT', 'LOG OUT']);
+      assert.equal(afterEsc.menu, false); assert.equal(afterEsc.focus, 'profile-settings-button');
+    });
+    // The two top layers cooperate.
+    const bell = page.locator('#app-notification-button');
+    if (await bell.isVisible()) {
+      await bell.dispatchEvent('click');
+      await page.waitForSelector('#app-notification-panel:not([hidden])', { timeout: 3000 });
+      await page.locator('#profile-settings-button').dispatchEvent('click');
+      await page.waitForTimeout(150);
+      const menuOverPanel = await state();
+      check(`menu ${tag}: opening the account menu closes the notification panel`, () => { assert.equal(menuOverPanel.menu, true); assert.equal(menuOverPanel.panel, false); });
+      await bell.dispatchEvent('click');
+      await page.waitForTimeout(150);
+      const panelOverMenu = await state();
+      check(`menu ${tag}: opening the notification panel closes the account menu`, () => { assert.equal(panelOverMenu.panel, true); assert.equal(panelOverMenu.menu, false); });
+      await page.keyboard.press('Escape');
+      await page.locator('#profile-settings-button').dispatchEvent('click');
+      await page.keyboard.press('Escape');
+      await page.waitForTimeout(100);
+      const both = await state();
+      check(`menu ${tag}: Escape leaves nothing open`, () => { assert.equal(both.menu, false); assert.equal(both.panel, false); });
+    } else check(`menu ${tag}: bell hidden in this view (noted)`, () => {});
+    await context.close();
   }
   check(`no uncaught page errors (${pageErrors.join(' | ')})`, () => assert.deepEqual(pageErrors, []));
 } finally {

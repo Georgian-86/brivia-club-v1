@@ -309,6 +309,8 @@ const openNotificationPanel = () => {
   const panel = document.querySelector('#app-notification-panel');
   const button = document.querySelector('#app-notification-button');
   if (!panel || !button) return;
+  // One top layer at a time: the account menu closes when the panel opens (and the panel when the menu opens).
+  closeProfileSettingsMenu();
   panel.removeAttribute('hidden');
   document.documentElement.classList.add('notifications-open');
   if (POPOVER && !panel.matches(':popover-open')) panel.showPopover();
@@ -483,8 +485,13 @@ const profileSettingsOpen = () => {
 };
 // Top layer: above ⚙ when the five 44 px items fit under the header, otherwise below it, never under the tab bar;
 // its right edge on ⚙'s right edge, inside the page.
+// At 600 px and under the menu is a bottom sheet (full width, flush with the bottom edge, set by menus-fit.css from
+// data-layout); above that it is a popover anchored to ⚙. menuLayout is the one place the breakpoint lives.
+const menuLayout = (viewportWidth) => (viewportWidth <= 600 ? 'sheet' : 'popover');
 const placeProfileSettingsMenu = () => {
   const { settings, menu } = profileSettings;
+  menu.dataset.layout = menuLayout(window.innerWidth);
+  if (menu.dataset.layout === 'sheet') { menu.style.top = ''; menu.style.left = ''; return; }
   const r = settings.getBoundingClientRect();
   const height = menu.offsetHeight;
   const headerBottom = document.querySelector('.app-topbar')?.getBoundingClientRect().bottom || 0;
@@ -499,6 +506,8 @@ const placeProfileSettingsMenu = () => {
 const openProfileSettingsMenu = () => {
   if (!profileSettings?.menu.isConnected) return;
   const { settings, menu } = profileSettings;
+  closeNotificationPanel();
+  menu.dataset.layout = menuLayout(window.innerWidth);
   if (POPOVER) { menu.showPopover(); placeProfileSettingsMenu(); } else menu.hidden = false;
   settings.setAttribute('aria-expanded', 'true');
 };
@@ -510,15 +519,22 @@ const closeProfileSettingsMenu = ({ returnFocus = false } = {}) => {
   if (returnFocus) settings.focus();
 };
 document.addEventListener('click', (event) => {
-  if (profileSettings && !profileSettings.settings.contains(event.target) && !profileSettings.menu.contains(event.target)) closeProfileSettingsMenu();
+  if (!profileSettings) return;
+  const { settings, menu } = profileSettings;
+  if (!settings.contains(event.target) && !menu.contains(event.target)) { closeProfileSettingsMenu(); return; }
+  // A click on the sheet's backdrop is delivered to the menu itself, from outside its box.
+  if (event.target === menu && profileSettingsOpen()) {
+    const r = menu.getBoundingClientRect();
+    if (event.clientX < r.left || event.clientX > r.right || event.clientY < r.top || event.clientY > r.bottom) closeProfileSettingsMenu();
+  }
 });
 document.addEventListener('keydown', (event) => {
-  if (event.key === 'Escape' && profileSettingsOpen()) { event.preventDefault(); closeProfileSettingsMenu({ returnFocus: true }); }
+  if (event.key === 'Escape' && !event.defaultPrevented && profileSettingsOpen()) { event.preventDefault(); closeProfileSettingsMenu({ returnFocus: true }); }
 });
 window.addEventListener('resize', () => closeProfileSettingsMenu());
 // A top-layer menu is fixed: follow ⚙ while the page scrolls, and close once ⚙ has scrolled out of view.
 window.addEventListener('scroll', () => {
-  if (!POPOVER || !profileSettingsOpen()) return;
+  if (!POPOVER || !profileSettingsOpen() || profileSettings.menu.dataset.layout === 'sheet') return;
   const r = profileSettings.settings.getBoundingClientRect();
   if (r.bottom < 0 || r.top > window.innerHeight) closeProfileSettingsMenu();
   else placeProfileSettingsMenu();
@@ -1871,8 +1887,9 @@ const ensureProfilePhotoEditor = () => {
   const menu = document.createElement('div');
   menu.id = 'profile-settings-menu';
   menu.className = 'profile-settings-menu';
+  menu.setAttribute('aria-label', 'Account menu');
   // "Signed in as" (Phase C Task 5): the only place the member's own email is shown. A <p>, so Tab skips it.
-  menu.innerHTML = '<p class="profile-settings-account">Signed in as <strong></strong></p><button type="button" data-profile-setting="notifications">NOTIFICATIONS</button><button type="button" data-profile-setting="block">BLOCKED USERS</button><button type="button" data-profile-setting="removed">REMOVED CONNECTIONS</button><button type="button" data-profile-setting="privacy">PRIVACY &amp; ACCOUNT</button><button type="button" data-profile-setting="logout">LOG OUT</button>';
+  menu.innerHTML = '<p class="profile-settings-account">Signed in as <strong></strong></p><button type="button" data-profile-setting="notifications">NOTIFICATIONS</button><button type="button" data-profile-setting="block">BLOCKED USERS</button><button type="button" data-profile-setting="removed">REMOVED CONNECTIONS</button><button type="button" data-profile-setting="privacy">PRIVACY &amp; ACCOUNT</button><button type="button" data-profile-setting="logout">LOG OUT</button><span class="profile-settings-grabber" aria-hidden="true"></span>';
   // The menu follows ⚙ in the DOM, so Tab goes ⚙ -> the five items -> EDIT PROFILE. Where popovers exist it opens in
   // the top layer (popover="manual"): above the hero's overflow clip and the dashboard, without leaving its tab order.
   // Without them it toggles `hidden` in place, as before Phase C.
