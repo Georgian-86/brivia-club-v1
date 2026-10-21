@@ -1,1 +1,21 @@
-/* Owner: Task A (menus fit the viewport). Empty scaffold. */
+/* Owner: Task A (menus fit the viewport). */
+
+/* A3: the notification panel opens above every view, anchored to the bell. In the top layer (popover="manual") it
+   needs no z-index; placeNotificationPanel() sets top/left (fixed, right edge on the bell's right edge, 8 px inside
+   the viewport) and a max-height, so the list scrolls when the screen is short. */
+body .notification-panel[popover]{position:fixed;inset:auto;margin:0;z-index:auto;max-width:calc(100vw - 16px)}
+body .notification-panel[popover]:not(:popover-open){display:none}
+body .notification-panel[popover]:popover-open{display:flex;flex-direction:column}
+body .notification-panel[popover] .notification-list{min-height:0;flex:1 1 auto}
+/* Without popover support: fixed, above .chat-window and every view (the header is its stacking context). */
+body .notification-panel:not([popover]){position:fixed;z-index:200}
+@supports not selector(:popover-open){
+  body.app-body .app-topbar{z-index:200}
+}
+/* The bell is 27-30 px; give it a 44 px touch target without moving it. */
+body.app-body .app-topbar .app-notification-button::before{content:"";position:absolute;inset:-8px}
+/* 701-780 px: the avatar is 37 px wide and 5vw from the edge, so the bell sits a full avatar width further in (it was
+   covered by the avatar). */
+@media (min-width:701px) and (max-width:780px){
+  body.app-body .app-topbar .app-notification-button{right:calc(clamp(20px,5vw,72px) + 50px)}
+}

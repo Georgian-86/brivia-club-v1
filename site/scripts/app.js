@@ -285,11 +285,42 @@ const formatNotificationTime = (value) => {
   if (age < 24 * 60 * 60 * 1000) return `${Math.floor(age / (60 * 60 * 1000))}h`;
   return date.toLocaleDateString([], { day: 'numeric', month: 'short' });
 };
-const closeNotificationPanel = () => {
+// Where popovers exist (every current browser) the notification panel opens in the top layer (popover="manual"), like the
+// profile settings menu: above the chat list and every other view. Without them it is position:fixed above .chat-window.
+const POPOVER = typeof HTMLElement !== 'undefined' && typeof HTMLElement.prototype.showPopover === 'function';
+const notificationPanelOpen = () => {
+  const panel = document.querySelector('#app-notification-panel');
+  return Boolean(panel) && !panel.hasAttribute('hidden');
+};
+// Fixed position under the bell: its right edge on the bell's right edge, always inside 8 px of the viewport, and no
+// taller than the room left under it.
+const placeNotificationPanel = () => {
   const panel = document.querySelector('#app-notification-panel');
   const button = document.querySelector('#app-notification-button');
+  if (!panel || !button || panel.hasAttribute('hidden')) return;
+  const bell = button.getBoundingClientRect();
+  const width = document.documentElement.clientWidth;
+  const top = Math.round(bell.bottom + 8);
+  panel.style.maxHeight = `${Math.max(120, window.innerHeight - top - 8)}px`;
+  const left = Math.max(8, Math.min(bell.right - panel.offsetWidth, width - panel.offsetWidth - 8));
+  Object.assign(panel.style, { top: `${top}px`, left: `${Math.round(left)}px`, right: 'auto' });
+};
+const openNotificationPanel = () => {
+  const panel = document.querySelector('#app-notification-panel');
+  const button = document.querySelector('#app-notification-button');
+  if (!panel || !button) return;
+  panel.removeAttribute('hidden');
+  if (POPOVER && !panel.matches(':popover-open')) panel.showPopover();
+  button.setAttribute('aria-expanded', 'true');
+  placeNotificationPanel();
+};
+const closeNotificationPanel = ({ returnFocus = false } = {}) => {
+  const panel = document.querySelector('#app-notification-panel');
+  const button = document.querySelector('#app-notification-button');
+  if (POPOVER && panel?.matches(':popover-open')) panel.hidePopover();
   panel?.setAttribute('hidden', '');
   button?.setAttribute('aria-expanded', 'false');
+  if (returnFocus) button?.focus();
 };
 const renderNotifications = () => {
   const list = document.querySelector('#notification-list');
@@ -360,19 +391,32 @@ const ensureNotificationControls = () => {
   renderNotifications();
   const button = document.querySelector('#app-notification-button');
   const panel = document.querySelector('#app-notification-panel');
+  if (POPOVER) panel?.setAttribute('popover', 'manual');
   button?.addEventListener('click', (event) => {
     event.stopPropagation();
-    const shouldOpen = panel?.hasAttribute('hidden');
-    closeNotificationPanel();
-    if (shouldOpen) { panel?.removeAttribute('hidden'); button.setAttribute('aria-expanded', 'true'); renderNotifications(); loadConnectionRequests(); }
+    if (notificationPanelOpen()) { closeNotificationPanel({ returnFocus: true }); return; }
+    openNotificationPanel();
+    renderNotifications();
+    placeNotificationPanel();
+    loadConnectionRequests();
   });
   document.querySelector('#notification-mark-all')?.addEventListener('click', () => {
     notifications = notifications.map((notification) => ({ ...notification, read: true }));
     saveNotifications();
     renderNotifications();
   });
-  document.addEventListener('click', (event) => { if (!panel?.contains(event.target) && event.target !== button) closeNotificationPanel(); });
-  document.addEventListener('keydown', (event) => { if (event.key === 'Escape') closeNotificationPanel(); });
+  document.addEventListener('click', (event) => {
+    if (!notificationPanelOpen() || panel?.contains(event.target) || button?.contains(event.target)) return;
+    const active = document.activeElement;
+    // Focus goes back to the bell unless the click landed on something else that took it.
+    closeNotificationPanel({ returnFocus: !active || active === document.body || panel?.contains(active) });
+  });
+  document.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape' && notificationPanelOpen()) { event.preventDefault(); closeNotificationPanel({ returnFocus: true }); }
+  });
+  // The panel is fixed: follow the bell as the page resizes (a rotated phone) or scrolls.
+  window.addEventListener('resize', placeNotificationPanel);
+  window.addEventListener('scroll', placeNotificationPanel, { passive: true });
 };
 
 // The honest signal quota (UX_SPEC §B "Signal counter", D-026, D-032). The server quota is the only signal limit:
@@ -423,7 +467,6 @@ document.querySelectorAll('[data-nav-host]').forEach((host) => { host.innerHTML 
 
 // The profile ⚙ menu (Phase C Task 4). One menu exists at a time (the current hero's); the document and window
 // listeners below are bound once, here, so rebuilding the profile never stacks them.
-const POPOVER = typeof HTMLElement !== 'undefined' && typeof HTMLElement.prototype.showPopover === 'function';
 let profileSettings = null;
 const profileSettingsOpen = () => {
   const menu = profileSettings?.menu;

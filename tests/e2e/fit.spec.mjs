@@ -12,7 +12,10 @@
 // * no horizontal overflow, and the chat layout spans the app area (no side gutters at desktop widths);
 // * the first bubble is not cropped under the thread header (scrolled to the top);
 // * an image opens in a new tab on tap (it stays a link).
-// Sections "notifications", "menu" and "blocked send" belong to later tasks of the wave and are added to this file by them.
+// Section "notifications" (375x812, 768x1024, 1440x900; E2E_SCREENSHOTS also 1280x800 and 1920x1080 in Chat, Explore, Connect
+// and Profile): with a thread open in Chat, the bell opens the panel in the top layer: it is on top at its centre, starts
+// under the bell, ends inside 8 px of the viewport; Escape and an outside click close it and focus returns to the bell.
+// Sections "menu" and "blocked send" belong to later tasks of the wave and are added to this file by them.
 import assert from 'node:assert/strict';
 import { mkdirSync } from 'node:fs';
 import path from 'node:path';
@@ -117,6 +120,65 @@ try {
     check(`chat ${tag}: the first bubble is not cropped under the header ${hint}`, () => assert.ok(m.first.top >= m.firstHead.bottom - 0.5, 'first bubble under the header'));
     check(`chat ${tag}: an image opens in a new tab on tap`, () => assert.ok(m.imgs.every((i) => i.link === '_blank')));
     await context.close();
+  }
+  const NOTE_VIEWPORTS = [[375, 812], [768, 1024], [1440, 900], ...(SHOTS ? [[1280, 800], [1920, 1080]] : [])];
+  const VIEWS = ['chat', 'explore', 'posts', 'profile'];
+  for (const [width, height] of NOTE_VIEWPORTS) {
+    const tag = `${width}x${height}`;
+    for (const view of VIEWS) {
+      if (!SHOTS && view !== 'chat') continue;
+      const context = await browser.newContext({ viewport: { width, height }, deviceScaleFactor: 1 });
+      await stub.attach(context);
+      const page = await stub.open(context, { path: `/app.html?view=${view}`, errors: pageErrors });
+      if (view === 'chat') {
+        await page.waitForFunction(() => document.querySelector('#chat-list [data-chat-id]'), null, { timeout: 10000 });
+        await page.locator('#chat-list .chat-row-copy > span').first().click({ timeout: 5000 });
+        await page.waitForFunction(() => document.querySelectorAll('#chat-messages .message').length >= 31, null, { timeout: 10000 });
+      }
+      const bell = page.locator('#app-notification-button');
+      const visible = await bell.isVisible();
+      if (view === 'chat') check(`notifications ${tag} ${view}: the bell is visible`, () => assert.ok(visible));
+      if (!visible) { if (SHOTS) console.log(`note: no bell in ${view} at ${tag}`); await context.close(); continue; }
+      await bell.click();
+      await page.waitForSelector('#app-notification-panel:not([hidden])', { timeout: 3000 });
+      const m = await page.evaluate(() => {
+        const panel = document.querySelector('#app-notification-panel');
+        const bellEl = document.querySelector('#app-notification-button');
+        const p = panel.getBoundingClientRect();
+        const b = bellEl.getBoundingClientRect();
+        const hit = document.elementFromPoint(p.left + p.width / 2, p.top + Math.min(p.height / 2, 40));
+        const hitCorner = document.elementFromPoint(p.right - 20, p.bottom - 20);
+        return { top: p.top, bottom: p.bottom, left: p.left, right: p.right, bellBottom: b.bottom, bellRight: b.right, w: innerWidth, h: innerHeight,
+          onTop: !!hit?.closest('#app-notification-panel'), cornerOnTop: !!hitCorner?.closest('#app-notification-panel'),
+          scrollWidth: document.documentElement.scrollWidth, clientWidth: document.documentElement.clientWidth, expanded: bellEl.getAttribute('aria-expanded') };
+      });
+      if (SHOTS) await page.screenshot({ path: path.join(SHOTS, `notifications-${view}-${tag}.png`) });
+      check(`notifications ${tag} ${view}: the panel is on top at its centre and corner`, () => { assert.ok(m.onTop, 'centre'); assert.ok(m.cornerOnTop, 'corner'); });
+      check(`notifications ${tag} ${view}: the panel starts under the bell, inside 8 px of the viewport`, () => {
+        assert.ok(m.top >= m.bellBottom - 1, `top ${m.top} vs bell bottom ${m.bellBottom}`);
+        assert.ok(m.right <= m.w - 8 + 0.5, `right ${m.right}/${m.w}`);
+        assert.ok(m.left >= 8 - 0.5, `left ${m.left}`);
+        assert.ok(m.bottom <= m.h - 8 + 0.5, `bottom ${m.bottom}/${m.h}`);
+      });
+      check(`notifications ${tag} ${view}: the right edge sits on the bell's right edge (or the 8 px gutter)`, () => assert.ok(Math.abs(m.right - m.bellRight) <= 1 || m.right >= m.w - 8 - 0.5 || m.left <= 8.5, `right ${m.right} bell ${m.bellRight}`));
+      check(`notifications ${tag} ${view}: no horizontal overflow`, () => assert.ok(m.scrollWidth <= m.clientWidth, `${m.scrollWidth} > ${m.clientWidth}`));
+      if (view === 'chat') {
+        await page.keyboard.press('Escape');
+        const afterEsc = await page.evaluate(() => ({ hidden: document.querySelector('#app-notification-panel').hidden, open: document.querySelector('#app-notification-panel').matches(':popover-open'), focus: document.activeElement?.id, expanded: document.querySelector('#app-notification-button').getAttribute('aria-expanded') }));
+        check(`notifications ${tag}: Escape closes the panel and focus returns to the bell`, () => { assert.equal(afterEsc.hidden, true); assert.equal(afterEsc.open, false); assert.equal(afterEsc.focus, 'app-notification-button'); assert.equal(afterEsc.expanded, 'false'); });
+        await bell.click();
+        await page.waitForSelector('#app-notification-panel:not([hidden])', { timeout: 3000 });
+        await page.mouse.click(Math.round(width / 2), 4); // empty header strip, nothing focusable
+        const afterOutside = await page.evaluate(() => ({ hidden: document.querySelector('#app-notification-panel').hidden, focus: document.activeElement?.id }));
+        check(`notifications ${tag}: an outside click closes the panel and focus returns to the bell`, () => { assert.equal(afterOutside.hidden, true); assert.equal(afterOutside.focus, 'app-notification-button'); });
+        await bell.click();
+        await page.waitForSelector('#app-notification-panel:not([hidden])', { timeout: 3000 });
+        await bell.click();
+        const afterToggle = await page.evaluate(() => document.querySelector('#app-notification-panel').hidden);
+        check(`notifications ${tag}: the bell toggles the panel closed`, () => assert.equal(afterToggle, true));
+      }
+      await context.close();
+    }
   }
   check(`no uncaught page errors (${pageErrors.join(' | ')})`, () => assert.deepEqual(pageErrors, []));
 } finally {
