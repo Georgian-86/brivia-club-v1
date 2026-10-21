@@ -24,7 +24,7 @@ reduced-motion respected, focus visible, one primary action per screen.
 | A3 | **Notifications open under the chat list** when opened from Chat. | The notifications panel is above every view (stacking context fixed), anchored to the bell, on all sizes. |
 | A4 | **Account menu (Signed in as / Notifications / Blocked / Removed / Privacy) stretched on smaller screens.** | A compact menu with natural item height on every size; on phones it becomes a bottom sheet. |
 | A5 | **Blocked sender can still "send"; nothing reaches the recipient.** | The blocked member can type and press Enter; the message shows as sent in their own thread only; the recipient never sees it (no row visible to them, no notification, no unread count, no typing signal). New migration `0012`: messages from a blocked sender are stored with a hidden flag (or not delivered) and every read path for the recipient excludes them. The block itself is never revealed. |
-| A6 | **Remove Yogansh and Keshav.** | I identify the accounts read-only and give the founder one SQL statement / dashboard step to delete them (the session never writes the live database). |
+| A6 | **Remove Yogansh and Keshav.** They are not live accounts (checked read-only: no such user in Auth or profiles); they are the showcase cards "Yugansh Tyagi" and "Keshav Jha" in the auth page's community marquee (`site/auth.html` ~210-222, both copies). | Both cards and their photos (`site/media/assets/Yugansh-Tyagi.webp`, `Keshav-Jha.webp`, manifest entries) are removed; the marquee still loops seamlessly with the remaining cards. |
 
 ### B. Signup again: one question per screen, Google kept, interests only
 
@@ -70,4 +70,4 @@ D-072 (A), D-073 (B), D-074 (C), D-075 (D), appended to `docs/DECISIONS.md`.
 
 ## Founder actions
 
-Run `0012` in the SQL editor when D ships; delete the two accounts with the statement provided.
+Run `0012` in the SQL editor when A5/C/D ship.
