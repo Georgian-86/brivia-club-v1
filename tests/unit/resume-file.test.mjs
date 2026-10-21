@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import {
   RESUME_MAX_BYTES, RESUME_BUCKET, resumePath, validateResume, readResumeHead, formatResumeSize, resumeMetaLine,
   resumeUploadErrorMessage, isMissingResumeStore, createResumeApi, REMOVE_RESUME_CONFIRM,
-  UPLOAD_PDF_COPY, EMPTY_FILE_COPY, TOO_LARGE_COPY, NOT_A_PDF_COPY, UPLOAD_FAILED_COPY,
+  UPLOAD_PDF_COPY, EMPTY_FILE_COPY, TOO_LARGE_COPY, NOT_A_PDF_COPY, UPLOAD_FAILED_COPY, REPLACED_NOT_SAVED_COPY,
 } from '../../site/scripts/resume-file.js';
 
 const PDF_HEAD = new Uint8Array([0x25, 0x50, 0x44, 0x46, 0x2d, 0x31, 0x2e, 0x37]); // %PDF-1.7
@@ -123,7 +123,7 @@ test('uploadResume upserts <uid>/resume.pdf as application/pdf, then stores resu
   const { client, log } = fakeClient();
   const pdf = file();
   const result = await createResumeApi(client).uploadResume('u-1', pdf);
-  assert.deepEqual(result, { path: 'u-1/resume.pdf', error: null });
+  assert.deepEqual(result, { path: 'u-1/resume.pdf', error: null, fileReplaced: false });
   assert.deepEqual(log, [
     ['upload', 'resumes', 'u-1/resume.pdf', pdf, { upsert: true, contentType: 'application/pdf' }],
     ['update', 'profiles', { resume_path: 'u-1/resume.pdf' }, 'id', 'u-1'],
@@ -146,7 +146,7 @@ test('uploadResume: a throwing client is an error result, never a rejection', as
   const client = { storage: { from: () => ({ upload: async () => { throw new Error('offline'); } }) } };
   const result = await createResumeApi(client).uploadResume('u-1', file());
   assert.equal(result.error.message, 'offline');
-  assert.deepEqual(await createResumeApi(null).uploadResume('u-1', file()), { path: null, error: new Error('Supabase is not configured.') });
+  assert.deepEqual(await createResumeApi(null).uploadResume('u-1', file()), { path: null, error: new Error('Supabase is not configured.'), fileReplaced: false });
 });
 
 test('removeResume removes the object, then sets resume_path to null; a failed remove leaves the row alone', async () => {
@@ -180,4 +180,40 @@ test('resumeInfo reads size and updated time of the own file only', async () => 
   const result = await createResumeApi(missing.client).resumeInfo('u-1');
   assert.equal(result.info, null);
   assert.equal(isMissingResumeStore(result.error), true);
+});
+
+test('fix 1: a failed profile write after a first upload removes the new object again (upload, update, remove)', async () => {
+  const { client, log } = fakeClient({ update: { error: { code: 'PGRST204', message: "Could not find the 'resume_path' column of 'profiles' in the schema cache" } } });
+  const result = await createResumeApi(client).uploadResume('u-1', file());
+  assert.equal(result.path, null);
+  assert.equal(result.fileReplaced, false);
+  assert.equal(isMissingResumeStore(result.error), true, 'the coming-soon branch leaves no file behind either');
+  assert.deepEqual(log.map((entry) => entry.slice(0, 3)), [['upload', 'resumes', 'u-1/resume.pdf'], ['update', 'profiles', { resume_path: 'u-1/resume.pdf' }], ['remove', 'resumes', ['u-1/resume.pdf']]]);
+});
+
+test('fix 1: on a Replace (the row already points at the path) a failed profile write removes nothing and reports fileReplaced', async () => {
+  const { client, log } = fakeClient({ update: { error: { message: 'denied' } } });
+  const result = await createResumeApi(client).uploadResume('u-1', file(), { hadPath: true });
+  assert.equal(result.path, null);
+  assert.equal(result.fileReplaced, true);
+  assert.equal(result.error.message, 'denied');
+  assert.deepEqual(log.map((entry) => entry[0]), ['upload', 'update']);
+  assert.equal(REPLACED_NOT_SAVED_COPY, "Your new resume is saved, but we couldn't update your profile. Please try again.");
+});
+
+test('fix 1: a failed upload removes nothing; a throwing rollback still returns the profile error', async () => {
+  const failedUpload = fakeClient({ upload: { data: null, error: { message: 'network' } } });
+  await createResumeApi(failedUpload.client).uploadResume('u-1', file());
+  assert.deepEqual(failedUpload.log.map((entry) => entry[0]), ['upload']);
+  const { client } = fakeClient({ update: { error: { message: 'denied' } } });
+  const from = client.storage.from;
+  client.storage.from = (bucket) => ({ ...from(bucket), remove: async () => { throw new Error('offline'); } });
+  const result = await createResumeApi(client).uploadResume('u-1', file());
+  assert.equal(result.error.message, 'denied');
+});
+
+test('fix 3: clearResumePath sets resume_path to null on the own row', async () => {
+  const { client, log } = fakeClient();
+  assert.deepEqual(await createResumeApi(client).clearResumePath('u-1'), { error: null });
+  assert.deepEqual(log, [['update', 'profiles', { resume_path: null }, 'id', 'u-1']]);
 });

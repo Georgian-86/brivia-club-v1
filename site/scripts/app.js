@@ -19,8 +19,8 @@ import '../styles/app-navigation.css';
 import '../styles/discovery-filters.css';
 import '../styles/mobile-app.css';
 import '../styles/skeleton.css';
-import { supabase, rowToProfile, saveProfile, isPresetCoverUrl, onboardingStatus, sendSignal, fetchSignalQuota, isRateLimited, isStorageImageUrl, withoutCredentials, uploadMessageAttachment, removeMessageAttachment, uploadCommunityPostImage, removeCommunityPostImage, ImageProcessingError, compressAttachmentFiles, attachmentKind, reportMember, setSensitiveConsent, fetchSensitiveConsentAt, fetchMyInterests, fetchInterestNodes, uploadResume, removeResume, resumeSignedUrl, resumeInfo } from './supabase.js';
-import { validateResume, readResumeHead, resumeMetaLine, formatResumeSize, resumeUploadErrorMessage, isMissingResumeStore, RESUME_FILE_NAME, REMOVE_RESUME_CONFIRM, REMOVE_FAILED_COPY, OPEN_FAILED_COPY, COMING_SOON_COPY } from './resume-file.js';
+import { supabase, rowToProfile, saveProfile, isPresetCoverUrl, onboardingStatus, sendSignal, fetchSignalQuota, isRateLimited, isStorageImageUrl, withoutCredentials, uploadMessageAttachment, removeMessageAttachment, uploadCommunityPostImage, removeCommunityPostImage, ImageProcessingError, compressAttachmentFiles, attachmentKind, reportMember, setSensitiveConsent, fetchSensitiveConsentAt, fetchMyInterests, fetchInterestNodes, uploadResume, removeResume, resumeSignedUrl, resumeInfo, clearResumePath } from './supabase.js';
+import { validateResume, readResumeHead, resumeMetaLine, formatResumeSize, resumeUploadErrorMessage, isMissingResumeStore, RESUME_FILE_NAME, REMOVE_RESUME_CONFIRM, REMOVE_FAILED_COPY, REPLACED_NOT_SAVED_COPY, OPEN_FAILED_COPY, COMING_SOON_COPY } from './resume-file.js';
 import { POPULAR_INTERESTS, INTEREST_CATALOG, LOOKING_FOR_CATALOG, taxonomyLabels, catalogValues, matchOptions } from './discovery-catalog.js';
 import { deleteAccount, clearBriviaKeys, DELETE_BUCKETS, reauthMarker, reauthMarkerMatches } from './account-deletion.js';
 import { openPrivacyAccount } from './privacy-account.js';
@@ -2213,7 +2213,9 @@ const initResume = (row) => {
   if (!resume.path || !memberProfile.id) return;
   resumeInfo(memberProfile.id).then(({ info, error }) => {
     if (isMissingResumeStore(error)) { resume.available = false; renderProfileResume(); return; }
-    if (info) { resume.info = info; renderProfileResume(); }
+    if (info) { resume.info = info; renderProfileResume(); return; }
+    // The stored path names no file (removed elsewhere): show Upload, and clear the column (best effort).
+    if (!error && !resume.busy) { resume.path = null; resume.info = null; renderProfileResume(); clearResumePath(memberProfile.id); }
   });
 };
 const renderProfileResume = () => {
@@ -2230,7 +2232,9 @@ const renderProfileResume = () => {
   if (resume.missing) { body.innerHTML = `<p class="profile-card-empty profile-resume-note">${escapeHtml(COMING_SOON_COPY)}</p>`; return; }
   const errorId = 'profile-resume-error';
   const describedBy = resume.error ? ` aria-describedby="${errorId}"` : '';
-  const disabled = busy ? ' disabled' : '';
+  // Busy actions stay focusable (aria-disabled, not disabled), so focus stays on the pressed button; the click
+  // handler ignores them while resume.busy is set.
+  const disabled = busy ? ' aria-disabled="true"' : '';
   const button = (action, label, tone = '') => `<button type="button" class="profile-resume-button${tone ? ` is-${tone}` : ''}" data-resume-action="${action}"${['upload', 'replace'].includes(action) ? describedBy : ''}${disabled}>${label}</button>`;
   const statusText = { upload: 'Uploading…', remove: 'Removing…', view: 'Opening…' }[resume.busy] || '';
   let file;
@@ -2252,17 +2256,27 @@ const renderProfileResume = () => {
 };
 const handleResumeFile = async (file) => {
   if (!file || resume.busy || !memberProfile.id) return;
+  resume.busy = 'upload'; // set before the first await, so a second pick or click is ignored meanwhile
   const check = validateResume(file, await readResumeHead(file));
   const origin = resume.path ? 'replace' : 'upload';
-  if (!check.ok) { resume.error = check.message; resume.focus = origin; renderProfileResume(); return; }
+  if (!check.ok) { resume.busy = ''; resume.error = check.message; resume.focus = origin; renderProfileResume(); return; }
   resume.error = '';
-  resume.busy = 'upload';
   resume.pending = { name: file.name, size: file.size };
   resume.focus = origin;
   renderProfileResume();
-  const { path, error } = await uploadResume(memberProfile.id, file);
-  resume.busy = '';
+  const { path, error, fileReplaced } = await uploadResume(memberProfile.id, file, { hadPath: Boolean(resume.path) });
   resume.pending = null;
+  if (error && fileReplaced) {
+    // The file was replaced but the profile write failed: say so honestly and show the file as it is now.
+    const { info } = await resumeInfo(memberProfile.id);
+    resume.busy = '';
+    resume.info = info || { size: file.size, updatedAt: new Date().toISOString() };
+    resume.error = REPLACED_NOT_SAVED_COPY;
+    resume.focus = 'replace';
+    renderProfileResume();
+    return;
+  }
+  resume.busy = '';
   if (error) {
     if (isMissingResumeStore(error)) resume.missing = true;
     else { resume.error = resumeUploadErrorMessage(error); resume.focus = origin; }

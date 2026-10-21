@@ -16,6 +16,7 @@ export const EMPTY_FILE_COPY = 'This file is empty.';
 export const TOO_LARGE_COPY = 'Your resume must be 5 MB or smaller.';
 export const NOT_A_PDF_COPY = "This file isn't a valid PDF.";
 export const UPLOAD_FAILED_COPY = "Your resume couldn't be uploaded. Please try again.";
+export const REPLACED_NOT_SAVED_COPY = "Your new resume is saved, but we couldn't update your profile. Please try again.";
 export const REMOVE_FAILED_COPY = "Your resume couldn't be removed. Please try again.";
 export const OPEN_FAILED_COPY = "Your resume couldn't be opened. Please try again.";
 export const COMING_SOON_COPY = 'Resume upload is coming soon.';
@@ -87,17 +88,35 @@ const notConfigured = () => new Error('Supabase is not configured.');
 
 // The Storage and profiles calls. Every method resolves (never rejects) with an `error` field.
 export const createResumeApi = (client) => ({
-  // Upsert <uid>/resume.pdf (Replace is the same call), then point profiles.resume_path at it.
-  async uploadResume(userId, file) {
-    if (!client) return { path: null, error: notConfigured() };
+  // Upsert <uid>/resume.pdf (Replace is the same call), then point profiles.resume_path at it. `hadPath`: the row
+  // already pointed at this path (a Replace). When the profile write fails on a first upload, the new object is
+  // removed again (best effort) so no file is left that the profile does not know about; on a Replace the row still
+  // points at the (now replaced) file, so there is nothing to undo and `fileReplaced` is true.
+  async uploadResume(userId, file, { hadPath = false } = {}) {
+    if (!client) return { path: null, error: notConfigured(), fileReplaced: false };
+    const path = resumePath(userId);
+    let uploadedOk = false;
     try {
-      const path = resumePath(userId);
       const uploaded = await client.storage.from(RESUME_BUCKET).upload(path, file, { upsert: true, contentType: 'application/pdf' });
-      if (uploaded?.error) return { path: null, error: asError(uploaded.error) };
+      if (uploaded?.error) return { path: null, error: asError(uploaded.error), fileReplaced: false };
+      uploadedOk = true;
       const saved = await client.from('profiles').update({ resume_path: path }).eq('id', userId);
-      if (saved?.error) return { path: null, error: asError(saved.error) };
-      return { path, error: null };
-    } catch (error) { return { path: null, error: asError(error) }; }
+      if (saved?.error) throw saved.error;
+      return { path, error: null, fileReplaced: false };
+    } catch (error) {
+      if (uploadedOk && !hadPath) {
+        try { await client.storage.from(RESUME_BUCKET).remove([path]); } catch { /* best effort */ }
+      }
+      return { path: null, error: asError(error), fileReplaced: uploadedOk && hadPath };
+    }
+  },
+  // Best effort: point profiles.resume_path at nothing (the stored path names no file).
+  async clearResumePath(userId) {
+    if (!client) return { error: notConfigured() };
+    try {
+      const saved = await client.from('profiles').update({ resume_path: null }).eq('id', userId);
+      return { error: saved?.error ? asError(saved.error) : null };
+    } catch (error) { return { error: asError(error) }; }
   },
   // Remove the object first; only then clear resume_path (a failed remove leaves the row pointing at the file).
   async removeResume(userId) {

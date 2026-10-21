@@ -330,6 +330,7 @@ export const searchPlaces = async (query, limit = 8) => {
 
 // Resume (polish wave D3; 0012 §D): one private PDF per member at resumes/<uid>/resume.pdf, plus profiles.resume_path.
 // The checks and request shapes live in resume-file.js (pure, unit-tested); here they are bound to this client.
-// uploadResume(userId, file) -> { path, error } · removeResume(userId) -> { error }
+// uploadResume(userId, file, { hadPath }) -> { path, error, fileReplaced } · removeResume(userId) -> { error }
 // resumeSignedUrl(path, seconds = 60) -> { url, error } · resumeInfo(userId) -> { info: { size, updatedAt } | null, error }
-export const { uploadResume, removeResume, resumeSignedUrl, resumeInfo } = createResumeApi(supabase);
+// clearResumePath(userId) -> { error } (best effort, when the stored path names no file)
+export const { uploadResume, removeResume, resumeSignedUrl, resumeInfo, clearResumePath } = createResumeApi(supabase);

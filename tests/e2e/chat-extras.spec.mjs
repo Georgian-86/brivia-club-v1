@@ -15,7 +15,9 @@
 //    it."; Cancel sends nothing, OK sends one Storage DELETE (prefixes [<me>/resume.pdf]) and one PATCH resume_path null.
 // R5 View signs <me>/resume.pdf for 60 s and opens the signed URL in a new tab.
 // R6 a stored resume loads its size and date from Storage ("1.2 MB · Updated …"); while uploading the card is
-//    aria-busy with every action disabled.
+//    aria-busy, every action is aria-disabled (still focusable) and focus stays on the pressed button.
+// R8 a stored path that names no file shows Upload and clears resume_path. R9 a failed profile PATCH after a first
+//    upload removes the new object again; after a Replace it keeps the file and says so honestly.
 // R7 every action is >= 44 x 44 px at 375 and 1440; axe clean on the card in each state; no sideways scroll at 320.
 // CHAT_EXTRAS_SHOTS=<dir> only saves screenshots (empty, uploading, uploaded and each error at 375, 768 and 1440;
 // uploaded at 320, 390, 1280 and 1920), then exits.
@@ -195,14 +197,23 @@ try {
         const axeEmpty = await axeViolations(page, { include: card });
         check(`R7 ${width}: axe clean on the empty card (${axeEmpty.join(' | ')})`, () => assert.deepEqual(axeEmpty, []));
         const mark = st.calls.length;
+        await page.locator(`${card} [data-resume-action="upload"]`).focus();
         await choose(page, FILES.valid);
         const busy = await waitFor(page, (sel) => {
           const el = document.querySelector(sel);
-          return el.getAttribute('aria-busy') === 'true' ? { buttons: [...el.querySelectorAll('button')].filter((b) => b.getClientRects().length).map((b) => b.disabled), status: el.querySelector('[role="status"]')?.textContent.trim() } : null;
+          return el.getAttribute('aria-busy') === 'true' ? { buttons: [...el.querySelectorAll('button')].filter((b) => b.getClientRects().length).map((b) => ({ aria: b.getAttribute('aria-disabled'), disabled: b.disabled })), focused: document.activeElement?.dataset?.resumeAction || document.activeElement?.tagName, status: el.querySelector('[role="status"]')?.textContent.trim() } : null;
         }, card).then((h) => h && h.jsonValue());
-        check(`R6 ${width}: while uploading the card is aria-busy, every action disabled, status "Uploading…" (${JSON.stringify(busy)})`, () => {
-          assert.ok(busy); assert.ok(busy.buttons.every(Boolean)); assert.match(busy.status, /Uploading/);
+        check(`R6 ${width}: while uploading the card is aria-busy, every action aria-disabled (still focusable), focus stays on Upload, status "Uploading…" (${JSON.stringify(busy)})`, () => {
+          assert.ok(busy);
+          assert.ok(busy.buttons.length && busy.buttons.every((b) => b.aria === 'true' && b.disabled === false));
+          assert.equal(busy.focused, 'upload');
+          assert.match(busy.status, /Uploading/);
         });
+        const chooser = page.waitForEvent('filechooser', { timeout: 400 }).then(() => true).catch(() => false);
+        await page.locator(`${card} [data-resume-action="upload"]`).click({ force: true });
+        const pickerOpened = await chooser;
+        // (No extra request either: R2 below counts exactly one Storage POST over the whole upload, this click included.)
+        check(`R6 ${width}: a click on a busy action opens no file picker (${pickerOpened})`, () => assert.equal(pickerOpened, false));
         const axeBusy = await axeViolations(page, { include: card });
         check(`R7 ${width}: axe clean while uploading (${axeBusy.join(' | ')})`, () => assert.deepEqual(axeBusy, []));
         await waitUploaded(page);
@@ -340,6 +351,58 @@ try {
         assert.equal(focused, 'upload');
       });
       await context.close();
+    });
+
+    // R8 (fix round): a stored path that names no file shows Upload and clears the column (best effort).
+    await scenario('R8 stale path', async () => {
+      const mark = st.calls.length;
+      const { context, page } = await open(375, { own: { ...ownRow, resume_path: RESUME }, routes: { [`POST ${LIST_PATH}`]: { body: [] } } });
+      await waitFor(page, (sel) => document.querySelector(`${sel} [data-resume-action="upload"]`), card);
+      await page.waitForTimeout(300);
+      const s = await state(page);
+      check(`R8 a stored path with no file shows Upload and PATCHes resume_path null (${JSON.stringify({ actions: s.actions.map((a) => a.action), patches: profilePatches(mark) })})`, () => {
+        assert.deepEqual(s.actions.map((a) => a.action), ['upload']);
+        assert.deepEqual(profilePatches(mark), [{ resume_path: null }]);
+      });
+      await context.close();
+    });
+
+    // R9 (fix round): a failed profile write after a first upload removes the new file again; after a Replace it
+    // keeps the file and says so honestly.
+    await scenario('R9 failed PATCH', async () => {
+      {
+        const { context, page } = await open(375, { routes: { 'PATCH profiles': { status: 500 } } });
+        const mark = st.calls.length;
+        await choose(page, FILES.valid);
+        await waitError(page);
+        await page.waitForTimeout(300);
+        const s = await state(page);
+        const storage = storageCalls(mark).map((c) => `${c.method} ${c.path}`);
+        check(`R9 first upload + failed PATCH: the object is removed again and the retry copy shows (${JSON.stringify({ storage, error: s.error, actions: s.actions.map((a) => a.action) })})`, () => {
+          assert.deepEqual(storage, [`POST ${UPLOAD_PATH}`, 'DELETE /storage/v1/object/resumes']);
+          assert.equal(s.error, "Your resume couldn't be uploaded. Please try again.");
+          assert.deepEqual(s.actions.map((a) => a.action), ['upload']);
+        });
+        await context.close();
+      }
+      {
+        const { context, page } = await open(375, { own: { ...ownRow, resume_path: RESUME }, routes: { [`POST ${LIST_PATH}`]: listed(), 'PATCH profiles': { status: 500 } } });
+        await waitUploaded(page);
+        const mark = st.calls.length;
+        await choose(page, FILES.valid);
+        await waitError(page);
+        await page.waitForTimeout(300);
+        const s = await state(page);
+        const storage = storageCalls(mark).map((c) => `${c.method} ${c.path}`);
+        check(`R9 Replace + failed PATCH: no rollback, the file is re-read and the copy is honest (${JSON.stringify({ storage, error: s.error, meta: s.meta })})`, () => {
+          assert.deepEqual(storage, [`POST ${UPLOAD_PATH}`, `POST ${LIST_PATH}`]);
+          assert.equal(s.error, "Your new resume is saved, but we couldn't update your profile. Please try again.");
+          assert.equal(s.name, 'resume.pdf');
+          assert.equal(s.meta, '1.2 MB · Updated 21 Oct 2026');
+          assert.deepEqual(s.actions.map((a) => a.action), ['view', 'replace', 'remove']);
+        });
+        await context.close();
+      }
     });
 
     // R7: no sideways scroll at 320 in the uploaded state with an error showing.
