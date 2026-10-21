@@ -12,6 +12,7 @@ body.app-body[data-app-view="chat"] .app-view[data-view="chat"].is-active{
   left:0!important;
   width:auto!important;
   padding:0!important;
+  padding-inline:env(safe-area-inset-left,0px) env(safe-area-inset-right,0px)!important;
 }
 body.app-body[data-app-view="chat"] .app-view[data-view="chat"].is-active .chat-layout{
   width:100%!important;
@@ -46,7 +47,7 @@ body.app-body[data-app-view="chat"] .app-view[data-view="chat"].is-active .chat-
 .app-view[data-view="chat"] .chat-layout .chat-messages .message.has-attachment .message-copy{max-width:100%;padding:8px 8px 0;background:transparent!important;border-radius:0}
 .app-view[data-view="chat"] .chat-layout .chat-messages .message.has-attachment small{margin:4px 6px 0 0}
 
-/* Pictures and videos: as big as the picture is, never more than 45% of the screen tall (420 px at most) or the bubble
+/* Pictures and videos: as big as the picture is, never more than 38% of the screen tall (320 px at most) or the bubble
    wide. width and height stay auto so the ratio holds; cover keeps a rounded, full tile. The link makes a tap open
    the original in a new tab. A floor stops a picture that has not loaded yet from collapsing the bubble. */
 .app-view[data-view="chat"] .chat-messages .message-attachment-image-link{display:block;max-width:100%;border-radius:9px;cursor:zoom-in}
@@ -59,8 +60,8 @@ body.app-body[data-app-view="chat"] .app-view[data-view="chat"].is-active .chat-
   min-width:min(120px,100%);
   min-height:120px;
   max-width:100%;
-  max-height:min(45vh,420px);
-  max-height:min(45dvh,420px);
+  max-height:min(38vh,320px);
+  max-height:min(38dvh,320px);
   object-fit:cover;
   background:var(--brivia-wine-soft);
 }
@@ -72,3 +73,12 @@ html:has(body.app-body[data-app-view="chat"]){scrollbar-gutter:auto}
 /* Phone rules elsewhere give text bubbles 84-88%; a bubble that holds a picture keeps the 72% limit so the picture never
    fills the thread edge to edge. */
 body.app-body[data-app-view="chat"] .app-view[data-view="chat"] .chat-layout .chat-messages .message.has-attachment{max-width:min(72%,560px)!important}
+
+/* Phone rules elsewhere fix pictures at 260 px wide and 230 px tall; the viewport cap and the bubble width win. */
+body.app-body[data-app-view="chat"] .app-view[data-view="chat"] .chat-messages :is(.message-attachment-image,.message-attachment-video){
+  width:auto!important;
+  max-width:100%!important;
+  max-height:min(38vh,320px)!important;
+  max-height:min(38dvh,320px)!important;
+}
+body.app-body[data-app-view="chat"] .app-view[data-view="chat"] .chat-messages .message-attachment-video{width:100%!important}

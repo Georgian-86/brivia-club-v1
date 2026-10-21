@@ -8,7 +8,7 @@
 // a thread of 30 messages with one 3000x4000 image from them, one 4000x3000 image from me and an image as the very
 // first message:
 // * the thread window and the composer end inside the viewport (the composer is always visible);
-// * message images are at most 45% of the viewport tall and never wider than the bubble limit;
+// * message images are at most 38% of the viewport tall (320 px at most) and never wider than the bubble limit;
 // * no horizontal overflow, and the chat layout spans the app area (no side gutters at desktop widths);
 // * the first bubble is not cropped under the thread header (scrolled to the top);
 // * an image opens in a new tab on tap (it stays a link).
@@ -23,7 +23,7 @@ const PORT = Number(process.env.E2E_PORT || 5191);
 const EXECUTABLE = process.env.CHROMIUM_PATH || '/opt/pw-browsers/chromium';
 const SHOTS = process.env.E2E_SCREENSHOTS || '';
 const A = 'aaaaaaaa-aaaa-4aaa-8aaa-000000000001';
-const VIEWPORTS = [[1280, 720], [1280, 800], [1366, 768], [1440, 780], [1440, 900], [1536, 864], [1920, 1080], [375, 812], [390, 844]];
+const VIEWPORTS = [[1280, 720], [1280, 800], [1366, 768], [1440, 780], [1440, 900], [1536, 864], [1920, 1080], [375, 812], [390, 844], [320, 568], [768, 1024]];
 
 // Two huge pictures drawn as SVG so the natural size is 3000x4000 / 4000x3000 without a big binary in the repo.
 const svg = (w, h, label) => `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}"><rect width="${w}" height="${h}" fill="#5e0b28"/><circle cx="${w / 2}" cy="${h / 2}" r="${Math.min(w, h) / 3}" fill="#e9d9c4"/><text x="${w / 2}" y="${h / 2}" font-size="240" text-anchor="middle" fill="#430416">${label}</text></svg>`;
@@ -59,7 +59,7 @@ try {
     await page.waitForTimeout(400);
     await page.waitForFunction(() => document.querySelector('#chat-list [data-chat-id]'), null, { timeout: 10000 });
     await page.locator('#chat-list .chat-row-copy > span').first().click({ timeout: 5000 });
-    await page.waitForFunction(() => document.querySelectorAll('#chat-messages .message').length >= 31, null, { timeout: 10000 }).catch(async (e) => { await page.screenshot({ path: '/tmp/a2-fail.png' }); console.log(tag, await page.evaluate(() => [document.querySelectorAll('#chat-messages .message').length, document.querySelector('#chat-messages')?.innerHTML.slice(0, 200), document.body.dataset.appView])); throw e; });
+    await page.waitForFunction(() => document.querySelectorAll('#chat-messages .message').length >= 31, null, { timeout: 10000 });
     // Images are loading="lazy": bring each into view so every picture has its real size, then settle at the top.
     await page.waitForFunction(() => document.querySelectorAll('#chat-messages img.message-attachment-image').length === 3, null, { timeout: 10000 });
     for (const handle of await page.locator('#chat-messages img.message-attachment-image').all()) {
@@ -102,9 +102,9 @@ try {
       assert.ok(m.composer.bottom <= m.innerHeight + 0.5, 'composer below the fold');
       assert.ok(m.composer.height > 20 && m.composer.top >= m.win.top, 'composer collapsed');
     });
-    check(`chat ${tag}: images at most 45% of the viewport tall and inside the bubble limit ${hint}`, () => {
+    check(`chat ${tag}: images at most 38% of the viewport tall (320 px at most) and inside the bubble limit ${hint}`, () => {
       for (const img of m.imgs) {
-        assert.ok(img.height <= Math.round(m.innerHeight * 0.45) + 1, `image ${Math.round(img.height)}px tall`);
+        assert.ok(img.height <= Math.min(Math.round(m.innerHeight * 0.38), 320) + 1, `image ${Math.round(img.height)}px tall`);
         assert.ok(img.width <= m.bubbleMax + 1, `image ${Math.round(img.width)}px wide`);
         assert.ok(img.height >= 60, 'image collapsed');
         assert.ok(img.bubble.height >= img.height && img.bubble.width >= img.width, 'bubble squeezed smaller than its picture');
