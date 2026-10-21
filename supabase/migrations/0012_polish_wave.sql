@@ -171,3 +171,63 @@ end;
 $$;
 revoke all on function public.delete_my_account(text) from public, anon;
 grant execute on function public.delete_my_account(text) to authenticated;
+
+-- Typing indicator authorization (D2). The chat sends "typing" as a Realtime broadcast on a private channel whose topic
+-- is typing:<lower member id>:<higher member id> (lower case, text order, so both members build the same string).
+-- Realtime Authorization checks realtime.messages policies when a socket joins (select = receive) and sends (insert).
+-- Only the two members of a live pair may do either: the caller is one of the two ids, the topic matches the format
+-- exactly, and brivia_can_message(other) holds (matched, not blocked either way, same world). A block therefore ends
+-- typing both ways without any signal. anon gets nothing. A topic names exactly one pair, so no member can join another
+-- pair's channel. Guarded: a no-op where Realtime Authorization (realtime.messages) is not present.
+do $typing$
+begin
+  if to_regclass('realtime.messages') is null then
+    return;
+  end if;
+
+  execute $f$
+    create or replace function brivia_private.brivia_typing_topic_ok(p_topic text)
+    returns boolean
+    language plpgsql
+    stable
+    security definer
+    set search_path = public
+    as $b$
+    declare
+      m text[];
+      me uuid := auth.uid();
+      lo uuid;
+      hi uuid;
+    begin
+      if me is null or p_topic is null then
+        return false;
+      end if;
+      m := regexp_match(p_topic,
+        '^typing:([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}):([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$');
+      if m is null or not (m[1] collate "C" < m[2] collate "C") then
+        return false;
+      end if;
+      lo := m[1]::uuid;
+      hi := m[2]::uuid;
+      if me = lo then
+        return coalesce(brivia_private.brivia_can_message(hi), false);
+      elsif me = hi then
+        return coalesce(brivia_private.brivia_can_message(lo), false);
+      end if;
+      return false;
+    end;
+    $b$
+  $f$;
+  revoke all on function brivia_private.brivia_typing_topic_ok(text) from public, anon;
+  grant execute on function brivia_private.brivia_typing_topic_ok(text) to authenticated;
+
+  drop policy if exists "Matched members can receive typing" on realtime.messages;
+  create policy "Matched members can receive typing"
+    on realtime.messages for select to authenticated
+    using (extension = 'broadcast' and brivia_private.brivia_typing_topic_ok((select realtime.topic())));
+  drop policy if exists "Matched members can send typing" on realtime.messages;
+  create policy "Matched members can send typing"
+    on realtime.messages for insert to authenticated
+    with check (extension = 'broadcast' and brivia_private.brivia_typing_topic_ok((select realtime.topic())));
+end
+$typing$;

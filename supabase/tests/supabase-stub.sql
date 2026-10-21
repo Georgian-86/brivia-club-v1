@@ -79,3 +79,17 @@ create or replace function storage.extension(name text) returns text language sq
 $$;
 -- Supabase grants the API roles table access on storage; RLS decides what they see.
 grant all on storage.objects, storage.buckets to anon, authenticated;
+
+-- Realtime Authorization (D2): the private-channel table and topic() helper, as Supabase ships them.
+create schema if not exists realtime;
+create table if not exists realtime.messages (
+  id bigserial primary key, topic text not null, extension text not null, event text, payload jsonb,
+  private boolean default true, inserted_at timestamptz default now());
+alter table realtime.messages enable row level security;
+create or replace function realtime.topic() returns text language sql stable as $$
+  select nullif(current_setting('realtime.topic', true), '')
+$$;
+grant usage on schema realtime to anon, authenticated;
+grant select, insert on realtime.messages to anon, authenticated;
+grant usage on sequence realtime.messages_id_seq to anon, authenticated;
+grant execute on function realtime.topic() to anon, authenticated;
