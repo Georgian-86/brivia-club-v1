@@ -8,7 +8,7 @@
 // * geolocation granted: asked only after the privacy explainer is visible, with { enableHighAccuracy: false,
 //   timeout: 10000, maximumAge: 600000 }; the coordinate appears only in the body of POST rpc/set_home_location, in
 //   no URL, no other body, no console line, and never in localStorage / sessionStorage;
-// * geolocation denied, missing or timed out: "Pick my city" opens with the fallback copy (never a dead end); the
+// * geolocation denied, missing or timed out: "Pick my city" opens with a line that says why (A1; never a dead end); the
 //   city listbox works from the keyboard and the request goes to rpc/set_home_city; a PT429 shows "Try again later."
 //   beside the location step;
 // * keyboard-only (Tab, Space, Enter, arrows): 2 interests added, 20 points placed with the steppers, a mode set;
@@ -592,7 +592,7 @@ try {
     await page.locator('[data-area-geo]').click();
     await page.waitForSelector('[data-area-picker]:not([hidden])', { timeout: 15000 });
     const fallback = (await page.locator('[data-area-fallback]').textContent()).trim();
-    check(`375: denial opens "Pick my city" with the fallback copy (got "${fallback}")`, () => { assert.ok(pickerHiddenBefore); assert.equal(fallback, 'No problem. Pick your city instead.'); });
+    check(`375: denial opens "Pick my city" with the denied copy (got "${fallback}")`, () => { assert.ok(pickerHiddenBefore); assert.equal(fallback, "Location is blocked for this site. Allow it in your browser's site settings, or pick your city."); });
     const comboAttrs = await page.locator('#area-city-search').evaluate((el) => ({ role: el.getAttribute('role'), controls: el.getAttribute('aria-controls'), label: el.labels?.[0]?.textContent?.trim() || '' }));
     check(`375: the city search is a labelled combobox over a listbox (${JSON.stringify(comboAttrs)})`, () => { assert.equal(comboAttrs.role, 'combobox'); assert.equal(comboAttrs.controls, 'area-city-results'); assert.ok(comboAttrs.label.length > 0); });
     await shot(page, 'onboarding-375-step2-fallback.png', '[data-area-fallback]');
@@ -681,7 +681,9 @@ try {
     await page.locator('[data-area-geo]').click();
     await page.waitForSelector('[data-area-picker]:not([hidden])', { timeout: 15000 });
     const fallback = (await page.locator('[data-area-fallback]').textContent()).trim();
-    check(`${variant}: geolocation ${variant} falls back to "Pick my city" (got "${fallback}")`, () => assert.equal(fallback, 'No problem. Pick your city instead.'));
+    // A1: a timeout says so and offers "Try again" (the button's text follows the line); a missing API gets the plain line.
+    const expected = variant === 'timeout' ? 'Finding your location took too long. Try again, or pick your city. Try again' : 'No problem. Pick your city instead.';
+    check(`${variant}: geolocation ${variant} falls back to "Pick my city" (got "${fallback}")`, () => assert.equal(fallback, expected));
     const focused = await page.evaluate(() => document.activeElement?.id);
     check(`${variant}: focus moves to the city search (got ${focused})`, () => assert.equal(focused, 'area-city-search'));
     check(`${variant}: no uncaught page errors`, () => assert.deepEqual(errors, []));

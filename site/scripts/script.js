@@ -1,6 +1,6 @@
 // Shared landing + auth behaviour. Styles come from the page entries (landing-entry.js, auth-entry.js), never from here.
 import {
-  supabase, supabaseReady, saveProfile, compressImageOnly, fileToDataUrl, PHOTO_ERROR_MESSAGE, withoutCredentials, rowToProfile, isRateLimited,
+  supabase, supabaseReady, saveProfile, compressImageOnly, fileToDataUrl, PHOTO_ERROR_MESSAGE, withoutCredentials, rowToProfile,
   declareAdult, setHomeLocation, setHomeCity, setMemberInterests, setSensitiveConsent, fetchSensitiveConsentAt, fetchMyInterests, fetchInterestNodes, searchPlaces, onboardingStatus,
 } from './supabase.js';
 import { buildPendingOnboarding, isPendingExpired, dataUrlToFile } from './pending-profile.js';
@@ -10,6 +10,7 @@ import {
   counterText, budgetFromRows, budgetGateText, spreadRemaining,
 } from './passion-budget.js';
 import { matchTypedCity } from './area-pick.js';
+import { locateOnce, fallbackCopy, isTryAgainLater, STILL_WAITING_TEXT } from './geo-locate.js';
 import { signupErrorCopy } from './signup-errors.js';
 import { defaultCoverUrl, normalizeCoverUrl } from './cover-assets.js';
 import { motionAllowed, introPlan, pickHeroSource, markLoaded, INTRO_CAP_MS, INTRO_START_GRACE_MS } from './landing-motion.js';
@@ -961,8 +962,10 @@ if (lookingPicker) {
 // Privacy (CLAUDE.md, Review Focus 4): coordinates live only in `areaChoice` below, in memory. They are never written
 // to localStorage / sessionStorage, the URL, the DOM or a log, and are dropped as soon as the server has the cell.
 // ---------------------------------------------------------------------------------------------------------------
-const GEO_OPTIONS = { enableHighAccuracy: false, timeout: 10000, maximumAge: 600000 };
-const AREA_FALLBACK_TEXT = 'No problem. Pick your city instead.';
+// A1: one attempt is locateOnce (geo-locate.js, GEO_OPTIONS there). After GEO_GUARD_MS without an answer the city list
+// opens ("Still waiting for your browser…") so nobody is stranded, but the attempt keeps listening for PROMPT_GRACE_MS:
+// an "Allow" answered late still counts, unless the member picked an area meanwhile.
+const GEO_GUARD_MS = 15000;
 // D-038 R3: sensitive interests are never shown to others and do not affect who the member sees yet.
 const PRIVATE_HINT_TEXT = 'Private: never shown on your profile, and does not change who you see';
 // R2: sensitive interests are offered only after the member opens the consent panel and continues (the box ticked).
@@ -1005,6 +1008,9 @@ let cityActive = -1;
 let citySearchSeq = 0;
 let citySearchTimer;
 let geoPending = false;
+let geoSeq = 0; // bumped per attempt and by resetArea: an answer for an older attempt is ignored
+let geoGuard;
+let areaRetryButton = null;
 
 const setAreaStatus = (text) => { if (areaStatus) areaStatus.textContent = text; };
 const setAreaError = (text) => { if (areaError) areaError.textContent = text; };
@@ -1041,55 +1047,67 @@ const chooseCity = (place) => {
   setAreaError('');
   setAreaStatus(`Your area: ${place.name}, ${place.region}. We use the city's centre, never your address.`);
 };
-const openCityPicker = (fallbackText = '') => {
+// The line above the city search, with an optional "Try again" (asks the browser once more) after a timeout.
+const setAreaFallback = (text, { retry = false } = {}) => {
+  if (!areaFallback) return;
+  areaFallback.textContent = text;
+  if (!retry) return;
+  if (!areaRetryButton) {
+    areaRetryButton = document.createElement('button');
+    areaRetryButton.type = 'button';
+    areaRetryButton.className = 'interest-retry';
+    areaRetryButton.dataset.areaRetry = '';
+    areaRetryButton.textContent = 'Try again';
+    areaRetryButton.addEventListener('click', () => { void useMyLocation(); });
+  }
+  areaFallback.append(' ', areaRetryButton);
+};
+const openCityPicker = (fallbackText = '', { retry = false } = {}) => {
   if (!areaPicker) return;
   areaPicker.hidden = false;
   areaCityButton?.setAttribute('aria-expanded', 'true');
-  if (areaFallback) areaFallback.textContent = fallbackText;
+  setAreaFallback(fallbackText, { retry });
   areaSearch?.focus();
   void renderCityResults();
 };
-const useMyLocation = () => {
+const useMyLocation = async () => {
   if (geoPending) return;
   setAreaError('');
-  const geo = window.isSecureContext ? navigator.geolocation : undefined;
-  if (!geo || typeof geo.getCurrentPosition !== 'function') { setAreaStatus(''); openCityPicker(AREA_FALLBACK_TEXT); return; }
+  const seq = ++geoSeq;
+  const choiceAtStart = areaChoice;
   geoPending = true;
   areaGeoButton?.setAttribute('aria-busy', 'true');
   setAreaStatus('Finding your area…');
-  let settled = false;
-  const fallBack = () => {
-    if (settled) return;
-    settled = true;
-    geoPending = false;
-    areaGeoButton?.removeAttribute('aria-busy');
+  // A permission prompt answered slowly (or never) must not strand the member: offer the city list, keep listening.
+  window.clearTimeout(geoGuard);
+  geoGuard = window.setTimeout(() => {
+    if (seq !== geoSeq || areaChoice !== choiceAtStart) return;
     setAreaStatus('');
-    openCityPicker(AREA_FALLBACK_TEXT);
-  };
-  // A permission prompt that is never answered must not strand the member either.
-  const guard = window.setTimeout(fallBack, 15000);
-  try {
-    geo.getCurrentPosition((position) => {
-      window.clearTimeout(guard);
-      if (settled) return;
-      const lat = Number(position?.coords?.latitude);
-      const lng = Number(position?.coords?.longitude);
-      if (!Number.isFinite(lat) || !Number.isFinite(lng)) { fallBack(); return; }
-      settled = true;
-      geoPending = false;
-      areaGeoButton?.removeAttribute('aria-busy');
-      areaChoice = { kind: 'geo', lat, lng };
-      if (areaPicker) areaPicker.hidden = true;
-      areaCityButton?.setAttribute('aria-expanded', 'false');
-      setAreaStatus("Got it. We keep only the ~2 km square you're in.");
-    }, () => { window.clearTimeout(guard); fallBack(); }, GEO_OPTIONS);
-  } catch {
-    window.clearTimeout(guard);
-    fallBack();
+    openCityPicker(STILL_WAITING_TEXT);
+  }, GEO_GUARD_MS);
+  const result = await locateOnce(navigator.geolocation, { secure: Boolean(window.isSecureContext) });
+  if (seq !== geoSeq) return; // the step was reset meanwhile
+  window.clearTimeout(geoGuard);
+  geoPending = false;
+  areaGeoButton?.removeAttribute('aria-busy');
+  if (areaChoice !== choiceAtStart) return; // the member picked an area while the browser was thinking: theirs wins
+  if (result.ok) {
+    areaChoice = { kind: 'geo', lat: result.lat, lng: result.lng };
+    const focusInPicker = areaPicker?.contains(document.activeElement);
+    if (areaPicker) areaPicker.hidden = true;
+    areaCityButton?.setAttribute('aria-expanded', 'false');
+    setAreaFallback('');
+    if (focusInPicker) areaGeoButton?.focus();
+    setAreaStatus("Got it. We keep only the ~2 km square you're in.");
+    return;
   }
+  setAreaStatus('');
+  openCityPicker(fallbackCopy(result.reason), { retry: result.reason === 'timeout' });
 };
 const resetArea = () => {
   areaChoice = null;
+  geoSeq += 1;
+  window.clearTimeout(geoGuard);
   geoPending = false;
   areaGeoButton?.removeAttribute('aria-busy');
   if (areaPicker) areaPicker.hidden = true;
@@ -1690,7 +1708,7 @@ const routeAfterProfile = async (user, row = null, pendingResult = null) => {
   if (pendingResult?.orbitError && startStep > 2) startStep = 2;
   showProfileCompletion(user, profileRow ? rowToProfile(profileRow) : null, { startStep, status, adultDeclared: Boolean(profileRow?.adult_declared_at) });
   if (pendingResult?.adultError) setAdultError(ADULT_SAVE_ERROR);
-  if (pendingResult?.orbitError) setAreaError(isRateLimited(pendingResult.orbitError.error, pendingResult.orbitError.status) ? 'Try again later.' : AREA_SAVE_ERROR);
+  if (pendingResult?.orbitError) setAreaError(isTryAgainLater(pendingResult.orbitError.error, pendingResult.orbitError.status) ? 'Try again later.' : AREA_SAVE_ERROR);
   if (status.interests > 0) {
     const { data: rows } = await fetchMyInterests();
     if (Array.isArray(rows) && rows.length && !budget.items.length) setBudget(budgetFromRows(rows), { rerenderChips: true });
@@ -2059,7 +2077,7 @@ const finishOnboarding = async (userId) => {
     const { data, error, status } = choice.kind === 'geo' ? await setHomeLocation(choice.lat, choice.lng) : await setHomeCity(choice.placeId);
     if (error) {
       setSignupStep(2);
-      const message = isRateLimited(error, status) ? 'Try again later.' : AREA_SAVE_ERROR;
+      const message = isTryAgainLater(error, status) ? 'Try again later.' : AREA_SAVE_ERROR;
       setAreaError(message);
       throw new OnboardingStepError(message);
     }

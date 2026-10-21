@@ -29,6 +29,10 @@ is done but `completed` is false, and that a failed save never withdraws a conse
 PLAYWRIGHT_MODULE=/tmp/pw/node_modules/playwright/index.mjs node tests/e2e/onboarding.spec.mjs
 ```
 
+`location.spec.mjs` (polish wave A1, Vite on :5192) drives "Use my location" on signup step 2 with a scripted
+`navigator.geolocation`: granted at once and late (after the 15 s guard), a city picked while waiting, codes 1/2/3 with
+their own lines and "Try again" after a timeout, no API or an insecure context, and the location cap at submit.
+
 `deck.spec.mjs` (Iteration 3, Task 10) loads `app.html` the same way (Vite on :5197) and checks the location-first deck:
 the distance band and "You both" chips, no City/State anywhere even when the stub wrongly adds them, no PLACE filter,
 one `interaction` pass POST per Pass, the A5 neutral pitch line, no wrap-around, every empty state (`caught_up`,
