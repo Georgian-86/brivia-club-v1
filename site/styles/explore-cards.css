@@ -112,9 +112,10 @@ body.app-body .post-card-action[aria-pressed="true"] svg{fill:currentColor}
 body.app-body .post-card-action:active:not(:disabled) svg{transform:scale(.88)}
 body.app-body .post-card-action:focus-visible{outline:2px solid var(--color-cream);outline-offset:-3px}
 @media (hover:hover){body.app-body .post-card-action:hover{background:color-mix(in srgb, var(--color-cream) 12%, transparent)}}
-/* A like lands with a small pop (movement, so not under reduced motion). */
+/* A like lands with a small pop, once per tap (data-just-liked, set by app.js markReaction); movement, so not under
+   reduced motion. */
 @media (prefers-reduced-motion:no-preference){
-  body.app-body .post-card-action[data-post-action="like"][aria-pressed="true"] svg{animation:post-like-pop 320ms var(--ease)}
+  body.app-body .post-card-action[data-just-liked] svg{animation:post-like-pop 320ms var(--ease)}
 }
 @keyframes post-like-pop{0%{transform:scale(1)}45%{transform:scale(1.22)}100%{transform:scale(1)}}
 /* Reduced motion: no lift, no zoom (the shadow still answers the hover). */

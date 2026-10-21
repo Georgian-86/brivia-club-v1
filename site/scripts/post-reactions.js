@@ -49,11 +49,13 @@ export const setReaction = async (client, kind, postId, memberId, on) => {
   }
 };
 
-// One request in flight per post and kind: begin('postId:like') is false until end('postId:like').
+// One request in flight per post and kind: begin('postId:like') is false until end('postId:like'); busy(key) says whether
+// that key is in flight (a reload skips it, so it never overwrites a pending change).
 export const createReactionGuard = () => {
   const busy = new Set();
   return {
     begin(key) { if (busy.has(key)) return false; busy.add(key); return true; },
     end(key) { busy.delete(key); },
+    busy(key) { return busy.has(key); },
   };
 };

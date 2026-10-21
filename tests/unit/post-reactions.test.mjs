@@ -119,3 +119,14 @@ for (const how of ['reject', 'throw']) {
     assert.equal(out.saved.size, 0);
   });
 }
+
+// C3 fix round: the view asks which keys are in flight, so a reload never overwrites a pending like or save.
+test('guard.busy reports a key in flight', () => {
+  const guard = createReactionGuard();
+  assert.equal(guard.busy('p:like'), false);
+  guard.begin('p:like');
+  assert.equal(guard.busy('p:like'), true);
+  assert.equal(guard.busy('p:save'), false);
+  guard.end('p:like');
+  assert.equal(guard.busy('p:like'), false);
+});

@@ -2305,18 +2305,26 @@ const syncReactionAvailability = () => {
   });
 };
 const REACTION_LABELS = { like: ['Like', 'Liked'], save: ['Save', 'Saved'] };
-const markReaction = (postId, kind, on) => {
+// { pop: true } (a member's own tap that turns Like on) marks the button data-just-liked for one beat, so the pop plays
+// once for that tap and never on a render or a reload.
+const markReaction = (postId, kind, on, { pop = false } = {}) => {
   const set = kind === 'like' ? communityReactions.liked : communityReactions.saved;
   if (on) set.add(postId); else set.delete(postId);
   document.querySelectorAll(`#community-post-list .post-card[data-post-id="${CSS.escape(String(postId))}"] [data-post-action="${kind}"]`).forEach((button) => {
     button.setAttribute('aria-pressed', String(on));
     const label = button.querySelector('span');
     if (label) label.textContent = REACTION_LABELS[kind][on ? 1 : 0];
+    if (pop && on && kind === 'like') {
+      button.dataset.justLiked = '';
+      window.setTimeout(() => button.removeAttribute('data-just-liked'), 400);
+    } else button.removeAttribute('data-just-liked');
   });
 };
 const missingTable = (error) => /does not exist|schema cache|42P01|PGRST205/i.test(`${error?.code || ''} ${error?.message || ''}`);
 // The server truth for the loaded posts. A failure keeps what is on screen (the optimistic change is already undone).
-const refreshCommunityReactions = async () => {
+// A post and kind with a request in flight keeps its on-screen state (the reload may predate that write); `own` is the
+// caller's key, which is applied (the caller's write has failed and the reload is its server truth).
+const refreshCommunityReactions = async ({ own = '' } = {}) => {
   if (!supabase || !memberProfile.id) return;
   const ids = communityPosts.map((post) => post.id);
   const result = await loadReactions(supabase, memberProfile.id, ids);
@@ -2326,9 +2334,13 @@ const refreshCommunityReactions = async () => {
     return;
   }
   communityReactions.available = true;
-  communityReactions.liked = result.liked;
-  communityReactions.saved = result.saved;
-  ids.forEach((id) => { markReaction(id, 'like', result.liked.has(id)); markReaction(id, 'save', result.saved.has(id)); });
+  ids.forEach((id) => {
+    for (const [kind, set] of [['like', result.liked], ['save', result.saved]]) {
+      const key = `${id}:${kind}`;
+      if (key !== own && communityReactionGuard.busy(key)) continue;
+      markReaction(id, kind, set.has(id));
+    }
+  });
   syncReactionAvailability();
 };
 // Optimistic like / save: the button flips at once; one request per post and kind is in flight (a double tap is one
@@ -2340,12 +2352,12 @@ const toggleCommunityReaction = async (postId, kind) => {
   if (!communityReactionGuard.begin(key)) return;
   try {
     const next = !(kind === 'like' ? communityReactions.liked : communityReactions.saved).has(postId);
-    markReaction(postId, kind, next);
+    markReaction(postId, kind, next, { pop: true });
     const { error } = await setReaction(supabase, kind, postId, memberProfile.id, next);
     if (error) {
       markReaction(postId, kind, !next);
       if (error.code !== '42501') showToast(REACTION_FAILED);
-      await refreshCommunityReactions();
+      await refreshCommunityReactions({ own: key });
     }
   } catch (error) {
     console.warn('Reaction failed:', error?.message);
@@ -2448,7 +2460,8 @@ const bindCommunityPostActions = () => {
     const postId = card.dataset.postId;
     const action = event.target.closest('[data-post-action]')?.dataset.postAction;
     if (action === 'like' || action === 'save') toggleCommunityReaction(postId, action);
-    else if (action === 'comment') openCommunityPostDetail(postId);
+    // Safari does not focus a clicked button: pass it, so closing the detail returns focus to Comment.
+    else if (action === 'comment') openCommunityPostDetail(postId, event.target.closest('[data-post-action]'));
     else if (action === 'share') shareCommunityPost(postId);
     else if (!action && event.target.closest('.post-card-media')) openCommunityPostDetail(postId, card.querySelector('[data-post-action="comment"]'));
   });

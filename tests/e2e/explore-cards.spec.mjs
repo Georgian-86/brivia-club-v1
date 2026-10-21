@@ -413,6 +413,27 @@ try {
       await context.close();
     });
 
+    // Mutual consent: matched with A only, B's post offers only "View profile" (the stub honours the or= pair).
+    await scenario('matched with A, not B', async () => {
+      st.matchIds = [A];
+      const { context, page } = await open(375);
+      const actionsFor = async (id) => {
+        await page.locator(`.post-card[data-post-id="${id}"] [data-post-action="comment"]`).click();
+        await page.waitForFunction(() => document.querySelector('#post-detail[open] [data-post-detail-action]:not([aria-busy="true"])'), null, { timeout: 5000 }).catch(() => {});
+        const actions = await page.evaluate(() => [...document.querySelectorAll('#post-detail[open] [data-post-detail-action]')].map((b) => b.textContent.trim()));
+        await page.keyboard.press('Escape');
+        await page.waitForTimeout(200);
+        return actions;
+      };
+      const b = await actionsFor('post-2');
+      const a = await actionsFor('post-1');
+      check(`matched with A only: B's post offers only "View profile", A's "Reply in chat" (${JSON.stringify({ a, b })})`, () => {
+        assert.deepEqual(b, ['View profile']); assert.deepEqual(a, ['Reply in chat']);
+      });
+      await context.close();
+      st.matchIds = [];
+    });
+
     // ?post=<id> opens the detail once the posts load.
     await scenario('scenario 10', async () => {
       const { context, page } = await open(375, { pagePath: '/app.html?view=posts&post=post-6', wait: false });

@@ -10,7 +10,7 @@
 //   status        deck_status() answer                      emptyDeck / deckFail   deck_candidates answers [] / 500
 //   matchAll      send_signal answers 'matched'             onboarding             my_onboarding_status answers in order
 //   passed, signalled (Set)  ids removed from the deck     remaining, resetsAt    the signal quota
-//   matchIds      GET /rest/v1/matches (members I am matched with)                search  rpc/search_members answer
+//   matchIds      GET /rest/v1/matches (members I am matched with; a pair or= lookup answers that pair only)                search  rpc/search_members answer
 //   report        'ok' | 'cap'                              rows                   deck rows (null: the default rows)
 //   reportHold    a promise report_member waits on          calls, bodies          every request / every JSON answer
 //   myInterests   rpc/my_interests rows (default 3)         posts                  GET community_posts rows (default [])
@@ -138,7 +138,13 @@ export const startAppStub = async ({ port, state = {}, deckRows = defaultDeckRow
       if (pathName === '/rest/v1/brivia_blocks' && method === 'POST') return route.fulfill({ status: 201, body: '', headers: { 'access-control-allow-origin': '*' } });
       if (pathName === '/rest/v1/rpc/list_members') return json(200, deckRows);
       if (pathName === '/rest/v1/rpc/search_members') return json(200, st.search);
-      if (pathName === '/rest/v1/matches' && method === 'GET') return json(200, st.matchIds.map((id) => ({ user1_id: ME, user2_id: id })));
+      if (pathName === '/rest/v1/matches' && method === 'GET') {
+        const rows = st.matchIds.map((id) => ({ user1_id: ME, user2_id: id }));
+        // A pair lookup (hasMatchWith: or=(and(user1_id.eq.X,user2_id.eq.Y),and(...))) answers only that pair's row; the
+        // member-wide read (or=(user1_id.eq.ME,user2_id.eq.ME)) answers every row (polish wave C3 fix round).
+        const pairs = [...(reqUrl.searchParams.get('or') || '').matchAll(/and\(user1_id\.eq\.([^,]+),user2_id\.eq\.([^)]+)\)/g)].map((m) => [m[1], m[2]]);
+        return json(200, pairs.length ? rows.filter((row) => pairs.some(([u1, u2]) => row.user1_id === u1 && row.user2_id === u2)) : rows);
+      }
       if (pathName === '/rest/v1/community_posts' && method === 'GET') return json(200, st.posts || []);
       if (pathName === '/rest/v1/brivia_messages' && method === 'GET') return json(200, st.messages || []);
       if (pathName.startsWith('/rest/v1/')) return json(200, []);
