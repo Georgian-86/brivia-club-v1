@@ -422,7 +422,13 @@ Filled by later tasks; each subsection is written by the task named in it.
 
 ### C: post likes and saves
 
-(empty)
+Creates `public.community_post_likes` and `public.community_post_saves` (post_id, member_id default `auth.uid()`,
+created_at; primary key (post_id, member_id); both foreign keys `on delete cascade`). RLS is on; `authenticated` gets
+select, insert and delete only (no update); `anon` gets nothing. Policies: select own, insert own (completed profile
+and the post must be visible under the posts select policy), delete own. A second like or save is a `unique_violation`
+(23505), which the client treats as done. There are no counts and no RPC: a like or save is private to its owner.
+Idempotent (`if not exists`, `drop policy if exists`). Tested by `supabase/tests/c-post-reactions.test.sql` (P0-P6).
+No pre-flight needed; it adds two tables and touches nothing existing.
 
 ### D: resumes, resume messages, typing, deletion
 
