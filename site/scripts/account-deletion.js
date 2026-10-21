@@ -9,7 +9,8 @@
 //     -> { ok: true } | { ok: false, stage: 'storage' | 'rpc' | 'reauth', filesRemoved: boolean, error }
 //   storage.from(bucket).list(prefix, { limit, offset }) / .remove(paths)   (Supabase Storage client shape)
 //   rpc(name, args) -> { error }                                              (Supabase rpc shape)
-export const DELETE_BUCKETS = ['profile-photos', 'profile-covers', 'message-attachments', 'community-posts'];
+// 'resumes' (polish wave D3, 0012 §D): delete_my_account answers storage_not_empty while resumes/<uid>/ holds a file.
+export const DELETE_BUCKETS = ['profile-photos', 'profile-covers', 'message-attachments', 'community-posts', 'resumes'];
 export const PAGE_SIZE = 100;
 export const REMOVE_BATCH = 100;
 const MAX_PASSES = 50; // a bucket that never empties is reported, not looped on forever
@@ -27,6 +28,8 @@ const listAll = async (bucket, prefix) => {
   const paths = [];
   for (let offset = 0; ; offset += PAGE_SIZE) {
     const { data, error } = await bucket.list(prefix, { limit: PAGE_SIZE, offset });
+    // A bucket that does not exist yet (its migration is not applied) holds no files: nothing to remove.
+    if (error && /bucket not found/i.test(`${error.message || ''} ${error.error || ''}`)) return paths;
     if (error) throw asError(error);
     const items = data || [];
     for (const item of items) {

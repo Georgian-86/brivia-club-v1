@@ -1,1 +1,211 @@
-/* Owner: Task C/D (chat extras). Empty scaffold. */
+/* Owner: Task C/D (chat extras). Tokens only (tokens.css): no raw colours, no font stacks. */
+
+/* ---------------------------------------------------------------------------------------------------------------
+   Resume card in Profile (polish wave D3). Sits in the profile column under "Experience" and reuses .profile-card /
+   .profile-card-title (profile-view.css). A calm document row (icon tile, name, size and date), then the actions:
+   one filled primary (Upload resume / View), outline (Replace) and a quiet text action (Remove). Every target is
+   >= 44 px. Field errors sit between the row and the actions, in deep wine on a soft wine wash with an icon.
+   --------------------------------------------------------------------------------------------------------------- */
+.profile-resume[hidden] { display: none; }
+
+.profile-resume .profile-card-title { margin-bottom: var(--space-4); }
+
+.profile-resume-hint {
+  margin-left: var(--space-1);
+  color: var(--color-ink-soft);
+  font-family: var(--font-body);
+  font-size: var(--text-14);
+  font-weight: 500;
+  letter-spacing: 0;
+  white-space: nowrap;
+}
+
+.profile-resume-file {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  min-width: 0;
+  padding: var(--space-4);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-m);
+  background: color-mix(in srgb, var(--color-wine) 4%, var(--color-cream));
+}
+
+.profile-resume-file.is-empty {
+  border-style: dashed;
+  border-color: color-mix(in srgb, var(--color-wine) 32%, transparent);
+  background: transparent;
+}
+
+.profile-resume-icon {
+  display: inline-grid;
+  flex: 0 0 auto;
+  place-items: center;
+  width: 44px;
+  height: 52px;
+  border: 1px solid color-mix(in srgb, var(--color-wine) 40%, transparent);
+  border-radius: var(--radius-s);
+  background: var(--color-cream);
+  color: var(--color-wine);
+}
+
+.profile-resume-icon.is-filled {
+  border-color: var(--color-wine-deep);
+  background: var(--color-wine-deep);
+  color: var(--color-cream);
+}
+
+.profile-resume-text { min-width: 0; }
+
+.profile-resume-name {
+  margin: 0;
+  overflow: hidden;
+  color: var(--color-ink);
+  font-family: var(--font-body);
+  font-size: var(--text-16);
+  font-weight: 600;
+  line-height: 1.35;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.profile-resume-meta,
+.profile-resume-lead {
+  margin: var(--space-1) 0 0;
+  color: var(--color-ink-soft);
+  font-family: var(--font-body);
+  font-size: var(--text-14);
+  line-height: 1.45;
+  font-variant-numeric: tabular-nums;
+}
+
+.profile-resume-meta span { white-space: nowrap; }
+
+.profile-resume-lead { margin: 0; color: var(--color-ink); }
+
+/* Indeterminate progress while the file uploads (Storage reports no byte progress). */
+.profile-resume-progress {
+  position: relative;
+  height: 4px;
+  margin-top: var(--space-3);
+  overflow: hidden;
+  border-radius: var(--radius-pill);
+  background: color-mix(in srgb, var(--color-wine) 12%, transparent);
+}
+
+.profile-resume-progress i {
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 40%;
+  border-radius: inherit;
+  background: var(--color-wine);
+  animation: profile-resume-progress 1.1s var(--ease) infinite;
+}
+
+@keyframes profile-resume-progress {
+  from { transform: translateX(-100%); }
+  to { transform: translateX(250%); }
+}
+
+.profile-resume-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-top: var(--space-4);
+}
+
+.profile-resume-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 44px;
+  min-height: 44px;
+  padding: 0 var(--space-5);
+  border: 1px solid var(--color-wine);
+  border-radius: var(--radius-pill);
+  background: transparent;
+  color: var(--color-wine);
+  font-family: var(--font-body);
+  font-size: var(--text-14);
+  font-weight: 600;
+  line-height: 1;
+  cursor: pointer;
+  transition: background var(--motion-fast) var(--ease), color var(--motion-fast) var(--ease), border-color var(--motion-fast) var(--ease);
+}
+
+.profile-resume-button:hover { background: color-mix(in srgb, var(--color-wine) 8%, var(--color-cream)); }
+
+.profile-resume-button.is-primary {
+  border-color: var(--color-wine-deep);
+  background: var(--color-wine-deep);
+  color: var(--color-cream);
+}
+
+.profile-resume-button.is-primary:hover { border-color: var(--color-wine); background: var(--color-wine); }
+
+.profile-resume-button.is-quiet {
+  border-color: transparent;
+  padding: 0 var(--space-4);
+  text-decoration: underline;
+  text-decoration-color: color-mix(in srgb, var(--color-wine) 40%, transparent);
+  text-underline-offset: 4px;
+}
+
+.profile-resume-button.is-quiet:hover { background: transparent; text-decoration-color: currentColor; }
+
+.profile-resume-button:focus-visible {
+  outline: 2px solid var(--color-wine);
+  outline-offset: 2px;
+}
+
+.profile-resume-button:disabled {
+  cursor: progress;
+  opacity: .55;
+}
+
+.profile-resume-error {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  margin: var(--space-3) 0 0;
+  padding: var(--space-2) var(--space-3);
+  border-left: 3px solid var(--color-wine);
+  border-radius: var(--radius-s);
+  background: color-mix(in srgb, var(--color-wine) 8%, var(--color-cream));
+  color: var(--color-wine-deep);
+  font-family: var(--font-body);
+  font-size: var(--text-14);
+  font-weight: 600;
+  line-height: 1.4;
+}
+
+.profile-resume-error svg { flex: 0 0 auto; margin-top: 1px; }
+
+.profile-resume-status:empty { display: none; }
+
+.profile-resume-status {
+  margin: var(--space-2) 0 0;
+  color: var(--color-ink-soft);
+  font-family: var(--font-body);
+  font-size: var(--text-14);
+}
+
+.profile-resume-privacy {
+  margin: var(--space-3) 0 0;
+  color: var(--color-ink-soft);
+  font-family: var(--font-body);
+  font-size: var(--text-12);
+  line-height: 1.5;
+}
+
+.profile-resume-note { margin: 0; }
+
+@media (max-width: 480px) {
+  .profile-resume-file { gap: var(--space-3); padding: var(--space-3); }
+  .profile-resume-actions .profile-resume-button { flex: 1 1 auto; padding: 0 var(--space-3); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .profile-resume-progress i { width: 100%; opacity: .45; animation: none; }
+  .profile-resume-button { transition: none; }
+}

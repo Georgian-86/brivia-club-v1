@@ -119,3 +119,12 @@ reduced motion), and the open menu stops it and hides the button. `landing-smoot
 
 `consent.spec.mjs` section 9b (D-071) checks "Send without a note" on the pitch sheet at 1440 and 375 px (one note-null
 send, no double send, the 44 px ×, axe). `SHEET_SHOTS=<dir>` saves `pitch-sheet-1440.png` and `pitch-sheet-375.png`.
+
+`chat-extras.spec.mjs` (polish wave D; Vite on :5186) uses `app-stub.mjs`. Section "resume" (D3) checks the Profile
+resume card: hidden without the `resume_path` column (0012 not applied) and a calm "coming soon" line when the bucket
+is missing; one upsert POST to `resumes/<me>/resume.pdf` plus one `profiles` PATCH; the four field errors with no
+request; Replace, Remove (confirm, DELETE + PATCH null) and View (a 60 s signed URL in a new tab without an opener);
+44 px targets and axe in each state. `SECTIONS=resume` runs one section; `CHAT_EXTRAS_SHOTS=<dir>` saves screenshots.
+```bash
+PLAYWRIGHT_MODULE=/tmp/pw/node_modules/playwright/index.mjs node tests/e2e/chat-extras.spec.mjs
+```

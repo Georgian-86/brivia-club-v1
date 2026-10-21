@@ -227,3 +227,33 @@ test('F3: the re-auth marker records the user id and time; only the same user wi
   assert.equal(reauthMarkerMatches('{bad json', 'u-1', now), false);
   assert.equal(reauthMarkerMatches(raw, '', now), false);
 });
+
+test('D3: DELETE_BUCKETS includes resumes, and the default run empties resumes/<uid>/ before the second RPC call', async () => {
+  const { DELETE_BUCKETS } = await import('../../site/scripts/account-deletion.js');
+  assert.ok(DELETE_BUCKETS.includes('resumes'));
+  const files = { resumes: new Set(['resume.pdf']) };
+  const events = [];
+  const storage = {
+    from: (bucket) => ({
+      list: async (prefix, opts) => {
+        const names = [...(files[bucket] || [])];
+        return { data: names.slice(opts.offset, opts.offset + opts.limit).map((name) => ({ name, id: `id-${name}` })), error: null };
+      },
+      remove: async (paths) => { events.push(`remove ${bucket} ${paths.join(',')}`); paths.forEach((p) => files[bucket].delete(p.replace(`${UID}/`, ''))); return { data: paths, error: null }; },
+    }),
+  };
+  const rpc = async () => { events.push('rpc'); return files.resumes.size ? { error: { code: 'P0001', message: 'storage_not_empty' } } : { error: null }; };
+  const result = await deleteAccount({ storage, rpc, signOut: async () => {}, clearLocal: () => {}, uid: UID });
+  assert.deepEqual(result, { ok: true });
+  assert.deepEqual(events, ['rpc', `remove resumes ${UID}/resume.pdf`, 'rpc']);
+});
+
+test('D3: a bucket that does not exist yet (0012 not applied) counts as empty, so deletion still finishes', async () => {
+  const h = makeHarness({ files: { 'profile-photos': ['a.jpg'] } });
+  const from = h.args.storage.from;
+  h.args.buckets = [...BUCKETS, 'resumes'];
+  h.args.storage.from = (b) => (b === 'resumes' ? { list: async () => ({ data: null, error: { message: 'Bucket not found', statusCode: '404' } }), remove: async () => assert.fail('nothing to remove') } : from(b));
+  const result = await deleteAccount(h.args);
+  assert.deepEqual(result, { ok: true });
+  assert.equal(h.store['profile-photos'].size, 0);
+});

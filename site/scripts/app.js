@@ -19,7 +19,8 @@ import '../styles/app-navigation.css';
 import '../styles/discovery-filters.css';
 import '../styles/mobile-app.css';
 import '../styles/skeleton.css';
-import { supabase, rowToProfile, saveProfile, isPresetCoverUrl, onboardingStatus, sendSignal, fetchSignalQuota, isRateLimited, isStorageImageUrl, withoutCredentials, uploadMessageAttachment, removeMessageAttachment, uploadCommunityPostImage, removeCommunityPostImage, ImageProcessingError, compressAttachmentFiles, attachmentKind, reportMember, setSensitiveConsent, fetchSensitiveConsentAt, fetchMyInterests, fetchInterestNodes } from './supabase.js';
+import { supabase, rowToProfile, saveProfile, isPresetCoverUrl, onboardingStatus, sendSignal, fetchSignalQuota, isRateLimited, isStorageImageUrl, withoutCredentials, uploadMessageAttachment, removeMessageAttachment, uploadCommunityPostImage, removeCommunityPostImage, ImageProcessingError, compressAttachmentFiles, attachmentKind, reportMember, setSensitiveConsent, fetchSensitiveConsentAt, fetchMyInterests, fetchInterestNodes, uploadResume, removeResume, resumeSignedUrl, resumeInfo } from './supabase.js';
+import { validateResume, readResumeHead, resumeMetaLine, formatResumeSize, resumeUploadErrorMessage, isMissingResumeStore, RESUME_FILE_NAME, REMOVE_RESUME_CONFIRM, REMOVE_FAILED_COPY, OPEN_FAILED_COPY, COMING_SOON_COPY } from './resume-file.js';
 import { POPULAR_INTERESTS, INTEREST_CATALOG, LOOKING_FOR_CATALOG, taxonomyLabels, catalogValues, matchOptions } from './discovery-catalog.js';
 import { deleteAccount, clearBriviaKeys, DELETE_BUCKETS, reauthMarker, reauthMarkerMatches } from './account-deletion.js';
 import { openPrivacyAccount } from './privacy-account.js';
@@ -2200,6 +2201,128 @@ const renderProfileExperience = () => {
     ? `<p class="profile-experience-text">${escapeHtml(experience)}</p>`
     : '<p class="profile-card-empty">Your role, craft or what you are building.</p><button type="button" class="profile-card-action" data-profile-edit>Add your experience</button>';
 };
+// Resume (polish wave D3): one private PDF per member. `available` is false until 0012 adds profiles.resume_path (the
+// card stays hidden); `missing` means the bucket answered "not found" (a calm "coming soon" line, never an error).
+const resume = { available: false, missing: false, path: null, info: null, busy: '', pending: null, error: '', focus: '' };
+const RESUME_DOC_ICON = '<svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/><path d="M9 13h6M9 17h4"/></svg>';
+const RESUME_ALERT_ICON = '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="9"/><path d="M12 7.5v5.5M12 16.5v.01"/></svg>';
+const initResume = (row) => {
+  resume.available = Boolean(row) && Object.prototype.hasOwnProperty.call(row, 'resume_path');
+  resume.path = resume.available && typeof row.resume_path === 'string' && row.resume_path ? row.resume_path : null;
+  renderProfileResume();
+  if (!resume.path || !memberProfile.id) return;
+  resumeInfo(memberProfile.id).then(({ info, error }) => {
+    if (isMissingResumeStore(error)) { resume.available = false; renderProfileResume(); return; }
+    if (info) { resume.info = info; renderProfileResume(); }
+  });
+};
+const renderProfileResume = () => {
+  const section = document.querySelector('#profile-resume');
+  const body = document.querySelector('#profile-resume-body');
+  if (!section || !body) return;
+  section.hidden = !resume.available;
+  if (!resume.available) { body.innerHTML = ''; return; }
+  // Keep focus where it was across a re-render (or move it where the last action asked).
+  const focusAction = resume.focus || (body.contains(document.activeElement) ? document.activeElement?.dataset?.resumeAction : '');
+  resume.focus = '';
+  const busy = Boolean(resume.busy);
+  if (busy) section.setAttribute('aria-busy', 'true'); else section.removeAttribute('aria-busy');
+  if (resume.missing) { body.innerHTML = `<p class="profile-card-empty profile-resume-note">${escapeHtml(COMING_SOON_COPY)}</p>`; return; }
+  const errorId = 'profile-resume-error';
+  const describedBy = resume.error ? ` aria-describedby="${errorId}"` : '';
+  const disabled = busy ? ' disabled' : '';
+  const button = (action, label, tone = '') => `<button type="button" class="profile-resume-button${tone ? ` is-${tone}` : ''}" data-resume-action="${action}"${['upload', 'replace'].includes(action) ? describedBy : ''}${disabled}>${label}</button>`;
+  const statusText = { upload: 'Uploading…', remove: 'Removing…', view: 'Opening…' }[resume.busy] || '';
+  let file;
+  if (resume.busy === 'upload' && resume.pending) {
+    file = `<div class="profile-resume-file is-busy"><span class="profile-resume-icon">${RESUME_DOC_ICON}</span><div class="profile-resume-text"><p class="profile-resume-name">${escapeHtml(resume.pending.name || RESUME_FILE_NAME)}</p><p class="profile-resume-meta">${escapeHtml(formatResumeSize(resume.pending.size))}</p></div></div><div class="profile-resume-progress" aria-hidden="true"><i></i></div>`;
+  } else if (resume.path) {
+    file = `<div class="profile-resume-file"><span class="profile-resume-icon is-filled">${RESUME_DOC_ICON}</span><div class="profile-resume-text"><p class="profile-resume-name">${RESUME_FILE_NAME}</p><p class="profile-resume-meta">${(resumeMetaLine(resume.info || {}) || 'PDF on file').split(' · ').map((part) => `<span>${escapeHtml(part)}</span>`).join(' · ')}</p></div></div>`;
+  } else {
+    file = `<div class="profile-resume-file is-empty"><span class="profile-resume-icon">${RESUME_DOC_ICON}</span><p class="profile-resume-lead">Add your resume so a match can see your experience when you choose to share it.</p></div>`;
+  }
+  const actions = resume.path
+    ? `${button('view', 'View', 'primary')}${button('replace', 'Replace')}${button('remove', 'Remove', 'quiet')}`
+    : button('upload', 'Upload resume', 'primary');
+  const status = `<p class="profile-resume-status" role="status">${statusText}</p>`;
+  const error = resume.error ? `<p class="profile-resume-error" id="${errorId}" role="alert">${RESUME_ALERT_ICON}<span>${escapeHtml(resume.error)}</span></p>` : '';
+  const privacy = resume.path && !busy ? '<p class="profile-resume-privacy">Private to you. A match can open it only after you share it with them.</p>' : '';
+  body.innerHTML = `${file}${error}<div class="profile-resume-actions">${actions}</div>${status}${privacy}`;
+  if (focusAction) (body.querySelector(`[data-resume-action="${focusAction}"]`) || body.querySelector('[data-resume-action]'))?.focus();
+};
+const handleResumeFile = async (file) => {
+  if (!file || resume.busy || !memberProfile.id) return;
+  const check = validateResume(file, await readResumeHead(file));
+  const origin = resume.path ? 'replace' : 'upload';
+  if (!check.ok) { resume.error = check.message; resume.focus = origin; renderProfileResume(); return; }
+  resume.error = '';
+  resume.busy = 'upload';
+  resume.pending = { name: file.name, size: file.size };
+  resume.focus = origin;
+  renderProfileResume();
+  const { path, error } = await uploadResume(memberProfile.id, file);
+  resume.busy = '';
+  resume.pending = null;
+  if (error) {
+    if (isMissingResumeStore(error)) resume.missing = true;
+    else { resume.error = resumeUploadErrorMessage(error); resume.focus = origin; }
+    renderProfileResume();
+    return;
+  }
+  resume.path = path;
+  resume.info = { size: file.size, updatedAt: new Date().toISOString() };
+  resume.focus = 'view';
+  renderProfileResume();
+  showToast('Your resume is saved.');
+};
+const openOwnResume = async () => {
+  if (!resume.path || resume.busy) return;
+  // Open the tab inside the click (Safari blocks a window.open after an await), then point it at the signed link.
+  const tab = window.open('', '_blank');
+  if (tab) tab.opener = null;
+  resume.error = '';
+  resume.busy = 'view';
+  resume.focus = 'view';
+  renderProfileResume();
+  const { url, error } = await resumeSignedUrl(resume.path);
+  resume.busy = '';
+  resume.focus = 'view';
+  if (error || !url) {
+    tab?.close();
+    resume.error = OPEN_FAILED_COPY;
+  } else if (tab) {
+    tab.location.href = url;
+  } else {
+    const link = Object.assign(document.createElement('a'), { href: url, target: '_blank', rel: 'noopener noreferrer' });
+    document.body.append(link); link.click(); link.remove();
+  }
+  renderProfileResume();
+};
+const removeOwnResume = async () => {
+  if (!resume.path || resume.busy || !memberProfile.id) return;
+  if (!window.confirm(REMOVE_RESUME_CONFIRM)) return;
+  resume.error = '';
+  resume.busy = 'remove';
+  resume.focus = 'remove';
+  renderProfileResume();
+  const { error } = await removeResume(memberProfile.id);
+  resume.busy = '';
+  if (error) { resume.error = REMOVE_FAILED_COPY; resume.focus = 'remove'; } else { resume.path = null; resume.info = null; resume.focus = 'upload'; }
+  renderProfileResume();
+};
+document.querySelector('#profile-resume')?.addEventListener('click', (event) => {
+  const action = event.target.closest('[data-resume-action]')?.dataset.resumeAction;
+  if (!action || resume.busy) return;
+  if (action === 'upload' || action === 'replace') document.querySelector('#profile-resume-input')?.click();
+  else if (action === 'view') openOwnResume();
+  else if (action === 'remove') removeOwnResume();
+});
+document.querySelector('#profile-resume-input')?.addEventListener('change', (event) => {
+  const input = event.target;
+  const file = input.files?.[0];
+  input.value = ''; // choosing the same file again still fires change
+  handleResumeFile(file);
+});
 document.querySelector('[data-view="profile"]')?.addEventListener('click', (event) => {
   if (event.target.closest('[data-interests-retry]')) { loadProfileInterests(); return; }
   if (event.target.closest('[data-checklist-item], [data-profile-edit]')) openProfileEditor();
@@ -2230,6 +2353,7 @@ const renderProfile = () => {
   renderProfileInterests();
   renderProfileLookingFor();
   renderProfileExperience();
+  renderProfileResume();
 };
 
 let communityPosts = [];
@@ -3097,6 +3221,7 @@ const loadSupabaseCommunity = async () => {
   // The profile needs only the member's own row: show it now rather than after the inbox and the deck have loaded
   // (a slow deck left "New Member" and an empty checklist on the profile meanwhile; Phase C Task 6).
   renderProfile();
+  initResume(ownRow);
   if (document.body.dataset.appView === 'profile' && profileInterests.status === 'idle') loadProfileInterests();
   await syncBlockedUserIds();
   const { data: matchRows, error: matchError } = await supabase.from('matches').select('user1_id,user2_id').or(`user1_id.eq.${session.user.id},user2_id.eq.${session.user.id}`);

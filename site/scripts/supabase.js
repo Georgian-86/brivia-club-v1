@@ -1,6 +1,7 @@
 import { createClient } from '@supabase/supabase-js';
 import { NOTICE_VERSION } from './notice-version.js';
 import { isPresetCoverUrl } from './preset-cover.js';
+import { createResumeApi } from './resume-file.js';
 import { compressImageOnly, compressAttachmentFiles, attachmentKind, replacedObjectPath, ImageProcessingError } from './image-compress.js';
 
 export { ImageProcessingError, PHOTO_ERROR_MESSAGE, compressImageOnly, compressAttachmentFiles, attachmentKind } from './image-compress.js';
@@ -326,3 +327,9 @@ export const searchPlaces = async (query, limit = 8) => {
   const { data, error, status } = await request.order('is_launch', { ascending: false }).order('name').limit(limit);
   return { data: data || [], error, status };
 };
+
+// Resume (polish wave D3; 0012 §D): one private PDF per member at resumes/<uid>/resume.pdf, plus profiles.resume_path.
+// The checks and request shapes live in resume-file.js (pure, unit-tested); here they are bound to this client.
+// uploadResume(userId, file) -> { path, error } · removeResume(userId) -> { error }
+// resumeSignedUrl(path, seconds = 60) -> { url, error } · resumeInfo(userId) -> { info: { size, updatedAt } | null, error }
+export const { uploadResume, removeResume, resumeSignedUrl, resumeInfo } = createResumeApi(supabase);
