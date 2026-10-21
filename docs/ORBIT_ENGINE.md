@@ -210,6 +210,10 @@ is **capped at 25%**, so every strong match can still be explained by named, sha
 - Clients only ever receive a **rounded distance band**: `~3 km`, `~10 km`, the place name ("Mumbai"), the region
   ("Maharashtra"), the country ("India") or `Abroad` (the set shipped in `deck_candidates`, §7). Never coordinates,
   never a cell id, and never another member's legacy free-text `city` / `state` (D-036).
+- **Sharing your own area in chat (D-075).** A member may, by choice and after a confirm sheet, send their **own**
+  `place_label` (`my_onboarding_status`) to a person they can message, as ordinary chat text: `My area: <place_label>`
+  plus ` (about a 2 km area)` unless the label already ends in `(city-wide)`. Nothing else is sent: never
+  coordinates, never a cell id, never another member's area. ORBIT does not read or rank on these messages.
 - Travel mode replaces `home_cell` with `travel_cell` until `travel_until`.
 - Location enters only through a server-side snap (`set_home_location`, at most 3 home or travel changes a day), and
   a candidate in a sparsely populated cell is shown at a coarser cell level (g6, then g5; k = 10 for rings 0–1,

@@ -261,6 +261,8 @@ export const rowToProfile = (row) => ({
   // Keep the profile screen working for existing members as well as new saves.
   coverUrl: row.cover_url || row.coverUrl || row.cover_image_url || row.cover_image || '',
   coverName: row.cover_url || row.coverUrl || row.cover_image_url || row.cover_image ? 'Cover image' : '',
+  // The own resume (0012, D3), '' when none or before 0012. Only the owner's row carries it (profiles RLS).
+  resumePath: row.resume_path || '',
 });
 
 // ---------------------------------------------------------------------------------------------

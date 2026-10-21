@@ -21,6 +21,22 @@
 // R7 every action is >= 44 x 44 px at 375 and 1440; axe clean on the card in each state; no sideways scroll at 320.
 // CHAT_EXTRAS_SHOTS=<dir> only saves screenshots (empty, uploading, uploaded and each error at 375, 768 and 1440;
 // uploaded at 320, 390, 1280 and 1920), then exits.
+//
+// Section "share" (D4): the chat "+" quick-share (aria-label "Share") in an open thread with a match.
+// Q1 "+" opens a menu of exactly "Share my resume" and "Share my area", every target >= 44 px; Escape closes it and
+//    focus returns to "+"; axe clean with the menu open; no sideways scroll at 320.
+// Q2 Share my resume asks first ("They'll always see your latest resume."); Cancel sends nothing; confirming posts
+//    exactly one brivia_messages row { message_type 'resume', body 'Shared their resume', attachment_path
+//    '<me>/resume.pdf', attachment_name 'resume.pdf', attachment_mime 'application/pdf', attachment_size } with no URL
+//    in it, and nothing is signed while sharing.
+// Q3 Share my area asks "Send your area to {name}?" and shows what they'll see; confirming posts exactly
+//    "My area: Kochi (about a 2 km area)" (a city pick: "My area: Pune (city-wide)") as a text message: no
+//    coordinate-like digits (COORD_RE), no other keys.
+// Q4 a received resume renders as a "Resume · PDF" card with Open (nothing is signed until Open); Open signs
+//    resumes/<sender>/resume.pdf with { expiresIn: 60 } and opens it in a new tab without an opener; a 400 shows
+//    "This resume is no longer shared." An area message renders as a place card.
+// Q5 without a resume, "Share my resume" is disabled with "Add a resume in your profile first." and an action that
+//    leads to Profile; without a match the item is absent; without 0012 (no resume_path column) it is absent.
 import { mkdirSync } from 'node:fs';
 import assert from 'node:assert/strict';
 import path from 'node:path';
@@ -31,7 +47,7 @@ const { chromium } = await import(process.env.PLAYWRIGHT_MODULE || 'playwright')
 const PORT = Number(process.env.E2E_PORT || 5186);
 const EXECUTABLE = process.env.CHROMIUM_PATH || '/opt/pw-browsers/chromium';
 const SHOTS = process.env.CHAT_EXTRAS_SHOTS || '';
-const SECTIONS = (process.env.SECTIONS || 'resume').split(',');
+const SECTIONS = (process.env.SECTIONS || 'resume,share').split(',');
 const VIEWPORTS = {
   320: { width: 320, height: 720 }, 375: { width: 375, height: 812 }, 390: { width: 390, height: 844 }, 768: { width: 768, height: 1024 },
   1280: { width: 1280, height: 800 }, 1440: { width: 1440, height: 900 }, 1920: { width: 1920, height: 1080 },
@@ -108,7 +124,7 @@ try {
   const waitUploaded = (page) => waitFor(page, (sel) => document.querySelector(`${sel} .profile-resume-name`) && document.querySelector(sel).getAttribute('aria-busy') !== 'true', card);
   const waitError = (page) => waitFor(page, (sel) => document.querySelector(`${sel} [role="alert"]`)?.textContent.trim(), card);
 
-  if (SHOTS) {
+  if (SHOTS && SECTIONS.includes('resume')) {
     const dir = SHOTS;
     mkdirSync(dir, { recursive: true });
     const shot = async (page, name) => {
@@ -164,7 +180,7 @@ try {
       await shot(page, 'resume-focus-1440');
       await context.close();
     }
-  } else if (SECTIONS.includes('resume')) {
+  } else if (!SHOTS && SECTIONS.includes('resume')) {
     // R1: 0012 not applied: the own row has no resume_path column, so the card is hidden.
     await scenario('R1 hidden', async () => {
       const { context, page } = await open(375, { own: { ...ownRow } });
@@ -421,8 +437,255 @@ try {
       await context.close();
     });
 
-    check(`no uncaught page errors (${JSON.stringify(pageErrors.slice(0, 5))})`, () => assert.deepEqual(pageErrors, []));
   }
+  // ------------------------------------------------------------------------------------------------------------
+  // Section "share" (D4): the chat "+" quick-share.
+  // ------------------------------------------------------------------------------------------------------------
+  if (!SHOTS && SECTIONS.includes('share')) {
+    const A = 'aaaaaaaa-aaaa-4aaa-8aaa-000000000001';
+    const THEIR_RESUME = `${A}/resume.pdf`;
+    const THEIR_SIGN = `/storage/v1/object/sign/resumes/${THEIR_RESUME}`;
+    const COORD_RE = /-?\d{1,3}\.\d{2,}/;
+    const SHARE = '#chat-form [aria-label="Share"]';
+    const MENU = '#chat-share-menu';
+    const DIALOG = 'dialog.share-confirm';
+    const hello = { id: 'msg-hello', sender_id: A, recipient_id: ME, body: 'Shall we play on Saturday?', created_at: new Date(Date.now() - 6e5).toISOString() };
+    const theirResume = { id: 'msg-resume', sender_id: A, recipient_id: ME, body: 'Shared their resume', message_type: 'resume', attachment_url: null, attachment_path: THEIR_RESUME, attachment_name: 'resume.pdf', attachment_mime: 'application/pdf', attachment_size: 1258291, created_at: new Date(Date.now() - 4e5).toISOString() };
+    const theirArea = { id: 'msg-area', sender_id: A, recipient_id: ME, body: 'My area: Kochi (about a 2 km area)', message_type: 'text', created_at: new Date(Date.now() - 3e5).toISOString() };
+    const messagePosts = (mark) => since(mark).filter((c) => c.method === 'POST' && c.path === '/rest/v1/brivia_messages').map((c) => JSON.parse(c.body || '{}'));
+    const signCalls = (mark) => since(mark).filter((c) => c.method === 'POST' && c.path.startsWith('/storage/v1/object/sign/'));
+    const openThread = async (width, { own = { ...ownRow, resume_path: RESUME }, routes = {}, messages = [hello], matchIds = [A], placeLabel = 'Kochi' } = {}) => {
+      Object.assign(st, { own, routes: { ...baseRoutes(), [`POST ${LIST_PATH}`]: listed(), [`POST ${THEIR_SIGN}`]: { body: { signedURL: `/object/sign/resumes/${THEIR_RESUME}?token=their-token` } }, ...routes }, messages, matchIds, placeLabel });
+      const context = await stub.newContext(browser, VIEWPORTS[width], { reducedMotion: 'reduce', ...(width <= 780 ? PHONE : {}) });
+      const page = await stub.open(context, { path: '/app.html?view=chat', errors: pageErrors });
+      page.setDefaultTimeout(6000);
+      await page.waitForSelector('#chat-list [data-chat-id]', { timeout: 8000 });
+      await page.locator('#chat-list [data-chat-id]').first().click();
+      await page.waitForSelector('#chat-window:not([hidden]) #chat-form', { timeout: 6000 });
+      await page.waitForTimeout(500);
+      return { context, page };
+    };
+    const menuState = (page) => page.evaluate(([toggleSel, menuSel]) => {
+      const toggle = document.querySelector(toggleSel);
+      const menu = document.querySelector(menuSel);
+      const visible = (node) => Boolean(node && node.getClientRects().length && getComputedStyle(node).visibility !== 'hidden');
+      const box = (node) => { const r = node.getBoundingClientRect(); return { w: Math.round(r.width), h: Math.round(r.height) }; };
+      return {
+        toggle: toggle ? { visible: visible(toggle), expanded: toggle.getAttribute('aria-expanded'), ...box(toggle) } : null,
+        open: visible(menu),
+        items: menu ? [...menu.querySelectorAll('[data-share]')].filter(visible).map((b) => ({ share: b.dataset.share, title: b.querySelector('.chat-share-title')?.textContent.trim(), hint: b.querySelector('.chat-share-hint')?.textContent.trim() || '', disabled: b.getAttribute('aria-disabled') === 'true' || b.disabled, ...box(b) })) : [],
+        actions: menu ? [...menu.querySelectorAll('[data-share-action]')].filter(visible).map((b) => ({ action: b.dataset.shareAction, text: b.textContent.trim(), ...box(b) })) : [],
+        focused: document.activeElement?.getAttribute('aria-label') || document.activeElement?.dataset?.share || document.activeElement?.tagName,
+      };
+    }, [SHARE, MENU]);
+    const openMenu = async (page) => { await page.locator(SHARE).click(); await page.waitForTimeout(250); return menuState(page); };
+
+    await scenario('Q1 menu', async () => {
+      for (const width of [375, 1440]) {
+        const { context, page } = await openThread(width);
+        const closed = await menuState(page);
+        check(`Q1 ${width}: the composer has a "+" Share button >= 44 px, closed (${JSON.stringify(closed.toggle)})`, () => {
+          assert.ok(closed.toggle && closed.toggle.visible);
+          assert.equal(closed.toggle.expanded, 'false');
+          assert.ok(closed.toggle.w >= 44 && closed.toggle.h >= 44);
+          assert.equal(closed.open, false);
+        });
+        const s = await openMenu(page);
+        check(`Q1 ${width}: the menu shows exactly "Share my resume" and "Share my area", each >= 44 px (${JSON.stringify(s)})`, () => {
+          assert.equal(s.open, true);
+          assert.equal(s.toggle.expanded, 'true');
+          assert.deepEqual(s.items.map((i) => i.title), ['Share my resume', 'Share my area']);
+          assert.ok(s.items.every((i) => i.h >= 44 && i.w >= 44 && !i.disabled));
+        });
+        // Scoped to the new controls: the legacy #chat-input (title-only label) and the thread's time stamps (3.5:1)
+        // predate D4 and are reported, not fixed here.
+        const axe = await axeViolations(page, { include: `#chat-share-toggle, ${MENU}` });
+        check(`Q1 ${width}: axe clean with the menu open (${axe.join(' | ')})`, () => assert.deepEqual(axe, []));
+        await page.keyboard.press('Escape');
+        await page.waitForTimeout(150);
+        const after = await menuState(page);
+        check(`Q1 ${width}: Escape closes the menu and focus returns to "+" (${JSON.stringify({ open: after.open, focused: after.focused })})`, () => {
+          assert.equal(after.open, false);
+          assert.equal(after.toggle.expanded, 'false');
+          assert.equal(after.focused, 'Share');
+        });
+        await context.close();
+      }
+      const { context, page } = await openThread(320);
+      await openMenu(page);
+      const overflow = await page.evaluate((sel) => {
+        const menu = document.querySelector(sel).getBoundingClientRect();
+        const card = document.querySelector('#chat-window').getBoundingClientRect();
+        return { doc: document.documentElement.scrollWidth - document.documentElement.clientWidth, left: Math.round(menu.left), right: Math.round(menu.right), cardLeft: Math.round(card.left), cardRight: Math.round(card.right) };
+      }, MENU);
+      check(`Q1 320: the open menu fits inside the chat card (which clips), no sideways scroll (${JSON.stringify(overflow)})`, () => { assert.ok(overflow.doc <= 0); assert.ok(overflow.right <= overflow.cardRight && overflow.left >= overflow.cardLeft); });
+      await context.close();
+    });
+
+    await scenario('Q2 share resume', async () => {
+      const { context, page } = await openThread(375);
+      await openMenu(page);
+      let mark = st.calls.length;
+      await page.locator(`${MENU} [data-share="resume"]`).click();
+      await page.waitForSelector(`${DIALOG}[open]`, { timeout: 4000 });
+      const sheet = await page.locator(DIALOG).innerText();
+      check(`Q2 Share my resume asks first and says they'll see the latest resume (${JSON.stringify(sheet)})`, () => {
+        assert.match(sheet, /Share your resume with Asha Band\?/);
+        assert.match(sheet, /They'll always see your latest resume\./);
+      });
+      const axe = await axeViolations(page, { include: DIALOG });
+      check(`Q2 axe clean on the confirm sheet (${axe.join(' | ')})`, () => assert.deepEqual(axe, []));
+      await page.locator(`${DIALOG} [data-share-cancel]`).click();
+      await page.waitForTimeout(250);
+      check(`Q2 Cancel sends nothing (${JSON.stringify(messagePosts(mark))})`, () => assert.deepEqual(messagePosts(mark), []));
+      await openMenu(page);
+      mark = st.calls.length;
+      await page.locator(`${MENU} [data-share="resume"]`).click();
+      await page.waitForSelector(`${DIALOG}[open]`, { timeout: 4000 });
+      await page.locator(`${DIALOG} [data-share-confirm]`).click();
+      await page.waitForTimeout(600);
+      const posts = messagePosts(mark);
+      const raw = since(mark).filter((c) => c.method === 'POST' && c.path === '/rest/v1/brivia_messages').map((c) => c.body).join('');
+      check(`Q2 confirming posts exactly one resume message with the D4 payload (${JSON.stringify(posts)})`, () => {
+        assert.deepEqual(posts, [{ sender_id: ME, recipient_id: A, body: 'Shared their resume', message_type: 'resume', attachment_path: RESUME, attachment_name: 'resume.pdf', attachment_mime: 'application/pdf', attachment_size: 1258291 }]);
+      });
+      check(`Q2 the message carries no URL and nothing was signed while sharing (${JSON.stringify({ raw, sign: signCalls(mark).length })})`, () => {
+        assert.ok(!/https?:|token=|\/storage\//i.test(raw));
+        assert.equal(signCalls(mark).length, 0);
+      });
+      const closed = await page.evaluate((sel) => !document.querySelector(`${sel}[open]`), DIALOG);
+      check('Q2 the sheet closes after sharing', () => assert.equal(closed, true));
+      await context.close();
+    });
+
+    await scenario('Q3 share area', async () => {
+      for (const [label, expected] of [['Kochi', 'My area: Kochi (about a 2 km area)'], ['Pune (city-wide)', 'My area: Pune (city-wide)']]) {
+        const { context, page } = await openThread(1440, { placeLabel: label });
+        await openMenu(page);
+        const mark = st.calls.length;
+        await page.locator(`${MENU} [data-share="area"]`).click();
+        await page.waitForSelector(`${DIALOG}[open]`, { timeout: 4000 });
+        const sheet = await page.locator(DIALOG).innerText();
+        check(`Q3 ${label}: the sheet asks "Send your area to Asha Band?" and shows what they'll see (${JSON.stringify(sheet)})`, () => {
+          assert.match(sheet, /Send your area to Asha Band\?/);
+          assert.match(sheet, /They'll see:/);
+          assert.ok(sheet.includes(expected));
+        });
+        const axe = await axeViolations(page, { include: DIALOG });
+        check(`Q3 ${label}: axe clean on the sheet (${axe.join(' | ')})`, () => assert.deepEqual(axe, []));
+        await page.locator(`${DIALOG} [data-share-confirm]`).click();
+        await page.waitForTimeout(600);
+        const posts = messagePosts(mark);
+        check(`Q3 ${label}: exactly one text message with the exact area text and nothing else (${JSON.stringify(posts)})`, () => {
+          assert.deepEqual(posts, [{ sender_id: ME, recipient_id: A, body: expected, message_type: 'text' }]);
+          assert.ok(!COORD_RE.test(JSON.stringify(posts)));
+        });
+        await context.close();
+      }
+    });
+
+    await scenario('Q4 bubbles', async () => {
+      for (const width of [375, 1440]) {
+        const mark0 = st.calls.length;
+        const { context, page } = await openThread(width, { messages: [hello, theirResume, theirArea] });
+        await page.waitForSelector('#chat-messages .message-resume', { timeout: 6000 });
+        const bubbles = await page.evaluate(() => {
+          const card = document.querySelector('#chat-messages .message-resume');
+          const place = document.querySelector('#chat-messages .message-place');
+          const open = card?.querySelector('[data-resume-open]');
+          const r = open?.getBoundingClientRect();
+          return { card: card?.innerText.replace(/\s+/g, ' ').trim(), open: open ? { text: open.textContent.trim(), w: Math.round(r.width), h: Math.round(r.height) } : null, place: place?.innerText.replace(/\s+/g, ' ').trim() || '' };
+        });
+        check(`Q4 ${width}: the resume renders as a "Resume · PDF" card with Open >= 44 px, the area as a place card (${JSON.stringify(bubbles)})`, () => {
+          assert.match(bubbles.card, /Resume · PDF/);
+          assert.equal(bubbles.open.text, 'Open');
+          assert.ok(bubbles.open.w >= 44 && bubbles.open.h >= 44);
+          assert.match(bubbles.place, /Kochi/);
+          assert.match(bubbles.place, /about a 2 km area/i);
+        });
+        check(`Q4 ${width}: nothing is signed before Open (${JSON.stringify(signCalls(mark0).map((c) => c.path))})`, () => assert.deepEqual(signCalls(mark0).filter((c) => c.path.includes('resume')), []));
+        const axe = await axeViolations(page, { include: '#chat-messages .message-resume, #chat-messages .message-place' });
+        check(`Q4 ${width}: axe clean on the bubbles (${axe.join(' | ')})`, () => assert.deepEqual(axe, []));
+        if (width === 1440) {
+          let mark = st.calls.length;
+          const [popup] = await Promise.all([
+            context.waitForEvent('page', { timeout: 6000 }),
+            page.locator('#chat-messages [data-resume-open]').click(),
+          ]);
+          await popup.waitForURL(/token=their-token/, { timeout: 6000 }).catch(() => {});
+          await page.waitForTimeout(200);
+          const sign = signCalls(mark);
+          check(`Q4 Open signs resumes/<sender>/resume.pdf for 60 s and opens it (${JSON.stringify({ sign: sign.map((c) => `${c.path} ${c.body}`), url: popup.url() })})`, () => {
+            assert.equal(sign.length, 1);
+            assert.equal(sign[0].path, THEIR_SIGN);
+            assert.deepEqual(JSON.parse(sign[0].body), { expiresIn: 60 });
+            assert.equal(popup.url(), `${ORIGIN}/storage/v1/object/sign/resumes/${THEIR_RESUME}?token=their-token`);
+          });
+          const opener = await popup.evaluate(() => window.opener === null).catch(() => null);
+          check(`Q4 the new tab has no opener (${opener})`, () => assert.equal(opener, true));
+          await popup.close();
+          const stored = await page.evaluate(() => /token=/.test(document.documentElement.outerHTML + JSON.stringify(window.localStorage)));
+          check(`Q4 nothing signed is stored in the page or storage (${stored})`, () => assert.equal(stored, false));
+          st.routes[`POST ${THEIR_SIGN}`] = { status: 400, message: 'Object not found' };
+          mark = st.calls.length;
+          const popups = [];
+          context.on('page', (p) => popups.push(p));
+          await page.locator('#chat-messages [data-resume-open]').click();
+          await page.waitForFunction(() => /This resume is no longer shared\./.test(document.querySelector('#chat-messages .message-resume')?.textContent || ''), null, { timeout: 6000 }).catch(() => {});
+          await page.waitForTimeout(300);
+          const gone = await page.evaluate(() => document.querySelector('#chat-messages .message-resume')?.innerText.replace(/\s+/g, ' ').trim());
+          const openTabs = popups.filter((p) => !p.isClosed()).length;
+          check(`Q4 a 400 shows "This resume is no longer shared." and leaves no tab open (${JSON.stringify({ gone, openTabs, sign: signCalls(mark).length })})`, () => {
+            assert.match(gone, /This resume is no longer shared\./);
+            assert.equal(openTabs, 0);
+            assert.equal(signCalls(mark).length, 1);
+          });
+        }
+        await context.close();
+      }
+    });
+
+    await scenario('Q5 no resume', async () => {
+      {
+        const { context, page } = await openThread(375, { own: { ...ownRow, resume_path: null } });
+        const s = await openMenu(page);
+        check(`Q5 without a resume the item is disabled with "Add a resume in your profile first." and a way to Profile (${JSON.stringify(s)})`, () => {
+          assert.deepEqual(s.items.map((i) => i.title), ['Share my resume', 'Share my area']);
+          assert.equal(s.items[0].disabled, true);
+          assert.equal(s.items[0].hint, 'Add a resume in your profile first.');
+          assert.equal(s.items[1].disabled, false);
+          assert.deepEqual(s.actions.map((a) => a.action), ['add-resume']);
+          assert.ok(s.actions.every((a) => a.h >= 44 && a.w >= 44));
+        });
+        const axe = await axeViolations(page, { include: `#chat-share-toggle, ${MENU}` });
+        check(`Q5 axe clean with the disabled item (${axe.join(' | ')})`, () => assert.deepEqual(axe, []));
+        const mark = st.calls.length;
+        await page.locator(`${MENU} [data-share="resume"]`).click({ force: true });
+        await page.waitForTimeout(300);
+        const dialogOpen = await page.evaluate((sel) => Boolean(document.querySelector(`${sel}[open]`)), DIALOG);
+        check(`Q5 the disabled item sends nothing and asks nothing (${JSON.stringify({ posts: messagePosts(mark), dialogOpen })})`, () => { assert.deepEqual(messagePosts(mark), []); assert.equal(dialogOpen, false); });
+        if (!(await menuState(page)).open) await openMenu(page);
+        await page.locator(`${MENU} [data-share-action="add-resume"]`).click();
+        await page.waitForTimeout(500);
+        const where = await page.evaluate(() => ({ view: new URLSearchParams(window.location.search).get('view'), card: Boolean(document.querySelector('#profile-resume')?.getClientRects().length), focused: document.activeElement?.dataset?.resumeAction || '' }));
+        check(`Q5 the Profile action opens Profile at the resume card with Upload focused (${JSON.stringify(where)})`, () => { assert.equal(where.view, 'profile'); assert.equal(where.card, true); assert.equal(where.focused, 'upload'); });
+        await context.close();
+      }
+      {
+        const { context, page } = await openThread(375, { matchIds: [] });
+        const s = await openMenu(page);
+        check(`Q5 without a match "Share my resume" is absent (${JSON.stringify(s.items.map((i) => i.title))})`, () => assert.deepEqual(s.items.map((i) => i.title), ['Share my area']));
+        await context.close();
+      }
+      {
+        const { context, page } = await openThread(375, { own: { ...ownRow } });
+        const s = await openMenu(page);
+        check(`Q5 without 0012 (no resume_path column) "Share my resume" is absent (${JSON.stringify(s.items.map((i) => i.title))})`, () => assert.deepEqual(s.items.map((i) => i.title), ['Share my area']));
+        await context.close();
+      }
+    });
+  }
+  if (!SHOTS) check(`no uncaught page errors (${JSON.stringify(pageErrors.slice(0, 5))})`, () => assert.deepEqual(pageErrors, []));
 } finally {
   await browser?.close();
   await stub.close();

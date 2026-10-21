@@ -124,7 +124,11 @@ send, no double send, the 44 px ×, axe). `SHEET_SHOTS=<dir>` saves `pitch-sheet
 resume card: hidden without the `resume_path` column (0012 not applied) and a calm "coming soon" line when the bucket
 is missing; one upsert POST to `resumes/<me>/resume.pdf` plus one `profiles` PATCH; the four field errors with no
 request; Replace, Remove (confirm, DELETE + PATCH null) and View (a 60 s signed URL in a new tab without an opener);
-44 px targets and axe in each state. `SECTIONS=resume` runs one section; `CHAT_EXTRAS_SHOTS=<dir>` saves screenshots.
+44 px targets and axe in each state. Section "share" (D4) checks the chat "+" quick-share (Q1–Q5): the menu of
+"Share my resume" and "Share my area" (44 px, Escape), one `resume` message with no URL after a confirm sheet, the exact
+area text with no coordinates, Open on a received resume signing `resumes/<sender>/resume.pdf` for 60 s (a 400 shows
+"This resume is no longer shared."), and the no-resume, no-match and no-0012 states. `SECTIONS=resume` (or `share`)
+runs one section; `CHAT_EXTRAS_SHOTS=<dir>` saves the resume-card screenshots.
 ```bash
 PLAYWRIGHT_MODULE=/tmp/pw/node_modules/playwright/index.mjs node tests/e2e/chat-extras.spec.mjs
 ```

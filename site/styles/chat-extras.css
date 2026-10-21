@@ -209,3 +209,449 @@
   .profile-resume-progress i { width: 100%; opacity: .45; animation: none; }
   .profile-resume-button { transition: none; }
 }
+
+/* ---------------------------------------------------------------------------------------------------------------
+   Chat "+" quick-share (polish wave D4). A calm popover above the composer with two rows ("Share my resume", "Share
+   my area"), a confirm sheet, and the two bubbles: a resume document card ("Resume · PDF" + Open) and a small place
+   card. #chat-form scoping outranks the legacy `.chat-compose button` rules without !important. Targets >= 44 px.
+   --------------------------------------------------------------------------------------------------------------- */
+#chat-form .chat-share-toggle {
+  display: inline-grid;
+  flex: 0 0 44px;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  box-shadow: none;
+  color: var(--color-cream);
+  cursor: pointer;
+}
+
+#chat-form .chat-share-toggle[hidden] { display: none; }
+
+#chat-form .chat-share-glyph {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  background: var(--color-wine-deep);
+  transition: background var(--motion-fast) var(--ease), transform var(--motion-fast) var(--ease);
+}
+
+#chat-form .chat-share-glyph svg { transition: transform var(--motion-base) var(--ease); }
+#chat-form .chat-share-toggle:hover .chat-share-glyph { background: var(--color-wine); }
+#chat-form .chat-share-toggle[aria-expanded="true"] .chat-share-glyph { background: var(--color-wine); }
+#chat-form .chat-share-toggle[aria-expanded="true"] .chat-share-glyph svg { transform: rotate(45deg); }
+
+#chat-form .chat-share-toggle:focus-visible { outline: none; }
+#chat-form .chat-share-toggle:focus-visible .chat-share-glyph {
+  outline: 2px solid var(--color-wine-deep);
+  outline-offset: 2px;
+}
+
+/* The paperclip on the attachment button (it used to be the "+"). */
+#chat-attach-toggle svg { display: block; }
+
+#chat-form .chat-share-menu {
+  position: absolute;
+  z-index: 26;
+  bottom: calc(100% + 10px);
+  left: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  width: min(320px, calc(100vw - 48px)); /* stays inside the chat card, which clips its overflow */
+  padding: var(--space-2);
+  border: 1px solid color-mix(in srgb, var(--color-wine) 16%, transparent);
+  border-radius: var(--radius-m);
+  background: var(--color-cream);
+  box-shadow: 0 14px 36px color-mix(in srgb, var(--color-wine-deep) 18%, transparent);
+  animation: chat-share-in var(--motion-base) var(--ease);
+}
+
+#chat-form .chat-share-menu[hidden] { display: none; }
+
+@keyframes chat-share-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: none; }
+}
+
+/* No resume yet: the disabled row, then "Add resume" under its hint (a way to Profile, never a dead end). */
+#chat-form .chat-share-row {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  padding-bottom: var(--space-2);
+}
+
+#chat-form .chat-share-item {
+  display: flex;
+  flex: 1 1 auto;
+  align-items: center;
+  gap: var(--space-3);
+  width: 100%;
+  min-width: 0;
+  min-height: 56px;
+  height: auto;
+  margin: 0;
+  padding: var(--space-2) var(--space-3) var(--space-2) var(--space-2);
+  border: 0;
+  border-radius: var(--radius-s);
+  background: transparent;
+  box-shadow: none;
+  color: var(--color-ink);
+  font-family: var(--font-body);
+  text-align: left;
+  cursor: pointer;
+}
+
+#chat-form .chat-share-row .chat-share-item { padding-bottom: var(--space-1); }
+#chat-form .chat-share-row .chat-share-add { margin-left: calc(var(--space-2) + 40px + var(--space-3)); }
+
+#chat-form .chat-share-item:hover { background: color-mix(in srgb, var(--color-wine) 7%, var(--color-cream)); }
+
+#chat-form .chat-share-item:focus-visible,
+#chat-form .chat-share-add:focus-visible {
+  outline: 2px solid var(--color-wine-deep);
+  outline-offset: -2px;
+}
+
+#chat-form .chat-share-icon {
+  display: grid;
+  flex: 0 0 40px;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--color-wine) 10%, var(--color-cream));
+  color: var(--color-wine-deep);
+}
+
+#chat-form .chat-share-copy {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 2px;
+}
+
+#chat-form .chat-share-title {
+  color: var(--color-ink);
+  font-size: var(--text-14);
+  font-weight: 600;
+  line-height: 1.3;
+}
+
+#chat-form .chat-share-hint {
+  color: var(--color-ink-soft);
+  font-size: var(--text-12);
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+
+#chat-form .chat-share-item[aria-disabled="true"] { cursor: default; }
+#chat-form .chat-share-item[aria-disabled="true"]:hover { background: transparent; }
+#chat-form .chat-share-item[aria-disabled="true"] .chat-share-icon {
+  background: color-mix(in srgb, var(--color-ink) 6%, var(--color-cream));
+  color: var(--color-ink-soft);
+}
+#chat-form .chat-share-item[aria-disabled="true"] .chat-share-title { color: var(--color-ink-soft); }
+
+#chat-form .chat-share-add {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  width: auto;
+  min-width: 44px;
+  height: 44px;
+  margin: 0;
+  padding: 0 var(--space-4);
+  border: 1px solid var(--color-wine);
+  border-radius: var(--radius-pill);
+  background: transparent;
+  box-shadow: none;
+  color: var(--color-wine);
+  font-family: var(--font-body);
+  font-size: var(--text-14);
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+#chat-form .chat-share-add:hover { background: color-mix(in srgb, var(--color-wine) 8%, var(--color-cream)); }
+
+/* Confirm sheet: centred on wide screens, a bottom sheet on phones. */
+.share-confirm {
+  box-sizing: border-box;
+  width: min(420px, calc(100vw - 32px));
+  max-height: calc(100dvh - 32px);
+  padding: 0;
+  overflow: auto;
+  border: 1px solid color-mix(in srgb, var(--color-wine-deep) 20%, transparent);
+  border-radius: var(--radius-l);
+  background: var(--color-cream);
+  color: var(--color-ink);
+  box-shadow: 0 24px 60px color-mix(in srgb, var(--color-wine-deep) 30%, transparent);
+  font-family: var(--font-body);
+}
+
+.share-confirm::backdrop { background: color-mix(in srgb, var(--color-wine-deep) 55%, transparent); }
+
+.share-confirm[open] { animation: share-confirm-in var(--motion-slow) var(--ease); }
+
+@keyframes share-confirm-in {
+  from { opacity: 0; transform: translateY(12px); }
+  to { opacity: 1; transform: none; }
+}
+
+.share-confirm-panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-5);
+}
+
+.share-confirm-icon {
+  display: grid;
+  place-items: center;
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--color-wine) 10%, var(--color-cream));
+  color: var(--color-wine-deep);
+}
+
+.share-confirm-title {
+  margin: 0;
+  color: var(--color-wine-deep);
+  font-family: var(--font-heading);
+  font-size: var(--text-24);
+  font-weight: 500;
+  line-height: 1.2;
+  overflow-wrap: anywhere;
+}
+
+.share-confirm-lead,
+.share-confirm-note {
+  margin: 0;
+  color: var(--color-ink-soft);
+  font-size: var(--text-14);
+  line-height: 1.5;
+}
+
+.share-confirm-preview {
+  margin: 0;
+  padding: var(--space-3) var(--space-4);
+  border-left: 3px solid var(--color-wine);
+  border-radius: var(--radius-s);
+  background: color-mix(in srgb, var(--color-wine) 6%, var(--color-cream));
+  color: var(--color-ink);
+  font-size: var(--text-16);
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+
+.share-confirm-doc {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-m);
+  background: color-mix(in srgb, var(--color-wine) 4%, var(--color-cream));
+}
+
+.share-confirm-doc-icon {
+  display: grid;
+  flex: 0 0 auto;
+  place-items: center;
+  width: 40px;
+  height: 46px;
+  border-radius: var(--radius-s);
+  background: var(--color-wine-deep);
+  color: var(--color-cream);
+}
+
+.share-confirm-doc-copy { display: flex; min-width: 0; flex-direction: column; gap: 2px; }
+.share-confirm-doc-title { font-size: var(--text-14); font-weight: 600; }
+.share-confirm-doc-meta { color: var(--color-ink-soft); font-size: var(--text-12); }
+
+.share-confirm-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-2);
+  margin-top: var(--space-2);
+}
+
+.share-confirm-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 44px;
+  min-height: 44px;
+  padding: 0 var(--space-5);
+  border: 1px solid var(--color-wine);
+  border-radius: var(--radius-pill);
+  background: transparent;
+  color: var(--color-wine);
+  font-family: var(--font-body);
+  font-size: var(--text-14);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.share-confirm-button:hover { background: color-mix(in srgb, var(--color-wine) 8%, var(--color-cream)); }
+.share-confirm-button.is-primary { border-color: var(--color-wine-deep); background: var(--color-wine-deep); color: var(--color-cream); }
+.share-confirm-button.is-primary:hover { border-color: var(--color-wine); background: var(--color-wine); }
+.share-confirm-button:focus-visible { outline: 2px solid var(--color-wine-deep); outline-offset: 2px; }
+
+@media (max-width: 560px) {
+  .share-confirm {
+    width: 100vw;
+    max-width: 100vw;
+    margin: auto 0 0;
+    border-bottom: 0;
+    border-radius: var(--radius-l) var(--radius-l) 0 0;
+  }
+  .share-confirm-panel { padding: var(--space-5) var(--space-4) calc(var(--space-5) + env(safe-area-inset-bottom, 0px)); }
+  .share-confirm-actions .share-confirm-button { flex: 1 1 0; }
+}
+
+/* Bubbles: a document card and a place card, set inside the usual bubble (it keeps the time and the tail), with a
+   tighter frame so the card reads as the message. */
+body.app-body .app-view[data-view="chat"] .chat-layout .message.has-share {
+  width: min(300px, 86%);
+  max-width: min(300px, 86%);
+  padding: var(--space-2) var(--space-2) var(--space-1);
+}
+
+body.app-body .app-view[data-view="chat"] .chat-layout .message.has-share small { margin: var(--space-1) var(--space-2) 0; }
+
+.message-resume,
+.message-place {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-width: 0;
+  padding: var(--space-3);
+  border: 1px solid color-mix(in srgb, var(--color-wine) 12%, transparent);
+  border-radius: var(--radius-s);
+  background: var(--color-cream);
+  color: var(--color-ink);
+  font-family: var(--font-body);
+  text-align: left;
+}
+
+.message.me .message-resume,
+.message.me .message-place { border-color: transparent; }
+
+.message-resume-icon {
+  display: grid;
+  flex: 0 0 auto;
+  place-items: center;
+  width: 40px;
+  height: 48px;
+  border-radius: var(--radius-s);
+  background: var(--color-wine-deep);
+  color: var(--color-cream);
+}
+
+.message-place-icon {
+  display: grid;
+  flex: 0 0 auto;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--color-wine) 10%, var(--color-cream));
+  color: var(--color-wine-deep);
+}
+
+.message-resume-copy,
+.message-place-copy {
+  display: flex;
+  min-width: 0;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.message-resume-title {
+  color: var(--color-ink);
+  white-space: nowrap;
+  font-size: var(--text-14);
+  font-weight: 600;
+  line-height: 1.3;
+}
+
+.message-resume-sub,
+.message-place-scope {
+  color: var(--color-ink-soft);
+  font-size: var(--text-12);
+  line-height: 1.4;
+}
+
+.message-resume-gone {
+  margin-top: 2px;
+  color: var(--color-wine-deep);
+  font-size: var(--text-12);
+  font-weight: 600;
+  line-height: 1.4;
+}
+
+.message-place-eyebrow {
+  color: var(--color-wine);
+  font-size: var(--text-12);
+  font-weight: 600;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+
+.message-place-name {
+  color: var(--color-ink);
+  font-family: var(--font-heading);
+  font-size: var(--text-20);
+  line-height: 1.2;
+  overflow-wrap: anywhere;
+}
+
+.app-view[data-view="chat"] .message-resume .message-resume-open {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  min-width: 44px;
+  height: 44px;
+  margin: 0;
+  padding: 0 var(--space-4);
+  border: 1px solid var(--color-wine-deep);
+  border-radius: var(--radius-pill);
+  background: var(--color-wine-deep);
+  box-shadow: none;
+  color: var(--color-cream);
+  font-family: var(--font-body);
+  font-size: var(--text-14);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.app-view[data-view="chat"] .message-resume .message-resume-open:hover { border-color: var(--color-wine); background: var(--color-wine); }
+.app-view[data-view="chat"] .message-resume .message-resume-open:focus-visible { outline: 2px solid var(--color-wine-deep); outline-offset: 2px; }
+
+@media (prefers-reduced-motion: reduce) {
+  #chat-form .chat-share-menu,
+  .share-confirm[open] { animation: chat-share-fade var(--motion-base) linear; }
+  #chat-form .chat-share-glyph,
+  #chat-form .chat-share-glyph svg { transition: none; }
+  #chat-form .chat-share-toggle[aria-expanded="true"] .chat-share-glyph svg { transform: none; }
+}
+
+@keyframes chat-share-fade {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
