@@ -1910,7 +1910,7 @@ const openProfileEditor = () => {
         <label><span>EMAIL</span><input value="${escapeHtml(profile.email || '')}" readonly /></label>
         <label><span>PHONE</span><input name="phone" value="${escapeHtml(profile.phone || '')}" /></label>
         <label><span>EXPERIENCE / ROLE</span><input name="experience" value="${escapeHtml(profile.experience || '')}" /></label>
-        <div class="profile-edit-wide profile-edit-readonly" data-profile-area><span>YOUR AREA</span><p>${escapeHtml(memberPlaceLabel || 'Not set yet')}</p><small class="profile-edit-helper">Change your area: coming soon. Other members only ever see a rough distance, never your area's name.</small></div>
+        <div class="profile-edit-wide profile-edit-readonly" data-profile-area><span>YOUR AREA</span><p>${escapeHtml(memberPlaceLabel || 'Not set yet')}</p><small class="profile-edit-helper">Change your area: coming soon. Other members only ever see a rough distance, never your area's name, unless you share it in a chat.</small></div>
         <div class="profile-edit-wide profile-edit-readonly"><span>SKILLS / INTERESTS</span><p>${escapeHtml(profile.skills || 'Pick interests in your profile setup')}</p><small class="profile-edit-helper">These come from your interests and passion points. Private interests are never shown.</small></div>
         <label class="profile-edit-wide"><span>LOOKING FOR</span><input name="lookingFor" list="profile-edit-looking-options" value="${escapeHtml(profile.lookingFor || '')}" placeholder="Search or type what you are looking for" /><datalist id="profile-edit-looking-options">${profileEditDatalist('lookingFor')}</datalist><small class="profile-edit-helper">Choose from suggestions or type your own.</small></label>
         <label><span>PROFILE PHOTO</span><input name="photoFile" type="file" accept="image/*" aria-describedby="profile-photo-error" /><small class="media-inline-error" id="profile-photo-error" role="alert" hidden></small></label>
@@ -2257,6 +2257,7 @@ const renderProfileResume = () => {
   if (!section || !body) return;
   section.hidden = !resume.available;
   memberProfile.resumePath = resume.path || ''; // kept in step for the chat quick-share (D4)
+  syncShareToggle(); // "+" hides when there is nothing to share (every call runs after module init)
   if (!resume.available) { body.innerHTML = ''; return; }
   // Keep focus where it was across a re-render (or move it where the last action asked).
   const focusAction = resume.focus || (body.contains(document.activeElement) ? document.activeElement?.dataset?.resumeAction : '');
@@ -3043,7 +3044,7 @@ const syncShareToggle = () => {
   const toggle = document.querySelector('#chat-share-toggle');
   if (toggle) toggle.hidden = !selectedChat || (!areaShareBody(memberPlaceLabel) && shareResumeState() === null);
 };
-const shareItem = (share, icon, title, hint, extra = '') => `<button type="button" class="chat-share-item" data-share="${share}"${extra}><span class="chat-share-icon">${icon}</span><span class="chat-share-copy"><span class="chat-share-title">${title}</span><span class="chat-share-hint"${share === 'resume' && extra ? ' id="chat-share-resume-hint"' : ''}>${escapeHtml(hint)}</span></span></button>`;
+const shareItem = (share, icon, title, hint, extra = '') => `<button type="button" class="chat-share-item" data-share="${share}"${extra}><span class="chat-share-icon">${icon}</span><span class="chat-share-copy"><span class="chat-share-title">${title}</span><span class="chat-share-hint">${escapeHtml(hint)}</span></span></button>`;
 const renderShareMenu = () => {
   const menu = document.querySelector('#chat-share-menu');
   if (!menu || !selectedChat) return;
@@ -3053,7 +3054,7 @@ const renderShareMenu = () => {
   if (resumeState !== null && shareMatches.get(String(selectedChat.id)) === true) {
     rows.push(resumeState
       ? shareItem('resume', RESUME_DOC_ICON, 'Share my resume', 'PDF · they always see your latest')
-      : `<div class="chat-share-row">${shareItem('resume', RESUME_DOC_ICON, 'Share my resume', NO_RESUME_HINT, ' aria-disabled="true" aria-describedby="chat-share-resume-hint"')}<button type="button" class="chat-share-add" data-share-action="add-resume" data-nav="profile">Add resume</button></div>`);
+      : `<div class="chat-share-row">${shareItem('resume', RESUME_DOC_ICON, 'Share my resume', NO_RESUME_HINT, ' aria-disabled="true"')}<button type="button" class="chat-share-add" data-share-action="add-resume" data-nav="profile">Add resume</button></div>`);
   }
   const area = parseAreaBody(areaShareBody(memberPlaceLabel));
   if (area) rows.push(shareItem('area', SHARE_PIN_ICON, 'Share my area', `${area.place}, ${area.scope.toLowerCase()}`));
@@ -3161,6 +3162,8 @@ const bindChatShare = (form, closeMenus) => {
   toggle.addEventListener('click', () => {
     const wasOpen = !menu.hidden;
     closeMenus();
+    document.querySelector('#chat-more-menu')?.setAttribute('hidden', '');
+    document.querySelector('#chat-more')?.setAttribute('aria-expanded', 'false');
     if (!wasOpen) openShareMenu();
   });
   menu.addEventListener('click', (event) => {
@@ -3173,8 +3176,8 @@ const bindChatShare = (form, closeMenus) => {
   });
   document.addEventListener('keydown', (event) => {
     if (menu.hidden) return;
-    if (event.key === 'Escape') { event.preventDefault(); closeShareMenu({ focusToggle: true }); return; }
-    if (event.key !== 'ArrowDown' && event.key !== 'ArrowUp') return;
+    if (event.key === 'Escape') { if (event.defaultPrevented) return; event.preventDefault(); closeShareMenu({ focusToggle: true }); return; }
+    if ((event.key !== 'ArrowDown' && event.key !== 'ArrowUp') || !menu.contains(document.activeElement)) return;
     const buttons = [...menu.querySelectorAll('button')];
     if (!buttons.length) return;
     event.preventDefault();
@@ -3182,6 +3185,13 @@ const bindChatShare = (form, closeMenus) => {
     const next = event.key === 'ArrowDown' ? (index + 1) % buttons.length : (index <= 0 ? buttons.length - 1 : index - 1);
     buttons[next].focus();
   });
+  // Tabbing out of the menu (and away from "+") closes it.
+  const onFocusOut = (event) => {
+    if (menu.hidden || !event.relatedTarget) return;
+    if (!menu.contains(event.relatedTarget) && event.relatedTarget !== toggle) closeShareMenu();
+  };
+  menu.addEventListener('focusout', onFocusOut);
+  toggle.addEventListener('focusout', onFocusOut);
 };
 // Open on a shared resume: a fresh 60 s link each time, opened in a new tab without an opener; nothing is stored.
 const openSharedResume = async (button) => {
@@ -3287,7 +3297,8 @@ const ensureChatComposer = () => {
     if (picker) { picker.value = ''; picker.click(); }
   }));
   Object.values(pickerInputs).forEach((selector) => document.querySelector(selector)?.addEventListener('change', (event) => queueChatFiles(event.target.files)));
-  document.addEventListener('click', (event) => { if (!form.contains(event.target)) closeMenus(); });
+  // Capture phase: controls such as the chat "..." button and the chat-row avatar stop propagation (the A3 rule).
+  document.addEventListener('click', (event) => { if (!form.contains(event.target)) closeMenus(); }, true);
   bindChatShare(form, closeMenus);
   // The "+" (D4) takes 44 px of the row: on phones the placeholder gets shorter so it is never clipped.
   const fullPlaceholder = input?.getAttribute('placeholder') || 'Write a thoughtful message...';

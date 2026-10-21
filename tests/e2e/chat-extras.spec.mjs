@@ -481,7 +481,7 @@ try {
     const openMenu = async (page) => { await page.locator(SHARE).click(); await page.waitForTimeout(250); return menuState(page); };
 
     await scenario('Q1 menu', async () => {
-      for (const width of [375, 1440]) {
+      for (const width of [375, 390, 1280, 1440, 1920]) {
         const { context, page } = await openThread(width);
         const closed = await menuState(page);
         check(`Q1 ${width}: the composer has a "+" Share button >= 44 px, closed (${JSON.stringify(closed.toggle)})`, () => {
@@ -509,6 +509,13 @@ try {
           assert.equal(after.toggle.expanded, 'false');
           assert.equal(after.focused, 'Share');
         });
+        await openMenu(page);
+        const fit = await page.evaluate((sel) => {
+          const menu = document.querySelector(sel).getBoundingClientRect();
+          const card = document.querySelector('#chat-window').getBoundingClientRect();
+          return { doc: document.documentElement.scrollWidth - document.documentElement.clientWidth, left: Math.round(menu.left), right: Math.round(menu.right), cardLeft: Math.round(card.left), cardRight: Math.round(card.right) };
+        }, MENU);
+        check(`Q1 ${width}: the open menu fits inside the chat card, no sideways scroll (${JSON.stringify(fit)})`, () => { assert.ok(fit.doc <= 0); assert.ok(fit.right <= fit.cardRight && fit.left >= fit.cardLeft); });
         await context.close();
       }
       const { context, page } = await openThread(320);
@@ -520,6 +527,31 @@ try {
       }, MENU);
       check(`Q1 320: the open menu fits inside the chat card (which clips), no sideways scroll (${JSON.stringify(overflow)})`, () => { assert.ok(overflow.doc <= 0); assert.ok(overflow.right <= overflow.cardRight && overflow.left >= overflow.cardLeft); });
       await context.close();
+    });
+
+    // I1 (review): "+" and the chat "..." menu close each other ("..." stops propagation, so the composer listens in
+    // the capture phase).
+    await scenario('Q1 layers', async () => {
+      for (const width of [375, 1440]) {
+        const { context, page } = await openThread(width);
+        await openMenu(page);
+        // A programmatic click keeps focus in the menu, so only the outside-click closer (not focusout) can close it.
+        await page.evaluate(() => document.querySelector('#chat-more').click());
+        await page.waitForTimeout(200);
+        const a = await page.evaluate((sel) => ({ share: !document.querySelector(sel).hidden, more: !document.querySelector('#chat-more-menu').hidden, expanded: document.querySelector('#chat-share-toggle').getAttribute('aria-expanded') }), MENU);
+        check(`Q1 ${width}: opening "..." closes the share menu (${JSON.stringify(a)})`, () => { assert.equal(a.share, false); assert.equal(a.more, true); assert.equal(a.expanded, 'false'); });
+        await page.locator(SHARE).click();
+        await page.waitForTimeout(250);
+        const b = await page.evaluate((sel) => ({ share: !document.querySelector(sel).hidden, more: !document.querySelector('#chat-more-menu').hidden }), MENU);
+        check(`Q1 ${width}: opening "+" closes the "..." menu (${JSON.stringify(b)})`, () => { assert.equal(b.share, true); assert.equal(b.more, false); });
+        await page.keyboard.press('Tab');
+        await page.keyboard.press('Tab');
+        await page.keyboard.press('Tab');
+        await page.waitForTimeout(150);
+        const c = await page.evaluate((sel) => ({ share: !document.querySelector(sel).hidden, inMenu: document.querySelector(sel).contains(document.activeElement) }), MENU);
+        check(`Q1 ${width}: tabbing out of the menu closes it (${JSON.stringify(c)})`, () => { assert.equal(c.inMenu, false); assert.equal(c.share, false); });
+        await context.close();
+      }
     });
 
     await scenario('Q2 share resume', async () => {

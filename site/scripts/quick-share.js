@@ -35,7 +35,7 @@ export const parseAreaBody = (body) => {
   let scope = '';
   if (place.endsWith(AREA_SUFFIX.trim())) { place = place.slice(0, -AREA_SUFFIX.trim().length).trim(); scope = 'About a 2 km area'; }
   else if (place.endsWith(CITY_WIDE)) { place = place.slice(0, -CITY_WIDE.length).trim(); scope = 'City-wide'; }
-  if (!place || !scope) return null;
+  if (!place || !scope || COORDINATE_LIKE.test(place)) return null;
   return { place, scope };
 };
 

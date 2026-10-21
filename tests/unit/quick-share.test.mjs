@@ -29,6 +29,8 @@ test('D4: parseAreaBody reads an area message back into place and scope', () => 
   assert.equal(parseAreaBody('My area is lovely'), null);
   assert.equal(parseAreaBody('Hello'), null);
   assert.equal(parseAreaBody('My area: '), null);
+  // Coordinate-shaped text never becomes a place card (review M1).
+  assert.equal(parseAreaBody('My area: 12.9716, 77.5946 (about a 2 km area)'), null);
 });
 
 test('D4: the resume attachment points at the sender\'s own resume and carries no URL', () => {
