@@ -38,6 +38,7 @@ import { createDeckSwipe, SWIPE } from './deck-swipe.js';
 import { whyPanelMarkup, whyRow } from './why-panel.js';
 import { chatEmojiCategories } from './chat-emoji-data.js';
 import { chatGifCatalog } from './chat-gif-data.js';
+import { typingTopic, createTypingSender, createTypingReceiver, TYPING_EVENT } from './chat-typing.js';
 import '../styles/chat-attachments.css';
 import '../styles/mobile-final-fixes.css';
 import '../styles/community-feed.css';
@@ -85,6 +86,7 @@ const filterDrafts = { skills: '', lookingFor: '' };
 let activeChatFilter = 'all';
 let chatSearchQuery = '';
 let selectedChat = null;
+let typingSession = null; // the open thread's typing channel (D5): { otherId, channel, sender, receiver, joined }
 let chatShouldOpenAtLatest = false;
 let suppressChatAutoOpen = false;
 let pitchPerson = null;
@@ -124,8 +126,9 @@ const readBlockedUserIds = () => {
 const saveBlockedUserIds = (ids) => {
   try {
     window.localStorage.setItem(blockedUsersStorageKey(), JSON.stringify([...ids]));
-    return true;
   } catch { return false; }
+  syncTypingForSelectedChat(); // D5: a block drops typing at once; an unblock of the open thread joins it again
+  return true;
 };
 const syncBlockedUserIds = async () => {
   if (!supabase || !memberProfile.id) return;
@@ -1482,6 +1485,7 @@ const renderChats = () => {
     if (!saveHiddenChatIds(hiddenIds)) { showToast('Could not remove this chat. Please try again.'); return; }
     readChatIds.delete(person.id);
     if (selectedChat?.id === person.id) {
+      leaveTyping();
       selectedChat = null;
       document.querySelector('#chat-window')?.setAttribute('hidden', '');
       document.querySelector('#chat-list')?.removeAttribute('hidden');
@@ -1600,6 +1604,7 @@ const openChat = (person, markAsRead = true) => {
   ensureChatMoreMenu();
   ensureChatWallpaper();
   selectedChat = person;
+  joinTyping(person);
   if (markAsRead) readChatIds.add(person.id);
   const list = document.querySelector('#chat-list'); const windowPanel = document.querySelector('#chat-window');
   const isSmallScreen = window.matchMedia('(max-width: 700px)').matches;
@@ -1725,6 +1730,7 @@ const renderMessages = () => {
 
 const closeSelectedChat = () => {
   closeShareMenu();
+  leaveTyping();
   selectedChat = null;
   document.querySelector('#chat-window')?.setAttribute('hidden', '');
   document.querySelector('#chat-list')?.removeAttribute('hidden');
@@ -1734,6 +1740,83 @@ const closeSelectedChat = () => {
   renderChats();
   suppressChatAutoOpen = false;
 };
+// Typing indicator (D5). A private Realtime broadcast channel per pair (topic typing:<lower id>:<higher id>, event
+// 'typing', payload only { typing: boolean }). 0012 D2 lets only a matched pair in the same world join, and cuts off
+// the member who blocked; the client never joins (and drops at once) when the other member is in the local blocked
+// list. A refused join is quiet: nothing shows, nothing is logged, nothing is retried. A blocked member's client
+// behaves exactly as before (their join succeeds; their signals simply reach nobody).
+const typingLine = () => {
+  const head = document.querySelector('.chat-window-head');
+  if (!head) return null;
+  if (!document.querySelector('#chat-typing')) {
+    head.insertAdjacentHTML('afterbegin', '<div class="chat-typing" id="chat-typing" aria-hidden="true" hidden><i class="chat-typing-dots"><i></i><i></i><i></i></i><em class="chat-typing-text">typing…</em></div>');
+    head.insertAdjacentHTML('afterend', '<p class="chat-typing-live" id="chat-typing-live" role="status" aria-live="polite"></p>');
+  }
+  return document.querySelector('#chat-typing');
+};
+const showTyping = (visible, person) => {
+  const line = typingLine();
+  if (line) line.hidden = !visible;
+  const live = document.querySelector('#chat-typing-live');
+  // One announcement per burst: set on show, cleared on hide.
+  if (live) live.textContent = visible && person ? `${String(person.name || 'They').trim().split(/\s+/)[0]} is typing` : '';
+};
+const leaveTyping = () => {
+  const session = typingSession;
+  if (!session) return;
+  session.sender.stop();
+  typingSession = null;
+  session.receiver.reset();
+  showTyping(false);
+  supabase?.removeChannel(session.channel)?.catch?.(() => {});
+};
+const joinTyping = (person) => {
+  if (typingSession && typingSession.otherId === String(person?.id)) return;
+  leaveTyping();
+  typingLine(); // the (hidden) pill and live region exist before any signal, so the first one never moves anything
+  if (!supabase || !memberProfile.id || !person?.id || readBlockedUserIds().has(String(person.id))) return;
+  // A reopen right after a leave gets a fresh channel: Realtime drops a leaving channel locally at once.
+  const channel = supabase.channel(typingTopic(memberProfile.id, person.id), { config: { private: true, broadcast: { self: false } } });
+  const session = { otherId: String(person.id), channel, joined: false };
+  session.sender = createTypingSender({
+    send: (payload) => {
+      // Only over a joined socket: never the REST broadcast fallback.
+      if (session.joined) Promise.resolve(channel.send({ type: 'broadcast', event: TYPING_EVENT, payload })).catch(() => {});
+    },
+  });
+  session.receiver = createTypingReceiver({ onChange: (visible) => { if (typingSession === session) showTyping(visible, person); } });
+  typingSession = session;
+  channel
+    .on('broadcast', { event: TYPING_EVENT }, ({ payload } = {}) => {
+      if (typingSession !== session) return;
+      if (readBlockedUserIds().has(session.otherId)) { leaveTyping(); return; }
+      session.receiver.onSignal({ typing: payload?.typing === true });
+    })
+    .subscribe((status) => {
+      if (typingSession !== session) return;
+      session.joined = status === 'SUBSCRIBED';
+      if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+        // Refused (no match, or blocked on the server) or unreachable: quietly drop typing for this thread.
+        session.receiver.reset();
+        typingSession = null;
+        setTimeout(() => { supabase.removeChannel(channel)?.catch?.(() => {}); }, 0);
+      }
+    });
+};
+function syncTypingForSelectedChat() {
+  if (!selectedChat) { if (typingSession) leaveTyping(); return; }
+  if (readBlockedUserIds().has(String(selectedChat.id))) leaveTyping();
+  else joinTyping(selectedChat);
+}
+const noteTyping = () => {
+  if (typingSession && selectedChat && typingSession.otherId === String(selectedChat.id)) typingSession.sender.onInput();
+};
+// Leaving the page: Realtime closes its socket on pagehide (which leaves every channel on the server); this drops the
+// local session too. Hiding the tab first ends the burst while the socket is still open, so the other side clears at
+// once instead of after the 4 s idle.
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') typingSession?.sender.stop(); });
+window.addEventListener('pagehide', () => leaveTyping(), { capture: true });
+window.addEventListener('pageshow', (event) => { if (event.persisted && selectedChat) syncTypingForSelectedChat(); });
 // The one block flow: the remote row, then the local blocked-ids store. Shared by the chat menu and the card overflow.
 const blockMember = async (person) => {
   const remoteResult = await saveRemoteBlock(person.id, true);
@@ -3300,6 +3383,8 @@ const ensureChatComposer = () => {
   // Capture phase: controls such as the chat "..." button and the chat-row avatar stop propagation (the A3 rule).
   document.addEventListener('click', (event) => { if (!form.contains(event.target)) closeMenus(); }, true);
   bindChatShare(form, closeMenus);
+  // D5: typing signals (throttled in chat-typing.js); clearing the draft ends the burst.
+  input?.addEventListener('input', () => { if (input.value.trim()) noteTyping(); else typingSession?.sender.stop(); });
   // The "+" (D4) takes 44 px of the row: on phones the placeholder gets shorter so it is never clipped.
   const fullPlaceholder = input?.getAttribute('placeholder') || 'Write a thoughtful message...';
   const narrowComposer = window.matchMedia('(max-width: 480px)');
@@ -3343,6 +3428,7 @@ document.querySelector('#chat-form')?.addEventListener('submit', async (event) =
   const sendButton = document.querySelector('.chat-send-button') || document.querySelector('#chat-form button[type="submit"]');
   const body = input?.value.trim() || '';
   if (!selectedChat || (!body && !pendingChatFiles.length && !pendingChatGif) || !supabase || !memberProfile.id) return;
+  typingSession?.sender.stop();
   if (sendButton) sendButton.disabled = true;
   try {
     // Re-encode every image BEFORE anything is sent: one failure aborts the whole send (no text, no files) and the

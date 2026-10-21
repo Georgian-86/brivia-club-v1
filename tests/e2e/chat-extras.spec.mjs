@@ -37,6 +37,22 @@
 //    "This resume is no longer shared." An area message renders as a place card.
 // Q5 without a resume, "Share my resume" is disabled with "Add a resume in your profile first." and an action that
 //    leads to Profile; without a match the item is absent; without 0012 (no resume_path column) it is absent.
+//
+// Section "typing" (D5): the typing indicator over a private Realtime broadcast channel. The Realtime socket is
+// answered in the test (routeWebSocket): every phx_join is answered ok unless a scenario refuses the typing topic.
+// T1 an open thread joins realtime:typing:<lower id>:<higher id> as a private channel; a pushed broadcast
+//    { typing: true } shows "typing…" under the header without moving the thread, the live region says "Asha is
+//    typing" once, and it is gone after 4 s idle; dots animate, static under reduced motion; no sideways scroll at 320.
+// T2 typing in the composer sends one frame (event 'typing', payload exactly { typing: true }) per 2 s; sending the
+//    message sends one { typing: false }; nothing carries the draft.
+// T3 with the other member in the local blocked list no phx_join for a typing topic is sent; blocking while the thread
+//    is open hides the indicator at once and leaves the channel; later signals show nothing.
+// T4 a typing join refused by the server shows nothing, logs nothing and is not retried.
+// T5 closing the thread leaves the typing channel; hiding the tab sends { typing: false }; pagehide leaves (Realtime
+//    closes its socket on pagehide) and nothing more is sent.
+// T6 switching threads leaves the old pair's channel and joins the new one; a late signal from the old pair shows nothing.
+// T7 closing and reopening a thread while the old leave reply is still in flight ends with one working channel.
+// TYPING_SHOTS=<dir> (with SECTIONS=typing) only saves the typing line at 320, 375, 390, 768, 1280, 1440 and 1920.
 import { mkdirSync } from 'node:fs';
 import assert from 'node:assert/strict';
 import path from 'node:path';
@@ -47,7 +63,7 @@ const { chromium } = await import(process.env.PLAYWRIGHT_MODULE || 'playwright')
 const PORT = Number(process.env.E2E_PORT || 5186);
 const EXECUTABLE = process.env.CHROMIUM_PATH || '/opt/pw-browsers/chromium';
 const SHOTS = process.env.CHAT_EXTRAS_SHOTS || '';
-const SECTIONS = (process.env.SECTIONS || 'resume,share').split(',');
+const SECTIONS = (process.env.SECTIONS || 'resume,share,typing').split(',');
 const VIEWPORTS = {
   320: { width: 320, height: 720 }, 375: { width: 375, height: 812 }, 390: { width: 390, height: 844 }, 768: { width: 768, height: 1024 },
   1280: { width: 1280, height: 800 }, 1440: { width: 1440, height: 900 }, 1920: { width: 1920, height: 1080 },
@@ -716,6 +732,337 @@ try {
         await context.close();
       }
     });
+  }
+  // ------------------------------------------------------------------------------------------------------------
+  // Section "typing" (D5): the typing indicator over a private Realtime broadcast channel.
+  // ------------------------------------------------------------------------------------------------------------
+  if (SECTIONS.includes('typing') && (!SHOTS || process.env.TYPING_SHOTS)) {
+    const A = 'aaaaaaaa-aaaa-4aaa-8aaa-000000000001';
+    const TOPIC = `realtime:typing:${[ME, A].sort().join(':')}`;
+    const hello = { id: 'msg-hello', sender_id: A, recipient_id: ME, body: 'Shall we play on Saturday?', created_at: new Date(Date.now() - 6e5).toISOString() };
+    const SECRET = 'my secret draft';
+    // A Realtime server in the test: answers phx_join ok (or refuses the typing topic), decodes the client's binary
+    // broadcast pushes (realtime-js vsn 2.0.0, kind 3) and pushes broadcasts to the client.
+    const fakeRealtime = async (context, { refuseTyping = false, leaveDelayMs = 0 } = {}) => {
+      const rt = { ws: null, joins: [], leaves: [], frames: [], raw: [], closed: 0 };
+      await context.routeWebSocket(/realtime\/v1\/websocket/, (ws) => {
+        rt.ws = ws;
+        ws.onClose(() => { rt.closed += 1; });
+        const reply = (joinRef, ref, topic, status, response = {}) => ws.send(JSON.stringify([joinRef, ref, topic, 'phx_reply', { status, response }]));
+        ws.onMessage((message) => {
+          if (typeof message !== 'string') {
+            const buf = Buffer.from(message);
+            rt.raw.push(buf.toString('latin1'));
+            if (buf[0] !== 3) return;
+            const [jl, rl, tl, el, ml, enc] = [buf[1], buf[2], buf[3], buf[4], buf[5], buf[6]];
+            let o = 7 + jl + rl;
+            const topic = buf.subarray(o, o + tl).toString(); o += tl;
+            const event = buf.subarray(o, o + el).toString(); o += el + ml;
+            const body = buf.subarray(o).toString();
+            rt.frames.push({ topic, event, payload: enc === 1 ? JSON.parse(body) : body, at: Date.now() });
+            return;
+          }
+          rt.raw.push(message);
+          const [joinRef, ref, topic, event, payload] = JSON.parse(message);
+          if (event === 'phx_join') {
+            rt.joins.push({ topic, config: payload?.config || {} });
+            if (refuseTyping && topic.startsWith('realtime:typing:')) return reply(joinRef, ref, topic, 'error', { reason: 'Unauthorized: You do not have permissions to read from this Channel topic' });
+            return reply(joinRef, ref, topic, 'ok', { postgres_changes: (payload?.config?.postgres_changes || []).map((c, i) => ({ ...c, id: i + 1 })) });
+          }
+          if (event === 'phx_leave') {
+            rt.leaves.push(topic);
+            if (leaveDelayMs) { setTimeout(() => reply(joinRef, ref, topic, 'ok'), leaveDelayMs); return undefined; }
+          }
+          if (event === 'broadcast') rt.frames.push({ topic, event: payload?.event, payload: payload?.payload, at: Date.now() });
+          return reply(joinRef, ref, topic, 'ok');
+        });
+      });
+      rt.push = (typing) => rt.ws?.send(JSON.stringify([null, null, TOPIC, 'broadcast', { type: 'broadcast', event: 'typing', payload: { typing } }]));
+      rt.typingJoins = () => rt.joins.filter((j) => j.topic.startsWith('realtime:typing:'));
+      rt.typingFrames = () => rt.frames.filter((f) => f.topic === TOPIC);
+      return rt;
+    };
+    const openTyping = async (width, { blocked = [], refuseTyping = false, reducedMotion = 'reduce', matchIds = [A], leaveDelayMs = 0 } = {}) => {
+      Object.assign(st, { own: { ...ownRow }, routes: baseRoutes(), messages: [hello], matchIds, placeLabel: 'Kochi' });
+      const context = await stub.newContext(browser, VIEWPORTS[width], { reducedMotion, ...(width <= 780 ? PHONE : {}) });
+      if (blocked.length) await context.addInitScript(([key, value]) => window.localStorage.setItem(key, value), [`brivia-blocked-users:${ME}`, JSON.stringify(blocked)]);
+      const rt = await fakeRealtime(context, { refuseTyping, leaveDelayMs });
+      const consoleLines = [];
+      const page = await stub.open(context, { path: '/app.html?view=chat', errors: pageErrors });
+      page.on('console', (m) => consoleLines.push(`${m.type()}: ${m.text()}`));
+      page.setDefaultTimeout(6000);
+      await page.waitForSelector('#chat-list [data-chat-id]', { timeout: 8000 });
+      await page.locator('#chat-list [data-chat-id]').first().click();
+      await page.waitForSelector('#chat-window:not([hidden]) #chat-form', { timeout: 6000 });
+      await page.waitForTimeout(700);
+      return { context, page, rt, consoleLines };
+    };
+    const typingState = (page) => page.evaluate(() => {
+      const el = document.querySelector('#chat-typing');
+      const live = document.querySelector('#chat-typing-live');
+      const head = document.querySelector('.chat-window-head')?.getBoundingClientRect();
+      const msgs = document.querySelector('#chat-messages')?.getBoundingClientRect();
+      const visible = Boolean(el && !el.hidden && el.getClientRects().length && getComputedStyle(el).visibility !== 'hidden' && Number(getComputedStyle(el).opacity) > 0);
+      const r = el?.getBoundingClientRect();
+      const dot = el?.querySelector('.chat-typing-dots i');
+      return {
+        visible,
+        text: visible ? el.innerText.replace(/\s+/g, ' ').trim() : '',
+        live: live?.textContent.trim() || '',
+        liveRole: live ? `${live.getAttribute('role')}/${live.getAttribute('aria-live')}` : null,
+        box: r ? { top: Math.round(r.top), left: Math.round(r.left), right: Math.round(r.right), h: Math.round(r.height) } : null,
+        headBottom: head ? Math.round(head.bottom) : null,
+        msgs: msgs ? { top: Math.round(msgs.top), h: Math.round(msgs.height) } : null,
+        win: (() => { const w = document.querySelector('#chat-window').getBoundingClientRect(); return { left: Math.round(w.left), right: Math.round(w.right) }; })(),
+        anim: dot ? getComputedStyle(dot).animationName : null,
+        fontSize: el ? parseFloat(getComputedStyle(el.querySelector('.chat-typing-text') || el).fontSize) : null,
+        doc: document.documentElement.scrollWidth - document.documentElement.clientWidth,
+      };
+    });
+    const waitTyping = (page, shown) => page.waitForFunction((want) => {
+      const el = document.querySelector('#chat-typing');
+      return Boolean(el && !el.hidden) === want;
+    }, shown, { timeout: 6000 }).catch(() => null);
+
+    if (process.env.TYPING_SHOTS) {
+      const dir = process.env.TYPING_SHOTS;
+      mkdirSync(dir, { recursive: true });
+      for (const width of [320, 375, 390, 768, 1280, 1440, 1920]) {
+        const { context, page, rt } = await openTyping(width, { reducedMotion: 'no-preference' });
+        rt.push(true);
+        await waitTyping(page, true);
+        await page.waitForTimeout(450);
+        await page.screenshot({ path: path.join(dir, `typing-${width}.png`) });
+        await page.locator('#chat-window').screenshot({ path: path.join(dir, `typing-${width}-thread.png`) });
+        await context.close();
+      }
+    }
+
+    if (!SHOTS && !process.env.TYPING_SHOTS) {
+      await scenario('T1 shows and hides', async () => {
+        for (const width of [320, 375, 1440]) {
+          const { context, page, rt } = await openTyping(width);
+          const joins = rt.typingJoins();
+          check(`T1 ${width}: the thread joins ${TOPIC} once as a private channel (${JSON.stringify(joins)})`, () => {
+            assert.equal(joins.length, 1);
+            assert.equal(joins[0].topic, TOPIC);
+            assert.equal(joins[0].config.private, true);
+          });
+          const before = await typingState(page);
+          rt.push(true);
+          await waitTyping(page, true);
+          const shown = await typingState(page);
+          const shownAt = Date.now();
+          check(`T1 ${width}: "typing…" shows under the header, the thread does not move, the live region says it once (${JSON.stringify({ before: before.msgs, shown })})`, () => {
+            assert.equal(before.visible, false);
+            assert.equal(shown.visible, true);
+            assert.match(shown.text, /^typing…$/);
+            assert.ok(shown.box.top >= shown.headBottom - 1, 'under the header');
+            assert.deepEqual(shown.msgs, before.msgs);
+            assert.equal(shown.live, 'Asha is typing');
+            assert.equal(shown.liveRole, 'status/polite');
+            assert.ok(shown.fontSize >= 12);
+            assert.ok(shown.box.left >= shown.win.left && shown.box.right <= shown.win.right);
+            assert.ok(shown.doc <= 0);
+          });
+          check(`T1 ${width}: reduced motion keeps the dots still (${shown.anim})`, () => assert.equal(shown.anim, 'none'));
+          rt.push(true);
+          await page.waitForTimeout(150);
+          const again = await typingState(page);
+          check(`T1 ${width}: a second signal in the burst keeps it shown without a new announcement (${again.live})`, () => { assert.equal(again.visible, true); assert.equal(again.live, 'Asha is typing'); });
+          await page.waitForTimeout(Math.max(0, 3500 - (Date.now() - shownAt)));
+          const mid = await typingState(page);
+          await waitTyping(page, false);
+          const hiddenAfter = Date.now() - shownAt;
+          const gone = await typingState(page);
+          check(`T1 ${width}: still shown at 3.5 s, gone after 4 s idle (${JSON.stringify({ mid: mid.visible, hiddenAfter, gone: gone.visible, live: gone.live, msgs: gone.msgs })})`, () => {
+            assert.equal(mid.visible, true);
+            assert.equal(gone.visible, false);
+            assert.ok(hiddenAfter >= 3900 && hiddenAfter < 5200);
+            assert.equal(gone.live, '');
+            assert.deepEqual(gone.msgs, before.msgs);
+          });
+          rt.push(true);
+          await waitTyping(page, true);
+          rt.push(false);
+          await waitTyping(page, false);
+          const off = await typingState(page);
+          check(`T1 ${width}: { typing: false } hides it at once (${off.visible})`, () => assert.equal(off.visible, false));
+          await context.close();
+        }
+        const { context, page, rt } = await openTyping(1440, { reducedMotion: 'no-preference' });
+        rt.push(true);
+        await waitTyping(page, true);
+        const moving = await typingState(page);
+        check(`T1 the dots animate when motion is allowed (${moving.anim})`, () => assert.ok(moving.anim && moving.anim !== 'none'));
+        const axe = await axeViolations(page, { include: '#chat-typing, #chat-typing-live' });
+        check(`T1 axe clean on the indicator (${axe.join(' | ')})`, () => assert.deepEqual(axe, []));
+        await context.close();
+      });
+
+      await scenario('T2 sends throttled', async () => {
+        const { context, page, rt } = await openTyping(375);
+        const input = page.locator('#chat-input');
+        await input.click();
+        const t0 = Date.now();
+        await input.pressSequentially('my sec', { delay: 120 });
+        const early = rt.typingFrames().map((f) => ({ event: f.event, payload: f.payload }));
+        check(`T2 typing for under 2 s sends one frame { typing: true } (${JSON.stringify({ early, ms: Date.now() - t0 })})`, () => {
+          assert.ok(Date.now() - t0 < 2000);
+          assert.deepEqual(early, [{ event: 'typing', payload: { typing: true } }]);
+        });
+        await page.waitForTimeout(Math.max(0, 2150 - (Date.now() - t0)));
+        await input.pressSequentially('ret draft', { delay: 40 });
+        const two = rt.typingFrames().map((f) => f.payload);
+        check(`T2 typing again after 2 s sends a second frame (${JSON.stringify(two)})`, () => assert.deepEqual(two, [{ typing: true }, { typing: true }]));
+        await input.press('Enter');
+        await page.waitForTimeout(500);
+        const all = rt.typingFrames().map((f) => f.payload);
+        check(`T2 sending the message sends one { typing: false } (${JSON.stringify(all)})`, () => assert.deepEqual(all, [{ typing: true }, { typing: true }, { typing: false }]));
+        const leaked = rt.raw.filter((m) => m.includes(SECRET) || m.includes('secret')).length;
+        check(`T2 no frame carries the draft (${leaked})`, () => assert.equal(leaked, 0));
+        await context.close();
+      });
+
+      await scenario('T3 blocked', async () => {
+        {
+          const { context, page, rt } = await openTyping(375, { blocked: [A] });
+          rt.push(true);
+          await page.waitForTimeout(400);
+          await page.locator('#chat-input').pressSequentially('hi', { delay: 50 }).catch(() => {});
+          await page.waitForTimeout(300);
+          const s = await typingState(page);
+          check(`T3 a blocked member's thread joins no typing topic, sends nothing and shows nothing (${JSON.stringify({ joins: rt.typingJoins(), frames: rt.typingFrames(), visible: s.visible })})`, () => {
+            assert.deepEqual(rt.typingJoins(), []);
+            assert.deepEqual(rt.typingFrames(), []);
+            assert.equal(s.visible, false);
+          });
+          await context.close();
+        }
+        {
+          const { context, page, rt } = await openTyping(1440);
+          page.on('dialog', (d) => d.accept());
+          rt.push(true);
+          await waitTyping(page, true);
+          await page.locator('#chat-more').click();
+          await page.locator('#chat-more-menu [data-chat-action="block"]').click();
+          await page.waitForTimeout(500);
+          const s = await typingState(page);
+          check(`T3 blocking while the thread is open hides typing at once and leaves the channel (${JSON.stringify({ visible: s.visible, live: s.live, leaves: rt.leaves })})`, () => {
+            assert.equal(s.visible, false);
+            assert.equal(s.live, '');
+            assert.ok(rt.leaves.includes(TOPIC));
+          });
+          rt.push(true);
+          await page.waitForTimeout(400);
+          const later = await typingState(page);
+          check(`T3 a later signal shows nothing (${later.visible})`, () => assert.equal(later.visible, false));
+          await context.close();
+        }
+      });
+
+      await scenario('T4 refused join', async () => {
+        const { context, page, rt, consoleLines } = await openTyping(375, { refuseTyping: true });
+        rt.push(true);
+        await page.locator('#chat-input').pressSequentially('hello', { delay: 50 });
+        await page.waitForTimeout(2600);
+        const s = await typingState(page);
+        const toast = await page.evaluate(() => [...document.querySelectorAll('.app-toast.show')].map((t) => t.textContent.trim()));
+        const typingLogs = consoleLines.filter((l) => /typing|realtime|channel/i.test(l));
+        check(`T4 a refused typing join shows nothing, logs nothing, sends nothing and is not retried (${JSON.stringify({ visible: s.visible, live: s.live, toast, typingLogs, joins: rt.typingJoins().length, frames: rt.typingFrames().length })})`, () => {
+          assert.equal(s.visible, false);
+          assert.equal(s.live, '');
+          assert.deepEqual(toast, []);
+          assert.deepEqual(typingLogs, []);
+          assert.equal(rt.typingJoins().length, 1);
+          assert.equal(rt.typingFrames().length, 0);
+        });
+        const rest = st.calls.filter((c) => c.path.includes('/realtime/'));
+        check(`T4 no REST broadcast fallback (${rest.length})`, () => assert.equal(rest.length, 0));
+        await context.close();
+      });
+
+      await scenario('T5 leaves', async () => {
+        const { context, page, rt } = await openTyping(375);
+        rt.push(true);
+        await waitTyping(page, true);
+        await page.locator('#chat-back').click();
+        await page.waitForTimeout(400);
+        const s = await typingState(page);
+        check(`T5 closing the thread leaves the typing channel and clears the indicator (${JSON.stringify({ leaves: rt.leaves, visible: s.visible })})`, () => {
+          assert.ok(rt.leaves.includes(TOPIC));
+          assert.equal(s.visible, false);
+        });
+        await page.locator('#chat-list [data-chat-id]').first().click();
+        await page.waitForTimeout(600);
+        const rejoined = rt.typingJoins().length;
+        await page.locator('#chat-input').pressSequentially('hi', { delay: 40 });
+        await page.waitForTimeout(150);
+        // Hiding the tab ends the burst while the socket is open.
+        await page.evaluate(() => {
+          Object.defineProperty(document, 'visibilityState', { configurable: true, get: () => 'hidden' });
+          document.dispatchEvent(new Event('visibilitychange'));
+        });
+        await page.waitForTimeout(200);
+        const frames = rt.typingFrames().map((f) => f.payload);
+        check(`T5 reopening joins again; hiding the tab sends one { typing: false } (${JSON.stringify({ rejoined, frames })})`, () => {
+          assert.equal(rejoined, 2);
+          assert.deepEqual(frames, [{ typing: true }, { typing: false }]);
+        });
+        const closedBefore = rt.closed;
+        await page.evaluate(() => window.dispatchEvent(new PageTransitionEvent('pagehide', { persisted: false })));
+        await page.waitForTimeout(300);
+        await page.evaluate(() => { delete document.visibilityState; });
+        await page.locator('#chat-input').pressSequentially(' there', { delay: 40 });
+        await page.waitForTimeout(200);
+        const after = { closed: rt.closed - closedBefore, leaves: rt.leaves.filter((t) => t === TOPIC).length, frames: rt.typingFrames().length };
+        check(`T5 pagehide leaves the channel (a phx_leave, or Realtime closing its socket) and nothing is sent after (${JSON.stringify(after)})`, () => {
+          assert.ok(after.closed >= 1 || after.leaves === 2);
+          assert.equal(after.frames, 2);
+        });
+        await context.close();
+      });
+
+      await scenario('T7 quick reopen', async () => {
+        const { context, page, rt } = await openTyping(375, { leaveDelayMs: 500 });
+        await page.locator('#chat-back').click();
+        await page.locator('#chat-list [data-chat-id]').first().click();
+        await page.waitForTimeout(1200);
+        rt.push(true);
+        await waitTyping(page, true);
+        const s = await typingState(page);
+        await page.locator('#chat-input').pressSequentially('hey', { delay: 40 });
+        await page.waitForTimeout(200);
+        check(`T7 reopening the thread while the old leave reply is still in flight joins again and works both ways (${JSON.stringify({ joins: rt.typingJoins().length, visible: s.visible, frames: rt.typingFrames().map((f) => f.payload) })})`, () => {
+          assert.equal(rt.typingJoins().length, 2);
+          assert.equal(s.visible, true);
+          assert.deepEqual(rt.typingFrames().map((f) => f.payload), [{ typing: true }]);
+        });
+        await context.close();
+      });
+
+      await scenario('T6 switching threads', async () => {
+        const B = 'aaaaaaaa-aaaa-4aaa-8aaa-000000000002';
+        const TOPIC_B = `realtime:typing:${[ME, B].sort().join(':')}`;
+        const { context, page, rt } = await openTyping(1440, { matchIds: [A, B] });
+        rt.push(true);
+        await waitTyping(page, true);
+        await page.locator(`#chat-list [data-chat-id="${B}"]`).click();
+        await page.waitForTimeout(500);
+        const s = await typingState(page);
+        check(`T6 switching threads leaves the old typing channel, joins the new one and clears the indicator (${JSON.stringify({ leaves: rt.leaves, joins: rt.typingJoins().map((j) => j.topic), visible: s.visible, live: s.live })})`, () => {
+          assert.deepEqual(rt.leaves.filter((t) => t.startsWith('realtime:typing:')), [TOPIC]);
+          assert.deepEqual(rt.typingJoins().map((j) => j.topic), [TOPIC, TOPIC_B]);
+          assert.equal(s.visible, false);
+          assert.equal(s.live, '');
+        });
+        rt.push(true);
+        await page.waitForTimeout(300);
+        const stale = await typingState(page);
+        check(`T6 a late signal on the old pair shows nothing in the new thread (${stale.visible})`, () => assert.equal(stale.visible, false));
+        await context.close();
+      });
+    }
   }
   if (!SHOTS) check(`no uncaught page errors (${JSON.stringify(pageErrors.slice(0, 5))})`, () => assert.deepEqual(pageErrors, []));
 } finally {
