@@ -881,11 +881,11 @@ try {
         { id: 'post-unknown', author_id: A, image_url: '/Images/Cover%20images/NOT-A-PRESET.PNG', image_path: '', caption: 'Unknown preset', created_at: ago(3) },
       ];
       const { context, page } = await open(WIDE, '/app.html?view=posts');
-      await page.waitForFunction(() => document.querySelectorAll('#community-post-list .community-post-card').length >= 3, null, { timeout: 8000 }).catch(() => {});
+      await page.waitForFunction(() => document.querySelectorAll('#community-post-list .post-card').length >= 3, null, { timeout: 8000 }).catch(() => {});
       await page.waitForTimeout(800);
-      const cards = await page.evaluate(() => Object.fromEntries([...document.querySelectorAll('#community-post-list .community-post-card')].map((c) => {
-        const img = c.querySelector('.community-post-image-wrap img');
-        return [c.querySelector('h3')?.textContent, { src: img?.getAttribute('src') || null, loaded: Boolean(img && img.complete && img.naturalWidth > 0), missing: Boolean(c.querySelector('.community-post-image-missing')) }];
+      const cards = await page.evaluate(() => Object.fromEntries([...document.querySelectorAll('#community-post-list .post-card')].map((c) => {
+        const img = c.querySelector('.post-card-media img');
+        return [c.querySelector('.post-card-caption')?.textContent, { src: img?.getAttribute('src') || null, loaded: Boolean(img && img.complete && img.naturalWidth > 0), missing: Boolean(c.querySelector('.community-post-image-missing')) }];
       })));
       check(`posts: a preset identifier renders the shipped asset; external and unknown show the placeholder (${JSON.stringify(cards)})`, () => {
         const preset = cards['Preset illustration'];

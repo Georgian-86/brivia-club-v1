@@ -3,7 +3,12 @@
   <head>
     <meta charset="UTF-8" />
     <title>Brivia Club · Connect</title>
-    <script>window.location.replace('/app.html?view=explore');</script>
+    <script>
+      // A shared post link (post-card.js shareData) lands on that post in the Explore feed (view 'posts'); any other
+      // visit goes to Connect, as before.
+      var post = new URLSearchParams(window.location.search).get('post');
+      window.location.replace(post ? '/app.html?view=posts&post=' + encodeURIComponent(post) : '/app.html?view=explore');
+    </script>
   </head>
   <body>
     <noscript><a href="/app.html?view=explore">Continue to Brivia Club</a></noscript>

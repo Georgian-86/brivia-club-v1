@@ -84,3 +84,38 @@ test('guard allows one request in flight per post and kind', () => {
   guard.end('p:like');
   assert.equal(guard.begin('p:like'), true);
 });
+
+// C3 (carried from the C2 review): a thrown or rejected request never escapes; it comes back as { error }.
+const rejectingClient = (how) => ({
+  from() {
+    const fail = () => (how === 'throw' ? (() => { throw new Error('network down'); })() : Promise.reject(new Error('network down')));
+    let eqs = 0;
+    let deleting = false;
+    const chain = {
+      select: () => chain,
+      delete: () => { deleting = true; return chain; },
+      eq: () => { eqs += 1; return deleting && eqs === 2 ? fail() : chain; },
+      in: () => fail(),
+      insert: () => fail(),
+    };
+    return chain;
+  },
+});
+
+for (const how of ['reject', 'throw']) {
+  test(`setReaction returns { error } when the request ${how}s`, async () => {
+    const client = rejectingClient(how);
+    const on = await setReaction(client, 'like', 'p', 'me', true);
+    assert.ok(on.error instanceof Error);
+    assert.equal(on.error.message, 'network down');
+    const off = await setReaction(rejectingClient(how), 'save', 'p', 'me', false);
+    assert.ok(off.error instanceof Error);
+  });
+
+  test(`loadReactions returns empty sets and { error } when the request ${how}s`, async () => {
+    const out = await loadReactions(rejectingClient(how), 'me', ['a']);
+    assert.ok(out.error instanceof Error);
+    assert.equal(out.liked.size, 0);
+    assert.equal(out.saved.size, 0);
+  });
+}

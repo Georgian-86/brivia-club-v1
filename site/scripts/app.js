@@ -27,6 +27,8 @@ import { isUnderReview, UNDER_REVIEW_COPY } from './onboarding-guard.js';
 import { openReportDialog, bindCardOverflow, cardOverflowOpen, reportSuccessCopy } from './report-dialog.js';
 import { defaultCoverUrl, normalizeCoverUrl } from './cover-assets.js';
 import { postImageSrc } from './post-image.js';
+import { postCardMarkup, shareData, isSafePostImageSrc } from './post-card.js';
+import { loadReactions, setReaction, createReactionGuard } from './post-reactions.js';
 import { profileChecklist } from './profile-checklist.js';
 import { quotaLabel, quotaErrorText, quotaBlocked, quotaNotice } from './signal-quota.js';
 import { pitchLine, deckChips, deckEmptyState, deckFields, bandNote, deckCoverSrc } from './deck-view.js';
@@ -506,7 +508,12 @@ const setView = (view) => {
 
 const validViews = ['home', 'explore', 'posts', 'chat', 'profile'];
 const routeFromUrl = () => {
-  const view = new URLSearchParams(window.location.search).get('view') || window.location.hash.slice(1) || 'explore';
+  const params = new URLSearchParams(window.location.search);
+  // ?post=<id> (a shared post link, via explore.html) opens that post's detail once the Explore feed has loaded; it is
+  // read once per page load, so a later hashchange does not reopen it.
+  const postParam = params.get('post');
+  if (postParam && !pendingPostParamRead) { pendingPostParamRead = true; pendingPostId = postParam; }
+  const view = params.get('view') || window.location.hash.slice(1) || (postParam ? 'posts' : 'explore');
   setView(validViews.includes(view) ? view : 'explore');
 };
 
@@ -2231,11 +2238,20 @@ let communityPostSort = 'newest';
 let communityPostsLoaded = false;
 let communityPostsLoading = false;
 let communityPostPreviewUrl = '';
+// Likes and saves (polish wave C3; tables from 0012): the member's own sets, and whether the tables exist yet.
+const communityReactions = { liked: new Set(), saved: new Set(), available: true };
+const communityReactionGuard = createReactionGuard();
+// A post id from ?post=<id>, opened once the feed has loaded (routeFromUrl).
+let pendingPostId = null;
+let pendingPostParamRead = false;
+const REACTION_FAILED = "That didn't save. Please try again.";
 
 const formatCommunityPostDate = (value) => {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return 'RECENTLY';
-  return date.toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' }).toUpperCase();
+  // This year's posts drop the year ("OCT 21"), so the card's header bar keeps room for the name.
+  const sameYear = date.getFullYear() === new Date().getFullYear();
+  return date.toLocaleDateString([], { month: 'short', day: 'numeric', ...(sameYear ? {} : { year: 'numeric' }) }).toUpperCase();
 };
 
 const bindCommunityProfileTriggers = () => {
@@ -2268,13 +2284,181 @@ const renderCommunityPosts = () => {
   }
   list.innerHTML = sorted.map((post) => {
     const author = communityPostAuthors[post.author_id] || { id: post.author_id, name: 'Brivia member', image: '' };
-    const authorId = author.id || post.author_id;
     // Only the author's own community-posts Storage file or a shipped preset illustration auto-loads (post-image.js);
     // any other URL shows a placeholder.
-    const postImage = postImageSrc(post, { isStorageImageUrl, isPresetCoverUrl, normalizeCoverUrl });
-    return `<article class="community-post-card"><div class="community-post-image-wrap community-post-profile-trigger" data-public-profile-id="${escapeHtml(authorId)}" role="button" tabindex="0" aria-label="Open ${escapeHtml(author.name)} profile"><span class="community-post-media-label">COMMUNITY</span>${postImage ? `<img src="${escapeHtml(postImage)}" alt="Post by ${escapeHtml(author.name)}" loading="lazy" />` : '<span class="community-post-image-missing" role="img" aria-label="Image unavailable"></span>'}</div><div class="community-post-card-body"><div class="community-post-card-top"><span class="community-post-pill">POST</span><span class="community-post-more" aria-hidden="true">•••</span></div><h3>${escapeHtml(post.caption)}</h3><div class="community-post-author" data-public-profile-id="${escapeHtml(authorId)}" role="button" tabindex="0" aria-label="Open ${escapeHtml(author.name)} profile">${renderAvatar({ name: author.name, image: author.image }, 'community-post-avatar')}<div><strong>POSTED BY ${escapeHtml(author.name).toUpperCase()}</strong><span>${formatCommunityPostDate(post.created_at)}</span></div></div></div></article>`;
+    const imageSrc = postImageSrc(post, { isStorageImageUrl, isPresetCoverUrl, normalizeCoverUrl });
+    return postCardMarkup(post, author, {
+      liked: communityReactions.liked.has(post.id),
+      saved: communityReactions.saved.has(post.id),
+      imageSrc,
+      dateLabel: formatCommunityPostDate(post.created_at),
+    }, { escapeHtml, renderAvatar });
   }).join('');
+  syncReactionAvailability();
   bindCommunityProfileTriggers();
+};
+
+// Like and Save follow the member's own rows. Until 0012 is applied the tables do not exist: both buttons are hidden.
+const syncReactionAvailability = () => {
+  document.querySelectorAll('#community-post-list [data-post-action="like"], #community-post-list [data-post-action="save"]').forEach((button) => {
+    button.hidden = !communityReactions.available;
+  });
+};
+const REACTION_LABELS = { like: ['Like', 'Liked'], save: ['Save', 'Saved'] };
+const markReaction = (postId, kind, on) => {
+  const set = kind === 'like' ? communityReactions.liked : communityReactions.saved;
+  if (on) set.add(postId); else set.delete(postId);
+  document.querySelectorAll(`#community-post-list .post-card[data-post-id="${CSS.escape(String(postId))}"] [data-post-action="${kind}"]`).forEach((button) => {
+    button.setAttribute('aria-pressed', String(on));
+    const label = button.querySelector('span');
+    if (label) label.textContent = REACTION_LABELS[kind][on ? 1 : 0];
+  });
+};
+const missingTable = (error) => /does not exist|schema cache|42P01|PGRST205/i.test(`${error?.code || ''} ${error?.message || ''}`);
+// The server truth for the loaded posts. A failure keeps what is on screen (the optimistic change is already undone).
+const refreshCommunityReactions = async () => {
+  if (!supabase || !memberProfile.id) return;
+  const ids = communityPosts.map((post) => post.id);
+  const result = await loadReactions(supabase, memberProfile.id, ids);
+  if (result.error) {
+    if (missingTable(result.error)) { communityReactions.available = false; syncReactionAvailability(); }
+    else console.warn('Likes and saves could not load:', result.error.message);
+    return;
+  }
+  communityReactions.available = true;
+  communityReactions.liked = result.liked;
+  communityReactions.saved = result.saved;
+  ids.forEach((id) => { markReaction(id, 'like', result.liked.has(id)); markReaction(id, 'save', result.saved.has(id)); });
+  syncReactionAvailability();
+};
+// Optimistic like / save: the button flips at once; one request per post and kind is in flight (a double tap is one
+// row). On an error the change is undone and the server truth reloaded. 42501 means RLS refused the write (the post is
+// gone or no longer visible): reload only, no toast (post-reactions.js). Anything else also shows the toast.
+const toggleCommunityReaction = async (postId, kind) => {
+  if (!supabase || !memberProfile.id || !communityReactions.available) return;
+  const key = `${postId}:${kind}`;
+  if (!communityReactionGuard.begin(key)) return;
+  try {
+    const next = !(kind === 'like' ? communityReactions.liked : communityReactions.saved).has(postId);
+    markReaction(postId, kind, next);
+    const { error } = await setReaction(supabase, kind, postId, memberProfile.id, next);
+    if (error) {
+      markReaction(postId, kind, !next);
+      if (error.code !== '42501') showToast(REACTION_FAILED);
+      await refreshCommunityReactions();
+    }
+  } catch (error) {
+    console.warn('Reaction failed:', error?.message);
+  } finally {
+    communityReactionGuard.end(key);
+  }
+};
+// Share: the system share sheet when there is one, else the link on the clipboard. Only a neutral title and the link
+// leave the page (shareData): never the caption or the author's name.
+const shareCommunityPost = async (postId) => {
+  const post = communityPosts.find((item) => String(item.id) === String(postId));
+  if (!post) return;
+  const data = shareData(post, window.location.origin);
+  if (typeof navigator.share === 'function') {
+    try { await navigator.share(data); return; } catch (error) { if (error?.name === 'AbortError') return; }
+  }
+  try {
+    await navigator.clipboard.writeText(data.url);
+    showToast('Link copied.');
+  } catch {
+    showToast("Couldn't copy the link.");
+  }
+};
+
+// The post detail sheet (Comment, or a ?post=<id> link): image, caption, author and date. Its one action is "Reply in
+// chat" for a member I am matched with (mutual consent: no thread opens otherwise), else "View profile".
+const closeCommunityPostDetail = () => {
+  const dialog = document.querySelector('#post-detail');
+  if (!dialog) return;
+  const returnTo = dialog.__returnFocus;
+  if (dialog.open) dialog.close();
+  dialog.remove();
+  if (returnTo?.isConnected) returnTo.focus();
+};
+const replyToCommunityPost = (post, author) => {
+  closeCommunityPostDetail();
+  let person = findPersonById(author.id);
+  if (!person) { person = { ...author }; people.push(person); }
+  setView('chat');
+  openChat(person);
+  const input = document.querySelector('#chat-input');
+  if (!input) return;
+  const quote = Array.from(String(post.caption || '').trim()).slice(0, 60).join('');
+  input.value = `Re: “${quote}” `;
+  input.focus();
+  input.setSelectionRange(input.value.length, input.value.length);
+};
+const openCommunityPostDetail = async (postId, opener = document.activeElement) => {
+  const post = communityPosts.find((item) => String(item.id) === String(postId));
+  if (!post) return;
+  document.querySelector('#post-detail')?.remove();
+  const author = communityPostAuthors[post.author_id] || { id: post.author_id, name: 'Brivia member', image: '' };
+  const name = author.name || 'Brivia member';
+  const imageSrc = postImageSrc(post, { isStorageImageUrl, isPresetCoverUrl, normalizeCoverUrl });
+  const media = isSafePostImageSrc(imageSrc)
+    ? `<img src="${escapeHtml(imageSrc)}" alt="Post by ${escapeHtml(name)}" />`
+    : '<span class="community-post-image-missing" role="img" aria-label="Image unavailable"></span>';
+  const created = new Date(post.created_at);
+  const datetime = Number.isNaN(created.getTime()) ? '' : ` datetime="${escapeHtml(created.toISOString())}"`;
+  const dialog = document.createElement('dialog');
+  dialog.id = 'post-detail';
+  dialog.className = 'post-detail';
+  dialog.setAttribute('aria-labelledby', 'post-detail-author');
+  dialog.innerHTML = `<div class="post-detail-panel"><div class="post-detail-media">${media}</div>`
+    + `<div class="post-detail-head">${renderAvatar({ name, image: author.image || '' }, 'post-card-avatar')}<div class="post-detail-byline"><h2 class="post-detail-author" id="post-detail-author">${escapeHtml(name)}</h2><time${datetime}>${escapeHtml(formatCommunityPostDate(post.created_at))}</time></div>`
+    + '<button type="button" class="post-detail-close" data-post-detail-close aria-label="Close post"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M6 6l12 12M18 6 6 18"/></svg></button></div>'
+    + `<p class="post-detail-caption">${escapeHtml(post.caption || '')}</p>`
+    + '<div class="post-detail-footer"><button type="button" class="post-detail-action" data-post-detail-action aria-busy="true" disabled>View profile</button></div></div>';
+  dialog.__returnFocus = opener;
+  document.body.append(dialog);
+  dialog.addEventListener('cancel', (event) => { event.preventDefault(); closeCommunityPostDetail(); });
+  dialog.addEventListener('click', (event) => {
+    if (event.target === dialog || event.target.closest('[data-post-detail-close]')) closeCommunityPostDetail();
+  });
+  dialog.showModal();
+  dialog.querySelector('[data-post-detail-close]')?.focus();
+  const action = dialog.querySelector('[data-post-detail-action]');
+  const isOwn = String(author.id) === String(memberProfile.id);
+  const matched = !isOwn && (remoteConnectionIds.some((id) => String(id) === String(author.id)) || await hasMatchWith(author.id));
+  if (!action.isConnected) return;
+  action.textContent = matched ? 'Reply in chat' : 'View profile';
+  action.removeAttribute('aria-busy');
+  action.disabled = false;
+  action.addEventListener('click', () => {
+    if (matched) { replyToCommunityPost(post, author); return; }
+    dialog.__returnFocus = null;
+    closeCommunityPostDetail();
+    openPublicProfile(isOwn ? memberProfile : (communityPostAuthors[author.id] || findPersonById(author.id) || author), { forcePublic: !isOwn });
+  });
+};
+// One delegated listener for every card's actions (the cards are re-rendered on sort and reload). A tap on the image
+// opens the post too (pointer convenience; keyboard and screen-reader users have Comment).
+const bindCommunityPostActions = () => {
+  const list = document.querySelector('#community-post-list');
+  if (!list || list.dataset.postActionsBound === 'true') return;
+  list.dataset.postActionsBound = 'true';
+  list.addEventListener('click', (event) => {
+    const card = event.target.closest('.post-card');
+    if (!card) return;
+    const postId = card.dataset.postId;
+    const action = event.target.closest('[data-post-action]')?.dataset.postAction;
+    if (action === 'like' || action === 'save') toggleCommunityReaction(postId, action);
+    else if (action === 'comment') openCommunityPostDetail(postId);
+    else if (action === 'share') shareCommunityPost(postId);
+    else if (!action && event.target.closest('.post-card-media')) openCommunityPostDetail(postId, card.querySelector('[data-post-action="comment"]'));
+  });
+};
+const openPendingCommunityPost = () => {
+  if (!pendingPostId) return;
+  const postId = pendingPostId;
+  pendingPostId = null;
+  if (communityPosts.some((post) => String(post.id) === String(postId))) openCommunityPostDetail(postId);
+  else showToast('That post is no longer available.');
 };
 
 // The feed's first load shows post-shaped skeletons and marks the list aria-busy (Phase C Task 6); a reload after a new
@@ -2311,6 +2495,8 @@ const loadCommunityPosts = async () => {
     communityPostAuthors[memberProfile.id] = { ...memberProfile, image: memberProfile.photoUrl || '', photoUrl: memberProfile.photoUrl || '' };
   }
   const otherAuthorIds = authorIds.filter((id) => String(id) !== String(memberProfile.id));
+  // Likes and saves load beside the authors, so the cards render once, already in the member's state.
+  const reactionsLoaded = refreshCommunityReactions().catch((reactionError) => console.warn('Likes and saves could not load:', reactionError?.message));
   if (otherAuthorIds.length) {
     const authors = await fetchCandidates(otherAuthorIds);
     if (authors.error) console.warn('Post authors could not load:', authors.error.message);
@@ -2328,10 +2514,12 @@ const loadCommunityPosts = async () => {
       };
     });
   }
+  await reactionsLoaded;
   communityPostsLoading = false;
   communityPostsLoaded = true;
   list?.removeAttribute('aria-busy');
   renderCommunityPosts();
+  openPendingCommunityPost();
 };
 
 const openCommunityPostComposer = () => {
@@ -2362,6 +2550,7 @@ document.querySelector('#community-post-list')?.addEventListener('click', (event
   if (event.target.closest('[data-post-first]')) openCommunityPostComposer();
   else if (event.target.closest('[data-posts-retry]')) { communityPostsLoaded = false; loadCommunityPosts(); }
 });
+bindCommunityPostActions();
 document.querySelector('#close-community-post')?.addEventListener('click', closeCommunityPostComposer);
 document.querySelector('#community-post-image')?.addEventListener('change', (event) => {
   const file = event.target.files?.[0];

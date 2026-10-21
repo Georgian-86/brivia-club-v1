@@ -24,6 +24,8 @@
 //                 'community_posts'), optionally prefixed by a method ('POST community_posts'; the method key wins):
 //                 { delayMs, status } waits delayMs before answering, and a status >= 400 answers that error instead;
 //                 { body } answers 200 with that JSON as is (e.g. a malformed deck_candidates answer; Phase C final fixes).
+//                 An error override may name its PostgREST { code, message } (polish wave C3: '42501' for an RLS refusal,
+//                 '42P01' for a table that does not exist yet); the default is 'XX000' / 'stub failure'.
 import { readFileSync } from 'node:fs';
 import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
@@ -91,7 +93,7 @@ export const startAppStub = async ({ port, state = {}, deckRows = defaultDeckRow
       const short = pathName.replace(/^\/rest\/v1\//, '');
       const override = st.routes?.[`${method} ${short}`] || st.routes?.[short];
       if (override?.delayMs) await new Promise((resolve) => setTimeout(resolve, override.delayMs));
-      if (override?.status >= 400) return json(override.status, { code: 'XX000', message: 'stub failure' });
+      if (override?.status >= 400) return json(override.status, { code: override.code || 'XX000', message: override.message || 'stub failure' });
       if (override && 'body' in override) return json(200, override.body);
       const own = st.own || ownRow;
       if (pathName === '/rest/v1/profiles') return json(200, (request.headers().accept || '').includes('vnd.pgrst.object') ? own : [own]);

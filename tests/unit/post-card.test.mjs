@@ -57,3 +57,18 @@ test('shareData carries no caption and no name', () => {
   const data = shareData(post, 'https://brivia.club');
   assert.deepEqual(data, { title: 'A post on Brivia Club', url: 'https://brivia.club/explore.html?post=p1' });
 });
+
+// C3 (carried from the C2 review): only an https: or same-origin path image renders; anything else is the placeholder.
+test('imageSrc must start with https: or /; other schemes render the placeholder', () => {
+  for (const bad of ['javascript:alert(1)', 'http://x.test/a.jpg', 'data:image/png;base64,AAAA', '//evil.test/a.jpg', ' https://x.test/a.jpg', 'blob:https://x.test/1']) {
+    const html = postCardMarkup(post, author, { ...view, imageSrc: bad }, deps);
+    assert.doesNotMatch(html, /<img /, bad);
+    assert.match(html, /community-post-image-missing/, bad);
+  }
+  assert.match(postCardMarkup(post, author, { ...view, imageSrc: '/media/Images/a.webp' }, deps), /<img src="\/media\/Images\/a\.webp"/);
+  assert.match(postCardMarkup(post, author, { ...view, imageSrc: 'https://x.test/a.jpg' }, deps), /<img src="https:\/\/x\.test\/a\.jpg"/);
+});
+
+test('shareData encodes the post id', () => {
+  assert.equal(shareData({ id: 'a b&c=d/e?f' }, 'https://brivia.club').url, 'https://brivia.club/explore.html?post=a%20b%26c%3Dd%2Fe%3Ff');
+});

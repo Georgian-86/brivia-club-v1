@@ -67,3 +67,14 @@ test('setBusy keeps a button that was already disabled disabled, and ignores a m
   assert.equal(button.disabled, true);
   assert.doesNotThrow(() => setBusy(null, true));
 });
+
+// Polish wave C3: a posts skeleton is drawn in the Explore card's shape (wine header bar, 4:5 media, caption lines, wine
+// action bar), so the real card replaces it without a layout shift. Each card is still one .skeleton block.
+test('posts skeleton blocks have the post card shape', () => {
+  const html = skeletonMarkup('posts', 2);
+  assert.equal(blocks(html), 2);
+  for (const part of ['skeleton-post-head', 'skeleton-post-media', 'skeleton-post-caption', 'skeleton-post-actions']) {
+    assert.equal((html.match(new RegExp(`class="${part}"`, 'g')) || []).length, 2, part);
+  }
+  assert.doesNotMatch(skeletonMarkup('list', 2), /skeleton-post-/);
+});

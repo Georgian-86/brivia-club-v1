@@ -7,13 +7,17 @@
 
 const KINDS = ['deck', 'list', 'posts', 'chips'];
 const MAX_BLOCKS = 12;
+// Polish wave C3: a posts block is drawn in the Explore card's shape (explore-cards.css): the wine header bar, the 4:5
+// media, two caption lines and the wine action bar, so the real card replaces it without a layout shift.
+const POST_CARD = '<div class="skeleton skeleton-posts"><div class="skeleton-post-head"></div><div class="skeleton-post-media"></div>'
+  + '<div class="skeleton-post-caption"></div><div class="skeleton-post-actions"></div></div>';
 
 // A decorative placeholder: the group is aria-hidden, so the caller announces loading (aria-busy on the container, and a
 // status line where one helps). `deck` is always one card; other kinds draw `count` blocks (1..12).
 export const skeletonMarkup = (kind, count = 3) => {
   const shape = KINDS.includes(kind) ? kind : 'list';
   const n = shape === 'deck' ? 1 : Math.min(MAX_BLOCKS, Math.max(1, Math.floor(Number(count)) || 1));
-  const block = `<div class="skeleton skeleton-${shape}"></div>`;
+  const block = shape === 'posts' ? POST_CARD : `<div class="skeleton skeleton-${shape}"></div>`;
   return `<div class="skeleton-group skeleton-group-${shape}" aria-hidden="true">${block.repeat(n)}</div>`;
 };
 
