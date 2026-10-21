@@ -1,10 +1,11 @@
 -- Polish wave, Task D1 (0012 section D): the private resumes bucket, resume messages, deletion covers resumes.
--- R1 the bucket row is private, 5242880 bytes, {application/pdf}
+-- R1 the bucket row is private, 5242880 bytes, {application/pdf}; R1b re-applying the bucket statement resets it
 -- R2 a can insert a/resume.pdf but not a/cv.pdf or b/resume.pdf; a cannot rename it away; b cannot touch a's file
 -- R3 b cannot select a/resume.pdf without a message (anon neither)
 -- R4 with a match and a 'resume' message a -> b, b can select it; c (not the recipient) cannot
+-- R4b that resume message does not open a same-named message-attachments file (a/resume.pdf) to b
 -- R5 after b blocks a, a blocks b, or the match is deleted, b cannot; a message without a match grants nothing
--- R6 a message of type 'resume' with any other path is refused by the constraint (23514)
+-- R6 a message of type 'resume' with any other path, or none, is refused by the constraint (23514)
 -- R7 resume_path is not a column of public_profiles nor in the result type of get_candidates, search_members,
 --    deck_candidates, list_members; a can set resume_path to a/resume.pdf but not b/resume.pdf; b cannot read a's
 -- R8 delete_my_account('DELETE') with a fresh amr raises storage_not_empty while a/resume.pdf exists (no owner set,
@@ -68,6 +69,22 @@ begin
   if r.file_size_limit is distinct from 5242880 then raise exception 'FAIL R1: file_size_limit = %', r.file_size_limit; end if;
   if r.allowed_mime_types is distinct from array['application/pdf'] then
     raise exception 'FAIL R1: allowed_mime_types = %', r.allowed_mime_types; end if;
+end $$;
+
+-- R1b: re-applying the section D bucket statement resets a loosened bucket (the statement below is copied verbatim
+-- from 0012 section D).
+do $$
+declare r record;
+begin
+  update storage.buckets set public = true, file_size_limit = 52428800, allowed_mime_types = array['image/png'] where id = 'resumes';
+  insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+  values ('resumes', 'resumes', false, 5242880, array['application/pdf'])
+  on conflict (id) do update set public = false, file_size_limit = 5242880, allowed_mime_types = array['application/pdf'];
+  select * into r from storage.buckets where id = 'resumes';
+  if r.public is distinct from false or r.file_size_limit is distinct from 5242880
+     or r.allowed_mime_types is distinct from array['application/pdf'] then
+    raise exception 'FAIL R1b: the bucket was not reset: public %, limit %, types %', r.public, r.file_size_limit, r.allowed_mime_types;
+  end if;
 end $$;
 
 -- R2: owner-only writes on exactly <uid>/resume.pdf.
@@ -142,6 +159,15 @@ begin
   perform pg_temp.as_member(a);
   if pg_temp.sees(p) <> 1 then raise exception 'FAIL R4: a cannot read the own resume'; end if;
   perform pg_temp.as_owner();
+  -- R4b: a resume message never aliases a same-named file in message-attachments
+  insert into storage.objects (bucket_id, name) values ('message-attachments', p);
+  perform pg_temp.as_member(b);
+  if (select count(*) from storage.objects where bucket_id = 'message-attachments' and name = p) <> 0 then
+    raise exception 'FAIL R4b: a resume message opens message-attachments/% to b', p; end if;
+  perform pg_temp.as_owner();
+  perform set_config('storage.allow_delete_query', 'true', true);
+  delete from storage.objects where bucket_id = 'message-attachments' and name = p;
+  perform set_config('storage.allow_delete_query', 'false', true);
 
   insert into public.brivia_blocks (blocker_id, blocked_id) values (b, a);
   perform pg_temp.as_member(b);
@@ -167,7 +193,7 @@ end $$;
 do $$
 declare a uuid := pg_temp.rm(1); b uuid := pg_temp.rm(2); bad text; st text;
 begin
-  foreach bad in array array[a::text || '/cv.pdf', b::text || '/resume.pdf', a::text || '/resume.pdf.exe', 'resume.pdf'] loop
+  foreach bad in array array[a::text || '/cv.pdf', b::text || '/resume.pdf', a::text || '/resume.pdf.exe', 'resume.pdf', null] loop
     st := '';
     begin
       insert into public.brivia_messages (sender_id, recipient_id, body, message_type, attachment_path)

@@ -446,7 +446,9 @@ member, always at `resumes/<uid>/resume.pdf`. Policies on `storage.objects` for 
 Adds `profiles.resume_path text` (null, or exactly `<id>/resume.pdf`: constraint `profiles_resume_path_own`) with
 `grant update (resume_path)` to `authenticated`. Only the owner reads it (profiles select is own-row only;
 `public_profiles` and the member RPCs do not return it). Adds `brivia_messages_resume_path`: a `resume` message must
-carry its sender's own `<sender_id>/resume.pdf` path. Redefines `delete_my_account(p_confirm)` with the 0005 body,
+carry its sender's own `<sender_id>/resume.pdf` path (a null path is refused too). Redefines the 0003 select policy
+"Participants can view message attachments" verbatim plus `m.message_type <> 'resume'`, so a resume message never
+opens a same-named file in `message-attachments`. Redefines `delete_my_account(p_confirm)` with the 0005 body,
 adding `resumes` to the member-folder buckets: a stored resume raises `storage_not_empty` until the client removes it
 through the Storage API (same signature, grants and errors). The test-member purge (`seed/purge-test-members.sql`)
 already removes every object under a purged member's folder in any bucket, resumes included.
@@ -455,7 +457,7 @@ Pre-flight (must return 0 before applying, else adding the message constraint fa
 
 ```sql
 select count(*) from public.brivia_messages
- where message_type = 'resume' and attachment_path <> sender_id::text || '/resume.pdf';
+ where message_type = 'resume' and (attachment_path is null or attachment_path <> sender_id::text || '/resume.pdf');
 ```
 
 Verify after applying: `select id, public, file_size_limit, allowed_mime_types from storage.buckets where id = 'resumes';`

@@ -88,10 +88,30 @@ alter table public.profiles add constraint profiles_resume_path_own
 grant update (resume_path) on public.profiles to authenticated;
 
 -- A resume message points at its sender's own resume, nothing else (brivia_messages_attachment_path_owner, 0003,
--- already pins the sender's folder).
+-- already pins the sender's folder). coalesce: a null path would make the check null, which a CHECK accepts.
 alter table public.brivia_messages drop constraint if exists brivia_messages_resume_path;
 alter table public.brivia_messages add constraint brivia_messages_resume_path
-  check (message_type <> 'resume' or attachment_path = sender_id::text || '/resume.pdf');
+  check (message_type <> 'resume' or coalesce(attachment_path = sender_id::text || '/resume.pdf', false));
+
+-- The 0003 message-attachments select policy, redefined verbatim plus `m.message_type <> 'resume'`: a resume message
+-- (path <sender>/resume.pdf) must never open a same-named file in the message-attachments bucket.
+drop policy if exists "Participants can view message attachments" on storage.objects;
+create policy "Participants can view message attachments"
+  on storage.objects for select to authenticated
+  using (
+    bucket_id = 'message-attachments'
+    and (
+      (storage.foldername(name))[1] = (select auth.uid()::text)
+      or exists (
+        select 1 from public.brivia_messages m
+         where m.attachment_path = storage.objects.name
+           and m.message_type <> 'resume'
+           -- the object must sit in the SENDER's folder: a message cannot claim someone else's file
+           and (storage.foldername(storage.objects.name))[1] = m.sender_id::text
+           and (select auth.uid()) in (m.sender_id, m.recipient_id)
+      )
+    )
+  );
 
 -- delete_my_account, redefined: the 0005 body unchanged except that 'resumes' joins the member-folder bucket list, so
 -- a stored resume blocks deletion (storage_not_empty) until the client removes it through the Storage API.
