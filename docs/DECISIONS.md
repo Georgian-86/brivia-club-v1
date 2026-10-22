@@ -1651,3 +1651,16 @@ controls (a tester or a seeded test member), never a real member, so no new expo
   Account and 18+ on the same column, title and subtitle one line each, the whole login card on screen with 8 px to
   spare and no panel scroll at 1920x886, 1536x709, 1440x780, 1366x633 and 1280x720) and
   `tests/unit/showcase-cards.test.mjs` (no tagline).
+- **Connect deck as a stack** (founder: "the card should look stacked, as it did earlier"; refines D-081). The next
+  member's card peeks out 12 px below the top card at 96% width, and a plain deeper layer (`#swipe-card-back`,
+  decorative, aria-hidden) 24 px below at 92%, both opaque, in the card's paper with the same oxblood edge and a soft
+  shadow (the next card used to sit at 72% opacity and a fainter edge, which hid the stack). The deeper layer shows
+  only while two or more members wait behind the top card, and neither layer exists behind the last card. While the
+  top card is dragged the deeper layer never moves and the next card only rises in place, as before. Desktop reserves
+  24 px under the stage (`--deck-peek`; the card is 24 px shorter, and the headline, Pass / Pitch and hint keep their
+  D-081 alignment with the card); phones keep their layout with 24 px more under the card. Reduced motion: no layer
+  animates. CSS: `deck.css`, `reference-design.css`; markup `app.html`; `renderNextCard` in `app.js`. Numbers:
+  1366x633 card 327x511 -> 312x487 (152,045 px², still >= 145,000), 1440x900 486x759 -> 471x735, 1920x1080 563x880
+  -> 563x880 (width-bound). Proof: `tests/e2e/deck.spec.mjs` (two layers +12 / +24 px, narrower, opaque, inside the
+  stage, at every D-081 size and at 375x812 and 320x640; layers still mid-drag; one layer with one member left, none
+  behind the last; reduced motion).

@@ -911,8 +911,24 @@ try {
     assert.equal(passes().length, passesBefore);
   });
 
-  // Mid-drag: the card follows the pointer with a rotation and the stamp of the side.
+  // D-082: while the top card is dragged, the stacked layers stay put: the back layer does not move at all and the
+  // next card stays centred (it only rises in place as the top card leaves).
+  const layerBoxes = (pg) => pg.evaluate(() => Object.fromEntries(['#swipe-card-back', '#swipe-card-next', '#swipe-card'].map((s) => {
+    const el = document.querySelector(s);
+    if (!el || !el.getClientRects().length) return [s, null];
+    const r = el.getBoundingClientRect();
+    return [s, { l: Math.round(r.left), t: Math.round(r.top), w: Math.round(r.width), b: Math.round(r.bottom), cx: Math.round(r.left + r.width / 2) }];
+  })));
+  const restLayers = await layerBoxes(sp);
   await slowDrag(sp, -w * 0.28, { release: false });
+  const dragLayers = await layerBoxes(sp);
+  check(`mid-drag: the stacked layers stay put while the top card moves (rest ${JSON.stringify(restLayers)}, drag ${JSON.stringify(dragLayers)})`, () => {
+    assert.ok(restLayers['#swipe-card-back'] && dragLayers['#swipe-card-back']);
+    assert.deepEqual(dragLayers['#swipe-card-back'], restLayers['#swipe-card-back']);
+    assert.ok(Math.abs(dragLayers['#swipe-card-next'].cx - restLayers['#swipe-card-next'].cx) <= 1);
+    assert.ok(Math.abs(dragLayers['#swipe-card'].cx - restLayers['#swipe-card'].cx) >= 40, 'the top card did not move');
+  });
+  // Mid-drag: the card follows the pointer with a rotation and the stamp of the side.
   const midLeft = await sp.evaluate(() => ({ pass: Number(getComputedStyle(document.querySelector('.swipe-stamp-pass')).opacity), pitch: Number(getComputedStyle(document.querySelector('.swipe-stamp-pitch')).opacity), held: document.querySelector('#swipe-card').classList.contains('is-held') }));
   const midLeftTurn = await rotationOf(sp);
   await swipeShot(sp, 'drag-left-1440.png');
@@ -967,6 +983,9 @@ try {
   await sp.waitForTimeout(400);
   const settled = await sp.evaluate(() => ({ transform: document.querySelector('#swipe-card').style.transform, opacity: getComputedStyle(document.querySelector('#swipe-card')).opacity }));
   check(`the next card takes the front at rest (${JSON.stringify(settled)})`, () => { assert.equal(settled.transform, ''); assert.equal(settled.opacity, '1'); });
+  // D-082: the stack shows only the cards that exist: Chen has one card behind (Dana), so the deeper layer goes.
+  const depthChen = await sp.evaluate(() => ({ next: !document.querySelector('#swipe-card-next').hidden, nextName: document.querySelector('#swipe-next-name').textContent.trim(), back: Boolean(document.querySelector('#swipe-card-back')?.getClientRects().length) }));
+  check(`with one card left behind, one layer peeks (${JSON.stringify(depthChen)})`, () => assert.deepEqual(depthChen, { next: true, nextName: 'Dana Blank', back: false }));
 
   // A fast short fling commits.
   await sp.waitForTimeout(200);
@@ -984,6 +1003,9 @@ try {
     await mcdp.detach();
     const flung = await waitForCard(sp, 'Dana Blank');
     check(`a fast short fling left (80 px) commits a Pass (${passes().length - passesBefore})`, () => { assert.equal(flung, true); assert.equal(passes().length - passesBefore, 1); });
+    await sp.waitForTimeout(400);
+    const depthLast = await sp.evaluate(() => ({ next: Boolean(document.querySelector('#swipe-card-next')?.getClientRects().length), back: Boolean(document.querySelector('#swipe-card-back')?.getClientRects().length) }));
+    check(`the last card stands alone, no layers behind it (${JSON.stringify(depthLast)})`, () => assert.deepEqual(depthLast, { next: false, back: false }));
   }
 
   // No click-through: a drag that starts on VIEW PROFILE never opens the profile.
@@ -1056,6 +1078,8 @@ try {
   const rmAfter = await rp2.evaluate(() => getComputedStyle(document.querySelector('#swipe-card')).transform);
   check(`reduced motion: no rotation mid-drag (${rmTurn}) and the pass still works`, () => { assert.equal(rmTurn, 0); assert.equal(rmNext, true); });
   check(`reduced motion: the card rests with no transform (${rmAfter})`, () => assert.equal(rmAfter, 'none'));
+  const rmLayers = await rp2.evaluate(() => ['#swipe-card-next', '#swipe-card-back'].map((s) => { const el = document.querySelector(s); return el ? getComputedStyle(el).transitionDuration : 'missing'; }));
+  check(`reduced motion: the stacked layers never animate (${JSON.stringify(rmLayers)})`, () => rmLayers.forEach((d) => assert.match(d, /^0s(, 0s)*$/)));
   await rm.close();
 
   // Desktop composition (D-081, refines D-079): the card is the hero. One frame, no scrolling at any listed laptop or
@@ -1079,6 +1103,9 @@ try {
       const ctl = (s) => { const b = box(s); return { ...b, b: b.b + 25 }; };
       return {
         nav: box('.app-topbar'), card, next: box('#swipe-card-next'), head: box('.home-heading'), hint: box('.swipe-hint'), pass: ctl('.swipe-pass'), like: ctl('.swipe-like'),
+        back: document.querySelector('#swipe-card-back')?.getClientRects().length ? box('#swipe-card-back') : null,
+        stage: box('.app-view[data-view="home"]'),
+        layerLook: ['#swipe-card-next', '#swipe-card-back'].every((s) => { const el = document.querySelector(s); return el && Number(getComputedStyle(el).opacity) >= 0.98; }) ? 'opaque' : 'faded',
         viewIn: !view || (view.top >= card.t && view.bottom <= card.b + 0.5),
         scroll: document.documentElement.scrollHeight - innerHeight, hscroll: document.documentElement.scrollWidth - document.documentElement.clientWidth, vh: innerHeight,
       };
@@ -1118,6 +1145,20 @@ try {
       assert.ok(next.w >= 0.9 * card.w && next.w <= card.w + 0.5);
       assert.ok(next.b >= card.b - 0.5 && next.b <= card.b + 24);
     });
+    // D-082: the card reads as a deck. Two layers peek out below the top card (each at least 8 px lower, the deeper one
+    // lower and narrower still), in the same paper, fully opaque, centred, and inside the stage: on screen, above the
+    // controls under the card (850-1099 px), and the page still does not scroll.
+    const { back, stage } = m;
+    check(`${vw}x${vh}: the card reads as a stack: two layers peek out below it (next +${back ? r0(next.b - card.b) : '-'} px, ${r0(next.w)} wide; back +${back ? r0(back.b - card.b) : 'missing'} px, ${back ? r0(back.w) : '-'} wide; card ${r0(card.w)}), opaque (${m.layerLook}), inside the stage (back bottom ${back ? r0(back.b) : '-'} of ${m.vh}${vw < 1100 ? `, controls at ${r0(pass.t)}` : ''})`, () => {
+      assert.ok(back, 'no second layer');
+      assert.ok(next.b >= card.b + 8, 'next does not peek');
+      assert.ok(back.b >= card.b + 8 && back.b >= next.b + 6, 'back does not peek below next');
+      assert.ok(back.w < next.w - 4 && next.w < card.w - 4, 'layers are not narrower');
+      assert.ok(Math.abs(back.cx - card.cx) <= 2);
+      assert.ok(back.b <= m.vh - 4 && back.b <= stage.b + 0.5, 'back leaves the stage');
+      if (vw < 1100) assert.ok(back.b <= pass.t, 'back runs into Pass / Pitch');
+      assert.equal(m.layerLook, 'opaque');
+    });
     if (vw === 1366 && vh === 633) {
       check(`1366x633: the card is the hero: ${r0(card.w)}x${r0(card.h)} (height >= 470, area ${r0(card.w * card.h)} >= 145,000 px²)`, () => { assert.ok(card.h >= 470); assert.ok(card.w * card.h >= 145000); });
     }
@@ -1131,6 +1172,29 @@ try {
     assert.ok(areas['1440x900'] >= areas['1366x633'] * 1.25);
     assert.ok(areas['1920x1080'] >= areas['1440x900'] * 1.1);
   });
+
+  // D-082 on phones: the same two layers peek out below the card, and Pass / Pitch stay clear of them.
+  for (const [pw, ph] of [[375, 812], [320, 640]]) {
+    resetStub();
+    const mc = await stub.newContext(browser, { width: pw, height: ph }, { hasTouch: true, isMobile: true });
+    const mp = await open(mc);
+    await waitForCard(mp, 'Asha Band');
+    await mp.waitForTimeout(600);
+    const mm = await mp.evaluate(() => {
+      const box = (s) => { const el = document.querySelector(s); if (!el || !el.getClientRects().length) return null; const b = el.getBoundingClientRect(); return { l: b.left, r: b.right, t: b.top, b: b.bottom, w: b.width, cx: b.left + b.width / 2 }; };
+      return { card: box('#swipe-card'), next: box('#swipe-card-next'), back: box('#swipe-card-back'), pass: box('.swipe-pass'), hscroll: document.documentElement.scrollWidth - document.documentElement.clientWidth };
+    });
+    await swipeShot(mp, `stack-${pw}x${ph}.png`);
+    check(`${pw}x${ph}: two layers peek out below the card (next +${mm.next ? Math.round(mm.next.b - mm.card.b) : '-'}, back +${mm.back ? Math.round(mm.back.b - mm.card.b) : 'missing'}), Pass / Pitch below them (${mm.pass ? Math.round(mm.pass.t) : '-'}), no sideways scroll (${mm.hscroll})`, () => {
+      assert.ok(mm.next && mm.back);
+      assert.ok(mm.next.b >= mm.card.b + 8 && mm.back.b >= mm.next.b + 6);
+      assert.ok(mm.back.w < mm.next.w && mm.next.w < mm.card.w);
+      assert.ok(Math.abs(mm.back.cx - mm.card.cx) <= 2);
+      assert.ok(mm.pass.t >= mm.back.b);
+      assert.ok(mm.hscroll <= 0);
+    });
+    await mc.close();
+  }
 
   // A cover that fails to load (a broken path) falls back to the placeholder, never the alt text.
   resetStub({ rows: [{ ...deckRows[0], photo_url: null, cover_url: '/assets/no-such-cover-xyz.webp' }, deckRows[1]] });

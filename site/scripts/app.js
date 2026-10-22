@@ -881,6 +881,9 @@ const renderNextCard = (queue) => {
   const index = queue.findIndex((person) => String(person.id) === String(currentPerson?.id));
   const person = index >= 0 ? queue[index + 1] : null;
   next.hidden = !person;
+  // The deeper layer (D-082) shows only when a second member waits behind the next one.
+  const back = document.querySelector('#swipe-card-back');
+  if (back) back.hidden = !(person && queue[index + 2]);
   if (!person) return;
   setCardImage(next.querySelector('#swipe-next-image'), deckCoverSrc(person, safeImageUrl), '');
   const name = next.querySelector('#swipe-next-name'); if (name) name.textContent = person.name || '';
@@ -891,7 +894,7 @@ const renderHome = (queue = getExplorePeople()) => {
   const hint = document.querySelector('.swipe-hint');
   const limitState = document.querySelector('#swipe-limit-state');
   const emptyState = document.querySelector('#home-empty-state');
-  if (!currentPerson) document.querySelector('#swipe-card-next')?.setAttribute('hidden', '');
+  if (!currentPerson) document.querySelectorAll('#swipe-card-next, #swipe-card-back').forEach((layer) => layer.setAttribute('hidden', ''));
   if (!currentPerson && deckLoadingNow()) {
     renderWhy(null);
     card?.removeAttribute('hidden');

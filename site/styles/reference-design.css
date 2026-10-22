@@ -198,11 +198,13 @@ body.app-body .app-view[data-view="home"] .swipe-card .why-panel {
   left: var(--ref-inset-x);
 }
 
-/* The card underneath matches the top card's face. */
-body.app-body .app-view[data-view="home"] .swipe-card-next {
-  border: 1.5px solid color-mix(in srgb, var(--color-oxblood) 60%, transparent);
+/* The cards underneath match the top card's face: the same paper, the same oxblood edge, a soft shadow (D-082). */
+body.app-body .app-view[data-view="home"] .swipe-card-next,
+body.app-body .app-view[data-view="home"] .swipe-card-back {
+  border: 1.5px solid color-mix(in srgb, var(--color-oxblood) 78%, transparent);
   border-radius: 22px;
   background: var(--color-card-paper);
+  box-shadow: 0 14px 26px -16px color-mix(in srgb, var(--color-oxblood) 45%, transparent);
 }
 body.app-body .app-view[data-view="home"] .swipe-card-next::before {
   top: var(--ref-inset-top);
@@ -229,7 +231,9 @@ body.app-body .app-view[data-view="home"] .swipe-like { border-color: var(--colo
    width follows at 0.64 x the height, so it stays tall (about 1.56 to 1). From 1100 px wide Pass and Pitch flank the
    card, level with its middle; narrower desktops keep them under it. The hint is a two-line caption under the
    headline, level with the card's bottom edge. Everything fits one frame from 1280x650 to 2560x1440.
-   Tracks: 1 headline | 2 gutter | 3 Pass | 4 card | 5 Pitch | 6 gutter (3 and 5 are empty under 1100 px). */
+   Tracks: 1 headline | 2 gutter | 3 Pass | 4 card | 5 Pitch | 6 gutter (3 and 5 are empty under 1100 px).
+   D-082: --deck-peek (24 px) is kept free under the card for the two stacked layers; the headline, Pass / Pitch and
+   hint carry the same bottom margin, so they stay level with the card itself. */
 @media (min-width: 850px) {
   body.app-body .app-view[data-view="home"] {
     --deck-top: 76px;
@@ -239,7 +243,8 @@ body.app-body .app-view[data-view="home"] .swipe-like { border-color: var(--colo
     --deck-ctl: 60px;
     --deck-ctl-gap: 0px;
     --deck-under: 104px;
-    --deck-h-avail: calc(100svh - var(--deck-top) - 2 * var(--deck-pad-y) - var(--deck-under));
+    --deck-peek: 24px;
+    --deck-h-avail: calc(100svh - var(--deck-top) - 2 * var(--deck-pad-y) - var(--deck-under) - var(--deck-peek));
     --deck-w-avail: calc(var(--deck-content) * .6 - 2 * (var(--deck-ctl) + var(--deck-ctl-gap)) - 16px);
     --deck-card-h: clamp(400px, min(var(--deck-h-avail), var(--deck-w-avail) / .64), 880px);
     --deck-card-w: calc(var(--deck-card-h) * .64);
@@ -271,7 +276,7 @@ body.app-body .app-view[data-view="home"] .swipe-like { border-color: var(--colo
     top: auto;
     left: auto;
     max-width: 100%;
-    margin: 0;
+    margin: 0 0 var(--deck-peek);
     padding-right: 16px;
     transform: none !important;
   }
@@ -283,7 +288,7 @@ body.app-body .app-view[data-view="home"] .swipe-like { border-color: var(--colo
     grid-row: 1;
     width: var(--deck-card-w);
     height: var(--deck-card-h);
-    margin: 0;
+    margin: 0 0 var(--deck-peek);
   }
   body.app-body .app-view[data-view="home"] .swipe-stack .swipe-card {
     height: var(--deck-card-h);
@@ -320,7 +325,7 @@ body.app-body .app-view[data-view="home"] .swipe-like { border-color: var(--colo
     row-gap: 4px;
     width: auto;
     max-width: 100%;
-    margin: 0;
+    margin: 0 0 var(--deck-peek);
     padding: 14px 16px 0 0;
     background: linear-gradient(var(--dk-line), var(--dk-line)) left top / 32px 1px no-repeat;
     text-align: left;
@@ -337,8 +342,8 @@ body.app-body .app-view[data-view="home"] .swipe-like { border-color: var(--colo
   body.app-body .app-view[data-view="home"] { --deck-ctl: 64px; --deck-ctl-gap: clamp(24px, 2.4vw, 44px); --deck-under: 0px; }
   body.app-body .app-view[data-view="home"]:has(.swipe-limit-state:not([hidden])) { --deck-under: 84px; }
   body.app-body .app-view[data-view="home"] .swipe-actions:not([hidden]) { display: contents; }
-  body.app-body .app-view[data-view="home"] .swipe-pass { grid-column: 3; grid-row: 1; align-self: center; margin: 0 var(--deck-ctl-gap) 0 0; }
-  body.app-body .app-view[data-view="home"] .swipe-like { grid-column: 5; grid-row: 1; align-self: center; margin: 0 0 0 var(--deck-ctl-gap); }
+  body.app-body .app-view[data-view="home"] .swipe-pass { grid-column: 3; grid-row: 1; align-self: center; margin: 0 var(--deck-ctl-gap) var(--deck-peek) 0; }
+  body.app-body .app-view[data-view="home"] .swipe-like { grid-column: 5; grid-row: 1; align-self: center; margin: 0 0 var(--deck-peek) var(--deck-ctl-gap); }
   body.app-body .app-view[data-view="home"] .swipe-limit-state { grid-row: 2; margin-top: 20px; }
 }
 @media (min-width: 1100px) and (min-height: 821px) {

@@ -248,10 +248,11 @@ body.app-body :is(button, [role="button"], .filter-button, .discovery-filter-sug
 .app-view[data-view="home"] .swipe-stack {
   --swipe-rise: 0;
   --swipe-rise-speed: 0ms;
+  --stack-peek: 12px;
   position: relative;
   z-index: 1;
   width: min(100%, 380px);
-  margin: 0 auto;
+  margin: 0 auto calc(var(--stack-peek) * 2);
 }
 .app-view[data-view="home"] .swipe-stack .swipe-card {
   position: relative;
@@ -275,8 +276,23 @@ body.app-body :is(button, [role="button"], .filter-button, .discovery-filter-sug
 .app-view[data-view="home"] .swipe-stack .swipe-card.is-entering { animation: deck-card-in .24s cubic-bezier(.34, 1.56, .64, 1); }
 @keyframes deck-card-in { from { transform: translateY(8px) scale(.975); } to { transform: none; } }
 
-/* The card underneath: the next member, slightly smaller and lower; it rises as the top card leaves. */
-.app-view[data-view="home"] .swipe-card-next[hidden] { display: none !important; }
+/* The deck (D-082): the next member peeks out 12 px below the top card at 96% width, and a plain deeper layer 24 px
+   below at 92%, so the card reads as a stack of people. The next card rises into place as the top card leaves; the
+   deeper layer never moves. --stack-peek is reserved under the stack (margin) so nothing else runs into the layers. */
+.app-view[data-view="home"] .swipe-card-next[hidden],
+.app-view[data-view="home"] .swipe-card-back[hidden] { display: none !important; }
+.app-view[data-view="home"] .swipe-card-back {
+  position: absolute;
+  z-index: 0;
+  inset: 0;
+  border: 2px solid var(--dk-ink);
+  border-radius: 18px;
+  background: var(--dk-paper);
+  box-shadow: 0 10px 24px var(--dk-line);
+  pointer-events: none;
+  transform: translateY(calc(var(--stack-peek) * 2)) scale(.92);
+  transform-origin: 50% 100%;
+}
 .app-view[data-view="home"] .swipe-card-next {
   position: absolute;
   z-index: 1;
@@ -287,9 +303,8 @@ body.app-body :is(button, [role="button"], .filter-button, .discovery-filter-sug
   background: var(--dk-paper);
   box-shadow: 0 10px 24px var(--dk-line);
   pointer-events: none;
-  transform: translateY(calc((1 - var(--swipe-rise)) * 14px)) scale(calc(.955 + var(--swipe-rise) * .045));
+  transform: translateY(calc((1 - var(--swipe-rise)) * var(--stack-peek))) scale(calc(.96 + var(--swipe-rise) * .04));
   transform-origin: 50% 100%;
-  opacity: calc(.72 + var(--swipe-rise) * .28);
   transition: transform var(--swipe-rise-speed) cubic-bezier(.2, .7, .2, 1), opacity var(--swipe-rise-speed) linear;
 }
 .app-view[data-view="home"] .swipe-stack.is-dragging .swipe-card-next { transition: none; }
@@ -375,7 +390,8 @@ body.app-body :is(button, [role="button"], .filter-button, .discovery-filter-sug
 
 @media (max-width: 700px) {
   .app-view[data-view="home"] .swipe-stack { width: 100%; }
-  .app-view[data-view="home"] .swipe-card-next { border-radius: 17px; }
+  .app-view[data-view="home"] .swipe-card-next,
+  .app-view[data-view="home"] .swipe-card-back { border-radius: 17px; }
   .app-view[data-view="home"] .swipe-stamp { top: 70px; font-size: var(--text-20); }
 }
 
