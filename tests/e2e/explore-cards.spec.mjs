@@ -331,6 +331,43 @@ try {
       });
       await context.close();
     });
+    // VFIX 3: on phones the "Link copied." toast never lands on the action bar of the post just shared (nor on the tab
+    // bar); on desktop it stays where it was (bottom right).
+    await scenario('toast clear of the action bar', async () => {
+      const init = () => { Object.defineProperty(navigator, 'share', { configurable: true, value: undefined }); };
+      for (const width of [320, 375, 390, 1440]) {
+        for (const where of ['low', 'high']) {
+          const { context, page } = await open(width, { init });
+          await watchToasts(page);
+          const card = page.locator('.post-card[data-post-id="post-2"]');
+          // Scroll so the action bar sits just above the tab bar ('low') or just under the header ('high').
+          await page.evaluate((where) => {
+            const bar = document.querySelector('.post-card[data-post-id="post-2"] .post-card-actions');
+            const r = bar.getBoundingClientRect();
+            const target = where === 'low' ? innerHeight - 90 - r.height : 70;
+            window.scrollBy(0, r.top - target);
+          }, where);
+          await page.waitForTimeout(300);
+          await card.locator('[data-post-action="share"]').click();
+          await page.waitForTimeout(450);
+          const m = await page.evaluate(() => {
+            const t = document.querySelector('#app-toast').getBoundingClientRect();
+            const b = document.querySelector('.post-card[data-post-id="post-2"] .post-card-actions').getBoundingClientRect();
+            const tab = document.querySelector('.app-tabbar')?.getBoundingClientRect();
+            const hit = (a, c) => a.left < c.right && c.left < a.right && a.top < c.bottom && c.top < a.bottom;
+            return { toast: [t.left, t.top, t.right, t.bottom].map(Math.round), bar: [b.left, b.top, b.right, b.bottom].map(Math.round), onBar: hit(t, b), onTabs: Boolean(tab && tab.height && getComputedStyle(document.querySelector('.app-tabbar')).display !== 'none' && hit(t, tab)), inside: t.left >= 0 && t.right <= innerWidth && t.top >= 0 && t.bottom <= innerHeight, shown: document.querySelector('#app-toast').classList.contains('show'), scroll: document.documentElement.scrollWidth - innerWidth };
+          });
+          if (width < 1000) check(`toast ${width} (${where}): "Link copied." is clear of the action bar and the tab bar, inside the viewport (${JSON.stringify(m)})`, () => {
+            assert.equal(m.shown, true); assert.equal(m.onBar, false, 'toast covers the action bar'); assert.equal(m.onTabs, false, 'toast covers the tab bar');
+            assert.equal(m.inside, true); assert.equal(m.scroll, 0);
+          });
+          else check(`toast ${width} (${where}): desktop keeps the toast bottom right (${JSON.stringify(m)})`, () => {
+            assert.equal(m.shown, true); assert.ok(m.toast[2] >= 1440 - 40 && m.toast[3] >= 900 - 110, 'toast moved on desktop');
+          });
+          await context.close();
+        }
+      }
+    });
     await scenario('scenario 7', async () => {
       const init = () => { Object.defineProperty(navigator, 'share', { configurable: true, value: undefined }); };
       const { context, page } = await open(1440, { init });

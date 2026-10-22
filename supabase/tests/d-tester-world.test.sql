@@ -572,7 +572,7 @@ begin
    where schemaname = 'public' and tablename in ('connection_requests', 'matches', 'brivia_messages')
      and cmd in ('SELECT', 'INSERT')
      and coalesce(qual, '') || coalesce(with_check, '')
-         !~ '(brivia_incoming_request_visible|brivia_pair_world_ok|brivia_can_message)\(';
+         !~ '(brivia_incoming_request_visible|brivia_pair_world_ok|brivia_can_message|brivia_can_send)\(';  -- brivia_can_send: 0013
   if bad is not null then raise exception 'FAIL guard: pair policies without a world rule: %', bad; end if;
 end $$;
 

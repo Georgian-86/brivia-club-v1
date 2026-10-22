@@ -1,21 +1,21 @@
 /* Full-screen Brivia AI room based on the supplied desktop reference. */
 @media(min-width:701px){
-  :root{--brivia-cream:#efe5d9;--brivia-paper:#f7efe5;--brivia-wine:#5a061f;--brivia-ink:#332522;--brivia-line:rgba(90,6,31,.27)}
+  :root{--brivia-cream:#efe5d9;--brivia-paper:#f7efe5;--brivia-wine:#5a061f;--brivia-ink:#332522;--brivia-line:rgba(90,6,31,.27);--chat-list-w:max(280px,25%)}
   body.app-body[data-app-view="chat"]{min-height:100svh;overflow:hidden;background:var(--brivia-cream);color:var(--brivia-ink)}
   body.app-body[data-app-view="chat"] .app-wrap{height:100svh;min-height:100svh;padding:0}
   body.app-body[data-app-view="chat"] .app-topbar{display:grid}
   body.app-body[data-app-view="chat"] .app-main{width:100%;height:100svh;max-width:none}
   .app-view[data-view="chat"]{position:relative;display:flex!important;height:100%;min-height:0;padding:6px;background:var(--brivia-cream)}
   .app-view[data-view="chat"]>.view-topline,.app-view[data-view="chat"]>.view-heading{display:none}
-  .app-view[data-view="chat"]>.inbox-toolbar{position:absolute;z-index:5;top:clamp(112px,15vh,135px);left:21px;width:calc(25% - 42px);margin:0;display:block}
+  .app-view[data-view="chat"]>.inbox-toolbar{position:absolute;z-index:5;top:clamp(112px,15vh,135px);left:21px;width:calc(var(--chat-list-w) - 42px);margin:0;display:block}
   .app-view[data-view="chat"] .inbox-search{height:34px;min-height:34px;padding:0 12px;border:0;border-radius:18px;background:rgba(255,255,255,.52);box-shadow:none}
   .app-view[data-view="chat"] .inbox-search span{font-size:var(--text-14);color:var(--brivia-wine)}
   .app-view[data-view="chat"] .inbox-search input{height:34px;font-family:var(--font-body);font-size:var(--text-12)}
   .app-view[data-view="chat"] .inbox-tabs{display:none}
-  .app-view[data-view="chat"] .chat-layout{position:relative;display:grid!important;grid-template-columns:25% 75%;flex:1;width:100%;height:100%;min-height:0;border:1px solid var(--brivia-line);border-radius:12px;background:var(--brivia-paper);box-shadow:0 11px 32px rgba(64,37,30,.08);overflow:hidden}
+  .app-view[data-view="chat"] .chat-layout{position:relative;display:grid!important;grid-template-columns:var(--chat-list-w) minmax(0,1fr);flex:1;width:100%;height:100%;min-height:0;border:1px solid var(--brivia-line);border-radius:12px;background:var(--brivia-paper);box-shadow:0 11px 32px rgba(64,37,30,.08);overflow:hidden}
   .app-view[data-view="chat"] .chat-layout>.chat-list{position:relative;height:100%;min-height:0;padding:18px 0 0;border-right:1px solid var(--brivia-line);background:rgba(247,239,229,.82);color:var(--brivia-ink);overflow:hidden}
   .app-view[data-view="chat"] .chat-list:before{display:block;height:89px;padding:3px 24px 0;color:var(--brivia-ink);content:'Brivia\A\A  —\A  P E O P L E\A  I D E A S\A  O P P O R T U N I T I E S';white-space:pre;font-family:var(--font-heading);font-size:var(--text-32);letter-spacing:-1.5px;line-height:1.05}
-  .app-view[data-view="chat"] .chat-list:after{position:absolute;right:24px;bottom:22px;left:24px;padding-top:17px;border-top:1px solid var(--brivia-line);color:rgba(90,6,31,.75);content:'BRIVIA AI  ·  THOUGHTFUL CONNECTIONS';font-family:var(--font-body);font-size:var(--text-12);letter-spacing:.107em;line-height:1.8;white-space:nowrap}
+  .app-view[data-view="chat"] .chat-list:after{position:absolute;right:24px;bottom:22px;left:24px;padding-top:17px;border-top:1px solid var(--brivia-line);color:rgba(90,6,31,.75);content:'BRIVIA AI  ·  THOUGHTFUL CONNECTIONS';font-family:var(--font-body);font-size:var(--text-12);letter-spacing:.107em;line-height:1.8;white-space:normal;text-wrap:balance}
   .app-view[data-view="chat"] #chat-list .inbox-panel-head{display:none}
   .app-view[data-view="chat"] #chat-list>.chat-row:first-of-type{margin-top:42px}
   .app-view[data-view="chat"] #chat-list>.chat-row{min-height:69px;padding:10px 15px;border-bottom:1px solid rgba(90,6,31,.12);background:transparent}
@@ -84,7 +84,7 @@
   .app-view[data-view="chat"]>.inbox-toolbar{
     top:clamp(124px,16vh,148px);
     left:26px;
-    width:calc(25% - 52px);
+    width:calc(var(--chat-list-w) - 52px);
     padding:0 2px;
     border-radius:20px;
     background:rgba(247,239,229,.96);
@@ -96,7 +96,7 @@
 
 /* Keep the two panes in one row and respect the hidden state of the real chat window. */
 @media(min-width:701px){
-  .app-view[data-view="chat"] .chat-layout{grid-template-columns:minmax(0,25%) minmax(0,75%)!important;grid-template-rows:minmax(0,1fr)!important}
+  .app-view[data-view="chat"] .chat-layout{grid-template-columns:minmax(0,var(--chat-list-w)) minmax(0,1fr)!important;grid-template-rows:minmax(0,1fr)!important}
   .app-view[data-view="chat"] .chat-layout>.chat-list{grid-column:1!important;grid-row:1!important;min-width:0!important}
   .app-view[data-view="chat"] .chat-layout>.chat-window{grid-column:2!important;grid-row:1!important}
   .app-view[data-view="chat"] .chat-layout>.chat-window[hidden]{display:none!important}

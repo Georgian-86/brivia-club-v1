@@ -324,7 +324,7 @@ try {
     check('1440: page does not scroll sideways (step 1)', () => assert.ok(noScroll1));
     await a11yStep(page, '1440 step 1');
     const previewHeadline = await page.evaluate(() => document.querySelector('#community-preview-title')?.textContent.replace(/\s+/g, ' ').trim());
-    check(`1440: the preview headline is "THE KIND OF PEOPLE WE'RE BUILDING FOR." (got "${previewHeadline}")`, () => assert.equal(previewHeadline, "THE KIND OF PEOPLE WE'RE BUILDING FOR."));
+    check(`1440: the preview headline is "YOUR KIND IS ALREADY HERE." (D-078; got "${previewHeadline}")`, () => assert.equal(previewHeadline, 'YOUR KIND IS ALREADY HERE.'));
     const stepLabelStyle = await page.evaluate(() => { const el = document.querySelector('[data-signup-step-label]'); const st = getComputedStyle(el); return { color: st.color, size: parseFloat(st.fontSize) }; });
     check(`1440: the "STEP n OF 4" label is #5e0b28 at 12 px or more (${JSON.stringify(stepLabelStyle)})`, () => { assert.equal(stepLabelStyle.color, 'rgb(94, 11, 40)'); assert.ok(stepLabelStyle.size >= 12); });
     const counterShown = await page.evaluate(() => { const el = document.querySelector('.auth-step'); return Boolean(el && el.getClientRects().length && getComputedStyle(el).visibility !== 'hidden'); });

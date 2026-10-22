@@ -30,6 +30,7 @@ import { openReportDialog, bindCardOverflow, cardOverflowOpen, reportSuccessCopy
 import { defaultCoverUrl, normalizeCoverUrl } from './cover-assets.js';
 import { postImageSrc } from './post-image.js';
 import { postCardMarkup, shareData, isSafePostImageSrc } from './post-card.js';
+import { toastSide } from './toast-place.js';
 import { loadReactions, setReaction, createReactionGuard } from './post-reactions.js';
 import { profileChecklist } from './profile-checklist.js';
 import { quotaLabel, quotaErrorText, quotaBlocked, quotaNotice } from './signal-quota.js';
@@ -237,10 +238,20 @@ const avatarImage = (image, name) => {
 const initials = (name = 'New Member') => name.split(/\s+/).map((part) => part[0]).join('').slice(0, 2).toUpperCase();
 // Header and board avatars use the same initials as the profile avatar ("Qa Tester" -> "QT", never "QA").
 const headerInitials = (name = 'New Member') => initials(String(name || '').trim() || 'New Member') || 'NM';
+// The control (or its action bar) the member just used: on phones the toast keeps clear of it (toast-place.js).
+let lastUsedControl = null;
+document.addEventListener('pointerdown', (event) => { lastUsedControl = event.target instanceof Element ? event.target.closest('button, a, [role="button"]') : null; }, true);
+document.addEventListener('keydown', () => { lastUsedControl = null; }, true);
 const showToast = (message) => {
   const toast = document.querySelector('#app-toast');
   if (!toast) return;
   toast.textContent = message;
+  toast.classList.remove('toast-top');
+  if (window.matchMedia('(max-width: 780px)').matches) {
+    const used = lastUsedControl?.isConnected ? lastUsedControl : document.activeElement;
+    const anchor = used instanceof Element && used !== document.body ? (used.closest('.post-card-actions') || used) : null;
+    if (toastSide(toast.getBoundingClientRect(), anchor?.getBoundingClientRect()) === 'top') toast.classList.add('toast-top');
+  }
   toast.classList.add('show');
   window.setTimeout(() => toast.classList.remove('show'), 2600);
 };
@@ -3368,9 +3379,10 @@ const openShareConfirm = ({ title, lead = '', preview, note, confirmLabel, icon 
   dialog.showModal();
   dialog.querySelector('[data-share-confirm]')?.focus();
 });
-// The composer's send-error copy (shared with the text send below).
+// The composer's send-error copy (shared with the text send below). Since 0013 a block never refuses a send (the
+// message is withheld), so a refusal means the pair is no longer matched: neutral copy, never the word "blocked".
 const chatSendErrorCopy = (error) => (/row-level security|policy|brivia_is_blocked_between|blocked/i.test(error?.message || '')
-  ? 'This conversation is blocked. Unblock the user before sending a message.'
+  ? 'You can no longer message this member.'
   : (error?.message || 'Message could not be saved.'));
 const sendShare = async (person, send) => {
   if (shareBusy || !supabase || !memberProfile.id) return;

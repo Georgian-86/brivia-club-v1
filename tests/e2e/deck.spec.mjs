@@ -1051,8 +1051,11 @@ try {
   check(`reduced motion: the card rests with no transform (${rmAfter})`, () => assert.equal(rmAfter, 'none'));
   await rm.close();
 
-  // Desktop alignment: the card top is below the top bar and Pass / Pitch sit centred under the card.
-  for (const [vw, vh] of [[1920, 1080], [1366, 768], [1440, 900], [1280, 720]]) {
+  // Desktop alignment (D-079): one frame, no scrolling: the card top is below the top bar, the card is always tall like
+  // the phone card (at least 1.5 tall per 1 wide; founder 2026-10-22 "long, not wide" and "in one frame"), its View
+  // profile button is inside it, Pass / Pitch sit centred under it, everything ends on screen, and the headline is level
+  // with the middle of the card. 1366x633 is a 768 px laptop screen minus browser bars.
+  for (const [vw, vh] of [[1920, 1080], [1366, 768], [1440, 900], [1280, 720], [1366, 633], [1280, 650], [1536, 730]]) {
     resetStub();
     const lc = await makeContext({ width: vw, height: vh });
     const lp = await open(lc);
@@ -1060,15 +1063,20 @@ try {
     await lp.waitForTimeout(600);
     const m = await lp.evaluate(() => {
       const r = (s) => document.querySelector(s).getBoundingClientRect();
-      const nav = r('.app-topbar'); const card = r('#swipe-card'); const pass = r('.swipe-pass'); const like = r('.swipe-like'); const hint = r('.swipe-hint');
-      return { navBottom: Math.round(nav.bottom), cardTop: Math.round(card.top), cardBottom: Math.round(card.bottom), cardCx: Math.round(card.left + card.width / 2), actionsCx: Math.round((pass.left + like.right) / 2), actionsTop: Math.round(pass.top), hintBottom: Math.round(hint.bottom), vh: innerHeight };
+      const nav = r('.app-topbar'); const card = r('#swipe-card'); const pass = r('.swipe-pass'); const like = r('.swipe-like'); const hint = r('.swipe-hint'); const head = r('.home-heading');
+      const view = document.querySelector('#swipe-card .view-info-button')?.getBoundingClientRect();
+      return { navBottom: Math.round(nav.bottom), cardTop: Math.round(card.top), cardBottom: Math.round(card.bottom), cardW: Math.round(card.width), cardH: Math.round(card.height), cardCx: Math.round(card.left + card.width / 2), cardCy: Math.round(card.top + card.height / 2), headCy: Math.round(head.top + head.height / 2), viewIn: !view || (view.top >= card.top && view.bottom <= card.bottom + 0.5), actionsCx: Math.round((pass.left + like.right) / 2), actionsTop: Math.round(pass.top), hintBottom: Math.round(hint.bottom), scroll: document.documentElement.scrollHeight - innerHeight, vh: innerHeight };
     });
-    if ([1920, 1366].includes(vw)) await swipeShot(lp, `layout-${vw}x${vh}.png`);
-    check(`${vw}x${vh}: card top ${m.cardTop} is below the top bar (${m.navBottom}); controls under the card, centred (${m.actionsCx} vs ${m.cardCx}), all on screen (${m.hintBottom} <= ${m.vh})`, () => {
+    await swipeShot(lp, `layout-${vw}x${vh}.png`);
+    check(`${vw}x${vh}: one frame (scroll ${m.scroll}, hint ${m.hintBottom} <= ${m.vh}); card ${m.cardW}x${m.cardH} is tall, below the top bar (${m.cardTop} >= ${m.navBottom}), View profile inside (${m.viewIn}); controls centred under it (${m.actionsCx} vs ${m.cardCx}); headline level with the card (${m.headCy} vs ${m.cardCy})`, () => {
       assert.ok(m.cardTop >= m.navBottom);
+      assert.ok(m.cardH >= 1.5 * m.cardW);
+      assert.ok(m.viewIn);
       assert.ok(Math.abs(m.actionsCx - m.cardCx) <= 40);
       assert.ok(m.actionsTop > m.cardBottom);
       assert.ok(m.hintBottom <= m.vh);
+      assert.ok(m.scroll <= 1);
+      assert.ok(Math.abs(m.headCy - m.cardCy) <= 16);
     });
     if (vw === 1920) {
       const ax = await axeViolations(lp, { include: '.app-view[data-view="home"]', decorative: ['.swipe-card-info::before'] });

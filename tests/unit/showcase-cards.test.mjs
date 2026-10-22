@@ -30,3 +30,15 @@ test('the marquee keeps the same speed per card (38s for 11 cards becomes 31s fo
   const css = readFileSync('site/styles/auth-polish.css', 'utf8');
   assert.match(css, /\.community-track\{[^}]*animation:community-cards-slide 31s linear infinite/);
 });
+
+test('the marquee caption carries no head count (founder ruling)', () => {
+  const note = authHtml.match(/<p class="community-preview-note">([^<]*)<\/p>/)?.[1];
+  assert.equal(note, 'PEOPLE LIKE YOU · OPEN POSSIBILITIES');
+  assert.doesNotMatch(authHtml, /THREE PEOPLE/i);
+});
+
+test('the profiles heading reads "Your kind is already here." in the serif heading font (founder, 2026-10-22)', () => {
+  assert.match(authHtml, /<p class="auth-eyebrow">A FEW PEOPLE IN THE ROOM<\/p><h2 id="community-preview-title">YOUR KIND <br \/><em>IS ALREADY HERE\.<\/em><\/h2>/);
+  const css = readFileSync('site/styles/auth-polish.css', 'utf8');
+  assert.match(css, /\.community-preview-heading h2\{font-family:var\(--font-heading\)/);
+});

@@ -148,14 +148,19 @@ begin
   if not brivia_private.brivia_incoming_request_visible(c) then reset role; raise exception 'FAIL H3: a cannot see c''s request'; end if;
   if (select count(*) from public.connection_requests where to_id = a) <> 1 then reset role; raise exception 'FAIL H3: request policy'; end if;
   reset role;
-  -- a blocks b: no message, either way; a blocks c: c's request is hidden from a
+  -- b blocks a: a message to a blocking match is stored and withheld (0013: never refused, b never sees it);
+  -- a blocks c: c's request is hidden from a
   insert into public.brivia_blocks (blocker_id, blocked_id) values (b, a), (a, c);
   set local role authenticated;
   perform set_config('request.jwt.claims', json_build_object('sub', a)::text, true);
   failed := false;
   begin insert into public.brivia_messages (sender_id, recipient_id, body) values (a, b, 'again');
   exception when insufficient_privilege then failed := true; end;
-  if not failed then reset role; raise exception 'FAIL H3: a message to a blocking match was allowed'; end if;
+  if failed then reset role; raise exception 'FAIL H3: a message to a blocking match was refused (it must be stored and withheld)'; end if;
+  perform set_config('request.jwt.claims', json_build_object('sub', b)::text, true);
+  if exists (select 1 from public.brivia_messages where sender_id = a and body = 'again') then
+    reset role; raise exception 'FAIL H3: a message to a blocking match reached the blocker'; end if;
+  perform set_config('request.jwt.claims', json_build_object('sub', a)::text, true);
   if (select count(*) from public.connection_requests where to_id = a) <> 0 then reset role; raise exception 'FAIL H3: blocked request visible'; end if;
   reset role;
   delete from public.brivia_blocks where blocker_id in (a, b);

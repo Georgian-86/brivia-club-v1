@@ -1509,3 +1509,53 @@ controls (a tester or a seeded test member), never a real member, so no new expo
   removed from the auth page marquee, which loops 9 cards at the same per-card speed (31 s).
 - **Blocked sends withheld (A5)** ships separately with migration `0013`.
 
+## D-076: The Connect card is always tall on desktop, like the phone card (founder, 2026-10-22)
+
+- **What happened.** D-059 (2026-10-14, "card and controls aligned") sized the desktop card from the window height so
+  the card and Pass / Pitch always fit on screen. On a short laptop window (1366x633, a 768 px screen minus browser
+  bars) that squashed the card to 352x400: nearly square, the View profile button cut off. The polish wave did not
+  change it (measured identical before and after).
+- **Decision.** The founder wants the card long, not wide, like the phone card. On desktop the card height is now
+  `clamp(600px, 100svh - 262px, 700px)` (the signal-limit state `clamp(600px, ..., 640px)`) at the same 352 px+ width,
+  so it is always at least 1.6 tall per 1 wide. On a short window the page scrolls to Pass / Pitch, which stay
+  centred under the card. Phones are unchanged.
+- **Proof.** `tests/e2e/deck.spec.mjs` desktop layout check at 1920x1080, 1366x768, 1440x900, 1280x720 and 1366x633:
+  card height at least 1.6x its width, controls centred under it and reachable; on screen at 880 px tall and above.
+
+## D-077: A blocked member's messages are stored and withheld, never refused (A5 of the polish wave, 0013, 2026-10-22)
+
+- **Founder ask.** A blocked member could not send at all, which looked like a bug and revealed the block. Now they
+  type and send as normal; the message shows as sent in their own thread only.
+- **How.** `0013_blocked_sends_withheld.sql` (0012 is live and frozen, so A5 left 0012). The insert policy uses
+  `brivia_can_send` (matched + same world, no block clause). An AFTER INSERT trigger, under the same pair lock as the
+  block trigger, marks a message withheld when either member has blocked the other (`brivia_private.withheld_message`,
+  no grants). Every recipient read path excludes withheld rows: the messages select policy (so the inbox, unread
+  counts, notifications and Realtime `postgres_changes`), the message-attachments policy and the resume policy.
+- **Rules.** Either direction; permanent (an unblock never releases a withheld message); the block is never
+  revealed; `report_member` evidence still includes withheld rows (moderation only). An unmatched pair is still
+  refused, and the client's refusal copy is now neutral ("You can no longer message this member.").
+- **Known trade-off.** A blocked member can keep storing messages that nobody sees; `report_member` evidence is the
+  latest 50 rows, so a long withheld flood can push older messages out of that window. Revisit with the P0-C
+  moderation work (rate limit or evidence that keeps pre-block messages).
+
+## D-078: The auth page profiles heading reads "Your kind is already here." again (founder, 2026-10-22)
+
+- The founder asked for the original line on the login page's profile section: eyebrow "A FEW PEOPLE IN THE ROOM",
+  heading "YOUR KIND / IS ALREADY HERE.", keeping the current Bodoni serif heading font (only the words change).
+- This reverses the R10 honesty copy on that heading (29f1e24: "EXAMPLE PROFILES", "THE KIND OF PEOPLE WE'RE BUILDING
+  FOR."). The founder owns the product copy; the marquee cards are still showcase cards, not live members.
+
+## D-079: The Connect card stays tall AND fits one screen on desktop (founder, 2026-10-22; refines D-076)
+
+- After D-076 the tall card made short laptop windows scroll. The founder wants it in one frame, still long (not
+  wide), with "Connection, curated." in the centre.
+- The card height follows the window again (`clamp(400px, 100svh - 262px, 700px)`; under 820 px tall
+  `clamp(360px, 100svh - 230px, 700px)` with smaller Pass / Pitch and a one-line-each hint), and the WIDTH now follows
+  the height (`clamp(260px, 0.58 x height, 480px)`), so a short window gets a narrower tall card instead of a squashed
+  one. Under 700 px tall the avatar, bar and cover shrink, and interest chips show in whole rows only (two rows under
+  820 px tall, one under 700 px; "You both" chips first), so View profile always stays inside the card. The headline is level
+  with the middle of the card. Phones are unchanged.
+- Proof: `tests/e2e/deck.spec.mjs` desktop layout at 1920x1080, 1366x768, 1440x900, 1280x720, 1366x633, 1280x650 and
+  1536x730: no scrolling, card at least 1.5 tall per 1 wide, View profile inside, controls centred under it, headline
+  centred with the card.
+
