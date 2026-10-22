@@ -1,8 +1,7 @@
 /* Guided signup (polish wave B, D-073; first D-067/D-068): one question per screen, in a calm editorial card beside
    the auth image on desktop, a full-height sheet with the primary button pinned above the keyboard on phones.
    Brivia deep-wine tokens only (tokens.css, deep-wine-theme.css), Bodoni Moda headings, Instrument Sans body.
-   The stepper: one bubble per question with its icon; done = filled wine with a tick, current = a wine ring that
-   glows softly, pending = a faint outline. The line between bubbles fills as the member moves on. */
+   The stepper (D-082b): one thin bar per question; done bars fill with wine, the current one is part-filled. */
 .auth-guided {
   --g-wine: var(--color-chat-wine);
   --g-deep: var(--brivia-deep-wine);
@@ -56,95 +55,37 @@
   overflow: hidden !important; clip: rect(0 0 0 0) !important; white-space: nowrap !important; border: 0 !important;
 }
 
-/* ---- The bubble stepper ---- */
+/* ---- The stepper (D-082b): one thin bar per question. Done = filled wine, current = part-filled, pending = the bare
+   track. The progressbar role and the visually hidden "Step n of N" carry the meaning; the bars are decoration. ---- */
 .guided-steps {
   display: flex;
-  justify-content: space-between;
-  margin: 0 0 var(--space-3);
-  padding: 0;
-  list-style: none;
+  gap: 6px;
+  margin: 0 0 var(--space-5);
 }
 .guided-steps[hidden] { display: none; }
-.guided-bubble {
+.guided-bar {
   position: relative;
-  display: flex;
   flex: 1 1 0;
-  flex-direction: column;
-  align-items: center;
-  gap: 6px;
-  min-width: 0;
-}
-.guided-bubble + .guided-bubble::before,
-.guided-bubble + .guided-bubble::after {
-  content: '';
-  position: absolute;
-  top: 19px;
-  right: calc(50% + 24px);
-  left: calc(-50% + 24px);
-  height: 2px;
-  border-radius: 2px;
+  height: 4px;
+  overflow: hidden;
+  border-radius: 4px;
   background: var(--g-line);
 }
-.guided-bubble + .guided-bubble::after {
+.guided-bar-fill {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: 0;
+  border-radius: inherit;
   background: var(--g-wine);
-  transform: scaleX(0);
-  transform-origin: left center;
-  transition: transform var(--motion-slow) var(--ease) calc(var(--i, 0) * 40ms);
+  transition: width var(--motion-slow) var(--ease) calc(var(--i, 0) * 40ms);
 }
-.guided-bubble.is-current::after,
-.guided-bubble.is-done::after { transform: scaleX(1); }
-.guided-bubble-dot {
-  position: relative;
-  display: grid;
-  width: 40px;
-  height: 40px;
-  place-items: center;
-  border: 1.5px solid var(--g-line-strong);
-  border-radius: 50%;
-  background: var(--g-paper);
-  color: var(--g-soft);
-  transition: background var(--motion-slow) var(--ease), border-color var(--motion-slow) var(--ease), color var(--motion-slow) var(--ease), transform var(--motion-slow) var(--ease);
-}
-.guided-bubble-dot svg {
-  grid-area: 1 / 1;
-  width: 19px;
-  height: 19px;
-  fill: none;
-  stroke: currentColor;
-  stroke-width: 1.7;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-  transition: opacity var(--motion-base) var(--ease), transform var(--motion-base) var(--ease);
-}
-.guided-bubble-tick { opacity: 0; transform: scale(.6); }
-.guided-bubble-name {
-  overflow: hidden;
-  max-width: 100%;
-  color: var(--g-muted);
-  font-size: var(--text-12);
-  font-weight: 600;
-  letter-spacing: .06em;
-  text-overflow: ellipsis;
-  text-transform: uppercase;
-  white-space: nowrap;
-}
-.guided-bubble.is-done .guided-bubble-dot { border-color: var(--g-wine); background: var(--g-wine); color: var(--g-paper); }
-.guided-bubble.is-done .guided-bubble-icon { opacity: 0; transform: scale(.6); }
-.guided-bubble.is-done .guided-bubble-tick { opacity: 1; transform: none; }
-.guided-bubble.is-current .guided-bubble-dot {
-  border: 2px solid var(--g-wine);
-  color: var(--g-wine);
-  transform: scale(1.08);
-  animation: guided-glow 2.4s var(--ease) infinite;
-}
-.guided-bubble.is-current .guided-bubble-name,
-.guided-bubble.is-done .guided-bubble-name { color: var(--g-wine); }
-@keyframes guided-glow {
-  0%, 100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--color-chat-wine) 26%, transparent); }
-  50% { box-shadow: 0 0 0 8px color-mix(in srgb, var(--color-chat-wine) 0%, transparent); }
-}
+.guided-bar.is-current { background: var(--g-line-strong); }
+.guided-bar.is-current .guided-bar-fill { width: 45%; }
+.guided-bar.is-done .guided-bar-fill { width: 100%; }
 .guided-step-label {
-  margin: 0 0 var(--space-5);
+  margin: 0;
   color: var(--g-wine);
   font-size: var(--text-12);
   font-weight: 700;
@@ -378,22 +319,23 @@
 /* Interests: the catalogue, the "Your picks" tray, the flying chip */
 .guided-field--search { margin-bottom: var(--space-3); }
 .guided-tray {
-  position: sticky;
-  z-index: 2;
-  top: 0;
-  margin: 0 0 var(--space-4);
-  padding: 14px 16px;
+  display: flex;
+  min-height: 60px;
+  align-items: center;
+  gap: 12px;
+  margin: 0 0 var(--space-3);
+  padding: 6px 6px 6px 14px;
   border: 1px solid var(--g-line-strong);
   border-radius: var(--radius-m);
-  background: color-mix(in srgb, var(--color-cream) 96%, transparent);
-  box-shadow: 0 14px 28px -24px color-mix(in srgb, var(--brivia-deep-wine) 70%, transparent);
-  backdrop-filter: blur(6px);
+  background: var(--g-paper);
 }
-.guided-tray-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; color: var(--g-deep); font-size: var(--text-12); font-weight: 700; letter-spacing: .12em; text-transform: uppercase; }
-.guided-tray-head b { display: inline-block; padding: 4px 12px; border-radius: var(--radius-pill); background: var(--g-wine); color: var(--g-paper); letter-spacing: .04em; white-space: nowrap; }
-.guided-tray-list { display: flex; flex-wrap: wrap; gap: 6px; margin: 10px 0 0; padding: 0; list-style: none; }
+/* D-082b: the tray is one compact row in the flow (never sticky, never over the chips); picks scroll sideways. */
+.guided-tray-head { display: grid; flex: none; gap: 4px; justify-items: start; color: var(--g-deep); font-size: var(--text-12); font-weight: 700; letter-spacing: .12em; text-transform: uppercase; }
+.guided-tray-head b { display: inline-block; padding: 2px 10px; border-radius: var(--radius-pill); background: var(--g-wine); color: var(--g-paper); letter-spacing: .04em; white-space: nowrap; }
+.guided-tray-list { display: flex; flex: 1 1 auto; min-width: 0; gap: 6px; margin: 0; padding: 2px; overflow-x: auto; list-style: none; scrollbar-width: thin; scrollbar-color: var(--g-line-strong) transparent; }
+.guided-tray-list li { flex: none; }
 .guided-tray-list:empty { display: none; }
-.guided-tray-empty { margin: 8px 0 0; color: var(--g-muted); font-size: var(--text-14); }
+.guided-tray-empty { flex: 1 1 auto; margin: 0; color: var(--g-muted); font-size: var(--text-14); }
 .guided-tray-empty[hidden] { display: none; }
 .guided-pick, .guided-option {
   display: inline-flex;
@@ -407,10 +349,73 @@
   font-size: var(--text-14);
   cursor: pointer;
 }
-.guided-pick { border: 1px solid var(--g-wine); background: var(--g-wine); color: var(--g-paper); font-weight: 600; }
+.guided-pick { border: 1px solid var(--g-wine); background: var(--g-wine); color: var(--g-paper); font-weight: 600; white-space: nowrap; }
 .guided-pick span { font-size: var(--text-16); line-height: 1; }
 .guided-pick:hover { background: var(--g-deep); }
-.guided-options { display: flex; flex-wrap: wrap; gap: 8px; padding-bottom: var(--space-2); }
+.guided-options {
+  display: flex;
+  height: var(--guided-panel-h, clamp(140px, calc(100svh - 540px), 300px));
+  flex-wrap: wrap;
+  align-content: flex-start;
+  gap: 8px;
+  margin: 0 -6px;
+  padding: 6px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  scrollbar-color: var(--g-line-strong) transparent;
+}
+.guided-options:focus-visible { outline-offset: -2px; }
+/* More chips below: a soft fade at the panel's foot (signup-screens.js sets .has-more while it can still scroll). */
+.guided-options.has-more { mask-image: linear-gradient(to bottom, black calc(100% - 28px), transparent); }
+/* The category tabs: one scrollable row, the selected tab underlined in wine; arrow buttons on desktop pointers. */
+.guided-tabs { position: relative; display: flex; align-items: center; gap: 4px; margin: 0 0 var(--space-3); border-bottom: 1px solid var(--g-line); }
+.guided-tabs[hidden] { display: none; }
+.guided-tablist { display: flex; flex: 1 1 auto; min-width: 0; gap: 2px; overflow-x: auto; scrollbar-width: none; }
+.guided-tablist::-webkit-scrollbar { display: none; }
+.guided-tabs.can-next .guided-tablist { mask-image: linear-gradient(to right, black calc(100% - 48px), transparent); }
+.guided-tabs.can-prev .guided-tablist { mask-image: linear-gradient(to left, black calc(100% - 48px), transparent); }
+.guided-tabs.can-prev.can-next .guided-tablist { mask-image: linear-gradient(to right, transparent, black 48px, black calc(100% - 48px), transparent); }
+.guided-tab {
+  flex: none;
+  min-height: 44px;
+  margin: 0 0 -1px;
+  padding: 0 14px;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  background: none;
+  color: var(--g-muted);
+  font: inherit;
+  font-size: var(--text-14);
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: color var(--motion-fast) var(--ease), border-color var(--motion-fast) var(--ease);
+}
+.guided-tab:hover { color: var(--g-deep); }
+.guided-tab[aria-selected="true"] { border-bottom-color: var(--g-wine); color: var(--g-deep); }
+.guided .guided-tab:focus-visible { outline-offset: -4px; }
+.guided-tabs-scroll { display: none; }
+@media (min-width: 781px) and (hover: hover) and (pointer: fine) {
+  .guided-tabs-scroll {
+    display: grid;
+    flex: none;
+    width: 44px;
+    height: 44px;
+    place-items: center;
+    padding: 0;
+    border: 1px solid var(--g-line);
+    border-radius: 50%;
+    background: var(--g-paper);
+    color: var(--g-wine);
+    cursor: pointer;
+    visibility: hidden;
+  }
+  .guided-tabs-scroll svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+  .guided-tabs-scroll:hover { border-color: var(--g-wine); }
+  .guided-tabs.can-prev .guided-tabs-scroll--prev,
+  .guided-tabs.can-next .guided-tabs-scroll--next { visibility: visible; }
+}
 .guided-option {
   border: 1px solid var(--g-line-strong);
   background: var(--g-paper);
@@ -517,12 +522,8 @@
   .guided::before { display: none; }
   /* One question and nothing else: the example-profiles marquee below the shell waits for the login view. */
   body.auth-page:has(.auth-guided.is-active) .community-preview { display: none; }
-  .guided-bubble-dot { width: 34px; height: 34px; }
-  .guided-bubble-dot svg { width: 16px; height: 16px; }
-  .guided-bubble + .guided-bubble::before,
-  .guided-bubble + .guided-bubble::after { top: 16px; right: calc(50% + 20px); left: calc(-50% + 20px); }
-  .guided-bubble-name { display: none; }
-  .guided-step-label { margin-bottom: var(--space-4); }
+  .guided-steps { margin-bottom: var(--space-4); }
+  .guided-options { --guided-panel-h: clamp(200px, 44svh, 340px); }
   .auth-shell .guided .guided-screen h1 { font-size: clamp(30px, 9vw, 38px) !important; }
   /* Sticky, not fixed: the auth shell is transformed (its float animation), which would anchor a fixed bar to the
      shell instead of the screen. The card is a screen tall, so the bar rests on the bottom edge. */
@@ -544,8 +545,7 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .guided-bubble.is-current .guided-bubble-dot { animation: none; }
   .guided-reveal-mark { animation: none; }
-  .guided-bubble-dot, .guided-bubble + .guided-bubble::after, .guided-choice, .guided-next, .guided-option { transition: none; }
+  .guided-bar-fill, .guided-tab, .guided-choice, .guided-next, .guided-option { transition: none; }
   .guided-choice:hover:not(:disabled), .guided-next:hover:not(:disabled) { transform: none; }
 }

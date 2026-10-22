@@ -50,3 +50,31 @@ export const backTarget = (path, screen, hasSession) => {
 
 // VITE_SIGNUP_FLOW: `classic` keeps the 4-step form for one release (rollback); anything else is the guided flow.
 export const signupFlowMode = (value) => (String(value ?? '').trim().toLowerCase() === 'classic' ? 'classic' : 'guided');
+
+// D-082b: the Interests picker shows one category at a time. `nodes` is the whole active taxonomy (levels 1-4);
+// only offered nodes (not sensitive, level 3-4, labelled) are listed. "Popular" comes first: the popular labels that
+// exist, in their order, topped up round-robin across the categories to `size`. Then one group per top-level
+// category in taxonomy order, labelled by its level-1 node (or the id, capitalised, when that node is missing).
+export const isOffered = (n) => Boolean(n && !n.sensitive && n.level >= 3 && String(n.label || '').trim());
+export const groupInterests = (nodes = [], popular = [], { size = 16 } = {}) => {
+  const offered = nodes.filter(isOffered);
+  if (!offered.length) return [];
+  const tops = new Map();
+  for (const n of offered) {
+    const top = String(n.id).split('.')[0];
+    if (!tops.has(top)) {
+      const head = nodes.find((x) => x && x.id === top);
+      tops.set(top, { id: top, label: String(head?.label || '').trim() || top.charAt(0).toUpperCase() + top.slice(1).replace(/_/g, ' '), items: [] });
+    }
+    tops.get(top).items.push(n);
+  }
+  const categories = [...tops.values()];
+  const chosen = [];
+  const seen = new Set();
+  const add = (n) => { if (n && !seen.has(n.id) && chosen.length < size) { seen.add(n.id); chosen.push(n); } };
+  for (const label of popular) add(offered.find((n) => n.label.toLowerCase() === String(label).toLowerCase()));
+  for (let round = 0; chosen.length < size && categories.some((c) => c.items.length > round); round += 1) {
+    for (const c of categories) add(c.items[round]);
+  }
+  return [{ id: 'popular', label: 'Popular', items: chosen }, ...categories];
+};

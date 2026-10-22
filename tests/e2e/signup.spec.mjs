@@ -158,13 +158,15 @@ const ui = (page) => page.evaluate(() => {
     h2: [...root.querySelectorAll('h2')].filter(visible).length,
     title: root.querySelector('h1')?.textContent.trim(),
     label: visible(root.querySelector('[data-guided-step-label]')) ? root.querySelector('[data-guided-step-label]').textContent : null,
-    bubbles: [...root.querySelectorAll('.guided-bubble')].filter(visible).map((b) => `${b.dataset.step}:${b.className.match(/is-(done|current|pending)/)?.[1]}`),
+    // D-082b: the stepper is a row of bars (done / current / pending), one per question.
+    bubbles: [...root.querySelectorAll('.guided-bar')].filter(visible).map((b) => `${b.dataset.step}:${b.className.match(/is-(done|current|pending)/)?.[1]}`),
     primaries: [next, ...root.querySelectorAll('.guided-choice--primary')].filter(visible).length,
     nextDisabled: next?.disabled,
     back: visible(root.querySelector('[data-guided-back]')),
     error: root.querySelector('[data-guided-error]')?.hidden ? '' : root.querySelector('[data-guided-error]')?.textContent,
     points: [...root.querySelectorAll('input')].filter((i) => /points/i.test(i.name)).length,
     text: root.innerText,
+    firstTab: root.querySelector('[role="tab"]')?.textContent.trim() || null,
   };
 });
 
@@ -382,7 +384,7 @@ try {
     u = await ui(page);
     check(`${w} interests: "Step 6 of 6", Continue disabled with 0 picks, private ones never offered, popular first, no points input`, () => {
       assert.equal(u.label, 'Step 6 of 6'); assert.equal(u.questions, 1); assert.equal(u.nextDisabled, true);
-      assert.ok(!/A private belief/.test(u.text)); assert.ok(u.text.indexOf('Chess') < u.text.indexOf('Interest A'));
+      assert.ok(!/A private belief/.test(u.text)); assert.equal(u.firstTab, 'Popular'); assert.match(u.text, /Chess/);
       assert.equal(u.points, 0); assert.ok(!/passion points|points left/i.test(u.text));
     });
     await page.locator('.guided-option', { hasText: 'Chess' }).click();
@@ -519,7 +521,7 @@ try {
     await page.evaluate(() => { window.__ghosts = 0; new MutationObserver((list) => list.forEach((m) => m.addedNodes.forEach((n) => { if (n.classList?.contains('guided-ghost')) window.__ghosts += 1; }))).observe(document.body, { childList: true }); });
     await page.locator('.guided-option', { hasText: 'Chess' }).click();
     await page.waitForTimeout(300);
-    const r = await page.evaluate(() => ({ ghosts: window.__ghosts, tray: document.querySelectorAll('.guided-pick').length, glow: getComputedStyle(document.querySelector('.guided-bubble.is-current .guided-bubble-dot')).animationName }));
+    const r = await page.evaluate(() => ({ ghosts: window.__ghosts, tray: document.querySelectorAll('.guided-pick').length, glow: (() => { const el = document.querySelector('.guided-bar.is-current'); return el ? getComputedStyle(el).animationName : 'no bar'; })() }));
     check(`reduced motion: the pick lands in the tray without a flying chip and the current bubble does not pulse (${JSON.stringify(r)})`, () => { assert.equal(r.ghosts, 0); assert.equal(r.tray, 1); assert.equal(r.glow, 'none'); });
     await context.close();
   }
@@ -966,15 +968,18 @@ try {
     await context.close();
   }
 
-  // ================================ D-082: register lines up with login; login fits one screen ================================
-  // The founder (1920x1080 at 125% scaling, a ~1536x709 CSS viewport): the Welcome card sat left of the login card and
-  // "Find your people." wrapped; the login card's "New here?" line was cut. Every guided screen shares the login card's
-  // left edge (within 2 px), the Welcome title and subtitle are one line each from 1100 px, and the whole login card is
-  // on screen with breathing room at the listed laptop and desktop sizes, with no scrolling inside the panel.
-  const boxOf = (page, sel) => page.evaluate((s) => { const el = document.querySelector(s); if (!el || !el.getClientRects().length) return null; const r = el.getBoundingClientRect(); return { l: r.left, r: r.right, t: r.top, b: r.bottom, w: r.width, h: r.height }; }, sel);
-  const linesOf = (page, sel) => page.evaluate((s) => { const el = document.querySelector(s); const c = getComputedStyle(el); const lh = parseFloat(c.lineHeight) || parseFloat(c.fontSize) * 1.2; return { h: el.getBoundingClientRect().height, lh, lines: Math.round(el.getBoundingClientRect().height / lh) }; }, sel);
+  // ================================ D-082 / D-082b: register and login share the right half; login fits one screen ================================
+  // The founder (D-082b, replacing D-082's "line up with the login card"): the telephone art keeps the left half and the
+  // card sits in the centre of the right half, horizontally and vertically, on Welcome, every guided screen and login
+  // (centre x within 24 px of 75% of the window from 1100 px; centre y within 24 px of the middle when the card fits).
+  // The question heading is calmer (at most 40 px) and the card wider, so "Find your people." and "Are you 18 or
+  // older?" are one line at 1440 and 1920; the Welcome subtitle is one line from 1280 px.
+  const boxOf = (page, sel) => page.evaluate((s) => { const el = document.querySelector(s); if (!el || !el.getClientRects().length) return null; const r = el.getBoundingClientRect(); return { l: r.left, r: r.right, t: r.top, b: r.bottom, w: r.width, h: r.height, cx: r.left + r.width / 2, cy: r.top + r.height / 2 }; }, sel);
+  const linesOf = (page, sel) => page.evaluate((s) => { const el = document.querySelector(s); const c = getComputedStyle(el); const lh = parseFloat(c.lineHeight) || parseFloat(c.fontSize) * 1.2; return { h: el.getBoundingClientRect().height, lh, size: parseFloat(c.fontSize) }; }, sel);
+  const centred = (b, vw, vh) => ({ dx: Math.round(b.cx - vw * 0.75), dy: b.h <= vh - 48 ? Math.round(b.cy - vh / 2) : 0 });
   for (const viewport of [{ width: 1100, height: 800 }, { width: 1280, height: 720 }, { width: 1440, height: 900 }, { width: 1536, height: 709 }, { width: 1920, height: 1080 }, { width: 1920, height: 886 }]) {
     const tag = `${viewport.width}x${viewport.height}`;
+    const vw = viewport.width; const vh = viewport.height;
     const context = await browser.newContext({ viewport });
     await setup(context);
     const page = await context.newPage();
@@ -983,20 +988,22 @@ try {
     await settleAnimations(page);
     await page.evaluate(() => document.fonts.ready);
     const login = await boxOf(page, '.auth-login');
+    const lc = centred(login, vw, vh);
+    check(`${tag} the login card is centred in the right half (dx ${lc.dx}, dy ${lc.dy})`, () => { assert.ok(Math.abs(lc.dx) <= 24); assert.ok(Math.abs(lc.dy) <= 24); });
     await page.locator('.auth-login .auth-create-trigger').click();
     await waitScreen(page, 'welcome');
     await settleAnimations(page);
     const welcome = await boxOf(page, '#guided-signup');
     const title = await linesOf(page, '#guided-signup h1');
     const helper = await linesOf(page, '#guided-signup .guided-helper');
+    const wc = centred(welcome, vw, vh);
     await shot(page, `align-welcome-${tag}`, 0);
-    check(`${tag} Welcome card's left edge matches the login card's (${Math.round(welcome.l)} vs ${Math.round(login.l)})`, () => assert.ok(Math.abs(welcome.l - login.l) <= 2));
-    check(`${tag} "Find your people." is one line (${Math.round(title.h)} px, line ${Math.round(title.lh)} px) and the subtitle is one line (${Math.round(helper.h)} px, line ${Math.round(helper.lh)} px)`, () => {
+    check(`${tag} Welcome card centred in the right half (dx ${wc.dx}, dy ${wc.dy}; ${Math.round(welcome.w)}x${Math.round(welcome.h)})`, () => { assert.ok(Math.abs(wc.dx) <= 24); assert.ok(Math.abs(wc.dy) <= 24); assert.ok(welcome.l >= vw / 2 - 1 && welcome.r <= vw); });
+    check(`${tag} "Find your people." is one line at ${title.size} px (<= 40; ${Math.round(title.h)} px, line ${Math.round(title.lh)} px)${vw >= 1280 ? ` and the subtitle is one line (${Math.round(helper.h)} px, line ${Math.round(helper.lh)} px)` : ''}`, () => {
+      assert.ok(title.size <= 40);
       assert.ok(title.h <= title.lh * 1.4, JSON.stringify(title));
-      assert.ok(helper.h <= helper.lh * 1.4, JSON.stringify(helper));
+      if (vw >= 1280) assert.ok(helper.h <= helper.lh * 1.4, JSON.stringify(helper));
     });
-    check(`${tag} the Welcome card stays inside the window (${Math.round(welcome.l)}-${Math.round(welcome.r)} of ${viewport.width})`, () => assert.ok(welcome.l >= 0 && welcome.r <= viewport.width));
-    // The card does not jump between steps: Account, 18+ and Name share the same left edge and width.
     await page.locator('[data-guided-email]').click();
     await waitScreen(page, 'account');
     await settleAnimations(page);
@@ -1008,10 +1015,113 @@ try {
     const onAdult = await waitScreen(page, 'adult');
     await settleAnimations(page);
     const adult = onAdult ? await boxOf(page, '#guided-signup') : null;
-    check(`${tag} every guided step keeps the same column (Account ${Math.round(account.l)}/${Math.round(account.w)}, 18+ ${adult ? `${Math.round(adult.l)}/${Math.round(adult.w)}` : 'not reached'} vs Welcome ${Math.round(welcome.l)}/${Math.round(welcome.w)})`, () => {
+    const adultTitle = onAdult ? await linesOf(page, '#guided-signup h1') : null;
+    await shot(page, `align-adult-${tag}`, 0);
+    check(`${tag} Account and 18+ stay centred in the right half and as wide as Welcome (Account dx ${centred(account, vw, vh).dx} dy ${centred(account, vw, vh).dy}, 18+ ${adult ? `dx ${centred(adult, vw, vh).dx} dy ${centred(adult, vw, vh).dy}` : 'not reached'})`, () => {
       assert.ok(adult);
-      for (const b of [account, adult]) { assert.ok(Math.abs(b.l - welcome.l) <= 1); assert.ok(Math.abs(b.w - welcome.w) <= 1); }
+      for (const b of [account, adult]) { const c = centred(b, vw, vh); assert.ok(Math.abs(c.dx) <= 24); assert.ok(Math.abs(c.dy) <= 24); assert.ok(Math.abs(b.w - welcome.w) <= 1); }
     });
+    if (vw >= 1440) check(`${tag} "Are you 18 or older?" is one line at ${adultTitle?.size} px (${Math.round(adultTitle?.h)} px, line ${Math.round(adultTitle?.lh)} px)`, () => { assert.ok(adultTitle.size <= 40); assert.ok(adultTitle.h <= adultTitle.lh * 1.4); });
+    // The stepper: one thin bar per question, done / current / pending, no icon circles and no step names.
+    const bars = await page.evaluate(() => {
+      const steps = document.querySelector('[data-guided-steps]');
+      const bar = [...steps.querySelectorAll('.guided-bar')];
+      const fill = (b) => { const f = b.querySelector('.guided-bar-fill'); return f ? Math.round((f.getBoundingClientRect().width / b.getBoundingClientRect().width) * 100) : -1; };
+      return {
+        n: bar.length, states: bar.map((b) => b.className.match(/is-(done|current|pending)/)?.[1]), fills: bar.map(fill),
+        h: Math.round(bar[0]?.getBoundingClientRect().height || 0), icons: steps.querySelectorAll('svg, .guided-bubble-dot').length,
+        names: /ACCOUNT|18\+|NAME|DETAILS|AREA|INTERESTS/i.test(steps.innerText), role: steps.getAttribute('role'),
+        now: steps.getAttribute('aria-valuenow'), max: steps.getAttribute('aria-valuemax'), text: steps.getAttribute('aria-valuetext'),
+        label: document.querySelector('[data-guided-step-label]').textContent.trim(), labelClipped: getComputedStyle(document.querySelector('[data-guided-step-label]')).clipPath !== 'none' || getComputedStyle(document.querySelector('[data-guided-step-label]')).clip !== 'auto',
+      };
+    });
+    check(`${tag} the stepper is 6 thin bars (done ${bars.fills[0]}%, current ${bars.fills[1]}%, pending ${bars.fills[2]}%; ${bars.h} px tall), no icons or step names, a progressbar 2 of 6, "Step 2 of 6" only for screen readers (${JSON.stringify(bars.states)})`, () => {
+      assert.equal(bars.n, 6); assert.deepEqual(bars.states, ['done', 'current', 'pending', 'pending', 'pending', 'pending']);
+      assert.equal(bars.fills[0], 100); assert.ok(bars.fills[1] > 0 && bars.fills[1] < 100); assert.equal(bars.fills[2], 0);
+      assert.ok(bars.h >= 2 && bars.h <= 8); assert.equal(bars.icons, 0); assert.equal(bars.names, false);
+      assert.equal(bars.role, 'progressbar'); assert.equal(bars.now, '2'); assert.equal(bars.max, '6'); assert.equal(bars.text, 'Step 2 of 6');
+      assert.equal(bars.label, 'Step 2 of 6'); assert.equal(bars.labelClipped, true);
+    });
+    await context.close();
+  }
+
+  // D-082b: the Interests picker: a search field, a scrollable row of category tabs ("Popular" first, arrow keys), one
+  // category's chips at a time in a fixed-height area, search across every category, a compact "Your picks" tray that
+  // never overlaps the chips, and the whole screen (Back and Finish included) inside 1920x886 and 1440x900.
+  for (const viewport of [{ width: 1920, height: 886 }, { width: 1440, height: 900 }, { width: 375, height: 812 }]) {
+    const tag = `${viewport.width}x${viewport.height}`;
+    const mobile = viewport.width < 800;
+    const context = await browser.newContext({ viewport, isMobile: mobile, hasTouch: mobile });
+    await setup(context, { signedIn: true, profile: { id: ME, name: 'Ida Picker', email: EMAIL, phone_number: '9876543210', phone_country_code: '+91', gender: 'Female', experience: '3–7 years' }, adultAt: '2026-10-18T00:00:00Z', hasCell: true });
+    const page = await context.newPage();
+    await page.goto(`${BASE}/auth.html?complete-profile=1`, { waitUntil: 'load' });
+    const reached = await waitScreen(page, 'interests', 8000);
+    await page.waitForSelector('.guided-option', { timeout: 5000 }).catch(() => {});
+    await settleAnimations(page);
+    const tabs = await page.evaluate(() => {
+      const list = document.querySelector('#guided-signup [role="tablist"]');
+      const all = [...(list?.querySelectorAll('[role="tab"]') || [])];
+      const panel = document.querySelector('#guided-signup [role="tabpanel"]');
+      return { n: all.length, names: all.map((t) => t.textContent.trim()), selected: all.filter((t) => t.getAttribute('aria-selected') === 'true').map((t) => t.textContent.trim()), panelFor: panel?.getAttribute('aria-labelledby'), selectedId: all.find((t) => t.getAttribute('aria-selected') === 'true')?.id, focusable: all.filter((t) => t.tabIndex === 0).length, panelH: Math.round(panel?.getBoundingClientRect().height || 0), panelOverflow: panel ? getComputedStyle(panel).overflowY : '' };
+    });
+    check(`${tag} interests (${reached}): a tablist with "Popular" first and selected, one tab in the Tab order, the panel labelled by it, a fixed-height scroll area (${JSON.stringify(tabs)})`, () => {
+      assert.equal(reached, true); assert.ok(tabs.n >= 3); assert.equal(tabs.names[0], 'Popular'); assert.deepEqual(tabs.selected, ['Popular']);
+      assert.equal(tabs.focusable, 1); assert.equal(tabs.panelFor, tabs.selectedId); assert.match(tabs.panelOverflow, /auto|scroll/);
+    });
+    // Arrow keys move along the tabs; the panel then shows that one category only.
+    await page.locator('#guided-signup [role="tab"][aria-selected="true"]').focus({ timeout: 3000 }).catch(() => {});
+    await page.keyboard.press('ArrowRight');
+    await page.waitForTimeout(80);
+    const second = await page.evaluate(() => {
+      const t = document.activeElement;
+      const chips = [...document.querySelectorAll('#guided-signup [role="tabpanel"] .guided-option')].filter((c) => c.getClientRects().length);
+      return { name: t?.textContent.trim(), role: t?.getAttribute('role'), selected: t?.getAttribute('aria-selected'), cat: t?.dataset.cat, chipCats: [...new Set(chips.map((c) => c.dataset.id.split('.')[0]))], n: chips.length };
+    });
+    check(`${tag} ArrowRight selects the next tab and shows one category only (${JSON.stringify(second)})`, () => {
+      assert.equal(second.role, 'tab'); assert.equal(second.selected, 'true'); assert.notEqual(second.name, 'Popular');
+      assert.ok(second.n >= 1); assert.deepEqual(second.chipCats, [second.cat]);
+    });
+    await page.keyboard.press('End'); await page.keyboard.press('Home');
+    const home = await page.evaluate(() => document.activeElement?.textContent.trim());
+    check(`${tag} Home returns to "Popular" (${home})`, () => assert.equal(home, 'Popular'));
+    // Search shows matches from every category, with the tabs set aside meanwhile.
+    await page.locator('input[name="guided-interest"]').fill('e');
+    await page.waitForTimeout(120);
+    const found = await page.evaluate(() => {
+      const chips = [...document.querySelectorAll('#guided-signup .guided-option')].filter((c) => c.getClientRects().length);
+      const list = document.querySelector('#guided-signup [role="tablist"]');
+      return { cats: [...new Set(chips.map((c) => c.dataset.id.split('.')[0]))], labels: chips.map((c) => c.textContent.trim()), tabsShown: Boolean(list?.getClientRects().length) };
+    });
+    check(`${tag} search "e" shows matching chips from more than one category (${JSON.stringify(found)})`, () => {
+      assert.ok(found.cats.length >= 2); assert.ok(found.labels.includes('Chess')); assert.ok(found.labels.every((l) => /e/i.test(l))); assert.equal(found.tabsShown, false);
+    });
+    await page.locator('input[name="guided-interest"]').fill('');
+    await page.waitForTimeout(120);
+    for (let i = 0; i < 8; i += 1) { await page.locator('#guided-signup [role="tabpanel"] .guided-option[aria-pressed="false"]').first().click({ timeout: 3000 }).catch(() => {}); await page.waitForTimeout(40); }
+    await page.waitForTimeout(400);
+    const layout = await page.evaluate(() => {
+      const r = (el) => { const b = el.getBoundingClientRect(); return { l: b.left, t: b.top, r: b.right, b: b.bottom }; };
+      const hit = (a, b) => a.l < b.r - 0.5 && b.l < a.r - 0.5 && a.t < b.b - 0.5 && b.t < a.b - 0.5;
+      const tray = r(document.querySelector('[data-guided-tray]'));
+      const panelEl = document.querySelector('#guided-signup [role="tabpanel"]'); if (!panelEl) return { overlaps: -1, picks: 0, trayH: 0, back: r(document.querySelector('[data-guided-back]')), finish: r(document.querySelector('[data-guided-next]')), vh: innerHeight, pickH: 0 };
+      const panel = r(panelEl);
+      const tabsEl = document.querySelector('#guided-signup [role="tablist"]');
+      const chips = [...document.querySelectorAll('#guided-signup [role="tabpanel"] .guided-option')].filter((c) => c.getClientRects().length).map(r);
+      const back = r(document.querySelector('[data-guided-back]'));
+      const finish = r(document.querySelector('[data-guided-next]'));
+      return { overlaps: chips.filter((c) => hit(c, tray)).length + (hit(panel, tray) ? 1 : 0) + (tabsEl && hit(r(tabsEl), tray) ? 1 : 0), picks: document.querySelectorAll('.guided-pick').length, trayH: Math.round(tray.b - tray.t), back, finish, vh: innerHeight, scroll: document.documentElement.scrollHeight - innerHeight, pickH: Math.round(document.querySelector('.guided-pick')?.getBoundingClientRect().height || 0) };
+    });
+    await shot(page, `interests-${tag}`, 0);
+    check(`${tag} the "Your picks" tray (${layout.picks} picks, ${layout.trayH} px tall) never overlaps the tabs, the panel or a chip (${layout.overlaps}); picks are 44 px targets (${layout.pickH})`, () => { assert.equal(layout.picks, 8); assert.equal(layout.overlaps, 0); assert.ok(layout.pickH >= 44); });
+    if (!mobile) {
+      check(`${tag} the whole Interests screen fits the window: Back (${Math.round(layout.back.b)}) and Finish (${Math.round(layout.finish.b)}) on screen of ${layout.vh}; tray compact (${layout.trayH} px)`, () => {
+        for (const b of [layout.back, layout.finish]) { assert.ok(b.t >= 0 && b.b <= layout.vh); }
+        assert.ok(layout.trayH <= 96);
+      });
+    } else {
+      check(`${tag} on a phone Finish stays in view (${Math.round(layout.finish.t)}-${Math.round(layout.finish.b)} of ${layout.vh})`, () => assert.ok(layout.finish.t >= 0 && layout.finish.b <= layout.vh));
+    }
+    await auditScreen(page, `${tag} interests picker`);
     await context.close();
   }
   for (const viewport of [{ width: 1920, height: 886 }, { width: 1536, height: 709 }, { width: 1440, height: 780 }, { width: 1366, height: 633 }, { width: 1280, height: 720 }]) {

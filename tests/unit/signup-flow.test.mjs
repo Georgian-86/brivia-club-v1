@@ -87,3 +87,31 @@ test('evenSplit: 20 points, largest remainder, each at least 1, ties to earlier 
   assert.throws(() => evenSplit([]));
   assert.throws(() => evenSplit(ids(13)));
 });
+
+// D-082b: the Interests picker shows one category at a time. groupInterests(all nodes, popular labels) gives
+// "Popular" first (the popular labels found, topped up across the categories to `size`), then one group per top-level
+// category in taxonomy order, labelled by its level-1 node (or the id, capitalised, when that node is missing).
+// Only offered nodes (non-sensitive, level 3-4, labelled) appear; each appears once per category.
+test('groupInterests: Popular first, then one tab per top-level category, private interests never offered', async () => {
+  const { groupInterests } = await import('../../site/scripts/signup-flow.js');
+  const nodes = [
+    { id: 'games', parent_id: null, level: 1, label: 'Games and play', sensitive: false },
+    { id: 'games.board', parent_id: 'games', level: 2, label: 'Board games', sensitive: false },
+    { id: 'games.board.chess', parent_id: 'games.board', level: 3, label: 'Chess', sensitive: false },
+    { id: 'games.board.go', parent_id: 'games.board', level: 3, label: 'Go', sensitive: false },
+    { id: 'music.instruments.guitar', parent_id: 'music.instruments', level: 3, label: 'Guitar', sensitive: false },
+    { id: 'music.instruments.guitar.flamenco', parent_id: 'music.instruments.guitar', level: 4, label: 'Flamenco guitar', sensitive: false },
+    { id: 'beliefs.faith.private', parent_id: 'beliefs.faith', level: 3, label: 'A private belief', sensitive: true },
+    { id: 'tech.events.hackathons', parent_id: 'tech.events', level: 3, label: 'Hackathons', sensitive: false },
+    { id: 'tech.events.blank', parent_id: 'tech.events', level: 3, label: '  ', sensitive: false },
+  ];
+  const groups = groupInterests(nodes, ['Guitar', 'Chess', 'Nope'], { size: 4 });
+  assert.deepEqual(groups.map((g) => [g.id, g.label]), [['popular', 'Popular'], ['games', 'Games and play'], ['music', 'Music'], ['tech', 'Tech']]);
+  // Popular: the popular labels in their order, then topped up round-robin across the categories, no repeats.
+  assert.deepEqual(groups[0].items.map((n) => n.label), ['Guitar', 'Chess', 'Hackathons', 'Go']);
+  assert.deepEqual(groups[1].items.map((n) => n.label), ['Chess', 'Go']);
+  assert.deepEqual(groups[2].items.map((n) => n.label), ['Guitar', 'Flamenco guitar']);
+  assert.deepEqual(groups[3].items.map((n) => n.label), ['Hackathons']);
+  assert.ok(groups.every((g) => g.items.every((n) => !n.sensitive && n.level >= 3)));
+  assert.deepEqual(groupInterests([], ['Chess']), []);
+});

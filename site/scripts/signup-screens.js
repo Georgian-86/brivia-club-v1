@@ -4,7 +4,7 @@
 // account (email path) and saves everything through the existing pipeline. No email code, no points screen: the
 // interests are saved with an even split. Coordinates live only in `answers.area` (memory) and are dropped once saved.
 import { searchPlaces, fetchInterestNodes } from './supabase.js';
-import { SCREENS, STEP_ICONS, stepLabel, stepStates, backTarget } from './signup-flow.js';
+import { SCREENS, STEP_ICONS, stepLabel, stepStates, backTarget, groupInterests, isOffered } from './signup-flow.js';
 import { MAX_INTERESTS } from './passion-budget.js';
 import { POPULAR_INTERESTS } from './discovery-catalog.js';
 import { matchTypedCity } from './area-pick.js';
@@ -33,18 +33,13 @@ const countryCodes = () => {
 
 const ICONS = {
   mail: '<rect x="3" y="5" width="18" height="14" rx="2.5"/><path d="M3.5 7.5l8.5 6 8.5-6"/>',
-  shield: '<path d="M12 3l7 3v5c0 4.5-3 8.3-7 10-4-1.7-7-5.5-7-10V6l7-3z"/><path d="M9 12l2 2 4-4"/>',
-  phone: '<rect x="7" y="2.8" width="10" height="18.4" rx="2.4"/><path d="M10.5 17.8h3"/>',
-  person: '<circle cx="12" cy="8" r="3.8"/><path d="M4.5 20.5c1.4-3.8 4.3-5.8 7.5-5.8s6.1 2 7.5 5.8"/>',
   pin: '<path d="M12 21s-6.5-5.6-6.5-11a6.5 6.5 0 0 1 13 0c0 5.4-6.5 11-6.5 11z"/><circle cx="12" cy="10" r="2.4"/>',
-  spark: '<path d="M12 3.5l1.9 5.1 5.1 1.9-5.1 1.9L12 17.5l-1.9-5.1L5 10.5l5.1-1.9z"/><path d="M18.5 16.5l.8 2 2 .8-2 .8-.8 2-.8-2-2-.8 2-.8z"/>',
   tick: '<path d="M5.5 12.5l4.2 4.2L18.5 8"/>',
   search: '<circle cx="11" cy="11" r="6.5"/><path d="M16 16l4.5 4.5"/>',
   arrow: '<path d="M5 12h14M13 6l6 6-6 6"/>',
   back: '<path d="M19 12H5M11 6l-6 6 6 6"/>',
 };
 const svg = (name, cls = '') => `<svg class="${cls}" viewBox="0 0 24 24" aria-hidden="true" focusable="false">${ICONS[name]}</svg>`;
-const STEP_NAMES = { account: 'Account', adult: '18+', name: 'Name', details: 'Details', area: 'Area', interests: 'Interests' };
 
 export const COPY = {
   emailInvalid: 'Enter a valid email address.',
@@ -90,13 +85,18 @@ export const initGuidedSignup = ({
   const renderSteps = () => {
     const showSteps = state.screen !== 'welcome' && state.screen !== 'stop';
     steps.hidden = !showSteps;
-    steps.innerHTML = showSteps ? stepStates(state.path, state.screen).map(({ screen, state: s }, i) => `
-      <li class="guided-bubble is-${s}" data-step="${screen}" style="--i:${i}"${s === 'current' ? ' aria-current="step"' : ''}>
-        <span class="guided-bubble-dot">${svg(STEP_ICONS[screen], 'guided-bubble-icon')}${svg('tick', 'guided-bubble-tick')}</span>
-        <span class="guided-bubble-name">${STEP_NAMES[screen]}</span>
-        <span class="sr-only">${s === 'done' ? 'done' : s === 'current' ? 'current step' : 'to do'}</span>
-      </li>`).join('') : '';
+    // D-082b: one thin bar per question (done = filled wine, current = part-filled, pending = empty); the progressbar
+    // role and the visually hidden "Step n of N" carry the meaning, the bars are decoration.
+    const states = showSteps ? stepStates(state.path, state.screen) : [];
+    steps.innerHTML = states.map(({ screen, state: s }, i) => `<span class="guided-bar is-${s}" data-step="${screen}" style="--i:${i}"><span class="guided-bar-fill"></span></span>`).join('');
     const text = stepLabel(state.path, state.screen);
+    const at = states.findIndex((x) => x.state === 'current');
+    const now = at >= 0 ? at + 1 : states.length;
+    if (showSteps) {
+      steps.setAttribute('aria-valuemax', String(states.length));
+      steps.setAttribute('aria-valuenow', String(now));
+      steps.setAttribute('aria-valuetext', text || `Step ${now} of ${states.length}`);
+    }
     label.textContent = text || '';
     label.hidden = !text;
   };
@@ -442,19 +442,30 @@ export const initGuidedSignup = ({
       const picked = () => new Set(a.interests.map((p) => p.id));
       return {
         primary: 'Finish',
+        // D-082b: search, a compact "Your picks" tray (in the flow, so it never covers a chip), a scrollable row of
+        // category tabs ("Popular" first), and one category's chips at a time in a fixed-height panel.
         html: `${heading('What are you into?', 'Pick what you genuinely care about, up to twelve. Three to six works best.')}
           <label class="guided-field guided-field--search"><span class="sr-only">Search interests</span>${svg('search', 'guided-search-icon')}
-            <input type="search" name="guided-interest" autocomplete="off" spellcheck="false" placeholder="Search, e.g. chess or hiking" aria-controls="guided-interest-options" /></label>
+            <input type="search" name="guided-interest" autocomplete="off" spellcheck="false" placeholder="Search all interests, e.g. chess or hiking" aria-controls="guided-interest-options" /></label>
           <div class="guided-tray" data-guided-tray>
             <div class="guided-tray-head"><span>Your picks</span><b data-guided-count aria-hidden="true">0 picked</b></div>
             <ul class="guided-tray-list" aria-label="Your picks"></ul>
             <p class="guided-tray-empty" data-guided-tray-empty>Tap an interest below to add it here.</p>
             <p class="sr-only" data-guided-announce aria-live="polite"></p>
           </div>
-          <div class="guided-options" id="guided-interest-options" role="group" aria-label="Interests"></div>`,
+          <div class="guided-tabs" data-guided-tabs>
+            <button class="guided-tabs-scroll guided-tabs-scroll--prev" type="button" tabindex="-1" aria-hidden="true" data-tabs-scroll="-1">${svg('back', '')}</button>
+            <div class="guided-tablist" role="tablist" aria-label="Interest categories"></div>
+            <button class="guided-tabs-scroll guided-tabs-scroll--next" type="button" tabindex="-1" aria-hidden="true" data-tabs-scroll="1">${svg('arrow', '')}</button>
+          </div>
+          <div class="guided-options" id="guided-interest-options" role="tabpanel" tabindex="0"></div>`,
         mount: async (el) => {
           const input = el.querySelector('input');
           const options = el.querySelector('.guided-options');
+          const tabsBox = el.querySelector('[data-guided-tabs]');
+          const tablist = el.querySelector('[role="tablist"]');
+          let groups = [];
+          let activeTab = 'popular';
           const tray = el.querySelector('.guided-tray-list');
           const trayEmpty = el.querySelector('[data-guided-tray-empty]');
           const count = el.querySelector('[data-guided-count]');
@@ -502,20 +513,68 @@ export const initGuidedSignup = ({
             fly(from, (has ? options : tray).querySelector(`[data-id="${CSS.escape(id)}"]`));
             refreshNext();
           };
+          // The tabs: roving tabindex, automatic activation (arrow keys, Home, End), the selected one scrolled into view.
+          const tabId = (id) => `guided-tab-${id}`;
+          const renderTabs = () => {
+            tablist.innerHTML = groups.map((g) => `<button type="button" role="tab" class="guided-tab" id="${tabId(escapeHtml(g.id))}" data-cat="${escapeHtml(g.id)}" aria-controls="guided-interest-options" aria-selected="${g.id === activeTab}" tabindex="${g.id === activeTab ? 0 : -1}">${escapeHtml(g.label)}</button>`).join('');
+          };
+          const syncScrollers = () => {
+            const max = tablist.scrollWidth - tablist.clientWidth;
+            tabsBox.classList.toggle('can-prev', tablist.scrollLeft > 2);
+            tabsBox.classList.toggle('can-next', tablist.scrollLeft < max - 2);
+          };
+          const selectTab = (id, { focus = false } = {}) => {
+            activeTab = id;
+            for (const t of tablist.querySelectorAll('[role="tab"]')) {
+              const on = t.dataset.cat === id;
+              t.setAttribute('aria-selected', String(on));
+              t.tabIndex = on ? 0 : -1;
+              if (on) {
+                if (focus) t.focus({ preventScroll: true });
+                const left = t.offsetLeft - tablist.offsetLeft;
+                if (left < tablist.scrollLeft || left + t.offsetWidth > tablist.scrollLeft + tablist.clientWidth) tablist.scrollTo({ left: Math.max(0, left - 24), behavior: reducedMotion() ? 'auto' : 'smooth' });
+              }
+            }
+            options.scrollTop = 0;
+            renderOptions();
+          };
           const renderOptions = () => {
             const chosen = picked();
             const q = query.trim().toLowerCase();
-            let list = state.nodes;
-            if (q) list = list.filter((n) => n.label.toLowerCase().includes(q)).sort((x, y) => Number(!x.label.toLowerCase().startsWith(q)) - Number(!y.label.toLowerCase().startsWith(q)));
-            else {
-              const popular = POPULAR_INTERESTS.map((l) => list.find((n) => n.label.toLowerCase() === l.toLowerCase())).filter(Boolean);
-              list = [...popular, ...list.filter((n) => !popular.includes(n))];
+            let list;
+            tabsBox.hidden = Boolean(q);
+            if (q) {
+              list = state.nodes.filter((n) => n.label.toLowerCase().includes(q)).sort((x, y) => Number(!x.label.toLowerCase().startsWith(q)) - Number(!y.label.toLowerCase().startsWith(q))).slice(0, 40);
+              options.setAttribute('role', 'region');
+              options.removeAttribute('aria-labelledby');
+              options.setAttribute('aria-label', 'Matching interests');
+            } else {
+              list = (groups.find((g) => g.id === activeTab) || groups[0])?.items || [];
+              options.setAttribute('role', 'tabpanel');
+              options.removeAttribute('aria-label');
+              options.setAttribute('aria-labelledby', tabId(activeTab));
             }
-            list = list.slice(0, q ? 40 : 30);
             options.innerHTML = list.length
               ? list.map((n) => `<button type="button" class="guided-option" data-id="${escapeHtml(n.id)}" aria-pressed="${chosen.has(n.id)}">${svg('tick', 'guided-option-tick')}${escapeHtml(n.label)}</button>`).join('')
               : `<p class="guided-helper">No interest matches "${escapeHtml(query)}".</p>`;
+            requestAnimationFrame(syncMore);
           };
+          tablist.addEventListener('click', (event) => { const t = event.target.closest('[role="tab"]'); if (t) selectTab(t.dataset.cat); });
+          tablist.addEventListener('keydown', (event) => {
+            const tabs = [...tablist.querySelectorAll('[role="tab"]')];
+            const at = tabs.findIndex((t) => t.dataset.cat === activeTab);
+            const to = { ArrowRight: at + 1, ArrowLeft: at - 1, Home: 0, End: tabs.length - 1 }[event.key];
+            if (to === undefined || !tabs.length) return;
+            event.preventDefault();
+            selectTab(tabs[(to + tabs.length) % tabs.length].dataset.cat, { focus: true });
+          });
+          tablist.addEventListener('scroll', syncScrollers, { passive: true });
+          const syncMore = () => options.classList.toggle('has-more', options.scrollHeight - options.clientHeight - options.scrollTop > 4);
+          options.addEventListener('scroll', syncMore, { passive: true });
+          tabsBox.addEventListener('click', (event) => {
+            const b = event.target.closest('[data-tabs-scroll]');
+            if (b) tablist.scrollBy({ left: Number(b.dataset.tabsScroll) * tablist.clientWidth * 0.7, behavior: reducedMotion() ? 'auto' : 'smooth' });
+          });
           tray.addEventListener('click', (event) => { const b = event.target.closest('.guided-pick'); if (b) toggle(b.dataset.id, b); });
           options.addEventListener('click', (event) => { const b = event.target.closest('.guided-option'); if (b) toggle(b.dataset.id, b); });
           input.addEventListener('input', () => { query = input.value; if (state.nodes) renderOptions(); });
@@ -531,14 +590,17 @@ export const initGuidedSignup = ({
             options.innerHTML = '<p class="guided-helper">Loading interests…</p>';
             const { data, error } = await fetchInterestNodes();
             // Private (sensitive) interests are not offered here: they need their own consent screen.
-            if (!error) state.nodes = (data || []).filter((n) => n && !n.sensitive && n.level >= 3 && String(n.label || '').trim());
+            if (!error) { state.allNodes = data || []; state.nodes = state.allNodes.filter(isOffered); }
             if (!el.isConnected) return;
             if (error || !state.nodes?.length) { state.nodes = null; options.innerHTML = ''; setError(COPY.interestsLoad); return; }
           }
           // Picks restored from an earlier visit keep only what is still offered.
           a.interests = a.interests.filter((p) => state.nodes.some((n) => n.id === p.id));
+          groups = groupInterests(state.allNodes || state.nodes, POPULAR_INTERESTS);
+          renderTabs();
           renderTray();
           renderOptions();
+          requestAnimationFrame(syncScrollers);
           refreshNext();
         },
         ready: () => a.interests.length >= 1 && a.interests.length <= MAX_INTERESTS && Boolean(state.nodes),

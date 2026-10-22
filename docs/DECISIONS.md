@@ -1664,3 +1664,31 @@ controls (a tester or a seeded test member), never a real member, so no new expo
   -> 563x880 (width-bound). Proof: `tests/e2e/deck.spec.mjs` (two layers +12 / +24 px, narrower, opaque, inside the
   stage, at every D-081 size and at 375x812 and 320x640; layers still mid-drag; one layer with one member left, none
   behind the last; reduced motion).
+
+## D-082b: Guided signup: a bar stepper, calmer questions in the right half, the interest picker by category (founder, 2026-10-22)
+
+- **Founder ask** (1920x886): drop the big icon circles and step names; centre the card in the right half of the
+  screen (the telephone keeps the left half), and centre the login card the same way, replacing D-082's "line up with
+  the login card"; smaller questions on one line; the interests "wall of capsules" should look professionally
+  designed, with the "Your picks" tray no longer floating over the chips. A dropdown was considered and rejected: it
+  hides the options and is poor for multi-select, especially on phones.
+- **Stepper.** One thin bar per question (6 on email, 5 on Google): done = filled wine, current = part-filled, pending
+  = the bare track. The container is a `progressbar` (aria-valuenow / valuemax / valuetext "Step n of N") and
+  "Step n of N" stays as visually hidden live text. No icons, no step names.
+- **Position and type.** From 1100 px the auth shell is two equal columns on login and every guided screen; the
+  login card (480 px) and the guided card (up to 620 px) are centred in the right half, across and down. The
+  question heading and "Welcome back." are `clamp(28px, 2.4vw, 40px)` (phones `clamp(28px, 8vw, 34px)`): "Find your
+  people." and "Are you 18 or older?" are one line at 1440 and 1920. Under 760 px tall the guided card is tighter.
+- **Interests.** Search on top (it searches every category and sets the tabs aside), a compact one-row "Your picks"
+  tray in the flow (its picks scroll sideways; it can no longer cover a chip), a scrollable tablist ("Popular", then
+  one tab per top-level category; roving tabindex, arrow keys, Home and End, arrow buttons and edge fades on desktop
+  pointers), and one category's chips at a time in a fixed-height panel that scrolls inside, with a fade while more
+  chips are below. "Popular" is the popular labels found, topped up across the categories to 16
+  (`groupInterests` in `signup-flow.js`, unit-tested). The 1-12 limit, the toggle buttons with aria-pressed, the
+  flying chip and the even split are unchanged. The whole screen fits 1920x886 and 1440x900 with Back and Finish in
+  view; on phones the page scrolls and the action bar stays pinned.
+- Proof: `tests/e2e/signup.spec.mjs` (bars and their fills, progressbar values, no icons or names; login and guided
+  centres within 24 px of 75% of the width and of the middle at 1100-1920; headings at most 40 px and one line;
+  tabs, arrow keys, one category per tab, search across categories, the tray never intersecting the tabs, the panel or
+  a chip, Back and Finish on screen at 1920x886 and 1440x900, axe, 44 px targets and contrast on the picker at 1920,
+  1440 and 375), `tests/unit/signup-flow.test.mjs` (`groupInterests`).

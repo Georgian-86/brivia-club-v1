@@ -76,8 +76,8 @@
 
           <div class="auth-view auth-signup auth-guided" data-auth-view="guided" hidden>
             <section class="guided" id="guided-signup" aria-labelledby="signup-screen-title">
-              <ol class="guided-steps" data-guided-steps aria-label="Your progress" hidden></ol>
-              <p class="guided-step-label" data-guided-step-label aria-live="polite" hidden></p>
+              <div class="guided-steps" data-guided-steps role="progressbar" aria-label="Your progress" aria-valuemin="1" hidden></div>
+              <p class="guided-step-label sr-only" data-guided-step-label aria-live="polite" hidden></p>
               <div class="guided-host" data-guided-host></div>
               <p class="guided-error" data-guided-error role="alert" hidden></p>
               <div class="guided-actions" data-guided-actions hidden>

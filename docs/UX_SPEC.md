@@ -41,11 +41,16 @@ New components reuse these tokens. **No raw hex in new components**, and no new 
 `auth.html` `#guided-signup`, `signup-flow.js`, `signup-screens.js`, `signup.css`. Screens: Welcome (Continue with
 Google · Continue with email · I already have an account) → Account (email, password, confirm; email path only; the
 account is created at the end, no email code) → 18+ → Name → Details (phone and gender, D-068) → Area ("Use my
-location" with the A1 fallbacks, or a city) → Interests (1–12 picks with an animated "Your picks" tray; no points
+location" with the A1 fallbacks, or a city) → Interests (1–12 picks: search, "Popular" then one tab per category, one category's chips at a time in a fixed-height panel, and a compact "Your picks" tray above the tabs; no points
 screen, `evenSplit` behind the scenes; private interests not offered) → Reveal, or Verify ("Check your email.") when
-email confirmation is on. "Step n of 6" (email) or "of 5" (Google) with bubbles; one visible question, which is the
+email confirmation is on. "Step n of 6" (email) or "of 5" (Google) as a row of thin bars (done, current part-filled, pending; the text is for screen readers only, D-082b); one visible question, which is the
 page's h1; Enter = Continue; Back on every question screen; Finish submits once (busy until the next screen shows).
 The classic 4-step form stays behind `VITE_SIGNUP_FLOW=classic` for one release. Notice version `2026-10-05`.
+
+**Layout (D-082, D-082b).** From 1100 px the telephone art takes the left half and the card sits in the centre of the
+right half on login and on every guided screen; the guided card is up to 620 px wide and the question heading is
+`clamp(28px, 2.4vw, 40px)` (phones `clamp(28px, 8vw, 34px)`). Interests fits one screen at 1920x886 and 1440x900
+with Back and Finish in view.
 
 ### A. Onboarding: 4 steps with "Your area" and the Passion Budget (shipped in Iteration 3, Task 8)
 
