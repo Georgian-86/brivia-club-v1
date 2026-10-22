@@ -1509,6 +1509,19 @@ controls (a tester or a seeded test member), never a real member, so no new expo
   removed from the auth page marquee, which loops 9 cards at the same per-card speed (31 s).
 - **Blocked sends withheld (A5)** ships separately with migration `0013`.
 
+## D-076: The Connect card is always tall on desktop, like the phone card (founder, 2026-10-22)
+
+- **What happened.** D-059 (2026-10-14, "card and controls aligned") sized the desktop card from the window height so
+  the card and Pass / Pitch always fit on screen. On a short laptop window (1366x633, a 768 px screen minus browser
+  bars) that squashed the card to 352x400: nearly square, the View profile button cut off. The polish wave did not
+  change it (measured identical before and after).
+- **Decision.** The founder wants the card long, not wide, like the phone card. On desktop the card height is now
+  `clamp(600px, 100svh - 262px, 700px)` (the signal-limit state `clamp(600px, ..., 640px)`) at the same 352 px+ width,
+  so it is always at least 1.6 tall per 1 wide. On a short window the page scrolls to Pass / Pitch, which stay
+  centred under the card. Phones are unchanged.
+- **Proof.** `tests/e2e/deck.spec.mjs` desktop layout check at 1920x1080, 1366x768, 1440x900, 1280x720 and 1366x633:
+  card height at least 1.6x its width, controls centred under it and reachable; on screen at 880 px tall and above.
+
 ## D-077: A blocked member's messages are stored and withheld, never refused (A5 of the polish wave, 0013, 2026-10-22)
 
 - **Founder ask.** A blocked member could not send at all, which looked like a bug and revealed the block. Now they
