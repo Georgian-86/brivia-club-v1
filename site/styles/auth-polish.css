@@ -2573,7 +2573,7 @@
 .community-preview-heading>span{color:rgba(41,29,27,.5)}
 .community-marquee{max-width:none;margin:0;padding:0;overflow:hidden}
 .community-marquee:before,.community-marquee:after{display:none}
-.community-track{display:flex;gap:14px;width:max-content;padding:0;animation:community-cards-slide 38s linear infinite}
+.community-track{display:flex;gap:14px;width:max-content;padding:0;animation:community-cards-slide 31s linear infinite}
 .community-card{display:grid;grid-template-rows:235px minmax(90px,auto);flex:0 0 min(340px,calc((100vw - 28px) / 3));width:min(340px,calc((100vw - 28px) / 3));height:auto;min-height:320px;padding:0;overflow:hidden;border:1px solid rgba(41,29,27,.1);border-radius:16px;background:#fff;color:#46504d;box-shadow:0 8px 24px rgba(41,29,27,.08)}
 .community-member-photo{width:100%;height:235px;border-radius:16px 16px 0 0;background:#d9dddc;box-shadow:none}
 .community-member-photo img{object-position:center 35%}
