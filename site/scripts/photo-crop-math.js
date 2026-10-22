@@ -58,3 +58,13 @@ export const cropRect = (state, dims) => {
     size,
   };
 };
+
+// Fix round 1 (I3): the decoded photo is at most MAX_DECODE px on its long side (aspect kept, never upscaled), so a
+// 6000 x 4000 phone photo is not held and redrawn at full size on every drag frame. 2048 px still gives the 800 px
+// output enough pixels at 2.5x zoom.
+export const MAX_DECODE = 2048;
+export const decodeSize = (width, height, max = MAX_DECODE) => {
+  const scale = max / Math.max(width, height);
+  if (!(scale < 1)) return { width, height, scaled: false };
+  return { width: Math.max(1, Math.round(width * scale)), height: Math.max(1, Math.round(height * scale)), scaled: true };
+};

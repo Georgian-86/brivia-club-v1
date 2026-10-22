@@ -75,3 +75,18 @@ test('portrait photos and tiny photos stay inside', () => {
   const tiny = { width: 1, height: 1, diameter: 300 };
   assert.deepEqual(cropRect({ x: 30, y: 30, zoom: 3 }, tiny), { sx: 0, sy: 0, size: 1 });
 });
+
+// Fix round 1 (I3): very large photos are decoded at most 2048 px on the long side, aspect ratio kept, never upscaled.
+import { MAX_DECODE, decodeSize } from '../../site/scripts/photo-crop-math.js';
+
+test('decodeSize caps the long side at 2048 px and keeps the aspect ratio', () => {
+  assert.equal(MAX_DECODE, 2048);
+  assert.deepEqual(decodeSize(6000, 4000), { width: 2048, height: 1365, scaled: true });
+  assert.deepEqual(decodeSize(4000, 6000), { width: 1365, height: 2048, scaled: true });
+  assert.deepEqual(decodeSize(3000, 3000), { width: 2048, height: 2048, scaled: true });
+  assert.deepEqual(decodeSize(2048, 1000), { width: 2048, height: 1000, scaled: false });
+  assert.deepEqual(decodeSize(800, 600), { width: 800, height: 600, scaled: false });
+  // A 20000 x 10 strip keeps at least 1 px.
+  assert.deepEqual(decodeSize(20000, 10), { width: 2048, height: 1, scaled: true });
+  assert.deepEqual(decodeSize(1000, 500, 400), { width: 400, height: 200, scaled: true });
+});

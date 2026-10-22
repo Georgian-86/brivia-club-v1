@@ -19,7 +19,7 @@ import '../styles/app-navigation.css';
 import '../styles/discovery-filters.css';
 import '../styles/mobile-app.css';
 import '../styles/skeleton.css';
-import { supabase, rowToProfile, saveProfile, isPresetCoverUrl, onboardingStatus, sendSignal, fetchSignalQuota, isRateLimited, isStorageImageUrl, withoutCredentials, uploadMessageAttachment, removeMessageAttachment, uploadCommunityPostImage, removeCommunityPostImage, ImageProcessingError, PHOTO_ERROR_MESSAGE, compressAttachmentFiles, attachmentKind, reportMember, setSensitiveConsent, fetchSensitiveConsentAt, fetchMyInterests, fetchInterestNodes, uploadResume, removeResume, resumeSignedUrl, resumeInfo, clearResumePath } from './supabase.js';
+import { supabase, rowToProfile, saveProfile, isPresetCoverUrl, onboardingStatus, sendSignal, fetchSignalQuota, isRateLimited, isStorageImageUrl, withoutCredentials, uploadMessageAttachment, removeMessageAttachment, uploadCommunityPostImage, removeCommunityPostImage, ImageProcessingError, PHOTO_ERROR_MESSAGE, PHOTO_FRAMER_ERROR, compressAttachmentFiles, attachmentKind, reportMember, setSensitiveConsent, fetchSensitiveConsentAt, fetchMyInterests, fetchInterestNodes, uploadResume, removeResume, resumeSignedUrl, resumeInfo, clearResumePath } from './supabase.js';
 import { areaShareBody, parseAreaBody, resumeShareAttachment, resumeMessageFields, RESUME_SHARE_BODY, NO_RESUME_HINT, RESUME_GONE_COPY, RESUME_SHARE_NOTE, AREA_SHARE_NOTE } from './quick-share.js';
 import { validateResume, readResumeHead, resumeMetaLine, formatResumeSize, resumeUploadErrorMessage, isMissingResumeStore, RESUME_FILE_NAME, REMOVE_RESUME_CONFIRM, REMOVE_FAILED_COPY, REPLACED_NOT_SAVED_COPY, OPEN_FAILED_COPY, COMING_SOON_COPY } from './resume-file.js';
 import { POPULAR_INTERESTS, INTEREST_CATALOG, LOOKING_FOR_CATALOG, taxonomyLabels, catalogValues, matchOptions } from './discovery-catalog.js';
@@ -2223,8 +2223,19 @@ const openProfileEditor = () => {
     photoError.hidden = true;
     photoError.textContent = '';
     if (!picked) return;
+    // The framer is a separate chunk. If it cannot load, say so and keep nothing: never upload an unframed photo, and
+    // never blame the photo for a network problem (fix round 1, M1).
+    let openPhotoCrop;
     try {
-      const { openPhotoCrop } = await import('./photo-crop.js');
+      ({ openPhotoCrop } = await import('./photo-crop.js'));
+    } catch {
+      photoInput.value = '';
+      photoError.textContent = PHOTO_FRAMER_ERROR;
+      photoError.hidden = false;
+      photoInput.focus();
+      return;
+    }
+    try {
       const framed = await openPhotoCrop(picked, { returnFocus: photoInput });
       if (!framed) { photoInput.value = ''; return; }
       framedPhoto = framed;

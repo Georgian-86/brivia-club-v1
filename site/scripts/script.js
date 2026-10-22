@@ -1,6 +1,6 @@
 // Shared landing + auth behaviour. Styles come from the page entries (landing-entry.js, auth-entry.js), never from here.
 import {
-  supabase, supabaseReady, saveProfile, compressImageOnly, fileToDataUrl, PHOTO_ERROR_MESSAGE, withoutCredentials, rowToProfile,
+  supabase, supabaseReady, saveProfile, compressImageOnly, fileToDataUrl, PHOTO_ERROR_MESSAGE, PHOTO_FRAMER_ERROR, ImageProcessingError, withoutCredentials, rowToProfile,
   declareAdult, setHomeLocation, setHomeCity, setMemberInterests, setSensitiveConsent, fetchSensitiveConsentAt, fetchMyInterests, fetchInterestNodes, searchPlaces, onboardingStatus,
 } from './supabase.js';
 import { buildPendingOnboarding, isPendingExpired, dataUrlToFile } from './pending-profile.js';
@@ -751,14 +751,27 @@ if (photoUpload) {
     // "Frame your photo" (D-080): the member chooses the part shown in the circle; only that square is uploaded.
     // Cancel clears the pick. A file the browser cannot decode skips the dialog and keeps the pick, so the submit
     // shows the existing inline photo error (R12) before any account write.
+    // If the framer chunk cannot load (or fails for any reason but an undecodable photo), say so and keep nothing:
+    // never upload an unframed photo, never blame the photo for a network problem (fix round 1, M2).
+    const photoError = photoUpload.querySelector('#profile-photo-error');
+    const framerFailed = () => {
+      resetPhoto();
+      if (photoError) { photoError.textContent = PHOTO_FRAMER_ERROR; photoError.hidden = false; }
+      photoInput.focus();
+    };
+    if (photoError) { photoError.textContent = ''; photoError.hidden = true; }
     let file = picked;
+    let openPhotoCrop;
+    try { ({ openPhotoCrop } = await import('./photo-crop.js')); } catch { framerFailed(); return; }
     try {
-      const { openPhotoCrop } = await import('./photo-crop.js');
       const framed = await openPhotoCrop(picked, { returnFocus: photoInput });
       if (!framed) { resetPhoto(); return; }
       framedSignupPhoto = framed;
       file = framed;
-    } catch { /* undecodable: handled at submit */ }
+    } catch (error) {
+      if (!(error instanceof ImageProcessingError)) { framerFailed(); return; }
+      /* undecodable: the pick stays and the submit shows the inline photo error before any write */
+    }
     if (previewUrl) URL.revokeObjectURL(previewUrl);
     previewUrl = URL.createObjectURL(file);
     photoUpload.classList.add('has-file');
@@ -2199,6 +2212,8 @@ signupForm?.addEventListener('submit', async (event) => {
     if (signupFeedback) signupFeedback.textContent = '';
     signupForm.querySelector('.photo-input')?.focus();
   };
+  // Only a framed photo is ever uploaded: a pick the framer could not decode stops here (fix round 1, M2).
+  if (pickedPhoto && !framedSignupPhoto) { failMedia('photo'); return; }
   if (photoFile) {
     try { photoFile = await compressImageOnly(photoFile); profile.photoUrl = await fileToDataUrl(photoFile); } catch { failMedia('photo'); return; }
   } else if (profileCompletionPhotoUrl) profile.photoUrl = profileCompletionPhotoUrl;

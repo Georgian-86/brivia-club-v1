@@ -4,7 +4,7 @@ import { isPresetCoverUrl, presetCoverPath } from './preset-cover.js';
 import { createResumeApi } from './resume-file.js';
 import { compressImageOnly, compressAttachmentFiles, attachmentKind, replacedObjectPath, ImageProcessingError } from './image-compress.js';
 
-export { ImageProcessingError, PHOTO_ERROR_MESSAGE, compressImageOnly, compressAttachmentFiles, attachmentKind } from './image-compress.js';
+export { ImageProcessingError, PHOTO_ERROR_MESSAGE, PHOTO_FRAMER_ERROR, compressImageOnly, compressAttachmentFiles, attachmentKind } from './image-compress.js';
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL?.trim();
 const supabaseKey = (import.meta.env.VITE_SUPABASE_ANON_KEY || import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY)?.trim();

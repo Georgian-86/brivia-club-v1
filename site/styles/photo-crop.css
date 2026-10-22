@@ -9,7 +9,7 @@
 .photo-crop-body{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:var(--space-5);align-items:center;margin-top:var(--space-2)}
 .photo-crop-stage{position:relative;width:min(100%,380px);aspect-ratio:1;justify-self:center;overflow:hidden;border-radius:var(--radius-m);background:var(--color-cream);box-shadow:inset 0 0 0 1px var(--color-line);cursor:grab;touch-action:none;user-select:none;-webkit-user-select:none}
 .photo-crop-stage.is-dragging{cursor:grabbing}
-.photo-crop-stage:focus{outline:none}
+.photo-crop-stage:focus,.photo-crop-dialog:focus{outline:none}
 .photo-crop-stage:focus-visible{outline:3px solid var(--color-wine);outline-offset:3px}
 .photo-crop-canvas{position:absolute;inset:0;width:100%;height:100%;display:block}
 .photo-crop-mask{position:absolute;inset:7%;border-radius:50%;box-shadow:0 0 0 2px var(--color-wine),0 0 0 999px color-mix(in srgb,var(--color-cream) 74%,transparent);pointer-events:none}

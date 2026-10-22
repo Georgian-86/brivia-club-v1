@@ -648,6 +648,10 @@ set lock_timeout = '5s';
 -- the cleanup prints covers_cleaned: 3 on the first run (0 on any later run)
 ```
 
+Note: the SQL editor shows only the result of the **last** statement in the file (here the policy drops, "Success. No
+rows returned"), so the `covers_cleaned` line is usually not visible. Do not re-run the file to see it: the
+post-apply queries below are the verification.
+
 Post-apply checks (read-only):
 
 ```sql

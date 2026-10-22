@@ -6,20 +6,45 @@
 // (zoom). Escape or Cancel resolves null. Focus is trapped while open and returns to `returnFocus` on close.
 import '../styles/photo-crop.css';
 import { ImageProcessingError } from './image-compress.js';
-import { MIN_ZOOM, MAX_ZOOM, clampZoom, clampOffset, panBy, zoomAbout, wheelZoom, pinchZoom, cropRect, initialCrop, baseScale } from './photo-crop-math.js';
+import { MIN_ZOOM, MAX_ZOOM, clampZoom, clampOffset, panBy, zoomAbout, wheelZoom, pinchZoom, cropRect, initialCrop, baseScale, decodeSize } from './photo-crop-math.js';
 
 export const OUTPUT_SIZE = 800;
 const MASK = 0.86; // the circle's share of the stage side
 const KEY_STEP = 12;
 
 // EXIF orientation is applied by the decoder ('from-image'); an <img> fallback (browsers apply it there by default)
-// covers decoders without createImageBitmap options or for SVG.
+// covers decoders without createImageBitmap options or for SVG. Either way the photo kept for the dialog is at most
+// MAX_DECODE (2048) px on its long side (decodeSize, fix round 1 I3): an over-size bitmap is resized with
+// createImageBitmap resizeWidth / resizeHeight and the full-size one closed at once; the <img> path draws into a
+// capped canvas. Only that capped source is redrawn on every drag frame.
+const fromBitmap = async (bitmap) => {
+  const size = decodeSize(bitmap.width, bitmap.height);
+  if (!size.scaled) return { source: bitmap, width: bitmap.width, height: bitmap.height, release: () => bitmap.close?.() };
+  try {
+    const small = await createImageBitmap(bitmap, { resizeWidth: size.width, resizeHeight: size.height, resizeQuality: 'high' });
+    return { source: small, width: small.width, height: small.height, release: () => small.close?.() };
+  } finally {
+    bitmap.close?.();
+  }
+};
+const fromImage = (image, release) => {
+  const size = decodeSize(image.naturalWidth, image.naturalHeight);
+  if (!size.scaled) return { source: image, width: image.naturalWidth, height: image.naturalHeight, release };
+  const canvas = document.createElement('canvas');
+  canvas.width = size.width;
+  canvas.height = size.height;
+  const context = canvas.getContext('2d');
+  if (!context) { release(); throw new ImageProcessingError(); }
+  context.imageSmoothingQuality = 'high';
+  context.drawImage(image, 0, 0, size.width, size.height);
+  release();
+  return { source: canvas, width: size.width, height: size.height, release: () => { canvas.width = 0; canvas.height = 0; } };
+};
 const decode = async (file) => {
   if (typeof createImageBitmap === 'function') {
-    try {
-      const bitmap = await createImageBitmap(file, { imageOrientation: 'from-image' });
-      return { source: bitmap, width: bitmap.width, height: bitmap.height, release: () => bitmap.close?.() };
-    } catch { /* fall through to <img> */ }
+    let bitmap = null;
+    try { bitmap = await createImageBitmap(file, { imageOrientation: 'from-image' }); } catch { /* fall through to <img> */ }
+    if (bitmap) return fromBitmap(bitmap);
   }
   const url = URL.createObjectURL(file);
   try {
@@ -27,7 +52,7 @@ const decode = async (file) => {
     image.decoding = 'async';
     image.src = url;
     await image.decode();
-    return { source: image, width: image.naturalWidth, height: image.naturalHeight, release: () => URL.revokeObjectURL(url) };
+    return fromImage(image, () => URL.revokeObjectURL(url));
   } catch (error) {
     URL.revokeObjectURL(url);
     throw error;
@@ -53,7 +78,7 @@ export const renderCrop = async (decoded, rect, name = 'photo') => {
 const ICON_MINUS = '<svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" focusable="false"><path d="M5 12h14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>';
 const ICON_PLUS = '<svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" focusable="false"><path d="M5 12h14M12 5v14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>';
 
-const markup = () => `<div class="photo-crop-dialog" role="dialog" aria-modal="true" aria-labelledby="photo-crop-title" aria-describedby="photo-crop-help">
+const markup = () => `<div class="photo-crop-dialog" role="dialog" aria-modal="true" aria-labelledby="photo-crop-title" aria-describedby="photo-crop-help" tabindex="-1">
   <p class="photo-crop-kicker">PROFILE PHOTO</p>
   <h2 class="photo-crop-title" id="photo-crop-title">Frame your photo</h2>
   <p class="photo-crop-help" id="photo-crop-help">Drag to choose what shows in the circle. Zoom with the slider, a pinch or the mouse wheel. Arrow keys move it; + and − zoom.</p>
@@ -92,6 +117,10 @@ export async function openPhotoCrop(file, { returnFocus = null } = {}) {
   root.innerHTML = markup();
   document.body.append(root);
   document.body.classList.add('photo-crop-open');
+  // Fix round 1 (I1): everything behind the dialog is inert while it is open (the profile editor included), so a click
+  // on plain dialog text cannot hand Tab to the page behind. Each sibling's own inert state is restored on close.
+  const madeInert = [...document.body.children].filter((el) => el !== root && !el.inert);
+  madeInert.forEach((el) => { el.inert = true; });
   const dialog = root.querySelector('.photo-crop-dialog');
   const stage = root.querySelector('[data-photo-crop-stage]');
   const canvas = root.querySelector('.photo-crop-canvas');
@@ -120,6 +149,7 @@ export async function openPhotoCrop(file, { returnFocus = null } = {}) {
     const p = preview.getContext('2d');
     if (p) { p.clearRect(0, 0, preview.width, preview.height); p.drawImage(decoded.source, rect.sx, rect.sy, rect.size, rect.size, 0, 0, preview.width, preview.height); }
     stage.dataset.cropRect = `${rect.sx},${rect.sy},${rect.size}`;
+    stage.dataset.sourceSize = `${decoded.width},${decoded.height}`;
     range.value = String(state.zoom);
     range.setAttribute('aria-valuetext', `${state.zoom.toFixed(1)} times`);
   };
@@ -194,6 +224,8 @@ export async function openPhotoCrop(file, { returnFocus = null } = {}) {
       done = true;
       observer?.disconnect();
       window.removeEventListener('resize', measure);
+      document.removeEventListener('keydown', onKeydown, true);
+      madeInert.forEach((el) => { el.inert = false; });
       root.remove();
       document.body.classList.remove('photo-crop-open');
       decoded.release();
@@ -211,15 +243,20 @@ export async function openPhotoCrop(file, { returnFocus = null } = {}) {
         useButton.removeAttribute('aria-busy');
       }
     });
-    root.addEventListener('keydown', (event) => {
+    // Capture phase on the document (fix round 1, I1): Escape and Tab work wherever focus is (even on <body> after a
+    // click on plain text), and nothing behind the dialog sees them.
+    const onKeydown = (event) => {
       if (event.key === 'Escape') { event.preventDefault(); event.stopPropagation(); finish(null); return; }
       if (event.key === 'Tab') {
+        event.stopPropagation();
         const items = [...dialog.querySelectorAll(FOCUSABLE)].filter((el) => el.offsetParent !== null || el === document.activeElement);
         if (!items.length) return;
         const first = items[0];
         const last = items[items.length - 1];
-        if (event.shiftKey && (document.activeElement === first || !dialog.contains(document.activeElement))) { event.preventDefault(); last.focus(); }
-        else if (!event.shiftKey && (document.activeElement === last || !dialog.contains(document.activeElement))) { event.preventDefault(); first.focus(); }
+        const active = document.activeElement;
+        const outside = !dialog.contains(active) || active === dialog; // the dialog itself after a click on plain text
+        if (event.shiftKey && (active === first || outside)) { event.preventDefault(); last.focus(); }
+        else if (!event.shiftKey && (active === last || outside)) { event.preventDefault(); first.focus(); }
         return;
       }
       const inRange = event.target === range;
@@ -229,7 +266,8 @@ export async function openPhotoCrop(file, { returnFocus = null } = {}) {
       const step = event.shiftKey ? KEY_STEP * 4 : KEY_STEP;
       const moves = { ArrowLeft: [-step, 0], ArrowRight: [step, 0], ArrowUp: [0, -step], ArrowDown: [0, step] };
       if (moves[event.key]) { event.preventDefault(); set(panBy(state, moves[event.key][0], moves[event.key][1], dims())); }
-    });
+    };
+    document.addEventListener('keydown', onKeydown, true);
     // Clicks on the backdrop do nothing (a stray tap must not lose the framing); Cancel and Escape close.
     stage.focus();
   });

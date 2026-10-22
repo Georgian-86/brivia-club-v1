@@ -1,6 +1,8 @@
 // Image re-encode for every member upload (R12). It FAILS CLOSED: the original file (with its EXIF, possibly GPS)
 // is never returned for an image. Dependencies are injectable so this runs under node without a DOM.
 export const PHOTO_ERROR_MESSAGE = "We couldn't process this photo. Try a JPG or PNG.";
+// The crop dialog's chunk (photo-crop.js) could not load: nothing is uploaded (D-080 fix round 1, M1/M2).
+export const PHOTO_FRAMER_ERROR = "Couldn't open the photo framer. Please try again.";
 
 export class ImageProcessingError extends Error {
   constructor(message = PHOTO_ERROR_MESSAGE) {
