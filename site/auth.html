@@ -74,6 +74,19 @@
             <button class="auth-secondary auth-create-trigger" type="button">CREATE AN ACCOUNT <span>↗</span></button>
           </div>
 
+          <div class="auth-view auth-signup auth-guided" data-auth-view="guided" hidden>
+            <section class="guided" id="guided-signup" aria-labelledby="signup-screen-title">
+              <ol class="guided-steps" data-guided-steps aria-label="Your progress" hidden></ol>
+              <p class="guided-step-label" data-guided-step-label aria-live="polite" hidden></p>
+              <div class="guided-host" data-guided-host></div>
+              <p class="guided-error" data-guided-error role="alert" hidden></p>
+              <div class="guided-actions" data-guided-actions hidden>
+                <button class="guided-back" data-guided-back type="button"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M19 12H5M11 6l-6 6 6 6" /></svg><span>Back</span></button>
+                <button class="guided-next" data-guided-next type="button">Continue</button>
+              </div>
+            </section>
+          </div>
+
           <div class="auth-view auth-signup" data-auth-view="signup" hidden>
             <p class="auth-eyebrow">YOUR PLACE IN THE ROOM</p>
             <h1 id="signup-title">FIND YOUR PEOPLE</h1>

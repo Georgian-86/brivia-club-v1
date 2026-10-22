@@ -1,0 +1,597 @@
+// Guided signup (polish wave B, D-073; first D-067/D-068): one question per screen, at every width. Renders into
+// #guided-signup (auth.html): the bubble stepper (done / current / pending), "Step n of N", one screen, and Back + one
+// primary button. Answers stay in memory until the last question; then `submit(answers)` (script.js) creates the
+// account (email path) and saves everything through the existing pipeline. No email code, no points screen: the
+// interests are saved with an even split. Coordinates live only in `answers.area` (memory) and are dropped once saved.
+import { searchPlaces, fetchInterestNodes } from './supabase.js';
+import { SCREENS, STEP_ICONS, stepLabel, stepStates, backTarget } from './signup-flow.js';
+import { MAX_INTERESTS } from './passion-budget.js';
+import { POPULAR_INTERESTS } from './discovery-catalog.js';
+import { matchTypedCity } from './area-pick.js';
+import { locateOnce, fallbackCopy, STILL_WAITING_TEXT } from './geo-locate.js';
+
+const PLACEHOLDER_NAME = 'New Member';
+const realName = (value) => { const name = String(value || '').trim(); return name && name !== PLACEHOLDER_NAME ? name : ''; };
+const escapeHtml = (value) => String(value ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
+const reducedMotion = () => Boolean(window.matchMedia?.('(prefers-reduced-motion: reduce)').matches);
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const MIN_PASSWORD = 8;
+// The stored values (supabase.js normalizeGender), shown as they are.
+export const GENDERS = ['Male', 'Female', 'Prefer not to say'];
+const phoneDigits = (value) => String(value || '').replace(/\D/g, '');
+// A1: after this long without an answer the city list opens ("Still waiting for your browser…"); the attempt keeps
+// listening (locateOnce's grace), so a late "Allow" still counts unless the member picked a city meanwhile.
+const GEO_GUARD_MS = 15000;
+const GOT_IT = "Got it. We keep only the ~2 km square you're in.";
+const FINDING = 'Finding your area…';
+const STILL_LOOKING = 'Still looking for your location…';
+// The country codes the classic form offers (one list in auth.html), else the common ones.
+const countryCodes = () => {
+  const options = [...document.querySelectorAll('#signup-form select[name="phoneCountryCode"] option')].map((o) => o.value).filter(Boolean);
+  return options.length ? options : ['+91', '+1', '+44', '+61', '+65', '+971'];
+};
+
+const ICONS = {
+  mail: '<rect x="3" y="5" width="18" height="14" rx="2.5"/><path d="M3.5 7.5l8.5 6 8.5-6"/>',
+  shield: '<path d="M12 3l7 3v5c0 4.5-3 8.3-7 10-4-1.7-7-5.5-7-10V6l7-3z"/><path d="M9 12l2 2 4-4"/>',
+  phone: '<rect x="7" y="2.8" width="10" height="18.4" rx="2.4"/><path d="M10.5 17.8h3"/>',
+  person: '<circle cx="12" cy="8" r="3.8"/><path d="M4.5 20.5c1.4-3.8 4.3-5.8 7.5-5.8s6.1 2 7.5 5.8"/>',
+  pin: '<path d="M12 21s-6.5-5.6-6.5-11a6.5 6.5 0 0 1 13 0c0 5.4-6.5 11-6.5 11z"/><circle cx="12" cy="10" r="2.4"/>',
+  spark: '<path d="M12 3.5l1.9 5.1 5.1 1.9-5.1 1.9L12 17.5l-1.9-5.1L5 10.5l5.1-1.9z"/><path d="M18.5 16.5l.8 2 2 .8-2 .8-.8 2-.8-2-2-.8 2-.8z"/>',
+  tick: '<path d="M5.5 12.5l4.2 4.2L18.5 8"/>',
+  search: '<circle cx="11" cy="11" r="6.5"/><path d="M16 16l4.5 4.5"/>',
+  arrow: '<path d="M5 12h14M13 6l6 6-6 6"/>',
+  back: '<path d="M19 12H5M11 6l-6 6 6 6"/>',
+};
+const svg = (name, cls = '') => `<svg class="${cls}" viewBox="0 0 24 24" aria-hidden="true" focusable="false">${ICONS[name]}</svg>`;
+const STEP_NAMES = { account: 'Account', adult: '18+', name: 'Name', details: 'Details', area: 'Area', interests: 'Interests' };
+
+export const COPY = {
+  emailInvalid: 'Enter a valid email address.',
+  passwordShort: `Use at least ${MIN_PASSWORD} characters for your password.`,
+  passwordMismatch: "The two passwords don't match.",
+  saveFailed: "That didn't save. Check your connection and try again.",
+  under18: "Brivia Club is for adults. Come back when you're 18.",
+  nameMissing: 'Enter the name members should see.',
+  phoneInvalid: 'Enter a mobile number of 7 to 15 digits.',
+  areaMissing: 'Use your location or pick your city.',
+  interestsLoad: "We couldn't load the interests. Please try again.",
+  interestsMissing: 'Pick at least one interest.',
+  cap: `You can pick up to ${MAX_INTERESTS}. Remove one to add another.`,
+};
+
+// root: #guided-signup. path: 'email' | 'google'. submit(answers) -> Promise<{ ok: true, session } | { ok: false,
+// screen, message }>. resumeAt: the first screen to show for a signed-in member (resumeScreen). prefill: answers
+// already known (a Google name, an existing row). hasSession: a member is signed in (Back never returns to account).
+export const initGuidedSignup = ({
+  root, path = 'email', startGoogle, submit, redirectToApp, resumeAt = null, prefill = {}, hasSession = false,
+  onLogin = () => {}, onSignOut = () => {},
+}) => {
+  if (!root) return null;
+  const steps = root.querySelector('[data-guided-steps]');
+  const label = root.querySelector('[data-guided-step-label]');
+  const host = root.querySelector('[data-guided-host]');
+  const errorBox = root.querySelector('[data-guided-error]');
+  const actions = root.querySelector('[data-guided-actions]');
+  const back = root.querySelector('[data-guided-back]');
+  const next = root.querySelector('[data-guided-next]');
+  const emptyAnswers = () => ({ email: '', password: '', passwordConfirm: '', adult: false, name: '', phoneCountryCode: '+91', phoneNumber: '', gender: '', area: null, interests: [] });
+  const state = { path, hasSession, resumeAt, screen: 'welcome', busy: false, nodes: null, current: null, email: '', answers: { ...emptyAnswers(), ...prefill } };
+  const geo = { seq: 0, pending: false, guard: 0 };
+
+  const setError = (text) => { errorBox.textContent = text || ''; errorBox.hidden = !text; };
+  const refreshNext = () => { next.disabled = state.busy || !state.current?.ready?.(); };
+  const setBusy = (busy) => { state.busy = busy; next.setAttribute('aria-busy', String(busy)); refreshNext(); };
+  const cancelGeo = () => { geo.seq += 1; geo.pending = false; window.clearTimeout(geo.guard); };
+  const questions = () => (SCREENS[state.path] || SCREENS.email).filter((s) => STEP_ICONS[s]);
+  const nextAfter = (screen) => { const list = SCREENS[state.path] || SCREENS.email; return list[list.indexOf(screen) + 1] || 'reveal'; };
+
+  const renderSteps = () => {
+    const showSteps = state.screen !== 'welcome' && state.screen !== 'stop';
+    steps.hidden = !showSteps;
+    steps.innerHTML = showSteps ? stepStates(state.path, state.screen).map(({ screen, state: s }, i) => `
+      <li class="guided-bubble is-${s}" data-step="${screen}" style="--i:${i}"${s === 'current' ? ' aria-current="step"' : ''}>
+        <span class="guided-bubble-dot">${svg(STEP_ICONS[screen], 'guided-bubble-icon')}${svg('tick', 'guided-bubble-tick')}</span>
+        <span class="guided-bubble-name">${STEP_NAMES[screen]}</span>
+        <span class="sr-only">${s === 'done' ? 'done' : s === 'current' ? 'current step' : 'to do'}</span>
+      </li>`).join('') : '';
+    const text = stepLabel(state.path, state.screen);
+    label.textContent = text || '';
+    label.hidden = !text;
+  };
+
+  // The swap: the outgoing screen fades and lifts 8 px, the incoming one rises in (a plain fade under reduced motion).
+  const show = async (screen, { focus = true } = {}) => {
+    if (screen === 'done') { redirectToApp(); return; }
+    const build = SCREEN_BUILDERS[screen];
+    if (!build) return;
+    if (screen !== 'area') cancelGeo();
+    setError('');
+    const old = host.firstElementChild;
+    if (old && old.animate && state.screen !== screen) {
+      const frames = reducedMotion() ? [{ opacity: 1 }, { opacity: 0 }] : [{ opacity: 1, transform: 'none' }, { opacity: 0, transform: 'translateY(-8px)' }];
+      await old.animate(frames, { duration: 140, easing: 'ease-in' }).finished.catch(() => {});
+    }
+    state.screen = screen;
+    state.current = build();
+    host.innerHTML = '';
+    const el = document.createElement('div');
+    el.className = `guided-screen guided-screen--${screen}`;
+    if (STEP_ICONS[screen]) el.dataset.question = screen;
+    el.innerHTML = state.current.html;
+    host.append(el);
+    if (el.animate) el.animate(reducedMotion() ? [{ opacity: 0 }, { opacity: 1 }] : [{ opacity: 0, transform: 'translateY(10px)' }, { opacity: 1, transform: 'none' }], { duration: 240, easing: 'cubic-bezier(.2,.7,.2,1)' });
+    renderSteps();
+    const target = backTarget(state.path, screen, state.hasSession);
+    back.hidden = !target || !STEP_ICONS[screen];
+    actions.hidden = Boolean(state.current.noActions);
+    next.innerHTML = `<span>${escapeHtml(state.current.primary || 'Continue')}</span>${svg('arrow', 'guided-next-icon')}`;
+    root.dataset.screen = screen;
+    root.dataset.path = state.path;
+    // Every screen starts at its top (a long Interests list must not leave the next screen scrolled away).
+    const panel = root.closest('.auth-panel');
+    if (panel) panel.scrollTop = 0;
+    if (root.getBoundingClientRect().top < 0) root.scrollIntoView({ block: 'start' });
+    state.current.mount?.(el);
+    refreshNext();
+    if (focus) {
+      const field = state.current.autofocus ? el.querySelector(state.current.autofocus) : null;
+      // A phone keyboard popping up on every screen is jarring: on touch screens the heading takes focus instead.
+      if (field && !window.matchMedia?.('(pointer: coarse)').matches) field.focus({ preventScroll: true });
+      else root.querySelector('#signup-screen-title')?.focus({ preventScroll: true });
+    }
+  };
+
+  const fail = (copy) => { const error = new Error(copy); error.copy = copy; throw error; };
+  const goNext = async () => {
+    if (state.busy || !state.current?.submit) return;
+    if (!state.current.ready?.()) { if (state.current.notReady) setError(state.current.notReady()); return; }
+    setError('');
+    setBusy(true);
+    let to = null;
+    let message = '';
+    try {
+      to = await state.current.submit();
+    } catch (error) {
+      message = error?.copy || COPY.saveFailed;
+    }
+    setBusy(false);
+    if (to && typeof to === 'object') { message = to.message || ''; to = to.screen; }
+    if (to) await show(to);
+    if (message) setError(message);
+  };
+
+  // ---- Screens ------------------------------------------------------------------------------------------------
+  const heading = (title, helper = '') => `<h2 id="signup-screen-title" tabindex="-1">${title}</h2>${helper ? `<p class="guided-helper">${helper}</p>` : ''}`;
+  const kicker = (text) => `<p class="guided-kicker">${text}</p>`;
+  const a = state.answers;
+
+  const SCREEN_BUILDERS = {
+    welcome: () => (state.hasSession ? {
+      noActions: true,
+      html: `${kicker('The Brivia Club')}${heading('Welcome back.', `You're signed in${state.email ? ` as <b>${escapeHtml(state.email)}</b>` : ''}. Pick up where you left off.`)}
+        <div class="guided-choices">
+          <button class="guided-choice guided-choice--primary" type="button" data-guided-continue><span>Continue</span>${svg('arrow', 'guided-choice-icon')}</button>
+          <button class="guided-link guided-link--center" type="button" data-guided-signout>Sign out</button>
+        </div>`,
+      mount: (el) => {
+        el.querySelector('[data-guided-continue]').addEventListener('click', () => { void show(state.resumeAt || questions()[0]); });
+        el.querySelector('[data-guided-signout]').addEventListener('click', () => { onSignOut(); });
+      },
+    } : {
+      noActions: true,
+      html: `${kicker('The Brivia Club')}${heading('Find your <em>people.</em>', 'A few quick questions, one at a time. It takes about two minutes.')}
+        <div class="guided-choices">
+          <button class="guided-choice guided-choice--google" type="button" data-guided-google><span class="auth-google-mark guided-google-mark" aria-hidden="true">G</span><span>Continue with Google</span></button>
+          <div class="guided-or" aria-hidden="true"><span>or</span></div>
+          <button class="guided-choice guided-choice--primary" type="button" data-guided-email>${svg('mail', 'guided-choice-icon')}<span>Continue with email</span></button>
+          <button class="guided-link guided-link--center" type="button" data-guided-login>I already have an account</button>
+        </div>
+        <p class="guided-fine">By continuing you agree to how we handle your data: <a href="/privacy.html" target="_blank" rel="noopener">privacy notice</a>.</p>`,
+      mount: (el) => {
+        el.querySelector('[data-guided-google]').addEventListener('click', () => { state.path = 'google'; startGoogle(); });
+        el.querySelector('[data-guided-email]').addEventListener('click', () => { state.path = 'email'; void show('account'); });
+        el.querySelector('[data-guided-login]').addEventListener('click', () => onLogin());
+      },
+    }),
+
+    account: () => ({
+      autofocus: 'input[name="guided-email"]',
+      html: `${heading('Create your account', 'Your email is how you log in. We confirm it once you finish.')}
+        <label class="guided-field"><span class="guided-field-label">Email address</span>
+          <input type="email" name="guided-email" autocomplete="email" inputmode="email" autocapitalize="off" spellcheck="false" placeholder="you@example.com" value="${escapeHtml(a.email)}" required /></label>
+        <label class="guided-field"><span class="guided-field-label">Password</span>
+          <input type="password" name="guided-password" autocomplete="new-password" minlength="${MIN_PASSWORD}" placeholder="At least ${MIN_PASSWORD} characters" value="${escapeHtml(a.password)}" required /></label>
+        <label class="guided-field"><span class="guided-field-label">Confirm password</span>
+          <input type="password" name="guided-password-confirm" autocomplete="new-password" minlength="${MIN_PASSWORD}" placeholder="Type it again" value="${escapeHtml(a.passwordConfirm)}" required /></label>`,
+      mount: (el) => {
+        const [email, pass, again] = el.querySelectorAll('input');
+        email.addEventListener('input', () => { a.email = email.value.trim(); refreshNext(); });
+        pass.addEventListener('input', () => { a.password = pass.value; refreshNext(); });
+        again.addEventListener('input', () => { a.passwordConfirm = again.value; refreshNext(); });
+      },
+      ready: () => EMAIL_RE.test(a.email) && a.password.length >= MIN_PASSWORD && a.passwordConfirm.length >= MIN_PASSWORD,
+      notReady: () => (!EMAIL_RE.test(a.email) ? COPY.emailInvalid : COPY.passwordShort),
+      submit: async () => {
+        if (a.password !== a.passwordConfirm) fail(COPY.passwordMismatch);
+        return nextAfter('account');
+      },
+    }),
+
+    adult: () => ({
+      autofocus: 'input[name="guided-adult"]',
+      html: `${heading('Are you 18 or older?', 'Brivia Club is for adults. We never ask for your date of birth.')}
+        <label class="guided-check"><input type="checkbox" name="guided-adult" ${a.adult ? 'checked' : ''} /><span>I'm 18 or older</span></label>
+        <p class="guided-fine"><a href="/privacy.html" target="_blank" rel="noopener">How we use your data</a> (privacy notice)</p>
+        <button class="guided-link" type="button" data-guided-under18>I'm under 18</button>`,
+      mount: (el) => {
+        const box = el.querySelector('input[name="guided-adult"]');
+        box.addEventListener('change', () => { a.adult = box.checked; refreshNext(); });
+        el.querySelector('[data-guided-under18]').addEventListener('click', () => {
+          cancelGeo();
+          Object.assign(a, emptyAnswers());
+          if (state.hasSession) onSignOut({ quiet: true });
+          state.screen = 'stop';
+          host.innerHTML = `<div class="guided-screen guided-screen--stop">${heading('Thanks for being honest.', COPY.under18)}</div>`;
+          root.dataset.screen = 'stop';
+          steps.hidden = true; label.hidden = true; actions.hidden = true;
+          root.querySelector('#signup-screen-title')?.focus();
+        });
+      },
+      ready: () => a.adult === true,
+      submit: async () => nextAfter('adult'),
+    }),
+
+    name: () => ({
+      autofocus: 'input[name="guided-name"]',
+      html: `${heading('What should members call you?', 'Your first name is enough. Members see it on your card.')}
+        <label class="guided-field"><span class="guided-field-label">Your name</span>
+          <input type="text" name="guided-name" autocomplete="name" maxlength="60" placeholder="Your name" value="${escapeHtml(realName(a.name))}" /></label>`,
+      mount: (el) => {
+        const input = el.querySelector('input');
+        input.addEventListener('input', () => { a.name = input.value; refreshNext(); });
+      },
+      ready: () => Boolean(realName(a.name)),
+      notReady: () => COPY.nameMissing,
+      submit: async () => { a.name = realName(a.name).replace(/\s+/g, ' '); return nextAfter('name'); },
+    }),
+
+    details: () => {
+      const codes = countryCodes();
+      if (!codes.includes(a.phoneCountryCode)) codes.unshift(a.phoneCountryCode);
+      return {
+        autofocus: 'input[name="guided-phone"]',
+        html: `${heading('A little more about you', 'Your phone number stays private: no member ever sees it.')}
+          <div class="guided-field"><span class="guided-field-label" id="guided-phone-label">Phone number</span>
+            <div class="guided-phone" role="group" aria-labelledby="guided-phone-label">
+              <select name="guided-phone-code" aria-label="Country code" autocomplete="tel-country-code">${codes.map((c) => `<option ${c === a.phoneCountryCode ? 'selected' : ''}>${escapeHtml(c)}</option>`).join('')}</select>
+              <input type="tel" name="guided-phone" inputmode="tel" autocomplete="tel-national" placeholder="98765 43210" aria-label="Mobile number" value="${escapeHtml(a.phoneNumber)}" />
+            </div></div>
+          <div class="guided-field"><span class="guided-field-label" id="guided-gender-label">Gender</span>
+            <div class="guided-segments" role="radiogroup" aria-labelledby="guided-gender-label">
+              ${GENDERS.map((g) => `<button type="button" role="radio" class="guided-segment" data-gender="${escapeHtml(g)}" aria-checked="${g === a.gender}">${escapeHtml(g)}</button>`).join('')}
+            </div></div>`,
+        mount: (el) => {
+          const select = el.querySelector('select');
+          const input = el.querySelector('input[name="guided-phone"]');
+          const radios = [...el.querySelectorAll('.guided-segment')];
+          select.addEventListener('change', () => { a.phoneCountryCode = select.value; });
+          input.addEventListener('input', () => { a.phoneNumber = phoneDigits(input.value); refreshNext(); });
+          const pick = (button) => {
+            a.gender = button.dataset.gender;
+            radios.forEach((r) => { r.setAttribute('aria-checked', String(r === button)); r.tabIndex = r === button ? 0 : -1; });
+            refreshNext();
+          };
+          radios.forEach((r, i) => {
+            r.tabIndex = (a.gender ? r.dataset.gender === a.gender : i === 0) ? 0 : -1;
+            r.addEventListener('click', () => pick(r));
+            r.addEventListener('keydown', (event) => {
+              const step = { ArrowRight: 1, ArrowDown: 1, ArrowLeft: -1, ArrowUp: -1 }[event.key];
+              if (!step) return;
+              event.preventDefault();
+              const to = radios[(i + step + radios.length) % radios.length];
+              pick(to); to.focus();
+            });
+          });
+        },
+        ready: () => a.phoneNumber.length >= 7 && a.phoneNumber.length <= 15 && GENDERS.includes(a.gender),
+        notReady: () => (a.phoneNumber.length < 7 || a.phoneNumber.length > 15 ? COPY.phoneInvalid : 'Choose how you describe your gender.'),
+        submit: async () => nextAfter('details'),
+      };
+    },
+
+    area: () => {
+      let options = [];
+      let searchSeq = 0;
+      let searchTimer = 0;
+      return {
+        html: `${heading('Where are you based?', 'We show people near you first. Members only ever see a rounded distance, never your address.')}
+          <button class="guided-choice guided-choice--geo" type="button" data-guided-geo aria-pressed="false">${svg('pin', 'guided-choice-icon')}<span>Use my location</span></button>
+          <div class="guided-or"><span>or pick your city</span></div>
+          <p class="guided-fallback" data-guided-area-fallback></p>
+          <label class="guided-field guided-field--search"><span class="sr-only">Your city</span>${svg('search', 'guided-search-icon')}
+            <input type="search" name="guided-city" autocomplete="off" spellcheck="false" placeholder="Start typing your city" aria-controls="guided-city-results" /></label>
+          <ul class="guided-cities" id="guided-city-results" aria-label="Cities" hidden></ul>
+          <p class="guided-status" data-guided-area-status role="status" aria-live="polite"></p>`,
+        mount: (el) => {
+          const geoButton = el.querySelector('[data-guided-geo]');
+          const input = el.querySelector('input');
+          const list = el.querySelector('.guided-cities');
+          const status = el.querySelector('[data-guided-area-status]');
+          const fallback = el.querySelector('[data-guided-area-fallback]');
+          const setFallback = (text, { retry = false } = {}) => {
+            fallback.textContent = text;
+            if (retry) {
+              const again = document.createElement('button');
+              again.type = 'button';
+              again.className = 'guided-link';
+              again.textContent = 'Try again';
+              again.addEventListener('click', () => { void useLocation(); });
+              fallback.append(' ', again);
+            }
+          };
+          const paintPressed = () => {
+            geoButton.setAttribute('aria-pressed', String(a.area?.kind === 'geo'));
+            list.querySelectorAll('button').forEach((b) => b.setAttribute('aria-pressed', String(a.area?.kind === 'city' && b.dataset.place === a.area.placeId)));
+          };
+          const choose = (area, text) => {
+            a.area = area;
+            status.textContent = text;
+            paintPressed();
+            refreshNext();
+          };
+          const render = async () => {
+            const seq = ++searchSeq;
+            const { data, error } = await searchPlaces(input.value, 8);
+            if (seq !== searchSeq || !el.isConnected) return;
+            options = error ? [] : data;
+            list.hidden = false;
+            list.innerHTML = options.length
+              ? options.map((place) => `<li><button type="button" data-place="${escapeHtml(place.id)}" aria-pressed="false"><span>${escapeHtml(place.name)}</span><small>${escapeHtml([place.region, place.country].filter(Boolean).join(', '))}</small></button></li>`).join('')
+              : `<li class="guided-cities-empty">${error ? 'Cities could not load. Check your connection and try again.' : 'No city found. Try the nearest larger city.'}</li>`;
+            paintPressed();
+          };
+          const chooseCity = (place) => {
+            if (!place) return false;
+            cancelGeo();
+            geoButton.removeAttribute('aria-busy');
+            setFallback('');
+            choose({ kind: 'city', placeId: place.id, label: `${place.name}, ${place.region}` }, `Your area: ${place.name}, ${place.region}. We use the city's centre, never your address.`);
+            return true;
+          };
+          const openList = (text = '', opts = {}) => { setFallback(text, opts); input.focus({ preventScroll: true }); void render(); };
+          const useLocation = async () => {
+            if (geo.pending) { status.textContent = STILL_LOOKING; return; }
+            setError('');
+            const seq = ++geo.seq;
+            const choiceAtStart = a.area;
+            geo.pending = true;
+            geoButton.setAttribute('aria-busy', 'true');
+            status.textContent = FINDING;
+            window.clearTimeout(geo.guard);
+            geo.guard = window.setTimeout(() => {
+              if (seq !== geo.seq || a.area !== choiceAtStart) return;
+              status.textContent = '';
+              openList(STILL_WAITING_TEXT);
+            }, GEO_GUARD_MS);
+            const result = await locateOnce(navigator.geolocation, { secure: Boolean(window.isSecureContext) });
+            if (seq !== geo.seq || !el.isConnected) return;
+            window.clearTimeout(geo.guard);
+            geo.pending = false;
+            geoButton.removeAttribute('aria-busy');
+            if (a.area !== choiceAtStart) { if (fallback.textContent === STILL_WAITING_TEXT) setFallback(''); return; }
+            if (result.ok) {
+              setFallback('');
+              list.hidden = true;
+              choose({ kind: 'geo', lat: result.lat, lng: result.lng }, GOT_IT);
+              // The answer is in: Enter now means Continue (focus moves from "Use my location" to the primary button).
+              if (document.activeElement === geoButton || document.activeElement === document.body) next.focus({ preventScroll: true });
+              return;
+            }
+            status.textContent = '';
+            openList(fallbackCopy(result.reason), { retry: result.reason === 'timeout' });
+          };
+          if (a.area?.kind === 'city') { input.value = a.area.label.split(',')[0]; choose(a.area, `Your area: ${a.area.label}. We use the city's centre, never your address.`); }
+          else if (a.area?.kind === 'geo') choose(a.area, GOT_IT);
+          else if (a.area?.kind === 'keep') choose(a.area, a.area.label ? `Your area: ${a.area.label}. Choose again to change it.` : 'Your area is set. Choose again to change it.');
+          geoButton.addEventListener('click', () => { void useLocation(); });
+          input.addEventListener('focus', () => { if (list.hidden) void render(); });
+          input.addEventListener('input', () => {
+            searchSeq += 1; options = []; list.innerHTML = '';
+            window.clearTimeout(searchTimer);
+            searchTimer = window.setTimeout(() => void render(), 160);
+          });
+          // Enter picks the city typed when it is unambiguous; otherwise (an area already chosen) it is Continue.
+          input.addEventListener('keydown', (event) => {
+            if (event.key !== 'Enter') return;
+            const typed = matchTypedCity(input.value, options);
+            if (typed && !(a.area?.kind === 'city' && a.area.placeId === typed.id)) { event.preventDefault(); chooseCity(typed); }
+          });
+          list.addEventListener('click', (event) => {
+            const button = event.target.closest('button[data-place]');
+            if (button) chooseCity(options.find((p) => p.id === button.dataset.place));
+          });
+        },
+        ready: () => Boolean(a.area),
+        notReady: () => COPY.areaMissing,
+        submit: async () => nextAfter('area'),
+      };
+    },
+
+    interests: () => {
+      let query = '';
+      const picked = () => new Set(a.interests.map((p) => p.id));
+      return {
+        primary: 'Finish',
+        html: `${heading('What are you into?', 'Pick what you genuinely care about, up to twelve. Three to six works best.')}
+          <label class="guided-field guided-field--search"><span class="sr-only">Search interests</span>${svg('search', 'guided-search-icon')}
+            <input type="search" name="guided-interest" autocomplete="off" spellcheck="false" placeholder="Search, e.g. chess or hiking" aria-controls="guided-interest-options" /></label>
+          <div class="guided-tray" data-guided-tray>
+            <div class="guided-tray-head"><span>Your picks</span><b data-guided-count aria-hidden="true">0 picked</b></div>
+            <ul class="guided-tray-list" aria-label="Your picks"></ul>
+            <p class="guided-tray-empty" data-guided-tray-empty>Tap an interest below to add it here.</p>
+            <p class="sr-only" data-guided-announce aria-live="polite"></p>
+          </div>
+          <div class="guided-options" id="guided-interest-options" role="group" aria-label="Interests"></div>`,
+        mount: async (el) => {
+          const input = el.querySelector('input');
+          const options = el.querySelector('.guided-options');
+          const tray = el.querySelector('.guided-tray-list');
+          const trayEmpty = el.querySelector('[data-guided-tray-empty]');
+          const count = el.querySelector('[data-guided-count]');
+          const announce = el.querySelector('[data-guided-announce]');
+          const renderTray = () => {
+            tray.innerHTML = a.interests.map((p) => `<li><button type="button" class="guided-pick" data-id="${escapeHtml(p.id)}" aria-label="Remove ${escapeHtml(p.label)}">${escapeHtml(p.label)}<span aria-hidden="true">×</span></button></li>`).join('');
+            count.textContent = `${a.interests.length} picked`;
+            trayEmpty.hidden = a.interests.length > 0;
+          };
+          const bump = () => { if (!reducedMotion() && count.animate) count.animate([{ transform: 'scale(1)' }, { transform: 'scale(1.14)' }, { transform: 'scale(1)' }], { duration: 180, easing: 'ease-out' }); };
+          // FLIP: a clone flies from the tapped chip to its slot in the tray (and back on removal); under reduced
+          // motion the chip simply fades in where it lands. from: { rect, node } captured before the lists re-render.
+          const fly = (from, to) => {
+            if (!from?.rect || !to || !to.isConnected) return;
+            if (reducedMotion() || !to.animate) { to.animate?.([{ opacity: 0 }, { opacity: 1 }], { duration: 150 }); return; }
+            const s = from.rect;
+            const t = to.getBoundingClientRect();
+            const ghost = from.node.cloneNode(true);
+            ghost.classList.add('guided-ghost');
+            ghost.removeAttribute('id');
+            ghost.setAttribute('aria-hidden', 'true');
+            Object.assign(ghost.style, { left: `${s.left}px`, top: `${s.top}px`, width: `${s.width}px`, height: `${s.height}px` });
+            document.body.append(ghost);
+            to.style.opacity = '0';
+            const anim = ghost.animate([
+              { transform: 'translate(0, 0) scale(1)', opacity: 1 },
+              { transform: `translate(${t.left - s.left}px, ${t.top - s.top}px) scale(${t.width / Math.max(1, s.width)}, ${t.height / Math.max(1, s.height)})`, opacity: 1 },
+            ], { duration: 240, easing: 'cubic-bezier(.2,.7,.2,1)' });
+            const done = () => { ghost.remove(); to.style.opacity = ''; };
+            anim.finished.then(done, done);
+          };
+          const toggle = (id, source) => {
+            const node = state.nodes.find((n) => n.id === id);
+            if (!node) return;
+            const has = picked().has(id);
+            if (!has && a.interests.length >= MAX_INTERESTS) { setError(COPY.cap); return; }
+            const from = source?.isConnected ? { rect: source.getBoundingClientRect(), node: source } : null;
+            setError('');
+            a.interests = has ? a.interests.filter((p) => p.id !== id) : [...a.interests, { id, label: node.label, mode: 'play' }];
+            renderTray();
+            renderOptions();
+            bump();
+            announce.textContent = `${node.label} ${has ? 'removed' : 'added'}. ${a.interests.length} picked.`;
+            navigator.vibrate?.(8);
+            fly(from, (has ? options : tray).querySelector(`[data-id="${CSS.escape(id)}"]`));
+            refreshNext();
+          };
+          const renderOptions = () => {
+            const chosen = picked();
+            const q = query.trim().toLowerCase();
+            let list = state.nodes;
+            if (q) list = list.filter((n) => n.label.toLowerCase().includes(q)).sort((x, y) => Number(!x.label.toLowerCase().startsWith(q)) - Number(!y.label.toLowerCase().startsWith(q)));
+            else {
+              const popular = POPULAR_INTERESTS.map((l) => list.find((n) => n.label.toLowerCase() === l.toLowerCase())).filter(Boolean);
+              list = [...popular, ...list.filter((n) => !popular.includes(n))];
+            }
+            list = list.slice(0, q ? 40 : 30);
+            options.innerHTML = list.length
+              ? list.map((n) => `<button type="button" class="guided-option" data-id="${escapeHtml(n.id)}" aria-pressed="${chosen.has(n.id)}">${svg('tick', 'guided-option-tick')}${escapeHtml(n.label)}</button>`).join('')
+              : `<p class="guided-helper">No interest matches "${escapeHtml(query)}".</p>`;
+          };
+          tray.addEventListener('click', (event) => { const b = event.target.closest('.guided-pick'); if (b) toggle(b.dataset.id, b); });
+          options.addEventListener('click', (event) => { const b = event.target.closest('.guided-option'); if (b) toggle(b.dataset.id, b); });
+          input.addEventListener('input', () => { query = input.value; if (state.nodes) renderOptions(); });
+          // Enter in the search adds the first match; with nothing typed it is Continue.
+          input.addEventListener('keydown', (event) => {
+            if (event.key !== 'Enter' || !query.trim()) return;
+            event.preventDefault();
+            const first = options.querySelector('.guided-option[aria-pressed="false"]');
+            if (first) { toggle(first.dataset.id, first); input.value = ''; query = ''; renderOptions(); }
+          });
+          renderTray();
+          if (!state.nodes) {
+            options.innerHTML = '<p class="guided-helper">Loading interests…</p>';
+            const { data, error } = await fetchInterestNodes();
+            // Private (sensitive) interests are not offered here: they need their own consent screen.
+            if (!error) state.nodes = (data || []).filter((n) => n && !n.sensitive && n.level >= 3 && String(n.label || '').trim());
+            if (!el.isConnected) return;
+            if (error || !state.nodes?.length) { state.nodes = null; options.innerHTML = ''; setError(COPY.interestsLoad); return; }
+          }
+          // Picks restored from an earlier visit keep only what is still offered.
+          a.interests = a.interests.filter((p) => state.nodes.some((n) => n.id === p.id));
+          renderTray();
+          renderOptions();
+          refreshNext();
+        },
+        ready: () => a.interests.length >= 1 && a.interests.length <= MAX_INTERESTS && Boolean(state.nodes),
+        notReady: () => COPY.interestsMissing,
+        submit: async () => {
+          const result = await submit({ ...a, adult: true, interests: a.interests.map(({ id, label, mode }) => ({ id, label, mode })) });
+          if (!result?.ok) return { screen: result?.screen || 'interests', message: result?.message || COPY.saveFailed };
+          // Saved (or kept for after the email is confirmed): the coordinates and the password leave memory.
+          cancelGeo();
+          if (a.area?.kind === 'geo') a.area = { kind: 'keep', label: '' };
+          a.password = ''; a.passwordConfirm = '';
+          if (result.session) state.hasSession = true;
+          return result.session ? 'reveal' : 'verify';
+        },
+      };
+    },
+
+    reveal: () => {
+      const first = realName(a.name).split(' ')[0] || 'friend';
+      const pick = a.interests[0]?.label;
+      return {
+        primary: 'See my deck',
+        html: `<div class="guided-reveal-mark" aria-hidden="true">${svg('tick')}</div>
+          ${heading(`You're in, ${escapeHtml(first)}.`, pick
+            ? `Your deck is ready. People near you who care about ${escapeHtml(pick.toLowerCase())} come first.`
+            : 'Your deck is ready. People near you come first.')}`,
+        ready: () => true,
+        submit: async () => { redirectToApp(); return null; },
+      };
+    },
+
+    verify: () => ({
+      noActions: true,
+      html: `<div class="guided-reveal-mark" aria-hidden="true">${svg('mail')}</div>
+        ${heading('Check your email.', `We sent a link to <b>${escapeHtml(a.email)}</b>. Open it to activate your Brivia profile; it signs you in. It can take a few minutes, so check spam or promotions too.`)}
+        <div class="guided-choices"><button class="guided-link guided-link--center" type="button" data-guided-login>Back to log in</button></div>`,
+      mount: (el) => { el.querySelector('[data-guided-login]').addEventListener('click', () => onLogin()); },
+    }),
+  };
+
+  next.addEventListener('click', () => { void goNext(); });
+  back.addEventListener('click', () => {
+    const target = backTarget(state.path, state.screen, state.hasSession);
+    if (target) void show(target);
+  });
+  // Enter = Continue from any field of a question (buttons and links keep their own Enter).
+  root.addEventListener('keydown', (event) => {
+    if (event.key !== 'Enter' || event.defaultPrevented || event.isComposing) return;
+    const target = event.target;
+    if (!(target instanceof Element) || !host.contains(target) || target.closest('button, a, textarea')) return;
+    event.preventDefault();
+    void goNext();
+  });
+
+  // Phones: keep the primary button above the on-screen keyboard.
+  const vv = window.visualViewport;
+  if (vv) {
+    const place = () => root.style.setProperty('--guided-keyboard', `${Math.max(0, window.innerHeight - vv.height - vv.offsetTop)}px`);
+    vv.addEventListener('resize', place);
+    vv.addEventListener('scroll', place);
+  }
+
+  return {
+    show,
+    // Re-points the flow (a Google return, a returning member, a fresh visitor) and shows `screen`.
+    open: ({ path: p = 'email', hasSession: signed = false, prefill: values = {}, resumeAt: at = null, email = '' } = {}, screen = 'welcome') => {
+      cancelGeo();
+      Object.assign(state, { path: p, hasSession: signed, resumeAt: at, email });
+      Object.assign(a, emptyAnswers(), values);
+      return show(screen);
+    },
+    get screen() { return state.screen; },
+    get answers() { return a; },
+  };
+};
