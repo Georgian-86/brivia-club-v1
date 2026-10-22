@@ -18,7 +18,11 @@
 // Section "menu" (320x568, 375x812, 390x844, 768x1024, 1280x800, 1440x900, 1920x1080; E2E_SCREENSHOTS saves each): the Profile
 // ⚙ account menu keeps natural items (44-52 px, never stretched) and is at most 320 px wide; at 600 px and under it is a
 // bottom sheet (flush with the left, right and bottom edges, a grabber, backdrop click closes). Tab order, Escape + focus,
-// and the menu and the notification panel close each other.
+// and the menu and the notification panel close each other. Fix round 1: with a leaked inset (an id rule and an inline
+// bottom:0, as Safari's UA `[popover]{inset:0}` did) at 1600x1040, 1440x900 and 1280x800 the box still hugs its rows and
+// bottom is auto; at 820x600 to 1600x1040 (and without popover support) it never covers ⚙ and stays under the header; at
+// 375 a tap on the scrim over EDIT PROFILE or the brand closes the sheet and reaches nothing, the page does not scroll,
+// and swipe down (past 60 px or a flick) closes it while a short drag snaps back.
 // Section "blocked send" belong to later tasks of the wave and are added to this file by them.
 import assert from 'node:assert/strict';
 import { mkdirSync } from 'node:fs';
@@ -275,6 +279,142 @@ try {
       check(`menu ${tag}: Escape leaves nothing open`, () => { assert.equal(both.menu, false); assert.equal(both.panel, false); });
     } else check(`menu ${tag}: bell hidden in this view (noted)`, () => {});
     await context.close();
+  }
+  // A4 fix round 1. (1) Safari stretched the popover from under the header to the window's bottom: an inset the script
+  // does not own (the UA `[popover]{inset:0}`) reached the box. Mimic it at a low specificity (an id rule, then an inline
+  // bottom:0 set before opening) and require a box that hugs its rows, with bottom computed as auto.
+  const box = (page) => page.evaluate(() => {
+    const menu = document.querySelector('#profile-settings-menu');
+    const r = menu.getBoundingClientRect(); const cs = getComputedStyle(menu);
+    const kids = [...menu.children].filter((c) => c.getClientRects().length);
+    const first = kids[0].getBoundingClientRect(); const last = kids[kids.length - 1].getBoundingClientRect();
+    const px = (v) => parseFloat(v) || 0;
+    const content = (last.bottom + px(getComputedStyle(kids[kids.length - 1]).marginBottom)) - (first.top - px(getComputedStyle(kids[0]).marginTop)) + px(cs.paddingTop) + px(cs.paddingBottom) + px(cs.borderTopWidth) + px(cs.borderBottomWidth);
+    const g = document.querySelector('#profile-settings-button').getBoundingClientRect();
+    const header = document.querySelector('.app-topbar')?.getBoundingClientRect().bottom || 0;
+    return { top: r.top, bottom: r.bottom, left: r.left, right: r.right, height: r.height, content, bottomValue: String(menu.computedStyleMap().get('bottom')), rows: [...menu.querySelectorAll('button')].map((b) => b.getBoundingClientRect().height), gear: { top: g.top, bottom: g.bottom, left: g.left, right: g.right }, header, innerHeight };
+  });
+  const short = (b) => JSON.stringify({ top: Math.round(b.top), h: Math.round(b.height), content: Math.round(b.content), bottom: b.bottomValue, rows: b.rows.map(Math.round), gear: [Math.round(b.gear.top), Math.round(b.gear.bottom)], header: Math.round(b.header) });
+  const overlaps = (a, g) => a.left < g.right && a.right > g.left && a.top < g.bottom && a.bottom > g.top;
+  for (const [width, height] of [[1600, 1040], [1440, 900], [1280, 800]]) {
+    for (const [how, leak] of [['id rule bottom:0;right:0', 'sheet'], ['inline bottom:0 before open', 'inline']]) {
+      const context = await stub.newContext(browser, { width, height }, { reducedMotion: 'reduce' });
+      const page = await stub.open(context, { path: '/app.html?view=profile', errors: pageErrors });
+      await page.waitForSelector('#profile-settings-button', { state: 'attached', timeout: 10000 });
+      await page.waitForTimeout(400);
+      if (leak === 'sheet') await page.addStyleTag({ content: '#profile-settings-menu{bottom:0;right:0}' });
+      else await page.evaluate(() => { document.querySelector('#profile-settings-menu').style.bottom = '0'; });
+      await page.locator('#profile-settings-button').click();
+      await page.waitForTimeout(200);
+      const b = await box(page);
+      check(`menu leak ${width}x${height} (${how}): the box hugs its rows, bottom auto, rows ~44 px ${short(b)}`, () => {
+        assert.ok(Math.abs(b.height - b.content) <= 2, `height ${b.height} vs content ${b.content}`);
+        assert.equal(b.bottomValue, 'auto');
+        b.rows.forEach((h) => assert.ok(h >= 44 && h <= 52, `row ${h}`));
+      });
+      await context.close();
+    }
+  }
+  // (2) Never over the gear: below it if there is room, else above, else the larger side, capped, with its own scroll.
+  // (3) Without popover support the menu never rises over the header.
+  for (const [width, height, nopop] of [[820, 600], [1024, 700], [1280, 800], [1440, 900], [1600, 1040], [1440, 900, true], [1280, 800, true], [1024, 700, true]]) {
+    for (const scroll of ['none', 'center']) {
+      const tag = `${width}x${height}${nopop ? ' without popover' : ''} scroll ${scroll}`;
+      const context = await stub.newContext(browser, { width, height }, { reducedMotion: 'reduce' });
+      if (nopop) await context.addInitScript(() => { delete HTMLElement.prototype.showPopover; delete HTMLElement.prototype.hidePopover; });
+      const page = await stub.open(context, { path: '/app.html?view=profile', errors: pageErrors });
+      await page.waitForSelector('#profile-settings-button', { state: 'attached', timeout: 10000 });
+      await page.waitForTimeout(400);
+      if (scroll === 'center') await page.evaluate(() => document.querySelector('#profile-settings-button').scrollIntoView({ block: 'center' }));
+      await page.locator('#profile-settings-button').click();
+      await page.waitForTimeout(200);
+      const b = await box(page);
+      if (SHOTS && scroll === 'none') await page.screenshot({ path: path.join(SHOTS, `menu-gear-${tag.replace(/ /g, '-')}.png`) });
+      check(`menu ${tag}: the menu never covers the gear ${short(b)}`, () => assert.ok(!overlaps(b, b.gear)));
+      check(`menu ${tag}: inside the viewport, under the header ${short(b)}`, () => { assert.ok(b.top >= Math.max(0, b.header + 8) - 0.5, `top ${b.top}`); assert.ok(b.bottom <= b.innerHeight + 0.5, `bottom ${b.bottom}`); });
+      await context.close();
+    }
+  }
+  // (4) The phone sheet: a tap on the dimmed page closes it and reaches nothing else; the page does not scroll under
+  // it; a swipe down on the grabber or the header closes it, a short slow drag snaps back.
+  {
+    const openSheetPage = async (motion) => {
+      const context = await stub.newContext(browser, { width: 375, height: 812 }, { reducedMotion: motion, isMobile: true, hasTouch: true });
+      const page = await stub.open(context, { path: '/app.html?view=profile', errors: pageErrors });
+      await page.waitForSelector('#profile-settings-button', { state: 'attached', timeout: 10000 });
+      await page.waitForTimeout(400);
+      await page.evaluate(() => document.querySelector('#profile-settings-button').scrollIntoView({ block: 'center' }));
+      return { context, page };
+    };
+    const isOpen = (page) => page.evaluate(() => !!document.querySelector('#profile-settings-menu')?.matches(':popover-open'));
+    // A tap that cannot land (an editor opened by a click that went through) is a failed check, not a crash.
+    const tapGear = async (page) => {
+      await page.evaluate(() => document.querySelector('#profile-edit-modal')?.remove());
+      await page.locator('#profile-settings-button').tap({ timeout: 3000 }).catch((error) => check('menu sheet 375: the gear can be tapped', () => { throw error; }));
+      await page.waitForTimeout(250);
+    };
+    const drag = async (page, sel, dy, steps, stepMs) => {
+      const cdp = await page.context().newCDPSession(page);
+      const r = await page.locator(sel).boundingBox({ timeout: 3000 }).catch(() => null);
+      if (!r) { check(`menu sheet 375: ${sel} is on screen to drag`, () => assert.fail('not found')); return null; }
+      const x = r.x + r.width / 2; const y = r.y + r.height / 2;
+      await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x, y }] });
+      let mid = null;
+      for (let i = 1; i <= steps; i += 1) {
+        await cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x, y: y + (dy * i) / steps }] });
+        if (stepMs) await page.waitForTimeout(stepMs);
+        if (stepMs && i === Math.ceil(steps / 2)) mid = await page.evaluate(() => document.querySelector('#profile-settings-menu').style.transform);
+      }
+      await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+      await page.waitForTimeout(300);
+      return mid;
+    };
+    const { context, page } = await openSheetPage('reduce');
+    await tapGear(page);
+    const editor = await page.locator('#profile-photo-editor').boundingBox();
+    const ex = editor.x + editor.width / 2; const ey = editor.y + editor.height / 2;
+    const hitEditor = await page.evaluate(([x, y]) => { const e = document.elementFromPoint(x, y); return `${e?.tagName}.${e?.className}`; }, [ex, ey]);
+    const y0 = await page.evaluate(() => scrollY);
+    await page.mouse.move(ex, ey);
+    await page.mouse.wheel(0, 400);
+    await page.waitForTimeout(300);
+    const y1 = await page.evaluate(() => scrollY);
+    const locked = await page.evaluate(() => document.documentElement.classList.contains('account-sheet-open') && getComputedStyle(document.documentElement).overflowY === 'hidden');
+    await page.touchscreen.tap(ex, ey);
+    await page.waitForTimeout(400);
+    const afterEditorTap = await page.evaluate(() => ({ open: document.querySelector('#profile-settings-menu').matches(':popover-open'), editor: !!document.querySelector('#profile-edit-modal'), locked: document.documentElement.classList.contains('account-sheet-open') }));
+    check(`menu sheet 375: the dimmed page above the sheet is a solid scrim (${hitEditor})`, () => assert.match(hitEditor, /account-sheet-scrim/));
+    check(`menu sheet 375: the page does not scroll while the sheet is open (${y0} -> ${y1}, locked ${locked})`, () => { assert.equal(y1, y0); assert.equal(locked, true); });
+    check(`menu sheet 375: a tap over EDIT PROFILE closes the sheet and does not open the editor ${JSON.stringify(afterEditorTap)}`, () => { assert.equal(afterEditorTap.open, false); assert.equal(afterEditorTap.editor, false); assert.equal(afterEditorTap.locked, false); });
+    await page.evaluate(() => scrollTo(0, 0));
+    await page.waitForTimeout(150);
+    await tapGear(page);
+    const brand = await page.locator('.app-brand').boundingBox();
+    await page.evaluate(() => document.querySelector('#profile-edit-modal')?.remove());
+    const before = page.url();
+    await page.touchscreen.tap(brand.x + brand.width / 2, brand.y + brand.height / 2);
+    await page.waitForTimeout(600);
+    const afterBrand = { open: await isOpen(page), url: page.url() };
+    check(`menu sheet 375: a tap over the brand link closes the sheet and does not navigate ${JSON.stringify(afterBrand)}`, () => { assert.equal(afterBrand.open, false); assert.equal(afterBrand.url, before); });
+    if (afterBrand.url !== before) { await page.goto(before); await page.waitForSelector('#profile-settings-button', { state: 'attached', timeout: 10000 }); await page.waitForTimeout(400); }
+    await tapGear(page);
+    const reducedMid = await drag(page, '#profile-settings-menu .profile-settings-grabber', 120, 8, 20);
+    const reducedClosed = !(await isOpen(page));
+    check(`menu sheet 375 reduced motion: a swipe down on the grabber closes it; the sheet does not follow the finger (${reducedMid})`, () => { assert.equal(reducedClosed, true); assert.ok(!reducedMid); });
+    await context.close();
+    const moving = await openSheetPage('no-preference');
+    await tapGear(moving.page);
+    const followMid = await drag(moving.page, '#profile-settings-menu .profile-settings-account', 30, 6, 40);
+    const snapped = { open: await isOpen(moving.page), transform: await moving.page.evaluate(() => document.querySelector('#profile-settings-menu').style.transform) };
+    check(`menu sheet 375: a short slow drag follows the finger (${followMid}) and snaps back ${JSON.stringify(snapped)}`, () => { assert.match(String(followMid), /translateY\(\d/); assert.equal(snapped.open, true); assert.ok(!/translateY\([1-9]/.test(snapped.transform)); });
+    await drag(moving.page, '#profile-settings-menu .profile-settings-grabber', 100, 6, 20);
+    const farClosed = !(await isOpen(moving.page));
+    check(`menu sheet 375: dragging past 60 px closes it (${farClosed})`, () => assert.equal(farClosed, true));
+    await tapGear(moving.page);
+    await drag(moving.page, '#profile-settings-menu .profile-settings-grabber', 40, 2, 0);
+    const flickClosed = !(await isOpen(moving.page));
+    check(`menu sheet 375: a fast 40 px flick closes it (${flickClosed})`, () => assert.equal(flickClosed, true));
+    await moving.context.close();
   }
   check(`no uncaught page errors (${pageErrors.join(' | ')})`, () => assert.deepEqual(pageErrors, []));
 } finally {

@@ -304,6 +304,13 @@ const placeNotificationPanel = () => {
   panel.style.maxHeight = `${Math.max(120, window.innerHeight - top - 8)}px`;
   const left = Math.max(8, Math.min(bell.right - panel.offsetWidth, width - panel.offsetWidth - 8));
   Object.assign(panel.style, { top: `${top}px`, left: `${Math.round(left)}px`, right: 'auto' });
+  // Without popovers the panel stays inside the header, whose backdrop-filter makes it the containing block of a fixed
+  // child; when .app-wrap has scrolled the header up (focus returning to the bell does that) the panel landed over the
+  // bell. Correct by whatever offset the containing block adds, so it always starts under the bell.
+  const placed = panel.getBoundingClientRect();
+  const dy = placed.top - top;
+  const dx = placed.left - left;
+  if (Math.abs(dy) > 0.5 || Math.abs(dx) > 0.5) Object.assign(panel.style, { top: `${Math.round(top - dy)}px`, left: `${Math.round(left - dx)}px` });
 };
 const openNotificationPanel = () => {
   const panel = document.querySelector('#app-notification-panel');
@@ -483,51 +490,142 @@ const profileSettingsOpen = () => {
   if (!menu?.isConnected) return false;
   return POPOVER ? menu.matches(':popover-open') : !menu.hidden;
 };
-// Top layer: above ⚙ when the five 44 px items fit under the header, otherwise below it, never under the tab bar;
-// its right edge on ⚙'s right edge, inside the page.
 // At 600 px and under the menu is a bottom sheet (full width, flush with the bottom edge, set by menus-fit.css from
 // data-layout); above that it is a popover anchored to ⚙. menuLayout is the one place the breakpoint lives.
 const menuLayout = (viewportWidth) => (viewportWidth <= 600 ? 'sheet' : 'popover');
+// Popover: never over ⚙. Below it when the box fits above the tab bar, else above it when it fits under the header,
+// else on the roomier side with a max-height (the menu scrolls inside). The script owns every inset: a bottom or right
+// that a stylesheet leaves (Safari's UA `[popover]{inset:0}`) would stretch the box from its top to the window's edge,
+// so both are set to auto before the natural height is read. Without popover support the menu stays absolute in the
+// hero and gets the same top, converted to its offset parent, so it never rises over the header.
 const placeProfileSettingsMenu = () => {
   const { settings, menu } = profileSettings;
   menu.dataset.layout = menuLayout(window.innerWidth);
-  if (menu.dataset.layout === 'sheet') { menu.style.top = ''; menu.style.left = ''; return; }
+  if (menu.dataset.layout === 'sheet') {
+    Object.assign(menu.style, { top: '', left: '', right: '', bottom: '', maxHeight: '' });
+    return;
+  }
+  Object.assign(menu.style, { bottom: 'auto', maxHeight: 'none', ...(POPOVER ? { right: 'auto' } : {}) });
   const r = settings.getBoundingClientRect();
   const height = menu.offsetHeight;
   const headerBottom = document.querySelector('.app-topbar')?.getBoundingClientRect().bottom || 0;
   const tabbar = document.querySelector('.app-tabbar');
-  const floor = tabbar && tabbar.getClientRects().length ? tabbar.getBoundingClientRect().top : window.innerHeight;
-  let top = r.top - height - 10;
-  if (top < headerBottom + 8) top = Math.max(headerBottom + 8, Math.min(r.bottom + 10, floor - height - 8));
+  const floor = (tabbar && tabbar.getClientRects().length ? tabbar.getBoundingClientRect().top : window.innerHeight) - 8;
+  const ceiling = Math.max(0, headerBottom) + 8;
+  const below = floor - (r.bottom + 10);
+  const above = r.top - 10 - ceiling;
+  let top;
+  let room = height;
+  if (height <= below) top = r.bottom + 10;
+  else if (height <= above) top = r.top - 10 - height;
+  else if (below >= above) { top = r.bottom + 10; room = below; }
+  else { room = above; top = r.top - 10 - room; }
+  if (top < ceiling) { room -= ceiling - top; top = ceiling; }
+  menu.style.setProperty('--account-menu-header', `${Math.round(Math.max(0, headerBottom))}px`);
+  menu.style.maxHeight = room < height ? `${Math.max(0, Math.floor(room))}px` : '';
+  if (!POPOVER) {
+    const parent = menu.offsetParent;
+    const offset = parent ? parent.getBoundingClientRect().top + parent.clientTop : 0;
+    menu.style.top = `${Math.round(top - offset)}px`;
+    return;
+  }
   const width = document.documentElement.clientWidth;
   const left = Math.max(8, Math.min(r.right - menu.offsetWidth, width - menu.offsetWidth - 8));
   Object.assign(menu.style, { top: `${Math.round(top)}px`, left: `${Math.round(left)}px` });
+};
+// The sheet's scrim: a real element between the page and the sheet (Chromium's UA makes a popover's ::backdrop
+// pointer-events:none, so a tap on the dimmed page used to reach the button under it). In the top layer it is shown
+// just before the menu, so it stacks right under it; without popovers it sits before the menu, one z-index below.
+let accountScrim = null;
+let sheetDrag = null;
+const accountSheetScrim = () => {
+  if (accountScrim?.isConnected) return accountScrim;
+  accountScrim = document.createElement('div');
+  accountScrim.className = 'account-sheet-scrim';
+  accountScrim.setAttribute('aria-hidden', 'true');
+  if (POPOVER) { accountScrim.setAttribute('popover', 'manual'); document.body.append(accountScrim); }
+  else { accountScrim.hidden = true; profileSettings.menu.before(accountScrim); }
+  return accountScrim;
+};
+const setAccountSheet = (open) => {
+  document.documentElement.classList.toggle('account-sheet-open', open);
+  if (!open && !accountScrim) return;
+  const scrim = accountSheetScrim();
+  if (!POPOVER) { scrim.hidden = !open; return; }
+  if (open && !scrim.matches(':popover-open')) scrim.showPopover();
+  if (!open && scrim.matches(':popover-open')) scrim.hidePopover();
 };
 const openProfileSettingsMenu = () => {
   if (!profileSettings?.menu.isConnected) return;
   const { settings, menu } = profileSettings;
   closeNotificationPanel();
   menu.dataset.layout = menuLayout(window.innerWidth);
-  if (POPOVER) { menu.showPopover(); placeProfileSettingsMenu(); } else menu.hidden = false;
+  menu.style.transform = '';
+  menu.style.transition = '';
+  if (menu.dataset.layout === 'sheet') setAccountSheet(true);
+  if (POPOVER) menu.showPopover(); else menu.hidden = false;
+  placeProfileSettingsMenu();
   settings.setAttribute('aria-expanded', 'true');
 };
 const closeProfileSettingsMenu = ({ returnFocus = false } = {}) => {
+  setAccountSheet(false);
   if (!profileSettingsOpen()) return;
   const { settings, menu } = profileSettings;
   if (POPOVER) menu.hidePopover(); else menu.hidden = true;
+  menu.style.transform = '';
+  sheetDrag = null;
   settings.setAttribute('aria-expanded', 'false');
   if (returnFocus) settings.focus();
 };
+const accountSheetOpen = () => profileSettingsOpen() && profileSettings.menu.dataset.layout === 'sheet';
 document.addEventListener('click', (event) => {
   if (!profileSettings) return;
   const { settings, menu } = profileSettings;
-  if (!settings.contains(event.target) && !menu.contains(event.target)) { closeProfileSettingsMenu(); return; }
-  // A click on the sheet's backdrop is delivered to the menu itself, from outside its box.
-  if (event.target === menu && profileSettingsOpen()) {
-    const r = menu.getBoundingClientRect();
-    if (event.clientX < r.left || event.clientX > r.right || event.clientY < r.top || event.clientY > r.bottom) closeProfileSettingsMenu();
-  }
+  if (!settings.contains(event.target) && !menu.contains(event.target)) closeProfileSettingsMenu();
 });
+// While the sheet is open, a tap outside it only closes it: it never reaches the page (a link, EDIT PROFILE, the
+// brand) even where the scrim cannot cover (no popover support). Only real input; a script's own click is left alone.
+window.addEventListener('click', (event) => {
+  if (!event.isTrusted || !accountSheetOpen() || profileSettings.menu.contains(event.target)) return;
+  event.preventDefault();
+  event.stopImmediatePropagation();
+  closeProfileSettingsMenu();
+}, true);
+// Swipe down to close: drag the grabber or the "Signed in as" header. The sheet follows the finger (not under reduced
+// motion); a release past 60 px or a fast flick closes it, anything shorter snaps back (sheetDrag is declared above).
+const reducedMotion = () => window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+document.addEventListener('pointerdown', (event) => {
+  if (!event.isPrimary || !accountSheetOpen()) return;
+  const handle = event.target.closest?.('.profile-settings-grabber, .profile-settings-account');
+  if (!handle || !profileSettings.menu.contains(handle)) return;
+  sheetDrag = { id: event.pointerId, y: event.clientY, dy: 0, samples: [[event.timeStamp, 0]] };
+  try { handle.setPointerCapture(event.pointerId); } catch { /* the pointer is already gone */ }
+});
+document.addEventListener('pointermove', (event) => {
+  if (!sheetDrag || event.pointerId !== sheetDrag.id) return;
+  sheetDrag.dy = Math.max(0, event.clientY - sheetDrag.y);
+  sheetDrag.samples.push([event.timeStamp, sheetDrag.dy]);
+  if (sheetDrag.samples.length > 12) sheetDrag.samples.shift();
+  if (reducedMotion()) return;
+  const { menu } = profileSettings;
+  menu.style.transition = 'none';
+  menu.style.transform = `translateY(${Math.round(sheetDrag.dy)}px)`;
+});
+const endSheetDrag = (event) => {
+  if (!sheetDrag || event.pointerId !== sheetDrag.id) return;
+  const drag = sheetDrag;
+  sheetDrag = null;
+  const dy = Math.max(drag.dy, event.type === 'pointercancel' ? 0 : event.clientY - drag.y);
+  // A flick: the speed over the last 100 ms of the gesture (px per ms), not the average of a slow start.
+  const [t0, dy0] = drag.samples.find(([t]) => event.timeStamp - t <= 100) || [event.timeStamp, dy];
+  const speed = (dy - dy0) / Math.max(1, event.timeStamp - t0);
+  if (event.type !== 'pointercancel' && (dy > 60 || (dy > 16 && speed > 0.3))) { closeProfileSettingsMenu(); return; }
+  const { menu } = profileSettings;
+  menu.style.transition = reducedMotion() ? '' : 'transform .18s ease-out';
+  menu.style.transform = '';
+};
+document.addEventListener('pointerup', endSheetDrag);
+document.addEventListener('pointercancel', endSheetDrag);
 document.addEventListener('keydown', (event) => {
   if (event.key === 'Escape' && !event.defaultPrevented && profileSettingsOpen()) { event.preventDefault(); closeProfileSettingsMenu({ returnFocus: true }); }
 });
