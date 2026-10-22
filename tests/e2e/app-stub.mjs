@@ -26,6 +26,7 @@
 //                 { body } answers 200 with that JSON as is (e.g. a malformed deck_candidates answer; Phase C final fixes).
 //                 An error override may name its PostgREST { code, message } (polish wave C3: '42501' for an RLS refusal,
 //                 '42P01' for a table that does not exist yet); the default is 'XX000' / 'stub failure'.
+//                 A 2xx { status } without a body answers that status with an empty body (polish wave A5: a 201 insert).
 import { readFileSync } from 'node:fs';
 import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
@@ -94,6 +95,7 @@ export const startAppStub = async ({ port, state = {}, deckRows = defaultDeckRow
       const override = st.routes?.[`${method} ${short}`] || st.routes?.[short];
       if (override?.delayMs) await new Promise((resolve) => setTimeout(resolve, override.delayMs));
       if (override?.status >= 400) return json(override.status, { code: override.code || 'XX000', message: override.message || 'stub failure' });
+      if (override?.status >= 200 && override.status < 300 && !('body' in override)) return route.fulfill({ status: override.status, body: '', headers: { 'access-control-allow-origin': '*' } });
       if (override && 'body' in override) return json(200, override.body);
       const own = st.own || ownRow;
       if (pathName === '/rest/v1/profiles') return json(200, (request.headers().accept || '').includes('vnd.pgrst.object') ? own : [own]);
