@@ -88,3 +88,24 @@ export const budgetFromRows = (rows) => {
   }
   return { items };
 };
+
+// Guided signup (Phase E, D-056): no points screen. The picks share the budget evenly; the remainder goes to the
+// earliest picks (largest remainder with equal shares), so every pick holds at least 1 point. 1-12 picks.
+export const evenSplit = (items, budget = BUDGET) => {
+  if (!Array.isArray(items) || items.length < 1 || items.length > MAX_INTERESTS) throw new RangeError('pick 1 to 12 interests');
+  const base = Math.floor(budget / items.length);
+  const extra = budget - base * items.length;
+  return items.map((item, i) => ({ interest_id: item.id, points: base + (i < extra ? 1 : 0), mode: validMode(item.mode) }));
+};
+
+// Guided signup, resumed (fix round 1, M3): the budget to save for the guided picks. When the picks are exactly the
+// ids of a complete saved budget (20 points), the member's own points and modes are kept and `unchanged` is true (the
+// save can be skipped). Otherwise the picks get the even split, each with its own mode.
+export const guidedBudget = (picks, saved = null) => {
+  const savedItems = Array.isArray(saved?.items) ? saved.items : [];
+  const ids = new Set((picks || []).map((p) => p.id));
+  const unchanged = savedItems.length > 0 && isComplete({ items: savedItems }) && ids.size === savedItems.length
+    && (picks || []).length === ids.size && savedItems.every((item) => ids.has(item.id));
+  if (unchanged) return { unchanged, budget: { items: savedItems.map((item) => ({ ...item, mode: validMode(item.mode) })) } };
+  return { unchanged, budget: { items: evenSplit(picks).map((row, i) => ({ id: row.interest_id, label: picks[i].label, points: row.points, mode: row.mode })) } };
+};

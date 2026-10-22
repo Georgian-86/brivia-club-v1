@@ -36,6 +36,17 @@ New components reuse these tokens. **No raw hex in new components**, and no new 
 
 ## Flow changes
 
+### A0. Guided signup: one question per screen (D-073, live from 2026-10-22; replaces the 4-step form below)
+
+`auth.html` `#guided-signup`, `signup-flow.js`, `signup-screens.js`, `signup.css`. Screens: Welcome (Continue with
+Google · Continue with email · I already have an account) → Account (email, password, confirm; email path only; the
+account is created at the end, no email code) → 18+ → Name → Details (phone and gender, D-068) → Area ("Use my
+location" with the A1 fallbacks, or a city) → Interests (1–12 picks with an animated "Your picks" tray; no points
+screen, `evenSplit` behind the scenes; private interests not offered) → Reveal, or Verify ("Check your email.") when
+email confirmation is on. "Step n of 6" (email) or "of 5" (Google) with bubbles; one visible question, which is the
+page's h1; Enter = Continue; Back on every question screen; Finish submits once (busy until the next screen shows).
+The classic 4-step form stays behind `VITE_SIGNUP_FLOW=classic` for one release. Notice version `2026-10-05`.
+
 ### A. Onboarding: 4 steps with "Your area" and the Passion Budget (shipped in Iteration 3, Task 8)
 
 The signup (`auth.html`, `script.js`, `passion-budget.js`) has **4 steps**. The progress reads `STEP n OF 4 · …` and the
@@ -215,10 +226,13 @@ labelled "PRIVATE · ONLY YOU SEE THESE", and the hero and the area stat show th
     Only horizontal drags are captured (`touch-action: pan-y`, 8 px axis lock); a drag never clicks through. Reduced
     motion: no rotation or fling, a short fade. The next member waits underneath as a decorative stacked card. The
     pitched card stays on screen (parked right) until the sheet resolves, then leaves (or springs back on a failed
-    send). A card with no usable or loadable cover shows the deep-wine orbit placeholder, never the alt text. Desktop:
-    headline left; card, Pass / Pitch (centred under the card) and the hint in the right column; the card's height
-    follows the viewport so it never sits under the top bar (1280x720 to 1920x1080). The hint reads on two lines:
-    "PASS WITH INTENTION · PITCH WITH PURPOSE", then the signal counter.
+    send). A card with no usable or loadable cover shows the deep-wine orbit placeholder, never the alt text. Desktop (D-081):
+    the card is the hero. A headline column (40% of the content width, a smaller headline) on the left and the card
+    stage (60%) with the card centred in it. The card height uses the window (top bar and padding off) and the width
+    is 0.64 x the height, so it stays tall; nothing scrolls from 1280x650 to 2560x1440. From 1100 px wide Pass sits
+    left of the card and Pitch right of it, level with its middle; narrower desktops keep them centred under the card.
+    The hint is a quiet two-line caption in the headline column, level with the card's bottom edge:
+    "PASS WITH INTENTION · PITCH WITH PURPOSE", then the signal counter. The headline is level with the card's middle.
 - **Deck empty states (final copy).** Each says why the deck is empty and offers exactly one action (`#deck-empty-action`,
   at least 44 px tall, visible focus). Pass/Pitch and the hint are hidden while it shows. When the deck empties, focus
   moves to the title (`#deck-empty-title`, `tabindex="-1"`); if the pitch sheet is open over it, focus moves when the

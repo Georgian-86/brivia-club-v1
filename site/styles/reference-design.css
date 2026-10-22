@@ -223,24 +223,134 @@ body.app-body .app-view[data-view="home"] .swipe-card-next-name { color: var(--c
 /* Pass / Pitch in the same oxblood. */
 body.app-body .app-view[data-view="home"] .swipe-like { border-color: var(--color-oxblood); background: var(--color-oxblood); }
 
-/* Desktop: the whole card, Pass / Pitch and the hint fit one screen (no scrolling), and the card always stays tall like
-   the phone card (founder, 2026-10-22: "make it long, not wide" and "in one frame"): its height follows the window and
-   its width follows its height (0.58 wide per 1 tall, never under 260 px), so a short laptop window gets a narrower
-   card instead of a squashed one. */
+/* Desktop (D-081, founder 2026-10-22: "the main feature shall grab the attention"; refines D-076 and D-079): the card
+   is the hero. A quiet headline column (40% of the content width, a smaller headline) on the left; the card stage
+   (60%) on the right with the card centred in it. The card height uses the window (top bar and padding off) and its
+   width follows at 0.64 x the height, so it stays tall (about 1.56 to 1). From 1100 px wide Pass and Pitch flank the
+   card, level with its middle; narrower desktops keep them under it. The hint is a two-line caption under the
+   headline, level with the card's bottom edge. Everything fits one frame from 1280x650 to 2560x1440.
+   Tracks: 1 headline | 2 gutter | 3 Pass | 4 card | 5 Pitch | 6 gutter (3 and 5 are empty under 1100 px). */
 @media (min-width: 850px) {
   body.app-body .app-view[data-view="home"] {
-    --deck-card-h: clamp(400px, calc(100svh - 262px), 700px);
-    --deck-col: clamp(260px, calc(var(--deck-card-h) * .58), 480px);
+    --deck-top: 76px;
+    --deck-pad-y: clamp(16px, 3.6svh, 52px);
+    --deck-pad-x: clamp(24px, 4vw, 72px);
+    --deck-content: min(100vw - 16px - 2 * var(--deck-pad-x), 1600px);
+    --deck-ctl: 60px;
+    --deck-ctl-gap: 0px;
+    --deck-under: 104px;
+    --deck-h-avail: calc(100svh - var(--deck-top) - 2 * var(--deck-pad-y) - var(--deck-under));
+    --deck-w-avail: calc(var(--deck-content) * .6 - 2 * (var(--deck-ctl) + var(--deck-ctl-gap)) - 16px);
+    --deck-card-h: clamp(400px, min(var(--deck-h-avail), var(--deck-w-avail) / .64), 880px);
+    --deck-card-w: calc(var(--deck-card-h) * .64);
+    display: grid;
+    grid-template-columns: minmax(0, 40%) minmax(0, 1fr) auto auto auto minmax(0, 1fr);
+    grid-template-rows: auto auto auto;
+    align-content: center;
+    align-items: start;
+    gap: 0;
+    box-sizing: border-box;
+    width: 100%;
+    max-width: none;
+    height: calc(100svh - var(--deck-top));
+    min-height: 0;
+    margin: 0;
+    padding: var(--deck-pad-y) max(var(--deck-pad-x), calc((100% - 1600px) / 2));
   }
-  /* The signal-limit notice adds a row under the column (the hint wraps more), so the card gives way. */
-  body.app-body .app-view[data-view="home"]:has(.swipe-limit-state:not([hidden])) { --deck-card-h: clamp(380px, calc(100svh - 372px), 600px); }
+  /* The signal-limit notice takes a row under the card, so the card gives way. */
+  body.app-body .app-view[data-view="home"]:has(.swipe-limit-state:not([hidden])) { --deck-under: 188px; }
+  body.app-body .app-view[data-view="home"] .home-layout-spacer { display: none; }
+
+  /* The headline column: supports the card, level with its middle. */
+  body.app-body .app-view[data-view="home"] .home-heading {
+    position: static;
+    grid-column: 1;
+    grid-row: 1;
+    align-self: center;
+    justify-self: start;
+    top: auto;
+    left: auto;
+    max-width: 100%;
+    margin: 0;
+    padding-right: 16px;
+    transform: none !important;
+  }
+  body.app-body .app-view[data-view="home"] .home-heading h1 { font-size: clamp(44px, 5vw, 88px); letter-spacing: -.045em; }
+
+  /* The stage: the card (and the stacked next card behind it) centred in tracks 2-6. */
+  body.app-body .app-view[data-view="home"] .swipe-stack {
+    grid-column: 4;
+    grid-row: 1;
+    width: var(--deck-card-w);
+    height: var(--deck-card-h);
+    margin: 0;
+  }
+  body.app-body .app-view[data-view="home"] .swipe-stack .swipe-card {
+    height: var(--deck-card-h);
+    min-height: 0;
+    box-shadow:
+      0 46px 80px -40px color-mix(in srgb, var(--brivia-deep-wine) 60%, transparent),
+      0 18px 34px -20px color-mix(in srgb, var(--color-oxblood) 38%, transparent),
+      inset 0 1px 0 color-mix(in srgb, var(--color-cream) 70%, transparent);
+  }
+
+  /* Pass / Pitch under the card (850-1099 px). */
+  body.app-body .app-view[data-view="home"] .swipe-actions {
+    position: static;
+    grid-column: 2 / 7;
+    grid-row: 2;
+    justify-self: center;
+    top: auto;
+    margin: 22px 0 0;
+  }
+  body.app-body .app-view[data-view="home"] .swipe-action { width: var(--deck-ctl); height: var(--deck-ctl); }
+
+  /* The hint: a quiet caption in the headline column, level with the card's bottom edge. */
+  body.app-body .app-view[data-view="home"] .swipe-hint {
+    position: static;
+    grid-column: 1;
+    grid-row: 1;
+    align-self: end;
+    justify-self: start;
+    top: auto;
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: flex-start;
+    column-gap: 0;
+    row-gap: 4px;
+    width: auto;
+    max-width: 100%;
+    margin: 0;
+    padding: 14px 16px 0 0;
+    background: linear-gradient(var(--dk-line), var(--dk-line)) left top / 32px 1px no-repeat;
+    text-align: left;
+    white-space: normal;
+  }
+  body.app-body .app-view[data-view="home"] .swipe-hint .swipe-left-copy:not([hidden]) { order: 2; flex-basis: 100%; font-weight: inherit; }
+  body.app-body .app-view[data-view="home"] .swipe-hint .swipe-left-copy > span[aria-hidden] { display: none; }
+  body.app-body .app-view[data-view="home"] .swipe-limit-state { grid-column: 2 / 7; grid-row: 3; align-self: start; justify-self: center; margin: 34px 0 0; }
+  body.app-body .app-view[data-view="home"] .deck-empty { grid-column: 2 / 7; grid-row: 1 / -1; align-self: center; justify-self: center; }
+}
+/* 1100 px and wider: Pass left of the card and Pitch right of it, level with its middle, so the card can use nearly
+   the full height. */
+@media (min-width: 1100px) {
+  body.app-body .app-view[data-view="home"] { --deck-ctl: 64px; --deck-ctl-gap: clamp(24px, 2.4vw, 44px); --deck-under: 0px; }
+  body.app-body .app-view[data-view="home"]:has(.swipe-limit-state:not([hidden])) { --deck-under: 84px; }
+  body.app-body .app-view[data-view="home"] .swipe-actions:not([hidden]) { display: contents; }
+  body.app-body .app-view[data-view="home"] .swipe-pass { grid-column: 3; grid-row: 1; align-self: center; margin: 0 var(--deck-ctl-gap) 0 0; }
+  body.app-body .app-view[data-view="home"] .swipe-like { grid-column: 5; grid-row: 1; align-self: center; margin: 0 0 0 var(--deck-ctl-gap); }
+  body.app-body .app-view[data-view="home"] .swipe-limit-state { grid-row: 2; margin-top: 20px; }
+}
+@media (min-width: 1100px) and (min-height: 821px) {
+  body.app-body .app-view[data-view="home"] { --deck-ctl: 76px; }
+}
+/* Very tall screens (1440 px and up): the card keeps growing with the window. */
+@media (min-width: 1100px) and (min-height: 1200px) {
+  body.app-body .app-view[data-view="home"] { --deck-card-h: clamp(400px, min(var(--deck-h-avail), var(--deck-w-avail) / .64), 1040px); }
 }
 @media (min-width: 850px) and (max-height: 820px) {
-  /* A short laptop window: tighter controls, so the tall card keeps its height and everything stays in one frame. */
-  body.app-body .app-view[data-view="home"] { --ref-avatar: clamp(84px, 28cqw, 104px); --ref-bar-h: 42px; --deck-card-h: clamp(360px, calc(100svh - 230px), 700px); }
-  body.app-body .app-view[data-view="home"] .swipe-actions { margin-top: 12px; }
-  body.app-body .app-view[data-view="home"] .swipe-action { width: 56px; height: 56px; }
-  body.app-body .app-view[data-view="home"] .swipe-hint { width: max-content; max-width: none; margin-top: 30px; white-space: nowrap; }
+  /* A short laptop window: a compact info block so the cover keeps room. */
+  body.app-body .app-view[data-view="home"] { --ref-avatar: clamp(84px, 28cqw, 104px); --ref-bar-h: 42px; }
   /* At most two rows of interest chips, so View profile always stays inside the card ("You both" chips come first). */
   body.app-body .app-view[data-view="home"] .swipe-card #swipe-tags { max-height: var(--deck-tag-rows-h, 96px); overflow: hidden; }
   body.app-body .app-view[data-view="home"] .swipe-card .swipe-card-info { padding-top: calc(var(--ref-avatar) * .42); }
@@ -256,10 +366,6 @@ body.app-body .app-view[data-view="home"] .swipe-like { border-color: var(--colo
   body.app-body .app-view[data-view="home"] .swipe-card .swipe-card-image { min-height: 72px; }
   body.app-body .app-view[data-view="home"] .swipe-card .member-name-row { margin-top: 4px; }
   body.app-body .app-view[data-view="home"] .swipe-card .view-info-button { min-height: 44px; margin-top: 8px; }
-}
-/* Desktop: "Connection, curated." sits level with the middle of the card. */
-@media (min-width: 850px) {
-  body.app-body .app-view[data-view="home"] .home-heading { grid-row: 1; align-self: center; }
 }
 /* Phones: the card fills the column and starts higher (a shorter headline), so most of it shows on arrival. */
 @media (max-width: 700px) {

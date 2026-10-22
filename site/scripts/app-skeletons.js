@@ -7,7 +7,7 @@
 
 const KINDS = ['deck', 'list', 'posts', 'chips'];
 const MAX_BLOCKS = 12;
-// Polish wave C3: a posts block is drawn in the Explore card's shape (explore-cards.css): the wine header bar, the 4:5
+// Polish wave C3: a posts block is drawn in the Explore card's shape (explore-cards.css): the wine header bar, the 5:4
 // media, two caption lines and the wine action bar, so the real card replaces it without a layout shift.
 const POST_CARD = '<div class="skeleton skeleton-posts"><div class="skeleton-post-head"></div><div class="skeleton-post-media"></div>'
   + '<div class="skeleton-post-caption"></div><div class="skeleton-post-actions"></div></div>';

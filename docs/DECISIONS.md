@@ -1559,6 +1559,47 @@ controls (a tester or a seeded test member), never a real member, so no new expo
   1536x730: no scrolling, card at least 1.5 tall per 1 wide, View profile inside, controls centred under it, headline
   centred with the card.
 
+## D-073: Guided signup again, interests only, Google kept; editorial login card (release B of the polish wave, 2026-10-22)
+
+- **Founder ask:** one question per screen again; no points at signup, interests only; keep "Continue with Google";
+  beautify login and signup "a class apart". This reverses D-069 (the classic form) at the founder's request.
+- **Flow:** Welcome → Account (email path) → 18+ → Name → Details → Area → Interests → Reveal / Verify (UX_SPEC A0).
+  Email + password with the account created at the end (no email code, so no Supabase template dependency); 18+ and
+  Name on separate screens; phone and gender kept (D-068); interests only with `evenSplit` (ORBIT 3.2), private
+  interests not offered; the answers go through the existing pipeline unchanged (`declare_adult` before area and
+  interests). Notice version `2026-10-05` (0011). Classic behind `VITE_SIGNUP_FLOW=classic` for one release; Vercel
+  leaves it unset, so production is guided.
+- **Login:** one editorial deep-wine card (max 480 px) next to the telephone art, "Continue with Google" as a full
+  labelled button, Bodoni headings, sentence-case buttons ("Log in", "Create an account"); the top-bar "Create account"
+  pill is hidden on the login view. Ids and behaviour unchanged.
+- **Review fixes:** Finish submits once (busy until the next screen; Back disabled meanwhile), the question is each
+  field's description, Google start shows busy and a visible error, a resumed signup with unchanged picks keeps its
+  points and modes.
+- **Follow-ups:** "Forgot password?" is still a dead button (pre-existing; needs a reset flow and SMTP).
+
+## D-081: The Connect card is the hero on desktop (founder, 2026-10-22; refines D-076 and D-079)
+
+- **Founder ask** (1366x633 screenshot): "the main feature is taking the least place in the entire screen ... The ratio
+  should be professionally allotted and the main feature shall grab the attention." The card was 260x403, pushed to
+  the far right, while "CONNECTION, CURATED." filled most of the screen.
+- **Decision.** From 850 px wide the deck is a two-part composition: a quiet headline column (40% of the content width,
+  headline `clamp(44px, 5vw, 88px)`, eyebrow and filter button kept) and a card stage (60%) with the card centred in it.
+  The card height uses the window (`100svh` minus the top bar, padding and, under 1100 px, the controls; 400-880 px,
+  up to 1040 px on screens 1200 px and taller) and its width is 0.64 x the height (about 1.56 tall per 1 wide). From
+  1100 px Pass sits left of the card and Pitch right of it, level with its middle; under 1100 px they stay centred
+  under the card. The hint ("PASS WITH INTENTION · PITCH WITH PURPOSE", then the signal counter) becomes a quiet
+  two-line caption in the headline column, level with the card's bottom edge, so the card gets the full height.
+  Content is capped at 1600 px and centred on very wide screens. The card has a deeper wine shadow; the stacked next
+  card behind it is unchanged. Phones (780 px and less) are unchanged. CSS: `reference-design.css` (D-081 block); the
+  old D-059/D-079 grid in `deck.css` is removed.
+- **Numbers.** 1366x633: card 260x403 (104,780 px²) -> 327x511 (167,387 px²). 1440x900: 370x638 -> 486x759.
+  1920x1080: 406x700 -> 563x880.
+- **Proof.** `tests/e2e/deck.spec.mjs` desktop composition at 1366x633, 1280x650, 1280x720, 1366x768, 1440x900,
+  1536x730, 1920x1080, 2560x1440 and 1024x768: no document or sideways scroll, card at least 1.45 tall per 1 wide and
+  below the top bar, View profile inside, headline within 20 px of the card's middle, Pass / Pitch at least 56 px
+  (flanking within ±20 px from 1100 px, under the card below), no overlap between headline, card, controls and hint,
+  the stacked card lined up, at 1366x633 height >= 470 and area >= 145,000 px², and larger cards at 1440x900 and
+  1920x1080. The swipe, stamp, pitch-sheet, keyboard and reduced-motion checks run at 1440x900 on the new size.
 
 ## D-080: Frame your photo before upload; covers only from the provided set (founder, 2026-10-22)
 

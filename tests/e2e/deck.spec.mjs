@@ -453,6 +453,9 @@ try {
       overflow: document.documentElement.scrollWidth - window.innerWidth,
       cardTop: document.querySelector('#swipe-card')?.getBoundingClientRect().top,
       barBottom: document.querySelector('.app-topbar')?.getBoundingClientRect().bottom,
+      noticeBottom: document.querySelector('#swipe-limit-state')?.getBoundingClientRect().bottom,
+      scroll: document.documentElement.scrollHeight - innerHeight,
+      vh: innerHeight,
     };
   });
   const zero = await zeroState(small);
@@ -475,7 +478,11 @@ try {
   await wpage.waitForFunction(() => !document.querySelector('#swipe-limit-state')?.hidden, null, { timeout: 5000 }).catch(() => {});
   await wpage.waitForTimeout(300);
   const wideZero = await zeroState(wpage);
-  check(`1440 px zero quota: the card top is at or below the top bar (card ${wideZero.cardTop}, bar ${wideZero.barBottom})`, () => assert.ok(wideZero.cardTop >= wideZero.barBottom - 0.5));
+  check(`1440 px zero quota: the card top is at or below the top bar (card ${wideZero.cardTop}, bar ${wideZero.barBottom}), the notice is on screen (${wideZero.noticeBottom} <= ${wideZero.vh}) and nothing scrolls (${wideZero.scroll})`, () => {
+    assert.ok(wideZero.cardTop >= wideZero.barBottom - 0.5);
+    assert.ok(wideZero.noticeBottom <= wideZero.vh + 0.5);
+    assert.ok(wideZero.scroll <= 1);
+  });
   await shot(wpage, 'deck-1440-zero-quota.png');
   // My own profile's location line is my_onboarding_status().place_label.
   await wpage.evaluate(() => document.querySelector('[data-nav="profile"]')?.click());
@@ -1051,39 +1058,79 @@ try {
   check(`reduced motion: the card rests with no transform (${rmAfter})`, () => assert.equal(rmAfter, 'none'));
   await rm.close();
 
-  // Desktop alignment (D-079): one frame, no scrolling: the card top is below the top bar, the card is always tall like
-  // the phone card (at least 1.5 tall per 1 wide; founder 2026-10-22 "long, not wide" and "in one frame"), its View
-  // profile button is inside it, Pass / Pitch sit centred under it, everything ends on screen, and the headline is level
-  // with the middle of the card. 1366x633 is a 768 px laptop screen minus browser bars.
-  for (const [vw, vh] of [[1920, 1080], [1366, 768], [1440, 900], [1280, 720], [1366, 633], [1280, 650], [1536, 730]]) {
+  // Desktop composition (D-081, refines D-079): the card is the hero. One frame, no scrolling at any listed laptop or
+  // desktop size; the card is tall (at least 1.45 tall per 1 wide) and uses the window height (at 1366x633 at least
+  // 470 px tall and 145,000 px², larger at 1440x900 and 1920x1080); View profile is inside it; the headline is level with
+  // its middle. From 1100 px wide Pass sits left of the card and Pitch right of it, both level with its middle; narrower
+  // desktops keep them under the card. Headline, card, controls and hint never overlap, and the stacked next card lines
+  // up under the top card. 1366x633 is a 768 px laptop screen minus browser bars.
+  const areas = {};
+  for (const [vw, vh] of [[1366, 633], [1280, 650], [1280, 720], [1366, 768], [1440, 900], [1536, 730], [1920, 1080], [2560, 1440], [1024, 768]]) {
     resetStub();
     const lc = await makeContext({ width: vw, height: vh });
     const lp = await open(lc);
     await waitForCard(lp, 'Asha Band');
     await lp.waitForTimeout(600);
     const m = await lp.evaluate(() => {
-      const r = (s) => document.querySelector(s).getBoundingClientRect();
-      const nav = r('.app-topbar'); const card = r('#swipe-card'); const pass = r('.swipe-pass'); const like = r('.swipe-like'); const hint = r('.swipe-hint'); const head = r('.home-heading');
+      const box = (s) => { const b = document.querySelector(s).getBoundingClientRect(); return { l: b.left, t: b.top, r: b.right, b: b.bottom, w: b.width, h: b.height, cx: b.left + b.width / 2, cy: b.top + b.height / 2 }; };
       const view = document.querySelector('#swipe-card .view-info-button')?.getBoundingClientRect();
-      return { navBottom: Math.round(nav.bottom), cardTop: Math.round(card.top), cardBottom: Math.round(card.bottom), cardW: Math.round(card.width), cardH: Math.round(card.height), cardCx: Math.round(card.left + card.width / 2), cardCy: Math.round(card.top + card.height / 2), headCy: Math.round(head.top + head.height / 2), viewIn: !view || (view.top >= card.top && view.bottom <= card.bottom + 0.5), actionsCx: Math.round((pass.left + like.right) / 2), actionsTop: Math.round(pass.top), hintBottom: Math.round(hint.bottom), scroll: document.documentElement.scrollHeight - innerHeight, vh: innerHeight };
+      const card = box('#swipe-card');
+      // Pass / Pitch carry their label 25 px under the circle (::after), so the control box includes it.
+      const ctl = (s) => { const b = box(s); return { ...b, b: b.b + 25 }; };
+      return {
+        nav: box('.app-topbar'), card, next: box('#swipe-card-next'), head: box('.home-heading'), hint: box('.swipe-hint'), pass: ctl('.swipe-pass'), like: ctl('.swipe-like'),
+        viewIn: !view || (view.top >= card.t && view.bottom <= card.b + 0.5),
+        scroll: document.documentElement.scrollHeight - innerHeight, hscroll: document.documentElement.scrollWidth - document.documentElement.clientWidth, vh: innerHeight,
+      };
     });
     await swipeShot(lp, `layout-${vw}x${vh}.png`);
-    check(`${vw}x${vh}: one frame (scroll ${m.scroll}, hint ${m.hintBottom} <= ${m.vh}); card ${m.cardW}x${m.cardH} is tall, below the top bar (${m.cardTop} >= ${m.navBottom}), View profile inside (${m.viewIn}); controls centred under it (${m.actionsCx} vs ${m.cardCx}); headline level with the card (${m.headCy} vs ${m.cardCy})`, () => {
-      assert.ok(m.cardTop >= m.navBottom);
-      assert.ok(m.cardH >= 1.5 * m.cardW);
+    const r0 = (n) => Math.round(n);
+    const { card, head, pass, like, hint, next } = m;
+    areas[`${vw}x${vh}`] = card.w * card.h;
+    const overlap = (a, b) => a.l < b.r - 0.5 && b.l < a.r - 0.5 && a.t < b.b - 0.5 && b.t < a.b - 0.5;
+    const parts = { head, card, pass, like, hint };
+    const clashes = [];
+    Object.keys(parts).forEach((a, i) => Object.keys(parts).slice(i + 1).forEach((b) => { if (overlap(parts[a], parts[b])) clashes.push(`${a}/${b}`); }));
+    check(`${vw}x${vh}: one frame (scroll ${m.scroll}, sideways ${m.hscroll}); card ${r0(card.w)}x${r0(card.h)} at least 1.45 tall per 1 wide, below the top bar (${r0(card.t)} >= ${r0(m.nav.b)}), View profile inside (${m.viewIn}); headline level with the card (${r0(head.cy)} vs ${r0(card.cy)}); nothing overlaps (${clashes.join(', ') || 'none'}); everything on screen`, () => {
+      assert.ok(m.scroll <= 1, 'document scrolls');
+      assert.ok(m.hscroll <= 0, 'sideways scroll');
+      assert.ok(card.t >= m.nav.b - 0.5);
+      assert.ok(card.h >= 1.45 * card.w);
       assert.ok(m.viewIn);
-      assert.ok(Math.abs(m.actionsCx - m.cardCx) <= 40);
-      assert.ok(m.actionsTop > m.cardBottom);
-      assert.ok(m.hintBottom <= m.vh);
-      assert.ok(m.scroll <= 1);
-      assert.ok(Math.abs(m.headCy - m.cardCy) <= 16);
+      assert.ok(Math.abs(head.cy - card.cy) <= 20);
+      assert.deepEqual(clashes, []);
+      [card, head, hint, pass, like].forEach((b) => assert.ok(b.b <= m.vh + 0.5 && b.t >= 0 && b.l >= 0 && b.r <= vw));
     });
+    check(`${vw}x${vh}: Pass ${r0(pass.w)} px and Pitch ${r0(like.w)} px are at least 56 px and ${vw >= 1100 ? `flank the card level with its middle (Pass ${r0(pass.r)} <= ${r0(card.l)}, Pitch ${r0(like.l)} >= ${r0(card.r)}; ${r0(pass.cy)} / ${r0(like.cy)} vs ${r0(card.cy)})` : `sit under the card (${r0(pass.t)} > ${r0(card.b)})`}`, () => {
+      [pass, like].forEach((b) => { assert.ok(b.w >= 56); assert.ok(b.h >= 56); });
+      if (vw >= 1100) {
+        assert.ok(pass.r <= card.l);
+        assert.ok(like.l >= card.r);
+        assert.ok(Math.abs(pass.cy - card.cy) <= 20);
+        assert.ok(Math.abs(like.cy - card.cy) <= 20);
+      } else {
+        assert.ok(pass.t > card.b && like.t > card.b);
+        assert.ok(Math.abs((pass.l + like.r) / 2 - card.cx) <= 40);
+      }
+    });
+    check(`${vw}x${vh}: the stacked next card lines up under the top card (next ${r0(next.w)} px wide at ${r0(next.cx)}, card ${r0(card.w)} at ${r0(card.cx)}; bottom ${r0(next.b)} vs ${r0(card.b)})`, () => {
+      assert.ok(Math.abs(next.cx - card.cx) <= 2);
+      assert.ok(next.w >= 0.9 * card.w && next.w <= card.w + 0.5);
+      assert.ok(next.b >= card.b - 0.5 && next.b <= card.b + 24);
+    });
+    if (vw === 1366 && vh === 633) {
+      check(`1366x633: the card is the hero: ${r0(card.w)}x${r0(card.h)} (height >= 470, area ${r0(card.w * card.h)} >= 145,000 px²)`, () => { assert.ok(card.h >= 470); assert.ok(card.w * card.h >= 145000); });
+    }
     if (vw === 1920) {
       const ax = await axeViolations(lp, { include: '.app-view[data-view="home"]', decorative: ['.swipe-card-info::before'] });
       check(`axe: the deck with the stack and stamps is clean (${ax.join(' | ')})`, () => assert.deepEqual(ax, []));
     }
     await lc.close();
   }
+  check(`the card grows with the window (area 1366x633 ${Math.round(areas['1366x633'])} < 1440x900 ${Math.round(areas['1440x900'])} < 1920x1080 ${Math.round(areas['1920x1080'])})`, () => {
+    assert.ok(areas['1440x900'] >= areas['1366x633'] * 1.25);
+    assert.ok(areas['1920x1080'] >= areas['1440x900'] * 1.1);
+  });
 
   // A cover that fails to load (a broken path) falls back to the placeholder, never the alt text.
   resetStub({ rows: [{ ...deckRows[0], photo_url: null, cover_url: '/assets/no-such-cover-xyz.webp' }, deckRows[1]] });

@@ -90,6 +90,11 @@ that a moderator confirms). Until placed, they match only by exact id.
 
 The budget turns every interest into a weight that **sums to 1 per member**: `p_u(i) = points_u(i) / 20`.
 
+**Signup picks interests only (D-073).** The guided signup has no points screen: the member picks 1–12 interests and the
+client spreads the 20 points evenly with `evenSplit` (`passion-budget.js`: largest remainder, every pick at least 1,
+ties to earlier picks; 3 picks give 7/7/6). Points can be tuned later in Profile. A resumed signup whose picks are
+unchanged keeps the saved points and modes.
+
 Enforced in the database by `set_member_interests(p_items jsonb)` (SECURITY DEFINER, volatile, `authenticated`
 only; needs a profile row). It accepts 1–12 items `{ interest_id, points, mode }` with distinct, active, level ≥ 3
 ids, integer points ≥ 1 that sum to exactly 20, and a mode in `learn | play | teach | build` (missing means `play`).

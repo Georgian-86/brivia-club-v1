@@ -1,6 +1,6 @@
 // Explore post card (polish wave C2): pure markup, no DOM, no storage.
 //
-// A card is a wine header bar (avatar, the author's name as a profile trigger, date), a 4:5 media block, a two-line
+// A card is a wine header bar (avatar, the author's name as a profile trigger, date), a 5:4 media block, a two-line
 // caption and a wine action bar of four buttons (like, comment, share, save). Every value is escaped by the caller's
 // escapeHtml. The view wires the buttons by data-post-action (post-reactions.js persists like and save).
 
