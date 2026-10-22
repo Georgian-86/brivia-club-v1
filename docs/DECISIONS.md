@@ -1544,3 +1544,18 @@ controls (a tester or a seeded test member), never a real member, so no new expo
   heading "YOUR KIND / IS ALREADY HERE.", keeping the current Bodoni serif heading font (only the words change).
 - This reverses the R10 honesty copy on that heading (29f1e24: "EXAMPLE PROFILES", "THE KIND OF PEOPLE WE'RE BUILDING
   FOR."). The founder owns the product copy; the marquee cards are still showcase cards, not live members.
+
+## D-079: The Connect card stays tall AND fits one screen on desktop (founder, 2026-10-22; refines D-076)
+
+- After D-076 the tall card made short laptop windows scroll. The founder wants it in one frame, still long (not
+  wide), with "Connection, curated." in the centre.
+- The card height follows the window again (`clamp(400px, 100svh - 262px, 700px)`; under 820 px tall
+  `clamp(360px, 100svh - 230px, 700px)` with smaller Pass / Pitch and a one-line-each hint), and the WIDTH now follows
+  the height (`clamp(260px, 0.58 x height, 480px)`), so a short window gets a narrower tall card instead of a squashed
+  one. Under 700 px tall the avatar, bar and cover shrink, and interest chips show in whole rows only (two rows under
+  820 px tall, one under 700 px; "You both" chips first), so View profile always stays inside the card. The headline is level
+  with the middle of the card. Phones are unchanged.
+- Proof: `tests/e2e/deck.spec.mjs` desktop layout at 1920x1080, 1366x768, 1440x900, 1280x720, 1366x633, 1280x650 and
+  1536x730: no scrolling, card at least 1.5 tall per 1 wide, View profile inside, controls centred under it, headline
+  centred with the card.
+

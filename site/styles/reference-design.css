@@ -223,23 +223,43 @@ body.app-body .app-view[data-view="home"] .swipe-card-next-name { color: var(--c
 /* Pass / Pitch in the same oxblood. */
 body.app-body .app-view[data-view="home"] .swipe-like { border-color: var(--color-oxblood); background: var(--color-oxblood); }
 
-/* Desktop: the Canva proportions (about 0.58 wide per 1 tall), always a tall card like the phone one (founder,
-   2026-10-22: "make it long, not wide"). A short laptop screen keeps the tall card and scrolls to Pass / Pitch. */
+/* Desktop: the whole card, Pass / Pitch and the hint fit one screen (no scrolling), and the card always stays tall like
+   the phone card (founder, 2026-10-22: "make it long, not wide" and "in one frame"): its height follows the window and
+   its width follows its height (0.58 wide per 1 tall, never under 260 px), so a short laptop window gets a narrower
+   card instead of a squashed one. */
 @media (min-width: 850px) {
   body.app-body .app-view[data-view="home"] {
-    --deck-card-h: clamp(600px, calc(100svh - 262px), 700px);
-    --deck-col: max(352px, calc(var(--deck-card-h) * .58));
+    --deck-card-h: clamp(400px, calc(100svh - 262px), 700px);
+    --deck-col: clamp(260px, calc(var(--deck-card-h) * .58), 480px);
   }
-  /* The signal-limit notice adds a row under the narrower column (the hint wraps more), so the card gives way. */
-  body.app-body .app-view[data-view="home"]:has(.swipe-limit-state:not([hidden])) { --deck-card-h: clamp(600px, calc(100svh - 372px), 640px); }
+  /* The signal-limit notice adds a row under the column (the hint wraps more), so the card gives way. */
+  body.app-body .app-view[data-view="home"]:has(.swipe-limit-state:not([hidden])) { --deck-card-h: clamp(380px, calc(100svh - 372px), 600px); }
 }
 @media (min-width: 850px) and (max-height: 820px) {
-  body.app-body .app-view[data-view="home"] { --ref-avatar: clamp(84px, 28cqw, 104px); --ref-bar-h: 42px; }
+  /* A short laptop window: tighter controls, so the tall card keeps its height and everything stays in one frame. */
+  body.app-body .app-view[data-view="home"] { --ref-avatar: clamp(84px, 28cqw, 104px); --ref-bar-h: 42px; --deck-card-h: clamp(360px, calc(100svh - 230px), 700px); }
+  body.app-body .app-view[data-view="home"] .swipe-actions { margin-top: 12px; }
+  body.app-body .app-view[data-view="home"] .swipe-action { width: 56px; height: 56px; }
+  body.app-body .app-view[data-view="home"] .swipe-hint { width: max-content; max-width: none; margin-top: 30px; white-space: nowrap; }
+  /* At most two rows of interest chips, so View profile always stays inside the card ("You both" chips come first). */
+  body.app-body .app-view[data-view="home"] .swipe-card #swipe-tags { max-height: var(--deck-tag-rows-h, 96px); overflow: hidden; }
   body.app-body .app-view[data-view="home"] .swipe-card .swipe-card-info { padding-top: calc(var(--ref-avatar) * .42); }
   body.app-body .app-view[data-view="home"] .swipe-card .swipe-card-info::before { top: calc(var(--ref-avatar) * -.6); width: var(--ref-avatar); height: var(--ref-avatar); }
   body.app-body .app-view[data-view="home"] .swipe-card .member-name-row { margin-top: 8px; }
   body.app-body .app-view[data-view="home"] .swipe-card .member-tags::before { margin-top: 9px; margin-bottom: 4px; }
   body.app-body .app-view[data-view="home"] .swipe-card .view-info-button { min-height: 46px; margin-top: 12px; }
+}
+/* Very short laptop windows (under 700 px tall, e.g. 1366x633): a smaller avatar and cover so the card's own content,
+   View profile included, still fits inside the tall card. */
+@media (min-width: 850px) and (max-height: 700px) {
+  body.app-body .app-view[data-view="home"] { --ref-avatar: 72px; --ref-bar-h: 38px; --deck-tag-rows-h: 56px; }
+  body.app-body .app-view[data-view="home"] .swipe-card .swipe-card-image { min-height: 72px; }
+  body.app-body .app-view[data-view="home"] .swipe-card .member-name-row { margin-top: 4px; }
+  body.app-body .app-view[data-view="home"] .swipe-card .view-info-button { min-height: 44px; margin-top: 8px; }
+}
+/* Desktop: "Connection, curated." sits level with the middle of the card. */
+@media (min-width: 850px) {
+  body.app-body .app-view[data-view="home"] .home-heading { grid-row: 1; align-self: center; }
 }
 /* Phones: the card fills the column and starts higher (a shorter headline), so most of it shows on arrival. */
 @media (max-width: 700px) {

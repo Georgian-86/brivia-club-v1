@@ -400,8 +400,8 @@ body.app-body :is(button, [role="button"], .filter-button, .discovery-filter-sug
     align-items: start;
     column-gap: clamp(32px, 6vw, 120px);
     row-gap: 0;
-    height: auto;
-    min-height: calc(100svh - 76px);
+    height: calc(100svh - 76px);
+    min-height: 0;
     padding-top: 16px;
     padding-bottom: 16px;
   }
