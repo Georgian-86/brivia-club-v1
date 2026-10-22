@@ -53,12 +53,12 @@ test('stop without typing sends nothing; typing again right after stop sends at 
   assert.deepEqual(sent, [{ typing: true }, { typing: false }, { typing: true }]);
 });
 
-test('the payload is only { typing: boolean } (never message content)', () => {
+test('whatever onInput is handed (an input event, the draft), send only ever gets { typing: true } / { typing: false }', () => {
   const sent = [];
-  const sender = createTypingSender({ send: (p) => sent.push(p), now: () => 0 });
-  sender.onInput('secret draft');
-  sender.stop();
-  for (const p of sent) assert.deepEqual(Object.keys(p), ['typing']);
+  const sender = createTypingSender({ send: (...args) => sent.push(args), now: () => 0 });
+  sender.onInput({ target: { value: 'secret draft' }, data: 't' }, 'secret draft');
+  sender.stop({ value: 'secret draft' });
+  assert.deepEqual(sent, [[{ typing: true }], [{ typing: false }]]);
 });
 
 const timers = () => {

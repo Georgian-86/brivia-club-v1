@@ -51,6 +51,9 @@
 // T5 closing the thread leaves the typing channel; hiding the tab sends { typing: false }; pagehide leaves (Realtime
 //    closes its socket on pagehide) and nothing more is sent.
 // T6 switching threads leaves the old pair's channel and joins the new one; a late signal from the old pair shows nothing.
+// T5 also: pagehide mid-burst sends nothing (no REST broadcast fallback, no console warning).
+// T8 a dropped socket is not auto-retried; returning to the tab or coming online makes one fresh join (never for a
+//    blocked pair, never a loop).
 // T7 closing and reopening a thread while the old leave reply is still in flight ends with one working channel.
 // TYPING_SHOTS=<dir> (with SECTIONS=typing) only saves the typing line at 320, 375, 390, 768, 1280, 1440 and 1920.
 import { mkdirSync } from 'node:fs';
@@ -1021,6 +1024,73 @@ try {
           assert.equal(after.frames, 2);
         });
         await context.close();
+      });
+
+      // M1/M6 (fix round 1): pagehide in the middle of a burst (no tab-hide first). Realtime has already closed its
+      // socket, so the stop must not go out at all: no REST broadcast fallback, no console warning.
+      await scenario('T5 quiet pagehide', async () => {
+        const { context, page, rt, consoleLines } = await openTyping(375);
+        await page.locator('#chat-input').pressSequentially('hi', { delay: 40 });
+        await page.waitForTimeout(200);
+        const mark = st.calls.length;
+        const logMark = consoleLines.length;
+        await page.evaluate(() => window.dispatchEvent(new PageTransitionEvent('pagehide', { persisted: false })));
+        await page.waitForTimeout(500);
+        const rest = since(mark).filter((c) => c.path.includes('/realtime/'));
+        // The legacy messages channel warns "Realtime messages channel could not connect." when its socket closes;
+        // that predates D5 and is not about typing.
+        const warnings = consoleLines.slice(logMark).filter((l) => /^(warning|error):/.test(l) && !/Realtime messages channel could not connect/.test(l));
+        check(`T5 pagehide mid-burst makes no REST broadcast and logs no warning (${JSON.stringify({ rest: rest.map((c) => c.path), warnings, frames: rt.typingFrames().map((f) => f.payload) })})`, () => {
+          assert.deepEqual(rest, []);
+          assert.deepEqual(warnings, []);
+          assert.deepEqual(rt.typingFrames().map((f) => f.payload), [{ typing: true }]);
+        });
+        await context.close();
+      });
+
+      // I1 (fix round 1): a dropped socket (screen lock, app switch) reports CHANNEL_ERROR like a refusal. Typing is
+      // never retried on its own, but returning to the tab or coming back online allows one fresh join.
+      const visible = (page) => page.evaluate(() => document.dispatchEvent(new Event('visibilitychange')));
+      const online = (page) => page.evaluate(() => window.dispatchEvent(new Event('online')));
+      await scenario('T8 re-join after a dropped socket', async () => {
+        {
+          const { context, page, rt } = await openTyping(375);
+          rt.ws.close({ code: 1006, reason: 'gone' });
+          await page.waitForTimeout(3000);
+          const afterDrop = rt.typingJoins().length;
+          await visible(page);
+          await page.waitForTimeout(1500);
+          const afterVisible = rt.typingJoins().length;
+          rt.push(true);
+          await waitTyping(page, true);
+          const s = await typingState(page);
+          await online(page);
+          await visible(page);
+          await page.waitForTimeout(800);
+          check(`T8 a dropped socket is not retried on its own; returning to the tab joins exactly once and works; later events while joined add nothing (${JSON.stringify({ afterDrop, afterVisible, shown: s.visible, final: rt.typingJoins().length })})`, () => {
+            assert.equal(afterDrop, 1);
+            assert.equal(afterVisible, 2);
+            assert.equal(s.visible, true);
+            assert.equal(rt.typingJoins().length, 2);
+          });
+          await context.close();
+        }
+        {
+          const { context, page, rt } = await openTyping(375, { refuseTyping: true });
+          await online(page);
+          await page.waitForTimeout(2500);
+          const n = rt.typingJoins().length;
+          check(`T8 a refused join gets one attempt per online/visible event and never loops (${n})`, () => assert.equal(n, 2));
+          await context.close();
+        }
+        {
+          const { context, page, rt } = await openTyping(375, { blocked: [A] });
+          await visible(page);
+          await online(page);
+          await page.waitForTimeout(800);
+          check(`T8 a blocked pair still joins nothing on visible/online (${rt.typingJoins().length})`, () => assert.equal(rt.typingJoins().length, 0));
+          await context.close();
+        }
       });
 
       await scenario('T7 quick reopen', async () => {

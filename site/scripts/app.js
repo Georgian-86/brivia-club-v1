@@ -127,7 +127,8 @@ const saveBlockedUserIds = (ids) => {
   try {
     window.localStorage.setItem(blockedUsersStorageKey(), JSON.stringify([...ids]));
   } catch { return false; }
-  syncTypingForSelectedChat(); // D5: a block drops typing at once; an unblock of the open thread joins it again
+  // D5: a block drops typing at once; an unblock of the open thread joins it again. Typing never fails a block.
+  try { syncTypingForSelectedChat(); } catch { /* typing is best-effort */ }
   return true;
 };
 const syncBlockedUserIds = async () => {
@@ -1750,7 +1751,7 @@ const typingLine = () => {
   if (!head) return null;
   if (!document.querySelector('#chat-typing')) {
     head.insertAdjacentHTML('afterbegin', '<div class="chat-typing" id="chat-typing" aria-hidden="true" hidden><i class="chat-typing-dots"><i></i><i></i><i></i></i><em class="chat-typing-text">typing…</em></div>');
-    head.insertAdjacentHTML('afterend', '<p class="chat-typing-live" id="chat-typing-live" role="status" aria-live="polite"></p>');
+    head.insertAdjacentHTML('afterend', '<p class="chat-typing-live sr-only" id="chat-typing-live" role="status" aria-live="polite"></p>');
   }
   return document.querySelector('#chat-typing');
 };
@@ -1780,8 +1781,9 @@ const joinTyping = (person) => {
   const session = { otherId: String(person.id), channel, joined: false };
   session.sender = createTypingSender({
     send: (payload) => {
-      // Only over a joined socket: never the REST broadcast fallback.
-      if (session.joined) Promise.resolve(channel.send({ type: 'broadcast', event: TYPING_EVENT, payload })).catch(() => {});
+      // Only over a live, joined socket (never the REST broadcast fallback, which also warns): after pagehide or a
+      // drop Realtime may have closed the socket while this session still thinks it is joined.
+      if (session.joined && channel.state === 'joined' && supabase.realtime?.isConnected?.()) Promise.resolve(channel.send({ type: 'broadcast', event: TYPING_EVENT, payload })).catch(() => {});
     },
   });
   session.receiver = createTypingReceiver({ onChange: (visible) => { if (typingSession === session) showTyping(visible, person); } });
@@ -1796,7 +1798,8 @@ const joinTyping = (person) => {
       if (typingSession !== session) return;
       session.joined = status === 'SUBSCRIBED';
       if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
-        // Refused (no match, or blocked on the server) or unreachable: quietly drop typing for this thread.
+        // Refused (no match, or blocked on the server) or the socket dropped: quietly drop typing for this thread. It
+        // is never retried on its own; returning to the tab or coming back online allows one fresh join (below).
         session.receiver.reset();
         typingSession = null;
         setTimeout(() => { supabase.removeChannel(channel)?.catch?.(() => {}); }, 0);
@@ -1814,7 +1817,17 @@ const noteTyping = () => {
 // Leaving the page: Realtime closes its socket on pagehide (which leaves every channel on the server); this drops the
 // local session too. Hiding the tab first ends the burst while the socket is still open, so the other side clears at
 // once instead of after the 4 s idle.
-document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') typingSession?.sender.stop(); });
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'hidden') typingSession?.sender.stop();
+  else rejoinTypingOnce();
+});
+// One join attempt per user-side event (tab visible again, back online) when the open thread has no typing session:
+// covers a dropped socket (screen lock, app switch) without ever looping on a refused join. Never for a blocked pair.
+const rejoinTypingOnce = () => {
+  if (!selectedChat || typingSession || readBlockedUserIds().has(String(selectedChat.id))) return;
+  joinTyping(selectedChat);
+};
+window.addEventListener('online', () => rejoinTypingOnce());
 window.addEventListener('pagehide', () => leaveTyping(), { capture: true });
 window.addEventListener('pageshow', (event) => { if (event.persisted && selectedChat) syncTypingForSelectedChat(); });
 // The one block flow: the remote row, then the local blocked-ids store. Shared by the chat menu and the card overflow.
