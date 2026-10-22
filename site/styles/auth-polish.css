@@ -2570,7 +2570,6 @@
 .community-preview-heading .auth-eyebrow{color:#741f39}
 .community-preview-heading h2{font-family:var(--font-heading);font-size:clamp(48px,6vw,84px);font-weight:500;line-height:.88;letter-spacing:-.065em}
 .community-preview-heading h2 em{color:#741f39;font-style:normal}
-.community-preview-heading>span{color:rgba(41,29,27,.5)}
 .community-marquee{max-width:none;margin:0;padding:0;overflow:hidden}
 .community-marquee:before,.community-marquee:after{display:none}
 .community-track{display:flex;gap:14px;width:max-content;padding:0;animation:community-cards-slide 31s linear infinite}

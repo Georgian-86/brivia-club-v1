@@ -966,6 +966,79 @@ try {
     await context.close();
   }
 
+  // ================================ D-082: register lines up with login; login fits one screen ================================
+  // The founder (1920x1080 at 125% scaling, a ~1536x709 CSS viewport): the Welcome card sat left of the login card and
+  // "Find your people." wrapped; the login card's "New here?" line was cut. Every guided screen shares the login card's
+  // left edge (within 2 px), the Welcome title and subtitle are one line each from 1100 px, and the whole login card is
+  // on screen with breathing room at the listed laptop and desktop sizes, with no scrolling inside the panel.
+  const boxOf = (page, sel) => page.evaluate((s) => { const el = document.querySelector(s); if (!el || !el.getClientRects().length) return null; const r = el.getBoundingClientRect(); return { l: r.left, r: r.right, t: r.top, b: r.bottom, w: r.width, h: r.height }; }, sel);
+  const linesOf = (page, sel) => page.evaluate((s) => { const el = document.querySelector(s); const c = getComputedStyle(el); const lh = parseFloat(c.lineHeight) || parseFloat(c.fontSize) * 1.2; return { h: el.getBoundingClientRect().height, lh, lines: Math.round(el.getBoundingClientRect().height / lh) }; }, sel);
+  for (const viewport of [{ width: 1100, height: 800 }, { width: 1280, height: 720 }, { width: 1440, height: 900 }, { width: 1536, height: 709 }, { width: 1920, height: 1080 }, { width: 1920, height: 886 }]) {
+    const tag = `${viewport.width}x${viewport.height}`;
+    const context = await browser.newContext({ viewport });
+    await setup(context);
+    const page = await context.newPage();
+    await page.goto(`${BASE}/auth.html#login`, { waitUntil: 'load' });
+    await page.waitForSelector('.auth-login.is-active #login-form');
+    await settleAnimations(page);
+    await page.evaluate(() => document.fonts.ready);
+    const login = await boxOf(page, '.auth-login');
+    await page.locator('.auth-login .auth-create-trigger').click();
+    await waitScreen(page, 'welcome');
+    await settleAnimations(page);
+    const welcome = await boxOf(page, '#guided-signup');
+    const title = await linesOf(page, '#guided-signup h1');
+    const helper = await linesOf(page, '#guided-signup .guided-helper');
+    await shot(page, `align-welcome-${tag}`, 0);
+    check(`${tag} Welcome card's left edge matches the login card's (${Math.round(welcome.l)} vs ${Math.round(login.l)})`, () => assert.ok(Math.abs(welcome.l - login.l) <= 2));
+    check(`${tag} "Find your people." is one line (${Math.round(title.h)} px, line ${Math.round(title.lh)} px) and the subtitle is one line (${Math.round(helper.h)} px, line ${Math.round(helper.lh)} px)`, () => {
+      assert.ok(title.h <= title.lh * 1.4, JSON.stringify(title));
+      assert.ok(helper.h <= helper.lh * 1.4, JSON.stringify(helper));
+    });
+    check(`${tag} the Welcome card stays inside the window (${Math.round(welcome.l)}-${Math.round(welcome.r)} of ${viewport.width})`, () => assert.ok(welcome.l >= 0 && welcome.r <= viewport.width));
+    // The card does not jump between steps: Account, 18+ and Name share the same left edge and width.
+    await page.locator('[data-guided-email]').click();
+    await waitScreen(page, 'account');
+    await settleAnimations(page);
+    const account = await boxOf(page, '#guided-signup');
+    await page.locator('input[name="guided-email"]').fill('align@test.brivia.club');
+    await page.locator('input[name="guided-password"]').fill(PASSWORD);
+    await page.locator('input[name="guided-password-confirm"]').fill(PASSWORD);
+    await page.locator('[data-guided-next]').click();
+    const onAdult = await waitScreen(page, 'adult');
+    await settleAnimations(page);
+    const adult = onAdult ? await boxOf(page, '#guided-signup') : null;
+    check(`${tag} every guided step keeps the same column (Account ${Math.round(account.l)}/${Math.round(account.w)}, 18+ ${adult ? `${Math.round(adult.l)}/${Math.round(adult.w)}` : 'not reached'} vs Welcome ${Math.round(welcome.l)}/${Math.round(welcome.w)})`, () => {
+      assert.ok(adult);
+      for (const b of [account, adult]) { assert.ok(Math.abs(b.l - welcome.l) <= 1); assert.ok(Math.abs(b.w - welcome.w) <= 1); }
+    });
+    await context.close();
+  }
+  for (const viewport of [{ width: 1920, height: 886 }, { width: 1536, height: 709 }, { width: 1440, height: 780 }, { width: 1366, height: 633 }, { width: 1280, height: 720 }]) {
+    const tag = `${viewport.width}x${viewport.height}`;
+    const context = await browser.newContext({ viewport });
+    await setup(context);
+    const page = await context.newPage();
+    await page.goto(`${BASE}/auth.html#login`, { waitUntil: 'load' });
+    await page.waitForSelector('.auth-login.is-active #login-form');
+    await settleAnimations(page);
+    await page.evaluate(() => document.fonts.ready);
+    const fit = await page.evaluate(() => {
+      const card = document.querySelector('.auth-login').getBoundingClientRect();
+      const create = document.querySelector('.auth-login .auth-create-trigger').getBoundingClientRect();
+      const panel = document.querySelector('.auth-panel');
+      return { t: card.top, b: card.bottom, createB: create.bottom, vh: innerHeight, panelScroll: panel.scrollHeight - panel.clientHeight, scrollY: scrollY };
+    });
+    const a = await audit(page, '.auth-login');
+    await shot(page, `fit-login-${tag}`, 0);
+    check(`${tag} the whole login card is on screen with room to breathe (top ${Math.round(fit.t)}, bottom ${Math.round(fit.b)} of ${fit.vh}; "Create an account" ends at ${Math.round(fit.createB)}); nothing scrolls (panel ${fit.panelScroll}, page at ${fit.scrollY})`, () => {
+      assert.ok(fit.t >= 8, 'top'); assert.ok(fit.b <= fit.vh - 8, 'bottom'); assert.ok(fit.createB <= fit.vh - 8);
+      assert.ok(fit.panelScroll <= 0, 'panel scrolls'); assert.equal(fit.scrollY, 0);
+    });
+    check(`${tag} login: 44 px targets after the fit (${a.small.join(', ')})`, () => assert.deepEqual(a.small, []));
+    await context.close();
+  }
+
   // M6: one punctuation rule for every guided heading: a question ends with "?", anything else with a full stop.
   check(`M6 every guided heading ends with "." or "?" (${[...seenTitles].join(' | ')})`, () => {
     assert.ok(seenTitles.size >= 9); for (const t of seenTitles) assert.match(t, /[.?]$/, t);

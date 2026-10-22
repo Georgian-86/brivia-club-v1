@@ -1628,3 +1628,26 @@ controls (a tester or a seeded test member), never a real member, so no new expo
   `brivia_private.brivia_offered_cover_keys()`.
 - Proof: `tests/unit/photo-crop.test.mjs`, `tests/unit/preset-cover.test.mjs`, `supabase/tests/media-covers.test.sql`
   (V1-V5) and `tests/e2e/profile-media.spec.mjs` (crop, cancel, covers; 320-1920, axe at 375 and 1440).
+
+## D-082: Register lines up with login, login fits one screen, no swipe tagline; the Connect card reads as a stack (founder, 2026-10-22)
+
+- **Founder ask** (screenshots from a 1920x1080 screen in Chrome; the card widths show 125% scaling, so the CSS
+  viewport is about 1536x709): the register Welcome card sat left of the login card (x ≈ 805-1480 vs 955-1555 device
+  px) and "Find your people." wrapped; the login card was cut off at "New here? Create an account"; drop "SWIPE /
+  DISCOVER / CONNECT" from login and register; the Connect card should read as a deck again.
+- **Register.** From 781 px every guided screen starts at the login card's left edge (the panel's centre minus 240 px,
+  never past the panel's right edge) and is 576 px wide, so the card does not move between login and register or
+  between steps. The question heading takes the login heading's size (`clamp(34px, 3.6vw, 46px)`): a legacy
+  `.auth-signup h1` rule in auth-polish.css had outranked signup.css and set it to 4vw (up to 76 px). From 1100 px the
+  Welcome title and subtitle are one line each. Phones (780 px and less) are unchanged. Between 781 and about 1000 px
+  login and register keep their different pre-existing compositions (login has no phone art there).
+- **Login.** The card's padding and inner gaps follow the window height (`svh` clamps; inputs 46-52 px, buttons 48-56
+  px, every target still at least 44 px), and the panel's top and bottom padding shrink on short windows. 1366x633:
+  card 703 -> 584 px tall, bottom 728 -> 609 (of 633); 1536x709: bottom 732 -> 658; 1280x720: 729 -> 665. Tall screens
+  keep the generous card.
+- **Tagline.** The span "SWIPE / DISCOVER / CONNECT" beside "Your kind is already here." is removed from auth.html,
+  with its now-dead CSS.
+- CSS: `auth-refresh.css` (D-082 block). Proof: `tests/e2e/signup.spec.mjs` (left edges within 2 px at 1100-1920,
+  Account and 18+ on the same column, title and subtitle one line each, the whole login card on screen with 8 px to
+  spare and no panel scroll at 1920x886, 1536x709, 1440x780, 1366x633 and 1280x720) and
+  `tests/unit/showcase-cards.test.mjs` (no tagline).

@@ -32,7 +32,6 @@
   body.auth-page .community-preview{padding-top:70px}
   body.auth-page .community-preview-heading{padding-right:18px;padding-left:18px}
   body.auth-page .community-preview-heading h2{font-size:clamp(43px,13vw,62px);letter-spacing:-3px}
-  body.auth-page .community-preview-heading>span{font-size:var(--text-12);line-height:1.4}
   body.auth-page .community-card{width:245px;height:100px}
   body.auth-page .community-card-copy{min-width:0}
   body.auth-page .community-preview-note{padding-right:18px;padding-left:18px;font-size:var(--text-12)}

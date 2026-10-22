@@ -42,3 +42,9 @@ test('the profiles heading reads "Your kind is already here." in the serif headi
   const css = readFileSync('site/styles/auth-polish.css', 'utf8');
   assert.match(css, /\.community-preview-heading h2\{font-family:var\(--font-heading\)/);
 });
+
+test('the profiles heading carries no "SWIPE / DISCOVER / CONNECT" tagline on login or register (founder, D-082)', () => {
+  assert.doesNotMatch(authHtml, /SWIPE\s*\/\s*DISCOVER\s*\/\s*CONNECT/i);
+  // The heading is the eyebrow and the h2 only: no trailing span beside them.
+  assert.match(authHtml, /<div class="community-preview-heading"><div><p class="auth-eyebrow">[^<]*<\/p><h2 id="community-preview-title">[\s\S]*?<\/h2><\/div><\/div>/);
+});

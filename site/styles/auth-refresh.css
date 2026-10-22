@@ -378,3 +378,41 @@ body.auth-page .auth-shell:has(.auth-card.is-active) .auth-card :focus-visible {
   body.auth-page .auth-shell:has(.auth-guided.is-active) .auth-guided.is-active { margin: auto 0 !important; padding: 0 !important; }
   body.auth-page .auth-shell:has(.auth-guided.is-active) .guided { min-height: min(560px, calc(100svh - 64px)); margin: 0 auto; }
 }
+
+/* D-082 (founder, 2026-10-22). Register lines up with login, and the login card fits one screen.
+   1. Every guided screen shares the login card's column: the login card is 480 px wide and centred in the panel, so
+      the guided card starts at the panel's centre minus 240 px (never past the panel's right edge) and is 576 px wide,
+      enough for "Find your people." and its subtitle on one line each from 1100 px. The panel's side padding is
+      symmetric, so its centre is the login panel's centre; the slimmer padding only makes room for the wider card.
+      The question heading takes the login heading's size: a legacy `.auth-signup h1` rule (auth-polish.css) outranked
+      signup.css and blew it up to 4vw. Phones (780 px and less) keep their own layout.
+   2. The login card's padding and inner gaps follow the window height, so 1366x633, 1280x720 and a 125%-scaled
+      1920x1080 (about 1536x709) show the whole card, "New here?" included, with room around it. Targets stay 44 px. */
+@media (min-width: 781px) {
+  body.auth-page .auth-shell:has(.auth-guided.is-active) .auth-panel { padding-right: clamp(16px, 2.4vw, 48px) !important; padding-left: clamp(16px, 2.4vw, 48px) !important; }
+  body.auth-page .auth-shell:has(.auth-guided.is-active) .auth-guided.is-active { width: 100% !important; max-width: none !important; }
+  body.auth-page .auth-shell:has(.auth-guided.is-active) .guided {
+    --guided-w: min(100%, 576px);
+    width: var(--guided-w);
+    max-width: none;
+    margin: 0 0 0 clamp(0px, 50% - 240px, 100% - var(--guided-w));
+  }
+  body.auth-page .auth-shell .guided .guided-screen h1 { font-size: clamp(34px, 3.6vw, 46px) !important; }
+
+  body.auth-page .auth-shell:has(.auth-card.is-active) .auth-panel { padding-top: clamp(12px, 3svh, 40px); padding-bottom: clamp(12px, 3svh, 40px); }
+  body.auth-page .auth-shell:has(.auth-card.is-active) .auth-card {
+    --login-gap: clamp(10px, 1.8svh, 16px);
+    padding: clamp(22px, 4.4svh, 44px) clamp(24px, 3.2vw, 44px) clamp(16px, 3.2svh, 32px);
+  }
+  body.auth-page .auth-shell:has(.auth-card.is-active) .auth-card .auth-eyebrow { margin-bottom: clamp(6px, 1.2svh, 12px); }
+  body.auth-page .auth-shell:has(.auth-card.is-active) .auth-card h1 { margin-bottom: clamp(6px, 1.2svh, 12px); font-size: clamp(34px, min(3.6vw, 6.2svh), 46px) !important; }
+  body.auth-page .auth-shell:has(.auth-card.is-active) .auth-card .auth-intro { margin-bottom: clamp(14px, 2.6svh, 24px); }
+  body.auth-page .auth-shell:has(.auth-card.is-active) .auth-card .auth-google-trigger { min-height: clamp(48px, 6.6svh, 56px) !important; }
+  body.auth-page .auth-shell:has(.auth-card.is-active) .auth-card .auth-divider { margin: clamp(8px, 1.6svh, 16px) 0; }
+  body.auth-page .auth-shell:has(.auth-card.is-active) .auth-card .auth-form { gap: var(--login-gap); }
+  body.auth-page .auth-shell:has(.auth-card.is-active) .auth-card .auth-form label { gap: clamp(4px, .9svh, 8px); }
+  body.auth-page .auth-shell:has(.auth-card.is-active) .auth-card .auth-form input { height: clamp(46px, 6.4svh, 52px); }
+  body.auth-page .auth-shell:has(.auth-card.is-active) .auth-card .auth-forgot { margin: calc(var(--login-gap) * -.75) 0 calc(var(--login-gap) * -.5); }
+  body.auth-page .auth-shell:has(.auth-card.is-active) .auth-card .auth-submit { min-height: clamp(48px, 6.6svh, 56px); }
+  body.auth-page .auth-shell:has(.auth-card.is-active) .auth-card .auth-card-new { margin-top: clamp(6px, 1.4svh, 16px); padding-top: clamp(2px, .9svh, 12px); }
+}
