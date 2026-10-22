@@ -1,4 +1,4 @@
-// Polish wave C3: the Explore view's post cards (wine header bar, 4:5 media, wine action bar: like, comment, share,
+// Polish wave C3: the Explore view's post cards (wine header bar, 5:4 media, wine action bar: like, comment, share,
 // save), against stubbed Supabase. Never touches a real Supabase project. Playwright and axe-core are NOT repo
 // dependencies; see tests/e2e/README.md.
 //
@@ -6,7 +6,8 @@
 //
 // Asserts:
 // E1 columns: 1 at 375 and 390, 2 at 768, 3 at 1280, 1440 and 1920 (distinct card offsetLeft values).
-// E2 every card's media box is 4:5 (width / height 0.8 ± 0.01) and every card in a row has the same height.
+// E2 every card's media box is 5:4 (width / height 1.25 ± 0.01; founder 2026-10-22 "a bit too long"), the whole card is
+//    close to square (height / width 1.1 to 1.35) from 768 px, and every card in a row has the same height.
 // E3 the header and action bars are --brivia-wine; their text is >= 4.5:1 against it (computed, not axe); every action
 //    is >= 44 x 44 px.
 // E4 a double tap on Like sends one POST and leaves aria-pressed="true"; a 403 rolls back with the toast "That didn't
@@ -142,7 +143,7 @@ try {
     }
     console.log(`Screenshots saved to ${SHOTS}`);
   } else {
-    // E1 + E2 + E3: columns, 4:5 media, equal heights per row, wine bars and their contrast, 44 px targets.
+    // E1 + E2 + E3: columns, 5:4 media, equal heights per row, wine bars and their contrast, 44 px targets.
     for (const width of [375, 390, 768, 1280, 1440, 1920]) await scenario(`E1-E3 at ${width}`, async () => {
       const { context, page } = await open(width);
       const m = await page.evaluate(() => {
@@ -179,6 +180,8 @@ try {
           count: cards.length,
           columns: new Set(cards.map((c) => c.offsetLeft)).size,
           ratios: cards.map((c) => { const r = c.querySelector('.post-card-media').getBoundingClientRect(); return Number((r.width / r.height).toFixed(3)); }),
+          shapes: cards.map((c) => { const r = c.getBoundingClientRect(); return Number((r.height / r.width).toFixed(3)); }),
+          cardWidth: Math.round(cards[0].getBoundingClientRect().width),
           rows: Object.values(rows),
           wine,
           heads: [...new Set(cards.map((c) => getComputedStyle(c.querySelector('.post-card-head')).backgroundColor))],
@@ -190,9 +193,13 @@ try {
       });
       const expected = width <= 390 ? 1 : width === 768 ? 2 : 3;
       check(`E1 ${width}: ${expected} column(s) (${m.columns}; ${m.count} cards)`, () => { assert.equal(m.count, POSTS.length); assert.equal(m.columns, expected); });
-      check(`E2 ${width}: every media box is 4:5 and cards in a row share a height (${JSON.stringify({ ratios: m.ratios, rows: m.rows })})`, () => {
-        m.ratios.forEach((r) => assert.ok(Math.abs(r - 0.8) <= 0.01, String(r)));
+      check(`E2 ${width}: every media box is 5:4 and cards in a row share a height (${JSON.stringify({ ratios: m.ratios, rows: m.rows })})`, () => {
+        m.ratios.forEach((r) => assert.ok(Math.abs(r - 1.25) <= 0.01, String(r)));
         m.rows.forEach((row) => assert.ok(Math.max(...row) - Math.min(...row) <= 1, JSON.stringify(row)));
+      });
+      check(`E2 ${width}: the whole card reads close to square (height / width ${JSON.stringify([...new Set(m.shapes)])}, ${m.cardWidth} px wide)`, () => {
+        m.shapes.forEach((r) => assert.ok(width >= 768 ? r >= 1.1 && r <= 1.35 : r <= 1.4, String(r)));
+        assert.ok(m.cardWidth <= 440, `card ${m.cardWidth} px wide`);
       });
       check(`E3 ${width}: header and action bars are --brivia-wine, text >= 4.5:1, targets >= 44 px (${JSON.stringify({ wine: m.wine, heads: m.heads, bars: m.bars, min: m.minContrast, small: m.small })})`, () => {
         assert.deepEqual(m.heads, [m.wine]); assert.deepEqual(m.bars, [m.wine]);
@@ -521,7 +528,7 @@ try {
         check(`E7 ${width}: card-shaped skeletons while loading, aria-busy cleared after (${JSON.stringify({ during, after })})`, () => {
           assert.ok(during, 'skeletons with aria-busy within 900 ms');
           assert.equal(during.head && during.actions, true);
-          assert.ok(Math.abs(during.ratio - 0.8) <= 0.01, String(during.ratio));
+          assert.ok(Math.abs(during.ratio - 1.25) <= 0.01, String(during.ratio));
           assert.ok(Math.abs(during.width - after.width) <= 1, `${during.width} vs ${after.width}`);
           assert.ok(Math.abs(during.height - after.shortest) <= 24, `${during.height} vs ${after.shortest}`);
           assert.equal(after.busy, null); assert.equal(after.skeletons, 0);

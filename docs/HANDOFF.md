@@ -8,7 +8,7 @@ Update this file at the end of every session. CLAUDE.md holds the aim; this file
 ## 1. What is done
 
 **Explore post cards (2026-10-21, release C of the polish wave), D-074.** Explore posts are wine cards (header bar,
-4:5 image, two-line caption, action bar: Like, Comment, Share, Save); one, two or three columns. Like and Save are
+5:4 image (squarer since 2026-10-22), two-line caption, action bar: Like, Comment, Share, Save); one, two or three columns. Like and Save are
 private to the member (no counts) and live in `0012_polish_wave.sql` section C, which the founder applies once after
 parts A, C and D are on `main`; until then Like and Save are hidden and the rest works. Share sends a link only; Comment
 opens the detail sheet (no comment storage yet). Also: the badminton illustration lost its baked-in grey checkerboard
