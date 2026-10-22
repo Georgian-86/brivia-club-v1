@@ -1489,3 +1489,23 @@ controls (a tester or a seeded test member), never a real member, so no new expo
 - **Open question for the founder/counsel:** whether `privacy.html` should list the optional resume. The notice
   version is unchanged in this wave.
 
+## D-072: Location, chat fit, notifications over chat, the account menu, and the showcase cards (release A of the polish wave, 2026-10-22)
+
+- **"Use my location" (A1).** Most likely cause (reasoned from code and reproduced locally, not on the founder's device):
+  a 15 s guard started at the click covered both the permission prompt and the first fix, so a member who read the
+  prompt and pressed Allow could still be told to pick a city, and the late answer was thrown away. Now a late answer
+  is kept up to 30 s from the click; at 15 s the city list opens with "Still waiting for your browser…". A blocked or
+  OS-disabled location (codes 1 and 2) gets its own line, the denied one pointing to device settings; a timeout offers
+  "Try again". Coordinates are still never stored or shown (only the ~2 km cell).
+- **Chat fits short laptop screens (A2).** Thread, list and composer fit 720-1080 px tall viewports; photo bubbles are
+  capped at `min(38dvh, 320px)` (tap opens full size); safe-area insets on the sides; no side gutter in the chat view.
+- **Notifications open above the chat list (A3).** The panel is a manual popover in the top layer, anchored to the
+  bell; it closes when another layer opens; Escape closes only the topmost layer.
+- **Account menu (A4).** A compact popover on desktop that sizes to its rows, sets the insets it does not own to
+  auto (the founder's tall Safari box, most likely leaked popover insets; not reproducible in Chromium, covered by a
+  regression test that injects them), is capped below the header and never covers the gear. On phones (600 px and
+  less) it is a bottom sheet with a solid scrim (taps never reach the page), swipe down to close, and page scroll lock.
+- **Showcase cards (A6).** "Yugansh Tyagi" and "Keshav Jha" were never accounts; their cards, photos and sources are
+  removed from the auth page marquee, which loops 9 cards at the same per-card speed (31 s).
+- **Blocked sends withheld (A5)** ships separately with migration `0013`.
+

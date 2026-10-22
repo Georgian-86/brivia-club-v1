@@ -143,12 +143,15 @@ landing all passed, app-shell 208.
 Gmail plus-address of the founder's inbox for confirmation emails (disposable inboxes did not receive them).
 Tooling: Playwright **and axe-core** at `/tmp/pw` (`npm install --prefix /tmp/pw playwright axe-core`).
 
+- **2026-10-22, release A of the polish wave live (D-072):** location fix, chat fit, notifications over chat, compact
+  account menu (bottom sheet on phones), Yugansh/Keshav cards removed. Founder: check "Use my location" and the
+  account menu on the real Mac (Safari) and phone. Next: A5 with `0013`, then part B (guided signup, interests only).
+
 ## 2. Live Supabase state (project `wfbddovczpfdrspmxgfo`, ap-south-1)
 
 - **2026-10-22:** `0012_polish_wave.sql` (sections C and D) is **applied** and verified read-only (D-075): Explore
   likes and saves, the private `resumes` bucket, resume messages, typing authorization, deletion covers resumes.
-  Blocked-send withholding (A5) will be `0013`. Live `brivia_notice_version()` is still `2026-10-20`: **`0011` is
-  still NOT applied** (re-checked 2026-10-22).
+  Blocked-send withholding (A5) will be `0013`. Live `brivia_notice_version()` is still `2026-10-20`: `0011` is **applied** (2026-10-22, verified: version `2026-10-05`, accepted after 2026-11-03).
 - **Corrected 2026-10-20 (D-070), verified read-only on the live project:** `0001`–`0006`, `0008`, `0009` and `0010`
   are applied and frozen (`0009` and `0010` on 2026-10-14 from `claude/jolly-edison-49xvza`; `0010` needs `0008`'s
   `brivia_tester`, so `0008` is live too). Live `brivia_notice_version()` = `2026-10-20`, and
