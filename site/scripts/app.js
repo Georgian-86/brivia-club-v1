@@ -19,7 +19,7 @@ import '../styles/app-navigation.css';
 import '../styles/discovery-filters.css';
 import '../styles/mobile-app.css';
 import '../styles/skeleton.css';
-import { supabase, rowToProfile, saveProfile, isPresetCoverUrl, onboardingStatus, sendSignal, fetchSignalQuota, isRateLimited, isStorageImageUrl, withoutCredentials, uploadMessageAttachment, removeMessageAttachment, uploadCommunityPostImage, removeCommunityPostImage, ImageProcessingError, compressAttachmentFiles, attachmentKind, reportMember, setSensitiveConsent, fetchSensitiveConsentAt, fetchMyInterests, fetchInterestNodes, uploadResume, removeResume, resumeSignedUrl, resumeInfo, clearResumePath } from './supabase.js';
+import { supabase, rowToProfile, saveProfile, isPresetCoverUrl, onboardingStatus, sendSignal, fetchSignalQuota, isRateLimited, isStorageImageUrl, withoutCredentials, uploadMessageAttachment, removeMessageAttachment, uploadCommunityPostImage, removeCommunityPostImage, ImageProcessingError, PHOTO_ERROR_MESSAGE, compressAttachmentFiles, attachmentKind, reportMember, setSensitiveConsent, fetchSensitiveConsentAt, fetchMyInterests, fetchInterestNodes, uploadResume, removeResume, resumeSignedUrl, resumeInfo, clearResumePath } from './supabase.js';
 import { areaShareBody, parseAreaBody, resumeShareAttachment, resumeMessageFields, RESUME_SHARE_BODY, NO_RESUME_HINT, RESUME_GONE_COPY, RESUME_SHARE_NOTE, AREA_SHARE_NOTE } from './quick-share.js';
 import { validateResume, readResumeHead, resumeMetaLine, formatResumeSize, resumeUploadErrorMessage, isMissingResumeStore, RESUME_FILE_NAME, REMOVE_RESUME_CONFIRM, REMOVE_FAILED_COPY, REPLACED_NOT_SAVED_COPY, OPEN_FAILED_COPY, COMING_SOON_COPY } from './resume-file.js';
 import { POPULAR_INTERESTS, INTEREST_CATALOG, LOOKING_FOR_CATALOG, taxonomyLabels, catalogValues, matchOptions } from './discovery-catalog.js';
@@ -2186,7 +2186,7 @@ const openProfileEditor = () => {
         <div class="profile-edit-wide profile-edit-readonly" data-profile-area><span>YOUR AREA</span><p>${escapeHtml(memberPlaceLabel || 'Not set yet')}</p><small class="profile-edit-helper">Change your area: coming soon. Other members only ever see a rough distance, never your area's name, unless you share it in a chat.</small></div>
         <div class="profile-edit-wide profile-edit-readonly"><span>SKILLS / INTERESTS</span><p>${escapeHtml(profile.skills || 'Pick interests in your profile setup')}</p><small class="profile-edit-helper">These come from your interests and passion points. Private interests are never shown.</small></div>
         <label class="profile-edit-wide"><span>LOOKING FOR</span><input name="lookingFor" list="profile-edit-looking-options" value="${escapeHtml(profile.lookingFor || '')}" placeholder="Search or type what you are looking for" /><datalist id="profile-edit-looking-options">${profileEditDatalist('lookingFor')}</datalist><small class="profile-edit-helper">Choose from suggestions or type your own.</small></label>
-        <label><span>PROFILE PHOTO</span><input name="photoFile" type="file" accept="image/*" aria-describedby="profile-photo-error" /><small class="media-inline-error" id="profile-photo-error" role="alert" hidden></small></label>
+        <label><span>PROFILE PHOTO</span><input name="photoFile" type="file" accept="image/*" aria-describedby="profile-photo-error profile-photo-status" /><small class="profile-edit-helper" id="profile-photo-status" role="status"></small><small class="media-inline-error" id="profile-photo-error" role="alert" hidden></small></label>
         <label><span>COVER PHOTO</span><input name="coverFile" type="file" accept="image/*" aria-describedby="profile-cover-error" /><small class="media-inline-error" id="profile-cover-error" role="alert" hidden></small></label>
       </div>
       <p class="profile-edit-feedback" id="profile-edit-feedback" role="status"></p>
@@ -2197,6 +2197,32 @@ const openProfileEditor = () => {
   const close = () => modal.remove();
   modal.querySelectorAll('[data-profile-edit-close]').forEach((button) => button.addEventListener('click', close));
   modal.addEventListener('click', (event) => { if (event.target === modal) close(); });
+  // "Frame your photo" (D-080): a picked photo opens the crop dialog first; only the framed square is ever uploaded.
+  // Cancel clears the pick, so nothing is uploaded. A file that cannot be decoded shows the inline photo error.
+  const photoInput = modal.querySelector('[name="photoFile"]');
+  const photoStatus = modal.querySelector('#profile-photo-status');
+  let framedPhoto = null;
+  photoInput?.addEventListener('change', async () => {
+    const picked = photoInput.files?.[0] || null;
+    const photoError = modal.querySelector('#profile-photo-error');
+    framedPhoto = null;
+    photoStatus.textContent = '';
+    photoError.hidden = true;
+    photoError.textContent = '';
+    if (!picked) return;
+    try {
+      const { openPhotoCrop } = await import('./photo-crop.js');
+      const framed = await openPhotoCrop(picked, { returnFocus: photoInput });
+      if (!framed) { photoInput.value = ''; return; }
+      framedPhoto = framed;
+      photoStatus.textContent = 'Photo framed. Save changes to use it.';
+    } catch (error) {
+      photoInput.value = '';
+      photoError.textContent = error instanceof ImageProcessingError ? error.message : PHOTO_ERROR_MESSAGE;
+      photoError.hidden = false;
+      photoInput.focus();
+    }
+  });
   modal.querySelector('#profile-edit-form')?.addEventListener('submit', async (event) => {
     event.preventDefault();
     const form = event.currentTarget;
@@ -2210,7 +2236,7 @@ const openProfileEditor = () => {
       experience: String(formData.get('experience') || '').trim(),
       lookingFor: String(formData.get('lookingFor') || '').trim(),
     };
-    const photoFile = form.querySelector('[name="photoFile"]')?.files?.[0] || null;
+    const photoFile = framedPhoto;
     const coverFile = form.querySelector('[name="coverFile"]')?.files?.[0] || null;
     if (!nextProfile.name) { feedback.textContent = 'Please add your name.'; return; }
     const photoError = form.querySelector('#profile-photo-error');

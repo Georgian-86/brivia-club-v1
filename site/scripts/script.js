@@ -730,6 +730,7 @@ let resetCover = () => {};
 let fillLooking = () => {};
 let profileCompletionPhotoUrl = '';
 let profileCompletionCoverUrl = '';
+let framedSignupPhoto = null; // the square the member framed in the crop dialog (photo-crop.js)
 
 const photoUpload = document.querySelector('[data-photo-upload]');
 if (photoUpload) {
@@ -742,9 +743,21 @@ if (photoUpload) {
   const defaultPhotoText = 'Optional · A clear photo helps people recognise you.';
   const imageExtension = /\.(jpg|jpeg|png|webp|gif|svg|avif|heic|heif|bmp|tif|tiff)$/i;
 
-  photoInput?.addEventListener('change', () => {
-    const file = photoInput.files?.[0];
-    if (!file) return;
+  photoInput?.addEventListener('change', async () => {
+    const picked = photoInput.files?.[0];
+    framedSignupPhoto = null;
+    if (!picked) return;
+    // "Frame your photo" (D-080): the member chooses the part shown in the circle; only that square is uploaded.
+    // Cancel clears the pick. A file the browser cannot decode skips the dialog and keeps the pick, so the submit
+    // shows the existing inline photo error (R12) before any account write.
+    let file = picked;
+    try {
+      const { openPhotoCrop } = await import('./photo-crop.js');
+      const framed = await openPhotoCrop(picked, { returnFocus: photoInput });
+      if (!framed) { resetPhoto(); return; }
+      framedSignupPhoto = framed;
+      file = framed;
+    } catch { /* undecodable: handled at submit */ }
     if (previewUrl) URL.revokeObjectURL(previewUrl);
     previewUrl = URL.createObjectURL(file);
     photoUpload.classList.add('has-file');
@@ -759,10 +772,11 @@ if (photoUpload) {
       photoPreview.textContent = 'FILE';
       photoPreview.style.backgroundImage = '';
     }
-    if (photoFileName) photoFileName.textContent = file.name;
+    if (photoFileName) photoFileName.textContent = picked.name;
   });
 
   resetPhoto = () => {
+    framedSignupPhoto = null;
     if (previewUrl) URL.revokeObjectURL(previewUrl);
     previewUrl = '';
     if (photoInput) photoInput.value = '';
@@ -2187,8 +2201,9 @@ signupForm?.addEventListener('submit', async (event) => {
   profile.phoneCountryCode = phoneCountryCode;
   profile.phoneNumber = phoneNumber;
   profile.phone = `${phoneCountryCode} ${phoneNumber}`.trim();
-  let photoFile = signupForm.querySelector('.photo-input')?.files?.[0] || null;
-  profile.photoName = photoFile?.name || '';
+  const pickedPhoto = signupForm.querySelector('.photo-input')?.files?.[0] || null;
+  let photoFile = pickedPhoto ? (framedSignupPhoto || pickedPhoto) : null;
+  profile.photoName = pickedPhoto?.name || '';
   const mediaErrors = { photo: signupForm.querySelector('#profile-photo-error'), cover: signupForm.querySelector('#profile-cover-error') };
   const setMediaError = (which, message) => {
     const node = mediaErrors[which];

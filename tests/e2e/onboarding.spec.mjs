@@ -1426,6 +1426,9 @@ try {
     check('live: the duplicate "STEP 04" eyebrow is hidden (the progress label says it)', () => assert.equal(eyebrowShown, false));
     const onePixelPng = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==', 'base64');
     await page.locator('.photo-input').setInputFiles({ name: 'me.png', mimeType: 'image/png', buffer: onePixelPng });
+    // D-080: a decodable photo opens "Frame your photo"; "Use photo" keeps the framed square.
+    await page.locator('[data-photo-crop-use]').click();
+    await page.waitForSelector('.photo-crop', { state: 'detached' });
     await finishStepFour(page);
     await page.waitForSelector('#auth-success:not([hidden])', { timeout: 15000 });
     const successCopy = (await page.locator('[data-auth-success-message]').textContent()).trim();
@@ -1470,6 +1473,8 @@ try {
     await page.locator('[data-signup-step="3"] .signup-next').click();
     await page.waitForSelector('[data-signup-step="4"]:not([hidden])');
     await page.locator('.photo-input').setInputFiles({ name: 'me.png', mimeType: 'image/png', buffer: Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==', 'base64') });
+    await page.locator('[data-photo-crop-use]').click();
+    await page.waitForSelector('.photo-crop', { state: 'detached' });
     await finishStepFour(page);
     await page.waitForSelector('#auth-success:not([hidden])', { timeout: 15000 });
     const login = async () => {

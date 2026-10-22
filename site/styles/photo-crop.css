@@ -1,0 +1,48 @@
+/* "Frame your photo" (photo-crop.js). Tokens only (tokens.css): no raw colours, no font stacks.
+   Cream stage, deep-wine controls, 44 px targets, visible focus. A centred card from 601 px; a full-screen sheet on
+   phones. Reduced motion: a fade only. */
+.photo-crop{position:fixed;z-index:400;inset:0;display:grid;place-items:center;padding:var(--space-4);background:color-mix(in srgb,var(--color-ink) 70%,transparent);overscroll-behavior:contain}
+.photo-crop-dialog{box-sizing:border-box;display:flex;flex-direction:column;gap:var(--space-3);width:min(600px,100%);max-height:calc(100dvh - 2 * var(--space-4));overflow:auto;padding:var(--space-6) var(--space-6) var(--space-5);border:1px solid var(--color-line);border-radius:var(--radius-l);background:var(--color-card-paper);color:var(--color-ink);box-shadow:var(--shadow-2);font-family:var(--font-body);animation:photo-crop-in var(--motion-base) var(--ease) both}
+.photo-crop-kicker{margin:0;color:var(--color-wine-soft);font-size:var(--text-12);font-weight:700;letter-spacing:.15em}
+.photo-crop-title{margin:0;color:var(--color-wine-deep);font:400 var(--text-32)/1.05 var(--font-heading);letter-spacing:-.02em}
+.photo-crop-help{margin:0;color:var(--color-ink-soft);font-size:var(--text-14);line-height:1.45}
+.photo-crop-body{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:var(--space-5);align-items:center;margin-top:var(--space-2)}
+.photo-crop-stage{position:relative;width:min(100%,380px);aspect-ratio:1;justify-self:center;overflow:hidden;border-radius:var(--radius-m);background:var(--color-cream);box-shadow:inset 0 0 0 1px var(--color-line);cursor:grab;touch-action:none;user-select:none;-webkit-user-select:none}
+.photo-crop-stage.is-dragging{cursor:grabbing}
+.photo-crop-stage:focus{outline:none}
+.photo-crop-stage:focus-visible{outline:3px solid var(--color-wine);outline-offset:3px}
+.photo-crop-canvas{position:absolute;inset:0;width:100%;height:100%;display:block}
+.photo-crop-mask{position:absolute;inset:7%;border-radius:50%;box-shadow:0 0 0 2px var(--color-wine),0 0 0 999px color-mix(in srgb,var(--color-cream) 74%,transparent);pointer-events:none}
+.photo-crop-side{display:flex;flex-direction:column;align-items:center;gap:var(--space-2)}
+.photo-crop-preview{width:88px;height:88px;border-radius:50%;background:var(--color-cream);box-shadow:0 0 0 2px var(--color-wine),0 0 0 6px var(--color-card-paper),0 0 0 7px var(--color-line)}
+.photo-crop-preview-label{margin:0;color:var(--color-wine-soft);font-size:var(--text-12);font-weight:700;letter-spacing:.12em;text-transform:uppercase}
+.photo-crop-zoom{display:grid;grid-template-columns:44px minmax(0,1fr) 44px;gap:var(--space-2);align-items:center}
+.photo-crop-step{display:grid;place-items:center;width:44px;height:44px;padding:0;border:1px solid var(--color-line);border-radius:50%;background:var(--color-cream);color:var(--color-wine);cursor:pointer}
+.photo-crop-step:hover{border-color:var(--color-wine)}
+.photo-crop-range{width:100%;min-height:44px;margin:0;accent-color:var(--color-wine);cursor:pointer}
+.photo-crop-actions{display:flex;justify-content:flex-end;gap:var(--space-3);margin-top:var(--space-2)}
+.photo-crop-cancel,.photo-crop-use{min-height:44px;min-width:120px;padding:0 var(--space-5);border-radius:var(--radius-pill);font:700 var(--text-14) var(--font-body);letter-spacing:.04em;cursor:pointer}
+.photo-crop-cancel{border:1px solid var(--color-line);background:transparent;color:var(--color-wine)}
+.photo-crop-cancel:hover{border-color:var(--color-wine)}
+.photo-crop-use{border:1px solid var(--color-wine);background:var(--color-wine);color:var(--color-cream)}
+.photo-crop-use:hover{background:var(--color-wine-deep)}
+.photo-crop-use:disabled{opacity:.6;cursor:wait}
+.photo-crop-dialog button:focus-visible,.photo-crop-range:focus-visible{outline:2px solid var(--color-wine);outline-offset:3px}
+body.photo-crop-open{overflow:hidden}
+
+@keyframes photo-crop-in{from{opacity:0}to{opacity:1}}
+@keyframes photo-crop-rise{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:none}}
+@media (prefers-reduced-motion:no-preference){.photo-crop-dialog{animation-name:photo-crop-rise}}
+
+/* Phones: a full-screen sheet. The stage takes the width, but leaves room for the controls on short screens. */
+@media (max-width:600px){
+  .photo-crop{padding:0;place-items:stretch}
+  .photo-crop-dialog{width:100%;max-height:none;height:100dvh;padding:var(--space-5) var(--space-4) calc(var(--space-4) + env(safe-area-inset-bottom,0px));border:0;border-radius:0;box-shadow:none}
+  .photo-crop-title{font-size:var(--text-24)}
+  .photo-crop-body{grid-template-columns:1fr;gap:var(--space-3)}
+  .photo-crop-stage{width:min(100%,max(200px,calc(100dvh - 380px)))}
+  .photo-crop-side{flex-direction:row;justify-content:center;gap:var(--space-3)}
+  .photo-crop-preview{width:56px;height:56px}
+  .photo-crop-actions{margin-top:auto}
+  .photo-crop-cancel,.photo-crop-use{flex:1;min-width:0}
+}

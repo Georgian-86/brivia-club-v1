@@ -827,28 +827,36 @@ try {
   await hardPage.waitForSelector('#profile-photo-editor', { timeout: 8000 });
   await hardPage.locator('#profile-photo-editor').click();
   await hardPage.waitForSelector('#profile-edit-form');
-  // 8f0. An unprocessable photo shows the inline error beside the field; nothing is uploaded or written.
+  // 8f0. An unprocessable photo shows the inline error beside the field as soon as it is picked (the crop dialog
+  // cannot decode it, D-080): the pick is cleared and nothing is uploaded or written.
   const editCallsBefore = hard.calls.length;
   await hardPage.setInputFiles('#profile-edit-form [name="photoFile"]', { name: 'broken.png', mimeType: 'image/png', buffer: Buffer.from('this is not an image') });
-  await hardPage.locator('#profile-edit-form [type="submit"]').click();
   await hardPage.waitForFunction(() => !document.querySelector('#profile-photo-error')?.hidden, null, { timeout: 8000 });
-  const editError = await hardPage.evaluate(() => ({ text: document.querySelector('#profile-photo-error')?.textContent, linked: document.querySelector('[name="photoFile"]')?.getAttribute('aria-describedby') }));
+  const editError = await hardPage.evaluate(() => ({ text: document.querySelector('#profile-photo-error')?.textContent, linked: document.querySelector('[name="photoFile"]')?.getAttribute('aria-describedby'), files: document.querySelector('[name="photoFile"]')?.files.length, dialog: Boolean(document.querySelector('.photo-crop')) }));
   const editWrites = hard.calls.slice(editCallsBefore).filter((c) => c.method !== 'GET' && (c.path.startsWith('/storage/') || c.path === '/rest/v1/profiles'));
-  check(`unprocessable profile photo: inline error linked by aria-describedby, nothing uploaded (${JSON.stringify(editError)})`, () => {
+  check(`unprocessable profile photo: inline error linked by aria-describedby, no crop dialog, pick cleared, nothing uploaded (${JSON.stringify(editError)})`, () => {
     assert.equal(editError.text, "We couldn't process this photo. Try a JPG or PNG.");
-    assert.equal(editError.linked, 'profile-photo-error');
+    assert.ok(editError.linked.split(' ').includes('profile-photo-error'));
+    assert.equal(editError.files, 0);
+    assert.equal(editError.dialog, false);
     assert.equal(editWrites.length, 0);
   });
+  // D-080: a decodable photo opens "Frame your photo"; "Use photo" keeps the framed square.
+  const framePhoto = async (name) => {
+    await hardPage.setInputFiles('#profile-edit-form [name="photoFile"]', { name, mimeType: 'image/png', buffer: Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=', 'base64') });
+    await hardPage.locator('[data-photo-crop-use]').click();
+    await hardPage.waitForSelector('.photo-crop', { state: 'detached' });
+  };
   // 8f1. A good photo with an unprocessable cover: both are compressed before either is uploaded, so nothing is stored.
   const coverCallsBefore = hard.calls.length;
-  await hardPage.setInputFiles('#profile-edit-form [name="photoFile"]', { name: 'ok.png', mimeType: 'image/png', buffer: Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=', 'base64') });
+  await framePhoto('ok.png');
   await hardPage.setInputFiles('#profile-edit-form [name="coverFile"]', { name: 'bad-cover.png', mimeType: 'image/png', buffer: Buffer.from('this is not an image') });
   await hardPage.locator('#profile-edit-form [type="submit"]').click();
   await hardPage.waitForFunction(() => !document.querySelector('#profile-cover-error')?.hidden, null, { timeout: 8000 });
   const coverWrites = hard.calls.slice(coverCallsBefore).filter((c) => c.method !== 'GET' && (c.path.startsWith('/storage/') || c.path === '/rest/v1/profiles'));
   check('bad cover: inline cover error and the good photo was not uploaded either (no orphan)', () => assert.equal(coverWrites.length, 0));
   await hardPage.setInputFiles('#profile-edit-form [name="coverFile"]', []);
-  await hardPage.setInputFiles('#profile-edit-form [name="photoFile"]', { name: 'me.png', mimeType: 'image/png', buffer: Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=', 'base64') });
+  await framePhoto('me.png');
   await hardPage.locator('#profile-edit-form [type="submit"]').click();
   // Settles when the editor shows a result, or closes (the old data-URL fallback "succeeded" and closed it).
   await hardPage.waitForFunction(() => { const t = document.querySelector('#profile-edit-feedback')?.textContent || ''; return !document.querySelector('#profile-edit-form') || (t && !/Saving/.test(t)); }, null, { timeout: 8000 });

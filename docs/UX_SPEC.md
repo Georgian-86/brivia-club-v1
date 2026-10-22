@@ -296,6 +296,20 @@ From a member's point of view (D-015..D-018):
 
 ### E. Media (R12, Iteration 4)
 - Every image upload (signup photo/cover, profile editor, chat image, community post) is re-encoded to JPEG (max 1280 px, EXIF dropped). If that fails (decode error, no 2d context, null blob) the original is NEVER used: the action stops and the inline message "We couldn't process this photo. Try a JPG or PNG." shows beside the field (`role="alert"`, linked by `aria-describedby`), in the chat composer, or in the post composer. Not a toast. Signup stops before any account or profile write and returns to step 4. GIFs pass through unchanged.
+- **Frame your photo (D-080).** Picking a profile photo (Profile → EDIT PROFILE, and signup step 4) opens a modal
+  dialog before anything is saved (`photo-crop.js`; the maths is pure in `photo-crop-math.js`, no library). Kicker
+  "PROFILE PHOTO", heading **"Frame your photo"** in Bodoni Moda, help line "Drag to choose what shows in the circle. Zoom
+  with the slider, a pinch or the mouse wheel. Arrow keys move it; + and − zoom." The photo sits on a cream square stage
+  under a circular wine-ringed mask (the area outside the circle is veiled in cream), with a small live round preview.
+  Drag (mouse, pen, one finger), pinch, the wheel, the 1x–4x slider with − / + buttons, arrow keys (Shift for bigger
+  steps) and + / − all work. At 1x the photo's short side fills the circle; the photo can never be moved or zoomed so the
+  circle shows empty space. **Use photo** (wine, primary) produces an 800 × 800 JPEG of the framed square (decoded with
+  EXIF orientation applied), which then goes through the usual re-encode and upload; **Cancel** and Escape clear the
+  pick and nothing is uploaded. `role="dialog"`, `aria-modal`, labelled by the heading; focus starts on the stage and is
+  trapped; it returns to the photo field on close; every control is at least 44 px; reduced motion fades (no rise). It is
+  a centred card from 601 px and a full-screen sheet on phones. A file the browser cannot decode skips the dialog and
+  shows the inline photo error (profile editor at once; signup on submit, as before). Verified by
+  `tests/e2e/profile-media.spec.mjs` (320–1920, axe at 375 and 1440).
 - Chat: choosing a video shows "Videos can include the place they were filmed. Send only if you're comfortable sharing that." inline above the composer, before Send; hidden for other attachments.
 - Replacing a profile photo or cover removes the previous object only if it is the member's own file in the same bucket (never a preset cover or another member's path); its error is ignored.
 
