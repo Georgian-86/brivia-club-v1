@@ -30,3 +30,9 @@ test('the marquee keeps the same speed per card (38s for 11 cards becomes 31s fo
   const css = readFileSync('site/styles/auth-polish.css', 'utf8');
   assert.match(css, /\.community-track\{[^}]*animation:community-cards-slide 31s linear infinite/);
 });
+
+test('the marquee caption carries no head count (founder ruling)', () => {
+  const note = authHtml.match(/<p class="community-preview-note">([^<]*)<\/p>/)?.[1];
+  assert.equal(note, 'PEOPLE LIKE YOU · OPEN POSSIBILITIES');
+  assert.doesNotMatch(authHtml, /THREE PEOPLE/i);
+});
