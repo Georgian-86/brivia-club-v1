@@ -1466,3 +1466,26 @@ controls (a tester or a seeded test member), never a real member, so no new expo
 - **Proof.** Unit tests for the card markup and reaction helpers; `tests/e2e/explore-cards.spec.mjs` (columns, 4:5
   media, wine bars and contrast computed, targets, double tap, rollback, persistence across reload, share, detail,
   deep link, skeletons, axe at 375 and 1440). Screenshots at 320, 375, 390, 768, 1280, 1440 and 1920.
+
+## D-075: Resumes, chat quick-share and the typing indicator (release D of the polish wave, 2026-10-22)
+
+- **Resume storage.** One PDF per member at `resumes/<uid>/resume.pdf` in a private bucket (5 MB, PDF only, enforced by
+  Storage and checked in the client: type, size and the `%PDF` magic bytes). `profiles.resume_path` is readable only by
+  the owner. Replace and remove are supported; a failed profile write after a first upload rolls the file back.
+  Account deletion counts a stored resume as a member file (the client removes it first).
+- **Sharing a resume is a message, not a link.** "Share my resume" sends a `resume` message that carries only the
+  sender's own path. The recipient opens it with a 60 s signed URL created on open and never stored. Storage allows
+  that only while the pair can still message (`brivia_can_message`: matched, not blocked either way, same world), so an
+  unmatch or block closes every old share at once. Copy: "They'll always see your latest resume."
+- **Sharing your area is text only.** "Share my area" sends the member's own `place_label` (with "about a 2 km area"
+  unless it is city-wide) after a confirm sheet. Never coordinates or a cell id (ORBIT section 4.1 bullet).
+- **Typing indicator.** A Realtime broadcast on the private channel `typing:<lower id>:<higher id>`, authorised by
+  `realtime.messages` policies: matched, same world, and the caller has not blocked the other. A blocked member's join
+  still succeeds, so a block is never revealed; nothing reaches them or from them. The client never joins for a
+  blocked pair and drops typing at once on a block. Payload is only `{ typing: boolean }`. One re-join is attempted when
+  the tab becomes visible or the network returns; a refused join is never retried in a loop.
+- **0012 split.** 0012 went live with sections C and D only, because C's client was already live without its tables
+  (Like and Save were hidden). A5 (blocked sends withheld) moves to `0013`.
+- **Open question for the founder/counsel:** whether `privacy.html` should list the optional resume. The notice
+  version is unchanged in this wave.
+

@@ -412,13 +412,16 @@ select has_function_privilege('authenticated', 'public.brivia_notice_accepted(te
 Then sign up one test account on the live site and confirm the 18+ step succeeds. Local proof:
 `supabase/tests/p0f-notice-restore.test.sql` (it simulates a date after 2026-11-03).
 
-## 0012: the polish wave (not yet applied)
+## 0012: the polish wave (APPLIED 2026-10-22, sections C and D; frozen)
 
-Filled by later tasks; each subsection is written by the task named in it.
+Applied by the founder in the SQL editor on 2026-10-22 and verified read-only the same day: both reaction tables with
+three policies each, the `resumes` bucket (`false | 5242880 | {application/pdf}`), `profiles.resume_path` and both
+checks, the four resume policies, the two typing policies on `realtime.messages`, `delete_my_account` covering
+`resumes`, and the attachments policy carrying `message_type <> 'resume'`. Never edit or re-run it.
 
 ### A5: blocked sends are withheld
 
-(empty)
+Moved to `0013` so 0012 could go live first (C's client was already live without its tables).
 
 ### C: post likes and saves
 
