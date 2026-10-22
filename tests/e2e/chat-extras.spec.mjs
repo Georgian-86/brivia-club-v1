@@ -635,6 +635,30 @@ try {
       }
     });
 
+    await scenario('Q4 narrow resume card', async () => {
+      // VFIX 2: at 320x690 "Open" never overlaps "Resume · PDF", the subtitle takes at most two lines, nothing leaves the bubble.
+      for (const [width, height] of [[320, 690], [360, 740], [375, 812]]) {
+        const { context, page } = await openThread(320, { messages: [hello, theirResume] });
+        await page.setViewportSize({ width, height });
+        await page.waitForTimeout(250);
+        const m = await page.evaluate(() => {
+          const card = document.querySelector('#chat-messages .message-resume');
+          const rect = (sel) => { const r = card.querySelector(sel).getBoundingClientRect(); return { l: r.left, t: r.top, r: r.right, b: r.bottom, h: r.height }; };
+          const title = rect('.message-resume-title'); const sub = rect('.message-resume-sub'); const open = rect('[data-resume-open]');
+          const c = card.getBoundingClientRect();
+          const lh = parseFloat(getComputedStyle(card.querySelector('.message-resume-sub')).lineHeight);
+          const hit = (a, b) => a.l < b.r - 0.5 && b.l < a.r - 0.5 && a.t < b.b - 0.5 && b.t < a.b - 0.5;
+          return { overlapTitle: hit(title, open), overlapSub: hit(sub, open), subLines: Math.round(sub.h / lh), titleClipped: (() => { const t = card.querySelector('.message-resume-title'); return t.scrollWidth > t.clientWidth + 1; })(), inside: [title, sub, open].every((x) => x.l >= c.left - 0.5 && x.r <= c.right + 0.5), openH: open.h, scroll: document.documentElement.scrollWidth - innerWidth };
+        });
+        check(`Q4 ${width}x${height}: Open never overlaps the title or subtitle, the subtitle takes at most 2 lines, all stays in the card (${JSON.stringify(m)})`, () => {
+          assert.equal(m.overlapTitle, false); assert.equal(m.overlapSub, false); assert.equal(m.titleClipped, false, 'title text runs past its box');
+          assert.ok(m.subLines <= 2, `subtitle ${m.subLines} lines`); assert.equal(m.inside, true);
+          assert.ok(m.openH >= 43.5); assert.equal(m.scroll, 0);
+        });
+        await context.close();
+      }
+    });
+
     await scenario('Q4 bubbles', async () => {
       for (const width of [375, 1440]) {
         const mark0 = st.calls.length;
