@@ -181,10 +181,7 @@ Tooling: Playwright **and axe-core** at `/tmp/pw` (`npm install --prefix /tmp/pw
 
 ## 3. What to do next (in order)
 
-**Urgent, before 2026-11-03 (D-070):** in the SQL editor as `postgres`, apply `0011_notice_version_2026_10_05.sql`
-and run its read-only check
-`select public.brivia_notice_version(), public.brivia_notice_accepted('2026-10-05', '2026-11-10');` → `2026-10-05`, `t`.
-Then close the open test world
+**Done 2026-10-22:** `0011` is applied (D-070). Then close the open test world
 (`update public.brivia_world_switch set open_test_world = false, changed_at = now();`) and purge the test members
 before real launch. Item 0 below is partly done: `0008`, `0009` and `0010` are live (the seed and tester rows were not
 re-checked).
