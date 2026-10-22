@@ -585,11 +585,13 @@ export const initGuidedSignup = ({
   return {
     show,
     // Re-points the flow (a Google return, a returning member, a fresh visitor) and shows `screen`.
-    open: ({ path: p = 'email', hasSession: signed = false, prefill: values = {}, resumeAt: at = null, email = '' } = {}, screen = 'welcome') => {
+    // message: a line to show on that screen (a save that failed after the email was confirmed).
+    open: async ({ path: p = 'email', hasSession: signed = false, prefill: values = {}, resumeAt: at = null, email = '' } = {}, screen = 'welcome', { message = '' } = {}) => {
       cancelGeo();
       Object.assign(state, { path: p, hasSession: signed, resumeAt: at, email });
       Object.assign(a, emptyAnswers(), values);
-      return show(screen);
+      await show(screen);
+      if (message) setError(message);
     },
     get screen() { return state.screen; },
     get answers() { return a; },

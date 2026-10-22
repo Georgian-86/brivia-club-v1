@@ -6,6 +6,9 @@
 // mismatched passwords blocked, Area with A1's locateOnce (granted: the status line; denied: fallbackCopy and the city
 // list), Interests (0 picks disables Continue, the 13th is refused, the tray animates, not under reduced motion,
 // private interests never offered), axe clean, 44 px targets, computed text contrast >= 4.5:1, no sideways scroll.
+// Submit (B3): signUp at the end -> profile -> declare_adult (2026-10-05) -> set_home_* -> set_member_interests (20
+// points, even split); Verify without a session (pending profile, no coordinates); Google skips Account; a returning
+// member resumes at the first unfinished screen; VITE_SIGNUP_FLOW=classic shows the 4-step form.
 import { spawn } from 'node:child_process';
 import assert from 'node:assert/strict';
 import { fileURLToPath } from 'node:url';
@@ -215,7 +218,14 @@ const audit = (page, rootSel = '#guided-signup') => page.evaluate((sel) => {
   return { small, low, overflow: document.documentElement.scrollWidth - window.innerWidth };
 }, rootSel);
 const shot = async (page, name, settle = 450) => { if (!SHOTS) return; if (settle) await page.waitForTimeout(settle); await page.screenshot({ path: path.join(SHOTS, `${name}.png`) }); };
+// Let finite transitions (screen fade-in, the button's disabled -> enabled colour) settle first: a loaded machine
+// otherwise measures a half-faded heading. Infinite animations (the current bubble's pulse) are not awaited.
+const settleAnimations = (page) => page.evaluate(() => Promise.race([
+  Promise.all(document.getAnimations().filter((x) => x.effect?.getComputedTiming().iterations !== Infinity).map((x) => x.finished.catch(() => {}))),
+  new Promise((r) => setTimeout(r, 3000)),
+]));
 const auditScreen = async (page, tag) => {
+  await settleAnimations(page);
   const a = await audit(page);
   check(`${tag}: 44 px targets (${a.small.join(', ')})`, () => assert.deepEqual(a.small, []));
   check(`${tag}: text contrast >= 4.5:1 (${a.low.join(', ')})`, () => assert.deepEqual(a.low, []));
@@ -476,6 +486,237 @@ try {
     check(`reduced motion: the pick lands in the tray without a flying chip and the current bubble does not pulse (${JSON.stringify(r)})`, () => { assert.equal(r.ghosts, 0); assert.equal(r.tray, 1); assert.equal(r.glow, 'none'); });
     await context.close();
   }
+  // ================================ B3: the answers save through the existing pipeline ================================
+  // Walks from the current screen to the Finish button. opts: { area: 'geo' | 'city', picks }.
+  const answerRest = async (page, from, { area = 'city', picks = ['Chess', 'Guitar', 'Hackathons'], name = 'Gia Guided' } = {}) => {
+    const order = ['account', 'adult', 'name', 'details', 'area', 'interests'];
+    for (const screen of order.slice(order.indexOf(from))) {
+      await waitScreen(page, screen);
+      if (screen === 'account') {
+        await page.locator('input[name="guided-email"]').fill(EMAIL);
+        await page.locator('input[name="guided-password"]').fill(PASSWORD);
+        await page.locator('input[name="guided-password-confirm"]').fill(PASSWORD);
+      } else if (screen === 'adult') {
+        await page.locator('input[name="guided-adult"]').check();
+      } else if (screen === 'name') {
+        await page.locator('input[name="guided-name"]').fill(name);
+      } else if (screen === 'details') {
+        await page.locator('input[name="guided-phone"]').fill('98765 43210');
+        await page.locator('.guided-segment[data-gender="Female"]').click();
+      } else if (screen === 'area') {
+        if (area === 'geo') await page.locator('[data-guided-geo]').click();
+        else {
+          await page.locator('input[name="guided-city"]').fill('Pune');
+          await page.waitForSelector('.guided-cities button[data-place="in-pune"]', { timeout: 4000 });
+          await page.locator('.guided-cities button[data-place="in-pune"]').click();
+        }
+        await page.waitForFunction(() => !document.querySelector('[data-guided-next]').disabled, null, { timeout: 4000 }).catch(() => {});
+      } else if (screen === 'interests') {
+        await page.waitForSelector('.guided-option', { timeout: 5000 });
+        for (const label of picks) { await page.locator('.guided-option', { hasText: label }).first().click(); await page.waitForTimeout(40); }
+        await page.waitForTimeout(300);
+        return;
+      }
+      await page.locator('[data-guided-next]').click();
+    }
+  };
+  const order = (calls, list) => list.map((test) => calls.findIndex(test));
+  const isProfileWrite = (c) => c.path === '/rest/v1/profiles' && (c.method === 'POST' || c.method === 'PATCH');
+  const rpcAt = (name) => (c) => c.path === `/rest/v1/rpc/${name}`;
+
+  // ---- Email path, signup returns a session: signUp -> profile -> declare_adult -> set_home_location -> interests ----
+  for (const viewport of [{ width: 1440, height: 900 }, { width: 375, height: 812 }]) {
+    const w = viewport.width;
+    const mobile = w < 800;
+    const context = await browser.newContext({ viewport, isMobile: mobile, hasTouch: mobile });
+    await scriptGeo(context, 'ok');
+    const { state, calls } = await setup(context);
+    const page = await context.newPage();
+    const errors = [];
+    page.on('pageerror', (e) => errors.push(e.message));
+    await page.goto(`${BASE}/auth.html#signup`, { waitUntil: 'load' });
+    await waitScreen(page, 'welcome');
+    await page.locator('[data-guided-email]').click();
+    await answerRest(page, 'account', { area: 'geo' });
+    await page.locator('[data-guided-next]').click();
+    const revealed = await waitScreen(page, 'reveal', 8000);
+    const at = order(calls, [(c) => c.path === '/auth/v1/signup', isProfileWrite, rpcAt('declare_adult'), rpcAt('set_home_location'), rpcAt('set_member_interests')]);
+    const signup = JSON.parse(calls.find((c) => c.path === '/auth/v1/signup')?.body || '{}');
+    const declare = JSON.parse(calls.find(rpcAt('declare_adult'))?.body || '{}');
+    const loc = JSON.parse(calls.find(rpcAt('set_home_location'))?.body || '{}');
+    const items = JSON.parse(calls.find(rpcAt('set_member_interests'))?.body || '{}').p_items || [];
+    const leaked = calls.filter((c) => (COORD_RE.test(c.url) || COORD_RE.test(c.body)) && !c.path.endsWith('/set_home_location'));
+    const stored = await page.evaluate(() => JSON.stringify({ ...localStorage, ...sessionStorage }));
+    check(`${w} submit: the account is created at the end, then profile -> declare_adult -> set_home_location -> set_member_interests (${at.join(' < ')})`, () => {
+      assert.equal(revealed, true); assert.ok(at.every((i) => i >= 0)); assert.deepEqual([...at].sort((x, y) => x - y), at);
+      assert.equal(signup.email, EMAIL); assert.equal(signup.password, PASSWORD);
+    });
+    check(`${w} submit: declare_adult sends notice 2026-10-05; the location only in its own body; 3 picks save as 7/7/6 (20 points)`, () => {
+      assert.deepEqual(declare, { p_notice_version: '2026-10-05' });
+      assert.ok(Number.isFinite(loc.lat) && Number.isFinite(loc.lng)); assert.equal(leaked.length, 0); assert.ok(!COORD_RE.test(stored));
+      assert.deepEqual(items.map((i) => i.points), [7, 7, 6]); assert.equal(items.reduce((s, i) => s + i.points, 0), 20);
+      assert.deepEqual(items.map((i) => i.interest_id), ['games.board.chess', 'music.instruments.guitar', 'tech.events.hackathons']);
+      assert.ok(items.every((i) => i.mode === 'play'));
+    });
+    check(`${w} submit: phone digits, country code and gender on the member's own row (${state.profile?.phone_number}, ${state.profile?.gender})`, () => {
+      assert.equal(state.profile.id, ME); assert.equal(state.profile.name, 'Gia Guided'); assert.equal(state.profile.phone_number, '9876543210');
+      assert.equal(state.profile.phone_country_code, '+91'); assert.equal(state.profile.phone, '+91 9876543210'); assert.equal(state.profile.gender, 'Female');
+      assert.ok(!('password' in state.profile));
+    });
+    const u = await ui(page);
+    const hostText = await page.locator('[data-guided-host]').innerText();
+    await shot(page, `${w}-08-reveal`);
+    check(`${w} Reveal: "You're in, Gia.", every bubble done, no digits, no Back`, () => {
+      assert.equal(u.title, "You're in, Gia."); assert.ok(u.bubbles.every((b) => b.endsWith(':done'))); assert.equal(u.back, false);
+      assert.ok(!/\d/.test(hostText), hostText); assert.equal(u.primaries, 1);
+    });
+    await auditScreen(page, `${w} reveal`);
+    await page.locator('[data-guided-next]').click();
+    const toApp = await page.waitForURL(/\/app\.html/, { timeout: 5000 }).then(() => true).catch(() => false);
+    check(`${w} "See my deck" goes to /app.html`, () => assert.equal(toApp, true));
+    check(`${w} submit: no page errors (${errors.join(' | ')})`, () => assert.deepEqual(errors, []));
+    await context.close();
+  }
+
+  // ---- Email path with confirmation on: no session -> Verify; only the pending profile, never coordinates ----
+  for (const viewport of [{ width: 1440, height: 900 }, { width: 375, height: 812 }]) {
+    const w = viewport.width;
+    const mobile = w < 800;
+    const context = await browser.newContext({ viewport, isMobile: mobile, hasTouch: mobile });
+    await scriptGeo(context, 'ok');
+    const { calls } = await setup(context, { confirm: true });
+    const page = await context.newPage();
+    await page.goto(`${BASE}/auth.html#signup`, { waitUntil: 'load' });
+    await waitScreen(page, 'welcome');
+    await page.locator('[data-guided-email]').click();
+    await answerRest(page, 'account', { area: 'geo' });
+    await page.locator('[data-guided-next]').click();
+    const verified = await waitScreen(page, 'verify', 8000);
+    const u = await ui(page);
+    const pending = await page.evaluate(() => localStorage.getItem('brivia-pending-profile'));
+    const stored = await page.evaluate(() => JSON.stringify({ ...localStorage, ...sessionStorage }));
+    const p = JSON.parse(pending || '{}');
+    check(`${w} confirmation on: Verify "Check your email." with the address, all bubbles done, no actions`, () => {
+      assert.equal(verified, true); assert.equal(u.title, 'Check your email.'); assert.match(u.text, new RegExp(EMAIL.replace(/\./g, '\\.')));
+      assert.ok(u.bubbles.every((b) => b.endsWith(':done'))); assert.equal(u.back, false);
+    });
+    check(`${w} confirmation on: the pending profile keeps interests (20 points), adultDeclared and the KIND of area, no coordinates, no password`, () => {
+      assert.equal(p.adultDeclared, true); assert.deepEqual(p.orbit, { kind: 'geo' }); assert.equal(p.interests.reduce((s, i) => s + i.points, 0), 20);
+      assert.equal(p.phoneNumber, '9876543210'); assert.equal(p.gender, 'Female');
+      assert.ok(!COORD_RE.test(stored)); assert.ok(!/correct horse/.test(stored));
+      assert.equal(calls.filter((c) => c.path.startsWith('/rest/v1/rpc/')).length, 0);
+    });
+    await shot(page, `${w}-09-verify`);
+    await auditScreen(page, `${w} verify`);
+    await context.close();
+  }
+
+  // ---- signUp refused (the email has an account): back on Account with the reason ----
+  {
+    const context = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+    await setup(context, { signupError: true });
+    const page = await context.newPage();
+    await page.goto(`${BASE}/auth.html#signup`, { waitUntil: 'load' });
+    await waitScreen(page, 'welcome');
+    await page.locator('[data-guided-email]').click();
+    await answerRest(page, 'account');
+    await page.locator('[data-guided-next]').click();
+    const back = await waitScreen(page, 'account', 8000);
+    const u = await ui(page);
+    check(`signUp refused: Account again with a line (${u.error})`, () => { assert.equal(back, true); assert.ok(u.error.length > 5); });
+    await context.close();
+  }
+
+  // ---- Google return: lands on the guided 18+ screen, "Step 1 of 5", name prefilled, no account step, no signUp ----
+  for (const viewport of [{ width: 1440, height: 900 }, { width: 375, height: 812 }]) {
+    const w = viewport.width;
+    const mobile = w < 800;
+    const context = await browser.newContext({ viewport, isMobile: mobile, hasTouch: mobile });
+    const { state, calls } = await setup(context, { signedIn: true, provider: 'google', meta: { full_name: 'Gabe Google' } });
+    const page = await context.newPage();
+    await page.goto(`${BASE}/auth.html?complete-profile=1`, { waitUntil: 'load' });
+    const landed = await waitScreen(page, 'adult', 8000);
+    let u = await ui(page);
+    check(`${w} Google: lands on 18+ at "Step 1 of 5", bubbles without Account`, () => {
+      assert.equal(landed, true); assert.equal(u.label, 'Step 1 of 5');
+      assert.deepEqual(u.bubbles, ['adult:current', 'name:pending', 'details:pending', 'area:pending', 'interests:pending']);
+    });
+    await page.locator('[data-guided-back]').click();
+    await waitScreen(page, 'welcome');
+    u = await ui(page);
+    check(`${w} Google: Back from 18+ goes to Welcome (signed in), never to an account screen`, () => { assert.match(u.text, /Welcome back/); assert.match(u.text, /Sign out/); });
+    await page.locator('[data-guided-continue]').click();
+    await waitScreen(page, 'adult');
+    await page.locator('input[name="guided-adult"]').check();
+    await page.locator('[data-guided-next]').click();
+    await waitScreen(page, 'name');
+    const prefilled = await page.locator('input[name="guided-name"]').inputValue();
+    u = await ui(page);
+    check(`${w} Google: name prefilled (${prefilled}), "Step 2 of 5"`, () => { assert.equal(prefilled, 'Gabe Google'); assert.equal(u.label, 'Step 2 of 5'); });
+    await page.locator('[data-guided-next]').click();
+    await answerRest(page, 'details', { area: 'city', picks: ['Badminton'] });
+    await page.locator('[data-guided-next]').click();
+    const revealed = await waitScreen(page, 'reveal', 8000);
+    const at = order(calls, [isProfileWrite, rpcAt('declare_adult'), rpcAt('set_home_city'), rpcAt('set_member_interests')]);
+    const items = JSON.parse(calls.find(rpcAt('set_member_interests'))?.body || '{}').p_items || [];
+    check(`${w} Google: no signUp; profile -> declare_adult -> set_home_city -> interests (${at.join(' < ')}); one pick holds 20`, () => {
+      assert.equal(revealed, true); assert.equal(calls.filter((c) => c.path === '/auth/v1/signup').length, 0);
+      assert.ok(at.every((i) => i >= 0)); assert.deepEqual([...at].sort((x, y) => x - y), at);
+      assert.deepEqual(JSON.parse(calls.find(rpcAt('set_home_city')).body), { p_place_id: 'in-pune' });
+      assert.deepEqual(items, [{ interest_id: 'sports.racket.badminton', points: 20, mode: 'play' }]);
+      assert.equal(state.profile.name, 'Gabe Google'); assert.equal(state.profile.gender, 'Female');
+    });
+    await context.close();
+  }
+
+  // ---- A returning incomplete member resumes at the first unfinished screen; a failed save keeps the screen ----
+  {
+    const context = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+    const { calls } = await setup(context, { signedIn: true, profile: { id: ME, name: 'Ray Resume', email: EMAIL, phone_number: '9876543210', phone_country_code: '+91', gender: 'Male', experience: '3–7 years' }, adultAt: '2026-10-18T00:00:00Z', failRpc: ['set_member_interests'] });
+    const page = await context.newPage();
+    await page.goto(`${BASE}/auth.html?complete-profile=1`, { waitUntil: 'load' });
+    const resumed = await waitScreen(page, 'area', 8000);
+    let u = await ui(page);
+    check(`resume: 18+, name and details done -> Area at "Step 5 of 6" (${await screenOf(page)})`, () => { assert.equal(resumed, true); assert.equal(u.label, 'Step 5 of 6'); });
+    await answerRest(page, 'area', { area: 'city', picks: ['Chess', 'Guitar'] });
+    await page.locator('[data-guided-next]').click();
+    await page.waitForTimeout(1200);
+    u = await ui(page);
+    const screen = await screenOf(page);
+    const declared = calls.filter(rpcAt('declare_adult')).length;
+    const exp = calls.filter(isProfileWrite).map((c) => JSON.parse(c.body).experience);
+    check(`resume: a failed interests save keeps Interests with the line (${screen}: ${u.error}); declare_adult not repeated; experience kept`, () => {
+      assert.equal(screen, 'interests'); assert.match(u.error, /could not be saved|didn't save/i); assert.equal(declared, 0);
+      assert.ok(exp.every((e) => e === '3–7 years'), JSON.stringify(exp));
+    });
+    await context.close();
+  }
+  {
+    const context = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+    await setup(context, { signedIn: true, profile: { id: ME, name: 'Done Member', email: EMAIL }, adultAt: '2026-10-18T00:00:00Z', hasCell: true, interests: [{ interest_id: 'games.board.chess', points: 20, mode: 'play' }] });
+    const page = await context.newPage();
+    await page.goto(`${BASE}/auth.html#signup`, { waitUntil: 'load' });
+    const toApp = await page.waitForURL(/\/app\.html/, { timeout: 8000 }).then(() => true).catch(() => false);
+    check('a completed member opening auth.html#signup lands on /app.html', () => assert.equal(toApp, true));
+    await context.close();
+  }
+
+  // ---- VITE_SIGNUP_FLOW=classic: the 4-step form, no guided view ----
+  {
+    const CLASSIC_PORT = Number(process.env.E2E_CLASSIC_PORT || PORT + 2);
+    const stopClassic = await startVite(CLASSIC_PORT, { VITE_SIGNUP_FLOW: 'classic' });
+    try {
+      const context = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+      await context.route(`${ORIGIN}/**`, (route) => route.fulfill({ status: 200, contentType: 'application/json', body: '[]', headers: { 'access-control-allow-origin': '*' } }));
+      const page = await context.newPage();
+      await page.goto(`http://127.0.0.1:${CLASSIC_PORT}/auth.html#signup`, { waitUntil: 'load' });
+      await page.waitForTimeout(800);
+      const r = await page.evaluate(() => ({ classic: !document.querySelector('[data-auth-view="signup"]').hidden, guided: !document.querySelector('[data-auth-view="guided"]').hidden, label: document.querySelector('[data-signup-step-label]')?.textContent }));
+      check(`VITE_SIGNUP_FLOW=classic shows the 4-step form (${JSON.stringify(r)})`, () => { assert.equal(r.classic, true); assert.equal(r.guided, false); assert.match(r.label, /STEP 1 OF 4/); });
+      await context.close();
+    } finally { stopClassic(); }
+  }
+
 } finally {
   await browser.close();
   stopVite();
