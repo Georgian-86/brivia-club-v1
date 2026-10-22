@@ -1559,3 +1559,21 @@ controls (a tester or a seeded test member), never a real member, so no new expo
   1536x730: no scrolling, card at least 1.5 tall per 1 wide, View profile inside, controls centred under it, headline
   centred with the card.
 
+## D-073: Guided signup again, interests only, Google kept; editorial login card (release B of the polish wave, 2026-10-22)
+
+- **Founder ask:** one question per screen again; no points at signup, interests only; keep "Continue with Google";
+  beautify login and signup "a class apart". This reverses D-069 (the classic form) at the founder's request.
+- **Flow:** Welcome → Account (email path) → 18+ → Name → Details → Area → Interests → Reveal / Verify (UX_SPEC A0).
+  Email + password with the account created at the end (no email code, so no Supabase template dependency); 18+ and
+  Name on separate screens; phone and gender kept (D-068); interests only with `evenSplit` (ORBIT 3.2), private
+  interests not offered; the answers go through the existing pipeline unchanged (`declare_adult` before area and
+  interests). Notice version `2026-10-05` (0011). Classic behind `VITE_SIGNUP_FLOW=classic` for one release; Vercel
+  leaves it unset, so production is guided.
+- **Login:** one editorial deep-wine card (max 480 px) next to the telephone art, "Continue with Google" as a full
+  labelled button, Bodoni headings, sentence-case buttons ("Log in", "Create an account"); the top-bar "Create account"
+  pill is hidden on the login view. Ids and behaviour unchanged.
+- **Review fixes:** Finish submits once (busy until the next screen; Back disabled meanwhile), the question is each
+  field's description, Google start shows busy and a visible error, a resumed signup with unchanged picks keeps its
+  points and modes.
+- **Follow-ups:** "Forgot password?" is still a dead button (pre-existing; needs a reset flow and SMTP).
+
