@@ -64,6 +64,8 @@ security definer
 set search_path = public
 as $$
 begin
+  -- Same pair lock as the block trigger (0003), so a block committed at the same instant as a send is always seen.
+  perform public.brivia_lock_pair(new.sender_id, new.recipient_id);
   if public.brivia_pair_is_blocked(new.sender_id, new.recipient_id) then
     insert into brivia_private.withheld_message (message_id) values (new.id) on conflict (message_id) do nothing;
   end if;

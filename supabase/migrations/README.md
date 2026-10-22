@@ -565,10 +565,12 @@ select policyname from pg_policies where schemaname = 'storage' and tablename = 
    and qual ~ 'brivia_message_visible' order by 1;
 -- Members can read their resume or one shared with them
 -- Participants can view message attachments
-select tgname from pg_trigger where tgrelid = 'public.brivia_messages'::regclass and not tgisinternal order by 1;
--- includes brivia_messages_withhold_blocked
+select tgname, tgenabled, (tgtype & 1) = 1 as per_row, (tgtype & 2) = 0 as after, (tgtype & 4) = 4 as on_insert
+  from pg_trigger where tgrelid = 'public.brivia_messages'::regclass and not tgisinternal order by 1;
+-- includes brivia_messages_withhold_blocked | O | t | t | t
 select has_table_privilege('authenticated', 'brivia_private.withheld_message', 'select'),
-       has_function_privilege('authenticated', 'public.brivia_withhold_blocked_message()', 'execute'); -- f, f
+       has_function_privilege('authenticated', 'public.brivia_withhold_blocked_message()', 'execute'),
+       has_function_privilege('anon', 'brivia_private.brivia_can_send(uuid)', 'execute');              -- f, f, f
 ```
 
 Expected advisor notes (intended, not failures): `brivia_private.brivia_can_send` and

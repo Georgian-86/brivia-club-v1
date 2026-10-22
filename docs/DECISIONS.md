@@ -1509,3 +1509,19 @@ controls (a tester or a seeded test member), never a real member, so no new expo
   removed from the auth page marquee, which loops 9 cards at the same per-card speed (31 s).
 - **Blocked sends withheld (A5)** ships separately with migration `0013`.
 
+## D-077: A blocked member's messages are stored and withheld, never refused (A5 of the polish wave, 0013, 2026-10-22)
+
+- **Founder ask.** A blocked member could not send at all, which looked like a bug and revealed the block. Now they
+  type and send as normal; the message shows as sent in their own thread only.
+- **How.** `0013_blocked_sends_withheld.sql` (0012 is live and frozen, so A5 left 0012). The insert policy uses
+  `brivia_can_send` (matched + same world, no block clause). An AFTER INSERT trigger, under the same pair lock as the
+  block trigger, marks a message withheld when either member has blocked the other (`brivia_private.withheld_message`,
+  no grants). Every recipient read path excludes withheld rows: the messages select policy (so the inbox, unread
+  counts, notifications and Realtime `postgres_changes`), the message-attachments policy and the resume policy.
+- **Rules.** Either direction; permanent (an unblock never releases a withheld message); the block is never
+  revealed; `report_member` evidence still includes withheld rows (moderation only). An unmatched pair is still
+  refused, and the client's refusal copy is now neutral ("You can no longer message this member.").
+- **Known trade-off.** A blocked member can keep storing messages that nobody sees; `report_member` evidence is the
+  latest 50 rows, so a long withheld flood can push older messages out of that window. Revisit with the P0-C
+  moderation work (rate limit or evidence that keeps pre-block messages).
+
