@@ -3,7 +3,7 @@
 -- Idempotent: the local harness (bash supabase/tests/run.sh) applies every migration twice.
 -- Each task fills only its own section below.
 
--- §A5 blocked sends are withheld
+-- §A5 (blocked sends are withheld) moved to 0013 so this file could go live first (2026-10-22).
 
 -- §C post likes and saves
 -- Private to the member: a like or save is visible only to its owner (no counts, no RPC). The insert policy checks
