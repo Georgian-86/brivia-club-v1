@@ -91,6 +91,7 @@ const setup = async (context, opts = {}) => {
     const headers = { 'access-control-allow-origin': '*' };
     const json = (status, payload) => route.fulfill({ status, contentType: 'application/json', body: payload === undefined ? '' : JSON.stringify(payload), headers });
     if (method === 'OPTIONS') return route.fulfill({ status: 204, headers: { ...headers, 'access-control-allow-headers': '*', 'access-control-allow-methods': '*' } });
+    if (opts.delay?.[p]) await new Promise((r) => setTimeout(r, opts.delay[p]));
     if (p === '/auth/v1/signup') {
       state.signedUp = true;
       if (opts.signupError) return json(422, { code: 'user_already_exists', error_code: 'user_already_exists', msg: 'User already registered' });
@@ -152,8 +153,10 @@ const ui = (page) => page.evaluate(() => {
   const next = root.querySelector('[data-guided-next]');
   return {
     questions: [...root.querySelectorAll('[data-question]')].filter(visible).length,
+    h1: [...root.querySelectorAll('h1')].filter(visible).length,
+    pageH1: [...document.querySelectorAll('h1')].filter(visible).length,
     h2: [...root.querySelectorAll('h2')].filter(visible).length,
-    title: root.querySelector('h2')?.textContent.trim(),
+    title: root.querySelector('h1')?.textContent.trim(),
     label: visible(root.querySelector('[data-guided-step-label]')) ? root.querySelector('[data-guided-step-label]').textContent : null,
     bubbles: [...root.querySelectorAll('.guided-bubble')].filter(visible).map((b) => `${b.dataset.step}:${b.className.match(/is-(done|current|pending)/)?.[1]}`),
     primaries: [next, ...root.querySelectorAll('.guided-choice--primary')].filter(visible).length,
@@ -224,8 +227,25 @@ const settleAnimations = (page) => page.evaluate(() => Promise.race([
   Promise.all(document.getAnimations().filter((x) => x.effect?.getComputedTiming().iterations !== Infinity).map((x) => x.finished.catch(() => {}))),
   new Promise((r) => setTimeout(r, 3000)),
 ]));
+// Fix round 1 (M6, M7): every guided heading seen, for one punctuation rule; one visible h1 on the page.
+const seenTitles = new Set();
+const headingInfo = (page) => page.evaluate(() => {
+  const visible = (el) => Boolean(el && el.getClientRects().length && getComputedStyle(el).visibility !== 'hidden');
+  return { title: document.querySelector('#guided-signup h1, #guided-signup h2')?.textContent.trim() || '', h1: [...document.querySelectorAll('h1')].filter(visible).map((h) => h.textContent.trim()) };
+});
+// Fix round 1 (M1): where focus lands and the focused element's accessible description (aria-describedby text).
+const focusInfo = (page) => page.evaluate(() => {
+  const el = document.activeElement;
+  const ids = (el?.getAttribute('aria-describedby') || '').split(/\s+/).filter(Boolean);
+  return { tag: el?.tagName.toLowerCase() || '', id: el?.id || '', name: el?.getAttribute('name') || '', description: ids.map((id) => document.getElementById(id)?.textContent.trim() || '').join(' ') };
+});
+// Fix round 1 (M6): the label type of a button's text span (case, size, weight, tracking).
+const typeOf = (page, sel) => page.evaluate((q) => { const el = document.querySelector(q); if (!el) return null; const c = getComputedStyle(el); return { transform: c.textTransform, size: c.fontSize, weight: c.fontWeight, spacing: c.letterSpacing }; }, sel);
 const auditScreen = async (page, tag) => {
   await settleAnimations(page);
+  const h = await headingInfo(page);
+  if (h.title) seenTitles.add(h.title);
+  check(`${tag}: the question heading is the page's one visible h1 (${JSON.stringify(h.h1)})`, () => { assert.equal(h.h1.length, 1); assert.equal(h.h1[0], h.title); });
   const a = await audit(page);
   check(`${tag}: 44 px targets (${a.small.join(', ')})`, () => assert.deepEqual(a.small, []));
   check(`${tag}: text contrast >= 4.5:1 (${a.low.join(', ')})`, () => assert.deepEqual(a.low, []));
@@ -253,8 +273,9 @@ try {
     check(`${w} #signup opens the guided Welcome: Google, email, "I already have an account"; no step label, no bubbles`, () => {
       assert.equal(atWelcome, true);
       assert.match(u.text, /Continue with Google/); assert.match(u.text, /Continue with email/); assert.match(u.text, /I already have an account/);
-      assert.equal(u.label, null); assert.deepEqual(u.bubbles, []); assert.equal(u.h2, 1); assert.equal(u.primaries, 1); assert.equal(u.questions, 0);
+      assert.equal(u.label, null); assert.deepEqual(u.bubbles, []); assert.equal(u.h1, 1); assert.equal(u.primaries, 1); assert.equal(u.questions, 0);
     });
+    const welcomeType = await typeOf(page, '[data-guided-email] > span');
     const classicHidden = await page.evaluate(() => document.querySelector('[data-auth-view="signup"]')?.hidden);
     check(`${w} the classic 4-step form is not shown`, () => assert.equal(classicHidden, true));
     await auditScreen(page, `${w} welcome`);
@@ -263,9 +284,20 @@ try {
     await waitScreen(page, 'account');
     u = await ui(page);
     check(`${w} account: one question, "Step 1 of 6", first bubble current, Back shown, Continue disabled (${u.bubbles.join(' ')})`, () => {
-      assert.equal(u.questions, 1); assert.equal(u.h2, 1); assert.equal(u.primaries, 1); assert.equal(u.label, 'Step 1 of 6');
+      assert.equal(u.questions, 1); assert.equal(u.h1, 1); assert.equal(u.primaries, 1); assert.equal(u.label, 'Step 1 of 6');
       assert.deepEqual(u.bubbles, ['account:current', 'adult:pending', 'name:pending', 'details:pending', 'area:pending', 'interests:pending']);
       assert.equal(u.back, true); assert.equal(u.nextDisabled, true);
+    });
+    let f = await focusInfo(page);
+    check(`${w} account: focus ${mobile ? 'on the question heading (touch)' : 'in the email field, described by the question'} (${JSON.stringify(f)})`, () => {
+      if (mobile) { assert.equal(f.tag, 'h1'); assert.equal(f.id, 'signup-screen-title'); }
+      else { assert.equal(f.name, 'guided-email'); assert.match(f.description, /^Create your account\./); }
+    });
+    const backType = await typeOf(page, '[data-guided-back] > span');
+    const nextType = await typeOf(page, '[data-guided-next] > span');
+    check(`${w} Back and Continue use the Welcome buttons' sentence-case type (${JSON.stringify({ backType, nextType, welcomeType })})`, () => {
+      assert.equal(welcomeType.transform, 'none');
+      assert.deepEqual(backType, welcomeType); assert.deepEqual(nextType, welcomeType);
     });
     await page.locator('input[name="guided-email"]').fill(EMAIL);
     await page.locator('input[name="guided-password"]').fill(PASSWORD);
@@ -307,6 +339,11 @@ try {
     u = await ui(page);
     check(`${w} name: "Step 3 of 6", one question, Back shown, Continue disabled when empty`, () => {
       assert.equal(u.label, 'Step 3 of 6'); assert.equal(u.questions, 1); assert.equal(u.back, true); assert.equal(u.nextDisabled, true);
+    });
+    f = await focusInfo(page);
+    check(`${w} name: focus ${mobile ? 'on the question heading (touch)' : 'in the name field, described by the question'} (${JSON.stringify(f)})`, () => {
+      if (mobile) { assert.equal(f.tag, 'h1'); assert.equal(f.id, 'signup-screen-title'); }
+      else { assert.equal(f.name, 'guided-name'); assert.match(f.description, /^What should members call you\?/); }
     });
     await page.locator('input[name="guided-name"]').fill('Gia Guided');
     await shot(page, `${w}-04-name`);
@@ -644,6 +681,7 @@ try {
     await page.locator('[data-guided-back]').click();
     await waitScreen(page, 'welcome');
     u = await ui(page);
+    if (u.title) seenTitles.add(u.title);
     check(`${w} Google: Back from 18+ goes to Welcome (signed in), never to an account screen`, () => { assert.match(u.text, /Welcome back/); assert.match(u.text, /Sign out/); });
     await page.locator('[data-guided-continue]').click();
     await waitScreen(page, 'adult');
@@ -698,6 +736,129 @@ try {
     await page.goto(`${BASE}/auth.html#signup`, { waitUntil: 'load' });
     const toApp = await page.waitForURL(/\/app\.html/, { timeout: 8000 }).then(() => true).catch(() => false);
     check('a completed member opening auth.html#signup lands on /app.html', () => assert.equal(toApp, true));
+    await context.close();
+  }
+
+  // ================================ Fix round 1 ================================
+  // I1: one submit per Finish. A double tap (taps keep coming every 10 ms while Interests is on screen) and Enter+Enter
+  // (a real Enter, then synthetic Enters every 10 ms) on the email path that ends on Verify (no session) and the one
+  // that ends on Reveal (a session): exactly one signUp, one declare_adult, one area RPC and one set_member_interests;
+  // Back is disabled while the submit is in flight.
+  for (const kind of ['verify', 'session']) {
+    for (const how of ['click', 'enter']) {
+      const context = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+      await scriptGeo(context, 'ok');
+      const delay = kind === 'verify' ? { '/auth/v1/signup': 450 } : { '/rest/v1/rpc/set_member_interests': 450 };
+      const { calls } = await setup(context, { confirm: kind === 'verify', delay });
+      const page = await context.newPage();
+      await page.goto(`${BASE}/auth.html#signup`, { waitUntil: 'load' });
+      await waitScreen(page, 'welcome');
+      await page.locator('[data-guided-email]').click();
+      await answerRest(page, 'account', { area: 'city' });
+      if (how === 'enter') await page.locator('input[name="guided-interest"]').focus();
+      const run = page.evaluate((mode) => new Promise((resolve) => {
+        const root = document.querySelector('#guided-signup');
+        const next = root.querySelector('[data-guided-next]');
+        const back = root.querySelector('[data-guided-back]');
+        const input = root.querySelector('input[name="guided-interest"]');
+        const samples = [];
+        const enter = () => input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true }));
+        const started = Date.now();
+        const timer = setInterval(() => {
+          const busy = next.getAttribute('aria-busy') === 'true';
+          samples.push({ busy, backDisabled: back.disabled, backHidden: back.hidden });
+          if (root.dataset.screen === 'interests') { if (mode === 'click') next.click(); else enter(); }
+          if (Date.now() - started > 2500) { clearInterval(timer); resolve(samples); }
+        }, 10);
+      }), how);
+      // The first tap is the interval's first tick; the Enter run starts with a real key press.
+      if (how === 'enter') await page.keyboard.press('Enter');
+      const samples = await run;
+      const target = kind === 'verify' ? 'verify' : 'reveal';
+      const landed = await waitScreen(page, target, 6000);
+      await page.waitForTimeout(500);
+      const count = (test) => calls.filter(test).length;
+      const n = {
+        signUp: count((c) => c.path === '/auth/v1/signup'),
+        declare: count(rpcAt('declare_adult')),
+        area: count((c) => rpcAt('set_home_city')(c) || rpcAt('set_home_location')(c)),
+        interests: count(rpcAt('set_member_interests')),
+      };
+      const inFlight = samples.filter((x) => x.busy && !x.backHidden);
+      check(`I1 ${kind} ${how}: one submit per Finish, ends on ${target} (${await screenOf(page)}; ${JSON.stringify(n)})`, () => {
+        assert.equal(landed, true);
+        assert.deepEqual(n, kind === 'verify' ? { signUp: 1, declare: 0, area: 0, interests: 0 } : { signUp: 1, declare: 1, area: 1, interests: 1 });
+      });
+      check(`I1 ${kind} ${how}: Back is disabled while the submit is in flight (${inFlight.length} busy samples, ${inFlight.filter((x) => !x.backDisabled).length} with Back enabled)`, () => {
+        assert.ok(inFlight.length >= 5); assert.ok(inFlight.every((x) => x.backDisabled));
+      });
+      const backAfter = kind === 'verify' ? null : await page.evaluate(() => document.querySelector('[data-guided-back]').disabled);
+      if (backAfter !== null) check(`I1 ${kind} ${how}: Back is enabled again once the submit is done`, () => assert.equal(backAfter, false));
+      await context.close();
+    }
+  }
+
+  // M2: the guided "Continue with Google" is disabled and busy while the OAuth start runs; a failed start shows a
+  // visible line on the Welcome screen itself (not the hidden login note) and gives the button back.
+  {
+    const context = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+    await setup(context);
+    // A stubbed OAuth start failure: building the authorize URL throws (the select_account query is Google's).
+    await context.addInitScript(() => {
+      const Real = window.URLSearchParams;
+      window.URLSearchParams = class extends Real {
+        constructor(init) { if (init && typeof init === 'object' && !(init instanceof Real) && !Array.isArray(init) && init.prompt === 'select_account') throw new Error('stub: oauth start failed'); super(init); }
+      };
+    });
+    const page = await context.newPage();
+    await page.goto(`${BASE}/auth.html#signup`, { waitUntil: 'load' });
+    await waitScreen(page, 'welcome');
+    await page.evaluate(() => {
+      window.__googleBusy = [];
+      const b = document.querySelector('[data-guided-google]');
+      new MutationObserver(() => window.__googleBusy.push({ disabled: b.disabled, busy: b.getAttribute('aria-busy') })).observe(b, { attributes: true });
+    });
+    await page.locator('[data-guided-google]').click();
+    await page.waitForTimeout(400);
+    const r = await page.evaluate(() => {
+      const box = document.querySelector('[data-guided-error]');
+      if (!box) return { url: location.href };
+      const b = document.querySelector('[data-guided-google]');
+      return { screen: document.querySelector('#guided-signup').dataset.screen, error: box.hidden ? '' : box.textContent, visible: Boolean(box.getClientRects().length), log: window.__googleBusy, disabled: b.disabled, busy: b.getAttribute('aria-busy') };
+    });
+    check(`M2 guided Google: busy while starting, then a visible line on Welcome when the start fails (${JSON.stringify(r)})`, () => {
+      assert.equal(r.screen, 'welcome'); assert.equal(r.visible, true); assert.match(r.error, /Google sign-in could not start/);
+      assert.ok(r.log.some((x) => x.disabled && x.busy === 'true')); assert.equal(r.disabled, false); assert.notEqual(r.busy, 'true');
+    });
+    await auditScreen(page, 'M2 welcome with the Google line');
+    await context.close();
+  }
+
+  // M3: resuming at Area with a complete saved budget (custom points and modes) and finishing with the same picks keeps
+  // them: no set_member_interests call, the saved rows unchanged.
+  {
+    const context = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+    const saved = [{ interest_id: 'games.board.chess', points: 13, mode: 'learn' }, { interest_id: 'music.instruments.guitar', points: 7, mode: 'teach' }];
+    const { state, calls } = await setup(context, { signedIn: true, profile: { id: ME, name: 'Kim Keep', email: EMAIL, phone_number: '9876543210', phone_country_code: '+91', gender: 'Female' }, adultAt: '2026-10-18T00:00:00Z', interests: saved.map((x) => ({ ...x })) });
+    const page = await context.newPage();
+    await page.goto(`${BASE}/auth.html?complete-profile=1`, { waitUntil: 'load' });
+    const atArea = await waitScreen(page, 'area', 8000);
+    await page.locator('input[name="guided-city"]').fill('Pune');
+    await page.waitForSelector('.guided-cities button[data-place="in-pune"]', { timeout: 4000 }).catch(() => {});
+    await page.locator('.guided-cities button[data-place="in-pune"]').click();
+    await page.locator('[data-guided-next]').click();
+    await waitScreen(page, 'interests');
+    await page.waitForSelector('.guided-option', { timeout: 5000 });
+    const tray = await page.evaluate(() => [...document.querySelectorAll('.guided-pick')].map((b) => b.dataset.id));
+    await page.locator('[data-guided-next]').click();
+    const revealed = await waitScreen(page, 'reveal', 8000);
+    check(`M3 resume with unchanged picks keeps the custom points and modes (${JSON.stringify({ atArea, tray, interests: calls.filter(rpcAt('set_member_interests')).length, saved: state.interests })})`, () => {
+      assert.equal(atArea, true); assert.equal(revealed, true);
+      assert.deepEqual(tray, ['games.board.chess', 'music.instruments.guitar']);
+      assert.equal(calls.filter(rpcAt('set_home_city')).length, 1);
+      assert.equal(calls.filter(rpcAt('set_member_interests')).length, 0);
+      assert.deepEqual(state.interests, saved);
+    });
     await context.close();
   }
 
@@ -790,9 +951,12 @@ try {
       });
       await page.goto(`${BASE}/auth.html#login`, { waitUntil: 'load' });
       await page.waitForSelector('.auth-login.is-active .auth-create-trigger', { state: 'attached' });
+      const loginType = await typeOf(page, '.auth-login .auth-submit > span');
       await page.locator('.auth-login .auth-create-trigger').click({ timeout: 4000 }).catch(() => {});
       const toGuided = await waitScreen(page, 'welcome');
       check(`${w} login: "Create an account" opens the guided Welcome`, () => assert.equal(toGuided, true));
+      const choiceType = await typeOf(page, '[data-guided-email] > span');
+      check(`${w} login "Log in" and the guided Welcome buttons share one label type (${JSON.stringify({ loginType, choiceType })})`, () => assert.deepEqual(choiceType, loginType));
       // The guided Welcome's Google button starts Google too.
       await page.locator('[data-guided-google]').click({ timeout: 4000 }).catch(() => {});
       await page.waitForURL(/\/auth\/v1\/authorize/, { timeout: 5000 }).catch(() => {});
@@ -802,6 +966,10 @@ try {
     await context.close();
   }
 
+  // M6: one punctuation rule for every guided heading: a question ends with "?", anything else with a full stop.
+  check(`M6 every guided heading ends with "." or "?" (${[...seenTitles].join(' | ')})`, () => {
+    assert.ok(seenTitles.size >= 9); for (const t of seenTitles) assert.match(t, /[.?]$/, t);
+  });
 } finally {
   await browser.close();
   stopVite();

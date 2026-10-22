@@ -274,6 +274,8 @@ body.auth-page .auth-shell:has(.auth-card.is-active) .auth-card .auth-submit {
 }
 body.auth-page .auth-shell:has(.auth-card.is-active) .auth-card .auth-submit:hover:not(:disabled) { background: var(--c-deep); transform: translateY(-1px); }
 body.auth-page .auth-shell:has(.auth-card.is-active) .auth-card .auth-submit:disabled { cursor: progress; opacity: .75; }
+/* "Log in" reads like every other primary button (guided Welcome, Back, Continue): 16 px, 600, sentence case. */
+body.auth-page .auth-shell:has(.auth-card.is-active) .auth-card .auth-submit span { margin: 0; font: inherit; letter-spacing: inherit; text-transform: none; }
 body.auth-page .auth-shell:has(.auth-card.is-active) .auth-card .auth-submit svg {
   width: 18px;
   height: 18px;

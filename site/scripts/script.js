@@ -7,7 +7,7 @@ import { buildPendingOnboarding, isPendingExpired, dataUrlToFile } from './pendi
 import { isUnderReview, shouldWithdrawConsent } from './onboarding-guard.js';
 import {
   MAX_INTERESTS, MODES, emptyBudget, addInterest, removeInterest, stepPoints, setMode, pointsLeft, isComplete, toPayload,
-  counterText, budgetFromRows, budgetGateText, spreadRemaining, evenSplit,
+  counterText, budgetFromRows, budgetGateText, spreadRemaining, guidedBudget,
 } from './passion-budget.js';
 import { matchTypedCity } from './area-pick.js';
 import { locateOnce, fallbackCopy, isTryAgainLater, STILL_WAITING_TEXT } from './geo-locate.js';
@@ -1618,11 +1618,15 @@ if (isStandaloneAuthPage) {
   });
 }
 
+// Resolves { ok: true } once the browser is on its way to Google, or { ok: false, message } when the start failed
+// (the guided Welcome shows the message on its own feedback line; the login card uses #login-note).
+const GOOGLE_START_FAILED = 'Google sign-in could not start. Please try again, or continue with email.';
 const startGoogleAuth = async () => {
   if (!supabaseReady || !supabase) {
-    if (loginNote) loginNote.textContent = 'Google sign-in is not configured yet. Please use email and password.';
-    if (signupFeedback) signupFeedback.textContent = 'Google sign-in is not configured yet. Please use email and password.';
-    return;
+    const message = 'Google sign-in is not configured yet. Please use email and password.';
+    if (loginNote) loginNote.textContent = message;
+    if (signupFeedback) signupFeedback.textContent = message;
+    return { ok: false, message };
   }
   const buttons = authModal?.querySelectorAll('.auth-google-trigger') || [];
   buttons.forEach((button) => { button.disabled = true; });
@@ -1633,14 +1637,13 @@ const startGoogleAuth = async () => {
       provider: 'google',
       options: { redirectTo: `${window.location.origin}/auth.html`, queryParams: { prompt: 'select_account' } },
     });
-    if (!error) return;
-    buttons.forEach((button) => { button.disabled = false; });
-    if (loginNote) loginNote.textContent = error.message || 'Google sign-in could not start.';
-    if (signupFeedback) signupFeedback.textContent = error.message || 'Google sign-in could not start.';
+    if (!error) return { ok: true };
+    throw error;
   } catch (error) {
     buttons.forEach((button) => { button.disabled = false; });
-    if (loginNote) loginNote.textContent = error.message || 'Google sign-in could not start.';
-    if (signupFeedback) signupFeedback.textContent = error.message || 'Google sign-in could not start.';
+    if (loginNote) loginNote.textContent = error?.message || GOOGLE_START_FAILED;
+    if (signupFeedback) signupFeedback.textContent = error?.message || GOOGLE_START_FAILED;
+    return { ok: false, message: GOOGLE_START_FAILED };
   }
 };
 
@@ -1650,6 +1653,7 @@ const startGoogleAuth = async () => {
 // session (email confirmation on) only the pending profile is kept (never coordinates) and the Verify screen shows.
 // Resolves { ok: true, session } or { ok: false, screen, message } (the screen to show the line on).
 let guidedRow = null;  // the signed-in member's own profile row when the flow resumed (kept fields are not cleared)
+let guidedSaved = null;  // their saved budget (my_interests) when the flow resumed: unchanged picks keep its points
 const GUIDED_DEFAULT_COVER = '/Images/Cover%20images/163BDB0C-64AC-44E7-8663-55C323ADB4FE.PNG';
 const guidedStepFor = (message) => (message === ADULT_SAVE_ERROR ? 'adult'
   : message === AREA_SAVE_ERROR || message === 'Try again later.' ? 'area' : 'interests');
@@ -1671,7 +1675,9 @@ const submitGuidedSignup = async (answers) => {
   };
   if (kept.photoUrl || kept.photo_url) profile.photoUrl = kept.photoUrl || kept.photo_url;
   areaChoice = answers.area && ['geo', 'city', 'keep'].includes(answers.area.kind) ? { ...answers.area } : null;
-  budget = { items: evenSplit(answers.interests).map((row, i) => ({ id: row.interest_id, label: answers.interests[i].label, points: row.points, mode: row.mode })) };
+  // Unchanged picks over a complete saved budget keep the member's own points and modes and are not saved again (M3).
+  const planned = guidedBudget(answers.interests, guidedSaved);
+  budget = planned.budget;
   try {
     const { data: sessionData } = await supabase.auth.getSession();
     let user = sessionData?.session?.user || null;
@@ -1704,7 +1710,7 @@ const submitGuidedSignup = async (answers) => {
     adultAlreadyDeclared = Boolean(guidedRow?.adult_declared_at);
     const { error: profileError } = await saveProfile(user.id, profile, null, null);
     if (profileError) return { ok: false, screen: 'interests', message: signupErrorCopy(profileError) };
-    await finishOnboarding(user.id);
+    await finishOnboarding(user.id, { skipInterests: planned.unchanged });
     areaChoice = null;
     window.localStorage.removeItem('brivia-pending-profile');
     window.localStorage.setItem('brivia-member-profile', JSON.stringify({ ...profile, id: user.id }));
@@ -1723,6 +1729,7 @@ guidedSignup = GUIDED_SIGNUP ? initGuidedSignup({
   onSignOut: async ({ quiet = false } = {}) => {
     await supabase?.auth.signOut().catch(() => {});
     guidedRow = null;
+    guidedSaved = null;
     if (!quiet) setAuthView('signup');
   },
 }) : null;
@@ -1812,6 +1819,7 @@ const isSensitiveConsentError = (error) => /sensitive consent required/i.test(St
 // screen (resumeScreen), with what is already known prefilled. `row` may be null (no profile yet).
 const openGuidedFor = async (user, row = null, status = null, pendingResult = null) => {
   guidedRow = row || null;
+  guidedSaved = null;
   let current = status;
   if (!current) ({ data: current } = await onboardingStatus());
   const meta = user.user_metadata || {};
@@ -1821,7 +1829,8 @@ const openGuidedFor = async (user, row = null, status = null, pendingResult = nu
   let interests = [];
   if (current?.interests > 0) {
     const { data: rows } = await fetchMyInterests();
-    interests = budgetFromRows(rows).items.map(({ id, label }) => ({ id, label, mode: 'play' }));
+    guidedSaved = budgetFromRows(rows);
+    interests = guidedSaved.items.map(({ id, label, mode }) => ({ id, label, mode }));
   }
   const flow = {
     adult_declared: Boolean(row?.adult_declared_at),
@@ -2233,7 +2242,9 @@ const declareAdultStep = async () => {
   }
   adultAlreadyDeclared = true;
 };
-const finishOnboarding = async (userId) => {
+// skipInterests: the guided flow resumed with the member's saved budget unchanged (fix round 1, M3): it is already on
+// the server, so set_member_interests (and the consent it may need) is not sent again.
+const finishOnboarding = async (userId, { skipInterests = false } = {}) => {
   await declareAdultStep();
   if (areaChoice && areaChoice.kind !== 'keep') {
     const choice = areaChoice;
@@ -2249,6 +2260,7 @@ const finishOnboarding = async (userId) => {
     const savedLabel = typeof data === 'string' && data ? data : choice.label || '';
     keepCurrentArea(choice.kind === 'city' ? cityWideLabel(savedLabel) : savedLabel);
   }
+  if (skipInterests) return;
   // R2: consent is given only when a private interest is in the budget (or the server asked for it and the member agreed
   // in the panel), and is withdrawn again if the save then fails.
   const wantsConsent = budget.items.some((item) => isSensitiveInterest(item.id)) || (serverWantedConsent && privateUnlocked);

@@ -81,7 +81,8 @@ export const initGuidedSignup = ({
 
   const setError = (text) => { errorBox.textContent = text || ''; errorBox.hidden = !text; };
   const refreshNext = () => { next.disabled = state.busy || !state.current?.ready?.(); };
-  const setBusy = (busy) => { state.busy = busy; next.setAttribute('aria-busy', String(busy)); refreshNext(); };
+  // While a step is saving (and until its next screen is on), neither Continue/Finish nor Back can be used.
+  const setBusy = (busy) => { state.busy = busy; next.setAttribute('aria-busy', String(busy)); back.disabled = busy; refreshNext(); };
   const cancelGeo = () => { geo.seq += 1; geo.pending = false; window.clearTimeout(geo.guard); };
   const questions = () => (SCREENS[state.path] || SCREENS.email).filter((s) => STEP_ICONS[s]);
   const nextAfter = (screen) => { const list = SCREENS[state.path] || SCREENS.email; return list[list.indexOf(screen) + 1] || 'reveal'; };
@@ -134,8 +135,11 @@ export const initGuidedSignup = ({
     if (root.getBoundingClientRect().top < 0) root.scrollIntoView({ block: 'start' });
     state.current.mount?.(el);
     refreshNext();
+    const field = state.current.autofocus ? el.querySelector(state.current.autofocus) : null;
+    // The first field is described by the question (and its helper), so a screen reader hears the question even when
+    // focus goes straight to the field.
+    if (field) field.setAttribute('aria-describedby', ['signup-screen-title', el.querySelector('#signup-screen-helper') ? 'signup-screen-helper' : ''].filter(Boolean).join(' '));
     if (focus) {
-      const field = state.current.autofocus ? el.querySelector(state.current.autofocus) : null;
       // A phone keyboard popping up on every screen is jarring: on touch screens the heading takes focus instead.
       if (field && !window.matchMedia?.('(pointer: coarse)').matches) field.focus({ preventScroll: true });
       else root.querySelector('#signup-screen-title')?.focus({ preventScroll: true });
@@ -155,14 +159,15 @@ export const initGuidedSignup = ({
     } catch (error) {
       message = error?.copy || COPY.saveFailed;
     }
-    setBusy(false);
     if (to && typeof to === 'object') { message = to.message || ''; to = to.screen; }
-    if (to) await show(to);
+    // Busy until the next screen is on: the outgoing screen fades for 140 ms and must not take a second tap or Enter.
+    try { if (to) await show(to); } finally { setBusy(false); }
     if (message) setError(message);
   };
 
   // ---- Screens ------------------------------------------------------------------------------------------------
-  const heading = (title, helper = '') => `<h2 id="signup-screen-title" tabindex="-1">${title}</h2>${helper ? `<p class="guided-helper">${helper}</p>` : ''}`;
+  // The question is the page's h1 (one per screen). Headings end with "?" for a question and "." otherwise.
+  const heading = (title, helper = '') => `<h1 id="signup-screen-title" tabindex="-1">${title}</h1>${helper ? `<p class="guided-helper" id="signup-screen-helper">${helper}</p>` : ''}`;
   const kicker = (text) => `<p class="guided-kicker">${text}</p>`;
   const a = state.answers;
 
@@ -189,7 +194,20 @@ export const initGuidedSignup = ({
         </div>
         <p class="guided-fine">By continuing you agree to how we handle your data: <a href="/privacy.html" target="_blank" rel="noopener">privacy notice</a>.</p>`,
       mount: (el) => {
-        el.querySelector('[data-guided-google]').addEventListener('click', () => { state.path = 'google'; startGoogle(); });
+        const google = el.querySelector('[data-guided-google]');
+        google.addEventListener('click', async () => {
+          if (google.disabled) return;
+          state.path = 'google';
+          setError('');
+          google.disabled = true;
+          google.setAttribute('aria-busy', 'true');
+          let result;
+          try { result = await startGoogle(); } catch { result = { ok: false }; }
+          if (result?.ok !== false) return;  // on its way to Google
+          google.disabled = false;
+          google.removeAttribute('aria-busy');
+          setError(result.message || 'Google sign-in could not start. Please try again, or continue with email.');
+        });
         el.querySelector('[data-guided-email]').addEventListener('click', () => { state.path = 'email'; void show('account'); });
         el.querySelector('[data-guided-login]').addEventListener('click', () => onLogin());
       },
@@ -197,7 +215,7 @@ export const initGuidedSignup = ({
 
     account: () => ({
       autofocus: 'input[name="guided-email"]',
-      html: `${heading('Create your account', 'Your email is how you log in. We confirm it once you finish.')}
+      html: `${heading('Create your account.', 'Your email is how you log in. We confirm it once you finish.')}
         <label class="guided-field"><span class="guided-field-label">Email address</span>
           <input type="email" name="guided-email" autocomplete="email" inputmode="email" autocapitalize="off" spellcheck="false" placeholder="you@example.com" value="${escapeHtml(a.email)}" required /></label>
         <label class="guided-field"><span class="guided-field-label">Password</span>
@@ -261,7 +279,7 @@ export const initGuidedSignup = ({
       if (!codes.includes(a.phoneCountryCode)) codes.unshift(a.phoneCountryCode);
       return {
         autofocus: 'input[name="guided-phone"]',
-        html: `${heading('A little more about you', 'Your phone number stays private: no member ever sees it.')}
+        html: `${heading('A little more about you.', 'Your phone number stays private: no member ever sees it.')}
           <div class="guided-field"><span class="guided-field-label" id="guided-phone-label">Phone number</span>
             <div class="guided-phone" role="group" aria-labelledby="guided-phone-label">
               <select name="guided-phone-code" aria-label="Country code" autocomplete="tel-country-code">${codes.map((c) => `<option ${c === a.phoneCountryCode ? 'selected' : ''}>${escapeHtml(c)}</option>`).join('')}</select>
@@ -420,6 +438,7 @@ export const initGuidedSignup = ({
 
     interests: () => {
       let query = '';
+      let submitted = false;
       const picked = () => new Set(a.interests.map((p) => p.id));
       return {
         primary: 'Finish',
@@ -525,8 +544,13 @@ export const initGuidedSignup = ({
         ready: () => a.interests.length >= 1 && a.interests.length <= MAX_INTERESTS && Boolean(state.nodes),
         notReady: () => COPY.interestsMissing,
         submit: async () => {
-          const result = await submit({ ...a, adult: true, interests: a.interests.map(({ id, label, mode }) => ({ id, label, mode })) });
-          if (!result?.ok) return { screen: result?.screen || 'interests', message: result?.message || COPY.saveFailed };
+          // One submit per Finish: a second tap or Enter that slips through is ignored (the latch opens again only
+          // when the save failed and the member is asked to try again).
+          if (submitted) return null;
+          submitted = true;
+          let result;
+          try { result = await submit({ ...a, adult: true, interests: a.interests.map(({ id, label, mode }) => ({ id, label, mode })) }); } catch (error) { submitted = false; throw error; }
+          if (!result?.ok) { submitted = false; return { screen: result?.screen || 'interests', message: result?.message || COPY.saveFailed }; }
           // Saved (or kept for after the email is confirmed): the coordinates and the password leave memory.
           cancelGeo();
           if (a.area?.kind === 'geo') a.area = { kind: 'keep', label: '' };
@@ -562,6 +586,7 @@ export const initGuidedSignup = ({
 
   next.addEventListener('click', () => { void goNext(); });
   back.addEventListener('click', () => {
+    if (state.busy) return;
     const target = backTarget(state.path, state.screen, state.hasSession);
     if (target) void show(target);
   });
@@ -572,6 +597,12 @@ export const initGuidedSignup = ({
     if (!(target instanceof Element) || !host.contains(target) || target.closest('button, a, textarea')) return;
     event.preventDefault();
     void goNext();
+  });
+
+  // Back from Google (the page restored from the back-forward cache): the Google button is usable again.
+  window.addEventListener('pageshow', (event) => {
+    if (!event.persisted) return;
+    root.querySelectorAll('[data-guided-google]').forEach((b) => { b.disabled = false; b.removeAttribute('aria-busy'); });
   });
 
   // Phones: keep the primary button above the on-screen keyboard.

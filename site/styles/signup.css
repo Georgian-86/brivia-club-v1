@@ -164,7 +164,8 @@
   letter-spacing: .18em;
   text-transform: uppercase;
 }
-.guided-screen h2 {
+/* The question is the page's h1; .guided raises it above the older .auth-view h1 rules (auth-modal / auth-polish). */
+.guided .guided-screen h1 {
   margin: 0 0 var(--space-3);
   color: var(--g-deep);
   font-family: var(--font-heading);
@@ -175,7 +176,21 @@
   overflow-wrap: anywhere;
   outline: none;
 }
-.guided-screen h2 em { font-style: italic; }
+.guided .guided-screen h1 em { color: inherit !important; font-style: italic; }
+/* The guided view also carries .auth-signup, whose legacy h1 rules (auth-polish.css, mobile-final-fixes.css) use
+   !important sizes, centring and tight tracking meant for the classic form's one-line title. The question heading
+   keeps its own type: these !important values only win over those legacy rules. */
+.auth-shell .guided .guided-screen h1 {
+  max-width: none;
+  color: var(--g-deep) !important;
+  font-family: var(--font-heading) !important;
+  font-size: clamp(32px, 3.6vw, 46px) !important;
+  font-weight: 500 !important;
+  letter-spacing: -.02em !important;
+  line-height: 1.06 !important;
+  text-align: left !important;
+  white-space: normal !important;
+}
 .guided-helper {
   margin: 0 0 var(--space-5);
   color: var(--g-muted);
@@ -294,13 +309,14 @@
   font: inherit;
   font-size: var(--text-16);
   font-weight: 600;
-  letter-spacing: .01em;
+  letter-spacing: 0;
   cursor: pointer;
   transition: border-color var(--motion-fast) var(--ease), background var(--motion-fast) var(--ease), box-shadow var(--motion-fast) var(--ease), transform var(--motion-fast) var(--ease);
 }
-.guided-choice:hover { border-color: var(--g-wine); transform: translateY(-1px); box-shadow: 0 10px 24px -16px color-mix(in srgb, var(--brivia-deep-wine) 60%, transparent); }
+.guided-choice:hover:not(:disabled) { border-color: var(--g-wine); transform: translateY(-1px); box-shadow: 0 10px 24px -16px color-mix(in srgb, var(--brivia-deep-wine) 60%, transparent); }
 .guided-choice[aria-pressed="true"] { border-color: var(--g-wine); background: var(--g-tint); }
 .guided-choice[aria-busy="true"] { cursor: progress; }
+.guided-choice:disabled { opacity: .75; cursor: progress; }
 .guided-choice--primary { border-color: var(--g-wine); background: var(--g-wine); color: var(--g-paper); }
 .guided-choice--primary:hover { background: var(--g-deep); }
 .guided-choice-icon { flex: none; width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
@@ -448,14 +464,15 @@
   background: none;
   color: var(--g-wine);
   font: inherit;
-  font-size: var(--text-14);
-  font-weight: 700;
-  letter-spacing: .06em;
-  text-transform: uppercase;
+  font-size: var(--text-16);
+  font-weight: 600;
+  letter-spacing: 0;
+  text-transform: none;
   cursor: pointer;
 }
 .guided-back svg, .guided-next-icon { flex: none; width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
-.guided-back:hover { color: var(--g-deep); }
+.guided-back:hover:not(:disabled) { color: var(--g-deep); }
+.guided-back:disabled { opacity: .45; cursor: not-allowed; }
 .guided-back[hidden] { display: inline-flex; visibility: hidden; }
 .guided-next {
   display: inline-flex;
@@ -472,10 +489,10 @@
   color: var(--g-paper);
   box-shadow: 0 14px 30px -14px color-mix(in srgb, var(--color-chat-wine) 70%, transparent);
   font: inherit;
-  font-size: var(--text-14);
-  font-weight: 700;
-  letter-spacing: .1em;
-  text-transform: uppercase;
+  font-size: var(--text-16);
+  font-weight: 600;
+  letter-spacing: 0;
+  text-transform: none;
   cursor: pointer;
   transition: background var(--motion-fast) var(--ease), transform var(--motion-fast) var(--ease), opacity var(--motion-fast) var(--ease);
 }
@@ -483,7 +500,7 @@
 .guided-next:disabled { opacity: .45; cursor: not-allowed; box-shadow: none; }
 .guided-next[aria-busy="true"] { opacity: .75; cursor: progress; }
 .guided :focus-visible { outline: 2px solid var(--g-wine); outline-offset: 3px; }
-.guided h2:focus-visible { outline: none; }
+.guided h1:focus-visible { outline: none; }
 
 /* Phones: the card becomes the page; the primary button is pinned to the bottom, above the keyboard. */
 @media (max-width: 780px) {
@@ -506,7 +523,7 @@
   .guided-bubble + .guided-bubble::after { top: 16px; right: calc(50% + 20px); left: calc(-50% + 20px); }
   .guided-bubble-name { display: none; }
   .guided-step-label { margin-bottom: var(--space-4); }
-  .guided-screen h2 { font-size: clamp(30px, 9vw, 38px); }
+  .auth-shell .guided .guided-screen h1 { font-size: clamp(30px, 9vw, 38px) !important; }
   /* Sticky, not fixed: the auth shell is transformed (its float animation), which would anchor a fixed bar to the
      shell instead of the screen. The card is a screen tall, so the bar rests on the bottom edge. */
   .guided-actions {
@@ -530,5 +547,5 @@
   .guided-bubble.is-current .guided-bubble-dot { animation: none; }
   .guided-reveal-mark { animation: none; }
   .guided-bubble-dot, .guided-bubble + .guided-bubble::after, .guided-choice, .guided-next, .guided-option { transition: none; }
-  .guided-choice:hover, .guided-next:hover:not(:disabled) { transform: none; }
+  .guided-choice:hover:not(:disabled), .guided-next:hover:not(:disabled) { transform: none; }
 }
