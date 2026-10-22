@@ -416,6 +416,41 @@ try {
     check(`menu sheet 375: a fast 40 px flick closes it (${flickClosed})`, () => assert.equal(flickClosed, true));
     await moving.context.close();
   }
+  // Section "chat list width" (VFIX 1): between the phone layout and wide desktop the conversation list keeps a readable
+  // width (names, search placeholder and footer line are not cut) while the thread stays usable. 768, 820, 900, 1024
+  // and 1180 wide, in portrait and landscape.
+  for (const width of [768, 820, 900, 1024, 1180]) {
+    for (const [orient, height] of [['portrait', Math.round(width * 1.4)], ['landscape', Math.round(width * 0.65)]]) {
+      const tag = `${width}x${height} ${orient}`;
+      const context = await stub.newContext(browser, { width, height }, { reducedMotion: 'reduce', isMobile: true, hasTouch: true });
+      const page = await stub.open(context, { path: '/app.html?view=chat', errors: pageErrors });
+      await page.waitForFunction(() => document.querySelector('#chat-list [data-chat-id]'), null, { timeout: 10000 });
+      await page.locator('#chat-list .chat-row-copy > span').first().click({ timeout: 5000 });
+      await page.waitForFunction(() => document.querySelectorAll('#chat-messages .message').length >= 3, null, { timeout: 10000 });
+      await page.waitForTimeout(300);
+      const m = await page.evaluate(() => {
+        const list = document.querySelector('#chat-list');
+        const name = document.querySelector('#chat-list .chat-row-copy strong');
+        const search = document.querySelector('#chat-list .inbox-search input');
+        const after = getComputedStyle(list, '::after');
+        return {
+          list: list.getBoundingClientRect().width, win: document.querySelector('#chat-window').getBoundingClientRect().width,
+          nameCut: name.scrollWidth > name.clientWidth + 1, nameText: name.textContent,
+          searchCut: (() => { const c = getComputedStyle(search); const g = document.createElement('canvas').getContext('2d'); g.font = `${c.fontStyle} ${c.fontWeight} ${c.fontSize} ${c.fontFamily}`; return g.measureText(search.placeholder).width > search.clientWidth - parseFloat(c.paddingLeft) - parseFloat(c.paddingRight) + 1; })(), searchWidth: search.clientWidth,
+          footerWrap: after.whiteSpace, scrollWidth: document.documentElement.scrollWidth, innerWidth,
+        };
+      });
+      const hint = JSON.stringify(m);
+      check(`chat list ${tag}: the list is at least 280 px wide, the thread at least 400 px ${hint}`, () => { assert.ok(m.list >= 279.5, `list ${m.list}`); assert.ok(m.win >= 399.5, `thread ${m.win}`); });
+      check(`chat list ${tag}: the name, the search placeholder and the footer line are not cut ${hint}`, () => {
+        assert.equal(m.nameCut, false, `name "${m.nameText}" cut`);
+        assert.equal(m.searchCut, false, 'search field cut');
+        assert.notEqual(m.footerWrap, 'nowrap', 'footer line cannot wrap');
+      });
+      check(`chat list ${tag}: no horizontal overflow ${m.scrollWidth}/${m.innerWidth}`, () => assert.equal(m.scrollWidth, m.innerWidth));
+      await context.close();
+    }
+  }
   check(`no uncaught page errors (${pageErrors.join(' | ')})`, () => assert.deepEqual(pageErrors, []));
 } finally {
   await browser?.close();
