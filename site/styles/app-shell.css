@@ -112,6 +112,9 @@ body.app-body .app-view[data-view="profile"] .profile-board-content{overflow:vis
   }
   body.app-body .app-topbar .app-notification-button{right:56px}
 
+  /* The toast rests above the tab bar; when that would cover the control just used it sits under the header (toast-place.js). */
+  body.app-body .app-toast.toast-top{top:calc(54px + env(safe-area-inset-top, 0px) + var(--space-3));bottom:auto}
+
   body.app-body .app-tabbar{
     position:fixed;
     right:0;
