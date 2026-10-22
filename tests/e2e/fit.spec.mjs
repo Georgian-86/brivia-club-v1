@@ -23,7 +23,10 @@
 // bottom is auto; at 820x600 to 1600x1040 (and without popover support) it never covers ⚙ and stays under the header; at
 // 375 a tap on the scrim over EDIT PROFILE or the brand closes the sheet and reaches nothing, the page does not scroll,
 // and swipe down (past 60 px or a flick) closes it while a short drag snaps back.
-// Section "blocked send" belong to later tasks of the wave and are added to this file by them.
+// Section "blocked send" (A5, migration 0013; 320x568, 375x812, 390x844, 768x1024, 1280x800, 1440x900, 1920x1080): the
+// member A blocked writes to A. The server stores the message and withholds it from A, so the insert answers 201 exactly
+// like any other send and the sender's own thread reads it back. Enter sends it: the bubble shows as sent (mine), the
+// composer clears, and no toast or error appears. Nothing in the client may differ from an ordinary send.
 import assert from 'node:assert/strict';
 import { mkdirSync } from 'node:fs';
 import path from 'node:path';
@@ -450,6 +453,51 @@ try {
       check(`chat list ${tag}: no horizontal overflow ${m.scrollWidth}/${m.innerWidth}`, () => assert.equal(m.scrollWidth, m.innerWidth));
       await context.close();
     }
+  }
+  // Section "blocked send" (A5).
+  const BLOCKED_SEND = 'Are we still on for Saturday at the club?';
+  for (const [width, height] of [[320, 568], [375, 812], [390, 844], [768, 1024], [1280, 800], [1440, 900], [1920, 1080]]) {
+    const tag = `${width}x${height}`;
+    const phone = width <= 780;
+    st.messages = [text(1), text(2)];
+    st.routes = { ...(st.routes || {}), 'POST brivia_messages': { status: 201 } };
+    const context = await stub.newContext(browser, { width, height }, { reducedMotion: 'reduce', ...(phone ? { isMobile: true, hasTouch: true } : {}) });
+    // The server keeps the row (withheld from A only): the sender's next read returns it, as for any message.
+    const posted = [];
+    await context.route(/\/rest\/v1\/brivia_messages/, (route) => {
+      if (route.request().method() === 'POST') posted.push(JSON.parse(route.request().postData() || '{}'));
+      if (route.request().method() === 'POST' && st.routes['POST brivia_messages'].status < 300) {
+        const row = posted[posted.length - 1];
+        st.messages.push({ id: `sent-${posted.length}`, message_type: 'text', created_at: new Date().toISOString(), ...row });
+      }
+      return route.fallback();
+    });
+    const page = await stub.open(context, { path: '/app.html?view=chat', errors: pageErrors });
+    await page.waitForFunction(() => document.querySelector('#chat-list [data-chat-id]'), null, { timeout: 10000 });
+    await page.locator('#chat-list .chat-row-copy > span').first().click({ timeout: 5000 });
+    await page.waitForFunction(() => document.querySelectorAll('#chat-messages .message').length >= 2, null, { timeout: 10000 });
+    // Every toast shown from here on is recorded (a toast hides itself after 2.6 s).
+    await page.evaluate(() => {
+      window.__toasts = [];
+      const toast = document.querySelector('#app-toast');
+      new MutationObserver(() => { if (toast.classList.contains('show')) window.__toasts.push(toast.textContent.trim()); }).observe(toast, { attributes: true, attributeFilter: ['class'], childList: true, characterData: true, subtree: true });
+    });
+    const input = page.locator('#chat-input');
+    await input.fill(BLOCKED_SEND);
+    await input.press('Enter');
+    const shown = await page.waitForFunction((body) => [...document.querySelectorAll('#chat-messages .message.me')].some((m) => m.textContent.includes(body)), BLOCKED_SEND, { timeout: 5000 }).then(() => true, () => false);
+    await page.waitForTimeout(800);
+    const s = await page.evaluate(() => {
+      const toast = document.querySelector('#app-toast');
+      return { value: document.querySelector('#chat-input').value, toast: [...new Set(window.__toasts)].join(' | ') || (toast?.classList.contains('show') ? toast.textContent.trim() : ''), attachmentError: document.querySelector('.chat-attachment-error:not([hidden])')?.textContent.trim() || '', scrollWidth: document.documentElement.scrollWidth, innerWidth };
+    });
+    if (SHOTS) await page.screenshot({ path: path.join(SHOTS, `blocked-send-${tag}.png`) });
+    check(`blocked send ${tag}: one insert to A with the text (${posted.length})`, () => { assert.equal(posted.length, 1); assert.equal(posted[0].recipient_id, A); assert.equal(posted[0].body, BLOCKED_SEND); });
+    check(`blocked send ${tag}: the bubble shows as sent in my thread`, () => assert.ok(shown));
+    check(`blocked send ${tag}: the composer clears (${JSON.stringify(s.value)})`, () => assert.equal(s.value, ''));
+    check(`blocked send ${tag}: no toast and no error (${JSON.stringify([s.toast, s.attachmentError])})`, () => { assert.equal(s.toast, ''); assert.equal(s.attachmentError, ''); });
+    check(`blocked send ${tag}: no horizontal overflow ${s.scrollWidth}/${s.innerWidth}`, () => assert.ok(s.scrollWidth <= s.innerWidth));
+    await context.close();
   }
   check(`no uncaught page errors (${pageErrors.join(' | ')})`, () => assert.deepEqual(pageErrors, []));
 } finally {

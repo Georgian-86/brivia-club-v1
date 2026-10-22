@@ -3379,9 +3379,10 @@ const openShareConfirm = ({ title, lead = '', preview, note, confirmLabel, icon 
   dialog.showModal();
   dialog.querySelector('[data-share-confirm]')?.focus();
 });
-// The composer's send-error copy (shared with the text send below).
+// The composer's send-error copy (shared with the text send below). Since 0013 a block never refuses a send (the
+// message is withheld), so a refusal means the pair is no longer matched: neutral copy, never the word "blocked".
 const chatSendErrorCopy = (error) => (/row-level security|policy|brivia_is_blocked_between|blocked/i.test(error?.message || '')
-  ? 'This conversation is blocked. Unblock the user before sending a message.'
+  ? 'You can no longer message this member.'
   : (error?.message || 'Message could not be saved.'));
 const sendShare = async (person, send) => {
   if (shareBusy || !supabase || !memberProfile.id) return;

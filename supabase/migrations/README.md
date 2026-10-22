@@ -1,6 +1,6 @@
 # Migrations: apply and deploy runbook
 
-The files here are applied **by hand in the Supabase SQL editor, as `postgres`, in order** (`0001` → `0011`; there is
+The files here are applied **by hand in the Supabase SQL editor, as `postgres`, in order** (`0001` → `0013`; there is
 no `0007`). Each
 file is idempotent: the local harness (`bash supabase/tests/run.sh`) applies every file twice. Verify locally with
 the harness before touching the live project. `supabase/legacy/` is archive only and is never applied.
@@ -421,7 +421,7 @@ checks, the four resume policies, the two typing policies on `realtime.messages`
 
 ### A5: blocked sends are withheld
 
-Moved to `0013` so 0012 could go live first (C's client was already live without its tables).
+Not in this file: see the section "0013" below (moved there so 0012 could go live first).
 
 ### C: post likes and saves
 
@@ -491,3 +491,92 @@ includes "Matched members can receive typing" (SELECT) and "Matched members can 
 `{authenticated}`. Any other broad permissive `realtime.messages` policy already on the project would also open typing
 topics, so check that none exists. Idempotent (`create or replace`, `drop policy if exists`). Tested by
 `supabase/tests/d-typing.test.sql` (T1-T5).
+
+## 0013: a blocked sender's messages are stored and withheld, never refused (polish wave A5). **Not yet applied**
+
+Why: before `0013`, a message to a match who has blocked you was refused by the insert policy (an RLS error, 42501),
+and the client showed "This conversation is blocked": the block was revealed to the blocked member. From `0013` a
+send between a blocked pair (either direction) succeeds exactly as before, the sender's own thread shows it, and the
+recipient never receives it: no row, no Realtime event, no notification or unread count, no attachment, no resume.
+Withheld is permanent (unblocking does not release it); moderation evidence (`report_member`) still includes withheld
+rows. No client deploy is needed: the client already treats a 201 as sent.
+
+What it does:
+
+- creates `brivia_private.withheld_message (message_id uuid primary key references public.brivia_messages(id) on delete
+  cascade, created_at timestamptz)`, RLS on with no policy, every privilege revoked from `public`, `anon`,
+  `authenticated` (server only, in the non-exposed schema);
+- adds `brivia_private.brivia_can_send(p_recipient)`: the 0008 `brivia_can_message` body without the block clause
+  (matched and same world), and `brivia_private.brivia_message_visible(p_id, p_sender, p_recipient)`: true for the
+  sender, and for the recipient unless the message is withheld. Both stable, security definer, `search_path = public`,
+  execute for `authenticated` only;
+- adds the trigger `brivia_messages_withhold_blocked` (after insert, for each row) running
+  `public.brivia_withhold_blocked_message()` (security definer, execute revoked from `public`, `anon`,
+  `authenticated`): a withheld mark when `public.brivia_pair_is_blocked(sender, recipient)`, in the same transaction;
+- redefines, each from its latest live definition plus one clause: the `brivia_messages` select policy "Completed
+  members can view their messages" (0008, plus `brivia_message_visible`), the insert policy "Completed members can send
+  messages" (0006, with `brivia_can_send` in place of `brivia_can_message`; still exactly one insert policy), and on
+  `storage.objects` "Participants can view message attachments" and "Members can read their resume or one shared with
+  them" (both 0012 section D, plus `brivia_message_visible` inside the `exists`).
+
+Realtime: the chat listens with `postgres_changes` (INSERT on `public.brivia_messages`, published in
+`supabase_realtime` since 0001). Realtime checks the subscriber's select policy on each new row after commit, when the
+withheld mark already exists, so the recipient gets no event. The unread count and the notification list are built
+from the same select (`site/scripts/app.js`), so they never count a withheld row.
+
+Pre-flight (read-only; every line must answer as shown):
+
+```sql
+-- 0012 is live: the attachments policy carries the resume exclusion and the resume read policy exists
+select count(*) from pg_policies where schemaname = 'storage' and tablename = 'objects'
+   and ((policyname = 'Participants can view message attachments' and qual ~ 'resume')
+     or policyname = 'Members can read their resume or one shared with them');                       -- 2
+-- brivia_messages has exactly the two policies 0013 redefines (select with the world rule, insert with can_message)
+select policyname, cmd, coalesce(qual, with_check) ~ '(brivia_pair_world_ok|brivia_can_message)'
+  from pg_policies where schemaname = 'public' and tablename = 'brivia_messages' order by 1;
+-- Completed members can send messages | INSERT | t
+-- Completed members can view their messages | SELECT | t
+-- the helpers 0013 relies on exist with these signatures
+select to_regprocedure('public.brivia_pair_is_blocked(uuid,uuid)') is not null,
+       to_regprocedure('public.brivia_in_test_world(uuid)') is not null,
+       to_regprocedure('brivia_private.brivia_pair_world_ok(uuid,uuid)') is not null,
+       to_regprocedure('brivia_private.brivia_can_message(uuid)') is not null;                     -- t, t, t, t
+select to_regclass('brivia_private.withheld_message');                                             -- null (first apply)
+```
+
+Apply, as `postgres` in the SQL editor (small and idempotent; avoid the cron window 20:17–20:37 UTC). The file's first
+line is `set lock_timeout = '5s';`: replacing the policies briefly locks `brivia_messages` and `storage.objects`, so a
+busy moment fails fast instead of queueing chat traffic behind it. On a lock timeout, run the whole file again.
+
+```sql
+set lock_timeout = '5s';
+-- paste and run 0013_blocked_sends_withheld.sql
+```
+
+Post-apply checks (read-only):
+
+```sql
+select count(*) from brivia_private.withheld_message;                                              -- runs; 0 at first
+select policyname, cmd, coalesce(qual, with_check) ~ '(brivia_message_visible|brivia_can_send)'
+  from pg_policies where schemaname = 'public' and tablename = 'brivia_messages' order by 1;
+-- Completed members can send messages | INSERT | t
+-- Completed members can view their messages | SELECT | t
+select policyname from pg_policies where schemaname = 'storage' and tablename = 'objects'
+   and qual ~ 'brivia_message_visible' order by 1;
+-- Members can read their resume or one shared with them
+-- Participants can view message attachments
+select tgname, tgenabled, (tgtype & 1) = 1 as per_row, (tgtype & 2) = 0 as after, (tgtype & 4) = 4 as on_insert
+  from pg_trigger where tgrelid = 'public.brivia_messages'::regclass and not tgisinternal order by 1;
+-- includes brivia_messages_withhold_blocked | O | t | t | t
+select has_table_privilege('authenticated', 'brivia_private.withheld_message', 'select'),
+       has_function_privilege('authenticated', 'public.brivia_withhold_blocked_message()', 'execute'),
+       has_function_privilege('anon', 'brivia_private.brivia_can_send(uuid)', 'execute');              -- f, f, f
+```
+
+Expected advisor notes (intended, not failures): `brivia_private.brivia_can_send` and
+`brivia_private.brivia_message_visible` are security definer policy helpers executable by `authenticated`, the same
+intended case as `brivia_can_message` (not in an exposed schema). `brivia_private.withheld_message` may show "RLS
+enabled, no policy" (INFO): intended, the table is server only. `public.brivia_withhold_blocked_message` is a trigger
+function with execute revoked from `anon` and `authenticated`; if a lint lists it as callable, that is a finding.
+Tested by `supabase/tests/a5-blocked-send.test.sql` (S1-S8) and `orbit-hygiene.test.sql` H3; e2e
+`tests/e2e/fit.spec.mjs` section "blocked send".
