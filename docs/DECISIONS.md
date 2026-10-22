@@ -1538,3 +1538,9 @@ controls (a tester or a seeded test member), never a real member, so no new expo
   latest 50 rows, so a long withheld flood can push older messages out of that window. Revisit with the P0-C
   moderation work (rate limit or evidence that keeps pre-block messages).
 
+## D-078: The auth page profiles heading reads "Your kind is already here." again (founder, 2026-10-22)
+
+- The founder asked for the original line on the login page's profile section: eyebrow "A FEW PEOPLE IN THE ROOM",
+  heading "YOUR KIND / IS ALREADY HERE.", keeping the current Bodoni serif heading font (only the words change).
+- This reverses the R10 honesty copy on that heading (29f1e24: "EXAMPLE PROFILES", "THE KIND OF PEOPLE WE'RE BUILDING
+  FOR."). The founder owns the product copy; the marquee cards are still showcase cards, not live members.

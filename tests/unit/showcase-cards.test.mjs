@@ -36,3 +36,9 @@ test('the marquee caption carries no head count (founder ruling)', () => {
   assert.equal(note, 'PEOPLE LIKE YOU · OPEN POSSIBILITIES');
   assert.doesNotMatch(authHtml, /THREE PEOPLE/i);
 });
+
+test('the profiles heading reads "Your kind is already here." in the serif heading font (founder, 2026-10-22)', () => {
+  assert.match(authHtml, /<p class="auth-eyebrow">A FEW PEOPLE IN THE ROOM<\/p><h2 id="community-preview-title">YOUR KIND <br \/><em>IS ALREADY HERE\.<\/em><\/h2>/);
+  const css = readFileSync('site/styles/auth-polish.css', 'utf8');
+  assert.match(css, /\.community-preview-heading h2\{font-family:var\(--font-heading\)/);
+});
