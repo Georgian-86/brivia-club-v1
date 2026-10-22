@@ -293,11 +293,53 @@ const formatNotificationTime = (value) => {
   if (age < 24 * 60 * 60 * 1000) return `${Math.floor(age / (60 * 60 * 1000))}h`;
   return date.toLocaleDateString([], { day: 'numeric', month: 'short' });
 };
-const closeNotificationPanel = () => {
+// Where popovers exist (every current browser) the notification panel opens in the top layer (popover="manual"), like the
+// profile settings menu: above the chat list and every other view. Without them it is position:fixed above .chat-window.
+const POPOVER = typeof HTMLElement !== 'undefined' && typeof HTMLElement.prototype.showPopover === 'function';
+const notificationPanelOpen = () => {
+  const panel = document.querySelector('#app-notification-panel');
+  return Boolean(panel) && !panel.hasAttribute('hidden');
+};
+// Fixed position under the bell: its right edge on the bell's right edge, always inside 8 px of the viewport, and no
+// taller than the room left under it.
+const placeNotificationPanel = () => {
   const panel = document.querySelector('#app-notification-panel');
   const button = document.querySelector('#app-notification-button');
+  if (!panel || !button || panel.hasAttribute('hidden')) return;
+  const bell = button.getBoundingClientRect();
+  const width = document.documentElement.clientWidth;
+  const top = Math.round(bell.bottom + 8);
+  panel.style.maxHeight = `${Math.max(120, window.innerHeight - top - 8)}px`;
+  const left = Math.max(8, Math.min(bell.right - panel.offsetWidth, width - panel.offsetWidth - 8));
+  Object.assign(panel.style, { top: `${top}px`, left: `${Math.round(left)}px`, right: 'auto' });
+  // Without popovers the panel stays inside the header, whose backdrop-filter makes it the containing block of a fixed
+  // child; when .app-wrap has scrolled the header up (focus returning to the bell does that) the panel landed over the
+  // bell. Correct by whatever offset the containing block adds, so it always starts under the bell.
+  const placed = panel.getBoundingClientRect();
+  const dy = placed.top - top;
+  const dx = placed.left - left;
+  if (Math.abs(dy) > 0.5 || Math.abs(dx) > 0.5) Object.assign(panel.style, { top: `${Math.round(top - dy)}px`, left: `${Math.round(left - dx)}px` });
+};
+const openNotificationPanel = () => {
+  const panel = document.querySelector('#app-notification-panel');
+  const button = document.querySelector('#app-notification-button');
+  if (!panel || !button) return;
+  // One top layer at a time: the account menu closes when the panel opens (and the panel when the menu opens).
+  closeProfileSettingsMenu();
+  panel.removeAttribute('hidden');
+  document.documentElement.classList.add('notifications-open');
+  if (POPOVER && !panel.matches(':popover-open')) panel.showPopover();
+  button.setAttribute('aria-expanded', 'true');
+  placeNotificationPanel();
+};
+const closeNotificationPanel = ({ returnFocus = false } = {}) => {
+  const panel = document.querySelector('#app-notification-panel');
+  const button = document.querySelector('#app-notification-button');
+  if (POPOVER && panel?.matches(':popover-open')) panel.hidePopover();
   panel?.setAttribute('hidden', '');
+  document.documentElement.classList.remove('notifications-open');
   button?.setAttribute('aria-expanded', 'false');
+  if (returnFocus) button?.focus();
 };
 const renderNotifications = () => {
   const list = document.querySelector('#notification-list');
@@ -368,19 +410,38 @@ const ensureNotificationControls = () => {
   renderNotifications();
   const button = document.querySelector('#app-notification-button');
   const panel = document.querySelector('#app-notification-panel');
+  if (POPOVER) panel?.setAttribute('popover', 'manual');
   button?.addEventListener('click', (event) => {
     event.stopPropagation();
-    const shouldOpen = panel?.hasAttribute('hidden');
-    closeNotificationPanel();
-    if (shouldOpen) { panel?.removeAttribute('hidden'); button.setAttribute('aria-expanded', 'true'); renderNotifications(); loadConnectionRequests(); }
+    if (notificationPanelOpen()) { closeNotificationPanel({ returnFocus: true }); return; }
+    openNotificationPanel();
+    renderNotifications();
+    placeNotificationPanel();
+    loadConnectionRequests();
   });
   document.querySelector('#notification-mark-all')?.addEventListener('click', () => {
     notifications = notifications.map((notification) => ({ ...notification, read: true }));
     saveNotifications();
     renderNotifications();
   });
-  document.addEventListener('click', (event) => { if (!panel?.contains(event.target) && event.target !== button) closeNotificationPanel(); });
-  document.addEventListener('keydown', (event) => { if (event.key === 'Escape') closeNotificationPanel(); });
+  // Capture phase: controls that stopPropagation (chat rows, menus, dialogs) must still close the top-layer panel.
+  document.addEventListener('click', (event) => {
+    if (!notificationPanelOpen() || panel?.contains(event.target) || button?.contains(event.target)) return;
+    const active = document.activeElement;
+    // Focus goes back to the bell unless the click landed on something else that took it.
+    closeNotificationPanel({ returnFocus: !active || active === document.body || panel?.contains(active) });
+  }, true);
+  document.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape' && !event.defaultPrevented && notificationPanelOpen()) { event.preventDefault(); closeNotificationPanel({ returnFocus: true }); }
+  });
+  // The panel is fixed: follow the bell as the page resizes (a rotated phone) or scrolls.
+  window.addEventListener('resize', placeNotificationPanel);
+  window.addEventListener('scroll', () => {
+    if (!notificationPanelOpen()) return;
+    const r = button.getBoundingClientRect();
+    if (r.bottom < 0 || r.top > window.innerHeight) closeNotificationPanel();
+    else placeNotificationPanel();
+  }, { passive: true });
 };
 
 // The honest signal quota (UX_SPEC §B "Signal counter", D-026, D-032). The server quota is the only signal limit:
@@ -431,51 +492,155 @@ document.querySelectorAll('[data-nav-host]').forEach((host) => { host.innerHTML 
 
 // The profile ⚙ menu (Phase C Task 4). One menu exists at a time (the current hero's); the document and window
 // listeners below are bound once, here, so rebuilding the profile never stacks them.
-const POPOVER = typeof HTMLElement !== 'undefined' && typeof HTMLElement.prototype.showPopover === 'function';
 let profileSettings = null;
 const profileSettingsOpen = () => {
   const menu = profileSettings?.menu;
   if (!menu?.isConnected) return false;
   return POPOVER ? menu.matches(':popover-open') : !menu.hidden;
 };
-// Top layer: above ⚙ when the five 44 px items fit under the header, otherwise below it, never under the tab bar;
-// its right edge on ⚙'s right edge, inside the page.
+// At 600 px and under the menu is a bottom sheet (full width, flush with the bottom edge, set by menus-fit.css from
+// data-layout); above that it is a popover anchored to ⚙. menuLayout is the one place the breakpoint lives.
+const menuLayout = (viewportWidth) => (viewportWidth <= 600 ? 'sheet' : 'popover');
+// Popover: never over ⚙. Below it when the box fits above the tab bar, else above it when it fits under the header,
+// else on the roomier side with a max-height (the menu scrolls inside). The script owns every inset: a bottom or right
+// that a stylesheet leaves (Safari's UA `[popover]{inset:0}`) would stretch the box from its top to the window's edge,
+// so both are set to auto before the natural height is read. Without popover support the menu stays absolute in the
+// hero and gets the same top, converted to its offset parent, so it never rises over the header.
 const placeProfileSettingsMenu = () => {
   const { settings, menu } = profileSettings;
+  menu.dataset.layout = menuLayout(window.innerWidth);
+  if (menu.dataset.layout === 'sheet') {
+    Object.assign(menu.style, { top: '', left: '', right: '', bottom: '', maxHeight: '' });
+    return;
+  }
+  Object.assign(menu.style, { bottom: 'auto', maxHeight: 'none', ...(POPOVER ? { right: 'auto' } : {}) });
   const r = settings.getBoundingClientRect();
   const height = menu.offsetHeight;
   const headerBottom = document.querySelector('.app-topbar')?.getBoundingClientRect().bottom || 0;
   const tabbar = document.querySelector('.app-tabbar');
-  const floor = tabbar && tabbar.getClientRects().length ? tabbar.getBoundingClientRect().top : window.innerHeight;
-  let top = r.top - height - 10;
-  if (top < headerBottom + 8) top = Math.max(headerBottom + 8, Math.min(r.bottom + 10, floor - height - 8));
+  const floor = (tabbar && tabbar.getClientRects().length ? tabbar.getBoundingClientRect().top : window.innerHeight) - 8;
+  const ceiling = Math.max(0, headerBottom) + 8;
+  const below = floor - (r.bottom + 10);
+  const above = r.top - 10 - ceiling;
+  let top;
+  let room = height;
+  if (height <= below) top = r.bottom + 10;
+  else if (height <= above) top = r.top - 10 - height;
+  else if (below >= above) { top = r.bottom + 10; room = below; }
+  else { room = above; top = r.top - 10 - room; }
+  if (top < ceiling) { room -= ceiling - top; top = ceiling; }
+  menu.style.setProperty('--account-menu-header', `${Math.round(Math.max(0, headerBottom))}px`);
+  menu.style.maxHeight = room < height ? `${Math.max(0, Math.floor(room))}px` : '';
+  if (!POPOVER) {
+    const parent = menu.offsetParent;
+    const offset = parent ? parent.getBoundingClientRect().top + parent.clientTop : 0;
+    menu.style.top = `${Math.round(top - offset)}px`;
+    return;
+  }
   const width = document.documentElement.clientWidth;
   const left = Math.max(8, Math.min(r.right - menu.offsetWidth, width - menu.offsetWidth - 8));
   Object.assign(menu.style, { top: `${Math.round(top)}px`, left: `${Math.round(left)}px` });
 };
+// The sheet's scrim: a real element between the page and the sheet (Chromium's UA makes a popover's ::backdrop
+// pointer-events:none, so a tap on the dimmed page used to reach the button under it). In the top layer it is shown
+// just before the menu, so it stacks right under it; without popovers it sits before the menu, one z-index below.
+let accountScrim = null;
+let sheetDrag = null;
+const accountSheetScrim = () => {
+  if (accountScrim?.isConnected) return accountScrim;
+  accountScrim = document.createElement('div');
+  accountScrim.className = 'account-sheet-scrim';
+  accountScrim.setAttribute('aria-hidden', 'true');
+  if (POPOVER) { accountScrim.setAttribute('popover', 'manual'); document.body.append(accountScrim); }
+  else { accountScrim.hidden = true; profileSettings.menu.before(accountScrim); }
+  return accountScrim;
+};
+const setAccountSheet = (open) => {
+  document.documentElement.classList.toggle('account-sheet-open', open);
+  if (!open && !accountScrim) return;
+  const scrim = accountSheetScrim();
+  if (!POPOVER) { scrim.hidden = !open; return; }
+  if (open && !scrim.matches(':popover-open')) scrim.showPopover();
+  if (!open && scrim.matches(':popover-open')) scrim.hidePopover();
+};
 const openProfileSettingsMenu = () => {
   if (!profileSettings?.menu.isConnected) return;
   const { settings, menu } = profileSettings;
-  if (POPOVER) { menu.showPopover(); placeProfileSettingsMenu(); } else menu.hidden = false;
+  closeNotificationPanel();
+  menu.dataset.layout = menuLayout(window.innerWidth);
+  menu.style.transform = '';
+  menu.style.transition = '';
+  if (menu.dataset.layout === 'sheet') setAccountSheet(true);
+  if (POPOVER) menu.showPopover(); else menu.hidden = false;
+  placeProfileSettingsMenu();
   settings.setAttribute('aria-expanded', 'true');
 };
 const closeProfileSettingsMenu = ({ returnFocus = false } = {}) => {
+  setAccountSheet(false);
   if (!profileSettingsOpen()) return;
   const { settings, menu } = profileSettings;
   if (POPOVER) menu.hidePopover(); else menu.hidden = true;
+  menu.style.transform = '';
+  sheetDrag = null;
   settings.setAttribute('aria-expanded', 'false');
   if (returnFocus) settings.focus();
 };
+const accountSheetOpen = () => profileSettingsOpen() && profileSettings.menu.dataset.layout === 'sheet';
 document.addEventListener('click', (event) => {
-  if (profileSettings && !profileSettings.settings.contains(event.target) && !profileSettings.menu.contains(event.target)) closeProfileSettingsMenu();
+  if (!profileSettings) return;
+  const { settings, menu } = profileSettings;
+  if (!settings.contains(event.target) && !menu.contains(event.target)) closeProfileSettingsMenu();
 });
+// While the sheet is open, a tap outside it only closes it: it never reaches the page (a link, EDIT PROFILE, the
+// brand) even where the scrim cannot cover (no popover support). Only real input; a script's own click is left alone.
+window.addEventListener('click', (event) => {
+  if (!event.isTrusted || !accountSheetOpen() || profileSettings.menu.contains(event.target)) return;
+  event.preventDefault();
+  event.stopImmediatePropagation();
+  closeProfileSettingsMenu();
+}, true);
+// Swipe down to close: drag the grabber or the "Signed in as" header. The sheet follows the finger (not under reduced
+// motion); a release past 60 px or a fast flick closes it, anything shorter snaps back (sheetDrag is declared above).
+const reducedMotion = () => window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+document.addEventListener('pointerdown', (event) => {
+  if (!event.isPrimary || !accountSheetOpen()) return;
+  const handle = event.target.closest?.('.profile-settings-grabber, .profile-settings-account');
+  if (!handle || !profileSettings.menu.contains(handle)) return;
+  sheetDrag = { id: event.pointerId, y: event.clientY, dy: 0, samples: [[event.timeStamp, 0]] };
+  try { handle.setPointerCapture(event.pointerId); } catch { /* the pointer is already gone */ }
+});
+document.addEventListener('pointermove', (event) => {
+  if (!sheetDrag || event.pointerId !== sheetDrag.id) return;
+  sheetDrag.dy = Math.max(0, event.clientY - sheetDrag.y);
+  sheetDrag.samples.push([event.timeStamp, sheetDrag.dy]);
+  if (sheetDrag.samples.length > 12) sheetDrag.samples.shift();
+  if (reducedMotion()) return;
+  const { menu } = profileSettings;
+  menu.style.transition = 'none';
+  menu.style.transform = `translateY(${Math.round(sheetDrag.dy)}px)`;
+});
+const endSheetDrag = (event) => {
+  if (!sheetDrag || event.pointerId !== sheetDrag.id) return;
+  const drag = sheetDrag;
+  sheetDrag = null;
+  const dy = Math.max(drag.dy, event.type === 'pointercancel' ? 0 : event.clientY - drag.y);
+  // A flick: the speed over the last 100 ms of the gesture (px per ms), not the average of a slow start.
+  const [t0, dy0] = drag.samples.find(([t]) => event.timeStamp - t <= 100) || [event.timeStamp, dy];
+  const speed = (dy - dy0) / Math.max(1, event.timeStamp - t0);
+  if (event.type !== 'pointercancel' && (dy > 60 || (dy > 16 && speed > 0.3))) { closeProfileSettingsMenu(); return; }
+  const { menu } = profileSettings;
+  menu.style.transition = reducedMotion() ? '' : 'transform .18s ease-out';
+  menu.style.transform = '';
+};
+document.addEventListener('pointerup', endSheetDrag);
+document.addEventListener('pointercancel', endSheetDrag);
 document.addEventListener('keydown', (event) => {
-  if (event.key === 'Escape' && profileSettingsOpen()) { event.preventDefault(); closeProfileSettingsMenu({ returnFocus: true }); }
+  if (event.key === 'Escape' && !event.defaultPrevented && profileSettingsOpen()) { event.preventDefault(); closeProfileSettingsMenu({ returnFocus: true }); }
 });
 window.addEventListener('resize', () => closeProfileSettingsMenu());
 // A top-layer menu is fixed: follow ⚙ while the page scrolls, and close once ⚙ has scrolled out of view.
 window.addEventListener('scroll', () => {
-  if (!POPOVER || !profileSettingsOpen()) return;
+  if (!POPOVER || !profileSettingsOpen() || profileSettings.menu.dataset.layout === 'sheet') return;
   const r = profileSettings.settings.getBoundingClientRect();
   if (r.bottom < 0 || r.top > window.innerHeight) closeProfileSettingsMenu();
   else placeProfileSettingsMenu();
@@ -1957,8 +2122,9 @@ const ensureProfilePhotoEditor = () => {
   const menu = document.createElement('div');
   menu.id = 'profile-settings-menu';
   menu.className = 'profile-settings-menu';
+  menu.setAttribute('aria-label', 'Account menu');
   // "Signed in as" (Phase C Task 5): the only place the member's own email is shown. A <p>, so Tab skips it.
-  menu.innerHTML = '<p class="profile-settings-account">Signed in as <strong></strong></p><button type="button" data-profile-setting="notifications">NOTIFICATIONS</button><button type="button" data-profile-setting="block">BLOCKED USERS</button><button type="button" data-profile-setting="removed">REMOVED CONNECTIONS</button><button type="button" data-profile-setting="privacy">PRIVACY &amp; ACCOUNT</button><button type="button" data-profile-setting="logout">LOG OUT</button>';
+  menu.innerHTML = '<p class="profile-settings-account">Signed in as <strong></strong></p><button type="button" data-profile-setting="notifications">NOTIFICATIONS</button><button type="button" data-profile-setting="block">BLOCKED USERS</button><button type="button" data-profile-setting="removed">REMOVED CONNECTIONS</button><button type="button" data-profile-setting="privacy">PRIVACY &amp; ACCOUNT</button><button type="button" data-profile-setting="logout">LOG OUT</button><span class="profile-settings-grabber" aria-hidden="true"></span>';
   // The menu follows ⚙ in the DOM, so Tab goes ⚙ -> the five items -> EDIT PROFILE. Where popovers exist it opens in
   // the top layer (popover="manual"): above the hero's overflow clip and the dashboard, without leaving its tab order.
   // Without them it toggles `hidden` in place, as before Phase C.

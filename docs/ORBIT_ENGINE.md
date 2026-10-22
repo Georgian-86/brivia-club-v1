@@ -786,11 +786,21 @@ select log_impressions($1, $4);
   names from `place(id, name, region, country, is_launch)`; its centroid columns are never granted.
 - **Client capture (UX_SPEC §A, D-035).** The signup asks for geolocation only after the privacy explainer, with
   `{ enableHighAccuracy: false, timeout: 10000, maximumAge: 600000 }`; denial, timeout, a missing API or an insecure
-  context opens "Pick my city". The coordinates stay in one in-memory variable until `set_home_location` succeeds,
+  context opens "Pick my city" (polish wave A1, `site/scripts/geo-locate.js` `locateOnce`) with a line that says why:
+  code 1 → "Location is blocked. Allow it in your browser's site settings (on a Mac or phone, also check that location is on for your browser), or pick your city."; code 2 →
+  "Your device couldn't find a location. Check that location services are on, or pick your city."; code 3 →
+  "Finding your location took too long. Try again, or pick your city." plus a "Try again" button (one more call); a
+  missing API or an insecure context (the API is never called) → "No problem. Pick your city instead.". After 15 s
+  without an answer the city list opens ("Still waiting for your browser…") but the attempt keeps listening for 30 s
+  from the click, so an "Allow" answered late still counts unless the member picked an area meanwhile (their pick
+  wins, and the waiting line goes). Pressing the button again while waiting shows "Still looking for your location…";
+  leaving the area step (Back, or the form closing for email confirmation) cancels the attempt, so a later answer is
+  ignored. The coordinates stay in one in-memory variable until `set_home_location` succeeds,
   then are dropped; they never reach `localStorage` / `sessionStorage`, a URL, the DOM or a log. A signup that waits
   for email confirmation stores only `{ kind: 'city', placeId }` or `{ kind: 'geo' }` (with interests as
   `{ id, points, mode }`, sensitive ones left out, and a 7-day `savedAt` expiry); after login a city is applied
-  and a geo choice asks for the location again. A `PT429` shows "Try again later." on the location step.
+  and a geo choice asks for the location again. A `PT429` (HTTP 429), or any error whose message is exactly
+  `try again later` (a gateway that answers the cap as 400), shows "Try again later." on the location step.
 - **No parameter logging:** the project sets `log_parameter_max_length_on_error = 0` and
   `log_parameter_max_length = 0`; neither pgaudit nor auto_explain logs parameters (`auto_explain.log_parameter_max_length = 0`
   if enabled). A pre-launch test calls `set_home_location` with a known coordinate (e.g. `12.971598, 77.594566`),

@@ -1,1 +1,66 @@
-/* Owner: Task A (menus fit the viewport). Empty scaffold. */
+/* Owner: Task A (menus fit the viewport). */
+
+/* A3: the notification panel opens above every view, anchored to the bell. In the top layer (popover="manual") it
+   needs no z-index; placeNotificationPanel() sets top/left (fixed, right edge on the bell's right edge, 8 px inside
+   the viewport) and a max-height, so the list scrolls when the screen is short. */
+body .notification-panel[popover]{position:fixed;inset:auto;margin:0;z-index:auto;max-width:calc(100vw - 16px)}
+body .notification-panel[popover]:not(:popover-open){display:none}
+body .notification-panel[popover]:popover-open{display:flex;flex-direction:column}
+body .notification-panel[popover] .notification-list{min-height:0;flex:1 1 auto}
+/* Without popover support: fixed, above .chat-window; the header (the panel's stacking context) is raised only while
+   the panel is open, just over the active view (.app-view.is-active is z 100). The panel closes on any other click,
+   so it is never up while a div modal opens. */
+body .notification-panel:not([popover]){position:fixed;z-index:90;max-width:calc(100vw - 16px)}
+body .notification-panel:not([popover]):not([hidden]){display:flex;flex-direction:column}
+body .notification-panel:not([popover]) .notification-list{min-height:0;flex:1 1 auto}
+html.notifications-open body.app-body .app-topbar{z-index:101}
+/* The bell is 27-30 px; give it a 44 px touch target without moving it. */
+body.app-body .app-topbar .app-notification-button::before{content:"";position:absolute;inset:-8px}
+/* 701-780 px: the avatar is 37 px wide and 5vw from the edge, so the bell sits a full avatar width further in (it was
+   covered by the avatar). */
+@media (min-width:701px) and (max-width:780px){
+  body.app-body .app-topbar .app-notification-button{right:calc(clamp(20px,5vw,72px) + 50px)}
+}
+
+/* A4: the Profile ⚙ account menu. Compact: its width follows its content (240-320 px) and its items keep their natural
+   44 px height; nothing in it can grow, so a short or narrow screen can never stretch the rows apart. Its height is
+   fit-content and, as a popover, bottom and right are auto (placeProfileSettingsMenu() also sets them inline): an inset
+   left over by a stylesheet (Safari's UA `[popover]{inset:0}`) can no longer stretch the box to the window's bottom.
+   The cap keeps it under the header (--account-menu-header is the header's bottom, set by the script).
+   At 600 px and under (menuLayout() in app.js sets data-layout) it is a bottom sheet: full width, flush with the bottom
+   edge, rounded top, safe-area padding, a grabber (swipe down to close), over a solid scrim that closes it on a tap. */
+body.app-body[data-app-view] .profile-hero-actions .profile-settings-menu{
+  width:max-content;min-width:240px;max-width:min(320px,calc(100vw - 16px));height:fit-content;
+  max-height:calc(100dvh - var(--account-menu-header,76px) - 16px);
+  overflow-y:auto;overscroll-behavior:contain;display:grid;grid-auto-rows:min-content;align-content:start;gap:2px;
+}
+body.app-body[data-app-view] .profile-hero-actions .profile-settings-menu[popover]:not([data-layout="sheet"]){bottom:auto;right:auto}
+body.app-body .profile-hero-actions .profile-settings-menu button{flex:none;min-height:44px;height:auto}
+.profile-settings-menu .profile-settings-grabber{display:none}
+body.app-body[data-app-view] .profile-hero-actions .profile-settings-menu[data-layout="sheet"]{
+  position:fixed;inset:auto 0 0 0;margin:0;width:auto;min-width:0;max-width:none;max-height:min(80dvh,560px);
+  border-radius:var(--radius-l) var(--radius-l) 0 0;border-bottom:0;
+  padding:var(--space-2) var(--space-3) calc(var(--space-3) + env(safe-area-inset-bottom,0px));
+  animation:account-sheet-in .18s ease-out;
+}
+body.app-body[data-app-view] .profile-hero-actions .profile-settings-menu[data-layout="sheet"] .profile-settings-grabber{
+  display:block;position:relative;order:-1;width:40px;height:4px;margin:0 auto var(--space-2);border-radius:var(--radius-pill);
+  background:var(--color-line);touch-action:none;cursor:grab;
+}
+/* A 44 px tall, wide hit area for the 4 px grabber. */
+.profile-settings-menu[data-layout="sheet"] .profile-settings-grabber::before{content:"";position:absolute;inset:-20px -60px}
+.profile-settings-menu[data-layout="sheet"] .profile-settings-account{padding:var(--space-2) var(--space-3) var(--space-3);touch-action:none}
+/* The scrim (app.js accountSheetScrim): in the top layer just under the sheet, or one z-index under it without popover
+   support. It takes every tap on the dimmed page. While the sheet is open the page does not scroll. */
+.account-sheet-scrim{
+  position:fixed;inset:0;z-index:9;width:auto;height:auto;max-width:none;max-height:none;margin:0;padding:0;border:0;
+  background:color-mix(in srgb,var(--color-wine-deep) 45%,transparent);touch-action:none;overscroll-behavior:none;
+  animation:account-sheet-fade .18s linear;
+}
+.account-sheet-scrim[popover]:not(:popover-open),.account-sheet-scrim[hidden]{display:none}
+html.account-sheet-open{overflow:hidden;overscroll-behavior:none}
+@keyframes account-sheet-in{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:none}}
+@keyframes account-sheet-fade{from{opacity:0}to{opacity:1}}
+@media (prefers-reduced-motion:reduce){
+  body.app-body[data-app-view] .profile-hero-actions .profile-settings-menu[data-layout="sheet"]{animation:account-sheet-fade .12s linear}
+}

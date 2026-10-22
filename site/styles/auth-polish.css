@@ -2755,6 +2755,9 @@
 .auth-signup-form .area-error:empty,
 .auth-signup-form .budget-error:empty { display: none; }
 .auth-signup-form .area-fallback { margin: 0; color: var(--ob-ink); font-size: var(--text-12); font-weight: 600; text-transform: none; letter-spacing: 0; }
+/* A1: after a timeout the line carries a "Try again" button: beside it when it fits, on its own row when not. */
+.auth-signup-form .area-fallback:has([data-area-retry]) { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 10px; }
+.auth-signup-form .area-fallback [data-area-retry] { margin-left: 0; }
 .auth-signup-form .area-city-results {
   display: flex; flex-direction: column; gap: 2px; max-height: 240px; margin: 0; padding: 4px; overflow-y: auto; list-style: none;
   border: 1px solid var(--ob-line); border-radius: 8px; background: white;

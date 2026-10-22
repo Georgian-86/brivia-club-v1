@@ -802,7 +802,8 @@ try {
         assert.equal(menuHits.length, 5);
         menuHits.forEach((m) => { assert.ok(m.onTop, `${m.item} is covered`); assert.ok(m.height >= 44, `${m.item} is ${m.height}px`); });
       });
-      await page.locator('#profile-settings-button').click();
+      // Close it with a click where ⚙ is: the gear itself as a popover, the sheet's scrim (which covers ⚙) on a phone.
+      { const gear = await page.locator('#profile-settings-button').boundingBox(); await page.mouse.click(gear.x + gear.width / 2, gear.y + gear.height / 2); await page.waitForTimeout(150); }
       // Keyboard (fix round 1): Enter on ⚙ opens it, Tab walks the five items in order, Escape closes it and focus
       // returns to ⚙; a view change and a resize close it too.
       const menuState = () => page.evaluate(() => {
