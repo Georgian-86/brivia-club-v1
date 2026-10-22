@@ -535,7 +535,6 @@ body.app-body .app-view[data-view="chat"] .chat-layout .message.has-share small 
 .message-resume,
 .message-place {
   display: flex;
-  flex-wrap: wrap;
   align-items: center;
   gap: var(--space-3);
   min-width: 0;
@@ -577,7 +576,7 @@ body.app-body .app-view[data-view="chat"] .chat-layout .message.has-share small 
 .message-place-copy {
   display: flex;
   min-width: 0;
-  flex: 1 1 8.5rem;
+  flex: 1 1 0;
   flex-direction: column;
   gap: 2px;
 }
@@ -722,4 +721,10 @@ body.app-body .app-view[data-view="chat"] .chat-layout .message.has-share small 
 @media (prefers-reduced-motion: reduce) {
   .app-view[data-view="chat"] .chat-window-head .chat-typing { animation: none; }
   .chat-typing .chat-typing-dots i { opacity: .7; animation: none; }
+}
+
+/* Small phones only: Open drops under the text instead of covering it; wider screens keep it inline. */
+@media (max-width: 360px) {
+  .message-resume { flex-wrap: wrap; }
+  .message-resume .message-resume-copy { flex-basis: 8.5rem; }
 }
