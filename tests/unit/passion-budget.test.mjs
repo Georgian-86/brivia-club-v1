@@ -167,3 +167,29 @@ test('budgetFromRows trims the largest items until the total is at most 20', () 
   assert.ok(huge.items.every((item) => item.points >= 1));
   assert.equal(isComplete(huge), true);
 });
+
+// Fix round 1 (M3): a member who resumes the guided flow with a complete saved budget and finishes without changing
+// the picks keeps their own points and modes; the save is skipped. Any change (or an incomplete saved budget) gets the
+// guided even split, keeping each kept pick's saved mode.
+test('guidedBudget: unchanged picks over a complete saved budget keep the saved points and modes, unchanged = true', async () => {
+  const { guidedBudget } = await import('../../site/scripts/passion-budget.js');
+  const saved = { items: [{ id: 'a', label: 'A', points: 12, mode: 'learn' }, { id: 'b', label: 'B', points: 8, mode: 'teach' }] };
+  const r = guidedBudget([{ id: 'b', label: 'B', mode: 'teach' }, { id: 'a', label: 'A', mode: 'learn' }], saved);
+  assert.equal(r.unchanged, true);
+  assert.deepEqual(r.budget.items, saved.items);
+  assert.notEqual(r.budget.items[0], saved.items[0], 'a copy, not the saved objects');
+});
+
+test('guidedBudget: a changed pick set or an incomplete saved budget gets the even split', async () => {
+  const { guidedBudget } = await import('../../site/scripts/passion-budget.js');
+  const saved = { items: [{ id: 'a', label: 'A', points: 12, mode: 'learn' }, { id: 'b', label: 'B', points: 8, mode: 'play' }] };
+  const added = guidedBudget([{ id: 'a', label: 'A', mode: 'learn' }, { id: 'b', label: 'B', mode: 'play' }, { id: 'c', label: 'C', mode: 'play' }], saved);
+  assert.equal(added.unchanged, false);
+  assert.deepEqual(added.budget.items.map((i) => [i.id, i.points, i.mode]), [['a', 7, 'learn'], ['b', 7, 'play'], ['c', 6, 'play']]);
+  const short = guidedBudget([{ id: 'a', label: 'A' }], { items: [{ id: 'a', label: 'A', points: 5, mode: 'build' }] });
+  assert.equal(short.unchanged, false);
+  assert.deepEqual(short.budget.items, [{ id: 'a', label: 'A', points: 20, mode: 'play' }]);
+  const none = guidedBudget([{ id: 'a', label: 'A' }], null);
+  assert.equal(none.unchanged, false);
+  assert.equal(none.budget.items[0].points, 20);
+});

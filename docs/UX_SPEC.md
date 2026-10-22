@@ -36,6 +36,17 @@ New components reuse these tokens. **No raw hex in new components**, and no new 
 
 ## Flow changes
 
+### A0. Guided signup: one question per screen (D-073, live from 2026-10-22; replaces the 4-step form below)
+
+`auth.html` `#guided-signup`, `signup-flow.js`, `signup-screens.js`, `signup.css`. Screens: Welcome (Continue with
+Google · Continue with email · I already have an account) → Account (email, password, confirm; email path only; the
+account is created at the end, no email code) → 18+ → Name → Details (phone and gender, D-068) → Area ("Use my
+location" with the A1 fallbacks, or a city) → Interests (1–12 picks with an animated "Your picks" tray; no points
+screen, `evenSplit` behind the scenes; private interests not offered) → Reveal, or Verify ("Check your email.") when
+email confirmation is on. "Step n of 6" (email) or "of 5" (Google) with bubbles; one visible question, which is the
+page's h1; Enter = Continue; Back on every question screen; Finish submits once (busy until the next screen shows).
+The classic 4-step form stays behind `VITE_SIGNUP_FLOW=classic` for one release. Notice version `2026-10-05`.
+
 ### A. Onboarding: 4 steps with "Your area" and the Passion Budget (shipped in Iteration 3, Task 8)
 
 The signup (`auth.html`, `script.js`, `passion-budget.js`) has **4 steps**. The progress reads `STEP n OF 4 · …` and the

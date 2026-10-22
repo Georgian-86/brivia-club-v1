@@ -7,11 +7,13 @@ import { buildPendingOnboarding, isPendingExpired, dataUrlToFile } from './pendi
 import { isUnderReview, shouldWithdrawConsent } from './onboarding-guard.js';
 import {
   MAX_INTERESTS, MODES, emptyBudget, addInterest, removeInterest, stepPoints, setMode, pointsLeft, isComplete, toPayload,
-  counterText, budgetFromRows, budgetGateText, spreadRemaining,
+  counterText, budgetFromRows, budgetGateText, spreadRemaining, guidedBudget,
 } from './passion-budget.js';
 import { matchTypedCity } from './area-pick.js';
 import { locateOnce, fallbackCopy, isTryAgainLater, STILL_WAITING_TEXT } from './geo-locate.js';
 import { signupErrorCopy } from './signup-errors.js';
+import { initGuidedSignup } from './signup-screens.js';
+import { signupFlowMode, resumeScreen } from './signup-flow.js';
 import { defaultCoverUrl, normalizeCoverUrl } from './cover-assets.js';
 import { motionAllowed, introPlan, pickHeroSource, markLoaded, INTRO_CAP_MS, INTRO_START_GRACE_MS } from './landing-motion.js';
 import { SOUND_LIMIT_MS, SOUND_STORAGE_KEY, soundPreference, soundPlan, isUnlockEvent, barsToSchedule } from './landing-sound.js';
@@ -706,6 +708,10 @@ if (isStandaloneAuthPage) {
   window.history.replaceState({ briviaAuthView: requestedAuthView }, '', window.location.href);
 }
 const authViews = document.querySelectorAll('[data-auth-view]');
+// Polish wave B (D-073): signup is the guided, one-question-per-screen flow. VITE_SIGNUP_FLOW=classic brings back the
+// 4-step form for one release (a no-code rollback).
+const GUIDED_SIGNUP = signupFlowMode(import.meta.env.VITE_SIGNUP_FLOW) === 'guided' && Boolean(document.querySelector('#guided-signup') || !isStandaloneAuthPage);
+let guidedSignup = null;
 const authStep = authModal?.querySelector('.auth-step');
 const authPanelKicker = authModal?.querySelector('.auth-panel-kicker');
 const authShell = authModal?.querySelector('.auth-shell');
@@ -1568,14 +1574,22 @@ signupSuccess?.querySelectorAll('[data-copy-credential]').forEach((button) => {
   });
 });
 
-const setAuthView = (view, historyMode = 'push') => {
+const setAuthView = (view, historyMode = 'push', { guidedScreen = 'welcome' } = {}) => {
+  // Guided signup: "signup" opens the guided flow (the landing's modal sends the visitor to auth.html#signup).
+  let openGuided = false;
+  if (view === 'signup' && GUIDED_SIGNUP) {
+    if (!isStandaloneAuthPage) { window.location.href = '/auth.html#signup'; return; }
+    view = 'guided';
+    openGuided = true;
+  }
+  const isSignupView = view === 'signup' || view === 'guided';
   // Never leave a view hidden if the envelope transition was interrupted.
   authShell?.classList.remove('is-envelope-opening');
   authModal?.classList.add('is-open');
   if (isStandaloneAuthPage && view !== authHistoryView && historyMode !== 'none') {
     const state = { briviaAuthView: view };
     const nextUrl = new URL(window.location.href);
-    nextUrl.hash = view === 'signup' ? '#signup' : view === 'login' ? '#login' : '';
+    nextUrl.hash = isSignupView ? '#signup' : view === 'login' ? '#login' : '';
     if (historyMode === 'replace') window.history.replaceState(state, '', nextUrl);
     else window.history.pushState(state, '', nextUrl);
   }
@@ -1587,14 +1601,15 @@ const setAuthView = (view, historyMode = 'push') => {
   });
   if (authStep) {
     authStep.textContent = view === 'welcome' ? 'WELCOME' : view === 'login' ? '01 / 02' : '02 / 02';
-    authStep.toggleAttribute('hidden', view === 'signup');  // the counter means nothing beside the 4-step signup
-    authStep.style.display = view === 'signup' ? 'none' : '';
+    authStep.toggleAttribute('hidden', isSignupView);  // the counter means nothing beside the signup's own steps
+    authStep.style.display = isSignupView ? 'none' : '';
   }
   if (authPanelKicker) authPanelKicker.textContent = view === 'welcome' ? 'THE BRIVIA CLUB' : view === 'login' ? 'RETURNING MEMBER' : 'YOUR APPLICATION';
   const authTopSignup = authModal?.querySelector('.auth-top-signup');
-  if (authTopSignup) authTopSignup.innerHTML = view === 'signup' ? 'ALREADY A MEMBER? <b>LOG IN</b>' : 'NEW HERE? <b>CREATE ACCOUNT</b>';
-  if (authShell) authShell.setAttribute('aria-labelledby', view === 'welcome' ? 'auth-welcome-title' : view === 'login' ? 'auth-title' : 'signup-title');
+  if (authTopSignup) authTopSignup.innerHTML = isSignupView ? 'ALREADY A MEMBER? <b>LOG IN</b>' : 'NEW HERE? <b>CREATE ACCOUNT</b>';
+  if (authShell) authShell.setAttribute('aria-labelledby', view === 'welcome' ? 'auth-welcome-title' : view === 'login' ? 'auth-title' : view === 'guided' ? 'signup-screen-title' : 'signup-title');
   if (view === 'signup') signupForm?.querySelector('input')?.focus();
+  if (openGuided && guidedSignup && guidedScreen === 'welcome') void guidedSignup.open({ path: 'email' }, 'welcome');
 };
 
 if (isStandaloneAuthPage) {
@@ -1603,11 +1618,15 @@ if (isStandaloneAuthPage) {
   });
 }
 
+// Resolves { ok: true } once the browser is on its way to Google, or { ok: false, message } when the start failed
+// (the guided Welcome shows the message on its own feedback line; the login card uses #login-note).
+const GOOGLE_START_FAILED = 'Google sign-in could not start. Please try again, or continue with email.';
 const startGoogleAuth = async () => {
   if (!supabaseReady || !supabase) {
-    if (loginNote) loginNote.textContent = 'Google sign-in is not configured yet. Please use email and password.';
-    if (signupFeedback) signupFeedback.textContent = 'Google sign-in is not configured yet. Please use email and password.';
-    return;
+    const message = 'Google sign-in is not configured yet. Please use email and password.';
+    if (loginNote) loginNote.textContent = message;
+    if (signupFeedback) signupFeedback.textContent = message;
+    return { ok: false, message };
   }
   const buttons = authModal?.querySelectorAll('.auth-google-trigger') || [];
   buttons.forEach((button) => { button.disabled = true; });
@@ -1618,16 +1637,102 @@ const startGoogleAuth = async () => {
       provider: 'google',
       options: { redirectTo: `${window.location.origin}/auth.html`, queryParams: { prompt: 'select_account' } },
     });
-    if (!error) return;
-    buttons.forEach((button) => { button.disabled = false; });
-    if (loginNote) loginNote.textContent = error.message || 'Google sign-in could not start.';
-    if (signupFeedback) signupFeedback.textContent = error.message || 'Google sign-in could not start.';
+    if (!error) return { ok: true };
+    throw error;
   } catch (error) {
     buttons.forEach((button) => { button.disabled = false; });
-    if (loginNote) loginNote.textContent = error.message || 'Google sign-in could not start.';
-    if (signupFeedback) signupFeedback.textContent = error.message || 'Google sign-in could not start.';
+    if (loginNote) loginNote.textContent = error?.message || GOOGLE_START_FAILED;
+    if (signupFeedback) signupFeedback.textContent = error?.message || GOOGLE_START_FAILED;
+    return { ok: false, message: GOOGLE_START_FAILED };
   }
 };
+
+// The guided flow's last step (polish wave B3): the answers become the classic form's state (areaChoice and an
+// even-split budget) and run the classic pipeline unchanged: signUp at the end (email path) or the existing session
+// (Google, a returning member) -> saveProfile -> finishOnboarding (declare_adult before area and interests). Without a
+// session (email confirmation on) only the pending profile is kept (never coordinates) and the Verify screen shows.
+// Resolves { ok: true, session } or { ok: false, screen, message } (the screen to show the line on).
+let guidedRow = null;  // the signed-in member's own profile row when the flow resumed (kept fields are not cleared)
+let guidedSaved = null;  // their saved budget (my_interests) when the flow resumed: unchanged picks keep its points
+const GUIDED_DEFAULT_COVER = '/Images/Cover%20images/163BDB0C-64AC-44E7-8663-55C323ADB4FE.PNG';
+const guidedStepFor = (message) => (message === ADULT_SAVE_ERROR ? 'adult'
+  : message === AREA_SAVE_ERROR || message === 'Try again later.' ? 'area' : 'interests');
+const submitGuidedSignup = async (answers) => {
+  if (!supabaseReady || !supabase) return { ok: false, screen: 'interests', message: 'Supabase is not configured.' };
+  const kept = guidedRow ? rowToProfile(guidedRow) : {};
+  const phoneCountryCode = answers.phoneCountryCode || '+91';
+  const phoneNumber = String(answers.phoneNumber || '').replace(/\D/g, '');
+  const profile = {
+    name: String(answers.name || '').trim(),
+    email: '',
+    phoneCountryCode,
+    phoneNumber,
+    phone: `${phoneCountryCode} ${phoneNumber}`.trim(),
+    gender: normalizeSignupGender(answers.gender),
+    experience: kept.experience || '',
+    lookingFor: kept.lookingFor || kept.looking_for || '',
+    coverUrl: normalizeCoverUrl(kept.coverUrl || kept.cover_url || '') || GUIDED_DEFAULT_COVER,
+  };
+  if (kept.photoUrl || kept.photo_url) profile.photoUrl = kept.photoUrl || kept.photo_url;
+  areaChoice = answers.area && ['geo', 'city', 'keep'].includes(answers.area.kind) ? { ...answers.area } : null;
+  // Unchanged picks over a complete saved budget keep the member's own points and modes and are not saved again (M3).
+  const planned = guidedBudget(answers.interests, guidedSaved);
+  budget = planned.budget;
+  try {
+    const { data: sessionData } = await supabase.auth.getSession();
+    let user = sessionData?.session?.user || null;
+    if (!user) {
+      profile.email = String(answers.email || '').trim();
+      const { data, error } = await supabase.auth.signUp({
+        email: profile.email,
+        password: answers.password,
+        options: {
+          emailRedirectTo: `${window.location.origin}/auth.html`,
+          // Auth metadata holds contact basics only: never interests (some are private) or any location.
+          data: { name: profile.name, full_name: profile.name, phone: profile.phone, phoneCountryCode, phoneNumber, gender: profile.gender, coverUrl: profile.coverUrl },
+        },
+      });
+      if (error) return { ok: false, screen: 'account', message: signupErrorCopy(error) };
+      if (!data.user) return { ok: false, screen: 'account', message: 'We could not create your account. Please try again.' };
+      if (!data.session) {
+        // Email confirmation: nothing can be written before a session exists. Keep the interests and only the KIND of
+        // area choice (a city id, or "ask for my location again"); the coordinates are dropped here.
+        const pendingOnboarding = buildPendingOnboarding(budget, isSensitiveInterest, areaChoice);
+        window.localStorage.setItem('brivia-pending-profile', JSON.stringify({ ...profile, ...pendingOnboarding, adultDeclared: true }));
+        areaChoice = null;
+        cancelGeo();
+        return { ok: true, session: false };
+      }
+      user = data.user;
+    } else {
+      profile.email = user.email || '';
+    }
+    adultAlreadyDeclared = Boolean(guidedRow?.adult_declared_at);
+    const { error: profileError } = await saveProfile(user.id, profile, null, null);
+    if (profileError) return { ok: false, screen: 'interests', message: signupErrorCopy(profileError) };
+    await finishOnboarding(user.id, { skipInterests: planned.unchanged });
+    areaChoice = null;
+    window.localStorage.removeItem('brivia-pending-profile');
+    window.localStorage.setItem('brivia-member-profile', JSON.stringify({ ...profile, id: user.id }));
+    return { ok: true, session: true };
+  } catch (error) {
+    if (error instanceof OnboardingStepError) return { ok: false, screen: guidedStepFor(error.message), message: error.message };
+    return { ok: false, screen: 'interests', message: signupErrorCopy(error) };
+  }
+};
+guidedSignup = GUIDED_SIGNUP ? initGuidedSignup({
+  root: document.querySelector('#guided-signup'),
+  startGoogle: () => startGoogleAuth(),
+  submit: (answers) => submitGuidedSignup(answers),
+  redirectToApp: () => redirectToApp(),
+  onLogin: () => setAuthView('login'),
+  onSignOut: async ({ quiet = false } = {}) => {
+    await supabase?.auth.signOut().catch(() => {});
+    guidedRow = null;
+    guidedSaved = null;
+    if (!quiet) setAuthView('signup');
+  },
+}) : null;
 
 const getPhoneParts = (profile = {}, metadata = {}) => {
   const rawPhone = String(profile.phone || metadata.phone || '').trim();
@@ -1710,6 +1815,54 @@ const INTERESTS_SAVE_ERROR = 'Your interests could not be saved. Please try agai
 const SENSITIVE_CONSENT_ERROR = 'Private interests need your consent first.';
 const isSensitiveConsentError = (error) => /sensitive consent required/i.test(String(error?.message || ''));
 
+// Guided signup for a signed-in member (a Google return, a confirmed email, a returning member): the first unfinished
+// screen (resumeScreen), with what is already known prefilled. `row` may be null (no profile yet).
+const openGuidedFor = async (user, row = null, status = null, pendingResult = null) => {
+  guidedRow = row || null;
+  guidedSaved = null;
+  let current = status;
+  if (!current) ({ data: current } = await onboardingStatus());
+  const meta = user.user_metadata || {};
+  const phone = getPhoneParts(row ? rowToProfile(row) : {}, meta);
+  const gender = normalizeSignupGender(row?.gender || meta.gender);
+  const digits = String(phone.phoneNumber || '').replace(/\D/g, '');
+  let interests = [];
+  if (current?.interests > 0) {
+    const { data: rows } = await fetchMyInterests();
+    guidedSaved = budgetFromRows(rows);
+    interests = guidedSaved.items.map(({ id, label, mode }) => ({ id, label, mode }));
+  }
+  const flow = {
+    adult_declared: Boolean(row?.adult_declared_at),
+    has_name: Boolean(realName(row?.name)),
+    has_phone: digits.length >= 7,
+    has_gender: Boolean(gender),
+    has_cell: Boolean(current?.has_cell),
+    interests: Number(current?.interests) || 0,
+    points: Number(current?.points) || 0,
+    completed: false,
+  };
+  let screen = resumeScreen({ session: { user }, status: flow });
+  if (pendingResult?.orbitError) screen = 'area';
+  if (screen === 'done') { redirectToApp(); return; }
+  const prefill = {
+    email: user.email || '',
+    adult: flow.adult_declared,
+    name: realName(row?.name) || realName(meta.full_name) || realName(meta.name),
+    phoneCountryCode: phone.phoneCountryCode || '+91',
+    phoneNumber: digits,
+    gender,
+    area: flow.has_cell ? { kind: 'keep', label: current?.place_label || '' } : null,
+    interests,
+  };
+  const path = user.app_metadata?.provider === 'google' ? 'google' : 'email';
+  setAuthView('signup', 'none', { guidedScreen: screen });
+  window.history.replaceState({ briviaAuthView: 'guided' }, '', '/auth.html#signup');
+  const message = pendingResult?.orbitError ? (isTryAgainLater(pendingResult.orbitError.error, pendingResult.orbitError.status) ? 'Try again later.' : AREA_SAVE_ERROR)
+    : pendingResult?.adultError ? ADULT_SAVE_ERROR : pendingResult?.interestsFailed ? INTERESTS_SAVE_ERROR : '';
+  await guidedSignup.open({ path, hasSession: true, prefill, resumeAt: screen, email: user.email || '' }, screen, { message });
+};
+
 // After a profile exists: the app when onboarding is complete, else the completion flow at the first incomplete step.
 // An unknown status (RPC error) goes to the app, whose server-side visibility still requires completion (D-030).
 // `pendingResult` (from applyPendingOnboarding) carries what happened to a pending signup's area and interests.
@@ -1720,6 +1873,7 @@ const routeAfterProfile = async (user, row = null, pendingResult = null) => {
   if (!profileRow) ({ data: profileRow } = await supabase.from('profiles').select('*').eq('id', user.id).maybeSingle());
   // F2: every step done but not completed = under review; the app shows the notice (no onboarding loop here).
   if (isUnderReview(status, profileRow)) { redirectToApp(); return; }
+  if (guidedSignup) { await openGuidedFor(user, profileRow, status, pendingResult); return; }
   let startStep = firstIncompleteStep(status, profileRow);
   if (pendingResult?.orbitError && startStep > 2) startStep = 2;
   showProfileCompletion(user, profileRow ? rowToProfile(profileRow) : null, { startStep, status, adultDeclared: Boolean(profileRow?.adult_declared_at) });
@@ -1798,7 +1952,8 @@ const restoreAuthPageSession = async () => {
     return;
   }
   const isAuthCallback = Boolean(params.get('code') || params.get('access_token') || window.location.hash.includes('access_token'));
-  if (requestedAuthView === 'signup' && !isAuthCallback) {
+  // Guided: #signup with a session resumes the flow (a completed member goes to the app), so no sign-out here.
+  if (requestedAuthView === 'signup' && !isAuthCallback && !guidedSignup) {
     await supabase.auth.signOut().catch(() => {});
     resetSignup();
     setAuthView('signup', 'none');
@@ -1826,6 +1981,7 @@ const restoreAuthPageSession = async () => {
     await routeAfterProfile(session.user, null, pendingResult);
     return;
   }
+  if (guidedSignup) { await openGuidedFor(session.user, null, null, null); return; }
   showProfileCompletion(session.user, pendingMatches ? withoutOnboarding(pending) : null);
   window.history.replaceState({ briviaAuthView: 'signup' }, '', '/auth.html');
 };
@@ -1992,7 +2148,7 @@ authModal?.querySelector('[data-auth-close]')?.addEventListener('click', closeAu
 authModal?.querySelector('.auth-welcome-login')?.addEventListener('click', () => openAuthEnvelope('login'));
 authModal?.querySelector('.auth-welcome-signup')?.addEventListener('click', () => openAuthEnvelope('signup'));
 authModal?.querySelector('.auth-top-signup')?.addEventListener('click', async () => {
-  if (authHistoryView === 'signup') { setAuthView('login'); return; }
+  if (authHistoryView === 'signup' || authHistoryView === 'guided') { setAuthView('login'); return; }
   await supabase?.auth.signOut().catch(() => {});
   resetSignup();
   setAuthView('signup');
@@ -2086,7 +2242,9 @@ const declareAdultStep = async () => {
   }
   adultAlreadyDeclared = true;
 };
-const finishOnboarding = async (userId) => {
+// skipInterests: the guided flow resumed with the member's saved budget unchanged (fix round 1, M3): it is already on
+// the server, so set_member_interests (and the consent it may need) is not sent again.
+const finishOnboarding = async (userId, { skipInterests = false } = {}) => {
   await declareAdultStep();
   if (areaChoice && areaChoice.kind !== 'keep') {
     const choice = areaChoice;
@@ -2102,6 +2260,7 @@ const finishOnboarding = async (userId) => {
     const savedLabel = typeof data === 'string' && data ? data : choice.label || '';
     keepCurrentArea(choice.kind === 'city' ? cityWideLabel(savedLabel) : savedLabel);
   }
+  if (skipInterests) return;
   // R2: consent is given only when a private interest is in the budget (or the server asked for it and the member agreed
   // in the panel), and is withdrawn again if the save then fails.
   const wantsConsent = budget.items.some((item) => isSensitiveInterest(item.id)) || (serverWantedConsent && privateUnlocked);
@@ -2322,6 +2481,7 @@ if (document.body.classList.contains('auth-page')) void restoreAuthPageSession()
 // from a field of the signup form, and never once a signup is past step 1: progress must not be lost to one key.
 document.addEventListener('keydown', (event) => {
   if (event.key !== 'Escape' || event.defaultPrevented || !authModal?.classList.contains('is-open')) return;
+  if (authHistoryView === 'guided' && guidedSignup && guidedSignup.screen !== 'welcome') return;
   const inSignup = signupForm && event.target instanceof Node && signupForm.contains(event.target);
   if (inSignup && (event.target.closest?.('input, select, textarea') || signupCurrentStep > 1)) return;
   if (!signupForm?.hasAttribute('hidden') && authHistoryView === 'signup' && signupCurrentStep > 1) return;
