@@ -717,6 +717,91 @@ try {
     } finally { stopClassic(); }
   }
 
+  // ================================ B4: the login look ================================
+  // A calm one-column card (max 480 px from 781 px; full width minus 16 px gutters below), "Continue with Google" a
+  // full-width labelled button that still starts Google, the heading in Bodoni Moda, SVG icons (no glyphs), contrast
+  // >= 4.5:1 for every text node in the card, 44 px targets, no sideways scroll; "Forgot password?" and "Create an
+  // account" keep their behaviour.
+  for (const viewport of [{ width: 320, height: 640 }, { width: 375, height: 812 }, { width: 390, height: 844 }, { width: 768, height: 1024 }, { width: 1280, height: 800 }, { width: 1440, height: 900 }, { width: 1920, height: 1080 }]) {
+    const w = viewport.width;
+    const mobile = w < 800;
+    const context = await browser.newContext({ viewport, isMobile: mobile, hasTouch: mobile });
+    const { calls } = await setup(context);
+    const page = await context.newPage();
+    const errors = [];
+    page.on('pageerror', (e) => errors.push(e.message));
+    await page.goto(`${BASE}/auth.html#login`, { waitUntil: 'load' });
+    await page.waitForSelector('.auth-login.is-active #login-form');
+    await settleAnimations(page);
+    await page.evaluate(() => document.fonts.ready);
+    const r = await page.evaluate(() => {
+      const card = document.querySelector('.auth-login');
+      const box = (el) => { const b = el.getBoundingClientRect(); return { x: Math.round(b.left), w: Math.round(b.width), h: Math.round(b.height), top: Math.round(b.top) }; };
+      const google = card.querySelector('.auth-google-trigger');
+      const submit = card.querySelector('#login-form .auth-submit');
+      const email = card.querySelector('#login-form input[name="email"]');
+      const password = card.querySelector('#login-form input[name="password"]');
+      const h1 = card.querySelector('#auth-title');
+      return {
+        card: box(card), inner: window.innerWidth,
+        google: box(google), googleText: google.innerText.trim(), googleName: google.getAttribute('aria-label') || [...google.childNodes].filter((n) => !(n.nodeType === 1 && n.getAttribute('aria-hidden') === 'true')).map((n) => n.textContent).join('').trim(),
+        submit: box(submit), email: box(email), password: box(password),
+        h1Font: getComputedStyle(h1).fontFamily, h1Text: h1.textContent.trim(),
+        forgot: Boolean(card.querySelector('.auth-forgot')) && /Forgot password\?/.test(card.querySelector('.auth-forgot').textContent),
+        create: card.querySelector('.auth-create-trigger')?.innerText.trim() || '',
+        createVisible: Boolean(card.querySelector('.auth-create-trigger')?.getClientRects().length),
+        glyphs: /[✉♙◉↗→]/.test(card.innerText),
+        svgIcons: card.querySelectorAll('#login-form svg').length,
+        inputFont: parseFloat(getComputedStyle(email).fontSize),
+      };
+    });
+    if ([320, 375, 1440, 1920].includes(w)) await shot(page, `login-${w}`, 300);
+    check(`${w} login: one calm card, ${w >= 781 ? 'max 480 px' : 'full width minus 16 px gutters'} (${r.card.w} of ${r.inner})`, () => {
+      if (w >= 781) { assert.ok(r.card.w <= 480 && r.card.w >= 400, String(r.card.w)); }
+      else assert.ok(Math.abs(r.card.w - (r.inner - 32)) <= 1, `${r.card.w} vs ${r.inner - 32}`);
+    });
+    check(`${w} login: one column: Google, email, password and Log in share the same left edge and width`, () => {
+      for (const b of [r.email, r.password, r.submit]) { assert.ok(Math.abs(b.x - r.google.x) <= 1, JSON.stringify(r)); assert.ok(Math.abs(b.w - r.google.w) <= 1, JSON.stringify(r)); }
+      assert.ok(r.google.top < r.email.top && r.email.top < r.password.top && r.password.top < r.submit.top);
+    });
+    check(`${w} login: "Continue with Google" is a full-width labelled button (${r.googleText}, ${r.google.w}x${r.google.h})`, () => {
+      assert.match(r.googleText, /Continue with Google/); assert.equal(r.googleName, 'Continue with Google'); assert.ok(r.google.h >= 44);
+    });
+    check(`${w} login: the heading is Bodoni Moda (${r.h1Font})`, () => assert.match(r.h1Font, /Bodoni Moda/));
+    check(`${w} login: "Forgot password?" and "Create an account" are there, SVG field icons, no glyph icons, 16 px fields`, () => {
+      assert.equal(r.forgot, true); assert.match(r.create, /create an account/i); assert.equal(r.createVisible, true);
+      assert.equal(r.glyphs, false); assert.ok(r.svgIcons >= 2); assert.ok(r.inputFont >= 16);
+    });
+    const a = await audit(page, '.auth-login');
+    check(`${w} login: 44 px targets (${a.small.join(', ')})`, () => assert.deepEqual(a.small, []));
+    check(`${w} login: text contrast >= 4.5:1 (${a.low.join(', ')})`, () => assert.deepEqual(a.low, []));
+    check(`${w} login: no sideways scroll (${a.overflow})`, () => assert.ok(a.overflow <= 0));
+    if ([320, 375, 1440].includes(w)) {
+      const axe = await axeViolations(page, { include: '.auth-shell' });
+      check(`${w} login: axe clean (${axe.join(' | ')})`, () => assert.deepEqual(axe, []));
+    }
+    if (w === 1440 || w === 375) {
+      // Google still starts: signInWithOAuth sends the browser to the stub's /authorize with provider=google.
+      await page.locator('.auth-login .auth-google-trigger').click();
+      await page.waitForURL(/\/auth\/v1\/authorize/, { timeout: 5000 }).catch(() => {});
+      const authorize = calls.find((c) => c.path === '/auth/v1/authorize');
+      check(`${w} login: "Continue with Google" starts Google sign-in (${authorize ? new URL(authorize.url).searchParams.get('provider') : 'no call'})`, () => {
+        assert.ok(authorize); assert.equal(new URL(authorize.url).searchParams.get('provider'), 'google');
+      });
+      await page.goto(`${BASE}/auth.html#login`, { waitUntil: 'load' });
+      await page.waitForSelector('.auth-login.is-active .auth-create-trigger', { state: 'attached' });
+      await page.locator('.auth-login .auth-create-trigger').click({ timeout: 4000 }).catch(() => {});
+      const toGuided = await waitScreen(page, 'welcome');
+      check(`${w} login: "Create an account" opens the guided Welcome`, () => assert.equal(toGuided, true));
+      // The guided Welcome's Google button starts Google too.
+      await page.locator('[data-guided-google]').click({ timeout: 4000 }).catch(() => {});
+      await page.waitForURL(/\/auth\/v1\/authorize/, { timeout: 5000 }).catch(() => {});
+      check(`${w} guided Welcome: "Continue with Google" starts Google sign-in`, () => assert.equal(calls.filter((c) => c.path === '/auth/v1/authorize').length, 2));
+    }
+    check(`${w} login: no page errors (${errors.join(' | ')})`, () => assert.deepEqual(errors, []));
+    await context.close();
+  }
+
 } finally {
   await browser.close();
   stopVite();
