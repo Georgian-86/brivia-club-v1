@@ -1559,3 +1559,27 @@ controls (a tester or a seeded test member), never a real member, so no new expo
   1536x730: no scrolling, card at least 1.5 tall per 1 wide, View profile inside, controls centred under it, headline
   centred with the card.
 
+
+## D-081: The Connect card is the hero on desktop (founder, 2026-10-22; refines D-076 and D-079)
+
+- **Founder ask** (1366x633 screenshot): "the main feature is taking the least place in the entire screen ... The ratio
+  should be professionally allotted and the main feature shall grab the attention." The card was 260x403, pushed to
+  the far right, while "CONNECTION, CURATED." filled most of the screen.
+- **Decision.** From 850 px wide the deck is a two-part composition: a quiet headline column (40% of the content width,
+  headline `clamp(44px, 5vw, 88px)`, eyebrow and filter button kept) and a card stage (60%) with the card centred in it.
+  The card height uses the window (`100svh` minus the top bar, padding and, under 1100 px, the controls; 400-880 px,
+  up to 1040 px on screens 1200 px and taller) and its width is 0.64 x the height (about 1.56 tall per 1 wide). From
+  1100 px Pass sits left of the card and Pitch right of it, level with its middle; under 1100 px they stay centred
+  under the card. The hint ("PASS WITH INTENTION · PITCH WITH PURPOSE", then the signal counter) becomes a quiet
+  two-line caption in the headline column, level with the card's bottom edge, so the card gets the full height.
+  Content is capped at 1600 px and centred on very wide screens. The card has a deeper wine shadow; the stacked next
+  card behind it is unchanged. Phones (780 px and less) are unchanged. CSS: `reference-design.css` (D-081 block); the
+  old D-059/D-079 grid in `deck.css` is removed.
+- **Numbers.** 1366x633: card 260x403 (104,780 px²) -> 327x511 (167,387 px²). 1440x900: 370x638 -> 486x759.
+  1920x1080: 406x700 -> 563x880.
+- **Proof.** `tests/e2e/deck.spec.mjs` desktop composition at 1366x633, 1280x650, 1280x720, 1366x768, 1440x900,
+  1536x730, 1920x1080, 2560x1440 and 1024x768: no document or sideways scroll, card at least 1.45 tall per 1 wide and
+  below the top bar, View profile inside, headline within 20 px of the card's middle, Pass / Pitch at least 56 px
+  (flanking within ±20 px from 1100 px, under the card below), no overlap between headline, card, controls and hint,
+  the stacked card lined up, at 1366x633 height >= 470 and area >= 145,000 px², and larger cards at 1440x900 and
+  1920x1080. The swipe, stamp, pitch-sheet, keyboard and reduced-motion checks run at 1440x900 on the new size.

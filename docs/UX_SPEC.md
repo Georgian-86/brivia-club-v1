@@ -207,10 +207,13 @@ labelled "PRIVATE · ONLY YOU SEE THESE", and the hero and the area stat show th
     Only horizontal drags are captured (`touch-action: pan-y`, 8 px axis lock); a drag never clicks through. Reduced
     motion: no rotation or fling, a short fade. The next member waits underneath as a decorative stacked card. The
     pitched card stays on screen (parked right) until the sheet resolves, then leaves (or springs back on a failed
-    send). A card with no usable or loadable cover shows the deep-wine orbit placeholder, never the alt text. Desktop:
-    headline left; card, Pass / Pitch (centred under the card) and the hint in the right column; the card's height
-    follows the viewport so it never sits under the top bar (1280x720 to 1920x1080). The hint reads on two lines:
-    "PASS WITH INTENTION · PITCH WITH PURPOSE", then the signal counter.
+    send). A card with no usable or loadable cover shows the deep-wine orbit placeholder, never the alt text. Desktop (D-081):
+    the card is the hero. A headline column (40% of the content width, a smaller headline) on the left and the card
+    stage (60%) with the card centred in it. The card height uses the window (top bar and padding off) and the width
+    is 0.64 x the height, so it stays tall; nothing scrolls from 1280x650 to 2560x1440. From 1100 px wide Pass sits
+    left of the card and Pitch right of it, level with its middle; narrower desktops keep them centred under the card.
+    The hint is a quiet two-line caption in the headline column, level with the card's bottom edge:
+    "PASS WITH INTENTION · PITCH WITH PURPOSE", then the signal counter. The headline is level with the card's middle.
 - **Deck empty states (final copy).** Each says why the deck is empty and offers exactly one action (`#deck-empty-action`,
   at least 44 px tall, visible focus). Pass/Pitch and the hint are hidden while it shows. When the deck empties, focus
   moves to the title (`#deck-empty-title`, `tabindex="-1"`); if the pitch sheet is open over it, focus moves when the
