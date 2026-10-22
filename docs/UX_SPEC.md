@@ -122,7 +122,9 @@ background under a pseudo-element).
      picks taking the remainder, and keeps every point already placed (live walkthrough, D-049). It only fills the
      budget; the member can still move points before Next.
    - "What are you looking for?" (unchanged) is required here too.
-4. **Security and presence** (`STEP 4 OF 4 · SECURITY & PRESENCE`): password, photo and cover, unchanged.
+4. **Security and presence** (`STEP 4 OF 4 · SECURITY & PRESENCE`): password, photo (framed in "Frame your photo",
+   §E) and cover. The cover is one of the 18 provided covers only (D-080): there is no upload, and the picker stores the
+   preset path `/Images/Cover%20images/<file>`, never the build URL of the image.
 
 **Submit order.** With a session: save the profile, then `set_home_location` or `set_home_city`, then
 `set_member_interests`, then the app. A failed area or interest call returns to that step with the error beside it.
@@ -160,7 +162,13 @@ so it never covers "Log in".
 **Profile editor (`app.js`).** Skills / interests always come from the server row and are shown read-only (empty
 state: "Pick interests in your profile setup") ("These come from your interests and passion
 points. Private interests are never shown.").
-There are no City or State inputs (D-036). The member's area (`my_onboarding_status().place_label`) is shown
+There are no City or State inputs (D-036). **Cover (D-080):** there is no cover upload anywhere. A fieldset "COVER"
+("Choose one of the Brivia covers. Your own pictures can't be used as a cover.") holds the 18 provided covers as a
+radio group of 16:9 thumbnails with their uppercase titles (the signup picker's), 2 columns on phones and up to 5 on
+desktop; the current cover is checked (wine ring, a check badge, bold deep-wine title; a legacy value marks its preset,
+none marks the default first cover). Arrow keys move the choice; focus shows a deep-wine ring. SAVE CHANGES stores the
+picked preset path; saving without a change sends the stored value back. The server (0014) accepts only these paths
+and no longer accepts uploads into `profile-covers`. The member's area (`my_onboarding_status().place_label`) is shown
 read-only as "YOUR AREA" with "Change your area: coming soon." The profile page's details card (email, phone) is
 labelled "PRIVATE · ONLY YOU SEE THESE", and the hero and the area stat show the place label.
 
@@ -295,7 +303,7 @@ From a member's point of view (D-015..D-018):
 4. **A like opens the pitch sheet.** Nothing is sent until the sheet closes. Send delivers one request with your note. Closing it, pressing Escape, tapping outside or swiping to the next card delivers one request without a note. "Send without a note" under Send does the same, in one tap (D-071).
 
 ### E. Media (R12, Iteration 4)
-- Every image upload (signup photo/cover, profile editor, chat image, community post) is re-encoded to JPEG (max 1280 px, EXIF dropped). If that fails (decode error, no 2d context, null blob) the original is NEVER used: the action stops and the inline message "We couldn't process this photo. Try a JPG or PNG." shows beside the field (`role="alert"`, linked by `aria-describedby`), in the chat composer, or in the post composer. Not a toast. Signup stops before any account or profile write and returns to step 4. GIFs pass through unchanged.
+- Every image upload (signup photo, profile editor photo, chat image, community post; covers are never uploaded, D-080) is re-encoded to JPEG (max 1280 px, EXIF dropped). If that fails (decode error, no 2d context, null blob) the original is NEVER used: the action stops and the inline message "We couldn't process this photo. Try a JPG or PNG." shows beside the field (`role="alert"`, linked by `aria-describedby`), in the chat composer, or in the post composer. Not a toast. Signup stops before any account or profile write and returns to step 4. GIFs pass through unchanged.
 - **Frame your photo (D-080).** Picking a profile photo (Profile → EDIT PROFILE, and signup step 4) opens a modal
   dialog before anything is saved (`photo-crop.js`; the maths is pure in `photo-crop-math.js`, no library). Kicker
   "PROFILE PHOTO", heading **"Frame your photo"** in Bodoni Moda, help line "Drag to choose what shows in the circle. Zoom
@@ -311,7 +319,7 @@ From a member's point of view (D-015..D-018):
   shows the inline photo error (profile editor at once; signup on submit, as before). Verified by
   `tests/e2e/profile-media.spec.mjs` (320–1920, axe at 375 and 1440).
 - Chat: choosing a video shows "Videos can include the place they were filmed. Send only if you're comfortable sharing that." inline above the composer, before Send; hidden for other attachments.
-- Replacing a profile photo or cover removes the previous object only if it is the member's own file in the same bucket (never a preset cover or another member's path); its error is ignored.
+- Replacing a profile photo removes the previous object only if it is the member's own file in the same bucket (never another member's path); its error is ignored. Old uploaded covers are not removed by the client; 0014 clears the reference and the founder removes the file in the Storage dashboard.
 
 ### F. Report a member (R4, Iteration 4)
 

@@ -1,6 +1,6 @@
 import { createClient } from '@supabase/supabase-js';
 import { NOTICE_VERSION } from './notice-version.js';
-import { isPresetCoverUrl } from './preset-cover.js';
+import { isPresetCoverUrl, presetCoverPath } from './preset-cover.js';
 import { createResumeApi } from './resume-file.js';
 import { compressImageOnly, compressAttachmentFiles, attachmentKind, replacedObjectPath, ImageProcessingError } from './image-compress.js';
 
@@ -112,16 +112,6 @@ export const uploadProfilePhoto = async (userId, file) => {
   return supabase.storage.from('profile-photos').getPublicUrl(path).data.publicUrl;
 };
 
-export const uploadProfileCover = async (userId, file) => {
-  if (!supabase || !file) return '';
-  const compressedFile = await compressImageOnly(file);
-  const extension = compressedFile.type === 'image/jpeg' ? 'jpg' : (compressedFile.name.split('.').pop()?.toLowerCase() || 'bin');
-  const path = `${userId}/${crypto.randomUUID()}.${extension}`;
-  const { error } = await supabase.storage.from('profile-covers').upload(path, compressedFile, { upsert: true, contentType: compressedFile.type || 'application/octet-stream' });
-  if (error) throw new Error('Your cover photo could not be uploaded. Please try again.');
-  return supabase.storage.from('profile-covers').getPublicUrl(path).data.publicUrl;
-};
-
 const messageAttachmentExtension = (file) => {
   const mimeExtension = {
     'image/jpeg': 'jpg',
@@ -197,29 +187,26 @@ const removeReplacedImage = async (bucket, userId, previousUrl, newUrl) => {
   try { await supabase.storage.from(bucket).remove([objectPath]); } catch { /* ignored */ }
 };
 
-export const saveProfile = async (userId, profile, photoFile, coverFile = null, previous = {}) => {
+// Covers are never uploaded (D-080, 0014): a cover is one of the provided presets, stored as its canonical path.
+export const saveProfile = async (userId, profile, photoFile, previous = {}) => {
   if (!supabase) return { data: null, error: new Error('Supabase is not configured.') };
   let photoUrl;
-  let coverUrl;
-  // Compress BOTH before uploading either: a failure on the second must not leave the first orphaned in Storage.
   try {
-    if (photoFile) { try { photoFile = await compressImageOnly(photoFile); } catch (error) { if (error instanceof ImageProcessingError) error.field = 'photo'; throw error; } }
-    if (coverFile) { try { coverFile = await compressImageOnly(coverFile); } catch (error) { if (error instanceof ImageProcessingError) error.field = 'cover'; throw error; } }
+    if (photoFile) photoFile = await compressImageOnly(photoFile);
+    photoUrl = await uploadProfilePhoto(userId, photoFile);
   } catch (error) {
+    if (error instanceof ImageProcessingError) error.field = 'photo';
     return { data: null, error };
   }
-  try {
-    try { photoUrl = await uploadProfilePhoto(userId, photoFile); } catch (error) { if (error instanceof ImageProcessingError) error.field = 'photo'; throw error; }
-    try { coverUrl = coverFile ? await uploadProfileCover(userId, coverFile) : (profile.coverUrl || profile.cover_url || ''); } catch (error) { if (error instanceof ImageProcessingError) error.field = 'cover'; throw error; }
-  } catch (error) {
-    return { data: null, error };
-  }
-  const row = profileToRow({ ...profile, coverUrl }, userId, photoUrl);
-  // Only this member's own Storage files (or a bundled preset cover) are stored (0003 CHECK constraints). Local
-  // data:/blob: previews, OAuth avatars and any other URL are never stored: an update leaves the column
-  // unchanged, an insert stores null.
+  const row = profileToRow(profile, userId, photoUrl);
+  // Only this member's own Storage photo (0003) and an offered preset cover (0014) are stored. Local data:/blob:
+  // previews, OAuth avatars and any other URL are never stored: an update leaves the column unchanged, an insert
+  // stores null. An empty cover clears it (the default cover shows); a legacy preset value is stored canonically.
   if (row.photo_url && !isStorageImageUrl(row.photo_url, 'profile-photos', userId)) delete row.photo_url;
-  if (row.cover_url && !isStorageImageUrl(row.cover_url, 'profile-covers', userId) && !isPresetCoverUrl(row.cover_url)) delete row.cover_url;
+  if (row.cover_url) {
+    const cover = presetCoverPath(row.cover_url);
+    if (cover) row.cover_url = cover; else delete row.cover_url;
+  }
   // Members may update only editable columns (0003_trust_hardening.sql): id and email are insert-only and
   // created_at is always the server clock, so an upsert (which rewrites every column) would be denied. Update
   // first, insert the full row only when this member has no profile yet.
@@ -236,7 +223,6 @@ export const saveProfile = async (userId, profile, photoFile, coverFile = null, 
   }
   if (!result.error) {
     if (photoFile && photoUrl) await removeReplacedImage('profile-photos', userId, previous.photoUrl, photoUrl);
-    if (coverFile && coverUrl) await removeReplacedImage('profile-covers', userId, previous.coverUrl, coverUrl);
   }
   return result;
 };

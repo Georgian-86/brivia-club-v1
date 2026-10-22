@@ -580,3 +580,97 @@ enabled, no policy" (INFO): intended, the table is server only. `public.brivia_w
 function with execute revoked from `anon` and `authenticated`; if a lint lists it as callable, that is a finding.
 Tested by `supabase/tests/a5-blocked-send.test.sql` (S1-S8) and `orbit-hygiene.test.sql` H3; e2e
 `tests/e2e/fit.spec.mjs` section "blocked send".
+
+## 0014
+
+**Covers from the provided set only (founder request 2026-10-22, D-080). Not yet applied.**
+
+Why: the founder does not want members to use their own cover pictures; they may switch between the covers Brivia
+provides, not upload one. From `0014` a profile's `cover_url` is null or exactly `/Images/Cover%20images/<file>` for one
+of the 18 provided covers, and nobody can upload into the `profile-covers` bucket any more.
+
+What it does:
+
+- adds `brivia_private.brivia_offered_cover_keys()` (the 18 file names; mirrors `PRESET_COVER_KEYS` in
+  `site/scripts/preset-cover.js`, pinned equal by `tests/unit/preset-cover.test.mjs`),
+  `brivia_private.brivia_is_offered_cover(text)` and `brivia_private.brivia_offered_cover_for(text)` (the SQL twin of
+  `resolveCoverKey` in `cover-name.js`: maps old Vite-hashed `/assets/<stem>-<hash>.<ext>` values to their preset).
+  All immutable, `search_path = public`, execute revoked from `public`, `anon`, `authenticated`;
+- one-time cleanup of **real members only** (`is_test = false`; seeded test members are untouched), through
+  `brivia_private.brivia_cleanup_custom_covers()`: a legacy `/assets/...` value the client knows becomes its preset path;
+  an uploaded cover (`.../storage/v1/object/public/profile-covers/<uid>/...`) or any unknown value becomes null (the
+  member sees the default cover). Running it again changes nothing. **SQL never deletes Storage objects** (see below);
+- adds the trigger `brivia_profiles_cover_offered` (before insert or update of `cover_url`, for each row) running
+  `brivia_private.brivia_guard_cover_url()` (security definer): null, `''` and an offered path pass; an update that
+  leaves the value unchanged passes; anything else fails with `23514` "cover_url is not an offered cover". A trigger,
+  not a CHECK, so rows nobody writes are never re-validated. (The message names `cover_url` on purpose: an old cached
+  client retries its save without the cover when the error mentions it, so a stale tab still saves the profile.) The
+  0003 CHECK `profiles_cover_url_storage` and `public.brivia_is_preset_cover` are unchanged (community posts use it);
+- drops the `storage.objects` policies "Members can upload their profile cover" (insert) and "Members can update their
+  profile cover" (update), both from 0001. "Members can view their own profile covers" (select, 0001) and "Members can
+  delete their profile covers" (delete, 0005) stay, so old files can still be removed and `delete_my_account`'s
+  `storage_not_empty` check (0005, 0012) keeps working.
+
+Deploy order: **deploy the client first** (it stores only offered paths and has no cover upload), check that Profile →
+EDIT PROFILE shows the cover picker and no "COVER PHOTO" file field, **then** apply `0014`. Applied before the client,
+the old signup would store a build path (`/assets/...webp`) that the trigger refuses (the save then drops the cover).
+
+Pre-flight (read-only; run before applying, every line must answer as shown):
+
+```sql
+-- the four profile-covers policies 0014 builds on (0001 + 0005)
+select policyname, cmd from pg_policies where schemaname = 'storage' and tablename = 'objects'
+   and coalesce(qual, '') || coalesce(with_check, '') ~ 'profile-covers' order by 1;
+-- Members can delete their profile covers | DELETE
+-- Members can update their profile cover | UPDATE
+-- Members can upload their profile cover | INSERT
+-- Members can view their own profile covers | SELECT
+select conname from pg_constraint where conrelid = 'public.profiles'::regclass and conname like 'profiles_cover_url%' order by 1;
+-- profiles_cover_url_length
+-- profiles_cover_url_storage
+select to_regnamespace('brivia_private') is not null, to_regprocedure('public.brivia_is_preset_cover(text)') is not null,
+       exists (select 1 from pg_trigger where tgrelid = 'public.profiles'::regclass and tgname = 'brivia_profiles_cover_offered');
+-- t, t, f (first apply)
+-- what the cleanup will change: expected 3 rows on 2026-10-22 (1 uploaded, 2 legacy /assets/ paths). Note them.
+select id, left(cover_url, 90) as cover from public.profiles
+ where not is_test and cover_url is not null and cover_url !~ '^/Images/Cover%20images/' order by id;
+-- the uploaded file(s) to remove by hand after the apply: note bucket path(s)
+select name, created_at from storage.objects where bucket_id = 'profile-covers' order by created_at;
+```
+
+Apply, as `postgres` in the SQL editor (small and idempotent; avoid the cron window 20:17–20:37 UTC). The first line is
+`set lock_timeout = '5s';`: creating the trigger and dropping the policies briefly lock `profiles` and
+`storage.objects`; on a lock timeout, run the whole file again.
+
+```sql
+set lock_timeout = '5s';
+-- paste and run 0014_preset_covers_only.sql
+-- the cleanup prints covers_cleaned: 3 on the first run (0 on any later run)
+```
+
+Post-apply checks (read-only):
+
+```sql
+-- no real member keeps a cover outside the offered set
+select count(*) from public.profiles
+ where not is_test and cover_url is not null and not brivia_private.brivia_is_offered_cover(cover_url);  -- 0
+-- the rows the pre-flight listed: the two legacy ones now read /Images/Cover%20images/<file> (or null), the upload null
+select id, cover_url from public.profiles where id in ('<id 1>', '<id 2>', '<id 3>') order by id;
+select policyname, cmd from pg_policies where schemaname = 'storage' and tablename = 'objects'
+   and coalesce(qual, '') || coalesce(with_check, '') ~ 'profile-covers' order by 1;
+-- Members can delete their profile covers | DELETE
+-- Members can view their own profile covers | SELECT
+select tgname, tgenabled from pg_trigger where tgrelid = 'public.profiles'::regclass and tgname = 'brivia_profiles_cover_offered';
+-- brivia_profiles_cover_offered | O
+select has_function_privilege('authenticated', 'brivia_private.brivia_cleanup_custom_covers()', 'execute'),
+       has_function_privilege('anon', 'brivia_private.brivia_guard_cover_url()', 'execute');           -- f, f
+```
+
+Then, by hand: **Storage → `profile-covers` → delete the old uploaded file** the pre-flight listed (`<uid>/<file>`). The
+bucket stays public for reads until its files are gone, so the old picture is reachable by its URL until you remove it.
+Keep the empty bucket (its select and delete policies stay for account deletion).
+
+Expected advisor notes: `brivia_private.brivia_guard_cover_url` and `brivia_private.brivia_cleanup_custom_covers` are
+security definer functions with execute revoked from every client role (not RPCs; `brivia_private` is not exposed).
+Tested by `supabase/tests/media-covers.test.sql` (V1-V5), `trust.test.sql` FF2 and `d-tester-world.test.sql` (the
+cleanup reads `is_test` of the row itself only); e2e `tests/e2e/profile-media.spec.mjs` section "covers".

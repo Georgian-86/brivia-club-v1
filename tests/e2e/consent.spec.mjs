@@ -847,15 +847,9 @@ try {
     await hardPage.locator('[data-photo-crop-use]').click();
     await hardPage.waitForSelector('.photo-crop', { state: 'detached' });
   };
-  // 8f1. A good photo with an unprocessable cover: both are compressed before either is uploaded, so nothing is stored.
-  const coverCallsBefore = hard.calls.length;
-  await framePhoto('ok.png');
-  await hardPage.setInputFiles('#profile-edit-form [name="coverFile"]', { name: 'bad-cover.png', mimeType: 'image/png', buffer: Buffer.from('this is not an image') });
-  await hardPage.locator('#profile-edit-form [type="submit"]').click();
-  await hardPage.waitForFunction(() => !document.querySelector('#profile-cover-error')?.hidden, null, { timeout: 8000 });
-  const coverWrites = hard.calls.slice(coverCallsBefore).filter((c) => c.method !== 'GET' && (c.path.startsWith('/storage/') || c.path === '/rest/v1/profiles'));
-  check('bad cover: inline cover error and the good photo was not uploaded either (no orphan)', () => assert.equal(coverWrites.length, 0));
-  await hardPage.setInputFiles('#profile-edit-form [name="coverFile"]', []);
+  // 8f1. Covers come only from the provided set (D-080): the editor has no cover upload (profile-media.spec covers the picker).
+  const coverFields = await hardPage.locator('#profile-edit-form [name="coverFile"], #profile-edit-form input[type="file"]:not([name="photoFile"])').count();
+  check(`profile editor has no cover upload (${coverFields})`, () => assert.equal(coverFields, 0));
   await framePhoto('me.png');
   await hardPage.locator('#profile-edit-form [type="submit"]').click();
   // Settles when the editor shows a result, or closes (the old data-URL fallback "succeeded" and closed it).

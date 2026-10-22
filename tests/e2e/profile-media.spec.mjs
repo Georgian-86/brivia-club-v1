@@ -15,10 +15,15 @@
 //   profile-photos/<me>/; reduced motion fades (no rise).
 // Section "cancel" (375x812, 1440x900): Cancel or Escape closes the dialog, focus returns to the input, the pick is
 // cleared and SAVE uploads nothing.
+// Section "covers" (every viewport above; 0014): no cover file input exists anywhere (profile editor, signup page);
+// the editor shows the 18 provided covers as a radio group with the stored one checked (a legacy /assets/ value marks
+// its preset); tiles are at least 44 px, titles at least 12 px, nothing scrolls sideways, axe finds nothing (375,
+// 1440); picking another cover (pointer or arrow keys) and saving PATCHes cover_url = /Images/Cover%20images/<file>;
+// saving without a change sends the stored value back; nothing is ever uploaded to profile-covers.
 import assert from 'node:assert/strict';
 import { mkdirSync } from 'node:fs';
 import path from 'node:path';
-import { startAppStub, ME, STILL } from './app-stub.mjs';
+import { startAppStub, ME, STILL, ownRow } from './app-stub.mjs';
 import { axeViolations, textAudit } from './a11y.mjs';
 
 const { chromium } = await import(process.env.PLAYWRIGHT_MODULE || 'playwright');
@@ -196,6 +201,111 @@ try {
       await context.close();
     }
   }
+  // ---- covers
+  const P = (key) => `/Images/Cover%20images/${key}`;
+  const MOMENTUM = '3157077F-6C3B-4D85-BC8B-4646C85B33D1.PNG';
+  const MATTER = 'F28EA63E-1BEB-49E9-BA01-F62127017DB1.PNG';
+  const profileWrites = () => stub.calls.filter((c) => c.path === '/rest/v1/profiles' && ['PATCH', 'POST'].includes(c.method)).map((c) => JSON.parse(c.body || '{}'));
+  const coverUploads = () => stub.calls.filter((c) => c.method !== 'GET' && c.path.startsWith('/storage/v1/object/profile-covers'));
+  for (const [width, height] of VIEWPORTS) {
+    const tag = `${width}x${height}`;
+    const phone = width <= 600;
+    st.own = { ...ownRow, cover_url: P(MOMENTUM) };
+    const context = await stub.newContext(browser, { width, height }, phone ? { isMobile: true, hasTouch: true } : {});
+    const page = await openEditor(context);
+    await page.locator('.profile-cover-picker').scrollIntoViewIfNeeded();
+    await page.waitForTimeout(300);
+    const c = await page.evaluate(() => {
+      const modal = document.querySelector('#profile-edit-modal');
+      const radios = [...modal.querySelectorAll('input[name="coverChoice"]')];
+      const tiles = [...modal.querySelectorAll('.profile-cover-option')].map((el) => { const r = el.getBoundingClientRect(); return [Math.round(r.width), Math.round(r.height)]; });
+      return {
+        // every file input on the page: none is about covers (the post image and the resume are fine); in the editor only the photo
+        files: [...document.querySelectorAll('input[type="file"]')].filter((el) => /cover/i.test(`${el.name} ${el.id} ${el.className} ${el.closest('label, section, div')?.textContent || ''}`)).map((el) => el.name || el.id),
+        editorFiles: [...modal.querySelectorAll('input[type="file"]')].map((el) => el.name),
+        coverFile: document.querySelectorAll('[name="coverFile"], .cover-input').length,
+        radios: radios.length, types: [...new Set(radios.map((r) => r.type))], checked: radios.filter((r) => r.checked).map((r) => r.value),
+        legend: modal.querySelector('.profile-cover-picker legend')?.textContent.trim(), tiles,
+        scrollWidth: document.documentElement.scrollWidth, innerWidth, dialogWidth: modal.querySelector('.profile-edit-dialog').scrollWidth - modal.querySelector('.profile-edit-dialog').clientWidth,
+      };
+    });
+    if (SHOTS) {
+      // Thumbnails are lazy: wait for the ones in view before the picture.
+      await page.waitForFunction(() => [...document.querySelectorAll('.profile-cover-thumb img')].filter((img) => { const r = img.getBoundingClientRect(); return r.bottom > 0 && r.top < innerHeight; }).every((img) => img.complete && img.naturalWidth), null, { timeout: 8000 }).catch(() => {});
+      await page.screenshot({ path: path.join(SHOTS, `covers-${tag}.png`) });
+    }
+    check(`covers ${tag}: no cover file input anywhere; the editor has only the photo one (${JSON.stringify([c.files, c.editorFiles, c.coverFile])})`, () => { assert.deepEqual(c.files, []); assert.deepEqual(c.editorFiles, ['photoFile']); assert.equal(c.coverFile, 0); });
+    check(`covers ${tag}: 18 provided covers as radios, the stored one checked (${JSON.stringify([c.radios, c.types, c.checked, c.legend])})`, () => {
+      assert.equal(c.radios, 18); assert.deepEqual(c.types, ['radio']); assert.deepEqual(c.checked, [P(MOMENTUM)]); assert.equal(c.legend, 'COVER');
+    });
+    check(`covers ${tag}: tiles are at least 44 px tall and wide (${JSON.stringify(c.tiles.slice(0, 2))})`, () => c.tiles.forEach(([w, h]) => { assert.ok(w >= 44 && h >= 44); }));
+    check(`covers ${tag}: no sideways scroll (${c.scrollWidth}/${c.innerWidth}, dialog ${c.dialogWidth})`, () => { assert.ok(c.scrollWidth <= c.innerWidth); assert.ok(c.dialogWidth <= 0); });
+    const audit = await textAudit(page, { root: '.profile-cover-picker' });
+    check(`covers ${tag}: no text under 12 px (${audit.small.join(' | ')})`, () => assert.deepEqual(audit.small, []));
+    if (width === 375 || width === 1440) {
+      const violations = await axeViolations(page, { include: '.profile-cover-picker' });
+      check(`covers ${tag}: axe finds nothing in the cover picker (${violations.join(' | ')})`, () => assert.deepEqual(violations, []));
+    }
+    if (width === 375 || width === 1440 || width === 320) {
+      // Unchanged: the stored value goes back as is.
+      const before = profileWrites().length;
+      await page.locator('#profile-edit-form .profile-edit-save').click();
+      await page.waitForSelector('#profile-edit-modal', { state: 'detached', timeout: 8000 });
+      const same = profileWrites().slice(before);
+      check(`covers ${tag}: saving without a change keeps the stored cover (${JSON.stringify(same.map((b) => b.cover_url))})`, () => { assert.equal(same.length, 1); assert.equal(same[0].cover_url, P(MOMENTUM)); });
+      // Pointer pick.
+      await page.locator('#profile-photo-editor').click();
+      await page.waitForSelector('#profile-edit-modal');
+      await page.locator('.profile-cover-option', { hasText: 'MAKE IT MATTER' }).click();
+      const n = profileWrites().length;
+      await page.locator('#profile-edit-form .profile-edit-save').click();
+      await page.waitForSelector('#profile-edit-modal', { state: 'detached', timeout: 8000 });
+      const picked = profileWrites().slice(n);
+      check(`covers ${tag}: a picked cover saves its preset path (${JSON.stringify(picked.map((b) => b.cover_url))})`, () => { assert.equal(picked.length, 1); assert.equal(picked[0].cover_url, P(MATTER)); });
+      // Keyboard: arrow keys move the choice.
+      await page.locator('#profile-photo-editor').click();
+      await page.waitForSelector('#profile-edit-modal');
+      await page.locator(`input[name="coverChoice"][value="${P(MOMENTUM)}"]`).focus();
+      await page.keyboard.press('ArrowRight');
+      const keyed = await page.evaluate(() => ({ value: document.querySelector('input[name="coverChoice"]:checked')?.value, outline: getComputedStyle(document.activeElement.nextElementSibling).outlineStyle }));
+      check(`covers ${tag}: arrow keys move the choice with a visible focus ring (${JSON.stringify(keyed)})`, () => { assert.equal(keyed.value, P('3453059c-4864-46f7-ae45-6f7049939b9f.png')); assert.equal(keyed.outline, 'solid'); });
+      await page.locator('.profile-edit-close').click();
+    }
+    await context.close();
+  }
+  // A legacy /assets/ value (an old build of a preset) marks its preset as current and still renders on the profile.
+  st.own = { ...ownRow, cover_url: '/assets/F28EA63E-1BEB-49E9-BA01-F62127017DB1-B4-NibCZ.webp' };
+  {
+    const context = await stub.newContext(browser, { width: 1440, height: 900 });
+    const page = await stub.open(context, { path: '/app.html#profile', errors: pageErrors });
+    await page.waitForSelector('#profile-photo-editor', { state: 'visible', timeout: 10000 });
+    const hero = await page.evaluate(() => document.querySelector('#profile-cover-image')?.style.backgroundImage || '');
+    await page.locator('#profile-photo-editor').click();
+    const checked = await page.evaluate(() => document.querySelector('input[name="coverChoice"]:checked')?.value);
+    check(`covers legacy: the hero renders the preset (${hero.slice(0, 90)})`, () => { assert.match(hero, /F28EA63E-1BEB-49E9-BA01-F62127017DB1/); assert.ok(!/NibCZ/.test(hero)); });
+    check(`covers legacy: its preset is marked current (${checked})`, () => assert.equal(checked, P(MATTER)));
+    await context.close();
+  }
+  // The signup page has no cover upload either (its picker stores the preset path).
+  {
+    const context = await browser.newContext({ viewport: { width: 375, height: 812 } });
+    const page = await context.newPage();
+    await page.route((u) => !u.href.startsWith(stub.url), (route) => route.abort());
+    await page.goto(`${stub.url}/auth.html#signup`, { waitUntil: 'domcontentloaded' });
+    await page.waitForSelector('[data-cover-picker]', { state: 'attached', timeout: 10000 });
+    const signup = await page.evaluate(() => ({
+      files: [...document.querySelectorAll('input[type="file"]')].map((el) => el.className),
+      value: document.querySelector('.cover-value')?.value,
+    }));
+    await page.evaluate(() => [...document.querySelectorAll('.cover-choice')].at(-1).click());
+    const pickedValue = await page.evaluate(() => document.querySelector('.cover-value')?.value);
+    check(`covers signup: only the photo file input (${JSON.stringify(signup.files)})`, () => assert.deepEqual(signup.files, ['photo-input']));
+    check(`covers signup: the picker stores preset paths, never a build URL (${signup.value} -> ${pickedValue})`, () => {
+      assert.equal(signup.value, P('163BDB0C-64AC-44E7-8663-55C323ADB4FE.PNG')); assert.equal(pickedValue, P(MATTER));
+    });
+    await context.close();
+  }
+  check(`nothing was ever uploaded to profile-covers (${coverUploads().length})`, () => assert.equal(coverUploads().length, 0));
   check(`no uncaught page errors (${pageErrors.join(' | ')})`, () => assert.deepEqual(pageErrors, []));
 } finally {
   await browser?.close();

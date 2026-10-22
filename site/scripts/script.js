@@ -13,6 +13,7 @@ import { matchTypedCity } from './area-pick.js';
 import { locateOnce, fallbackCopy, isTryAgainLater, STILL_WAITING_TEXT } from './geo-locate.js';
 import { signupErrorCopy } from './signup-errors.js';
 import { defaultCoverUrl, normalizeCoverUrl } from './cover-assets.js';
+import { presetCoverPath } from './preset-cover.js';
 import { motionAllowed, introPlan, pickHeroSource, markLoaded, INTRO_CAP_MS, INTRO_START_GRACE_MS } from './landing-motion.js';
 import { SOUND_LIMIT_MS, SOUND_STORAGE_KEY, soundPreference, soundPlan, isUnlockEvent, barsToSchedule } from './landing-sound.js';
 import Lenis from 'lenis';
@@ -797,16 +798,15 @@ if (photoUpload) {
 
 const coverPicker = document.querySelector('[data-cover-picker]');
 const coverOptionUrl = (button) => normalizeCoverUrl(button?.querySelector('img')?.getAttribute('src') || button?.dataset.coverOption || '');
+// Covers come only from the provided set (D-080, 0014): no upload. The hidden field stores the canonical preset path
+// (/Images/Cover%20images/<file>), never the build URL of the image, which only paints the preview.
 if (coverPicker) {
   const coverValue = coverPicker.querySelector('.cover-value');
   const coverPreview = coverPicker.querySelector('[data-cover-preview]');
-  const coverInput = coverPicker.querySelector('.cover-input');
-  const coverFileName = coverPicker.querySelector('.cover-file-name');
-  let coverPreviewUrl = '';
   const defaultCover = defaultCoverUrl;
 
   const setCover = (url, button = null) => {
-    if (coverValue) coverValue.value = url || '';
+    if (coverValue) coverValue.value = presetCoverPath(button?.dataset.coverOption || '');
     if (coverPreview) {
       coverPreview.style.backgroundImage = url ? `url("${url}")` : '';
       coverPreview.classList.toggle('has-cover', Boolean(url));
@@ -816,30 +816,9 @@ if (coverPicker) {
   };
 
   coverPicker.querySelectorAll('.cover-choice').forEach((button) => {
-    button.addEventListener('click', () => {
-      if (coverPreviewUrl) {
-        URL.revokeObjectURL(coverPreviewUrl);
-        coverPreviewUrl = '';
-      }
-      if (coverInput) coverInput.value = '';
-      if (coverFileName) coverFileName.textContent = 'Recommended: a wide image with room for your profile details.';
-      setCover(coverOptionUrl(button) || defaultCover, button);
-    });
-  });
-  coverInput?.addEventListener('change', () => {
-    const file = coverInput.files?.[0];
-    if (!file) return;
-    if (coverPreviewUrl) URL.revokeObjectURL(coverPreviewUrl);
-    coverPreviewUrl = URL.createObjectURL(file);
-    setCover(coverPreviewUrl);
-    coverPicker.querySelectorAll('.cover-choice').forEach((choice) => choice.classList.remove('is-selected'));
-    if (coverFileName) coverFileName.textContent = file.name;
+    button.addEventListener('click', () => setCover(coverOptionUrl(button) || defaultCover, button));
   });
   resetCover = () => {
-    if (coverPreviewUrl) URL.revokeObjectURL(coverPreviewUrl);
-    coverPreviewUrl = '';
-    if (coverInput) coverInput.value = '';
-    if (coverFileName) coverFileName.textContent = 'Recommended: a wide image with room for your profile details.';
     const defaultChoice = coverPicker.querySelector('.cover-choice');
     setCover(coverOptionUrl(defaultChoice) || defaultCover, defaultChoice);
   };
@@ -1689,8 +1668,8 @@ const showProfileCompletion = (user, savedProfile = null, { startStep = 1, statu
   emailField?.setAttribute('readonly', '');
   fillLooking(profile.lookingFor || profile.looking_for || metadata.lookingFor || metadata.looking_for || '');
   profileCompletionPhotoUrl = profile.photoUrl || metadata.avatar_url || metadata.picture || '';
-  profileCompletionCoverUrl = normalizeCoverUrl(profile.coverUrl || profile.cover_url || metadata.coverUrl || '');
-  const savedCover = profileCompletionCoverUrl && [...(coverPicker?.querySelectorAll('.cover-choice') || [])].find((choice) => choice.dataset.coverOption === profileCompletionCoverUrl || coverOptionUrl(choice) === profileCompletionCoverUrl);
+  profileCompletionCoverUrl = presetCoverPath(profile.coverUrl || profile.cover_url || metadata.coverUrl || '');
+  const savedCover = profileCompletionCoverUrl && [...(coverPicker?.querySelectorAll('.cover-choice') || [])].find((choice) => presetCoverPath(choice.dataset.coverOption) === profileCompletionCoverUrl);
   if (savedCover) savedCover.click();
   setSignupPasswordMode(true, false);
   const submit = signupForm.querySelector('[type="submit"]');
@@ -2204,30 +2183,28 @@ signupForm?.addEventListener('submit', async (event) => {
   const pickedPhoto = signupForm.querySelector('.photo-input')?.files?.[0] || null;
   let photoFile = pickedPhoto ? (framedSignupPhoto || pickedPhoto) : null;
   profile.photoName = pickedPhoto?.name || '';
-  const mediaErrors = { photo: signupForm.querySelector('#profile-photo-error'), cover: signupForm.querySelector('#profile-cover-error') };
+  const mediaErrors = { photo: signupForm.querySelector('#profile-photo-error') };
   const setMediaError = (which, message) => {
     const node = mediaErrors[which];
     if (!node) return;
     node.textContent = message || '';
     node.hidden = !message;
   };
-  setMediaError('photo', ''); setMediaError('cover', '');
+  setMediaError('photo', '');
   // A photo that cannot be re-encoded is never used as-is (its EXIF could carry a location): stop BEFORE any account
   // or profile write, go back to the photo step and say so beside the field.
   const failMedia = (which) => {
     setSignupStep(4, false);
     setMediaError(which, PHOTO_ERROR_MESSAGE);
     if (signupFeedback) signupFeedback.textContent = '';
-    signupForm.querySelector(which === 'photo' ? '.photo-input' : '.cover-input')?.focus();
+    signupForm.querySelector('.photo-input')?.focus();
   };
   if (photoFile) {
     try { photoFile = await compressImageOnly(photoFile); profile.photoUrl = await fileToDataUrl(photoFile); } catch { failMedia('photo'); return; }
   } else if (profileCompletionPhotoUrl) profile.photoUrl = profileCompletionPhotoUrl;
-  let coverFile = signupForm.querySelector('.cover-input')?.files?.[0] || null;
-  profile.coverName = coverFile?.name || (profile.coverUrl?.startsWith('/assets/') || profile.coverUrl?.startsWith('/Images/Cover%20images/') ? 'Brivia suggestion' : '');
-  if (coverFile) {
-    try { coverFile = await compressImageOnly(coverFile); profile.coverUrl = await fileToDataUrl(coverFile); } catch { failMedia('cover'); return; }
-  } else if (profileCompletionCoverUrl) profile.coverUrl = normalizeCoverUrl(profileCompletionCoverUrl);
+  // Covers come only from the provided set (D-080): the picked preset path, else the one already stored, else none.
+  profile.coverUrl = presetCoverPath(profile.coverUrl) || profileCompletionCoverUrl || '';
+  profile.coverName = profile.coverUrl ? 'Brivia suggestion' : '';
   const submit = signupForm.querySelector('[type="submit"]');
   if (submit) { submit.disabled = true; submit.setAttribute('aria-busy', 'true'); }
   if (signupFeedback) signupFeedback.textContent = 'Saving your profile...';
@@ -2244,7 +2221,7 @@ signupForm?.addEventListener('submit', async (event) => {
         const { error: passwordError } = await supabase.auth.updateUser({ password });
         if (passwordError) throw passwordError;
       }
-      const { error: profileError } = await saveProfile(sessionUser.id, profile, photoFile, coverFile);
+      const { error: profileError } = await saveProfile(sessionUser.id, profile, photoFile);
       if (profileError) throw profileError;
       await finishOnboarding(sessionUser.id);
       window.localStorage.removeItem('brivia-pending-profile');
@@ -2279,7 +2256,7 @@ signupForm?.addEventListener('submit', async (event) => {
       signupForm.elements.namedItem('email')?.setAttribute('readonly', '');
       setSignupPasswordMode(false);
       if (submit) submit.innerHTML = 'COMPLETE MY PROFILE <span>→</span>';
-      const { error: profileError } = await saveProfile(data.user.id, profile, photoFile, coverFile);
+      const { error: profileError } = await saveProfile(data.user.id, profile, photoFile);
       if (profileError) throw profileError;
       await finishOnboarding(data.user.id);
       window.localStorage.setItem('brivia-member-profile', JSON.stringify({ ...profile, id: data.user.id }));

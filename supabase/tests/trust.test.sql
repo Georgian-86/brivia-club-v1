@@ -24,7 +24,7 @@ begin
   update public.profiles set name='A2', full_name='A2', phone='1', phone_country_code='+1', phone_number='1',
     gender='Male', experience='x', looking_for='{c}',
     photo_url='https://proj.supabase.co/storage/v1/object/public/profile-photos/a1a1a1a1-0000-0000-0000-0000000000a1/p.jpg',
-    cover_url='/assets/c.png', updated_at=now()
+    cover_url='/Images/Cover%20images/163BDB0C-64AC-44E7-8663-55C323ADB4FE.PNG', updated_at=now()  -- an offered preset (0014)
   where id = auth.uid();
   get diagnostics n = row_count;
   if n <> 1 then raise exception 'FAIL: editable update touched % rows', n; end if;
@@ -968,10 +968,10 @@ set local request.jwt.claims = '{"sub":"72000000-0000-0000-0000-000000000001"}';
 do $$
 declare col text; failed boolean;
 begin
-  -- exactly 2048 characters, valid storage URLs of the own folder: accepted
+  -- exactly 2048 characters, a valid storage URL of the own folder: accepted. (Covers are offered presets only since
+  -- 0014, so an uploaded cover URL of any length is refused; media-covers.test.sql covers that.)
   update public.profiles
-     set photo_url = rpad('https://proj.supabase.co/storage/v1/object/public/profile-photos/' || auth.uid() || '/', 2048, 'a'),
-         cover_url = rpad('https://proj.supabase.co/storage/v1/object/public/profile-covers/' || auth.uid() || '/', 2048, 'a')
+     set photo_url = rpad('https://proj.supabase.co/storage/v1/object/public/profile-photos/' || auth.uid() || '/', 2048, 'a')
    where id = auth.uid();
   if (select char_length(photo_url) from public.profiles where id = auth.uid()) <> 2048 then raise exception 'FAIL T3b: 2048-character photo_url not stored'; end if;
   foreach col in array array['photo_url', 'cover_url'] loop
@@ -1535,10 +1535,9 @@ declare
 begin
   set local role authenticated;
   perform set_config('request.jwt.claims', json_build_object('sub', f1)::text, true);
-  -- accepted: own folder in the right bucket; preset covers are same-site paths
-  update public.profiles set photo_url = base || 'profile-photos/' || f1 || '/9f2c.jpg', cover_url = base || 'profile-covers/' || f1 || '/c.png' where id = f1;
-  update public.profiles set cover_url = '/assets/163BDB0C-64AC-Bx1a.PNG' where id = f1;
-  update public.profiles set cover_url = '/Images/Cover%20images/2257522A.PNG' where id = f1;
+  -- accepted: own folder in the right bucket; covers are the offered presets only (0014, D-080)
+  update public.profiles set photo_url = base || 'profile-photos/' || f1 || '/9f2c.jpg', cover_url = '/Images/Cover%20images/163BDB0C-64AC-44E7-8663-55C323ADB4FE.PNG' where id = f1;
+  update public.profiles set cover_url = '/Images/Cover%20images/2257522A-04B9-4E3E-AB1A-A73D7BB8CCBF.PNG' where id = f1;
   update public.profiles set photo_url = null, cover_url = null where id = f1;
   insert into public.community_posts (author_id, image_url, image_path) values (f1, base || 'community-posts/' || f1 || '/ok.jpg', f1 || '/ok.jpg');
   delete from public.community_posts where author_id = f1;
@@ -1556,6 +1555,10 @@ begin
     format('update public.profiles set cover_url = %L where id = %L', '//tracker.example/cover.png', f1),
     format('update public.profiles set cover_url = %L where id = %L', '/assets/../../x.png', f1),
     format('update public.profiles set cover_url = %L where id = %L', base || 'profile-photos/' || f1 || '/x.jpg', f1),
+    -- 0014: an own uploaded cover and preset-shaped paths outside the offered set are refused too
+    format('update public.profiles set cover_url = %L where id = %L', base || 'profile-covers/' || f1 || '/c.png', f1),
+    format('update public.profiles set cover_url = %L where id = %L', '/assets/163BDB0C-64AC-Bx1a.PNG', f1),
+    format('update public.profiles set cover_url = %L where id = %L', '/Images/Cover%20images/2257522A.PNG', f1),
     format('insert into public.community_posts (author_id, image_url, image_path) values (%L, %L, %L)', f1, 'https://tracker.example/p.jpg', f1 || '/p.jpg'),
     format('insert into public.community_posts (author_id, image_url, image_path) values (%L, %L, %L)', f1, base || 'community-posts/' || f2 || '/p.jpg', f2 || '/p.jpg'),
     format('insert into public.community_posts (author_id, image_url, image_path) values (%L, %L, %L)', f1, base || 'community-posts/' || f1 || '/p.jpg', f1 || '/q.jpg'),

@@ -28,6 +28,7 @@ import { openPrivacyAccount } from './privacy-account.js';
 import { isUnderReview, UNDER_REVIEW_COPY } from './onboarding-guard.js';
 import { openReportDialog, bindCardOverflow, cardOverflowOpen, reportSuccessCopy } from './report-dialog.js';
 import { defaultCoverUrl, normalizeCoverUrl } from './cover-assets.js';
+import { PRESET_COVERS, presetCoverPath, presetCoverStoredPath } from './preset-cover.js';
 import { postImageSrc } from './post-image.js';
 import { postCardMarkup, shareData, isSafePostImageSrc } from './post-card.js';
 import { toastSide } from './toast-place.js';
@@ -58,6 +59,7 @@ import '../styles/chat-fit.css';
 import '../styles/menus-fit.css';
 import '../styles/explore-cards.css';
 import '../styles/chat-extras.css';
+import '../styles/profile-cover-picker.css';
 import { navMarkup, markCurrentNav, setChatBadges } from './app-nav.js';
 import { skeletonMarkup, setBusy } from './app-skeletons.js';
 
@@ -2166,9 +2168,20 @@ const ensureProfilePhotoEditor = () => {
 };
 
 
+// The cover picker (D-080): the provided covers only, as a radio group of thumbnails (arrow keys move, the checked one
+// is the current cover). Members cannot use their own picture as a cover.
+const COVER_CHECK_ICON = '<svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" focusable="false"><path d="M5 12.5l4.5 4.5L19 7.5" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+const profileCoverPicker = (current) => `<fieldset class="profile-edit-wide profile-cover-picker" aria-describedby="profile-cover-help"><legend>COVER</legend><small class="profile-edit-helper" id="profile-cover-help">Choose one of the Brivia covers. Your own pictures can't be used as a cover.</small><div class="profile-cover-grid">${PRESET_COVERS.map(({ key, title }) => {
+  const value = presetCoverStoredPath(key);
+  const checked = value === current;
+  return `<label class="profile-cover-option"><input type="radio" name="coverChoice" value="${escapeHtml(value)}"${checked ? ' checked' : ''} /><span class="profile-cover-thumb"><img src="${escapeHtml(normalizeCoverUrl(value))}" alt="" loading="lazy" decoding="async" width="160" height="90" /><b class="profile-cover-check" aria-hidden="true">${COVER_CHECK_ICON}</b></span><span class="profile-cover-title">${escapeHtml(title)}</span></label>`;
+}).join('')}</div></fieldset>`;
+
 const openProfileEditor = () => {
   if (!memberProfile.id || document.querySelector('#profile-edit-modal')) return;
   const profile = memberProfile;
+  // The cover marked as current: the stored preset (a legacy value resolves to its preset), else the default cover.
+  const currentCover = presetCoverPath(profile.coverUrl) || presetCoverStoredPath(PRESET_COVERS[0].key);
   const modal = document.createElement('div');
   modal.id = 'profile-edit-modal';
   modal.className = 'profile-edit-modal';
@@ -2187,7 +2200,7 @@ const openProfileEditor = () => {
         <div class="profile-edit-wide profile-edit-readonly"><span>SKILLS / INTERESTS</span><p>${escapeHtml(profile.skills || 'Pick interests in your profile setup')}</p><small class="profile-edit-helper">These come from your interests and passion points. Private interests are never shown.</small></div>
         <label class="profile-edit-wide"><span>LOOKING FOR</span><input name="lookingFor" list="profile-edit-looking-options" value="${escapeHtml(profile.lookingFor || '')}" placeholder="Search or type what you are looking for" /><datalist id="profile-edit-looking-options">${profileEditDatalist('lookingFor')}</datalist><small class="profile-edit-helper">Choose from suggestions or type your own.</small></label>
         <label><span>PROFILE PHOTO</span><input name="photoFile" type="file" accept="image/*" aria-describedby="profile-photo-error profile-photo-status" /><small class="profile-edit-helper" id="profile-photo-status" role="status"></small><small class="media-inline-error" id="profile-photo-error" role="alert" hidden></small></label>
-        <label><span>COVER PHOTO</span><input name="coverFile" type="file" accept="image/*" aria-describedby="profile-cover-error" /><small class="media-inline-error" id="profile-cover-error" role="alert" hidden></small></label>
+        ${profileCoverPicker(currentCover)}
       </div>
       <p class="profile-edit-feedback" id="profile-edit-feedback" role="status"></p>
       <div class="profile-edit-actions"><button type="button" class="profile-edit-cancel" data-profile-edit-close>CANCEL</button><button type="submit" class="profile-edit-save">SAVE CHANGES <span>↗</span></button></div>
@@ -2236,24 +2249,25 @@ const openProfileEditor = () => {
       experience: String(formData.get('experience') || '').trim(),
       lookingFor: String(formData.get('lookingFor') || '').trim(),
     };
+    // Covers come only from the provided set (D-080): the picked preset path, or the stored value when unchanged.
+    const coverChoice = String(formData.get('coverChoice') || '');
+    if (coverChoice && coverChoice !== currentCover) nextProfile.coverUrl = coverChoice;
     const photoFile = framedPhoto;
-    const coverFile = form.querySelector('[name="coverFile"]')?.files?.[0] || null;
     if (!nextProfile.name) { feedback.textContent = 'Please add your name.'; return; }
     const photoError = form.querySelector('#profile-photo-error');
-    const coverError = form.querySelector('#profile-cover-error');
-    [photoError, coverError].forEach((node) => { node.hidden = true; node.textContent = ''; });
+    photoError.hidden = true;
+    photoError.textContent = '';
     setBusy(submit, true);
     feedback.textContent = 'Saving your profile...';
-    const { data, error } = await saveProfile(memberProfile.id, nextProfile, photoFile, coverFile, { photoUrl: memberProfile.photoUrl, coverUrl: memberProfile.coverUrl });
+    const { data, error } = await saveProfile(memberProfile.id, nextProfile, photoFile, { photoUrl: memberProfile.photoUrl });
     if (error) {
       setBusy(submit, false);
       if (error instanceof ImageProcessingError) {
-        // Inline beside the field that failed (nothing was uploaded); photo is processed first.
-        const target = error.field === 'cover' ? coverError : photoError;
-        target.textContent = error.message;
-        target.hidden = false;
+        // Inline beside the photo field (nothing was uploaded).
+        photoError.textContent = error.message;
+        photoError.hidden = false;
         feedback.textContent = '';
-        form.querySelector(error.field === 'cover' ? '[name="coverFile"]' : '[name="photoFile"]')?.focus();
+        form.querySelector('[name="photoFile"]')?.focus();
         return;
       }
       feedback.textContent = error.message || 'Profile could not be saved.';

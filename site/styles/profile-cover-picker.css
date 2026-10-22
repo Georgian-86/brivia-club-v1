@@ -1,0 +1,18 @@
+/* The profile editor's cover picker (D-080): the provided covers only. Tokens only (tokens.css): no raw colours, no
+   font stacks. A radio group of thumbnails; the checked one (the current cover) gets a wine ring and a check badge.
+   Scoped under .profile-cover-picker so the editor's older `.profile-edit-grid label` / `label span` rules lose. */
+.profile-edit-grid .profile-cover-picker{grid-column:1/-1;display:flex;flex-direction:column;gap:var(--space-2);min-width:0;margin:0;padding:0;border:0}
+.profile-cover-picker legend{float:left;width:100%;margin:0 0 var(--space-1);padding:0;color:var(--color-wine-soft);font:700 var(--text-12) var(--font-body);letter-spacing:.107em}
+.profile-cover-picker legend+.profile-edit-helper{clear:both;margin:0;color:var(--color-ink-soft)}
+.profile-cover-picker .profile-cover-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(116px,1fr));gap:var(--space-3) 10px}
+.profile-cover-picker .profile-cover-option{position:relative;display:grid;align-content:start;gap:6px;min-width:0;cursor:pointer}
+.profile-cover-picker .profile-cover-option input{position:absolute;top:0;left:0;width:1px;height:1px;min-height:0;margin:0;padding:0;border:0;opacity:0}
+.profile-cover-picker .profile-cover-thumb{position:relative;display:block;aspect-ratio:16/9;overflow:hidden;border-radius:var(--radius-s);background:var(--color-skeleton);box-shadow:0 0 0 1px var(--color-line);transition:box-shadow var(--motion-fast) var(--ease)}
+.profile-cover-picker .profile-cover-thumb img{display:block;width:100%;height:100%;object-fit:cover}
+.profile-cover-picker .profile-cover-option:hover .profile-cover-thumb{box-shadow:0 0 0 2px var(--color-wine-soft)}
+.profile-cover-picker .profile-cover-check{position:absolute;top:6px;right:6px;display:none;place-items:center;width:24px;height:24px;border-radius:50%;background:var(--color-wine);color:var(--color-cream);box-shadow:0 0 0 2px var(--color-cream)}
+.profile-cover-picker .profile-cover-option input:checked+.profile-cover-thumb{box-shadow:0 0 0 3px var(--color-wine)}
+.profile-cover-picker .profile-cover-option input:checked+.profile-cover-thumb .profile-cover-check{display:grid}
+.profile-cover-picker .profile-cover-option input:focus-visible+.profile-cover-thumb{outline:3px solid var(--color-wine-deep);outline-offset:4px}
+.profile-cover-picker .profile-cover-title{color:var(--color-ink-soft);font:600 var(--text-12)/1.3 var(--font-body);letter-spacing:.06em;overflow-wrap:anywhere}
+.profile-cover-picker .profile-cover-option input:checked~.profile-cover-title{color:var(--color-wine-deep);font-weight:700}

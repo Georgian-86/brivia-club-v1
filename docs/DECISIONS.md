@@ -1559,3 +1559,31 @@ controls (a tester or a seeded test member), never a real member, so no new expo
   1536x730: no scrolling, card at least 1.5 tall per 1 wide, View profile inside, controls centred under it, headline
   centred with the card.
 
+
+## D-080: Frame your photo before upload; covers only from the provided set (founder, 2026-10-22)
+
+- The founder: "for profile picture i want the portion selector feature so that the user can select which part of the
+  picture will be visible and it shall match the theme of the Brivia. Then i also need to remove the change cover picture
+  options. I don't want anyone to use their own cover pictures. They can change between what all options is provided
+  but not from their own."
+- **Photo.** Picking a profile photo (Profile → EDIT PROFILE and signup step 4) opens "Frame your photo", our own small
+  module (`site/scripts/photo-crop.js`, pure maths in `photo-crop-math.js`; no third-party cropper, to keep the bundle
+  small and the brand exact). A circular mask over a cream square stage (avatars are round); drag, pinch, wheel, a
+  1x–4x slider and the keyboard; the photo can never leave empty space in the circle. The member's choice becomes an
+  800 × 800 JPEG (EXIF orientation applied), which then takes the existing re-encode (R12) and upload path. Cancel
+  uploads nothing. The module loads only when a photo is picked, so the landing and auth bundles do not grow.
+- **Covers.** Members choose from the 18 provided covers only; no surface can upload one. The profile editor's "COVER
+  PHOTO" file field is replaced by a picker of the same covers (and titles) as signup, the current one marked; the
+  upload code (`uploadProfileCover`) is removed. A cover is stored as `/Images/Cover%20images/<file>` (the signup
+  picker used to store the build URL of the image, which is where the live `/assets/<name>-<hash>` values came from).
+- **Server (0014).** A trigger (not a CHECK, so untouched rows are never re-validated) allows only null, `''` or one of
+  the 18 paths on insert or update of `cover_url`; an unchanged value passes. The `profile-covers` insert and update
+  Storage policies are dropped; select and delete stay (old files can be removed; account deletion still works). A
+  one-time cleanup maps the two live legacy `/assets/` values to their preset and nulls the one uploaded cover; seeded
+  test members are untouched. SQL never deletes Storage objects: the founder removes the old file in the dashboard
+  (README "## 0014"). Deploy the client before applying 0014.
+- The 18-name list exists three times (client `preset-cover.js`, `cover-assets.js`, SQL); `tests/unit/preset-cover.test.mjs`
+  pins them, and the signup page, equal. Adding a cover means a new migration that redefines
+  `brivia_private.brivia_offered_cover_keys()`.
+- Proof: `tests/unit/photo-crop.test.mjs`, `tests/unit/preset-cover.test.mjs`, `supabase/tests/media-covers.test.sql`
+  (V1-V5) and `tests/e2e/profile-media.spec.mjs` (crop, cancel, covers; 320-1920, axe at 375 and 1440).
