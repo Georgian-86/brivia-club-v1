@@ -1692,3 +1692,19 @@ controls (a tester or a seeded test member), never a real member, so no new expo
   tabs, arrow keys, one category per tab, search across categories, the tray never intersecting the tabs, the panel or
   a chip, Back and Finish on screen at 1920x886 and 1440x900, axe, 44 px targets and contrast on the picker at 1920,
   1440 and 375), `tests/unit/signup-flow.test.mjs` (`groupInterests`).
+
+## D-083: The login screen goes back to its pre-B4 look; login and signup behaviour unchanged (founder, 2026-10-23)
+
+- **Founder ask:** "restore the previous login system UI. Do not alter the present flow for login or signup, but in the
+  previous UI."
+- **What changed:** only the login view's markup in `site/auth.html`, restored byte for byte from the commit before B4
+  (`6bda976^`): "RETURNING MEMBER / JOIN THE CLUB / THOUGHTFUL PEOPLE. REAL MOMENTUM.", the glyph field icons, LOG IN,
+  "Forgot password?", "OR CONTINUE WITH" and the round Google button, and "NEW HERE? CREATE ACCOUNT" in the panel's top
+  bar. Without the `auth-card` class the B4 / D-082 login CSS in `auth-refresh.css` no longer matches anything, so the
+  older auth CSS draws the screen again; the build renders pixel-identical to the pre-B4 build at 1440x900 and 375x812.
+- **Unchanged:** `#login-form`, `#login-note`, `.auth-submit`, `.auth-forgot`, `.auth-google-trigger` and the create
+  triggers keep their handlers in `script.js`; the guided signup (B2/B3, D-082b styling, Google) is untouched.
+- The B4 login rules stay in `auth-refresh.css`, inert, so the editorial card can come back by re-adding the class
+  and markup. B4's "Continue with Google" label and one-column checks are replaced in `tests/e2e/signup.spec.mjs` by
+  checks on the restored screen and its behaviour (Google starts, "Create account" opens the guided Welcome); the
+  D-082 login-centring and login-fit checks are dropped because they measured the B4 card.

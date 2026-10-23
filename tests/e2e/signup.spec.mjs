@@ -880,12 +880,12 @@ try {
     } finally { stopClassic(); }
   }
 
-  // ================================ B4: the login look ================================
-  // A calm one-column card (max 480 px from 781 px; full width minus 16 px gutters below), "Continue with Google" a
-  // full-width labelled button that still starts Google, the heading in Bodoni Moda, SVG icons (no glyphs), contrast
-  // >= 4.5:1 for every text node in the card, 44 px targets, no sideways scroll; "Forgot password?" and "Create an
-  // account" keep their behaviour.
-  for (const viewport of [{ width: 320, height: 640 }, { width: 375, height: 812 }, { width: 390, height: 844 }, { width: 768, height: 1024 }, { width: 1280, height: 800 }, { width: 1440, height: 900 }, { width: 1920, height: 1080 }]) {
+  // ================================ D-083: the login look restored to the pre-B4 screen ================================
+  // The founder asked for the earlier login UI back with the flow unchanged: "JOIN THE CLUB", the email form, LOG IN,
+  // "Forgot password?", "OR CONTINUE WITH" and the round Google button, and "NEW HERE? CREATE ACCOUNT" in the panel's
+  // top bar. Behaviour is what is checked: Google still starts, "Create account" still opens the guided Welcome (and
+  // its Google button still starts), the form is the same #login-form, and nothing scrolls sideways.
+  for (const viewport of [{ width: 320, height: 640 }, { width: 375, height: 812 }, { width: 768, height: 1024 }, { width: 1280, height: 800 }, { width: 1440, height: 900 }, { width: 1920, height: 1080 }]) {
     const w = viewport.width;
     const mobile = w < 800;
     const context = await browser.newContext({ viewport, isMobile: mobile, hasTouch: mobile });
@@ -898,67 +898,42 @@ try {
     await settleAnimations(page);
     await page.evaluate(() => document.fonts.ready);
     const r = await page.evaluate(() => {
-      const card = document.querySelector('.auth-login');
-      const box = (el) => { const b = el.getBoundingClientRect(); return { x: Math.round(b.left), w: Math.round(b.width), h: Math.round(b.height), top: Math.round(b.top) }; };
-      const google = card.querySelector('.auth-google-trigger');
-      const submit = card.querySelector('#login-form .auth-submit');
-      const email = card.querySelector('#login-form input[name="email"]');
-      const password = card.querySelector('#login-form input[name="password"]');
-      const h1 = card.querySelector('#auth-title');
+      const view = document.querySelector('.auth-login');
+      const visible = (el) => Boolean(el?.getClientRects().length);
       return {
-        card: box(card), inner: window.innerWidth,
-        google: box(google), googleText: google.innerText.trim(), googleName: google.getAttribute('aria-label') || [...google.childNodes].filter((n) => !(n.nodeType === 1 && n.getAttribute('aria-hidden') === 'true')).map((n) => n.textContent).join('').trim(),
-        submit: box(submit), email: box(email), password: box(password),
-        h1Font: getComputedStyle(h1).fontFamily, h1Text: h1.textContent.trim(),
-        forgot: Boolean(card.querySelector('.auth-forgot')) && /Forgot password\?/.test(card.querySelector('.auth-forgot').textContent),
-        create: card.querySelector('.auth-create-trigger')?.innerText.trim() || '',
-        createVisible: Boolean(card.querySelector('.auth-create-trigger')?.getClientRects().length),
-        glyphs: /[✉♙◉↗→]/.test(card.innerText),
-        svgIcons: card.querySelectorAll('#login-form svg').length,
-        inputFont: parseFloat(getComputedStyle(email).fontSize),
+        cardClass: view.classList.contains('auth-card'),
+        h1: view.querySelector('#auth-title')?.textContent.trim(),
+        email: visible(view.querySelector('#login-form input[name="email"]')),
+        password: visible(view.querySelector('#login-form input[name="password"]')),
+        submit: view.querySelector('#login-form .auth-submit')?.innerText.trim() || '',
+        forgot: visible(view.querySelector('.auth-forgot')),
+        google: visible(view.querySelector('.auth-google-trigger')),
+        googleName: view.querySelector('.auth-google-trigger')?.getAttribute('aria-label') || '',
+        topCreate: visible(document.querySelector('.auth-top-signup')),
+        overflow: document.documentElement.scrollWidth - innerWidth,
       };
     });
     if ([320, 375, 1440, 1920].includes(w)) await shot(page, `login-${w}`, 300);
-    check(`${w} login: one calm card, ${w >= 781 ? 'max 480 px' : 'full width minus 16 px gutters'} (${r.card.w} of ${r.inner})`, () => {
-      if (w >= 781) { assert.ok(r.card.w <= 480 && r.card.w >= 400, String(r.card.w)); }
-      else assert.ok(Math.abs(r.card.w - (r.inner - 32)) <= 1, `${r.card.w} vs ${r.inner - 32}`);
+    check(`${w} login: the pre-B4 screen ("${r.h1}", no editorial card)`, () => { assert.equal(r.h1, 'JOIN THE CLUB'); assert.equal(r.cardClass, false); });
+    check(`${w} login: email, password, LOG IN, "Forgot password?" and the Google button are shown (${JSON.stringify(r)})`, () => {
+      assert.equal(r.email, true); assert.equal(r.password, true); assert.match(r.submit, /LOG IN/); assert.equal(r.forgot, true);
+      assert.equal(r.google, true); assert.equal(r.googleName, 'Continue with Google');
     });
-    check(`${w} login: one column: Google, email, password and Log in share the same left edge and width`, () => {
-      for (const b of [r.email, r.password, r.submit]) { assert.ok(Math.abs(b.x - r.google.x) <= 1, JSON.stringify(r)); assert.ok(Math.abs(b.w - r.google.w) <= 1, JSON.stringify(r)); }
-      assert.ok(r.google.top < r.email.top && r.email.top < r.password.top && r.password.top < r.submit.top);
-    });
-    check(`${w} login: "Continue with Google" is a full-width labelled button (${r.googleText}, ${r.google.w}x${r.google.h})`, () => {
-      assert.match(r.googleText, /Continue with Google/); assert.equal(r.googleName, 'Continue with Google'); assert.ok(r.google.h >= 44);
-    });
-    check(`${w} login: the heading is Bodoni Moda (${r.h1Font})`, () => assert.match(r.h1Font, /Bodoni Moda/));
-    check(`${w} login: "Forgot password?" and "Create an account" are there, SVG field icons, no glyph icons, 16 px fields`, () => {
-      assert.equal(r.forgot, true); assert.match(r.create, /create an account/i); assert.equal(r.createVisible, true);
-      assert.equal(r.glyphs, false); assert.ok(r.svgIcons >= 2); assert.ok(r.inputFont >= 16);
-    });
-    const a = await audit(page, '.auth-login');
-    check(`${w} login: 44 px targets (${a.small.join(', ')})`, () => assert.deepEqual(a.small, []));
-    check(`${w} login: text contrast >= 4.5:1 (${a.low.join(', ')})`, () => assert.deepEqual(a.low, []));
-    check(`${w} login: no sideways scroll (${a.overflow})`, () => assert.ok(a.overflow <= 0));
-    if ([320, 375, 1440].includes(w)) {
-      const axe = await axeViolations(page, { include: '.auth-shell' });
-      check(`${w} login: axe clean (${axe.join(' | ')})`, () => assert.deepEqual(axe, []));
-    }
+    check(`${w} login: "NEW HERE? CREATE ACCOUNT" is in the top bar`, () => assert.equal(r.topCreate, true));
+    check(`${w} login: no sideways scroll (${r.overflow})`, () => assert.ok(r.overflow <= 0));
     if (w === 1440 || w === 375) {
       // Google still starts: signInWithOAuth sends the browser to the stub's /authorize with provider=google.
       await page.locator('.auth-login .auth-google-trigger').click();
       await page.waitForURL(/\/auth\/v1\/authorize/, { timeout: 5000 }).catch(() => {});
       const authorize = calls.find((c) => c.path === '/auth/v1/authorize');
-      check(`${w} login: "Continue with Google" starts Google sign-in (${authorize ? new URL(authorize.url).searchParams.get('provider') : 'no call'})`, () => {
+      check(`${w} login: the Google button starts Google sign-in (${authorize ? new URL(authorize.url).searchParams.get('provider') : 'no call'})`, () => {
         assert.ok(authorize); assert.equal(new URL(authorize.url).searchParams.get('provider'), 'google');
       });
       await page.goto(`${BASE}/auth.html#login`, { waitUntil: 'load' });
-      await page.waitForSelector('.auth-login.is-active .auth-create-trigger', { state: 'attached' });
-      const loginType = await typeOf(page, '.auth-login .auth-submit > span');
-      await page.locator('.auth-login .auth-create-trigger').click({ timeout: 4000 }).catch(() => {});
+      await page.waitForSelector('.auth-login.is-active #login-form');
+      await page.locator('.auth-top-signup').click({ timeout: 4000 }).catch(() => {});
       const toGuided = await waitScreen(page, 'welcome');
-      check(`${w} login: "Create an account" opens the guided Welcome`, () => assert.equal(toGuided, true));
-      const choiceType = await typeOf(page, '[data-guided-email] > span');
-      check(`${w} login "Log in" and the guided Welcome buttons share one label type (${JSON.stringify({ loginType, choiceType })})`, () => assert.deepEqual(choiceType, loginType));
+      check(`${w} login: "Create account" opens the guided Welcome`, () => assert.equal(toGuided, true));
       // The guided Welcome's Google button starts Google too.
       await page.locator('[data-guided-google]').click({ timeout: 4000 }).catch(() => {});
       await page.waitForURL(/\/auth\/v1\/authorize/, { timeout: 5000 }).catch(() => {});
@@ -970,7 +945,7 @@ try {
 
   // ================================ D-082 / D-082b: register and login share the right half; login fits one screen ================================
   // The founder (D-082b, replacing D-082's "line up with the login card"): the telephone art keeps the left half and the
-  // card sits in the centre of the right half, horizontally and vertically, on Welcome, every guided screen and login
+  // card sits in the centre of the right half, horizontally and vertically, on Welcome and every guided screen (login is the restored pre-B4 screen, D-083)
   // (centre x within 24 px of 75% of the window from 1100 px; centre y within 24 px of the middle when the card fits).
   // The question heading is calmer (at most 40 px) and the card wider, so "Find your people." and "Are you 18 or
   // older?" are one line at 1440 and 1920; the Welcome subtitle is one line from 1280 px.
@@ -987,10 +962,7 @@ try {
     await page.waitForSelector('.auth-login.is-active #login-form');
     await settleAnimations(page);
     await page.evaluate(() => document.fonts.ready);
-    const login = await boxOf(page, '.auth-login');
-    const lc = centred(login, vw, vh);
-    check(`${tag} the login card is centred in the right half (dx ${lc.dx}, dy ${lc.dy})`, () => { assert.ok(Math.abs(lc.dx) <= 24); assert.ok(Math.abs(lc.dy) <= 24); });
-    await page.locator('.auth-login .auth-create-trigger').click();
+    await page.locator('.auth-top-signup').click();
     await waitScreen(page, 'welcome');
     await settleAnimations(page);
     const welcome = await boxOf(page, '#guided-signup');
@@ -1124,31 +1096,6 @@ try {
     await auditScreen(page, `${tag} interests picker`);
     await context.close();
   }
-  for (const viewport of [{ width: 1920, height: 886 }, { width: 1536, height: 709 }, { width: 1440, height: 780 }, { width: 1366, height: 633 }, { width: 1280, height: 720 }]) {
-    const tag = `${viewport.width}x${viewport.height}`;
-    const context = await browser.newContext({ viewport });
-    await setup(context);
-    const page = await context.newPage();
-    await page.goto(`${BASE}/auth.html#login`, { waitUntil: 'load' });
-    await page.waitForSelector('.auth-login.is-active #login-form');
-    await settleAnimations(page);
-    await page.evaluate(() => document.fonts.ready);
-    const fit = await page.evaluate(() => {
-      const card = document.querySelector('.auth-login').getBoundingClientRect();
-      const create = document.querySelector('.auth-login .auth-create-trigger').getBoundingClientRect();
-      const panel = document.querySelector('.auth-panel');
-      return { t: card.top, b: card.bottom, createB: create.bottom, vh: innerHeight, panelScroll: panel.scrollHeight - panel.clientHeight, scrollY: scrollY };
-    });
-    const a = await audit(page, '.auth-login');
-    await shot(page, `fit-login-${tag}`, 0);
-    check(`${tag} the whole login card is on screen with room to breathe (top ${Math.round(fit.t)}, bottom ${Math.round(fit.b)} of ${fit.vh}; "Create an account" ends at ${Math.round(fit.createB)}); nothing scrolls (panel ${fit.panelScroll}, page at ${fit.scrollY})`, () => {
-      assert.ok(fit.t >= 8, 'top'); assert.ok(fit.b <= fit.vh - 8, 'bottom'); assert.ok(fit.createB <= fit.vh - 8);
-      assert.ok(fit.panelScroll <= 0, 'panel scrolls'); assert.equal(fit.scrollY, 0);
-    });
-    check(`${tag} login: 44 px targets after the fit (${a.small.join(', ')})`, () => assert.deepEqual(a.small, []));
-    await context.close();
-  }
-
   // M6: one punctuation rule for every guided heading: a question ends with "?", anything else with a full stop.
   check(`M6 every guided heading ends with "." or "?" (${[...seenTitles].join(' | ')})`, () => {
     assert.ok(seenTitles.size >= 9); for (const t of seenTitles) assert.match(t, /[.?]$/, t);

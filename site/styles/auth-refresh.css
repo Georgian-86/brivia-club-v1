@@ -3,7 +3,9 @@
    labelled button, then the email form with one primary action. Brivia deep-wine tokens only.
    The auth page carries years of layered overrides (auth-polish.css, mobile-final-fixes.css), several with !important.
    Everything here is scoped to the login card and weighted to win: the `:has(.auth-card.is-active)` prefix outranks
-   their `:has(.auth-login.is-active)` selectors, and !important is used only where they use it. */
+   their `:has(.auth-login.is-active)` selectors, and !important is used only where they use it.
+   D-083: the login view no longer carries `.auth-card` (the pre-B4 screen is back), so the login-card rules below are
+   inert; the guided signup rules still apply. */
 .auth-card {
   --c-wine: var(--color-chat-wine);
   --c-deep: var(--brivia-deep-wine);
