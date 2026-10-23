@@ -1705,3 +1705,16 @@ controls (a tester or a seeded test member), never a real member, so no new expo
 - **Domain:** `thebriviaclub.live` (and `www`, 308 to the bare domain) were added to the Vercel project on
   2026-10-23; DNS at name.com is the founder's step.
 - Proof: `npm run test:unit` 313/313 (copy assertions updated); stub build OK, the new address is in `dist/`.
+
+## D-084: Landing page title, description and link preview are Brivia's, not the template's (founder, 2026-10-24)
+
+- **Found by the founder:** a WhatsApp share of thebriviaclub.live previewed "Balavignesh | Senior Product Designer".
+  The landing still carried the portfolio template's `<title>` and meta description, plus a hidden contact section
+  with the template author's portrait and bio.
+- **Change:** a Brivia title and description, a canonical URL, Open Graph and Twitter card tags, and a 1200x630
+  preview image (`site/public/og-image.jpg`: the hero poster under a deep-wine band, "BRIVIA CLUB" and the one-line
+  vision). The hidden template section is removed; nothing referenced it and it was never visible.
+- **Open:** `app.html`'s initial deck image `src` is still the template portrait (`media/assets/bala.webp`); the script
+  replaces it before a card shows. Swap it for the branded placeholder when the deck is next touched.
+- **Caches:** WhatsApp, LinkedIn and others cache previews; re-check with each platform's inspector after deploy.
+- Proof: `npm run test:unit` 313/313; stub build OK; `dist/index.html` has 9 `og:` tags and no "bala"; asset budget OK.
