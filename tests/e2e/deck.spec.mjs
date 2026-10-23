@@ -572,7 +572,7 @@ try {
       noteLabel: d.querySelector(`label[for="${note?.id}"]`)?.textContent?.replace(/\s+/g, ' ').trim(),
       submit: d.querySelector('[data-report-submit]')?.textContent?.trim(),
       submitH: Math.round(d.querySelector('[data-report-submit]')?.getBoundingClientRect().height || 0),
-      contact: d.textContent.includes('Urgent? Email thebrivia.club@gmail.com'),
+      contact: d.textContent.includes('Urgent? Email hello@thebriviaclub.live'),
       modal: d.matches(':modal'),
       inside: d.contains(document.activeElement),
       scroll: d.scrollWidth - d.clientWidth,
@@ -625,7 +625,7 @@ try {
   await rep.waitForFunction(() => /several reports/.test(document.querySelector('[data-report-error]')?.textContent || '')).catch(() => {});
   const capText = await rep.evaluate(() => ({ err: document.querySelector('[data-report-error]')?.textContent?.trim(), role: document.querySelector('[data-report-error]')?.getAttribute('role'), open: Boolean(document.querySelector('dialog.report-dialog')?.open) }));
   check(`PT429 shows the cap copy in role=alert and keeps the dialog open (${JSON.stringify(capText)})`, () => {
-    assert.equal(capText.err, "You've sent several reports today. For anything urgent, email thebrivia.club@gmail.com.");
+    assert.equal(capText.err, "You've sent several reports today. For anything urgent, email hello@thebriviaclub.live.");
     assert.equal(capText.role, 'alert'); assert.equal(capText.open, true);
   });
   const capName = await cardName(rep);

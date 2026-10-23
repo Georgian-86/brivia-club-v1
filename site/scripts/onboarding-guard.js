@@ -5,7 +5,7 @@
 // the R1/D-030 rules that only happens while an operator review flag ('suspended_pending_review') is on the member, so
 // the app shows a neutral notice instead of sending them through onboarding again (each pass would burn an interest
 // rewrite). The notice never says why or who reported them.
-export const UNDER_REVIEW_COPY = 'Your profile is being reviewed. This usually takes up to 72 hours. Questions? Email thebrivia.club@gmail.com.';
+export const UNDER_REVIEW_COPY = 'Your profile is being reviewed. This usually takes up to 72 hours. Questions? Email hello@thebriviaclub.live.';
 
 const realName = (value) => { const name = String(value || '').trim(); return name && name !== 'New Member' ? name : ''; };
 

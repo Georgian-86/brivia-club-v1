@@ -1305,8 +1305,8 @@ try {
     });
     check(`F2a: under review stays in the app with the neutral notice (${JSON.stringify(notice)})`, () => {
       assert.equal(notice.path, '/app.html');
-      assert.ok(notice.text?.includes('Your profile is being reviewed. This usually takes up to 72 hours. Questions? Email thebrivia.club@gmail.com.'), notice.text);
-      assert.equal(notice.mail, 'mailto:thebrivia.club@gmail.com');
+      assert.ok(notice.text?.includes('Your profile is being reviewed. This usually takes up to 72 hours. Questions? Email hello@thebriviaclub.live.'), notice.text);
+      assert.equal(notice.mail, 'mailto:hello@thebriviaclub.live');
       assert.ok(notice.heading); assert.ok(notice.focus, 'focus moves to the notice');
       assert.ok(notice.targets.every((h) => h >= 44), 'targets under 44 px'); assert.ok(notice.noH, 'horizontal scroll at 375 px');
       assert.ok(!/report/i.test(notice.text), 'the notice never mentions a report');

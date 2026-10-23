@@ -23,7 +23,7 @@ test('F2a: a member with a missing step is not under review (they finish onboard
 });
 
 test('F2a: the notice copy is exact and names no reporter', () => {
-  assert.equal(UNDER_REVIEW_COPY, 'Your profile is being reviewed. This usually takes up to 72 hours. Questions? Email thebrivia.club@gmail.com.');
+  assert.equal(UNDER_REVIEW_COPY, 'Your profile is being reviewed. This usually takes up to 72 hours. Questions? Email hello@thebriviaclub.live.');
 });
 
 test('F2b: consent is withdrawn after a failed save only when it was null before this submit', () => {

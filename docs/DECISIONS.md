@@ -1692,3 +1692,16 @@ controls (a tester or a seeded test member), never a real member, so no new expo
   tabs, arrow keys, one category per tab, search across categories, the tray never intersecting the tabs, the panel or
   a chip, Back and Finish on screen at 1920x886 and 1440x900, axe, 44 px targets and contrast on the picker at 1920,
   1440 and 375), `tests/unit/signup-flow.test.mjs` (`groupInterests`).
+
+## D-083: Public contact address moves to hello@thebriviaclub.live (founder, 2026-10-23)
+
+- **Founder ask:** use the verified domain `thebriviaclub.live` for email. Every member-facing contact (landing CTA and
+  footer, privacy notice and grievance officer, report dialog, under-review notice, account and deletion errors) now
+  says `hello@thebriviaclub.live` instead of `thebrivia.club@gmail.com`. `UX_SPEC.md` and `BREACH_RUNBOOK.md` follow;
+  older plans and arena records keep the address they were written with.
+- **Prerequisite (founder):** Resend only sends. Mail to `hello@` must be received (name.com email forwarding to the
+  founder's inbox) before this ships, or safety reports and deletion requests bounce. 2FA covers the name.com account.
+- **Notice version unchanged:** the privacy notice's substance is the same; only the contact address changed.
+- **Domain:** `thebriviaclub.live` (and `www`, 308 to the bare domain) were added to the Vercel project on
+  2026-10-23; DNS at name.com is the founder's step.
+- Proof: `npm run test:unit` 313/313 (copy assertions updated); stub build OK, the new address is in `dist/`.

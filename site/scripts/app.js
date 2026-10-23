@@ -1037,7 +1037,7 @@ const recordPass = (personId) => {
 // UNDER REVIEW (final fix F2): completed = false while every client-visible step is done means an operator review flag
 // is on the member. They see a neutral notice in the app (never why, never who), not onboarding again: each pass
 // through step 3 would burn an interest rewrite. Any other incomplete member finishes onboarding as before.
-const UNDER_REVIEW_CONTACT = 'thebrivia.club@gmail.com';
+const UNDER_REVIEW_CONTACT = 'hello@thebriviaclub.live';
 const showUnderReview = () => {
   if (document.querySelector('[data-under-review]')) return;
   document.body.classList.add('app-auth-pending'); // the app stays hidden behind the notice
