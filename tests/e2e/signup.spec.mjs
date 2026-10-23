@@ -274,7 +274,7 @@ try {
     await shot(page, `${w}-01-welcome`, 1200);
     check(`${w} #signup opens the guided Welcome: Google, email, "I already have an account"; no step label, no bubbles`, () => {
       assert.equal(atWelcome, true);
-      assert.match(u.text, /Continue with Google/); assert.match(u.text, /Continue with email/); assert.match(u.text, /I already have an account/);
+      assert.match(u.text, /Continue with Google/i); assert.match(u.text, /Continue with email/i); assert.match(u.text, /I already have an account/i);
       assert.equal(u.label, null); assert.deepEqual(u.bubbles, []); assert.equal(u.h1, 1); assert.equal(u.primaries, 1); assert.equal(u.questions, 0);
     });
     const welcomeType = await typeOf(page, '[data-guided-email] > span');
@@ -297,8 +297,8 @@ try {
     });
     const backType = await typeOf(page, '[data-guided-back] > span');
     const nextType = await typeOf(page, '[data-guided-next] > span');
-    check(`${w} Back and Continue use the Welcome buttons' sentence-case type (${JSON.stringify({ backType, nextType, welcomeType })})`, () => {
-      assert.equal(welcomeType.transform, 'none');
+    check(`${w} Back and Continue use the Welcome buttons' classic uppercase type (D-084) (${JSON.stringify({ backType, nextType, welcomeType })})`, () => {
+      assert.equal(welcomeType.transform, 'uppercase');
       assert.deepEqual(backType, welcomeType); assert.deepEqual(nextType, welcomeType);
     });
     await page.locator('input[name="guided-email"]').fill(EMAIL);
@@ -321,7 +321,7 @@ try {
       assert.equal(calls.filter((c) => c.path.startsWith('/auth/v1/signup')).length, 0);
     });
     check(`${w} 18+: one checkbox "I'm 18 or older", the notice link, Continue disabled until ticked`, () => {
-      assert.match(u.text, /I'm 18 or older/); assert.match(u.text, /privacy|How we use your data/i); assert.equal(u.nextDisabled, true);
+      assert.match(u.text, /I'm 18 or older/i); assert.match(u.text, /privacy|How we use your data/i); assert.equal(u.nextDisabled, true);
     });
     await page.keyboard.press('Enter');
     await page.waitForTimeout(150);
@@ -354,7 +354,7 @@ try {
     await waitScreen(page, 'details');
     u = await ui(page);
     check(`${w} details: phone + gender, "Step 4 of 6", Continue disabled until both`, () => {
-      assert.equal(u.label, 'Step 4 of 6'); assert.equal(u.questions, 1); assert.equal(u.nextDisabled, true); assert.match(u.text, /Prefer not to say/);
+      assert.equal(u.label, 'Step 4 of 6'); assert.equal(u.questions, 1); assert.equal(u.nextDisabled, true); assert.match(u.text, /Prefer not to say/i);
     });
     await page.locator('input[name="guided-phone"]').fill('98765 43210');
     u = await ui(page);
@@ -384,7 +384,7 @@ try {
     u = await ui(page);
     check(`${w} interests: "Step 6 of 6", Continue disabled with 0 picks, private ones never offered, popular first, no points input`, () => {
       assert.equal(u.label, 'Step 6 of 6'); assert.equal(u.questions, 1); assert.equal(u.nextDisabled, true);
-      assert.ok(!/A private belief/.test(u.text)); assert.equal(u.firstTab, 'Popular'); assert.match(u.text, /Chess/);
+      assert.ok(!/A private belief/.test(u.text)); assert.equal(u.firstTab, 'Popular'); assert.match(u.text, /Chess/i);
       assert.equal(u.points, 0); assert.ok(!/passion points|points left/i.test(u.text));
     });
     await page.locator('.guided-option', { hasText: 'Chess' }).click();
@@ -684,7 +684,7 @@ try {
     await waitScreen(page, 'welcome');
     u = await ui(page);
     if (u.title) seenTitles.add(u.title);
-    check(`${w} Google: Back from 18+ goes to Welcome (signed in), never to an account screen`, () => { assert.match(u.text, /Welcome back/); assert.match(u.text, /Sign out/); });
+    check(`${w} Google: Back from 18+ goes to Welcome (signed in), never to an account screen`, () => { assert.match(u.text, /Welcome back/i); assert.match(u.text, /Sign out/i); });
     await page.locator('[data-guided-continue]').click();
     await waitScreen(page, 'adult');
     await page.locator('input[name="guided-adult"]').check();
@@ -943,15 +943,13 @@ try {
     await context.close();
   }
 
-  // ================================ D-082 / D-082b: register and login share the right half; login fits one screen ================================
-  // The founder (D-082b, replacing D-082's "line up with the login card"): the telephone art keeps the left half and the
-  // card sits in the centre of the right half, horizontally and vertically, on Welcome and every guided screen (login is the restored pre-B4 screen, D-083)
-  // (centre x within 24 px of 75% of the window from 1100 px; centre y within 24 px of the middle when the card fits).
-  // The question heading is calmer (at most 40 px) and the card wider, so "Find your people." and "Are you 18 or
-  // older?" are one line at 1440 and 1920; the Welcome subtitle is one line from 1280 px.
+  // ================================ D-084: the guided signup in the classic signup look ================================
+  // The founder asked for the earlier signup UI with today's flow (no points): every guided screen sits in the classic
+  // column under the "FIND YOUR PEOPLE" head (centred on it, 560 px at most, one width for Welcome, Account and 18+),
+  // the head is one line on desktop, "Are you 18 or older?" is one line from 1440 px, and the stepper is the classic
+  // "STEP n OF N" over a thin wine track (done and current filled) that stays a progressbar.
   const boxOf = (page, sel) => page.evaluate((s) => { const el = document.querySelector(s); if (!el || !el.getClientRects().length) return null; const r = el.getBoundingClientRect(); return { l: r.left, r: r.right, t: r.top, b: r.bottom, w: r.width, h: r.height, cx: r.left + r.width / 2, cy: r.top + r.height / 2 }; }, sel);
   const linesOf = (page, sel) => page.evaluate((s) => { const el = document.querySelector(s); const c = getComputedStyle(el); const lh = parseFloat(c.lineHeight) || parseFloat(c.fontSize) * 1.2; return { h: el.getBoundingClientRect().height, lh, size: parseFloat(c.fontSize) }; }, sel);
-  const centred = (b, vw, vh) => ({ dx: Math.round(b.cx - vw * 0.75), dy: b.h <= vh - 48 ? Math.round(b.cy - vh / 2) : 0 });
   for (const viewport of [{ width: 1100, height: 800 }, { width: 1280, height: 720 }, { width: 1440, height: 900 }, { width: 1536, height: 709 }, { width: 1920, height: 1080 }, { width: 1920, height: 886 }]) {
     const tag = `${viewport.width}x${viewport.height}`;
     const vw = viewport.width; const vh = viewport.height;
@@ -968,13 +966,13 @@ try {
     const welcome = await boxOf(page, '#guided-signup');
     const title = await linesOf(page, '#guided-signup h1');
     const helper = await linesOf(page, '#guided-signup .guided-helper');
-    const wc = centred(welcome, vw, vh);
+    const head = await boxOf(page, '.auth-guided .guided-brand-title');
+    const brand = await linesOf(page, '.auth-guided .guided-brand-title');
+    const under = (b) => Math.round(b.cx - head.cx);
     await shot(page, `align-welcome-${tag}`, 0);
-    check(`${tag} Welcome card centred in the right half (dx ${wc.dx}, dy ${wc.dy}; ${Math.round(welcome.w)}x${Math.round(welcome.h)})`, () => { assert.ok(Math.abs(wc.dx) <= 24); assert.ok(Math.abs(wc.dy) <= 24); assert.ok(welcome.l >= vw / 2 - 1 && welcome.r <= vw); });
-    check(`${tag} "Find your people." is one line at ${title.size} px (<= 40; ${Math.round(title.h)} px, line ${Math.round(title.lh)} px)${vw >= 1280 ? ` and the subtitle is one line (${Math.round(helper.h)} px, line ${Math.round(helper.lh)} px)` : ''}`, () => {
-      assert.ok(title.size <= 40);
-      assert.ok(title.h <= title.lh * 1.4, JSON.stringify(title));
-      if (vw >= 1280) assert.ok(helper.h <= helper.lh * 1.4, JSON.stringify(helper));
+    check(`${tag} Welcome sits in the classic column under the head (dx ${under(welcome)}; ${Math.round(welcome.w)}x${Math.round(welcome.h)})`, () => { assert.ok(Math.abs(under(welcome)) <= 2); assert.ok(welcome.w <= 560 && welcome.w >= 400); assert.ok(welcome.t > head.b); });
+    check(`${tag} "FIND YOUR PEOPLE" is one line (${Math.round(brand.h)} px, line ${Math.round(brand.lh)} px); the screen's own h1 is for screen readers only (${Math.round(title.h)} px)`, () => {
+      assert.ok(brand.h <= brand.lh * 1.4, JSON.stringify(brand)); assert.ok(title.h <= 1);
     });
     await page.locator('[data-guided-email]').click();
     await waitScreen(page, 'account');
@@ -989,9 +987,9 @@ try {
     const adult = onAdult ? await boxOf(page, '#guided-signup') : null;
     const adultTitle = onAdult ? await linesOf(page, '#guided-signup h1') : null;
     await shot(page, `align-adult-${tag}`, 0);
-    check(`${tag} Account and 18+ stay centred in the right half and as wide as Welcome (Account dx ${centred(account, vw, vh).dx} dy ${centred(account, vw, vh).dy}, 18+ ${adult ? `dx ${centred(adult, vw, vh).dx} dy ${centred(adult, vw, vh).dy}` : 'not reached'})`, () => {
+    check(`${tag} Account and 18+ stay in the same column and as wide as Welcome (Account dx ${under(account)}, 18+ ${adult ? `dx ${under(adult)}` : 'not reached'})`, () => {
       assert.ok(adult);
-      for (const b of [account, adult]) { const c = centred(b, vw, vh); assert.ok(Math.abs(c.dx) <= 24); assert.ok(Math.abs(c.dy) <= 24); assert.ok(Math.abs(b.w - welcome.w) <= 1); }
+      for (const b of [account, adult]) { assert.ok(Math.abs(under(b)) <= 2); assert.ok(Math.abs(b.w - welcome.w) <= 1); }
     });
     if (vw >= 1440) check(`${tag} "Are you 18 or older?" is one line at ${adultTitle?.size} px (${Math.round(adultTitle?.h)} px, line ${Math.round(adultTitle?.lh)} px)`, () => { assert.ok(adultTitle.size <= 40); assert.ok(adultTitle.h <= adultTitle.lh * 1.4); });
     // The stepper: one thin bar per question, done / current / pending, no icon circles and no step names.
@@ -1007,12 +1005,12 @@ try {
         label: document.querySelector('[data-guided-step-label]').textContent.trim(), labelClipped: getComputedStyle(document.querySelector('[data-guided-step-label]')).clipPath !== 'none' || getComputedStyle(document.querySelector('[data-guided-step-label]')).clip !== 'auto',
       };
     });
-    check(`${tag} the stepper is 6 thin bars (done ${bars.fills[0]}%, current ${bars.fills[1]}%, pending ${bars.fills[2]}%; ${bars.h} px tall), no icons or step names, a progressbar 2 of 6, "Step 2 of 6" only for screen readers (${JSON.stringify(bars.states)})`, () => {
+    check(`${tag} the stepper is the classic thin track (done ${bars.fills[0]}%, current ${bars.fills[1]}%, pending ${bars.fills[2]}%; ${bars.h} px tall), no icons or step names, a progressbar 2 of 6, "Step 2 of 6" shown above it (${JSON.stringify(bars.states)})`, () => {
       assert.equal(bars.n, 6); assert.deepEqual(bars.states, ['done', 'current', 'pending', 'pending', 'pending', 'pending']);
-      assert.equal(bars.fills[0], 100); assert.ok(bars.fills[1] > 0 && bars.fills[1] < 100); assert.equal(bars.fills[2], 0);
+      assert.equal(bars.fills[0], 100); assert.equal(bars.fills[1], 100); assert.equal(bars.fills[2], 0);
       assert.ok(bars.h >= 2 && bars.h <= 8); assert.equal(bars.icons, 0); assert.equal(bars.names, false);
       assert.equal(bars.role, 'progressbar'); assert.equal(bars.now, '2'); assert.equal(bars.max, '6'); assert.equal(bars.text, 'Step 2 of 6');
-      assert.equal(bars.label, 'Step 2 of 6'); assert.equal(bars.labelClipped, true);
+      assert.equal(bars.label, 'Step 2 of 6'); assert.equal(bars.labelClipped, false);
     });
     await context.close();
   }

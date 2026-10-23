@@ -1,0 +1,270 @@
+/* D-084 (founder, 2026-10-23): the guided signup wears the classic signup's look again, with its flow unchanged.
+   The screens, their order, the checks and the save pipeline are the guided ones (signup-screens.js; no points
+   screen). Only the look goes back to the 4-step form's: no card, the centred "YOUR PLACE IN THE ROOM / FIND YOUR
+   PEOPLE / THOUGHTFUL PEOPLE. REAL MOMENTUM." head (auth.html, styled by the legacy `.auth-signup` rules like the classic
+   view), "STEP n OF N" over a thin wine track, uppercase wine labels, the classic fields and gender boxes, outlined and
+   wine pill buttons, and "ALREADY A MEMBER? LOG IN" in the top bar. Values are the classic form's computed styles.
+   Loaded after signup.css and auth-refresh.css; the `body.auth-page .auth-shell` prefix outranks signup.css, and
+   !important is used only against rules that use it. */
+.auth-guided {
+  --k-wine: var(--color-chat-wine);
+  --k-wine-2: var(--color-wine);
+  --k-wine-deep: var(--color-wine-deep);
+  --k-ink: var(--color-ink);
+  --k-name: var(--color-name-ink);
+  --k-muted: var(--color-ink-soft);
+  --k-paper: var(--color-cream);
+  --k-label: color-mix(in srgb, var(--color-chat-wine) 74%, transparent);
+  --k-line: color-mix(in srgb, var(--color-chat-wine) 18%, transparent);
+  --k-field: color-mix(in srgb, var(--color-cream) 22%, transparent);
+  --k-box: color-mix(in srgb, var(--color-cream) 42%, transparent);
+  --k-shadow: 0 8px 18px color-mix(in srgb, var(--color-chat-wine) 26%, transparent);
+}
+
+/* The top bar reads "ALREADY A MEMBER? LOG IN", as on the classic form (the legacy `.auth-signup` rules style it). */
+body.auth-page .auth-shell:has(.auth-guided.is-active) .auth-top-signup { display: inline-flex !important; }
+
+/* The classic head. The legacy `.auth-signup` rules style the eyebrow and the intro; the title copies their h1. */
+body.auth-page .auth-shell .auth-guided .guided-brand-title {
+  margin: 0 0 6px;
+  color: var(--k-wine);
+  font-family: var(--font-heading);
+  font-size: clamp(48px, 4vw, 76px);
+  font-weight: 400;
+  letter-spacing: -.055em;
+  line-height: .95;
+  text-align: center;
+  white-space: nowrap;
+}
+body.auth-page .auth-shell .auth-guided .guided-brand .auth-intro { text-transform: uppercase; }
+
+/* ---- No card: the form sits on the panel, 560 px wide, under the head ---- */
+body.auth-page .auth-shell .guided {
+  width: min(100%, 560px);
+  min-height: 0;
+  margin: 0 auto;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: none;
+  box-shadow: none;
+  color: var(--k-wine);
+  text-align: left;
+}
+body.auth-page .auth-shell .guided::before { display: none; }
+
+/* ---- "STEP n OF N" over a thin wine track (the bars join into one line; done and current are filled) ---- */
+body.auth-page .auth-shell .guided .guided-step-label:not([hidden]) {
+  position: static !important;
+  order: -2;
+  width: auto !important;
+  height: auto !important;
+  margin: 0 0 8px !important;
+  overflow: visible !important;
+  clip: auto !important;
+  color: var(--k-wine-2);
+  font-size: var(--text-12);
+  font-weight: 700;
+  letter-spacing: .097em;
+  text-align: left;
+  text-transform: uppercase;
+  white-space: normal !important;
+}
+body.auth-page .auth-shell .guided .guided-steps { order: -1; gap: 0; margin: 0 0 var(--space-5); overflow: hidden; border-radius: 999px; background: color-mix(in srgb, var(--color-chat-wine) 8%, transparent); }
+body.auth-page .auth-shell .guided .guided-bar { height: 3px; border-radius: 0; background: none; }
+body.auth-page .auth-shell .guided .guided-bar.is-current .guided-bar-fill,
+body.auth-page .auth-shell .guided .guided-bar.is-done .guided-bar-fill { width: 100%; border-radius: 0; background: var(--k-wine-2); }
+
+/* ---- The question: the classic step heading ---- */
+body.auth-page .auth-shell .guided .guided-kicker { color: var(--k-wine-2); font-size: var(--text-12); letter-spacing: .097em; }
+body.auth-page .auth-shell .guided .guided-screen h1 {
+  margin: 0 0 var(--space-2);
+  color: var(--k-ink) !important;
+  font-family: var(--font-heading) !important;
+  font-size: var(--text-32) !important;
+  font-weight: 400 !important;
+  letter-spacing: -.047em !important;
+  line-height: .95 !important;
+  text-align: left !important;
+}
+body.auth-page .auth-shell .guided .guided-screen h1 em { font-style: normal; }
+body.auth-page .auth-shell .guided .guided-helper { margin: 0 0 var(--space-4); color: var(--k-muted); font-size: var(--text-12); line-height: 1.4; }
+body.auth-page .auth-shell .guided .guided-helper b { color: var(--k-wine); font-weight: 700; }
+body.auth-page .auth-shell .guided .guided-fine { margin: var(--space-3) 0 0; color: var(--k-muted); font-size: var(--text-12); line-height: 1.45; }
+body.auth-page .auth-shell .guided .guided-fine a { color: var(--k-wine); font-weight: 700; }
+body.auth-page .auth-shell .guided .guided-link {
+  color: color-mix(in srgb, var(--color-chat-wine) 70%, transparent);
+  font-size: var(--text-12);
+  font-weight: 700;
+  letter-spacing: .075em;
+  text-decoration: none;
+  text-transform: uppercase;
+}
+body.auth-page .auth-shell .guided .guided-link:hover { color: var(--k-wine); }
+
+/* Welcome: the head above already says "FIND YOUR PEOPLE", so the screen's own kicker and h1 are for screen readers
+   only (the h1 still names the dialog); the signed-in "Welcome back." keeps its visible heading. */
+body.auth-page .auth-shell .guided .guided-screen--welcome:has([data-guided-email]) :is(.guided-kicker, h1) {
+  position: absolute !important; width: 1px; height: 1px; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap;
+}
+body.auth-page .auth-shell .guided .guided-screen--welcome :is(.guided-helper, .guided-fine) { text-align: center; }
+
+/* ---- Fields ---- */
+body.auth-page .auth-shell .guided .guided-field { margin-bottom: var(--space-3); }
+body.auth-page .auth-shell .guided .guided-field-label { margin-bottom: 8px; color: var(--k-label); font-size: var(--text-12); font-weight: 700; letter-spacing: .093em; text-transform: uppercase; }
+body.auth-page .auth-shell .guided :is(.guided-field input, .guided-phone select) {
+  min-height: 47px;
+  padding: 0 13px;
+  border: 1px solid var(--k-line);
+  border-radius: 7px;
+  background: var(--k-field);
+  color: var(--k-name);
+  font-size: var(--text-12);
+  font-weight: 500;
+}
+body.auth-page .auth-shell .guided .guided-field--search input { padding-left: 42px; }
+body.auth-page .auth-shell .guided .guided-search-icon { top: 14px; left: 13px; width: 18px; height: 18px; stroke: var(--k-label); }
+body.auth-page .auth-shell .guided :is(.guided-field input, .guided-phone select):focus { border-color: var(--k-wine); box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-chat-wine) 10%, transparent); }
+body.auth-page .auth-shell .guided .guided-field input::placeholder { color: color-mix(in srgb, var(--color-chat-wine) 45%, var(--color-cream)); }
+body.auth-page .auth-shell .guided .guided-phone { grid-template-columns: minmax(96px, 27%) minmax(0, 1fr); }
+
+/* Gender: the classic square boxes. */
+body.auth-page .auth-shell .guided .guided-segment {
+  min-height: 48px;
+  padding: 8px 6px;
+  border: 1px solid var(--k-line);
+  border-radius: 0;
+  background: var(--k-box);
+  color: var(--k-wine);
+  font-size: var(--text-12);
+  font-weight: 700;
+  letter-spacing: .053em;
+  text-transform: uppercase;
+}
+body.auth-page .auth-shell .guided .guided-segment[aria-checked="true"] { border-color: var(--k-wine); background: var(--k-wine); color: var(--k-paper); }
+
+/* 18+: the classic confirmation box. */
+body.auth-page .auth-shell .guided .guided-check {
+  min-height: 56px;
+  gap: 12px;
+  padding: 8px 12px;
+  border: 1px solid color-mix(in srgb, var(--color-wine-deep) 20%, transparent);
+  border-radius: 10px;
+  background: none;
+  color: var(--k-label);
+  font-size: var(--text-12);
+  font-weight: 700;
+  letter-spacing: .093em;
+  text-transform: uppercase;
+}
+body.auth-page .auth-shell .guided .guided-check:has(input:checked) { border-color: var(--k-wine); background: var(--k-box); color: var(--k-wine); }
+
+/* ---- Choices (Welcome, Area): the classic outlined pills; the email way in is the wine pill ---- */
+body.auth-page .auth-shell .guided .guided-choices { gap: 10px; margin-top: var(--space-1); }
+body.auth-page .auth-shell .guided .guided-choice {
+  min-height: 48px;
+  gap: 8px;
+  padding: 10px 14px;
+  border: 1px solid var(--k-wine-deep);
+  background: transparent;
+  color: var(--k-wine-deep);
+  font-size: var(--text-12);
+  font-weight: 700;
+  letter-spacing: .073em;
+  line-height: 1.2;
+  text-transform: uppercase;
+}
+body.auth-page .auth-shell .guided .guided-choice:hover:not(:disabled) { transform: none; box-shadow: none; background: var(--k-box); }
+body.auth-page .auth-shell .guided .guided-choice[aria-pressed="true"] { border-color: var(--k-wine); background: var(--k-box); }
+body.auth-page .auth-shell .guided .guided-choice--primary { min-height: 51px; border-color: var(--k-wine); background: var(--k-wine); box-shadow: var(--k-shadow); color: var(--k-paper); }
+body.auth-page .auth-shell .guided .guided-choice--primary:hover:not(:disabled) { background: var(--k-wine-deep); box-shadow: var(--k-shadow); }
+body.auth-page .auth-shell .guided .guided-choice-icon { width: 16px; height: 16px; }
+body.auth-page .auth-shell .guided .guided-google-mark { width: 22px; height: 22px; font-size: var(--text-12); }
+body.auth-page .auth-shell .guided .guided-or { color: var(--k-label); font-size: var(--text-12); font-weight: 700; letter-spacing: .09em; }
+body.auth-page .auth-shell .guided .guided-or::before,
+body.auth-page .auth-shell .guided .guided-or::after { background: var(--k-line); }
+
+/* Area: cities and status in the classic type. */
+body.auth-page .auth-shell .guided .guided-cities button { border-color: var(--k-line); border-radius: 7px; background: var(--k-field); color: var(--k-name); font-size: var(--text-14); }
+body.auth-page .auth-shell .guided .guided-cities button[aria-pressed="true"] { border-color: var(--k-wine); background: var(--k-box); }
+body.auth-page .auth-shell .guided :is(.guided-status, .guided-fallback, .guided-cities-empty) { font-size: var(--text-12); }
+body.auth-page .auth-shell .guided .guided-status { font-weight: 700; letter-spacing: .02em; }
+
+/* Interests: the tabs, the tray and the chips in the classic type. The head above the question takes room, so on
+   laptops the chip panel is shorter and Back and Finish stay on screen (1920x886, 1440x900). */
+@media (min-width: 781px) {
+  body.auth-page .auth-shell .guided .guided-options { --guided-panel-h: clamp(112px, calc(100svh - 700px), 300px); }
+}
+body.auth-page .auth-shell .guided .guided-tabs { border-bottom-color: var(--k-line); }
+body.auth-page .auth-shell .guided .guided-tab { color: var(--k-muted); font-size: var(--text-12); font-weight: 700; letter-spacing: .073em; text-transform: uppercase; }
+body.auth-page .auth-shell .guided .guided-tab[aria-selected="true"] { border-bottom-color: var(--k-wine); color: var(--k-wine); }
+body.auth-page .auth-shell .guided .guided-tray { border-color: var(--k-line); border-radius: 7px; background: var(--k-field); }
+body.auth-page .auth-shell .guided .guided-tray-head { color: var(--k-label); letter-spacing: .093em; }
+body.auth-page .auth-shell .guided .guided-tray-head b { background: var(--k-wine); }
+body.auth-page .auth-shell .guided .guided-tray-empty { font-size: var(--text-12); }
+body.auth-page .auth-shell .guided :is(.guided-pick, .guided-option) { font-size: var(--text-12); font-weight: 700; letter-spacing: .053em; text-transform: uppercase; }
+body.auth-page .auth-shell .guided .guided-pick { background: var(--k-wine); border-color: var(--k-wine); }
+body.auth-page .auth-shell .guided .guided-option { border-color: var(--k-line); background: var(--k-box); color: var(--k-wine); }
+body.auth-page .auth-shell .guided .guided-option[aria-pressed="true"] { border-color: var(--k-wine); background: var(--k-wine); color: var(--k-paper); }
+
+/* Reveal and Verify, the error line. */
+body.auth-page .auth-shell .guided .guided-reveal-mark { width: 47px; height: 47px; margin: 0 0 var(--space-4); box-shadow: none; }
+body.auth-page .auth-shell .guided .guided-reveal-mark svg { width: 22px; height: 22px; }
+body.auth-page .auth-shell .guided .guided-error { color: var(--k-wine); font-size: var(--text-12); font-weight: 700; }
+
+/* ---- Back and Continue: the classic step buttons, side by side; Continue alone fills the row ---- */
+body.auth-page .auth-shell .guided .guided-actions {
+  display: grid;
+  grid-auto-columns: minmax(0, 1fr);
+  grid-auto-flow: column;
+  gap: 10px;
+  margin-top: 0;
+  padding-top: var(--space-4);
+}
+body.auth-page .auth-shell .guided .guided-actions[hidden] { display: none; }
+body.auth-page .auth-shell .guided .guided-back[hidden] { display: none; }
+body.auth-page .auth-shell .guided :is(.guided-back, .guided-next) {
+  min-width: 0;
+  min-height: 48px;
+  justify-content: center;
+  gap: 8px;
+  margin: 0;
+  padding: 0 12px;
+  font-size: var(--text-12);
+  font-weight: 700;
+  text-transform: uppercase;
+}
+body.auth-page .auth-shell .guided .guided-back {
+  border: 1px solid color-mix(in srgb, var(--color-wine) 45%, transparent);
+  border-radius: 9px;
+  background: transparent;
+  color: var(--k-wine-2);
+  letter-spacing: .073em;
+}
+body.auth-page .auth-shell .guided .guided-back:hover:not(:disabled) { border-color: var(--k-wine-2); color: var(--k-wine-2); background: var(--k-box); }
+body.auth-page .auth-shell .guided .guided-next {
+  border: 1px solid var(--k-wine);
+  border-radius: 999px;
+  background: var(--k-wine);
+  box-shadow: var(--k-shadow);
+  color: var(--k-paper);
+  letter-spacing: .073em;
+}
+body.auth-page .auth-shell .guided .guided-next:hover:not(:disabled) { background: var(--k-wine-deep); transform: none; }
+body.auth-page .auth-shell .guided .guided-next:only-child,
+body.auth-page .auth-shell .guided .guided-back[hidden] + .guided-next { min-height: 51px; }
+body.auth-page .auth-shell .guided :is(.guided-back svg, .guided-next-icon) { width: 16px; height: 16px; }
+
+/* Phones: the classic phone head (left-aligned, the legacy rules), inputs at 16 px, one gender box per row from 480
+   px down; Back and Continue stay pinned above the keyboard (the guided flow's sticky bar) in the classic colours. */
+@media (max-width: 780px) {
+  body.auth-page .auth-shell .auth-guided .guided-brand-title { color: var(--k-name); font-size: clamp(38px, 11.5vw, 55px); text-align: left; white-space: normal; }
+  body.auth-page .auth-shell .guided { width: 100%; min-height: 0; margin: 0; padding: 0; }
+  body.auth-page .auth-shell .guided :is(.guided-field input, .guided-phone select) { font-size: var(--text-16); }
+  body.auth-page .auth-shell .guided .guided-screen h1 { font-size: var(--text-32) !important; }
+  body.auth-page .auth-shell .guided .guided-screen--welcome :is(.guided-helper, .guided-fine) { text-align: left; }
+  body.auth-page .auth-shell .guided .guided-actions { margin: var(--space-4) -16px 0; padding: 10px 16px calc(10px + env(safe-area-inset-bottom, 0px)); border-top-color: var(--k-line); }
+}
+@media (max-width: 480px) {
+  body.auth-page .auth-shell .guided .guided-segments { grid-template-columns: 1fr; }
+}
