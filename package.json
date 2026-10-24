@@ -12,7 +12,8 @@
     "media:build": "node scripts/optimize-media.mjs",
     "media:repoint": "node scripts/repoint-media.mjs",
     "media:hero4k": "node scripts/encode-hero-4k.mjs",
-    "media:cards": "node scripts/encode-card-variants.mjs"
+    "media:cards": "node scripts/encode-card-variants.mjs",
+    "media:heroaudio": "node scripts/encode-hero-audio.mjs"
   },
   "devDependencies": {
     "sharp": "^0.35.5",

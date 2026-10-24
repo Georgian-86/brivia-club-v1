@@ -846,30 +846,7 @@
   }
 }
 
-/* Keep the profile photo fully inside the mobile hero and align the edit
-   control with the lower edge of the settings button. */
-@media (max-width:700px){
-  body.app-body:has(.app-view[data-view="profile"]:not([hidden])) .profile-board-content .profile-hero .profile-avatar{
-    top:16px!important;
-    right:16px!important;
-    left:auto!important;
-    width:78px!important;
-    height:78px!important;
-    border-radius:50%!important;
-    overflow:hidden!important;
-  }
-
-  body.app-body:has(.app-view[data-view="profile"]:not([hidden])) .profile-board-content .profile-hero-actions{
-    right:16px!important;
-    bottom:10px!important;
-    align-items:flex-end!important;
-  }
-
-  body.app-body:has(.app-view[data-view="profile"]:not([hidden])) .profile-board-content .profile-hero-actions .profile-photo-editor{
-    align-self:flex-end!important;
-    margin-top:0!important;
-  }
-}
+/* The profile hero's phone layout lives in profile-layout.css (D-092). */
 
 /* Keep the original intro framing and only enlarge the intro slightly on
    phones so its central message is easier to read. */

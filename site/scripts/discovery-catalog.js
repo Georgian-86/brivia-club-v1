@@ -87,3 +87,19 @@ export const matchOptions = (values, query, selected = new Set(), limit = Infini
   const contains = open.filter((value) => !normalize(value).startsWith(q) && normalize(value).includes(q));
   return [...starts, ...contains].slice(0, limit);
 };
+
+// The Skills & interests / Looking for dropdowns (D-092; they replace the quick-pick capsules). An empty query opens
+// the whole list with the popular picks on top; a typed query is one ranked list of the best 12. Selected values are
+// left out (they show as chips above the field).
+export const dropdownOptions = (values, query, selected = new Set(), popular = []) => {
+  if (normalize(query)) return { popular: [], rest: matchOptions(values, query, selected, 12) };
+  const open = matchOptions(values, '', selected);
+  const byKey = new Map(open.map((value) => [normalize(value), value]));
+  const top = [];
+  for (const pick of popular) {
+    const value = byKey.get(normalize(pick));
+    if (value && !top.includes(value)) top.push(value);
+  }
+  const topKeys = new Set(top.map(normalize));
+  return { popular: top, rest: open.filter((value) => !topKeys.has(normalize(value))) };
+};

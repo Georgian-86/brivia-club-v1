@@ -5,7 +5,8 @@
 //
 // Asserts (375 px and 1440 px unless noted):
 // * exactly one visible member nav: the header nav at 1440 px, the tab bar at 375 px, on every view;
-// * no .profile-sidebar, .profile-board-nav, #app-logout-button or .chat-sidebar-brand in the DOM;
+// * no .profile-board-nav, #app-logout-button or .chat-sidebar-brand in the DOM; the .profile-sidebar (D-092) has no
+//   control and is aria-hidden;
 // * tab bar items are at least 44 x 44 px with labels of at least 12 px (375 px);
 // * ?view=chat, #profile, ?view=home, a tab click (no reload) and Back: aria-current matches the visible [data-view];
 // * a long name and area cause no horizontal page scroll (375 px);
@@ -585,8 +586,12 @@ try {
         assert.deepEqual(s.tabbarItems, ['explore', 'posts', 'chat', 'profile']);
       });
       // 2. The duplicate navs are gone (the chat view has been rendered above).
-      const gone = await page.evaluate(() => ['.profile-sidebar', '.profile-board-nav', '#app-logout-button', '.chat-sidebar-brand'].filter((sel) => document.querySelector(sel)));
-      check(`${tag}: no .profile-sidebar, .profile-board-nav, #app-logout-button or .chat-sidebar-brand (${gone.join(', ')})`, () => assert.deepEqual(gone, []));
+      const gone = await page.evaluate(() => ['.profile-board-nav', '#app-logout-button', '.chat-sidebar-brand'].filter((sel) => document.querySelector(sel)));
+      check(`${tag}: no .profile-board-nav, #app-logout-button or .chat-sidebar-brand (${gone.join(', ')})`, () => assert.deepEqual(gone, []));
+      // D-092: the profile's brand sidebar is back by founder request, as a quiet panel only: hidden from assistive
+      // tech and with no control in it (never a second, dead navigation).
+      const sidebar = await page.evaluate(() => { const el = document.querySelector('.profile-sidebar'); return el ? { hidden: el.getAttribute('aria-hidden'), controls: el.querySelectorAll('a, button, input, select, textarea, [tabindex]').length } : null; });
+      check(`${tag}: the profile sidebar is presentational only (${JSON.stringify(sidebar)})`, () => { assert.ok(sidebar); assert.equal(sidebar.hidden, 'true'); assert.equal(sidebar.controls, 0); });
       const filters = await page.evaluate(() => { const b = document.querySelector('#open-discovery-filters'); return { inHeading: Boolean(b?.closest('.home-heading')), controls: b?.getAttribute('aria-controls'), expanded: b?.getAttribute('aria-expanded'), label: b?.getAttribute('aria-label') }; });
       check(`${tag}: #open-discovery-filters sits in .home-heading with its aria attributes (${JSON.stringify(filters)})`, () => assert.deepEqual(filters, { inHeading: true, controls: 'discovery-filter-drawer', expanded: 'false', label: 'Open discovery filters' }));
       // 8. axe on the visible nav (full default rule set).

@@ -5,7 +5,8 @@
 //   PLAYWRIGHT_MODULE=/path/to/node_modules/playwright/index.mjs node tests/e2e/explore-cards.spec.mjs
 //
 // Asserts:
-// E1 columns: 1 at 375 and 390, 2 at 768, 3 at 1280, 1440 and 1920 (distinct card offsetLeft values).
+// E1 columns: 1 at 375 and 390, 2 at 768, 4 at 1280, 1440 and 1920 (distinct card offsetLeft values); smaller cards
+//    since D-092: at most 340 px wide on a phone and 300 px from 1280.
 // E2 every card's media box is 5:4 (width / height 1.25 ± 0.01; founder 2026-10-22 "a bit too long"), the whole card is
 //    close to square (height / width 1.1 to 1.35) from 768 px, and every card in a row has the same height.
 // E3 the header and action bars are --brivia-wine; their text is >= 4.5:1 against it (computed, not axe); every action
@@ -191,8 +192,9 @@ try {
           overflow: document.documentElement.scrollWidth - document.documentElement.clientWidth,
         };
       });
-      const expected = width <= 390 ? 1 : width === 768 ? 2 : 3;
-      check(`E1 ${width}: ${expected} column(s) (${m.columns}; ${m.count} cards)`, () => { assert.equal(m.count, POSTS.length); assert.equal(m.columns, expected); });
+      const expected = width <= 390 ? 1 : width === 768 ? 2 : 4;
+      check(`E1 ${width}: ${expected} column(s) (${m.columns}; ${m.count} cards)`, () => { assert.equal(m.count, POSTS.length); assert.equal(m.columns, Math.min(expected, m.count)); });
+      check(`E1 ${width}: smaller cards (${m.cardWidth} px wide)`, () => assert.ok(m.cardWidth <= (width <= 390 ? 340 : width === 768 ? 310 : 300), String(m.cardWidth)));
       check(`E2 ${width}: every media box is 5:4 and cards in a row share a height (${JSON.stringify({ ratios: m.ratios, rows: m.rows })})`, () => {
         m.ratios.forEach((r) => assert.ok(Math.abs(r - 1.25) <= 0.01, String(r)));
         m.rows.forEach((row) => assert.ok(Math.max(...row) - Math.min(...row) <= 1, JSON.stringify(row)));

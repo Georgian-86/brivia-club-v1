@@ -1855,3 +1855,53 @@ controls (a tester or a seeded test member), never a real member, so no new expo
 - Proof: `npm run test:unit` 324/324 (3 new); e2e `tests/e2e/password-reveal.spec.mjs` 56/56 (new, 1440 and 390 px,
   axe), signup 285/285, onboarding 269/269, password-reset 18/18, location 64/64, landing 47/47; style ratchet, asset
   budget and build OK.
+
+## D-092: Launch polish: divider, profile dialog, smaller Explore cards, filter dropdowns, profile sidebar and hero, the hero video's own soundtrack, area changes, and no decorative dead ends (founder, 2026-10-25)
+
+- **Asked (before the public launch):** drop the repeated "continue with" from the login divider; beautify the member
+  profile dialog; smaller Explore cards with the same proportions; a dropdown instead of the capsule cloud in "Find
+  your people"; the profile page's sidebar and cover/photo after the founder's reference (only those parts); the hero
+  music from the original video; and nothing on the live site that only looks like it works.
+- **Done:**
+  1. Login (and the landing modal): the divider reads OR.
+  2. Profile dialog (`app.js` openPublicProfile, `profile-theme.css`): cover, a framed photo over its edge, the name
+     and band, a real bio only (the invented "X is open to meaningful connections." is gone from the deck mapping and
+     the dialog), interests and "looking for" once each as chips, Message for a match (opens that chat), Escape and
+     focus kept inside, a bottom sheet on phones.
+  3. Explore cards about 280 px wide (4 columns from 1240 px, 3 from 960, 2 from 640, 340 px on phones); slimmer bars
+     keep the card at about 1.25-1.35 tall per 1 wide; the 5:4 image is unchanged.
+  4. "Find your people": the 12 capsules are gone; Skills & interests and Looking for are comboboxes (Popular on top,
+     type to search, arrow keys, Enter, Escape closes the list only, picks stay open, chips remove). Pure ordering in
+     `discovery-catalog.js` `dropdownOptions` (unit tested). The drawer is a `section` (an `aside` cannot be a dialog),
+     its legend and result line reach 4.5:1, and RESET FILTERS is named by its words.
+  5. Profile page (`profile-layout.css`, loads last; an old !important phone block in `mobile-final-fixes.css` is
+     removed): a quiet brand sidebar from 1100 px (aria-hidden, no controls), and a hero with MEMBER, the name, area and
+     a short line on the cover's left and the photo in a tall framed card on the right with EDIT PROFILE and ⚙. The
+     "MEMBER PROFILE" pill (a green dot that read like an online status) is gone. Everything below the hero is unchanged.
+  6. Landing sound: the original `HEROSECTIONVI.MOV` soundtrack (`npm run media:heroaudio`, AAC 128 kb/s, 318 KB),
+     fetched only once sound starts, looped with a 2 s crossfade through the same gain bus (gesture start, 5-minute
+     stop, mute button and remembered choice unchanged); stopping ends the queued passes, so it never layers.
+  7. Change your area from Edit profile (it said "coming soon"): city search (`set_home_city`) or "Use my location"
+     (`set_home_location`, snapped to a ~2 km cell in SQL; coordinates never stored), the server's 3-a-day cap shown in
+     words, the hero follows and the deck starts again from the new area. No SQL change. Copy in `area-change.js`
+     (unit tested); the old helper's claim that others never see the area's name was untrue (the deck shows a city
+     beyond ~10 km) and is replaced. The area block's missing `</div>` (every later field was nested in it) is fixed.
+  8. Decorative dead ends removed: the landing's hidden template footer ("©2026 BDSN.CLUB") and "Webflow Honors" tab;
+     the chat list's "BRIVIA AI · THOUGHTFUL CONNECTIONS" line (there is no AI) now reads THE BRIVIA CLUB; the hidden
+     mock "Brivia AI" chat window CSS; a GIF picker whose GIFs cannot load (Giphy blocked or offline) now says so.
+- **Audit:** every visible control on every page and app view was clicked from a fresh load, at 1440 and 390 px
+  (signed in: 106 and 107 controls; signed out: landing, login, signup, privacy, careers). None was dead (one artefact:
+  a click during the deck's card animation). Menus and composer tools were checked one by one (card ⋯, ⚙ account menu,
+  chat ⋯, emoji, document, photo, GIF, camera, +).
+- **Open for the founder (not code):** the chat masthead still says "BRIVIA SOCIETY" (product name: Brivia Club);
+  chat GIFs are hot-linked from Giphy (each viewer's browser contacts Giphy); the grievance officer in `privacy.html`
+  is "the founder", not a named person; custom SMTP for reset and confirmation emails.
+
+## D-093: A touch of burgundy in the aura, everywhere (founder, 2026-10-25)
+
+- The aura (D-087) gains two glows in the brand wine: `--aura-wine` (rgba(110, 14, 46, .30)) low behind the left of
+  the page and `--aura-wine-soft` (rgba(128, 30, 62, .20)) faint near the top. Defined once in `tokens.css`
+  `--aura-bg`, so every page with the aura gets it (login, signup, app, profile, explore, chat list, hand-off);
+  photo and video art is untouched. The founder chose it from a screenshot of the login page.
+- Proof: e2e signup 285, onboarding 269, app-shell 210, explore-cards 74 (their contrast and axe checks included),
+  launch-polish 40, password-reveal 57, landing 47; unit 330; build, style ratchet and asset budget OK.

@@ -728,3 +728,6 @@ body.app-body .app-view[data-view="chat"] .chat-layout .message.has-share small 
   .message-resume { flex-wrap: wrap; }
   .message-resume .message-resume-copy { flex-basis: 8.5rem; }
 }
+
+/* No GIF could load (D-092): one plain line instead of an empty picker. */
+.chat-gif-empty { margin: 12px 4px 6px; color: var(--color-ink-soft); font-size: var(--text-14); }

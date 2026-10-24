@@ -547,33 +547,38 @@ body.app-body .app-view[data-view="chat"] .chat-compose button[type="submit"] { 
   body.app-body .app-view[data-view="chat"] .chat-layout .message { max-width: 84%; }
 }
 
-/* ---------- 3. Discovery filters: popular picks and the full catalog (D-062) ---------- */
-.discovery-filter-popular { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 14px; }
-.discovery-filter-popular:empty { display: none; }
-.discovery-filter-pop {
-  min-height: 36px;
-  padding: 0 14px;
-  border: 1px solid color-mix(in srgb, var(--color-oxblood) 16%, transparent);
-  border-radius: 999px;
-  background: var(--color-chip);
-  color: var(--color-name-ink);
-  font-family: var(--font-heading);
-  font-size: var(--text-14);
-  cursor: pointer;
-  transition: background var(--motion-fast) var(--ease), color var(--motion-fast) var(--ease), transform var(--motion-fast) var(--ease);
+/* ---------- 3. Discovery filters: the full catalog (D-062) as two dropdowns (D-092, no capsule cloud) ---------- */
+.discovery-filter-combo { position: relative; }
+.discovery-filter-combo .discovery-filter-input { height: 46px; padding-right: 42px; font-size: var(--text-14); cursor: pointer; }
+.discovery-filter-combo .discovery-filter-input:focus { cursor: text; }
+.discovery-filter-chevron {
+  position: absolute; top: 23px; right: 14px; width: 18px; height: 18px; transform: translateY(-50%);
+  fill: none; stroke: var(--color-oxblood); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round;
+  pointer-events: none; transition: transform var(--motion-fast) var(--ease);
 }
-.discovery-filter-pop:hover { transform: translateY(-1px); border-color: color-mix(in srgb, var(--color-oxblood) 45%, transparent); }
-.discovery-filter-pop.is-on { border-color: var(--color-oxblood); background: var(--color-oxblood); color: var(--color-cream); }
-.discovery-filter-pop:focus-visible { outline: 2px solid var(--color-oxblood); outline-offset: 2px; }
-/* A focused empty box lists the whole catalog: a scrolling list, not an endless drawer. */
-.discovery-filter-suggestions.is-open {
-  max-height: min(260px, 38svh);
-  overflow-y: auto;
-  overscroll-behavior: contain;
-  padding-right: 2px;
-  scrollbar-width: thin;
-  scrollbar-color: color-mix(in srgb, var(--color-oxblood) 50%, transparent) transparent;
+.discovery-filter-combo.is-open .discovery-filter-chevron { transform: translateY(-50%) rotate(180deg); }
+.discovery-filter-combo.is-open .discovery-filter-input { border-bottom-left-radius: 0; border-bottom-right-radius: 0; }
+/* The open list hangs from the field: one card, a scrolling list, never an endless drawer. */
+.discovery-filter-combo .discovery-filter-suggestions { display: none; margin-top: 0; }
+.discovery-filter-combo .discovery-filter-suggestions.is-open {
+  display: grid; gap: 2px; max-height: min(280px, 40svh); padding: 6px; overflow-y: auto; overscroll-behavior: contain;
+  border: 1px solid color-mix(in srgb, var(--color-oxblood) 30%, transparent); border-top: 0;
+  border-radius: 0 0 var(--radius-m) var(--radius-m); background: var(--color-cream);
+  box-shadow: 0 14px 28px -18px color-mix(in srgb, var(--color-oxblood-deep) 60%, transparent);
+  scrollbar-width: thin; scrollbar-color: color-mix(in srgb, var(--color-oxblood) 50%, transparent) transparent;
 }
+.discovery-filter-option-group { display: grid; gap: 2px; }
+.discovery-filter-option-group + .discovery-filter-option-group { margin-top: 6px; padding-top: 6px; border-top: 1px solid var(--color-line); }
+.discovery-filter-option-label {
+  margin: 4px 8px 2px; color: var(--color-ink-soft); font-size: var(--text-12); font-weight: 700; letter-spacing: .12em; text-transform: uppercase;
+}
+.discovery-filter-combo .discovery-filter-suggestion {
+  min-height: 44px; padding: 0 12px; border: 0; border-radius: var(--radius-s); background: transparent;
+  color: var(--color-name-ink); font-family: var(--font-body); font-size: var(--text-14); text-align: left;
+}
+.discovery-filter-combo .discovery-filter-suggestion:hover,
+.discovery-filter-combo .discovery-filter-suggestion:focus-visible { background: var(--color-oxblood); color: var(--color-cream); outline: 0; }
+.discovery-filter-combo .discovery-filter-empty { margin: 8px 10px; color: var(--color-ink-soft); font-size: var(--text-14); }
 .discovery-filter-suggestion { min-height: 40px; font-family: var(--font-heading); font-size: var(--text-14); }
 /* Phones: the drawer's footer is sticky, so a box scrolled into view (focus, keyboard) stops above it. */
 @media (max-width: 700px) {

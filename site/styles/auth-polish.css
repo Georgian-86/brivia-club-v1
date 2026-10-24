@@ -1484,7 +1484,8 @@
 
 .auth-shell:has(.auth-login.is-active) .auth-divider {
   width: min(100%, 405px);
-  margin: clamp(22px, 3.2vh, 32px) auto 12px;
+  /* OR sits exactly midway between LOG IN and the Google button (founder, D-092). */
+  margin: clamp(22px, 3.2vh, 32px) auto;
   color: rgba(90, 6, 31, .55);
   font-size: var(--text-12);
   letter-spacing: .105em;

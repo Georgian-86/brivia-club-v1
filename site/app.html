@@ -55,13 +55,23 @@
 
         <section class="app-view profile-view" data-view="profile" hidden>
           <div class="profile-shell">
+            <aside class="profile-sidebar" aria-hidden="true">
+              <p class="profile-sidebar-mark"><em>The</em> Brivia Club</p>
+              <span class="profile-sidebar-rule"></span>
+              <p class="profile-sidebar-words">People<br />Ideas<br />Opportunities</p>
+              <span class="profile-sidebar-rule"></span>
+              <p class="profile-sidebar-words">Curiosity<br />creates<br />opportunities</p>
+              <div class="profile-sidebar-photo"></div>
+              <p class="profile-sidebar-words">A<br />brighter<br />network<br />awaits</p>
+              <span class="profile-sidebar-rule"></span>
+            </aside>
             <div class="profile-board">
               <div class="profile-board-content">
           <div class="view-topline"><span>MY PROFILE / PRIVATE</span><button class="logout-button" id="logout-button">LOG OUT ↗</button></div>
           <div class="profile-hero">
             <div class="profile-cover-image" id="profile-cover-image" role="img" aria-label="Your cover image"></div>
-            <div class="profile-hero-copy"><p class="app-eyebrow">YOUR PLACE IN THE CLUB</p><h1 id="profile-name">New Member</h1><p id="profile-location">Your area</p><span class="profile-status"><i></i> MEMBER PROFILE</span></div>
-            <div class="profile-avatar" id="profile-avatar"></div>
+            <div class="profile-hero-copy"><p class="app-eyebrow">MEMBER</p><h1 id="profile-name">New Member</h1><p id="profile-location">Your area</p><span class="profile-hero-rule" aria-hidden="true"></span><p class="profile-hero-quote">&ldquo;Same curiosity.<br />Bigger conversations.&rdquo;</p></div>
+            <div class="profile-photo-frame"><div class="profile-avatar" id="profile-avatar"></div></div>
           </div>
           <div class="profile-column">
             <section class="profile-card profile-checklist" id="profile-checklist" aria-labelledby="profile-checklist-title"></section>
@@ -80,15 +90,15 @@
 
     <div class="discovery-filter-drawer" id="discovery-filter-drawer" hidden>
       <button class="discovery-filter-backdrop" type="button" data-close-discovery-filters aria-label="Close filters"></button>
-      <aside class="discovery-filter-panel" role="dialog" aria-modal="true" aria-labelledby="discovery-filter-title">
+      <section class="discovery-filter-panel" role="dialog" aria-modal="true" aria-labelledby="discovery-filter-title">
         <div class="discovery-filter-head"><div><p class="app-eyebrow">DISCOVERY / FILTERS</p><h2 id="discovery-filter-title">Find your<br /><em>people.</em></h2></div><button class="discovery-filter-close" type="button" data-close-discovery-filters aria-label="Close filters">×</button></div>
         <p class="discovery-filter-note">Your deck already starts nearby. Narrow it by name, skills and what people are open to.</p>
         <label class="discovery-filter-search"><span aria-hidden="true">⌕</span><input id="drawer-filter-search" type="search" placeholder="Search names (2+ letters)..." aria-label="Search names, at least 2 letters" autocomplete="off" /></label>
         <div class="discovery-filter-suggestions" id="filter-name-suggestions" role="listbox" aria-label="Matching names"></div>
-        <fieldset class="discovery-filter-group"><legend>SKILLS &amp; INTERESTS</legend><div class="discovery-filter-popular" id="filter-popular" role="group" aria-label="Popular interests"></div><div class="discovery-filter-selected" id="filter-skills-selected"></div><input class="discovery-filter-input" id="filter-skills-input" type="search" placeholder="Chess, music, guitar, hackathons..." aria-label="Search skills and interests" autocomplete="off" /><div class="discovery-filter-suggestions" id="filter-skills-suggestions" role="listbox" aria-label="Matching skills"></div></fieldset>
-        <fieldset class="discovery-filter-group"><legend>LOOKING FOR</legend><div class="discovery-filter-selected" id="filter-looking-for-selected"></div><input class="discovery-filter-input" id="filter-looking-for-input" type="search" placeholder="Hackathon buddy, co-founder, mentor..." aria-label="Search what people are looking for" autocomplete="off" /><div class="discovery-filter-suggestions" id="filter-looking-for-suggestions" role="listbox" aria-label="Matching intentions"></div></fieldset>
+        <fieldset class="discovery-filter-group"><legend>SKILLS &amp; INTERESTS</legend><div class="discovery-filter-selected" id="filter-skills-selected"></div><div class="discovery-filter-combo" data-filter-combo="skills"><input class="discovery-filter-input" id="filter-skills-input" type="text" role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="filter-skills-suggestions" placeholder="Choose interests, or type to search" aria-label="Skills and interests" autocomplete="off" spellcheck="false" /><svg class="discovery-filter-chevron" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M6 9l6 6 6-6" /></svg><div class="discovery-filter-suggestions" id="filter-skills-suggestions" role="listbox" aria-label="Skills and interests" aria-multiselectable="true"></div></div></fieldset>
+        <fieldset class="discovery-filter-group"><legend>LOOKING FOR</legend><div class="discovery-filter-selected" id="filter-looking-for-selected"></div><div class="discovery-filter-combo" data-filter-combo="looking-for"><input class="discovery-filter-input" id="filter-looking-for-input" type="text" role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="filter-looking-for-suggestions" placeholder="Choose, or type to search" aria-label="What people are looking for" autocomplete="off" spellcheck="false" /><svg class="discovery-filter-chevron" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M6 9l6 6 6-6" /></svg><div class="discovery-filter-suggestions" id="filter-looking-for-suggestions" role="listbox" aria-label="What people are looking for" aria-multiselectable="true"></div></div></fieldset>
         <div class="discovery-filter-footer"><span id="discovery-filter-result">All people</span><button class="discovery-filter-clear" id="clear-discovery-filters" type="button">CLEAR</button><button class="discovery-filter-apply" id="apply-discovery-filters" type="button">SHOW PEOPLE <b>↗</b></button></div>
-      </aside>
+      </section>
     </div>
 
     <div class="app-overlay" id="pitch-modal" hidden><div class="app-overlay-backdrop" data-close-overlay></div><section class="pitch-panel"><button class="overlay-close" type="button" data-close-overlay aria-label="Close and send without a note">×</button><p class="app-eyebrow">A WARM INTRODUCTION</p><h2>Send a pitch<br /><em>with context.</em></h2><p class="pitch-copy">Tell <strong id="pitch-name">them</strong> why you’d like to connect.</p><form id="pitch-form"><textarea id="pitch-message" rows="4" maxlength="500" placeholder="Hey, I noticed we both care about..." required></textarea><button class="pitch-submit" type="submit">SEND PITCH <span>→</span></button><button class="pitch-no-note" type="button">Send without a note</button></form></section></div>
