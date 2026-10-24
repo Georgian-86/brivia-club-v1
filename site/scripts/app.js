@@ -3773,7 +3773,7 @@ const loadSupabaseCommunity = async () => {
     window.location.href = '/auth.html';
     return;
   }
-  // The member's row and onboarding status are independent reads: ask for both at once (D-086).
+  // The member's row and onboarding status are independent reads: ask for both at once (D-088).
   const [{ data: ownRow, error: ownError }, { data: onboarding, error: onboardingError }] = await Promise.all([
     supabase.from('profiles').select('*').eq('id', session.user.id).maybeSingle(),
     onboardingStatus(),
@@ -3820,7 +3820,7 @@ const loadSupabaseCommunity = async () => {
   renderProfile();
   initResume(ownRow);
   if (document.body.dataset.appView === 'profile' && profileInterests.status === 'idle') loadProfileInterests();
-  // Blocks, matches and the inbox are independent reads: load them together (D-086), then use them in the old order.
+  // Blocks, matches and the inbox are independent reads: load them together (D-088), then use them in the old order.
   const inboxFilter = `sender_id.eq.${session.user.id},recipient_id.eq.${session.user.id}`;
   const loadInbox = async () => {
     // Sort in the browser so an older Supabase schema cache cannot block inbox loading.

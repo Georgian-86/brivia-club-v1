@@ -143,6 +143,10 @@ landing all passed, app-shell 208.
 Gmail plus-address of the founder's inbox for confirmation emails (disposable inboxes did not receive them).
 Tooling: Playwright **and axe-core** at `/tmp/pw` (`npm install --prefix /tmp/pw playwright axe-core`).
 
+- **2026-10-23, signup in the classic look (D-086):** the guided signup (same screens, Google, no points) now looks like
+  the old "FIND YOUR PEOPLE" form (`signup-classic.css`, CSS and one static head only). e2e signup 285, onboarding 269.
+- **2026-10-23, login look restored (D-085):** the login screen is back to the pre-B4 "JOIN THE CLUB" UI (markup only;
+  the B4 card CSS is inert). Login and the guided signup work exactly as before. e2e signup 285, onboarding 269 passed.
 - **2026-10-22, release A of the polish wave live (D-072):** location fix, chat fit, notifications over chat, compact
   account menu (bottom sheet on phones), Yugansh/Keshav cards removed. Founder: check "Use my location" and the
   account menu on the real Mac (Safari) and phone. Next: A5 with `0013`, then part B (guided signup, interests only).

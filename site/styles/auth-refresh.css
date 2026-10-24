@@ -3,7 +3,9 @@
    labelled button, then the email form with one primary action. Brivia deep-wine tokens only.
    The auth page carries years of layered overrides (auth-polish.css, mobile-final-fixes.css), several with !important.
    Everything here is scoped to the login card and weighted to win: the `:has(.auth-card.is-active)` prefix outranks
-   their `:has(.auth-login.is-active)` selectors, and !important is used only where they use it. */
+   their `:has(.auth-login.is-active)` selectors, and !important is used only where they use it.
+   D-085: the login view no longer carries `.auth-card` (the pre-B4 screen is back), so the login-card rules below are
+   inert; the guided signup rules still apply. */
 .auth-card {
   --c-wine: var(--color-chat-wine);
   --c-deep: var(--brivia-deep-wine);
@@ -369,45 +371,8 @@ body.auth-page .auth-shell:has(.auth-card.is-active) .auth-card :focus-visible {
   body.auth-page .auth-shell:has(.auth-card.is-active) .auth-card :is(.auth-google-trigger, .auth-submit):hover { transform: none; }
 }
 
-/* The guided signup frame on laptops (polish wave B4): the card sits in the middle of the panel and fits a short
-   screen (1280x800, a MacBook Air) with its Continue button in view; a taller question scrolls inside the panel, and
-   the auto margins drop to 0 so its top never clips. */
-@media (min-width: 781px) {
-  body.auth-page .auth-shell:has(.auth-guided.is-active) .auth-panel { padding-top: 24px !important; padding-bottom: 24px !important; }
-  body.auth-page .auth-shell:has(.auth-guided.is-active) .auth-panel-top { display: none !important; }
-  body.auth-page .auth-shell:has(.auth-guided.is-active) .auth-guided.is-active { margin: auto 0 !important; padding: 0 !important; }
-  body.auth-page .auth-shell:has(.auth-guided.is-active) .guided { min-height: min(560px, calc(100svh - 64px)); margin: 0 auto; }
-}
-
-/* D-082 / D-082b (founder, 2026-10-22). Register and login share the right half, and the login card fits one screen.
-   1. From 1100 px the telephone art takes the left half and the panel the right half, on login and on every guided
-      screen; both cards sit in the centre of that half, across and down (the panels' paddings are symmetric and the
-      cards use auto margins). The guided card is up to 620 px wide so short questions stay on one line. Headings are
-      calmer: clamp(28px, 2.4vw, 40px) for the question and for "Welcome back." (a legacy `.auth-signup h1` rule in
-      auth-polish.css had outranked signup.css and blown the question up to 4vw). Phones keep their layout; their
-      question heading is clamp(28px, 8vw, 34px), the size signup.css meant (the legacy rule had made it about 43 px).
-   2. The login card's padding and inner gaps follow the window height, so 1366x633, 1280x720 and a 125%-scaled
-      1920x1080 (about 1536x709) show the whole card, "New here?" included, with room around it. Targets stay 44 px. */
-@media (min-width: 1100px) {
-  body.auth-page .auth-shell:has(:is(.auth-card, .auth-guided).is-active) { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) !important; }
-  body.auth-page .auth-shell:has(:is(.auth-card, .auth-guided).is-active) .auth-phone { background-position: 50% center, 0 0, 0 0 !important; }
-}
-body.auth-page .auth-shell .guided .guided-screen h1 { font-size: clamp(28px, 8vw, 34px) !important; }
-@media (min-width: 781px) {
-  body.auth-page .auth-shell:has(.auth-guided.is-active) .auth-panel { padding-right: clamp(16px, 2.4vw, 48px) !important; padding-left: clamp(16px, 2.4vw, 48px) !important; }
-  body.auth-page .auth-shell:has(.auth-guided.is-active) .auth-guided.is-active { width: 100% !important; max-width: none !important; }
-  body.auth-page .auth-shell:has(.auth-guided.is-active) .guided { width: min(100%, 620px); max-width: none; margin: 0 auto; }
-  body.auth-page .auth-shell .guided .guided-screen h1 { font-size: clamp(28px, 2.4vw, 40px) !important; }
-}
-/* Short laptop windows: a tighter guided card, so even Interests (tabs, tray, chips) keeps Back and Finish in view. */
-@media (min-width: 781px) and (max-height: 760px) {
-  body.auth-page .auth-shell:has(.auth-guided.is-active) .auth-panel { padding-top: 12px !important; padding-bottom: 12px !important; }
-  body.auth-page .auth-shell:has(.auth-guided.is-active) .guided { min-height: min(560px, calc(100svh - 24px)); padding-top: 24px; padding-bottom: 20px; }
-  body.auth-page .auth-shell .guided .guided-steps { margin-bottom: var(--space-4); }
-  body.auth-page .auth-shell .guided .guided-screen--interests .guided-helper { margin-bottom: var(--space-3); }
-  body.auth-page .auth-shell .guided .guided-actions { padding-top: var(--space-4); }
-  body.auth-page .auth-shell .guided .guided-options { --guided-panel-h: clamp(112px, calc(100svh - 520px), 300px); }
-}
+/* D-086: the guided signup's card frame, the right-half split and its heading sizes (B4, D-082, D-082b) are gone: the
+   guided screens wear the classic signup look (signup-classic.css, which also sizes the interests panel). */
 /* 2. The login card's padding and inner gaps follow the window height (see the header above). */
 @media (min-width: 781px) {
   body.auth-page .auth-shell:has(.auth-card.is-active) .auth-panel { padding-top: clamp(12px, 3svh, 40px); padding-bottom: clamp(12px, 3svh, 40px); }
@@ -426,4 +391,43 @@ body.auth-page .auth-shell .guided .guided-screen h1 { font-size: clamp(28px, 8v
   body.auth-page .auth-shell:has(.auth-card.is-active) .auth-card .auth-forgot { margin: calc(var(--login-gap) * -.75) 0 calc(var(--login-gap) * -.5); }
   body.auth-page .auth-shell:has(.auth-card.is-active) .auth-card .auth-submit { min-height: clamp(48px, 6.6svh, 56px); }
   body.auth-page .auth-shell:has(.auth-card.is-active) .auth-card .auth-card-new { margin-top: clamp(6px, 1.4svh, 16px); padding-top: clamp(2px, .9svh, 12px); }
+}
+
+/* Founder, 2026-10-24 (D-089): on the login page "Continue with Google" is a full-width pill matching LOG IN (same
+   width, height, radius and tracking) instead of a 34px "G" circle, as the outlined secondary action under the
+   primary one. Scoped to auth.html: the landing's modal keeps its row of round social marks. */
+body.auth-page .auth-shell:has(.auth-login.is-active) .auth-login .auth-socials { display: block; min-height: 0; }
+body.auth-page .auth-shell:has(.auth-login.is-active) .auth-login .auth-socials .auth-google-trigger {
+  display: flex !important;
+  width: 100% !important;
+  min-width: 0 !important;
+  height: auto !important;
+  min-height: max(44px, clamp(40px, 5.3vh, 49px)) !important;
+  aspect-ratio: auto !important;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 0 20px;
+  border: 1px solid var(--color-chat-wine);
+  border-radius: 999px;
+  background: var(--color-cream);
+  box-shadow: none;
+  color: var(--color-chat-wine);
+  font-family: var(--font-body);
+  font-size: var(--text-12);
+  font-weight: 700;
+  letter-spacing: .147em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: background var(--motion-base) var(--ease), transform var(--motion-base) var(--ease);
+}
+body.auth-page .auth-shell:has(.auth-login.is-active) .auth-login .auth-socials .auth-google-trigger:hover {
+  background: color-mix(in srgb, var(--color-chat-wine) 7%, var(--color-cream));
+  transform: translateY(-1px);
+}
+body.auth-page .auth-shell:has(.auth-login.is-active) .auth-login .auth-socials .auth-google-trigger:disabled { cursor: progress; opacity: .7; transform: none; }
+body.auth-page .auth-shell:has(.auth-login.is-active) .auth-login .auth-socials .auth-google-mark { font-size: var(--text-16); letter-spacing: 0; }
+@media (prefers-reduced-motion: reduce) {
+  body.auth-page .auth-shell:has(.auth-login.is-active) .auth-login .auth-socials .auth-google-trigger { transition: none; }
+  body.auth-page .auth-shell:has(.auth-login.is-active) .auth-login .auth-socials .auth-google-trigger:hover { transform: none; }
 }

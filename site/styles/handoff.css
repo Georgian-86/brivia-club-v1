@@ -1,4 +1,4 @@
-/* Sign-in hand-off (2026-10-24, D-086). One branded "opening your club" screen covers every wait between a sign-in
+/* Sign-in hand-off (2026-10-24, D-088). One branded "opening your club" screen covers every wait between a sign-in
    and the app: auth.html shows it the moment a session exists (inline head script adds html.brivia-handing-off) and right
    after a successful sign-in; app.html shows it while body.app-auth-pending. Before this, members saw the login card
    for a second, then a blank page, then the app. Same aura as the pages around it, so the change of page is one calm

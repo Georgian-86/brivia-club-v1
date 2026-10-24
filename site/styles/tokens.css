@@ -62,7 +62,7 @@
   --motion-slow: 250ms;
   --ease: cubic-bezier(.2, .7, .2, 1);
 
-  /* Aura background (2026-10-24, D-085): a light, Vampr-style mesh of soft pastel glows on a warm near-white,
+  /* Aura background (2026-10-24, D-087): a light, Vampr-style mesh of soft pastel glows on a warm near-white,
      tinted to the wine brand. Painted once by aura-theme.css on a fixed layer behind every page. */
   --aura-base: #fbf8f4;
   --aura-lilac: rgba(208, 192, 242, .55);

@@ -701,7 +701,7 @@ if (showreelSection && showreelToggle) {
 }
 
 const authModal = document.querySelector('#auth-modal');
-// D-086: the "opening your club" screen (auth.html .brivia-handoff) covers every wait between a sign-in and the app.
+// D-088: the "opening your club" screen (auth.html .brivia-handoff) covers every wait between a sign-in and the app.
 // startHandoff shows it with a short note; endHandoff hides it again unless the page is already leaving for the app.
 let leavingForApp = false;
 const handoffNote = document.querySelector('[data-handoff-note]');
@@ -1984,7 +1984,7 @@ const restoreAuthPageSession = async () => {
     setAuthView(requestedAuthView, 'none');
     return;
   }
-  // As on the login form: with no pending signup, read the onboarding status beside the profile (D-086).
+  // As on the login form: with no pending signup, read the onboarding status beside the profile (D-088).
   const statusRequest = readPendingProfile() ? null : onboardingStatus();
   const { data: profile, error } = await supabase.from('profiles').select('*').eq('id', session.user.id).maybeSingle();
   if (error) {
@@ -2228,7 +2228,7 @@ loginForm?.addEventListener('submit', async (event) => {
       window.localStorage.removeItem('brivia-pending-profile');
     }
     // With no pending signup to apply first, the onboarding status cannot change before routing: read it beside the
-    // profile instead of after it (D-086).
+    // profile instead of after it (D-088).
     const statusRequest = pending ? null : onboardingStatus();
     const { data: ownProfile, error: ownProfileError } = await supabase.from('profiles').select('*').eq('id', data.user.id).maybeSingle();
     if (ownProfileError) throw ownProfileError;

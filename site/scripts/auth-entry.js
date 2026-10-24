@@ -13,6 +13,7 @@ import '../styles/mobile-final-fixes.css';
 import '../styles/auth-a11y.css';
 import '../styles/signup.css';
 import '../styles/auth-refresh.css';
+import '../styles/signup-classic.css';
 import '../styles/aura-theme.css';
 import '../styles/handoff.css';
 import './script.js';
