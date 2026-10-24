@@ -1838,3 +1838,20 @@ controls (a tester or a seeded test member), never a real member, so no new expo
   SMTP Settings. The "Reset Password" template's link must keep `{{ .ConfirmationURL }}`.
 - Proof: `npm run test:unit` 321/321 (8 new); e2e password-reset 18/18, signup 285/285, onboarding 269/269, landing
   47/47; style ratchet, asset budget and build OK.
+
+## D-091: Show / hide password on every password field; "Forgot password?" stays as D-090 built it (founder, 2026-10-24)
+
+- **Asked:** "add the see password while typing and forgot password".
+- **Found:** "Forgot password?" already works end to end (D-090: reset link by email, then a new password inside the
+  login card); nothing changes there. The login field's eye (`◉`, `.auth-field-eye`) was decoration only
+  (`aria-hidden`, no handler), and no other password field had one.
+- **Done:** `site/scripts/password-reveal.js` gives every password field (login, the reset new-password step, the
+  guided signup's account screen, the classic signup, the landing's login modal) a real eye button, attached on load
+  and to fields the guided signup renders later (a `MutationObserver`). It switches the field between dots and text;
+  focus and caret stay in the field, so the member keeps typing; it is a 44 px `type="button"` with "Show password" /
+  "Hide password" and `aria-pressed`, reachable by Tab; each eye toggles only its own field; every field of a form goes
+  back to dots on submit (password managers save it, nothing stays on screen). The decorative glyph is removed from
+  `auth.html` and `index.html`. Look: `site/styles/password-reveal.css` (tokens only, loads last on both pages).
+- Proof: `npm run test:unit` 324/324 (3 new); e2e `tests/e2e/password-reveal.spec.mjs` 56/56 (new, 1440 and 390 px,
+  axe), signup 285/285, onboarding 269/269, password-reset 18/18, location 64/64, landing 47/47; style ratchet, asset
+  budget and build OK.

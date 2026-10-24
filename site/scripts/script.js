@@ -19,6 +19,7 @@ import { defaultCoverUrl, normalizeCoverUrl } from './cover-assets.js';
 import { presetCoverPath } from './preset-cover.js';
 import { motionAllowed, introPlan, pickHeroSource, markLoaded, INTRO_CAP_MS, INTRO_START_GRACE_MS } from './landing-motion.js';
 import { SOUND_LIMIT_MS, SOUND_STORAGE_KEY, soundPreference, soundPlan, isUnlockEvent, barsToSchedule } from './landing-sound.js';
+import { watchPasswordFields } from './password-reveal.js';
 import Lenis from 'lenis';
 import 'lenis/dist/lenis.css';
 
@@ -715,6 +716,8 @@ const endHandoff = () => {
 };
 const authCta = document.querySelector('.hero-nav .cta-button');
 const isStandaloneAuthPage = document.body.classList.contains('auth-page');
+// Show / hide password on every password field, the guided signup's included (D-091).
+watchPasswordFields(document);
 const requestedAuthView = window.location.hash === '#signup' ? 'signup' : 'login';
 let authHistoryView = isStandaloneAuthPage ? requestedAuthView : 'welcome';
 if (isStandaloneAuthPage) {
