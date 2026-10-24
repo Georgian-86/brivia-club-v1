@@ -392,3 +392,42 @@ body.auth-page .auth-shell:has(.auth-card.is-active) .auth-card :focus-visible {
   body.auth-page .auth-shell:has(.auth-card.is-active) .auth-card .auth-submit { min-height: clamp(48px, 6.6svh, 56px); }
   body.auth-page .auth-shell:has(.auth-card.is-active) .auth-card .auth-card-new { margin-top: clamp(6px, 1.4svh, 16px); padding-top: clamp(2px, .9svh, 12px); }
 }
+
+/* Founder, 2026-10-24 (D-089): on the login page "Continue with Google" is a full-width pill matching LOG IN (same
+   width, height, radius and tracking) instead of a 34px "G" circle, as the outlined secondary action under the
+   primary one. Scoped to auth.html: the landing's modal keeps its row of round social marks. */
+body.auth-page .auth-shell:has(.auth-login.is-active) .auth-login .auth-socials { display: block; min-height: 0; }
+body.auth-page .auth-shell:has(.auth-login.is-active) .auth-login .auth-socials .auth-google-trigger {
+  display: flex !important;
+  width: 100% !important;
+  min-width: 0 !important;
+  height: auto !important;
+  min-height: max(44px, clamp(40px, 5.3vh, 49px)) !important;
+  aspect-ratio: auto !important;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 0 20px;
+  border: 1px solid var(--color-chat-wine);
+  border-radius: 999px;
+  background: var(--color-cream);
+  box-shadow: none;
+  color: var(--color-chat-wine);
+  font-family: var(--font-body);
+  font-size: var(--text-12);
+  font-weight: 700;
+  letter-spacing: .147em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: background var(--motion-base) var(--ease), transform var(--motion-base) var(--ease);
+}
+body.auth-page .auth-shell:has(.auth-login.is-active) .auth-login .auth-socials .auth-google-trigger:hover {
+  background: color-mix(in srgb, var(--color-chat-wine) 7%, var(--color-cream));
+  transform: translateY(-1px);
+}
+body.auth-page .auth-shell:has(.auth-login.is-active) .auth-login .auth-socials .auth-google-trigger:disabled { cursor: progress; opacity: .7; transform: none; }
+body.auth-page .auth-shell:has(.auth-login.is-active) .auth-login .auth-socials .auth-google-mark { font-size: var(--text-16); letter-spacing: 0; }
+@media (prefers-reduced-motion: reduce) {
+  body.auth-page .auth-shell:has(.auth-login.is-active) .auth-login .auth-socials .auth-google-trigger { transition: none; }
+  body.auth-page .auth-shell:has(.auth-login.is-active) .auth-login .auth-socials .auth-google-trigger:hover { transform: none; }
+}

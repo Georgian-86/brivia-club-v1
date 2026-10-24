@@ -19,6 +19,8 @@ import '../styles/app-navigation.css';
 import '../styles/discovery-filters.css';
 import '../styles/mobile-app.css';
 import '../styles/skeleton.css';
+import '../styles/aura-theme.css';
+import '../styles/handoff.css';
 import { supabase, rowToProfile, saveProfile, isPresetCoverUrl, onboardingStatus, sendSignal, fetchSignalQuota, isRateLimited, isStorageImageUrl, withoutCredentials, uploadMessageAttachment, removeMessageAttachment, uploadCommunityPostImage, removeCommunityPostImage, ImageProcessingError, PHOTO_ERROR_MESSAGE, PHOTO_FRAMER_ERROR, compressAttachmentFiles, attachmentKind, reportMember, setSensitiveConsent, fetchSensitiveConsentAt, fetchMyInterests, fetchInterestNodes, uploadResume, removeResume, resumeSignedUrl, resumeInfo, clearResumePath } from './supabase.js';
 import { areaShareBody, parseAreaBody, resumeShareAttachment, resumeMessageFields, RESUME_SHARE_BODY, NO_RESUME_HINT, RESUME_GONE_COPY, RESUME_SHARE_NOTE, AREA_SHARE_NOTE } from './quick-share.js';
 import { validateResume, readResumeHead, resumeMetaLine, formatResumeSize, resumeUploadErrorMessage, isMissingResumeStore, RESUME_FILE_NAME, REMOVE_RESUME_CONFIRM, REMOVE_FAILED_COPY, REPLACED_NOT_SAVED_COPY, OPEN_FAILED_COPY, COMING_SOON_COPY } from './resume-file.js';
@@ -3771,7 +3773,11 @@ const loadSupabaseCommunity = async () => {
     window.location.href = '/auth.html';
     return;
   }
-  const { data: ownRow, error: ownError } = await supabase.from('profiles').select('*').eq('id', session.user.id).maybeSingle();
+  // The member's row and onboarding status are independent reads: ask for both at once (D-088).
+  const [{ data: ownRow, error: ownError }, { data: onboarding, error: onboardingError }] = await Promise.all([
+    supabase.from('profiles').select('*').eq('id', session.user.id).maybeSingle(),
+    onboardingStatus(),
+  ]);
   if (ownError) {
     window.location.replace('/auth.html?profile-check=failed');
     return;
@@ -3783,7 +3789,6 @@ const loadSupabaseCommunity = async () => {
   // Onboarding gate (UX_SPEC flow A): a member without a home area or a complete Passion Budget finishes it first.
   // Only an explicit completed = false redirects; if the status cannot be read, the server still hides an incomplete
   // member from everyone (D-030).
-  const { data: onboarding, error: onboardingError } = await onboardingStatus();
   if (!onboardingError && onboarding && onboarding.completed === false) {
     await routeIncompleteMember(onboarding, ownRow);
     return;
@@ -3815,16 +3820,21 @@ const loadSupabaseCommunity = async () => {
   renderProfile();
   initResume(ownRow);
   if (document.body.dataset.appView === 'profile' && profileInterests.status === 'idle') loadProfileInterests();
-  await syncBlockedUserIds();
-  const { data: matchRows, error: matchError } = await supabase.from('matches').select('user1_id,user2_id').or(`user1_id.eq.${session.user.id},user2_id.eq.${session.user.id}`);
+  // Blocks, matches and the inbox are independent reads: load them together (D-088), then use them in the old order.
+  const inboxFilter = `sender_id.eq.${session.user.id},recipient_id.eq.${session.user.id}`;
+  const loadInbox = async () => {
+    // Sort in the browser so an older Supabase schema cache cannot block inbox loading.
+    const full = await supabase.from('brivia_messages').select('id,sender_id,recipient_id,body,created_at,message_type,attachment_url,attachment_path,attachment_name,attachment_mime,attachment_size').or(inboxFilter);
+    return full.error ? supabase.from('brivia_messages').select('id,sender_id,recipient_id,body').or(inboxFilter) : full;
+  };
+  const [, { data: matchRows, error: matchError }, { data: inboxRows, error: inboxError }] = await Promise.all([
+    syncBlockedUserIds(),
+    supabase.from('matches').select('user1_id,user2_id').or(`user1_id.eq.${session.user.id},user2_id.eq.${session.user.id}`),
+    loadInbox(),
+  ]);
   if (!matchError) {
     remoteConnectionIds = (matchRows || []).map((match) => match.user1_id === session.user.id ? match.user2_id : match.user1_id);
     remoteMatchIds = [...remoteConnectionIds];
-  }
-  // Sort in the browser so an older Supabase schema cache cannot block inbox loading.
-  let { data: inboxRows, error: inboxError } = await supabase.from('brivia_messages').select('id,sender_id,recipient_id,body,created_at,message_type,attachment_url,attachment_path,attachment_name,attachment_mime,attachment_size').or(`sender_id.eq.${session.user.id},recipient_id.eq.${session.user.id}`);
-  if (inboxError) {
-    ({ data: inboxRows, error: inboxError } = await supabase.from('brivia_messages').select('id,sender_id,recipient_id,body').or(`sender_id.eq.${session.user.id},recipient_id.eq.${session.user.id}`));
   }
   if (!inboxError) {
     try { await syncIncomingNotifications(inboxRows || []); } catch (error) { console.warn('Notifications could not load:', error.message); }

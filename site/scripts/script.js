@@ -701,6 +701,17 @@ if (showreelSection && showreelToggle) {
 }
 
 const authModal = document.querySelector('#auth-modal');
+// D-088: the "opening your club" screen (auth.html .brivia-handoff) covers every wait between a sign-in and the app.
+// startHandoff shows it with a short note; endHandoff hides it again unless the page is already leaving for the app.
+let leavingForApp = false;
+const handoffNote = document.querySelector('[data-handoff-note]');
+const startHandoff = (note = 'Opening your club') => {
+  if (handoffNote) handoffNote.textContent = note;
+  document.documentElement.classList.add('brivia-handing-off');
+};
+const endHandoff = () => {
+  if (!leavingForApp) document.documentElement.classList.remove('brivia-handing-off');
+};
 const authCta = document.querySelector('.hero-nav .cta-button');
 const isStandaloneAuthPage = document.body.classList.contains('auth-page');
 const requestedAuthView = window.location.hash === '#signup' ? 'signup' : 'login';
@@ -1581,6 +1592,7 @@ signupSuccess?.querySelectorAll('[data-copy-credential]').forEach((button) => {
 });
 
 const setAuthView = (view, historyMode = 'push', { guidedScreen = 'welcome' } = {}) => {
+  endHandoff(); // a form is about to show: the hand-off screen must not hide it (or block its focus)
   // Guided signup: "signup" opens the guided flow (the landing's modal sends the visitor to auth.html#signup).
   let openGuided = false;
   if (view === 'signup' && GUIDED_SIGNUP) {
@@ -1643,9 +1655,10 @@ const startGoogleAuth = async () => {
       provider: 'google',
       options: { redirectTo: `${window.location.origin}/auth.html`, queryParams: { prompt: 'select_account' } },
     });
-    if (!error) return { ok: true };
+    if (!error) { startHandoff('Opening Google'); return { ok: true }; }
     throw error;
   } catch (error) {
+    endHandoff();
     buttons.forEach((button) => { button.disabled = false; });
     if (loginNote) loginNote.textContent = error?.message || GOOGLE_START_FAILED;
     if (signupFeedback) signupFeedback.textContent = error?.message || GOOGLE_START_FAILED;
@@ -1872,8 +1885,9 @@ const openGuidedFor = async (user, row = null, status = null, pendingResult = nu
 // After a profile exists: the app when onboarding is complete, else the completion flow at the first incomplete step.
 // An unknown status (RPC error) goes to the app, whose server-side visibility still requires completion (D-030).
 // `pendingResult` (from applyPendingOnboarding) carries what happened to a pending signup's area and interests.
-const routeAfterProfile = async (user, row = null, pendingResult = null) => {
-  const { data: status, error } = await onboardingStatus();
+// `statusRequest` is an onboarding-status read already in flight (the login form starts it beside the profile read).
+const routeAfterProfile = async (user, row = null, pendingResult = null, statusRequest = null) => {
+  const { data: status, error } = await (statusRequest || onboardingStatus());
   if (error || !status || status.completed !== false) { redirectToApp(); return; }
   let profileRow = row;
   if (!profileRow) ({ data: profileRow } = await supabase.from('profiles').select('*').eq('id', user.id).maybeSingle());
@@ -1970,6 +1984,8 @@ const restoreAuthPageSession = async () => {
     setAuthView(requestedAuthView, 'none');
     return;
   }
+  // As on the login form: with no pending signup, read the onboarding status beside the profile (D-088).
+  const statusRequest = readPendingProfile() ? null : onboardingStatus();
   const { data: profile, error } = await supabase.from('profiles').select('*').eq('id', session.user.id).maybeSingle();
   if (error) {
     setAuthView('login');
@@ -1977,7 +1993,7 @@ const restoreAuthPageSession = async () => {
     return;
   }
   if (profile) {
-    await routeAfterProfile(session.user, profile);
+    await routeAfterProfile(session.user, profile, null, statusRequest);
     return;
   }
   const pending = readPendingProfile();
@@ -2003,8 +2019,17 @@ const updateAuthScrollbar = () => {
 };
 
 const redirectToApp = () => {
+  leavingForApp = true;
+  startHandoff();
   window.location.replace('/app.html');
 };
+// Back from Google (or the app) restores this page from the back/forward cache with the hand-off still up: undo it.
+window.addEventListener('pageshow', (event) => {
+  if (!event.persisted) return;
+  leavingForApp = false;
+  endHandoff();
+  authModal?.querySelectorAll('.auth-google-trigger').forEach((button) => { button.disabled = false; });
+});
 
 // The pending signup profile, or null. One older than 7 days (or without savedAt) is removed, never applied.
 const readPendingProfile = () => {
@@ -2187,6 +2212,7 @@ loginForm?.addEventListener('submit', async (event) => {
     if (!supabaseReady || !supabase) throw new Error('Supabase is not configured.');
     const { data, error } = await supabase.auth.signInWithPassword({ email, password });
     if (error) throw error;
+    startHandoff('Signing you in');
     const pending = readPendingProfile();
     const pendingBelongsToUser = pending?.email?.toLowerCase() === data.user?.email?.toLowerCase();
     let loginPendingResult = null;
@@ -2201,6 +2227,9 @@ loginForm?.addEventListener('submit', async (event) => {
     } else if (pending && !pendingBelongsToUser) {
       window.localStorage.removeItem('brivia-pending-profile');
     }
+    // With no pending signup to apply first, the onboarding status cannot change before routing: read it beside the
+    // profile instead of after it (D-088).
+    const statusRequest = pending ? null : onboardingStatus();
     const { data: ownProfile, error: ownProfileError } = await supabase.from('profiles').select('*').eq('id', data.user.id).maybeSingle();
     if (ownProfileError) throw ownProfileError;
     if (!ownProfile) {
@@ -2216,11 +2245,12 @@ loginForm?.addEventListener('submit', async (event) => {
     if (pendingBelongsToUser && pending?.coverUrl) {
       await supabase.auth.updateUser({ data: { coverUrl: pending.coverUrl } }).catch(() => {});
     }
-    await routeAfterProfile(data.user, ownProfile, loginPendingResult);
+    await routeAfterProfile(data.user, ownProfile, loginPendingResult, statusRequest);
   } catch (error) {
     if (loginNote) loginNote.textContent = error.message || 'Could not sign you in. Check your email and password.';
   } finally {
     if (submit) submit.disabled = false;
+    endHandoff();
   }
 });
 
@@ -2482,7 +2512,7 @@ function showSignupSuccessTop(title) {
   }
 }
 
-if (document.body.classList.contains('auth-page')) void restoreAuthPageSession();
+if (document.body.classList.contains('auth-page')) void restoreAuthPageSession().catch(() => setAuthView(requestedAuthView, 'none')).finally(endHandoff);
 
 // Escape closes the auth modal (on auth.html it leaves the page), but never when a control already handled it, never
 // from a field of the signup form, and never once a signup is past step 1: progress must not be lost to one key.
