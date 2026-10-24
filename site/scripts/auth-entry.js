@@ -13,4 +13,5 @@ import '../styles/mobile-final-fixes.css';
 import '../styles/auth-a11y.css';
 import '../styles/signup.css';
 import '../styles/auth-refresh.css';
+import '../styles/aura-theme.css';
 import './script.js';

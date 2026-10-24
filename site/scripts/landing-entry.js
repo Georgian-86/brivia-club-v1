@@ -13,4 +13,5 @@ import '../styles/mobile-final-fixes.css';
 import '../styles/skeleton.css';
 // Smooth scrolling, cheaper scene layers and the sound button (D-063); loads last.
 import '../styles/landing-smooth.css';
+import '../styles/aura-theme.css';
 import './script.js';

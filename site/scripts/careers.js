@@ -1,6 +1,7 @@
 import '../styles/tokens.css';
 import '../styles/fonts.css';
 import '../styles/fonts-careers.css';
+import '../styles/aura-theme.css';
 import { supabase } from './supabase.js';
 
 const roles = {

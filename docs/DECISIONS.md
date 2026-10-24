@@ -1718,3 +1718,19 @@ controls (a tester or a seeded test member), never a real member, so no new expo
   replaces it before a card shows. Swap it for the branded placeholder when the deck is next touched.
 - **Caches:** WhatsApp, LinkedIn and others cache previews; re-check with each platform's inspector after deploy.
 - Proof: `npm run test:unit` 313/313; stub build OK; `dist/index.html` has 9 `og:` tags and no "bala"; asset budget OK.
+
+## D-085: Light "aura" background after vampr.me, on preview only (founder, 2026-10-24)
+
+- **Asked:** a background like vampr.me's (a light mesh of soft pastel glows, "not so dark") that merges with the
+  existing theme. Preview branch only; **not merged to main until the founder says so.**
+- **Done:** `site/styles/aura-theme.css` (loaded last by every entry) paints one fixed `body::before` layer: lilac,
+  mint, blush and peach radial glows on a warm near-white (`--aura-*` in `tokens.css`, tinted to the wine brand).
+  Flat cream page surfaces go transparent (app shell, profile page, inbox, login/signup frame, careers and privacy
+  bodies, the landing's light bands); the top bar and chat list become frosted glass. The login phone uses the
+  existing cut-out so it floats on the aura. Cards, photo and video art, and the landing's dark cinematic bands are
+  unchanged, so text contrast is unchanged.
+- **Why `!important`:** these surfaces are set by layered rules with `:has()` weight and `!important`
+  (auth-polish.css, reference-design.css); the theme layer overrides `background` only.
+- **Open:** the landing's dark bands (Meet your kind, Discover/Swipe, principles, process, footer), the careers header,
+  and the pillars text panel keep their colours; lighten them next if the founder wants the whole landing on the aura.
+- Proof: style ratchet OK, asset budget OK, `npm run test:unit` 313/313, build OK; screenshots at 390 and 1440 px.

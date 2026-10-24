@@ -61,6 +61,22 @@
   --motion-base: 200ms;
   --motion-slow: 250ms;
   --ease: cubic-bezier(.2, .7, .2, 1);
+
+  /* Aura background (2026-10-24, D-085): a light, Vampr-style mesh of soft pastel glows on a warm near-white,
+     tinted to the wine brand. Painted once by aura-theme.css on a fixed layer behind every page. */
+  --aura-base: #fbf8f4;
+  --aura-lilac: rgba(208, 192, 242, .55);
+  --aura-rose: rgba(236, 184, 202, .5);
+  --aura-mint: rgba(188, 228, 216, .45);
+  --aura-peach: rgba(248, 220, 198, .55);
+  --aura-glass: rgba(255, 252, 248, .62);
+  --aura-bg:
+    radial-gradient(ellipse 48% 42% at 22% 30%, var(--aura-lilac), transparent 72%),
+    radial-gradient(ellipse 42% 40% at 84% 36%, var(--aura-mint), transparent 72%),
+    radial-gradient(ellipse 50% 40% at 62% 88%, var(--aura-rose), transparent 72%),
+    radial-gradient(ellipse 40% 36% at 6% 92%, var(--aura-peach), transparent 72%),
+    radial-gradient(ellipse 36% 30% at 96% 4%, var(--aura-peach), transparent 72%),
+    var(--aura-base);
 }
 
 @media (prefers-reduced-motion: reduce) {
