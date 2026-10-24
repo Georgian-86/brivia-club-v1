@@ -143,6 +143,8 @@ landing all passed, app-shell 208.
 Gmail plus-address of the founder's inbox for confirmation emails (disposable inboxes did not receive them).
 Tooling: Playwright **and axe-core** at `/tmp/pw` (`npm install --prefix /tmp/pw playwright axe-core`).
 
+- **2026-10-24, show / hide password (D-091):** every password field has a working eye button (`password-reveal.js`);
+  "Forgot password?" is unchanged from D-090. e2e password-reveal 56, signup 285, onboarding 269, password-reset 18.
 - **2026-10-23, signup in the classic look (D-086):** the guided signup (same screens, Google, no points) now looks like
   the old "FIND YOUR PEOPLE" form (`signup-classic.css`, CSS and one static head only). e2e signup 285, onboarding 269.
 - **2026-10-23, login look restored (D-085):** the login screen is back to the pre-B4 "JOIN THE CLUB" UI (markup only;

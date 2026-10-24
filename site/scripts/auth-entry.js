@@ -16,4 +16,5 @@ import '../styles/auth-refresh.css';
 import '../styles/signup-classic.css';
 import '../styles/aura-theme.css';
 import '../styles/handoff.css';
+import '../styles/password-reveal.css';
 import './script.js';
