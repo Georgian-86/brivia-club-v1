@@ -1818,3 +1818,23 @@ controls (a tester or a seeded test member), never a real member, so no new expo
   who mistypes or forgets a password cannot reset it.
 - Proof: `npm run test:unit` 313/313; e2e signup 285/285, onboarding 269/269, app-shell 208/208, landing 47/47;
   style ratchet, asset budget and build OK.
+
+## D-090: "Forgot password?" works: reset by email inside the login card (founder, 2026-10-24)
+
+- **Reported:** "Forgot password is not working on the live site." The button on `auth.html` had no handler at all
+  (found in D-089), so a member with a wrong or forgotten password had no way back in by email.
+- **Done:** inside the login card (same layout and styles; heading follows the step):
+  1. "Forgot password?" swaps the login form for RESET PASSWORD / "We'll email you a link." (the typed email is kept),
+     SEND RESET LINK calls `resetPasswordForEmail(email, { redirectTo: <origin>/auth.html })` and shows the same line
+     whether or not the account exists ("If an account exists for ..."); rate limits read as "wait"; Back to log in.
+  2. The emailed link returns with `#...&type=recovery`: the head scripts of `auth.html` (and `index.html`, if Supabase
+     falls back to the Site URL) no longer forward it to the app or show the hand-off screen; the card shows NEW
+     PASSWORD (twice, at least 8 characters like signup), `updateUser({ password })`, then the app.
+  3. An expired or used link (`#error_code=otp_expired`, or no recovery session) returns to step 1 with "That reset
+     link has expired or was already used." The landing's modal "Forgot password?" opens `auth.html?forgot=1`.
+  Pure logic in `site/scripts/password-reset.js` (unit tested); `tests/e2e/password-reset.spec.mjs` covers the flow.
+- **Founder check:** Supabase's built-in mailer is heavily rate limited and, on projects without custom SMTP, may only
+  deliver to the project team's addresses. For members to receive reset emails, set up SMTP under Auth → Emails →
+  SMTP Settings. The "Reset Password" template's link must keep `{{ .ConfirmationURL }}`.
+- Proof: `npm run test:unit` 321/321 (8 new); e2e password-reset 18/18, signup 285/285, onboarding 269/269, landing
+  47/47; style ratchet, asset budget and build OK.

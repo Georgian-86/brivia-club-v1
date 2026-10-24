@@ -5,6 +5,7 @@ import {
 } from './supabase.js';
 import { buildPendingOnboarding, isPendingExpired, dataUrlToFile } from './pending-profile.js';
 import { isUnderReview, shouldWithdrawConsent } from './onboarding-guard.js';
+import { readAuthHash, newPasswordProblem, resetRequestError, passwordUpdateError, RESET_SENT, LINK_EXPIRED } from './password-reset.js';
 import {
   MAX_INTERESTS, MODES, emptyBudget, addInterest, removeInterest, stepPoints, setMode, pointsLeft, isComplete, toPayload,
   counterText, budgetFromRows, budgetGateText, spreadRemaining, guidedBudget,
@@ -733,6 +734,94 @@ const signupForm = document.querySelector('#signup-form');
 const signupSuccess = document.querySelector('#auth-success');
 const loginForm = document.querySelector('#login-form');
 const loginNote = document.querySelector('#login-note');
+
+// D-090: "Forgot password?" inside the login card. The card swaps the login form for the reset request (email -> link)
+// or, back from the emailed link (a recovery session), for the new-password form; the heading follows the step.
+const authHashInfo = readAuthHash(window.location.hash); // read now: the Supabase client clears the hash once parsed
+const isRecoveryVisit = authHashInfo.recovery || document.documentElement.dataset.authRecovery === '1';
+const loginView = loginForm?.closest('[data-auth-view="login"]') || null;
+const resetRequestForm = document.querySelector('#reset-request-form');
+const resetUpdateForm = document.querySelector('#reset-update-form');
+const loginHeading = loginView ? {
+  eyebrow: loginView.querySelector('.auth-eyebrow'),
+  title: loginView.querySelector('h1'),
+  intro: loginView.querySelector('.auth-intro'),
+} : {};
+const loginCopy = Object.fromEntries(Object.entries(loginHeading).map(([key, node]) => [key, node?.textContent || '']));
+const RESET_COPY = {
+  request: { eyebrow: 'FORGOT PASSWORD', title: 'RESET PASSWORD', intro: "WE'LL EMAIL YOU A LINK." },
+  update: { eyebrow: 'ALMOST THERE', title: 'NEW PASSWORD', intro: "CHOOSE ONE YOU'LL REMEMBER." },
+};
+const setResetMode = (mode = null) => {
+  if (!loginView || !resetRequestForm || !resetUpdateForm) return;
+  loginView.classList.toggle('is-resetting', Boolean(mode));
+  loginForm.hidden = Boolean(mode);
+  resetRequestForm.hidden = mode !== 'request';
+  resetUpdateForm.hidden = mode !== 'update';
+  const copy = mode ? RESET_COPY[mode] : loginCopy;
+  Object.entries(loginHeading).forEach(([key, node]) => { if (node) node.textContent = copy[key]; });
+  if (loginNote) loginNote.textContent = '';
+  const field = mode === 'request' ? resetRequestForm.elements.namedItem('email') : mode === 'update' ? resetUpdateForm.elements.namedItem('password') : null;
+  field?.focus();
+};
+loginForm?.querySelector('.auth-forgot')?.addEventListener('click', () => {
+  // The landing's modal has no reset forms: open the login page in its reset step.
+  if (!resetRequestForm) { window.location.href = '/auth.html?forgot=1#login'; return; }
+  const typed = String(loginForm.elements.namedItem('email')?.value || '').trim();
+  setResetMode('request');
+  if (typed) resetRequestForm.elements.namedItem('email').value = typed;
+});
+resetRequestForm?.querySelector('.auth-reset-back')?.addEventListener('click', () => {
+  setResetMode(null);
+  loginForm?.elements.namedItem('email')?.focus();
+});
+resetRequestForm?.addEventListener('submit', async (event) => {
+  event.preventDefault();
+  const input = resetRequestForm.elements.namedItem('email');
+  const email = String(input?.value || '').trim();
+  if (!email || !input.checkValidity()) {
+    if (loginNote) loginNote.textContent = 'Enter the email address you use for Brivia.';
+    input?.focus();
+    return;
+  }
+  const submit = resetRequestForm.querySelector('.auth-submit');
+  if (submit) { submit.disabled = true; submit.setAttribute('aria-busy', 'true'); }
+  if (loginNote) loginNote.textContent = 'Sending your reset link...';
+  try {
+    if (!supabaseReady || !supabase) throw new Error('Supabase is not configured.');
+    const { error } = await supabase.auth.resetPasswordForEmail(email, { redirectTo: `${window.location.origin}/auth.html` });
+    if (loginNote) loginNote.textContent = error ? resetRequestError(error) : RESET_SENT(email);
+  } catch (error) {
+    if (loginNote) loginNote.textContent = resetRequestError(error);
+  } finally {
+    if (submit) { submit.disabled = false; submit.removeAttribute('aria-busy'); }
+  }
+});
+resetUpdateForm?.addEventListener('submit', async (event) => {
+  event.preventDefault();
+  const password = String(resetUpdateForm.elements.namedItem('password')?.value || '');
+  const confirm = String(resetUpdateForm.elements.namedItem('confirm')?.value || '');
+  const problem = newPasswordProblem(password, confirm);
+  if (problem) {
+    if (loginNote) loginNote.textContent = problem;
+    resetUpdateForm.elements.namedItem(password.length < 8 ? 'password' : 'confirm')?.focus();
+    return;
+  }
+  const submit = resetUpdateForm.querySelector('.auth-submit');
+  if (submit) { submit.disabled = true; submit.setAttribute('aria-busy', 'true'); }
+  if (loginNote) loginNote.textContent = 'Saving your new password...';
+  try {
+    if (!supabaseReady || !supabase) throw new Error('Supabase is not configured.');
+    const { error } = await supabase.auth.updateUser({ password });
+    if (error) throw error;
+    redirectToApp(); // the hand-off screen covers the way in; app.html sends an unfinished member to onboarding
+  } catch (error) {
+    const message = passwordUpdateError(error);
+    if (message === LINK_EXPIRED) setResetMode('request');
+    if (loginNote) loginNote.textContent = message;
+    if (submit) { submit.disabled = false; submit.removeAttribute('aria-busy'); }
+  }
+});
 const signupPasswordFields = signupForm?.querySelector('.signup-password-fields');
 const signupStepLabel = signupForm?.querySelector('[data-signup-step-label]');
 const signupProgress = signupForm?.querySelector('.signup-progress-track');
@@ -1593,6 +1682,7 @@ signupSuccess?.querySelectorAll('[data-copy-credential]').forEach((button) => {
 
 const setAuthView = (view, historyMode = 'push', { guidedScreen = 'welcome' } = {}) => {
   endHandoff(); // a form is about to show: the hand-off screen must not hide it (or block its focus)
+  if (view !== 'login') setResetMode(null); // leaving the login card ends a reset in progress
   // Guided signup: "signup" opens the guided flow (the landing's modal sends the visitor to auth.html#signup).
   let openGuided = false;
   if (view === 'signup' && GUIDED_SIGNUP) {
@@ -1964,6 +2054,22 @@ const restoreAuthPageSession = async () => {
   if (!document.body.classList.contains('auth-page')) return;
   if (!supabaseReady || !supabase) { setAuthView(requestedAuthView, 'none'); return; }
   const params = new URLSearchParams(window.location.search);
+  // D-090: back from a reset email. A live recovery session chooses a new password; an expired or used link (no
+  // session, or an error in the hash) asks for a fresh link. Never the app, never the onboarding routing below.
+  if (isRecoveryVisit || authHashInfo.error === LINK_EXPIRED) {
+    const { data: { session } } = await supabase.auth.getSession();
+    setAuthView('login', 'none');
+    if (isRecoveryVisit && session?.user) setResetMode('update');
+    else { setResetMode('request'); if (loginNote) loginNote.textContent = LINK_EXPIRED; }
+    window.history.replaceState({ briviaAuthView: 'login' }, '', '/auth.html#login');
+    return;
+  }
+  if (params.get('forgot') === '1') {
+    setAuthView('login', 'none');
+    setResetMode('request');
+    window.history.replaceState({ briviaAuthView: 'login' }, '', '/auth.html#login');
+    return;
+  }
   const oauthError = params.get('error_description') || params.get('error');
   if (oauthError) {
     setAuthView('login');
