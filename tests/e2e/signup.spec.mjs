@@ -297,7 +297,7 @@ try {
     });
     const backType = await typeOf(page, '[data-guided-back] > span');
     const nextType = await typeOf(page, '[data-guided-next] > span');
-    check(`${w} Back and Continue use the Welcome buttons' classic uppercase type (D-084) (${JSON.stringify({ backType, nextType, welcomeType })})`, () => {
+    check(`${w} Back and Continue use the Welcome buttons' classic uppercase type (D-086) (${JSON.stringify({ backType, nextType, welcomeType })})`, () => {
       assert.equal(welcomeType.transform, 'uppercase');
       assert.deepEqual(backType, welcomeType); assert.deepEqual(nextType, welcomeType);
     });
@@ -880,7 +880,7 @@ try {
     } finally { stopClassic(); }
   }
 
-  // ================================ D-083: the login look restored to the pre-B4 screen ================================
+  // ================================ D-085: the login look restored to the pre-B4 screen ================================
   // The founder asked for the earlier login UI back with the flow unchanged: "JOIN THE CLUB", the email form, LOG IN,
   // "Forgot password?", "OR CONTINUE WITH" and the round Google button, and "NEW HERE? CREATE ACCOUNT" in the panel's
   // top bar. Behaviour is what is checked: Google still starts, "Create account" still opens the guided Welcome (and
@@ -943,7 +943,7 @@ try {
     await context.close();
   }
 
-  // ================================ D-084: the guided signup in the classic signup look ================================
+  // ================================ D-086: the guided signup in the classic signup look ================================
   // The founder asked for the earlier signup UI with today's flow (no points): every guided screen sits in the classic
   // column under the "FIND YOUR PEOPLE" head (centred on it, 560 px at most, one width for Welcome, Account and 18+),
   // the head is one line on desktop, "Are you 18 or older?" is one line from 1440 px, and the stepper is the classic

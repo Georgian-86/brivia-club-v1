@@ -27,7 +27,7 @@ test('privacy.html, notice-version.js and brivia_notice_version() carry the same
 test('privacy.html names the grievance contact and the retention rows the purge implements', () => {
   const html = read('site/privacy.html');
   const sql = read('supabase/migrations/0005_p0b_dpdp_safety.sql');
-  assert.ok(html.includes('thebrivia.club@gmail.com'));
+  assert.ok(html.includes('hello@thebriviaclub.live'));
   assert.ok(html.includes('Supabase, Mumbai (ap-south-1), India'));
   // The purge's intervals: every one must appear as a row in the table.
   const purge = sql.slice(sql.indexOf('create or replace function public.purge_expired_requests()'));

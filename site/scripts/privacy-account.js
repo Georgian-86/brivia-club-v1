@@ -3,7 +3,7 @@
 // returned to the trigger. Everything that touches Supabase is injected by app.js, so this file only builds the UI.
 import { consentStatusCopy, reauthMethod, deletionErrorCopy, DELETE_DISCLOSURE } from './account-deletion.js';
 
-const CONTACT = 'thebrivia.club@gmail.com';
+const CONTACT = 'hello@thebriviaclub.live';
 const WITHDRAW_ERROR = `We couldn't withdraw your consent. Try again, or email ${CONTACT}.`;
 const escapeText = (value) => String(value).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 let dialogCount = 0;

@@ -43,16 +43,16 @@ Google · Continue with email · I already have an account) → Account (email, 
 account is created at the end, no email code) → 18+ → Name → Details (phone and gender, D-068) → Area ("Use my
 location" with the A1 fallbacks, or a city) → Interests (1–12 picks: search, "Popular" then one tab per category, one category's chips at a time in a fixed-height panel, and a compact "Your picks" tray above the tabs; no points
 screen, `evenSplit` behind the scenes; private interests not offered) → Reveal, or Verify ("Check your email.") when
-email confirmation is on. "STEP n OF 6" (email) or "OF 5" (Google) shown above a thin wine track (done and current filled, pending empty; a progressbar, D-084); one visible question, which is the
+email confirmation is on. "STEP n OF 6" (email) or "OF 5" (Google) shown above a thin wine track (done and current filled, pending empty; a progressbar, D-086); one visible question, which is the
 page's h1; Enter = Continue; Back on every question screen; Finish submits once (busy until the next screen shows).
 The classic 4-step form stays behind `VITE_SIGNUP_FLOW=classic` for one release. Notice version `2026-10-05`.
 
-**Look (D-084, replacing D-082/D-082b).** The guided screens wear the classic signup look: no card; the classic
+**Look (D-086, replacing D-082/D-082b).** The guided screens wear the classic signup look: no card; the classic
 "YOUR PLACE IN THE ROOM / FIND YOUR PEOPLE / THOUGHTFUL PEOPLE. REAL MOMENTUM." head; a 560 px column under it;
 uppercase wine labels, the classic fields and square gender boxes; outlined and wine pill buttons; "ALREADY A MEMBER?
 LOG IN" in the top bar (`signup-classic.css`). The question heading is Bodoni 32 px. On Welcome the screen's own
 kicker and h1 are for screen readers only (the head says it). Interests keeps Back and Finish in view at 1920x886 and
-1440x900 (a shorter chip panel on laptops). The login screen is the pre-B4 one (D-083).
+1440x900 (a shorter chip panel on laptops). The login screen is the pre-B4 one (D-085).
 
 ### A. Onboarding: 4 steps with "Your area" and the Passion Budget (shipped in Iteration 3, Task 8)
 
@@ -164,7 +164,7 @@ area is kept ("Your area: Pune. Choose again to change it.") and existing intere
 the member's own `adult_declared_at`, a cell, 1–12 interests worth exactly 20 points), an operator review flag is on the
 member. `app.js` then keeps the app hidden and shows a neutral notice instead of the completion flow: eyebrow "THE BRIVIA
 CLUB", heading **"Profile under review"** (focused), "Your profile is being reviewed. This usually takes up to 72 hours.
-Questions? Email thebrivia.club@gmail.com." (a mailto link) and **Sign out**; 44 px targets, deep-wine tokens, no
+Questions? Email hello@thebriviaclub.live." (a mailto link) and **Sign out**; 44 px targets, deep-wine tokens, no
 mention of a report. `auth.html?complete-profile=1` sends such a member back to the app (no loop, no interest rewrite).
 The same rule (`onboarding-guard.js` `isUnderReview`) applies to the deck's `complete_profile` re-check.
 
@@ -357,12 +357,12 @@ From a member's point of view (D-015..D-018):
   Fake profile or impersonation (`fake`), May be under 18 (`underage`), I feel unsafe or threatened (`safety`),
   Something else (`other`). Note label "Anything else we should know? (optional)" with "Kept for up to a year so we can
   review it." Safety and underage show "If anyone is in immediate danger, call 112." Always: "Urgent? Email
-  thebrivia.club@gmail.com". Submitting with no reason shows "Choose a reason to continue."
+  hello@thebriviaclub.live". Submitting with no reason shows "Choose a reason to continue."
 - **Outcomes.** Success: the dialog closes, the toast says "Thanks. We've received your report, and you won't see {name}
   again.", the member is added to the local blocked ids (the server already blocked), and from the deck the card leaves
   like a Pass with **no** pass interaction POST; from chat the chat closes and focus moves to the chat list (its first row,
   or the heading when it is empty). Cap (HTTP 429 / `PT429` `report_cap`):
-  "You've sent several reports today. For anything urgent, email thebrivia.club@gmail.com." in `role="alert"`, the dialog
+  "You've sent several reports today. For anything urgent, email hello@thebriviaclub.live." in `role="alert"`, the dialog
   and card stay. Other errors keep the dialog open with a retry message. The outcome follows the request, not the close
   (F7): if the browser force-closes the dialog while the request is in flight (Chrome's second Escape), a success still
   hides the member, shows the toast and advances the card.
@@ -374,14 +374,14 @@ From a member's point of view (D-015..D-018):
 - **Entry.** The profile settings menu gains **PRIVACY & ACCOUNT** (after Removed connections, before Log out; items are
   44 px tall, 12 px text). It opens a real `<dialog>` (`privacy-account.js`): consent status ("Private interests:
   consent given on 5 October 2026." or "consent not given."), **Withdraw consent** (only while consent is given), links
-  to `/privacy.html` and `thebrivia.club@gmail.com`, and **Delete my account**. Status comes from the member's own
+  to `/privacy.html` and `hello@thebriviaclub.live`, and **Delete my account**. Status comes from the member's own
   `profiles.sensitive_consent_at`.
 - **Withdraw (R2).** Dialog "Withdraw consent?" / "We'll delete your private interests now and spread their points
   across your other interests." (F4: "You can add them again later." was dropped: no interest-edit path exists yet.)
   Buttons **Withdraw and delete** / **Keep** (Keep has
   initial focus). It calls `set_sensitive_consent(false)`; the member stays in the app, the status flips to "not given",
   the Withdraw button goes away and the profile's interests are re-read. A failure shows "We couldn't withdraw your
-  consent. Try again, or email thebrivia.club@gmail.com." in `role="alert"`.
+  consent. Try again, or email hello@thebriviaclub.live." in `role="alert"`.
 - **Delete (R5).** Dialog "Delete my account" lists, in plain language, what is deleted (profile, photos, interests,
   points; matches, requests, signals; messages, which vanish from other people's chats too; posts and uploaded files)
   and what remains and for how long (reports you made, up to a year, without your name; reports about you, 365 days, with
@@ -398,10 +398,10 @@ From a member's point of view (D-015..D-018):
   member with no files is deleted by the first call. Only on success: `signOut({ scope: 'local' })` (errors ignored),
   every `brivia-*` key and the `sb-*-auth-token` key cleared from localStorage and sessionStorage, `location.assign('/privacy.html?deleted=1')`.
   Failures show in `role="alert"` and every run can be retried: storage "We removed some of your files but couldn't
-  finish. Nothing else was deleted. Try again." (with "If it keeps failing, email thebrivia.club@gmail.com."), an RPC
+  finish. Nothing else was deleted. Try again." (with "If it keeps failing, email hello@thebriviaclub.live."), an RPC
   failure after the files were removed "Your photos and files are gone, but your account still exists. Try again to finish,
-  or email thebrivia.club@gmail.com.", an RPC failure before any file was touched "We couldn't delete your account. Try
-  again, or email thebrivia.club@gmail.com."
+  or email hello@thebriviaclub.live.", an RPC failure before any file was touched "We couldn't delete your account. Try
+  again, or email hello@thebriviaclub.live."
 - **Recent sign-in.** `reauth_required` reveals **Confirm your password** (password members: `signInWithPassword`, then the
   deletion retries on the same click) or **Sign in with Google again** (Google-only members: sets the sessionStorage
   marker `brivia-reauth-delete`, re-runs OAuth with `prompt=select_account`; the marker holds `{ userId, ts }` and is honoured for 10 minutes; on return `app.js`
@@ -423,7 +423,7 @@ focus ring, a skip link, no raw hex outside the token block, reduced motion resp
   (18+) · How long we keep things · Deleting your account (what is deleted, what remains: the R5 list, the same strings as the
   delete dialog) · Where your data lives ("Supabase, Mumbai (ap-south-1), India") · Reports and safety (72 h review of an
   under-18 report, 112) · Your rights (access, correction, erasure, withdraw consent, grievance, nominee, complaint to the
-  Data Protection Board of India) · Grievance officer (the founder of Brivia Club, thebrivia.club@gmail.com, "We reply
+  Data Protection Board of India) · Grievance officer (the founder of Brivia Club, hello@thebriviaclub.live, "We reply
   within 7 days and resolve within 90 days"). The version line is **"Version 2026-10-05 · effective 5 October 2026"**.
 - **Retention** is a real `<table>` with a `<caption>`, `th scope`, and 15 rows that mirror `purge_expired_requests()` in
   0005 (likes/passes 180 d; requests, accepts, declines and other events 365 d; impressions 30 d; signal ledger 30 d;

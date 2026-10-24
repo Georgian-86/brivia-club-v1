@@ -84,7 +84,7 @@ test('F1: storage_not_empty -> files emptied -> one more RPC call; still not emp
   assert.equal(result.stage, 'storage');
   assert.equal(h.log.rpc.length, 2, 'the RPC is called at most twice');
   assert.equal(h.log.signOut.length, 0);
-  assert.match(deletionErrorCopy(result.stage), /thebrivia\.club@gmail\.com/);
+  assert.match(deletionErrorCopy(result.stage), /hello@thebriviaclub\.live/);
 });
 
 test('every bucket is emptied, and a list of 0 items ends the loop', async () => {
@@ -182,11 +182,11 @@ test('a bucket that never empties fails with stage storage instead of looping fo
 
 test('error copy is the exact R5 text', () => {
   assert.equal(STORAGE_FAILED_COPY, "We removed some of your files but couldn't finish. Nothing else was deleted. Try again.");
-  assert.equal(RPC_FAILED_COPY, 'Your photos and files are gone, but your account still exists. Try again to finish, or email thebrivia.club@gmail.com.');
+  assert.equal(RPC_FAILED_COPY, 'Your photos and files are gone, but your account still exists. Try again to finish, or email hello@thebriviaclub.live.');
   assert.match(deletionErrorCopy('storage'), /^We removed some of your files but couldn't finish\. Nothing else was deleted\. Try again\./);
-  assert.match(deletionErrorCopy('storage'), /thebrivia\.club@gmail\.com/);
+  assert.match(deletionErrorCopy('storage'), /hello@thebriviaclub\.live/);
   assert.equal(deletionErrorCopy('rpc', { filesRemoved: true }), RPC_FAILED_COPY);
-  assert.equal(RPC_NOTHING_REMOVED_COPY, "We couldn't delete your account. Try again, or email thebrivia.club@gmail.com.");
+  assert.equal(RPC_NOTHING_REMOVED_COPY, "We couldn't delete your account. Try again, or email hello@thebriviaclub.live.");
   assert.equal(deletionErrorCopy('rpc'), RPC_NOTHING_REMOVED_COPY);
 });
 

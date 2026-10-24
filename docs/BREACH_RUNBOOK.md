@@ -9,7 +9,7 @@ Keep it open and fill the log as you go. Short lines on purpose: you will be str
 ## 0. Owner and contacts
 
 - **Incident owner:** the founder. One owner, one decision log.
-- **Grievance inbox:** thebrivia.club@gmail.com (2FA must be on, see section 3).
+- **Grievance inbox:** hello@thebriviaclub.live (2FA must be on, see section 3).
 - **Emergency (a member is in danger):** 112.
 - **Supabase project:** `wfbddovczpfdrspmxgfo`. **Hosting:** Vercel. **Code:** GitHub.
 - **Counsel:** `[fill in name and phone before you need them]`
@@ -76,7 +76,7 @@ Log the pause and the restore with times.
 - [ ] **Vercel environment variables:** update `VITE_SUPABASE_URL` / `VITE_SUPABASE_ANON_KEY`, then redeploy.
 - [ ] **GitHub tokens:** personal access tokens, deploy keys, Actions secrets, Vercel-GitHub integration.
 - [ ] Revoke unknown sessions and collaborators (GitHub, Vercel, Supabase organisation members).
-- [ ] **Confirm 2FA is on** for thebrivia.club@gmail.com, and for the Supabase, Vercel and GitHub accounts.
+- [ ] **Confirm 2FA is on** for the name.com account (it holds the hello@ forwarding) and the inbox it forwards to, and for the Supabase, Vercel and GitHub accounts.
 - [ ] Reset the grievance inbox password if it may be exposed.
 
 Never paste secrets into this document, the log or chat.
@@ -111,7 +111,7 @@ Order: CERT-In, Board, members, processors. Prepare all four notices in parallel
 |---|---|---|
 | CERT-In | Within **6 hours** of noticing | incident@cert-in.org.in |
 | Data Protection Board of India | Intimation **without delay**; detailed report within **72 hours** | Board's prescribed channel `[confirm with counsel]` |
-| Affected members | Without delay, plain language | Email from thebrivia.club@gmail.com |
+| Affected members | Without delay, plain language | Email from hello@thebriviaclub.live |
 | Processors (Supabase, Vercel) | Immediately | Their support or security contacts |
 
 If you do not have all facts, send what you know and say what is still being checked. A late complete notice is worse
@@ -124,7 +124,7 @@ To: incident@cert-in.org.in
 Subject: Cyber incident report: Brivia Club (thebrivia.club)
 
 Organisation: Brivia Club (location-first, interest-matched networking for adults, India)
-Reporter: [name], founder; thebrivia.club@gmail.com; [phone]
+Reporter: [name], founder; hello@thebriviaclub.live; [phone]
 Incident id: BR-YYYYMMDD-01
 Time of detection (IST): [ ]
 Time incident began (IST, if known): [ ]
@@ -143,7 +143,7 @@ Part A, **intimation without delay**:
 
 ```
 Subject: Intimation of personal data breach: Brivia Club
-Data Fiduciary: Brivia Club, [legal entity / founder name], thebrivia.club@gmail.com
+Data Fiduciary: Brivia Club, [legal entity / founder name], hello@thebriviaclub.live
 Incident id: BR-YYYYMMDD-01
 Date and time of detection (IST): [ ]
 Brief description of the breach (nature, extent, timing): [ ]
@@ -193,7 +193,7 @@ What you can do:
   - Be careful with messages that ask for money, codes or passwords. We will never ask for these.
   - Use a different password here from other sites.
   - [Add anything specific to this incident.]
-Questions or concerns: write to thebrivia.club@gmail.com. If you feel unsafe, call 112.
+Questions or concerns: write to hello@thebriviaclub.live. If you feel unsafe, call 112.
 You may also complain to the Data Protection Board of India.
 
 We are sorry. We will keep you informed.

@@ -1381,7 +1381,7 @@ try {
     assert.match(acct.status, /consent given on 5 October 2026/);
     assert.equal(acct.withdraw, true);
     assert.equal(acct.del, 'Delete my account');
-    assert.ok(acct.links.includes('/privacy.html') && acct.links.includes('mailto:thebrivia.club@gmail.com'));
+    assert.ok(acct.links.includes('/privacy.html') && acct.links.includes('mailto:hello@thebriviaclub.live'));
     assert.ok(acct.noHScroll && acct.docNoHScroll, 'horizontal scroll at 375 px');
     assert.deepEqual(acct.small, []);
     assert.deepEqual(acct.fonts, []);
@@ -1484,7 +1484,7 @@ try {
   const storageFail = await pw.page.evaluate(() => ({ text: document.querySelector('[data-privacy-error]')?.textContent.trim(), role: document.querySelector('[data-privacy-error]')?.getAttribute('role') }));
   check(`after the re-auth, storage_not_empty empties the folders; a mid-way failure shows the storage copy and calls the RPC no more (${JSON.stringify(storageFail)}; rpc calls ${pw.st.rpcCalls.length})`, () => {
     assert.match(storageFail.text, /^We removed some of your files but couldn't finish\. Nothing else was deleted\. Try again\./);
-    assert.match(storageFail.text, /thebrivia\.club@gmail\.com/);
+    assert.match(storageFail.text, /hello@thebriviaclub\.live/);
     assert.equal(pw.st.rpcCalls.length, 2);
     assert.ok(pw.st.files['message-attachments'].length > 0 && pw.st.files['message-attachments'].length < 230, `left ${pw.st.files['message-attachments'].length}`);
     assert.ok(pw.st.calls.filter((c) => c.method === 'DELETE').every((c) => (JSON.parse(c.body || '{}').prefixes || []).length <= 100));
@@ -1496,7 +1496,7 @@ try {
   await pw.page.waitForFunction(() => /account still exists/.test(document.querySelector('[data-privacy-error]')?.textContent || ''), null, { timeout: 10000 }).catch(() => {});
   const rpcFail = await pw.page.evaluate(() => document.querySelector('[data-privacy-error]')?.textContent.trim());
   check(`rpc failure after storage shows the rpc copy (${rpcFail})`, () => {
-    assert.equal(rpcFail, 'Your photos and files are gone, but your account still exists. Try again to finish, or email thebrivia.club@gmail.com.');
+    assert.equal(rpcFail, 'Your photos and files are gone, but your account still exists. Try again to finish, or email hello@thebriviaclub.live.');
     assert.deepEqual(Object.values(pw.st.files).map((f) => f.length), [0, 0, 0, 0]);
     assert.equal(pw.st.rpcCalls.length, 4);
   });
@@ -1574,7 +1574,7 @@ try {
   check('privacy.html without ?deleted=1 shows an empty status region', () => assert.equal(page375.banner, ''));
   check(`privacy.html: version line, region and grievance contact (${page375.version})`, () => {
     assert.equal(page375.version, 'Version 2026-10-05 · effective 5 October 2026');
-    for (const needle of ['Supabase, Mumbai (ap-south-1), India', 'thebrivia.club@gmail.com', 'We reply within 7 days and resolve within 90 days', 'Data Protection Board of India', 'The founder of Brivia Club', 'call 112', '72 hours', 'Your messages, which disappear from other people']) assert.ok(page375.text.includes(needle), needle);
+    for (const needle of ['Supabase, Mumbai (ap-south-1), India', 'hello@thebriviaclub.live', 'We reply within 7 days and resolve within 90 days', 'Data Protection Board of India', 'The founder of Brivia Club', 'call 112', '72 hours', 'Your messages, which disappear from other people']) assert.ok(page375.text.includes(needle), needle);
   });
   const privSmall = await smallText(priv, { root: 'body' });
   const privDeleted = await priv.evaluate(() => ({ under18: /from a member with a complete profile, on Brivia for at least 7 days, who has been in touch with that person \(a like, pass, request, match or message\) pauses them while we review it/.test(document.body.innerText) && /We review every under-18 report within 72 hours/.test(document.body.innerText), flags: /Safety pauses and rejoin reviews: until we have reviewed them/.test(document.body.innerText), code: document.body.innerText.includes('a one-way code made from your email'), noOld: !/the interests you chose to show/.test(document.body.innerText) }));

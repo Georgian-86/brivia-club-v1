@@ -1693,7 +1693,33 @@ controls (a tester or a seeded test member), never a real member, so no new expo
   a chip, Back and Finish on screen at 1920x886 and 1440x900, axe, 44 px targets and contrast on the picker at 1920,
   1440 and 375), `tests/unit/signup-flow.test.mjs` (`groupInterests`).
 
-## D-083: The login screen goes back to its pre-B4 look; login and signup behaviour unchanged (founder, 2026-10-23)
+## D-083: Public contact address moves to hello@thebriviaclub.live (founder, 2026-10-23)
+
+- **Founder ask:** use the verified domain `thebriviaclub.live` for email. Every member-facing contact (landing CTA and
+  footer, privacy notice and grievance officer, report dialog, under-review notice, account and deletion errors) now
+  says `hello@thebriviaclub.live` instead of `thebrivia.club@gmail.com`. `UX_SPEC.md` and `BREACH_RUNBOOK.md` follow;
+  older plans and arena records keep the address they were written with.
+- **Prerequisite (founder):** Resend only sends. Mail to `hello@` must be received (name.com email forwarding to the
+  founder's inbox) before this ships, or safety reports and deletion requests bounce. 2FA covers the name.com account.
+- **Notice version unchanged:** the privacy notice's substance is the same; only the contact address changed.
+- **Domain:** `thebriviaclub.live` (and `www`, 308 to the bare domain) were added to the Vercel project on
+  2026-10-23; DNS at name.com is the founder's step.
+- Proof: `npm run test:unit` 313/313 (copy assertions updated); stub build OK, the new address is in `dist/`.
+
+## D-084: Landing page title, description and link preview are Brivia's, not the template's (founder, 2026-10-24)
+
+- **Found by the founder:** a WhatsApp share of thebriviaclub.live previewed "Balavignesh | Senior Product Designer".
+  The landing still carried the portfolio template's `<title>` and meta description, plus a hidden contact section
+  with the template author's portrait and bio.
+- **Change:** a Brivia title and description, a canonical URL, Open Graph and Twitter card tags, and a 1200x630
+  preview image (`site/public/og-image.jpg`: the hero poster under a deep-wine band, "BRIVIA CLUB" and the one-line
+  vision). The hidden template section is removed; nothing referenced it and it was never visible.
+- **Open:** `app.html`'s initial deck image `src` is still the template portrait (`media/assets/bala.webp`); the script
+  replaces it before a card shows. Swap it for the branded placeholder when the deck is next touched.
+- **Caches:** WhatsApp, LinkedIn and others cache previews; re-check with each platform's inspector after deploy.
+- Proof: `npm run test:unit` 313/313; stub build OK; `dist/index.html` has 9 `og:` tags and no "bala"; asset budget OK.
+
+## D-085: The login screen goes back to its pre-B4 look; login and signup behaviour unchanged (founder, 2026-10-23)
 
 - **Founder ask:** "restore the previous login system UI. Do not alter the present flow for login or signup, but in the
   previous UI."
@@ -1709,7 +1735,7 @@ controls (a tester or a seeded test member), never a real member, so no new expo
   checks on the restored screen and its behaviour (Google starts, "Create account" opens the guided Welcome); the
   D-082 login-centring and login-fit checks are dropped because they measured the B4 card.
 
-## D-084: The guided signup wears the classic signup look; flow unchanged, no points screen (founder, 2026-10-23)
+## D-086: The guided signup wears the classic signup look; flow unchanged, no points screen (founder, 2026-10-23)
 
 - **Founder ask:** "do the same with sign up as well but do not change the functionality as of now. I don't want the
   points system back."

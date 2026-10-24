@@ -16,9 +16,9 @@ export const REMOVE_BATCH = 100;
 const MAX_PASSES = 50; // a bucket that never empties is reported, not looped on forever
 
 export const STORAGE_FAILED_COPY = "We removed some of your files but couldn't finish. Nothing else was deleted. Try again.";
-export const RPC_FAILED_COPY = 'Your photos and files are gone, but your account still exists. Try again to finish, or email thebrivia.club@gmail.com.';
-export const RPC_NOTHING_REMOVED_COPY = "We couldn't delete your account. Try again, or email thebrivia.club@gmail.com.";
-export const STORAGE_NOT_EMPTY_COPY = `${STORAGE_FAILED_COPY} If it keeps failing, email thebrivia.club@gmail.com.`;
+export const RPC_FAILED_COPY = 'Your photos and files are gone, but your account still exists. Try again to finish, or email hello@thebriviaclub.live.';
+export const RPC_NOTHING_REMOVED_COPY = "We couldn't delete your account. Try again, or email hello@thebriviaclub.live.";
+export const STORAGE_NOT_EMPTY_COPY = `${STORAGE_FAILED_COPY} If it keeps failing, email hello@thebriviaclub.live.`;
 export const REAUTH_COPY = 'For your security, confirm it is you before we delete your account.';
 
 const asError = (error) => (error instanceof Error ? error : Object.assign(new Error(error?.message || String(error)), error && typeof error === 'object' ? error : {}));

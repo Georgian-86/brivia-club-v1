@@ -1,4 +1,4 @@
-/* D-084 (founder, 2026-10-23): the guided signup wears the classic signup's look again, with its flow unchanged.
+/* D-086 (founder, 2026-10-23): the guided signup wears the classic signup's look again, with its flow unchanged.
    The screens, their order, the checks and the save pipeline are the guided ones (signup-screens.js; no points
    screen). Only the look goes back to the 4-step form's: no card, the centred "YOUR PLACE IN THE ROOM / FIND YOUR
    PEOPLE / THOUGHTFUL PEOPLE. REAL MOMENTUM." head (auth.html, styled by the legacy `.auth-signup` rules like the classic

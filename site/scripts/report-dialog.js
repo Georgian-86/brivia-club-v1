@@ -15,12 +15,12 @@ export const REPORT_REASONS = [
 ];
 const EMERGENCY_REASONS = new Set(['safety', 'underage']);
 const NOTE_MAX = 500;
-export const REPORT_CAP_COPY = "You've sent several reports today. For anything urgent, email thebrivia.club@gmail.com.";
+export const REPORT_CAP_COPY = "You've sent several reports today. For anything urgent, email hello@thebriviaclub.live.";
 export const reportSuccessCopy = (name) => `Thanks. We've received your report, and you won't see ${name} again.`;
 const reportErrorCopy = (error, status) => {
   if (isRateLimited(error, status)) return REPORT_CAP_COPY;
   if (error?.code === '22023') return 'That report could not be sent. Check the reason and note, then try again.';
-  return 'Your report could not be sent. Please try again, or email thebrivia.club@gmail.com.';
+  return 'Your report could not be sent. Please try again, or email hello@thebriviaclub.live.';
 };
 const escapeText = (value) => String(value).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 let dialogCount = 0;
@@ -45,7 +45,7 @@ export const openReportDialog = ({ name, trigger, send }) => new Promise((resolv
     <label class="report-note" for="${id}-note">Anything else we should know? (optional) <small>Kept for up to a year so we can review it.</small></label>
     <textarea id="${id}-note" name="note" rows="3" maxlength="${NOTE_MAX}" autocomplete="off"></textarea>
     <p class="report-error" data-report-error role="alert"></p>
-    <p class="report-contact">Urgent? Email thebrivia.club@gmail.com</p>
+    <p class="report-contact">Urgent? Email hello@thebriviaclub.live</p>
     <div class="report-actions"><button type="button" class="report-cancel" data-report-cancel>Cancel</button><button type="submit" class="report-submit" data-report-submit>Report and block</button></div>
   </form>`;
   document.body.append(dialog);

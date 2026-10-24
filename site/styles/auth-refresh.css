@@ -4,7 +4,7 @@
    The auth page carries years of layered overrides (auth-polish.css, mobile-final-fixes.css), several with !important.
    Everything here is scoped to the login card and weighted to win: the `:has(.auth-card.is-active)` prefix outranks
    their `:has(.auth-login.is-active)` selectors, and !important is used only where they use it.
-   D-083: the login view no longer carries `.auth-card` (the pre-B4 screen is back), so the login-card rules below are
+   D-085: the login view no longer carries `.auth-card` (the pre-B4 screen is back), so the login-card rules below are
    inert; the guided signup rules still apply. */
 .auth-card {
   --c-wine: var(--color-chat-wine);
@@ -371,7 +371,7 @@ body.auth-page .auth-shell:has(.auth-card.is-active) .auth-card :focus-visible {
   body.auth-page .auth-shell:has(.auth-card.is-active) .auth-card :is(.auth-google-trigger, .auth-submit):hover { transform: none; }
 }
 
-/* D-084: the guided signup's card frame, the right-half split and its heading sizes (B4, D-082, D-082b) are gone: the
+/* D-086: the guided signup's card frame, the right-half split and its heading sizes (B4, D-082, D-082b) are gone: the
    guided screens wear the classic signup look (signup-classic.css, which also sizes the interests panel). */
 /* 2. The login card's padding and inner gaps follow the window height (see the header above). */
 @media (min-width: 781px) {
