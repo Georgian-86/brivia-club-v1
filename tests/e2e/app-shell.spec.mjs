@@ -53,6 +53,8 @@ import { axeViolations, textAudit, TYPE_FAMILIES } from './a11y.mjs';
 import { startAppStub, STILL, defaultDeckRows } from './app-stub.mjs';
 
 const { chromium } = await import(process.env.PLAYWRIGHT_MODULE || 'playwright');
+// Pass / Pitch are out of sight since D-094 (a swipe answers the card): press them the way a keyboard user would.
+const tap = (locator, sel) => (/data-action="(pass|like)"/.test(sel) ? locator.dispatchEvent('click', null, { timeout: 5000 }) : locator.click({ timeout: 5000 }));
 const PORT = Number(process.env.E2E_PORT || 5195);
 const EXECUTABLE = process.env.CHROMIUM_PATH || '/opt/pw-browsers/chromium';
 const SHOTS = process.env.APP_SHOTS || '';
@@ -132,7 +134,7 @@ try {
     for (const [name, view, steps] of DIALOGS) {
       const { context, page } = await openShot(NARROW, `/app.html?view=${view}`);
       await page.waitForTimeout(1500);
-      for (const sel of steps) { await page.locator(sel).first().click({ timeout: 5000 }); await page.waitForTimeout(500); }
+      for (const sel of steps) { await tap(page.locator(sel).first(), sel); await page.waitForTimeout(500); }
       await page.screenshot({ path: path.join(SHOTS, `app-${name}-375.png`) });
       await context.close();
     }
@@ -142,7 +144,7 @@ try {
     for (const [tag, viewport] of [['375', NARROW], ['1440', WIDE]]) {
       const { context, page } = await openShot(viewport);
       await page.waitForTimeout(1500);
-      await page.locator('[data-action="like"]').click({ timeout: 5000 });
+      await page.locator('[data-action="like"]').dispatchEvent('click', null, { timeout: 5000 });
       await page.waitForTimeout(600);
       await page.screenshot({ path: path.join(SHOTS, `app-pitch-sheet-${tag}.png`) });
       await context.close();
@@ -272,7 +274,7 @@ try {
         await page.waitForFunction(() => !document.body.classList.contains('app-auth-pending'), null, { timeout: 15000 });
         if (view === 'explore') await page.waitForFunction(() => document.querySelector('#swipe-name')?.textContent.trim() && !document.querySelector('#swipe-card')?.hidden, null, { timeout: 8000 }).catch(() => {});
         await settle(page);
-        for (const sel of steps) await page.locator(sel).first().click({ timeout: 5000 }).catch((error) => console.log(`${label}: ${sel} failed: ${error.message.split('\n')[0]}`));
+        for (const sel of steps) await tap(page.locator(sel).first(), sel).catch((error) => console.log(`${label}: ${sel} failed: ${error.message.split('\n')[0]}`));
         await page.waitForFunction((sel) => { const el = document.querySelector(sel); return el && !el.hidden; }, root, { timeout: 5000 }).catch(() => {});
         await page.waitForTimeout(450);
         const result = await coveredControls(page, root);
@@ -393,7 +395,7 @@ try {
       await page.waitForFunction(() => document.querySelector('#swipe-name')?.textContent.trim(), null, { timeout: 8000 }).catch(() => {});
       await settle(page);
       st.routes = { 'rpc/deck_candidates': { body: { malformed: true } } };
-      await page.locator('[data-action="pass"]').click({ timeout: 5000 }).catch(() => {});
+      await page.locator('[data-action="pass"]').dispatchEvent('click', null, { timeout: 5000 }).catch(() => {});
       await page.waitForTimeout(2000);
       const state = await page.evaluate(() => {
         const action = document.querySelector('#deck-empty-action');
@@ -431,7 +433,7 @@ try {
         await page.goto(`${stub.url}/app.html?view=${view}`, { waitUntil: 'domcontentloaded' });
         await page.waitForFunction(() => !document.body.classList.contains('app-auth-pending'), null, { timeout: 15000 });
         await page.waitForTimeout(900);
-        for (const sel of steps) { await page.locator(sel).first().click({ timeout: 5000 }).catch((error) => console.log(`${label}: ${sel} failed: ${error.message.split('\n')[0]}`)); await page.waitForTimeout(400); }
+        for (const sel of steps) { await tap(page.locator(sel).first(), sel).catch((error) => console.log(`${label}: ${sel} failed: ${error.message.split('\n')[0]}`)); await page.waitForTimeout(400); }
         const fields = await smallFields(page);
         seen += fields.count;
         check(`375 ${label}: every visible text field is >= 16 px, no sideways scroll (${JSON.stringify(fields)})`, () => { assert.deepEqual(fields.small, []); assert.equal(fields.scroll, false); });

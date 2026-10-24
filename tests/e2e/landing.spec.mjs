@@ -306,14 +306,13 @@ try {
         assert.deepEqual(imgInfo.filter((img) => !img.hasSize).map((img) => img.src), [], 'image without width/height');
       });
 
-      await check(`${label}: hero video starts on its own after load, the playground video waits until it is near`, async () => {
+      await check(`${label}: hero video starts on its own after load; the camera (playground) video is gone`, async () => {
         const heroRequests = [...new Set(beforeScroll.filter(isHeroVideo).map((url) => url.replace(/-[\w-]{8}\.mp4$|\.mp4$/, '')))];
         assert.equal(heroRequests.length, 1, `one hero file, got ${heroRequests.join(', ') || 'none'}`);
         assert.ok(heroRequests[0].includes(HERO_FILE(viewport).replace(/\.mp4$/, '')), `${heroRequests[0]} is not ${HERO_FILE(viewport)}`);
-        assert.equal(beforeScroll.some((url) => /write_Its_a_in_black_color[^/]*\.mp4/.test(url)), false, 'playground video fetched before scrolling');
-        await page.evaluate(() => document.querySelector('[data-playground-video]').scrollIntoView({ block: 'center' }));
-        await page.waitForTimeout(1500);
-        assert.equal(tracked.urls.some((url) => /write_Its_a_in_black_color[^/]*\.mp4/.test(url)), true, 'playground video not requested near the viewport');
+        assert.equal(await page.locator('[data-playground-video], .playground-section').count(), 0, 'playground section still on the page');
+        const videos = await page.evaluate(() => [...document.querySelectorAll('video')].map((v) => v.className));
+        assert.deepEqual(videos.filter((c) => !['intro-video', 'hero-video'].includes(c)), [], 'a video other than the intro and hero');
       });
 
       const target = '[data-pillar-image="private"]';

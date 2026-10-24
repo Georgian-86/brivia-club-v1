@@ -177,7 +177,7 @@ try {
 
   // 2. Pass: exactly one POST /rest/v1/interaction { viewer_id, target_id, event: 'pass' }; the next card shows "Pune".
   let before = passes().length;
-  await page.locator('[data-action="pass"]').click();
+  await page.locator('[data-action="pass"]').dispatchEvent('click');
   await waitForCard(page, 'Bilal Place');
   await page.waitForTimeout(200);
   const passBodies = passes().slice(before).map((c) => JSON.parse(c.body || '{}'));
@@ -191,7 +191,7 @@ try {
   check(`axe color-contrast: the place-band card has no violations (${noteContrast.join(' | ')})`, () => assert.deepEqual(noteContrast, []));
   const noteSmall = await smallText(page, { root: '#swipe-card' });
   check(`the place-band card text is at least 12 px (${noteSmall.join(' | ')})`, () => assert.deepEqual(noteSmall, []));
-  await page.locator('[data-action="pass"]').click();
+  await page.locator('[data-action="pass"]').dispatchEvent('click');
   await waitForCard(page, 'Chen Abroad');
   card = await cardState(page);
   check(`card 3 shows "Abroad" and "You both: Badminton" (${JSON.stringify(card)})`, () => { assert.equal(card.band, 'Abroad'); assert.deepEqual(card.shared, ['You both: Badminton']); });
@@ -199,14 +199,14 @@ try {
   check(`under "Abroad" the area-filling note shows too (${JSON.stringify(note3)})`, () => { assert.equal(note3.text, noteText); assert.equal(note3.visible, true); });
   text = await pageText(page);
   check('cards 2-3: the page never shows the stub City/State', () => assert.ok(!LEAK_RE.test(text)));
-  await page.locator('[data-action="pass"]').click();
+  await page.locator('[data-action="pass"]').dispatchEvent('click');
   await waitForCard(page, 'Dana Blank');
   const note4 = await bandNote(page);
   check(`a "~10 km" band has no area-filling note (${JSON.stringify(note4)})`, () => assert.equal(note4.visible, false));
 
   // 3. A5: Like on a card with no tags and no shared interests opens the pitch with the neutral line.
   const errorsBefore = pageErrors.length;
-  await page.locator('[data-action="like"]').click();
+  await page.locator('[data-action="like"]').dispatchEvent('click');
   await page.waitForSelector('#pitch-modal:not([hidden])');
   const pitch = await page.locator('#pitch-message').inputValue();
   check(`A5: the neutral pitch line for a card with no tags/shared (got "${pitch}")`, () => assert.equal(pitch, "Hey Dana Blank, I'd love to connect and exchange ideas."));
@@ -313,7 +313,7 @@ try {
   check('"Try again" loads the deck', () => assert.equal(retried, true));
   // F11: a 'matched' result from the deck shows the mutual toast.
   st.matchAll = true;
-  await page.locator('[data-action="like"]').click();
+  await page.locator('[data-action="like"]').dispatchEvent('click');
   await page.waitForSelector('#pitch-modal:not([hidden])');
   await page.waitForTimeout(450);
   await page.keyboard.press('Escape');
@@ -359,7 +359,7 @@ try {
       assert.match(img.src, /\.webp(\?|$)/);
       assert.ok(img.w > 0, 'cover image did not load');
     });
-    await page.locator('[data-action="pass"]').click();
+    await page.locator('[data-action="pass"]').dispatchEvent('click');
   }
   await coverCtx.close();
 
@@ -368,7 +368,7 @@ try {
   const searchCtx = await makeContext({ width: 1440, height: 900 });
   page = await open(searchCtx);
   await waitForCard(page, 'Asha Band');
-  await page.locator('[data-action="pass"]').click();   // Asha is consumed (deck.seen)
+  await page.locator('[data-action="pass"]').dispatchEvent('click');   // Asha is consumed (deck.seen)
   await waitForCard(page, 'Bilal Place');
   await page.locator('#open-discovery-filters').click();
   await page.locator('#drawer-filter-search').fill('Kai');
@@ -377,7 +377,7 @@ try {
   await page.locator('.discovery-filter-close').click();
   const firstHit = await waitForCard(page, 'Kai New');
   check(`search: the first "Kai" card is the new member, not the matched one (got "${await cardName(page)}")`, () => assert.equal(firstHit, true));
-  await page.locator('[data-action="pass"]').click();
+  await page.locator('[data-action="pass"]').dispatchEvent('click');
   const noMoreKai = await waitForEmpty(page, 'No one in this deck matches these filters.');
   check('search: the matched member never joins the deck', () => assert.equal(noMoreKai, true));
   // Clear the search (works whether or not the empty state showed), then walk the rest of the deck.
@@ -393,7 +393,7 @@ try {
     }, null, { timeout: 8000 }).then((h) => h.jsonValue(), () => '(timeout)');
     if (name === '(empty)' || name === '(timeout)') { seenNames.push(name); break; }
     seenNames.push(name);
-    await page.locator('[data-action="pass"]').click();
+    await page.locator('[data-action="pass"]').dispatchEvent('click');
     await page.waitForFunction((n) => document.querySelector('#swipe-card:not([hidden]) #swipe-name')?.textContent?.trim() !== n || !document.querySelector('#home-empty-state')?.hidden, name, { timeout: 8000 }).catch(() => {});
   }
   check(`search: after clearing, the deck has neither the passed nor the matched member (${seenNames.join(', ')})`, () => {
@@ -781,7 +781,7 @@ try {
     });
     // The next card: the panel starts closed and explains that card.
     await tp.locator('#why-toggle').click();
-    await tp.locator('[data-action="pass"]').click();
+    await tp.locator('[data-action="pass"]').dispatchEvent('click');
     await waitForCard(tp, 'Bilal Place');
     await tp.waitForFunction(() => document.querySelector('#why-panel')?.dataset.for === 'aaaaaaaa-aaaa-4aaa-8aaa-000000000002', null, { timeout: 5000 }).catch(() => {});
     w = await whyState(tp);
@@ -793,7 +793,7 @@ try {
       assert.match(w.panelText, /Distance tier Same area/); assert.doesNotMatch(w.panelText, /Chess/);
     });
     // A card deck_why has no row for (C): no button, the tester is still a tester.
-    await tp.locator('[data-action="pass"]').click();
+    await tp.locator('[data-action="pass"]').dispatchEvent('click');
     await waitForCard(tp, 'Chen Abroad');
     await tp.waitForFunction(() => [...performance.getEntriesByType('resource')].filter((e) => e.name.includes('/rpc/deck_why')).length >= 3, null, { timeout: 5000 }).catch(() => {});
     await tp.waitForTimeout(300);
@@ -812,7 +812,7 @@ try {
   await rp.waitForTimeout(300);
   const firstCalls = whyCalls().length - whyBefore;
   for (const next of ['Bilal Place', 'Chen Abroad', 'Dana Blank']) {
-    await rp.locator('[data-action="pass"]').click();
+    await rp.locator('[data-action="pass"]').dispatchEvent('click');
     await waitForCard(rp, next);
   }
   await rp.waitForTimeout(500);
@@ -833,7 +833,7 @@ try {
   await ep.waitForTimeout(300);
   let ew = await whyState(ep);
   check(`a deck_why 500 shows no button on that card (${JSON.stringify([ew.toggle, whyCalls().length - errBefore])})`, () => { assert.equal(ew.toggle, false); assert.equal(whyCalls().length - errBefore, 1); });
-  await ep.locator('[data-action="pass"]').click();
+  await ep.locator('[data-action="pass"]').dispatchEvent('click');
   await waitForCard(ep, 'Bilal Place');
   const recovered = await ep.waitForFunction(() => { const t = document.querySelector('#why-toggle'); return t && !t.hidden && t.getBoundingClientRect().height > 0; }, null, { timeout: 5000 }).then(() => true, () => false);
   check(`after a 500 the next card asks again and the button appears (${JSON.stringify([recovered, whyCalls().length - errBefore])})`, () => { assert.equal(recovered, true); assert.equal(whyCalls().length - errBefore, 2); });
@@ -846,7 +846,7 @@ try {
   const np = await open(nfCtx);
   await waitForCard(np, 'Asha Band');
   await np.waitForTimeout(500);
-  for (const next of ['Bilal Place', 'Chen Abroad']) { await np.locator('[data-action="pass"]').click(); await waitForCard(np, next); }
+  for (const next of ['Bilal Place', 'Chen Abroad']) { await np.locator('[data-action="pass"]').dispatchEvent('click'); await waitForCard(np, next); }
   await np.waitForTimeout(500);
   const nfw = await whyState(np);
   check(`a deck_why 404 is asked once and never again (${JSON.stringify([whyCalls().length - nfBefore, nfw.toggle])})`, () => { assert.equal(whyCalls().length - nfBefore, 1); assert.equal(nfw.toggle, false); });
@@ -859,7 +859,7 @@ try {
   const cp = await open(capCtx);
   await waitForCard(cp, 'Asha Band');
   await cp.waitForTimeout(400);
-  for (const next of ['Bilal Place', 'Chen Abroad', 'Dana Blank']) { await cp.locator('[data-action="pass"]').click(); await waitForCard(cp, next); await cp.waitForTimeout(400); }
+  for (const next of ['Bilal Place', 'Chen Abroad', 'Dana Blank']) { await cp.locator('[data-action="pass"]').dispatchEvent('click'); await waitForCard(cp, next); await cp.waitForTimeout(400); }
   check(`after 3 consecutive deck_why errors the client stops asking (${whyCalls().length - capBefore} calls over 4 cards)`, () => assert.equal(whyCalls().length - capBefore, 3));
   await capCtx.close();
 
@@ -1037,7 +1037,7 @@ try {
   await waitForCard(kp, 'Asha Band');
   await kp.waitForTimeout(500);
   signalsBefore = signals().length;
-  await kp.locator('[data-action="like"]').click();
+  await kp.locator('[data-action="like"]').dispatchEvent('click');
   await kp.waitForSelector('#pitch-modal:not([hidden])');
   await kp.waitForTimeout(700);
   const btnPitch = { name: await cardName(kp), parked: await kp.evaluate(() => document.querySelector('#swipe-card').classList.contains('is-parked')) };
@@ -1062,7 +1062,7 @@ try {
   await waitForCard(kp, 'Dana Blank');
   await kp.waitForTimeout(400);
   passesBefore = passes().length;
-  await kp.locator('[data-action="pass"]').click();
+  await kp.locator('[data-action="pass"]').dispatchEvent('click');
   await kp.waitForTimeout(150);
   const midFly = await kp.evaluate(() => document.querySelector('#swipe-card').style.transform);
   await kp.waitForTimeout(500);
@@ -1086,11 +1086,11 @@ try {
   check(`reduced motion: the stacked layers never animate (${JSON.stringify(rmLayers)})`, () => rmLayers.forEach((d) => assert.match(d, /^0s(, 0s)*$/)));
   await rm.close();
 
-  // Desktop composition (D-081, refines D-079): the card is the hero. One frame, no scrolling at any listed laptop or
+  // Desktop composition (D-081, refines D-079; D-094 shortens the card and drops the round Pass / Pitch): the card is the hero. One frame, no scrolling at any listed laptop or
   // desktop size; the card is tall (at least 1.45 tall per 1 wide) and uses the window height (at 1366x633 at least
   // 470 px tall and 145,000 px², larger at 1440x900 and 1920x1080); View profile is inside it; the headline is level with
-  // its middle. From 1100 px wide Pass sits left of the card and Pitch right of it, both level with its middle; narrower
-  // desktops keep them under the card. Headline, card, controls and hint never overlap, and the stacked next card lines
+  // its middle. Since D-094 there are no round Pass / Pitch buttons on screen (a swipe or the arrow keys answers the card);
+  // they stay in the page out of sight for keyboard users. Headline, card and hint never overlap, and the stacked next card lines
   // up under the top card. 1366x633 is a 768 px laptop screen minus browser bars.
   const areas = {};
   for (const [vw, vh] of [[1366, 633], [1280, 650], [1280, 720], [1366, 768], [1440, 900], [1536, 730], [1920, 1080], [2560, 1440], [1024, 768]]) {
@@ -1106,7 +1106,7 @@ try {
       // Pass / Pitch carry their label 25 px under the circle (::after), so the control box includes it.
       const ctl = (s) => { const b = box(s); return { ...b, b: b.b + 25 }; };
       return {
-        nav: box('.app-topbar'), card, next: box('#swipe-card-next'), head: box('.home-heading'), hint: box('.swipe-hint'), pass: ctl('.swipe-pass'), like: ctl('.swipe-like'),
+        nav: box('.app-topbar'), card, next: box('#swipe-card-next'), head: box('.home-heading'), hint: box('.swipe-hint'), pass: ctl('.swipe-pass'), like: ctl('.swipe-like'), actions: box('.swipe-actions'),
         back: document.querySelector('#swipe-card-back')?.getClientRects().length ? box('#swipe-card-back') : null,
         stage: box('.app-view[data-view="home"]'),
         layerLook: ['#swipe-card-next', '#swipe-card-back'].every((s) => { const el = document.querySelector(s); return el && Number(getComputedStyle(el).opacity) >= 0.98; }) ? 'opaque' : 'faded',
@@ -1119,30 +1119,22 @@ try {
     const { card, head, pass, like, hint, next } = m;
     areas[`${vw}x${vh}`] = card.w * card.h;
     const overlap = (a, b) => a.l < b.r - 0.5 && b.l < a.r - 0.5 && a.t < b.b - 0.5 && b.t < a.b - 0.5;
-    const parts = { head, card, pass, like, hint };
+    const parts = { head, card, hint };
     const clashes = [];
     Object.keys(parts).forEach((a, i) => Object.keys(parts).slice(i + 1).forEach((b) => { if (overlap(parts[a], parts[b])) clashes.push(`${a}/${b}`); }));
-    check(`${vw}x${vh}: one frame (scroll ${m.scroll}, sideways ${m.hscroll}); card ${r0(card.w)}x${r0(card.h)} at least 1.45 tall per 1 wide, below the top bar (${r0(card.t)} >= ${r0(m.nav.b)}), View profile inside (${m.viewIn}); headline level with the card (${r0(head.cy)} vs ${r0(card.cy)}); nothing overlaps (${clashes.join(', ') || 'none'}); everything on screen`, () => {
+    check(`${vw}x${vh}: one frame (scroll ${m.scroll}, sideways ${m.hscroll}); card ${r0(card.w)}x${r0(card.h)} at least 1.4 tall per 1 wide and at most 660 px tall, below the top bar (${r0(card.t)} >= ${r0(m.nav.b)}), View profile inside (${m.viewIn}); headline level with the card (${r0(head.cy)} vs ${r0(card.cy)}); nothing overlaps (${clashes.join(', ') || 'none'}); everything on screen`, () => {
       assert.ok(m.scroll <= 1, 'document scrolls');
       assert.ok(m.hscroll <= 0, 'sideways scroll');
       assert.ok(card.t >= m.nav.b - 0.5);
-      assert.ok(card.h >= 1.45 * card.w);
+      assert.ok(card.h >= 1.4 * card.w);
+      assert.ok(card.h <= 660.5, 'the card is taller than D-094 allows');
       assert.ok(m.viewIn);
       assert.ok(Math.abs(head.cy - card.cy) <= 20);
       assert.deepEqual(clashes, []);
-      [card, head, hint, pass, like].forEach((b) => assert.ok(b.b <= m.vh + 0.5 && b.t >= 0 && b.l >= 0 && b.r <= vw));
+      [card, head, hint].forEach((b) => assert.ok(b.b <= m.vh + 0.5 && b.t >= 0 && b.l >= 0 && b.r <= vw));
     });
-    check(`${vw}x${vh}: Pass ${r0(pass.w)} px and Pitch ${r0(like.w)} px are at least 56 px and ${vw >= 1100 ? `flank the card level with its middle (Pass ${r0(pass.r)} <= ${r0(card.l)}, Pitch ${r0(like.l)} >= ${r0(card.r)}; ${r0(pass.cy)} / ${r0(like.cy)} vs ${r0(card.cy)})` : `sit under the card (${r0(pass.t)} > ${r0(card.b)})`}`, () => {
-      [pass, like].forEach((b) => { assert.ok(b.w >= 56); assert.ok(b.h >= 56); });
-      if (vw >= 1100) {
-        assert.ok(pass.r <= card.l);
-        assert.ok(like.l >= card.r);
-        assert.ok(Math.abs(pass.cy - card.cy) <= 20);
-        assert.ok(Math.abs(like.cy - card.cy) <= 20);
-      } else {
-        assert.ok(pass.t > card.b && like.t > card.b);
-        assert.ok(Math.abs((pass.l + like.r) / 2 - card.cx) <= 40);
-      }
+    check(`${vw}x${vh}: no round Pass / Pitch on screen (D-094): both clipped out of sight (their row shows ${r0(m.actions.w)}x${r0(m.actions.h)} px)`, () => {
+      assert.ok(m.actions.w <= 1 && m.actions.h <= 1);
     });
     check(`${vw}x${vh}: the stacked next card lines up under the top card (next ${r0(next.w)} px wide at ${r0(next.cx)}, card ${r0(card.w)} at ${r0(card.cx)}; bottom ${r0(next.b)} vs ${r0(card.b)})`, () => {
       assert.ok(Math.abs(next.cx - card.cx) <= 2);
@@ -1153,18 +1145,24 @@ try {
     // lower and narrower still), in the same paper, fully opaque, centred, and inside the stage: on screen, above the
     // controls under the card (850-1099 px), and the page still does not scroll.
     const { back, stage } = m;
-    check(`${vw}x${vh}: the card reads as a stack: two layers peek out below it (next +${back ? r0(next.b - card.b) : '-'} px, ${r0(next.w)} wide; back +${back ? r0(back.b - card.b) : 'missing'} px, ${back ? r0(back.w) : '-'} wide; card ${r0(card.w)}), opaque (${m.layerLook}), inside the stage (back bottom ${back ? r0(back.b) : '-'} of ${m.vh}${vw < 1100 ? `, controls at ${r0(pass.t)}` : ''})`, () => {
+    check(`${vw}x${vh}: the card reads as a stack: two layers peek out below it (next +${back ? r0(next.b - card.b) : '-'} px, ${r0(next.w)} wide; back +${back ? r0(back.b - card.b) : 'missing'} px, ${back ? r0(back.w) : '-'} wide; card ${r0(card.w)}), opaque (${m.layerLook}), inside the stage (back bottom ${back ? r0(back.b) : '-'} of ${m.vh})`, () => {
       assert.ok(back, 'no second layer');
       assert.ok(next.b >= card.b + 8, 'next does not peek');
       assert.ok(back.b >= card.b + 8 && back.b >= next.b + 6, 'back does not peek below next');
       assert.ok(back.w < next.w - 4 && next.w < card.w - 4, 'layers are not narrower');
       assert.ok(Math.abs(back.cx - card.cx) <= 2);
       assert.ok(back.b <= m.vh - 4 && back.b <= stage.b + 0.5, 'back leaves the stage');
-      if (vw < 1100) assert.ok(back.b <= pass.t, 'back runs into Pass / Pitch');
       assert.equal(m.layerLook, 'opaque');
     });
     if (vw === 1366 && vh === 633) {
       check(`1366x633: the card is the hero: ${r0(card.w)}x${r0(card.h)} (height >= 470, area ${r0(card.w * card.h)} >= 145,000 px²)`, () => { assert.ok(card.h >= 470); assert.ok(card.w * card.h >= 145000); });
+    }
+    if (vw === 1440) {
+      // D-094: a keyboard user who tabs to Pass / Pitch sees them as a small bar, 56 px targets, on screen.
+      await lp.focus('.swipe-pass');
+      const bar = await lp.evaluate(() => [...document.querySelectorAll('.swipe-actions button')].map((el) => { const b = el.getBoundingClientRect(); return { w: Math.round(b.width), h: Math.round(b.height), t: b.top, b: b.bottom }; }));
+      check(`1440x900: keyboard focus on Pass shows the Pass / Pitch bar (${JSON.stringify(bar)})`, () => bar.forEach((b) => { assert.ok(b.w >= 56 && b.h >= 56); assert.ok(b.t >= 0 && b.b <= vh); }));
+      await lp.evaluate(() => document.activeElement?.blur());
     }
     if (vw === 1920) {
       const ax = await axeViolations(lp, { include: '.app-view[data-view="home"]', decorative: ['.swipe-card-info::before'] });
@@ -1177,7 +1175,7 @@ try {
     assert.ok(areas['1920x1080'] >= areas['1440x900'] * 1.1);
   });
 
-  // D-082 on phones: the same two layers peek out below the card, and Pass / Pitch stay clear of them.
+  // D-082 on phones: the same two layers peek out below the card, and the hint stays clear of them (D-094: no buttons).
   for (const [pw, ph] of [[375, 812], [320, 640]]) {
     resetStub();
     const mc = await stub.newContext(browser, { width: pw, height: ph }, { hasTouch: true, isMobile: true });
@@ -1186,15 +1184,16 @@ try {
     await mp.waitForTimeout(600);
     const mm = await mp.evaluate(() => {
       const box = (s) => { const el = document.querySelector(s); if (!el || !el.getClientRects().length) return null; const b = el.getBoundingClientRect(); return { l: b.left, r: b.right, t: b.top, b: b.bottom, w: b.width, cx: b.left + b.width / 2 }; };
-      return { card: box('#swipe-card'), next: box('#swipe-card-next'), back: box('#swipe-card-back'), pass: box('.swipe-pass'), hscroll: document.documentElement.scrollWidth - document.documentElement.clientWidth };
+      return { card: box('#swipe-card'), next: box('#swipe-card-next'), back: box('#swipe-card-back'), hint: box('.swipe-hint'), hscroll: document.documentElement.scrollWidth - document.documentElement.clientWidth };
     });
     await swipeShot(mp, `stack-${pw}x${ph}.png`);
-    check(`${pw}x${ph}: two layers peek out below the card (next +${mm.next ? Math.round(mm.next.b - mm.card.b) : '-'}, back +${mm.back ? Math.round(mm.back.b - mm.card.b) : 'missing'}), Pass / Pitch below them (${mm.pass ? Math.round(mm.pass.t) : '-'}), no sideways scroll (${mm.hscroll})`, () => {
+    check(`${pw}x${ph}: two layers peek out below the card (next +${mm.next ? Math.round(mm.next.b - mm.card.b) : '-'}, back +${mm.back ? Math.round(mm.back.b - mm.card.b) : 'missing'}), the hint below them (${mm.hint ? Math.round(mm.hint.t) : '-'}), card ${Math.round(mm.card.b - mm.card.t)} px tall, no sideways scroll (${mm.hscroll})`, () => {
       assert.ok(mm.next && mm.back);
       assert.ok(mm.next.b >= mm.card.b + 8 && mm.back.b >= mm.next.b + 6);
       assert.ok(mm.back.w < mm.next.w && mm.next.w < mm.card.w);
       assert.ok(Math.abs(mm.back.cx - mm.card.cx) <= 2);
-      assert.ok(mm.pass.t >= mm.back.b);
+      assert.ok(mm.hint.t >= mm.back.b);
+      assert.ok(mm.card.b - mm.card.t <= 560.5, 'the phone card is taller than D-094 allows');
       assert.ok(mm.hscroll <= 0);
     });
     await mc.close();

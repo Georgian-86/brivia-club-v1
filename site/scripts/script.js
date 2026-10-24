@@ -98,12 +98,12 @@ if (introBurst && plan === 'play') {
 
 /* Keep the landing-page music enabled on desktop and mobile. Browsers may
    reject autoplay with sound, so retry immediately on the first real gesture. */
-const landingVideos = [...document.querySelectorAll('.hero-video, [data-playground-video]')];
-// Videos start late (hero when idle, playground when near the viewport) and never under reduced-motion or save-data.
+const landingVideos = [...document.querySelectorAll('.hero-video')];
+// The hero video starts late (when idle) and never under reduced-motion or save-data.
 // Until a video has started, the gesture handler leaves it alone, so nothing is force-loaded. Every video keeps
 // `muted` + `playsinline` in the HTML (iOS autoplay); the first user gesture unmutes them as before.
 const startedLandingVideos = new Set();
-// Set by the first user gesture; a video that starts later (idle hero, playground near the viewport) is unmuted on start.
+// Set by the first user gesture; a video that starts later (the idle hero) is unmuted on start.
 let landingAudioUnlocked = false;
 const playLandingVideo = (video) => {
   video.muted = false;
@@ -197,7 +197,6 @@ let musicPlayedMs = 0;
 let musicPlayingSince = 0;
 let musicState = 'wait'; // 'wait' | 'play' | 'off' | 'ended'
 let gestureSeen = false;
-const setPlaygroundSound = (on) => { try { playgroundSoundEnabled = on; } catch { /* declared below; set once it exists */ } };
 const renderSoundButton = () => {
   if (!soundButton) return;
   const playing = musicState === 'play';
@@ -302,7 +301,7 @@ const onUnlockGesture = (event) => {
   if (!isUnlockEvent(event) || soundButton?.contains(event.target)) return;
   if (!gestureSeen) {
     gestureSeen = true;
-    if (musicPreference === 'on') { enableLandingVideoAudio(); setPlaygroundSound(true); }
+    if (musicPreference === 'on') enableLandingVideoAudio();
   }
   tryStartMusic();
   if (musicState !== 'wait' || musicPreference === 'off') UNLOCK_EVENTS.forEach((name) => window.removeEventListener(name, onUnlockGesture, true));
@@ -326,14 +325,12 @@ if (isLandingPage) {
       stopMusic('off');
       landingAudioUnlocked = false; // a video that starts later stays muted too
       landingVideos.forEach((video) => { video.muted = true; });
-      setPlaygroundSound(false);
     } else {
       musicPreference = 'on';
       if (musicState === 'ended') musicPlayedMs = 0; // a deliberate replay gets a fresh 5 minutes
       musicState = 'wait';
       gestureSeen = true;
       enableLandingVideoAudio();
-      setPlaygroundSound(true);
       tryStartMusic();
     }
     try { window.localStorage.setItem(SOUND_STORAGE_KEY, musicPreference); } catch { /* private mode */ }
@@ -570,109 +567,6 @@ if (pillarItems.length && 'IntersectionObserver' in window) {
   }, { rootMargin: '-38% 0px -38% 0px', threshold: 0 });
 
   pillarItems.forEach((item) => pillarObserver.observe(item));
-}
-
-const playgroundStage = document.querySelector('[data-playground-stage]');
-const playgroundVideo = document.querySelector('[data-playground-video]');
-const playgroundAudioToggle = document.querySelector('[data-playground-audio-toggle]');
-const playgroundShuttle = null;
-// Two round sound buttons never share the corner: the page's own steps aside while the playground stage is on screen.
-if (playgroundStage && soundButton && 'IntersectionObserver' in window) {
-  new IntersectionObserver(([entry]) => soundButton.classList.toggle('is-yielding', entry.isIntersecting)).observe(playgroundStage);
-}
-let playgroundAudioContext;
-let playgroundSoundEnabled = Boolean(window.__briviaLandingAudioEnabled);
-let playgroundStarted = false;
-
-const getPlaygroundAudio = () => {
-  const AudioContextClass = window.AudioContext || window.webkitAudioContext;
-  if (!AudioContextClass) return null;
-  playgroundAudioContext ||= new AudioContextClass();
-  if (playgroundAudioContext.state === 'suspended') playgroundAudioContext.resume().catch(() => {});
-  return playgroundAudioContext;
-};
-
-const playBadmintonHit = () => {
-  if (!playgroundSoundEnabled) return;
-  const audio = getPlaygroundAudio();
-  if (!audio) return;
-  const now = audio.currentTime;
-  const oscillator = audio.createOscillator();
-  const gain = audio.createGain();
-  oscillator.type = 'triangle';
-  oscillator.frequency.setValueAtTime(730, now);
-  oscillator.frequency.exponentialRampToValueAtTime(160, now + .12);
-  gain.gain.setValueAtTime(.0001, now);
-  gain.gain.exponentialRampToValueAtTime(.22, now + .008);
-  gain.gain.exponentialRampToValueAtTime(.0001, now + .15);
-  oscillator.connect(gain).connect(audio.destination);
-  oscillator.start(now); oscillator.stop(now + .16);
-};
-
-const playGuitarStrum = () => {
-  if (!playgroundSoundEnabled) return;
-  const audio = getPlaygroundAudio();
-  if (!audio) return;
-  const now = audio.currentTime;
-  [196, 247, 294, 392, 494].forEach((frequency, index) => {
-    const oscillator = audio.createOscillator();
-    const gain = audio.createGain();
-    oscillator.type = 'triangle';
-    oscillator.frequency.value = frequency;
-    const start = now + index * .035;
-    gain.gain.setValueAtTime(.0001, start);
-    gain.gain.exponentialRampToValueAtTime(.08, start + .012);
-    gain.gain.exponentialRampToValueAtTime(.0001, start + 1.45);
-    oscillator.connect(gain).connect(audio.destination);
-    oscillator.start(start); oscillator.stop(start + 1.5);
-  });
-};
-
-const startPlaygroundRally = () => {
-  if (!playgroundStage || !playgroundShuttle || playgroundStarted) return;
-  playgroundStarted = true;
-  const runCycle = () => {
-    playgroundStage.classList.remove('is-guitar');
-    playgroundShuttle.style.animation = 'none';
-    void playgroundShuttle.offsetWidth;
-    playgroundShuttle.style.animation = '';
-  };
-  playgroundShuttle.addEventListener('animationstart', playBadmintonHit);
-  playgroundShuttle.addEventListener('animationend', () => {
-    playgroundStage.classList.add('is-guitar');
-    playGuitarStrum();
-    window.setTimeout(runCycle, 3500);
-  });
-  runCycle();
-};
-
-if (playgroundStage) {
-  const updatePlaygroundAudioToggle = () => {
-    if (!playgroundVideo || !playgroundAudioToggle) return;
-    const isUnmuted = !playgroundVideo.muted;
-    playgroundAudioToggle.classList.toggle('is-unmuted', isUnmuted);
-    playgroundAudioToggle.setAttribute('aria-pressed', String(isUnmuted));
-    playgroundAudioToggle.setAttribute('aria-label', isUnmuted ? 'Mute animation' : 'Unmute animation');
-  };
-  playgroundAudioToggle?.addEventListener('pointerdown', (event) => event.stopPropagation());
-  playgroundAudioToggle?.addEventListener('touchstart', (event) => event.stopPropagation(), { passive: true });
-  playgroundAudioToggle?.addEventListener('click', (event) => {
-    event.stopPropagation();
-    if (!playgroundVideo) return;
-    playgroundVideo.muted = !playgroundVideo.muted;
-    if (!playgroundVideo.muted && landingMotion) playgroundVideo.play().catch(() => {});
-    updatePlaygroundAudioToggle();
-  });
-  updatePlaygroundAudioToggle();
-  playgroundStage.addEventListener('click', (event) => {
-    // Keep the animation muted until the user explicitly taps the audio toggle.
-    if (landingMotion) playgroundVideo?.play().catch(() => {});
-    startPlaygroundRally();
-  });
-  if ('IntersectionObserver' in window) {
-    const playgroundObserver = new IntersectionObserver(([entry]) => { if (entry.isIntersecting) { startPlaygroundRally(); playgroundObserver.disconnect(); } }, { threshold: .28 });
-    playgroundObserver.observe(playgroundStage);
-  } else startPlaygroundRally();
 }
 
 const serviceSection = document.querySelector('.services-marquee');

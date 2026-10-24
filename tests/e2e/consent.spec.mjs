@@ -91,6 +91,7 @@ try {
   browser = await chromium.launch({ headless: true, executablePath: EXECUTABLE });
   const context = await browser.newContext({ viewport: { width: 1280, height: 900 } });
   await context.addInitScript(([key, value]) => { window.localStorage.setItem(key, value); }, ['sb-stub-auth-token', JSON.stringify(session)]);
+  await context.addInitScript(() => { try { if (location.pathname === '/app.html') localStorage.setItem('brivia-deck-tutorial', 'hidden'); } catch { /* none */ } }); // D-094
 
   const state = { matchedWith: new Set(), insertedRequests: new Set(), answered: new Set(), holdInsert: null, holdRpc: null, remaining: 30, passed: new Set() };
   const calls = [];
@@ -184,7 +185,7 @@ try {
   const likeAndOpenSheet = async () => {
     await page.waitForFunction(() => document.querySelector('#pitch-modal')?.hidden);
     const row = await cardRow();
-    await page.locator('[data-action="like"]').click();
+    await page.locator('[data-action="like"]').dispatchEvent('click');
     await page.waitForSelector('#pitch-modal:not([hidden])');
     await page.waitForTimeout(500); // past the 280 ms card advance
     return row;
@@ -396,6 +397,7 @@ try {
   const deckBodies = [];
   const deckContext = await browser.newContext({ viewport: { width: 1280, height: 900 } });
   await deckContext.addInitScript(([key, value]) => { window.localStorage.setItem(key, value); }, ['sb-stub-auth-token', JSON.stringify(session)]);
+  await deckContext.addInitScript(() => { try { if (location.pathname === '/app.html') localStorage.setItem('brivia-deck-tutorial', 'hidden'); } catch { /* none */ } }); // D-094
   await deckContext.route(`${ORIGIN}/**`, async (route) => {
     const request = route.request();
     const url = new URL(request.url());
@@ -548,6 +550,7 @@ try {
   const hard = { calls: [], holdInsert: null, failInsert: false, capInsert: false };
   const hardContext = await browser.newContext({ viewport: { width: 1280, height: 900 } });
   await hardContext.addInitScript(([key, value]) => { window.localStorage.setItem(key, value); }, ['sb-stub-auth-token', JSON.stringify(session)]);
+  await hardContext.addInitScript(() => { try { if (location.pathname === '/app.html') localStorage.setItem('brivia-deck-tutorial', 'hidden'); } catch { /* none */ } }); // D-094
   // An older build cached the signup password in the stored profile: it must be scrubbed on load.
   await hardContext.addInitScript(([id, secret]) => {
     if (window.sessionStorage.getItem('stale-seeded')) return;
@@ -640,7 +643,7 @@ try {
 
   // 8b. Double-clicking Like opens the sheet once and sends nothing until the sheet resolves.
   let hardBefore = hardPosts().length;
-  await hardPage.locator('[data-action="like"]').dblclick();
+  await hardPage.evaluate(() => { const like = document.querySelector('[data-action="like"]'); like.click(); like.click(); });
   await hardPage.waitForTimeout(600);
   const sheetOpenAfterDbl = await hardPage.locator('#pitch-modal').isVisible();
   check(`double-click Like: sheet open, no request yet (posts ${hardPosts().length - hardBefore})`, () => {
@@ -665,7 +668,7 @@ try {
   const ivanImage = await hardPage.evaluate(() => document.querySelector('#swipe-image')?.getAttribute('src') || '');
   check(`a Supabase storage photo_url renders (got ${ivanImage.slice(0, 90)})`, () => assert.equal(ivanImage, IVAN_PHOTO));
   hardBefore = hardPosts().length;
-  await hardPage.locator('[data-action="like"]').click();
+  await hardPage.locator('[data-action="like"]').dispatchEvent('click');
   await hardPage.waitForSelector('#pitch-modal:not([hidden])');
   await hardPage.waitForTimeout(600);
   let releaseHard;
@@ -932,6 +935,7 @@ try {
   const q = { remaining: 30, resetsAt: null, race: false, fail: false, limitedUnknown: false, calls: [], passed: new Set(), signalled: new Set() };
   const quotaContext = await browser.newContext({ viewport: { width: 1280, height: 900 } });
   await quotaContext.addInitScript(([key, value]) => { window.localStorage.setItem(key, value); }, ['sb-stub-auth-token', JSON.stringify(session)]);
+  await quotaContext.addInitScript(() => { try { if (location.pathname === '/app.html') localStorage.setItem('brivia-deck-tutorial', 'hidden'); } catch { /* none */ } }); // D-094
   await quotaContext.route(`${ORIGIN}/**`, async (route) => {
     const request = route.request();
     const url = new URL(request.url());
@@ -985,7 +989,7 @@ try {
   const resetLabel = await quotaPage.evaluate((iso) => (() => { const d = new Date(iso); return d.toLocaleTimeString([], d.getMinutes() === 0 ? { hour: 'numeric' } : { hour: 'numeric', minute: '2-digit' }); })(), RESETS_AT);
   // One like resolves: the counter drops to 29 (the stub decrements) and the quota is read again.
   const readsBefore = qQuotaReads().length;
-  await quotaPage.locator('[data-action="like"]').click();
+  await quotaPage.locator('[data-action="like"]').dispatchEvent('click');
   await quotaPage.waitForSelector('#pitch-modal:not([hidden])');
   await quotaPage.waitForTimeout(500);
   await quotaPage.keyboard.press('Escape');
@@ -998,7 +1002,7 @@ try {
   // F1: a failed signal never loses the person. A 500, then a 429 without a cap message: the card comes back to the
   // front each time, with the retry copy; the unknown 429 also reads the quota again.
   const likeAndEscape = async () => {
-    await quotaPage.locator('[data-action="like"]').click();
+    await quotaPage.locator('[data-action="like"]').dispatchEvent('click');
     await quotaPage.waitForSelector('#pitch-modal:not([hidden])');
     await quotaPage.waitForTimeout(500);
     const advanced = await qCard();
@@ -1031,7 +1035,7 @@ try {
   await quotaPage.waitForTimeout(400);
   const raceCard = await qCard();
   q.race = true;
-  await quotaPage.locator('[data-action="like"]').click();
+  await quotaPage.locator('[data-action="like"]').dispatchEvent('click');
   await quotaPage.waitForSelector('#pitch-modal:not([hidden])');
   await quotaPage.waitForTimeout(500);
   const advancedTo = await qCard();
@@ -1080,7 +1084,7 @@ try {
   for (let i = 0; i < 20; i += 1) {
     const name = await qCard();
     if (!name) break;
-    await quotaPage.locator('[data-action="pass"]').click();
+    await quotaPage.locator('[data-action="pass"]').dispatchEvent('click');
     await quotaPage.waitForFunction((n) => (document.querySelector('#swipe-card:not([hidden]) #swipe-name')?.textContent?.trim() || '') !== n, name, { timeout: 4000 }).catch(() => {});
   }
   await quotaPage.waitForTimeout(300);
@@ -1142,6 +1146,7 @@ try {
     const s = { remaining: 30, calls: [], passed: new Set(), signalled: new Set(), hold: null };
     const ctx = await browser.newContext({ viewport: { width, height } });
     await ctx.addInitScript(([key, value]) => { window.localStorage.setItem(key, value); }, ['sb-stub-auth-token', JSON.stringify(session)]);
+    await ctx.addInitScript(() => { try { if (location.pathname === '/app.html') localStorage.setItem('brivia-deck-tutorial', 'hidden'); } catch { /* none */ } }); // D-094
     await ctx.route(`${ORIGIN}/**`, async (route) => {
       const request = route.request();
       const url = new URL(request.url());
@@ -1183,7 +1188,7 @@ try {
       await pg.waitForFunction(() => document.querySelector('#pitch-modal')?.hidden && !document.querySelector('#swipe-card')?.classList.contains('is-loading'));
       await pg.waitForTimeout(400);
       const name = await card();
-      await pg.locator('[data-action="like"]').click();
+      await pg.locator('[data-action="like"]').dispatchEvent('click');
       await pg.waitForSelector('#pitch-modal:not([hidden])');
       if (settle) await pg.waitForTimeout(500); // past the 400 ms ghost-tap window
       return name;
@@ -1292,6 +1297,7 @@ try {
     const pUser = { ...user, app_metadata: { provider, providers: [provider] } };
     const pSession = { ...session, user: pUser };
     await ctx.addInitScript(([key, value]) => { window.localStorage.setItem(key, value); }, ['sb-stub-auth-token', JSON.stringify(pSession)]);
+    await ctx.addInitScript(() => { try { if (location.pathname === '/app.html') localStorage.setItem('brivia-deck-tutorial', 'hidden'); } catch { /* none */ } }); // D-094
     const st = {
       consentAt: '2026-10-05T10:00:00+00:00', calls: [], files: { 'profile-photos': ['p1.jpg'], 'profile-covers': [], 'message-attachments': Array.from({ length: 230 }, (_, i) => `m${String(i).padStart(3, '0')}.png`), 'community-posts': ['c1.jpg'] },
       failDeleteAt: 0, deleteCount: 0, rpcMode: [], rpcCalls: [], holdList: null, tokenCalls: 0, listsServed: 0,

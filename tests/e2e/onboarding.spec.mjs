@@ -792,6 +792,7 @@ try {
   {
     const context = await browser.newContext({ viewport: { width: 1280, height: 900 } });
     await context.addInitScript(([key, value]) => { if (!sessionStorage.getItem('seeded')) { localStorage.setItem(key, value); sessionStorage.setItem('seeded', '1'); } }, ['sb-stub-auth-token', JSON.stringify(session)]);
+    await context.addInitScript(() => { try { if (location.pathname === '/app.html') localStorage.setItem('brivia-deck-tutorial', 'hidden'); } catch { /* none */ } }); // D-094
     const stub = await stubContext(context, { profileExists: true, hasCell: true, realApp: true });
     const { page, errors } = await newPage(context, stub.consoleLines);
     await page.goto(`${BASE}/app.html`, { waitUntil: 'domcontentloaded' });
@@ -1088,6 +1089,7 @@ try {
   {
     const context = await browser.newContext({ viewport: { width: 1280, height: 900 } });
     await context.addInitScript(([key, value]) => { if (!sessionStorage.getItem('seeded')) { localStorage.setItem(key, value); sessionStorage.setItem('seeded', '1'); } }, ['sb-stub-auth-token', JSON.stringify({ ...session, user: { ...user, user_metadata: {} } })]);
+    await context.addInitScript(() => { try { if (location.pathname === '/app.html') localStorage.setItem('brivia-deck-tutorial', 'hidden'); } catch { /* none */ } }); // D-094
     const stub = await stubContext(context, { profileExists: true, profileName: 'New Member', hasCell: true, interests: [{ interest_id: 'sports.racket.tennis', label: 'Tennis', points: 20, mode: 'play' }] });
     const { page, errors } = await newPage(context, stub.consoleLines);
     await page.goto(`${BASE}/auth.html?complete-profile=1`, { waitUntil: 'domcontentloaded' });
@@ -1203,6 +1205,7 @@ try {
   {
     const context = await browser.newContext({ viewport: { width: 1280, height: 900 } });
     await context.addInitScript(([key, value]) => { if (!sessionStorage.getItem('seeded')) { localStorage.setItem(key, value); sessionStorage.setItem('seeded', '1'); } }, ['sb-stub-auth-token', JSON.stringify(session)]);
+    await context.addInitScript(() => { try { if (location.pathname === '/app.html') localStorage.setItem('brivia-deck-tutorial', 'hidden'); } catch { /* none */ } }); // D-094
     const interests = [
       { interest_id: 'sports.racket.tennis', label: 'Tennis', points: 10, mode: 'play' },
       { interest_id: 'games.board.chess', label: 'Chess', points: 5, mode: 'play' },
@@ -1290,6 +1293,7 @@ try {
   {
     const context = await browser.newContext({ viewport: { width: 375, height: 800 } });
     await context.addInitScript(([key, value]) => { if (!sessionStorage.getItem('seeded')) { localStorage.setItem(key, value); sessionStorage.setItem('seeded', '1'); } }, ['sb-stub-auth-token', JSON.stringify(session)]);
+    await context.addInitScript(() => { try { if (location.pathname === '/app.html') localStorage.setItem('brivia-deck-tutorial', 'hidden'); } catch { /* none */ } }); // D-094
     const interests = [
       { interest_id: 'sports.racket.tennis', label: 'Tennis', points: 10, mode: 'play' },
       { interest_id: 'games.board.chess', label: 'Chess', points: 10, mode: 'play' },
@@ -1332,6 +1336,7 @@ try {
   {
     const context = await browser.newContext({ viewport: { width: 1280, height: 900 } });
     await context.addInitScript(([key, value]) => { if (!sessionStorage.getItem('seeded')) { localStorage.setItem(key, value); sessionStorage.setItem('seeded', '1'); } }, ['sb-stub-auth-token', JSON.stringify(session)]);
+    await context.addInitScript(() => { try { if (location.pathname === '/app.html') localStorage.setItem('brivia-deck-tutorial', 'hidden'); } catch { /* none */ } }); // D-094
     const stub = await stubContext(context, { profileExists: true, hasCell: true, consentAt: '2026-10-01T00:00:00Z', interestsStatus: [429], realApp: true });
     const { page, errors } = await newPage(context, stub.consoleLines);
     await page.goto(`${BASE}/app.html`, { waitUntil: 'domcontentloaded' });
