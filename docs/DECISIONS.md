@@ -1718,3 +1718,42 @@ controls (a tester or a seeded test member), never a real member, so no new expo
   replaces it before a card shows. Swap it for the branded placeholder when the deck is next touched.
 - **Caches:** WhatsApp, LinkedIn and others cache previews; re-check with each platform's inspector after deploy.
 - Proof: `npm run test:unit` 313/313; stub build OK; `dist/index.html` has 9 `og:` tags and no "bala"; asset budget OK.
+
+## D-085: The login screen goes back to its pre-B4 look; login and signup behaviour unchanged (founder, 2026-10-23)
+
+- **Founder ask:** "restore the previous login system UI. Do not alter the present flow for login or signup, but in the
+  previous UI."
+- **What changed:** only the login view's markup in `site/auth.html`, restored byte for byte from the commit before B4
+  (`6bda976^`): "RETURNING MEMBER / JOIN THE CLUB / THOUGHTFUL PEOPLE. REAL MOMENTUM.", the glyph field icons, LOG IN,
+  "Forgot password?", "OR CONTINUE WITH" and the round Google button, and "NEW HERE? CREATE ACCOUNT" in the panel's top
+  bar. Without the `auth-card` class the B4 / D-082 login CSS in `auth-refresh.css` no longer matches anything, so the
+  older auth CSS draws the screen again; the build renders pixel-identical to the pre-B4 build at 1440x900 and 375x812.
+- **Unchanged:** `#login-form`, `#login-note`, `.auth-submit`, `.auth-forgot`, `.auth-google-trigger` and the create
+  triggers keep their handlers in `script.js`; the guided signup (B2/B3, D-082b styling, Google) is untouched.
+- The B4 login rules stay in `auth-refresh.css`, inert, so the editorial card can come back by re-adding the class
+  and markup. B4's "Continue with Google" label and one-column checks are replaced in `tests/e2e/signup.spec.mjs` by
+  checks on the restored screen and its behaviour (Google starts, "Create account" opens the guided Welcome); the
+  D-082 login-centring and login-fit checks are dropped because they measured the B4 card.
+
+## D-086: The guided signup wears the classic signup look; flow unchanged, no points screen (founder, 2026-10-23)
+
+- **Founder ask:** "do the same with sign up as well but do not change the functionality as of now. I don't want the
+  points system back."
+- **Reading:** "the previous signup UI" is the classic 4-step form's look ("FIND YOUR PEOPLE", the one with the
+  passion points). The functionality stays the guided flow's: the same screens in the same order (Welcome, Account,
+  18+, Name, Details, Area, Interests, Reveal/Verify), the same checks, Google, the even split and the save pipeline.
+  Bringing back the classic form itself was rejected: it has the points step and different fields (experience,
+  looking-for, photo, cover), so it would change the flow.
+- **What changed (look only):** a static classic head in the guided view (`auth.html`, `aria-hidden`, styled by the
+  legacy `.auth-signup` rules like the classic view); `site/styles/signup-classic.css` (new, loaded last) restyles the
+  guided screens with the classic form's computed values: no card, a 560 px column, "STEP n OF N" visible over a thin
+  wine track (done and current filled), uppercase wine labels, classic inputs and square gender boxes, outlined and wine
+  pill buttons, "ALREADY A MEMBER? LOG IN" in the top bar. On Welcome the screen's kicker and h1 are visually hidden
+  (still the dialog's name). The B4/D-082/D-082b guided frame rules in `auth-refresh.css` are removed; the laptop
+  interests panel is shorter (`100svh - 700px`, 112-300 px) so Back and Finish stay on screen at 1920x886 and 1440x900.
+  No JS changed.
+- **A11y kept:** 44 px targets, contrast >= 4.5:1 (the "or pick your city" divider uses the label colour, 74% wine),
+  inputs 16 px on phones, the progressbar role and values, axe clean on every screen the spec audits.
+- Proof: `tests/e2e/signup.spec.mjs` 285 passed (D-082b layout checks replaced by classic-column, one-line head and
+  classic-track checks; text matches made case-insensitive for the uppercase labels), onboarding 269, location 64,
+  unit 313.

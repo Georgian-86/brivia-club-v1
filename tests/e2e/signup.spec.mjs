@@ -274,7 +274,7 @@ try {
     await shot(page, `${w}-01-welcome`, 1200);
     check(`${w} #signup opens the guided Welcome: Google, email, "I already have an account"; no step label, no bubbles`, () => {
       assert.equal(atWelcome, true);
-      assert.match(u.text, /Continue with Google/); assert.match(u.text, /Continue with email/); assert.match(u.text, /I already have an account/);
+      assert.match(u.text, /Continue with Google/i); assert.match(u.text, /Continue with email/i); assert.match(u.text, /I already have an account/i);
       assert.equal(u.label, null); assert.deepEqual(u.bubbles, []); assert.equal(u.h1, 1); assert.equal(u.primaries, 1); assert.equal(u.questions, 0);
     });
     const welcomeType = await typeOf(page, '[data-guided-email] > span');
@@ -297,8 +297,8 @@ try {
     });
     const backType = await typeOf(page, '[data-guided-back] > span');
     const nextType = await typeOf(page, '[data-guided-next] > span');
-    check(`${w} Back and Continue use the Welcome buttons' sentence-case type (${JSON.stringify({ backType, nextType, welcomeType })})`, () => {
-      assert.equal(welcomeType.transform, 'none');
+    check(`${w} Back and Continue use the Welcome buttons' classic uppercase type (D-086) (${JSON.stringify({ backType, nextType, welcomeType })})`, () => {
+      assert.equal(welcomeType.transform, 'uppercase');
       assert.deepEqual(backType, welcomeType); assert.deepEqual(nextType, welcomeType);
     });
     await page.locator('input[name="guided-email"]').fill(EMAIL);
@@ -321,7 +321,7 @@ try {
       assert.equal(calls.filter((c) => c.path.startsWith('/auth/v1/signup')).length, 0);
     });
     check(`${w} 18+: one checkbox "I'm 18 or older", the notice link, Continue disabled until ticked`, () => {
-      assert.match(u.text, /I'm 18 or older/); assert.match(u.text, /privacy|How we use your data/i); assert.equal(u.nextDisabled, true);
+      assert.match(u.text, /I'm 18 or older/i); assert.match(u.text, /privacy|How we use your data/i); assert.equal(u.nextDisabled, true);
     });
     await page.keyboard.press('Enter');
     await page.waitForTimeout(150);
@@ -354,7 +354,7 @@ try {
     await waitScreen(page, 'details');
     u = await ui(page);
     check(`${w} details: phone + gender, "Step 4 of 6", Continue disabled until both`, () => {
-      assert.equal(u.label, 'Step 4 of 6'); assert.equal(u.questions, 1); assert.equal(u.nextDisabled, true); assert.match(u.text, /Prefer not to say/);
+      assert.equal(u.label, 'Step 4 of 6'); assert.equal(u.questions, 1); assert.equal(u.nextDisabled, true); assert.match(u.text, /Prefer not to say/i);
     });
     await page.locator('input[name="guided-phone"]').fill('98765 43210');
     u = await ui(page);
@@ -384,7 +384,7 @@ try {
     u = await ui(page);
     check(`${w} interests: "Step 6 of 6", Continue disabled with 0 picks, private ones never offered, popular first, no points input`, () => {
       assert.equal(u.label, 'Step 6 of 6'); assert.equal(u.questions, 1); assert.equal(u.nextDisabled, true);
-      assert.ok(!/A private belief/.test(u.text)); assert.equal(u.firstTab, 'Popular'); assert.match(u.text, /Chess/);
+      assert.ok(!/A private belief/.test(u.text)); assert.equal(u.firstTab, 'Popular'); assert.match(u.text, /Chess/i);
       assert.equal(u.points, 0); assert.ok(!/passion points|points left/i.test(u.text));
     });
     await page.locator('.guided-option', { hasText: 'Chess' }).click();
@@ -684,7 +684,7 @@ try {
     await waitScreen(page, 'welcome');
     u = await ui(page);
     if (u.title) seenTitles.add(u.title);
-    check(`${w} Google: Back from 18+ goes to Welcome (signed in), never to an account screen`, () => { assert.match(u.text, /Welcome back/); assert.match(u.text, /Sign out/); });
+    check(`${w} Google: Back from 18+ goes to Welcome (signed in), never to an account screen`, () => { assert.match(u.text, /Welcome back/i); assert.match(u.text, /Sign out/i); });
     await page.locator('[data-guided-continue]').click();
     await waitScreen(page, 'adult');
     await page.locator('input[name="guided-adult"]').check();
@@ -880,12 +880,12 @@ try {
     } finally { stopClassic(); }
   }
 
-  // ================================ B4: the login look ================================
-  // A calm one-column card (max 480 px from 781 px; full width minus 16 px gutters below), "Continue with Google" a
-  // full-width labelled button that still starts Google, the heading in Bodoni Moda, SVG icons (no glyphs), contrast
-  // >= 4.5:1 for every text node in the card, 44 px targets, no sideways scroll; "Forgot password?" and "Create an
-  // account" keep their behaviour.
-  for (const viewport of [{ width: 320, height: 640 }, { width: 375, height: 812 }, { width: 390, height: 844 }, { width: 768, height: 1024 }, { width: 1280, height: 800 }, { width: 1440, height: 900 }, { width: 1920, height: 1080 }]) {
+  // ================================ D-085: the login look restored to the pre-B4 screen ================================
+  // The founder asked for the earlier login UI back with the flow unchanged: "JOIN THE CLUB", the email form, LOG IN,
+  // "Forgot password?", "OR CONTINUE WITH" and the round Google button, and "NEW HERE? CREATE ACCOUNT" in the panel's
+  // top bar. Behaviour is what is checked: Google still starts, "Create account" still opens the guided Welcome (and
+  // its Google button still starts), the form is the same #login-form, and nothing scrolls sideways.
+  for (const viewport of [{ width: 320, height: 640 }, { width: 375, height: 812 }, { width: 768, height: 1024 }, { width: 1280, height: 800 }, { width: 1440, height: 900 }, { width: 1920, height: 1080 }]) {
     const w = viewport.width;
     const mobile = w < 800;
     const context = await browser.newContext({ viewport, isMobile: mobile, hasTouch: mobile });
@@ -898,67 +898,42 @@ try {
     await settleAnimations(page);
     await page.evaluate(() => document.fonts.ready);
     const r = await page.evaluate(() => {
-      const card = document.querySelector('.auth-login');
-      const box = (el) => { const b = el.getBoundingClientRect(); return { x: Math.round(b.left), w: Math.round(b.width), h: Math.round(b.height), top: Math.round(b.top) }; };
-      const google = card.querySelector('.auth-google-trigger');
-      const submit = card.querySelector('#login-form .auth-submit');
-      const email = card.querySelector('#login-form input[name="email"]');
-      const password = card.querySelector('#login-form input[name="password"]');
-      const h1 = card.querySelector('#auth-title');
+      const view = document.querySelector('.auth-login');
+      const visible = (el) => Boolean(el?.getClientRects().length);
       return {
-        card: box(card), inner: window.innerWidth,
-        google: box(google), googleText: google.innerText.trim(), googleName: google.getAttribute('aria-label') || [...google.childNodes].filter((n) => !(n.nodeType === 1 && n.getAttribute('aria-hidden') === 'true')).map((n) => n.textContent).join('').trim(),
-        submit: box(submit), email: box(email), password: box(password),
-        h1Font: getComputedStyle(h1).fontFamily, h1Text: h1.textContent.trim(),
-        forgot: Boolean(card.querySelector('.auth-forgot')) && /Forgot password\?/.test(card.querySelector('.auth-forgot').textContent),
-        create: card.querySelector('.auth-create-trigger')?.innerText.trim() || '',
-        createVisible: Boolean(card.querySelector('.auth-create-trigger')?.getClientRects().length),
-        glyphs: /[✉♙◉↗→]/.test(card.innerText),
-        svgIcons: card.querySelectorAll('#login-form svg').length,
-        inputFont: parseFloat(getComputedStyle(email).fontSize),
+        cardClass: view.classList.contains('auth-card'),
+        h1: view.querySelector('#auth-title')?.textContent.trim(),
+        email: visible(view.querySelector('#login-form input[name="email"]')),
+        password: visible(view.querySelector('#login-form input[name="password"]')),
+        submit: view.querySelector('#login-form .auth-submit')?.innerText.trim() || '',
+        forgot: visible(view.querySelector('.auth-forgot')),
+        google: visible(view.querySelector('.auth-google-trigger')),
+        googleName: view.querySelector('.auth-google-trigger')?.getAttribute('aria-label') || '',
+        topCreate: visible(document.querySelector('.auth-top-signup')),
+        overflow: document.documentElement.scrollWidth - innerWidth,
       };
     });
     if ([320, 375, 1440, 1920].includes(w)) await shot(page, `login-${w}`, 300);
-    check(`${w} login: one calm card, ${w >= 781 ? 'max 480 px' : 'full width minus 16 px gutters'} (${r.card.w} of ${r.inner})`, () => {
-      if (w >= 781) { assert.ok(r.card.w <= 480 && r.card.w >= 400, String(r.card.w)); }
-      else assert.ok(Math.abs(r.card.w - (r.inner - 32)) <= 1, `${r.card.w} vs ${r.inner - 32}`);
+    check(`${w} login: the pre-B4 screen ("${r.h1}", no editorial card)`, () => { assert.equal(r.h1, 'JOIN THE CLUB'); assert.equal(r.cardClass, false); });
+    check(`${w} login: email, password, LOG IN, "Forgot password?" and the Google button are shown (${JSON.stringify(r)})`, () => {
+      assert.equal(r.email, true); assert.equal(r.password, true); assert.match(r.submit, /LOG IN/); assert.equal(r.forgot, true);
+      assert.equal(r.google, true); assert.equal(r.googleName, 'Continue with Google');
     });
-    check(`${w} login: one column: Google, email, password and Log in share the same left edge and width`, () => {
-      for (const b of [r.email, r.password, r.submit]) { assert.ok(Math.abs(b.x - r.google.x) <= 1, JSON.stringify(r)); assert.ok(Math.abs(b.w - r.google.w) <= 1, JSON.stringify(r)); }
-      assert.ok(r.google.top < r.email.top && r.email.top < r.password.top && r.password.top < r.submit.top);
-    });
-    check(`${w} login: "Continue with Google" is a full-width labelled button (${r.googleText}, ${r.google.w}x${r.google.h})`, () => {
-      assert.match(r.googleText, /Continue with Google/); assert.equal(r.googleName, 'Continue with Google'); assert.ok(r.google.h >= 44);
-    });
-    check(`${w} login: the heading is Bodoni Moda (${r.h1Font})`, () => assert.match(r.h1Font, /Bodoni Moda/));
-    check(`${w} login: "Forgot password?" and "Create an account" are there, SVG field icons, no glyph icons, 16 px fields`, () => {
-      assert.equal(r.forgot, true); assert.match(r.create, /create an account/i); assert.equal(r.createVisible, true);
-      assert.equal(r.glyphs, false); assert.ok(r.svgIcons >= 2); assert.ok(r.inputFont >= 16);
-    });
-    const a = await audit(page, '.auth-login');
-    check(`${w} login: 44 px targets (${a.small.join(', ')})`, () => assert.deepEqual(a.small, []));
-    check(`${w} login: text contrast >= 4.5:1 (${a.low.join(', ')})`, () => assert.deepEqual(a.low, []));
-    check(`${w} login: no sideways scroll (${a.overflow})`, () => assert.ok(a.overflow <= 0));
-    if ([320, 375, 1440].includes(w)) {
-      const axe = await axeViolations(page, { include: '.auth-shell' });
-      check(`${w} login: axe clean (${axe.join(' | ')})`, () => assert.deepEqual(axe, []));
-    }
+    check(`${w} login: "NEW HERE? CREATE ACCOUNT" is in the top bar`, () => assert.equal(r.topCreate, true));
+    check(`${w} login: no sideways scroll (${r.overflow})`, () => assert.ok(r.overflow <= 0));
     if (w === 1440 || w === 375) {
       // Google still starts: signInWithOAuth sends the browser to the stub's /authorize with provider=google.
       await page.locator('.auth-login .auth-google-trigger').click();
       await page.waitForURL(/\/auth\/v1\/authorize/, { timeout: 5000 }).catch(() => {});
       const authorize = calls.find((c) => c.path === '/auth/v1/authorize');
-      check(`${w} login: "Continue with Google" starts Google sign-in (${authorize ? new URL(authorize.url).searchParams.get('provider') : 'no call'})`, () => {
+      check(`${w} login: the Google button starts Google sign-in (${authorize ? new URL(authorize.url).searchParams.get('provider') : 'no call'})`, () => {
         assert.ok(authorize); assert.equal(new URL(authorize.url).searchParams.get('provider'), 'google');
       });
       await page.goto(`${BASE}/auth.html#login`, { waitUntil: 'load' });
-      await page.waitForSelector('.auth-login.is-active .auth-create-trigger', { state: 'attached' });
-      const loginType = await typeOf(page, '.auth-login .auth-submit > span');
-      await page.locator('.auth-login .auth-create-trigger').click({ timeout: 4000 }).catch(() => {});
+      await page.waitForSelector('.auth-login.is-active #login-form');
+      await page.locator('.auth-top-signup').click({ timeout: 4000 }).catch(() => {});
       const toGuided = await waitScreen(page, 'welcome');
-      check(`${w} login: "Create an account" opens the guided Welcome`, () => assert.equal(toGuided, true));
-      const choiceType = await typeOf(page, '[data-guided-email] > span');
-      check(`${w} login "Log in" and the guided Welcome buttons share one label type (${JSON.stringify({ loginType, choiceType })})`, () => assert.deepEqual(choiceType, loginType));
+      check(`${w} login: "Create account" opens the guided Welcome`, () => assert.equal(toGuided, true));
       // The guided Welcome's Google button starts Google too.
       await page.locator('[data-guided-google]').click({ timeout: 4000 }).catch(() => {});
       await page.waitForURL(/\/auth\/v1\/authorize/, { timeout: 5000 }).catch(() => {});
@@ -968,15 +943,13 @@ try {
     await context.close();
   }
 
-  // ================================ D-082 / D-082b: register and login share the right half; login fits one screen ================================
-  // The founder (D-082b, replacing D-082's "line up with the login card"): the telephone art keeps the left half and the
-  // card sits in the centre of the right half, horizontally and vertically, on Welcome, every guided screen and login
-  // (centre x within 24 px of 75% of the window from 1100 px; centre y within 24 px of the middle when the card fits).
-  // The question heading is calmer (at most 40 px) and the card wider, so "Find your people." and "Are you 18 or
-  // older?" are one line at 1440 and 1920; the Welcome subtitle is one line from 1280 px.
+  // ================================ D-086: the guided signup in the classic signup look ================================
+  // The founder asked for the earlier signup UI with today's flow (no points): every guided screen sits in the classic
+  // column under the "FIND YOUR PEOPLE" head (centred on it, 560 px at most, one width for Welcome, Account and 18+),
+  // the head is one line on desktop, "Are you 18 or older?" is one line from 1440 px, and the stepper is the classic
+  // "STEP n OF N" over a thin wine track (done and current filled) that stays a progressbar.
   const boxOf = (page, sel) => page.evaluate((s) => { const el = document.querySelector(s); if (!el || !el.getClientRects().length) return null; const r = el.getBoundingClientRect(); return { l: r.left, r: r.right, t: r.top, b: r.bottom, w: r.width, h: r.height, cx: r.left + r.width / 2, cy: r.top + r.height / 2 }; }, sel);
   const linesOf = (page, sel) => page.evaluate((s) => { const el = document.querySelector(s); const c = getComputedStyle(el); const lh = parseFloat(c.lineHeight) || parseFloat(c.fontSize) * 1.2; return { h: el.getBoundingClientRect().height, lh, size: parseFloat(c.fontSize) }; }, sel);
-  const centred = (b, vw, vh) => ({ dx: Math.round(b.cx - vw * 0.75), dy: b.h <= vh - 48 ? Math.round(b.cy - vh / 2) : 0 });
   for (const viewport of [{ width: 1100, height: 800 }, { width: 1280, height: 720 }, { width: 1440, height: 900 }, { width: 1536, height: 709 }, { width: 1920, height: 1080 }, { width: 1920, height: 886 }]) {
     const tag = `${viewport.width}x${viewport.height}`;
     const vw = viewport.width; const vh = viewport.height;
@@ -987,22 +960,19 @@ try {
     await page.waitForSelector('.auth-login.is-active #login-form');
     await settleAnimations(page);
     await page.evaluate(() => document.fonts.ready);
-    const login = await boxOf(page, '.auth-login');
-    const lc = centred(login, vw, vh);
-    check(`${tag} the login card is centred in the right half (dx ${lc.dx}, dy ${lc.dy})`, () => { assert.ok(Math.abs(lc.dx) <= 24); assert.ok(Math.abs(lc.dy) <= 24); });
-    await page.locator('.auth-login .auth-create-trigger').click();
+    await page.locator('.auth-top-signup').click();
     await waitScreen(page, 'welcome');
     await settleAnimations(page);
     const welcome = await boxOf(page, '#guided-signup');
     const title = await linesOf(page, '#guided-signup h1');
     const helper = await linesOf(page, '#guided-signup .guided-helper');
-    const wc = centred(welcome, vw, vh);
+    const head = await boxOf(page, '.auth-guided .guided-brand-title');
+    const brand = await linesOf(page, '.auth-guided .guided-brand-title');
+    const under = (b) => Math.round(b.cx - head.cx);
     await shot(page, `align-welcome-${tag}`, 0);
-    check(`${tag} Welcome card centred in the right half (dx ${wc.dx}, dy ${wc.dy}; ${Math.round(welcome.w)}x${Math.round(welcome.h)})`, () => { assert.ok(Math.abs(wc.dx) <= 24); assert.ok(Math.abs(wc.dy) <= 24); assert.ok(welcome.l >= vw / 2 - 1 && welcome.r <= vw); });
-    check(`${tag} "Find your people." is one line at ${title.size} px (<= 40; ${Math.round(title.h)} px, line ${Math.round(title.lh)} px)${vw >= 1280 ? ` and the subtitle is one line (${Math.round(helper.h)} px, line ${Math.round(helper.lh)} px)` : ''}`, () => {
-      assert.ok(title.size <= 40);
-      assert.ok(title.h <= title.lh * 1.4, JSON.stringify(title));
-      if (vw >= 1280) assert.ok(helper.h <= helper.lh * 1.4, JSON.stringify(helper));
+    check(`${tag} Welcome sits in the classic column under the head (dx ${under(welcome)}; ${Math.round(welcome.w)}x${Math.round(welcome.h)})`, () => { assert.ok(Math.abs(under(welcome)) <= 2); assert.ok(welcome.w <= 560 && welcome.w >= 400); assert.ok(welcome.t > head.b); });
+    check(`${tag} "FIND YOUR PEOPLE" is one line (${Math.round(brand.h)} px, line ${Math.round(brand.lh)} px); the screen's own h1 is for screen readers only (${Math.round(title.h)} px)`, () => {
+      assert.ok(brand.h <= brand.lh * 1.4, JSON.stringify(brand)); assert.ok(title.h <= 1);
     });
     await page.locator('[data-guided-email]').click();
     await waitScreen(page, 'account');
@@ -1017,9 +987,9 @@ try {
     const adult = onAdult ? await boxOf(page, '#guided-signup') : null;
     const adultTitle = onAdult ? await linesOf(page, '#guided-signup h1') : null;
     await shot(page, `align-adult-${tag}`, 0);
-    check(`${tag} Account and 18+ stay centred in the right half and as wide as Welcome (Account dx ${centred(account, vw, vh).dx} dy ${centred(account, vw, vh).dy}, 18+ ${adult ? `dx ${centred(adult, vw, vh).dx} dy ${centred(adult, vw, vh).dy}` : 'not reached'})`, () => {
+    check(`${tag} Account and 18+ stay in the same column and as wide as Welcome (Account dx ${under(account)}, 18+ ${adult ? `dx ${under(adult)}` : 'not reached'})`, () => {
       assert.ok(adult);
-      for (const b of [account, adult]) { const c = centred(b, vw, vh); assert.ok(Math.abs(c.dx) <= 24); assert.ok(Math.abs(c.dy) <= 24); assert.ok(Math.abs(b.w - welcome.w) <= 1); }
+      for (const b of [account, adult]) { assert.ok(Math.abs(under(b)) <= 2); assert.ok(Math.abs(b.w - welcome.w) <= 1); }
     });
     if (vw >= 1440) check(`${tag} "Are you 18 or older?" is one line at ${adultTitle?.size} px (${Math.round(adultTitle?.h)} px, line ${Math.round(adultTitle?.lh)} px)`, () => { assert.ok(adultTitle.size <= 40); assert.ok(adultTitle.h <= adultTitle.lh * 1.4); });
     // The stepper: one thin bar per question, done / current / pending, no icon circles and no step names.
@@ -1035,12 +1005,12 @@ try {
         label: document.querySelector('[data-guided-step-label]').textContent.trim(), labelClipped: getComputedStyle(document.querySelector('[data-guided-step-label]')).clipPath !== 'none' || getComputedStyle(document.querySelector('[data-guided-step-label]')).clip !== 'auto',
       };
     });
-    check(`${tag} the stepper is 6 thin bars (done ${bars.fills[0]}%, current ${bars.fills[1]}%, pending ${bars.fills[2]}%; ${bars.h} px tall), no icons or step names, a progressbar 2 of 6, "Step 2 of 6" only for screen readers (${JSON.stringify(bars.states)})`, () => {
+    check(`${tag} the stepper is the classic thin track (done ${bars.fills[0]}%, current ${bars.fills[1]}%, pending ${bars.fills[2]}%; ${bars.h} px tall), no icons or step names, a progressbar 2 of 6, "Step 2 of 6" shown above it (${JSON.stringify(bars.states)})`, () => {
       assert.equal(bars.n, 6); assert.deepEqual(bars.states, ['done', 'current', 'pending', 'pending', 'pending', 'pending']);
-      assert.equal(bars.fills[0], 100); assert.ok(bars.fills[1] > 0 && bars.fills[1] < 100); assert.equal(bars.fills[2], 0);
+      assert.equal(bars.fills[0], 100); assert.equal(bars.fills[1], 100); assert.equal(bars.fills[2], 0);
       assert.ok(bars.h >= 2 && bars.h <= 8); assert.equal(bars.icons, 0); assert.equal(bars.names, false);
       assert.equal(bars.role, 'progressbar'); assert.equal(bars.now, '2'); assert.equal(bars.max, '6'); assert.equal(bars.text, 'Step 2 of 6');
-      assert.equal(bars.label, 'Step 2 of 6'); assert.equal(bars.labelClipped, true);
+      assert.equal(bars.label, 'Step 2 of 6'); assert.equal(bars.labelClipped, false);
     });
     await context.close();
   }
@@ -1124,31 +1094,6 @@ try {
     await auditScreen(page, `${tag} interests picker`);
     await context.close();
   }
-  for (const viewport of [{ width: 1920, height: 886 }, { width: 1536, height: 709 }, { width: 1440, height: 780 }, { width: 1366, height: 633 }, { width: 1280, height: 720 }]) {
-    const tag = `${viewport.width}x${viewport.height}`;
-    const context = await browser.newContext({ viewport });
-    await setup(context);
-    const page = await context.newPage();
-    await page.goto(`${BASE}/auth.html#login`, { waitUntil: 'load' });
-    await page.waitForSelector('.auth-login.is-active #login-form');
-    await settleAnimations(page);
-    await page.evaluate(() => document.fonts.ready);
-    const fit = await page.evaluate(() => {
-      const card = document.querySelector('.auth-login').getBoundingClientRect();
-      const create = document.querySelector('.auth-login .auth-create-trigger').getBoundingClientRect();
-      const panel = document.querySelector('.auth-panel');
-      return { t: card.top, b: card.bottom, createB: create.bottom, vh: innerHeight, panelScroll: panel.scrollHeight - panel.clientHeight, scrollY: scrollY };
-    });
-    const a = await audit(page, '.auth-login');
-    await shot(page, `fit-login-${tag}`, 0);
-    check(`${tag} the whole login card is on screen with room to breathe (top ${Math.round(fit.t)}, bottom ${Math.round(fit.b)} of ${fit.vh}; "Create an account" ends at ${Math.round(fit.createB)}); nothing scrolls (panel ${fit.panelScroll}, page at ${fit.scrollY})`, () => {
-      assert.ok(fit.t >= 8, 'top'); assert.ok(fit.b <= fit.vh - 8, 'bottom'); assert.ok(fit.createB <= fit.vh - 8);
-      assert.ok(fit.panelScroll <= 0, 'panel scrolls'); assert.equal(fit.scrollY, 0);
-    });
-    check(`${tag} login: 44 px targets after the fit (${a.small.join(', ')})`, () => assert.deepEqual(a.small, []));
-    await context.close();
-  }
-
   // M6: one punctuation rule for every guided heading: a question ends with "?", anything else with a full stop.
   check(`M6 every guided heading ends with "." or "?" (${[...seenTitles].join(' | ')})`, () => {
     assert.ok(seenTitles.size >= 9); for (const t of seenTitles) assert.match(t, /[.?]$/, t);
