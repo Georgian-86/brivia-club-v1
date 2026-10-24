@@ -20,6 +20,21 @@
     <link rel="preload" as="image" href="./media/posters/hero-section-video.webp" fetchpriority="high" />
     <link rel="preload" as="font" type="font/woff2" fetchpriority="low" href="../node_modules/@fontsource/instrument-sans/files/instrument-sans-latin-700-normal.woff2" crossorigin />
     <script>
+      /* D-086: a sign-in that Supabase returns to the Site URL (this page) instead of auth.html goes straight on to the
+         app, as auth.html does, rather than leaving the member on the landing holding a session. */
+      (() => {
+        const params = new URLSearchParams(window.location.search);
+        const hasCode = params.has('code');
+        const hasTokens = /(?:^|#|&)access_token=|(?:^|#|&)refresh_token=/.test(window.location.hash);
+        if (!hasCode && !hasTokens) return;
+        const target = new URL('/app.html', window.location.origin);
+        target.searchParams.set('oauth', '1');
+        if (hasCode) target.searchParams.set('code', params.get('code'));
+        if (hasTokens) target.hash = window.location.hash;
+        window.location.replace(target.toString());
+      })();
+    </script>
+    <script>
       /* Returning visitors, auth hand-offs, reduced-motion and save-data never see the intro (no flash before script.js
          runs). Mirrors introPlan()/motionAllowed() in landing-motion.js; keep the two in step. */
       (function () {

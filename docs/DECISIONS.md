@@ -1737,3 +1737,31 @@ controls (a tester or a seeded test member), never a real member, so no new expo
 - **Follow-up (founder, same day):** the aura also on Profile and Explore. Explore (`?view=posts`, the community
   feed) painted its own flat cream; it is now transparent. Profile and Explore cards (`--aura-card`, 66% paper) and the
   mobile tab bar are frosted glass so the glows show; dark ink on the card stays about 15:1, helper text about 6.5:1.
+
+## D-086: Sign-in hand-off: one branded screen from sign-in to the app (founder, 2026-10-24)
+
+- **Reported:** after logging in with email or Google, members saw the login (or landing) page for a few seconds
+  before Connect.
+- **Root cause (reproduced with a filmstrip, stubbed Supabase at 300 ms per call):** (1) `auth.html` showed the
+  login card while `restoreAuthPageSession` checked an existing session, and kept it on "Checking your membership..."
+  after an email sign-in, through `profiles` then `my_onboarding_status` one after another; (2) the hard navigation to
+  `app.html` then showed a blank page (with a stray filter button and toast box) while the app repeated the same two
+  reads in sequence; (3) the deck waited on blocks, then matches, then messages. A Google return that Supabase sends to
+  the Site URL (redirect URL not allowlisted) left the member on the landing page.
+- **Done:** `handoff.css` + one `.brivia-handoff` splash (wordmark, thin wine progress line, "Opening your club") on
+  `auth.html` and `app.html`, on the aura. `auth.html` shows it before first paint when a session is stored
+  (`html.brivia-handing-off`, inline head script, 8 s safety timer); `script.js` shows it after a successful email
+  sign-in ("Signing you in"), when leaving for Google ("Opening Google") and on every redirect to the app, and ends it
+  in `setAuthView` (so any form that has to show, such as onboarding, is never hidden or unfocusable) and on a
+  back/forward-cache return. `app.html` shows it while `app-auth-pending`; nothing else leaks through and the app fades
+  in. Independent reads run together: profile + onboarding status (app boot, login form, session restore) and
+  blocks + matches + inbox. `index.html` forwards an OAuth return straight to the app, as `auth.html` does.
+- **Measured (production build, 300 ms/call):** signed-in member opening `auth.html`: never sees the login card, app at
+  ~1.2 s (was login card, blank, app at ~1.8 s); email sign-in app at ~1.5 s (was ~1.9 s); Google return ~1.0 s
+  (was ~1.3 s), all on one continuous splash.
+- **Tried and dropped:** a cross-document view transition; its mid-frame flashed white between two identical splashes.
+- **Founder action:** in Supabase Auth → URL Configuration, the Redirect URLs must include
+  `https://thebriviaclub.live/auth.html` and the preview pattern (`https://*-golus-projects.vercel.app/auth.html`),
+  otherwise Google returns to the Site URL.
+- Proof: `npm run test:unit` 313/313; e2e onboarding 269/269, signup 339/339, app-shell 208/208, consent 182/182,
+  deck 195/195, landing 47/47; style ratchet, asset budget and build OK.

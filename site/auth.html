@@ -13,6 +13,18 @@
         if (hasTokens) target.hash = window.location.hash;
         window.location.replace(target.toString());
       })();
+      // D-086: a stored session means this visit is a hand-off to the app (or the next onboarding step), never a login
+      // form: show the "opening your club" screen before first paint. script.js ends it if the member stays here; the
+      // timer is a safety net so the form can never stay hidden.
+      (() => {
+        try {
+          const params = new URLSearchParams(window.location.search);
+          if (params.has('error') || params.has('error_description') || params.has('profile-check')) return;
+          if (!Object.keys(window.localStorage).some((key) => /^sb-.+-auth-token$/.test(key))) return;
+          document.documentElement.classList.add('brivia-handing-off');
+          window.setTimeout(() => document.documentElement.classList.remove('brivia-handing-off'), 8000);
+        } catch { /* storage unavailable: show the form as before */ }
+      })();
     </script>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -21,6 +33,7 @@
     <title>Join the Brivia Club</title>
   </head>
   <body class="auth-page auth-open">
+    <div class="brivia-handoff" role="status" aria-live="polite"><div><p class="brivia-handoff-mark"><em>the</em>Brivia Club</p><div class="brivia-handoff-line" aria-hidden="true"></div><p class="brivia-handoff-note" data-handoff-note>Opening your club</p></div></div>
     <div class="auth-modal is-open" id="auth-modal">
       <div class="auth-backdrop" data-auth-close></div>
       <section class="auth-shell" role="dialog" aria-modal="true" aria-labelledby="auth-welcome-title">
