@@ -1734,3 +1734,6 @@ controls (a tester or a seeded test member), never a real member, so no new expo
 - **Open:** the landing's dark bands (Meet your kind, Discover/Swipe, principles, process, footer), the careers header,
   and the pillars text panel keep their colours; lighten them next if the founder wants the whole landing on the aura.
 - Proof: style ratchet OK, asset budget OK, `npm run test:unit` 313/313, build OK; screenshots at 390 and 1440 px.
+- **Follow-up (founder, same day):** the aura also on Profile and Explore. Explore (`?view=posts`, the community
+  feed) painted its own flat cream; it is now transparent. Profile and Explore cards (`--aura-card`, 66% paper) and the
+  mobile tab bar are frosted glass so the glows show; dark ink on the card stays about 15:1, helper text about 6.5:1.

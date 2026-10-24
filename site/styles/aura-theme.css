@@ -23,14 +23,27 @@ html body.careers-page { background: transparent !important; }
 
 /* App: the shell, the profile page and the inbox sit on the aura. Bars and the chat list become frosted glass. */
 html body .app-wrap,
+html body .app-view.community-feed-view,
 html body .app-view[data-view="chat"],
 html body .app-view[data-view="chat"] .chat-layout { background: transparent !important; }
 html body .app-topbar,
 html body.app-body .app-view[data-view="chat"] .chat-layout > .chat-list,
-html body .inbox-tabs {
+html body .inbox-tabs,
+html body .app-tabbar {
   background: var(--aura-glass) !important;
   -webkit-backdrop-filter: blur(18px);
   backdrop-filter: blur(18px);
+}
+
+/* Profile and Explore: cards turn to light frosted paper (66% paper over pale glows, so dark ink stays above 12:1) and the
+   glows show at their edges instead of being covered by solid blocks. */
+html body .profile-view .profile-card,
+html body .community-feed-view .community-post-card,
+html body .community-feed-view .community-post-empty,
+html body .community-feed-view .community-post-composer {
+  background: var(--aura-card) !important;
+  -webkit-backdrop-filter: blur(14px);
+  backdrop-filter: blur(14px);
 }
 
 /* Signup and login page (not the landing's modal): the frame and the form column; the phone becomes the cut-out so

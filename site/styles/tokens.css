@@ -70,6 +70,7 @@
   --aura-mint: rgba(188, 228, 216, .45);
   --aura-peach: rgba(248, 220, 198, .55);
   --aura-glass: rgba(255, 252, 248, .62);
+  --aura-card: rgba(255, 252, 248, .66);
   --aura-bg:
     radial-gradient(ellipse 48% 42% at 22% 30%, var(--aura-lilac), transparent 72%),
     radial-gradient(ellipse 42% 40% at 84% 36%, var(--aura-mint), transparent 72%),
