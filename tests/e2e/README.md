@@ -136,3 +136,8 @@ runs one section; `CHAT_EXTRAS_SHOTS=<dir>` saves the resume-card screenshots.
 ```bash
 PLAYWRIGHT_MODULE=/tmp/pw/node_modules/playwright/index.mjs node tests/e2e/chat-extras.spec.mjs
 ```
+
+`password-reset.spec.mjs` (D-090, Vite on :5181) drives "Forgot password?" on `auth.html` at 1440 and 390 px: the request
+step (typed email kept, `/auth/v1/recover` with `redirect_to` auth.html, the neutral "if an account exists" line, a rate
+limit, Back to log in), the emailed recovery link opening NEW PASSWORD instead of the app (mismatch caught before any
+call, `PUT /auth/v1/user`, then the app), an expired link, and a recovery link that lands on the home page.

@@ -431,3 +431,21 @@ body.auth-page .auth-shell:has(.auth-login.is-active) .auth-login .auth-socials 
   body.auth-page .auth-shell:has(.auth-login.is-active) .auth-login .auth-socials .auth-google-trigger { transition: none; }
   body.auth-page .auth-shell:has(.auth-login.is-active) .auth-login .auth-socials .auth-google-trigger:hover { transform: none; }
 }
+
+/* D-090: "Forgot password?" swaps the login form for a reset step inside the same card. While resetting, only that
+   step shows: no "or continue with", Google button or "create an account" beneath it. */
+body.auth-page .auth-login.is-resetting :is(.auth-divider, .auth-socials, .auth-create-trigger) { display: none !important; }
+body.auth-page .auth-login :is(.auth-reset-form, #login-form)[hidden] { display: none !important; }
+/* The reset step's status line ("If an account exists...", errors) is a sentence, not a caption: keep it readable,
+   in the form's column, and out of the layout when empty. */
+body.auth-page .auth-login.is-resetting #login-note {
+  width: min(100%, 405px);
+  margin: 14px auto 0;
+  color: var(--color-ink-soft);
+  font-size: var(--text-14);
+  line-height: 1.5;
+  letter-spacing: 0;
+  text-align: center;
+  text-transform: none;
+}
+body.auth-page .auth-login.is-resetting #login-note:empty { display: none; }

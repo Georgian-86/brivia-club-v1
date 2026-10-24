@@ -6,6 +6,8 @@
         const params = new URLSearchParams(window.location.search);
         const hasCode = params.has('code');
         const hasTokens = /(?:^|#|&)access_token=|(?:^|#|&)refresh_token=/.test(window.location.hash);
+        // D-090: a password-reset link stays here to choose a new password (script.js reads the mark); never the app.
+        if (/(?:^|#|&)type=recovery(?:&|$)/.test(window.location.hash)) { document.documentElement.dataset.authRecovery = '1'; return; }
         if (!hasCode && !hasTokens) return;
         const target = new URL('/app.html', window.location.origin);
         target.searchParams.set('oauth', '1');
@@ -20,6 +22,7 @@
         try {
           const params = new URLSearchParams(window.location.search);
           if (params.has('error') || params.has('error_description') || params.has('profile-check')) return;
+          if (document.documentElement.dataset.authRecovery || /(?:^|#|&)error(?:_description)?=/.test(window.location.hash)) return;
           if (!Object.keys(window.localStorage).some((key) => /^sb-.+-auth-token$/.test(key))) return;
           document.documentElement.classList.add('brivia-handing-off');
           window.setTimeout(() => document.documentElement.classList.remove('brivia-handing-off'), 8000);
@@ -80,6 +83,16 @@
               <label>Password<span class="auth-input-shell"><span class="auth-field-icon" aria-hidden="true">♙</span><input type="password" name="password" autocomplete="off" placeholder="Enter your password" required /><span class="auth-field-eye" aria-hidden="true">◉</span></span></label>
               <button class="auth-submit" type="submit">LOG IN <span>→</span></button>
               <button class="auth-forgot" type="button">Forgot password?</button>
+            </form>
+            <form class="auth-form auth-reset-form" id="reset-request-form" novalidate hidden>
+              <label>Email address<span class="auth-input-shell"><span class="auth-field-icon" aria-hidden="true">✉</span><input type="email" name="email" autocomplete="email" placeholder="you@yourdomain.com" required /></span></label>
+              <button class="auth-submit" type="submit">SEND RESET LINK <span>→</span></button>
+              <button class="auth-forgot auth-reset-back" type="button">Back to log in</button>
+            </form>
+            <form class="auth-form auth-reset-form" id="reset-update-form" novalidate hidden>
+              <label>New password<span class="auth-input-shell"><span class="auth-field-icon" aria-hidden="true">♙</span><input type="password" name="password" autocomplete="new-password" minlength="8" placeholder="At least 8 characters" required /></span></label>
+              <label>Confirm new password<span class="auth-input-shell"><span class="auth-field-icon" aria-hidden="true">♙</span><input type="password" name="confirm" autocomplete="new-password" minlength="8" placeholder="Type it again" required /></span></label>
+              <button class="auth-submit" type="submit">SAVE PASSWORD <span>→</span></button>
             </form>
             <p class="auth-note" id="login-note" aria-live="polite"></p>
             <div class="auth-divider"><span>OR CONTINUE WITH</span></div>

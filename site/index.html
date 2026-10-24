@@ -27,6 +27,8 @@
         const hasCode = params.has('code');
         const hasTokens = /(?:^|#|&)access_token=|(?:^|#|&)refresh_token=/.test(window.location.hash);
         if (!hasCode && !hasTokens) return;
+        // D-090: a password-reset link goes to auth.html to choose a new password, not into the app.
+        if (/(?:^|#|&)type=recovery(?:&|$)/.test(window.location.hash)) { window.location.replace('/auth.html' + window.location.hash); return; }
         const target = new URL('/app.html', window.location.origin);
         target.searchParams.set('oauth', '1');
         if (hasCode) target.searchParams.set('code', params.get('code'));
