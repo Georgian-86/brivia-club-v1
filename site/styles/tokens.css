@@ -69,9 +69,14 @@
   --aura-rose: rgba(236, 184, 202, .5);
   --aura-mint: rgba(188, 228, 216, .45);
   --aura-peach: rgba(248, 220, 198, .55);
+  /* A touch of the brand wine in the aura (founder, 2026-10-25, D-093): low behind the left of the page, faint at the top. */
+  --aura-wine: rgba(110, 14, 46, .30);
+  --aura-wine-soft: rgba(128, 30, 62, .20);
   --aura-glass: rgba(255, 252, 248, .62);
   --aura-card: rgba(255, 252, 248, .66);
   --aura-bg:
+    radial-gradient(ellipse 40% 44% at 12% 76%, var(--aura-wine), transparent 70%),
+    radial-gradient(ellipse 34% 30% at 72% 6%, var(--aura-wine-soft), transparent 72%),
     radial-gradient(ellipse 48% 42% at 22% 30%, var(--aura-lilac), transparent 72%),
     radial-gradient(ellipse 42% 40% at 84% 36%, var(--aura-mint), transparent 72%),
     radial-gradient(ellipse 50% 40% at 62% 88%, var(--aura-rose), transparent 72%),

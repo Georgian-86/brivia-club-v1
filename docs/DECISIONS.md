@@ -1896,3 +1896,12 @@ controls (a tester or a seeded test member), never a real member, so no new expo
 - **Open for the founder (not code):** the chat masthead still says "BRIVIA SOCIETY" (product name: Brivia Club);
   chat GIFs are hot-linked from Giphy (each viewer's browser contacts Giphy); the grievance officer in `privacy.html`
   is "the founder", not a named person; custom SMTP for reset and confirmation emails.
+
+## D-093: A touch of burgundy in the aura, everywhere (founder, 2026-10-25)
+
+- The aura (D-087) gains two glows in the brand wine: `--aura-wine` (rgba(110, 14, 46, .30)) low behind the left of
+  the page and `--aura-wine-soft` (rgba(128, 30, 62, .20)) faint near the top. Defined once in `tokens.css`
+  `--aura-bg`, so every page with the aura gets it (login, signup, app, profile, explore, chat list, hand-off);
+  photo and video art is untouched. The founder chose it from a screenshot of the login page.
+- Proof: e2e signup 285, onboarding 269, app-shell 210, explore-cards 74 (their contrast and axe checks included),
+  launch-polish 40, password-reveal 57, landing 47; unit 330; build, style ratchet and asset budget OK.
