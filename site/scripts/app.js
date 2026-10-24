@@ -21,10 +21,12 @@ import '../styles/mobile-app.css';
 import '../styles/skeleton.css';
 import '../styles/aura-theme.css';
 import '../styles/handoff.css';
-import { supabase, rowToProfile, saveProfile, isPresetCoverUrl, onboardingStatus, sendSignal, fetchSignalQuota, isRateLimited, isStorageImageUrl, withoutCredentials, uploadMessageAttachment, removeMessageAttachment, uploadCommunityPostImage, removeCommunityPostImage, ImageProcessingError, PHOTO_ERROR_MESSAGE, PHOTO_FRAMER_ERROR, compressAttachmentFiles, attachmentKind, reportMember, setSensitiveConsent, fetchSensitiveConsentAt, fetchMyInterests, fetchInterestNodes, uploadResume, removeResume, resumeSignedUrl, resumeInfo, clearResumePath } from './supabase.js';
+import { supabase, rowToProfile, saveProfile, isPresetCoverUrl, onboardingStatus, sendSignal, fetchSignalQuota, isRateLimited, isStorageImageUrl, withoutCredentials, uploadMessageAttachment, removeMessageAttachment, uploadCommunityPostImage, removeCommunityPostImage, ImageProcessingError, PHOTO_ERROR_MESSAGE, PHOTO_FRAMER_ERROR, compressAttachmentFiles, attachmentKind, reportMember, setSensitiveConsent, fetchSensitiveConsentAt, fetchMyInterests, fetchInterestNodes, uploadResume, removeResume, resumeSignedUrl, resumeInfo, clearResumePath, searchPlaces, setHomeCity, setHomeLocation } from './supabase.js';
+import { locateOnce, fallbackCopy } from './geo-locate.js';
+import { areaChangeMessage, AREA_HELPER, AREA_NO_MATCH } from './area-change.js';
 import { areaShareBody, parseAreaBody, resumeShareAttachment, resumeMessageFields, RESUME_SHARE_BODY, NO_RESUME_HINT, RESUME_GONE_COPY, RESUME_SHARE_NOTE, AREA_SHARE_NOTE } from './quick-share.js';
 import { validateResume, readResumeHead, resumeMetaLine, formatResumeSize, resumeUploadErrorMessage, isMissingResumeStore, RESUME_FILE_NAME, REMOVE_RESUME_CONFIRM, REMOVE_FAILED_COPY, REPLACED_NOT_SAVED_COPY, OPEN_FAILED_COPY, COMING_SOON_COPY } from './resume-file.js';
-import { POPULAR_INTERESTS, INTEREST_CATALOG, LOOKING_FOR_CATALOG, taxonomyLabels, catalogValues, matchOptions } from './discovery-catalog.js';
+import { POPULAR_INTERESTS, INTEREST_CATALOG, LOOKING_FOR_CATALOG, taxonomyLabels, catalogValues, matchOptions, dropdownOptions } from './discovery-catalog.js';
 import { deleteAccount, clearBriviaKeys, DELETE_BUCKETS, reauthMarker, reauthMarkerMatches } from './account-deletion.js';
 import { openPrivacyAccount } from './privacy-account.js';
 import { isUnderReview, UNDER_REVIEW_COPY } from './onboarding-guard.js';
@@ -62,6 +64,8 @@ import '../styles/menus-fit.css';
 import '../styles/explore-cards.css';
 import '../styles/chat-extras.css';
 import '../styles/profile-cover-picker.css';
+// The profile page's sidebar and hero after the founder's reference (D-092). Loads last.
+import '../styles/profile-layout.css';
 import { navMarkup, markCurrentNav, setChatBadges } from './app-nav.js';
 import { skeletonMarkup, setBusy } from './app-skeletons.js';
 
@@ -977,7 +981,7 @@ const toMemberPerson = (row) => {
   const looking = profile.lookingFor.split(',').map((item) => item.trim()).filter(Boolean);
   const tags = [...skills, ...looking];
   const filters = ['all', ...tags.map((item) => item.toLowerCase()), profile.experience?.toLowerCase() || ''];
-  return { ...profile, coverUrl: normalizeCoverUrl(profile.coverUrl), ...deckFields(safeRow), city: '', state: '', email: '', phone: '', phoneCountryCode: '', phoneNumber: '', age: '', role: profile.experience || 'Brivia member', distance: '', bio: `${profile.name} is open to meaningful connections.`, tags, image: profile.photoUrl || '', filters: filters.filter(Boolean) };
+  return { ...profile, coverUrl: normalizeCoverUrl(profile.coverUrl), ...deckFields(safeRow), city: '', state: '', email: '', phone: '', phoneCountryCode: '', phoneNumber: '', age: '', role: profile.experience || 'Brivia member', distance: '', bio: '', tags, image: profile.photoUrl || '', filters: filters.filter(Boolean) };
 };
 // Adds cards not already known to the registry (a known card gains a band or chips it lacked); returns their ids.
 const mergePeople = (rows) => {
@@ -1271,11 +1275,11 @@ const resolvePublicPerson = (person = {}) => {
   if (person.id && String(memberProfile.id) === String(person.id)) {
     const skills = splitProfileValues(memberProfile.skills);
     const lookingFor = splitProfileValues(memberProfile.lookingFor);
-    return { ...memberProfile, image: memberProfile.photoUrl || memberProfile.image || '', role: memberProfile.experience || 'Brivia member', tags: [...skills, ...lookingFor], bio: memberProfile.bio || `${memberProfile.name || 'This member'} is open to meaningful connections.` };
+    return { ...memberProfile, image: memberProfile.photoUrl || memberProfile.image || '', role: memberProfile.experience || 'Brivia member', tags: [...skills, ...lookingFor], bio: memberProfile.bio || '' };
   }
   const skills = splitProfileValues(person.skills);
   const lookingFor = splitProfileValues(person.lookingFor);
-  return { ...person, image: person.image || person.photoUrl || '', role: person.role || person.experience || 'Brivia member', tags: person.tags?.length ? person.tags : [...skills, ...lookingFor], bio: person.bio || `${person.name || 'This member'} is open to meaningful connections.` };
+  return { ...person, image: person.image || person.photoUrl || '', role: person.role || person.experience || 'Brivia member', tags: person.tags?.length ? person.tags : [...skills, ...lookingFor], bio: person.bio || '' };
 };
 
 const openPublicProfile = (person, options = {}) => {
@@ -1290,24 +1294,62 @@ const openPublicProfile = (person, options = {}) => {
   const coverUrl = normalizeCoverUrl(profile.coverUrl || profile.cover_url || profile.cover_image_url) || defaultCoverUrl;
   const skills = splitProfileValues(profile.skills);
   const lookingFor = splitProfileValues(profile.lookingFor);
-  const tags = profile.tags?.length ? profile.tags : [...skills, ...lookingFor];
+  // Interests and skills, then what they are looking for: each value once (the old dialog listed them twice).
+  const interests = skills.length ? skills : (profile.tags || []).filter((tag) => !lookingFor.includes(tag));
   // Location is the deck's distance band when known, and otherwise no line at all (never a City/State).
   const location = profile.distanceBand || '';
+  const name = profile.name || 'Brivia member';
+  const role = profile.role && profile.role !== 'Brivia member' ? profile.role : '';
+  const firstName = name.split(/\s+/)[0];
+  // A real bio only: the dialog never invents one (D-092).
+  const bio = String(profile.bio || '').trim();
+  const matched = remoteMatchIds.map(String).includes(String(profile.id));
+  const chips = (values, kind) => `<ul class="public-profile-chips public-profile-chips--${kind}">${values.map((value) => `<li>${escapeHtml(value)}</li>`).join('')}</ul>`;
+  const group = (title, values, kind) => (values.length ? `<section class="public-profile-group"><h3>${title}</h3>${chips(values, kind)}</section>` : '');
+  const groups = group('Interests &amp; skills', interests, 'interest') + group('Looking for', lookingFor, 'looking');
+  const opener = document.activeElement;
   const modal = document.createElement('div');
   modal.id = 'public-profile-modal';
   modal.className = 'public-profile-modal';
   modal.setAttribute('role', 'dialog');
   modal.setAttribute('aria-modal', 'true');
   modal.setAttribute('aria-label', `${profile.name || 'Member'} public profile`);
-  modal.innerHTML = `<button class="public-profile-backdrop" type="button" data-public-profile-close aria-label="Close profile"></button><section class="public-profile-dialog"><button class="public-profile-close" type="button" data-public-profile-close aria-label="Close profile">×</button><div class="public-profile-cover"><div class="public-profile-avatar">${avatarImage(image, profile.name) || escapeHtml(initials(profile.name))}</div></div><div class="public-profile-body"><p class="public-profile-kicker">BRIVIA MEMBER / PUBLIC PROFILE</p><h2>${escapeHtml(profile.name || 'Brivia member')}</h2><p class="public-profile-role">${escapeHtml(profile.role || 'Brivia member')}</p>${location ? `<p class="public-profile-location">${escapeHtml(location)}</p>` : ''}<p class="public-profile-bio">${escapeHtml(profile.bio || 'Open to meaningful connections inside the club.')}</p><div class="public-profile-facts"><div><span>LOOKING FOR</span><strong>${escapeHtml(lookingFor.join(', ') || 'Meaningful connections')}</strong></div><div><span>SKILLS &amp; INTERESTS</span><strong>${escapeHtml(skills.join(', ') || tags.join(', ') || 'Open to connect')}</strong></div></div><div class="public-profile-pills">${tags.length ? tags.map((tag) => `<span>${escapeHtml(tag)}</span>`).join('') : '<span>Open to connect</span>'}</div></div></section>`;
+  modal.innerHTML = `<button class="public-profile-backdrop" type="button" data-public-profile-close aria-label="Close profile" tabindex="-1"></button>`
+    + `<section class="public-profile-dialog">`
+    + `<button class="public-profile-close" type="button" data-public-profile-close aria-label="Close profile"><span aria-hidden="true">×</span></button>`
+    + `<div class="public-profile-cover"></div>`
+    + `<header class="public-profile-head"><div class="public-profile-avatar">${avatarImage(image, profile.name) || escapeHtml(initials(profile.name))}</div>`
+    + `<div class="public-profile-id"><h2>${escapeHtml(name)}</h2>`
+    + `<p class="public-profile-meta">${role ? `<span class="public-profile-role">${escapeHtml(role)}</span>` : ''}${location ? `<span class="public-profile-location">${escapeHtml(location)}</span>` : ''}</p></div></header>`
+    + `<div class="public-profile-body">${bio ? `<p class="public-profile-bio">${escapeHtml(bio)}</p>` : ''}`
+    + (groups || `<p class="public-profile-empty">${escapeHtml(firstName)} hasn't added interests yet.</p>`)
+    + `</div>`
+    + (matched ? `<footer class="public-profile-actions"><button class="public-profile-message" type="button" data-public-profile-message>Message ${escapeHtml(firstName)}</button></footer>` : '')
+    + `</section>`;
   document.body.append(modal);
   const safeCover = safeImageUrl(coverUrl) || safeImageUrl(defaultCoverUrl);
   modal.querySelector('.public-profile-cover').style.backgroundImage = `url("${safeCover.replace(/["\\\n]/g, encodeURIComponent)}")`;
-  const close = () => modal.remove();
-  modal.addEventListener('click', (event) => { if (event.target.closest('[data-public-profile-close]')) close(); });
-  modal.addEventListener('keydown', (event) => { if (event.key === 'Escape') close(); });
+  const close = () => { modal.remove(); if (opener?.isConnected) opener.focus?.(); };
+  modal.addEventListener('click', (event) => {
+    if (event.target.closest('[data-public-profile-close]')) { close(); return; }
+    if (event.target.closest('[data-public-profile-message]')) {
+      modal.remove();
+      setView('chat');
+      openChat(findPersonById(profile.id) || profile);
+    }
+  });
+  modal.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape') { close(); return; }
+    if (event.key !== 'Tab') return;
+    // Focus stays inside the dialog while it is open.
+    const stops = [...modal.querySelectorAll('.public-profile-dialog button')];
+    if (!stops.length) return;
+    const first = stops[0]; const last = stops[stops.length - 1];
+    if (event.shiftKey && (document.activeElement === first || document.activeElement === modal)) { event.preventDefault(); last.focus(); }
+    else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus(); }
+  });
   modal.tabIndex = -1;
-  window.setTimeout(() => modal.focus(), 0);
+  window.setTimeout(() => modal.querySelector('.public-profile-close')?.focus(), 0);
 };
 
 // Notes typed into a pitch whose send failed, kept in memory (never storage) until the member tries again.
@@ -1531,13 +1573,25 @@ const renderSuggestionList = (container, values, query, kind, selected = new Set
     ? matches.map((value) => `<button class="discovery-filter-suggestion" type="button" role="option" data-filter-kind="${kind}" data-filter-value="${escapeHtml(value)}">${escapeHtml(value)}</button>`).join('')
     : `<p class="discovery-filter-empty">${kind === 'name' ? 'No member by that name in your deck yet.' : 'No match. Try a shorter word.'}</p>`;
 };
-// The quick-pick row above the skills box: one tap adds the filter; a picked one shows as selected.
-const renderPopularFilters = (container, selected) => {
+// The Skills & interests / Looking for dropdowns (D-092; they replace the quick-pick capsules): open while the member
+// is in the field or its list, popular picks on top when nothing is typed; picking keeps the list open for another.
+let openFilterDropdown = null; // 'skills' | 'looking-for' | null
+const FILTER_INPUTS = { skills: '#filter-skills-input', 'looking-for': '#filter-looking-for-input' };
+const renderFilterDropdown = (container, values, query, kind, selected, popular = []) => {
   if (!container) return;
-  container.innerHTML = POPULAR_INTERESTS.map((value) => {
-    const on = selected.has(normalizedValue(value));
-    return `<button class="discovery-filter-pop${on ? ' is-on' : ''}" type="button" aria-pressed="${on}" ${on ? `data-remove-filter="skills"` : `data-filter-kind="skills"`} data-filter-value="${escapeHtml(value)}">${escapeHtml(value)}</button>`;
-  }).join('');
+  const input = document.querySelector(FILTER_INPUTS[kind]);
+  // Only inside the open drawer: a closed drawer never builds (or keeps) a list.
+  if (document.querySelector('#discovery-filter-drawer')?.hidden) openFilterDropdown = null;
+  const open = openFilterDropdown === kind;
+  input?.setAttribute('aria-expanded', String(open));
+  container.closest('.discovery-filter-combo')?.classList.toggle('is-open', open);
+  if (!open) { container.innerHTML = ''; container.classList.remove('is-open'); return; }
+  const lists = dropdownOptions(values, query, selected, popular);
+  const option = (value) => `<button class="discovery-filter-suggestion" type="button" role="option" aria-selected="false" tabindex="-1" data-filter-kind="${kind}" data-filter-value="${escapeHtml(value)}">${escapeHtml(value)}</button>`;
+  const group = (label, items) => (items.length ? `<div class="discovery-filter-option-group" role="group" aria-label="${label}"><p class="discovery-filter-option-label" aria-hidden="true">${label}</p>${items.map(option).join('')}</div>` : '');
+  const body = lists.popular.length ? group('Popular', lists.popular) + group('All', lists.rest) : lists.rest.map(option).join('');
+  container.classList.add('is-open');
+  container.innerHTML = body || '<p class="discovery-filter-empty">No match. Try a shorter word.</p>';
 };
 const renderSelectedFilters = (container, values, selected, kind) => {
   if (!container) return;
@@ -1550,15 +1604,14 @@ const renderFilterOptions = () => {
   const lookingInput = document.querySelector('#filter-looking-for-input');
   if (!search || !skillsInput || !lookingInput) return;
   const { names, skills, lookingFor } = filterCatalog();
-  renderPopularFilters(document.querySelector('#filter-popular'), exploreFilters.skills);
   if (document.activeElement !== search && search.value !== exploreFilters.query) search.value = exploreFilters.query;
   if (document.activeElement !== skillsInput && skillsInput.value !== filterDrafts.skills) skillsInput.value = filterDrafts.skills;
   if (document.activeElement !== lookingInput && lookingInput.value !== filterDrafts.lookingFor) lookingInput.value = filterDrafts.lookingFor;
   renderSuggestionList(document.querySelector('#filter-name-suggestions'), names, exploreFilters.query, 'name', new Set(), false);
   renderSelectedFilters(document.querySelector('#filter-skills-selected'), skills, exploreFilters.skills, 'skills');
-  renderSuggestionList(document.querySelector('#filter-skills-suggestions'), skills, filterDrafts.skills, 'skills', exploreFilters.skills, document.activeElement === skillsInput);
+  renderFilterDropdown(document.querySelector('#filter-skills-suggestions'), skills, filterDrafts.skills, 'skills', exploreFilters.skills, POPULAR_INTERESTS);
   renderSelectedFilters(document.querySelector('#filter-looking-for-selected'), lookingFor, exploreFilters.lookingFor, 'looking-for');
-  renderSuggestionList(document.querySelector('#filter-looking-for-suggestions'), lookingFor, filterDrafts.lookingFor, 'looking-for', exploreFilters.lookingFor, document.activeElement === lookingInput);
+  renderFilterDropdown(document.querySelector('#filter-looking-for-suggestions'), lookingFor, filterDrafts.lookingFor, 'looking-for', exploreFilters.lookingFor);
 };
 const updateDiscoveryFilterResult = (count) => {
   const result = document.querySelector('#discovery-filter-result');
@@ -1569,7 +1622,7 @@ const updateDiscoveryFilterResult = (count) => {
   if (resetButton) {
     resetButton.textContent = 'RESET FILTERS';
     resetButton.disabled = !activeCount;
-    resetButton.setAttribute('aria-label', activeCount ? 'Reset all filters' : 'No filters selected');
+    resetButton.removeAttribute('aria-label'); // the visible words are its name (WCAG 2.5.3)
   }
 };
 const renderExplore = () => {
@@ -2182,6 +2235,85 @@ const profileCoverPicker = (current) => `<fieldset class="profile-edit-wide prof
   return `<label class="profile-cover-option"><input type="radio" name="coverChoice" value="${escapeHtml(value)}"${checked ? ' checked' : ''} /><span class="profile-cover-thumb"><img src="${escapeHtml(normalizeCoverUrl(value))}" alt="" loading="lazy" decoding="async" width="160" height="90" /><b class="profile-cover-check" aria-hidden="true">${COVER_CHECK_ICON}</b></span><span class="profile-cover-title">${escapeHtml(title)}</span></label>`;
 }).join('')}</div></fieldset>`;
 
+// Change your area (D-092): a picked city or the browser's location, saved at once through the same server calls as
+// signup (the server snaps a location to a ~2 km cell and allows 3 changes a day). The deck then starts again from
+// the new area.
+const wireAreaChanger = (modal) => {
+  const box = modal.querySelector('[data-profile-area]');
+  if (!box) return;
+  const current = box.querySelector('[data-area-current]');
+  const status = box.querySelector('[data-area-status]');
+  const search = box.querySelector('[data-area-search]');
+  const results = box.querySelector('#profile-area-results');
+  const geo = box.querySelector('[data-area-geo]');
+  let busy = false;
+  let seq = 0;
+  let timer;
+  const showResults = (rows, message = '') => {
+    results.innerHTML = rows.length
+      ? rows.map((row) => `<li><button type="button" role="option" aria-selected="false" data-place-id="${escapeHtml(row.id)}" data-place-name="${escapeHtml(row.name)}">${escapeHtml(row.name)}${row.region ? `<small>${escapeHtml(row.region)}</small>` : ''}</button></li>`).join('')
+      : (message ? `<li class="profile-area-empty">${escapeHtml(message)}</li>` : '');
+    results.hidden = !results.innerHTML;
+    search.setAttribute('aria-expanded', String(!results.hidden));
+  };
+  const apply = async (call) => {
+    if (busy) return;
+    busy = true;
+    box.setAttribute('aria-busy', 'true');
+    status.textContent = 'Saving your area...';
+    let answer;
+    try { answer = await call(); } catch (error) { answer = { error }; }
+    busy = false;
+    box.removeAttribute('aria-busy');
+    status.textContent = areaChangeMessage(answer || {});
+    if (answer?.error || typeof answer?.data !== 'string') return;
+    memberPlaceLabel = answer.data.trim();
+    current.textContent = memberPlaceLabel;
+    const heroLocation = document.querySelector('#profile-location');
+    if (heroLocation) heroLocation.textContent = memberPlaceLabel;
+    search.value = '';
+    showResults([]);
+    // The deck is location-first: start it again from the new area.
+    deck.ids = [];
+    deck.end = null;
+    refillDeck();
+  };
+  search.addEventListener('input', () => {
+    window.clearTimeout(timer);
+    const term = search.value.trim();
+    if (term.length < 2) { showResults([]); return; }
+    const ticket = ++seq;
+    timer = window.setTimeout(async () => {
+      const { data, error } = await searchPlaces(term);
+      if (ticket !== seq) return;
+      if (error) { showResults([], "Cities couldn't be loaded. Please try again."); return; }
+      showResults(data || [], AREA_NO_MATCH);
+    }, 200);
+  });
+  search.addEventListener('keydown', (event) => {
+    if (event.key === 'ArrowDown') { event.preventDefault(); results.querySelector('button')?.focus(); }
+    else if (event.key === 'Escape' && !results.hidden) { event.preventDefault(); event.stopPropagation(); showResults([]); }
+  });
+  results.addEventListener('keydown', (event) => {
+    const buttons = [...results.querySelectorAll('button')];
+    const at = buttons.indexOf(document.activeElement);
+    if (event.key === 'ArrowDown') { event.preventDefault(); buttons[Math.min(at + 1, buttons.length - 1)]?.focus(); }
+    else if (event.key === 'ArrowUp') { event.preventDefault(); if (at <= 0) search.focus(); else buttons[at - 1].focus(); }
+    else if (event.key === 'Escape') { event.preventDefault(); event.stopPropagation(); showResults([]); search.focus(); }
+  });
+  results.addEventListener('click', (event) => {
+    const option = event.target.closest('[data-place-id]');
+    if (option) apply(() => setHomeCity(option.dataset.placeId));
+  });
+  geo.addEventListener('click', async () => {
+    if (busy) return;
+    status.textContent = 'Finding your location...';
+    const found = await locateOnce(navigator.geolocation, { secure: window.isSecureContext });
+    if (!found.ok) { status.textContent = fallbackCopy(found.reason); return; }
+    apply(() => setHomeLocation(found.lat, found.lng));
+  });
+};
+
 const openProfileEditor = () => {
   if (!memberProfile.id || document.querySelector('#profile-edit-modal')) return;
   const profile = memberProfile;
@@ -2201,7 +2333,7 @@ const openProfileEditor = () => {
         <label><span>EMAIL</span><input value="${escapeHtml(profile.email || '')}" readonly /></label>
         <label><span>PHONE</span><input name="phone" value="${escapeHtml(profile.phone || '')}" /></label>
         <label><span>EXPERIENCE / ROLE</span><input name="experience" value="${escapeHtml(profile.experience || '')}" /></label>
-        <div class="profile-edit-wide profile-edit-readonly" data-profile-area><span>YOUR AREA</span><p>${escapeHtml(memberPlaceLabel || 'Not set yet')}</p><small class="profile-edit-helper">Change your area: coming soon. Other members only ever see a rough distance, never your area's name, unless you share it in a chat.</small></div>
+        <div class="profile-edit-wide profile-edit-area" data-profile-area><span id="profile-area-label">YOUR AREA</span><p class="profile-edit-area-current" data-area-current>${escapeHtml(memberPlaceLabel || 'Not set yet')}</p><div class="profile-edit-area-tools"><button type="button" class="profile-area-geo" data-area-geo>Use my location</button><div class="profile-area-search"><input type="text" role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="profile-area-results" aria-labelledby="profile-area-label" placeholder="Or search your city" autocomplete="off" spellcheck="false" data-area-search /><ul class="profile-area-results" id="profile-area-results" role="listbox" aria-label="Cities" hidden></ul></div></div><small class="profile-edit-helper" data-area-status role="status">${escapeHtml(AREA_HELPER)}</small></div>
         <div class="profile-edit-wide profile-edit-readonly"><span>SKILLS / INTERESTS</span><p>${escapeHtml(profile.skills || 'Pick interests in your profile setup')}</p><small class="profile-edit-helper">These come from your interests and passion points. Private interests are never shown.</small></div>
         <label class="profile-edit-wide"><span>LOOKING FOR</span><input name="lookingFor" list="profile-edit-looking-options" value="${escapeHtml(profile.lookingFor || '')}" placeholder="Search or type what you are looking for" /><datalist id="profile-edit-looking-options">${profileEditDatalist('lookingFor')}</datalist><small class="profile-edit-helper">Choose from suggestions or type your own.</small></label>
         <label><span>PROFILE PHOTO</span><input name="photoFile" type="file" accept="image/*" aria-describedby="profile-photo-error profile-photo-status" /><small class="profile-edit-helper" id="profile-photo-status" role="status"></small><small class="media-inline-error" id="profile-photo-error" role="alert" hidden></small></label>
@@ -2214,6 +2346,7 @@ const openProfileEditor = () => {
   document.body.append(modal);
   const close = () => modal.remove();
   modal.querySelectorAll('[data-profile-edit-close]').forEach((button) => button.addEventListener('click', close));
+  wireAreaChanger(modal);
   modal.addEventListener('click', (event) => { if (event.target === modal) close(); });
   // "Frame your photo" (D-080): a picked photo opens the crop dialog first; only the framed square is ever uploaded.
   // Cancel clears the pick, so nothing is uploaded. A file that cannot be decoded shows the inline photo error.
@@ -3163,6 +3296,7 @@ document.querySelectorAll('[data-close-overlay]').forEach((button) => button.add
 const discoveryFilterDrawer = document.querySelector('#discovery-filter-drawer');
 const discoveryFilterButton = document.querySelector('#open-discovery-filters');
 const closeDiscoveryFilters = () => {
+  openFilterDropdown = null;
   discoveryFilterDrawer?.setAttribute('hidden', '');
   discoveryFilterButton?.setAttribute('aria-expanded', 'false');
   document.body.classList.remove('discovery-filters-open');
@@ -3183,6 +3317,8 @@ discoveryFilterDrawer?.addEventListener('click', (event) => {
     const targetSet = removeButton.dataset.removeFilter === 'skills' ? exploreFilters.skills : exploreFilters.lookingFor;
     targetSet.delete(normalizedValue(removeButton.dataset.filterValue));
     renderExplore();
+    // The chip is gone: keyboard focus goes to its field, not to the page.
+    document.querySelector(FILTER_INPUTS[removeButton.dataset.removeFilter])?.focus({ preventScroll: true });
     return;
   }
   const suggestion = event.target.closest('[data-filter-kind]');
@@ -3197,8 +3333,11 @@ discoveryFilterDrawer?.addEventListener('click', (event) => {
     const targetSet = kind === 'skills' ? exploreFilters.skills : exploreFilters.lookingFor;
     targetSet.add(normalizedValue(value));
     filterDrafts[kind === 'skills' ? 'skills' : 'lookingFor'] = '';
-    const input = document.querySelector(kind === 'skills' ? '#filter-skills-input' : '#filter-looking-for-input');
+    const input = document.querySelector(FILTER_INPUTS[kind]);
     if (input) input.value = '';
+    renderExplore();
+    input?.focus(); // the list stays open for the next pick
+    return;
   }
   renderExplore();
 });
@@ -3209,8 +3348,44 @@ const filterInputBindings = [
 ];
 filterInputBindings.forEach(([selector, update]) => {
   const input = document.querySelector(selector);
-  input?.addEventListener('input', (event) => { update(event.target.value); renderExplore(); });
-  input?.addEventListener('focus', () => renderExplore());
+  const kind = Object.keys(FILTER_INPUTS).find((key) => FILTER_INPUTS[key] === selector) || null;
+  input?.addEventListener('input', (event) => { update(event.target.value); if (kind) openFilterDropdown = kind; renderExplore(); });
+  input?.addEventListener('focus', () => { if (kind) openFilterDropdown = kind; renderExplore(); });
+  if (kind) input?.addEventListener('click', () => { if (openFilterDropdown !== kind) { openFilterDropdown = kind; renderExplore(); } });
+});
+// Keyboard: Down enters the list, Up / Down / Home / End move in it, Enter picks the first match while typing,
+// Escape closes the list (a second Escape closes the drawer, as before).
+const filterOptions = (kind) => [...document.querySelectorAll(`[data-filter-combo="${kind}"] .discovery-filter-suggestion`)];
+const closeFilterDropdown = (kind, refocus = true) => {
+  openFilterDropdown = null;
+  renderExplore();
+  if (refocus) document.querySelector(FILTER_INPUTS[kind])?.focus({ preventScroll: true });
+};
+document.querySelectorAll('[data-filter-combo]').forEach((combo) => {
+  const kind = combo.dataset.filterCombo;
+  combo.addEventListener('keydown', (event) => {
+    const options = filterOptions(kind);
+    const at = options.indexOf(document.activeElement);
+    const inInput = event.target.matches('input');
+    if (event.key === 'Escape' && openFilterDropdown === kind) { event.preventDefault(); event.stopPropagation(); closeFilterDropdown(kind); return; }
+    if (!options.length) return;
+    if (event.key === 'ArrowDown') { event.preventDefault(); if (openFilterDropdown !== kind) { openFilterDropdown = kind; renderExplore(); filterOptions(kind)[0]?.focus(); return; } options[inInput ? 0 : Math.min(at + 1, options.length - 1)].focus(); }
+    else if (event.key === 'ArrowUp' && !inInput) { event.preventDefault(); if (at <= 0) event.target.closest('[data-filter-combo]').querySelector('input').focus(); else options[at - 1].focus(); }
+    else if (event.key === 'Home' && !inInput) { event.preventDefault(); options[0].focus(); }
+    else if (event.key === 'End' && !inInput) { event.preventDefault(); options[options.length - 1].focus(); }
+    else if (event.key === 'Enter' && inInput && event.target.value.trim()) { event.preventDefault(); options[0].click(); }
+  });
+});
+// A press anywhere outside the open field and its list closes the list.
+document.addEventListener('pointerdown', (event) => {
+  if (!openFilterDropdown || event.target.closest(`[data-filter-combo="${openFilterDropdown}"]`)) return;
+  closeFilterDropdown(openFilterDropdown, false);
+}, true);
+// Leaving the field and its list with Tab closes it too.
+document.addEventListener('focusin', (event) => {
+  if (!openFilterDropdown || event.target.closest(`[data-filter-combo="${openFilterDropdown}"]`)) return;
+  const kind = event.target.closest('[data-filter-combo]')?.dataset.filterCombo || null;
+  if (kind !== openFilterDropdown) { openFilterDropdown = kind; renderExplore(); }
 });
 const clearDiscoveryFilters = () => {
   exploreFilters.query = '';
@@ -3599,7 +3774,13 @@ const ensureChatComposer = () => {
     queueChatGif(chatGifCatalog[Number(button.dataset.chatGif)]);
     closeMenus();
   }));
-  gifPicker?.querySelectorAll('.chat-gif-grid img').forEach((image) => image.addEventListener('error', () => image.closest('[data-chat-gif]')?.remove(), { once: true }));
+  // A GIF that cannot load leaves the grid; when none can (Giphy blocked or offline) the picker says so instead of
+  // opening empty (D-092).
+  gifPicker?.querySelectorAll('.chat-gif-grid img').forEach((image) => image.addEventListener('error', () => {
+    const grid = image.closest('.chat-gif-grid');
+    image.closest('[data-chat-gif]')?.remove();
+    if (grid && !grid.querySelector('[data-chat-gif]')) grid.outerHTML = '<p class="chat-gif-empty">GIFs couldn\'t load right now. Try again later.</p>';
+  }, { once: true }));
   const closeMenus = () => {
     closeShareMenu();
     emojiPicker?.setAttribute('hidden', '');

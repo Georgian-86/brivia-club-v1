@@ -1,6 +1,7 @@
 // Landing sound and smooth scroll (D-063), against `vite preview` of a fresh build:
 // * scrolling alone never starts the music (no browser allows it), the first real gesture does, on desktop (click)
 //   and on a phone (a tap: touchend / pointerup, the old one-shot touchstart never could);
+// * the music is the hero video's own soundtrack (D-092), looped with a crossfade, never layered;
 // * the sound button turns it off and on, the choice survives a reload, and the music stops itself after 5 minutes;
 // * Lenis smooth scroll runs on a desktop pointer, not on a phone, not with reduced motion; the menu stops it.
 //   VITE_SUPABASE_URL=https://stub.supabase.local VITE_SUPABASE_ANON_KEY=stub npm run build
@@ -38,6 +39,15 @@ const INIT = () => {
     constructor(...args) { super(...args); window.__ctx = this; this.__suspend(); }
     __suspend() { Real.prototype.suspend.call(this).catch(() => {}); }
     resume() { return window.__gesture ? Real.prototype.resume.call(this) : Promise.resolve(); }
+  };
+  // D-092: count the soundtrack passes that are queued and still live (started, not yet ended or stopped early).
+  window.__passes = { started: 0, live: 0, duration: 0 };
+  const realSource = Real.prototype.createBufferSource;
+  Real.prototype.createBufferSource = function createBufferSource() {
+    const node = realSource.call(this);
+    const realStart = node.start.bind(node);
+    node.start = (...a) => { window.__passes.started += 1; window.__passes.live += 1; window.__passes.duration = node.buffer?.duration || 0; node.addEventListener('ended', () => { window.__passes.live -= 1; }); return realStart(...a); };
+    return node;
   };
 };
 const sound = (page) => page.evaluate(() => {
@@ -79,6 +89,12 @@ try {
     const started = await waitFor(page, () => document.querySelector('[data-landing-sound]')?.getAttribute('aria-pressed') === 'true');
     s = await sound(page);
     await check(`1440: the first click starts the music at once (pressed ${s.pressed}, context ${s.ctx})`, () => { assert.equal(started, true); assert.equal(s.ctx, 'running'); });
+    const playing = await waitFor(page, () => window.__passes?.started > 0);
+    const passes = await page.evaluate(() => window.__passes);
+    await check(`1440: it plays the hero video's own soundtrack (${passes.duration.toFixed(1)} s), not a synthesized chord`, () => {
+      assert.equal(playing, true);
+      assert.ok(passes.duration > 17 && passes.duration < 18.5, String(passes.duration));
+    });
     await page.locator('[data-landing-sound]').click();
     await page.waitForTimeout(200);
     s = await sound(page);
@@ -93,6 +109,10 @@ try {
     const back = await waitFor(page, () => document.querySelector('[data-landing-sound]')?.getAttribute('aria-pressed') === 'true');
     s = await sound(page);
     await check('1440: the button turns it back on', () => { assert.equal(back, true); assert.equal(s.stored, 'on'); });
+    await page.locator('[data-landing-sound]').click(); await page.waitForTimeout(150);
+    await page.locator('[data-landing-sound]').click(); await page.waitForTimeout(1200);
+    const layered = await page.evaluate(() => window.__passes.live);
+    await check(`1440: off and on again never layers a second copy (live passes ${layered})`, () => assert.ok(layered <= 1, String(layered)));
     await page.evaluate(() => { window.__timeShift = 5 * 60 * 1000 + 1000; });
     const ended = await waitFor(page, () => document.querySelector('[data-landing-sound]')?.getAttribute('aria-pressed') === 'false');
     await check('1440: the music stops itself after 5 minutes', () => assert.equal(ended, true));

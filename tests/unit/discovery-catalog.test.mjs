@@ -53,3 +53,21 @@ test('matchOptions: empty query lists everything not selected; a query puts pref
   assert.deepEqual(matchOptions(values, 'mus', new Set(), 1), ['Music']);
   assert.deepEqual(matchOptions(values, 'zzz'), []);
 });
+
+// D-092: the Skills & interests dropdown replaces the quick-pick capsules.
+test('dropdownOptions: an empty query lists the popular picks first, then the rest, never a selected one twice', async () => {
+  const { dropdownOptions } = await import('../../site/scripts/discovery-catalog.js');
+  const values = ['Badminton', 'Chess', 'Cooking', 'Guitar', 'Pottery'];
+  const r = dropdownOptions(values, '', new Set(['guitar']), ['Chess', 'Guitar', 'Kabaddi']);
+  assert.deepEqual(r.popular, ['Chess']);
+  assert.deepEqual(r.rest, ['Badminton', 'Cooking', 'Pottery']);
+});
+
+test('dropdownOptions: a typed query is one ranked list (starts-with first), capped at 12', async () => {
+  const { dropdownOptions } = await import('../../site/scripts/discovery-catalog.js');
+  const r = dropdownOptions(['Chess', 'Bach', 'Cha cha', 'Coaching'], 'ch', new Set(), ['Chess']);
+  assert.deepEqual(r.popular, []);
+  assert.deepEqual(r.rest, ['Chess', 'Cha cha', 'Bach', 'Coaching']);
+  const many = Array.from({ length: 30 }, (_, i) => `Item ${i}`);
+  assert.equal(dropdownOptions(many, 'item', new Set(), []).rest.length, 12);
+});

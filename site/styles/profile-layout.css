@@ -1,0 +1,327 @@
+/* The profile page after the founder's reference (D-092): a quiet brand sidebar on the left (desktop only), and a hero
+   with the name, area and a short line on the cover's left and the photo in a tall framed card on the right, with
+   EDIT PROFILE (and the ⚙ account menu) on the frame. Everything under the hero is unchanged (profile-view.css).
+   Loads last; tokens only. */
+
+body.app-body[data-app-view] .app-view.profile-view[data-view="profile"] {
+  --frame-w: 216px;
+  --frame-h: 268px;
+  --frame-right: 40px;
+  --hero-h: 380px;
+}
+
+/* ---------- The sidebar (from 1100 px) ---------- */
+body.app-body[data-app-view] .app-view.profile-view[data-view="profile"] .profile-sidebar { display: none; }
+
+@media (min-width: 1100px) {
+  body.app-body[data-app-view] .app-view.profile-view[data-view="profile"]:not([hidden]) { max-width: calc(1140px + 2 * var(--space-5)); }
+  body.app-body[data-app-view] .app-view.profile-view[data-view="profile"] .profile-shell {
+    display: grid;
+    grid-template-columns: 236px minmax(0, 1fr);
+    align-items: start;
+    gap: var(--space-5);
+    max-width: 1220px;
+    margin: 0 auto;
+  }
+  body.app-body[data-app-view] .app-view.profile-view[data-view="profile"] .profile-sidebar {
+    position: sticky;
+    top: calc(var(--app-header-h, 76px) + var(--space-4));
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--space-5);
+    padding: var(--space-6) var(--space-5);
+    border: 1px solid var(--color-card-edge);
+    border-radius: var(--radius-l);
+    background: color-mix(in srgb, var(--color-cream) 88%, transparent);
+    color: var(--color-ink);
+  }
+  body.app-body[data-app-view] .app-view.profile-view[data-view="profile"] .profile-board { min-width: 0; }
+}
+
+body.app-body[data-app-view] .app-view.profile-view[data-view="profile"] .profile-sidebar-mark {
+  margin: 0;
+  color: var(--color-wine-deep);
+  font-family: var(--font-heading);
+  font-size: var(--text-24);
+  font-weight: 500;
+  line-height: 1.1;
+}
+body.app-body[data-app-view] .app-view.profile-view[data-view="profile"] .profile-sidebar-mark em { font-size: var(--text-20); font-style: italic; font-weight: 400; }
+body.app-body[data-app-view] .app-view.profile-view[data-view="profile"] .profile-sidebar-rule {
+  display: block;
+  width: 32px;
+  height: 1px;
+  background: color-mix(in srgb, var(--color-wine) 55%, transparent);
+}
+body.app-body[data-app-view] .app-view.profile-view[data-view="profile"] .profile-sidebar-words {
+  margin: 0;
+  color: var(--color-ink-soft);
+  font-family: var(--font-heading);
+  font-size: var(--text-12);
+  letter-spacing: .26em;
+  line-height: 1.75;
+  text-transform: uppercase;
+}
+body.app-body[data-app-view] .app-view.profile-view[data-view="profile"] .profile-sidebar-photo {
+  width: 100%;
+  aspect-ratio: 3 / 4;
+  border-radius: var(--radius-m);
+  background: var(--color-card-paper) url("../media/Images/after login bg.webp") 88% center / cover no-repeat;
+  box-shadow: 0 18px 34px -24px color-mix(in srgb, var(--color-oxblood-deep) 70%, transparent);
+}
+
+/* ---------- The hero ---------- */
+body.app-body[data-app-view] .app-view.profile-view[data-view="profile"] .profile-board-content .profile-hero {
+  position: relative;
+  display: flex;
+  align-items: center;
+  min-height: var(--hero-h);
+  height: auto;
+  padding: var(--space-6) calc(var(--frame-w) + var(--frame-right) + var(--space-6)) var(--space-6) var(--space-7);
+  overflow: hidden;
+  border: 0;
+  border-radius: var(--radius-l);
+  background: var(--color-oxblood-deep);
+  isolation: isolate;
+}
+body.app-body[data-app-view] .app-view.profile-view[data-view="profile"] .profile-board-content .profile-hero .profile-cover-image {
+  position: absolute;
+  inset: 0;
+  z-index: -2;
+  width: 100%;
+  height: 100%;
+  border-radius: 0;
+  background-position: center;
+  background-size: cover;
+  opacity: 1;
+  filter: none;
+  mix-blend-mode: normal;
+}
+body.app-body[data-app-view] .app-view.profile-view[data-view="profile"] .profile-board-content .profile-hero .profile-cover-image::before,
+body.app-body[data-app-view] .app-view.profile-view[data-view="profile"] .profile-board-content .profile-hero .profile-cover-image::after { display: none; }
+/* The copy reads on any cover: a soft dark wash from the left. */
+body.app-body[data-app-view] .app-view.profile-view[data-view="profile"] .profile-board-content .profile-hero::before {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  width: auto;
+  height: auto;
+  margin: 0;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  opacity: 1;
+  transform: none;
+  background: linear-gradient(90deg, color-mix(in srgb, var(--color-oxblood-deep) 86%, transparent) 0%, color-mix(in srgb, var(--color-oxblood-deep) 55%, transparent) 55%, color-mix(in srgb, var(--color-oxblood-deep) 25%, transparent) 100%);
+  content: '';
+}
+body.app-body[data-app-view] .app-view.profile-view[data-view="profile"] .profile-board-content .profile-hero::after { display: none; }
+body.app-body[data-app-view] .app-view.profile-view[data-view="profile"] .profile-board-content .profile-hero-copy {
+  position: relative;
+  inset: auto;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-2);
+  max-width: 100%;
+  min-width: 0;
+  margin: 0;
+  padding: 0 !important; /* mobile-app.css and mobile-final-fixes.css pad the old overlay copy with !important */
+  color: var(--color-cream);
+  transform: none;
+  align-self: center;
+}
+body.app-body[data-app-view] .app-view.profile-view[data-view="profile"] .profile-board-content .profile-hero-copy .app-eyebrow {
+  display: block;
+  visibility: visible;
+  margin: 0;
+  color: color-mix(in srgb, var(--color-cream) 82%, transparent);
+  font-size: var(--text-12);
+  letter-spacing: .26em;
+}
+body.app-body[data-app-view] .app-view.profile-view[data-view="profile"] .profile-board-content .profile-hero h1 {
+  margin: 0;
+  color: var(--color-cream);
+  font-family: var(--font-heading);
+  font-size: clamp(var(--text-44), 6vw, 76px);
+  font-weight: 400;
+  letter-spacing: -.02em;
+}
+body.app-body[data-app-view] .app-view.profile-view[data-view="profile"] .profile-board-content .profile-hero #profile-location {
+  margin: 0;
+  color: var(--color-cream);
+  font-family: var(--font-heading);
+  font-size: var(--text-20);
+  opacity: .92;
+}
+body.app-body[data-app-view] .app-view.profile-view[data-view="profile"] .profile-hero-rule {
+  display: block;
+  width: 40px;
+  height: 1px;
+  margin: var(--space-3) 0 var(--space-2);
+  background: color-mix(in srgb, var(--color-cream) 70%, transparent);
+}
+body.app-body[data-app-view] .app-view.profile-view[data-view="profile"] .profile-board-content .profile-hero-copy > p:not(.app-eyebrow) { margin: 0; overflow: visible; white-space: normal; }
+body.app-body[data-app-view] .app-view.profile-view[data-view="profile"] .profile-hero-quote {
+  margin: 0;
+  color: color-mix(in srgb, var(--color-cream) 92%, transparent);
+  font-family: var(--font-heading);
+  font-size: var(--text-20);
+  font-style: italic;
+  line-height: 1.35;
+}
+
+/* The framed photo card on the right. */
+body.app-body[data-app-view] .app-view.profile-view[data-view="profile"] .profile-photo-frame {
+  position: absolute;
+  top: 50%;
+  right: var(--frame-right);
+  width: var(--frame-w);
+  height: var(--frame-h);
+  padding: 8px;
+  border-radius: var(--radius-l);
+  background: var(--color-cream);
+  box-shadow: 0 24px 48px -20px color-mix(in srgb, var(--color-oxblood-deep) 80%, transparent);
+  transform: translateY(-50%);
+}
+body.app-body[data-app-view] .app-view.profile-view[data-view="profile"] .profile-board-content .profile-photo-frame .profile-avatar {
+  position: static;
+  inset: auto;
+  display: grid;
+  place-items: center;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  overflow: hidden;
+  border: 0;
+  border-radius: calc(var(--radius-l) - 8px);
+  background: linear-gradient(160deg, var(--color-wine-soft), var(--color-wine-deep));
+  box-shadow: none;
+  color: var(--color-cream);
+  font-family: var(--font-heading);
+  font-size: var(--text-44);
+  transform: none;
+}
+body.app-body[data-app-view] .app-view.profile-view[data-view="profile"] .profile-board-content .profile-photo-frame .profile-avatar img {
+  width: 100%;
+  height: 100%;
+  border-radius: 0;
+  object-fit: cover;
+}
+
+/* ⚙ and EDIT PROFILE sit on the frame's lower edge, inside the photo. */
+body.app-body[data-app-view] .app-view.profile-view[data-view="profile"] .profile-board-content .profile-hero .profile-hero-actions {
+  position: absolute;
+  top: auto;
+  right: calc(var(--frame-right) + 16px);
+  bottom: calc((var(--hero-h) - var(--frame-h)) / 2 + 16px);
+  left: auto;
+  z-index: 3;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  width: calc(var(--frame-w) - 32px);
+}
+body.app-body[data-app-view] .app-view.profile-view[data-view="profile"] .profile-board-content .profile-hero .profile-hero-actions .profile-photo-editor {
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 44px;
+  margin: 0;
+  padding: 0 var(--space-3);
+  border: 0;
+  border-radius: var(--radius-m);
+  background: var(--color-wine-deep);
+  color: var(--color-cream);
+  font-family: var(--font-heading);
+  font-size: 15px;
+  font-weight: 500;
+  letter-spacing: .02em;
+  text-transform: none;
+  white-space: nowrap;
+  box-shadow: 0 8px 18px -10px color-mix(in srgb, var(--color-oxblood-deep) 80%, transparent);
+}
+body.app-body[data-app-view] .app-view.profile-view[data-view="profile"] .profile-board-content .profile-hero .profile-hero-actions .profile-photo-editor span { font: inherit; letter-spacing: inherit; }
+body.app-body[data-app-view] .app-view.profile-view[data-view="profile"] .profile-board-content .profile-hero .profile-hero-actions .profile-photo-editor:hover { background: var(--color-wine); }
+body.app-body[data-app-view] .app-view.profile-view[data-view="profile"] .profile-board-content .profile-hero .profile-hero-actions .profile-settings-button {
+  flex: 0 0 44px !important; /* profile-theme.css sizes the old ⚙ with !important */
+  width: 44px !important;
+  height: 44px !important;
+  border: 1px solid color-mix(in srgb, var(--color-cream) 70%, transparent);
+  border-radius: var(--radius-m);
+  background: color-mix(in srgb, var(--color-oxblood-deep) 62%, transparent);
+  color: var(--color-cream);
+}
+body.app-body[data-app-view] .app-view.profile-view[data-view="profile"] .profile-board-content .profile-hero .profile-hero-actions :is(.profile-photo-editor, .profile-settings-button):focus-visible {
+  outline: 2px solid var(--color-cream);
+  outline-offset: 2px;
+}
+
+/* ---------- Tablets and phones: the same parts, stacked ---------- */
+@media (max-width: 780px) {
+  body.app-body[data-app-view] .app-view.profile-view[data-view="profile"] {
+    --frame-w: 132px;
+    --frame-h: 164px;
+    --frame-right: 18px;
+  }
+  body.app-body[data-app-view] .app-view.profile-view[data-view="profile"] .profile-board-content .profile-hero {
+    flex-direction: column;
+    align-items: stretch;
+    justify-content: flex-end;
+    gap: var(--space-4);
+    min-height: 0;
+    padding: calc(var(--frame-h) + 34px) var(--space-5) var(--space-5);
+  }
+  body.app-body[data-app-view] .app-view.profile-view[data-view="profile"] .profile-board-content .profile-hero::before {
+    background: linear-gradient(180deg, color-mix(in srgb, var(--color-oxblood-deep) 30%, transparent) 0%, color-mix(in srgb, var(--color-oxblood-deep) 88%, transparent) 62%);
+  }
+  body.app-body[data-app-view] .app-view.profile-view[data-view="profile"] .profile-photo-frame {
+    top: 18px;
+    padding: 6px;
+    transform: none;
+  }
+  body.app-body[data-app-view] .app-view.profile-view[data-view="profile"] .profile-board-content .profile-photo-frame .profile-avatar {
+    border-radius: calc(var(--radius-l) - 6px);
+    font-size: var(--text-32);
+  }
+  body.app-body[data-app-view] .app-view.profile-view[data-view="profile"] .profile-board-content .profile-hero-copy { align-self: stretch; }
+  body.app-body[data-app-view] .app-view.profile-view[data-view="profile"] .profile-board-content .profile-hero h1 { font-size: var(--text-44); }
+  body.app-body[data-app-view] .app-view.profile-view[data-view="profile"] .profile-board-content .profile-hero #profile-location,
+  body.app-body[data-app-view] .app-view.profile-view[data-view="profile"] .profile-hero-quote { font-size: var(--text-16); }
+  body.app-body[data-app-view] .app-view.profile-view[data-view="profile"] .profile-board-content .profile-hero .profile-hero-actions {
+    position: static;
+    width: 100%;
+  }
+}
+
+/* ---------- Edit profile: change your area (D-092) ---------- */
+.profile-edit-area { display: flex; flex-direction: column; gap: var(--space-2); grid-column: 1 / -1; }
+.profile-edit-area > span { font-size: var(--text-12); font-weight: 700; letter-spacing: .1em; }
+.profile-edit-area-current { margin: 0; color: var(--color-wine-deep); font-family: var(--font-heading); font-size: var(--text-20); }
+.profile-edit-area-tools { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: var(--space-2); align-items: start; }
+.profile-edit-area .profile-area-geo {
+  min-height: 44px; padding: 0 var(--space-4); border: 1px solid color-mix(in srgb, var(--color-wine) 40%, transparent);
+  border-radius: var(--radius-pill); background: transparent; color: var(--color-wine); font-family: var(--font-body);
+  font-size: var(--text-14); font-weight: 600; white-space: nowrap; cursor: pointer;
+}
+.profile-edit-area .profile-area-geo:hover { background: color-mix(in srgb, var(--color-wine) 8%, transparent); }
+.profile-edit-area .profile-area-search { position: relative; min-width: 0; }
+.profile-edit-area .profile-area-search input { width: 100%; min-height: 44px; }
+.profile-edit-area .profile-area-results {
+  position: absolute; top: calc(100% + 4px); right: 0; left: 0; z-index: 5; max-height: 240px; margin: 0; padding: 6px;
+  overflow-y: auto; list-style: none; border: 1px solid var(--color-card-edge); border-radius: var(--radius-m);
+  background: var(--color-cream); box-shadow: 0 16px 30px -18px color-mix(in srgb, var(--color-oxblood-deep) 60%, transparent);
+}
+.profile-edit-area .profile-area-results button {
+  display: flex; align-items: baseline; justify-content: space-between; gap: var(--space-3); width: 100%; min-height: 44px;
+  padding: 0 var(--space-3); border: 0; border-radius: var(--radius-s); background: transparent; color: var(--color-ink);
+  font-family: var(--font-body); font-size: var(--text-14); text-align: left; cursor: pointer;
+}
+.profile-edit-area .profile-area-results button small { color: var(--color-ink-soft); font-size: var(--text-12); }
+.profile-edit-area .profile-area-results button:hover,
+.profile-edit-area .profile-area-results button:focus-visible { background: var(--color-wine); color: var(--color-cream); outline: 0; }
+.profile-edit-area .profile-area-results button:hover small,
+.profile-edit-area .profile-area-results button:focus-visible small { color: inherit; }
+.profile-edit-area .profile-area-empty { padding: 10px 12px; color: var(--color-ink-soft); font-size: var(--text-14); }
+.profile-edit-area[aria-busy="true"] :is(button, input) { pointer-events: none; opacity: .6; }
+@media (max-width: 560px) { .profile-edit-area-tools { grid-template-columns: 1fr; } }

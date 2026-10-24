@@ -2,7 +2,7 @@
    A card is a rounded cream sheet with a slim deep-wine header bar (avatar, the member's name in Bodoni Moda, the date),
    a 5:4 image, a two-line caption and a slim deep-wine action bar of four cream icons with small labels (like, comment,
    share, save). The whole card reads close to square (about 1.2 tall per 1 wide; founder 2026-10-22, "a bit too
-   long"). Grid: 1 column on phones, 2 from 640 px, 3 from 1024 px; every card in a row is the same height. Tokens only:
+   long"). Grid (D-092, smaller cards): 1 column on phones (340 px), 2 from 640 px, 3 from 960 px, 4 from 1240 px; every card in a row is the same height. Tokens only:
    no raw colours (the tints are color-mix of brand tokens). Loaded after community-feed.css, so the old card rules lose. */
 
 body.app-body .community-feed-view{
@@ -12,8 +12,8 @@ body.app-body .community-feed-view{
   --post-on-bar-soft:color-mix(in srgb, var(--color-cream) 82%, var(--brivia-wine));
   --post-shadow:0 1px 2px color-mix(in srgb, var(--brivia-deep-wine) 10%, transparent), 0 22px 40px -24px color-mix(in srgb, var(--brivia-deep-wine) 60%, transparent);
   --post-shadow-lift:0 2px 4px color-mix(in srgb, var(--brivia-deep-wine) 12%, transparent), 0 30px 56px -26px color-mix(in srgb, var(--brivia-deep-wine) 70%, transparent);
-  --post-head-h:48px;
-  --post-actions-h:56px;
+  --post-head-h:44px;
+  --post-actions-h:48px;
 }
 
 /* "New post": the one primary action, a wide wine button above the feed. */
@@ -38,12 +38,16 @@ body.app-body .post-new-button:focus-visible{outline:2px solid var(--brivia-wine
 body.app-body .community-feed-toolbar{color:var(--color-ink-soft)}
 
 /* The grid. */
-body.app-body .community-post-list{display:grid;grid-template-columns:minmax(0,1fr);gap:var(--space-5);align-items:stretch;max-width:420px;margin:0 auto}
+/* Smaller cards, same 5:4 image (founder, D-092): about 290 px wide, so a desktop row holds four. */
+body.app-body .community-post-list{display:grid;grid-template-columns:minmax(0,1fr);gap:var(--space-5);align-items:stretch;max-width:340px;margin:0 auto}
 @media (min-width:640px){
-  body.app-body .community-post-list{grid-template-columns:repeat(2,minmax(0,1fr));max-width:1180px}
+  body.app-body .community-post-list{grid-template-columns:repeat(2,minmax(0,1fr));max-width:620px}
 }
-@media (min-width:1024px){
-  body.app-body .community-post-list{grid-template-columns:repeat(3,minmax(0,1fr));gap:28px}
+@media (min-width:960px){
+  body.app-body .community-post-list{grid-template-columns:repeat(3,minmax(0,1fr));max-width:920px}
+}
+@media (min-width:1240px){
+  body.app-body .community-post-list{grid-template-columns:repeat(4,minmax(0,1fr));max-width:1180px;gap:var(--space-4)}
 }
 body.app-body .community-post-list>.community-post-empty{border-radius:var(--post-radius)}
 
@@ -94,12 +98,12 @@ body.app-body :is(.post-card-media, .post-detail-media) .community-post-image-mi
 /* Caption: two lines at most and always two lines tall, so every card is the same height. Margins, not padding: a
    line-clamped box shows its third line inside its own padding. The action bar sits at the bottom whatever the row. */
 body.app-body .post-card-caption{
-  display:-webkit-box;flex:0 0 auto;box-sizing:content-box;height:2.9em;margin:var(--space-3) var(--space-4);padding:0;overflow:hidden;
-  color:var(--color-ink);font-size:var(--text-14);line-height:1.45;overflow-wrap:anywhere;-webkit-box-orient:vertical;-webkit-line-clamp:2;
+  display:-webkit-box;flex:0 0 auto;box-sizing:content-box;height:2.7em;margin:10px var(--space-3);padding:0;overflow:hidden;
+  color:var(--color-ink);font-size:var(--text-14);line-height:1.35;overflow-wrap:anywhere;-webkit-box-orient:vertical;-webkit-line-clamp:2;
 }
 
 /* Action bar: four equal cream buttons, icon over label. A hidden Like / Save (no 0012 yet) leaves equal halves. */
-body.app-body .post-card-actions{margin-top:auto;display:grid;grid-auto-flow:column;grid-auto-columns:minmax(0,1fr);gap:var(--space-1);height:var(--post-actions-h);padding:var(--space-1) var(--space-2);background:var(--post-bar)}
+body.app-body .post-card-actions{margin-top:auto;display:grid;grid-auto-flow:column;grid-auto-columns:minmax(0,1fr);gap:var(--space-1);height:var(--post-actions-h);padding:2px var(--space-2);background:var(--post-bar)}
 body.app-body .post-card-action{
   display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;min-width:44px;min-height:44px;margin:0;padding:4px 2px;
   border:0;border-radius:14px;background:transparent;color:var(--post-on-bar);

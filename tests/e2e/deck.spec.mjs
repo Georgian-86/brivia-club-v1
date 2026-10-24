@@ -20,7 +20,7 @@
 // * zero quota: plain copy, Pitch aria-disabled and described by the notice, the 1440 px card stays below the top bar;
 // * a 'matched' like from the deck shows the mutual toast;
 // * search results join the deck except members already matched with me and cards already swiped (Minor 2);
-// * my own profile: details marked private, the area is place_label (read-only in the editor, "coming soon"), no
+// * my own profile: details marked private, the area is place_label (changed in the editor by city or location), no
 //   City/State anywhere, and a profile save sends no city, state or skills (D-036);
 // * at 375 px the chips wrap without clipping and the action buttons are at least 44 px tall.
 // E2E_SCREENSHOTS=<dir> saves 375 px and 1440 px screenshots: card with band and chips (with the quota counter), the
@@ -504,11 +504,15 @@ try {
   const editor = await wpage.evaluate(() => ({
     cityInputs: document.querySelectorAll('#profile-edit-form input[name="city"], #profile-edit-form input[name="state"]').length,
     area: document.querySelector('#profile-edit-form [data-profile-area]')?.textContent?.replace(/\s+/g, ' ').trim() || '',
+    areaControls: [...document.querySelectorAll('#profile-edit-form [data-profile-area] [data-area-geo], #profile-edit-form [data-profile-area] [data-area-search]')].length,
   }));
-  check(`profile editor: no City/State inputs; the area is read-only with "coming soon" (${JSON.stringify(editor)})`, () => {
+  // D-092: the area changes through the city search or "Use my location" (set_home_city / set_home_location), never a
+  // free-text City/State field, and the copy no longer says "coming soon".
+  check(`profile editor: no City/State inputs; the area shows its place and can be changed (${JSON.stringify(editor)})`, () => {
     assert.equal(editor.cityInputs, 0);
     assert.match(editor.area, /Kochi/);
-    assert.match(editor.area, /Change your area: coming soon/);
+    assert.equal(editor.areaControls, 2);
+    assert.doesNotMatch(editor.area, /coming soon/i);
   });
   const patchesBefore = st.calls.filter((c) => c.method === 'PATCH' && c.path === '/rest/v1/profiles').length;
   await wpage.locator('#profile-edit-form input[name="experience"]').fill('Founder and cook');

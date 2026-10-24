@@ -882,7 +882,7 @@ try {
 
   // ================================ D-085: the login look restored to the pre-B4 screen ================================
   // The founder asked for the earlier login UI back with the flow unchanged: "JOIN THE CLUB", the email form, LOG IN,
-  // "Forgot password?", "OR CONTINUE WITH" and the round Google button, and "NEW HERE? CREATE ACCOUNT" in the panel's
+  // "Forgot password?", an "OR" divider and the round Google button, and "NEW HERE? CREATE ACCOUNT" in the panel's
   // top bar. Behaviour is what is checked: Google still starts, "Create account" still opens the guided Welcome (and
   // its Google button still starts), the form is the same #login-form, and nothing scrolls sideways.
   for (const viewport of [{ width: 320, height: 640 }, { width: 375, height: 812 }, { width: 768, height: 1024 }, { width: 1280, height: 800 }, { width: 1440, height: 900 }, { width: 1920, height: 1080 }]) {

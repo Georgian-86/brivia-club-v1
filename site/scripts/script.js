@@ -19,6 +19,7 @@ import { defaultCoverUrl, normalizeCoverUrl } from './cover-assets.js';
 import { presetCoverPath } from './preset-cover.js';
 import { motionAllowed, introPlan, pickHeroSource, markLoaded, INTRO_CAP_MS, INTRO_START_GRACE_MS } from './landing-motion.js';
 import { SOUND_LIMIT_MS, SOUND_STORAGE_KEY, soundPreference, soundPlan, isUnlockEvent, barsToSchedule } from './landing-sound.js';
+import heroSoundtrackUrl from '../media/audio/hero-soundtrack.m4a?url';
 import { watchPasswordFields } from './password-reveal.js';
 import Lenis from 'lenis';
 import 'lenis/dist/lenis.css';
@@ -175,19 +176,21 @@ if (landingMotion && belowFoldVideos.length) {
     belowFoldVideos.forEach((video) => videoObserver.observe(video));
   } else belowFoldVideos.forEach(startLandingVideo);
 }
-// ---- Landing sound (D-063) ----
-// The music (a soft chord every 3.2 s) starts as early as the browser allows: at load when the browser permits it,
-// otherwise on the visitor's first real gesture (any of them, retried until it works: scrolling alone can never
-// start audio in a browser). It fades in, plays for at most 5 minutes of visible time, then fades out. The sound
-// button (bottom right) turns everything off or on, and the choice is remembered.
+// ---- Landing sound (D-063; the hero video's own soundtrack since D-092) ----
+// The music (the original hero video's soundtrack, looped with a 2 s crossfade) starts as early as the browser allows:
+// at load when the browser permits it, otherwise on the visitor's first real gesture (any of them, retried until it
+// works: scrolling alone can never start audio in a browser). It fades in, plays for at most 5 minutes of visible
+// time, then fades out. The sound button (bottom right) turns everything off or on, and the choice is remembered.
 const soundButton = document.querySelector('[data-landing-sound]');
-const MUSIC_VOLUME = 0.045;
-const BAR_SECONDS = 3.2;
-const MUSIC_CHORD = [220, 277.18, 329.63, 440];
+const MUSIC_VOLUME = 0.32;
+const MUSIC_CROSSFADE = 2;
 let musicPreference = 'on';
 try { musicPreference = soundPreference(window.localStorage.getItem(SOUND_STORAGE_KEY)); } catch { /* private mode */ }
 let musicContext;
 let musicBus;
+let musicBuffer = null;
+let musicLoading = null;
+const musicSources = new Set();
 let musicScheduler;
 let musicNextBarAt = 0;
 let musicPlayedMs = 0;
@@ -203,28 +206,41 @@ const renderSoundButton = () => {
   soundButton.setAttribute('aria-label', playing ? 'Mute sound' : 'Play sound');
   soundButton.title = playing ? 'Mute sound' : 'Play sound';
 };
+// Fetched and decoded once, after the first start (never on load: a visitor who never hears it never downloads it).
+const loadMusic = () => {
+  musicLoading ||= fetch(heroSoundtrackUrl)
+    .then((response) => { if (!response.ok) throw new Error(`soundtrack ${response.status}`); return response.arrayBuffer(); })
+    .then((data) => new Promise((resolve, reject) => musicContext.decodeAudioData(data, resolve, reject)))
+    .then((buffer) => { musicBuffer = buffer; scheduleMusic(); })
+    .catch(() => { musicLoading = null; }); // offline or blocked: the next start tries again
+  return musicLoading;
+};
+// One pass of the soundtrack: it fades in over the previous pass's last 2 s and fades out over its own.
 const playMusicBar = (start) => {
-  MUSIC_CHORD.forEach((frequency, index) => {
-    const oscillator = musicContext.createOscillator();
-    const gain = musicContext.createGain();
-    oscillator.type = index % 2 ? 'sine' : 'triangle';
-    oscillator.frequency.setValueAtTime(frequency, start);
-    gain.gain.setValueAtTime(0.0001, start);
-    gain.gain.exponentialRampToValueAtTime(index === 0 ? 0.22 : 0.12, start + 0.18);
-    gain.gain.exponentialRampToValueAtTime(0.0001, start + BAR_SECONDS);
-    oscillator.connect(gain).connect(musicBus);
-    oscillator.start(start);
-    oscillator.stop(start + BAR_SECONDS + 0.05);
-  });
+  const source = musicContext.createBufferSource();
+  const gain = musicContext.createGain();
+  const end = start + musicBuffer.duration;
+  source.buffer = musicBuffer;
+  gain.gain.setValueAtTime(0.0001, start);
+  gain.gain.exponentialRampToValueAtTime(1, start + MUSIC_CROSSFADE);
+  gain.gain.setValueAtTime(1, end - MUSIC_CROSSFADE);
+  gain.gain.exponentialRampToValueAtTime(0.0001, end);
+  source.connect(gain).connect(musicBus);
+  source.addEventListener('ended', () => musicSources.delete(source));
+  musicSources.add(source);
+  source.start(start);
+  source.stop(end);
 };
 const musicElapsedMs = () => musicPlayedMs + (musicState === 'play' && !document.hidden ? performance.now() - musicPlayingSince : 0);
-// Queues bars on the audio clock a second ahead (a busy main thread never leaves a gap), and ends at 5 minutes.
+// Queues the next pass on the audio clock a second ahead (a busy main thread never leaves a gap), and ends at 5 minutes.
 const scheduleMusic = () => {
   if (!musicContext || musicState !== 'play') return;
   if (musicElapsedMs() >= SOUND_LIMIT_MS) { stopMusic('ended'); return; }
-  for (const start of barsToSchedule({ now: musicContext.currentTime, nextBarAt: musicNextBarAt, barLength: BAR_SECONDS, lookahead: 1 })) {
+  if (!musicBuffer) { loadMusic(); return; }
+  if (musicNextBarAt === 0) musicNextBarAt = musicContext.currentTime + 0.05;
+  for (const start of barsToSchedule({ now: musicContext.currentTime, nextBarAt: musicNextBarAt, barLength: musicBuffer.duration - MUSIC_CROSSFADE, lookahead: 1 })) {
     playMusicBar(start);
-    musicNextBarAt = start + BAR_SECONDS;
+    musicNextBarAt = start + musicBuffer.duration - MUSIC_CROSSFADE;
   }
 };
 const ensureMusicContext = () => {
@@ -247,7 +263,7 @@ const beginMusic = () => {
   musicBus.gain.cancelScheduledValues(now);
   musicBus.gain.setValueAtTime(Math.max(musicBus.gain.value, 0.0001), now);
   musicBus.gain.exponentialRampToValueAtTime(MUSIC_VOLUME, now + 1.2); // a soft fade-in, never a jolt
-  musicNextBarAt = now + 0.05;
+  musicNextBarAt = 0; // the first pass starts as soon as the soundtrack is decoded
   scheduleMusic();
   window.clearInterval(musicScheduler);
   musicScheduler = window.setInterval(scheduleMusic, 250);
@@ -260,9 +276,13 @@ function stopMusic(next) {
   window.clearInterval(musicScheduler);
   if (musicContext && musicBus) {
     const now = musicContext.currentTime;
+    const fade = next === 'ended' ? 2.5 : 0.6;
     musicBus.gain.cancelScheduledValues(now);
     musicBus.gain.setValueAtTime(Math.max(musicBus.gain.value, 0.0001), now);
-    musicBus.gain.exponentialRampToValueAtTime(0.0001, now + (next === 'ended' ? 2.5 : 0.6));
+    musicBus.gain.exponentialRampToValueAtTime(0.0001, now + fade);
+    // Queued passes end with the fade, so turning the sound on again never layers a second copy over the first.
+    musicSources.forEach((source) => { try { source.stop(now + fade); } catch { /* already stopped */ } });
+    musicSources.clear();
   }
   renderSoundButton();
 }
