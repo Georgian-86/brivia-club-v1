@@ -388,7 +388,6 @@ body:has(.app-view[data-view="profile"]:not([hidden])) .app-wrap{padding-bottom:
   .public-profile-body{padding:var(--space-4) var(--space-5) var(--space-5)}
   .public-profile-actions{padding:var(--space-3) var(--space-5) max(var(--space-4),env(safe-area-inset-bottom))}
 }
-}
 /* Read-only interests in the profile editor: profiles.skills is written only by set_member_interests (0004). */
 .profile-edit-grid .profile-edit-readonly{grid-column:1/-1;display:flex;flex-direction:column;gap:7px}
 .profile-edit-grid .profile-edit-readonly>span{color:var(--brivia-wine-soft);font-size:var(--text-12);font-weight:700;letter-spacing:.107em}

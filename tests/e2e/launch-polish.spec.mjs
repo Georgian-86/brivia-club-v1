@@ -1,4 +1,5 @@
 // Launch polish (D-092), stubbed Supabase (Vite on :5185). Never touches a real Supabase project. At 1440 and 390 px:
+// * login: the divider reads OR, exactly midway between LOG IN and the Google button;
 // * the public profile dialog: name and band, no invented bio, each interest once, Message only for a match (it opens
 //   that chat), Escape closes and focus returns;
 // * "Find your people": no capsule cloud; Skills & interests is a dropdown (Popular first), picks stay open, typing +
@@ -31,6 +32,24 @@ const errors = [];
 
 try {
   for (const [tag, viewport] of [['1440', { width: 1440, height: 900 }], ['390', { width: 390, height: 844 }]]) {
+    // 0. Login (signed out): OR sits exactly midway between LOG IN and the Google button, and the card fits the screen.
+    {
+      const out = await browser.newContext({ viewport });
+      await out.route('https://stub.supabase.local/**', (route) => route.fulfill({ status: 200, contentType: 'application/json', body: '[]', headers: { 'access-control-allow-origin': '*', 'access-control-allow-headers': '*' } }));
+      const login = await out.newPage();
+      await login.goto(`${stub.url}/auth.html#login`, { waitUntil: 'load' });
+      await login.waitForSelector('.auth-login.is-active #login-form');
+      await login.waitForTimeout(600);
+      const gaps = await login.evaluate(() => {
+        const r = (sel) => document.querySelector(sel).getBoundingClientRect();
+        const submit = r('.auth-login #login-form .auth-submit'); const or = r('.auth-login .auth-divider span'); const g = r('.auth-login .auth-google-trigger');
+        return { above: Math.round(or.top - submit.bottom), below: Math.round(g.top - or.bottom), text: document.querySelector('.auth-login .auth-divider').textContent.trim(), googleBottom: Math.round(g.bottom), h: innerHeight };
+      });
+      await check(`${tag} login: the divider reads OR, midway between LOG IN and Google (${JSON.stringify(gaps)})`, () => {
+        assert.equal(gaps.text, 'OR'); assert.ok(Math.abs(gaps.above - gaps.below) <= 1); assert.ok(gaps.googleBottom <= gaps.h);
+      });
+      await out.close();
+    }
     // 1. The public profile dialog, from the deck card (Asha is a match in this stub).
     let ctx = await stub.newContext(browser, viewport);
     let page = await stub.open(ctx, { errors });
