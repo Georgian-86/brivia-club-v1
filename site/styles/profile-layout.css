@@ -275,18 +275,58 @@ body.app-body[data-app-view] .app-view.profile-view[data-view="profile"] .profil
     border-radius: calc(var(--radius-l) - 6px);
     font-size: var(--text-32);
   }
-  body.app-body[data-app-view] .app-view.profile-view[data-view="profile"] .profile-board-content .profile-hero h1 { font-size: clamp(30px, 9.4vw, 44px); }
+  /* The name stays on one line: it scales with the screen, and a very long one ends in an ellipsis (the full name is
+     still the heading's text for screen readers). */
+  body.app-body[data-app-view] .app-view.profile-view[data-view="profile"] .profile-board-content .profile-hero h1 {
+    max-width: 100%;
+    overflow: hidden;
+    font-size: clamp(24px, 7.2vw, 34px);
+    line-height: 1.1;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
   body.app-body[data-app-view] .app-view.profile-view[data-view="profile"] .profile-board-content .profile-hero #profile-location,
   body.app-body[data-app-view] .app-view.profile-view[data-view="profile"] .profile-hero-quote { font-size: var(--text-16); }
   body.app-body[data-app-view] .app-view.profile-view[data-view="profile"] .profile-hero-rule { margin: var(--space-2) 0 var(--space-1); }
-  /* Inside a narrower frame: ⚙ stays 44 px; "Edit profile" may take two short lines. */
-  body.app-body[data-app-view] .app-view.profile-view[data-view="profile"] .profile-board-content .profile-hero .profile-hero-actions { gap: 6px; }
+  /* In the narrow frame: one slim EDIT PROFILE pill across the photo's foot, and the ⚙ as a small round button in the
+     photo's top right corner. Both are 32 px with a 44 px tap area, in proportion to a 130 px photo. */
+  body.app-body[data-app-view] .app-view.profile-view[data-view="profile"] .profile-board-content .profile-hero .profile-hero-actions {
+    top: calc(50% + var(--frame-h) / 2 - var(--frame-inset) - 32px);
+    gap: 0;
+  }
   body.app-body[data-app-view] .app-view.profile-view[data-view="profile"] .profile-board-content .profile-hero .profile-hero-actions .profile-photo-editor {
-    padding: 0 var(--space-2);
+    position: relative;
+    min-height: 32px;
+    padding: 0 6px;
+    border-radius: var(--radius-pill);
+    font-family: var(--font-body);
     font-size: var(--text-12);
-    letter-spacing: .08em;
-    line-height: 1.15;
-    white-space: normal;
+    font-weight: 600;
+    letter-spacing: .04em;
+    line-height: 1;
+    text-transform: uppercase;
+    white-space: nowrap;
+  }
+  body.app-body[data-app-view] .app-view.profile-view[data-view="profile"] .profile-board-content .profile-hero .profile-hero-actions .profile-settings-button {
+    position: absolute !important;
+    top: calc(-1 * var(--frame-h) + 2 * var(--frame-inset) + 38px) !important;
+    right: 0 !important;
+    left: auto !important;
+    flex: none !important;
+    width: 32px !important;
+    min-width: 32px !important;
+    height: 32px !important;
+    min-height: 32px !important;
+    padding: 0 !important;
+    border-radius: 50%;
+    -webkit-backdrop-filter: blur(6px);
+    backdrop-filter: blur(6px);
+  }
+  body.app-body[data-app-view] .app-view.profile-view[data-view="profile"] .profile-board-content .profile-hero .profile-hero-actions .profile-settings-button svg { width: 16px; height: 16px; }
+  body.app-body[data-app-view] .app-view.profile-view[data-view="profile"] .profile-board-content .profile-hero .profile-hero-actions :is(.profile-photo-editor, .profile-settings-button)::after {
+    position: absolute;
+    inset: -6px;
+    content: '';
   }
 }
 
