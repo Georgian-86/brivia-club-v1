@@ -158,6 +158,8 @@ Tooling: Playwright **and axe-core** at `/tmp/pw` (`npm install --prefix /tmp/pw
   founder's screenshot (was Bodoni Moda since D-078).
 - **2026-10-25, phone login and profile (D-098):** the handset sized to the space the form leaves (Google always
   on screen, `vh` fallback without `svh`); the profile name on one line, a slim EDIT PROFILE pill and a round ⚙ in the photo.
+- **2026-10-25, phone sign-up start (D-099):** the login's composition on the first sign-up screen: one Log in pill top
+  right, a centred head, the tagline on one line. Later steps unchanged.
 - **2026-10-25, launch polish (D-092):** OR divider, the profile dialog, smaller Explore cards, filter dropdowns, the
   profile sidebar and framed hero, the hero video's own soundtrack, area changes from Edit profile, and the decorative
   dead ends removed. New e2e `tests/e2e/launch-polish.spec.mjs`; every control clicked at 1440 and 390 px (D-092).
