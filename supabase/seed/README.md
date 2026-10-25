@@ -75,6 +75,23 @@ seed id prefix `a7e57000-0000-4000-8000-`, so a real signup using that domain is
 Nobody can log in as a test member: each has a random password that is never stored. To act as one, reset that user's
 password in Authentication, Users. A member who signs in sees only the test world, so use it to see the demo data.
 
+## Seed v3: 200 more members with faceless photos (D-100)
+
+`test-members-v3.sql` adds **t061 to t260** (200 members, 260 in the test world) after v2: Bengaluru 30, Mumbai 26,
+Thane 22, Pune 22, Delhi 18, Hyderabad 18, Chennai 14, Navi Mumbai 10, Gurugram 10, Kolkata 10, Noida 8, Ahmedabad 6,
+Jaipur 6. Realistic names (mostly Indian, region-appropriate), 2 to 5 non-sensitive interests each summing to 20, with
+city "scenes" so neighbours share interests; a home cell within about 6 km of the city centre; a preset cover; and a
+faceless Unsplash photo shipped with the site (`/media/test-members/tNNN.webp`, credits in `credits.json` there).
+No posts, requests, matches or chats (v2 shows those). The file is **generated**: change
+`scripts/seed/gen-test-members-v3.mjs` and re-run it (`node scripts/seed/gen-test-members-v3.mjs`); never edit the SQL.
+Photos: `scripts/seed/fetch-test-photos.mjs` (candidates, a face check by eye, then build).
+
+Steps: apply migration `0015` (`supabase/migrations/README.md`), then paste `test-members-v3.sql` into the SQL editor
+and Run as `postgres`. The result row: `test_members = 260`, `v3_members = 200`, `v3_with_photo` = the number of photos
+shipped. Idempotent; a later run fills in photos added since. Note: v3 members join the v2 members' cities, so a v2
+"first member" no longer sees exactly the v2 roles at the top of the deck (the roles are checked before v3 in the
+harness). The purge removes v3 too (same `is_test` and id prefix); delete `site/media/test-members/` at launch.
+
 ## The tester switch (see your own account in the test world)
 
 After migration `0008`, a real account can be moved into the test world without becoming a test member: add it to the

@@ -249,7 +249,8 @@ do $$
 declare
   f text := 'a7e57000-0000-4000-8000-';
 begin
-  if (select count(*) from public.profiles where is_test and email like '%@test.brivia.club') <> 60 then
+  -- Its own 60 ids only: the v3 seed (test-members-v3.sql) adds more test members, and v2 must stay re-runnable after it.
+  if (select count(*) from public.profiles p join _seed_members m on p.id = (f || lpad(m.n::text, 12, '0'))::uuid where p.is_test) <> 60 then
     raise exception 'seed aborted: is_test was not stored. Run this script in the Supabase SQL editor as postgres (not service_role).';
   end if;
   -- Every seeded member is completed (D-030): interests summing to 20 and a cell. A flagged member is complete but

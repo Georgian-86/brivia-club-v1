@@ -43,7 +43,7 @@ done
 # after D-030. Not matched by the loop below; not loaded in the seed database.
 run tests/harness-autocomplete.sql
 for t in "$STAGE"/tests/*.test.sql; do
-  [ "$(basename "$t")" = seed.test.sql ] && continue   # needs the seed: runs in its own database below
+  case "$(basename "$t")" in seed.test.sql|seed-v3.test.sql) continue ;; esac   # need the seed: run in their own database below
   run "tests/$(basename "$t")"
 done
 
@@ -89,6 +89,10 @@ grep -q 'try again later' "$DATA/log" || { echo "FAIL: the over-cap probe error 
   "${PSQL[@]}" -d $DB -v phase=seeded -f "$STAGE/tests/seed.test.sql"
   "${PSQL[@]}" -d $DB -v phase=extras -f "$STAGE/tests/seed.test.sql"
   "${PSQL[@]}" -d $DB -v phase=tester -f "$STAGE/tests/seed.test.sql"   # founder path: a real account becomes a tester
+  # v3 (D-100): 200 more members after the v2 checks (they would change the v2 decks); v2 must stay re-runnable after it.
+  run seed/test-members-v3.sql; run seed/test-members-v3.sql; run seed/test-members.sql
+  "${PSQL[@]}" -d $DB -v phase=seeded -f "$STAGE/tests/seed-v3.test.sql"
   run seed/purge-test-members.sql; run seed/purge-test-members.sql
-  "${PSQL[@]}" -d $DB -v phase=purged -f "$STAGE/tests/seed.test.sql" )
+  "${PSQL[@]}" -d $DB -v phase=purged -f "$STAGE/tests/seed.test.sql"
+  "${PSQL[@]}" -d $DB -v phase=purged -f "$STAGE/tests/seed-v3.test.sql" )
 echo "ALL PASSED"

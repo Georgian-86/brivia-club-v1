@@ -678,3 +678,20 @@ Expected advisor notes: `brivia_private.brivia_guard_cover_url` and `brivia_priv
 security definer functions with execute revoked from every client role (not RPCs; `brivia_private` is not exposed).
 Tested by `supabase/tests/media-covers.test.sql` (V1-V5), `trust.test.sql` FF2 and `d-tester-world.test.sql` (the
 cleanup reads `is_test` of the row itself only); e2e `tests/e2e/profile-media.spec.mjs` section "covers".
+
+## 0015
+
+**Test members may show a photo shipped with the site (test world v3, D-100). Not yet applied.**
+
+Why: the v3 test members (`supabase/seed/test-members-v3.sql`) have faceless stock photos that ship with the site under
+`/media/test-members/tNNN.webp`. The 0003 CHECK `profiles_photo_url_storage` allows only a Storage URL of the member's
+own `profile-photos` folder, so it refused them.
+
+What it does: adds `public.brivia_is_test_member_photo(text)` (immutable; true only for exactly
+`/media/test-members/t<3 digits>.webp`) and re-creates `profiles_photo_url_storage` as: null, OR the 0003 Storage rule,
+OR (`is_test` AND that path). Only the table owner can set `is_test` (0003), so real members are unchanged. Re-adding
+the CHECK validates every row once; real rows already pass the 0003 rule.
+
+Apply: after `0014`, before the v3 seed. Paste the file into the SQL editor, Run (as `postgres`). Idempotent.
+Verify: `select pg_get_constraintdef(oid) from pg_constraint where conname = 'profiles_photo_url_storage';` shows the
+three branches. Before launch: the purge removes the test members; delete `site/media/test-members/` in the same release.
