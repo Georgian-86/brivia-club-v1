@@ -20,7 +20,7 @@
 // Storage origin (a third-party https URL never loads); profileToRow sends no created_at; blocking inserts and
 // treats 23505 as success; no password is ever kept in localStorage (a stale cached one is scrubbed on load).
 // Honest signal quota (Iteration 3, Task 9, D-026/D-032; copy R7, Iteration 4): the counter reads my_signal_quota
-// ("30 of 30 signals left · 24-hour window", then 29 after one like); at 0 a Like keeps the card, sends nothing and shows "More at 3 PM"; a PT429 race
+// ("30 of 30 signals left", then 29 after one like); at 0 a Like keeps the card, sends nothing and shows "More at 3 PM"; a PT429 race
 // puts the card back at the front; passes never call send_signal and nothing is kept in localStorage.
 // Founder live test (2026-10-14): the pitched card stays on screen (parked) while the sheet is open and leaves only
 // when the sheet resolves (D-018 unchanged: submit = note, close / Escape / backdrop / next card = note null).
@@ -980,10 +980,10 @@ try {
   const qSignals = () => q.calls.filter((c) => c.method === 'POST' && c.path === '/rest/v1/rpc/send_signal');
   const qQuotaReads = () => q.calls.filter((c) => c.path === '/rest/v1/rpc/my_signal_quota');
   await quotaPage.waitForFunction(() => document.querySelector('#swipe-card:not([hidden]) #swipe-name')?.textContent?.trim(), null, { timeout: 15000 });
-  await qWaitCounter('30 of 30 signals left · 24-hour window');
+  await qWaitCounter('30 of 30 signals left');
   const firstCounter = await qCounter();
-  check(`quota counter reads "30 of 30 signals left · 24-hour window" from my_signal_quota (got "${firstCounter}")`, () => {
-    assert.equal(firstCounter, '30 of 30 signals left · 24-hour window');
+  check(`quota counter reads "30 of 30 signals left" from my_signal_quota (got "${firstCounter}")`, () => {
+    assert.equal(firstCounter, '30 of 30 signals left');
     assert.ok(qQuotaReads().length >= 1, 'my_signal_quota was not read at boot');
   });
   const resetLabel = await quotaPage.evaluate((iso) => (() => { const d = new Date(iso); return d.toLocaleTimeString([], d.getMinutes() === 0 ? { hour: 'numeric' } : { hour: 'numeric', minute: '2-digit' }); })(), RESETS_AT);
@@ -994,10 +994,10 @@ try {
   await quotaPage.waitForTimeout(500);
   await quotaPage.keyboard.press('Escape');
   await qWaitToast(/Signal sent/);
-  await qWaitCounter('29 of 30 signals left · 24-hour window');
+  await qWaitCounter('29 of 30 signals left');
   const afterOne = await qCounter();
   if (SHOTS) await quotaPage.screenshot({ path: path.join(SHOTS, 'quota-1280-counter.png') });
-  check(`after one like the counter reads "29 of 30 signals left · 24-hour window" (got "${afterOne}")`, () => assert.equal(afterOne, '29 of 30 signals left · 24-hour window'));
+  check(`after one like the counter reads "29 of 30 signals left" (got "${afterOne}")`, () => assert.equal(afterOne, '29 of 30 signals left'));
   check('my_signal_quota is read again after send_signal', () => assert.ok(qQuotaReads().length > readsBefore));
   // F1: a failed signal never loses the person. A 500, then a 429 without a cap message: the card comes back to the
   // front each time, with the retry copy; the unknown 429 also reads the quota again.
@@ -1073,9 +1073,9 @@ try {
     assert.equal(zeroState.pitchOpen, false);
   });
   check('at 0 a Like makes no send_signal call', () => assert.equal(qSignals().length, zeroBefore));
-  check(`at 0 the notice reads "No signals left today. More at HH:MM · Passing is always free." and Pitch is aria-disabled (${JSON.stringify(zeroState)})`, () => {
+  check(`at 0 the notice reads "No signals left today. More at HH:MM. Passing is always free." and Pitch is aria-disabled (${JSON.stringify(zeroState)})`, () => {
     assert.equal(zeroState.limitVisible, true);
-    assert.match(zeroState.limitText, new RegExp(`No signals left today\\. More at ${resetLabel} · Passing is always free\\.`));
+    assert.match(zeroState.limitText, new RegExp(`No signals left today\\. More at ${resetLabel}. Passing is always free\\.`));
     assert.match(zeroState.toast, /More at/);
     assert.equal(zeroState.ariaDisabled, 'true');
   });
@@ -1195,7 +1195,7 @@ try {
     };
     const tag = `${width}px`;
     await pg.waitForFunction(() => document.querySelector('#swipe-card:not([hidden]) #swipe-name')?.textContent?.trim(), null, { timeout: 15000 });
-    await pg.waitForFunction(() => document.querySelector('#swipe-left-count')?.textContent?.trim() === '30 of 30 signals left · 24-hour window', null, { timeout: 6000 }).catch(() => {});
+    await pg.waitForFunction(() => document.querySelector('#swipe-left-count')?.textContent?.trim() === '30 of 30 signals left', null, { timeout: 6000 }).catch(() => {});
 
     // Layout and accessibility of the open sheet.
     const first = await openSheet();
@@ -1232,14 +1232,14 @@ try {
     await btn.click();
     await waitSheetHidden();
     const advanced = await waitCardNot(first);
-    await pg.waitForFunction(() => document.querySelector('#swipe-left-count')?.textContent?.trim() === '29 of 30 signals left · 24-hour window', null, { timeout: 6000 }).catch(() => {});
+    await pg.waitForFunction(() => document.querySelector('#swipe-left-count')?.textContent?.trim() === '29 of 30 signals left', null, { timeout: 6000 }).catch(() => {});
     await pg.waitForTimeout(300);
     let sent = signals().slice(before);
     check(`${tag}: "Send without a note" = exactly one send_signal with note null (${JSON.stringify(sent)})`, () => {
       assert.equal(sent.length, 1); assert.deepEqual(sent[0], { p_to: idOf(first), p_note: null });
     });
     const afterCounter = await counter();
-    check(`${tag}: the quota drops by one, as for close (got "${afterCounter}")`, () => assert.equal(afterCounter, '29 of 30 signals left · 24-hour window'));
+    check(`${tag}: the quota drops by one, as for close (got "${afterCounter}")`, () => assert.equal(afterCounter, '29 of 30 signals left'));
     check(`${tag}: the card advances past ${first} (now "${await card()}")`, () => assert.equal(advanced, true));
 
     // Double tap: still one request.
@@ -1579,7 +1579,7 @@ try {
   check(`privacy.html: body text is 16 px or more (${page375.bodySize})`, () => assert.ok(page375.bodySize >= 16));
   check('privacy.html without ?deleted=1 shows an empty status region', () => assert.equal(page375.banner, ''));
   check(`privacy.html: version line, region and grievance contact (${page375.version})`, () => {
-    assert.equal(page375.version, 'Version 2026-10-05 · effective 5 October 2026');
+    assert.equal(page375.version, 'Version 2026-10-05, effective 5 October 2026');
     for (const needle of ['Supabase, Mumbai (ap-south-1), India', 'hello@thebriviaclub.live', 'We reply within 7 days and resolve within 90 days', 'Data Protection Board of India', 'The founder of Brivia Club', 'call 112', '72 hours', 'Your messages, which disappear from other people']) assert.ok(page375.text.includes(needle), needle);
   });
   const privSmall = await smallText(priv, { root: 'body' });

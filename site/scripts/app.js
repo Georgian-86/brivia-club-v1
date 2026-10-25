@@ -67,6 +67,10 @@ import '../styles/chat-extras.css';
 import '../styles/profile-cover-picker.css';
 // The profile page's sidebar and hero after the founder's reference (D-092). Loads last.
 import '../styles/profile-layout.css';
+// The chat's close button and the phone inbox as one scrolling page (D-096). Loads last.
+import '../styles/chat-layout.css';
+// Equal header icons and roomier Explore spacing (D-096). Loads last.
+import '../styles/app-polish.css';
 // The compact deck without side buttons, and its first-run tutorial (D-094). Loads last.
 import '../styles/deck-compact.css';
 import { navMarkup, markCurrentNav, setChatBadges } from './app-nav.js';
@@ -1658,7 +1662,7 @@ const ensureInboxControls = () => {
   if (!chatView || !layout || chatView.querySelector('#inbox-toolbar')) return;
   const heading = chatView.querySelector('.view-heading h1');
   const headingCopy = chatView.querySelector('.view-heading>p:last-child');
-  if (heading) heading.textContent = 'Inbox';
+  if (heading) heading.textContent = 'Messages';
   if (headingCopy) headingCopy.textContent = 'Keep every introduction in one place.';
   const toolbar = document.createElement('div');
   toolbar.className = 'inbox-toolbar';
@@ -1709,7 +1713,7 @@ const renderChats = () => {
   const inboxMarkup = `<div class="inbox-panel-head"><div><strong>YOUR THREADS</strong><span>Private conversations</span></div>${inboxLoading ? '' : `<b>${conversations.length}</b>`}</div>${referenceRows}${inboxLoading ? skeletonMarkup('list', 4) : matches.length ? matches.map((person) => {
     const last = chatMessages[person.id]?.at(-1);
     const unread = last?.from === 'them' && !readChatIds.has(person.id);
-    const lastPreview = last?.attachment?.kind === 'resume' ? 'Resume · PDF' : last?.attachment ? `📎 ${last.attachment.name || 'Attachment'}` : (last?.text || 'Start a conversation');
+    const lastPreview = last?.attachment?.kind === 'resume' ? 'Resume (PDF)' : last?.attachment ? `📎 ${last.attachment.name || 'Attachment'}` : (last?.text || 'Start a conversation');
     return `<div class="chat-row${unread ? ' is-unread' : ''}${selectedChat?.id === person.id ? ' is-selected' : ''}"><button class="chat-row-open" type="button" data-chat-id="${escapeHtml(person.id)}"><span class="member-profile-trigger" data-public-profile-id="${escapeHtml(person.id)}" role="button" tabindex="0" aria-label="Open ${escapeHtml(person.name)} profile">${renderAvatar(person)}</span><span class="chat-row-copy"><strong data-public-profile-id="${escapeHtml(person.id)}">${escapeHtml(person.name)}</strong><span>${escapeHtml(lastPreview)}</span></span><span class="chat-row-meta"><time>${escapeHtml(formatChatTime(last?.createdAt))}</time>${unread ? '<b>1</b>' : ''}</span></button><button class="chat-delete" type="button" data-delete-chat-id="${escapeHtml(person.id)}" aria-label="Delete chat with ${escapeHtml(person.name)}" title="Delete chat"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M4.5 6h11M8 3.5h4M6.5 6l.6 10h5.8l-.6-10M8.5 8.5v5M11.5 8.5v5"/></svg></button></div>`;
   }).join('') : '<div class="inbox-empty"><strong>No threads found</strong><span>Chats open once a connection is mutual. Send a signal from Connect to start one.</span><button type="button" class="inbox-empty-action" data-nav="explore">CONNECT WITH PEOPLE ↗</button></div>'}`;
   const inboxScroll = list?.querySelector('.chat-inbox-scroll');
@@ -1885,7 +1889,7 @@ const openChat = (person, markAsRead = true) => {
     chatName.onclick = () => openPublicProfile(person);
     chatName.onkeydown = (event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); openPublicProfile(person); } };
   }
-  const chatRole = document.querySelector('#chat-role'); if (chatRole) chatRole.textContent = `${person.role || 'Brivia member'}${person.city ? ` · ${person.city}` : ''}`;
+  const chatRole = document.querySelector('#chat-role'); if (chatRole) chatRole.textContent = `${person.role || 'Brivia member'}${person.city ? `, ${person.city}` : ''}`;
   const chatStatus = document.querySelector('#chat-status'); if (chatStatus) chatStatus.textContent = 'MEMBER / PRIVATE THREAD';
   renderChats();
   if (!chatMessages[person.id]) chatMessages[person.id] = [];
@@ -1941,7 +1945,7 @@ const renderMessages = () => {
     const gone = !valid || sharedResumeFailed.has(String(message.id));
     const goneLine = gone ? `<span class="message-resume-gone" id="resume-gone-${id}">${escapeHtml(RESUME_GONE_COPY)}</span>` : '';
     const open = valid ? `<button type="button" class="message-resume-open" data-resume-open="${escapeHtml(message.attachment.path)}" data-message-id="${id}" aria-label="Open resume"${gone ? ` aria-describedby="resume-gone-${id}"` : ''}>Open</button>` : '';
-    return `<span class="message-resume"><span class="message-resume-icon">${RESUME_DOC_ICON}</span><span class="message-resume-copy"><span class="message-resume-title">Resume · PDF</span><span class="message-resume-sub">${message.from === 'me' ? 'Your latest version' : 'Their latest version'}</span>${goneLine}</span>${open}</span>`;
+    return `<span class="message-resume"><span class="message-resume-icon">${RESUME_DOC_ICON}</span><span class="message-resume-copy"><span class="message-resume-title">Resume (PDF)</span><span class="message-resume-sub">${message.from === 'me' ? 'Your latest version' : 'Their latest version'}</span>${goneLine}</span>${open}</span>`;
   };
   const renderSharedArea = (area) => `<span class="message-place"><span class="message-place-icon">${SHARE_PIN_ICON}</span><span class="message-place-copy"><span class="message-place-eyebrow">Shared area</span><span class="message-place-name">${escapeHtml(area.place)}</span><span class="message-place-scope">${escapeHtml(area.scope)}</span></span></span>`;
   const renderBubble = (message) => {
@@ -1983,6 +1987,22 @@ const renderMessages = () => {
   }
 };
 
+const CHAT_CLOSE_ICON = '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true" focusable="false"><path d="M6 6l12 12M18 6 6 18"/></svg>';
+// Something layered over the open thread (a menu, a picker, a dialog) takes Escape first.
+const CHAT_LAYERS = '#chat-more-menu:not([hidden]), #chat-emoji-picker:not([hidden]), #chat-attachment-menu:not([hidden]), #chat-gif-picker:not([hidden]), #chat-share-menu:not([hidden]), #chat-camera-modal:not([hidden]), #public-profile-modal, #profile-edit-modal, dialog[open], .app-overlay:not([hidden])';
+const closeChatToInbox = () => {
+  if (!selectedChat) return;
+  const id = selectedChat.id;
+  closeSelectedChat();
+  // Focus lands on the conversation just closed, so the keyboard keeps its place in the list.
+  (document.querySelector(`#chat-list [data-chat-id="${CSS.escape(String(id))}"]`) || document.querySelector('#chat-search, #chat-list input'))?.focus?.({ preventScroll: true });
+};
+window.addEventListener('keydown', (event) => {
+  if (event.key !== 'Escape' || !selectedChat || document.body.dataset.appView !== 'chat') return;
+  if (document.querySelector('#chat-window')?.hidden || document.querySelector(CHAT_LAYERS)) return;
+  event.preventDefault();
+  closeChatToInbox();
+}, true);
 const closeSelectedChat = () => {
   closeShareMenu();
   leaveTyping();
@@ -2163,6 +2183,11 @@ const ensureChatMoreMenu = () => {
   const header = document.querySelector('.chat-window-head');
   if (!header) return;
   if (!document.querySelector('#chat-more')) header.insertAdjacentHTML('beforeend', '<button class="chat-more" id="chat-more" type="button" aria-label="More chat options" aria-expanded="false">•••</button><div class="chat-more-menu" id="chat-more-menu" hidden><button type="button" data-chat-action="delete">Delete chat</button><button type="button" data-chat-action="remove-connection">Remove connection</button><button type="button" data-chat-action="block">Block user</button><button type="button" data-chat-action="report">Report and block</button></div>');
+  // Close (D-096): back to "Your messages" on desktop, where the phone's back arrow is hidden. Escape does the same.
+  if (!document.querySelector('#chat-close')) {
+    document.querySelector('#chat-more-menu')?.insertAdjacentHTML('afterend', `<button class="chat-close" id="chat-close" type="button" aria-label="Close chat" title="Close chat">${CHAT_CLOSE_ICON}</button>`);
+    document.querySelector('#chat-close')?.addEventListener('click', closeChatToInbox);
+  }
   const more = document.querySelector('#chat-more');
   const menu = document.querySelector('#chat-more-menu');
   const actionButton = menu?.querySelector('[data-chat-action="block"], [data-chat-action="unblock"]');
@@ -2637,7 +2662,7 @@ const openRemovedConnectionsManager = () => {
       const person = findPersonById(record.id) || { id: record.id, name: record.name, image: record.image };
       const removedDate = new Date(record.removedAt);
       const dateLabel = Number.isNaN(removedDate.getTime()) ? '' : removedDate.toLocaleDateString([], { day: 'numeric', month: 'short', year: 'numeric' });
-      return `<div class="profile-connection-row profile-removed-connection-row"><div class="profile-connection-member">${renderAvatar(person, 'profile-connection-avatar')}<div class="profile-connection-copy"><strong>${escapeHtml(record.name || person.name)}</strong><span>Removed${dateLabel ? ` · ${escapeHtml(dateLabel)}` : ''}</span></div></div></div>`;
+      return `<div class="profile-connection-row profile-removed-connection-row"><div class="profile-connection-member">${renderAvatar(person, 'profile-connection-avatar')}<div class="profile-connection-copy"><strong>${escapeHtml(record.name || person.name)}</strong><span>Removed${dateLabel ? ` on ${escapeHtml(dateLabel)}` : ''}</span></div></div></div>`;
     }).join('') : '<p class="profile-settings-empty">No removed connections yet.</p>';
   };
   renderList();
@@ -2756,7 +2781,7 @@ const renderProfileResume = () => {
   if (resume.busy === 'upload' && resume.pending) {
     file = `<div class="profile-resume-file is-busy"><span class="profile-resume-icon">${RESUME_DOC_ICON}</span><div class="profile-resume-text"><p class="profile-resume-name">${escapeHtml(resume.pending.name || RESUME_FILE_NAME)}</p><p class="profile-resume-meta">${escapeHtml(formatResumeSize(resume.pending.size))}</p></div></div><div class="profile-resume-progress" aria-hidden="true"><i></i></div>`;
   } else if (resume.path) {
-    file = `<div class="profile-resume-file"><span class="profile-resume-icon is-filled">${RESUME_DOC_ICON}</span><div class="profile-resume-text"><p class="profile-resume-name">${RESUME_FILE_NAME}</p><p class="profile-resume-meta">${(resumeMetaLine(resume.info || {}) || 'PDF on file').split(' · ').map((part) => `<span>${escapeHtml(part)}</span>`).join(' · ')}</p></div></div>`;
+    file = `<div class="profile-resume-file"><span class="profile-resume-icon is-filled">${RESUME_DOC_ICON}</span><div class="profile-resume-text"><p class="profile-resume-name">${RESUME_FILE_NAME}</p><p class="profile-resume-meta">${(resumeMetaLine(resume.info || {}) || 'PDF on file').split(', ').map((part) => `<span>${escapeHtml(part)}</span>`).join(', ')}</p></div></div>`;
   } else {
     file = `<div class="profile-resume-file is-empty"><span class="profile-resume-icon">${RESUME_DOC_ICON}</span><p class="profile-resume-lead">Add your resume so a match can see your experience when you choose to share it.</p></div>`;
   }
@@ -3471,10 +3496,10 @@ const renderPendingChatFiles = () => {
       : entry.kind === 'video'
         ? `<video src="${escapeHtml(entry.previewUrl)}" muted preload="metadata"></video>`
         : '<span class="chat-file-preview-icon">↗</span>';
-    return `<div class="chat-attachment-chip"><span class="chat-attachment-thumb">${media}</span><span class="chat-attachment-chip-copy"><strong>${escapeHtml(entry.file.name)}</strong><small>${entry.kind.toUpperCase()} · ${formatFileSize(entry.file.size)}</small></span><button type="button" data-remove-chat-file="${index}" aria-label="Remove ${escapeHtml(entry.file.name)}">×</button></div>`;
+    return `<div class="chat-attachment-chip"><span class="chat-attachment-thumb">${media}</span><span class="chat-attachment-chip-copy"><strong>${escapeHtml(entry.file.name)}</strong><small>${entry.kind.toUpperCase()}, ${formatFileSize(entry.file.size)}</small></span><button type="button" data-remove-chat-file="${index}" aria-label="Remove ${escapeHtml(entry.file.name)}">×</button></div>`;
   }).join('');
   if (pendingChatGif) {
-    preview.innerHTML += `<div class="chat-attachment-chip"><span class="chat-attachment-thumb"><img src="${escapeHtml(pendingChatGif.url)}" alt="${escapeHtml(pendingChatGif.label)} GIF" /></span><span class="chat-attachment-chip-copy"><strong>${escapeHtml(pendingChatGif.label)} GIF</strong><small>GIF · READY TO SEND</small></span><button type="button" data-remove-chat-gif aria-label="Remove GIF">×</button></div>`;
+    preview.innerHTML += `<div class="chat-attachment-chip"><span class="chat-attachment-thumb"><img src="${escapeHtml(pendingChatGif.url)}" alt="${escapeHtml(pendingChatGif.label)} GIF" /></span><span class="chat-attachment-chip-copy"><strong>${escapeHtml(pendingChatGif.label)} GIF</strong><small>GIF, READY TO SEND</small></span><button type="button" data-remove-chat-gif aria-label="Remove GIF">×</button></div>`;
   }
   preview.hidden = !pendingChatFiles.length && !pendingChatGif;
   const videoWarning = document.querySelector('#chat-video-warning');
@@ -3575,7 +3600,7 @@ const renderShareMenu = () => {
   // Only inside an existing match (brivia_can_message); without a resume the row leads to Profile (no dead end).
   if (resumeState !== null && shareMatches.get(String(selectedChat.id)) === true) {
     rows.push(resumeState
-      ? shareItem('resume', RESUME_DOC_ICON, 'Share my resume', 'PDF · they always see your latest')
+      ? shareItem('resume', RESUME_DOC_ICON, 'Share my resume', 'PDF. They always see your latest.')
       : `<div class="chat-share-row">${shareItem('resume', RESUME_DOC_ICON, 'Share my resume', NO_RESUME_HINT, ' aria-disabled="true"')}<button type="button" class="chat-share-add" data-share-action="add-resume" data-nav="profile">Add resume</button></div>`);
   }
   const area = parseAreaBody(areaShareBody(memberPlaceLabel));
@@ -3652,7 +3677,7 @@ const confirmResumeShare = async () => {
   const size = formatResumeSize(resume.info?.size);
   const ok = await openShareConfirm({
     title: `Share your resume with ${person.name || 'this member'}?`,
-    preview: `<div class="share-confirm-doc"><span class="share-confirm-doc-icon">${RESUME_DOC_ICON}</span><span class="share-confirm-doc-copy"><span class="share-confirm-doc-title">Resume · PDF</span><span class="share-confirm-doc-meta">${escapeHtml([RESUME_FILE_NAME, size].filter(Boolean).join(' · '))}</span></span></div>`,
+    preview: `<div class="share-confirm-doc"><span class="share-confirm-doc-icon">${RESUME_DOC_ICON}</span><span class="share-confirm-doc-copy"><span class="share-confirm-doc-title">Resume (PDF)</span><span class="share-confirm-doc-meta">${escapeHtml([RESUME_FILE_NAME, size].filter(Boolean).join(', '))}</span></span></div>`,
     note: RESUME_SHARE_NOTE,
     confirmLabel: 'Share resume',
     icon: RESUME_DOC_ICON,

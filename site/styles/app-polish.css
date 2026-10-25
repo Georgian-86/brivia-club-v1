@@ -1,0 +1,67 @@
+/* App polish (D-096). Loads last. Tokens only.
+   1. The header's bell and avatar are one size: 40 px circles (a 44 px tap area), on every screen.
+   2. Explore: more air between the post cards and around the grid; the card's proportions are unchanged. */
+
+/* ---------- 1. Header icons ---------- */
+body.app-body .app-topbar :is(#app-notification-button, #app-avatar-button) {
+  display: inline-grid !important;
+  place-items: center;
+  flex: 0 0 40px !important;
+  width: 40px !important;
+  height: 40px !important;
+  min-width: 40px !important;
+  min-height: 40px !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  border-radius: 50% !important;
+}
+body.app-body .app-topbar :is(#app-notification-button, #app-avatar-button)::before {
+  position: absolute;
+  inset: -2px;
+  border-radius: 50%;
+  content: '';
+}
+body.app-body .app-topbar #app-notification-button svg { width: 18px; height: 18px; }
+/* Phones: both centred on the 54 px header row, 12 px apart, 16 px from the edge. */
+@media (max-width: 780px) {
+  body.app-body .app-topbar #app-avatar-button { top: calc(7px + env(safe-area-inset-top, 0px)) !important; right: 16px !important; transform: none !important; }
+  body.app-body .app-topbar #app-notification-button { top: calc(7px + env(safe-area-inset-top, 0px)) !important; right: 68px !important; transform: none !important; }
+}
+
+/* ---------- 2. Explore spacing ---------- */
+body.app-body .community-feed-view .community-post-list {
+  gap: var(--space-6) !important;
+  max-width: 340px;
+  margin-top: var(--space-2) !important;
+}
+@media (max-width: 639px) {
+  /* One column between equal 20 px margins. */
+  body.app-body .community-feed-view { padding-right: 20px !important; padding-left: 20px !important; }
+  body.app-body .community-feed-view .community-post-list { gap: var(--space-5) !important; width: 100% !important; max-width: none !important; margin-right: 0 !important; margin-left: 0 !important; }
+}
+/* The heading row and the posts / sort row always span exactly the grid's width, so their edges line up. */
+@media (min-width: 640px) {
+  body.app-body .community-feed-view .community-post-list { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-5) !important; max-width: 640px; }
+  body.app-body .community-feed-view :is(.community-feed-head, .community-feed-toolbar) { max-width: 640px !important; margin-right: auto !important; margin-left: auto !important; }
+}
+@media (min-width: 960px) {
+  body.app-body .community-feed-view .community-post-list { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 28px !important; max-width: 960px; }
+  body.app-body .community-feed-view :is(.community-feed-head, .community-feed-toolbar) { max-width: 960px !important; }
+}
+@media (min-width: 1360px) {
+  body.app-body .community-feed-view .community-post-list { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--space-6) !important; max-width: 1240px; }
+  body.app-body .community-feed-view :is(.community-feed-head, .community-feed-toolbar) { max-width: 1240px !important; }
+}
+
+/* ---------- 3. The deck's hint: two plain lines, no separator dots (D-096) ---------- */
+body.app-body .app-view[data-view="home"] .swipe-hint:not([hidden]) {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  row-gap: 4px;
+}
+body.app-body .app-view[data-view="home"] .swipe-hint .swipe-left-copy:not([hidden]) { order: 2; font-weight: inherit; }
+@media (max-width: 849px) {
+  body.app-body .app-view[data-view="home"] .swipe-hint:not([hidden]) { align-items: center; }
+}
+body.app-body .app-view[data-view="home"] .swipe-hint .swipe-hint-line { margin: 0 !important; padding: 0 !important; color: inherit; }

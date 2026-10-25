@@ -79,8 +79,8 @@ test('sizes read as KB under 1 MB and as MB with one decimal above', () => {
   assert.equal(formatResumeSize(null), '');
 });
 
-test('the meta line is "resume.pdf · 1.2 MB · Updated 21 Oct 2026"; missing parts drop out', () => {
-  assert.equal(resumeMetaLine({ size: 1258291, updatedAt: '2026-10-21T09:00:00Z' }), '1.2 MB · Updated 21 Oct 2026');
+test('the meta line is "resume.pdf, 1.2 MB, Updated 21 Oct 2026"; missing parts drop out', () => {
+  assert.equal(resumeMetaLine({ size: 1258291, updatedAt: '2026-10-21T09:00:00Z' }), '1.2 MB, Updated 21 Oct 2026');
   assert.equal(resumeMetaLine({ size: 1258291 }), '1.2 MB');
   assert.equal(resumeMetaLine({ updatedAt: 'not a date' }), '');
 });

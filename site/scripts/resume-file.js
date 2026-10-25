@@ -63,7 +63,7 @@ export const resumeMetaLine = ({ size, updatedAt } = {}) => {
   if (sizeText) parts.push(sizeText);
   const date = updatedAt ? new Date(updatedAt) : null;
   if (date && !Number.isNaN(date.getTime())) parts.push(`Updated ${date.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}`);
-  return parts.join(' · ');
+  return parts.join(', ');
 };
 
 const errorText = (error) => `${error?.statusCode || error?.status || ''} ${error?.code || ''} ${error?.error || ''} ${error?.message || ''}`;

@@ -104,14 +104,14 @@ try {
   const wide = await makeContext({ width: 1440, height: 900 });
   let page = await open(wide);
   await waitForCard(page, 'Asha Band');
-  await page.waitForFunction(() => document.querySelector('#swipe-left-count')?.textContent?.trim() === '30 of 30 signals left · 24-hour window', null, { timeout: 5000 }).catch(() => {});
+  await page.waitForFunction(() => document.querySelector('#swipe-left-count')?.textContent?.trim() === '30 of 30 signals left', null, { timeout: 5000 }).catch(() => {});
   let card = await cardState(page);
   check(`card 1 shows the band "~3 km" (got "${card.band}")`, () => { assert.equal(card.band, '~3 km'); assert.equal(card.bandHidden, false); });
   check(`card 1 shows 2 "You both" chips then up to 3 tags (${JSON.stringify(card.chips)})`, () => {
     assert.deepEqual(card.shared, ['You both: Badminton', 'You both: Chess']);
     assert.deepEqual(card.chips, ['You both: Badminton', 'You both: Chess', 'Long-distance running', 'Poetry', 'Jazz piano']);
   });
-  check(`the quota counter shows under the deck (got "${card.counter}")`, () => assert.equal(card.counter, '30 of 30 signals left · 24-hour window'));
+  check(`the quota counter shows under the deck (got "${card.counter}")`, () => assert.equal(card.counter, '30 of 30 signals left'));
   check('the deck loads from rpc/deck_candidates { p_limit: 12 } and never rpc/list_members', () => {
     assert.ok(deckCalls().length >= 1);
     deckCalls().forEach((c) => assert.deepEqual(JSON.parse(c.body || '{}'), { p_limit: 12 }));
