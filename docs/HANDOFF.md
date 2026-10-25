@@ -147,7 +147,10 @@ Tooling: Playwright **and axe-core** at `/tmp/pw` (`npm install --prefix /tmp/pw
   ("playground") video section removed, a shorter deck card with no round Pass / Pitch on screen (keyboard users still
   reach them), and a first-run deck tutorial with "Don't show this again". New e2e `tests/e2e/deck-tutorial.spec.mjs`.
   Still open from the same founder message: chat close button + Escape, mobile profile/login after the attachments,
-  Explore spacing, fewer dots in deck copy, login OR spacing, the phone on "Where ideas begin", the Resend sender.
+  Explore spacing, fewer dots in deck copy, the phone on "Where ideas begin", the Resend sender.
+- **2026-10-25, interests dropdown (D-095):** signup step "What are you into?" is now one dropdown (a combobox with a
+  multi-select list grouped by category, Popular first; type to search) instead of tabs and chips. Picks show in the
+  "Your picks" tray above the field. The login "or" above Continue with Google sits 14 px from each neighbour (was ~28).
 - **2026-10-25, launch polish (D-092):** OR divider, the profile dialog, smaller Explore cards, filter dropdowns, the
   profile sidebar and framed hero, the hero video's own soundtrack, area changes from Edit profile, and the decorative
   dead ends removed. New e2e `tests/e2e/launch-polish.spec.mjs`; every control clicked at 1440 and 390 px (D-092).

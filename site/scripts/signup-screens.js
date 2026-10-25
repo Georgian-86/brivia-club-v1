@@ -38,6 +38,7 @@ const ICONS = {
   search: '<circle cx="11" cy="11" r="6.5"/><path d="M16 16l4.5 4.5"/>',
   arrow: '<path d="M5 12h14M13 6l6 6-6 6"/>',
   back: '<path d="M19 12H5M11 6l-6 6 6 6"/>',
+  chevron: '<path d="M6 9l6 6 6-6"/>',
 };
 const svg = (name, cls = '') => `<svg class="${cls}" viewBox="0 0 24 24" aria-hidden="true" focusable="false">${ICONS[name]}</svg>`;
 
@@ -442,30 +443,29 @@ export const initGuidedSignup = ({
       const picked = () => new Set(a.interests.map((p) => p.id));
       return {
         primary: 'Finish',
-        // D-082b: search, a compact "Your picks" tray (in the flow, so it never covers a chip), a scrollable row of
-        // category tabs ("Popular" first), and one category's chips at a time in a fixed-height panel.
+        // D-095 (refines D-082b): one dropdown, like "Find your people" (D-092). The field opens a list grouped by
+        // category ("Popular" first); typing narrows it to the best matches. Picks stay open for another and land in
+        // the compact "Your picks" tray above the field (never under the open list), where a tap removes them.
         html: `${heading('What are you into?', 'Pick what you genuinely care about, up to twelve. Three to six works best.')}
-          <label class="guided-field guided-field--search"><span class="sr-only">Search interests</span>${svg('search', 'guided-search-icon')}
-            <input type="search" name="guided-interest" autocomplete="off" spellcheck="false" placeholder="Search all interests, e.g. chess or hiking" aria-controls="guided-interest-options" /></label>
           <div class="guided-tray" data-guided-tray>
             <div class="guided-tray-head"><span>Your picks</span><b data-guided-count aria-hidden="true">0 picked</b></div>
             <ul class="guided-tray-list" aria-label="Your picks"></ul>
-            <p class="guided-tray-empty" data-guided-tray-empty>Tap an interest below to add it here.</p>
+            <p class="guided-tray-empty" data-guided-tray-empty>Open the list below and pick a few.</p>
             <p class="sr-only" data-guided-announce aria-live="polite"></p>
           </div>
-          <div class="guided-tabs" data-guided-tabs>
-            <button class="guided-tabs-scroll guided-tabs-scroll--prev" type="button" tabindex="-1" aria-hidden="true" data-tabs-scroll="-1">${svg('back', '')}</button>
-            <div class="guided-tablist" role="tablist" aria-label="Interest categories"></div>
-            <button class="guided-tabs-scroll guided-tabs-scroll--next" type="button" tabindex="-1" aria-hidden="true" data-tabs-scroll="1">${svg('arrow', '')}</button>
-          </div>
-          <div class="guided-options" id="guided-interest-options" role="tabpanel" tabindex="0"></div>`,
+          <div class="guided-combo" data-guided-combo>
+            <label class="guided-field guided-field--search guided-field--combo"><span class="sr-only">Interests</span>${svg('search', 'guided-search-icon')}
+              <input type="text" role="combobox" name="guided-interest" autocomplete="off" spellcheck="false" placeholder="Choose interests or type to search" aria-autocomplete="list" aria-expanded="false" aria-controls="guided-interest-options" />
+              ${svg('chevron', 'guided-combo-chevron')}</label>
+            <div class="guided-menu" id="guided-interest-options" role="listbox" aria-multiselectable="true" aria-label="Interests" hidden></div>
+          </div>`,
         mount: async (el) => {
+          const combo = el.querySelector('[data-guided-combo]');
           const input = el.querySelector('input');
-          const options = el.querySelector('.guided-options');
-          const tabsBox = el.querySelector('[data-guided-tabs]');
-          const tablist = el.querySelector('[role="tablist"]');
+          const menu = el.querySelector('.guided-menu');
           let groups = [];
-          let activeTab = 'popular';
+          let shown = []; // the options in the open list, in order (ids), for the arrow keys
+          let active = -1;
           const tray = el.querySelector('.guided-tray-list');
           const trayEmpty = el.querySelector('[data-guided-tray-empty]');
           const count = el.querySelector('[data-guided-count]');
@@ -476,131 +476,124 @@ export const initGuidedSignup = ({
             trayEmpty.hidden = a.interests.length > 0;
           };
           const bump = () => { if (!reducedMotion() && count.animate) count.animate([{ transform: 'scale(1)' }, { transform: 'scale(1.14)' }, { transform: 'scale(1)' }], { duration: 180, easing: 'ease-out' }); };
-          // FLIP: a clone flies from the tapped chip to its slot in the tray (and back on removal); under reduced
-          // motion the chip simply fades in where it lands. from: { rect, node } captured before the lists re-render.
-          const fly = (from, to) => {
-            if (!from?.rect || !to || !to.isConnected) return;
-            if (reducedMotion() || !to.animate) { to.animate?.([{ opacity: 0 }, { opacity: 1 }], { duration: 150 }); return; }
-            const s = from.rect;
-            const t = to.getBoundingClientRect();
-            const ghost = from.node.cloneNode(true);
-            ghost.classList.add('guided-ghost');
-            ghost.removeAttribute('id');
-            ghost.setAttribute('aria-hidden', 'true');
-            Object.assign(ghost.style, { left: `${s.left}px`, top: `${s.top}px`, width: `${s.width}px`, height: `${s.height}px` });
-            document.body.append(ghost);
-            to.style.opacity = '0';
-            const anim = ghost.animate([
-              { transform: 'translate(0, 0) scale(1)', opacity: 1 },
-              { transform: `translate(${t.left - s.left}px, ${t.top - s.top}px) scale(${t.width / Math.max(1, s.width)}, ${t.height / Math.max(1, s.height)})`, opacity: 1 },
-            ], { duration: 240, easing: 'cubic-bezier(.2,.7,.2,1)' });
-            const done = () => { ghost.remove(); to.style.opacity = ''; };
-            anim.finished.then(done, done);
+          const isOpen = () => !menu.hidden;
+          const optionId = (i) => `guided-interest-${i}`;
+          // A line in the list that is not a choice (loading, no match): an inert option, so the listbox holds only options.
+          const note = (text) => `<div class="guided-menu-note" role="option" aria-disabled="true" aria-selected="false">${text}</div>`;
+          const setActive = (i, { scroll = true } = {}) => {
+            active = shown.length && i >= 0 ? Math.min(i, shown.length - 1) : -1;
+            menu.querySelectorAll('.guided-menu-option').forEach((o, j) => o.classList.toggle('is-active', j === active));
+            if (active < 0) { input.removeAttribute('aria-activedescendant'); return; }
+            input.setAttribute('aria-activedescendant', optionId(active));
+            if (scroll) menu.querySelector(`#${optionId(active)}`)?.scrollIntoView({ block: 'nearest' });
           };
-          const toggle = (id, source) => {
-            const node = state.nodes.find((n) => n.id === id);
+          const renderMenu = () => {
+            if (!isOpen()) return;
+            const chosen = picked();
+            const q = query.trim().toLowerCase();
+            const option = (n) => {
+              const i = shown.push(n.id) - 1;
+              return `<div class="guided-menu-option" id="${optionId(i)}" role="option" data-id="${escapeHtml(n.id)}" aria-selected="${chosen.has(n.id)}">${escapeHtml(n.label)}${svg('tick', 'guided-menu-tick')}</div>`;
+            };
+            shown = [];
+            if (!state.nodes) { menu.innerHTML = note('Loading interests…'); return; }
+            if (q) {
+              const list = state.nodes.filter((n) => n.label.toLowerCase().includes(q)).sort((x, y) => Number(!x.label.toLowerCase().startsWith(q)) - Number(!y.label.toLowerCase().startsWith(q))).slice(0, 40);
+              menu.innerHTML = list.length ? list.map(option).join('') : note(`No interest matches "${escapeHtml(query)}". Try a shorter word.`);
+            } else {
+              // Popular, then each category; an interest listed under Popular is not listed again below it.
+              const inPopular = new Set((groups[0]?.items || []).map((n) => n.id));
+              menu.innerHTML = groups.map((g, gi) => {
+                const items = gi === 0 ? g.items : g.items.filter((n) => !inPopular.has(n.id));
+                if (!items.length) return '';
+                return `<div class="guided-menu-group" role="group" aria-label="${escapeHtml(g.label)}"><p class="guided-menu-label" aria-hidden="true">${escapeHtml(g.label)}</p>${items.map(option).join('')}</div>`;
+              }).join('');
+            }
+            setActive(Math.min(active, shown.length - 1), { scroll: false });
+          };
+          const openMenu = () => {
+            if (isOpen()) return;
+            menu.hidden = false;
+            combo.classList.add('is-open');
+            input.setAttribute('aria-expanded', 'true');
+            active = -1;
+            menu.scrollTop = 0;
+            renderMenu();
+            // On a short screen the open list scrolls the form so all of it shows.
+            requestAnimationFrame(() => { if (isOpen()) menu.scrollIntoView({ block: 'nearest' }); });
+          };
+          const closeMenu = () => {
+            if (!isOpen()) return;
+            menu.hidden = true;
+            combo.classList.remove('is-open');
+            input.setAttribute('aria-expanded', 'false');
+            input.removeAttribute('aria-activedescendant');
+            active = -1;
+          };
+          const toggle = (id) => {
+            const node = state.nodes?.find((n) => n.id === id);
             if (!node) return;
             const has = picked().has(id);
             if (!has && a.interests.length >= MAX_INTERESTS) { setError(COPY.cap); return; }
-            const from = source?.isConnected ? { rect: source.getBoundingClientRect(), node: source } : null;
             setError('');
             a.interests = has ? a.interests.filter((p) => p.id !== id) : [...a.interests, { id, label: node.label, mode: 'play' }];
             renderTray();
-            renderOptions();
+            const opt = menu.querySelector(`.guided-menu-option[data-id="${CSS.escape(id)}"]`);
+            if (opt) opt.setAttribute('aria-selected', String(!has));
             bump();
             announce.textContent = `${node.label} ${has ? 'removed' : 'added'}. ${a.interests.length} picked.`;
             navigator.vibrate?.(8);
-            fly(from, (has ? options : tray).querySelector(`[data-id="${CSS.escape(id)}"]`));
+            const landed = !has && tray.querySelector(`[data-id="${CSS.escape(id)}"]`);
+            if (landed && !reducedMotion()) landed.animate?.([{ opacity: 0, transform: 'scale(.85)' }, { opacity: 1, transform: 'none' }], { duration: 180, easing: 'cubic-bezier(.2,.7,.2,1)' });
             refreshNext();
           };
-          // The tabs: roving tabindex, automatic activation (arrow keys, Home, End), the selected one scrolled into view.
-          const tabId = (id) => `guided-tab-${id}`;
-          const renderTabs = () => {
-            tablist.innerHTML = groups.map((g) => `<button type="button" role="tab" class="guided-tab" id="${tabId(escapeHtml(g.id))}" data-cat="${escapeHtml(g.id)}" aria-controls="guided-interest-options" aria-selected="${g.id === activeTab}" tabindex="${g.id === activeTab ? 0 : -1}">${escapeHtml(g.label)}</button>`).join('');
-          };
-          const syncScrollers = () => {
-            const max = tablist.scrollWidth - tablist.clientWidth;
-            tabsBox.classList.toggle('can-prev', tablist.scrollLeft > 2);
-            tabsBox.classList.toggle('can-next', tablist.scrollLeft < max - 2);
-          };
-          const selectTab = (id, { focus = false } = {}) => {
-            activeTab = id;
-            for (const t of tablist.querySelectorAll('[role="tab"]')) {
-              const on = t.dataset.cat === id;
-              t.setAttribute('aria-selected', String(on));
-              t.tabIndex = on ? 0 : -1;
-              if (on) {
-                if (focus) t.focus({ preventScroll: true });
-                const left = t.offsetLeft - tablist.offsetLeft;
-                if (left < tablist.scrollLeft || left + t.offsetWidth > tablist.scrollLeft + tablist.clientWidth) tablist.scrollTo({ left: Math.max(0, left - 24), behavior: reducedMotion() ? 'auto' : 'smooth' });
-              }
-            }
-            options.scrollTop = 0;
-            renderOptions();
-          };
-          const renderOptions = () => {
-            const chosen = picked();
-            const q = query.trim().toLowerCase();
-            let list;
-            tabsBox.hidden = Boolean(q);
-            if (q) {
-              list = state.nodes.filter((n) => n.label.toLowerCase().includes(q)).sort((x, y) => Number(!x.label.toLowerCase().startsWith(q)) - Number(!y.label.toLowerCase().startsWith(q))).slice(0, 40);
-              options.setAttribute('role', 'region');
-              options.removeAttribute('aria-labelledby');
-              options.setAttribute('aria-label', 'Matching interests');
-            } else {
-              list = (groups.find((g) => g.id === activeTab) || groups[0])?.items || [];
-              options.setAttribute('role', 'tabpanel');
-              options.removeAttribute('aria-label');
-              options.setAttribute('aria-labelledby', tabId(activeTab));
-            }
-            options.innerHTML = list.length
-              ? list.map((n) => `<button type="button" class="guided-option" data-id="${escapeHtml(n.id)}" aria-pressed="${chosen.has(n.id)}">${svg('tick', 'guided-option-tick')}${escapeHtml(n.label)}</button>`).join('')
-              : `<p class="guided-helper">No interest matches "${escapeHtml(query)}".</p>`;
-            requestAnimationFrame(syncMore);
-          };
-          tablist.addEventListener('click', (event) => { const t = event.target.closest('[role="tab"]'); if (t) selectTab(t.dataset.cat); });
-          tablist.addEventListener('keydown', (event) => {
-            const tabs = [...tablist.querySelectorAll('[role="tab"]')];
-            const at = tabs.findIndex((t) => t.dataset.cat === activeTab);
-            const to = { ArrowRight: at + 1, ArrowLeft: at - 1, Home: 0, End: tabs.length - 1 }[event.key];
-            if (to === undefined || !tabs.length) return;
-            event.preventDefault();
-            selectTab(tabs[(to + tabs.length) % tabs.length].dataset.cat, { focus: true });
-          });
-          tablist.addEventListener('scroll', syncScrollers, { passive: true });
-          const syncMore = () => options.classList.toggle('has-more', options.scrollHeight - options.clientHeight - options.scrollTop > 4);
-          options.addEventListener('scroll', syncMore, { passive: true });
-          tabsBox.addEventListener('click', (event) => {
-            const b = event.target.closest('[data-tabs-scroll]');
-            if (b) tablist.scrollBy({ left: Number(b.dataset.tabsScroll) * tablist.clientWidth * 0.7, behavior: reducedMotion() ? 'auto' : 'smooth' });
-          });
-          tray.addEventListener('click', (event) => { const b = event.target.closest('.guided-pick'); if (b) toggle(b.dataset.id, b); });
-          options.addEventListener('click', (event) => { const b = event.target.closest('.guided-option'); if (b) toggle(b.dataset.id, b); });
-          input.addEventListener('input', () => { query = input.value; if (state.nodes) renderOptions(); });
-          // Enter in the search adds the first match; with nothing typed it is Continue.
+          input.addEventListener('focus', openMenu);
+          input.addEventListener('click', openMenu);
+          input.addEventListener('input', () => { query = input.value; openMenu(); active = query.trim() ? 0 : -1; renderMenu(); });
           input.addEventListener('keydown', (event) => {
-            if (event.key !== 'Enter' || !query.trim()) return;
-            event.preventDefault();
-            const first = options.querySelector('.guided-option[aria-pressed="false"]');
-            if (first) { toggle(first.dataset.id, first); input.value = ''; query = ''; renderOptions(); }
+            if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+              event.preventDefault();
+              if (!isOpen()) { openMenu(); setActive(0); return; }
+              setActive(active < 0 ? 0 : active + (event.key === 'ArrowDown' ? 1 : -1));
+            } else if (event.key === 'Home' && isOpen() && !query) { event.preventDefault(); setActive(0); }
+            else if (event.key === 'End' && isOpen() && !query) { event.preventDefault(); setActive(shown.length - 1); }
+            else if (event.key === 'Escape' && isOpen()) { event.preventDefault(); event.stopPropagation(); closeMenu(); }
+            else if (event.key === 'Tab') closeMenu();
+            else if (event.key === 'Enter') {
+              // Enter picks the highlighted interest (with something typed, the best match); with nothing typed and
+              // nothing highlighted it is Finish.
+              const id = shown[active] ?? (query.trim() ? shown.find((x) => !picked().has(x)) : undefined);
+              if (!isOpen() || !id) { closeMenu(); return; }
+              event.preventDefault();
+              toggle(id);
+              if (query.trim()) { input.value = ''; query = ''; active = -1; renderMenu(); }
+            }
           });
+          // A press on an option keeps the focus in the field (so the list stays open for another pick).
+          menu.addEventListener('mousedown', (event) => event.preventDefault());
+          menu.addEventListener('click', (event) => {
+            const o = event.target.closest('.guided-menu-option');
+            if (!o) return;
+            setActive(shown.indexOf(o.dataset.id), { scroll: false });
+            toggle(o.dataset.id);
+          });
+          // A press anywhere else closes the list.
+          const outside = (event) => { if (!el.isConnected) { document.removeEventListener('pointerdown', outside, true); return; } if (!combo.contains(event.target)) closeMenu(); };
+          document.addEventListener('pointerdown', outside, true);
+          tray.addEventListener('click', (event) => { const b = event.target.closest('.guided-pick'); if (b) { toggle(b.dataset.id); renderMenu(); } });
           renderTray();
           if (!state.nodes) {
-            options.innerHTML = '<p class="guided-helper">Loading interests…</p>';
             const { data, error } = await fetchInterestNodes();
             // Private (sensitive) interests are not offered here: they need their own consent screen.
             if (!error) { state.allNodes = data || []; state.nodes = state.allNodes.filter(isOffered); }
             if (!el.isConnected) return;
-            if (error || !state.nodes?.length) { state.nodes = null; options.innerHTML = ''; setError(COPY.interestsLoad); return; }
+            if (error || !state.nodes?.length) { state.nodes = null; menu.innerHTML = ''; setError(COPY.interestsLoad); return; }
           }
           // Picks restored from an earlier visit keep only what is still offered.
           a.interests = a.interests.filter((p) => state.nodes.some((n) => n.id === p.id));
           groups = groupInterests(state.allNodes || state.nodes, POPULAR_INTERESTS);
-          renderTabs();
           renderTray();
-          renderOptions();
-          requestAnimationFrame(syncScrollers);
+          renderMenu();
           refreshNext();
         },
         ready: () => a.interests.length >= 1 && a.interests.length <= MAX_INTERESTS && Boolean(state.nodes),

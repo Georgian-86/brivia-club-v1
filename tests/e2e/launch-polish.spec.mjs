@@ -1,5 +1,5 @@
 // Launch polish (D-092), stubbed Supabase (Vite on :5185). Never touches a real Supabase project. At 1440 and 390 px:
-// * login: the divider reads OR, exactly midway between LOG IN and the Google button;
+// * login: the divider reads OR, exactly midway between LOG IN and the Google button, 12-16 px from each (D-095);
 // * the public profile dialog: name and band, no invented bio, each interest once, Message only for a match (it opens
 //   that chat), Escape closes and focus returns;
 // * "Find your people": no capsule cloud; Skills & interests is a dropdown (Popular first), picks stay open, typing +
@@ -46,7 +46,7 @@ try {
         return { above: Math.round(or.top - submit.bottom), below: Math.round(g.top - or.bottom), text: document.querySelector('.auth-login .auth-divider').textContent.trim(), googleBottom: Math.round(g.bottom), h: innerHeight };
       });
       await check(`${tag} login: the divider reads OR, midway between LOG IN and Google (${JSON.stringify(gaps)})`, () => {
-        assert.equal(gaps.text, 'OR'); assert.ok(Math.abs(gaps.above - gaps.below) <= 1); assert.ok(gaps.googleBottom <= gaps.h);
+        assert.equal(gaps.text, 'OR'); assert.ok(Math.abs(gaps.above - gaps.below) <= 1); assert.ok(gaps.above >= 10 && gaps.above <= 17, 'OR gap'); assert.ok(gaps.googleBottom <= gaps.h);
       });
       await out.close();
     }
