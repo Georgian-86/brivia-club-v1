@@ -460,7 +460,7 @@ try {
   });
   const zero = await zeroState(small);
   check(`375 px zero quota: plain copy, no horizontal scroll (${JSON.stringify(zero)})`, () => {
-    assert.match(zero.text, /^No signals left today\. More at \d{1,2}(:\d\d)? ?[AP]M · Passing is always free\.$/i);
+    assert.match(zero.text, /^No signals left today\. More at \d{1,2}(:\d\d)? ?[AP]M\. Passing is always free\.$/i);
     assert.match(zero.hint, /^Your next signal frees up at \d{1,2}(:\d\d)? ?[AP]M$/i);
     assert.ok(zero.overflow <= 1);
   });

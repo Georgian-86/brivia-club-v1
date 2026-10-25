@@ -78,7 +78,15 @@ try {
         assert.equal(await page.evaluate(() => document.querySelector('#chat-window').hidden), true);
         assert.equal(await page.evaluate(() => document.activeElement?.classList.contains('chat-row-open')), true);
       });
+      // The notification panel over an open thread takes Escape first (the thread stays open).
       await page.locator('#chat-list [data-chat-id]').first().click();
+      await page.click('#app-notification-button');
+      await page.waitForSelector('#app-notification-panel:not([hidden])', { timeout: 3000 });
+      await page.keyboard.press('Escape');
+      await check(`${tag} chat: Escape with the notifications open closes them, not the thread`, async () => {
+        const st = await page.evaluate(() => ({ panel: document.querySelector('#app-notification-panel').hidden, thread: !document.querySelector('#chat-window').hidden }));
+        assert.deepEqual(st, { panel: true, thread: true });
+      });
       await page.click('#chat-close');
       await check(`${tag} chat: × closes the thread`, async () => assert.equal(await page.evaluate(() => document.querySelector('#chat-window').hidden), true));
     } else {

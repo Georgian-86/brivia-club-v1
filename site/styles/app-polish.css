@@ -11,6 +11,7 @@ body.app-body .app-topbar :is(#app-notification-button, #app-avatar-button) {
   height: 40px !important;
   min-width: 40px !important;
   min-height: 40px !important;
+  box-sizing: border-box !important; /* an open bell's border never grows it */
   margin: 0 !important;
   padding: 0 !important;
   border-radius: 50% !important;
@@ -65,3 +66,7 @@ body.app-body .app-view[data-view="home"] .swipe-hint .swipe-left-copy:not([hidd
   body.app-body .app-view[data-view="home"] .swipe-hint:not([hidden]) { align-items: center; }
 }
 body.app-body .app-view[data-view="home"] .swipe-hint .swipe-hint-line { margin: 0 !important; padding: 0 !important; color: inherit; }
+/* Hovered or open, the bell turns wine but keeps its size (it grew 5%): the two circles always match. */
+@media (min-width: 781px) {
+  body.app-body .app-topbar #app-notification-button:is(:hover, [aria-expanded="true"]) { transform: translateY(-50%); }
+}

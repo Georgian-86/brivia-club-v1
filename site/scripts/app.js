@@ -1989,7 +1989,7 @@ const renderMessages = () => {
 
 const CHAT_CLOSE_ICON = '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true" focusable="false"><path d="M6 6l12 12M18 6 6 18"/></svg>';
 // Something layered over the open thread (a menu, a picker, a dialog) takes Escape first.
-const CHAT_LAYERS = '#chat-more-menu:not([hidden]), #chat-emoji-picker:not([hidden]), #chat-attachment-menu:not([hidden]), #chat-gif-picker:not([hidden]), #chat-share-menu:not([hidden]), #chat-camera-modal:not([hidden]), #public-profile-modal, #profile-edit-modal, dialog[open], .app-overlay:not([hidden])';
+const CHAT_LAYERS = '#chat-more-menu:not([hidden]), #chat-emoji-picker:not([hidden]), #chat-attachment-menu:not([hidden]), #chat-gif-picker:not([hidden]), #chat-share-menu:not([hidden]), #chat-camera-modal:not([hidden]), #public-profile-modal, #profile-edit-modal, #app-notification-panel:not([hidden]), [popover]:popover-open, dialog[open], .app-overlay:not([hidden])';
 const closeChatToInbox = () => {
   if (!selectedChat) return;
   const id = selectedChat.id;
