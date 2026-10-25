@@ -3,8 +3,13 @@
    (1024 x 1536) holds the handset in its left half (centre at about 25% of its width), so the box is placed to put
    that centre on the screen's midline. Tokens only. */
 @media (max-width: 700px) {
+  /* The handset takes whatever height the form leaves (the form, through Continue with Google, is about 430 px), so the
+     whole login is one screen on any phone: tall phones get a big, immersive handset, short ones a smaller one. */
   body.auth-page {
-    --login-phone-h: clamp(130px, 25svh, 240px);
+    --login-phone-h: clamp(150px, calc(100vh - 508px), 330px); /* vh includes the hidden toolbar: 56 px more room */
+  }
+  @supports (height: 1svh) {
+    body.auth-page { --login-phone-h: clamp(150px, calc(100svh - 452px), 330px); }
   }
   body.auth-page .auth-shell:has(.auth-login.is-active) {
     position: relative;
@@ -22,10 +27,11 @@
     background-position: 0 0 !important;
     background-size: 100% 100% !important;
     background-repeat: no-repeat !important;
+    filter: drop-shadow(0 18px 22px color-mix(in srgb, var(--color-oxblood-deep) 22%, transparent));
     pointer-events: none;
     transform: none !important;
   }
-  /* The form starts where the handset ends; "New here? Create account" stays at the top right, over the cord. */
+  /* The form starts where the handset ends; "Create account" stays at the top right, beside the cord. */
   body.auth-page .auth-shell:has(.auth-login.is-active) .auth-panel {
     position: relative;
     z-index: 1;
@@ -35,16 +41,24 @@
     margin-top: calc(var(--login-phone-h) - 44px) !important;
   }
   body.auth-page .auth-shell:has(.auth-login.is-active) .auth-login h1 {
-    font-size: min(10.6vw, 50px) !important;
+    margin: 0 !important;
+    font-size: min(11vw, 52px) !important;
     line-height: 1 !important;
-    letter-spacing: -.02em;
+    letter-spacing: -.035em !important;
+    -webkit-text-stroke: .6px currentColor; /* Bodoni ships at 500 here; the stroke gives the reference's heavier cut */
+    text-align: center !important;
     white-space: nowrap !important; /* mobile-final-fixes.css sets normal !important */
     overflow-wrap: normal !important;
   }
   body.auth-page .auth-shell:has(.auth-login.is-active) .auth-login .auth-intro {
-    font-size: var(--text-12) !important;
-    letter-spacing: .1em !important;
+    margin: var(--space-3) 0 var(--space-6) !important;
+    font-size: min(11px, 3vw) !important;
+    letter-spacing: .26em !important;
+    text-align: center !important;
     white-space: nowrap;
+  }
+  body.auth-page .auth-shell:has(.auth-login.is-active) .auth-login .auth-form label {
+    letter-spacing: .16em !important;
   }
 }
   /* The cord runs where "New here?" sat: on phones the button alone says it. */

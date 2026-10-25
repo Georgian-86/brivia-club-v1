@@ -156,6 +156,8 @@ Tooling: Playwright **and axe-core** at `/tmp/pw` (`npm install --prefix /tmp/pw
   fewer dots. Email: point Supabase SMTP at Resend (D-096 has the settings) with a new key. e2e `mobile-polish.spec.mjs`.
 - **2026-10-25, auth heading (D-097):** "Your kind is already here." is Instrument Sans 700, tight tracking, as in the
   founder's screenshot (was Bodoni Moda since D-078).
+- **2026-10-25, phone login and profile (D-098):** the handset sized to the space the form leaves (Google always
+  on screen, `vh` fallback without `svh`); the profile name on one line, a slim EDIT PROFILE pill and a round ⚙ in the photo.
 - **2026-10-25, launch polish (D-092):** OR divider, the profile dialog, smaller Explore cards, filter dropdowns, the
   profile sidebar and framed hero, the hero video's own soundtrack, area changes from Edit profile, and the decorative
   dead ends removed. New e2e `tests/e2e/launch-polish.spec.mjs`; every control clicked at 1440 and 390 px (D-092).

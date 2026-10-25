@@ -3,6 +3,7 @@
 //   Google button is fully on screen; outlined field icons (no ✉ / ♙ glyphs).
 // * Chat: on desktop a 40 px × beside ••• closes the thread to "Your messages", and so does Escape (not while a menu
 //   is open); on phones there is no ×, the inbox is one page (the list does not scroll inside itself) under one heading.
+// * The phone profile hero: the name on one line; a slim EDIT PROFILE pill and a small round ⚙ inside the photo.
 // * Header: the bell and the avatar are the same size and on one line at 1440 and 390 px.
 // * Landing on phones: WHERE IDEAS BEGIN is one line, no telephone, nothing wider than the screen.
 // * The deck hint has no middle dots.
@@ -26,7 +27,7 @@ const signedOut = async (viewport) => {
 
 try {
   // 1. Login on phones.
-  for (const viewport of [{ width: 360, height: 700 }, { width: 390, height: 844 }]) {
+  for (const viewport of [{ width: 360, height: 600 }, { width: 360, height: 708 }, { width: 390, height: 844 }]) {
     const ctx = await signedOut(viewport);
     const page = await ctx.newPage();
     await page.goto(`${stub.url}/auth.html#login`, { waitUntil: 'load' });
@@ -41,7 +42,7 @@ try {
     });
     const tag = `${viewport.width}x${viewport.height}`;
     await check(`${tag} login: the telephone shows at the top, centred, above the title (${JSON.stringify(m)})`, () => {
-      assert.ok(m.phoneH >= 120); assert.ok(Math.abs(m.phoneMid - m.mid) <= 6); assert.ok(m.titleBelowPhone);
+      assert.ok(m.phoneH >= 150); assert.ok(Math.abs(m.phoneMid - m.mid) <= 6); assert.ok(m.titleBelowPhone);
     });
     await check(`${tag} login: JOIN THE CLUB is one line, Google is on screen, nothing scrolls sideways`, () => {
       assert.equal(m.titleLines, 1); assert.ok(m.googleBottom <= m.h, `${m.googleBottom} > ${m.h}`); assert.ok(m.overflow <= 0);
@@ -104,6 +105,25 @@ try {
     await page.waitForTimeout(800);
     const hint = await page.evaluate(() => document.querySelector('.swipe-hint')?.textContent || '');
     await check(`deck: the hint has no middle dots (${hint.trim()})`, () => { assert.ok(hint.includes('PASS WITH INTENTION')); assert.doesNotMatch(hint, /·/); });
+    await ctx.close();
+  }
+
+  // 5. The phone profile hero: the name on one line, a slim EDIT PROFILE pill on the photo's foot, ⚙ in its top corner.
+  for (const viewport of [{ width: 360, height: 708 }, { width: 412, height: 860 }]) {
+    const ctx = await stub.newContext(browser, viewport, { isMobile: true, hasTouch: true });
+    const page = await stub.open(ctx, { path: '/app.html?view=profile' });
+    await page.waitForSelector('.profile-photo-editor', { timeout: 10000 });
+    await page.evaluate(() => { document.querySelector('#profile-name').textContent = 'georgian-86'; });
+    const m = await page.evaluate(() => {
+      const r = (s) => document.querySelector(s).getBoundingClientRect();
+      const h = document.querySelector('#profile-name'); const f = r('.profile-photo-frame'); const e = r('.profile-photo-editor'); const g = r('.profile-settings-button');
+      return { nameLines: Math.round(h.getBoundingClientRect().height / parseFloat(getComputedStyle(h).lineHeight)), nameClipped: h.scrollWidth > h.clientWidth, nameRight: Math.round(h.getBoundingClientRect().right), frame: [Math.round(f.left), Math.round(f.top), Math.round(f.right), Math.round(f.bottom)], edit: [Math.round(e.left), Math.round(e.top), Math.round(e.right), Math.round(e.bottom), Math.round(e.height)], editOneLine: (() => { const l = document.querySelector('.profile-photo-editor span') || document.querySelector('.profile-photo-editor'); const b = l.getBoundingClientRect(); return e.height <= 34 && b.width <= e.width && b.height <= 20; })(), gear: [Math.round(g.left), Math.round(g.top), Math.round(g.right), Math.round(g.bottom)] };
+    });
+    await check(`${viewport.width} profile: the name is one line, beside the photo (${JSON.stringify(m)})`, () => { assert.equal(m.nameLines, 1); assert.equal(m.nameClipped, false); assert.ok(m.nameRight <= m.frame[0]); });
+    await check(`${viewport.width} profile: EDIT PROFILE is one slim line on the photo's foot, ⚙ in its top right corner`, () => {
+      assert.equal(m.editOneLine, true); assert.equal(m.edit[4], 32); assert.ok(m.edit[0] >= m.frame[0] && m.edit[2] <= m.frame[2] && m.edit[3] <= m.frame[3]);
+      assert.ok(m.gear[2] <= m.frame[2] && m.gear[2] >= m.frame[2] - 20 && m.gear[1] <= m.frame[1] + 24 && m.gear[1] >= m.frame[1]);
+    });
     await ctx.close();
   }
 

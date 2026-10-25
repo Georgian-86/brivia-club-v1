@@ -2003,3 +2003,17 @@ controls (a tester or a seeded test member), never a real member, so no new expo
   grotesque. It replaces the serif setting from D-078 (Bodoni Moda 500).
 - Now Instrument Sans 700 (`--font-body`, already loaded), letter-spacing -.07em, line-height .9, same sizes; the wine
   second line, the eyebrow and the cards are unchanged. One rule in `auth-polish.css`; the unit test follows it.
+
+## D-098: An immersive phone login after the founder's reference, and a calmer phone profile hero (founder, 2026-10-25)
+
+- **Login (≤ 700 px).** The hanging handset is the hero: its height is whatever the form leaves on screen
+  (`100svh - 452px`, 150 to 330 px), so tall phones get a big handset and every phone still shows Continue with Google
+  without scrolling. JOIN THE CLUB is centred, tighter (-.035em) with a .6 px stroke for the reference's heavier cut;
+  the line under it is tracked .26em; field labels .16em. Browsers without `svh` (the founder's phone showed the D-096
+  layout falling apart there) use `100vh - 508px` instead (vh counts the hidden toolbar). "New here?" stays hidden on
+  phones: the cord runs where it would sit.
+- **Profile hero (≤ 780 px).** The name is one line (24 to 34 px, ellipsis if it is ever too long; it no longer
+  breaks "georgian-86" over two lines). EDIT PROFILE is one slim 32 px pill across the photo's foot (12 px text) and ⚙
+  a 32 px round button in the photo's top right corner; both keep a 44 px tap area (6 px around). Desktop is unchanged.
+- Proof: `mobile-polish.spec.mjs` (25: login at 360 x 600 / 708 and 390 x 844, profile at 360 and 412), app-shell,
+  launch-polish (phones: 32 px controls with the -6 px tap area), profile-media, signup, password suites, unit 335.
