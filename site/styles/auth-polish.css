@@ -2569,7 +2569,7 @@
 .community-preview{padding:clamp(64px,8vw,108px) 0 48px;background:#f3f4f3;color:#291d1b}
 .community-preview-heading{max-width:1120px;margin:0 auto;padding:0 24px 34px}
 .community-preview-heading .auth-eyebrow{color:#741f39}
-.community-preview-heading h2{font-family:var(--font-heading);font-size:clamp(48px,6vw,84px);font-weight:500;line-height:.88;letter-spacing:-.065em}
+.community-preview-heading h2{font-family:var(--font-body);font-size:clamp(48px,6vw,84px);font-weight:700;line-height:.9;letter-spacing:-.07em}
 .community-preview-heading h2 em{color:#741f39;font-style:normal}
 .community-marquee{max-width:none;margin:0;padding:0;overflow:hidden}
 .community-marquee:before,.community-marquee:after{display:none}

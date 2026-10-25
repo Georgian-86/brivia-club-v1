@@ -37,10 +37,10 @@ test('the marquee caption carries no head count (founder ruling)', () => {
   assert.doesNotMatch(authHtml, /THREE PEOPLE/i);
 });
 
-test('the profiles heading reads "Your kind is already here." in the serif heading font (founder, 2026-10-22)', () => {
+test('the profiles heading reads "Your kind is already here." in a heavy, tightly set sans (founder, D-097)', () => {
   assert.match(authHtml, /<p class="auth-eyebrow">A FEW PEOPLE IN THE ROOM<\/p><h2 id="community-preview-title">YOUR KIND <br \/><em>IS ALREADY HERE\.<\/em><\/h2>/);
   const css = readFileSync('site/styles/auth-polish.css', 'utf8');
-  assert.match(css, /\.community-preview-heading h2\{font-family:var\(--font-heading\)/);
+  assert.match(css, /\.community-preview-heading h2\{font-family:var\(--font-body\);[^}]*font-weight:700;[^}]*letter-spacing:-\.07em\}/);
 });
 
 test('the profiles heading carries no "SWIPE / DISCOVER / CONNECT" tagline on login or register (founder, D-082)', () => {

@@ -1996,3 +1996,10 @@ controls (a tester or a seeded test member), never a real member, so no new expo
   Resend API key, sender `hello@thebriviaclub.live`, name Brivia Club. The key pasted in chat must be revoked in Resend
   and a new one used; never commit a key.
 - Proof: new e2e `mobile-polish.spec.mjs` (17); unit 335; e2e suites listed in the commit.
+
+## D-097: "Your kind is already here." is set in heavy sans again (founder, 2026-10-25)
+
+- The founder sent a screenshot of the earlier build: the auth page profiles heading in a heavy, tightly tracked
+  grotesque. It replaces the serif setting from D-078 (Bodoni Moda 500).
+- Now Instrument Sans 700 (`--font-body`, already loaded), letter-spacing -.07em, line-height .9, same sizes; the wine
+  second line, the eyebrow and the cards are unchanged. One rule in `auth-polish.css`; the unit test follows it.
