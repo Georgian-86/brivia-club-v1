@@ -166,9 +166,15 @@ const ui = (page) => page.evaluate(() => {
     error: root.querySelector('[data-guided-error]')?.hidden ? '' : root.querySelector('[data-guided-error]')?.textContent,
     points: [...root.querySelectorAll('input')].filter((i) => /points/i.test(i.name)).length,
     text: root.innerText,
-    firstTab: root.querySelector('[role="tab"]')?.textContent.trim() || null,
+    firstTab: root.querySelector('.guided-menu-label')?.textContent.trim() || null,
   };
 });
+
+// D-095: the interests step is a dropdown; this opens it and waits for its options.
+const openInterests = async (page) => {
+  await page.locator('input[name="guided-interest"]').click();
+  await page.waitForSelector('.guided-menu-option[data-id]', { timeout: 5000 });
+};
 
 // Targets >= 44 px, computed text contrast >= 4.5:1 (axe cannot see a cream gradient), and no sideways scroll.
 // Disabled controls and inline links inside a sentence are exempt (WCAG 1.4.3 / 2.5.8).
@@ -380,27 +386,27 @@ try {
     await auditScreen(page, `${w} area`);
     await page.keyboard.press('Enter');
     await waitScreen(page, 'interests');
-    await page.waitForSelector('.guided-option', { timeout: 5000 });
+    await openInterests(page);
     u = await ui(page);
     check(`${w} interests: "Step 6 of 6", Continue disabled with 0 picks, private ones never offered, popular first, no points input`, () => {
       assert.equal(u.label, 'Step 6 of 6'); assert.equal(u.questions, 1); assert.equal(u.nextDisabled, true);
       assert.ok(!/A private belief/.test(u.text)); assert.equal(u.firstTab, 'Popular'); assert.match(u.text, /Chess/i);
       assert.equal(u.points, 0); assert.ok(!/passion points|points left/i.test(u.text));
     });
-    await page.locator('.guided-option', { hasText: 'Chess' }).click();
-    await page.waitForTimeout(90);
-    const flight = await page.evaluate(() => { const g = document.querySelector('.guided-ghost'); return g ? getComputedStyle(g).transform : null; });
+    await page.locator('.guided-menu-option', { hasText: /^Chess$/ }).first().click();
     await page.waitForTimeout(320);
-    const picked = await page.evaluate(() => ({ count: document.querySelector('[data-guided-count]').textContent, pressed: document.querySelector('.guided-option[aria-pressed="true"]')?.textContent.trim(), tray: [...document.querySelectorAll('.guided-pick')].map((b) => b.textContent.replace('×', '').trim()), ghosts: document.querySelectorAll('.guided-ghost').length, next: document.querySelector('[data-guided-next]').disabled }));
-    check(`${w} a pick flies into the "Your picks" tray (mid-flight ${flight}), "1 picked", no ghost left, Continue enabled`, () => {
-      assert.ok(flight && flight !== 'none'); assert.equal(picked.count, '1 picked'); assert.equal(picked.pressed, 'Chess');
-      assert.deepEqual(picked.tray, ['Chess']); assert.equal(picked.ghosts, 0); assert.equal(picked.next, false);
+    const picked = await page.evaluate(() => ({ count: document.querySelector('[data-guided-count]').textContent, selected: document.querySelector('.guided-menu-option[aria-selected="true"]')?.textContent.trim(), tray: [...document.querySelectorAll('.guided-pick')].map((b) => b.textContent.replace('×', '').trim()), open: !document.querySelector('.guided-menu').hidden, next: document.querySelector('[data-guided-next]').disabled }));
+    check(`${w} a pick from the dropdown lands in the "Your picks" tray, "1 picked", the list stays open for another, Continue enabled (${JSON.stringify(picked)})`, () => {
+      assert.equal(picked.count, '1 picked'); assert.equal(picked.selected, 'Chess');
+      assert.deepEqual(picked.tray, ['Chess']); assert.equal(picked.open, true); assert.equal(picked.next, false);
     });
     await page.locator('.guided-pick', { hasText: 'Chess' }).click();
     await page.waitForTimeout(320);
     const removed = await page.evaluate(() => ({ count: document.querySelector('[data-guided-count]').textContent, next: document.querySelector('[data-guided-next]').disabled }));
     check(`${w} tapping a pick in the tray removes it; 0 picks disables Continue again`, () => { assert.equal(removed.count, '0 picked'); assert.equal(removed.next, true); });
-    for (let i = 0; i < 13; i += 1) { await page.locator('.guided-option[aria-pressed="false"]').first().click(); await page.waitForTimeout(30); }
+    await openInterests(page);
+    await shot(page, `${w}-07a-interests-open`);
+    for (let i = 0; i < 13; i += 1) { await page.locator('.guided-menu-option[aria-selected="false"][data-id]').first().click(); await page.waitForTimeout(30); }
     await page.waitForTimeout(320);
     u = await ui(page);
     const count = await page.locator('[data-guided-count]').textContent();
@@ -443,8 +449,9 @@ try {
     await page.locator('[data-guided-geo]').click();
     await page.waitForFunction(() => !document.querySelector('[data-guided-next]').disabled, null, { timeout: 4000 }).catch(() => {});
     await page.locator('[data-guided-next]').click(); await waitScreen(page, 'interests');
-    await page.waitForSelector('.guided-option', { timeout: 5000 });
-    for (const label of ['Chess', 'Guitar', 'Hackathons']) await page.locator('.guided-option', { hasText: label }).first().click();
+    await openInterests(page);
+    for (const label of ['Chess', 'Guitar', 'Hackathons']) await page.locator('.guided-menu-option', { hasText: new RegExp(`^${label}$`) }).first().click();
+    await page.keyboard.press('Escape');
     await page.waitForTimeout(320);
     await note('interests');
     await shot(page, '320-interests', 0);
@@ -517,9 +524,9 @@ try {
     await page.locator('[data-guided-geo]').click();
     await page.waitForFunction(() => !document.querySelector('[data-guided-next]').disabled, null, { timeout: 4000 }).catch(() => {});
     await page.locator('[data-guided-next]').click(); await waitScreen(page, 'interests');
-    await page.waitForSelector('.guided-option', { timeout: 5000 });
+    await openInterests(page);
     await page.evaluate(() => { window.__ghosts = 0; new MutationObserver((list) => list.forEach((m) => m.addedNodes.forEach((n) => { if (n.classList?.contains('guided-ghost')) window.__ghosts += 1; }))).observe(document.body, { childList: true }); });
-    await page.locator('.guided-option', { hasText: 'Chess' }).click();
+    await page.locator('.guided-menu-option', { hasText: /^Chess$/ }).first().click();
     await page.waitForTimeout(300);
     const r = await page.evaluate(() => ({ ghosts: window.__ghosts, tray: document.querySelectorAll('.guided-pick').length, glow: (() => { const el = document.querySelector('.guided-bar.is-current'); return el ? getComputedStyle(el).animationName : 'no bar'; })() }));
     check(`reduced motion: the pick lands in the tray without a flying chip and the current bubble does not pulse (${JSON.stringify(r)})`, () => { assert.equal(r.ghosts, 0); assert.equal(r.tray, 1); assert.equal(r.glow, 'none'); });
@@ -551,8 +558,9 @@ try {
         }
         await page.waitForFunction(() => !document.querySelector('[data-guided-next]').disabled, null, { timeout: 4000 }).catch(() => {});
       } else if (screen === 'interests') {
-        await page.waitForSelector('.guided-option', { timeout: 5000 });
-        for (const label of picks) { await page.locator('.guided-option', { hasText: label }).first().click(); await page.waitForTimeout(40); }
+        await openInterests(page);
+        for (const label of picks) { await page.locator('.guided-menu-option', { hasText: new RegExp(`^${label}$`) }).first().click(); await page.waitForTimeout(40); }
+        await page.keyboard.press('Escape'); // done picking: the list closes (Escape, Tab or a press outside)
         await page.waitForTimeout(300);
         return;
       }
@@ -850,7 +858,7 @@ try {
     await page.locator('.guided-cities button[data-place="in-pune"]').click();
     await page.locator('[data-guided-next]').click();
     await waitScreen(page, 'interests');
-    await page.waitForSelector('.guided-option', { timeout: 5000 });
+    await page.waitForSelector('[data-guided-tray]', { timeout: 5000 });
     const tray = await page.evaluate(() => [...document.querySelectorAll('.guided-pick')].map((b) => b.dataset.id));
     await page.locator('[data-guided-next]').click();
     const revealed = await waitScreen(page, 'reveal', 8000);
@@ -1026,63 +1034,67 @@ try {
     const page = await context.newPage();
     await page.goto(`${BASE}/auth.html?complete-profile=1`, { waitUntil: 'load' });
     const reached = await waitScreen(page, 'interests', 8000);
-    await page.waitForSelector('.guided-option', { timeout: 5000 }).catch(() => {});
+    await page.waitForSelector('input[name="guided-interest"]', { timeout: 5000 }).catch(() => {});
     await settleAnimations(page);
-    const tabs = await page.evaluate(() => {
-      const list = document.querySelector('#guided-signup [role="tablist"]');
-      const all = [...(list?.querySelectorAll('[role="tab"]') || [])];
-      const panel = document.querySelector('#guided-signup [role="tabpanel"]');
-      return { n: all.length, names: all.map((t) => t.textContent.trim()), selected: all.filter((t) => t.getAttribute('aria-selected') === 'true').map((t) => t.textContent.trim()), panelFor: panel?.getAttribute('aria-labelledby'), selectedId: all.find((t) => t.getAttribute('aria-selected') === 'true')?.id, focusable: all.filter((t) => t.tabIndex === 0).length, panelH: Math.round(panel?.getBoundingClientRect().height || 0), panelOverflow: panel ? getComputedStyle(panel).overflowY : '' };
+    // D-095: one dropdown. Closed until the field is used; then grouped by category with "Popular" first.
+    const closed = await page.evaluate(() => { const i = document.querySelector('input[name="guided-interest"]'); return { role: i?.getAttribute('role'), expanded: i?.getAttribute('aria-expanded'), hidden: document.querySelector('#guided-interest-options')?.hidden, controls: i?.getAttribute('aria-controls') }; });
+    check(`${tag} interests (${reached}): a closed combobox controlling the list (${JSON.stringify(closed)})`, () => {
+      assert.equal(reached, true); assert.deepEqual(closed, { role: 'combobox', expanded: 'false', hidden: true, controls: 'guided-interest-options' });
     });
-    check(`${tag} interests (${reached}): a tablist with "Popular" first and selected, one tab in the Tab order, the panel labelled by it, a fixed-height scroll area (${JSON.stringify(tabs)})`, () => {
-      assert.equal(reached, true); assert.ok(tabs.n >= 3); assert.equal(tabs.names[0], 'Popular'); assert.deepEqual(tabs.selected, ['Popular']);
-      assert.equal(tabs.focusable, 1); assert.equal(tabs.panelFor, tabs.selectedId); assert.match(tabs.panelOverflow, /auto|scroll/);
+    await openInterests(page);
+    const menu = await page.evaluate(() => {
+      const m = document.querySelector('#guided-interest-options');
+      const groups = [...m.querySelectorAll('[role="group"]')].map((g) => g.getAttribute('aria-label'));
+      const opts = [...m.querySelectorAll('[role="option"][data-id]')];
+      const box = m.getBoundingClientRect();
+      return { role: m.getAttribute('role'), multi: m.getAttribute('aria-multiselectable'), expanded: document.querySelector('input[name="guided-interest"]').getAttribute('aria-expanded'), groups: groups.slice(0, 3), nGroups: groups.length, n: opts.length, overflow: getComputedStyle(m).overflowY, h: Math.round(box.height), optH: Math.round(opts[0]?.getBoundingClientRect().height || 0), onScreen: box.bottom <= innerHeight + 0.5 };
     });
-    // Arrow keys move along the tabs; the panel then shows that one category only.
-    await page.locator('#guided-signup [role="tab"][aria-selected="true"]').focus({ timeout: 3000 }).catch(() => {});
-    await page.keyboard.press('ArrowRight');
-    await page.waitForTimeout(80);
-    const second = await page.evaluate(() => {
-      const t = document.activeElement;
-      const chips = [...document.querySelectorAll('#guided-signup [role="tabpanel"] .guided-option')].filter((c) => c.getClientRects().length);
-      return { name: t?.textContent.trim(), role: t?.getAttribute('role'), selected: t?.getAttribute('aria-selected'), cat: t?.dataset.cat, chipCats: [...new Set(chips.map((c) => c.dataset.id.split('.')[0]))], n: chips.length };
+    check(`${tag} the field opens a listbox grouped by category, "Popular" first, scrolling, 44 px rows, on screen (${JSON.stringify(menu)})`, () => {
+      assert.equal(menu.role, 'listbox'); assert.equal(menu.multi, 'true'); assert.equal(menu.expanded, 'true');
+      assert.equal(menu.groups[0], 'Popular'); assert.ok(menu.nGroups >= 2); assert.ok(menu.n >= 10);
+      assert.match(menu.overflow, /auto|scroll/); assert.ok(menu.optH >= 44); assert.ok(menu.onScreen);
     });
-    check(`${tag} ArrowRight selects the next tab and shows one category only (${JSON.stringify(second)})`, () => {
-      assert.equal(second.role, 'tab'); assert.equal(second.selected, 'true'); assert.notEqual(second.name, 'Popular');
-      assert.ok(second.n >= 1); assert.deepEqual(second.chipCats, [second.cat]);
+    // Arrow keys move the highlight; Enter picks it and the list stays open.
+    await page.keyboard.press('ArrowDown');
+    await page.keyboard.press('ArrowDown');
+    const activeId = await page.evaluate(() => document.querySelector('input[name="guided-interest"]').getAttribute('aria-activedescendant'));
+    await page.keyboard.press('Enter');
+    await page.waitForTimeout(120);
+    const keyed = await page.evaluate((id) => ({ id, selected: document.getElementById(id)?.getAttribute('aria-selected'), picks: document.querySelectorAll('.guided-pick').length, open: !document.querySelector('#guided-interest-options').hidden, screen: document.querySelector('#guided-signup').dataset.screen }), activeId);
+    check(`${tag} ArrowDown highlights an option (aria-activedescendant), Enter picks it and keeps the list open (${JSON.stringify(keyed)})`, () => {
+      assert.match(keyed.id || '', /^guided-interest-1$/); assert.equal(keyed.selected, 'true'); assert.equal(keyed.picks, 1); assert.equal(keyed.open, true); assert.equal(keyed.screen, 'interests');
     });
-    await page.keyboard.press('End'); await page.keyboard.press('Home');
-    const home = await page.evaluate(() => document.activeElement?.textContent.trim());
-    check(`${tag} Home returns to "Popular" (${home})`, () => assert.equal(home, 'Popular'));
-    // Search shows matches from every category, with the tabs set aside meanwhile.
+    // Typing narrows the list to matches from every category, without the headings.
     await page.locator('input[name="guided-interest"]').fill('e');
     await page.waitForTimeout(120);
     const found = await page.evaluate(() => {
-      const chips = [...document.querySelectorAll('#guided-signup .guided-option')].filter((c) => c.getClientRects().length);
-      const list = document.querySelector('#guided-signup [role="tablist"]');
-      return { cats: [...new Set(chips.map((c) => c.dataset.id.split('.')[0]))], labels: chips.map((c) => c.textContent.trim()), tabsShown: Boolean(list?.getClientRects().length) };
+      const opts = [...document.querySelectorAll('#guided-interest-options [role="option"][data-id]')];
+      return { cats: [...new Set(opts.map((c) => c.dataset.id.split('.')[0]))], labels: opts.map((c) => c.textContent.trim()), headings: document.querySelectorAll('#guided-interest-options .guided-menu-label').length };
     });
-    check(`${tag} search "e" shows matching chips from more than one category (${JSON.stringify(found)})`, () => {
-      assert.ok(found.cats.length >= 2); assert.ok(found.labels.includes('Chess')); assert.ok(found.labels.every((l) => /e/i.test(l))); assert.equal(found.tabsShown, false);
+    check(`${tag} typing "e" lists matches from more than one category, no headings (${found.labels.length} matches)`, () => {
+      assert.ok(found.cats.length >= 2); assert.ok(found.labels.includes('Chess')); assert.ok(found.labels.every((l) => /e/i.test(l))); assert.equal(found.headings, 0);
     });
     await page.locator('input[name="guided-interest"]').fill('');
-    await page.waitForTimeout(120);
-    for (let i = 0; i < 8; i += 1) { await page.locator('#guided-signup [role="tabpanel"] .guided-option[aria-pressed="false"]').first().click({ timeout: 3000 }).catch(() => {}); await page.waitForTimeout(40); }
+    await page.keyboard.press('Escape');
+    await page.waitForTimeout(80);
+    const esc = await page.evaluate(() => ({ hidden: document.querySelector('#guided-interest-options').hidden, expanded: document.querySelector('input[name="guided-interest"]').getAttribute('aria-expanded'), screen: document.querySelector('#guided-signup').dataset.screen }));
+    check(`${tag} Escape closes the list only (${JSON.stringify(esc)})`, () => assert.deepEqual(esc, { hidden: true, expanded: 'false', screen: 'interests' }));
+    await openInterests(page);
+    for (let i = 0; i < 7; i += 1) { await page.locator('#guided-interest-options .guided-menu-option[aria-selected="false"][data-id]').first().click({ timeout: 3000 }).catch(() => {}); await page.waitForTimeout(40); }
+    // A press outside closes it.
+    await page.mouse.click(5, 5);
     await page.waitForTimeout(400);
     const layout = await page.evaluate(() => {
       const r = (el) => { const b = el.getBoundingClientRect(); return { l: b.left, t: b.top, r: b.right, b: b.bottom }; };
       const hit = (a, b) => a.l < b.r - 0.5 && b.l < a.r - 0.5 && a.t < b.b - 0.5 && b.t < a.b - 0.5;
       const tray = r(document.querySelector('[data-guided-tray]'));
-      const panelEl = document.querySelector('#guided-signup [role="tabpanel"]'); if (!panelEl) return { overlaps: -1, picks: 0, trayH: 0, back: r(document.querySelector('[data-guided-back]')), finish: r(document.querySelector('[data-guided-next]')), vh: innerHeight, pickH: 0 };
-      const panel = r(panelEl);
-      const tabsEl = document.querySelector('#guided-signup [role="tablist"]');
-      const chips = [...document.querySelectorAll('#guided-signup [role="tabpanel"] .guided-option')].filter((c) => c.getClientRects().length).map(r);
+      const field = r(document.querySelector('.guided-combo'));
       const back = r(document.querySelector('[data-guided-back]'));
       const finish = r(document.querySelector('[data-guided-next]'));
-      return { overlaps: chips.filter((c) => hit(c, tray)).length + (hit(panel, tray) ? 1 : 0) + (tabsEl && hit(r(tabsEl), tray) ? 1 : 0), picks: document.querySelectorAll('.guided-pick').length, trayH: Math.round(tray.b - tray.t), back, finish, vh: innerHeight, scroll: document.documentElement.scrollHeight - innerHeight, pickH: Math.round(document.querySelector('.guided-pick')?.getBoundingClientRect().height || 0) };
+      return { closed: document.querySelector('#guided-interest-options').hidden, overlaps: hit(field, tray) ? 1 : 0, picks: document.querySelectorAll('.guided-pick').length, trayH: Math.round(tray.b - tray.t), back, finish, vh: innerHeight, pickH: Math.round(document.querySelector('.guided-pick')?.getBoundingClientRect().height || 0) };
     });
     await shot(page, `interests-${tag}`, 0);
-    check(`${tag} the "Your picks" tray (${layout.picks} picks, ${layout.trayH} px tall) never overlaps the tabs, the panel or a chip (${layout.overlaps}); picks are 44 px targets (${layout.pickH})`, () => { assert.equal(layout.picks, 8); assert.equal(layout.overlaps, 0); assert.ok(layout.pickH >= 44); });
+    check(`${tag} a press outside closes the list (${layout.closed}); the "Your picks" tray (${layout.picks} picks, ${layout.trayH} px tall) sits clear of the field (${layout.overlaps}); picks are 44 px targets (${layout.pickH})`, () => { assert.equal(layout.closed, true); assert.equal(layout.picks, 8); assert.equal(layout.overlaps, 0); assert.ok(layout.pickH >= 44); });
     if (!mobile) {
       check(`${tag} the whole Interests screen fits the window: Back (${Math.round(layout.back.b)}) and Finish (${Math.round(layout.finish.b)}) on screen of ${layout.vh}; tray compact (${layout.trayH} px)`, () => {
         for (const b of [layout.back, layout.finish]) { assert.ok(b.t >= 0 && b.b <= layout.vh); }

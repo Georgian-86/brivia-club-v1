@@ -1941,3 +1941,21 @@ controls (a tester or a seeded test member), never a real member, so no new expo
   would; landing 47, landing-sound 17, app-shell 210, consent 182, launch-polish 39, explore-cards 74, fit 324,
   chat-extras 145, profile-media 193, onboarding 269, signup 285, location 64, password-reset 18, password-reveal 56;
   unit 335 (new `deck-tutorial.test.mjs`); orbit tests; build, style ratchet and asset budget OK.
+
+## D-095: The interests step is a dropdown, and the login "or" sits closer (founder, 2026-10-25)
+
+- **Asked:** "make the interests here also like dropdown" (signup step "What are you into?", which had a search box,
+  category tabs and chips) and "reduce the top and bottom margin in 'or' continue with google".
+- **Done:**
+  1. Interests (refines D-082b): one field like the "Find your people" dropdowns (D-092): `role="combobox"` with a
+     chevron, opening a multi-select `role="listbox"`. With no text it lists every interest grouped by category,
+     Popular first (an interest already under Popular is not repeated); typing filters to a flat list, prefix matches
+     first, up to 40. A click or Enter picks or unpicks (a tick marks picked rows) and the list stays open for the
+     next pick; arrows, Home and End move; Escape, Tab or a press outside closes it. Enter with nothing to pick still
+     submits the step. The 12-pick cap, the tray, the count and the announcements are unchanged. The "Your picks"
+     tray now sits above the field so the open list never covers it. On phones the list opens in the page flow, so
+     Back and Finish move under it.
+  2. Login "or" (refines D-092): margin `clamp(12px, 1.6vh, 16px)` above and below (was `clamp(22px, 3.2vh, 32px)`),
+     about 14 px each side at 1440 and 390 px, asserted in `launch-polish.spec.mjs`.
+- **Proof:** e2e signup 288 (listbox groups, 44 px rows, keyboard pick, search, Escape, outside press, axe at 1440 and
+  375), onboarding 269, launch-polish; unit 335; build, style ratchet and asset budget OK.
