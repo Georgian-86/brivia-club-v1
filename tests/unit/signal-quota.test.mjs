@@ -20,18 +20,18 @@ test('the local time keeps its minutes only when the zone is off the hour', () =
   if (process.env.TZ === 'UTC') assert.match(localTime, /^3\s?PM$/i);
 });
 
-test('quotaLabel: normal state reads "N of 30 signals left · 24-hour window" (30 = the quota\'s daily_limit)', () => {
-  assert.equal(quotaLabel({ remaining: 30, daily_limit: 30, resets_at: null }), '30 of 30 signals left · 24-hour window');
-  assert.equal(quotaLabel({ remaining: 12, daily_limit: 30, resets_at: RESETS }), '12 of 30 signals left · 24-hour window');
-  assert.equal(quotaLabel({ remaining: 7, daily_limit: 20, resets_at: RESETS }), '7 of 20 signals left · 24-hour window', 'the limit comes from the quota object');
+test('quotaLabel: normal state reads "N of 30 signals left" (30 = the quota\'s daily_limit)', () => {
+  assert.equal(quotaLabel({ remaining: 30, daily_limit: 30, resets_at: null }), '30 of 30 signals left');
+  assert.equal(quotaLabel({ remaining: 12, daily_limit: 30, resets_at: RESETS }), '12 of 30 signals left');
+  assert.equal(quotaLabel({ remaining: 7, daily_limit: 20, resets_at: RESETS }), '7 of 20 signals left', 'the limit comes from the quota object');
 });
 
 test('quotaLabel: a quota without daily_limit (send_signal result merged early) falls back to 30', () => {
-  assert.equal(quotaLabel({ remaining: 29, resets_at: RESETS }), '29 of 30 signals left · 24-hour window');
+  assert.equal(quotaLabel({ remaining: 29, resets_at: RESETS }), '29 of 30 signals left');
 });
 
 test('quotaLabel: 1 left stays "1 of 30 signals left" (the unit is the window, not the count)', () => {
-  assert.equal(quotaLabel({ remaining: 1, daily_limit: 30, resets_at: RESETS }), '1 of 30 signals left · 24-hour window');
+  assert.equal(quotaLabel({ remaining: 1, daily_limit: 30, resets_at: RESETS }), '1 of 30 signals left');
 });
 
 test('quotaLabel: 0 left says "Your next signal frees up at 3 PM" in local time, hour numeric', () => {
@@ -40,13 +40,13 @@ test('quotaLabel: 0 left says "Your next signal frees up at 3 PM" in local time,
 });
 
 test('quotaLabel: 0 left without a reset time never invents one', () => {
-  assert.equal(quotaLabel({ remaining: 0, daily_limit: 30, resets_at: null }), '0 of 30 signals left · 24-hour window');
+  assert.equal(quotaLabel({ remaining: 0, daily_limit: 30, resets_at: null }), '0 of 30 signals left');
 });
 
 test('quotaNotice: the zero-quota notice beside the deck', () => {
-  assert.equal(quotaNotice({ remaining: 0, resets_at: RESETS }), `No signals left today. More at ${localTime} · Passing is always free.`);
-  assert.equal(quotaNotice({ remaining: 0, resets_at: null }), 'No signals left today · Passing is always free.');
-  assert.equal(quotaNotice({ remaining: 4, live_unanswered: 100, live_limit: 100 }), 'You have 100 signals waiting for an answer · Passing is always free.');
+  assert.equal(quotaNotice({ remaining: 0, resets_at: RESETS }), `No signals left today. More at ${localTime}. Passing is always free.`);
+  assert.equal(quotaNotice({ remaining: 0, resets_at: null }), 'No signals left today. Passing is always free.');
+  assert.equal(quotaNotice({ remaining: 4, live_unanswered: 100, live_limit: 100 }), 'You have 100 signals waiting for an answer. Passing is always free.');
   assert.equal(quotaNotice({ remaining: 4, live_unanswered: 2, live_limit: 100 }), '');
   assert.equal(quotaNotice(null), '');
 });

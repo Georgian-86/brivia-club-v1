@@ -33,7 +33,7 @@ test('the marquee keeps the same speed per card (38s for 11 cards becomes 31s fo
 
 test('the marquee caption carries no head count (founder ruling)', () => {
   const note = authHtml.match(/<p class="community-preview-note">([^<]*)<\/p>/)?.[1];
-  assert.equal(note, 'PEOPLE LIKE YOU · OPEN POSSIBILITIES');
+  assert.equal(note, 'PEOPLE LIKE YOU, OPEN TO POSSIBILITIES');
   assert.doesNotMatch(authHtml, /THREE PEOPLE/i);
 });
 

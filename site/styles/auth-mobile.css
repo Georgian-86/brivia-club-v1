@@ -1,0 +1,83 @@
+/* Login on phones after the founder's reference (D-096): the hanging red telephone back at the top, centred, with
+   JOIN THE CLUB on one line and the line under it on one line, then the form. Loads last on the auth page. The cut-out
+   (1024 x 1536) holds the handset in its left half (centre at about 25% of its width), so the box is placed to put
+   that centre on the screen's midline. Tokens only. */
+@media (max-width: 700px) {
+  body.auth-page {
+    --login-phone-h: clamp(130px, 25svh, 240px);
+  }
+  body.auth-page .auth-shell:has(.auth-login.is-active) {
+    position: relative;
+  }
+  body.auth-page .auth-shell:has(.auth-login.is-active) .auth-phone {
+    display: block !important;
+    position: absolute !important;
+    top: 0;
+    left: calc(50% - var(--login-phone-h) * .167);
+    z-index: 0;
+    width: calc(var(--login-phone-h) * .667) !important;
+    height: var(--login-phone-h) !important;
+    margin: 0 !important;
+    background-color: transparent !important;
+    background-position: 0 0 !important;
+    background-size: 100% 100% !important;
+    background-repeat: no-repeat !important;
+    pointer-events: none;
+    transform: none !important;
+  }
+  /* The form starts where the handset ends; "New here? Create account" stays at the top right, over the cord. */
+  body.auth-page .auth-shell:has(.auth-login.is-active) .auth-panel {
+    position: relative;
+    z-index: 1;
+    background: transparent !important;
+  }
+  body.auth-page .auth-shell:has(.auth-login.is-active) .auth-login {
+    margin-top: calc(var(--login-phone-h) - 44px) !important;
+  }
+  body.auth-page .auth-shell:has(.auth-login.is-active) .auth-login h1 {
+    font-size: min(10.6vw, 50px) !important;
+    line-height: 1 !important;
+    letter-spacing: -.02em;
+    white-space: nowrap !important; /* mobile-final-fixes.css sets normal !important */
+    overflow-wrap: normal !important;
+  }
+  body.auth-page .auth-shell:has(.auth-login.is-active) .auth-login .auth-intro {
+    font-size: var(--text-12) !important;
+    letter-spacing: .1em !important;
+    white-space: nowrap;
+  }
+}
+  /* The cord runs where "New here?" sat: on phones the button alone says it. */
+@media (max-width: 700px) {
+  body.auth-page .auth-shell:has(.auth-login.is-active) .auth-top-signup {
+    font-size: 0 !important;
+    letter-spacing: 0 !important;
+  }
+  body.auth-page .auth-shell:has(.auth-login.is-active) .auth-top-signup b {
+    font-size: var(--text-12) !important;
+    letter-spacing: .1em;
+  }
+}
+
+/* Field icons on every screen size (D-096): outlined envelope and lock in the brand wine instead of the ✉ and ♙ text
+   glyphs (a chess pawn stood for "password"). The glyph stays in the markup, hidden; the icon is a mask. */
+body.auth-page .auth-input-shell .auth-field-icon,
+.auth-modal .auth-input-shell .auth-field-icon {
+  width: 18px;
+  height: 18px;
+  font-size: 0 !important;
+  color: transparent !important;
+  background-color: color-mix(in srgb, var(--color-wine) 78%, transparent);
+  -webkit-mask: var(--field-icon) center / 18px 18px no-repeat;
+  mask: var(--field-icon) center / 18px 18px no-repeat;
+  top: 50%;
+  transform: translateY(-50%);
+}
+body.auth-page .auth-input-shell:has(input[type="email"]) .auth-field-icon,
+.auth-modal .auth-input-shell:has(input[type="email"]) .auth-field-icon {
+  --field-icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.7' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='3' y='5' width='18' height='14' rx='2.5'/%3E%3Cpath d='m4 7 8 6 8-6'/%3E%3C/svg%3E");
+}
+body.auth-page .auth-input-shell:has(input[name="password"], input[name="confirm"]) .auth-field-icon,
+.auth-modal .auth-input-shell:has(input[name="password"]) .auth-field-icon {
+  --field-icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.7' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='4.5' y='10.5' width='15' height='10' rx='2.5'/%3E%3Cpath d='M8 10.5V7.5a4 4 0 0 1 8 0v3'/%3E%3C/svg%3E");
+}

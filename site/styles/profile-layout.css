@@ -213,15 +213,16 @@ body.app-body[data-app-view] .app-view.profile-view[data-view="profile"] .profil
 /* ⚙ and EDIT PROFILE sit on the frame's lower edge, inside the photo. */
 body.app-body[data-app-view] .app-view.profile-view[data-view="profile"] .profile-board-content .profile-hero .profile-hero-actions {
   position: absolute;
-  top: auto;
-  right: calc(var(--frame-right) + 16px);
-  bottom: calc((var(--hero-h) - var(--frame-h)) / 2 + 16px);
+  /* From the frame's centre, so a long name (a taller hero) never moves them off the frame. */
+  top: calc(50% + var(--frame-h) / 2 - var(--frame-inset, 16px) - 44px);
+  right: calc(var(--frame-right) + var(--frame-inset, 16px));
+  bottom: auto;
   left: auto;
   z-index: 3;
   display: flex;
   align-items: center;
   gap: var(--space-2);
-  width: calc(var(--frame-w) - 32px);
+  width: calc(var(--frame-w) - 2 * var(--frame-inset, 16px));
 }
 body.app-body[data-app-view] .app-view.profile-view[data-view="profile"] .profile-board-content .profile-hero .profile-hero-actions .profile-photo-editor {
   flex: 1 1 auto;
@@ -257,40 +258,35 @@ body.app-body[data-app-view] .app-view.profile-view[data-view="profile"] .profil
   outline-offset: 2px;
 }
 
-/* ---------- Tablets and phones: the same parts, stacked ---------- */
+/* ---------- Tablets and phones: the same composition, scaled (founder's reference, D-096) ---------- */
 @media (max-width: 780px) {
   body.app-body[data-app-view] .app-view.profile-view[data-view="profile"] {
-    --frame-w: 132px;
-    --frame-h: 164px;
-    --frame-right: 18px;
+    --frame-w: clamp(124px, 36vw, 172px);
+    --frame-h: calc(var(--frame-w) * 1.22);
+    --frame-right: 16px;
+    --frame-inset: 10px;
+    --hero-h: calc(var(--frame-h) + 64px);
   }
   body.app-body[data-app-view] .app-view.profile-view[data-view="profile"] .profile-board-content .profile-hero {
-    flex-direction: column;
-    align-items: stretch;
-    justify-content: flex-end;
-    gap: var(--space-4);
-    min-height: 0;
-    padding: calc(var(--frame-h) + 34px) var(--space-5) var(--space-5);
+    padding: var(--space-5) calc(var(--frame-w) + var(--frame-right) + var(--space-3)) var(--space-5) var(--space-5);
   }
-  body.app-body[data-app-view] .app-view.profile-view[data-view="profile"] .profile-board-content .profile-hero::before {
-    background: linear-gradient(180deg, color-mix(in srgb, var(--color-oxblood-deep) 30%, transparent) 0%, color-mix(in srgb, var(--color-oxblood-deep) 88%, transparent) 62%);
-  }
-  body.app-body[data-app-view] .app-view.profile-view[data-view="profile"] .profile-photo-frame {
-    top: 18px;
-    padding: 6px;
-    transform: none;
-  }
+  body.app-body[data-app-view] .app-view.profile-view[data-view="profile"] .profile-photo-frame { padding: 6px; }
   body.app-body[data-app-view] .app-view.profile-view[data-view="profile"] .profile-board-content .profile-photo-frame .profile-avatar {
     border-radius: calc(var(--radius-l) - 6px);
     font-size: var(--text-32);
   }
-  body.app-body[data-app-view] .app-view.profile-view[data-view="profile"] .profile-board-content .profile-hero-copy { align-self: stretch; }
-  body.app-body[data-app-view] .app-view.profile-view[data-view="profile"] .profile-board-content .profile-hero h1 { font-size: var(--text-44); }
+  body.app-body[data-app-view] .app-view.profile-view[data-view="profile"] .profile-board-content .profile-hero h1 { font-size: clamp(30px, 9.4vw, 44px); }
   body.app-body[data-app-view] .app-view.profile-view[data-view="profile"] .profile-board-content .profile-hero #profile-location,
   body.app-body[data-app-view] .app-view.profile-view[data-view="profile"] .profile-hero-quote { font-size: var(--text-16); }
-  body.app-body[data-app-view] .app-view.profile-view[data-view="profile"] .profile-board-content .profile-hero .profile-hero-actions {
-    position: static;
-    width: 100%;
+  body.app-body[data-app-view] .app-view.profile-view[data-view="profile"] .profile-hero-rule { margin: var(--space-2) 0 var(--space-1); }
+  /* Inside a narrower frame: ⚙ stays 44 px; "Edit profile" may take two short lines. */
+  body.app-body[data-app-view] .app-view.profile-view[data-view="profile"] .profile-board-content .profile-hero .profile-hero-actions { gap: 6px; }
+  body.app-body[data-app-view] .app-view.profile-view[data-view="profile"] .profile-board-content .profile-hero .profile-hero-actions .profile-photo-editor {
+    padding: 0 var(--space-2);
+    font-size: var(--text-12);
+    letter-spacing: .08em;
+    line-height: 1.15;
+    white-space: normal;
   }
 }
 

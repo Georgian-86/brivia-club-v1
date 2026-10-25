@@ -1959,3 +1959,40 @@ controls (a tester or a seeded test member), never a real member, so no new expo
      about 14 px each side at 1440 and 390 px, asserted in `launch-polish.spec.mjs`.
 - **Proof:** e2e signup 288 (listbox groups, 44 px rows, keyboard pick, search, Escape, outside press, axe at 1440 and
   375), onboarding 269, launch-polish; unit 335; build, style ratchet and asset budget OK.
+
+## D-096: Pixel-level mobile polish: login with the telephone, a closable chat and a one-page inbox, the profile hero, equal header icons, roomier Explore, one-line "Where ideas begin", and fewer dots (founder, 2026-10-25)
+
+- **Asked:** the profile page and login on phones like the founder's two references; Explore with more space between
+  and around the posts; the bell and the avatar the same size; fewer middle dots ("it feels AI generated"); the phone
+  login without its cut Google button and with the telephone back; a close button (and Escape) for an open chat; the
+  phone inbox scrolling as a page instead of a small box; on phones "Where ideas begin" without the telephone and on
+  one line; the Resend sender for email. (Favicon, the camera video, the shorter deck, the side buttons, the tutorial
+  and the closer "or" were done in D-094 and D-095.)
+- **Done:**
+  1. Login on phones (`auth-mobile.css`, loads last): the hanging telephone at the top, centred on the handset
+     (`clamp(130px, 25svh, 240px)` tall), JOIN THE CLUB and its line on one line each, "Create account" alone at the
+     top right (the cord ran through "New here?"); everything through Google fits a 360 x 700 screen. Field icons on
+     every size are outlined envelope and lock masks (the ✉ glyph and a chess pawn ♙ before).
+  2. Chat (`chat-layout.css`, `app.js`): on desktop a 40 px × beside •••, same size and style, closes the thread to
+     "Your messages"; Escape does the same unless a menu, picker or dialog is open (that closes first); focus returns to
+     the conversation's row. Phones keep ← and get no ×. The phone inbox is one page: one heading ("Messages"), a
+     full-width search, All / Unread as two equal halves, the threads in one card with hairline rows; the "Inbox /
+     private · 03 conversations" line, the eyebrow and the "Your threads" box are gone, as is a decorative CSS "•••"
+     in the thread header. The unread marker is the brand wine (it was green).
+  3. Profile on phones (`profile-layout.css`): the desktop composition scaled down: name, area and line on the left of
+     the cover, the framed photo on the right with ⚙ and Edit profile inside its lower edge. The buttons are placed from
+     the frame's centre, so a long name never moves them off it.
+  4. Header (`app-polish.css`): bell and avatar are 40 px circles with a 44 px tap area, on one line, everywhere.
+  5. Explore: gaps 24-32 px; 1 column between equal 20 px margins on phones, 2 from 640 px, 3 from 960 px, 4 from
+     1360 px (3 at 1280 now); the heading and posts / sort rows span exactly the grid's width. Cards stay 1.24-1.33 tall
+     per 1 wide.
+  6. Landing on phones: WHERE IDEAS BEGIN on one centred line inside 20 px margins, no telephone.
+  7. Fewer dots: "N of 30 signals left" (no "· 24-hour window"), full stops in the quota notices, the deck hint as two
+     lines ("PASS WITH INTENTION. PITCH WITH PURPOSE." over the count), "Resume (PDF)", commas in file and resume
+     meta lines, "Removed on …", "PEOPLE LIKE YOU, OPEN TO POSSIBILITIES", "THOUGHTFUL CONNECTIONS", the privacy version
+     line. Browser tab titles keep their separator.
+- **Email (founder, dashboard only; no code sends email):** Supabase Auth sends the confirmation and reset emails. In
+  Supabase → Authentication → Emails → SMTP settings: host `smtp.resend.com`, port 465, user `resend`, password a
+  Resend API key, sender `hello@thebriviaclub.live`, name Brivia Club. The key pasted in chat must be revoked in Resend
+  and a new one used; never commit a key.
+- Proof: new e2e `mobile-polish.spec.mjs` (17); unit 335; e2e suites listed in the commit.

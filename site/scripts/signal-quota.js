@@ -37,7 +37,7 @@ export const quotaBlocked = (quota) => {
   return null;
 };
 
-// The counter line (iteration 3 R7): "N of 30 signals left · 24-hour window" (30 = daily_limit from my_signal_quota),
+// The counter line (iteration 3 R7; plain words since D-096): "N of 30 signals left" (30 = daily_limit from my_signal_quota),
 // and at 0 "Your next signal frees up at 3 PM". Without a reset time it never invents one.
 export const quotaLabel = (quota) => {
   const blocked = quotaBlocked(quota);
@@ -48,7 +48,7 @@ export const quotaLabel = (quota) => {
     if (time) return `Your next signal frees up at ${time}`;
   }
   const remaining = Math.max(Number(quota.remaining), 0);
-  return `${remaining} of ${dailyLimit(quota)} signals left · 24-hour window`;
+  return `${remaining} of ${dailyLimit(quota)} signals left`;
 };
 
 // The notice beside the deck at a cap (empty when nothing blocks): it says plainly that no signal is left.
@@ -56,9 +56,9 @@ export const quotaNotice = (quota) => {
   const blocked = quotaBlocked(quota);
   if (blocked === 'daily') {
     const time = resetTimeLabel(quota.resets_at);
-    return time ? `No signals left today. More at ${time} · Passing is always free.` : 'No signals left today · Passing is always free.';
+    return time ? `No signals left today. More at ${time}. Passing is always free.` : 'No signals left today. Passing is always free.';
   }
-  if (blocked === 'live') return `You have ${liveLimit(quota)} signals waiting for an answer · Passing is always free.`;
+  if (blocked === 'live') return `You have ${liveLimit(quota)} signals waiting for an answer. Passing is always free.`;
   return '';
 };
 

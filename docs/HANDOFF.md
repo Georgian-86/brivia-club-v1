@@ -151,6 +151,9 @@ Tooling: Playwright **and axe-core** at `/tmp/pw` (`npm install --prefix /tmp/pw
 - **2026-10-25, interests dropdown (D-095):** signup step "What are you into?" is now one dropdown (a combobox with a
   multi-select list grouped by category, Popular first; type to search) instead of tabs and chips. Picks show in the
   "Your picks" tray above the field. The login "or" above Continue with Google sits 14 px from each neighbour (was ~28).
+- **2026-10-25, mobile polish (D-096):** phone login with the telephone and outlined icons, chat × and Escape, the
+  phone inbox as one page, the phone profile hero, equal header icons, roomier Explore, one-line "Where ideas begin",
+  fewer dots. Email: point Supabase SMTP at Resend (D-096 has the settings) with a new key. e2e `mobile-polish.spec.mjs`.
 - **2026-10-25, launch polish (D-092):** OR divider, the profile dialog, smaller Explore cards, filter dropdowns, the
   profile sidebar and framed hero, the hero video's own soundtrack, area changes from Edit profile, and the decorative
   dead ends removed. New e2e `tests/e2e/launch-polish.spec.mjs`; every control clicked at 1440 and 390 px (D-092).

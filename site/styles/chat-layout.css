@@ -1,0 +1,151 @@
+/* Chat layout (D-096). Loads last. Tokens only.
+   Desktop: a close button (×) in the open thread's header, beside •••, the same size; Escape does the same (app.js).
+   Phones: the inbox is one page that scrolls as a whole (it was a short box scrolling inside the screen), under one
+   heading, with 20 px gutters, a full-width search, the All / Unread switch and evenly spaced rows. */
+
+/* ---------- The thread header's two round controls ---------- */
+body.app-body .app-view[data-view="chat"] .chat-window-head :is(.chat-more, .chat-close) {
+  display: grid !important;
+  flex: 0 0 40px !important;
+  place-items: center;
+  width: 40px !important;
+  height: 40px !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  border: 1px solid color-mix(in srgb, var(--color-chat-wine) 18%, transparent) !important;
+  border-radius: 50% !important;
+  background: color-mix(in srgb, var(--color-cream) 70%, transparent) !important;
+  color: var(--color-chat-wine) !important;
+  cursor: pointer;
+}
+body.app-body .app-view[data-view="chat"] .chat-window-head .chat-more { margin-left: auto !important; }
+body.app-body .app-view[data-view="chat"] .chat-window-head .chat-close { margin-left: var(--space-2) !important; }
+body.app-body .app-view[data-view="chat"] .chat-window-head :is(.chat-more, .chat-close):hover {
+  background: var(--color-chat-wine) !important;
+  color: var(--color-cream) !important;
+}
+body.app-body .app-view[data-view="chat"] .chat-window-head :is(.chat-more, .chat-close):focus-visible {
+  outline: 2px solid var(--color-chat-wine);
+  outline-offset: 2px;
+}
+/* Phones go back with ← (top left); one way out is enough there. */
+@media (max-width: 700px) {
+  body.app-body .app-view[data-view="chat"] .chat-window-head .chat-close { display: none !important; }
+}
+
+/* ---------- Phones: the inbox as one scrolling page ---------- */
+@media (max-width: 700px) {
+  body.app-body[data-app-view="chat"] .app-view[data-view="chat"]:not(:has(.chat-window:not([hidden]))) {
+    height: auto !important;
+    min-height: 0 !important;
+    max-height: none !important;
+    padding: var(--space-4) 20px calc(96px + env(safe-area-inset-bottom)) !important;
+    overflow: visible !important;
+  }
+  body.app-body[data-app-view="chat"] .app-view[data-view="chat"]:not(:has(.chat-window:not([hidden]))) :is(.chat-layout, #chat-list, .chat-inbox-scroll) {
+    height: auto !important;
+    min-height: 0 !important;
+    max-height: none !important;
+    overflow: visible !important;
+  }
+  /* One heading: no "Inbox / private · 03 conversations" line, no eyebrow, no "Your threads" box (they repeated it). */
+  body.app-body[data-app-view="chat"] .app-view[data-view="chat"] .view-topline,
+  body.app-body[data-app-view="chat"] .app-view[data-view="chat"] .view-heading .app-eyebrow,
+  body.app-body[data-app-view="chat"] .app-view[data-view="chat"] .inbox-panel-head { display: none !important; }
+  body.app-body[data-app-view="chat"] .app-view[data-view="chat"] .view-heading {
+    margin: 0 0 var(--space-4) !important;
+    padding: 0 !important;
+    background: transparent !important;
+  }
+  body.app-body[data-app-view="chat"] .app-view[data-view="chat"] .view-heading h1 {
+    margin: 0 !important;
+    color: var(--color-wine-deep) !important;
+    font-family: var(--font-heading) !important;
+    font-size: var(--text-32) !important;
+    font-weight: 500 !important;
+    letter-spacing: -.01em !important;
+    line-height: 1.1 !important;
+  }
+  body.app-body[data-app-view="chat"] .app-view[data-view="chat"] .chat-layout {
+    display: block !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    border: 0 !important;
+    background: transparent !important;
+    box-shadow: none !important;
+  }
+  body.app-body[data-app-view="chat"] .app-view[data-view="chat"] #chat-list {
+    width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    border: 0 !important;
+    background: transparent !important;
+    -webkit-backdrop-filter: none !important;
+    backdrop-filter: none !important;
+  }
+  /* Search and the All / Unread switch: full width, one row each, 48 px tall. */
+  body.app-body[data-app-view="chat"] .app-view[data-view="chat"] #inbox-toolbar {
+    display: grid !important;
+    gap: var(--space-3) !important;
+    margin: 0 0 var(--space-4) !important;
+    padding: 0 !important;
+    background: transparent !important;
+  }
+  /* The rows: one card holding them all, rows 76 px, 20 px inside, a hairline between rows. */
+  body.app-body[data-app-view="chat"] .app-view[data-view="chat"] .chat-inbox-scroll {
+    overflow: hidden !important;
+    border: 1px solid var(--color-card-edge) !important;
+    border-radius: var(--radius-l) !important;
+    background: color-mix(in srgb, var(--color-cream) 86%, transparent) !important;
+  }
+  body.app-body[data-app-view="chat"] .app-view[data-view="chat"] .chat-row {
+    min-height: 76px !important;
+    margin: 0 !important;
+    border: 0 !important;
+    border-radius: 0 !important;
+    background: transparent !important;
+  }
+  body.app-body[data-app-view="chat"] .app-view[data-view="chat"] .chat-row + .chat-row {
+    border-top: 1px solid var(--color-line) !important;
+  }
+  body.app-body[data-app-view="chat"] .app-view[data-view="chat"] .chat-row.is-unread .chat-row-copy strong { font-weight: 700 !important; }
+  /* No backing panel behind the search and switch; the switch is two equal halves. */
+  body.app-body[data-app-view="chat"] .app-view[data-view="chat"] #inbox-toolbar,
+  body.app-body[data-app-view="chat"] .app-view[data-view="chat"] #inbox-toolbar::before,
+  body.app-body[data-app-view="chat"] .app-view[data-view="chat"] #inbox-toolbar::after {
+    border: 0 !important;
+    box-shadow: none !important;
+    -webkit-backdrop-filter: none !important;
+    backdrop-filter: none !important;
+  }
+  body.app-body[data-app-view="chat"] .app-view[data-view="chat"] .inbox-search { width: 100% !important; margin: 0 !important; }
+  body.app-body[data-app-view="chat"] .app-view[data-view="chat"] .inbox-tabs {
+    display: grid !important;
+    grid-template-columns: 1fr 1fr !important;
+    gap: 4px !important;
+    width: 100% !important;
+    margin: 0 !important;
+    padding: 4px !important;
+    border: 1px solid var(--color-card-edge) !important;
+    border-radius: var(--radius-pill) !important;
+    background: color-mix(in srgb, var(--color-cream) 80%, transparent) !important;
+  }
+  body.app-body[data-app-view="chat"] .app-view[data-view="chat"] .inbox-tab {
+    width: 100% !important;
+    min-height: 40px !important;
+    margin: 0 !important;
+    border-radius: var(--radius-pill) !important;
+    text-align: center !important;
+    justify-content: center !important;
+  }
+  /* The "active" dot sits on the photo's edge, inside the row. */
+  body.app-body[data-app-view="chat"] .app-view[data-view="chat"] .chat-row { position: relative !important; padding-left: 20px !important; }
+}
+
+/* The unread marker: brand wine, centred on the row (it was a green dot pinned near the top). */
+body.app-body .app-view[data-view="chat"] .chat-row.is-unread::before {
+  top: 50% !important;
+  left: 7px !important;
+  background: var(--color-chat-wine) !important;
+  transform: translateY(-50%);
+}

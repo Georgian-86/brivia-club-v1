@@ -14,7 +14,7 @@
 // R4 Replace is the same upsert POST; Remove asks "Remove your resume? Matches you shared it with can no longer open
 //    it."; Cancel sends nothing, OK sends one Storage DELETE (prefixes [<me>/resume.pdf]) and one PATCH resume_path null.
 // R5 View signs <me>/resume.pdf for 60 s and opens the signed URL in a new tab.
-// R6 a stored resume loads its size and date from Storage ("1.2 MB · Updated …"); while uploading the card is
+// R6 a stored resume loads its size and date from Storage ("1.2 MB, Updated …"); while uploading the card is
 //    aria-busy, every action is aria-disabled (still focusable) and focus stays on the pressed button.
 // R8 a stored path that names no file shows Upload and clears resume_path. R9 a failed profile PATCH after a first
 //    upload removes the new object again; after a Replace it keeps the file and says so honestly.
@@ -32,7 +32,7 @@
 // Q3 Share my area asks "Send your area to {name}?" and shows what they'll see; confirming posts exactly
 //    "My area: Kochi (about a 2 km area)" (a city pick: "My area: Pune (city-wide)") as a text message: no
 //    coordinate-like digits (COORD_RE), no other keys.
-// Q4 a received resume renders as a "Resume · PDF" card with Open (nothing is signed until Open); Open signs
+// Q4 a received resume renders as a "Resume (PDF)" card with Open (nothing is signed until Open); Open signs
 //    resumes/<sender>/resume.pdf with { expiresIn: 60 } and opens it in a new tab without an opener; a 400 shows
 //    "This resume is no longer shared." An area message renders as a place card.
 // Q5 without a resume, "Share my resume" is disabled with "Add a resume in your profile first." and an action that
@@ -265,7 +265,7 @@ try {
         const done = await state(page);
         check(`R2 ${width}: the card shows resume.pdf · 1.2 MB and View / Replace / Remove, each >= 44 px (${JSON.stringify(done)})`, () => {
           assert.equal(done.name, 'resume.pdf');
-          assert.match(done.meta, /^1\.2 MB · Updated \d{1,2} [A-Z][a-z]{2,3} \d{4}$/);
+          assert.match(done.meta, /^1\.2 MB, Updated \d{1,2} [A-Z][a-z]{2,3} \d{4}$/);
           assert.deepEqual(done.actions.map((a) => a.action), ['view', 'replace', 'remove']);
           assert.ok(done.actions.every((a) => a.h >= 44 && a.w >= 44 && !a.disabled), JSON.stringify(done.actions));
           assert.equal(done.busy, null);
@@ -313,7 +313,7 @@ try {
       const { context, page, headers } = await open(1440, { own: { ...ownRow, resume_path: RESUME }, routes: { [`POST ${LIST_PATH}`]: listed() } });
       await waitUploaded(page);
       const s = await state(page);
-      check(`R6 a stored resume shows its size and date from Storage (${s.meta})`, () => assert.equal(s.meta, '1.2 MB · Updated 21 Oct 2026'));
+      check(`R6 a stored resume shows its size and date from Storage (${s.meta})`, () => assert.equal(s.meta, '1.2 MB, Updated 21 Oct 2026'));
 
       let mark = st.calls.length;
       const [popup] = await Promise.all([
@@ -433,7 +433,7 @@ try {
           assert.deepEqual(storage, [`POST ${UPLOAD_PATH}`, `POST ${LIST_PATH}`]);
           assert.equal(s.error, "Your new resume is saved, but we couldn't update your profile. Please try again.");
           assert.equal(s.name, 'resume.pdf');
-          assert.equal(s.meta, '1.2 MB · Updated 21 Oct 2026');
+          assert.equal(s.meta, '1.2 MB, Updated 21 Oct 2026');
           assert.deepEqual(s.actions.map((a) => a.action), ['view', 'replace', 'remove']);
         });
         await context.close();
@@ -636,7 +636,7 @@ try {
     });
 
     await scenario('Q4 narrow resume card', async () => {
-      // VFIX 2: at 320x690 "Open" never overlaps "Resume · PDF", the subtitle takes at most two lines, nothing leaves the bubble.
+      // VFIX 2: at 320x690 "Open" never overlaps "Resume (PDF)", the subtitle takes at most two lines, nothing leaves the bubble.
       for (const [width, height] of [[320, 690], [360, 740], [375, 812], [768, 1024], [1440, 900]]) {
         const { context, page } = await openThread(320, { messages: [hello, theirResume] });
         await page.setViewportSize({ width, height });
@@ -673,8 +673,8 @@ try {
           const r = open?.getBoundingClientRect();
           return { card: card?.innerText.replace(/\s+/g, ' ').trim(), open: open ? { text: open.textContent.trim(), w: Math.round(r.width), h: Math.round(r.height) } : null, place: place?.innerText.replace(/\s+/g, ' ').trim() || '' };
         });
-        check(`Q4 ${width}: the resume renders as a "Resume · PDF" card with Open >= 44 px, the area as a place card (${JSON.stringify(bubbles)})`, () => {
-          assert.match(bubbles.card, /Resume · PDF/);
+        check(`Q4 ${width}: the resume renders as a "Resume (PDF)" card with Open >= 44 px, the area as a place card (${JSON.stringify(bubbles)})`, () => {
+          assert.match(bubbles.card, /Resume \(PDF\)/);
           assert.equal(bubbles.open.text, 'Open');
           assert.ok(bubbles.open.w >= 44 && bubbles.open.h >= 44);
           assert.match(bubbles.place, /Kochi/);

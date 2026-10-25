@@ -21,7 +21,7 @@ test('privacy.html, notice-version.js and brivia_notice_version() carry the same
   assert.match(NOTICE_VERSION, /^\d{4}-\d{2}-\d{2}$/);
   assert.equal(page[1], NOTICE_VERSION);
   assert.equal(fn[1], NOTICE_VERSION);
-  assert.ok(html.includes(`Version ${NOTICE_VERSION} · effective 5 October 2026`), 'the visible version line is missing or differs');
+  assert.ok(html.includes(`Version ${NOTICE_VERSION}, effective 5 October 2026`), 'the visible version line is missing or differs');
 });
 
 test('privacy.html names the grievance contact and the retention rows the purge implements', () => {

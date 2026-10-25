@@ -192,9 +192,9 @@ try {
           overflow: document.documentElement.scrollWidth - document.documentElement.clientWidth,
         };
       });
-      const expected = width <= 390 ? 1 : width === 768 ? 2 : 4;
+      const expected = width <= 390 ? 1 : width === 768 ? 2 : width < 1360 ? 3 : 4; // D-096: more air, 4 columns from 1360 px
       check(`E1 ${width}: ${expected} column(s) (${m.columns}; ${m.count} cards)`, () => { assert.equal(m.count, POSTS.length); assert.equal(m.columns, Math.min(expected, m.count)); });
-      check(`E1 ${width}: smaller cards (${m.cardWidth} px wide)`, () => assert.ok(m.cardWidth <= (width <= 390 ? 340 : width === 768 ? 310 : 300), String(m.cardWidth)));
+      check(`E1 ${width}: smaller cards (${m.cardWidth} px wide)`, () => assert.ok(m.cardWidth <= (width <= 390 ? 350 : 310), String(m.cardWidth)));
       check(`E2 ${width}: every media box is 5:4 and cards in a row share a height (${JSON.stringify({ ratios: m.ratios, rows: m.rows })})`, () => {
         m.ratios.forEach((r) => assert.ok(Math.abs(r - 1.25) <= 0.01, String(r)));
         m.rows.forEach((row) => assert.ok(Math.max(...row) - Math.min(...row) <= 1, JSON.stringify(row)));

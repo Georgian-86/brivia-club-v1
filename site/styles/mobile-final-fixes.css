@@ -424,50 +424,31 @@
   }
 }
 
-/* The telephone belongs to the mobile-only WHERE IDEAS BEGIN treatment. */
+/* WHERE IDEAS BEGIN on phones (founder, D-096): no telephone, the three words on one centred line. */
 .orbit-phone{display:none}
 @media(max-width:700px){
   body:not(.auth-page):not(.app-body):not(.careers-page) .orbit-section{
     display:grid!important;
-    min-height:clamp(420px,64svh,520px)!important;
+    place-items:center;
+    min-height:clamp(320px,48svh,440px)!important;
     height:auto!important;
-    padding:24px 18px!important;
+    padding:24px 20px!important;
     background:#fff!important;
   }
-  body:not(.auth-page):not(.app-body):not(.careers-page) .orbit-stack{
-    display:grid!important;
-    width:min(100%,360px);
-    grid-template-columns:minmax(0,.92fr) minmax(0,1.08fr);
-    align-items:center;
-    gap:18px;
-  }
-  body:not(.auth-page):not(.app-body):not(.careers-page) .orbit-phone{
-    display:block;
-    width:100%;
-    height:210px;
-    overflow:hidden;
-    background:transparent;
-    transform:translateX(10px);
-  }
-  body:not(.auth-page):not(.app-body):not(.careers-page) .orbit-phone img{
-    display:block;
-    width:100%;
-    height:100%;
-    object-fit:contain;
-    object-position:left center;
-    transform:translateX(5px);
-  }
+  body:not(.auth-page):not(.app-body):not(.careers-page) .orbit-stack{display:block!important;width:100%}
+  body:not(.auth-page):not(.app-body):not(.careers-page) .orbit-phone{display:none!important}
   body:not(.auth-page):not(.app-body):not(.careers-page) .orbit-statement{
-    display:grid;
-    row-gap:6px;
-    text-align:left;
-    white-space:normal;
-    font-size:clamp(27px,8.2vw,42px)!important;
-    line-height:.9;
-    letter-spacing:-.07em;
+    display:flex;
+    justify-content:center;
+    gap:.24em;
+    text-align:center;
+    white-space:nowrap;
+    font-size:min(9.2vw,46px)!important;
+    line-height:1;
+    letter-spacing:-.05em;
     word-spacing:0;
   }
-  body:not(.auth-page):not(.app-body):not(.careers-page) .orbit-statement span{display:block}
+  body:not(.auth-page):not(.app-body):not(.careers-page) .orbit-statement span{display:inline}
 }
 
 /* Public login/signup on narrow phones. These overrides fix late desktop

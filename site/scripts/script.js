@@ -764,7 +764,7 @@ if (photoUpload) {
   const photoRemove = photoUpload.querySelector('.photo-remove');
   const photoTitle = photoUpload.querySelector('.photo-copy strong');
   let previewUrl = '';
-  const defaultPhotoText = 'Optional · A clear photo helps people recognise you.';
+  const defaultPhotoText = 'Optional. A clear photo helps people recognise you.';
   const imageExtension = /\.(jpg|jpeg|png|webp|gif|svg|avif|heic|heif|bmp|tif|tiff)$/i;
 
   photoInput?.addEventListener('change', async () => {
