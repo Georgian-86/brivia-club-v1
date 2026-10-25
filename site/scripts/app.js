@@ -41,6 +41,7 @@ import { profileChecklist } from './profile-checklist.js';
 import { quotaLabel, quotaErrorText, quotaBlocked, quotaNotice } from './signal-quota.js';
 import { pitchLine, deckChips, deckEmptyState, deckFields, bandNote, deckCoverSrc } from './deck-view.js';
 import { createDeckSwipe, SWIPE } from './deck-swipe.js';
+import { maybeShowDeckTutorial } from './deck-tutorial.js';
 import { whyPanelMarkup, whyRow } from './why-panel.js';
 import { chatEmojiCategories } from './chat-emoji-data.js';
 import { chatGifCatalog } from './chat-gif-data.js';
@@ -66,6 +67,8 @@ import '../styles/chat-extras.css';
 import '../styles/profile-cover-picker.css';
 // The profile page's sidebar and hero after the founder's reference (D-092). Loads last.
 import '../styles/profile-layout.css';
+// The compact deck without side buttons, and its first-run tutorial (D-094). Loads last.
+import '../styles/deck-compact.css';
 import { navMarkup, markCurrentNav, setChatBadges } from './app-nav.js';
 import { skeletonMarkup, setBusy } from './app-skeletons.js';
 
@@ -112,6 +115,7 @@ const readChatIds = new Set();
 let messageSyncTimer = null;
 let connectionSyncTick = 0;
 const overlayIds = ['pitch-modal'];
+let deckTutorialTimer = 0; // offerDeckTutorial (D-094)
 const hiddenChatsStorageKey = () => `brivia-hidden-chats:${memberProfile.id || 'anonymous'}`;
 const readHiddenChatIds = () => {
   try {
@@ -679,6 +683,7 @@ const setView = (view) => {
   document.querySelectorAll('[data-nav]').forEach((button) => button.classList.toggle('is-active', button.dataset.nav === view));
   markCurrentNav(document, view);
   if (view === 'explore') renderExplore();
+  if (view === 'home' || view === 'explore') offerDeckTutorial();
   if (view === 'posts') {
     showCommunityPostsLoading();
     loadCommunityPosts();
@@ -961,7 +966,20 @@ const renderHome = (queue = getExplorePeople()) => {
   const count = document.querySelector('#queue-count');
   if (count) count.textContent = `${String(currentIndex + 1).padStart(2, '0')} / ${String(queue.length).padStart(2, '0')}`;
   renderWhy(currentPerson);
+  offerDeckTutorial();
 };
+// D-094: the first-run tutorial (left = pass, right = pitch) once a card is really on screen: never over the sign-in
+// hand-off, the skeleton or another sheet. deck-tutorial.js decides whether it is due (once a visit until ticked off).
+function offerDeckTutorial() {
+  window.clearTimeout(deckTutorialTimer);
+  deckTutorialTimer = window.setTimeout(() => {
+    const card = document.querySelector('#swipe-card');
+    if (!currentPerson || !card || card.hidden || card.closest('[hidden]') || document.body.classList.contains('app-auth-pending')) return;
+    if (!['home', 'explore'].includes(document.body.dataset.appView)) return;
+    if (overlayIds.some((id) => !document.querySelector(`#${id}`)?.hidden) || document.querySelector('#public-profile-modal') || cardOverflowOpen()) return;
+    maybeShowDeckTutorial({ returnFocus: document.activeElement === document.body ? null : document.activeElement });
+  }, 700);
+}
 
 // Mutual consent (docs/VISION.md, CLAUDE.md): the client never writes `matches`. A like or a pitch sends one signal
 // (send_signal); the server creates the match when the other member has already asked, or accepts

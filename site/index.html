@@ -3,6 +3,9 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="icon" href="/favicon.ico" sizes="48x48" />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
     <meta name="theme-color" content="#ffffff" />
     <meta name="description" content="Brivia Club: find the people near you who love what you love, and the rare people far away who are worth the distance." />
     <title>Brivia Club · Find your people, nearby</title>
@@ -59,7 +62,7 @@
       </video>
     </div>
     <div class="cursor" aria-hidden="true"></div>
-    <!-- D-063: one sound control for the whole landing (music, playground video and its hits). -->
+    <!-- D-063: one sound control for the whole landing (the music). -->
     <button class="sound-toggle" type="button" data-landing-sound aria-pressed="false" aria-label="Play sound" title="Play sound"><span class="sound-toggle-bars" aria-hidden="true"><i></i><i></i><i></i><i></i></span></button>
     <header class="hero-nav">
       <button class="menu-trigger" aria-label="Open menu"><span></span><span></span><span></span></button>
@@ -252,56 +255,6 @@
             <div class="process-step-visual skeleton"><img src="/media/Images/POSSIBILITY1.webp" alt="A connection growing into a possibility" width="1536" height="1024" loading="lazy" decoding="async" /></div>
             <div class="process-step-copy"><span>03</span><h3>POSSIBILITY.</h3><p>Explore collaboration, stay connected, and let the relationship develop at its own pace.</p></div>
           </article>
-        </div>
-      </section>
-
-      <section class="playground-section" id="playground" aria-labelledby="playground-title">
-        <div class="playground-stage" data-playground-stage>
-          <div class="playground-video-frame">
-            <video class="playground-video" data-playground-video muted loop playsinline preload="none" poster="./media/posters/write_Its_a_in_black_color.webp" aria-label="Hand-drawn badminton animation transitioning into a guitar">
-              <source media="(max-width: 700px)" src="./media/video/write_Its_a_in_black_color_mobile-720.mp4" type="video/mp4" />
-              <source src="./media/video/write_Its_a_in_black_color-720.mp4" type="video/mp4" />
-            </video>
-            <span class="playground-watermark-cover" aria-hidden="true"></span>
-            <button class="playground-audio-toggle" data-playground-audio-toggle type="button" aria-label="Unmute animation" aria-pressed="false">
-              <svg class="audio-icon audio-icon-muted" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9v6h4l5 4V5L8 9H4Z"/><path d="m17 9 4 4m0-4-4 4"/></svg>
-              <svg class="audio-icon audio-icon-on" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9v6h4l5 4V5L8 9H4Z"/><path d="M17 9.5a4 4 0 0 1 0 5M19.5 7a7.5 7.5 0 0 1 0 10"/></svg>
-            </button>
-          </div>
-          <div class="playground-scene playground-badminton" role="img" aria-label="Two people playing badminton in a premium hand-drawn sketch style">
-              <img class="badminton-premium-art" src="./media/assets/badminton-premium-no-shuttle.webp" alt="Two people playing badminton with rackets" width="1555" height="1011" loading="lazy" decoding="async" />
-            <svg class="badminton-motion" viewBox="0 0 1000 600" aria-hidden="true">
-              <path class="shuttle-trail" d="M494 274Q530 220 608 192" />
-              <g class="sketch-sparkles"><path d="M166 177v25m-12-12h24M828 389v25m-12-12h24M414 116v19m-9-9h18" /><circle cx="180" cy="400" r="4" /><circle cx="785" cy="157" r="4" /></g>
-                <g class="playground-shuttle" data-playground-shuttle>
-                  <g class="shuttle-3d">
-                    <path class="shuttle-skirt" d="M496 224 468 241l16 28q12 10 24 0l16-28Z" />
-                    <path class="shuttle-skirt-shade" d="M496 224v45q12 10 24 0l16-28Z" />
-                    <path class="shuttle-feather" d="m471 240 18 28m-11-32 15 34m-7-37 9 38m28-31-18 28m11-32-15 34m7-37-9 38" />
-                    <path class="shuttle-feather-highlight" d="m478 237 12 26m36-26-12 26" />
-                    <ellipse class="shuttle-cork-shadow" cx="496" cy="270" rx="14" ry="7" />
-                    <ellipse class="shuttle-cork" cx="496" cy="266" rx="13" ry="9" />
-                    <ellipse class="shuttle-cork-highlight" cx="491" cy="263" rx="4.5" ry="2.5" />
-                  </g>
-                </g>
-            </svg>
-          </div>
-          <img class="playground-scene playground-guitar guitar-premium-art" src="./media/assets/guitar-premium.webp" alt="" aria-hidden="true" width="1546" height="1017" loading="lazy" decoding="async" />
-          <svg class="playground-scene playground-guitar guitar-old-svg" viewBox="0 0 1000 600" aria-hidden="true">
-            <path class="guitar-halo" d="M500 116c-170 0-306 78-306 180s136 180 306 180 306-78 306-180-136-180-306-180Z" />
-            <g class="guitar-art">
-              <path class="sketch-line" d="M550 165l-26 237" />
-              <path class="sketch-line" d="M565 165l-26 237" />
-              <path class="sketch-line guitar-head" d="M548 166l-11-33q0-13 13-17l35 4q12 3 10 16l-6 33" />
-              <path class="sketch-line" d="M524 382q-70-50-117 7-28 34 5 65 31 30 66 6 45-31 62-78 16 48 61 78 35 24 66-6 33-31 5-65-47-57-117-7Z" />
-              <ellipse class="guitar-soundhole" cx="500" cy="423" rx="22" ry="27" />
-              <path class="sketch-line guitar-bridge" d="M465 474q35 9 70 0" />
-              <path class="guitar-string" d="M539 149 500 474M544 149 500 474M549 150 500 474M554 150 500 474" />
-              <path class="sketch-line" d="M575 188l-17-7m21 37-18-7m14 37-18-7m14 38-18-7m14 38-18-7" />
-            </g>
-            <g class="guitar-sparkles" aria-hidden="true"><path d="M240 227v32m-16-16h32M755 390v35m-17-17h34" /><circle cx="286" cy="164" r="4" /><circle cx="720" cy="178" r="4" /></g>
-            <text class="guitar-note" x="673" y="217">♪</text><text class="guitar-note guitar-note-two" x="318" y="324">♫</text>
-          </svg>
         </div>
       </section>
 

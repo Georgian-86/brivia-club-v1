@@ -1,0 +1,222 @@
+/* The compact deck and its first-run tutorial (D-094, founder 2026-10-25: "shorten the matching cards a bit, remove the
+   cross and tick buttons from either side, and add a tutorial with don't show next time"). Loads after
+   reference-design.css so it wins. Tokens only.
+
+   1. No round Pass / Pitch buttons beside or under the card: a swipe (or the arrow keys) answers it. The two buttons stay
+      in the page for keyboard and screen-reader users, out of sight until one of them takes keyboard focus; then the
+      pair shows as a small floating bar under the card. */
+body.app-body .app-view[data-view="home"] .swipe-actions:not([hidden]) {
+  position: absolute;
+  display: flex;
+  width: 1px;
+  height: 1px;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+body.app-body .app-view[data-view="home"] .swipe-actions:not([hidden]):has(:focus-visible) {
+  position: fixed;
+  z-index: 30;
+  bottom: calc(env(safe-area-inset-bottom, 0px) + 96px);
+  left: 50%;
+  gap: 16px;
+  width: auto;
+  height: auto;
+  padding: 8px;
+  overflow: visible;
+  clip-path: none;
+  border-radius: 999px;
+  background: var(--aura-glass);
+  box-shadow: var(--shadow-1);
+  transform: translateX(-50%);
+}
+body.app-body .app-view[data-view="home"] .swipe-actions .swipe-action { flex: 0 0 56px; width: 56px; height: 56px; margin: 0; }
+
+/* 2. A shorter card. Desktop: about 84% of the free height (never under 560 px when the window has it, never over
+   660 px), a little wider for its height than before (0.68), and the side tracks Pass / Pitch used to hold are free.
+   Short laptop windows keep the height they had, since their card was already as short as its content allows. */
+@media (min-width: 850px) {
+  body.app-body .app-view[data-view="home"] {
+    --deck-ctl: 0px;
+    --deck-ctl-gap: 0px;
+    --deck-under: 0px;
+    --deck-card-h: clamp(400px, min(var(--deck-h-avail), max(560px, var(--deck-h-avail) * .84), var(--deck-w-avail) / .68, 660px), 660px);
+    --deck-card-w: calc(var(--deck-card-h) * .68);
+  }
+  body.app-body .app-view[data-view="home"]:has(.swipe-limit-state:not([hidden])) { --deck-under: 84px; }
+  body.app-body .app-view[data-view="home"] .swipe-limit-state { grid-row: 2; margin-top: 20px; }
+}
+/* Phones and tablets: about 50 px to 100 px shorter than before. */
+@media (max-width: 849px) {
+  body.app-body .app-view[data-view="home"] .swipe-stack .swipe-card { height: clamp(460px, calc(100svh - 250px), 560px); }
+  /* With no buttons in between, the hint sits right under the stack, over the photo: a frosted label keeps it legible. */
+  body.app-body .app-view[data-view="home"] .swipe-hint:not([hidden]) {
+    width: fit-content;
+    max-width: calc(100% - 16px);
+    margin: 14px auto 0;
+    padding: 8px 12px;
+    letter-spacing: .03em;
+    border-radius: 14px;
+    background: var(--aura-card);
+    box-shadow: 0 6px 18px -10px color-mix(in srgb, var(--color-oxblood) 40%, transparent);
+    backdrop-filter: blur(10px);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    row-gap: 2px;
+    text-align: center;
+  }
+  /* Tidy centred lines and no stray dots: pass, pitch, then the signals left. */
+  body.app-body .app-view[data-view="home"] .swipe-hint > span[aria-hidden],
+  body.app-body .app-view[data-view="home"] .swipe-hint .swipe-left-copy > span[aria-hidden] { display: none; }
+  body.app-body .app-view[data-view="home"] .swipe-hint .swipe-left-copy:not([hidden]) { order: 2; margin-top: 4px; font-weight: inherit; }
+}
+
+/* 3. The tutorial: a paper card over a wine veil, two rows that each show a small card leaving to its side. */
+.deck-tutorial {
+  box-sizing: border-box;
+  width: min(440px, calc(100vw - 32px));
+  max-height: calc(100dvh - 32px);
+  padding: 0;
+  overflow: auto;
+  border: 1.5px solid color-mix(in srgb, var(--color-oxblood) 78%, transparent);
+  border-radius: 22px;
+  background: var(--color-card-paper);
+  color: var(--color-name-ink);
+  box-shadow: var(--shadow-2);
+  font-family: var(--font-body);
+}
+.deck-tutorial::backdrop { background: color-mix(in srgb, var(--color-wine-deep) 62%, transparent); backdrop-filter: blur(3px); }
+.deck-tutorial[open] { animation: deck-tutorial-in .28s cubic-bezier(.2, .8, .2, 1); }
+@keyframes deck-tutorial-in { from { opacity: 0; transform: translateY(12px) scale(.98); } to { opacity: 1; transform: none; } }
+.deck-tutorial-form { display: flex; flex-direction: column; gap: 16px; padding: 26px 24px 22px; }
+.deck-tutorial-eyebrow { margin: 0; color: var(--color-wine); font-size: var(--text-12); font-weight: 700; letter-spacing: .2em; }
+.deck-tutorial h2 { margin: -6px 0 0; color: var(--color-oxblood); font-family: var(--font-heading); font-size: var(--text-32); font-weight: 500; line-height: 1.08; letter-spacing: -.01em; text-wrap: balance; }
+.deck-tutorial-steps { display: flex; flex-direction: column; gap: 12px; margin: 4px 0 0; padding: 0; list-style: none; }
+.deck-tutorial-step {
+  display: grid;
+  grid-template-columns: 96px minmax(0, 1fr);
+  align-items: center;
+  gap: 16px;
+  padding: 12px;
+  border: 1px solid var(--color-card-edge);
+  border-radius: 16px;
+  background: var(--color-cream);
+}
+.deck-tutorial-step h3 { margin: 0; color: var(--color-oxblood); font-family: var(--font-heading); font-size: var(--text-20); font-weight: 500; line-height: 1.15; }
+.deck-tutorial-step p { margin: 4px 0 0; text-wrap: pretty; color: var(--color-ink-soft); font-size: var(--text-14); line-height: 1.45; }
+
+/* The little demo: a card that leaves to its side with its stamp, over a faint card waiting underneath. */
+.deck-tutorial-demo { position: relative; display: block; width: 96px; height: 88px; }
+.deck-tutorial-ghost,
+.deck-tutorial-card {
+  position: absolute;
+  top: 6px;
+  left: 26px;
+  width: 44px;
+  height: 62px;
+  border: 1.5px solid var(--color-oxblood);
+  border-radius: 8px;
+  background: var(--color-card-paper);
+}
+.deck-tutorial-ghost { opacity: .35; transform: translateY(5px) scale(.92); }
+.deck-tutorial-card { display: flex; flex-direction: column; gap: 4px; padding: 3px; box-sizing: border-box; box-shadow: 0 6px 12px -6px color-mix(in srgb, var(--color-oxblood) 60%, transparent); }
+.deck-tutorial-card i { display: block; border-radius: 2px; background: var(--color-chip); }
+.deck-tutorial-card .deck-tutorial-card-bar { flex: 0 0 6px; background: var(--color-oxblood); }
+.deck-tutorial-card .deck-tutorial-card-photo { flex: 1 1 auto; background: var(--color-card-edge); }
+.deck-tutorial-card .deck-tutorial-card-line { flex: 0 0 3px; width: 80%; }
+.deck-tutorial-card .deck-tutorial-card-line--short { width: 52%; }
+.deck-tutorial-stamp {
+  position: absolute;
+  top: 18px;
+  left: 50%;
+  padding: 1px 4px;
+  border: 1.5px solid currentColor;
+  border-radius: 4px;
+  background: var(--color-cream);
+  font-size: var(--text-12);
+  font-weight: 700;
+  letter-spacing: .08em;
+  line-height: 1.2;
+  opacity: 0;
+  transform: translateX(-50%) rotate(-12deg);
+}
+.deck-tutorial-demo--pass .deck-tutorial-stamp { color: var(--color-ink-soft); }
+.deck-tutorial-demo--pitch .deck-tutorial-stamp { color: var(--color-wine); transform: translateX(-50%) rotate(12deg); }
+.deck-tutorial-arrow { position: absolute; bottom: 0; left: 50%; width: 22px; height: 22px; margin-left: -11px; fill: none; stroke: var(--color-oxblood); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.deck-tutorial-demo--pass .deck-tutorial-card { animation: deck-tutorial-pass 2.8s cubic-bezier(.45, .05, .25, 1) infinite; }
+.deck-tutorial-demo--pitch .deck-tutorial-card { animation: deck-tutorial-pitch 2.8s cubic-bezier(.45, .05, .25, 1) 1.4s infinite; }
+.deck-tutorial-demo--pass .deck-tutorial-stamp,
+.deck-tutorial-demo--pitch .deck-tutorial-stamp { animation: deck-tutorial-stamp 2.8s ease infinite; }
+.deck-tutorial-demo--pitch .deck-tutorial-stamp { animation-delay: 1.4s; }
+@keyframes deck-tutorial-pass {
+  0%, 18% { opacity: 1; transform: none; }
+  58% { opacity: 1; transform: translateX(-26px) rotate(-10deg); }
+  72% { opacity: 0; transform: translateX(-34px) rotate(-13deg); }
+  73%, 85% { opacity: 0; transform: none; }
+  100% { opacity: 1; transform: none; }
+}
+@keyframes deck-tutorial-pitch {
+  0%, 18% { opacity: 1; transform: none; }
+  58% { opacity: 1; transform: translateX(26px) rotate(10deg); }
+  72% { opacity: 0; transform: translateX(34px) rotate(13deg); }
+  73%, 85% { opacity: 0; transform: none; }
+  100% { opacity: 1; transform: none; }
+}
+@keyframes deck-tutorial-stamp { 0%, 30% { opacity: 0; } 45%, 62% { opacity: 1; } 72%, 100% { opacity: 0; } }
+@media (prefers-reduced-motion: reduce) {
+  .deck-tutorial[open], .deck-tutorial-card, .deck-tutorial-stamp { animation: none !important; }
+  .deck-tutorial-stamp { opacity: 1; }
+  .deck-tutorial-demo--pass .deck-tutorial-card { transform: translateX(-14px) rotate(-8deg); }
+  .deck-tutorial-demo--pitch .deck-tutorial-card { transform: translateX(14px) rotate(8deg); }
+}
+
+.deck-tutorial-keys { margin: 0; color: var(--color-ink-soft); font-size: var(--text-14); line-height: 1.45; }
+.deck-tutorial-keys kbd {
+  display: inline-grid;
+  min-width: 24px;
+  height: 24px;
+  padding: 0 6px;
+  box-sizing: border-box;
+  place-items: center;
+  border: 1px solid var(--color-card-edge);
+  border-bottom-width: 2px;
+  border-radius: 6px;
+  background: var(--color-cream);
+  color: var(--color-oxblood);
+  font-family: var(--font-body);
+  font-size: var(--text-14);
+  line-height: 1;
+}
+/* Touch screens have no arrow keys. */
+@media (hover: none) and (pointer: coarse) { .deck-tutorial-keys { display: none; } }
+
+.deck-tutorial-skip { display: flex; min-height: 44px; align-items: center; gap: 12px; color: var(--color-name-ink); font-size: var(--text-14); cursor: pointer; }
+.deck-tutorial-skip input { flex: 0 0 20px; width: 20px; height: 20px; margin: 0; accent-color: var(--color-oxblood); }
+.deck-tutorial-done {
+  min-height: 48px;
+  border: 0;
+  border-radius: 12px;
+  background: var(--color-oxblood);
+  color: var(--color-cream);
+  font-family: var(--font-heading);
+  font-size: var(--text-14);
+  letter-spacing: .32em;
+  cursor: pointer;
+  transition: background .2s ease;
+}
+.deck-tutorial-done:hover { background: var(--color-wine); }
+.deck-tutorial :focus-visible { outline: 2px solid var(--color-oxblood); outline-offset: 2px; }
+@media (max-width: 380px) {
+  .deck-tutorial-form { padding: 22px 18px 18px; }
+  .deck-tutorial-step { grid-template-columns: 76px minmax(0, 1fr); gap: 12px; }
+  .deck-tutorial-demo { width: 76px; }
+  .deck-tutorial-ghost, .deck-tutorial-card { left: 16px; }
+}
+
+/* The shorter card leaves the darker photo behind the phone tab bar: on the deck the bar is near-solid paper, so its
+   labels keep 4.5:1 (the 62% glass let the photo through). */
+html body.app-body[data-app-view="home"] .app-tabbar,
+html body.app-body[data-app-view="explore"] .app-tabbar { background: color-mix(in srgb, var(--color-cream) 92%, transparent) !important; }

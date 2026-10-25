@@ -4,7 +4,6 @@ import '../styles/tokens.css';
 import '../styles/fonts.css';
 import '../styles/style.css';
 import '../styles/intro-theme.css';
-import '../styles/playground.css';
 import '../styles/letter-theme.css';
 import '../styles/intro-reference.css';
 import '../styles/deep-wine-theme.css';

@@ -1905,3 +1905,39 @@ controls (a tester or a seeded test member), never a real member, so no new expo
   photo and video art is untouched. The founder chose it from a screenshot of the login page.
 - Proof: e2e signup 285, onboarding 269, app-shell 210, explore-cards 74 (their contrast and axe checks included),
   launch-polish 40, password-reveal 57, landing 47; unit 330; build, style ratchet and asset budget OK.
+
+## D-094: A favicon, no camera video, a shorter deck card without side buttons, and a first-run deck tutorial (founder, 2026-10-25)
+
+- **Asked:** "Add a professional looking favicon matching the theme. Remove the camera video from the landing page.
+  Shorten the matching cards a bit, they are looking too big now; remove the cross and tick buttons from either side;
+  add a tutorial with don't show next time of what happens when you do a left swipe or a right swipe."
+- **Done:**
+  1. Favicon: a rounded square in the burgundy gradient (#8f2f4f to #5e0b28 to #2f0210, a soft light top left) with a
+     cream Bodoni Moda 700 "B" drawn as a path (no font needed). `site/public/favicon.svg`, `favicon.ico` (16/32/48) and
+     a full-bleed `apple-touch-icon.png` (180), linked from all 8 pages.
+  2. The camera video was the landing's "playground" section (`write_Its_a_in_black_color*.mp4`, a camera that turns
+     into "IT'S A MATCH."). The whole section is gone, with the badminton / guitar scene that sat under it (never seen),
+     its JS (rally, synthesized hits, audio toggle) and `playground.css`. The sound button no longer steps aside for it.
+     The video files stay in `site/media/` (unreferenced, so not shipped).
+  3. The deck card: desktop height is about 84% of the free height, at least 560 px when the window has it and at most
+     660 px (it reached 880 px), at 0.68 wide per 1 tall; phones `clamp(460px, 100svh - 250px, 560px)` (was up to
+     660 px). Short laptop windows keep their height. `deck-compact.css`, loaded last.
+  4. No round Pass / Pitch beside or under the card: a swipe or the arrow keys answers it. The two buttons stay in the
+     page, clipped out of sight, so keyboard and screen-reader users still have them: on keyboard focus they show as a
+     small frosted bar under the card (56 px targets). On phones the hint under the stack is a frosted label in three
+     centred lines without the separating dots, and on the deck the phone tab bar is near-solid paper (the shorter card
+     left the darker photo behind it, and the 62% glass dropped its labels under 4.5:1).
+  5. First-run tutorial (`deck-tutorial.js`): a modal dialog over the deck once a card is on screen, "Two ways to answer
+     a card": swipe left to pass (they are never told), swipe right to pitch (a note if you like; if they pitch back,
+     you match and can chat), the arrow keys on a keyboard (hidden on touch screens), an unticked "Don't show this
+     again" and GOT IT. Without the tick it shows once per visit (sessionStorage); with it, never again
+     (`localStorage brivia-deck-tutorial = hidden`, cleared with the other `brivia-` keys on account deletion). It sends
+     nothing, and the deck's arrow keys are off while it is open.
+- **Not in this change** (same founder message, left for a follow-up): the chat close button and Escape, the mobile
+  profile and login after the founder's attachments, Explore spacing and equal icons, fewer dots in the deck copy, the
+  login OR spacing, the telephone on the "Where ideas begin" slide on phones, and the Resend sender address.
+- Proof: e2e deck 196 and the new deck-tutorial 25 at 1440 and 375 px (open, axe, arrow keys inert, once per visit,
+  ticked never again, Escape, the keyboard bar); specs that pressed Pass / Pitch now press them as a keyboard user
+  would; landing 47, landing-sound 17, app-shell 210, consent 182, launch-polish 39, explore-cards 74, fit 324,
+  chat-extras 145, profile-media 193, onboarding 269, signup 285, location 64, password-reset 18, password-reveal 56;
+  unit 335 (new `deck-tutorial.test.mjs`); orbit tests; build, style ratchet and asset budget OK.

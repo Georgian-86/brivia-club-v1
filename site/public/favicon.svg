@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <defs>
+    <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#8f2f4f"/>
+      <stop offset=".55" stop-color="#5e0b28"/>
+      <stop offset="1" stop-color="#2f0210"/>
+    </linearGradient>
+    <radialGradient id="h" cx=".28" cy=".18" r=".7">
+      <stop offset="0" stop-color="#fff" stop-opacity=".22"/>
+      <stop offset="1" stop-color="#fff" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <rect width="64" height="64" rx="14" fill="url(#g)"/>
+  <rect width="64" height="64" rx="14" fill="url(#h)"/>
+  <rect x="1" y="1" width="62" height="62" rx="13" fill="none" stroke="#fffaf1" stroke-opacity=".14" stroke-width="1"/>
+  <path fill="#fffaf1" transform="matrix(0.02400 0 0 -0.02400 15.548 50.000)" d="M45 0V39H706Q787 39 850.5 84.5Q914 130 950.0 215.5Q986 301 986 420Q986 539 950.0 611.5Q914 684 850.5 717.0Q787 750 706 750H486V776H767Q923 776 1049.5 740.0Q1176 704 1251.0 622.0Q1326 540 1326 400Q1326 182 1178.5 91.0Q1031 0 767 0ZM226 18V1482H537V18ZM486 764V790H686Q757 790 816.5 820.0Q876 850 911.5 920.0Q947 990 947 1109Q947 1228 911.5 1306.0Q876 1384 816.5 1422.5Q757 1461 686 1461H45V1500H727Q976 1500 1121.5 1412.5Q1267 1325 1267 1130Q1267 943 1129.0 853.5Q991 764 727 764Z"/>
+</svg>
