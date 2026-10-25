@@ -95,3 +95,46 @@ body.auth-page .auth-input-shell:has(input[name="password"], input[name="confirm
 .auth-modal .auth-input-shell:has(input[name="password"]) .auth-field-icon {
   --field-icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.7' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='4.5' y='10.5' width='15' height='10' rx='2.5'/%3E%3Cpath d='M8 10.5V7.5a4 4 0 0 1 8 0v3'/%3E%3C/svg%3E");
 }
+
+/* Sign up on phones (D-099): the same composition as the login above. One "Log in" pill at the top right, where the
+   login's "Create account" sits (no ×, as on the login; "I already have an account" remains). Only on the first
+   screen: the later steps keep their header and ×, so nothing floats over their scrolling content,
+   and the head centred in the login's type: the title in two balanced lines, the tracked line under it on one line. */
+@media (max-width: 700px) {
+  body.auth-page .auth-shell:has(.auth-guided.is-active .guided-screen--welcome) .auth-close { display: none !important; }
+  body.auth-page .auth-shell:has(.auth-guided.is-active .guided-screen--welcome) .auth-top-signup {
+    position: absolute !important;
+    top: 14px !important;
+    right: 20px !important;
+    left: auto !important;
+    margin: 0 !important;
+    font-size: 0 !important;
+    letter-spacing: 0 !important;
+  }
+  body.auth-page .auth-shell:has(.auth-guided.is-active .guided-screen--welcome) .auth-top-signup b {
+    font-size: var(--text-12) !important;
+    letter-spacing: .1em;
+  }
+  body.auth-page .auth-shell .auth-guided:has(.guided-screen--welcome) .guided-brand { text-align: center; }
+  body.auth-page .auth-shell .auth-guided:has(.guided-screen--welcome) .guided-brand .auth-eyebrow { text-align: center !important; }
+  body.auth-page .auth-shell .auth-guided:has(.guided-screen--welcome) .guided-brand-title {
+    color: var(--k-wine);
+    font-size: min(13vw, 56px);
+    line-height: .95;
+    letter-spacing: -.035em;
+    -webkit-text-stroke: .6px currentColor;
+    text-align: center;
+    text-wrap: balance;
+  }
+  body.auth-page .auth-shell .auth-guided:has(.guided-screen--welcome) .guided-brand .auth-intro {
+    margin: var(--space-3) 0 var(--space-6) !important;
+    font-size: min(11px, 3vw) !important;
+    letter-spacing: .26em !important;
+    text-align: center !important;
+    white-space: nowrap;
+  }
+  body.auth-page .auth-shell .guided .guided-screen--welcome :is(.guided-helper, .guided-fine) {
+    text-align: center;
+    text-wrap: balance;
+  }
+}

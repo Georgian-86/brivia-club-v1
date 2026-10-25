@@ -1,6 +1,7 @@
 // Mobile polish (D-096), stubbed Supabase (Vite on :5167). Never touches a real Supabase project.
 // * Login on phones (360 x 700, 390 x 844): the telephone shows at the top, centred; JOIN THE CLUB is one line; the
 //   Google button is fully on screen; outlined field icons (no ✉ / ♙ glyphs).
+// * Sign up on phones: the login's composition (one Log in pill top right, no ×, a centred head, a one-line tagline).
 // * Chat: on desktop a 40 px × beside ••• closes the thread to "Your messages", and so does Escape (not while a menu
 //   is open); on phones there is no ×, the inbox is one page (the list does not scroll inside itself) under one heading.
 // * The phone profile hero: the name on one line; a slim EDIT PROFILE pill and a small round ⚙ inside the photo.
@@ -48,6 +49,26 @@ try {
       assert.equal(m.titleLines, 1); assert.ok(m.googleBottom <= m.h, `${m.googleBottom} > ${m.h}`); assert.ok(m.overflow <= 0);
     });
     await check(`${tag} login: outlined field icons, no text glyphs`, () => { m.icons.forEach((i) => { assert.equal(i.font, '0px'); assert.match(i.mask, /url\(/); }); });
+    await ctx.close();
+  }
+
+  // 1b. Sign up on phones: the login's composition (one "Log in" pill top right, no ×, a centred head, one-line tagline).
+  for (const viewport of [{ width: 320, height: 622 }, { width: 390, height: 844 }]) {
+    const ctx = await signedOut(viewport);
+    const page = await ctx.newPage();
+    await page.goto(`${stub.url}/auth.html#signup`, { waitUntil: 'load' });
+    await page.waitForSelector('.auth-guided.is-active .guided-choice--google');
+    await page.waitForTimeout(400);
+    const m = await page.evaluate(() => {
+      const r = (s) => document.querySelector(s).getBoundingClientRect();
+      const shown = (s) => { const e = document.querySelector(s); return Boolean(e && e.getClientRects().length && getComputedStyle(e).display !== 'none'); };
+      const pill = r('.auth-top-signup'); const title = document.querySelector('.guided-brand-title'); const intro = r('.auth-guided .guided-brand .auth-intro'); const help = r('.guided-screen--welcome .guided-helper');
+      return { close: shown('.auth-close'), pillRight: Math.round(innerWidth - pill.right), pillTop: Math.round(pill.top), pillText: document.querySelector('.auth-top-signup b').textContent.trim(), labelHidden: getComputedStyle(document.querySelector('.auth-top-signup')).fontSize === '0px', titleAlign: getComputedStyle(title).textAlign, introLines: Math.round(intro.height / parseFloat(getComputedStyle(document.querySelector('.auth-guided .guided-brand .auth-intro')).lineHeight || intro.height)), gap: Math.round(help.top - intro.bottom), overflow: document.documentElement.scrollWidth - innerWidth };
+    });
+    await check(`${viewport.width}x${viewport.height} sign up: one Log in pill top right, no ×, a centred head, the tagline on one line (${JSON.stringify(m)})`, () => {
+      assert.equal(m.close, false); assert.equal(m.pillRight, 20); assert.equal(m.pillTop, 14); assert.match(m.pillText, /^LOG IN$/i); assert.equal(m.labelHidden, true);
+      assert.equal(m.titleAlign, 'center'); assert.equal(m.introLines, 1); assert.ok(m.gap >= 20, `gap ${m.gap}`); assert.ok(m.overflow <= 0);
+    });
     await ctx.close();
   }
 

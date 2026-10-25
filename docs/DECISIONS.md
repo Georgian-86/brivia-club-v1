@@ -2017,3 +2017,15 @@ controls (a tester or a seeded test member), never a real member, so no new expo
   a 32 px round button in the photo's top right corner; both keep a 44 px tap area (6 px around). Desktop is unchanged.
 - Proof: `mobile-polish.spec.mjs` (25: login at 360 x 600 / 708 and 390 x 844, profile at 360 and 412), app-shell,
   launch-polish (phones: 32 px controls with the -6 px tap area), profile-media, signup, password suites, unit 335.
+
+## D-099: The phone sign-up start screen in the login's composition (founder, 2026-10-25)
+
+- At ≤ 700 px, on the first sign-up screen only: one "Log in" pill at the top right, exactly where the login's "Create
+  account" sits (20 px in, 14 px down; "Already a member?" and the × hidden, as on the login; "I already have an
+  account" stays in the flow); FIND YOUR PEOPLE centred in two balanced lines in the login's type (13vw up to 56 px,
+  -.035em, .6 px stroke, wine); the tagline on one line, tracked .26em, 24 px above the helper; helper and fine print
+  centred and balanced.
+- Scoped to the welcome screen (`:has(.guided-screen--welcome)`): applied to every step, the taller head shifted the
+  interests step so a tap on a tray pick missed after the open list closed (signup.spec caught it). Later steps keep
+  their header, × and left-aligned head.
+- Proof: `mobile-polish.spec.mjs` 27 (sign up at 320 x 622 and 390 x 844), signup 288, onboarding 269.
