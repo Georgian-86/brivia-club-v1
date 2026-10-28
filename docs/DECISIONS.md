@@ -2119,3 +2119,28 @@ controls (a tester or a seeded test member), never a real member, so no new expo
   post id. The inbox row reads "Shared a post" and the notification "Shared a post with you." No SQL.
 - **Proof:** unit `post-activity.test.mjs` (8); e2e `post-activity.spec.mjs` (card, gone post, inbox row, axe on the
   card, View post opens the post; 1440 and 390); chat-extras 145, chat-inbox, explore-cards 74, app-shell 211.
+
+## D-104: Edit profile: editable interests, an Experience dropdown, the saved area shown, and a bio (founder, 2026-10-28)
+
+- **Asked (with a screenshot of Edit profile):** "interests edit ni horhe, experience mein drop down ni aarha. Location
+  daali thi, to yahan aani chahiye location jo daali thi. Bio bhi ni aata." (Interests can't be edited; Experience has
+  no dropdown; the location entered should show here; there is no bio.)
+- **Done:**
+  1. Interests: the read-only line is now chips (× removes) and a search that adds offered interests (private ones
+     never offered; already-saved private ones stay as chips marked Private). 1 to 12. Saved with
+     `set_member_interests` first, before anything else: unchanged picks send nothing (the member's own points and the
+     3-a-day rewrite limit are untouched), a change shares the 20 points evenly and keeps each pick's mode
+     (`planInterestSave`, `profile-edit.js`). The limit refusal says "You can change your interests up to 3 times a day.
+     Try again tomorrow." and the dialog stays. After a change the deck reloads (it matches on interests).
+  2. Experience is a dropdown with the signup's choices (Student / just starting … 12+ years); an older free-text
+     value stays selectable. The new signup (D-102) no longer asks it, so this is where members set it.
+  3. Area: the city box shows the saved city ("Ludhiana"), under the current area heading. Only the coarse place is
+     ever stored (privacy rule), so a street or locality typed at signup is not kept anywhere to show.
+  4. Bio: `0016_profile_bio.sql` adds `profiles.bio` (300 characters) and `member_bio()` (a visible member's bio only).
+     Edit profile has a BIO box with a counter; the profile has an About card; another member's profile dialog shows
+     their bio. Until 0016 is applied the field and card stay hidden. `privacy.html` lists the bio.
+  5. The dialog's labels, kicker and note were 3.5:1 on the cream; now above 4.5:1 in the same wine-brown family.
+- **Proof:** unit `profile-edit.test.mjs` (4); SQL `f-profile-bio.test.sql`; e2e `profile-edit.spec.mjs` (1440 and 390:
+  chips, dropdown, area prefilled, bio field, axe on the new fields, private interests not offered, the save payload,
+  bio and experience on the row, About card, no interest save when unchanged, the daily-limit line, another member's
+  bio).

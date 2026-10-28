@@ -710,3 +710,25 @@ select to_regclass('public.community_post_comments') is not null, to_regclass('p
 
 Expected advisor addition: `post_activity` joins the intended "security definer function executable by authenticated"
 list (`supabase/tests/orbit-hygiene.test.sql` H3).
+
+## 0016
+
+**A short bio on the profile (founder request 2026-10-28, D-104). Not yet applied.**
+
+What it does: adds `profiles.bio` (text, at most 300 characters, `profiles_bio_length`), grants `update (bio)` to
+`authenticated`, and adds `member_bio(uuid)` (security definer, `search_path = public`, `authenticated` only): the bio
+of a member the caller can see (`brivia_visible_to`), or the caller's own; null otherwise. Cards are unchanged.
+
+Deploy order: either. The client shows the Bio field and the About card only once the own row carries `bio`.
+Apply after `0015`.
+
+Verify after the apply:
+
+```sql
+select exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'profiles' and column_name = 'bio'),
+       has_column_privilege('authenticated', 'public.profiles', 'bio', 'update'),
+       has_function_privilege('authenticated', 'public.member_bio(uuid)', 'execute'),
+       has_function_privilege('anon', 'public.member_bio(uuid)', 'execute');  -- t, t, t, f
+```
+
+Expected advisor addition: `member_bio` joins the intended definer-RPC list (`orbit-hygiene.test.sql` H3).
