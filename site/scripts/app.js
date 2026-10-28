@@ -74,6 +74,7 @@ import '../styles/app-polish.css';
 // The compact deck without side buttons, and its first-run tutorial (D-094). Loads last.
 import '../styles/deck-compact.css';
 import { navMarkup, markCurrentNav, setChatBadges } from './app-nav.js';
+import { parseReadState, serializeReadState, lastReadAt, unreadCount, markRead, sortByLastContact, unreadTotal } from './chat-unread.js';
 import { skeletonMarkup, setBusy } from './app-skeletons.js';
 
 document.body.classList.add('app-auth-pending');
@@ -115,7 +116,43 @@ const PITCH_OPENING_MS = 400;
 let pitchOpenedAt = 0;
 const pitchSheetVisible = () => !document.querySelector('#pitch-modal')?.hidden;
 const chatMessages = {};
-const readChatIds = new Set();
+// Unread messages per conversation (D-100): the newest message seen in each one, kept in this browser per member.
+let chatReadState = null;
+let chatReadStateFor = '';
+const chatReadKey = () => `brivia-chat-read:${memberProfile.id || 'anonymous'}`;
+const getChatReadState = () => {
+  if (chatReadState && chatReadStateFor === chatReadKey()) return chatReadState;
+  let raw = null;
+  try { raw = window.localStorage.getItem(chatReadKey()); } catch { raw = null; }
+  chatReadState = parseReadState(raw);
+  chatReadStateFor = chatReadKey();
+  if (raw === null) saveChatReadState();
+  return chatReadState;
+};
+const saveChatReadState = () => {
+  try { window.localStorage.setItem(chatReadKey(), serializeReadState(chatReadState)); } catch { /* in memory only */ }
+};
+const chatUnreadCount = (personId) => unreadCount(chatMessages[personId], lastReadAt(getChatReadState(), personId));
+const markChatRead = (personId) => {
+  const next = markRead(getChatReadState(), personId, chatMessages[personId]);
+  if (next === chatReadState) return;
+  chatReadState = next;
+  saveChatReadState();
+};
+const unreadMessageTotal = (conversations) => unreadTotal(conversations.map((p) => p.id), (id) => chatMessages[id], (id) => lastReadAt(getChatReadState(), id));
+// Desktop: the inbox rows scroll inside .chat-inbox-scroll; a wheel over the search box or the heading above them
+// scrolls the rows too (founder, 2026-10-28: the list only moved from its own scrollbar area).
+const bindInboxWheel = (list) => {
+  if (!list || list.dataset.wheelBound === 'true') return;
+  list.dataset.wheelBound = 'true';
+  list.addEventListener('wheel', (event) => {
+    const scroller = list.querySelector('.chat-inbox-scroll');
+    if (!scroller || scroller.contains(event.target) || event.ctrlKey) return;
+    if (scroller.scrollHeight <= scroller.clientHeight || getComputedStyle(scroller).overflowY === 'visible') return;
+    scroller.scrollTop += event.deltaMode === 1 ? event.deltaY * 16 : event.deltaY;
+    event.preventDefault();
+  }, { passive: false });
+};
 let messageSyncTimer = null;
 let connectionSyncTick = 0;
 const overlayIds = ['pitch-modal'];
@@ -1695,11 +1732,12 @@ const renderChats = () => {
   ensureInboxControls();
   ensureChatMoreMenu();
   const hiddenChatIds = readHiddenChatIds();
-  const conversations = people.filter((person) => remoteMatchIds.includes(person.id) && !hiddenChatIds.has(String(person.id)));
+  // Newest contact first (founder, 2026-10-28): the conversation with the latest message, either way, is on top.
+  const conversations = sortByLastContact(people.filter((person) => remoteMatchIds.includes(person.id) && !hiddenChatIds.has(String(person.id))), (id) => chatMessages[id]);
   const query = chatSearchQuery.trim().toLowerCase();
   const matches = conversations.filter((person) => {
     const last = chatMessages[person.id]?.at(-1);
-    const unread = last?.from === 'them' && !readChatIds.has(person.id);
+    const unread = chatUnreadCount(person.id) > 0;
     const haystack = `${person.name} ${person.city} ${person.state || ''} ${person.role} ${person.experience || ''} ${person.skills || ''} ${person.lookingFor || ''} ${last?.text || ''} ${last?.attachment?.name || ''}`.toLowerCase();
     return (!query || haystack.includes(query)) && (activeChatFilter !== 'unread' || unread);
   });
@@ -1712,9 +1750,10 @@ const renderChats = () => {
   else list?.removeAttribute('aria-busy');
   const inboxMarkup = `<div class="inbox-panel-head"><div><strong>YOUR THREADS</strong><span>Private conversations</span></div>${inboxLoading ? '' : `<b>${conversations.length}</b>`}</div>${referenceRows}${inboxLoading ? skeletonMarkup('list', 4) : matches.length ? matches.map((person) => {
     const last = chatMessages[person.id]?.at(-1);
-    const unread = last?.from === 'them' && !readChatIds.has(person.id);
+    const unreadMessages = chatUnreadCount(person.id);
+    const unread = unreadMessages > 0;
     const lastPreview = last?.attachment?.kind === 'resume' ? 'Resume (PDF)' : last?.attachment ? `📎 ${last.attachment.name || 'Attachment'}` : (last?.text || 'Start a conversation');
-    return `<div class="chat-row${unread ? ' is-unread' : ''}${selectedChat?.id === person.id ? ' is-selected' : ''}"><button class="chat-row-open" type="button" data-chat-id="${escapeHtml(person.id)}"><span class="member-profile-trigger" data-public-profile-id="${escapeHtml(person.id)}" role="button" tabindex="0" aria-label="Open ${escapeHtml(person.name)} profile">${renderAvatar(person)}</span><span class="chat-row-copy"><strong data-public-profile-id="${escapeHtml(person.id)}">${escapeHtml(person.name)}</strong><span>${escapeHtml(lastPreview)}</span></span><span class="chat-row-meta"><time>${escapeHtml(formatChatTime(last?.createdAt))}</time>${unread ? '<b>1</b>' : ''}</span></button><button class="chat-delete" type="button" data-delete-chat-id="${escapeHtml(person.id)}" aria-label="Delete chat with ${escapeHtml(person.name)}" title="Delete chat"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M4.5 6h11M8 3.5h4M6.5 6l.6 10h5.8l-.6-10M8.5 8.5v5M11.5 8.5v5"/></svg></button></div>`;
+    return `<div class="chat-row${unread ? ' is-unread' : ''}${selectedChat?.id === person.id ? ' is-selected' : ''}"><button class="chat-row-open" type="button" data-chat-id="${escapeHtml(person.id)}"><span class="member-profile-trigger" data-public-profile-id="${escapeHtml(person.id)}" role="button" tabindex="0" aria-label="Open ${escapeHtml(person.name)} profile">${renderAvatar(person)}</span><span class="chat-row-copy"><strong data-public-profile-id="${escapeHtml(person.id)}">${escapeHtml(person.name)}</strong><span>${escapeHtml(lastPreview)}</span></span><span class="chat-row-meta"><time>${escapeHtml(formatChatTime(last?.createdAt))}</time>${unread ? `<b aria-label="${unreadMessages} unread">${unreadMessages > 99 ? '99+' : unreadMessages}</b>` : ''}</span></button><button class="chat-delete" type="button" data-delete-chat-id="${escapeHtml(person.id)}" aria-label="Delete chat with ${escapeHtml(person.name)}" title="Delete chat"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M4.5 6h11M8 3.5h4M6.5 6l.6 10h5.8l-.6-10M8.5 8.5v5M11.5 8.5v5"/></svg></button></div>`;
   }).join('') : '<div class="inbox-empty"><strong>No threads found</strong><span>Chats open once a connection is mutual. Send a signal from Connect to start one.</span><button type="button" class="inbox-empty-action" data-nav="explore">CONNECT WITH PEOPLE ↗</button></div>'}`;
   const inboxScroll = list?.querySelector('.chat-inbox-scroll');
   if (list && inboxScroll) {
@@ -1723,8 +1762,9 @@ const renderChats = () => {
     list.innerHTML = `<div class="chat-inbox-scroll">${inboxMarkup}</div>`;
     if (inboxToolbar) list.prepend(inboxToolbar);
   }
+  bindInboxWheel(list);
   document.querySelector('#chat-count').textContent = `${String(conversations.length).padStart(2, '0')} CONVERSATIONS`;
-  setChatBadges(document, conversations.length);
+  setChatBadges(document, unreadMessageTotal(conversations));
   list?.querySelectorAll('[data-chat-id]').forEach((button) => button.addEventListener('click', (event) => {
     const profileTrigger = event.target.closest('[data-public-profile-id]');
     const person = matches.find((item) => item.id === button.dataset.chatId);
@@ -1742,7 +1782,6 @@ const renderChats = () => {
     const hiddenIds = readHiddenChatIds();
     hiddenIds.add(String(person.id));
     if (!saveHiddenChatIds(hiddenIds)) { showToast('Could not remove this chat. Please try again.'); return; }
-    readChatIds.delete(person.id);
     if (selectedChat?.id === person.id) {
       leaveTyping();
       selectedChat = null;
@@ -1794,7 +1833,8 @@ const loadChatMessages = async (person) => {
       return !previous || previous.id !== message.id || previous.text !== message.text || previous.createdAt !== message.createdAt || previous.attachment?.url !== message.attachment?.url || previous.attachment?.path !== message.attachment?.path;
     });
     chatMessages[person.id] = mergedMessages;
-    if (messagesChanged) renderMessages();
+    if (selectedChat?.id === person.id) markChatRead(person.id);
+    if (messagesChanged) { renderMessages(); renderChats(); }
   } else console.warn('Messages could not load:', error.message);
 };
 
@@ -1822,7 +1862,8 @@ const appendRemoteMessage = (message) => {
     text: message.body ?? message.text ?? message.message ?? message.content ?? '',
     attachment: attachmentFromRow(message),
   });
-  if (senderId !== memberId) readChatIds.delete(otherId);
+  messages.sort((a, b) => new Date(a.createdAt || 0).getTime() - new Date(b.createdAt || 0).getTime());
+  if (selectedChat?.id === otherId) markChatRead(otherId);
   renderChats();
   if (selectedChat?.id === otherId) renderMessages();
 };
@@ -1864,7 +1905,7 @@ const openChat = (person, markAsRead = true) => {
   ensureChatWallpaper();
   selectedChat = person;
   joinTyping(person);
-  if (markAsRead) readChatIds.add(person.id);
+  if (markAsRead) markChatRead(person.id);
   const list = document.querySelector('#chat-list'); const windowPanel = document.querySelector('#chat-window');
   const isSmallScreen = window.matchMedia('(max-width: 700px)').matches;
   if (list) list.hidden = isSmallScreen;
@@ -2118,7 +2159,6 @@ const hideReportedMember = (person) => {
   const blockedIds = readBlockedUserIds();
   blockedIds.add(String(person.id));
   saveBlockedUserIds(blockedIds);
-  readChatIds.delete(person.id);
 };
 const completeChatAction = async (action) => {
   const person = selectedChat;
@@ -2157,7 +2197,6 @@ const completeChatAction = async (action) => {
       return;
     }
     rememberRemovedConnection(person);
-    readChatIds.delete(person.id);
     removeConnectionFromState(person);
     showToast(`Connection with ${person.name} removed.`);
     return;
@@ -2166,7 +2205,6 @@ const completeChatAction = async (action) => {
   if (!window.confirm(label)) return;
   if (action === 'block') {
     if (!await blockMember(person)) return;
-    readChatIds.delete(person.id);
     renderChats();
     renderMessages();
     showToast(`${person.name} is blocked.`);
@@ -2175,7 +2213,6 @@ const completeChatAction = async (action) => {
   const hiddenIds = readHiddenChatIds();
   hiddenIds.add(String(person.id));
   if (!saveHiddenChatIds(hiddenIds)) { showToast('Could not update this chat. Please try again.'); return; }
-  readChatIds.delete(person.id);
   closeSelectedChat();
   showToast('Chat deleted from your inbox.');
 };
