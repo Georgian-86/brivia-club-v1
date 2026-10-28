@@ -3,47 +3,65 @@
 // resumes, where Back goes, and the classic switch. There is no points screen: interests save with evenSplit.
 // `verify` ("Check your email.") is a terminal screen of the email path when signup needs email confirmation; it is
 // not a step.
+//
+// D-102 (founder, 2026-10-28): two phases. SIGNUP ends with a profile photo, which is required, and creates the account.
+// SETUP (area, then interests) is not part of signup: it is the first thing a new member sees once the account exists
+// (straight after signup, or after confirming the email and logging in), and nobody reaches the app without it (the
+// server's completion rule needs a home area and interests; the app sends an incomplete member back here).
+export const SETUP = ['area', 'interests'];
 export const SCREENS = {
-  email: ['welcome', 'account', 'adult', 'name', 'details', 'area', 'interests', 'reveal'],
-  google: ['welcome', 'adult', 'name', 'details', 'area', 'interests', 'reveal'],
+  email: ['welcome', 'account', 'adult', 'name', 'details', 'photo', ...SETUP, 'reveal'],
+  google: ['welcome', 'adult', 'name', 'details', 'photo', ...SETUP, 'reveal'],
 };
+// The last signup screen: its primary button creates the account and saves the profile.
+export const SIGNUP_LAST = 'photo';
+export const isSetupScreen = (screen) => SETUP.includes(screen);
 
 // The icon each question shows in its bubble (signup-screens.js draws them as inline SVG).
-export const STEP_ICONS = { account: 'mail', adult: 'shield', name: 'person', details: 'phone', area: 'pin', interests: 'spark' };
+export const STEP_ICONS = { account: 'mail', adult: 'shield', name: 'person', details: 'phone', photo: 'camera', area: 'pin', interests: 'spark' };
 const TERMINAL = ['reveal', 'verify'];
-const questions = (path) => (SCREENS[path] || SCREENS.email).filter((s) => s !== 'welcome' && s !== 'reveal');
-
-export const stepLabel = (path, screen) => {
-  const list = questions(path);
-  const at = list.indexOf(screen);
-  return at < 0 ? null : `Step ${at + 1} of ${list.length}`;
+// The questions of the phase `screen` belongs to (signup questions for welcome / verify, setup for reveal).
+const questions = (path, screen) => {
+  if (isSetupScreen(screen) || screen === 'reveal') return [...SETUP];
+  return (SCREENS[path] || SCREENS.email).filter((s) => s !== 'welcome' && s !== 'reveal' && !isSetupScreen(s));
 };
 
-// One bubble per question: done before the current one, current, pending after. On Reveal or Verify every bubble is done.
+export const stepLabel = (path, screen) => {
+  const list = questions(path, screen);
+  const at = list.indexOf(screen);
+  if (at < 0) return null;
+  return isSetupScreen(screen) ? `Set up ${at + 1} of ${list.length}` : `Step ${at + 1} of ${list.length}`;
+};
+
+// One bubble per question of the current phase: done before the current one, current, pending after. On Reveal or
+// Verify every bubble is done.
 export const stepStates = (path, screen) => {
-  const list = questions(path);
+  const list = questions(path, screen);
   const at = TERMINAL.includes(screen) ? list.length : list.indexOf(screen);
   return list.map((s, i) => ({ screen: s, state: i < at ? 'done' : i === at ? 'current' : 'pending' }));
 };
 
-// status: { adult_declared, has_name, has_phone, has_gender, has_cell, interests, points, completed }
-// (my_onboarding_status plus the member's own profile row). 'done' means go to the app.
+// status: { adult_declared, has_name, has_phone, has_gender, has_photo, has_cell, interests, points, completed }
+// (my_onboarding_status plus the member's own profile row). 'done' means go to the app. A completed member is never
+// sent back for a photo (the requirement is for signups from D-102 on).
 export const resumeScreen = ({ session, status = {} }) => {
   if (!session) return 'welcome';
   if (status.completed) return 'done';
   if (!status.adult_declared) return 'adult';
   if (!status.has_name) return 'name';
   if (!status.has_phone || !status.has_gender) return 'details';
+  if (status.has_photo === false) return 'photo';
   if (!status.has_cell) return 'area';
   if (!(status.interests > 0 && status.points === 20)) return 'interests';
   return 'done';
 };
 
-// Once the session exists, Back never returns to Account: the earliest target is Welcome.
+// Once the session exists, Back never returns to Account: the earliest target is Welcome. Setup never goes back into
+// signup (the account exists by then): Area has no Back.
 export const backTarget = (path, screen, hasSession) => {
   const list = SCREENS[path] || SCREENS.email;
   const at = list.indexOf(screen);
-  if (at <= 0) return null;
+  if (at <= 0 || screen === SETUP[0]) return null;
   const prev = list[at - 1];
   return hasSession && prev === 'account' ? 'welcome' : prev;
 };

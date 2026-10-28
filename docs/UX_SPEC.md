@@ -38,13 +38,23 @@ New components reuse these tokens. **No raw hex in new components**, and no new 
 
 ### A0. Guided signup: one question per screen (D-073, live from 2026-10-22; replaces the 4-step form below)
 
-`auth.html` `#guided-signup`, `signup-flow.js`, `signup-screens.js`, `signup.css`. Screens: Welcome (Continue with
-Google · Continue with email · I already have an account) → Account (email, password, confirm; email path only; the
-account is created at the end, no email code) → 18+ → Name → Details (phone and gender, D-068) → Area ("Use my
-location" with the A1 fallbacks, or a city) → Interests (1–12 picks: search, "Popular" then one tab per category, one category's chips at a time in a fixed-height panel, and a compact "Your picks" tray above the tabs; no points
-screen, `evenSplit` behind the scenes; private interests not offered) → Reveal, or Verify ("Check your email.") when
-email confirmation is on. "STEP n OF 6" (email) or "OF 5" (Google) shown above a thin wine track (done and current filled, pending empty; a progressbar, D-086); one visible question, which is the
-page's h1; Enter = Continue; Back on every question screen; Finish submits once (busy until the next screen shows).
+`auth.html` `#guided-signup`, `signup-flow.js`, `signup-screens.js`, `signup.css`. Two phases since D-102.
+**Signup:** Welcome (Continue with Google · Continue with email · I already have an account) → Account (email,
+password, confirm; email path only; no email code) → 18+ → Name → Details (phone and gender, D-068) → **Photo**
+(required: "Add a profile photo.", a round frame with a camera, "Choose a photo" opens the file picker and then "Frame
+your photo"; the button is "Create account", or "Continue" for a member who is already signed in). The photo screen's
+button creates the account, saves the profile and the photo, and records the 18+ declaration. "STEP n OF 5" (email) or
+"OF 4" (Google). With email confirmation on, Verify ("Check your email.") follows; the photo waits in the pending
+profile and is uploaded after login.
+**Setup (mandatory, not part of signup):** the first thing a new member sees once the account exists (straight after
+the photo, or after confirming the email and logging in): kicker "BEFORE YOU START", Area ("Use my location" with the A1
+fallbacks, or a city) → Interests (1–12 picks from one dropdown, "Popular" first, a compact "Your picks" tray; no points
+screen, `evenSplit` behind the scenes; private interests not offered) → Reveal. "SET UP n OF 2" over its own two-bar
+track; Area has no Back (signup is finished); "Already a member? Log in" is hidden. The app sends any member without an
+area and interests back here (server completion rule, D-030), so nobody reaches the app without them.
+Shared: one visible question, which is the page's h1; Enter = Continue; Back on every other question screen; each
+submitting button submits once (busy until the next screen shows). A returning incomplete member resumes at the first
+missing item: 18+, name, details, photo, area, interests (a completed member is never sent back for a photo).
 The classic 4-step form stays behind `VITE_SIGNUP_FLOW=classic` for one release. Notice version `2026-10-05`.
 
 **Look (D-086, replacing D-082/D-082b).** The guided screens wear the classic signup look: no card; the classic

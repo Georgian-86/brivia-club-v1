@@ -35,6 +35,17 @@ body.app-body .app-view[data-view="chat"] .chat-window-head :is(.chat-more, .cha
 
 /* ---------- Phones: the inbox as one scrolling page ---------- */
 @media (max-width: 700px) {
+  /* chat-attachments.css locks the page (overflow hidden) so an open thread's wallpaper never moves. With no thread
+     open the inbox is a page and must scroll: the document scrolls, the wrappers stay visible (founder, 2026-10-28). */
+  html:has(body.app-body[data-app-view="chat"] #chat-window[hidden]) {
+    overflow-x: hidden !important;
+    overflow-y: auto !important;
+  }
+  body.app-body[data-app-view="chat"]:has(#chat-window[hidden]),
+  body.app-body[data-app-view="chat"]:has(#chat-window[hidden]) :is(.app-wrap, .app-main) {
+    overflow: visible !important;
+    height: auto !important;
+  }
   body.app-body[data-app-view="chat"] .app-view[data-view="chat"]:not(:has(.chat-window:not([hidden]))) {
     height: auto !important;
     min-height: 0 !important;

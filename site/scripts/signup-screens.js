@@ -1,10 +1,13 @@
 // Guided signup (polish wave B, D-073; first D-067/D-068): one question per screen, at every width. Renders into
 // #guided-signup (auth.html): the bubble stepper (done / current / pending), "Step n of N", one screen, and Back + one
-// primary button. Answers stay in memory until the last question; then `submit(answers)` (script.js) creates the
-// account (email path) and saves everything through the existing pipeline. No email code, no points screen: the
-// interests are saved with an even split. Coordinates live only in `answers.area` (memory) and are dropped once saved.
+// primary button. D-102: two phases. Signup ends on the required profile photo, whose button calls `submit(answers)`
+// (script.js): it creates the account (email path), saves the profile and the photo and records the 18+ declaration.
+// Setup (area, then interests) follows at once (or after the email is confirmed) and calls `submitSetup(answers)`.
+// No email code, no points screen: the interests are saved with an even split. Coordinates live only in
+// `answers.area` (memory) and are dropped once saved.
 import { searchPlaces, fetchInterestNodes } from './supabase.js';
-import { SCREENS, STEP_ICONS, stepLabel, stepStates, backTarget, groupInterests, isOffered } from './signup-flow.js';
+import { SCREENS, STEP_ICONS, SETUP, stepLabel, stepStates, backTarget, groupInterests, isOffered } from './signup-flow.js';
+import { ImageProcessingError, PHOTO_ERROR_MESSAGE, PHOTO_FRAMER_ERROR } from './image-compress.js';
 import { MAX_INTERESTS } from './passion-budget.js';
 import { POPULAR_INTERESTS } from './discovery-catalog.js';
 import { matchTypedCity } from './area-pick.js';
@@ -39,6 +42,7 @@ const ICONS = {
   arrow: '<path d="M5 12h14M13 6l6 6-6 6"/>',
   back: '<path d="M19 12H5M11 6l-6 6 6 6"/>',
   chevron: '<path d="M6 9l6 6 6-6"/>',
+  camera: '<path d="M4 8.5A2.5 2.5 0 0 1 6.5 6h1.8l1.4-2h4.6l1.4 2h1.8A2.5 2.5 0 0 1 20 8.5v8a2.5 2.5 0 0 1-2.5 2.5h-11A2.5 2.5 0 0 1 4 16.5z"/><circle cx="12" cy="12.5" r="3.6"/>',
 };
 const svg = (name, cls = '') => `<svg class="${cls}" viewBox="0 0 24 24" aria-hidden="true" focusable="false">${ICONS[name]}</svg>`;
 
@@ -53,6 +57,7 @@ export const COPY = {
   areaMissing: 'Use your location or pick your city.',
   interestsLoad: "We couldn't load the interests. Please try again.",
   interestsMissing: 'Pick at least one interest.',
+  photoMissing: 'Add a profile photo to continue.',
   cap: `You can pick up to ${MAX_INTERESTS}. Remove one to add another.`,
 };
 
@@ -60,7 +65,7 @@ export const COPY = {
 // screen, message }>. resumeAt: the first screen to show for a signed-in member (resumeScreen). prefill: answers
 // already known (a Google name, an existing row). hasSession: a member is signed in (Back never returns to account).
 export const initGuidedSignup = ({
-  root, path = 'email', startGoogle, submit, redirectToApp, resumeAt = null, prefill = {}, hasSession = false,
+  root, path = 'email', startGoogle, submit, submitSetup, redirectToApp, resumeAt = null, prefill = {}, hasSession = false,
   onLogin = () => {}, onSignOut = () => {},
 }) => {
   if (!root) return null;
@@ -71,7 +76,8 @@ export const initGuidedSignup = ({
   const actions = root.querySelector('[data-guided-actions]');
   const back = root.querySelector('[data-guided-back]');
   const next = root.querySelector('[data-guided-next]');
-  const emptyAnswers = () => ({ email: '', password: '', passwordConfirm: '', adult: false, name: '', phoneCountryCode: '+91', phoneNumber: '', gender: '', area: null, interests: [] });
+  // photo: the framed File picked on the photo screen (D-102); photoUrl: the member's stored photo when resuming.
+  const emptyAnswers = () => ({ email: '', password: '', passwordConfirm: '', adult: false, name: '', phoneCountryCode: '+91', phoneNumber: '', gender: '', photo: null, photoUrl: '', area: null, interests: [] });
   const state = { path, hasSession, resumeAt, screen: 'welcome', busy: false, nodes: null, current: null, email: '', answers: { ...emptyAnswers(), ...prefill } };
   const geo = { seq: 0, pending: false, guard: 0 };
 
@@ -319,12 +325,77 @@ export const initGuidedSignup = ({
       };
     },
 
+    // D-102: a profile photo is required. "Choose a photo" opens the file picker, then "Frame your photo" (photo-crop.js);
+    // only the framed square is kept (it is re-encoded before upload, so no EXIF location ever leaves the device).
+    photo: () => {
+      let previewUrl = '';
+      return {
+        primary: state.hasSession ? 'Continue' : 'Create account',
+        html: `${heading('Add a profile photo.', 'Members see it on your card. A clear photo of your face helps people recognise you.')}
+          <div class="guided-photo">
+            <button class="guided-photo-pick" type="button" data-guided-photo-pick>
+              <span class="guided-photo-frame" data-guided-photo-preview aria-hidden="true">${svg('camera', 'guided-photo-icon')}</span>
+              <span class="guided-photo-label" data-guided-photo-label>Choose a photo</span>
+            </button>
+            <input class="sr-only" type="file" accept="image/*" tabindex="-1" aria-hidden="true" data-guided-photo-input />
+            <p class="guided-status" data-guided-photo-status role="status" aria-live="polite"></p>
+          </div>`,
+        mount: (el) => {
+          const pick = el.querySelector('[data-guided-photo-pick]');
+          const input = el.querySelector('[data-guided-photo-input]');
+          const frame = el.querySelector('[data-guided-photo-preview]');
+          const label = el.querySelector('[data-guided-photo-label]');
+          const status = el.querySelector('[data-guided-photo-status]');
+          const paint = () => {
+            const src = previewUrl || a.photoUrl;
+            frame.classList.toggle('has-photo', Boolean(src));
+            frame.innerHTML = src ? `<img src="${escapeHtml(src)}" alt="" />` : svg('camera', 'guided-photo-icon');
+            label.textContent = src ? 'Change photo' : 'Choose a photo';
+          };
+          if (a.photo) previewUrl = URL.createObjectURL(a.photo);
+          paint();
+          pick.addEventListener('click', () => { input.value = ''; input.click(); });
+          input.addEventListener('change', async () => {
+            const picked = input.files?.[0];
+            if (!picked) return;
+            setError('');
+            let openPhotoCrop;
+            try { ({ openPhotoCrop } = await import('./photo-crop.js')); } catch { setError(PHOTO_FRAMER_ERROR); return; }
+            let framed = null;
+            try { framed = await openPhotoCrop(picked, { returnFocus: pick }); } catch (error) {
+              setError(error instanceof ImageProcessingError ? PHOTO_ERROR_MESSAGE : PHOTO_FRAMER_ERROR);
+              return;
+            }
+            if (!framed || !el.isConnected) return;
+            a.photo = framed;
+            if (previewUrl) URL.revokeObjectURL(previewUrl);
+            previewUrl = URL.createObjectURL(framed);
+            paint();
+            status.textContent = 'Photo added.';
+            refreshNext();
+            next.focus({ preventScroll: true });
+          });
+        },
+        ready: () => Boolean(a.photo || a.photoUrl),
+        notReady: () => COPY.photoMissing,
+        submit: async () => {
+          const result = await submit({ ...a, adult: true });
+          if (!result?.ok) return { screen: result?.screen || 'photo', message: result?.message || COPY.saveFailed };
+          a.password = ''; a.passwordConfirm = '';
+          if (result.photoUrl) { a.photoUrl = result.photoUrl; a.photo = null; }
+          if (!result.session) return 'verify';
+          state.hasSession = true;
+          return SETUP[0];
+        },
+      };
+    },
+
     area: () => {
       let options = [];
       let searchSeq = 0;
       let searchTimer = 0;
       return {
-        html: `${heading('Where are you based?', 'We show people near you first. Members only ever see a rounded distance, never your address.')}
+        html: `${kicker('Before you start')}${heading('Where are you based?', 'We show people near you first. Members only ever see a rounded distance, never your address.')}
           <button class="guided-choice guided-choice--geo" type="button" data-guided-geo aria-pressed="false">${svg('pin', 'guided-choice-icon')}<span>Use my location</span></button>
           <div class="guided-or"><span>or pick your city</span></div>
           <p class="guided-fallback" data-guided-area-fallback></p>
@@ -604,14 +675,12 @@ export const initGuidedSignup = ({
           if (submitted) return null;
           submitted = true;
           let result;
-          try { result = await submit({ ...a, adult: true, interests: a.interests.map(({ id, label, mode }) => ({ id, label, mode })) }); } catch (error) { submitted = false; throw error; }
+          try { result = await submitSetup({ area: a.area, interests: a.interests.map(({ id, label, mode }) => ({ id, label, mode })) }); } catch (error) { submitted = false; throw error; }
           if (!result?.ok) { submitted = false; return { screen: result?.screen || 'interests', message: result?.message || COPY.saveFailed }; }
-          // Saved (or kept for after the email is confirmed): the coordinates and the password leave memory.
+          // Saved: the coordinates leave memory.
           cancelGeo();
           if (a.area?.kind === 'geo') a.area = { kind: 'keep', label: '' };
-          a.password = ''; a.passwordConfirm = '';
-          if (result.session) state.hasSession = true;
-          return result.session ? 'reveal' : 'verify';
+          return 'reveal';
         },
       };
     },
@@ -633,7 +702,7 @@ export const initGuidedSignup = ({
     verify: () => ({
       noActions: true,
       html: `<div class="guided-reveal-mark" aria-hidden="true">${svg('mail')}</div>
-        ${heading('Check your email.', `We sent a link to <b>${escapeHtml(a.email)}</b>. Open it to activate your Brivia profile; it signs you in. It can take a few minutes, so check spam or promotions too.`)}
+        ${heading('Check your email.', `We sent a link to <b>${escapeHtml(a.email)}</b>. Open it to activate your Brivia profile; it signs you in, and you pick your area and interests next. It can take a few minutes, so check spam or promotions too.`)}
         <div class="guided-choices"><button class="guided-link guided-link--center" type="button" data-guided-login>Back to log in</button></div>`,
       mount: (el) => { el.querySelector('[data-guided-login]').addEventListener('click', () => onLogin()); },
     }),

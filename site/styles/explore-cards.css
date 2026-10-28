@@ -194,3 +194,91 @@ dialog.post-detail[open]{animation:post-detail-in var(--motion-slow) var(--ease)
   .post-detail-caption{padding:var(--space-5) var(--space-5) var(--space-3);overflow:visible;font-size:var(--text-20)}
   .post-detail-footer{position:sticky;bottom:0;padding:var(--space-3) var(--space-5) calc(var(--space-5) + env(safe-area-inset-bottom, 0px));background:var(--color-cream)}
 }
+
+/* ---------- Post activity (D-101): counts, "Liked by", threaded comments, the share sheet ---------- */
+body.app-body .post-card-action{position:relative}
+body.app-body .post-card-count{
+  position:absolute;top:2px;left:calc(50% + 8px);min-width:18px;height:18px;padding:0 5px;border-radius:var(--radius-pill);
+  background:var(--color-cream);color:var(--brivia-wine);font-family:var(--font-body);font-size:var(--text-12);font-weight:700;
+  font-style:normal;line-height:18px;letter-spacing:0;text-align:center;
+}
+body.app-body .post-card-activity{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:2px var(--space-3);padding:var(--space-2) var(--space-3) var(--space-3);background:var(--color-cream)}
+body.app-body .post-card-likes{margin:0;color:var(--color-ink);font-size:var(--text-12);font-weight:600;letter-spacing:.02em}
+body.app-body .post-card-comments-link{min-height:32px;margin:0;padding:0;border:0;background:none;color:var(--color-ink-soft);font-family:var(--font-body);font-size:var(--text-12);text-decoration:underline;text-underline-offset:3px;cursor:pointer}
+body.app-body .post-card-comments-link:focus-visible{outline:2px solid var(--brivia-wine);outline-offset:2px}
+
+.post-detail-body{grid-area:caption;min-height:0;overflow-y:auto;overscroll-behavior:contain}
+.post-detail-body .post-detail-caption{overflow:visible}
+.post-detail-stats{display:flex;flex-wrap:wrap;gap:var(--space-1) var(--space-4);margin:0 var(--space-6) var(--space-3);color:var(--color-ink);font-size:var(--text-14);font-weight:600}
+.post-detail-stats[hidden],.post-detail-stats:empty{display:none}
+.post-detail-action.post-detail-action--quiet{
+  width:auto;min-height:40px;margin:0 var(--space-6) var(--space-4);padding:0 var(--space-4);border:1px solid var(--brivia-wine);border-radius:var(--radius-pill);
+  background:transparent;color:var(--brivia-wine);font-size:var(--text-12);letter-spacing:.12em;
+}
+@media (hover:hover){.post-detail-action.post-detail-action--quiet:not(:disabled):hover{background:var(--brivia-wine);color:var(--color-cream)}}
+.post-comments{margin:0 var(--space-6) var(--space-5);padding-top:var(--space-4);border-top:1px solid var(--color-line)}
+.post-comments-title{margin:0 0 var(--space-3);color:var(--color-wine-deep);font-family:var(--font-heading);font-size:var(--text-20);font-weight:500}
+.post-comments-note{margin:0;color:var(--color-ink-soft);font-size:var(--text-14)}
+.post-comments-thread,.post-comment-replies{margin:0;padding:0;list-style:none}
+.post-comment{margin:0 0 var(--space-3)}
+.post-comment-main{display:flex;gap:var(--space-3);align-items:flex-start}
+.post-comment-avatar{display:grid;flex:0 0 32px;width:32px;height:32px;place-items:center;overflow:hidden;border-radius:50%;background:color-mix(in srgb, var(--brivia-wine) 18%, var(--color-cream));color:var(--brivia-wine);font-size:var(--text-12);font-weight:700}
+.post-comment-avatar img{width:100%;height:100%;object-fit:cover}
+.post-comment-copy{flex:1 1 auto;min-width:0}
+.post-comment-meta{display:flex;align-items:baseline;gap:var(--space-2);margin:0}
+.post-comment-author{margin:0;padding:0;border:0;background:none;color:var(--color-ink);font-family:var(--font-body);font-size:var(--text-14);font-weight:700;cursor:pointer}
+.post-comment-meta time{color:var(--color-ink-soft);font-size:var(--text-12)}
+.post-comment-body{margin:2px 0 0;color:var(--color-ink);font-size:var(--text-14);line-height:1.45;overflow-wrap:anywhere;white-space:pre-line}
+.post-comment-to{color:var(--brivia-wine);font-weight:600}
+.post-comment-actions{display:flex;gap:var(--space-4);margin:2px 0 0}
+.post-comment-actions button{min-height:32px;margin:0;padding:0;border:0;background:none;color:var(--color-ink-soft);font-family:var(--font-body);font-size:var(--text-12);font-weight:600;letter-spacing:.04em;cursor:pointer}
+@media (hover:hover){.post-comment-actions button:hover,.post-comment-author:hover{color:var(--brivia-wine)}}
+:is(.post-comment-actions button,.post-comment-author):focus-visible{outline:2px solid var(--brivia-wine);outline-offset:2px}
+/* The thread line: replies sit under their comment, behind a hairline in the wine tint. */
+.post-comment-replies{margin:var(--space-2) 0 0 15px;padding-left:var(--space-4);border-left:2px solid color-mix(in srgb, var(--brivia-wine) 22%, transparent)}
+.post-comment[data-depth="2"] .post-comment-replies{margin-left:0;padding-left:0;border-left:0}
+.post-comment-form{display:grid;gap:var(--space-2);border-top:1px solid var(--color-line);background:var(--color-cream)}
+.post-comment-form[hidden]{display:none}
+.post-comment-replying{display:flex;align-items:center;justify-content:space-between;margin:0;color:var(--brivia-wine);font-size:var(--text-12);font-weight:600}
+.post-comment-replying[hidden]{display:none}
+.post-comment-replying button{width:32px;height:32px;border:0;border-radius:50%;background:none;color:var(--brivia-wine);font-size:var(--text-20);cursor:pointer}
+.post-comment-row{display:flex;gap:var(--space-2);align-items:flex-end}
+.post-comment-row textarea{
+  flex:1 1 auto;min-width:0;min-height:44px;max-height:120px;margin:0;padding:11px var(--space-4);resize:none;
+  border:1px solid var(--color-card-edge);border-radius:22px;background:color-mix(in srgb, var(--color-card-paper) 40%, var(--color-cream));color:var(--color-ink);font-family:var(--font-body);font-size:16px;line-height:1.35;
+}
+.post-comment-row textarea:focus-visible{outline:2px solid var(--brivia-wine);outline-offset:1px}
+.post-comment-send{
+  flex:0 0 auto;min-width:64px;height:44px;margin:0;padding:0 var(--space-4);border:0;border-radius:22px;background:var(--brivia-wine);color:var(--color-cream);
+  font-family:var(--font-body);font-size:var(--text-12);font-weight:700;letter-spacing:.12em;text-transform:uppercase;cursor:pointer;
+}
+.post-comment-send:disabled{opacity:.45;cursor:default}
+.post-comment-send:focus-visible{outline:2px solid var(--brivia-wine);outline-offset:2px}
+@media (max-width:719px){
+  .post-detail-body{overflow:visible}
+  .post-detail-stats,.post-comments{margin-left:var(--space-5);margin-right:var(--space-5)}
+  .post-detail-action.post-detail-action--quiet{margin-left:var(--space-5)}
+}
+
+body.app-body:has(dialog.post-share[open]){overflow:hidden}
+dialog.post-share{width:min(440px, calc(100vw - 32px));max-height:calc(100dvh - 48px);margin:auto;padding:0;border:0;border-radius:var(--radius-l);background:var(--color-cream);color:var(--color-ink);box-shadow:0 40px 90px -30px color-mix(in srgb, var(--brivia-deep-wine) 80%, transparent)}
+dialog.post-share::backdrop{background:color-mix(in srgb, var(--brivia-deep-wine) 62%, transparent);backdrop-filter:blur(6px)}
+.post-share-panel{display:flex;flex-direction:column;max-height:calc(100dvh - 48px)}
+.post-share-head{display:flex;align-items:center;justify-content:space-between;gap:var(--space-3);padding:var(--space-3) var(--space-3) var(--space-3) var(--space-5);background:var(--brivia-wine);color:var(--color-cream)}
+.post-share-head h2{margin:0;font-family:var(--font-heading);font-size:var(--text-24);font-weight:500}
+.post-share-lead{margin:var(--space-4) var(--space-5) var(--space-2);color:var(--color-ink-soft);font-size:var(--text-14)}
+.post-share-list{flex:1 1 auto;min-height:0;margin:0;padding:0 var(--space-5);overflow-y:auto;list-style:none}
+.post-share-row{display:flex;align-items:center;gap:var(--space-3);min-height:60px;border-bottom:1px solid var(--color-line)}
+.post-share-avatar{display:grid;flex:0 0 40px;width:40px;height:40px;place-items:center;overflow:hidden;border-radius:50%;background:color-mix(in srgb, var(--brivia-wine) 18%, var(--color-cream));color:var(--brivia-wine);font-size:var(--text-12);font-weight:700}
+.post-share-avatar img{width:100%;height:100%;object-fit:cover}
+.post-share-name{flex:1 1 auto;min-width:0;overflow:hidden;font-size:var(--text-16);font-weight:600;text-overflow:ellipsis;white-space:nowrap}
+.post-share-send{min-width:72px;height:36px;border:0;border-radius:var(--radius-pill);background:var(--brivia-wine);color:var(--color-cream);font-family:var(--font-body);font-size:var(--text-12);font-weight:700;letter-spacing:.1em;text-transform:uppercase;cursor:pointer}
+.post-share-send.is-sent{background:transparent;color:var(--brivia-wine);box-shadow:inset 0 0 0 1px var(--brivia-wine)}
+.post-share-send:disabled{cursor:default}
+.post-share-actions{display:flex;gap:var(--space-2);padding:var(--space-4) var(--space-5) var(--space-5)}
+.post-share-option{flex:1 1 0;min-height:44px;border:1px solid var(--brivia-wine);border-radius:var(--radius-pill);background:transparent;color:var(--brivia-wine);font-family:var(--font-body);font-size:var(--text-12);font-weight:700;letter-spacing:.1em;text-transform:uppercase;cursor:pointer}
+:is(.post-share-send,.post-share-option):focus-visible{outline:2px solid var(--brivia-wine);outline-offset:2px}
+@media (max-width:719px){
+  dialog.post-share{width:100%;max-width:none;margin:auto 0 0;border-radius:var(--radius-l) var(--radius-l) 0 0}
+  .post-share-actions{padding-bottom:calc(var(--space-5) + env(safe-area-inset-bottom, 0px))}
+}

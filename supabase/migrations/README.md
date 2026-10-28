@@ -678,3 +678,35 @@ Expected advisor notes: `brivia_private.brivia_guard_cover_url` and `brivia_priv
 security definer functions with execute revoked from every client role (not RPCs; `brivia_private` is not exposed).
 Tested by `supabase/tests/media-covers.test.sql` (V1-V5), `trust.test.sql` FF2 and `d-tester-world.test.sql` (the
 cleanup reads `is_test` of the row itself only); e2e `tests/e2e/profile-media.spec.mjs` section "covers".
+
+## 0015
+
+**Likes, threaded comments and shares that members see (founder request 2026-10-28, D-101). Not yet applied.**
+
+What it does: adds `community_post_comments` (a reply names its parent comment on the same post; readable by anyone who
+can see the post and the comment's author; insert own, completed, on a visible post; delete by the comment's author or
+the post's author, replies go with it; no update), `community_post_shares` (own rows, one per member and post) and the
+RPC `post_activity(uuid[])` (security definer, `search_path = public`, `authenticated` only): per post the caller can see,
+the like, comment and share counts (only members the caller can see are counted), `liked_by_me`, and up to three of the
+caller's connections who liked it. Likes and saves (0012) are unchanged: rows stay private to their owner.
+
+Deploy order: either order works. The client hides counts and comments until `post_activity` exists (and the comment
+box until the table exists), and an old client ignores the new objects. Apply `0015`, then deploy the client.
+
+Pre-flight (read-only):
+
+```sql
+select to_regclass('public.community_post_likes') is not null, to_regnamespace('brivia_private') is not null,
+       to_regprocedure('public.brivia_can_see_author(uuid)') is not null;  -- t, t, t
+```
+
+Verify after the apply:
+
+```sql
+select to_regclass('public.community_post_comments') is not null, to_regclass('public.community_post_shares') is not null,
+       has_function_privilege('authenticated', 'public.post_activity(uuid[])', 'execute'),
+       has_function_privilege('anon', 'public.post_activity(uuid[])', 'execute');  -- t, t, t, f
+```
+
+Expected advisor addition: `post_activity` joins the intended "security definer function executable by authenticated"
+list (`supabase/tests/orbit-hygiene.test.sql` H3).

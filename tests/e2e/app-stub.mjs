@@ -78,6 +78,9 @@ export const startAppStub = async ({ port, state = {}, deckRows = defaultDeckRow
 
   const attach = async (context) => {
     await context.addInitScript(([key, value]) => { window.localStorage.setItem(key, value); }, ['sb-stub-auth-token', JSON.stringify(session)]);
+    // D-100: a first run counts messages before "now" as read; stubbed members start with an old read baseline, so the
+    // stubbed messages are unread (a spec that sets its own read state first keeps it).
+    await context.addInitScript(([key]) => { if (!window.localStorage.getItem(key)) window.localStorage.setItem(key, JSON.stringify({ baseline: '2020-01-01T00:00:00.000Z', read: {} })); }, [`brivia-chat-read:${ME}`]);
     // The first-run deck tutorial (D-094) stays out of the way unless a spec asks for it (state.deckTutorial).
     if (!st.deckTutorial) await context.addInitScript(() => { try { if (location.pathname === '/app.html') window.localStorage.setItem('brivia-deck-tutorial', 'hidden'); } catch { /* none */ } });
     await context.grantPermissions(['clipboard-read', 'clipboard-write'], { origin: url });
@@ -150,6 +153,27 @@ export const startAppStub = async ({ port, state = {}, deckRows = defaultDeckRow
         return json(200, pairs.length ? rows.filter((row) => pairs.some(([u1, u2]) => row.user1_id === u1 && row.user2_id === u2)) : rows);
       }
       if (pathName === '/rest/v1/community_posts' && method === 'GET') return json(200, st.posts || []);
+      // D-101 post activity (0015): st.activity rows for rpc/post_activity, st.comments for community_post_comments
+      // (a POST adds a row by ME and answers it; a DELETE removes ?id=eq.X and its replies), shares answer 201.
+      if (pathName === '/rest/v1/rpc/post_activity') return json(200, (st.activity || []).filter((row) => (args.p_post_ids || []).includes(row.post_id)));
+      if (pathName === '/rest/v1/community_post_comments') {
+        st.comments ||= [];
+        if (method === 'GET') return json(200, st.comments.filter((c) => `eq.${c.post_id}` === reqUrl.searchParams.get('post_id')));
+        if (method === 'POST') {
+          const row = { id: `cmt-${st.comments.length + 1}-${Date.now()}`, author_id: ME, parent_id: null, created_at: new Date().toISOString(), ...args };
+          st.comments.push(row);
+          return json(201, (request.headers().accept || '').includes('vnd.pgrst.object') ? row : [row]);
+        }
+        if (method === 'DELETE') {
+          const gone = new Set([String(reqUrl.searchParams.get('id') || '').replace(/^eq\./, '')]);
+          let grew = true;
+          while (grew) { grew = false; for (const c of st.comments) if (c.parent_id && gone.has(c.parent_id) && !gone.has(c.id)) { gone.add(c.id); grew = true; } }
+          st.comments = st.comments.filter((c) => !gone.has(c.id));
+          return route.fulfill({ status: 204, body: '', headers: { 'access-control-allow-origin': '*' } });
+        }
+      }
+      if (pathName === '/rest/v1/community_post_shares' && method === 'POST') return route.fulfill({ status: 201, body: '', headers: { 'access-control-allow-origin': '*' } });
+      if (pathName === '/rest/v1/brivia_messages' && method === 'POST') { (st.sent ||= []).push(args); return route.fulfill({ status: 201, body: '', headers: { 'access-control-allow-origin': '*' } }); }
       if (pathName === '/rest/v1/brivia_messages' && method === 'GET') return json(200, st.messages || []);
       if (pathName.startsWith('/rest/v1/')) return json(200, []);
       return json(200, {});
