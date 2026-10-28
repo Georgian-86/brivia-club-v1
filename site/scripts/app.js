@@ -21,7 +21,7 @@ import '../styles/mobile-app.css';
 import '../styles/skeleton.css';
 import '../styles/aura-theme.css';
 import '../styles/handoff.css';
-import { supabase, rowToProfile, saveProfile, isPresetCoverUrl, onboardingStatus, sendSignal, fetchSignalQuota, isRateLimited, isStorageImageUrl, withoutCredentials, uploadMessageAttachment, removeMessageAttachment, uploadCommunityPostImage, removeCommunityPostImage, ImageProcessingError, PHOTO_ERROR_MESSAGE, PHOTO_FRAMER_ERROR, compressAttachmentFiles, attachmentKind, reportMember, setSensitiveConsent, fetchSensitiveConsentAt, fetchMyInterests, fetchInterestNodes, uploadResume, removeResume, resumeSignedUrl, resumeInfo, clearResumePath, searchPlaces, setHomeCity, setHomeLocation } from './supabase.js';
+import { supabase, rowToProfile, saveProfile, isPresetCoverUrl, onboardingStatus, sendSignal, fetchSignalQuota, isRateLimited, isStorageImageUrl, withoutCredentials, uploadMessageAttachment, removeMessageAttachment, uploadCommunityPostImage, removeCommunityPostImage, ImageProcessingError, PHOTO_ERROR_MESSAGE, PHOTO_FRAMER_ERROR, compressAttachmentFiles, attachmentKind, reportMember, setSensitiveConsent, fetchSensitiveConsentAt, fetchMyInterests, fetchInterestNodes, setMemberInterests, uploadResume, removeResume, resumeSignedUrl, resumeInfo, clearResumePath, searchPlaces, setHomeCity, setHomeLocation } from './supabase.js';
 import { locateOnce, fallbackCopy } from './geo-locate.js';
 import { areaChangeMessage, AREA_HELPER, AREA_NO_MATCH } from './area-change.js';
 import { areaShareBody, parseAreaBody, resumeShareAttachment, resumeMessageFields, RESUME_SHARE_BODY, NO_RESUME_HINT, RESUME_GONE_COPY, RESUME_SHARE_NOTE, AREA_SHARE_NOTE } from './quick-share.js';
@@ -34,6 +34,9 @@ import { openReportDialog, bindCardOverflow, cardOverflowOpen, reportSuccessCopy
 import { defaultCoverUrl, normalizeCoverUrl } from './cover-assets.js';
 import { PRESET_COVERS, presetCoverPath, presetCoverStoredPath } from './preset-cover.js';
 import { postImageSrc } from './post-image.js';
+import { experienceChoices, cleanBio, BIO_MAX, areaInputValue, planInterestSave } from './profile-edit.js';
+import { isOffered } from './signup-flow.js';
+import { MAX_INTERESTS } from './passion-budget.js';
 import { postCardMarkup, shareData, isSafePostImageSrc } from './post-card.js';
 import { toastSide } from './toast-place.js';
 import { loadReactions, setReaction, createReactionGuard } from './post-reactions.js';
@@ -1410,6 +1413,17 @@ const openPublicProfile = (person, options = {}) => {
   });
   modal.tabIndex = -1;
   window.setTimeout(() => modal.querySelector('.public-profile-close')?.focus(), 0);
+  // D-104: cards carry no bio; ask for it (member_bio answers only for a member this viewer can see).
+  if (!bio && supabase && profile.id && String(profile.id) !== String(memberProfile.id)) {
+    supabase.rpc('member_bio', { p_member: profile.id }).then(({ data, error }) => {
+      const text = !error && typeof data === 'string' ? data.trim() : '';
+      if (!text || !modal.isConnected || modal.querySelector('.public-profile-bio')) return;
+      const p = document.createElement('p');
+      p.className = 'public-profile-bio';
+      p.textContent = text;
+      modal.querySelector('.public-profile-body')?.prepend(p);
+    }, () => {});
+  }
 };
 
 // Notes typed into a pitch whose send failed, kept in memory (never storage) until the member tries again.
@@ -2448,6 +2462,84 @@ const wireAreaChanger = (modal) => {
   });
 };
 
+// D-104: profiles.bio exists once 0016 is applied (the own row then carries the key); until then no bio field shows.
+let bioAvailable = false;
+const INTEREST_LIMIT_COPY = 'You can change your interests up to 3 times a day. Try again tomorrow.';
+// The interests field of Edit profile: the saved picks as removable chips and a search that adds offered interests.
+// Private (sensitive) interests already saved stay as chips (marked Private) but are never offered here.
+const wireInterestEditor = (modal) => {
+  const box = modal.querySelector('[data-edit-interests]');
+  const state = { saved: [], picks: [], nodes: [], labels: new Map(), sensitive: new Set(), ready: false };
+  if (!box) return state;
+  const chips = box.querySelector('[data-interest-chips]');
+  const search = box.querySelector('[data-interest-search]');
+  const results = box.querySelector('#profile-interest-results');
+  const status = box.querySelector('[data-interest-status]');
+  const renderChips = () => {
+    chips.innerHTML = state.picks.length
+      ? state.picks.map((id) => `<li><span>${escapeHtml(state.labels.get(id) || id)}${state.sensitive.has(id) ? ' <em>Private</em>' : ''}</span><button type="button" data-interest-remove="${escapeHtml(id)}" aria-label="Remove ${escapeHtml(state.labels.get(id) || id)}">×</button></li>`).join('')
+      : '<li class="profile-edit-chips-empty">No interests yet. Add at least one.</li>';
+  };
+  const showResults = (rows) => {
+    results.innerHTML = rows.map((n) => `<li><button type="button" role="option" aria-selected="false" data-interest-add="${escapeHtml(n.id)}">${escapeHtml(n.label)}</button></li>`).join('');
+    results.hidden = !rows.length;
+    search.setAttribute('aria-expanded', String(!results.hidden));
+  };
+  const matches = () => {
+    const q = search.value.trim().toLowerCase();
+    if (!q) return [];
+    const picked = new Set(state.picks);
+    return state.nodes.filter((n) => !picked.has(n.id) && n.label.toLowerCase().includes(q))
+      .sort((a, b) => Number(!a.label.toLowerCase().startsWith(q)) - Number(!b.label.toLowerCase().startsWith(q))).slice(0, 8);
+  };
+  const add = (id) => {
+    if (!id || state.picks.includes(id)) return;
+    if (state.picks.length >= MAX_INTERESTS) { status.textContent = `You can pick up to ${MAX_INTERESTS}. Remove one to add another.`; return; }
+    state.picks.push(id);
+    search.value = '';
+    showResults([]);
+    renderChips();
+    status.textContent = `${state.labels.get(id) || 'Interest'} added. Save changes to keep it.`;
+    search.focus();
+  };
+  chips.addEventListener('click', (event) => {
+    const button = event.target.closest('[data-interest-remove]');
+    if (!button) return;
+    state.picks = state.picks.filter((id) => id !== button.dataset.interestRemove);
+    renderChips();
+    status.textContent = 'Removed. Save changes to keep it.';
+    search.focus();
+  });
+  search.addEventListener('input', () => showResults(matches()));
+  search.addEventListener('keydown', (event) => {
+    if (event.key === 'Enter') { event.preventDefault(); add(matches()[0]?.id); }
+    else if (event.key === 'ArrowDown') { event.preventDefault(); results.querySelector('button')?.focus(); }
+    else if (event.key === 'Escape' && !results.hidden) { event.preventDefault(); event.stopPropagation(); showResults([]); }
+  });
+  results.addEventListener('keydown', (event) => {
+    const buttons = [...results.querySelectorAll('button')];
+    const at = buttons.indexOf(document.activeElement);
+    if (event.key === 'ArrowDown') { event.preventDefault(); buttons[Math.min(at + 1, buttons.length - 1)]?.focus(); }
+    else if (event.key === 'ArrowUp') { event.preventDefault(); if (at <= 0) search.focus(); else buttons[at - 1].focus(); }
+    else if (event.key === 'Escape') { event.preventDefault(); event.stopPropagation(); showResults([]); search.focus(); }
+  });
+  results.addEventListener('click', (event) => add(event.target.closest('[data-interest-add]')?.dataset.interestAdd));
+  search.disabled = true;
+  Promise.all([fetchMyInterests(), fetchInterestNodes()]).then(([mine, all]) => {
+    if (!modal.isConnected) return;
+    if (mine.error || all.error) { status.textContent = "Your interests couldn't be loaded. Close and open Edit profile to try again."; return; }
+    state.saved = Array.isArray(mine.data) ? mine.data : [];
+    (all.data || []).forEach((n) => { if (n?.label) state.labels.set(String(n.id), n.label); if (n?.sensitive) state.sensitive.add(String(n.id)); });
+    state.saved.forEach((row) => { if (row.label) state.labels.set(String(row.interest_id), row.label); });
+    state.nodes = (all.data || []).filter(isOffered).map((n) => ({ id: String(n.id), label: n.label }));
+    state.picks = state.saved.map((row) => String(row.interest_id));
+    state.ready = true;
+    search.disabled = false;
+    renderChips();
+  }, () => { if (modal.isConnected) status.textContent = "Your interests couldn't be loaded. Close and open Edit profile to try again."; });
+  return state;
+};
+
 const openProfileEditor = () => {
   if (!memberProfile.id || document.querySelector('#profile-edit-modal')) return;
   const profile = memberProfile;
@@ -2460,15 +2552,16 @@ const openProfileEditor = () => {
     <button type="button" class="profile-edit-close" data-profile-edit-close aria-label="Close">×</button>
     <p class="profile-edit-kicker">THE BRIVIA CLUB / PROFILE</p>
     <h2 id="profile-edit-title">Edit your <em>profile.</em></h2>
-    <p class="profile-edit-note">Update your details, photo, and cover. Changes are saved to your member profile.</p>
+    <p class="profile-edit-note">Update your details, interests, photo and cover. Changes are saved to your member profile.</p>
     <form id="profile-edit-form">
       <div class="profile-edit-grid">
         <label><span>FULL NAME</span><input name="name" value="${escapeHtml(profile.name || '')}" required /></label>
         <label><span>EMAIL</span><input value="${escapeHtml(profile.email || '')}" readonly /></label>
         <label><span>PHONE</span><input name="phone" value="${escapeHtml(profile.phone || '')}" /></label>
-        <label><span>EXPERIENCE / ROLE</span><input name="experience" value="${escapeHtml(profile.experience || '')}" /></label>
-        <div class="profile-edit-wide profile-edit-area" data-profile-area><span id="profile-area-label">YOUR AREA</span><p class="profile-edit-area-current" data-area-current>${escapeHtml(memberPlaceLabel || 'Not set yet')}</p><div class="profile-edit-area-tools"><button type="button" class="profile-area-geo" data-area-geo>Use my location</button><div class="profile-area-search"><input type="text" role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="profile-area-results" aria-labelledby="profile-area-label" placeholder="Or search your city" autocomplete="off" spellcheck="false" data-area-search /><ul class="profile-area-results" id="profile-area-results" role="listbox" aria-label="Cities" hidden></ul></div></div><small class="profile-edit-helper" data-area-status role="status">${escapeHtml(AREA_HELPER)}</small></div>
-        <div class="profile-edit-wide profile-edit-readonly"><span>SKILLS / INTERESTS</span><p>${escapeHtml(profile.skills || 'Pick interests in your profile setup')}</p><small class="profile-edit-helper">These come from your interests and passion points. Private interests are never shown.</small></div>
+        <label><span>EXPERIENCE</span><select name="experience"><option value="">Choose one</option>${experienceChoices(profile.experience).map((choice) => `<option${choice === String(profile.experience || '').trim() ? ' selected' : ''}>${escapeHtml(choice)}</option>`).join('')}</select></label>
+        ${bioAvailable ? `<label class="profile-edit-wide profile-edit-bio"><span>BIO</span><textarea name="bio" rows="3" maxlength="${BIO_MAX}" placeholder="A line or two about you: what you do, what you love, what you're up to.">${escapeHtml(profile.bio || '')}</textarea><small class="profile-edit-helper"><span data-bio-count>${String(profile.bio || '').length}</span> / ${BIO_MAX}. Members who can see you read it on your profile.</small></label>` : ''}
+        <div class="profile-edit-wide profile-edit-area" data-profile-area><span id="profile-area-label">YOUR AREA</span><p class="profile-edit-area-current" data-area-current>${escapeHtml(memberPlaceLabel || 'Not set yet')}</p><div class="profile-edit-area-tools"><button type="button" class="profile-area-geo" data-area-geo>Use my location</button><div class="profile-area-search"><input type="text" role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="profile-area-results" aria-labelledby="profile-area-label" placeholder="Or search your city" value="${escapeHtml(areaInputValue(memberPlaceLabel))}" autocomplete="off" spellcheck="false" data-area-search /><ul class="profile-area-results" id="profile-area-results" role="listbox" aria-label="Cities" hidden></ul></div></div><small class="profile-edit-helper" data-area-status role="status">${escapeHtml(AREA_HELPER)}</small></div>
+        <div class="profile-edit-wide profile-edit-interests" data-edit-interests><span id="profile-interests-edit-label">INTERESTS</span><ul class="profile-edit-chips" data-interest-chips aria-label="Your interests"><li class="profile-edit-chips-empty">Loading your interests…</li></ul><div class="profile-area-search profile-interest-search"><input type="text" role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="profile-interest-results" aria-labelledby="profile-interests-edit-label" placeholder="Add an interest: type to search" autocomplete="off" spellcheck="false" data-interest-search /><ul class="profile-area-results" id="profile-interest-results" role="listbox" aria-label="Interests" hidden></ul></div><small class="profile-edit-helper" data-interest-status role="status">Pick 1 to ${MAX_INTERESTS}. You can change them up to 3 times a day. Private interests are never shown.</small></div>
         <label class="profile-edit-wide"><span>LOOKING FOR</span><input name="lookingFor" list="profile-edit-looking-options" value="${escapeHtml(profile.lookingFor || '')}" placeholder="Search or type what you are looking for" /><datalist id="profile-edit-looking-options">${profileEditDatalist('lookingFor')}</datalist><small class="profile-edit-helper">Choose from suggestions or type your own.</small></label>
         <label><span>PROFILE PHOTO</span><input name="photoFile" type="file" accept="image/*" aria-describedby="profile-photo-error profile-photo-status" /><small class="profile-edit-helper" id="profile-photo-status" role="status"></small><small class="media-inline-error" id="profile-photo-error" role="alert" hidden></small></label>
         ${profileCoverPicker(currentCover)}
@@ -2481,6 +2574,9 @@ const openProfileEditor = () => {
   const close = () => modal.remove();
   modal.querySelectorAll('[data-profile-edit-close]').forEach((button) => button.addEventListener('click', close));
   wireAreaChanger(modal);
+  const interestEdit = wireInterestEditor(modal);
+  const bioField = modal.querySelector('textarea[name="bio"]');
+  bioField?.addEventListener('input', () => { const count = modal.querySelector('[data-bio-count]'); if (count) count.textContent = String(bioField.value.length); });
   modal.addEventListener('click', (event) => { if (event.target === modal) close(); });
   // "Frame your photo" (D-080): a picked photo opens the crop dialog first; only the framed square is ever uploaded.
   // Cancel clears the pick, so nothing is uploaded. A file that cannot be decoded shows the inline photo error.
@@ -2537,11 +2633,29 @@ const openProfileEditor = () => {
     if (coverChoice && coverChoice !== currentCover) nextProfile.coverUrl = coverChoice;
     const photoFile = framedPhoto;
     if (!nextProfile.name) { feedback.textContent = 'Please add your name.'; return; }
+    // Interests first (the one save with a daily limit): when it is refused nothing else is saved, and the dialog stays.
+    const interestPlan = interestEdit.ready ? planInterestSave(interestEdit.saved, interestEdit.picks) : { unchanged: true };
+    if (interestPlan.error) { feedback.textContent = 'Pick at least one interest.'; form.querySelector('[data-interest-search]')?.focus(); return; }
     const photoError = form.querySelector('#profile-photo-error');
     photoError.hidden = true;
     photoError.textContent = '';
     setBusy(submit, true);
     feedback.textContent = 'Saving your profile...';
+    if (!interestPlan.unchanged) {
+      const { error: interestError } = await setMemberInterests(interestPlan.payload);
+      if (interestError) {
+        setBusy(submit, false);
+        feedback.textContent = /try again later|PT429/i.test(`${interestError.code || ''} ${interestError.message || ''}`) ? INTEREST_LIMIT_COPY : "Your interests couldn't be saved. Please try again.";
+        return;
+      }
+      interestEdit.saved = interestPlan.payload.map((row) => ({ ...row, label: interestEdit.labels.get(row.interest_id) || '' }));
+    }
+    const nextBio = bioField ? cleanBio(bioField.value) : null;
+    if (bioField && nextBio !== cleanBio(memberProfile.bio)) {
+      const { error: bioError } = await supabase.from('profiles').update({ bio: nextBio || null }).eq('id', memberProfile.id);
+      if (bioError) { setBusy(submit, false); feedback.textContent = "Your bio couldn't be saved. Please try again."; return; }
+      nextProfile.bio = nextBio;
+    }
     const { data, error } = await saveProfile(memberProfile.id, nextProfile, photoFile, { photoUrl: memberProfile.photoUrl });
     if (error) {
       setBusy(submit, false);
@@ -2561,6 +2675,14 @@ const openProfileEditor = () => {
     window.localStorage.setItem('brivia-member-profile', JSON.stringify(memberProfile));
     close();
     renderProfile();
+    if (!interestPlan.unchanged) {
+      // skills is server-owned (set_member_interests writes it): re-read it, and the interests card.
+      loadProfileInterests();
+      supabase.from('profiles').select('skills').eq('id', memberProfile.id).maybeSingle().then(({ data: row }) => {
+        if (row) { memberProfile = { ...memberProfile, skills: rowToProfile({ ...row, id: memberProfile.id }).skills }; window.localStorage.setItem('brivia-member-profile', JSON.stringify(memberProfile)); renderProfile(); }
+      });
+      deck.ids = []; deck.end = null; refillDeck();  // the deck matches on interests: start it again
+    }
     showToast('Profile updated and saved.');
   });
 };
@@ -2822,6 +2944,17 @@ const renderProfileLookingFor = () => {
     ? `<ul class="profile-chips">${items.map((item) => `<li>${escapeHtml(item)}</li>`).join('')}</ul>`
     : '<p class="profile-card-empty">Tell members what you are open to.</p><button type="button" class="profile-card-action" data-profile-edit>Say what you\'re looking for</button>';
 };
+// D-104: the member's bio (shown once 0016 adds the column).
+const renderProfileBio = () => {
+  const card = document.querySelector('#profile-bio');
+  const body = document.querySelector('#profile-bio-body');
+  if (!card || !body) return;
+  card.hidden = !bioAvailable;
+  const bio = String(memberProfile.bio || '').trim();
+  body.innerHTML = bio
+    ? `<p class="profile-bio-text">${escapeHtml(bio)}</p>`
+    : '<p class="profile-card-empty">A line or two about you helps people start a conversation.</p><button type="button" class="profile-card-action" data-profile-edit>Add a bio</button>';
+};
 const renderProfileExperience = () => {
   const body = document.querySelector('#profile-experience-body');
   if (!body) return;
@@ -2998,6 +3131,7 @@ const renderProfile = () => {
   renderProfileInterests();
   renderProfileLookingFor();
   renderProfileExperience();
+  renderProfileBio();
   renderProfileResume();
 };
 
@@ -4394,6 +4528,8 @@ const loadSupabaseCommunity = async () => {
   document.body.classList.remove('app-auth-pending');
   // The profile needs only the member's own row: show it now rather than after the inbox and the deck have loaded
   // (a slow deck left "New Member" and an empty checklist on the profile meanwhile; Phase C Task 6).
+  bioAvailable = Object.prototype.hasOwnProperty.call(ownRow, 'bio');
+  memberProfile.bio = typeof ownRow.bio === 'string' ? ownRow.bio : '';
   renderProfile();
   initResume(ownRow);
   if (document.body.dataset.appView === 'profile' && profileInterests.status === 'idle') loadProfileInterests();

@@ -15,6 +15,8 @@ Update this file at the end of every session. CLAUDE.md holds the aim; this file
   Delete in the post sheet, and a share sheet that sends the link to a connection in chat. Needs
   **`0015_post_activity.sql` (written, NOT applied)**; until then the client hides counts and comments. e2e
   `post-activity.spec.mjs`, SQL `e-post-activity.test.sql`.
+- **Shared post card in chat (D-103)** and **Edit profile (D-104):** editable interests, Experience dropdown, saved
+  city shown, bio (needs **`0016_profile_bio.sql`, NOT applied**).
 - **Signup (D-102):** the photo is a required last signup step ("Create account"); area and interests are a mandatory
   "Set up" right after (or after the email link). No SQL.
 - Proof: unit 349; SQL harness ALL PASSED; e2e signup 319, onboarding 269, location 64, app-shell 211, explore-cards 74,
@@ -223,7 +225,7 @@ Tooling: Playwright **and axe-core** at `/tmp/pw` (`npm install --prefix /tmp/pw
 
 ## 3. What to do next (in order)
 
-**New (2026-10-28):** review the preview of `claude/wizardly-volta-6hv7or`, then apply `0015_post_activity.sql`
+**Database owed (2026-10-28):** apply `0015_post_activity.sql` (comments, shares, counts) and then `0016_profile_bio.sql` (bio); README "0015" / "0016". The client is live and hides those features until each file is applied. Earlier note: review the preview of `claude/wizardly-volta-6hv7or`, then apply `0015_post_activity.sql`
 (README "0015": pre-flight, apply, verify; either order with the client works) and merge. Existing members without a
 photo are not forced to add one; only new signups and incomplete members are.
 

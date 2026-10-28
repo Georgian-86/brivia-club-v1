@@ -103,7 +103,11 @@ export const startAppStub = async ({ port, state = {}, deckRows = defaultDeckRow
       if (override?.status >= 200 && override.status < 300 && !('body' in override)) return route.fulfill({ status: override.status, body: '', headers: { 'access-control-allow-origin': '*' } });
       if (override && 'body' in override) return json(200, override.body);
       const own = st.own || ownRow;
-      if (pathName === '/rest/v1/profiles') return json(200, (request.headers().accept || '').includes('vnd.pgrst.object') ? own : [own]);
+      if (pathName === '/rest/v1/profiles') {
+        // An update returns the updated row, as PostgREST does (D-104: experience and bio are read back from it).
+        if (method === 'PATCH') { let patch = {}; try { patch = JSON.parse(postData || '{}'); } catch { /* not JSON */ } st.own = { ...own, ...patch }; return json(200, (request.headers().accept || '').includes('vnd.pgrst.object') ? st.own : [st.own]); }
+        return json(200, (request.headers().accept || '').includes('vnd.pgrst.object') ? own : [own]);
+      }
       // Storage uploads and removals (multipart bodies): accepted, nothing stored.
       if (pathName.startsWith('/storage/v1/')) return json(200, { Key: pathName.replace('/storage/v1/object/', ''), Id: 'stub-object' });
       let args = {};
