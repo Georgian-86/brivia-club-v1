@@ -21,8 +21,9 @@ export const areaInputValue = (label) => String(label || '').replace(/\s*\(city-
 // points evenly, each keeping its saved mode (new picks 'play').
 export const planInterestSave = (saved, picks) => {
   const ids = [...new Set((picks || []).map(String))];
-  if (ids.length < 1 || ids.length > MAX_INTERESTS) return { error: ids.length ? 'too_many' : 'none' };
   const before = new Map((saved || []).map((row) => [String(row.interest_id), row]));
+  // Untouched interests never block the rest of the save (even an empty set the member did not edit).
   if (ids.length === before.size && ids.every((id) => before.has(id))) return { unchanged: true };
+  if (ids.length < 1 || ids.length > MAX_INTERESTS) return { error: ids.length ? 'too_many' : 'none' };
   return { unchanged: false, payload: evenSplit(ids.map((id) => ({ id, mode: before.get(id)?.mode || 'play' }))) };
 };

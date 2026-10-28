@@ -27,5 +27,6 @@ test('planInterestSave: unchanged sets send nothing; a change shares 20 points a
   assert.equal(plan.unchanged, false);
   assert.deepEqual(plan.payload, [{ interest_id: 'a', points: 10, mode: 'teach' }, { interest_id: 'c', points: 10, mode: 'play' }]);
   assert.equal(planInterestSave(saved, []).error, 'none');
+  assert.deepEqual(planInterestSave([], []), { unchanged: true }, 'no interests, untouched: never blocks the save');
   assert.equal(planInterestSave(saved, Array.from({ length: 13 }, (_, i) => `i${i}`)).error, 'too_many');
 });
