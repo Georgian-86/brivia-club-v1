@@ -2144,3 +2144,23 @@ controls (a tester or a seeded test member), never a real member, so no new expo
   chips, dropdown, area prefilled, bio field, axe on the new fields, private interests not offered, the save payload,
   bio and experience on the row, About card, no interest save when unchanged, the daily-limit line, another member's
   bio).
+
+## D-105: One set of form components across the app; Edit profile rebuilt on it (founder, 2026-10-28)
+
+- **Asked (with a screenshot of the interest search in Edit profile showing bulleted, browser-default buttons):** "what
+  is this ui? Use ui-ux-pro-max to match the brand aesthetics and make everything professionally designed. I want the
+  designing guidelines to be constant across the platform."
+- **Found:** the D-104 interest list reused the area list's markup but that list's styles were scoped to the area block,
+  so it rendered raw. The dialog mixed four dropdown looks (a styled list, that raw list, a native select, a native
+  datalist for Looking for), a 12 px input text size and the browser's grey file button.
+- **ui-ux-pro-max:** the skill's database matched only generic rules here (autocomplete suggestions as you type, touch
+  target size and spacing); the brand system (`tokens.css`, this file) and the founder-approved signup dropdown (D-095,
+  D-086) are the source for the look. Recorded in `docs/UX_SPEC.md` "Shared form components".
+- **Done:** `site/styles/components.css` (`.b-field`, `.b-select`, `.b-combo`, `.b-listbox`, `.b-option`, `.b-chips`,
+  `.b-chip`, `.b-file`), loaded last. Edit profile uses it for every field: name, email, phone, Experience, Bio, the
+  area search and its city list, Interests and Looking for (both now one reusable chip picker, `wireChipPicker`: chips
+  with ×, an attached suggestion list, keyboard and screen-reader roles; Looking for also takes a typed value, up to
+  8), and the photo picker. The old scoped list rules and the generic dialog input rule no longer apply to these fields.
+- **Proof:** e2e `profile-edit.spec.mjs` (adds: no datalist, the list is the brand listbox with 44 px rows and no
+  bullets, Looking for keeps its value and adds a suggestion and a typed one), plus launch-polish (area), deck,
+  profile-media, app-shell, consent.
