@@ -72,3 +72,13 @@ test('imageSrc must start with https: or /; other schemes render the placeholder
 test('shareData encodes the post id', () => {
   assert.equal(shareData({ id: 'a b&c=d/e?f' }, 'https://brivia.club').url, 'https://brivia.club/explore.html?post=a%20b%26c%3Dd%2Fe%3Ff');
 });
+
+test('activity: counts on like, comment and share, a likes line and a comments link (D-101)', () => {
+  const html = postCardMarkup(post, author, { ...view, activity: { likeCount: 3, commentCount: 2, shareCount: 0 }, summary: 'Liked by <Asha> and 2 others' }, deps);
+  assert.match(html, /data-post-count="like" aria-label="3">3</);
+  assert.match(html, /data-post-count="comment" aria-label="2">2</);
+  assert.doesNotMatch(html, /data-post-count="share"/);
+  assert.match(html, /Liked by &lt;Asha&gt; and 2 others/);
+  assert.match(html, /View all 2 comments/);
+  assert.doesNotMatch(postCardMarkup(post, author, view, deps), /post-card-activity|post-card-count/);
+});

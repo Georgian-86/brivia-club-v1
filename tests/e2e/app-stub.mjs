@@ -150,6 +150,27 @@ export const startAppStub = async ({ port, state = {}, deckRows = defaultDeckRow
         return json(200, pairs.length ? rows.filter((row) => pairs.some(([u1, u2]) => row.user1_id === u1 && row.user2_id === u2)) : rows);
       }
       if (pathName === '/rest/v1/community_posts' && method === 'GET') return json(200, st.posts || []);
+      // D-101 post activity (0015): st.activity rows for rpc/post_activity, st.comments for community_post_comments
+      // (a POST adds a row by ME and answers it; a DELETE removes ?id=eq.X and its replies), shares answer 201.
+      if (pathName === '/rest/v1/rpc/post_activity') return json(200, (st.activity || []).filter((row) => (args.p_post_ids || []).includes(row.post_id)));
+      if (pathName === '/rest/v1/community_post_comments') {
+        st.comments ||= [];
+        if (method === 'GET') return json(200, st.comments.filter((c) => `eq.${c.post_id}` === reqUrl.searchParams.get('post_id')));
+        if (method === 'POST') {
+          const row = { id: `cmt-${st.comments.length + 1}-${Date.now()}`, author_id: ME, parent_id: null, created_at: new Date().toISOString(), ...args };
+          st.comments.push(row);
+          return json(201, (request.headers().accept || '').includes('vnd.pgrst.object') ? row : [row]);
+        }
+        if (method === 'DELETE') {
+          const gone = new Set([String(reqUrl.searchParams.get('id') || '').replace(/^eq\./, '')]);
+          let grew = true;
+          while (grew) { grew = false; for (const c of st.comments) if (c.parent_id && gone.has(c.parent_id) && !gone.has(c.id)) { gone.add(c.id); grew = true; } }
+          st.comments = st.comments.filter((c) => !gone.has(c.id));
+          return route.fulfill({ status: 204, body: '', headers: { 'access-control-allow-origin': '*' } });
+        }
+      }
+      if (pathName === '/rest/v1/community_post_shares' && method === 'POST') return route.fulfill({ status: 201, body: '', headers: { 'access-control-allow-origin': '*' } });
+      if (pathName === '/rest/v1/brivia_messages' && method === 'POST') { (st.sent ||= []).push(args); return route.fulfill({ status: 201, body: '', headers: { 'access-control-allow-origin': '*' } }); }
       if (pathName === '/rest/v1/brivia_messages' && method === 'GET') return json(200, st.messages || []);
       if (pathName.startsWith('/rest/v1/')) return json(200, []);
       return json(200, {});

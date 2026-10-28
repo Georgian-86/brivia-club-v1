@@ -37,6 +37,7 @@ import { postImageSrc } from './post-image.js';
 import { postCardMarkup, shareData, isSafePostImageSrc } from './post-card.js';
 import { toastSide } from './toast-place.js';
 import { loadReactions, setReaction, createReactionGuard } from './post-reactions.js';
+import { loadActivity, withLike, likeSummary, threadComments, cleanCommentBody, loadComments, addComment, deleteComment, recordShare, sharedPostMessage, emptyActivity, COMMENT_MAX } from './post-activity.js';
 import { profileChecklist } from './profile-checklist.js';
 import { quotaLabel, quotaErrorText, quotaBlocked, quotaNotice } from './signal-quota.js';
 import { pitchLine, deckChips, deckEmptyState, deckFields, bandNote, deckCoverSrc } from './deck-view.js';
@@ -2960,6 +2961,62 @@ const communityReactionGuard = createReactionGuard();
 let pendingPostId = null;
 let pendingPostParamRead = false;
 const REACTION_FAILED = "That didn't save. Please try again.";
+// D-101: counts, liked-by-connections and comment numbers per post (post_activity, 0015). available = false until 0015.
+const communityActivity = { map: new Map(), available: true };
+const activityFor = (postId) => communityActivity.map.get(String(postId)) || null;
+const personName = (id) => {
+  if (String(id) === String(memberProfile.id)) return 'You';
+  return (findPersonById(id) || communityPostAuthors[id])?.name || '';
+};
+const activitySummaryFor = (postId) => {
+  const a = activityFor(postId);
+  if (!a) return '';
+  const names = [...(a.likedByMe ? ['You'] : []), ...a.connectionLikers.map(personName)].filter(Boolean);
+  return likeSummary(a, names);
+};
+const refreshCommunityActivity = async () => {
+  if (!supabase || !memberProfile.id || !communityActivity.available) return;
+  const result = await loadActivity(supabase, communityPosts.map((post) => post.id));
+  if (!result.available) { communityActivity.available = false; return; }
+  if (result.error) { console.warn('Post activity could not load:', result.error.message); return; }
+  communityActivity.map = result.map;
+  // Connections who liked a post but are not loaded yet: load their cards so they can be named.
+  const missing = [...new Set([...result.map.values()].flatMap((a) => a.connectionLikers))].filter((id) => !personName(id));
+  if (missing.length) {
+    const { data } = await fetchCandidates(missing);
+    (data || []).forEach((row) => { const person = toMemberPerson(row); communityPostAuthors[row.id] = { ...person, id: row.id, image: person.photoUrl || '' }; });
+  }
+};
+// Repaints one card's counts and its likes line in place (focus stays on the button that was pressed).
+const paintPostActivity = (postId) => {
+  const a = activityFor(postId) || emptyActivity();
+  document.querySelectorAll(`#community-post-list .post-card[data-post-id="${CSS.escape(String(postId))}"]`).forEach((card) => {
+    for (const [kind, count] of [['like', a.likeCount], ['comment', a.commentCount], ['share', a.shareCount]]) {
+      const button = card.querySelector(`.post-card-actions [data-post-action="${kind}"]`);
+      if (!button) continue;
+      let badge = button.querySelector('.post-card-count');
+      if (count > 0) {
+        if (!badge) { badge = document.createElement('b'); badge.className = 'post-card-count'; badge.dataset.postCount = kind; button.append(badge); }
+        badge.textContent = count > 999 ? '999+' : String(count);
+        badge.setAttribute('aria-label', String(count));
+      } else badge?.remove();
+    }
+    card.querySelector('.post-card-activity')?.remove();
+    const summary = activitySummaryFor(postId);
+    if (!summary && !a.commentCount) return;
+    const line = document.createElement('div');
+    line.className = 'post-card-activity';
+    line.innerHTML = `${summary ? `<p class="post-card-likes" data-post-likes>${escapeHtml(summary)}</p>` : ''}${a.commentCount ? `<button type="button" class="post-card-comments-link" data-post-action="comment">View ${a.commentCount === 1 ? 'the comment' : `all ${a.commentCount} comments`}</button>` : ''}`;
+    card.append(line);
+  });
+};
+const bumpActivity = (postId, change) => {
+  if (!communityActivity.available) return;
+  const a = activityFor(postId) || emptyActivity();
+  communityActivity.map.set(String(postId), change(a));
+  paintPostActivity(postId);
+  paintDetailStats(postId);
+};
 
 const formatCommunityPostDate = (value) => {
   const date = new Date(value);
@@ -3007,6 +3064,8 @@ const renderCommunityPosts = () => {
       saved: communityReactions.saved.has(post.id),
       imageSrc,
       dateLabel: formatCommunityPostDate(post.created_at),
+      activity: activityFor(post.id),
+      summary: activitySummaryFor(post.id),
     }, { escapeHtml, renderAvatar });
   }).join('');
   syncReactionAvailability();
@@ -3068,9 +3127,11 @@ const toggleCommunityReaction = async (postId, kind) => {
   try {
     const next = !(kind === 'like' ? communityReactions.liked : communityReactions.saved).has(postId);
     markReaction(postId, kind, next, { pop: true });
+    if (kind === 'like') bumpActivity(postId, (a) => withLike(a, next));
     const { error } = await setReaction(supabase, kind, postId, memberProfile.id, next);
     if (error) {
       markReaction(postId, kind, !next);
+      if (kind === 'like') bumpActivity(postId, (a) => withLike(a, !next));
       if (error.code !== '42501') showToast(REACTION_FAILED);
       await refreshCommunityReactions({ own: key });
     }
@@ -3080,21 +3141,77 @@ const toggleCommunityReaction = async (postId, kind) => {
     communityReactionGuard.end(key);
   }
 };
-// Share: the system share sheet when there is one, else the link on the clipboard. Only a neutral title and the link
-// leave the page (shareData): never the caption or the author's name.
-const shareCommunityPost = async (postId) => {
+// Share (D-101): a sheet with the member's connections (the link goes to them as a chat message), "Copy link", and the
+// system share sheet when there is one. Only a neutral title and the link leave the page (shareData): never the
+// caption or the author's name. Every completed share is counted once per member (community_post_shares).
+const countShare = async (postId) => {
+  const { error } = await recordShare(supabase, postId);
+  if (error) { if (!/42P01|PGRST205|does not exist|schema cache/i.test(`${error.code || ''} ${error.message || ''}`)) console.warn('Share was not counted:', error.message); return; }
+  if (communityActivity.available && !sharedPostIds.has(String(postId))) {
+    sharedPostIds.add(String(postId));
+    bumpActivity(postId, (a) => ({ ...a, shareCount: a.shareCount + 1 }));
+  }
+};
+const sharedPostIds = new Set();
+const shareConnections = () => {
+  const blocked = readBlockedUserIds();
+  return remoteConnectionIds.map((id) => findPersonById(id)).filter((person) => person && !blocked.has(String(person.id)));
+};
+const closeShareSheet = () => {
+  const dialog = document.querySelector('#post-share');
+  if (!dialog) return;
+  const returnTo = dialog.__returnFocus;
+  if (dialog.open) dialog.close();
+  dialog.remove();
+  if (returnTo?.isConnected) returnTo.focus();
+};
+const shareCommunityPost = async (postId, opener = document.activeElement) => {
   const post = communityPosts.find((item) => String(item.id) === String(postId));
   if (!post) return;
   const data = shareData(post, window.location.origin);
-  if (typeof navigator.share === 'function') {
-    try { await navigator.share(data); return; } catch (error) { if (error?.name === 'AbortError') return; }
-  }
-  try {
-    await navigator.clipboard.writeText(data.url);
-    showToast('Link copied.');
-  } catch {
-    showToast("Couldn't copy the link.");
-  }
+  document.querySelector('#post-share')?.remove();
+  const connections = shareConnections();
+  const dialog = document.createElement('dialog');
+  dialog.id = 'post-share';
+  dialog.className = 'post-share';
+  dialog.setAttribute('aria-labelledby', 'post-share-title');
+  const rows = connections.map((person) => `<li class="post-share-row">${renderAvatar(person, 'post-share-avatar')}<span class="post-share-name">${escapeHtml(person.name)}</span><button type="button" class="post-share-send" data-share-to="${escapeHtml(person.id)}" aria-label="Send to ${escapeHtml(person.name)}">Send</button></li>`).join('');
+  dialog.innerHTML = '<div class="post-share-panel"><div class="post-share-head"><h2 id="post-share-title">Share this post</h2>'
+    + '<button type="button" class="post-detail-close" data-share-close aria-label="Close"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M6 6l12 12M18 6 6 18"/></svg></button></div>'
+    + (connections.length
+      ? `<p class="post-share-lead">Send it to a connection. It arrives in your chat with them as a link.</p><ul class="post-share-list">${rows}</ul>`
+      : '<p class="post-share-lead">Once you connect with someone, you can send posts to them here.</p>')
+    + `<div class="post-share-actions"><button type="button" class="post-share-option" data-share-copy>Copy link</button>${typeof navigator.share === 'function' ? '<button type="button" class="post-share-option" data-share-native>More options</button>' : ''}</div></div>`;
+  dialog.__returnFocus = opener;
+  document.body.append(dialog);
+  dialog.addEventListener('cancel', (event) => { event.preventDefault(); closeShareSheet(); });
+  dialog.addEventListener('click', async (event) => {
+    if (event.target === dialog || event.target.closest('[data-share-close]')) { closeShareSheet(); return; }
+    if (event.target.closest('[data-share-copy]')) {
+      closeShareSheet();
+      try { await navigator.clipboard.writeText(data.url); showToast('Link copied.'); void countShare(post.id); } catch { showToast("Couldn't copy the link."); }
+      return;
+    }
+    if (event.target.closest('[data-share-native]')) {
+      closeShareSheet();
+      try { await navigator.share(data); void countShare(post.id); } catch (error) { if (error?.name !== 'AbortError') showToast("Couldn't open sharing."); }
+      return;
+    }
+    const send = event.target.closest('[data-share-to]');
+    if (!send || send.disabled) return;
+    const person = findPersonById(send.dataset.shareTo);
+    if (!person) return;
+    send.disabled = true;
+    send.setAttribute('aria-busy', 'true');
+    const { error } = await supabase.from('brivia_messages').insert({ sender_id: memberProfile.id, recipient_id: person.id, body: sharedPostMessage(data.url), message_type: 'text' });
+    send.removeAttribute('aria-busy');
+    if (error) { send.disabled = false; showToast(chatSendErrorCopy(error)); return; }
+    send.textContent = 'Sent';
+    send.classList.add('is-sent');
+    void countShare(post.id);
+  });
+  dialog.showModal();
+  (dialog.querySelector('[data-share-to]') || dialog.querySelector('[data-share-copy]'))?.focus();
 };
 
 // The post detail sheet (Comment, or a ?post=<id> link): image, caption, author and date. Its one action is "Reply in
@@ -3120,6 +3237,141 @@ const replyToCommunityPost = (post, author) => {
   input.focus();
   input.setSelectionRange(input.value.length, input.value.length);
 };
+// The likes line and counts inside an open detail sheet.
+const paintDetailStats = (postId) => {
+  const dialog = document.querySelector('#post-detail');
+  const box = dialog?.querySelector('[data-post-detail-stats]');
+  if (!box || String(dialog.dataset.postId) !== String(postId)) return;
+  const a = activityFor(postId);
+  if (!a) { box.hidden = true; return; }
+  const parts = [activitySummaryFor(postId), a.shareCount ? `${a.shareCount} ${a.shareCount === 1 ? 'share' : 'shares'}` : ''].filter(Boolean);
+  box.hidden = !parts.length;
+  box.innerHTML = parts.map((part) => `<span>${escapeHtml(part)}</span>`).join('');
+};
+const COMMENT_FAILED = "Your comment didn't post. Please try again.";
+const commentAuthor = (id) => {
+  if (String(id) === String(memberProfile.id)) return { id, name: memberProfile.name || 'You', image: memberProfile.photoUrl || '' };
+  return communityPostAuthors[id] || findPersonById(id) || { id, name: 'Brivia member', image: '' };
+};
+const commentTime = (value) => {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '';
+  const age = Date.now() - date.getTime();
+  if (age < 60e3) return 'now';
+  if (age < 3600e3) return `${Math.floor(age / 60e3)}m`;
+  if (age < 86400e3) return `${Math.floor(age / 3600e3)}h`;
+  if (age < 7 * 86400e3) return `${Math.floor(age / 86400e3)}d`;
+  return formatCommunityPostDate(value);
+};
+// Threads (D-101): a reply sits under the comment it answers. Indentation stops at the second level so a long thread
+// never squeezes the text; deeper replies still name who they answer.
+const commentMarkup = (comment, post, depth = 0, parentName = '') => {
+  const who = commentAuthor(comment.author_id);
+  const own = String(comment.author_id) === String(memberProfile.id);
+  const canDelete = own || String(post.author_id) === String(memberProfile.id);
+  const replies = comment.replies.length
+    ? `<ul class="post-comment-replies" aria-label="Replies to ${escapeHtml(who.name)}">${comment.replies.map((r) => commentMarkup(r, post, depth + 1, who.name)).join('')}</ul>` : '';
+  return `<li class="post-comment" data-comment-id="${escapeHtml(comment.id)}" data-depth="${Math.min(depth, 2)}">`
+    + `<div class="post-comment-main">${renderAvatar(who, 'post-comment-avatar')}<div class="post-comment-copy">`
+    + `<p class="post-comment-meta"><button type="button" class="post-comment-author" data-public-profile-id="${escapeHtml(who.id)}">${escapeHtml(own ? 'You' : who.name)}</button><time datetime="${escapeHtml(comment.created_at || '')}">${escapeHtml(commentTime(comment.created_at))}</time></p>`
+    + `<p class="post-comment-body">${depth >= 2 && parentName ? `<span class="post-comment-to">@${escapeHtml(parentName)}</span> ` : ''}${escapeHtml(comment.body)}</p>`
+    + `<p class="post-comment-actions"><button type="button" data-comment-reply="${escapeHtml(comment.id)}" data-comment-name="${escapeHtml(own ? 'yourself' : who.name)}">Reply</button>${canDelete ? `<button type="button" data-comment-delete="${escapeHtml(comment.id)}">Delete</button>` : ''}</p>`
+    + `</div></div>${replies}</li>`;
+};
+const mountPostComments = async (dialog, post, author) => {
+  const listBox = dialog.querySelector('[data-post-comments]');
+  const form = dialog.querySelector('[data-post-comment-form]');
+  const input = form.querySelector('textarea');
+  const send = form.querySelector('.post-comment-send');
+  const replying = form.querySelector('[data-replying]');
+  let rows = [];
+  let replyTo = null;
+  let busy = false;
+  const render = () => {
+    const tree = threadComments(rows);
+    listBox.innerHTML = tree.length
+      ? `<ul class="post-comments-thread">${tree.map((c) => commentMarkup(c, post)).join('')}</ul>`
+      : '<p class="post-comments-note">No comments yet. Start the conversation.</p>';
+  };
+  const setCount = () => {
+    const visible = rows.length;
+    const a = activityFor(post.id);
+    if (a && a.commentCount !== visible) bumpActivity(post.id, (x) => ({ ...x, commentCount: visible }));
+  };
+  const setReply = (target) => {
+    replyTo = target;
+    replying.hidden = !target;
+    replying.querySelector('span').textContent = target ? `Replying to ${target.name}` : '';
+    input.placeholder = target ? `Reply to ${target.name}…` : 'Add a comment…';
+  };
+  const fit = () => { input.style.height = 'auto'; input.style.height = `${Math.min(input.scrollHeight, 120)}px`; };
+  input.addEventListener('input', () => { send.disabled = busy || !cleanCommentBody(input.value); fit(); });
+  input.addEventListener('keydown', (event) => {
+    if (event.key === 'Enter' && !event.shiftKey && !event.isComposing) { event.preventDefault(); form.requestSubmit(); }
+    if (event.key === 'Escape' && replyTo) { event.preventDefault(); event.stopPropagation(); setReply(null); }
+  });
+  replying.querySelector('[data-reply-cancel]').addEventListener('click', () => { setReply(null); input.focus(); });
+  form.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    const body = cleanCommentBody(input.value);
+    if (!body || busy) return;
+    busy = true;
+    send.disabled = true;
+    send.setAttribute('aria-busy', 'true');
+    const { row, error } = await addComment(supabase, post.id, body, replyTo?.id || null);
+    busy = false;
+    send.removeAttribute('aria-busy');
+    if (!dialog.isConnected) return;
+    if (error) { send.disabled = false; showToast(COMMENT_FAILED); return; }
+    rows.push({ ...row, author_id: row.author_id || memberProfile.id });
+    input.value = '';
+    fit();
+    setReply(null);
+    render();
+    setCount();
+    listBox.querySelector(`[data-comment-id="${CSS.escape(String(row.id))}"]`)?.scrollIntoView({ block: 'nearest' });
+  });
+  listBox.addEventListener('click', async (event) => {
+    const reply = event.target.closest('[data-comment-reply]');
+    if (reply) { setReply({ id: reply.dataset.commentReply, name: reply.dataset.commentName }); input.focus(); return; }
+    const remove = event.target.closest('[data-comment-delete]');
+    if (remove) {
+      if (!window.confirm('Delete this comment? Replies to it are removed too.')) return;
+      const id = remove.dataset.commentDelete;
+      const { error } = await deleteComment(supabase, id);
+      if (error) { showToast(REACTION_FAILED); return; }
+      const gone = new Set([id]);
+      let grew = true;
+      while (grew) { grew = false; rows.forEach((r) => { if (r.parent_id && gone.has(String(r.parent_id)) && !gone.has(String(r.id))) { gone.add(String(r.id)); grew = true; } }); }
+      rows = rows.filter((r) => !gone.has(String(r.id)));
+      if (replyTo && gone.has(String(replyTo.id))) setReply(null);
+      render();
+      setCount();
+      return;
+    }
+    const profile = event.target.closest('[data-public-profile-id]');
+    if (profile) {
+      const id = profile.dataset.publicProfileId;
+      if (String(id) === String(memberProfile.id)) return;
+      dialog.__returnFocus = null;
+      closeCommunityPostDetail();
+      openPublicProfile(commentAuthor(id), { forcePublic: true });
+    }
+  });
+  const result = await loadComments(supabase, post.id);
+  if (!dialog.isConnected) return;
+  if (!result.available) { dialog.querySelector('.post-comments')?.remove(); form.hidden = true; return; }
+  if (result.error) { listBox.innerHTML = '<p class="post-comments-note">Comments could not load. Close and open the post to try again.</p>'; return; }
+  rows = result.rows;
+  const unknown = [...new Set(rows.map((r) => r.author_id))].filter((id) => String(id) !== String(memberProfile.id) && !communityPostAuthors[id] && !findPersonById(id));
+  if (unknown.length) {
+    const { data } = await fetchCandidates(unknown);
+    (data || []).forEach((row) => { const person = toMemberPerson(row); communityPostAuthors[row.id] = { ...person, id: row.id, image: person.photoUrl || '' }; });
+  }
+  if (!dialog.isConnected) return;
+  render();
+  setCount();
+};
 const openCommunityPostDetail = async (postId, opener = document.activeElement) => {
   const post = communityPosts.find((item) => String(item.id) === String(postId));
   if (!post) return;
@@ -3134,13 +3386,19 @@ const openCommunityPostDetail = async (postId, opener = document.activeElement) 
   const datetime = Number.isNaN(created.getTime()) ? '' : ` datetime="${escapeHtml(created.toISOString())}"`;
   const dialog = document.createElement('dialog');
   dialog.id = 'post-detail';
+  dialog.dataset.postId = String(post.id);
   dialog.className = 'post-detail';
   dialog.setAttribute('aria-labelledby', 'post-detail-author');
   dialog.innerHTML = `<div class="post-detail-panel"><div class="post-detail-media">${media}</div>`
     + `<div class="post-detail-head">${renderAvatar({ name, image: author.image || '' }, 'post-card-avatar')}<div class="post-detail-byline"><h2 class="post-detail-author" id="post-detail-author">${escapeHtml(name)}</h2><time${datetime}>${escapeHtml(formatCommunityPostDate(post.created_at))}</time></div>`
     + '<button type="button" class="post-detail-close" data-post-detail-close aria-label="Close post"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M6 6l12 12M18 6 6 18"/></svg></button></div>'
-    + `<p class="post-detail-caption">${escapeHtml(post.caption || '')}</p>`
-    + '<div class="post-detail-footer"><button type="button" class="post-detail-action" data-post-detail-action aria-busy="true" disabled>View profile</button></div></div>';
+    + `<div class="post-detail-body"><p class="post-detail-caption">${escapeHtml(post.caption || '')}</p>`
+    + `<div class="post-detail-stats" data-post-detail-stats></div>`
+    + '<button type="button" class="post-detail-action post-detail-action--quiet" data-post-detail-action aria-busy="true" disabled>View profile</button>'
+    + '<section class="post-comments" aria-labelledby="post-comments-title"><h3 class="post-comments-title" id="post-comments-title">Comments</h3><div class="post-comments-list" data-post-comments aria-live="polite"><p class="post-comments-note">Loading comments…</p></div></section></div>'
+    + `<form class="post-detail-footer post-comment-form" data-post-comment-form novalidate><p class="post-comment-replying" data-replying hidden><span></span><button type="button" data-reply-cancel aria-label="Cancel reply">×</button></p>`
+    + `<div class="post-comment-row"><label class="sr-only" for="post-comment-input">Write a comment</label><textarea id="post-comment-input" name="comment" rows="1" maxlength="${COMMENT_MAX}" placeholder="Add a comment…" autocomplete="off"></textarea>`
+    + '<button type="submit" class="post-comment-send" disabled>Post</button></div></form></div>';
   dialog.__returnFocus = opener;
   document.body.append(dialog);
   dialog.addEventListener('cancel', (event) => { event.preventDefault(); closeCommunityPostDetail(); });
@@ -3149,6 +3407,8 @@ const openCommunityPostDetail = async (postId, opener = document.activeElement) 
   });
   dialog.showModal();
   dialog.querySelector('[data-post-detail-close]')?.focus();
+  paintDetailStats(post.id);
+  void mountPostComments(dialog, post, author);
   const action = dialog.querySelector('[data-post-detail-action]');
   const isOwn = String(author.id) === String(memberProfile.id);
   const matched = !isOwn && (remoteConnectionIds.some((id) => String(id) === String(author.id)) || await hasMatchWith(author.id));
@@ -3177,7 +3437,7 @@ const bindCommunityPostActions = () => {
     if (action === 'like' || action === 'save') toggleCommunityReaction(postId, action);
     // Safari does not focus a clicked button: pass it, so closing the detail returns focus to Comment.
     else if (action === 'comment') openCommunityPostDetail(postId, event.target.closest('[data-post-action]'));
-    else if (action === 'share') shareCommunityPost(postId);
+    else if (action === 'share') shareCommunityPost(postId, event.target.closest('[data-post-action]'));
     else if (!action && event.target.closest('.post-card-media')) openCommunityPostDetail(postId, card.querySelector('[data-post-action="comment"]'));
   });
 };
@@ -3224,7 +3484,10 @@ const loadCommunityPosts = async () => {
   }
   const otherAuthorIds = authorIds.filter((id) => String(id) !== String(memberProfile.id));
   // Likes and saves load beside the authors, so the cards render once, already in the member's state.
-  const reactionsLoaded = refreshCommunityReactions().catch((reactionError) => console.warn('Likes and saves could not load:', reactionError?.message));
+  const reactionsLoaded = Promise.all([
+    refreshCommunityReactions().catch((reactionError) => console.warn('Likes and saves could not load:', reactionError?.message)),
+    refreshCommunityActivity().catch((activityError) => console.warn('Post activity could not load:', activityError?.message)),
+  ]);
   if (otherAuthorIds.length) {
     const authors = await fetchCandidates(otherAuthorIds);
     if (authors.error) console.warn('Post authors could not load:', authors.error.message);

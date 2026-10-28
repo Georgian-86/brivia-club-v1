@@ -15,7 +15,7 @@
 //    save. Please try again." and reloads the reactions; a 42501 (RLS refused: the post is gone or no longer visible)
 //    rolls back and reloads with NO toast.
 // E5 Save persists across a reload (the stub returns the saved row).
-// E6 Share calls navigator.share with { title, url } only (no caption, no name); without it the clipboard gets the URL
+// E6 Share opens the share sheet (D-101); its "More options" calls navigator.share with { title, url } only (no caption, no name); without it the clipboard gets the URL
 //    and the toast reads "Link copied."
 // E7 card-shaped skeletons while community_posts is delayed 1 s, aria-busy cleared after; axe clean (posts view and the
 //    detail sheet, 375 and 1440); no sideways scroll at 320.
@@ -93,7 +93,7 @@ try {
   const toasts = (page) => page.evaluate(() => window.__toasts || []);
   const pressed = (page, id, kind) => page.evaluate(([id, kind]) => {
     const button = document.querySelector(`.post-card[data-post-id="${id}"] [data-post-action="${kind}"]`);
-    return button ? { pressed: button.getAttribute('aria-pressed'), label: button.textContent.trim() } : null;
+    return button ? { pressed: button.getAttribute('aria-pressed'), label: button.querySelector('span')?.textContent.trim() } : null;
   }, [id, kind]);
 
   if (SHOTS) {
@@ -330,6 +330,8 @@ try {
       const init = () => { window.__shared = []; Object.defineProperty(navigator, 'share', { configurable: true, value: async (data) => { window.__shared.push(data); } }); };
       const { context, page } = await open(375, { init });
       await page.locator('.post-card[data-post-id="post-1"] [data-post-action="share"]').click();
+      // D-101: Share opens the share sheet; "More options" is the system share sheet.
+      await page.locator('#post-share [data-share-native]').click();
       await page.waitForTimeout(300);
       const shared = await page.evaluate(() => window.__shared);
       check(`E6: Share calls navigator.share with { title, url } only (${JSON.stringify(shared)})`, () => {
@@ -358,6 +360,7 @@ try {
           }, where);
           await page.waitForTimeout(300);
           await card.locator('[data-post-action="share"]').click();
+          await page.locator('#post-share [data-share-copy]').click();
           await page.waitForTimeout(450);
           const m = await page.evaluate(() => {
             const t = document.querySelector('#app-toast').getBoundingClientRect();
@@ -382,6 +385,7 @@ try {
       const { context, page } = await open(1440, { init });
       await watchToasts(page);
       await page.locator('.post-card[data-post-id="post-2"] [data-post-action="share"]').click();
+      await page.locator('#post-share [data-share-copy]').click();
       await page.waitForTimeout(400);
       const clip = await page.evaluate(() => navigator.clipboard.readText());
       const seen = await toasts(page);
