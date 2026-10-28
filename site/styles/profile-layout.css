@@ -156,7 +156,7 @@ body.app-body[data-app-view] .app-view.profile-view[data-view="profile"] .profil
   opacity: .92;
 }
 body.app-body[data-app-view] .app-view.profile-view[data-view="profile"] .profile-hero-rule {
-  display: block;
+  display: none; /* founder, 2026-10-28: no rule under the area (D-106) */
   width: 40px;
   height: 1px;
   margin: var(--space-3) 0 var(--space-2);
@@ -250,7 +250,7 @@ body.app-body[data-app-view] .app-view.profile-view[data-view="profile"] .profil
   height: 44px !important;
   border: 1px solid color-mix(in srgb, var(--color-cream) 70%, transparent);
   border-radius: var(--radius-m);
-  background: color-mix(in srgb, var(--color-oxblood-deep) 62%, transparent);
+  background: var(--color-wine-deep); /* solid, like EDIT PROFILE: no see-through wine over the photo (D-106) */
   color: var(--color-cream);
 }
 body.app-body[data-app-view] .app-view.profile-view[data-view="profile"] .profile-board-content .profile-hero .profile-hero-actions :is(.profile-photo-editor, .profile-settings-button):focus-visible {
@@ -319,8 +319,8 @@ body.app-body[data-app-view] .app-view.profile-view[data-view="profile"] .profil
     min-height: 32px !important;
     padding: 0 !important;
     border-radius: 50%;
-    -webkit-backdrop-filter: blur(6px);
-    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
   }
   body.app-body[data-app-view] .app-view.profile-view[data-view="profile"] .profile-board-content .profile-hero .profile-hero-actions .profile-settings-button svg { width: 16px; height: 16px; }
   body.app-body[data-app-view] .app-view.profile-view[data-view="profile"] .profile-board-content .profile-hero .profile-hero-actions :is(.profile-photo-editor, .profile-settings-button)::after {
