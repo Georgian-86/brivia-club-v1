@@ -34,6 +34,23 @@ New components reuse these tokens. **No raw hex in new components**, and no new 
    pulsing CTAs.
 7. **Icons:** SVG, not emoji, for new UI. Existing glyphs like `✉ ♙ ◉` in auth are legacy and get replaced when touched.
 
+## Shared form components (D-105, binding for every new form)
+
+One look for every field, dropdown and chip in the app, defined once in `site/styles/components.css` from the tokens in
+`tokens.css` (loaded last in `app.js`). New forms use these classes and never style their own field or list.
+
+| Component | Class | Rule |
+|---|---|---|
+| Text field, textarea | `.b-field` | 44 px min height, cream fill, 1 px wine border at 22 %, 10 px radius, 14 px Instrument Sans (16 px on phones, so iOS never zooms). Focus: wine-soft border and a 3 px wine ring at 12 %. |
+| Select | `.b-select` | A `.b-field` with a wine chevron; never the browser's arrow. |
+| Combobox list | `.b-combo` > `.b-field` + `.b-listbox` | The list is attached under its field (field corners square off, one wine outline around both), 6 px inner padding, rows `.b-option` 44 px, 12 px side padding. Hover and the keyboard's active row: a light wine tint (8 %), never a full wine fill. Picked rows: wine text. A note row (`.b-listbox-note`) says why the list is empty. No bullets. Arrows move, Enter picks, Escape / Tab / a press outside close. |
+| Chip (a chosen value) | `.b-chips` > `.b-chip` | A wine-tinted pill (6 % fill, 22 % border), 14 px wine-deep text, a round × (`.b-chip-remove`, 28 px with a 4 px margin) that names what it removes. A tag inside (`.b-chip-tag`, e.g. "Private") is 12 px wine. |
+| File picker | `.b-file` | The native input kept for keyboard and screen readers; its button drawn as an outlined uppercase wine pill. |
+| Labels | form labels | 12 px, 700, tracked .1em, uppercase, wine-brown at 4.5:1 or more on the cream. |
+
+Native `<datalist>` and unstyled `<select>` are not used: suggestions go through the chip picker (`wireChipPicker` in
+`app.js`). The guided signup keeps its own founder-approved classic look (D-086), whose dropdown these components follow.
+
 ## Flow changes
 
 ### A0. Guided signup: one question per screen (D-073, live from 2026-10-22; replaces the 4-step form below)

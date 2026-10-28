@@ -342,22 +342,6 @@ body.app-body[data-app-view] .app-view.profile-view[data-view="profile"] .profil
 }
 .profile-edit-area .profile-area-geo:hover { background: color-mix(in srgb, var(--color-wine) 8%, transparent); }
 .profile-edit-area .profile-area-search { position: relative; min-width: 0; }
-.profile-edit-area .profile-area-search input { width: 100%; min-height: 44px; }
-.profile-edit-area .profile-area-results {
-  position: absolute; top: calc(100% + 4px); right: 0; left: 0; z-index: 5; max-height: 240px; margin: 0; padding: 6px;
-  overflow-y: auto; list-style: none; border: 1px solid var(--color-card-edge); border-radius: var(--radius-m);
-  background: var(--color-cream); box-shadow: 0 16px 30px -18px color-mix(in srgb, var(--color-oxblood-deep) 60%, transparent);
-}
-.profile-edit-area .profile-area-results button {
-  display: flex; align-items: baseline; justify-content: space-between; gap: var(--space-3); width: 100%; min-height: 44px;
-  padding: 0 var(--space-3); border: 0; border-radius: var(--radius-s); background: transparent; color: var(--color-ink);
-  font-family: var(--font-body); font-size: var(--text-14); text-align: left; cursor: pointer;
-}
-.profile-edit-area .profile-area-results button small { color: var(--color-ink-soft); font-size: var(--text-12); }
-.profile-edit-area .profile-area-results button:hover,
-.profile-edit-area .profile-area-results button:focus-visible { background: var(--color-wine); color: var(--color-cream); outline: 0; }
-.profile-edit-area .profile-area-results button:hover small,
-.profile-edit-area .profile-area-results button:focus-visible small { color: inherit; }
-.profile-edit-area .profile-area-empty { padding: 10px 12px; color: var(--color-ink-soft); font-size: var(--text-14); }
+/* The city list is the shared .b-listbox (components.css, D-105). */
 .profile-edit-area[aria-busy="true"] :is(button, input) { pointer-events: none; opacity: .6; }
 @media (max-width: 560px) { .profile-edit-area-tools { grid-template-columns: 1fr; } }

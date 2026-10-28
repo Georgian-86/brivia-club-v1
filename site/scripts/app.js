@@ -77,6 +77,7 @@ import '../styles/chat-layout.css';
 import '../styles/app-polish.css';
 // The compact deck without side buttons, and its first-run tutorial (D-094). Loads last.
 import '../styles/deck-compact.css';
+import '../styles/components.css';  // D-105: the shared field, select, listbox and chip components, last so they win
 import { navMarkup, markCurrentNav, setChatBadges } from './app-nav.js';
 import { parseReadState, serializeReadState, lastReadAt, unreadCount, markRead, sortByLastContact, unreadTotal } from './chat-unread.js';
 import { skeletonMarkup, setBusy } from './app-skeletons.js';
@@ -2399,8 +2400,8 @@ const wireAreaChanger = (modal) => {
   let timer;
   const showResults = (rows, message = '') => {
     results.innerHTML = rows.length
-      ? rows.map((row) => `<li><button type="button" role="option" aria-selected="false" data-place-id="${escapeHtml(row.id)}" data-place-name="${escapeHtml(row.name)}">${escapeHtml(row.name)}${row.region ? `<small>${escapeHtml(row.region)}</small>` : ''}</button></li>`).join('')
-      : (message ? `<li class="profile-area-empty">${escapeHtml(message)}</li>` : '');
+      ? rows.map((row) => `<li><button type="button" class="b-option" role="option" aria-selected="false" data-place-id="${escapeHtml(row.id)}" data-place-name="${escapeHtml(row.name)}">${escapeHtml(row.name)}${row.region ? `<small>${escapeHtml(row.region)}</small>` : ''}</button></li>`).join('')
+      : (message ? `<li class="profile-area-empty b-listbox-note">${escapeHtml(message)}</li>` : '');
     results.hidden = !results.innerHTML;
     search.setAttribute('aria-expanded', String(!results.hidden));
   };
@@ -2465,81 +2466,136 @@ const wireAreaChanger = (modal) => {
 // D-104: profiles.bio exists once 0016 is applied (the own row then carries the key); until then no bio field shows.
 let bioAvailable = false;
 const INTEREST_LIMIT_COPY = 'You can change your interests up to 3 times a day. Try again tomorrow.';
-// The interests field of Edit profile: the saved picks as removable chips and a search that adds offered interests.
-// Private (sensitive) interests already saved stay as chips (marked Private) but are never offered here.
-const wireInterestEditor = (modal) => {
-  const box = modal.querySelector('[data-edit-interests]');
-  const state = { saved: [], picks: [], nodes: [], labels: new Map(), sensitive: new Set(), ready: false };
-  if (!box) return state;
-  const chips = box.querySelector('[data-interest-chips]');
-  const search = box.querySelector('[data-interest-search]');
-  const results = box.querySelector('#profile-interest-results');
-  const status = box.querySelector('[data-interest-status]');
+// D-105: one chip picker for Edit profile (interests, looking for). Picks show as chips (× removes); the field is a
+// combobox whose list (components.css .b-listbox) suggests options as you type, or the first ones on focus. Arrows move
+// the active row (aria-activedescendant), Enter picks it, Escape or Tab closes, a press outside closes. allowCustom adds
+// what was typed when nothing matches (looking for); interests only take offered options.
+const CHIP_REMOVE_ICON = '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M6 6l12 12M18 6 6 18"/></svg>';
+const chipPickerMarkup = ({ id, label, placeholder, helper, listLabel }) => `<div class="profile-edit-wide profile-edit-picker" data-picker="${id}"><span class="profile-edit-picker-label" id="${id}-label">${label}</span>`
+  + `<ul class="b-chips" data-picker-chips aria-label="${escapeHtml(listLabel)}"><li class="b-chips-empty">Loading…</li></ul>`
+  + `<div class="b-combo"><input class="b-field" type="text" role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="${id}-list" aria-labelledby="${id}-label" placeholder="${escapeHtml(placeholder)}" autocomplete="off" spellcheck="false" data-picker-input />`
+  + `<ul class="b-listbox" id="${id}-list" role="listbox" aria-label="${escapeHtml(listLabel)}" hidden></ul></div>`
+  + `<small class="profile-edit-helper" data-picker-status role="status">${helper}</small></div>`;
+const wireChipPicker = (box, { max = 12, allowCustom = false, emptyText = 'Nothing picked yet.', noun = 'item' } = {}) => {
+  const picker = { picks: [], options: [], labels: new Map(), tags: new Map(), ready: false };
+  if (!box) return picker;
+  const chips = box.querySelector('[data-picker-chips]');
+  const input = box.querySelector('[data-picker-input]');
+  const list = box.querySelector('[role="listbox"]');
+  const status = box.querySelector('[data-picker-status]');
+  const idBase = list.id;
+  let shown = [];
+  let active = -1;
+  const labelOf = (id) => picker.labels.get(id) || id;
   const renderChips = () => {
-    chips.innerHTML = state.picks.length
-      ? state.picks.map((id) => `<li><span>${escapeHtml(state.labels.get(id) || id)}${state.sensitive.has(id) ? ' <em>Private</em>' : ''}</span><button type="button" data-interest-remove="${escapeHtml(id)}" aria-label="Remove ${escapeHtml(state.labels.get(id) || id)}">×</button></li>`).join('')
-      : '<li class="profile-edit-chips-empty">No interests yet. Add at least one.</li>';
+    chips.innerHTML = picker.picks.length
+      ? picker.picks.map((id) => `<li class="b-chip"><span class="b-chip-label">${escapeHtml(labelOf(id))}</span>${picker.tags.get(id) ? `<span class="b-chip-tag">${escapeHtml(picker.tags.get(id))}</span>` : ''}<button type="button" class="b-chip-remove" data-chip-remove="${escapeHtml(id)}" aria-label="Remove ${escapeHtml(labelOf(id))}">${CHIP_REMOVE_ICON}</button></li>`).join('')
+      : `<li class="b-chips-empty">${escapeHtml(emptyText)}</li>`;
   };
-  const showResults = (rows) => {
-    results.innerHTML = rows.map((n) => `<li><button type="button" role="option" aria-selected="false" data-interest-add="${escapeHtml(n.id)}">${escapeHtml(n.label)}</button></li>`).join('');
-    results.hidden = !rows.length;
-    search.setAttribute('aria-expanded', String(!results.hidden));
+  const suggestions = () => {
+    const q = input.value.trim().toLowerCase();
+    const picked = new Set(picker.picks);
+    const pool = picker.options.filter((o) => !picked.has(o.id));
+    const found = q ? pool.filter((o) => o.label.toLowerCase().includes(q)).sort((a, b) => Number(!a.label.toLowerCase().startsWith(q)) - Number(!b.label.toLowerCase().startsWith(q))) : pool;
+    const rows = found.slice(0, 8).map((o) => ({ id: o.id, label: o.label }));
+    const typed = input.value.trim();
+    if (allowCustom && typed && !picker.options.some((o) => o.label.toLowerCase() === typed.toLowerCase()) && !picked.has(typed)) rows.push({ id: typed, label: typed, custom: true });
+    return rows;
   };
-  const matches = () => {
-    const q = search.value.trim().toLowerCase();
-    if (!q) return [];
-    const picked = new Set(state.picks);
-    return state.nodes.filter((n) => !picked.has(n.id) && n.label.toLowerCase().includes(q))
-      .sort((a, b) => Number(!a.label.toLowerCase().startsWith(q)) - Number(!b.label.toLowerCase().startsWith(q))).slice(0, 8);
+  const setActive = (i) => {
+    active = shown.length ? Math.max(0, Math.min(i, shown.length - 1)) : -1;
+    list.querySelectorAll('.b-option').forEach((o, j) => o.classList.toggle('is-active', j === active));
+    if (active < 0) { input.removeAttribute('aria-activedescendant'); return; }
+    input.setAttribute('aria-activedescendant', `${idBase}-${active}`);
+    list.querySelector(`#${idBase}-${active}`)?.scrollIntoView({ block: 'nearest' });
+  };
+  const close = () => { list.hidden = true; input.setAttribute('aria-expanded', 'false'); input.removeAttribute('aria-activedescendant'); active = -1; };
+  const open = () => {
+    if (!picker.ready) return;
+    shown = suggestions();
+    list.innerHTML = shown.length
+      ? shown.map((o, i) => `<li id="${idBase}-${i}" role="option" aria-selected="false" class="b-option${o.custom ? ' b-option-add' : ''}" data-value="${escapeHtml(o.id)}">${o.custom ? `Add “${escapeHtml(o.label)}”` : escapeHtml(o.label)}</li>`).join('')
+      : `<li class="b-listbox-note" role="option" aria-disabled="true" aria-selected="false">${input.value.trim() ? 'No match. Try a shorter word.' : 'Everything here is picked.'}</li>`;
+    list.hidden = false;
+    input.setAttribute('aria-expanded', 'true');
+    setActive(input.value.trim() ? 0 : -1);
   };
   const add = (id) => {
-    if (!id || state.picks.includes(id)) return;
-    if (state.picks.length >= MAX_INTERESTS) { status.textContent = `You can pick up to ${MAX_INTERESTS}. Remove one to add another.`; return; }
-    state.picks.push(id);
-    search.value = '';
-    showResults([]);
+    if (!id || picker.picks.includes(id)) return;
+    if (picker.picks.length >= max) { status.textContent = `You can pick up to ${max}. Remove one to add another.`; return; }
+    if (!picker.labels.has(id)) picker.labels.set(id, id);
+    picker.picks.push(id);
+    input.value = '';
     renderChips();
-    status.textContent = `${state.labels.get(id) || 'Interest'} added. Save changes to keep it.`;
-    search.focus();
+    status.textContent = `${labelOf(id)} added. Save changes to keep it.`;
+    open();
   };
   chips.addEventListener('click', (event) => {
-    const button = event.target.closest('[data-interest-remove]');
+    const button = event.target.closest('[data-chip-remove]');
     if (!button) return;
-    state.picks = state.picks.filter((id) => id !== button.dataset.interestRemove);
+    const id = button.dataset.chipRemove;
+    picker.picks = picker.picks.filter((x) => x !== id);
     renderChips();
-    status.textContent = 'Removed. Save changes to keep it.';
-    search.focus();
+    status.textContent = `${labelOf(id)} removed. Save changes to keep it.`;
+    input.focus();
   });
-  search.addEventListener('input', () => showResults(matches()));
-  search.addEventListener('keydown', (event) => {
-    if (event.key === 'Enter') { event.preventDefault(); add(matches()[0]?.id); }
-    else if (event.key === 'ArrowDown') { event.preventDefault(); results.querySelector('button')?.focus(); }
-    else if (event.key === 'Escape' && !results.hidden) { event.preventDefault(); event.stopPropagation(); showResults([]); }
+  input.addEventListener('focus', open);
+  input.addEventListener('click', open);
+  input.addEventListener('input', open);
+  input.addEventListener('keydown', (event) => {
+    if (event.key === 'ArrowDown') { event.preventDefault(); if (list.hidden) open(); setActive(active + 1); }
+    else if (event.key === 'ArrowUp') { event.preventDefault(); setActive(active - 1); }
+    else if (event.key === 'Enter') { event.preventDefault(); const row = shown[active] || (input.value.trim() ? shown[0] : null); if (row) add(row.id); }
+    else if (event.key === 'Escape' && !list.hidden) { event.preventDefault(); event.stopPropagation(); close(); }
+    else if (event.key === 'Tab') close();
   });
-  results.addEventListener('keydown', (event) => {
-    const buttons = [...results.querySelectorAll('button')];
-    const at = buttons.indexOf(document.activeElement);
-    if (event.key === 'ArrowDown') { event.preventDefault(); buttons[Math.min(at + 1, buttons.length - 1)]?.focus(); }
-    else if (event.key === 'ArrowUp') { event.preventDefault(); if (at <= 0) search.focus(); else buttons[at - 1].focus(); }
-    else if (event.key === 'Escape') { event.preventDefault(); event.stopPropagation(); showResults([]); search.focus(); }
-  });
-  results.addEventListener('click', (event) => add(event.target.closest('[data-interest-add]')?.dataset.interestAdd));
-  search.disabled = true;
+  list.addEventListener('mousedown', (event) => event.preventDefault());  // keep the focus in the field
+  list.addEventListener('click', (event) => { const row = event.target.closest('.b-option[data-value]'); if (row) add(row.dataset.value); });
+  const outside = (event) => { if (!box.isConnected) { document.removeEventListener('pointerdown', outside, true); return; } if (!box.querySelector('.b-combo').contains(event.target)) close(); };
+  document.addEventListener('pointerdown', outside, true);
+  picker.load = ({ picks, options, labels = new Map(), tags = new Map() }) => {
+    picker.picks = [...picks];
+    picker.options = options;
+    picker.labels = labels;
+    picker.tags = tags;
+    picker.ready = true;
+    input.disabled = false;
+    renderChips();
+  };
+  picker.fail = (text) => { chips.innerHTML = ''; status.textContent = text; };
+  input.disabled = true;
+  void noun;
+  return picker;
+};
+
+// Interests in Edit profile: the saved picks (private ones kept and tagged Private, never offered), offered interests
+// to add. Saved with set_member_interests on Save (planInterestSave).
+const wireInterestEditor = (modal) => {
+  const picker = wireChipPicker(modal.querySelector('[data-picker="profile-interests-edit"]'), { max: MAX_INTERESTS, emptyText: 'No interests yet. Add at least one.' });
+  const state = { saved: [], get picks() { return picker.picks; }, labels: picker.labels, ready: false };
   // The profile page has usually loaded the member's interests already: reuse them rather than read them again.
   const mineRequest = profileInterests.status === 'ready' ? Promise.resolve({ data: profileInterests.rows, error: null }) : fetchMyInterests();
   Promise.all([mineRequest, fetchInterestNodes()]).then(([mine, all]) => {
     if (!modal.isConnected) return;
-    if (mine.error || all.error) { status.textContent = "Your interests couldn't be loaded. Close and open Edit profile to try again."; return; }
+    if (mine.error || all.error) { picker.fail("Your interests couldn't be loaded. Close and open Edit profile to try again."); return; }
     state.saved = Array.isArray(mine.data) ? mine.data : [];
-    (all.data || []).forEach((n) => { if (n?.label) state.labels.set(String(n.id), n.label); if (n?.sensitive) state.sensitive.add(String(n.id)); });
-    state.saved.forEach((row) => { if (row.label) state.labels.set(String(row.interest_id), row.label); });
-    state.nodes = (all.data || []).filter(isOffered).map((n) => ({ id: String(n.id), label: n.label }));
-    state.picks = state.saved.map((row) => String(row.interest_id));
+    const labels = new Map();
+    const tags = new Map();
+    (all.data || []).forEach((n) => { if (n?.label) labels.set(String(n.id), n.label); if (n?.sensitive) tags.set(String(n.id), 'Private'); });
+    state.saved.forEach((row) => { if (row.label) labels.set(String(row.interest_id), row.label); });
+    picker.load({ picks: state.saved.map((row) => String(row.interest_id)), options: (all.data || []).filter(isOffered).map((n) => ({ id: String(n.id), label: n.label })), labels, tags });
+    state.labels = picker.labels;
     state.ready = true;
-    search.disabled = false;
-    renderChips();
-  }, () => { if (modal.isConnected) status.textContent = "Your interests couldn't be loaded. Close and open Edit profile to try again."; });
+  }, () => { if (modal.isConnected) picker.fail("Your interests couldn't be loaded. Close and open Edit profile to try again."); });
   return state;
+};
+// Looking for in Edit profile: suggestions (the catalog and what members use) plus anything the member types.
+const LOOKING_FOR_MAX = 8;
+const wireLookingForEditor = (modal) => {
+  const picker = wireChipPicker(modal.querySelector('[data-picker="profile-looking-edit"]'), { max: LOOKING_FOR_MAX, allowCustom: true, emptyText: 'Nothing yet. Pick or type what you are open to.' });
+  const values = [...new Map([...profileEditLookingOptions, ...getFilterValues().lookingFor].map((value) => [normalizedValue(value), value])).values()].sort((a, b) => a.localeCompare(b));
+  picker.load({ picks: splitList(memberProfile.lookingFor), options: values.map((value) => ({ id: value, label: value })) });
+  return picker;
 };
 
 const openProfileEditor = () => {
@@ -2557,15 +2613,15 @@ const openProfileEditor = () => {
     <p class="profile-edit-note">Update your details, interests, photo and cover. Changes are saved to your member profile.</p>
     <form id="profile-edit-form">
       <div class="profile-edit-grid">
-        <label><span>FULL NAME</span><input name="name" value="${escapeHtml(profile.name || '')}" required /></label>
-        <label><span>EMAIL</span><input value="${escapeHtml(profile.email || '')}" readonly /></label>
-        <label><span>PHONE</span><input name="phone" value="${escapeHtml(profile.phone || '')}" /></label>
-        <label><span>EXPERIENCE</span><select name="experience"><option value="">Choose one</option>${experienceChoices(profile.experience).map((choice) => `<option${choice === String(profile.experience || '').trim() ? ' selected' : ''}>${escapeHtml(choice)}</option>`).join('')}</select></label>
-        ${bioAvailable ? `<label class="profile-edit-wide profile-edit-bio"><span>BIO</span><textarea name="bio" rows="3" maxlength="${BIO_MAX}" placeholder="A line or two about you: what you do, what you love, what you're up to.">${escapeHtml(profile.bio || '')}</textarea><small class="profile-edit-helper"><span data-bio-count>${String(profile.bio || '').length}</span> / ${BIO_MAX}. Members who can see you read it on your profile.</small></label>` : ''}
-        <div class="profile-edit-wide profile-edit-area" data-profile-area><span id="profile-area-label">YOUR AREA</span><p class="profile-edit-area-current" data-area-current>${escapeHtml(memberPlaceLabel || 'Not set yet')}</p><div class="profile-edit-area-tools"><button type="button" class="profile-area-geo" data-area-geo>Use my location</button><div class="profile-area-search"><input type="text" role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="profile-area-results" aria-labelledby="profile-area-label" placeholder="Or search your city" value="${escapeHtml(areaInputValue(memberPlaceLabel))}" autocomplete="off" spellcheck="false" data-area-search /><ul class="profile-area-results" id="profile-area-results" role="listbox" aria-label="Cities" hidden></ul></div></div><small class="profile-edit-helper" data-area-status role="status">${escapeHtml(AREA_HELPER)}</small></div>
-        <div class="profile-edit-wide profile-edit-interests" data-edit-interests><span id="profile-interests-edit-label">INTERESTS</span><ul class="profile-edit-chips" data-interest-chips aria-label="Your interests"><li class="profile-edit-chips-empty">Loading your interests…</li></ul><div class="profile-area-search profile-interest-search"><input type="text" role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="profile-interest-results" aria-labelledby="profile-interests-edit-label" placeholder="Add an interest: type to search" autocomplete="off" spellcheck="false" data-interest-search /><ul class="profile-area-results" id="profile-interest-results" role="listbox" aria-label="Interests" hidden></ul></div><small class="profile-edit-helper" data-interest-status role="status">Pick 1 to ${MAX_INTERESTS}. You can change them up to 3 times a day. Private interests are never shown.</small></div>
-        <label class="profile-edit-wide"><span>LOOKING FOR</span><input name="lookingFor" list="profile-edit-looking-options" value="${escapeHtml(profile.lookingFor || '')}" placeholder="Search or type what you are looking for" /><datalist id="profile-edit-looking-options">${profileEditDatalist('lookingFor')}</datalist><small class="profile-edit-helper">Choose from suggestions or type your own.</small></label>
-        <label><span>PROFILE PHOTO</span><input name="photoFile" type="file" accept="image/*" aria-describedby="profile-photo-error profile-photo-status" /><small class="profile-edit-helper" id="profile-photo-status" role="status"></small><small class="media-inline-error" id="profile-photo-error" role="alert" hidden></small></label>
+        <label><span>FULL NAME</span><input class="b-field" name="name" value="${escapeHtml(profile.name || '')}" required /></label>
+        <label><span>EMAIL</span><input class="b-field" value="${escapeHtml(profile.email || '')}" readonly /></label>
+        <label><span>PHONE</span><input class="b-field" name="phone" value="${escapeHtml(profile.phone || '')}" /></label>
+        <label><span>EXPERIENCE</span><select class="b-select" name="experience"><option value="">Choose one</option>${experienceChoices(profile.experience).map((choice) => `<option${choice === String(profile.experience || '').trim() ? ' selected' : ''}>${escapeHtml(choice)}</option>`).join('')}</select></label>
+        ${bioAvailable ? `<label class="profile-edit-wide profile-edit-bio"><span>BIO</span><textarea class="b-field" name="bio" rows="3" maxlength="${BIO_MAX}" placeholder="A line or two about you: what you do, what you love, what you're up to.">${escapeHtml(profile.bio || '')}</textarea><small class="profile-edit-helper"><span data-bio-count>${String(profile.bio || '').length}</span> / ${BIO_MAX}. Members who can see you read it on your profile.</small></label>` : ''}
+        <div class="profile-edit-wide profile-edit-area" data-profile-area><span id="profile-area-label">YOUR AREA</span><p class="profile-edit-area-current" data-area-current>${escapeHtml(memberPlaceLabel || 'Not set yet')}</p><div class="profile-edit-area-tools"><button type="button" class="profile-area-geo" data-area-geo>Use my location</button><div class="profile-area-search b-combo"><input class="b-field" type="text" role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="profile-area-results" aria-labelledby="profile-area-label" placeholder="Or search your city" value="${escapeHtml(areaInputValue(memberPlaceLabel))}" autocomplete="off" spellcheck="false" data-area-search /><ul class="profile-area-results b-listbox" id="profile-area-results" role="listbox" aria-label="Cities" hidden></ul></div></div><small class="profile-edit-helper" data-area-status role="status">${escapeHtml(AREA_HELPER)}</small></div>
+        ${chipPickerMarkup({ id: 'profile-interests-edit', label: 'INTERESTS', listLabel: 'Your interests', placeholder: 'Add an interest: type to search', helper: `Pick 1 to ${MAX_INTERESTS}. You can change them up to 3 times a day. Private interests are never shown.` })}
+        ${chipPickerMarkup({ id: 'profile-looking-edit', label: 'LOOKING FOR', listLabel: 'What you are looking for', placeholder: 'Add: pick a suggestion or type your own', helper: `Up to ${LOOKING_FOR_MAX}. Members see these on your card.` })}
+        <label><span>PROFILE PHOTO</span><input class="b-file" name="photoFile" type="file" accept="image/*" aria-describedby="profile-photo-error profile-photo-status" /><small class="profile-edit-helper" id="profile-photo-status" role="status"></small><small class="media-inline-error" id="profile-photo-error" role="alert" hidden></small></label>
         ${profileCoverPicker(currentCover)}
       </div>
       <p class="profile-edit-feedback" id="profile-edit-feedback" role="status"></p>
@@ -2577,6 +2633,7 @@ const openProfileEditor = () => {
   modal.querySelectorAll('[data-profile-edit-close]').forEach((button) => button.addEventListener('click', close));
   wireAreaChanger(modal);
   const interestEdit = wireInterestEditor(modal);
+  const lookingEdit = wireLookingForEditor(modal);
   const bioField = modal.querySelector('textarea[name="bio"]');
   bioField?.addEventListener('input', () => { const count = modal.querySelector('[data-bio-count]'); if (count) count.textContent = String(bioField.value.length); });
   modal.addEventListener('click', (event) => { if (event.target === modal) close(); });
@@ -2628,7 +2685,7 @@ const openProfileEditor = () => {
       name: String(formData.get('name') || '').trim(),
       phone: String(formData.get('phone') || '').trim(),
       experience: String(formData.get('experience') || '').trim(),
-      lookingFor: String(formData.get('lookingFor') || '').trim(),
+      lookingFor: lookingEdit.picks.join(', '),
     };
     // Covers come only from the provided set (D-080): the picked preset path, or the stored value when unchanged.
     const coverChoice = String(formData.get('coverChoice') || '');

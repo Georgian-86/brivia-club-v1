@@ -1,0 +1,166 @@
+/* Brivia shared form components (D-105). One look for every field, dropdown and chip in the app, built only from
+   tokens.css. Used by Edit profile; new forms use these classes instead of styling their own.
+   Field   .b-field     44 px, cream, thin wine border, 10 px radius, a soft wine ring on focus.
+   Select  .b-select    a .b-field with a wine chevron (no browser arrow).
+   Listbox .b-listbox   the panel attached under its field: 44 px rows (.b-option), a light wine tint on hover and on the
+                        keyboard's active row, a tick on picked rows, a quiet note row (.b-listbox-note).
+   Chips   .b-chips / .b-chip   a wine-tinted pill; .b-chip-remove is the round × (32 px, with a 6 px hit margin). */
+
+.b-field,
+.b-select {
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 44px;
+  margin: 0;
+  padding: 10px 14px;
+  border: 1px solid color-mix(in srgb, var(--color-wine) 22%, transparent);
+  border-radius: 10px;
+  outline: 0;
+  background: var(--color-cream);
+  color: var(--color-ink);
+  font: 400 var(--text-14) / 1.4 var(--font-body);
+  transition: border-color var(--motion-fast) var(--ease), box-shadow var(--motion-fast) var(--ease);
+}
+.b-field::placeholder { color: color-mix(in srgb, var(--color-ink-soft) 80%, transparent); }
+.b-field:hover,
+.b-select:hover { border-color: color-mix(in srgb, var(--color-wine) 40%, transparent); }
+.b-field:focus,
+.b-select:focus,
+.b-field:focus-visible,
+.b-select:focus-visible { border-color: var(--color-wine-soft); box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-wine) 12%, transparent); }
+.b-field:disabled { opacity: .6; cursor: progress; }
+textarea.b-field { min-height: 92px; resize: vertical; line-height: 1.5; }
+@media (max-width: 780px) { .b-field, .b-select { font-size: var(--text-16); } } /* 16 px stops iOS zooming in */
+
+.b-select {
+  appearance: none;
+  -webkit-appearance: none;
+  padding-right: 42px;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%235e0b28' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+  background-position: right 14px center;
+  background-repeat: no-repeat;
+  background-size: 18px;
+  cursor: pointer;
+}
+
+/* A field with a listbox under it. */
+.b-combo { position: relative; min-width: 0; }
+.b-listbox {
+  position: absolute;
+  top: calc(100% - 1px);
+  right: 0;
+  left: 0;
+  z-index: 20;
+  max-height: min(288px, 44svh);
+  margin: 0;
+  padding: 6px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  list-style: none;
+  border: 1px solid var(--color-wine-soft);
+  border-top-color: var(--color-card-edge);
+  border-radius: 0 0 var(--radius-m) var(--radius-m);
+  background: var(--color-cream);
+  box-shadow: 0 18px 36px -20px color-mix(in srgb, var(--color-oxblood-deep) 65%, transparent);
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-card-edge) transparent;
+}
+.b-listbox[hidden] { display: none; }
+/* Open: the field and its list read as one piece (as the signup's interest dropdown does). */
+.b-combo:has(> .b-listbox:not([hidden])) > .b-field { border-color: var(--color-wine-soft); border-bottom-left-radius: 0; border-bottom-right-radius: 0; box-shadow: none; }
+.b-listbox > li:not(.b-option, .b-listbox-note) { margin: 0; padding: 0; }
+.b-listbox > li::marker { content: none; }
+.b-option {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 44px;
+  margin: 0;
+  padding: 0 12px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--color-ink);
+  font: 400 var(--text-14) / 1.3 var(--font-body);
+  text-align: left;
+  cursor: pointer;
+  transition: background-color var(--motion-fast) var(--ease);
+}
+.b-option small { color: var(--color-ink-soft); font-size: var(--text-12); }
+.b-option:hover,
+.b-option.is-active { background: color-mix(in srgb, var(--color-wine) 8%, transparent); }
+.b-option:focus-visible { outline: 0; background: color-mix(in srgb, var(--color-wine) 8%, transparent); box-shadow: inset 0 0 0 1.5px var(--color-wine); }
+.b-option[aria-selected="true"] { color: var(--color-wine); font-weight: 600; }
+.b-option-add { color: var(--color-wine); font-weight: 600; }
+.b-listbox-note { padding: 12px; color: var(--color-ink-soft); font: 400 var(--text-14) / 1.4 var(--font-body); }
+
+/* Chips: a selected value. */
+.b-chips { display: flex; flex-wrap: wrap; gap: var(--space-2); margin: 0; padding: 0; list-style: none; }
+.b-chips > li::marker { content: none; }
+.b-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  max-width: 100%;
+  min-height: 36px;
+  padding: 0 4px 0 14px;
+  border: 1px solid color-mix(in srgb, var(--color-wine) 22%, transparent);
+  border-radius: var(--radius-pill);
+  background: color-mix(in srgb, var(--color-wine) 6%, var(--color-cream));
+  color: var(--color-wine-deep);
+  font: 500 var(--text-14) / 1.3 var(--font-body);
+}
+.b-chip-label { overflow-wrap: anywhere; }
+.b-chip-tag { margin-left: 6px; color: var(--color-wine); font-size: var(--text-12); font-weight: 600; letter-spacing: .04em; }
+.b-chip-remove {
+  display: grid;
+  flex: none;
+  width: 28px;
+  height: 28px;
+  margin: 4px;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--color-wine);
+  cursor: pointer;
+  transition: background-color var(--motion-fast) var(--ease);
+}
+.b-chip-remove svg { width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 2.2; stroke-linecap: round; }
+.b-chip-remove:hover { background: color-mix(in srgb, var(--color-wine) 14%, transparent); }
+.b-chip-remove:focus-visible { outline: 2px solid var(--color-wine); outline-offset: 1px; }
+.b-chips-empty { color: var(--color-ink-soft); font: 400 var(--text-14) / 1.4 var(--font-body); }
+
+/* File field: the native input kept (keyboard, screen readers), its button drawn as a brand pill. */
+.b-file {
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 44px;
+  padding: 5px 6px;
+  border: 1px solid color-mix(in srgb, var(--color-wine) 22%, transparent);
+  border-radius: 10px;
+  background: var(--color-cream);
+  color: var(--color-ink-soft);
+  font: 400 var(--text-14) / 1.4 var(--font-body);
+  cursor: pointer;
+}
+.b-file::file-selector-button {
+  min-height: 32px;
+  margin-right: 12px;
+  padding: 0 16px;
+  border: 1px solid color-mix(in srgb, var(--color-wine) 40%, transparent);
+  border-radius: var(--radius-pill);
+  background: transparent;
+  color: var(--color-wine);
+  font: 600 var(--text-12) / 1 var(--font-body);
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: background-color var(--motion-fast) var(--ease);
+}
+.b-file:hover::file-selector-button { background: color-mix(in srgb, var(--color-wine) 8%, transparent); }
+.b-file:focus-visible { outline: 0; border-color: var(--color-wine-soft); box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-wine) 12%, transparent); }

@@ -41,12 +41,14 @@ try {
     const about = await page.locator('#profile-bio').isVisible();
     check(`${w}: the profile shows an About card once the bio column exists`, about);
     await page.locator('#profile-bio [data-profile-edit]').click();
-    await page.waitForSelector('#profile-edit-modal [data-interest-chips] [data-interest-remove]');
+    await page.waitForSelector('#profile-edit-modal [data-picker="profile-interests-edit"] [data-chip-remove]');
     const ui = await page.evaluate(() => {
       const m = document.querySelector('#profile-edit-modal');
       const sel = m.querySelector('select[name="experience"]');
       return {
-        chips: [...m.querySelectorAll('[data-interest-chips] li span')].map((x) => x.textContent.trim()),
+        chips: [...m.querySelectorAll('[data-picker="profile-interests-edit"] .b-chip-label')].map((x) => x.textContent.trim()),
+        datalist: m.querySelectorAll('datalist').length,
+        looking: [...m.querySelectorAll('[data-picker="profile-looking-edit"] .b-chip-label')].map((x) => x.textContent.trim()),
         experience: sel ? [...sel.options].map((o) => o.textContent) : null,
         area: m.querySelector('[data-area-search]')?.value,
         bio: Boolean(m.querySelector('textarea[name="bio"]')),
@@ -56,17 +58,27 @@ try {
     check(`${w}: Experience is a dropdown with the signup choices`, ui.experience?.includes('3–7 years') && ui.experience[0] === 'Choose one', JSON.stringify(ui.experience));
     check(`${w}: the city box shows the saved area`, ui.area === 'Ludhiana', ui.area);
     check(`${w}: a Bio field is there`, ui.bio);
+    check(`${w}: no native datalist; Looking for is chips`, ui.datalist === 0 && Array.isArray(ui.looking), JSON.stringify(ui));
     if (SHOTS) { mkdirSync(SHOTS, { recursive: true }); await page.screenshot({ path: path.join(SHOTS, `edit-${w}.png`) }); }
-    const axe = await axeViolations(page, { include: '#profile-edit-modal [data-edit-interests], #profile-edit-modal .profile-edit-bio, #profile-edit-modal select[name="experience"], #profile-edit-modal [data-profile-area]' });
+    const axe = await axeViolations(page, { include: '#profile-edit-modal [data-picker], #profile-edit-modal .profile-edit-bio, #profile-edit-modal select[name="experience"], #profile-edit-modal [data-profile-area]' });
     check(`${w}: axe on the new interests, experience, area and bio fields`, axe.length === 0, JSON.stringify(axe));
 
     // Edit: remove Fashion, add Badminton (search), never offer a private interest; experience; bio.
-    await page.locator('[data-interest-remove="style.fashion.fashion"]').click();
-    await page.locator('[data-interest-search]').fill('priv');
-    const privateOffered = await page.locator('#profile-interest-results [data-interest-add]').count();
+    await page.locator('[data-chip-remove="style.fashion.fashion"]').click();
+    const interestInput = page.locator('[data-picker="profile-interests-edit"] [data-picker-input]');
+    await interestInput.fill('priv');
+    const privateOffered = await page.locator('#profile-interests-edit-list [data-value]').count();
     check(`${w}: private interests are never offered`, privateOffered === 0);
-    await page.locator('[data-interest-search]').fill('badm');
-    await page.locator('#profile-interest-results [data-interest-add="sports.racket.badminton"]').click();
+    await interestInput.fill('badm');
+    const look = await page.evaluate(() => { const list = document.querySelector('#profile-interests-edit-list'); const li = list.querySelector('li'); const cs = li && getComputedStyle(li); return { bullets: cs?.listStyleType, display: cs?.display, minH: Math.round(li?.getBoundingClientRect().height || 0), shadow: getComputedStyle(list).boxShadow !== 'none', radius: getComputedStyle(list).borderTopLeftRadius }; });
+    check(`${w}: the interest list is the brand listbox (no bullets, 44 px rows, a panel attached to the field)`, look.bullets === 'none' && look.display === 'flex' && look.minH >= 44 && look.shadow && look.radius === '0px', JSON.stringify(look));
+    await page.locator('#profile-interests-edit-list [data-value="sports.racket.badminton"]').click();
+    // Looking for: a suggestion and a value of the member's own
+    const lookInput = page.locator('[data-picker="profile-looking-edit"] [data-picker-input]');
+    await lookInput.fill('Mentor');
+    await page.locator('#profile-looking-edit-list [data-value="Mentor"]').click();
+    await lookInput.fill('Supper club');
+    await lookInput.press('Enter');
     await page.locator('select[name="experience"]').selectOption('3–7 years');
     await page.locator('textarea[name="bio"]').fill('Home cook and poetry reader in Ludhiana.');
     if (SHOTS) await page.locator('#profile-edit-modal .profile-edit-dialog').screenshot({ path: path.join(SHOTS, `edit-filled-${w}.png`) });
@@ -76,20 +88,21 @@ try {
     check(`${w}: the new interests save with 20 points, modes kept`, JSON.stringify(items.map((i) => i.interest_id)) === JSON.stringify(['food.cooking.home', 'arts.writing.poetry', 'sports.racket.badminton']) && items.reduce((a, i) => a + i.points, 0) === 20 && items[0].mode === 'play', JSON.stringify(items));
     const patches = st.calls.filter((c) => c.method === 'PATCH' && c.path === '/rest/v1/profiles').map((c) => JSON.parse(c.body || '{}'));
     check(`${w}: the bio and the experience are saved to the member's row`, patches.some((p) => p.bio === 'Home cook and poetry reader in Ludhiana.') && patches.some((p) => p.experience === '3–7 years'), JSON.stringify(patches.map((p) => ({ bio: p.bio, experience: p.experience }))));
+    check(`${w}: looking for keeps the saved value and adds a suggestion and a typed one`, patches.some((p) => JSON.stringify(p.looking_for) === JSON.stringify(['Friends', 'Mentor', 'Supper club'])), JSON.stringify(patches.map((p) => p.looking_for)));
     check(`${w}: the About card shows the bio`, (await page.locator('#profile-bio .profile-bio-text').textContent()) === 'Home cook and poetry reader in Ludhiana.');
 
     // Unchanged interests send nothing; the daily limit is explained and nothing else is saved.
     const before = posted('set_member_interests').length;
     await page.evaluate(() => document.querySelector('#profile-photo-editor')?.click());
-    await page.waitForSelector('#profile-edit-modal [data-interest-remove]');
+    await page.waitForSelector('#profile-edit-modal [data-chip-remove]');
     st.myInterests = MINE.map((r) => ({ ...r }));
     await page.locator('.profile-edit-save').click();
     await page.waitForFunction(() => !document.querySelector('#profile-edit-modal'));
     check(`${w}: saving without changing interests sends no interest save`, posted('set_member_interests').length === before);
     await page.evaluate(() => document.querySelector('#profile-photo-editor')?.click());
-    await page.waitForSelector('#profile-edit-modal [data-interest-remove]');
+    await page.waitForSelector('#profile-edit-modal [data-chip-remove]');
     st.routes['rpc/set_member_interests'] = { status: 429, code: 'PT429', message: 'try again later' };
-    await page.locator('#profile-edit-modal [data-interest-remove]').first().click();
+    await page.locator('#profile-edit-modal [data-picker="profile-interests-edit"] [data-chip-remove]').first().click();
     await page.locator('.profile-edit-save').click();
     await page.waitForFunction(() => /3 times a day/.test(document.querySelector('#profile-edit-feedback')?.textContent || ''));
     check(`${w}: the daily interest limit is explained and the dialog stays open`, await page.locator('#profile-edit-modal').isVisible());
