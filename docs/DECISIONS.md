@@ -2029,3 +2029,81 @@ controls (a tester or a seeded test member), never a real member, so no new expo
   interests step so a tap on a tray pick missed after the open list closed (signup.spec caught it). Later steps keep
   their header, × and left-aligned head.
 - Proof: `mobile-polish.spec.mjs` 27 (sign up at 320 x 622 and 390 x 844), signup 288, onboarding 269.
+
+## D-100: The chat inbox scrolls, sorts by last contact, and its badge counts unread messages (founder, 2026-10-28)
+
+- **Asked:** "chat list is not scrolling, only from the sidebar we go down"; "chat list sorting as per last contact";
+  "chat notification is showing the number of people in the inbox. I want it to show the unread messages."
+- **Found:** on phones `chat-attachments.css` sets `overflow: hidden` on html, body, `.app-wrap` and `.app-main` for the
+  whole chat view (so an open thread's wallpaper never moves), which clipped the one-page inbox of D-096: 15 rows in a
+  1448 px page inside an 844 px screen and nothing could scroll. On desktop the rows scroll inside `.chat-inbox-scroll`,
+  but a wheel over the search box or the heading above them did nothing. The order was the order cards loaded, the
+  Chat badge was `conversations.length`, and "unread" was an in-memory set that forgot everything on reload.
+- **Done:**
+  1. Phones, no thread open (`chat-layout.css`): the document scrolls (html `overflow-y: auto`, the wrappers visible).
+     An open thread keeps the locked page. Desktop (`app.js` `bindInboxWheel`): a wheel anywhere in the sidebar scrolls
+     the rows.
+  2. `chat-unread.js` (pure, unit-tested): per conversation, the time of the newest message the member has seen, kept in
+     this browser (`brivia-chat-read:<member id>`). Unread = their messages after that time and after the member's own
+     latest reply (answering means read, on any device). The first run of this build sets a baseline of "now", so old
+     messages do not all light up once. Opening a conversation, and every message that arrives while it is open, marks
+     it read. There are no server read receipts (that would be a migration and is not needed for the badge).
+  3. The Chat badge (header and tab bar) shows the total of unread messages; each row shows its own count (99+).
+  4. Rows sort by their newest message, either direction; conversations with no message keep their order at the end.
+- **Proof:** unit `chat-unread.test.mjs` (6); e2e `chat-inbox.spec.mjs` (15, 1440 and 390: order, badge = messages,
+  per-row count, replied-to not unread, page / sidebar scroll, the last row reachable, read state survives reload);
+  app-shell 211 (badge checks now seed one unread message; a conversation with nothing unread shows no badge).
+
+## D-101: Likes, threaded comments and shares on Explore that members see (founder, 2026-10-28)
+
+- **Asked:** "Make the likes, comments and share functional and the connections can see it. Make the comments in the
+  thread style: whoever replies to a comment, it should be in a thread form."
+- **Privacy design (no arena run this session; recorded here for the next arena):** likes stay private rows (0012
+  unchanged). Others learn only what `post_activity()` returns: counts of likes, comments and shares on a post they can
+  see (counting only members they can see, so blocked members and the other world are never counted), and up to three
+  of their own CONNECTIONS (mutual matches) who liked it, by name. Non-connections are only ever a number. Comments are
+  public to whoever can see the post and the comment's author (as posts are). Shares send only the neutral link.
+- **Done:**
+  1. `0015_post_activity.sql`: `community_post_comments` (`parent_id` makes a thread; a trigger refuses a reply on
+     another post and trims the body; 1-1000 characters; insert own, completed, visible post; delete by the comment's
+     author or the post's author, replies cascade; no update), `community_post_shares` (one row per member and post),
+     `post_activity(uuid[])` (definer, authenticated only, max 100 posts). README "0015"; hygiene list adds it.
+  2. Cards: counts on Like, Comment and Share; under the bar "Liked by You, Asha and 3 others" and "View all N
+     comments". A like moves the count at once (undone on error).
+  3. The post sheet: likes and shares line, then "Comments" as threads: a reply sits under its comment behind a thin wine
+     line; indentation stops at the second level and deeper replies start with "@Name". Reply (with a "Replying to
+     Name ×" chip; Escape cancels), Delete for your own comments and for any comment on your own post (its replies
+     go too). A composer at the foot (Enter posts, Shift+Enter is a new line). "Reply in chat" / "View profile" stays,
+     as a quiet pill.
+  4. Share opens a sheet: your connections, each with Send (the link arrives in your chat with them), Copy link, and
+     More options (the system share sheet). A completed share is counted once per member.
+  5. Until 0015 is applied the counts, lines and comments are simply absent; Like and Save behave as in D-074.
+  6. `privacy.html`: comments are collected; who sees counts, comments and liker names.
+- **Proof:** SQL `e-post-activity.test.sql` (Q1-Q5); unit `post-activity.test.mjs` (7), `post-card.test.mjs` (9); e2e
+  `post-activity.spec.mjs` (43, 1440 and 390, axe on the sheet and the share sheet); `explore-cards.spec.mjs` 74 (Share
+  now goes through the sheet).
+
+## D-102: A profile photo is required at signup; area and interests move to a mandatory setup right after (founder, 2026-10-28)
+
+- **Asked:** "Make the profile pic upload mandatory upon signup." "While signup, I want the interests and the location
+  to be mandatory, but not in the signup flow: it must be the first thing they get to see when they finish the sign up
+  flow."
+- **Done:**
+  1. Signup is Welcome → Account → 18+ → Name → Details → **Photo** (required; "Choose a photo" → Frame your photo;
+     the button is "Create account"). That button creates the account, uploads the framed photo, writes the profile and
+     declares 18+. "STEP n OF 5" (Google: of 4).
+  2. Setup follows at once: "BEFORE YOU START", Area → Interests → Reveal, "SET UP n OF 2". It is not part of signup:
+     no Back into signup, no "Log in" pill. With email confirmation on, Verify comes after the photo (the photo waits in
+     the pending profile as a compressed data:image and is uploaded after login, the existing D-049 path); after the
+     link and login, setup is the first screen.
+  3. Mandatory: the server's completion rule (D-030) already needs an area and interests, and the app sends any
+     incomplete member to `auth.html?complete-profile=1`, which resumes at the first missing item (18+, name,
+     details, photo, area, interests). A completed member is never sent back for a photo (existing members keep their
+     current state); the requirement is client-side, so no migration.
+  4. `signup-flow.js` (pure): `SETUP`, `SIGNUP_LAST`, phase-aware `stepLabel` / `stepStates`, `resumeScreen` with
+     `has_photo`, no Back from Area. `script.js`: `submitGuidedSignup` (account, profile, photo, 18+) and
+     `submitGuidedSetup` (area, interests).
+- **Proof:** unit `signup-flow.test.mjs` (8); e2e signup 319 (photo required, framed preview, upload before the profile
+  row, Verify straight after the photo with the photo pending, setup labels, no Back from Area, resume without a photo
+  starts at Photo, one submit per button for both submits), onboarding 269, location 64, mobile-polish, launch-polish,
+  password suites.

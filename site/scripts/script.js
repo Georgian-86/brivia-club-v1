@@ -1673,18 +1673,19 @@ const startGoogleAuth = async () => {
   }
 };
 
-// The guided flow's last step (polish wave B3): the answers become the classic form's state (areaChoice and an
-// even-split budget) and run the classic pipeline unchanged: signUp at the end (email path) or the existing session
-// (Google, a returning member) -> saveProfile -> finishOnboarding (declare_adult before area and interests). Without a
-// session (email confirmation on) only the pending profile is kept (never coordinates) and the Verify screen shows.
-// Resolves { ok: true, session } or { ok: false, screen, message } (the screen to show the line on).
+// The guided flow (polish wave B3, split in two by D-102). Signup's last screen (the photo) runs submitGuidedSignup:
+// signUp (email path) or the existing session (Google, a returning member) -> saveProfile with the framed photo ->
+// declare_adult. Without a session (email confirmation on) the profile is kept as the pending profile, the photo as a
+// compressed data:image preview (uploaded after login, pending-profile.js), and the Verify screen shows.
+// Setup's last screen (interests) runs submitGuidedSetup: the area, then the interests (finishOnboarding).
+// Each resolves { ok: true, ... } or { ok: false, screen, message } (the screen to show the line on).
 let guidedRow = null;  // the signed-in member's own profile row when the flow resumed (kept fields are not cleared)
 let guidedSaved = null;  // their saved budget (my_interests) when the flow resumed: unchanged picks keep its points
 const GUIDED_DEFAULT_COVER = '/Images/Cover%20images/163BDB0C-64AC-44E7-8663-55C323ADB4FE.PNG';
 const guidedStepFor = (message) => (message === ADULT_SAVE_ERROR ? 'adult'
   : message === AREA_SAVE_ERROR || message === 'Try again later.' ? 'area' : 'interests');
 const submitGuidedSignup = async (answers) => {
-  if (!supabaseReady || !supabase) return { ok: false, screen: 'interests', message: 'Supabase is not configured.' };
+  if (!supabaseReady || !supabase) return { ok: false, screen: 'photo', message: 'Supabase is not configured.' };
   const kept = guidedRow ? rowToProfile(guidedRow) : {};
   const phoneCountryCode = answers.phoneCountryCode || '+91';
   const phoneNumber = String(answers.phoneNumber || '').replace(/\D/g, '');
@@ -1700,10 +1701,14 @@ const submitGuidedSignup = async (answers) => {
     coverUrl: normalizeCoverUrl(kept.coverUrl || kept.cover_url || '') || GUIDED_DEFAULT_COVER,
   };
   if (kept.photoUrl || kept.photo_url) profile.photoUrl = kept.photoUrl || kept.photo_url;
-  areaChoice = answers.area && ['geo', 'city', 'keep'].includes(answers.area.kind) ? { ...answers.area } : null;
-  // Unchanged picks over a complete saved budget keep the member's own points and modes and are not saved again (M3).
-  const planned = guidedBudget(answers.interests, guidedSaved);
-  budget = planned.budget;
+  // The framed photo is re-encoded before anything is written: a photo that cannot be re-encoded is never used as-is
+  // (its EXIF could carry a location), and no account is created for it.
+  let photoFile = null;
+  if (answers.photo) {
+    try { photoFile = await compressImageOnly(answers.photo); } catch { return { ok: false, screen: 'photo', message: PHOTO_ERROR_MESSAGE }; }
+    profile.photoName = 'profile-photo.jpg';
+  }
+  if (!photoFile && !profile.photoUrl) return { ok: false, screen: 'photo', message: 'Add a profile photo to continue.' };
   try {
     const { data: sessionData } = await supabase.auth.getSession();
     let user = sessionData?.session?.user || null;
@@ -1714,19 +1719,24 @@ const submitGuidedSignup = async (answers) => {
         password: answers.password,
         options: {
           emailRedirectTo: `${window.location.origin}/auth.html`,
-          // Auth metadata holds contact basics only: never interests (some are private) or any location.
+          // Auth metadata holds contact basics only: never interests (some are private), any location or the photo.
           data: { name: profile.name, full_name: profile.name, phone: profile.phone, phoneCountryCode, phoneNumber, gender: profile.gender, coverUrl: profile.coverUrl },
         },
       });
       if (error) return { ok: false, screen: 'account', message: signupErrorCopy(error) };
       if (!data.user) return { ok: false, screen: 'account', message: 'We could not create your account. Please try again.' };
       if (!data.session) {
-        // Email confirmation: nothing can be written before a session exists. Keep the interests and only the KIND of
-        // area choice (a city id, or "ask for my location again"); the coordinates are dropped here.
-        const pendingOnboarding = buildPendingOnboarding(budget, isSensitiveInterest, areaChoice);
-        window.localStorage.setItem('brivia-pending-profile', JSON.stringify({ ...profile, ...pendingOnboarding, adultDeclared: true }));
-        areaChoice = null;
-        cancelGeo();
+        // Email confirmation: nothing can be written before a session exists. Keep the profile and the photo (as a
+        // compressed preview); area and interests are asked after login (setup), so none are kept.
+        if (photoFile) profile.photoUrl = await fileToDataUrl(photoFile);
+        const pendingOnboarding = buildPendingOnboarding({ items: [] }, isSensitiveInterest, null);
+        try {
+          window.localStorage.setItem('brivia-pending-profile', JSON.stringify({ ...profile, ...pendingOnboarding, adultDeclared: true }));
+        } catch {
+          // Storage full or blocked: keep the account; the photo (and, without storage, the 18+ box) is asked for again
+          // after login (resumeScreen), never an error here, since the account already exists.
+          try { window.localStorage.setItem('brivia-pending-profile', JSON.stringify({ ...profile, photoUrl: '', ...pendingOnboarding, adultDeclared: true })); } catch { /* nothing to keep */ }
+        }
         return { ok: true, session: false };
       }
       user = data.user;
@@ -1734,13 +1744,32 @@ const submitGuidedSignup = async (answers) => {
       profile.email = user.email || '';
     }
     adultAlreadyDeclared = Boolean(guidedRow?.adult_declared_at);
-    const { error: profileError } = await saveProfile(user.id, profile, null, null);
-    if (profileError) return { ok: false, screen: 'interests', message: signupErrorCopy(profileError) };
+    const { data: savedRow, error: profileError } = await saveProfile(user.id, profile, photoFile, { photoUrl: kept.photoUrl || kept.photo_url || '' });
+    if (profileError) return { ok: false, screen: 'photo', message: profileError.field === 'photo' ? PHOTO_ERROR_MESSAGE : signupErrorCopy(profileError) };
+    guidedRow = savedRow || guidedRow;
+    await declareAdultStep();
+    window.localStorage.removeItem('brivia-pending-profile');
+    window.localStorage.setItem('brivia-member-profile', JSON.stringify({ ...profile, photoUrl: savedRow?.photo_url || profile.photoUrl || '', id: user.id }));
+    return { ok: true, session: true, photoUrl: savedRow?.photo_url || '' };
+  } catch (error) {
+    if (error instanceof OnboardingStepError) return { ok: false, screen: guidedStepFor(error.message), message: error.message };
+    return { ok: false, screen: 'photo', message: signupErrorCopy(error) };
+  }
+};
+const submitGuidedSetup = async ({ area, interests }) => {
+  if (!supabaseReady || !supabase) return { ok: false, screen: 'interests', message: 'Supabase is not configured.' };
+  areaChoice = area && ['geo', 'city', 'keep'].includes(area.kind) ? { ...area } : null;
+  // Unchanged picks over a complete saved budget keep the member's own points and modes and are not saved again (M3).
+  const planned = guidedBudget(interests, guidedSaved);
+  budget = planned.budget;
+  try {
+    const { data: sessionData } = await supabase.auth.getSession();
+    const user = sessionData?.session?.user || null;
+    if (!user) return { ok: false, screen: 'area', message: 'Your session ended. Please log in again.' };
+    adultAlreadyDeclared = adultAlreadyDeclared || Boolean(guidedRow?.adult_declared_at);
     await finishOnboarding(user.id, { skipInterests: planned.unchanged });
     areaChoice = null;
-    window.localStorage.removeItem('brivia-pending-profile');
-    window.localStorage.setItem('brivia-member-profile', JSON.stringify({ ...profile, id: user.id }));
-    return { ok: true, session: true };
+    return { ok: true };
   } catch (error) {
     if (error instanceof OnboardingStepError) return { ok: false, screen: guidedStepFor(error.message), message: error.message };
     return { ok: false, screen: 'interests', message: signupErrorCopy(error) };
@@ -1750,6 +1779,7 @@ guidedSignup = GUIDED_SIGNUP ? initGuidedSignup({
   root: document.querySelector('#guided-signup'),
   startGoogle: () => startGoogleAuth(),
   submit: (answers) => submitGuidedSignup(answers),
+  submitSetup: (answers) => submitGuidedSetup(answers),
   redirectToApp: () => redirectToApp(),
   onLogin: () => setAuthView('login'),
   onSignOut: async ({ quiet = false } = {}) => {
@@ -1863,6 +1893,7 @@ const openGuidedFor = async (user, row = null, status = null, pendingResult = nu
     has_name: Boolean(realName(row?.name)),
     has_phone: digits.length >= 7,
     has_gender: Boolean(gender),
+    has_photo: Boolean(row?.photo_url),
     has_cell: Boolean(current?.has_cell),
     interests: Number(current?.interests) || 0,
     points: Number(current?.points) || 0,
@@ -1878,6 +1909,7 @@ const openGuidedFor = async (user, row = null, status = null, pendingResult = nu
     phoneCountryCode: phone.phoneCountryCode || '+91',
     phoneNumber: digits,
     gender,
+    photoUrl: row?.photo_url || '',
     area: flow.has_cell ? { kind: 'keep', label: current?.place_label || '' } : null,
     interests,
   };

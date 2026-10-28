@@ -726,9 +726,12 @@ try {
     }
     delete st.own; delete st.placeLabel;
 
-    // 7. The chat badge: hidden with no conversation; shown in header and tab bar with one.
-    for (const [label, matchIds, expectShown] of [['no conversation', [], false], ['one conversation', [A], true]]) {
+    // 7. The chat badge counts unread messages (D-100): hidden with no conversation, hidden for a conversation with
+    //    nothing unread, shown in header and tab bar with one unread message.
+    const unreadOne = [{ id: 'msg-badge', sender_id: A, recipient_id: '11111111-1111-4111-8111-111111111111', body: 'Hi', created_at: new Date(Date.now() - 6e4).toISOString() }];
+    for (const [label, matchIds, expectShown, messages] of [['no conversation', [], false, []], ['one conversation, nothing unread', [A], false, []], ['one conversation', [A], true, unreadOne]]) {
       st.matchIds = matchIds;
+      st.messages = messages;
       const { context, page } = await open(WIDE);
       if (expectShown) await page.waitForFunction(() => [...document.querySelectorAll('[data-chat-badge]')].some((b) => !b.hidden), null, { timeout: 8000 }).catch(() => {});
       else await settle(page);

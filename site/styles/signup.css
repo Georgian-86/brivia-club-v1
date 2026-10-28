@@ -429,6 +429,31 @@
 .guided-option[aria-pressed="true"] .guided-option-tick { display: block; }
 .guided-ghost { position: fixed; z-index: 90; margin: 0; pointer-events: none; transform-origin: top left; will-change: transform; }
 
+/* Profile photo (D-102): a round frame with a camera until a photo is framed, then the photo itself. */
+.guided-photo { display: grid; justify-items: center; margin: var(--space-4) 0 0; }
+.guided-photo-pick {
+  display: grid; justify-items: center; gap: var(--space-3); margin: 0; padding: var(--space-2); border: 0; border-radius: var(--radius-l);
+  background: none; color: var(--g-wine); font: inherit; cursor: pointer; -webkit-tap-highlight-color: transparent;
+}
+.guided-photo-frame {
+  display: grid; width: 148px; height: 148px; place-items: center; overflow: hidden; border-radius: 50%;
+  border: 2px dashed var(--g-line-strong); background: var(--g-tint); color: var(--g-wine);
+  transition: border-color var(--motion-fast) var(--ease), transform var(--motion-fast) var(--ease);
+}
+.guided-photo-frame.has-photo { border: 3px solid var(--g-wine); box-shadow: 0 0 0 6px var(--g-tint); }
+.guided-photo-frame img { width: 100%; height: 100%; object-fit: cover; }
+.guided-photo-icon { width: 44px; height: 44px; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+.guided-photo-label {
+  display: inline-flex; align-items: center; min-height: 44px; padding: 0 var(--space-5); border: 1px solid var(--g-wine); border-radius: var(--radius-pill);
+  font-size: var(--text-12); font-weight: 700; letter-spacing: .12em; text-transform: uppercase;
+}
+.guided-photo-pick:focus-visible { outline: 2px solid var(--g-wine); outline-offset: 3px; }
+@media (hover: hover) {
+  .guided-photo-pick:hover .guided-photo-frame { border-color: var(--g-wine); transform: scale(1.02); }
+  .guided-photo-pick:hover .guided-photo-label { background: var(--g-wine); color: var(--g-paper); }
+}
+.guided-photo .guided-status { text-align: center; }
+
 /* Reveal and Verify */
 .guided-reveal-mark {
   display: grid;
@@ -546,6 +571,8 @@
 
 @media (prefers-reduced-motion: reduce) {
   .guided-reveal-mark { animation: none; }
+  .guided-photo-frame { transition: none; }
+  .guided-photo-pick:hover .guided-photo-frame { transform: none; }
   .guided-bar-fill, .guided-tab, .guided-choice, .guided-next, .guided-option { transition: none; }
   .guided-choice:hover:not(:disabled), .guided-next:hover:not(:disabled) { transform: none; }
 }

@@ -309,3 +309,6 @@ body.auth-page .auth-shell .guided .guided-menu-note { padding: 12px 10px; color
 @media (max-width: 780px) {
   body.auth-page .auth-shell .guided .guided-menu { position: static; }
 }
+
+/* D-102: setup (area, interests) and Reveal come after the account exists: no "Already a member? Log in" there. */
+body.auth-page .auth-shell:has(#guided-signup:is([data-screen="area"], [data-screen="interests"], [data-screen="reveal"])) .auth-top-signup { visibility: hidden; }

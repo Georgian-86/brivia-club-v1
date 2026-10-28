@@ -78,6 +78,9 @@ export const startAppStub = async ({ port, state = {}, deckRows = defaultDeckRow
 
   const attach = async (context) => {
     await context.addInitScript(([key, value]) => { window.localStorage.setItem(key, value); }, ['sb-stub-auth-token', JSON.stringify(session)]);
+    // D-100: a first run counts messages before "now" as read; stubbed members start with an old read baseline, so the
+    // stubbed messages are unread (a spec that sets its own read state first keeps it).
+    await context.addInitScript(([key]) => { if (!window.localStorage.getItem(key)) window.localStorage.setItem(key, JSON.stringify({ baseline: '2020-01-01T00:00:00.000Z', read: {} })); }, [`brivia-chat-read:${ME}`]);
     // The first-run deck tutorial (D-094) stays out of the way unless a spec asks for it (state.deckTutorial).
     if (!st.deckTutorial) await context.addInitScript(() => { try { if (location.pathname === '/app.html') window.localStorage.setItem('brivia-deck-tutorial', 'hidden'); } catch { /* none */ } });
     await context.grantPermissions(['clipboard-read', 'clipboard-write'], { origin: url });

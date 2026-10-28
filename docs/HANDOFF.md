@@ -1,11 +1,27 @@
 # Session handoff (read after CLAUDE.md)
 
-Last updated: 2026-10-20 (live-database correction D-070; "Send without a note" D-071). Before that: 2026-10-16 (design references, D-062). Before that: 2026-10-13, after Phase D of the experience iteration (the test world), on branch
+Last updated: 2026-10-28 (D-100 chat inbox, D-101 post activity and 0015, D-102 photo and setup). Before that: 2026-10-20 (live-database correction D-070; "Send without a note" D-071). Before that: 2026-10-16 (design references, D-062). Before that: 2026-10-13, after Phase D of the experience iteration (the test world), on branch
 `claude/jolly-edison-49xvza` (repo `Georgian-86/brivia-club-v1`). Phases C and D are not on `main` yet, and Phase D's SQL
 is not applied: the founder applies it in the SQL editor (section 3, item 0).
 Update this file at the end of every session. CLAUDE.md holds the aim; this file holds **where we are**.
 
 ## 1. What is done
+
+**2026-10-28, branch `claude/wizardly-volta-6hv7or` (D-100 to D-102):**
+- **Chat (D-100):** the phone inbox scrolls as a page again (a chat-view `overflow: hidden` lock had clipped it), a wheel
+  anywhere in the desktop sidebar scrolls the rows, conversations sort by last contact, and the Chat badge counts
+  unread messages (`chat-unread.js`, read state per member in the browser). e2e `chat-inbox.spec.mjs`.
+- **Explore (D-101):** counts on Like / Comment / Share, "Liked by <connection>", threaded comments with Reply and
+  Delete in the post sheet, and a share sheet that sends the link to a connection in chat. Needs
+  **`0015_post_activity.sql` (written, NOT applied)**; until then the client hides counts and comments. e2e
+  `post-activity.spec.mjs`, SQL `e-post-activity.test.sql`.
+- **Signup (D-102):** the photo is a required last signup step ("Create account"); area and interests are a mandatory
+  "Set up" right after (or after the email link). No SQL.
+- Proof: unit 349; SQL harness ALL PASSED; e2e signup 319, onboarding 269, location 64, app-shell 211, explore-cards 74,
+  post-activity 43, chat-inbox 15, chat-extras 145, consent 182, deck 196, fit 324, profile-media 193, deck-tutorial,
+  mobile-polish, launch-polish, password suites; build, assets, style ratchet OK. (deck-tutorial's axe check flaked once
+  on a mid-animation stamp, then passed twice.) No agent-arena was run for D-101's privacy design: run one before 0015
+  goes live if the founder wants it.
 
 **Explore post cards (2026-10-21, release C of the polish wave), D-074.** Explore posts are wine cards (header bar,
 5:4 image (squarer since 2026-10-22), two-line caption, action bar: Like, Comment, Share, Save); one, two or three columns. Like and Save are
@@ -206,6 +222,10 @@ Tooling: Playwright **and axe-core** at `/tmp/pw` (`npm install --prefix /tmp/pw
 - Real members are **not allowed yet**: see the gate table in `docs/arena/2026-10-07-iteration-4.md`.
 
 ## 3. What to do next (in order)
+
+**New (2026-10-28):** review the preview of `claude/wizardly-volta-6hv7or`, then apply `0015_post_activity.sql`
+(README "0015": pre-flight, apply, verify; either order with the client works) and merge. Existing members without a
+photo are not forced to add one; only new signups and incomplete members are.
 
 **Done 2026-10-22:** `0011` is applied (D-070). Then close the open test world
 (`update public.brivia_world_switch set open_test_world = false, changed_at = now();`) and purge the test members
