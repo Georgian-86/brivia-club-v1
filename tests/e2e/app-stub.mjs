@@ -152,7 +152,15 @@ export const startAppStub = async ({ port, state = {}, deckRows = defaultDeckRow
         const pairs = [...(reqUrl.searchParams.get('or') || '').matchAll(/and\(user1_id\.eq\.([^,]+),user2_id\.eq\.([^)]+)\)/g)].map((m) => [m[1], m[2]]);
         return json(200, pairs.length ? rows.filter((row) => pairs.some(([u1, u2]) => row.user1_id === u1 && row.user2_id === u2)) : rows);
       }
-      if (pathName === '/rest/v1/community_posts' && method === 'GET') return json(200, st.posts || []);
+      if (pathName === '/rest/v1/community_posts' && method === 'GET') {
+        // One post by id (a shared post card in chat): ?id=eq.<id>, answered as an object when asked for one.
+        const one = reqUrl.searchParams.get('id');
+        if (one) {
+          const found = (st.posts || []).filter((post) => `eq.${post.id}` === one);
+          return (request.headers().accept || '').includes('vnd.pgrst.object') ? (found.length ? json(200, found[0]) : json(200, null)) : json(200, found);
+        }
+        return json(200, st.posts || []);
+      }
       // D-101 post activity (0015): st.activity rows for rpc/post_activity, st.comments for community_post_comments
       // (a POST adds a row by ME and answers it; a DELETE removes ?id=eq.X and its replies), shares answer 201.
       if (pathName === '/rest/v1/rpc/post_activity') return json(200, (st.activity || []).filter((row) => (args.p_post_ids || []).includes(row.post_id)));

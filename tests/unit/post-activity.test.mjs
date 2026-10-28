@@ -67,3 +67,15 @@ test('addComment refuses an empty body without a request; recordShare treats a r
   assert.equal((await recordShare(shareClient({ code: '23505' }), 'p')).error, null);
   assert.equal((await recordShare(shareClient({ code: '42501' }), 'p')).error.code, '42501');
 });
+
+test('parseSharedPost finds the post id of a shared-post message only', async () => {
+  const { parseSharedPost, sharedPostMessage } = await import('../../site/scripts/post-activity.js');
+  const id = 'd45b662c-83c2-4ca3-b801-6b805c1b24e4';
+  assert.equal(parseSharedPost(sharedPostMessage(`https://thebriviaclub.live/explore.html?post=${id}`)), id);
+  assert.equal(parseSharedPost(`https://brivia-club-x.vercel.app/explore.html?post=${id}`), id);
+  assert.equal(parseSharedPost(`Look at this https://thebriviaclub.live/explore.html?post=${id}`), null, 'a link inside other text stays text');
+  assert.equal(parseSharedPost(`javascript:alert(1)//explore.html?post=${id}`), null);
+  assert.equal(parseSharedPost(`https://x.test/explore.html?post=${id}&next=evil`), null);
+  assert.equal(parseSharedPost(''), null);
+  assert.equal(parseSharedPost(null), null);
+});

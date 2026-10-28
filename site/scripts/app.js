@@ -37,7 +37,7 @@ import { postImageSrc } from './post-image.js';
 import { postCardMarkup, shareData, isSafePostImageSrc } from './post-card.js';
 import { toastSide } from './toast-place.js';
 import { loadReactions, setReaction, createReactionGuard } from './post-reactions.js';
-import { loadActivity, withLike, likeSummary, threadComments, cleanCommentBody, loadComments, addComment, deleteComment, recordShare, sharedPostMessage, emptyActivity, COMMENT_MAX } from './post-activity.js';
+import { loadActivity, withLike, likeSummary, threadComments, cleanCommentBody, loadComments, addComment, deleteComment, recordShare, sharedPostMessage, parseSharedPost, emptyActivity, COMMENT_MAX } from './post-activity.js';
 import { profileChecklist } from './profile-checklist.js';
 import { quotaLabel, quotaErrorText, quotaBlocked, quotaNotice } from './signal-quota.js';
 import { pitchLine, deckChips, deckEmptyState, deckFields, bandNote, deckCoverSrc } from './deck-view.js';
@@ -329,7 +329,7 @@ const saveNotifications = () => {
   try { window.localStorage.setItem(notificationsStorageKey(), JSON.stringify(notifications.slice(0, 80))); } catch { /* Continue in memory if storage is unavailable. */ }
 };
 const findPersonById = (personId) => people.find((person) => String(person.id) === String(personId));
-const notificationPreview = (message) => message?.body || ((message?.attachment_url || message?.attachment_path) ? 'Sent an attachment.' : 'Sent you a message.');
+const notificationPreview = (message) => (parseSharedPost(message?.body) ? 'Shared a post with you.' : message?.body) || ((message?.attachment_url || message?.attachment_path) ? 'Sent an attachment.' : 'Sent you a message.');
 const addMessageNotification = (message) => {
   if (!areNotificationsEnabled() || !message?.id || !memberProfile.id || String(message.sender_id) === String(memberProfile.id)) return false;
   const id = String(message.id);
@@ -1753,7 +1753,7 @@ const renderChats = () => {
     const last = chatMessages[person.id]?.at(-1);
     const unreadMessages = chatUnreadCount(person.id);
     const unread = unreadMessages > 0;
-    const lastPreview = last?.attachment?.kind === 'resume' ? 'Resume (PDF)' : last?.attachment ? `📎 ${last.attachment.name || 'Attachment'}` : (last?.text || 'Start a conversation');
+    const lastPreview = last?.attachment?.kind === 'resume' ? 'Resume (PDF)' : last?.attachment ? `📎 ${last.attachment.name || 'Attachment'}` : parseSharedPost(last?.text) ? 'Shared a post' : (last?.text || 'Start a conversation');
     return `<div class="chat-row${unread ? ' is-unread' : ''}${selectedChat?.id === person.id ? ' is-selected' : ''}"><button class="chat-row-open" type="button" data-chat-id="${escapeHtml(person.id)}"><span class="member-profile-trigger" data-public-profile-id="${escapeHtml(person.id)}" role="button" tabindex="0" aria-label="Open ${escapeHtml(person.name)} profile">${renderAvatar(person)}</span><span class="chat-row-copy"><strong data-public-profile-id="${escapeHtml(person.id)}">${escapeHtml(person.name)}</strong><span>${escapeHtml(lastPreview)}</span></span><span class="chat-row-meta"><time>${escapeHtml(formatChatTime(last?.createdAt))}</time>${unread ? `<b aria-label="${unreadMessages} unread">${unreadMessages > 99 ? '99+' : unreadMessages}</b>` : ''}</span></button><button class="chat-delete" type="button" data-delete-chat-id="${escapeHtml(person.id)}" aria-label="Delete chat with ${escapeHtml(person.name)}" title="Delete chat"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M4.5 6h11M8 3.5h4M6.5 6l.6 10h5.8l-.6-10M8.5 8.5v5M11.5 8.5v5"/></svg></button></div>`;
   }).join('') : '<div class="inbox-empty"><strong>No threads found</strong><span>Chats open once a connection is mutual. Send a signal from Connect to start one.</span><button type="button" class="inbox-empty-action" data-nav="explore">CONNECT WITH PEOPLE ↗</button></div>'}`;
   const inboxScroll = list?.querySelector('.chat-inbox-scroll');
@@ -1948,8 +1948,59 @@ const openChat = (person, markAsRead = true) => {
 document.querySelector('#chat-messages')?.addEventListener('click', (event) => {
   const button = event.target.closest('[data-resume-open]');
   if (button) openSharedResume(button);
+  const post = event.target.closest('[data-shared-post-open]');
+  if (post) openSharedPost(post.dataset.sharedPostOpen);
 });
 
+// A shared post in chat (founder, 2026-10-28) shows as a card: image, author, caption and "View post". The post is
+// read from community_posts under its own select policy (only a post this member may see), never from the link, and
+// cached per post id; a post that is gone or hidden shows "This post is no longer available."
+const sharedPostCache = new Map();
+const loadSharedPost = async (postId) => {
+  if (sharedPostCache.has(postId)) return;
+  sharedPostCache.set(postId, { status: 'loading' });
+  let entry = { status: 'gone' };
+  try {
+    const known = communityPosts.find((post) => String(post.id) === String(postId));
+    let post = known || null;
+    if (!post && supabase) {
+      const { data, error } = await supabase.from('community_posts').select('id,author_id,image_url,image_path,caption,created_at').eq('id', postId).maybeSingle();
+      if (!error) post = data;
+    }
+    if (post) {
+      let author = String(post.author_id) === String(memberProfile.id)
+        ? { id: memberProfile.id, name: memberProfile.name, image: memberProfile.photoUrl || '' }
+        : communityPostAuthors[post.author_id] || findPersonById(post.author_id) || null;
+      if (!author) {
+        const { data } = await fetchCandidates([post.author_id]);
+        const row = (data || [])[0];
+        if (row) { const person = toMemberPerson(row); author = { ...person, id: row.id, image: person.photoUrl || '' }; communityPostAuthors[row.id] = author; }
+      }
+      entry = { status: 'ok', post, author: author || { id: post.author_id, name: 'Brivia member', image: '' } };
+    }
+  } catch { entry = { status: 'gone' }; }
+  sharedPostCache.set(postId, entry);
+  if (selectedChat) renderMessages();
+};
+const renderSharedPost = (postId) => {
+  const entry = sharedPostCache.get(postId);
+  if (!entry) void loadSharedPost(postId);
+  if (!entry || entry.status === 'loading') return '<span class="message-post is-loading" aria-busy="true"><span class="message-post-media"></span><span class="message-post-copy"><span class="message-post-eyebrow">Shared post</span><span class="message-post-caption">Loading…</span></span></span>';
+  if (entry.status !== 'ok') return '<span class="message-post is-gone"><span class="message-post-copy"><span class="message-post-eyebrow">Shared post</span><span class="message-post-caption">This post is no longer available.</span></span></span>';
+  const { post, author } = entry;
+  const src = postImageSrc(post, { isStorageImageUrl, isPresetCoverUrl, normalizeCoverUrl });
+  const media = isSafePostImageSrc(src) ? `<img src="${escapeHtml(src)}" alt="" loading="lazy" />` : '<span class="community-post-image-missing" aria-hidden="true"></span>';
+  const name = author?.name || 'Brivia member';
+  return `<span class="message-post"><span class="message-post-media">${media}</span><span class="message-post-copy">`
+    + `<span class="message-post-author">${renderAvatar({ name, image: author?.image || '' }, 'message-post-avatar')}<span>${escapeHtml(name)}</span></span>`
+    + `${post.caption ? `<span class="message-post-caption">${escapeHtml(post.caption)}</span>` : ''}`
+    + `<button type="button" class="message-post-open" data-shared-post-open="${escapeHtml(String(post.id))}" aria-label="View post by ${escapeHtml(name)}">View post</button></span></span>`;
+};
+const openSharedPost = (postId) => {
+  pendingPostId = postId;
+  if (communityPostsLoaded && !communityPostsLoading) { setView('posts'); openPendingCommunityPost(); return; }
+  setView('posts');
+};
 const renderMessages = () => {
   const messages = document.querySelector('#chat-messages'); if (!messages || !selectedChat) return;
   const openingAtLatest = chatShouldOpenAtLatest;
@@ -1993,10 +2044,12 @@ const renderMessages = () => {
   const renderBubble = (message) => {
     const isResume = message.attachment?.kind === 'resume' && Boolean(message.attachment.path);
     const area = !message.attachment ? parseAreaBody(message.text) : null;
+    const sharedPostId = !message.attachment && !area ? parseSharedPost(message.text) : null;
     const content = isResume ? renderSharedResume(message)
       : area ? renderSharedArea(area)
-        : `${renderAttachment(message.attachment)}${message.text ? `<span class="message-copy">${escapeHtml(message.text)}</span>` : ''}`;
-    const kind = isResume || area ? ' has-attachment has-share' : message.attachment ? ' has-attachment' : '';
+        : sharedPostId ? renderSharedPost(sharedPostId)
+          : `${renderAttachment(message.attachment)}${message.text ? `<span class="message-copy">${escapeHtml(message.text)}</span>` : ''}`;
+    const kind = isResume || area || sharedPostId ? ' has-attachment has-share' : message.attachment ? ' has-attachment' : '';
     return `<div class="message ${message.from === 'me' ? 'me' : 'them'}${kind}">${content}<small>${escapeHtml(formatChatTime(message.createdAt))}</small></div>`;
   };
   messages.innerHTML = thread.length ? thread.map(renderBubble).join('') : '<div class="chat-start-note"><strong>Start with context.</strong><span>A thoughtful first message makes a better introduction.</span></div>';
