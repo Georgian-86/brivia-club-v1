@@ -119,3 +119,12 @@ export const recordShare = async (client, postId) => {
 
 // The chat message a post is shared with: a neutral line and the link (never the caption or the author's name).
 export const sharedPostMessage = (url) => `Shared a post with you on Brivia Club: ${url}`;
+
+// The post id of a message that is a shared post (the line above, or a bare post link), else null. Chat shows it as a
+// post card; the inbox row says "Shared a post". Only http(s) links to /explore.html?post=<id> count, on any host (a
+// preview deployment shares its own host); the card itself is read from the database, never from the link.
+const SHARED_POST_RE = /^(?:Shared a post with you on Brivia Club:\s*)?(https?:\/\/[^\s/]+\/explore\.html\?post=([A-Za-z0-9-]{1,64}))\s*$/;
+export const parseSharedPost = (text) => {
+  const match = SHARED_POST_RE.exec(String(text ?? '').trim());
+  return match ? match[2] : null;
+};

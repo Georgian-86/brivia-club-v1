@@ -2107,3 +2107,15 @@ controls (a tester or a seeded test member), never a real member, so no new expo
   row, Verify straight after the photo with the photo pending, setup labels, no Back from Area, resume without a photo
   starts at Photo, one submit per button for both submits), onboarding 269, location 64, mobile-polish, launch-polish,
   password suites.
+
+## D-103: A post shared in chat shows as a post card (founder, 2026-10-28)
+
+- **Asked (with a screenshot of the live chat):** "the shared post should be shown with preview". A share (D-101)
+  arrived as the raw line "Shared a post with you on Brivia Club: https://…/explore.html?post=<id>".
+- **Done:** a message that is exactly a shared post (that line, or a bare post link, on any host; `parseSharedPost` in
+  `post-activity.js`) renders as a card: the post's image (5:4), the author's avatar and name, the caption (3 lines) and
+  VIEW POST, which opens the post on Explore. The card is read from `community_posts` under its own select policy, never
+  from the link, so a post the member may not see, or one deleted, shows "This post is no longer available." Cached per
+  post id. The inbox row reads "Shared a post" and the notification "Shared a post with you." No SQL.
+- **Proof:** unit `post-activity.test.mjs` (8); e2e `post-activity.spec.mjs` (card, gone post, inbox row, axe on the
+  card, View post opens the post; 1440 and 390); chat-extras 145, chat-inbox, explore-cards 74, app-shell 211.

@@ -731,3 +731,74 @@ body.app-body .app-view[data-view="chat"] .chat-layout .message.has-share small 
 
 /* No GIF could load (D-092): one plain line instead of an empty picker. */
 .chat-gif-empty { margin: 12px 4px 6px; color: var(--color-ink-soft); font-size: var(--text-14); }
+
+/* A shared post (founder, 2026-10-28): the post's image over its author and caption, and "View post". */
+.message-post {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  overflow: hidden;
+  border: 1px solid color-mix(in srgb, var(--color-wine) 12%, transparent);
+  border-radius: var(--radius-s);
+  background: var(--color-cream);
+  color: var(--color-ink);
+  font-family: var(--font-body);
+  text-align: left;
+}
+.message.me .message-post { border-color: transparent; }
+.message-post-media {
+  display: block;
+  aspect-ratio: 5 / 4;
+  overflow: hidden;
+  background: color-mix(in srgb, var(--color-wine) 8%, var(--color-cream));
+}
+.message-post-media img { display: block; width: 100%; height: 100%; object-fit: cover; }
+.message-post-media .community-post-image-missing { display: block; width: 100%; height: 100%; }
+.message-post.is-loading .message-post-media { animation: message-post-pulse 1.2s ease-in-out infinite; }
+@keyframes message-post-pulse { 50% { opacity: .55; } }
+.message-post-copy { display: flex; flex-direction: column; gap: var(--space-2); padding: var(--space-3); }
+.message-post-eyebrow { color: var(--color-wine); font-size: var(--text-12); font-weight: 600; letter-spacing: .08em; text-transform: uppercase; }
+.message-post-author { display: flex; align-items: center; gap: var(--space-2); color: var(--color-ink); font-size: var(--text-14); font-weight: 600; }
+.message-post-avatar {
+  display: grid;
+  flex: 0 0 28px;
+  width: 28px;
+  height: 28px;
+  place-items: center;
+  overflow: hidden;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--color-wine) 18%, var(--color-cream));
+  color: var(--color-wine-deep);
+  font-size: var(--text-12);
+  font-weight: 700;
+}
+.message-post-avatar img { width: 100%; height: 100%; object-fit: cover; }
+.message-post-caption {
+  display: -webkit-box;
+  overflow: hidden;
+  color: var(--color-ink);
+  font-size: var(--text-14);
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+}
+.message-post.is-gone .message-post-caption { color: var(--color-ink-soft); }
+.message-post-open {
+  align-self: flex-start;
+  min-height: 36px;
+  margin: 0;
+  padding: 0 var(--space-4);
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: var(--color-wine-deep);
+  color: var(--color-cream);
+  font-family: var(--font-body);
+  font-size: var(--text-12);
+  font-weight: 700;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+.message-post-open:focus-visible { outline: 2px solid var(--color-wine); outline-offset: 2px; }
+@media (prefers-reduced-motion: reduce) { .message-post.is-loading .message-post-media { animation: none; } }

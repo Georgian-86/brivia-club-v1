@@ -123,6 +123,37 @@ try {
     if (SHOTS) await page.locator('.post-card[data-post-id="post-1"]').screenshot({ path: path.join(SHOTS, `card-${w}.png`) });
     await ctx.close();
   }
+  // A post shared in chat shows as a card (image, author, caption, View post), which opens the post; a post the member
+  // cannot see (or that is gone) says so; the inbox row reads "Shared a post", not the link.
+  for (const [w, h] of [[1440, 900], [390, 844]]) {
+    Object.assign(st, freshState());
+    st.messages = [
+      { id: 'm-share', sender_id: A, recipient_id: ME, body: `Shared a post with you on Brivia Club: https://thebriviaclub.live/explore.html?post=post-1`, created_at: ago(0.2) },
+      { id: 'm-gone', sender_id: A, recipient_id: ME, body: 'https://thebriviaclub.live/explore.html?post=post-404', created_at: ago(0.1) },
+    ];
+    const ctx = await stub.newContext(browser, { width: w, height: h }, { reducedMotion: 'reduce', ...(w < 780 ? { isMobile: true, hasTouch: true } : {}) });
+    const page = await stub.open(ctx, { path: '/app.html?view=chat', errors });
+    page.setDefaultTimeout(8000);
+    await page.waitForSelector('.chat-row .chat-row-copy strong');
+    const row = await page.locator('.chat-row', { hasText: 'Asha Band' }).locator('.chat-row-copy > span').textContent();
+    check(`${w}: the inbox row says "Shared a post", not the link`, row === 'Shared a post', row);
+    await page.locator('.chat-row-open', { hasText: 'Asha Band' }).click();
+    await page.waitForSelector('#chat-messages .message-post:not(.is-loading) .message-post-open');
+    const card = await page.evaluate(() => {
+      const c = document.querySelector('#chat-messages .message-post:not(.is-gone)');
+      return { img: c?.querySelector('.message-post-media img')?.getAttribute('src'), author: c?.querySelector('.message-post-author')?.innerText.trim(), caption: c?.querySelector('.message-post-caption')?.textContent, link: document.querySelector('#chat-messages')?.innerText.includes('explore.html'), gone: document.querySelector('#chat-messages .message-post.is-gone')?.innerText.trim() };
+    });
+    check(`${w}: the shared post shows as a card with image, author and caption, not a raw link`, /163BDB0C/.test(card.img || '') && card.author === 'Bilal Place' && card.caption === 'Sunday rally at the courts.' && !card.link, JSON.stringify(card));
+    check(`${w}: a post that is gone says so`, /no longer available/.test(card.gone || ''), JSON.stringify(card));
+    const axeCard = await axeViolations(page, { include: '#chat-messages .message-post' });
+    check(`${w}: axe on the chat with the post card`, axeCard.length === 0, JSON.stringify(axeCard));
+    if (SHOTS) await page.screenshot({ path: path.join(SHOTS, `chat-post-${w}.png`) });
+    await page.locator('#chat-messages [data-shared-post-open]').click();
+    await page.waitForSelector('#post-detail[open]');
+    const opened = await page.evaluate(() => ({ view: document.body.dataset.appView, caption: document.querySelector('#post-detail[open] .post-detail-caption')?.textContent }));
+    check(`${w}: View post opens the post on Explore`, opened.view === 'posts' && opened.caption === 'Sunday rally at the courts.', JSON.stringify(opened));
+    await ctx.close();
+  }
   check('no page errors', errors.length === 0, JSON.stringify(errors));
 } finally {
   await browser.close();
