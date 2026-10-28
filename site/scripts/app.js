@@ -2525,7 +2525,9 @@ const wireInterestEditor = (modal) => {
   });
   results.addEventListener('click', (event) => add(event.target.closest('[data-interest-add]')?.dataset.interestAdd));
   search.disabled = true;
-  Promise.all([fetchMyInterests(), fetchInterestNodes()]).then(([mine, all]) => {
+  // The profile page has usually loaded the member's interests already: reuse them rather than read them again.
+  const mineRequest = profileInterests.status === 'ready' ? Promise.resolve({ data: profileInterests.rows, error: null }) : fetchMyInterests();
+  Promise.all([mineRequest, fetchInterestNodes()]).then(([mine, all]) => {
     if (!modal.isConnected) return;
     if (mine.error || all.error) { status.textContent = "Your interests couldn't be loaded. Close and open Edit profile to try again."; return; }
     state.saved = Array.isArray(mine.data) ? mine.data : [];
