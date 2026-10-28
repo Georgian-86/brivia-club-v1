@@ -515,7 +515,7 @@ try {
     assert.doesNotMatch(editor.area, /coming soon/i);
   });
   const patchesBefore = st.calls.filter((c) => c.method === 'PATCH' && c.path === '/rest/v1/profiles').length;
-  await wpage.locator('#profile-edit-form input[name="experience"]').fill('Founder and cook');
+  await wpage.locator('#profile-edit-form select[name="experience"]').selectOption('3–7 years');  // a dropdown since D-104
   await wpage.locator('#profile-edit-form [type="submit"]').click();
   await wpage.waitForFunction(() => /Profile updated and saved\./.test(document.querySelector('#app-toast')?.textContent || ''), null, { timeout: 5000 }).catch(() => {});
   const saveToast = await wpage.locator('#app-toast').textContent();
@@ -523,7 +523,7 @@ try {
   check(`profile save still works and sends no city/state/skills (${patches.map((b) => Object.keys(b).join(',')).join(' ; ')})`, () => {
     assert.equal(saveToast, 'Profile updated and saved.');
     assert.equal(patches.length, 1);
-    assert.equal(patches[0].experience, 'Founder and cook');
+    assert.equal(patches[0].experience, '3–7 years');
     ['city', 'state', 'skills', 'email', 'id'].forEach((key) => assert.ok(!(key in patches[0]), key));
   });
   await wide2.close();
