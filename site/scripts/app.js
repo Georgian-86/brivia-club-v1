@@ -2419,7 +2419,7 @@ const wireAreaChanger = (modal) => {
     memberPlaceLabel = answer.data.trim();
     current.textContent = memberPlaceLabel;
     const heroLocation = document.querySelector('#profile-location');
-    if (heroLocation) heroLocation.textContent = memberPlaceLabel;
+    if (heroLocation) heroLocation.textContent = areaInputValue(memberPlaceLabel);
     search.value = '';
     showResults([]);
     // The deck is location-first: start it again from the new area.
@@ -3177,7 +3177,7 @@ const renderProfile = () => {
   document.querySelector('#profile-name').textContent = profile.name || 'New Member';
   // My area as the server names it (my_onboarding_status().place_label), read-only here (D-036). The legacy free-text
   // City/State are neither shown nor editable: no other member can read them, and the area is the server's cell.
-  document.querySelector('#profile-location').textContent = memberPlaceLabel || 'Your area';
+  document.querySelector('#profile-location').textContent = areaInputValue(memberPlaceLabel) || 'Your area';  // no "(city-wide)" (D-106)
   const profileCover = document.querySelector('#profile-cover-image');
   const safeOwnCover = safeImageUrl(coverUrl) || safeImageUrl(defaultCoverUrl);
   if (profileCover) profileCover.style.backgroundImage = `url("${safeOwnCover}")`;

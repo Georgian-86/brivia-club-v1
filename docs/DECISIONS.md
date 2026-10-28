@@ -2164,3 +2164,11 @@ controls (a tester or a seeded test member), never a real member, so no new expo
 - **Proof:** e2e `profile-edit.spec.mjs` (adds: no datalist, the list is the brand listbox with 44 px rows and no
   bullets, Looking for keeps its value and adds a suggestion and a typed one), plus launch-polish (area), deck,
   profile-media, app-shell, consent.
+
+## D-106: Profile hero: no rule under the area, no "(city-wide)", and a solid ⚙ on the photo (founder, 2026-10-28)
+
+- **Asked:** "remove the line and city wide from cover pic below the city name, and remove the pink blur from profile pic".
+- **Done:** the short cream rule under the area is hidden (`.profile-hero-rule`); the hero shows the place name only
+  ("Ludhiana", via `areaInputValue`; Edit profile's area heading still says "(city-wide)" so the member knows what is
+  stored). The ⚙ over the photo was a see-through wine fill with a backdrop blur (a pinkish smudge on phones); it is now
+  solid wine-deep like EDIT PROFILE, no blur.
