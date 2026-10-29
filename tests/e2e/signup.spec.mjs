@@ -123,7 +123,9 @@ const setup = async (context, opts = {}) => {
       state.adultAt = state.adultAt || new Date().toISOString();
       return route.fulfill({ status: 204, body: '', headers });
     }
-    if (p === '/rest/v1/interest_node') return json(200, nodes);
+    // D-109: opts.catalog gives every public level-3 node a catalog_order (A-Z) and answers add_member_interest.
+    if (p === '/rest/v1/interest_node') return json(200, opts.catalog ? nodes.map((n) => ({ ...n, catalog_order: n.level >= 3 && !n.sensitive ? 1 + [...nodes].filter((x) => x.level >= 3 && !x.sensitive).sort((a, b) => a.label.localeCompare(b.label)).findIndex((x) => x.id === n.id) : null })) : nodes);
+    if (rpc === 'add_member_interest') return json(200, 'member.custom.kite_surfing_club');
     if (p === '/rest/v1/place') {
       const q = ((url.searchParams.get('or') || '').match(/name\.ilike\.\*([^*]*)\*/) || [])[1] || '';
       return json(200, places.filter((pl) => !q || pl.name.toLowerCase().includes(q.toLowerCase())));
@@ -790,6 +792,35 @@ try {
       assert.equal(screen, 'interests'); assert.match(u.error, /could not be saved|didn't save/i); assert.equal(declared, 0);
       assert.ok(exp.every((e) => e === '3–7 years'), JSON.stringify(exp));
     });
+    await context.close();
+  }
+  // D-109: the founder's catalogue: the list is A-Z under letter headings (no Popular); typing an interest that is not
+  // there offers "Add … as your own interest", which adds it to the picks and saves through set_member_interests.
+  for (const [w, h] of [[1440, 900], [390, 844]]) {
+    const context = await browser.newContext({ viewport: { width: w, height: h }, ...(w < 780 ? { isMobile: true, hasTouch: true } : {}) });
+    const { state, posts } = await setup(context, { signedIn: true, catalog: true, hasCell: true, profile: { id: ME, name: 'Cat Alog', email: EMAIL, phone_number: '9876543210', phone_country_code: '+91', gender: 'Female', experience: '3–7 years', photo_url: `${ORIGIN}/storage/v1/object/public/profile-photos/${ME}/p.jpg` }, adultAt: '2026-10-18T00:00:00Z' });
+    const page = await context.newPage();
+    await page.goto(`${BASE}/auth.html?complete-profile=1`, { waitUntil: 'load' });
+    await waitScreen(page, 'interests', 8000);
+    await openInterests(page);
+    const menu = await page.evaluate(() => ({ labels: [...document.querySelectorAll('.guided-menu-label')].map((x) => x.textContent.trim()), first: document.querySelector('.guided-menu-option')?.textContent.trim() }));
+    check(`${w} catalogue: letter headings A-Z, no Popular (${JSON.stringify(menu)})`, () => { assert.equal(menu.labels[0], 'B'); assert.ok(!menu.labels.includes('Popular')); assert.deepEqual(menu.labels, [...menu.labels].sort()); assert.equal(menu.first, 'Badminton'); });
+    const axe = await axeViolations(page, { include: '#guided-signup' });
+    check(`${w} catalogue: axe on the open A-Z list (${axe.join(' | ')})`, () => assert.deepEqual(axe, []));
+    await shot(page, `${w}-catalog-open`);
+    await page.locator('input[name="guided-interest"]').fill('Kite  surfing club');
+    const add = page.locator('.guided-menu-option.is-add');
+    const addText = await add.textContent().catch(() => 'none');
+    check(`${w} catalogue: "Add … as your own interest" is offered (${addText})`, () => assert.match(addText, /Add “Kite surfing club” as your own interest/));
+    await shot(page, `${w}-catalog-own`);
+    await page.keyboard.press('ArrowDown');
+    await page.keyboard.press('Enter');
+    await page.waitForFunction(() => [...document.querySelectorAll('.guided-pick')].some((b) => /Kite surfing club/.test(b.textContent)));
+    check(`${w} catalogue: Enter on the row adds it through add_member_interest`, () => assert.equal(JSON.parse(posts('add_member_interest').at(-1)?.body || '{}').p_label, 'Kite surfing club'));
+    await page.keyboard.press('Escape');
+    await page.locator('[data-guided-next]').click();
+    await page.waitForFunction(() => document.querySelector('#guided-signup')?.dataset.screen === 'reveal', null, { timeout: 6000 }).catch(() => {});
+    check(`${w} catalogue: Finish saves the own interest (${JSON.stringify(state.interests.map((i) => i.interest_id))})`, () => assert.deepEqual(state.interests.map((i) => i.interest_id), ['member.custom.kite_surfing_club']));
     await context.close();
   }
   // D-102: an incomplete member with no photo is asked for it first; the photo screen saves it and setup follows.

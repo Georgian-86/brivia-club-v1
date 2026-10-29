@@ -299,12 +299,23 @@ export const sendSignal = async (to, note = null) => firstRow(await rpcCall('sen
 export const fetchSignalQuota = async () => firstRow(await rpcCall('my_signal_quota', {}));
 
 // The active taxonomy (spec §3.1): id, parent_id, level, label, sensitive. Levels 1-2 group, levels 3-4 are selectable.
+// D-109: catalog_order (0017) marks the founder's A-Z catalogue; before 0017 the column is missing (42703) and the
+// pickers keep their category groups.
 export const fetchInterestNodes = async () => {
   if (!supabase) return notConfigured();
-  const { data, error, status } = await supabase.from('interest_node')
-    .select('id,parent_id,level,label,sensitive').eq('status', 'active').order('id');
+  const read = (columns) => supabase.from('interest_node').select(columns).eq('status', 'active').order('id');
+  let { data, error, status } = await read('id,parent_id,level,label,sensitive,catalog_order');
+  if (error?.code === '42703') ({ data, error, status } = await read('id,parent_id,level,label,sensitive'));
   return { data: data || [], error, status };
 };
+// "Other" (D-109, 0017): the id of an existing interest with that label, or a new member interest. Errors: 22023 the
+// label is not allowed, PT429 five new labels today, PGRST202 / 42883 0017 is not applied.
+export const addMemberInterest = async (label) => {
+  if (!supabase) return notConfigured();
+  const { data, error } = await supabase.rpc('add_member_interest', { p_label: label });
+  return { data: typeof data === 'string' ? data : null, error };
+};
+export const isMissingFunction = (error) => ['PGRST202', '42883'].includes(error?.code) || error?.status === 404;
 
 // City list for "Pick my city": name or region match, launch cities first. Wildcards in the query are dropped.
 export const searchPlaces = async (query, limit = 8) => {

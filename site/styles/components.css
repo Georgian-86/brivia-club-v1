@@ -68,7 +68,7 @@ textarea.b-field { min-height: 92px; resize: vertical; line-height: 1.5; }
 .b-listbox[hidden] { display: none; }
 /* Open: the field and its list read as one piece (as the signup's interest dropdown does). */
 .b-combo:has(> .b-listbox:not([hidden])) > .b-field { border-color: var(--color-wine-soft); border-bottom-left-radius: 0; border-bottom-right-radius: 0; box-shadow: none; }
-.b-listbox > li:not(.b-option, .b-listbox-note) { margin: 0; padding: 0; }
+.b-listbox > li:not(.b-option, .b-listbox-note, .b-listbox-heading) { margin: 0; padding: 0; }
 .b-listbox > li::marker { content: none; }
 .b-option {
   display: flex;
@@ -95,6 +95,22 @@ textarea.b-field { min-height: 92px; resize: vertical; line-height: 1.5; }
 .b-option:focus-visible { outline: 0; background: color-mix(in srgb, var(--color-wine) 8%, transparent); box-shadow: inset 0 0 0 1.5px var(--color-wine); }
 .b-option[aria-selected="true"] { color: var(--color-wine); font-weight: 600; }
 .b-option-add { color: var(--color-wine); font-weight: 600; }
+.b-option-add::before { content: '+'; flex: 0 0 auto; order: -1; display: grid; place-items: center; width: 22px; height: 22px; border: 1.5px solid currentColor; border-radius: 50%; font-weight: 700; line-height: 1; }
+.b-option-add { justify-content: flex-start; }
+/* D-109: a letter heading over its group in a long A-Z list; it stays at the top while its group scrolls. */
+.b-listbox-heading {
+  position: sticky;
+  top: -6px;
+  z-index: 1;
+  margin: 6px 0 2px;
+  padding: 6px 12px 4px;
+  background: var(--color-cream);
+  color: var(--color-wine);
+  font: 700 var(--text-12) / 1 var(--font-heading);
+  letter-spacing: .12em;
+  border-bottom: 1px solid var(--color-card-edge);
+}
+.b-listbox-heading:first-child { margin-top: 0; }
 .b-listbox-note { padding: 12px; color: var(--color-ink-soft); font: 400 var(--text-14) / 1.4 var(--font-body); }
 
 /* Chips: a selected value. */

@@ -2,7 +2,8 @@
 
 /**
  * Build an interest topology with a precomputed ancestor chain per node.
- * nodes: {id, parentId|null, level: 'domain'|'category'|'interest'|'niche'}[]
+ * nodes: {id, parentId|null, level: 'domain'|'category'|'interest'|'niche', placed?: boolean}[]
+ * placed: false marks a member's own interest not yet placed in the tree (spec §3.1): it matches by exact id only.
  */
 export function buildTopology(nodes) {
   const byId = new Map();
@@ -21,7 +22,7 @@ export function buildTopology(nodes) {
       if (p.level === 'category' && category == null) category = p.id;
       cur = p;
     }
-    info.set(n.id, { parentId: n.parentId ?? null, domain, category });
+    info.set(n.id, { parentId: n.parentId ?? null, domain, category, exact: n.placed === false });
   }
   return { info };
 }
@@ -31,7 +32,7 @@ export function topo(t, i, j, cfg) {
   if (i === j) return cfg.topo.same;
   const a = t.info.get(i);
   const b = t.info.get(j);
-  if (!a || !b) return 0;
+  if (!a || !b || a.exact || b.exact) return 0;
   if (a.parentId === j || b.parentId === i) return cfg.topo.parentChild;
   if (a.category != null && a.category === b.category) return cfg.topo.sibling;
   if (a.domain != null && a.domain === b.domain) return cfg.topo.domain;

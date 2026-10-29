@@ -305,6 +305,10 @@ body.auth-page .auth-shell .guided .guided-menu-option[aria-selected="true"] { c
 body.auth-page .auth-shell .guided .guided-menu-tick { flex: none; width: 18px; height: 18px; fill: none; stroke: var(--k-wine); stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; visibility: hidden; }
 body.auth-page .auth-shell .guided .guided-menu-option[aria-selected="true"] .guided-menu-tick { visibility: visible; }
 body.auth-page .auth-shell .guided .guided-menu-note { padding: 12px 10px; color: var(--k-muted); font-size: var(--text-12); }
+/* D-109: A-Z letter headings stay at the top while their group scrolls; "Add … as your own interest" reads as an action. */
+body.auth-page .auth-shell .guided .guided-menu-group[aria-label] > .guided-menu-label { position: sticky; top: -6px; z-index: 1; background: var(--k-paper); }
+body.auth-page .auth-shell .guided .guided-menu-option.is-add { justify-content: flex-start; color: var(--k-wine); font-weight: 600; }
+body.auth-page .auth-shell .guided .guided-add-mark { display: grid; flex: none; place-items: center; width: 22px; height: 22px; border: 1.5px solid currentColor; border-radius: 50%; font-weight: 700; line-height: 1; }
 /* Phones: the list opens in the page flow, so Back and Finish move down under it instead of sitting over it. */
 @media (max-width: 780px) {
   body.auth-page .auth-shell .guided .guided-menu { position: static; }

@@ -74,6 +74,34 @@ export const signupFlowMode = (value) => (String(value ?? '').trim().toLowerCase
 // exist, in their order, topped up round-robin across the categories to `size`. Then one group per top-level
 // category in taxonomy order, labelled by its level-1 node (or the id, capitalised, when that node is missing).
 export const isOffered = (n) => Boolean(n && !n.sensitive && n.level >= 3 && String(n.label || '').trim());
+// D-109: the founder's A-Z catalogue (interest_node.catalog_order, 0017). One group per first letter (accents folded),
+// in catalogue order; anything not A-Z goes under "#", last. Only offered catalogue nodes are listed.
+export const hasCatalog = (nodes) => Array.isArray(nodes) && nodes.some((n) => Number.isInteger(n?.catalog_order));
+export const catalogGroups = (nodes = []) => {
+  const groups = new Map();
+  nodes.filter((n) => isOffered(n) && Number.isInteger(n.catalog_order))
+    .sort((a, b) => a.catalog_order - b.catalog_order)
+    .forEach((n) => {
+      const first = String(n.label).trim().normalize('NFD').charAt(0).toUpperCase();
+      const key = /^[A-Z]$/.test(first) ? first : '#';
+      if (!groups.has(key)) groups.set(key, { id: `letter-${key}`, label: key, items: [] });
+      groups.get(key).items.push(n);
+    });
+  return [...groups.values()].sort((a, b) => (a.label === '#') - (b.label === '#') || a.label.localeCompare(b.label));
+};
+
+// "Other" (D-109): the client's copy of add_member_interest's check. Trims and collapses spaces; 2-40 characters;
+// letters (any script, with their marks), digits, spaces and & + - . ' /; not digits and punctuation only; no links.
+// Returns the clean label, or '' when the server would refuse it (the blocked-words list stays on the server).
+export const normalizeInterestLabel = (text) => {
+  const v = String(text ?? '').trim().replace(/\s+/g, ' ');
+  if (v.length < 2 || v.length > 40) return '';
+  if (!/^[\p{L}\p{M}\p{N} &+\-.'/]+$/u.test(v)) return '';
+  if (/^[0-9 &+\-.'/]+$/.test(v)) return '';
+  if (/(https?|www\.|\.(com|in|net|org|io)\b)/i.test(v)) return '';
+  return v;
+};
+
 export const groupInterests = (nodes = [], popular = [], { size = 16 } = {}) => {
   const offered = nodes.filter(isOffered);
   if (!offered.length) return [];

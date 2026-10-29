@@ -66,7 +66,11 @@ topo(i, j) = 1.0   if i == j
 ```
 
 New member-proposed interests are placed under a category by moderators (or by an embedding-nearest suggestion
-that a moderator confirms). Until placed, they match only by exact id.
+that a moderator confirms). Until placed, they match only by exact id. **As built (0017, D-109):** "Other" in the
+interest picker calls `add_member_interest`, which reuses any active node with the same label or creates
+`member.custom.<slug>` (level 3 under the `member` domain). A node marked `placed: false` (`topology.js`) has `topo` 1 for the
+same id and 0 for anything else; the adapter that loads `interest_node` into the engine (not wired yet) must mark every
+`member.*` node that way, so two different member interests are never siblings. The founder's A–Z catalogue (0017) is ordinary level-3 nodes under the existing categories.
 
 **As stored** (`0004_orbit_onboarding.sql`, table `interest_node(id, parent_id, level, label, status)`):
 - Ids are dotted slugs, one segment per level: `sports` (domain, level 1), `sports.racket` (category, level 2),

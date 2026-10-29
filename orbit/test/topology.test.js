@@ -32,3 +32,20 @@ test('unknown ids match only exactly', () => {
   assert.equal(topo(t, 'unknown-x', 'badminton', cfg), 0);
   assert.equal(topo(t, 'badminton', 'unknown-x', cfg), 0);
 });
+
+// D-109: a member's own interest ("Other", member.custom.*) is not yet placed in the tree: exact id only, never a
+// sibling of another member's own interest.
+test('an unplaced node matches only by exact id', () => {
+  const u = buildTopology([
+    { id: 'member', parentId: null, level: 'domain', placed: false },
+    { id: 'member.custom', parentId: 'member', level: 'category', placed: false },
+    { id: 'member.custom.kite_club', parentId: 'member.custom', level: 'interest', placed: false },
+    { id: 'member.custom.bonsai', parentId: 'member.custom', level: 'interest', placed: false },
+    ...nodes,
+  ]);
+  assert.equal(topo(u, 'member.custom.kite_club', 'member.custom.kite_club', cfg), 1);
+  assert.equal(topo(u, 'member.custom.kite_club', 'member.custom.bonsai', cfg), 0);
+  assert.equal(topo(u, 'member.custom.kite_club', 'member.custom', cfg), 0);
+  assert.equal(topo(u, 'member.custom.kite_club', 'badminton', cfg), 0);
+  assert.equal(topo(u, 'badminton', 'tennis', cfg), 0.55);
+});

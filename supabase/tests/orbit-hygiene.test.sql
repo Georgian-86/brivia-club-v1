@@ -91,7 +91,7 @@ begin
   select string_agg(p.proname, ',' order by p.proname) into got
     from pg_proc p where p.pronamespace = 'public'::regnamespace and p.prosecdef
      and has_function_privilege('authenticated', p.oid, 'execute');
-  want := 'brivia_can_see_author,brivia_has_completed_profile,'
+  want := 'add_member_interest,brivia_can_see_author,brivia_has_completed_profile,'
        || 'deck_candidates,deck_status,deck_why,declare_adult,delete_my_account,get_candidates,member_bio,my_interests,my_onboarding_status,'
        || 'my_outgoing_requests,my_signal_quota,post_activity,report_member,respond_connection_request,search_members,send_signal,set_home_city,'
        || 'set_home_location,set_member_interests,set_sensitive_consent';
