@@ -1,7 +1,7 @@
 // Explore post card (polish wave C2): pure markup and share data. Run: npm run test:unit
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { postCardMarkup, shareData } from '../../site/scripts/post-card.js';
+import { postCardMarkup, postFooterMarkup, shareData } from '../../site/scripts/post-card.js';
 
 const escapeHtml = (value = '') => String(value).replace(/[&<>'"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[c]));
 const renderAvatar = (person, cls = 'mini-avatar') => `<div class="${cls}">${escapeHtml((person?.name || '?')[0])}</div>`;
@@ -73,12 +73,39 @@ test('shareData encodes the post id', () => {
   assert.equal(shareData({ id: 'a b&c=d/e?f' }, 'https://brivia.club').url, 'https://brivia.club/explore.html?post=a%20b%26c%3Dd%2Fe%3Ff');
 });
 
-test('activity: counts on like, comment and share, a likes line and a comments link (D-101)', () => {
+test('activity: inline counts on like, comment and share, a likes line and a comments link (D-101, D-107)', () => {
   const html = postCardMarkup(post, author, { ...view, activity: { likeCount: 3, commentCount: 2, shareCount: 0 }, summary: 'Liked by <Asha> and 2 others' }, deps);
-  assert.match(html, /data-post-count="like" aria-label="3">3</);
-  assert.match(html, /data-post-count="comment" aria-label="2">2</);
+  assert.match(html, /<span class="post-card-count" data-post-count="like">3<\/span>/);
+  assert.match(html, /<span class="post-card-count" data-post-count="comment">2<\/span>/);
   assert.doesNotMatch(html, /data-post-count="share"/);
+  assert.doesNotMatch(html, /<b class="post-card-count"|aria-label="3"/);
   assert.match(html, /Liked by &lt;Asha&gt; and 2 others/);
-  assert.match(html, /View all 2 comments/);
-  assert.doesNotMatch(postCardMarkup(post, author, view, deps), /post-card-activity|post-card-count/);
+  assert.match(html, /View 2 comments/);
+});
+
+test('every card has one footer; with no activity it invites the first like (D-107)', () => {
+  for (const extra of [{}, { activity: { likeCount: 0, commentCount: 0, shareCount: 0 } }]) {
+    const html = postCardMarkup(post, author, { ...view, ...extra }, deps);
+    assert.equal((html.match(/class="post-card-footer"/g) || []).length, 1);
+    assert.match(html, /<p class="post-card-likes is-empty"[^>]*>Be the first to like this<\/p>/);
+    assert.doesNotMatch(html, /post-card-count|post-card-comments-link/);
+  }
+});
+
+test('footer: likes left, comments right; one comment reads singular (D-107)', () => {
+  const html = postFooterMarkup({ likeCount: 3, commentCount: 3 }, 'Liked by Asha and 2 others', escapeHtml);
+  assert.match(html, /^<div class="post-card-footer">/);
+  assert.ok(html.indexOf('Liked by Asha and 2 others') < html.indexOf('View 3 comments'));
+  assert.match(html, /<button type="button" class="post-card-comments-link" data-post-action="comment">View 3 comments<\/button>/);
+  assert.match(postFooterMarkup({ likeCount: 0, commentCount: 1 }, '', escapeHtml), /View 1 comment<.*|Be the first to like this/s);
+  const one = postFooterMarkup({ likeCount: 0, commentCount: 1 }, '', escapeHtml);
+  assert.match(one, /Be the first to like this/);
+  assert.match(one, />View 1 comment</);
+});
+
+test('counts cap at 999+ and save never shows a count (D-107)', () => {
+  const html = postCardMarkup(post, author, { ...view, activity: { likeCount: 1200, commentCount: 0, shareCount: 4 } }, deps);
+  assert.match(html, /data-post-count="like">999\+</);
+  assert.match(html, /data-post-count="share">4</);
+  assert.doesNotMatch(html, /data-post-count="save"/);
 });

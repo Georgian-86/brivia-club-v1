@@ -13,19 +13,25 @@ const ICONS = {
 
 const icon = (kind) => `<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">${ICONS[kind]}</svg>`;
 
-// count (D-101): likes, comments and shares that members see; 0 or undefined shows no number.
-const actionButton = (kind, label, pressed, count) => `<button type="button" class="post-card-action" data-post-action="${kind}"${pressed === undefined ? '' : ` aria-pressed="${pressed}"`}>${icon(kind)}<span>${label}</span>${count > 0 ? `<b class="post-card-count" data-post-count="${kind}" aria-label="${count}">${count > 999 ? '999+' : count}</b>` : ''}</button>`;
+// count (D-101, D-107): likes, comments and shares that members see, inline beside the icon; 0 or undefined shows none.
+export const countText = (count) => (count > 999 ? '999+' : String(count));
+const countMarkup = (kind, count) => (count > 0 ? `<span class="post-card-count" data-post-count="${kind}">${countText(count)}</span>` : '');
+const actionButton = (kind, label, pressed, count) => `<button type="button" class="post-card-action" data-post-action="${kind}"${pressed === undefined ? '' : ` aria-pressed="${pressed}"`}><span class="post-card-glyph">${icon(kind)}${countMarkup(kind, count)}</span><span class="post-card-label">${label}</span></button>`;
 
 // Only an https: URL or a same-origin path ("/media/...", never protocol-relative "//host") renders as an image;
 // anything else (javascript:, data:, http:, blob:) gets the placeholder, whatever the caller passed.
 export const isSafePostImageSrc = (src) => typeof src === 'string' && (src.startsWith('https:') || /^\/(?![/\\])/.test(src));
 
-// activity (D-101, post-activity.js): { likeCount, commentCount, shareCount }; summary: "Liked by Asha and 3 others".
-const activityLine = (activity, summary, escapeHtml) => {
+// D-107: every card ends in one footer of fixed height, so cards in a row line up. Left: "Liked by Asha and 2 others"
+// (summary) or a muted "Be the first to like this"; right: "View 3 comments" when there are any. Also used by the
+// in-place repaint (app.js paintPostActivity), so both produce the same structure.
+export const postFooterMarkup = (activity, summary, escapeHtml) => {
   const comments = activity?.commentCount || 0;
-  if (!summary && !comments) return '';
-  return `<div class="post-card-activity">${summary ? `<p class="post-card-likes" data-post-likes>${escapeHtml(summary)}</p>` : ''}`
-    + `${comments ? `<button type="button" class="post-card-comments-link" data-post-action="comment">View ${comments === 1 ? 'the comment' : `all ${comments} comments`}</button>` : ''}</div>`;
+  const likes = summary
+    ? `<p class="post-card-likes" data-post-likes>${escapeHtml(summary)}</p>`
+    : '<p class="post-card-likes is-empty" data-post-likes>Be the first to like this</p>';
+  const link = comments ? `<button type="button" class="post-card-comments-link" data-post-action="comment">View ${comments} comment${comments === 1 ? '' : 's'}</button>` : '';
+  return `<div class="post-card-footer">${likes}${link}</div>`;
 };
 
 export const postCardMarkup = (post, author, { liked = false, saved = false, imageSrc = '', dateLabel = '', activity = null, summary = '' } = {}, { escapeHtml, renderAvatar }) => {
@@ -41,7 +47,7 @@ export const postCardMarkup = (post, author, { liked = false, saved = false, ima
     + `<div class="post-card-media">${media}</div>`
     + `<p class="post-card-caption">${escapeHtml(post.caption || '')}</p>`
     + `<div class="post-card-actions">${actionButton('like', liked ? 'Liked' : 'Like', Boolean(liked), activity?.likeCount)}${actionButton('comment', 'Comment', undefined, activity?.commentCount)}${actionButton('share', 'Share', undefined, activity?.shareCount)}${actionButton('save', saved ? 'Saved' : 'Save', Boolean(saved))}</div>`
-    + activityLine(activity, summary, escapeHtml)
+    + postFooterMarkup(activity, summary, escapeHtml)
     + '</article>';
 };
 

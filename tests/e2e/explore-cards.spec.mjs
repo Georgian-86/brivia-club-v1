@@ -93,7 +93,7 @@ try {
   const toasts = (page) => page.evaluate(() => window.__toasts || []);
   const pressed = (page, id, kind) => page.evaluate(([id, kind]) => {
     const button = document.querySelector(`.post-card[data-post-id="${id}"] [data-post-action="${kind}"]`);
-    return button ? { pressed: button.getAttribute('aria-pressed'), label: button.querySelector('span')?.textContent.trim() } : null;
+    return button ? { pressed: button.getAttribute('aria-pressed'), label: button.querySelector('.post-card-label')?.textContent.trim() } : null;
   }, [id, kind]);
 
   if (SHOTS) {
@@ -200,7 +200,8 @@ try {
         m.rows.forEach((row) => assert.ok(Math.max(...row) - Math.min(...row) <= 1, JSON.stringify(row)));
       });
       check(`E2 ${width}: the whole card reads close to square (height / width ${JSON.stringify([...new Set(m.shapes)])}, ${m.cardWidth} px wide)`, () => {
-        m.shapes.forEach((r) => assert.ok(width >= 768 ? r >= 1.1 && r <= 1.35 : r <= 1.4, String(r)));
+        // D-107: every card now ends in a 40 px footer, so the bound moved from 1.35 to 1.5 (wide) and 1.4 to 1.5 (phone).
+        m.shapes.forEach((r) => assert.ok(width >= 768 ? r >= 1.1 && r <= 1.5 : r <= 1.5, String(r)));
         assert.ok(m.cardWidth <= 440, `card ${m.cardWidth} px wide`);
       });
       check(`E3 ${width}: header and action bars are --brivia-wine, text >= 4.5:1, targets >= 44 px (${JSON.stringify({ wine: m.wine, heads: m.heads, bars: m.bars, min: m.minContrast, small: m.small })})`, () => {
