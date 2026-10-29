@@ -9,15 +9,16 @@ values ('a3a3a3a3-0000-0000-0000-0000000000a3','A3','A3','a3@example.com'),
 on conflict (id) do nothing;
 -- c3 has an auth user but no profile row.
 
--- Taxonomy shape: 350-450 nodes, 10-14 domains, 50-70 categories, at least 20 niches; ids and levels consistent.
+-- Taxonomy shape: 1300-1600 nodes since the founder's catalogue (0017, D-109; 350-450 before), 10-15 domains (0017 adds
+-- "member"), 50-70 categories, at least 20 niches; ids and levels consistent.
 do $$
 declare n int; d int; c int; i int; x int;
 begin
   select count(*), count(*) filter (where level = 1), count(*) filter (where level = 2),
          count(*) filter (where level = 3), count(*) filter (where level = 4)
     into n, d, c, i, x from public.interest_node where status = 'active';
-  if n not between 350 and 450 then raise exception 'FAIL: % taxonomy nodes', n; end if;
-  if d not between 10 and 14 then raise exception 'FAIL: % domains', d; end if;
+  if n not between 1300 and 1600 then raise exception 'FAIL: % taxonomy nodes', n; end if;
+  if d not between 10 and 15 then raise exception 'FAIL: % domains', d; end if;
   if c not between 50 and 70 then raise exception 'FAIL: % categories', c; end if;
   if x < 20 then raise exception 'FAIL: % niches', x; end if;
   if i < 200 then raise exception 'FAIL: % interests', i; end if;
@@ -35,8 +36,8 @@ begin
   if n <> 0 then raise exception 'FAIL: % nodes with inconsistent id/level/parent', n; end if;
   select count(*) into n from (select lower(label), parent_id from public.interest_node group by 1, 2 having count(*) > 1) s;
   if n <> 0 then raise exception 'FAIL: % duplicate labels under one parent', n; end if;
-  -- Every category has at least one interest under it.
-  select count(*) into n from public.interest_node c where c.level = 2
+  -- Every category has at least one interest under it (member.custom, D-109, fills as members add their own).
+  select count(*) into n from public.interest_node c where c.level = 2 and c.id <> 'member.custom'
      and not exists (select 1 from public.interest_node ch where ch.parent_id = c.id);
   if n <> 0 then raise exception 'FAIL: % empty categories', n; end if;
 end $$;

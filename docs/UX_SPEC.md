@@ -48,6 +48,10 @@ One look for every field, dropdown and chip in the app, defined once in `site/st
 | File picker | `.b-file` | The native input kept for keyboard and screen readers; its button drawn as an outlined uppercase wine pill. |
 | Labels | form labels | 12 px, 700, tracked .1em, uppercase, wine-brown at 4.5:1 or more on the cream. |
 
+A long list (the A–Z interest catalogue, D-109) groups its rows under sticky letter headings (`.b-listbox-heading`,
+not options, hidden from screen readers). An "add your own" row (`.b-option-add`) leads with a ringed + and reads
+`Add “…” as your own interest`.
+
 Native `<datalist>` and unstyled `<select>` are not used: suggestions go through the chip picker (`wireChipPicker` in
 `app.js`). The guided signup keeps its own founder-approved classic look (D-086), whose dropdown these components follow.
 

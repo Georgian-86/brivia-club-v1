@@ -732,3 +732,30 @@ select exists (select 1 from information_schema.columns where table_schema = 'pu
 ```
 
 Expected advisor addition: `member_bio` joins the intended definer-RPC list (`orbit-hygiene.test.sql` H3).
+
+## 0017
+
+**The founder's A–Z interest catalogue and "Other" (founder request 2026-10-29, D-109). Not yet applied.**
+
+What it does: adds `interest_node.catalog_order` (the offered catalogue, 1..1129 A–Z); reuses 139 existing 0004 nodes
+(their id and label are unchanged, they only gain `catalog_order`) and adds 990 level-3 nodes under the closest
+existing category (source: `supabase/catalog/interest-catalog.tsv`; the data block is written by
+`node scripts/build-interest-catalog.mjs`). Adds the `member` / `member.custom` branch, `member_custom_interest` (RLS on,
+no grants) and `add_member_interest(text)` (security definer, `search_path = public`, `authenticated` only): returns an
+active public node with that label, or creates `member.custom.<slug>`; refuses bad labels (22023) and a sixth new label
+in 24 h (PT429). Nothing sensitive is added; "Gospel Music" is left out of the open list (a religion proxy, D-038).
+
+Deploy order: either. Before 0017 the pickers keep their category groups and no "own interest" row; after it they show
+the A–Z catalogue. Apply after `0016`. The file is long (the catalogue rows); paste all of it in one run.
+
+Verify after the apply:
+
+```sql
+select count(*) filter (where catalog_order is not null),                        -- 1129
+       count(*) filter (where catalog_order is not null and (sensitive or level < 3)),  -- 0
+       has_function_privilege('authenticated', 'public.add_member_interest(text)', 'execute'),  -- t
+       has_function_privilege('anon', 'public.add_member_interest(text)', 'execute')            -- f
+  from public.interest_node;
+```
+
+Expected advisor addition: `add_member_interest` joins the intended definer-RPC list (`orbit-hygiene.test.sql` H3).

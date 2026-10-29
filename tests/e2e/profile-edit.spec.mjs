@@ -110,6 +110,70 @@ try {
     await ctx.close();
   }
 
+  // D-109: with the founder's catalogue (0017) the list is A-Z under letter headings; search reaches all of it; an
+  // interest the member holds outside the catalogue stays and saves; "Add … as your own interest" (add_member_interest).
+  const CATALOG = [
+    ...NODES.filter((n) => !['sports.racket.badminton', 'arts.writing.poetry'].includes(n.id)).map((n) => ({ ...n, catalog_order: null })),
+    { id: 'arts.visual.abstract_art', parent_id: 'arts.visual', level: 3, label: 'Abstract Art', sensitive: false, catalog_order: 1 },
+    { id: 'sports.racket.badminton', parent_id: 'sports.racket', level: 3, label: 'Badminton', sensitive: false, catalog_order: 2 },
+    { id: 'arts.writing.poetry', parent_id: 'arts.writing', level: 3, label: 'Poetry', sensitive: false, catalog_order: 3 },
+    { id: 'food.cooking.zymology', parent_id: 'food.cooking', level: 3, label: 'Zymology', sensitive: false, catalog_order: 4 },
+  ];
+  for (const [w, h] of [[1440, 900], [390, 844]]) {
+    Object.assign(st, fresh({ routes: { interest_node: { body: CATALOG }, 'rpc/add_member_interest': { body: 'member.custom.kite_surfing_club' } } }));
+    st.calls.length = 0;
+    const ctx = await stub.newContext(browser, { width: w, height: h }, w < 780 ? { isMobile: true, hasTouch: true } : {});
+    const page = await stub.open(ctx, { path: '/app.html?view=profile', errors });
+    page.setDefaultTimeout(8000);
+    await page.locator('#profile-bio [data-profile-edit]').click();
+    await page.waitForSelector('#profile-edit-modal [data-picker="profile-interests-edit"] [data-chip-remove]');
+    const input = page.locator('[data-picker="profile-interests-edit"] [data-picker-input]');
+    await input.click();
+    await page.waitForSelector('#profile-interests-edit-list:not([hidden]) .b-listbox-heading');
+    const list = await page.evaluate(() => {
+      const l = document.querySelector('#profile-interests-edit-list');
+      return { headings: [...l.querySelectorAll('.b-listbox-heading')].map((x) => x.textContent), options: [...l.querySelectorAll('.b-option')].map((x) => x.textContent) };
+    });
+    check(`${w}: A-Z headings over the catalogue only (${JSON.stringify(list)})`, JSON.stringify(list.headings) === '["A","B","Z"]' && JSON.stringify(list.options) === '["Abstract Art","Badminton","Zymology"]');
+    const axe = await axeViolations(page, { include: '#profile-edit-modal [data-picker="profile-interests-edit"]' });
+    check(`${w}: axe on the open A-Z list`, axe.length === 0, JSON.stringify(axe));
+    if (SHOTS) await page.locator('#profile-edit-modal .profile-edit-dialog').screenshot({ path: path.join(SHOTS, `catalog-${w}.png`) });
+    await input.fill('zym');
+    check(`${w}: search finds Zymology`, (await page.locator('#profile-interests-edit-list .b-option').first().textContent()) === 'Zymology');
+    await input.fill('Kite  surfing club');
+    const add = page.locator('#profile-interests-edit-list .b-option-add');
+    check(`${w}: "Add … as your own interest" is offered (${await add.textContent().catch(() => 'none')})`, (await add.textContent()) === 'Add “Kite surfing club” as your own interest');
+    if (SHOTS) await page.locator('#profile-edit-modal .profile-edit-dialog').screenshot({ path: path.join(SHOTS, `own-${w}.png`) });
+    await add.click();
+    await page.waitForFunction(() => [...document.querySelectorAll('[data-picker="profile-interests-edit"] .b-chip-label')].some((x) => x.textContent === 'Kite surfing club'));
+    check(`${w}: add_member_interest got the clean label`, JSON.parse(posted('add_member_interest').at(-1)?.body || '{}').p_label === 'Kite surfing club');
+    await page.locator('.profile-edit-save').click();
+    await page.waitForFunction(() => !document.querySelector('#profile-edit-modal'));
+    const items = JSON.parse(posted('set_member_interests').at(-1)?.body || '{}').p_items || [];
+    check(`${w}: the own interest saves, and an interest outside the catalogue stays (${JSON.stringify(items.map((i) => i.interest_id))})`, items.some((i) => i.interest_id === 'member.custom.kite_surfing_club') && items.some((i) => i.interest_id === 'food.cooking.home') && items.reduce((a, i) => a + i.points, 0) === 20);
+    // A refused label: the toast says why, no chip.
+    st.routes['rpc/add_member_interest'] = { status: 400, code: '22023', message: 'not allowed' };
+    await page.evaluate(() => document.querySelector('#profile-bio [data-profile-edit]')?.click());
+    await page.waitForSelector('#profile-edit-modal [data-chip-remove]');
+    await input.fill('Rude words here');
+    await page.locator('#profile-interests-edit-list .b-option-add').click();
+    await page.waitForFunction(() => /can't be added/.test(document.querySelector('#app-toast')?.textContent || ''));
+    check(`${w}: a refused label explains itself and adds no chip`, !(await page.locator('[data-picker="profile-interests-edit"] .b-chip-label', { hasText: 'Rude words here' }).count()));
+    await ctx.close();
+  }
+  // Before 0017 (no catalog_order): no A-Z headings and no "own interest" row.
+  {
+    Object.assign(st, fresh());
+    const ctx = await stub.newContext(browser, { width: 1440, height: 900 });
+    const page = await stub.open(ctx, { path: '/app.html?view=profile', errors });
+    await page.locator('#profile-bio [data-profile-edit]').click();
+    await page.waitForSelector('#profile-edit-modal [data-chip-remove]');
+    await page.locator('[data-picker="profile-interests-edit"] [data-picker-input]').fill('Kite surfing club');
+    await page.waitForTimeout(150);
+    check('without 0017: no headings and no "own interest" row', await page.locator('#profile-interests-edit-list :is(.b-listbox-heading, .b-option-add)').count() === 0);
+    await ctx.close();
+  }
+
   // Others see the bio through member_bio when they open the profile.
   {
     Object.assign(st, fresh({ matchIds: ['aaaaaaaa-aaaa-4aaa-8aaa-000000000001'], routes: { interest_node: { body: NODES }, 'rpc/member_bio': { body: 'Designer who runs every Sunday.' } } }));

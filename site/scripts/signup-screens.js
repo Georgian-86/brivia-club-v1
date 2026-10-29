@@ -5,8 +5,8 @@
 // Setup (area, then interests) follows at once (or after the email is confirmed) and calls `submitSetup(answers)`.
 // No email code, no points screen: the interests are saved with an even split. Coordinates live only in
 // `answers.area` (memory) and are dropped once saved.
-import { searchPlaces, fetchInterestNodes } from './supabase.js';
-import { SCREENS, STEP_ICONS, SETUP, stepLabel, stepStates, backTarget, groupInterests, isOffered } from './signup-flow.js';
+import { searchPlaces, fetchInterestNodes, addMemberInterest, isMissingFunction } from './supabase.js';
+import { SCREENS, STEP_ICONS, SETUP, stepLabel, stepStates, backTarget, groupInterests, isOffered, hasCatalog, catalogGroups, normalizeInterestLabel } from './signup-flow.js';
 import { ImageProcessingError, PHOTO_ERROR_MESSAGE, PHOTO_FRAMER_ERROR } from './image-compress.js';
 import { MAX_INTERESTS } from './passion-budget.js';
 import { POPULAR_INTERESTS } from './discovery-catalog.js';
@@ -56,6 +56,9 @@ export const COPY = {
   phoneInvalid: 'Enter a mobile number of 7 to 15 digits.',
   areaMissing: 'Use your location or pick your city.',
   interestsLoad: "We couldn't load the interests. Please try again.",
+  ownNotAllowed: "That interest can't be added. Try different wording.",
+  ownCap: "You've added 5 of your own today. Try again tomorrow.",
+  ownFailed: 'That interest could not be added. Please try again.',
   interestsMissing: 'Pick at least one interest.',
   photoMissing: 'Add a profile photo to continue.',
   cap: `You can pick up to ${MAX_INTERESTS}. Remove one to add another.`,
@@ -570,12 +573,17 @@ export const initGuidedSignup = ({
             if (!state.nodes) { menu.innerHTML = note('Loading interests…'); return; }
             if (q) {
               const list = state.nodes.filter((n) => n.label.toLowerCase().includes(q)).sort((x, y) => Number(!x.label.toLowerCase().startsWith(q)) - Number(!y.label.toLowerCase().startsWith(q))).slice(0, 40);
-              menu.innerHTML = list.length ? list.map(option).join('') : note(`No interest matches "${escapeHtml(query)}". Try a shorter word.`);
+              // "Other" (D-109): the typed words as the member's own interest, when no interest has exactly that name.
+              const own = state.catalogue && !state.noOwn && !state.nodes.some((n) => n.label.toLowerCase() === q) ? normalizeInterestLabel(query) : '';
+              const rows = list.map(option).join('');  // first: option() numbers the rows in order
+              const ownRow = own ? `<div class="guided-menu-option is-add" id="${optionId(shown.push(`own:${own}`) - 1)}" role="option" data-id="own:${escapeHtml(own)}" aria-selected="false"><span class="guided-add-mark" aria-hidden="true">+</span>Add “${escapeHtml(own)}” as your own interest</div>` : '';
+              menu.innerHTML = rows || ownRow ? rows + ownRow : note(`No interest matches "${escapeHtml(query)}". Try a shorter word.`);
             } else {
-              // Popular, then each category; an interest listed under Popular is not listed again below it.
-              const inPopular = new Set((groups[0]?.items || []).map((n) => n.id));
+              // Popular, then each category; an interest listed under Popular is not listed again below it. With the
+              // founder's catalogue (D-109): A-Z under letter headings, no Popular.
+              const inPopular = groups[0]?.id === 'popular' ? new Set(groups[0].items.map((n) => n.id)) : new Set();
               menu.innerHTML = groups.map((g, gi) => {
-                const items = gi === 0 ? g.items : g.items.filter((n) => !inPopular.has(n.id));
+                const items = gi === 0 && g.id === 'popular' ? g.items : g.items.filter((n) => !inPopular.has(n.id));
                 if (!items.length) return '';
                 return `<div class="guided-menu-group" role="group" aria-label="${escapeHtml(g.label)}"><p class="guided-menu-label" aria-hidden="true">${escapeHtml(g.label)}</p>${items.map(option).join('')}</div>`;
               }).join('');
@@ -601,7 +609,27 @@ export const initGuidedSignup = ({
             input.removeAttribute('aria-activedescendant');
             active = -1;
           };
+          let addingOwn = false;
+          const addOwn = async (label) => {
+            if (addingOwn) return;
+            if (a.interests.length >= MAX_INTERESTS) { setError(COPY.cap); return; }
+            addingOwn = true;
+            announce.textContent = `Adding ${label}…`;
+            const { data, error } = await addMemberInterest(label);
+            addingOwn = false;
+            if (!el.isConnected) return;
+            if (!data) {
+              if (isMissingFunction(error)) { state.noOwn = true; renderMenu(); return; }
+              setError(error?.code === '22023' ? COPY.ownNotAllowed : error?.code === 'PT429' ? COPY.ownCap : COPY.ownFailed);
+              return;
+            }
+            // An interest that already exists comes back as its id; a new one joins the list for this visit.
+            if (!state.nodes.some((n) => n.id === data)) state.nodes.push({ id: data, label, level: 3, sensitive: false });
+            if (!picked().has(data)) toggle(data);
+            input.value = ''; query = ''; active = -1; renderMenu();
+          };
           const toggle = (id) => {
+            if (id.startsWith('own:')) { void addOwn(id.slice(4)); return; }
             const node = state.nodes?.find((n) => n.id === id);
             if (!node) return;
             const has = picked().has(id);
@@ -656,13 +684,19 @@ export const initGuidedSignup = ({
           if (!state.nodes) {
             const { data, error } = await fetchInterestNodes();
             // Private (sensitive) interests are not offered here: they need their own consent screen.
-            if (!error) { state.allNodes = data || []; state.nodes = state.allNodes.filter(isOffered); }
+            if (!error) {
+              state.allNodes = data || [];
+              // D-109: with the founder's catalogue (0017) only it is offered; older picks outside it stay valid on
+              // the profile but are not listed here.
+              state.catalogue = hasCatalog(state.allNodes);
+              state.nodes = state.allNodes.filter((n) => isOffered(n) && (!state.catalogue || Number.isInteger(n.catalog_order)));
+            }
             if (!el.isConnected) return;
             if (error || !state.nodes?.length) { state.nodes = null; menu.innerHTML = ''; setError(COPY.interestsLoad); return; }
           }
           // Picks restored from an earlier visit keep only what is still offered.
           a.interests = a.interests.filter((p) => state.nodes.some((n) => n.id === p.id));
-          groups = groupInterests(state.allNodes || state.nodes, POPULAR_INTERESTS);
+          groups = state.catalogue ? catalogGroups(state.allNodes) : groupInterests(state.allNodes || state.nodes, POPULAR_INTERESTS);
           renderTray();
           renderMenu();
           refreshNext();

@@ -21,7 +21,7 @@ import '../styles/mobile-app.css';
 import '../styles/skeleton.css';
 import '../styles/aura-theme.css';
 import '../styles/handoff.css';
-import { supabase, rowToProfile, saveProfile, isPresetCoverUrl, onboardingStatus, sendSignal, fetchSignalQuota, isRateLimited, isStorageImageUrl, withoutCredentials, uploadMessageAttachment, removeMessageAttachment, uploadCommunityPostImage, removeCommunityPostImage, ImageProcessingError, PHOTO_ERROR_MESSAGE, PHOTO_FRAMER_ERROR, compressAttachmentFiles, attachmentKind, reportMember, setSensitiveConsent, fetchSensitiveConsentAt, fetchMyInterests, fetchInterestNodes, setMemberInterests, uploadResume, removeResume, resumeSignedUrl, resumeInfo, clearResumePath, searchPlaces, setHomeCity, setHomeLocation } from './supabase.js';
+import { supabase, rowToProfile, saveProfile, isPresetCoverUrl, onboardingStatus, sendSignal, fetchSignalQuota, isRateLimited, isStorageImageUrl, withoutCredentials, uploadMessageAttachment, removeMessageAttachment, uploadCommunityPostImage, removeCommunityPostImage, ImageProcessingError, PHOTO_ERROR_MESSAGE, PHOTO_FRAMER_ERROR, compressAttachmentFiles, attachmentKind, reportMember, setSensitiveConsent, fetchSensitiveConsentAt, fetchMyInterests, fetchInterestNodes, addMemberInterest, isMissingFunction, setMemberInterests, uploadResume, removeResume, resumeSignedUrl, resumeInfo, clearResumePath, searchPlaces, setHomeCity, setHomeLocation } from './supabase.js';
 import { locateOnce, fallbackCopy } from './geo-locate.js';
 import { areaChangeMessage, AREA_HELPER, AREA_NO_MATCH } from './area-change.js';
 import { areaShareBody, parseAreaBody, resumeShareAttachment, resumeMessageFields, RESUME_SHARE_BODY, NO_RESUME_HINT, RESUME_GONE_COPY, RESUME_SHARE_NOTE, AREA_SHARE_NOTE } from './quick-share.js';
@@ -35,7 +35,7 @@ import { defaultCoverUrl, normalizeCoverUrl } from './cover-assets.js';
 import { PRESET_COVERS, presetCoverPath, presetCoverStoredPath } from './preset-cover.js';
 import { postImageSrc } from './post-image.js';
 import { experienceChoices, cleanBio, BIO_MAX, areaInputValue, planInterestSave } from './profile-edit.js';
-import { isOffered } from './signup-flow.js';
+import { isOffered, hasCatalog, catalogGroups, normalizeInterestLabel } from './signup-flow.js';
 import { MAX_INTERESTS } from './passion-budget.js';
 import { collabSummary, openCollabReview } from './collab-requests.js';
 import { postCardMarkup, postFooterMarkup, countText, shareData, isSafePostImageSrc } from './post-card.js';
@@ -2496,8 +2496,8 @@ const chipPickerMarkup = ({ id, label, placeholder, helper, listLabel }) => `<di
   + `<div class="b-combo"><input class="b-field" type="text" role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="${id}-list" aria-labelledby="${id}-label" placeholder="${escapeHtml(placeholder)}" autocomplete="off" spellcheck="false" data-picker-input />`
   + `<ul class="b-listbox" id="${id}-list" role="listbox" aria-label="${escapeHtml(listLabel)}" hidden></ul></div>`
   + `<small class="profile-edit-helper" data-picker-status role="status">${helper}</small></div>`;
-const wireChipPicker = (box, { max = 12, allowCustom = false, emptyText = 'Nothing picked yet.', noun = 'item' } = {}) => {
-  const picker = { picks: [], options: [], labels: new Map(), tags: new Map(), ready: false };
+const wireChipPicker = (box, { max = 12, allowCustom = false, onCustom = null, emptyText = 'Nothing picked yet.', noun = 'item' } = {}) => {
+  const picker = { picks: [], options: [], groups: null, labels: new Map(), tags: new Map(), ready: false };
   if (!box) return picker;
   const chips = box.querySelector('[data-picker-chips]');
   const input = box.querySelector('[data-picker-input]');
@@ -2516,10 +2516,24 @@ const wireChipPicker = (box, { max = 12, allowCustom = false, emptyText = 'Nothi
     const q = input.value.trim().toLowerCase();
     const picked = new Set(picker.picks);
     const pool = picker.options.filter((o) => !picked.has(o.id));
+    // D-109: with letter groups and nothing typed, the whole catalogue under its A-Z headings.
+    if (!q && picker.groups?.length) {
+      return picker.groups.flatMap((g) => {
+        const items = g.items.filter((o) => !picked.has(o.id));
+        return items.length ? [{ heading: g.label }, ...items.map((o) => ({ id: o.id, label: o.label }))] : [];
+      });
+    }
     const found = q ? pool.filter((o) => o.label.toLowerCase().includes(q)).sort((a, b) => Number(!a.label.toLowerCase().startsWith(q)) - Number(!b.label.toLowerCase().startsWith(q))) : pool;
-    const rows = found.slice(0, 8).map((o) => ({ id: o.id, label: o.label }));
+    const rows = found.slice(0, picker.groups?.length ? 40 : 8).map((o) => ({ id: o.id, label: o.label }));
     const typed = input.value.trim();
-    if (allowCustom && typed && !picker.options.some((o) => o.label.toLowerCase() === typed.toLowerCase()) && !picked.has(typed)) rows.push({ id: typed, label: typed, custom: true });
+    const lower = typed.toLowerCase();
+    const exact = picker.options.some((o) => o.label.toLowerCase() === lower) || picker.picks.some((id) => labelOf(id).toLowerCase() === lower);
+    if (allowCustom && typed && !exact && !picked.has(typed)) rows.push({ id: typed, label: typed, custom: true });
+    // "Other" (D-109): the server makes (or finds) the interest; a typed label it would refuse gets no row.
+    if (onCustom && !picker.noCustom && typed && !exact) {
+      const clean = normalizeInterestLabel(typed);
+      if (clean) rows.push({ id: `custom:${clean}`, label: clean, custom: true, own: true });
+    }
     return rows;
   };
   const setActive = (i) => {
@@ -2532,15 +2546,36 @@ const wireChipPicker = (box, { max = 12, allowCustom = false, emptyText = 'Nothi
   const close = () => { list.hidden = true; input.setAttribute('aria-expanded', 'false'); input.removeAttribute('aria-activedescendant'); active = -1; };
   const open = () => {
     if (!picker.ready) return;
-    shown = suggestions();
+    const rows = suggestions();
+    shown = rows.filter((o) => !o.heading);
+    let i = -1;
     list.innerHTML = shown.length
-      ? shown.map((o, i) => `<li id="${idBase}-${i}" role="option" aria-selected="false" class="b-option${o.custom ? ' b-option-add' : ''}" data-value="${escapeHtml(o.id)}">${o.custom ? `Add “${escapeHtml(o.label)}”` : escapeHtml(o.label)}</li>`).join('')
+      ? rows.map((o) => {
+        if (o.heading) return `<li class="b-listbox-heading" role="presentation" aria-hidden="true">${escapeHtml(o.heading)}</li>`;
+        i += 1;
+        const text = o.own ? `Add “${escapeHtml(o.label)}” as your own interest` : o.custom ? `Add “${escapeHtml(o.label)}”` : escapeHtml(o.label);
+        return `<li id="${idBase}-${i}" role="option" aria-selected="false" class="b-option${o.custom ? ' b-option-add' : ''}" data-value="${escapeHtml(o.id)}">${text}</li>`;
+      }).join('')
       : `<li class="b-listbox-note" role="option" aria-disabled="true" aria-selected="false">${input.value.trim() ? 'No match. Try a shorter word.' : 'Everything here is picked.'}</li>`;
     list.hidden = false;
     input.setAttribute('aria-expanded', 'true');
     setActive(input.value.trim() ? 0 : -1);
   };
+  let adding = false;
+  const addOwn = async (label) => {
+    if (adding) return;
+    if (picker.picks.length >= max) { status.textContent = `You can pick up to ${max}. Remove one to add another.`; return; }
+    adding = true;
+    status.textContent = `Adding ${label}…`;
+    const result = await onCustom(label);
+    adding = false;
+    if (!box.isConnected) return;
+    if (!result?.id) { status.textContent = result?.message || ''; if (result?.message) showToast(result.message); return; }
+    picker.labels.set(result.id, picker.labels.get(result.id) || result.label || label);
+    add(result.id);
+  };
   const add = (id) => {
+    if (id?.startsWith('custom:') && onCustom) { void addOwn(id.slice(7)); return; }
     if (!id || picker.picks.includes(id)) return;
     if (picker.picks.length >= max) { status.textContent = `You can pick up to ${max}. Remove one to add another.`; return; }
     if (!picker.labels.has(id)) picker.labels.set(id, id);
@@ -2573,9 +2608,10 @@ const wireChipPicker = (box, { max = 12, allowCustom = false, emptyText = 'Nothi
   list.addEventListener('click', (event) => { const row = event.target.closest('.b-option[data-value]'); if (row) add(row.dataset.value); });
   const outside = (event) => { if (!box.isConnected) { document.removeEventListener('pointerdown', outside, true); return; } if (!box.querySelector('.b-combo').contains(event.target)) close(); };
   document.addEventListener('pointerdown', outside, true);
-  picker.load = ({ picks, options, labels = new Map(), tags = new Map() }) => {
+  picker.load = ({ picks, options, groups = null, labels = new Map(), tags = new Map() }) => {
     picker.picks = [...picks];
     picker.options = options;
+    picker.groups = groups;
     picker.labels = labels;
     picker.tags = tags;
     picker.ready = true;
@@ -2588,10 +2624,21 @@ const wireChipPicker = (box, { max = 12, allowCustom = false, emptyText = 'Nothi
   return picker;
 };
 
+// "Other" (D-109): the server reuses an interest with that label or makes the member's own; the copy for its refusals.
+const OWN_INTEREST_COPY = {
+  '22023': "That interest can't be added. Try different wording.",
+  PT429: "You've added 5 of your own today. Try again tomorrow.",
+};
+const addOwnInterest = async (label) => {
+  const { data, error } = await addMemberInterest(label);
+  if (data) return { id: data, label };
+  if (isMissingFunction(error)) return { message: "Adding your own interest isn't available yet. Pick one from the list." };
+  return { message: OWN_INTEREST_COPY[error?.code] || 'That interest could not be added. Please try again.' };
+};
 // Interests in Edit profile: the saved picks (private ones kept and tagged Private, never offered), offered interests
 // to add. Saved with set_member_interests on Save (planInterestSave).
 const wireInterestEditor = (modal) => {
-  const picker = wireChipPicker(modal.querySelector('[data-picker="profile-interests-edit"]'), { max: MAX_INTERESTS, emptyText: 'No interests yet. Add at least one.' });
+  const picker = wireChipPicker(modal.querySelector('[data-picker="profile-interests-edit"]'), { max: MAX_INTERESTS, emptyText: 'No interests yet. Add at least one.', onCustom: addOwnInterest });
   const state = { saved: [], get picks() { return picker.picks; }, labels: picker.labels, ready: false };
   // The profile page has usually loaded the member's interests already: reuse them rather than read them again.
   const mineRequest = profileInterests.status === 'ready' ? Promise.resolve({ data: profileInterests.rows, error: null }) : fetchMyInterests();
@@ -2603,7 +2650,14 @@ const wireInterestEditor = (modal) => {
     const tags = new Map();
     (all.data || []).forEach((n) => { if (n?.label) labels.set(String(n.id), n.label); if (n?.sensitive) tags.set(String(n.id), 'Private'); });
     state.saved.forEach((row) => { if (row.label) labels.set(String(row.interest_id), row.label); });
-    picker.load({ picks: state.saved.map((row) => String(row.interest_id)), options: (all.data || []).filter(isOffered).map((n) => ({ id: String(n.id), label: n.label })), labels, tags });
+    // D-109: with the founder's catalogue (0017) the list is A-Z under letter headings and "Other" adds your own;
+    // interests outside it stay valid for members who hold them but are not offered.
+    const nodes = all.data || [];
+    const catalogue = hasCatalog(nodes);
+    const groups = catalogue ? catalogGroups(nodes).map((g) => ({ label: g.label, items: g.items.map((n) => ({ id: String(n.id), label: n.label })) })) : null;
+    const options = catalogue ? groups.flatMap((g) => g.items) : nodes.filter(isOffered).map((n) => ({ id: String(n.id), label: n.label }));
+    picker.load({ picks: state.saved.map((row) => String(row.interest_id)), options, groups, labels, tags });
+    if (!catalogue) picker.noCustom = true;
     state.labels = picker.labels;
     state.ready = true;
   }, () => { if (modal.isConnected) picker.fail("Your interests couldn't be loaded. Close and open Edit profile to try again."); });

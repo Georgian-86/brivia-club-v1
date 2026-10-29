@@ -2195,3 +2195,23 @@ controls (a tester or a seeded test member), never a real member, so no new expo
 - **Proof:** unit `collab-requests.test.mjs`; e2e `collab-requests.spec.mjs` (1440 and 390, axe, drag, keys, failure,
   reduced motion, wording) and `consent.spec.mjs` (escaped note, one RPC while in flight, blocked-pair accept,
   injection-safe photo).
+
+## D-109: The founder's A–Z interest catalogue, and "Other" adds a member's own interest (founder, 2026-10-29)
+
+- **Asked:** use the supplied A–Z list for the interest dropdown, with "Other" for manual input. Brainstorming: "Other"
+  interests are shown and matched like any interest.
+- **Done (migration 0017):** the list (1,131 labels; three repeated ones collapsed) became the offered catalogue
+  (`interest_node.catalog_order`). 139 labels reuse an existing 0004 interest, keeping its id and label (12 of them
+  are the same interest under fuller wording, e.g. AR/VR = "AR and VR", Garba = "Garba and dandiya", so members who
+  already picked them keep matching). 990 are new level-3 nodes placed under the closest existing category
+  (`supabase/catalog/interest-catalog.tsv`), so ORBIT's tree stays meaningful. Left out: "Gospel Music" (a religion
+  proxy; D-038 keeps those private, and the open list cannot hold a private interest) and "NLP" (the same interest as
+  Natural Language Processing). The pickers (signup interests, Edit profile) list the catalogue A–Z under letter
+  headings; search covers all of it; interests outside it stay valid for members who hold them.
+- **"Other":** typing something that is not there offers "Add “…” as your own interest". `add_member_interest`
+  reuses an interest with that name or creates `member.custom.<slug>`; 2–40 characters, any script, no symbols, links
+  or blocked words, not the name of a private interest; at most 5 new ones a day. ORBIT matches `member.*` nodes by
+  exact id only (`topology.js` `placed: false`, spec §3.1), so two different own interests are never "siblings".
+- **Proof:** SQL `g-interest-catalog.test.sql` (C1–C7) and the updated taxonomy bounds in `orbit-interests.test.sql`;
+  orbit `topology.test.js`; unit `interest-catalog.test.mjs`; e2e `profile-edit.spec.mjs` and `signup.spec.mjs`
+  (A–Z headings, search, Add, save, refusal, before-0017 fallback, axe at 1440 and 390).
