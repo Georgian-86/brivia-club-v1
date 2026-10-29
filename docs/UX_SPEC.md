@@ -51,6 +51,14 @@ One look for every field, dropdown and chip in the app, defined once in `site/st
 Native `<datalist>` and unstyled `<select>` are not used: suggestions go through the chip picker (`wireChipPicker` in
 `app.js`). The guided signup keeps its own founder-approved classic look (D-086), whose dropdown these components follow.
 
+## Post cards (D-107)
+
+Counts sit inline beside the Like, Comment and Share icons (12 px, 700, tabular figures; none when 0, "999+" above
+999); Save never shows a count. Every card ends in one 40 px cream footer, so the action bars in a grid row line up:
+"Liked by Asha and 2 others" on the left (ellipsis, never wraps) or a muted "Be the first to like this", and "View 3
+comments" on the right when there are any. `post-card.js` `postFooterMarkup` draws it for both the first render and
+the in-place repaint.
+
 ## Flow changes
 
 ### A0. Guided signup: one question per screen (D-073, live from 2026-10-22; replaces the 4-step form below)

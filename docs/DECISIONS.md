@@ -2172,3 +2172,13 @@ controls (a tester or a seeded test member), never a real member, so no new expo
   ("Ludhiana", via `areaInputValue`; Edit profile's area heading still says "(city-wide)" so the member knows what is
   stored). The ⚙ over the photo was a see-through wine fill with a backdrop blur (a pinkish smudge on phones); it is now
   solid wine-deep like EDIT PROFILE, no blur.
+
+## D-107: Post cards: inline counts and one footer on every card (founder, 2026-10-29)
+
+- **Asked:** the "Liked by" line and the count badges made the Explore cards look messy (screenshot).
+- **Done:** the circular badges pinned to the icons are gone; each count sits inline beside its icon in tabular
+  figures. Every card now has one fixed-height footer ("Liked by …" left, "View N comments" right, or a muted "Be the
+  first to like this"), so cards in a row have the same height and their action bars line up. The card's "close to
+  square" bound in `explore-cards.spec.mjs` moves from 1.35 to 1.5 to fit the footer.
+- **Proof:** unit `post-card.test.mjs`; e2e `post-activity.spec.mjs` (one 40 px footer per card, action bars aligned per
+  row, the empty footer flips to "Liked by You" after a like) and `explore-cards.spec.mjs`.

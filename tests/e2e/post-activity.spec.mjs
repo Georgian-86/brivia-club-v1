@@ -50,7 +50,15 @@ try {
     const counts = async () => card.evaluate((c) => Object.fromEntries([...c.querySelectorAll('.post-card-count')].map((b) => [b.dataset.postCount, b.textContent])));
     check(`${w}: the card shows like, comment and share counts`, JSON.stringify(await counts()) === JSON.stringify({ like: '4', comment: '2', share: '1' }), JSON.stringify(await counts()));
     check(`${w}: a connection who liked is named`, (await card.locator('[data-post-likes]').textContent()) === 'Liked by Asha Band and 3 others');
-    check(`${w}: a post with no activity has no counts or line`, await page.locator('.post-card[data-post-id="post-2"] :is(.post-card-count, .post-card-activity)').count() === 0);
+    const quiet = page.locator('.post-card[data-post-id="post-2"]');
+    check(`${w}: a post with no activity has no counts and invites the first like`, await quiet.locator('.post-card-count').count() === 0 && (await quiet.locator('.post-card-footer [data-post-likes]').textContent()) === 'Be the first to like this');
+    const rows = await page.evaluate(() => {
+      const cards = [...document.querySelectorAll('#community-post-list .post-card')];
+      const byTop = new Map();
+      cards.forEach((c) => { const t = Math.round(c.getBoundingClientRect().top); byTop.set(t, [...(byTop.get(t) || []), c]); });
+      return { footers: cards.every((c) => c.querySelectorAll('.post-card-footer').length === 1), rows: [...byTop.values()].map((row) => [...new Set(row.map((c) => Math.round(c.querySelector('.post-card-actions').getBoundingClientRect().top)))].length), wraps: cards.some((c) => c.querySelector('.post-card-footer').offsetHeight !== 40) };
+    });
+    check(`${w}: every card has one 40 px footer and the action bars in a row line up (${JSON.stringify(rows)})`, rows.footers && !rows.wraps && rows.rows.every((n) => n === 1));
 
     await card.locator('.post-card-actions [data-post-action="like"]').click();
     await page.waitForTimeout(200);

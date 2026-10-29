@@ -37,7 +37,7 @@ import { postImageSrc } from './post-image.js';
 import { experienceChoices, cleanBio, BIO_MAX, areaInputValue, planInterestSave } from './profile-edit.js';
 import { isOffered } from './signup-flow.js';
 import { MAX_INTERESTS } from './passion-budget.js';
-import { postCardMarkup, shareData, isSafePostImageSrc } from './post-card.js';
+import { postCardMarkup, postFooterMarkup, countText, shareData, isSafePostImageSrc } from './post-card.js';
 import { toastSide } from './toast-place.js';
 import { loadReactions, setReaction, createReactionGuard } from './post-reactions.js';
 import { loadActivity, withLike, likeSummary, threadComments, cleanCommentBody, loadComments, addComment, deleteComment, recordShare, sharedPostMessage, parseSharedPost, emptyActivity, COMMENT_MAX } from './post-activity.js';
@@ -3236,24 +3236,20 @@ const refreshCommunityActivity = async () => {
 // Repaints one card's counts and its likes line in place (focus stays on the button that was pressed).
 const paintPostActivity = (postId) => {
   const a = activityFor(postId) || emptyActivity();
+  const summary = activitySummaryFor(postId);
   document.querySelectorAll(`#community-post-list .post-card[data-post-id="${CSS.escape(String(postId))}"]`).forEach((card) => {
     for (const [kind, count] of [['like', a.likeCount], ['comment', a.commentCount], ['share', a.shareCount]]) {
-      const button = card.querySelector(`.post-card-actions [data-post-action="${kind}"]`);
-      if (!button) continue;
-      let badge = button.querySelector('.post-card-count');
+      const glyph = card.querySelector(`.post-card-actions [data-post-action="${kind}"] .post-card-glyph`);
+      if (!glyph) continue;
+      let badge = glyph.querySelector('.post-card-count');
       if (count > 0) {
-        if (!badge) { badge = document.createElement('b'); badge.className = 'post-card-count'; badge.dataset.postCount = kind; button.append(badge); }
-        badge.textContent = count > 999 ? '999+' : String(count);
-        badge.setAttribute('aria-label', String(count));
+        if (!badge) { badge = document.createElement('span'); badge.className = 'post-card-count'; badge.dataset.postCount = kind; glyph.append(badge); }
+        badge.textContent = countText(count);
       } else badge?.remove();
     }
-    card.querySelector('.post-card-activity')?.remove();
-    const summary = activitySummaryFor(postId);
-    if (!summary && !a.commentCount) return;
-    const line = document.createElement('div');
-    line.className = 'post-card-activity';
-    line.innerHTML = `${summary ? `<p class="post-card-likes" data-post-likes>${escapeHtml(summary)}</p>` : ''}${a.commentCount ? `<button type="button" class="post-card-comments-link" data-post-action="comment">View ${a.commentCount === 1 ? 'the comment' : `all ${a.commentCount} comments`}</button>` : ''}`;
-    card.append(line);
+    const footer = card.querySelector('.post-card-footer');
+    if (footer) footer.outerHTML = postFooterMarkup(a, summary, escapeHtml);
+    else card.insertAdjacentHTML('beforeend', postFooterMarkup(a, summary, escapeHtml));
   });
 };
 const bumpActivity = (postId, change) => {
@@ -3332,7 +3328,7 @@ const markReaction = (postId, kind, on, { pop = false } = {}) => {
   if (on) set.add(postId); else set.delete(postId);
   document.querySelectorAll(`#community-post-list .post-card[data-post-id="${CSS.escape(String(postId))}"] [data-post-action="${kind}"]`).forEach((button) => {
     button.setAttribute('aria-pressed', String(on));
-    const label = button.querySelector('span');
+    const label = button.querySelector('.post-card-label');
     if (label) label.textContent = REACTION_LABELS[kind][on ? 1 : 0];
     if (pop && on && kind === 'like') {
       button.dataset.justLiked = '';

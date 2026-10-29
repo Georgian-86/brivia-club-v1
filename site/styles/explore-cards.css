@@ -14,6 +14,7 @@ body.app-body .community-feed-view{
   --post-shadow-lift:0 2px 4px color-mix(in srgb, var(--brivia-deep-wine) 12%, transparent), 0 30px 56px -26px color-mix(in srgb, var(--brivia-deep-wine) 70%, transparent);
   --post-head-h:44px;
   --post-actions-h:48px;
+  --post-footer-h:40px;
 }
 
 /* "New post": the one primary action, a wide wine button above the feed. */
@@ -141,7 +142,7 @@ body.app-body .skeleton-post-caption{
   background-image:linear-gradient(var(--color-skeleton),var(--color-skeleton)),linear-gradient(var(--color-skeleton),var(--color-skeleton));
   background-repeat:no-repeat;background-size:78% 10px,46% 10px;background-position:var(--space-4) 18px,var(--space-4) 38px;
 }
-body.app-body .skeleton-post-actions{height:var(--post-actions-h)}
+body.app-body .skeleton-post-actions{height:var(--post-actions-h);margin-bottom:var(--post-footer-h)}
 
 /* The post detail sheet (Comment, or a ?post=<id> link): a centred card on wide screens (image left, text right), a
    bottom sheet on phones. Native <dialog>: focus stays inside, Escape closes, the tab bar hides (app-shell.css). */
@@ -196,15 +197,18 @@ dialog.post-detail[open]{animation:post-detail-in var(--motion-slow) var(--ease)
 }
 
 /* ---------- Post activity (D-101): counts, "Liked by", threaded comments, the share sheet ---------- */
-body.app-body .post-card-action{position:relative}
-body.app-body .post-card-count{
-  position:absolute;top:2px;left:calc(50% + 8px);min-width:18px;height:18px;padding:0 5px;border-radius:var(--radius-pill);
-  background:var(--color-cream);color:var(--brivia-wine);font-family:var(--font-body);font-size:var(--text-12);font-weight:700;
-  font-style:normal;line-height:18px;letter-spacing:0;text-align:center;
+/* D-107: the count sits inline beside its icon (no badge), in tabular figures so a changing number does not shift the
+   icon. The footer is one line of fixed height on every card, so the action bars in a row line up. */
+body.app-body .post-card-glyph{display:inline-flex;align-items:center;gap:5px;height:20px}
+body.app-body .post-card-count{font-size:var(--text-12);font-weight:700;font-variant-numeric:tabular-nums;letter-spacing:0;line-height:1}
+body.app-body .post-card-footer{
+  display:flex;align-items:center;justify-content:space-between;gap:var(--space-3);flex:0 0 auto;box-sizing:border-box;
+  height:var(--post-footer-h);padding:0 var(--space-3);background:var(--color-cream);
 }
-body.app-body .post-card-activity{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:2px var(--space-3);padding:var(--space-2) var(--space-3) var(--space-3);background:var(--color-cream)}
-body.app-body .post-card-likes{margin:0;color:var(--color-ink);font-size:var(--text-12);font-weight:600;letter-spacing:.02em}
-body.app-body .post-card-comments-link{min-height:32px;margin:0;padding:0;border:0;background:none;color:var(--color-ink-soft);font-family:var(--font-body);font-size:var(--text-12);text-decoration:underline;text-underline-offset:3px;cursor:pointer}
+body.app-body .post-card-likes{min-width:0;margin:0;overflow:hidden;color:var(--color-ink);font-size:var(--text-12);font-weight:600;letter-spacing:.02em;white-space:nowrap;text-overflow:ellipsis}
+body.app-body .post-card-likes.is-empty{color:var(--color-ink-soft);font-weight:500}
+body.app-body .post-card-comments-link{flex:0 0 auto;min-height:32px;margin:0;padding:0;border:0;background:none;color:var(--color-ink-soft);font-family:var(--font-body);font-size:var(--text-12);font-weight:500;white-space:nowrap;text-decoration:underline;text-underline-offset:3px;cursor:pointer}
+@media (hover:hover){body.app-body .post-card-comments-link:hover{color:var(--brivia-wine)}}
 body.app-body .post-card-comments-link:focus-visible{outline:2px solid var(--brivia-wine);outline-offset:2px}
 
 .post-detail-body{grid-area:caption;min-height:0;overflow-y:auto;overscroll-behavior:contain}
