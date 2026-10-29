@@ -75,9 +75,17 @@ begin
     begin perform public.add_member_interest(refused); exception when others then code := sqlstate; end;
     if code is distinct from '22023' then raise exception 'FAIL C4: "%" gave %', refused, coalesce(code, 'no error'); end if;
   end loop;
-  -- C5: three new so far (kite, kite 2, madhubani); two more pass, the sixth is refused; a reused label still works.
+  -- Review fix: a retired label is refused (a moderator's retirement sticks); a curly apostrophe is a straight one.
+  reset role;
+  update public.interest_node set status = 'retired' where id = 'member.custom.kite_surfing_club_2';
+  set local role authenticated;
+  perform set_config('request.jwt.claims', json_build_object('sub', pg_temp.gp(1))::text, true);
+  code := null;
+  begin perform public.add_member_interest('kite-surfing club'); exception when others then code := sqlstate; end;
+  if code is distinct from '22023' then raise exception 'FAIL C4: a retired label gave %', coalesce(code, 'no error'); end if;
+  if public.add_member_interest('Women’s Football') <> public.add_member_interest('Women''s football') then raise exception 'FAIL C3: curly and straight apostrophes differ'; end if;
+  -- C5: four new so far (kite, kite 2, madhubani, women's football); one more passes, the sixth is refused; a reused label still works.
   perform public.add_member_interest('Bonsai Shaping');
-  perform public.add_member_interest('Model Rocketry');
   code := null;
   begin perform public.add_member_interest('Tea Blending'); exception when others then code := sqlstate; end;
   if code is distinct from 'PT429' then raise exception 'FAIL C5: the sixth new label gave %', coalesce(code, 'no error'); end if;

@@ -141,3 +141,19 @@ select name, created_at from storage.objects
  where bucket_id = 'career-resumes' and created_at <= now() - interval '180 days'
  order by created_at;
 ```
+
+## Members' own interests (0017, D-109)
+
+"Other" lets a member add an interest that is not in the catalogue (`member.custom.*`). It shows on their profile. The
+server refuses symbols, links, a short blocked-words list and the name of a private or retired interest; spellings
+like "s3x" still get through, so look at new ones daily:
+
+```sql
+select n.id, n.label, c.created_at
+  from public.member_custom_interest c join public.interest_node n on n.id = c.node_id
+ where c.created_at > now() - interval '1 day' order by c.created_at desc;
+```
+
+To remove one, retire it: `update public.interest_node set status = 'retired' where id = '<id>';`. Nobody can pick
+it again and nobody can recreate that label (add_member_interest refuses a retired label). Members who already hold it
+keep it until their next interest save; clear it from profiles with the same steps as any reported profile text.

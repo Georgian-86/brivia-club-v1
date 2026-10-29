@@ -2230,3 +2230,15 @@ controls (a tester or a seeded test member), never a real member, so no new expo
   `presence.spec.mjs` (1440 and 390, one dot in all, the switch, before-0018 fallback, axe on the rows). The chat list's own
   axe findings (a button inside the row button, the inbox tab roles, a 4.42:1 tab label) predate this and are left
   for a separate fix.
+
+## D-111: Review fixes for D-108 and D-109 (2026-10-29)
+
+- **Message after Connect** works for a sender who was not in the deck (they are kept as a person once connected, so
+  the chat list and Message find them); the chat keeps the focus. A sender whose profile did not load gets "You're
+  connected." with Done, no broken Message button.
+- **A request that is no longer open** (expired, withdrawn, answered on another device: P0002) leaves the list with
+  "That request is no longer open." and the sheet moves on, instead of "try again" on a card that can never be answered.
+- **Members' own interests:** a retired label cannot be recreated (`add_member_interest` refuses it), and
+  `docs/MODERATION.md` has the daily check and the retire step. Curly apostrophes (iPhone) count as straight ones.
+- **Proof:** e2e `collab-requests.spec.mjs` (two new cases), SQL `g-interest-catalog.test.sql` (retired, apostrophes),
+  unit `interest-catalog.test.mjs`.

@@ -1283,15 +1283,26 @@ const respondToRequest = async (fromId, accept) => {
   respondingRequestIds.add(fromId);
   const { error } = await supabase.rpc('respond_connection_request', { p_from: fromId, p_accept: accept });
   respondingRequestIds.delete(fromId);
+  // P0002: the request is no longer open (expired, withdrawn, or answered on another device). Retrying cannot help, so
+  // it leaves the list and the sheet moves on.
+  if (error?.code === 'P0002') {
+    pendingRequests = pendingRequests.filter((item) => item.fromId !== fromId);
+    renderNotifications();
+    showToast('That request is no longer open.');
+    return { ok: true, connected: false };
+  }
   if (error) {
     showToast('That request could not be updated. Please try again.');
     return { ok: false, connected: false };
   }
+  const request = pendingRequests.find((item) => item.fromId === fromId);
   pendingRequests = pendingRequests.filter((item) => item.fromId !== fromId);
   renderNotifications();
   if (!accept) return { ok: true, connected: false };
   // Accepting a blocked pair silently records a decline (Ruling P12): only a real match opens chat.
   if (!(await hasMatchWith(fromId))) return { ok: true, connected: false };
+  // A sender who was not in the deck was loaded only for the request: keep them, so the chat list and Message find them.
+  if (request?.person && !findPersonById(fromId)) people.push(request.person);
   addConnection(fromId);
   await refreshConnections();
   renderChats();
@@ -1312,9 +1323,10 @@ const openRequestReview = () => {
       const person = findPersonById(fromId);
       if (person) { setView('chat'); openChat(person); }
     },
-    onClose: () => {
+    onClose: (reason) => {
       requestReviewOpen = false;
-      document.querySelector('#app-notification-button')?.focus({ preventScroll: true });
+      // Message opened a chat: the focus stays there.
+      if (reason !== 'message') document.querySelector('#app-notification-button')?.focus({ preventScroll: true });
       loadConnectionRequests();
     },
   });

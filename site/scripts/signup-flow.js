@@ -91,10 +91,10 @@ export const catalogGroups = (nodes = []) => {
 };
 
 // "Other" (D-109): the client's copy of add_member_interest's check. Trims and collapses spaces; 2-40 characters;
-// letters (any script, with their marks), digits, spaces and & + - . ' /; not digits and punctuation only; no links.
+// letters (any script, with their marks), digits, spaces and & + - . ' / (curly apostrophes become straight ones); not digits and punctuation only; no links.
 // Returns the clean label, or '' when the server would refuse it (the blocked-words list stays on the server).
 export const normalizeInterestLabel = (text) => {
-  const v = String(text ?? '').trim().replace(/\s+/g, ' ');
+  const v = String(text ?? '').replace(/[\u2018\u2019]/g, "'").trim().replace(/\s+/g, ' ');
   if (v.length < 2 || v.length > 40) return '';
   if (!/^[\p{L}\p{M}\p{N} &+\-.'/]+$/u.test(v)) return '';
   if (/^[0-9 &+\-.'/]+$/.test(v)) return '';

@@ -115,6 +115,40 @@ try {
     await ctx.close();
   }
 
+  // Review fixes: a sender who was not in the deck (loaded through get_candidates) can be messaged right after Connect,
+  // and the chat keeps the focus; a request that is no longer open moves on instead of blocking the queue.
+  {
+    Object.assign(st, { requests: [freshRequests()[2]], responses: [], matchIds: [], respondFail: false, respondGone: [] });
+    const ctx = await stub.newContext(browser, { width: 1440, height: 900 });
+    const page = await stub.open(ctx, { path: '/app.html', errors });
+    await page.waitForFunction(() => !document.querySelector('#notification-badge')?.hidden);
+    await page.locator('#app-notification-button').click();
+    await page.locator('[data-collab-review]').click();
+    await page.waitForSelector(`dialog.collab-review .collab-card[data-from="${CARA}"]`);
+    await page.locator('dialog.collab-review [data-collab-decide="connect"]').click();
+    await page.locator('dialog.collab-review [data-collab-message]').click();
+    await page.waitForFunction(() => !document.querySelector('dialog.collab-review') && !document.querySelector('#chat-window')?.hidden, null, { timeout: 4000 }).catch(() => {});
+    await page.waitForTimeout(300);
+    const opened = await page.evaluate(() => ({ name: document.querySelector('#chat-name')?.textContent, view: document.querySelector('#chat-window')?.hidden === false, focus: document.activeElement?.id, row: Boolean(document.querySelector('#chat-list [data-chat-id="cccccccc-cccc-4ccc-8ccc-000000000003"]')) }));
+    check(`Message after Connect opens the chat with a sender who was not in the deck, in the chat list, focus not on the bell (${JSON.stringify(opened)})`, opened.name === 'Cara Quill' && opened.view && opened.row && opened.focus !== 'app-notification-button');
+    await ctx.close();
+  }
+  {
+    Object.assign(st, { requests: [freshRequests()[1], freshRequests()[2]], responses: [], matchIds: [], respondGone: [BILAL] });
+    const ctx = await stub.newContext(browser, { width: 1440, height: 900 });
+    const page = await stub.open(ctx, { path: '/app.html', errors });
+    await page.waitForFunction(() => !document.querySelector('#notification-badge')?.hidden);
+    await page.locator('#app-notification-button').click();
+    await page.locator('[data-collab-review]').click();
+    await page.waitForSelector(`dialog.collab-review .collab-card[data-from="${BILAL}"]`);
+    await page.locator('dialog.collab-review [data-collab-decide="connect"]').click();
+    await page.waitForSelector(`dialog.collab-review .collab-card[data-from="${CARA}"]`, { timeout: 4000 }).catch(() => {});
+    const moved = await page.evaluate(() => ({ card: document.querySelector('dialog.collab-review .collab-card')?.dataset.from, count: document.querySelector('.collab-count')?.textContent, toast: document.querySelector('#app-toast')?.textContent }));
+    check(`a request that is no longer open moves on with a note, not "try again" (${JSON.stringify(moved)})`, moved.card === CARA && moved.count === '2 of 2' && /no longer open/.test(moved.toast) && !/try again/i.test(moved.toast));
+    st.respondGone = [];
+    await ctx.close();
+  }
+
   // Reduced motion: the card fades instead of flying (no transform during the exit).
   Object.assign(st, { requests: freshRequests(), responses: [], matchIds: [] });
   const ctx = await stub.newContext(browser, { width: 1440, height: 900 }, { reducedMotion: 'reduce' });

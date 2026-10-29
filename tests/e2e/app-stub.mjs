@@ -190,6 +190,7 @@ export const startAppStub = async ({ port, state = {}, deckRows = defaultDeckRow
       if (pathName === '/rest/v1/rpc/respond_connection_request') {
         if (st.respondHold) await st.respondHold;
         if (st.respondFail) return json(500, { code: 'XX000', message: 'stub failure' });
+        if ((st.respondGone || []).includes(args.p_from)) return json(400, { code: 'P0002', message: 'no live request' });
         (st.responses ||= []).push(args);
         st.requests = (st.requests || []).filter((row) => row.from_id !== args.p_from);
         if (args.p_accept && !(st.blockedAccept || []).includes(args.p_from) && !st.matchIds.includes(args.p_from)) st.matchIds.push(args.p_from);
