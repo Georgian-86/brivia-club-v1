@@ -13,11 +13,11 @@ Update this file at the end of every session. CLAUDE.md holds the aim; this file
 - **Requests (D-108, live):** no Accept / Decline; the notification panel shows "See who wants to collaborate with you"
   and Review opens a one-card-at-a-time sheet (Connect / Not now, drag or arrow keys; Not now declines quietly).
   `collab-requests.js`, e2e `collab-requests.spec.mjs`.
-- **Interest catalogue (D-109, client live, needs `0017_interest_catalog.sql`, NOT applied):** the founder's A–Z list
+- **Interest catalogue (D-109, client live, `0017_interest_catalog.sql` applied 2026-10-29):** the founder's A–Z list
   in both pickers under letter headings, and "Add … as your own interest" (`add_member_interest`). Source
   `supabase/catalog/interest-catalog.tsv` → `node scripts/build-interest-catalog.mjs`. ORBIT treats `member.*`
   interests as exact-match only (`placed: false`).
-- **Active status (D-110, needs `0018_member_presence.sql`, NOT applied):** one green dot on a connection's avatar in
+- **Active status (D-110, `0018_member_presence.sql` applied 2026-10-29):** one green dot on a connection's avatar in
   the chat list (founder: one dot only, nothing in the open chat). Settings → Notifications → "Show when I'm active".
 - Proof: unit 375; orbit 87; SQL harness ALL PASSED (new g-interest-catalog, h-member-presence); e2e signup 329,
   onboarding 269, profile-edit, collab-requests, presence, consent 184, app-shell 211, deck 196, fit 324, chat suites.
@@ -242,8 +242,8 @@ Tooling: Playwright **and axe-core** at `/tmp/pw` (`npm install --prefix /tmp/pw
 
 ## 3. What to do next (in order)
 
-**Database owed (2026-10-29):** in order, whichever are not yet applied: `0015`, `0016`, `0017_interest_catalog.sql`
-(long: the catalogue rows; paste all of it), `0018_member_presence.sql`. README sections "0015"–"0018" have the verify
+**Database (2026-10-29):** `0015`, `0017` and `0018` are applied on live (0017/0018 through the Supabase connector, verified).
+**Still owed: `0016_profile_bio.sql`** (the bio; until then Edit profile has no Bio field). README sections "0015"–"0018" have the verify
 queries. The client is live and hides each feature until its file is applied.
 
 **Database owed (2026-10-28):** apply `0015_post_activity.sql` (comments, shares, counts) and then `0016_profile_bio.sql` (bio); README "0015" / "0016". The client is live and hides those features until each file is applied. Earlier note: review the preview of `claude/wizardly-volta-6hv7or`, then apply `0015_post_activity.sql`

@@ -735,7 +735,7 @@ Expected advisor addition: `member_bio` joins the intended definer-RPC list (`or
 
 ## 0017
 
-**The founder's A–Z interest catalogue and "Other" (founder request 2026-10-29, D-109). Not yet applied.**
+**The founder's A–Z interest catalogue and "Other" (founder request 2026-10-29, D-109). Applied 2026-10-29** (via the Supabase connector in five parts: schema and function, then the rows in four batches; checksum of all 1,129 (id, label, order) rows matched the TSV).
 
 What it does: adds `interest_node.catalog_order` (the offered catalogue, 1..1129 A–Z); reuses 139 existing 0004 nodes
 (their id and label are unchanged, they only gain `catalog_order`) and adds 990 level-3 nodes under the closest
@@ -762,7 +762,7 @@ Expected advisor addition: `add_member_interest` joins the intended definer-RPC 
 
 ## 0018
 
-**Active status for connections in chat (founder request 2026-10-29, D-110). Not yet applied.**
+**Active status for connections in chat (founder request 2026-10-29, D-110). Applied 2026-10-29** (via the Supabase connector; verify query returned f, t, f, the TABLE shape).
 
 What it does: adds `member_presence(member_id, last_seen_at, visible)` (RLS on, no grants, deleted with the profile)
 and four `authenticated`-only definer functions (`search_path = public`): `touch_presence()` (own row, at most every

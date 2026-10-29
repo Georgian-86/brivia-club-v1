@@ -1219,7 +1219,7 @@ begin
   end if;
   if char_length(v) < 2 or char_length(v) > 40
      or v ~ '[[:cntrl:]!"#$%()*,:;<=>?@\[\\\]^_`{|}~]'                     -- ASCII symbols outside & + - . ' /
-     or v ~ '[ -⯿　-〿-︀-️\U0001f000-\U0001ffff]'  -- symbols, emoji
+     or v ~ '[\u2000-\u2bff\u3000-\u303f\ue000-\uf8ff\ufe00-\ufe0f\U0001f000-\U0001ffff]'  -- symbols, emoji (escapes, not raw characters)
      or v ~ '^[0-9 &+./''-]+$'                                              -- digits and punctuation only
      or lower(v) ~ '(https?|www\.|\.(com|in|net|org|io)\M)'
      or lower(v) ~ ('\m(' || blocked || ')\M')
