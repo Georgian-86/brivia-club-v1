@@ -5,8 +5,8 @@
 import { createDeckSwipe } from './deck-swipe.js';
 
 const SHARED_MAX = 3;
-const clean = (list) => (Array.isArray(list) ? list.map((x) => String(x || '').trim()).filter(Boolean) : []);
 const initialsOf = (name) => name.split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0].toUpperCase()).join('') || 'B';
+const clean = (list) => (Array.isArray(list) ? list.map((x) => String(x || '').trim()).filter(Boolean) : []);
 
 // The panel's one-line summary: up to three faces and "N people want to connect"; null when there is nothing to review.
 export const collabSummary = (requests = []) => {
@@ -59,13 +59,15 @@ export const reviewCardMarkup = (m, { index, total }, { escapeHtml, renderAvatar
     + '</div>';
 };
 
-// The sheet. respond(fromId, accept) resolves { ok, connected }; onMessage(fromId) opens the chat; onClose runs once.
+// The sheet. respond(fromId, accept) resolves { ok, connected }; onMessage(fromId) opens the chat; onClose(reason) runs
+// once ('message' when Message closed it).
 export const openCollabReview = ({ requests, respond, onMessage, onClose = () => {}, myInterests = [], escapeHtml, renderAvatar }) => {
   const queue = requests.slice();
   const total = queue.length;
   let index = 0;
   let busy = false;
   let swipe = null;
+  let closeReason = '';
   const dialog = document.createElement('dialog');
   dialog.className = 'collab-review';
   dialog.setAttribute('aria-labelledby', 'collab-review-title');
@@ -102,16 +104,18 @@ export const openCollabReview = ({ requests, respond, onMessage, onClose = () =>
   const connected = (m) => {
     swipe = null;
     hint.hidden = true;
-    const first = m.name.split(' ')[0];
     const more = index + 1 < queue.length;
+    // A sender whose profile did not load has no first name to use and no chat to open from here.
+    const first = m.person ? m.name.split(' ')[0] : '';
     body.innerHTML = `<div class="collab-state">${renderAvatar(m.person || { name: m.name }, 'collab-avatar')}`
-      + `<h3>You're connected.</h3><p>You and ${escapeHtml(first)} can now message each other.</p>`
-      + '<div class="collab-actions">'
-      + `<button type="button" class="collab-button collab-button--later" data-collab-next>${more ? 'Next request' : 'Done'}</button>`
-      + `<button type="button" class="collab-button collab-button--connect" data-collab-message>Message ${escapeHtml(first)}</button></div></div>`;
-    body.querySelector('[data-collab-message]').addEventListener('click', () => { close(); onMessage(m.fromId); });
+      + `<h3>You're connected.</h3><p>${first ? `You and ${escapeHtml(first)} can now message each other.` : 'You can now message each other from Chat.'}</p>`
+      + `<div class="collab-actions${first ? '' : ' collab-actions--single'}">`
+      + `<button type="button" class="collab-button collab-button--${first ? 'later' : 'connect'}" data-collab-next>${more ? 'Next request' : 'Done'}</button>`
+      + (first ? `<button type="button" class="collab-button collab-button--connect" data-collab-message>Message ${escapeHtml(first)}</button>` : '')
+      + '</div></div>';
+    body.querySelector('[data-collab-message]')?.addEventListener('click', () => { closeReason = 'message'; close(); onMessage(m.fromId); });
     body.querySelector('[data-collab-next]').addEventListener('click', () => { index += 1; show(); body.querySelector('[data-collab-decide="connect"], [data-collab-close]')?.focus(); });
-    body.querySelector('[data-collab-message]').focus();
+    (body.querySelector('[data-collab-message]') || body.querySelector('[data-collab-next]')).focus();
   };
   async function decide(accept, { dragged = false } = {}) {
     if (busy || !swipe || index >= queue.length) return;
@@ -120,8 +124,14 @@ export const openCollabReview = ({ requests, respond, onMessage, onClose = () =>
     const buttons = [...body.querySelectorAll('[data-collab-decide]')];
     buttons.forEach((b) => { b.disabled = true; });
     const current = swipe;
-    const [result] = await Promise.all([respond(m.fromId, accept), current.flyOut(accept ? 'pitch' : 'pass', dragged ? {} : { duration: 280 })]);
-    busy = false;
+    let result = null;
+    try {
+      [result] = await Promise.all([respond(m.fromId, accept), current.flyOut(accept ? 'pitch' : 'pass', dragged ? {} : { duration: 280 })]);
+    } catch (error) {
+      console.warn('A request could not be answered:', error?.message);  // treated as a failure: the card comes back
+    } finally {
+      busy = false;
+    }
     if (!dialog.open) return;
     if (!result?.ok) {
       // The request is still pending: the card comes back, ready for another try (the caller showed the toast).
@@ -149,7 +159,7 @@ export const openCollabReview = ({ requests, respond, onMessage, onClose = () =>
     event.preventDefault();
     decide(accept);
   });
-  dialog.addEventListener('close', () => { dialog.remove(); onClose(); }, { once: true });
+  dialog.addEventListener('close', () => { dialog.remove(); onClose(closeReason); }, { once: true });
   dialog.showModal();
   show();
   body.querySelector('[data-collab-decide="connect"]')?.focus();

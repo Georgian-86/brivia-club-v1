@@ -190,10 +190,22 @@ export const startAppStub = async ({ port, state = {}, deckRows = defaultDeckRow
       if (pathName === '/rest/v1/rpc/respond_connection_request') {
         if (st.respondHold) await st.respondHold;
         if (st.respondFail) return json(500, { code: 'XX000', message: 'stub failure' });
+        if ((st.respondGone || []).includes(args.p_from)) return json(400, { code: 'P0002', message: 'no live request' });
         (st.responses ||= []).push(args);
         st.requests = (st.requests || []).filter((row) => row.from_id !== args.p_from);
         if (args.p_accept && !(st.blockedAccept || []).includes(args.p_from) && !st.matchIds.includes(args.p_from)) st.matchIds.push(args.p_from);
         return route.fulfill({ status: 204, body: '', headers: { 'access-control-allow-origin': '*' } });
+      }
+      // D-110 active status: st.activeIds (members seen just now), st.presenceVisible (my switch, default on);
+      // st.noPresence answers PGRST202 as before 0018. Only my matches are answered, as the server does.
+      if (['/rest/v1/rpc/touch_presence', '/rest/v1/rpc/connection_presence', '/rest/v1/rpc/set_presence_visible', '/rest/v1/rpc/my_presence_visible'].includes(pathName) && st.noPresence) {
+        return json(404, { code: 'PGRST202', message: 'Could not find the function' });
+      }
+      if (pathName === '/rest/v1/rpc/touch_presence') { st.touches = (st.touches || 0) + 1; return route.fulfill({ status: 204, body: '', headers: { 'access-control-allow-origin': '*' } }); }
+      if (pathName === '/rest/v1/rpc/my_presence_visible') return json(200, st.presenceVisible !== false);
+      if (pathName === '/rest/v1/rpc/set_presence_visible') { st.presenceVisible = args.p_visible; return route.fulfill({ status: 204, body: '', headers: { 'access-control-allow-origin': '*' } }); }
+      if (pathName === '/rest/v1/rpc/connection_presence') {
+        return json(200, (args.p_ids || []).filter((id) => st.matchIds.includes(id)).map((id) => ({ member_id: id, active: st.presenceVisible !== false && (st.activeIds || []).includes(id) })));
       }
       if (pathName === '/rest/v1/community_post_shares' && method === 'POST') return route.fulfill({ status: 201, body: '', headers: { 'access-control-allow-origin': '*' } });
       if (pathName === '/rest/v1/brivia_messages' && method === 'POST') { (st.sent ||= []).push(args); return route.fulfill({ status: 201, body: '', headers: { 'access-control-allow-origin': '*' } }); }

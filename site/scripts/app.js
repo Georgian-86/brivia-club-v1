@@ -21,7 +21,7 @@ import '../styles/mobile-app.css';
 import '../styles/skeleton.css';
 import '../styles/aura-theme.css';
 import '../styles/handoff.css';
-import { supabase, rowToProfile, saveProfile, isPresetCoverUrl, onboardingStatus, sendSignal, fetchSignalQuota, isRateLimited, isStorageImageUrl, withoutCredentials, uploadMessageAttachment, removeMessageAttachment, uploadCommunityPostImage, removeCommunityPostImage, ImageProcessingError, PHOTO_ERROR_MESSAGE, PHOTO_FRAMER_ERROR, compressAttachmentFiles, attachmentKind, reportMember, setSensitiveConsent, fetchSensitiveConsentAt, fetchMyInterests, fetchInterestNodes, addMemberInterest, isMissingFunction, setMemberInterests, uploadResume, removeResume, resumeSignedUrl, resumeInfo, clearResumePath, searchPlaces, setHomeCity, setHomeLocation } from './supabase.js';
+import { supabase, rowToProfile, saveProfile, isPresetCoverUrl, onboardingStatus, sendSignal, fetchSignalQuota, isRateLimited, isStorageImageUrl, withoutCredentials, uploadMessageAttachment, removeMessageAttachment, uploadCommunityPostImage, removeCommunityPostImage, ImageProcessingError, PHOTO_ERROR_MESSAGE, PHOTO_FRAMER_ERROR, compressAttachmentFiles, attachmentKind, reportMember, setSensitiveConsent, fetchSensitiveConsentAt, fetchMyInterests, fetchInterestNodes, addMemberInterest, isMissingFunction, touchPresence, connectionPresence, setPresenceVisible, myPresenceVisible, setMemberInterests, uploadResume, removeResume, resumeSignedUrl, resumeInfo, clearResumePath, searchPlaces, setHomeCity, setHomeLocation } from './supabase.js';
 import { locateOnce, fallbackCopy } from './geo-locate.js';
 import { areaChangeMessage, AREA_HELPER, AREA_NO_MATCH } from './area-change.js';
 import { areaShareBody, parseAreaBody, resumeShareAttachment, resumeMessageFields, RESUME_SHARE_BODY, NO_RESUME_HINT, RESUME_GONE_COPY, RESUME_SHARE_NOTE, AREA_SHARE_NOTE } from './quick-share.js';
@@ -38,6 +38,7 @@ import { experienceChoices, cleanBio, BIO_MAX, areaInputValue, planInterestSave 
 import { isOffered, hasCatalog, catalogGroups, normalizeInterestLabel } from './signup-flow.js';
 import { MAX_INTERESTS } from './passion-budget.js';
 import { collabSummary, openCollabReview } from './collab-requests.js';
+import { createPresence, presenceDot } from './presence.js';
 import { postCardMarkup, postFooterMarkup, countText, shareData, isSafePostImageSrc } from './post-card.js';
 import { toastSide } from './toast-place.js';
 import { loadReactions, setReaction, createReactionGuard } from './post-reactions.js';
@@ -110,6 +111,9 @@ const filterDrafts = { skills: '', lookingFor: '' };
 let activeChatFilter = 'all';
 let chatSearchQuery = '';
 let selectedChat = null;
+// Active status (D-110): the presence loop (presence.js), started with the message sync.
+let presence = null;
+const isActiveNow = (id) => Boolean(presence?.isActive(id));
 let typingSession = null; // the open thread's typing channel (D5): { otherId, channel, sender, receiver, joined }
 let chatShouldOpenAtLatest = false;
 let suppressChatAutoOpen = false;
@@ -1279,15 +1283,26 @@ const respondToRequest = async (fromId, accept) => {
   respondingRequestIds.add(fromId);
   const { error } = await supabase.rpc('respond_connection_request', { p_from: fromId, p_accept: accept });
   respondingRequestIds.delete(fromId);
+  // P0002: the request is no longer open (expired, withdrawn, or answered on another device). Retrying cannot help, so
+  // it leaves the list and the sheet moves on.
+  if (error?.code === 'P0002') {
+    pendingRequests = pendingRequests.filter((item) => item.fromId !== fromId);
+    renderNotifications();
+    showToast('That request is no longer open.');
+    return { ok: true, connected: false };
+  }
   if (error) {
     showToast('That request could not be updated. Please try again.');
     return { ok: false, connected: false };
   }
+  const request = pendingRequests.find((item) => item.fromId === fromId);
   pendingRequests = pendingRequests.filter((item) => item.fromId !== fromId);
   renderNotifications();
   if (!accept) return { ok: true, connected: false };
   // Accepting a blocked pair silently records a decline (Ruling P12): only a real match opens chat.
   if (!(await hasMatchWith(fromId))) return { ok: true, connected: false };
+  // A sender who was not in the deck was loaded only for the request: keep them, so the chat list and Message find them.
+  if (request?.person && !findPersonById(fromId)) people.push(request.person);
   addConnection(fromId);
   await refreshConnections();
   renderChats();
@@ -1308,9 +1323,10 @@ const openRequestReview = () => {
       const person = findPersonById(fromId);
       if (person) { setView('chat'); openChat(person); }
     },
-    onClose: () => {
+    onClose: (reason) => {
       requestReviewOpen = false;
-      document.querySelector('#app-notification-button')?.focus({ preventScroll: true });
+      // Message opened a chat: the focus stays there.
+      if (reason !== 'message') document.querySelector('#app-notification-button')?.focus({ preventScroll: true });
       loadConnectionRequests();
     },
   });
@@ -1789,7 +1805,7 @@ const renderChats = () => {
     const unreadMessages = chatUnreadCount(person.id);
     const unread = unreadMessages > 0;
     const lastPreview = last?.attachment?.kind === 'resume' ? 'Resume (PDF)' : last?.attachment ? `📎 ${last.attachment.name || 'Attachment'}` : parseSharedPost(last?.text) ? 'Shared a post' : (last?.text || 'Start a conversation');
-    return `<div class="chat-row${unread ? ' is-unread' : ''}${selectedChat?.id === person.id ? ' is-selected' : ''}"><button class="chat-row-open" type="button" data-chat-id="${escapeHtml(person.id)}"><span class="member-profile-trigger" data-public-profile-id="${escapeHtml(person.id)}" role="button" tabindex="0" aria-label="Open ${escapeHtml(person.name)} profile">${renderAvatar(person)}</span><span class="chat-row-copy"><strong data-public-profile-id="${escapeHtml(person.id)}">${escapeHtml(person.name)}</strong><span>${escapeHtml(lastPreview)}</span></span><span class="chat-row-meta"><time>${escapeHtml(formatChatTime(last?.createdAt))}</time>${unread ? `<b aria-label="${unreadMessages} unread">${unreadMessages > 99 ? '99+' : unreadMessages}</b>` : ''}</span></button><button class="chat-delete" type="button" data-delete-chat-id="${escapeHtml(person.id)}" aria-label="Delete chat with ${escapeHtml(person.name)}" title="Delete chat"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M4.5 6h11M8 3.5h4M6.5 6l.6 10h5.8l-.6-10M8.5 8.5v5M11.5 8.5v5"/></svg></button></div>`;
+    return `<div class="chat-row${unread ? ' is-unread' : ''}${selectedChat?.id === person.id ? ' is-selected' : ''}"><button class="chat-row-open" type="button" data-chat-id="${escapeHtml(person.id)}"><span class="member-profile-trigger" data-public-profile-id="${escapeHtml(person.id)}" role="button" tabindex="0" aria-label="Open ${escapeHtml(person.name)} profile">${renderAvatar(person)}${presenceDot(isActiveNow(person.id))}</span><span class="chat-row-copy"><strong data-public-profile-id="${escapeHtml(person.id)}">${escapeHtml(person.name)}${isActiveNow(person.id) ? '<span class="sr-only">, active now</span>' : ''}</strong><span>${escapeHtml(lastPreview)}</span></span><span class="chat-row-meta"><time>${escapeHtml(formatChatTime(last?.createdAt))}</time>${unread ? `<b aria-label="${unreadMessages} unread">${unreadMessages > 99 ? '99+' : unreadMessages}</b>` : ''}</span></button><button class="chat-delete" type="button" data-delete-chat-id="${escapeHtml(person.id)}" aria-label="Delete chat with ${escapeHtml(person.name)}" title="Delete chat"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M4.5 6h11M8 3.5h4M6.5 6l.6 10h5.8l-.6-10M8.5 8.5v5M11.5 8.5v5"/></svg></button></div>`;
   }).join('') : '<div class="inbox-empty"><strong>No threads found</strong><span>Chats open once a connection is mutual. Send a signal from Connect to start one.</span><button type="button" class="inbox-empty-action" data-nav="explore">CONNECT WITH PEOPLE ↗</button></div>'}`;
   const inboxScroll = list?.querySelector('.chat-inbox-scroll');
   if (list && inboxScroll) {
@@ -1910,6 +1926,19 @@ const subscribeToMessages = () => {
     .channel(`brivia-messages-${memberProfile.id}`)
     .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'brivia_messages' }, ({ new: message }) => appendRemoteMessage(message))
     .subscribe((status) => { if (status === 'CHANNEL_ERROR') console.warn('Realtime messages channel could not connect.'); });
+};
+
+// Active status (D-110, 0018): one dot on a connection's avatar in the chat list, nothing else (founder, 2026-10-29).
+// Connections only; the member can turn it off (Settings), which hides it both ways.
+const startPresence = () => {
+  if (presence || !supabase || !memberProfile.id) return;
+  presence = createPresence({
+    touch: touchPresence,
+    fetch: connectionPresence,
+    ids: () => remoteConnectionIds.map(String),
+    onChange: () => renderChats(),
+  });
+  presence.start().catch((error) => console.warn('Active status could not start:', error.message));
 };
 
 const startMessageSync = () => {
@@ -2872,6 +2901,7 @@ const openNotificationSettings = () => {
     <h2 id="notification-settings-title">Your <em>signals.</em></h2>
     <p class="profile-settings-note">Choose how the club keeps you updated. Chat messages will still be available in your inbox when alerts are off.</p>
     <label class="settings-toggle-row"><span><strong>MESSAGE NOTIFICATIONS</strong><small>Get an alert when someone sends you a message.</small></span><input id="profile-notifications-toggle" type="checkbox" /><i aria-hidden="true"></i></label>
+    <label class="settings-toggle-row" data-presence-setting hidden><span><strong>SHOW WHEN I'M ACTIVE</strong><small>Your connections see a dot when you're here. Turn it off and you won't see theirs either.</small></span><input id="profile-presence-toggle" type="checkbox" /><i aria-hidden="true"></i></label>
     <p class="profile-settings-feedback" id="notification-settings-feedback" role="status"></p>
   </div>`;
   document.body.append(modal);
@@ -2884,6 +2914,23 @@ const openNotificationSettings = () => {
   toggle.addEventListener('change', () => {
     setNotificationsEnabled(toggle.checked);
     feedback.textContent = toggle.checked ? 'Notifications turned on.' : 'Notifications turned off.';
+  });
+  // D-110: the active-status switch shows once 0018 answers; its own state lives on the server.
+  const presenceRow = modal.querySelector('[data-presence-setting]');
+  const presenceToggle = modal.querySelector('#profile-presence-toggle');
+  myPresenceVisible().then(({ data, error }) => {
+    if (!modal.isConnected || error) return;
+    presenceToggle.checked = data !== false;
+    presenceRow.hidden = false;
+  });
+  presenceToggle.addEventListener('change', async () => {
+    const want = presenceToggle.checked;
+    presenceToggle.disabled = true;
+    const { error } = await setPresenceVisible(want);
+    presenceToggle.disabled = false;
+    if (error) { presenceToggle.checked = !want; showToast('That setting could not be saved. Please try again.'); return; }
+    feedback.textContent = want ? 'Your connections can see when you are active.' : 'Active status is off. You will not see others either.';
+    presence?.refresh();
   });
 };
 
@@ -4715,6 +4762,7 @@ const loadSupabaseCommunity = async () => {
   refreshSignalQuota();
   subscribeToMessages();
   startMessageSync();
+  startPresence();
   if (!appBackGuardActive) {
     appBackGuardActive = true;
     window.history.pushState(

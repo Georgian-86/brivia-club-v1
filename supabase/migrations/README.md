@@ -759,3 +759,27 @@ select count(*) filter (where catalog_order is not null),                       
 ```
 
 Expected advisor addition: `add_member_interest` joins the intended definer-RPC list (`orbit-hygiene.test.sql` H3).
+
+## 0018
+
+**Active status for connections in chat (founder request 2026-10-29, D-110). Not yet applied.**
+
+What it does: adds `member_presence(member_id, last_seen_at, visible)` (RLS on, no grants, deleted with the profile)
+and four `authenticated`-only definer functions (`search_path = public`): `touch_presence()` (own row, at most every
+30 s), `connection_presence(uuid[])` (for each id that is the caller's match in the same world: active = both switches
+on, not blocked, seen within 3 minutes; never a time; at most 100 ids), `set_presence_visible(boolean)` and
+`my_presence_visible()` (the "Show when I'm active" switch, default on, hides both ways).
+
+Deploy order: either. Before 0018 the client shows no dots and hides the switch. Apply after `0017`.
+
+Verify after the apply:
+
+```sql
+select has_table_privilege('authenticated', 'public.member_presence', 'select'),                -- f
+       has_function_privilege('authenticated', 'public.connection_presence(uuid[])', 'execute'), -- t
+       has_function_privilege('anon', 'public.touch_presence()', 'execute'),                     -- f
+       pg_get_function_result('public.connection_presence(uuid[])'::regprocedure);              -- TABLE(member_id uuid, active boolean)
+```
+
+Expected advisor additions: `connection_presence`, `my_presence_visible`, `set_presence_visible` and `touch_presence`
+join the intended definer-RPC list (`orbit-hygiene.test.sql` H3).

@@ -46,3 +46,8 @@ test('normalizeInterestLabel: symbols, emoji, links and digits-only are refused'
     assert.equal(normalizeInterestLabel(bad), '', bad);
   }
 });
+
+test('normalizeInterestLabel: curly apostrophes (iPhone keyboards) become straight ones', () => {
+  assert.equal(normalizeInterestLabel('Women’s football'), "Women's football");
+  assert.equal(normalizeInterestLabel('Rock ‘n’ Roll'), "Rock 'n' Roll");
+});

@@ -15,7 +15,7 @@ set lock_timeout = '5s';
 --      "member.custom"). Shown and matched like any interest (founder, 2026-10-29); ORBIT matches member.* nodes by
 --      exact id only (docs/ORBIT_ENGINE.md §3.1). Validation: 2-40 characters; letters (any script), digits, spaces and
 --      & + - . ' /; not digits and punctuation only; no links; not on the blocked-words list; not the label of a
---      sensitive node (those need their own consent screen). At most 5 new labels per member per 24 h
+--      sensitive node (those need their own consent screen), not the label of a retired node (moderation sticks). At most 5 new labels per member per 24 h
 --      (member_custom_interest). Saving still goes through set_member_interests.
 
 -- 1. The catalogue column.
@@ -1202,7 +1202,8 @@ set search_path = public
 as $$
 declare
   uid uuid := auth.uid();
-  v text := regexp_replace(btrim(coalesce(p_label, '')), '\s+', ' ', 'g');
+  -- Curly apostrophes (iPhone keyboards) count as straight ones.
+  v text := regexp_replace(translate(btrim(coalesce(p_label, '')), E'\u2019\u2018', ''''''), '\s+', ' ', 'g');
   blocked constant text := 'fuck|fucking|shit|cunt|bitch|slut|whore|dick|cock|pussy|porn|porno|nsfw|nude|nudes|sex|sexy|'
     || 'hookup|hookups|onlyfans|escort|escorts|sugar daddy|sugar baby|one night stand|rape|nazi|cocaine|heroin|meth|'
     || 'chutiya|madarchod|bhenchod|behenchod|randi|gandu|bsdk|mc|bc';
@@ -1222,7 +1223,9 @@ begin
      or v ~ '^[0-9 &+./''-]+$'                                              -- digits and punctuation only
      or lower(v) ~ '(https?|www\.|\.(com|in|net|org|io)\M)'
      or lower(v) ~ ('\m(' || blocked || ')\M')
-     or exists (select 1 from public.interest_node n where lower(n.label) = lower(v) and n.sensitive) then
+     or exists (select 1 from public.interest_node n where lower(n.label) = lower(v) and n.sensitive)
+     -- a label a moderator retired stays retired (docs/MODERATION.md "Members' own interests")
+     or exists (select 1 from public.interest_node n where lower(n.label) = lower(v) and n.status = 'retired') then
     raise exception 'not allowed' using errcode = '22023';
   end if;
 

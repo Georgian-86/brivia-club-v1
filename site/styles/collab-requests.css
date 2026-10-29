@@ -84,6 +84,7 @@ dialog.collab-review[open]{animation:collab-in var(--motion-slow) var(--ease)}
 .collab-stamp--later{right:var(--space-4);background:color-mix(in srgb, var(--color-card-paper) 88%, transparent);color:var(--color-ink-soft);opacity:var(--swipe-pass, 0);transform:rotate(12deg)}
 
 .collab-actions{display:grid;grid-template-columns:1fr 1fr;gap:var(--space-3);align-self:stretch}
+.collab-actions--single{grid-template-columns:minmax(0,240px);justify-content:center}
 .collab-button{
   display:inline-flex;align-items:center;justify-content:center;gap:var(--space-2);min-height:48px;padding:0 var(--space-4);
   border:1px solid var(--brivia-wine);border-radius:var(--radius-pill);background:transparent;color:var(--brivia-wine);
