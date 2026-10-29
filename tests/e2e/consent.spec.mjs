@@ -276,61 +276,71 @@ try {
   check('the like outcome comes from send_signal: no matches lookup for a like', () => assert.ok(!calls.some((c) => c.path === '/rest/v1/matches' && c.search.includes('and('))));
   await page.waitForTimeout(3000); // let the last toast clear
 
-  // 4. Requests list in the notifications panel.
+  // 4. Requests in the notifications panel (D-108): one "See who wants to collaborate with you" section; Review opens
+  // a sheet with one request at a time (Connect / Not now). No Accept / Decline rows.
   // Opening the panel refetches requests and re-renders the list; wait for that before measuring.
   const refetch = page.waitForResponse((res) => res.url().includes('/rest/v1/connection_requests') && res.request().method() === 'GET');
   await page.locator('#app-notification-button').click();
   await refetch;
   await page.waitForTimeout(200);
-  await page.waitForSelector('[data-request-from]');
+  await page.waitForSelector('[data-collab-review]');
   check('requests query is to_id=me and status=pending', () => assert.ok(calls.some((c) => c.method === 'GET' && c.path === '/rest/v1/connection_requests' && c.search.includes(`to_id=eq.${ME}`) && c.search.includes('status=eq.pending'))));
-  const requestItem = page.locator(`[data-request-from="${DEV}"]`);
-  const noteText = await requestItem.locator('.notification-request-note').textContent();
-  const noteHasTag = await requestItem.locator('.notification-request-note b').count();
-  const accept = requestItem.locator('[data-request-respond="accept"]');
-  const decline = requestItem.locator('[data-request-respond="decline"]');
-  const [acceptBox, declineBox] = [await accept.boundingBox(), await decline.boundingBox()];
-  const senderName = await requestItem.locator('strong').textContent();
+  const section = await page.locator('.notification-collab').innerText();
+  check(`the panel shows one collaboration section, no Accept / Decline (${JSON.stringify(section)})`, () => {
+    assert.match(section, /See who wants to collaborate with you/);
+    assert.match(section, /2 people want to connect/);
+    assert.equal(/accept|decline/i.test(section), false);
+  });
+  await page.locator('[data-collab-review]').click();
+  await page.waitForSelector('dialog.collab-review[open] .collab-card');
+  const devCard = page.locator(`dialog.collab-review .collab-card[data-from="${DEV}"]`);
+  const senderName = await devCard.locator('.collab-name').textContent();
+  const noteText = await devCard.locator('.collab-note-text').textContent();
+  const noteHasTag = await devCard.locator('.collab-note-text b').count();
   check(`request sender name is Dev Rao (got "${senderName}")`, () => assert.equal(senderName, 'Dev Rao'));
   check('request note escaped (rendered as text, no <b> element)', () => { assert.equal(noteText, '<b>climb</b> with me?'); assert.equal(noteHasTag, 0); });
-  const labels = [await accept.getAttribute('aria-label'), await decline.getAttribute('aria-label')];
-  check(`aria-labels present (${labels.join(' | ')})`, () => { assert.match(labels[0], /^Accept connection request from Dev Rao$/); assert.match(labels[1], /^Decline connection request from Dev Rao$/); });
-  check(`Accept/Decline >=44px and equal size (${acceptBox.width}x${acceptBox.height}, ${declineBox.width}x${declineBox.height})`, () => {
-    assert.ok(acceptBox.height >= 44 && declineBox.height >= 44);
-    assert.equal(Math.round(acceptBox.width), Math.round(declineBox.width));
+  const connect = page.locator('dialog.collab-review [data-collab-decide="connect"]');
+  const later = page.locator('dialog.collab-review [data-collab-decide="later"]');
+  const [connectBox, laterBox] = [await connect.boundingBox(), await later.boundingBox()];
+  check(`Connect / Not now >=44px and equal size (${connectBox.width}x${connectBox.height}, ${laterBox.width}x${laterBox.height})`, () => {
+    assert.ok(connectBox.height >= 44 && laterBox.height >= 44);
+    assert.equal(Math.round(connectBox.width), Math.round(laterBox.width));
   });
   let releaseRpc;
   state.holdRpc = new Promise((resolve) => { releaseRpc = resolve; });
-  await accept.click();
+  await connect.click();
   await page.waitForTimeout(150);
-  const bothDisabled = (await page.locator(`[data-request-from="${DEV}"] [data-request-respond="accept"]`).isDisabled())
-    && (await page.locator(`[data-request-from="${DEV}"] [data-request-respond="decline"]`).isDisabled());
+  const bothDisabled = (await connect.isDisabled()) && (await later.isDisabled());
+  await connect.click({ force: true, timeout: 500 }).catch(() => {});
   releaseRpc(); state.holdRpc = null;
-  await page.waitForFunction((id) => !document.querySelector(`[data-request-from="${id}"]`), DEV);
-  await page.waitForTimeout(300);
-  const acceptToast = await toast();
-  check('Accept/Decline disabled while the RPC is in flight', () => assert.equal(bothDisabled, true));
-  check('Accept calls /rest/v1/rpc/respond_connection_request with p_accept=true', () => {
+  await page.waitForSelector('dialog.collab-review .collab-state h3');
+  const connectedText = await page.locator('dialog.collab-review .collab-state').innerText();
+  check('Connect / Not now disabled while the RPC is in flight', () => assert.equal(bothDisabled, true));
+  check('Connect calls /rest/v1/rpc/respond_connection_request once with p_accept=true', () => {
     const rpc = posts('/rest/v1/rpc/respond_connection_request');
     assert.equal(rpc.length, 1);
     assert.deepEqual(JSON.parse(rpc[0].body), { p_from: DEV, p_accept: true });
   });
-  check(`accept toast (got "${acceptToast}")`, () => assert.equal(acceptToast, "It's mutual. Say hi to Dev Rao."));
+  check(`a real connection shows "You're connected." with Message (got ${JSON.stringify(connectedText)})`, () => { assert.match(connectedText, /You're connected\./); assert.match(connectedText, /Message Dev/); });
   check('accept checks matches in both orders', () => assert.ok(calls.some((c) => c.path === '/rest/v1/matches' && /and\(user1_id\.eq\.[^,]+,user2_id\.eq\.[^)]+\),and\(/.test(c.search))));
   check('accept refreshed connections from matches', () => assert.ok(calls.filter((c) => c.path === '/rest/v1/matches' && c.method === 'GET' && !c.search.includes('and(')).length >= 2));
+  await page.locator('dialog.collab-review [data-collab-next]').click();
 
   // 4b. A stranger's request: sender loaded via rpc/get_candidates; a crafted photo_url cannot inject markup.
-  const eveItem = page.locator(`[data-request-from="${EVE}"]`);
-  const eveName = await eveItem.locator('strong').textContent();
-  check(`unknown sender loaded from rpc/get_candidates (got "${eveName}")`, () => {
+  const eveCard = page.locator(`dialog.collab-review .collab-card[data-from="${EVE}"]`);
+  await eveCard.waitFor();
+  const eveName = await eveCard.locator('.collab-name').textContent();
+  const eveCount = await eveCard.locator('.collab-count').textContent();
+  check(`unknown sender loaded from rpc/get_candidates (got "${eveName}", ${eveCount})`, () => {
     assert.equal(eveName, 'Eve Stone');
+    assert.equal(eveCount, '2 of 2');
     assert.ok(calls.some((c) => c.method === 'POST' && c.path === '/rest/v1/rpc/get_candidates' && JSON.parse(c.body || '{}').p_ids?.includes(EVE)));
   });
   const injected = await page.evaluate(() => ({
     xss: window.__xss,
     onerrorImgs: document.querySelectorAll('img[onerror]').length,
     jsSrcImgs: [...document.querySelectorAll('img')].filter((img) => /^javascript:/i.test(img.getAttribute('src') || '')).length,
-    eveImgSrc: document.querySelector(`[data-request-from="${'55555555-5555-4555-8555-555555555555'}"] img`)?.getAttribute('src') || null,
+    eveImgSrc: document.querySelector(`.collab-card[data-from="${'55555555-5555-4555-8555-555555555555'}"] img`)?.getAttribute('src') || null,
   }));
   check(`crafted photo_url values inject nothing (${JSON.stringify(injected)})`, () => {
     assert.equal(injected.xss, undefined);
@@ -338,13 +348,17 @@ try {
     assert.equal(injected.jsSrcImgs, 0);
     assert.equal(injected.eveImgSrc, null, 'crafted photo_url should fall back to the initials avatar');
   });
-  // Accepting a blocked pair: the RPC succeeds but no match exists -> neutral toast, no chat.
+  // Accepting a blocked pair: the RPC succeeds but no match exists -> no "connected" state, no chat; the sheet moves on.
   await resetToast();
-  await eveItem.locator('[data-request-respond="accept"]').click();
-  await page.waitForFunction((id) => !document.querySelector(`[data-request-from="${id}"]`), EVE);
-  await waitForToast(/\S/);
-  const blockedToast = await toast();
-  check(`accept with no resulting match shows a neutral toast (got "${blockedToast}")`, () => assert.equal(blockedToast, 'Request answered.'));
+  await page.keyboard.press('ArrowRight');
+  await page.waitForSelector('dialog.collab-review .collab-state h3');
+  const caughtUp = await page.locator('dialog.collab-review .collab-state h3').textContent();
+  check(`accept with no resulting match moves on quietly (got "${caughtUp}", toast "${await toast()}")`, () => { assert.equal(caughtUp, "You're all caught up."); });
+  check('ArrowRight answered Eve with p_accept=true', () => assert.deepEqual(JSON.parse(posts('/rest/v1/rpc/respond_connection_request').at(-1).body), { p_from: EVE, p_accept: true }));
+  await page.locator('dialog.collab-review .collab-state [data-collab-close]').click();
+  await page.waitForFunction(() => !document.querySelector('dialog.collab-review'));
+  const focusBack = await page.evaluate(() => document.activeElement?.id);
+  check(`closing the sheet returns focus to the bell (got ${focusBack})`, () => assert.equal(focusBack, 'app-notification-button'));
 
   // 5. Chat list now contains the mutual and accepted people only.
   await page.evaluate(() => document.querySelector('[data-nav="chat"]')?.click());
