@@ -802,3 +802,12 @@ body.app-body .app-view[data-view="chat"] .chat-layout .message.has-share small 
 }
 .message-post-open:focus-visible { outline: 2px solid var(--color-wine); outline-offset: 2px; }
 @media (prefers-reduced-motion: reduce) { .message-post.is-loading .message-post-media { animation: none; } }
+
+/* ---------- Active status (D-110): one green dot with a cream ring on a connection's avatar in the chat list ---------- */
+.app-view[data-view="chat"] .chat-row .member-profile-trigger{position:relative}
+.presence-dot{
+  position:absolute;right:0;bottom:1px;z-index:1;width:12px;height:12px;box-sizing:border-box;
+  border:2px solid var(--color-cream);border-radius:50%;background:var(--color-presence);pointer-events:none;
+}
+/* The Settings switch stays hidden until 0018 answers (a settings row is display:flex, which beats [hidden]). */
+.settings-toggle-row[hidden]{display:none}

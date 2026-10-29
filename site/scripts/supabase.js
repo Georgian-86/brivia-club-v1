@@ -315,6 +315,11 @@ export const addMemberInterest = async (label) => {
   const { data, error } = await supabase.rpc('add_member_interest', { p_label: label });
   return { data: typeof data === 'string' ? data : null, error };
 };
+// Active status (D-110, 0018): connections only; connection_presence answers true or false, never a time.
+export const touchPresence = async () => (supabase ? supabase.rpc('touch_presence') : notConfigured());
+export const connectionPresence = async (ids) => (supabase ? supabase.rpc('connection_presence', { p_ids: ids }) : notConfigured());
+export const setPresenceVisible = async (visible) => (supabase ? supabase.rpc('set_presence_visible', { p_visible: Boolean(visible) }) : notConfigured());
+export const myPresenceVisible = async () => (supabase ? supabase.rpc('my_presence_visible') : notConfigured());
 export const isMissingFunction = (error) => ['PGRST202', '42883'].includes(error?.code) || error?.status === 404;
 
 // City list for "Pick my city": name or region match, launch cities first. Wildcards in the query are dropped.

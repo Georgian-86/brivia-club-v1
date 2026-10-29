@@ -75,6 +75,14 @@ never told. A failed answer keeps the card and shows the shared toast. The end r
 is the deck's (`deck-swipe.js`) with CONNECT / NOT NOW stamps; reduced motion fades. Focus stays in the sheet and goes
 back to the bell on close. Words: collaborate, connect, not now, request; never match, like, pass, swipe, crush or hearts.
 
+## Active status (D-110)
+
+Chat only, connections only. One 12 px dot (`--color-presence`, 2 px cream ring) on the bottom-right of a
+connection's avatar in the chat list while they have been here in the last 3 minutes. That is the only mark: the open
+chat's head, the deck, search and profiles show nothing (founder, 2026-10-29). The row's name carries ", active now"
+for screen readers; the dot itself is decorative. Never a time ("last seen"). Settings → Notifications has "Show when
+I'm active" (on by default; off hides it both ways). The switch only appears once the server answers.
+
 ## Flow changes
 
 ### A0. Guided signup: one question per screen (D-073, live from 2026-10-22; replaces the 4-step form below)

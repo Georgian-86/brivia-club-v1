@@ -2215,3 +2215,18 @@ controls (a tester or a seeded test member), never a real member, so no new expo
 - **Proof:** SQL `g-interest-catalog.test.sql` (C1–C7) and the updated taxonomy bounds in `orbit-interests.test.sql`;
   orbit `topology.test.js`; unit `interest-catalog.test.mjs`; e2e `profile-edit.spec.mjs` and `signup.spec.mjs`
   (A–Z headings, search, Add, save, refusal, before-0017 fallback, axe at 1440 and 390).
+
+## D-110: "Active now" for connections in chat, with an opt-out both ways (founder, 2026-10-29)
+
+- **Asked:** an active indicator for profiles in the chat section. Brainstorming: connections only, with an opt-out.
+- **Done (migration 0018):** the app touches its own presence on load, every minute while visible and on focus (the
+  server writes at most every 30 s). `connection_presence` tells the member which of their connections were here in
+  the last 3 minutes: only matches in the same world, not blocked, both switches on, and never a time. Chat shows one
+  green dot with a cream ring on the connection's avatar in the chat list, and nothing else (founder, 2026-10-29: a
+  first build also marked the open chat's avatar and added an "Active now" line; three marks for one person was too
+  many, so the open chat's head stays as it was). Screen readers hear ", active now" on the row. Settings (Profile ⚙, Notifications) has "Show when I'm active"; off hides the member
+  and hides everyone from them. Nothing on the deck, search or profiles. The privacy notice says so.
+- **Proof:** SQL `h-member-presence.test.sql` (P1–P5) and the definer allowlist; unit `presence.test.mjs`; e2e
+  `presence.spec.mjs` (1440 and 390, one dot in all, the switch, before-0018 fallback, axe on the rows). The chat list's own
+  axe findings (a button inside the row button, the inbox tab roles, a 4.42:1 tab label) predate this and are left
+  for a separate fix.

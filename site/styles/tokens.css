@@ -26,6 +26,7 @@
   --color-name-ink: #2f1d1b;
   --color-chat-paper: #f8eee6;
   --color-chat-head: #f7f0e5;
+  --color-presence: #2f9e68;   /* D-110: the "active now" dot; 3.25:1 on cream (WCAG 1.4.11 needs 3:1) */
 
   --space-1: 4px;
   --space-2: 8px;
