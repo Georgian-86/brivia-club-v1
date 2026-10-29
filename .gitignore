@@ -15,3 +15,6 @@ chrome-out.txt
 
 # design review screenshots (tests/e2e/design-shots.mjs)
 .superpowers/shots/
+
+# screenshots made for the founder (not shipped)
+.screens/
