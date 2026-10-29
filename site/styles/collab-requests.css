@@ -1,0 +1,121 @@
+/* "See who wants to collaborate with you" (D-108): the section in the notification panel and the review sheet
+   (collab-requests.js). Tokens only. The card moves like the deck (deck-swipe.js drives --swipe-pass / --swipe-pitch
+   for the NOT NOW / CONNECT stamps). A centred card on wide screens, a bottom sheet on phones. */
+
+/* ---------- The panel section ---------- */
+.notification-collab{
+  display:grid;grid-template-columns:auto minmax(0,1fr) auto;align-items:center;gap:var(--space-3);
+  padding:var(--space-3) 15px;border-bottom:1px solid var(--color-line);
+  background:linear-gradient(135deg, color-mix(in srgb, var(--brivia-wine) 7%, var(--color-cream)), var(--color-cream));
+}
+.notification-collab-faces{display:flex;padding-left:10px}
+.notification-collab-faces .notification-avatar{margin-left:-10px;border:2px solid var(--color-cream);box-shadow:0 1px 3px color-mix(in srgb, var(--brivia-deep-wine) 18%, transparent)}
+.notification-collab-copy{display:flex;flex-direction:column;gap:2px;min-width:0}
+.notification-collab-copy strong{color:var(--color-wine-deep);font-family:var(--font-heading);font-size:var(--text-14);font-weight:600;line-height:1.25}
+.notification-collab-copy span{color:var(--color-ink-soft);font-size:var(--text-12)}
+.notification-collab-review{
+  min-width:44px;min-height:44px;padding:0 var(--space-4);border:0;border-radius:var(--radius-pill);
+  background:var(--brivia-wine);color:var(--color-cream);font-family:var(--font-body);font-size:var(--text-12);font-weight:700;letter-spacing:.08em;
+  text-transform:uppercase;cursor:pointer;transition:background var(--motion-fast) var(--ease);
+}
+@media (hover:hover){.notification-collab-review:hover{background:var(--color-wine-deep)}}
+.notification-collab-review:focus-visible{outline:2px solid var(--brivia-wine);outline-offset:2px}
+
+/* ---------- The review sheet ---------- */
+dialog.collab-review{
+  width:min(440px, calc(100vw - 32px));max-width:none;max-height:calc(100dvh - 32px);margin:auto;padding:0;overflow:visible;
+  border:0;background:transparent;color:var(--color-ink);
+}
+dialog.collab-review::backdrop{background:color-mix(in srgb, var(--brivia-deep-wine) 62%, transparent);backdrop-filter:blur(6px)}
+dialog.collab-review[open]{animation:collab-in var(--motion-slow) var(--ease)}
+@keyframes collab-in{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:none}}
+.collab-panel{
+  position:relative;display:flex;flex-direction:column;gap:var(--space-4);max-height:calc(100dvh - 32px);overflow:hidden auto;
+  padding:var(--space-5) var(--space-5) var(--space-5);border-radius:var(--radius-l);background:var(--color-cream);
+  box-shadow:0 40px 90px -30px color-mix(in srgb, var(--brivia-deep-wine) 80%, transparent);
+}
+.collab-head{padding-right:48px}
+.collab-eyebrow{margin:0 0 6px;color:var(--brivia-wine);font-size:var(--text-12);font-weight:700;letter-spacing:.12em;text-transform:uppercase}
+.collab-head h2{margin:0;color:var(--color-ink);font-family:var(--font-heading);font-size:var(--text-24);font-weight:600;line-height:1.15}
+.collab-close{
+  position:absolute;top:var(--space-4);right:var(--space-4);display:grid;place-items:center;width:44px;height:44px;padding:0;
+  border:1px solid var(--color-line);border-radius:50%;background:var(--color-cream);color:var(--color-ink);cursor:pointer;
+}
+.collab-close svg,.collab-button svg,.collab-state-mark svg{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.collab-close:focus-visible{outline:2px solid var(--brivia-wine);outline-offset:2px}
+@media (hover:hover){.collab-close:hover{background:color-mix(in srgb, var(--brivia-wine) 8%, var(--color-cream))}}
+
+.collab-body{display:flex;flex-direction:column;gap:var(--space-4)}
+.collab-stack{position:relative}
+.collab-card{
+  position:relative;display:flex;flex-direction:column;align-items:center;gap:6px;padding:var(--space-6) var(--space-5) var(--space-5);
+  border:1px solid var(--color-card-edge);border-radius:20px;background:var(--color-card-paper);text-align:center;
+  box-shadow:0 18px 36px -24px color-mix(in srgb, var(--brivia-deep-wine) 70%, transparent);
+  touch-action:pan-y;user-select:none;-webkit-user-select:none;cursor:grab;will-change:transform;
+}
+.collab-card.is-held{cursor:grabbing}
+.collab-count{
+  position:absolute;top:var(--space-3);right:var(--space-3);margin:0;padding:3px 10px;border-radius:var(--radius-pill);
+  background:color-mix(in srgb, var(--brivia-wine) 9%, transparent);color:var(--brivia-wine);font-size:var(--text-12);font-weight:700;font-variant-numeric:tabular-nums;
+}
+.collab-avatar{
+  display:grid;place-items:center;width:96px;height:96px;overflow:hidden;border:3px solid var(--color-cream);border-radius:50%;
+  background:var(--color-chip);color:var(--brivia-wine);font-family:var(--font-heading);font-size:var(--text-32);font-weight:600;
+  box-shadow:0 0 0 1px color-mix(in srgb, var(--brivia-wine) 30%, transparent), 0 10px 24px -14px color-mix(in srgb, var(--brivia-deep-wine) 80%, transparent);
+}
+.collab-avatar img{width:100%;height:100%;object-fit:cover;pointer-events:none}
+.collab-name{margin:var(--space-2) 0 0;color:var(--color-name-ink);font-family:var(--font-heading);font-size:var(--text-24);font-weight:600;line-height:1.15;overflow-wrap:anywhere}
+.collab-meta{margin:0;color:var(--color-ink-soft);font-size:var(--text-14)}
+.collab-label{margin:var(--space-3) 0 2px;color:var(--brivia-wine);font-size:var(--text-12);font-weight:700;letter-spacing:.1em;text-transform:uppercase}
+.collab-shared{display:flex;flex-wrap:wrap;justify-content:center;gap:6px;margin:0;padding:0;list-style:none}
+.collab-shared li{padding:5px 12px;border:1px solid color-mix(in srgb, var(--brivia-wine) 22%, transparent);border-radius:var(--radius-pill);background:color-mix(in srgb, var(--brivia-wine) 6%, var(--color-cream));color:var(--color-wine-deep);font-size:var(--text-12);font-weight:600}
+.collab-note{align-self:stretch;margin-top:var(--space-1);text-align:left}
+.collab-note .collab-label{text-align:center}
+.collab-note-text{
+  display:-webkit-box;margin:var(--space-1) 0 0;padding:var(--space-3) var(--space-4);overflow:hidden;border-left:3px solid var(--brivia-wine);
+  border-radius:0 var(--radius-m) var(--radius-m) 0;background:var(--color-cream);color:var(--color-ink);font-size:var(--text-14);line-height:1.45;
+  overflow-wrap:anywhere;-webkit-box-orient:vertical;-webkit-line-clamp:5;
+}
+.collab-stamp{
+  position:absolute;top:var(--space-5);z-index:1;padding:6px 12px 5px;border:3px solid currentColor;border-radius:10px;
+  font-size:var(--text-20);font-weight:700;line-height:1;letter-spacing:.14em;pointer-events:none;
+}
+.collab-stamp--connect{left:var(--space-4);border-color:var(--brivia-wine);background:var(--brivia-wine);color:var(--color-cream);opacity:var(--swipe-pitch, 0);transform:rotate(-12deg)}
+.collab-stamp--later{right:var(--space-4);background:color-mix(in srgb, var(--color-card-paper) 88%, transparent);color:var(--color-ink-soft);opacity:var(--swipe-pass, 0);transform:rotate(12deg)}
+
+.collab-actions{display:grid;grid-template-columns:1fr 1fr;gap:var(--space-3);align-self:stretch}
+.collab-button{
+  display:inline-flex;align-items:center;justify-content:center;gap:var(--space-2);min-height:48px;padding:0 var(--space-4);
+  border:1px solid var(--brivia-wine);border-radius:var(--radius-pill);background:transparent;color:var(--brivia-wine);
+  font-family:var(--font-body);font-size:var(--text-14);font-weight:700;letter-spacing:.04em;cursor:pointer;
+  transition:background var(--motion-fast) var(--ease),color var(--motion-fast) var(--ease),transform var(--motion-fast) var(--ease);
+  -webkit-tap-highlight-color:transparent;touch-action:manipulation;
+}
+.collab-button--connect{background:var(--brivia-wine);color:var(--color-cream)}
+.collab-button:disabled{opacity:.55;cursor:default}
+.collab-button:active:not(:disabled){transform:scale(.97)}
+.collab-button:focus-visible{outline:2px solid var(--brivia-wine);outline-offset:3px}
+@media (hover:hover){
+  .collab-button--later:hover:not(:disabled){background:color-mix(in srgb, var(--brivia-wine) 8%, transparent)}
+  .collab-button--connect:hover:not(:disabled){background:var(--color-wine-deep)}
+}
+.collab-hint{margin:0;color:var(--color-ink-soft);font-size:var(--text-12);text-align:center}
+.collab-hint[hidden]{display:none}
+
+/* Connected and all-caught-up states. */
+.collab-state{display:flex;flex-direction:column;align-items:center;gap:var(--space-2);padding:var(--space-4) 0 0;text-align:center}
+.collab-state h3{margin:var(--space-2) 0 0;color:var(--color-ink);font-family:var(--font-heading);font-size:var(--text-24);font-weight:600}
+.collab-state p{margin:0 0 var(--space-3);color:var(--color-ink-soft);font-size:var(--text-14)}
+.collab-state > .collab-button{min-width:160px}
+.collab-state-mark{display:grid;place-items:center;width:64px;height:64px;border-radius:50%;background:color-mix(in srgb, var(--brivia-wine) 10%, var(--color-cream));color:var(--brivia-wine)}
+.collab-state-mark svg{width:28px;height:28px}
+@media (prefers-reduced-motion:no-preference){.collab-state{animation:collab-in var(--motion-slow) var(--ease)}}
+
+/* Phones: a bottom sheet. */
+@media (max-width:640px){
+  dialog.collab-review{width:100vw;max-height:calc(100dvh - 24px);margin:auto 0 0}
+  .collab-panel{max-height:calc(100dvh - 24px);padding:var(--space-5) var(--space-4) calc(var(--space-5) + env(safe-area-inset-bottom, 0px));border-radius:var(--radius-l) var(--radius-l) 0 0}
+  .collab-avatar{width:84px;height:84px}
+  .collab-head h2{font-size:var(--text-20)}
+}
+@media (prefers-reduced-motion:reduce){dialog.collab-review[open]{animation:none}}

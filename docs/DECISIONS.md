@@ -2182,3 +2182,16 @@ controls (a tester or a seeded test member), never a real member, so no new expo
   square" bound in `explore-cards.spec.mjs` moves from 1.35 to 1.5 to fit the footer.
 - **Proof:** unit `post-card.test.mjs`; e2e `post-activity.spec.mjs` (one 40 px footer per card, action bars aligned per
   row, the empty footer flips to "Liked by You" after a like) and `explore-cards.spec.mjs`.
+
+## D-108: Requests are reviewed in a "See who wants to collaborate with you" sheet, not Accept / Decline (founder, 2026-10-29)
+
+- **Asked:** no Accept / Decline in notifications; swipeable, under "see who wants to collaborate with you"; professional
+  networking wording, never a dating-app look.
+- **Done:** the panel shows one section (faces, "N people want to connect", Review). Review opens a sheet with one
+  request per card; Connect / right drag / ArrowRight calls `respond_connection_request(true)`, Not now / left drag /
+  ArrowLeft calls it with false (a quiet decline, as Decline did; founder chose this in brainstorming). A real
+  connection shows "You're connected." with Message and Next request; an accepted blocked pair moves on silently
+  (Ruling P12). No timer advances the connected state (the member taps Next or Message), so nobody is rushed.
+- **Proof:** unit `collab-requests.test.mjs`; e2e `collab-requests.spec.mjs` (1440 and 390, axe, drag, keys, failure,
+  reduced motion, wording) and `consent.spec.mjs` (escaped note, one RPC while in flight, blocked-pair accept,
+  injection-safe photo).

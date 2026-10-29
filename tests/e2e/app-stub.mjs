@@ -184,6 +184,17 @@ export const startAppStub = async ({ port, state = {}, deckRows = defaultDeckRow
           return route.fulfill({ status: 204, body: '', headers: { 'access-control-allow-origin': '*' } });
         }
       }
+      // D-108 requests: st.requests rows ({ from_id, note, created_at }) answer GET connection_requests; answering one
+      // removes it and logs st.responses; an accept makes a match unless the id is in st.blockedAccept.
+      if (pathName === '/rest/v1/connection_requests' && method === 'GET') return json(200, st.requests || []);
+      if (pathName === '/rest/v1/rpc/respond_connection_request') {
+        if (st.respondHold) await st.respondHold;
+        if (st.respondFail) return json(500, { code: 'XX000', message: 'stub failure' });
+        (st.responses ||= []).push(args);
+        st.requests = (st.requests || []).filter((row) => row.from_id !== args.p_from);
+        if (args.p_accept && !(st.blockedAccept || []).includes(args.p_from) && !st.matchIds.includes(args.p_from)) st.matchIds.push(args.p_from);
+        return route.fulfill({ status: 204, body: '', headers: { 'access-control-allow-origin': '*' } });
+      }
       if (pathName === '/rest/v1/community_post_shares' && method === 'POST') return route.fulfill({ status: 201, body: '', headers: { 'access-control-allow-origin': '*' } });
       if (pathName === '/rest/v1/brivia_messages' && method === 'POST') { (st.sent ||= []).push(args); return route.fulfill({ status: 201, body: '', headers: { 'access-control-allow-origin': '*' } }); }
       if (pathName === '/rest/v1/brivia_messages' && method === 'GET') return json(200, st.messages || []);

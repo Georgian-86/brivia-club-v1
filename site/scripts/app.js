@@ -37,6 +37,7 @@ import { postImageSrc } from './post-image.js';
 import { experienceChoices, cleanBio, BIO_MAX, areaInputValue, planInterestSave } from './profile-edit.js';
 import { isOffered } from './signup-flow.js';
 import { MAX_INTERESTS } from './passion-budget.js';
+import { collabSummary, openCollabReview } from './collab-requests.js';
 import { postCardMarkup, postFooterMarkup, countText, shareData, isSafePostImageSrc } from './post-card.js';
 import { toastSide } from './toast-place.js';
 import { loadReactions, setReaction, createReactionGuard } from './post-reactions.js';
@@ -77,6 +78,7 @@ import '../styles/chat-layout.css';
 import '../styles/app-polish.css';
 // The compact deck without side buttons, and its first-run tutorial (D-094). Loads last.
 import '../styles/deck-compact.css';
+import '../styles/collab-requests.css';  // D-108: the request section and review sheet
 import '../styles/components.css';  // D-105: the shared field, select, listbox and chip components, last so they win
 import { navMarkup, markCurrentNav, setChatBadges } from './app-nav.js';
 import { parseReadState, serializeReadState, lastReadAt, unreadCount, markRead, sortByLastContact, unreadTotal } from './chat-unread.js';
@@ -434,12 +436,11 @@ const renderNotifications = () => {
     grouped.set(key, group);
   });
   const unreadGroups = [...grouped.values()].sort((a, b) => new Date(b.latest.createdAt || 0) - new Date(a.latest.createdAt || 0));
-  const requestsHtml = requestCount ? `<section class="notification-requests" aria-label="Connection requests"><p class="notification-section-title">REQUESTS</p>${pendingRequests.map((request) => {
-    const name = request.person?.name || 'A Brivia member';
-    const busy = respondingRequestIds.has(request.fromId);
-    const disabled = busy ? ' disabled aria-busy="true"' : '';
-    return `<div class="notification-request" data-request-from="${escapeHtml(request.fromId)}">${renderAvatar(request.person, 'notification-avatar')}<div class="notification-copy"><strong>${escapeHtml(name)}</strong>${request.note ? `<span class="notification-request-note">${escapeHtml(request.note)}</span>` : '<span class="notification-request-note">Wants to connect with you.</span>'}</div><time>${escapeHtml(formatNotificationTime(request.createdAt))}</time><div class="notification-request-actions"><button type="button" class="notification-request-button" data-request-respond="accept" aria-label="Accept connection request from ${escapeHtml(name)}"${disabled}>ACCEPT</button><button type="button" class="notification-request-button" data-request-respond="decline" aria-label="Decline connection request from ${escapeHtml(name)}"${disabled}>DECLINE</button></div></div>`;
-  }).join('')}</section>` : '';
+  // D-108: one section for incoming requests; Review opens the one-at-a-time sheet (collab-requests.js).
+  const summary = collabSummary(pendingRequests);
+  const requestsHtml = summary ? `<section class="notification-collab" aria-labelledby="notification-collab-title"><div class="notification-collab-faces" aria-hidden="true">${summary.avatars.map((person) => renderAvatar(person, 'notification-avatar')).join('')}</div>`
+    + `<div class="notification-collab-copy"><strong id="notification-collab-title">See who wants to collaborate with you</strong><span>${escapeHtml(summary.text)}</span></div>`
+    + '<button type="button" class="notification-collab-review" data-collab-review>Review</button></section>' : '';
   // Every empty state offers a next step (Phase C Task 6): here, the notification settings.
   const settingsAction = '<button type="button" class="notification-empty-action" data-notification-settings>Notification settings</button>';
   const messagesHtml = !enabled ? `<div class="notification-empty"><p>Notifications are off in settings.</p>${settingsAction}</div>` : unreadGroups.length ? unreadGroups.map((group) => {
@@ -454,11 +455,10 @@ const renderNotifications = () => {
     closeNotificationPanel();
     openNotificationSettings();
   });
-  list.querySelectorAll('[data-request-respond]').forEach((control) => control.addEventListener('click', (event) => {
+  list.querySelector('[data-collab-review]')?.addEventListener('click', (event) => {
     event.stopPropagation();
-    const fromId = control.closest('[data-request-from]')?.dataset.requestFrom;
-    if (fromId) respondToRequest(fromId, control.dataset.requestRespond === 'accept');
-  }));
+    openRequestReview();
+  });
   list.querySelectorAll('[data-notification-person]').forEach((item) => item.addEventListener('click', () => {
     const personId = item.dataset.notificationPerson;
     markNotificationsReadForPerson(personId);
@@ -1272,28 +1272,48 @@ const refreshConnections = async () => {
     .forEach(addConnection);
   return remoteConnectionIds.length !== before;
 };
+// Answers one request; resolves { ok, connected }. The review sheet (D-108) shows its own outcome, so only a failure
+// toasts here (the member took the action).
 const respondToRequest = async (fromId, accept) => {
-  if (!supabase || respondingRequestIds.has(fromId)) return;
-  const request = pendingRequests.find((item) => item.fromId === fromId);
+  if (!supabase || respondingRequestIds.has(fromId)) return { ok: false, connected: false };
   respondingRequestIds.add(fromId);
-  renderNotifications();
   const { error } = await supabase.rpc('respond_connection_request', { p_from: fromId, p_accept: accept });
   respondingRequestIds.delete(fromId);
   if (error) {
-    renderNotifications();
     showToast('That request could not be updated. Please try again.');
-    loadConnectionRequests();
-    return;
+    return { ok: false, connected: false };
   }
   pendingRequests = pendingRequests.filter((item) => item.fromId !== fromId);
   renderNotifications();
-  if (!accept) { showToast('Request declined.'); return; }
+  if (!accept) return { ok: true, connected: false };
   // Accepting a blocked pair silently records a decline (Ruling P12): only a real match opens chat.
-  if (!(await hasMatchWith(fromId))) { showToast('Request answered.'); return; }
+  if (!(await hasMatchWith(fromId))) return { ok: true, connected: false };
   addConnection(fromId);
   await refreshConnections();
   renderChats();
-  showToast(mutualToast(request?.person));
+  return { ok: true, connected: true };
+};
+let requestReviewOpen = false;
+const openRequestReview = () => {
+  if (requestReviewOpen || !pendingRequests.length) return;
+  requestReviewOpen = true;
+  closeNotificationPanel();
+  openCollabReview({
+    requests: pendingRequests,
+    respond: respondToRequest,
+    myInterests: (profileInterests.rows || []).map((row) => row.label).filter(Boolean),
+    escapeHtml,
+    renderAvatar,
+    onMessage: (fromId) => {
+      const person = findPersonById(fromId);
+      if (person) { setView('chat'); openChat(person); }
+    },
+    onClose: () => {
+      requestReviewOpen = false;
+      document.querySelector('#app-notification-button')?.focus({ preventScroll: true });
+      loadConnectionRequests();
+    },
+  });
 };
 
 const removedConnectionsStorageKey = () => `brivia-removed-connections:${memberProfile.id || 'anonymous'}`;

@@ -59,6 +59,18 @@ Counts sit inline beside the Like, Comment and Share icons (12 px, 700, tabular 
 comments" on the right when there are any. `post-card.js` `postFooterMarkup` draws it for both the first render and
 the in-place repaint.
 
+## Collaboration requests (D-108)
+
+Incoming connection requests never show Accept / Decline rows. The notification panel has one section: up to three
+overlapping faces, **See who wants to collaborate with you**, "N people want to connect" and **Review**. Review opens a
+modal sheet (`collab-requests.js`; a centred 440 px card on wide screens, a bottom sheet at 640 px and below) with one
+request at a time: photo, name, role · distance band, "You both care about" (up to 3), "Their note", "1 of 3".
+**Connect** (button, right drag, ArrowRight) accepts; when a connection results the sheet shows "You're connected."
+with **Message <name>** and **Next request**. **Not now** (button, left drag, ArrowLeft) declines quietly; the sender is
+never told. A failed answer keeps the card and shows the shared toast. The end reads "You're all caught up." The drag
+is the deck's (`deck-swipe.js`) with CONNECT / NOT NOW stamps; reduced motion fades. Focus stays in the sheet and goes
+back to the bell on close. Words: collaborate, connect, not now, request; never match, like, pass, swipe, crush or hearts.
+
 ## Flow changes
 
 ### A0. Guided signup: one question per screen (D-073, live from 2026-10-22; replaces the 4-step form below)
