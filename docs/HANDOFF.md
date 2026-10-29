@@ -7,6 +7,23 @@ Update this file at the end of every session. CLAUDE.md holds the aim; this file
 
 ## 1. What is done
 
+**2026-10-29, same branch (D-107 to D-110; plan `docs/superpowers/plans/2026-10-29-collab-requests-interests-presence.md`):**
+- **Post cards (D-107, live):** counts inline beside the icons, one fixed 40 px footer on every card ("Liked by …" /
+  "View N comments", or "Be the first to like this"), so action bars line up.
+- **Requests (D-108, live):** no Accept / Decline; the notification panel shows "See who wants to collaborate with you"
+  and Review opens a one-card-at-a-time sheet (Connect / Not now, drag or arrow keys; Not now declines quietly).
+  `collab-requests.js`, e2e `collab-requests.spec.mjs`.
+- **Interest catalogue (D-109, client live, needs `0017_interest_catalog.sql`, NOT applied):** the founder's A–Z list
+  in both pickers under letter headings, and "Add … as your own interest" (`add_member_interest`). Source
+  `supabase/catalog/interest-catalog.tsv` → `node scripts/build-interest-catalog.mjs`. ORBIT treats `member.*`
+  interests as exact-match only (`placed: false`).
+- **Active status (D-110, needs `0018_member_presence.sql`, NOT applied):** one green dot on a connection's avatar in
+  the chat list (founder: one dot only, nothing in the open chat). Settings → Notifications → "Show when I'm active".
+- Proof: unit 375; orbit 87; SQL harness ALL PASSED (new g-interest-catalog, h-member-presence); e2e signup 329,
+  onboarding 269, profile-edit, collab-requests, presence, consent 184, app-shell 211, deck 196, fit 324, chat suites.
+- Known, not fixed here: the chat list's older axe findings (a button inside the row button, inbox tab roles, a
+  4.42:1 "Unread" tab label).
+
 **2026-10-28, branch `claude/wizardly-volta-6hv7or` (D-100 to D-102):**
 - **Chat (D-100):** the phone inbox scrolls as a page again (a chat-view `overflow: hidden` lock had clipped it), a wheel
   anywhere in the desktop sidebar scrolls the rows, conversations sort by last contact, and the Chat badge counts
@@ -224,6 +241,10 @@ Tooling: Playwright **and axe-core** at `/tmp/pw` (`npm install --prefix /tmp/pw
 - Real members are **not allowed yet**: see the gate table in `docs/arena/2026-10-07-iteration-4.md`.
 
 ## 3. What to do next (in order)
+
+**Database owed (2026-10-29):** in order, whichever are not yet applied: `0015`, `0016`, `0017_interest_catalog.sql`
+(long: the catalogue rows; paste all of it), `0018_member_presence.sql`. README sections "0015"–"0018" have the verify
+queries. The client is live and hides each feature until its file is applied.
 
 **Database owed (2026-10-28):** apply `0015_post_activity.sql` (comments, shares, counts) and then `0016_profile_bio.sql` (bio); README "0015" / "0016". The client is live and hides those features until each file is applied. Earlier note: review the preview of `claude/wizardly-volta-6hv7or`, then apply `0015_post_activity.sql`
 (README "0015": pre-flight, apply, verify; either order with the client works) and merge. Existing members without a
