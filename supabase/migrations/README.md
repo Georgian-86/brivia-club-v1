@@ -783,3 +783,37 @@ select has_table_privilege('authenticated', 'public.member_presence', 'select'),
 
 Expected advisor additions: `connection_presence`, `my_presence_visible`, `set_presence_visible` and `touch_presence`
 join the intended definer-RPC list (`orbit-hygiene.test.sql` H3).
+
+## 0019
+
+**The pitch in the review sheet; the chat starts with the pitch (founder request 2026-11-01, D-112). Not yet applied.**
+
+What it does: a guard first (0019 raises if `0013` is missing: the seeded messages rely on its select policy and
+withholding). `brivia_create_match` (still invoker, still revoked from every client role) becomes plpgsql: when it
+actually inserts the match row, it inserts one text message per request between the pair (either direction, status
+`pending` or `accepted`, non-blank note) from the request's sender to its recipient, dated at the request's
+`created_at`, so the chat opens with the pitch. No row when the match already existed. Every match path seeds
+(review-sheet Connect through `respond_connection_request`, like-back through the completion trigger); a blocked pair
+never reaches it. `report_member` evidence also keeps the pair's request notes as `kind = 'pitch'` entries.
+
+Deploy order: apply `0019` before (or with) the client that shows the pitch on the review card and sends the reply
+after Connect; an old client simply sees the pitch as the first chat message. Apply after `0013`-`0018`. Before 0019 a
+connection's chat starts empty.
+
+Pre-flight (read-only):
+
+```sql
+select to_regprocedure('brivia_private.brivia_message_visible(uuid,uuid,uuid)') is not null;  -- t
+```
+
+Verify after the apply:
+
+```sql
+select l.lanname, p.prosecdef,                                                                  -- plpgsql, f
+       has_function_privilege('authenticated', 'public.brivia_create_match(uuid,uuid)', 'execute'),  -- f
+       position('''pitch''' in pg_get_functiondef('public.report_member(uuid,text,text)'::regprocedure)) > 0  -- t
+  from pg_proc p join pg_language l on l.oid = p.prolang
+ where p.oid = 'public.brivia_create_match(uuid,uuid)'::regprocedure;
+```
+
+No advisor change: `brivia_create_match` stays invoker and `report_member` keeps its grants.

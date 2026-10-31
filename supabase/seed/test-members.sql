@@ -35,7 +35,8 @@
 --     3->1, 4->1, 9->10, 5->8 (v1) and 1->40 (t01 in both directions). Run as the owner, auth.uid() is null, so the
 --     cap trigger steps aside and RLS is bypassed; the AFTER INSERT consent trigger still runs, so the result obeys
 --     the mutual-consent rule.
---   * 15 short messages, only between the 3 matched pairs (5, 6 and 4). No notification rows: the app derives
+--   * 15 short messages, only between the 3 matched pairs (5, 6 and 4), each pair's chat opening with the pitch
+--     the match seeds from 0019 (3 more: 18 in all). No notification rows: the app derives
 --     notifications from these requests, matches and messages.
 --   * 30 community posts by unflagged members of all five cities. image_url is a preset illustration identifier
 --     (/Images/Cover%20images/<file>, the app's preset set) with an empty image_path: nothing is uploaded.
@@ -272,14 +273,15 @@ begin
   select (f || lpad(a::text, 12, '0'))::uuid, (f || lpad(b::text, 12, '0'))::uuid
     from (values (25, 32), (33, 11), (39, 48), (49, 23), (53, 60)) v(a, b)
   on conflict do nothing;
-  -- Matches: both directions, so the consent trigger accepts the pair and creates the match.
-  insert into public.connection_requests (from_id, to_id, note) values
-    ((f || '000000000001')::uuid, (f || '000000000002')::uuid, 'Test fixture: Bengaluru hello'),
-    ((f || '000000000002')::uuid, (f || '000000000001')::uuid, null),
-    ((f || '000000000043')::uuid, (f || '000000000044')::uuid, 'Fellow Thane person, football and chai?'),
-    ((f || '000000000044')::uuid, (f || '000000000043')::uuid, null),
-    ((f || '000000000013')::uuid, (f || '000000000014')::uuid, 'Saw you play badminton in Saket.'),
-    ((f || '000000000014')::uuid, (f || '000000000013')::uuid, null)
+  -- Matches: both directions, so the consent trigger accepts the pair and creates the match. Dated just before each
+  -- pair's first message: from 0019 (D-112) the match seeds the pitch as the chat's first message, at this time.
+  insert into public.connection_requests (from_id, to_id, note, created_at) values
+    ((f || '000000000001')::uuid, (f || '000000000002')::uuid, 'Test fixture: Bengaluru hello', now() - interval '310 minutes'),
+    ((f || '000000000002')::uuid, (f || '000000000001')::uuid, null, now() - interval '305 minutes'),
+    ((f || '000000000043')::uuid, (f || '000000000044')::uuid, 'Fellow Thane person, football and chai?', now() - interval '910 minutes'),
+    ((f || '000000000044')::uuid, (f || '000000000043')::uuid, null, now() - interval '905 minutes'),
+    ((f || '000000000013')::uuid, (f || '000000000014')::uuid, 'Saw you play badminton in Saket.', now() - interval '1510 minutes'),
+    ((f || '000000000014')::uuid, (f || '000000000013')::uuid, null, now() - interval '1505 minutes')
   on conflict do nothing;
   -- Pending requests (one direction only): t01 receives two and sends one.
   insert into public.connection_requests (from_id, to_id, note) values
@@ -289,7 +291,8 @@ begin
     ((f || '000000000005')::uuid, (f || '000000000008')::uuid, 'Test fixture: cross-city pending'),
     ((f || '000000000001')::uuid, (f || '000000000040')::uuid, 'Saw your robotics post. Data for robots, coffee sometime?')
   on conflict do nothing;
-  -- Messages: only between matched pairs, only when the pair has none yet. created_at is staggered (owner session).
+  -- Messages: only between matched pairs, only when the pair has none yet besides its seeded pitch (0019). created_at
+  -- is staggered (owner session).
   insert into public.brivia_messages (sender_id, recipient_id, body, created_at)
   select (f || lpad(v.s::text, 12, '0'))::uuid, (f || lpad(v.r::text, 12, '0'))::uuid, v.body,
          now() - make_interval(mins => v.ago)
@@ -315,7 +318,9 @@ begin
                     and m.user2_id = greatest((f || lpad(v.s::text, 12, '0'))::uuid, (f || lpad(v.r::text, 12, '0'))::uuid))
      and not exists (select 1 from public.brivia_messages b
                       where least(b.sender_id, b.recipient_id) = least((f || lpad(v.s::text, 12, '0'))::uuid, (f || lpad(v.r::text, 12, '0'))::uuid)
-                        and greatest(b.sender_id, b.recipient_id) = greatest((f || lpad(v.s::text, 12, '0'))::uuid, (f || lpad(v.r::text, 12, '0'))::uuid));
+                        and greatest(b.sender_id, b.recipient_id) = greatest((f || lpad(v.s::text, 12, '0'))::uuid, (f || lpad(v.r::text, 12, '0'))::uuid)
+                        and not exists (select 1 from public.connection_requests c   -- the 0019 seeded pitch
+                                         where c.from_id = b.sender_id and c.to_id = b.recipient_id and c.note = b.body));
   -- Posts: fixed ids (a7e57000-0000-4000-9000-0000000000KK), preset illustration, empty image_path (0008 section 4).
   insert into public.community_posts (id, author_id, image_url, image_path, caption, created_at)
   select ('a7e57000-0000-4000-9000-' || lpad(p.k::text, 12, '0'))::uuid, (f || lpad(p.n::text, 12, '0'))::uuid,

@@ -217,7 +217,7 @@ begin
   if exists (select 1 from public.connection_requests cr join public.profiles p on p.id in (cr.from_id, cr.to_id) where not p.is_test)
      or exists (select 1 from public.matches m join public.profiles p on p.id in (m.user1_id, m.user2_id) where not p.is_test) then
     raise exception 'FAIL S4: fixture touches a real member'; end if;
-  -- messages: only between matched pairs, 4-8 per match, 15 in all
+  -- messages: only between matched pairs, 4-8 per match, 18 in all (15 plus the 3 pitches 0019 seeds)
   if exists (select 1 from public.brivia_messages b
               where not exists (select 1 from public.matches m where m.user1_id = least(b.sender_id, b.recipient_id)
                                                                 and m.user2_id = greatest(b.sender_id, b.recipient_id))) then
@@ -229,7 +229,7 @@ begin
     if r.c not between 4 and 8 then raise exception 'FAIL S4: match % - % has % messages (want 4-8)', r.user1_id, r.user2_id, r.c; end if;
   end loop;
   select count(*) into n from public.brivia_messages;
-  if n <> 15 then raise exception 'FAIL S4: % messages, expected 15', n; end if;
+  if n <> 18 then raise exception 'FAIL S4: % messages, expected 18', n; end if;
   if exists (select 1 from public.brivia_messages b group by least(b.sender_id, b.recipient_id), greatest(b.sender_id, b.recipient_id)
               having count(distinct b.sender_id) < 2) then
     raise exception 'FAIL S4: a conversation is one-sided'; end if;
@@ -300,7 +300,7 @@ begin
   select count(*) into n from public.get_candidates(array['eeeeeeee-0000-0000-0000-0000000000e1'::uuid]);
   if n <> 0 then raise exception 'FAIL S6: test member sees a real member'; end if;
   select count(*) into n from public.matches; if n <> 1 then raise exception 'FAIL S6: member 1 sees % matches', n; end if;
-  select count(*) into n from public.brivia_messages; if n <> 5 then raise exception 'FAIL S6: member 1 reads % messages, expected 5', n; end if;
+  select count(*) into n from public.brivia_messages; if n <> 6 then raise exception 'FAIL S6: member 1 reads % messages, expected 6 (5 plus the seeded pitch)', n; end if;
   select count(*) into n from public.connection_requests where to_id = auth.uid() and status = 'pending';
   if n <> 2 then raise exception 'FAIL S6: member 1 has % pending incoming, expected 2', n; end if;
   select count(*) into n from public.community_posts; if n <> 30 then raise exception 'FAIL S6: member 1 sees % posts, expected 30', n; end if;
@@ -388,7 +388,7 @@ end $$;
 select 'seed.test S8 ORBIT roles (neighbours first, flagged invisible, blocks, far match only through the gate) OK';
 
 -- Seeding twice changes nothing (idempotent): run.sh re-runs the seed before these checks, and the exact counts above
--- (60 members, 30 posts, 15 messages, 15 consent rows, 5 blocks, 10 flags) would double otherwise.
+-- (60 members, 30 posts, 18 messages, 15 consent rows, 5 blocks, 10 flags) would double otherwise.
 select count(*) = 60 as ok from public.profiles where is_test \gset
 \if :ok
 \else

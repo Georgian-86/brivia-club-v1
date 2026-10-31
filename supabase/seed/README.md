@@ -24,7 +24,7 @@ members never see them. Real data is never touched by either script.
    the REST API or a client: only the table owner can set `is_test`, so any other route stores `is_test = false`.
    The script detects this, aborts and rolls back with "seed aborted: is_test was not stored".
 3. Check the result row: `test_members = 60`, `test_posts = 30`, `test_requests = 11`, `test_matches = 3`,
-   `test_messages = 15`, `flagged = 10`, `blocks = 5`.
+   `test_messages = 18` (15 before `0019`), `flagged = 10`, `blocks = 5`.
 
 ## What you get
 
@@ -43,7 +43,7 @@ where the founder's own accounts live, get the richest coverage (Thane is all ne
   path (`/Images/Cover%20images/<file>`, empty `image_path`), allowed for test members only (0008 section 4) and
   rendered by the feed from the shipped assets; nothing is uploaded. 3 matches (t01-t02 Bengaluru, t43-t44 Thane,
   t13-t14 Delhi), each made by the normal mutual-consent trigger from requests in both directions (never a direct
-  insert), with 5, 6 and 4 short messages. 5 pending requests: t03 and t04 to t01, t01 to t40 (so t01 has requests in
+  insert), with 5, 6 and 4 short messages (from `0019` each chat opens with the pitch the match seeds: 18 in all). 5 pending requests: t03 and t04 to t01, t01 to t40 (so t01 has requests in
   both directions), t09 to t10, t05 to t08. There is no notification table: the app derives notifications from these
   rows. Requests expire after 30 days; purge and re-seed to refresh.
 
