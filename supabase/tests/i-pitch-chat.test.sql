@@ -206,6 +206,7 @@ select 'i-pitch-chat.test L2 (respond) OK';
 -- C7 a tester pitching a real member across worlds: Accept is P0002; the thread list omits it.
 -- C8 after Accept, B's send_signal(A) answers 'matched'; messages still flow; the thread list omits the pair.
 -- C9 deleting that match (P10) closes everything: both inserts 42501, neither thread list shows the pair.
+-- C11 the typing topic follows the chat: false before Accept, true after (for both), false again after End chat.
 -- C10 the thread list's exact signature (no email, phone, coordinates or city); anon cannot execute the three;
 --    a caller without a completed profile gets 22023.
 -- Callers below run as `authenticated` (set local role in the do block); the helpers set the JWT subject.
@@ -334,7 +335,7 @@ end $$;
 select 'i-pitch-chat.test C3 OK';
 
 -- C4 (B declines before Accept; A ends after Accept; A cannot end before Accept) -----------------------------------
-create or replace function pg_temp.pc_c4_closed(p_label text) returns void language plpgsql as $$
+create or replace function pg_temp.pc_c4_closed(p_label text, p_history int) returns void language plpgsql as $$
 declare v text; n int;
 begin
   if (select status from public.connection_requests where from_id = pg_temp.pc(1) and to_id = pg_temp.pc(2))
@@ -342,6 +343,9 @@ begin
   set local role authenticated;
   v := pg_temp.pc_send(1, 2); if v <> '42501' then raise exception 'FAIL C4 %: A -> B after end: %', p_label, v; end if;
   v := pg_temp.pc_send(2, 1); if v <> '42501' then raise exception 'FAIL C4 %: B -> A after end: %', p_label, v; end if;
+  -- spec §3.8: what was sent while the chat was open stays readable to both sides
+  n := pg_temp.pc_seen(1, 1, 2); if n <> p_history then raise exception 'FAIL C4 %: A reads % messages (want %)', p_label, n, p_history; end if;
+  n := pg_temp.pc_seen(2, 1, 2); if n <> p_history then raise exception 'FAIL C4 %: B reads % messages (want %)', p_label, n, p_history; end if;
   perform set_config('request.jwt.claims', json_build_object('sub', pg_temp.pc(1))::text, true);
   select count(*) into n from public.my_outgoing_requests() o where o.to_id = pg_temp.pc(2) and o.status = 'pending';
   if n <> 1 then raise exception 'FAIL C4 %: A''s my_outgoing_requests no longer shows pending', p_label; end if;
@@ -367,7 +371,7 @@ begin
   v := pg_temp.pc_try(2, 'select public.end_pitch_chat($1)', 1);
   if v <> 'ok' then raise exception 'FAIL C4: B declining before Accept answered %', v; end if;
   reset role;
-  perform pg_temp.pc_c4_closed('(B before Accept)');
+  perform pg_temp.pc_c4_closed('(B before Accept)', 0);
   set local role authenticated;
   v := pg_temp.pc_try(2, 'select public.end_pitch_chat($1)', 1);
   if v <> 'P0002' then raise exception 'FAIL C4: ending a declined request answered %', v; end if;
@@ -387,7 +391,7 @@ begin
   v := pg_temp.pc_try(1, 'select public.end_pitch_chat($1)', 2);
   if v <> 'ok' then raise exception 'FAIL C4: A ending after Accept answered %', v; end if;
   reset role;
-  perform pg_temp.pc_c4_closed('(A after Accept)');
+  perform pg_temp.pc_c4_closed('(A after Accept)', 1);
 end $$;
 select 'i-pitch-chat.test C4 OK';
 
@@ -424,7 +428,7 @@ begin
      is not null then raise exception 'FAIL C6: accept on a blocked pair opened the chat'; end if;
   set local role authenticated;
   v := pg_temp.pc_send(4, 2);
-  if v not in ('ok', '42501') then raise exception 'FAIL C6: D -> B answered %', v; end if;
+  if v <> '42501' then raise exception 'FAIL C6: D -> B answered % (want 42501: the chat never opened)', v; end if;
   n := pg_temp.pc_seen(2, 4, 2); if n <> 0 then raise exception 'FAIL C6: B reads % messages from D', n; end if;
   v := pg_temp.pc_thread(2, 4); if v is not null then raise exception 'FAIL C6: B''s thread list shows D: %', v; end if;
 end $$;
@@ -506,6 +510,34 @@ begin
 end $$;
 do $$ begin perform pg_temp.pc_reset(); perform pg_temp.pc_clear_messages(); end $$;
 select 'i-pitch-chat.test C10 OK';
+
+-- C11 -------------------------------------------------------------------------------------------------------------
+-- Member p_as's brivia_typing_topic_ok for the A/B pair topic (ids sorted, as the client builds it).
+create or replace function pg_temp.pc_typing(p_as int) returns boolean language plpgsql as $$
+begin
+  perform set_config('request.jwt.claims', json_build_object('sub', pg_temp.pc(p_as))::text, true);
+  return brivia_private.brivia_typing_topic_ok('typing:' || pg_temp.pc(1)::text || ':' || pg_temp.pc(2)::text);
+end $$;
+
+do $$ begin perform pg_temp.pc_reset(); perform pg_temp.pc_clear_messages();
+            perform pg_temp.pc_request(1, 2, 'hello B', interval '1 day', null); end $$;
+do $$
+declare v text;
+begin
+  if to_regprocedure('brivia_private.brivia_typing_topic_ok(text)') is null then
+    raise exception 'FAIL C11: brivia_typing_topic_ok is missing (the stub has realtime.messages)'; end if;
+  set local role authenticated;
+  if pg_temp.pc_typing(1) or pg_temp.pc_typing(2) then raise exception 'FAIL C11: typing allowed before Accept'; end if;
+  v := pg_temp.pc_try(2, 'select public.accept_pitch_chat($1)', 1);
+  if v <> 'ok' then raise exception 'FAIL C11: accept answered %', v; end if;
+  if not pg_temp.pc_typing(1) then raise exception 'FAIL C11: A cannot type after Accept'; end if;
+  if not pg_temp.pc_typing(2) then raise exception 'FAIL C11: B cannot type after Accept'; end if;
+  v := pg_temp.pc_try(1, 'select public.end_pitch_chat($1)', 2);
+  if v <> 'ok' then raise exception 'FAIL C11: end answered %', v; end if;
+  if pg_temp.pc_typing(1) or pg_temp.pc_typing(2) then raise exception 'FAIL C11: typing allowed after End chat'; end if;
+end $$;
+do $$ begin perform pg_temp.pc_reset(); perform pg_temp.pc_clear_messages(); end $$;
+select 'i-pitch-chat.test C11 OK';
 
 -- ---------------------------------------------------------------------------------------------------------------
 -- Teardown (keep last)

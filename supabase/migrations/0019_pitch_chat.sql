@@ -17,7 +17,7 @@ set lock_timeout = '5s';
 --      respond_connection_request, purge_expired_requests, my_outgoing_requests, deck_candidates, send_signal and the
 --      select policy "Members can view their connection requests".
 -- Section 2: accept_pitch_chat, end_pitch_chat, my_pitch_threads (all security definer, authenticated), and chat-open brivia_can_send /
--- brivia_can_message.
+-- brivia_can_message, and the chat-open typing topic (brivia_typing_topic_ok).
 
 -- =============================================================================================
 -- Section 1: chat_accepted_at and the liveness rule that keeps an open pitch chat
@@ -562,3 +562,67 @@ end;
 $$;
 revoke all on function public.my_pitch_threads() from public, anon;
 grant execute on function public.my_pitch_threads() to authenticated;
+
+-- brivia_typing_topic_ok: copied from 0012_polish_wave.sql:191; only the matched clause gains "or a chat-open pitch
+-- between the pair" (either direction), so the typing channel follows the chat gates. The caller-only block clause
+-- and the world clause stay. Same guard as 0012: a no-op where Realtime Authorization (realtime.messages) is absent.
+do $typing$
+begin
+  if to_regclass('realtime.messages') is null then
+    return;
+  end if;
+
+  execute $f$
+    create or replace function brivia_private.brivia_typing_topic_ok(p_topic text)
+    returns boolean
+    language plpgsql
+    stable
+    security definer
+    set search_path = public
+    as $b$
+    declare
+      m text[];
+      me uuid := auth.uid();
+      lo uuid;
+      hi uuid;
+      other uuid;
+    begin
+      if me is null or p_topic is null then
+        return false;
+      end if;
+      m := regexp_match(p_topic,
+        '^typing:([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}):([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$');
+      if m is null or not (m[1] collate "C" < m[2] collate "C") then
+        return false;
+      end if;
+      lo := m[1]::uuid;
+      hi := m[2]::uuid;
+      if me = lo then
+        other := hi;
+      elsif me = hi then
+        other := lo;
+      else
+        return false;
+      end if;
+      -- Same checks as brivia_can_message (matched, same world) but only the CALLER's own block counts, so the
+      -- blocked member is never told: their join and sends behave exactly as before, only the blocker is cut off.
+      return coalesce(
+        (exists (select 1 from public.matches mt
+                  where (mt.user1_id = me and mt.user2_id = other) or (mt.user1_id = other and mt.user2_id = me))
+         or exists (select 1 from public.connection_requests r
+                     where ((r.from_id = me and r.to_id = other) or (r.from_id = other and r.to_id = me))
+                       and r.status = 'pending' and r.chat_accepted_at is not null
+                       and public.brivia_request_is_live(r.status, r.created_at, r.chat_accepted_at)))
+        and not exists (select 1 from public.brivia_blocks bl where bl.blocker_id = me and bl.blocked_id = other)
+        and exists (select 1 from public.profiles a join public.profiles b
+                      on public.brivia_in_test_world(a.id) = public.brivia_in_test_world(b.id)
+                     where a.id = me and b.id = other),
+        false);
+      return false;
+    end;
+    $b$
+  $f$;
+  revoke all on function brivia_private.brivia_typing_topic_ok(text) from public, anon;
+  grant execute on function brivia_private.brivia_typing_topic_ok(text) to authenticated;
+end
+$typing$;
