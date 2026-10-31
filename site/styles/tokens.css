@@ -27,6 +27,9 @@
   --color-chat-paper: #f8eee6;
   --color-chat-head: #f7f0e5;
   --color-presence: #2f9e68;   /* D-110: the "active now" dot; 3.25:1 on cream (WCAG 1.4.11 needs 3:1) */
+  /* The review sheet's burgundy (founder mockup, D-108 polish 2026-10-31): wine light at the top left, oxblood at the foot. */
+  --gradient-burgundy: radial-gradient(120% 70% at 12% 0%, color-mix(in srgb, var(--color-wine-soft) 70%, transparent), transparent 62%),
+    linear-gradient(165deg, var(--color-wine) 0%, var(--color-chat-wine) 46%, var(--color-oxblood-deep) 100%);
 
   --space-1: 4px;
   --space-2: 8px;

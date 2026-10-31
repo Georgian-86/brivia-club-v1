@@ -1,7 +1,8 @@
 // "See who wants to collaborate with you" (D-108): the notification panel shows one section with stacked faces, "N
-// people want to connect" and Review; Review opens a sheet with one request at a time. Connect (button, right drag,
-// ArrowRight) accepts and shows "You're connected." with Message; Not now (button, left drag, ArrowLeft) declines
-// quietly; a failed answer keeps the card; the end reads "You're all caught up."; no dating-app words; axe clean.
+// people want to connect" and Review; Review opens a sheet with one request at a time. Swipe only (2026-10-31): no
+// visible Connect / Not now pills; a right drag or ArrowRight accepts and shows "You're connected." with Message; a
+// left drag or ArrowLeft declines quietly; the keyboard keys show only while focused; a failed answer keeps the card;
+// the end reads "You're all caught up."; no dating-app words; axe clean.
 // PLAYWRIGHT_MODULE=/tmp/pw/node_modules/playwright/index.mjs node tests/e2e/collab-requests.spec.mjs   (Vite on :5183)
 // COLLAB_SHOTS=<dir> also saves the panel, the sheet and the connected state at 390 and 1440.
 import { mkdirSync } from 'node:fs';
@@ -29,6 +30,14 @@ const stub = await startAppStub({ port: 5183, state: st });
 const browser = await chromium.launch();
 const errors = [];
 const shot = async (page, name) => { if (!SHOTS) return; mkdirSync(SHOTS, { recursive: true }); await page.screenshot({ path: path.join(SHOTS, name) }); };
+const drag = async (page, dx) => {
+  const box = await page.locator('dialog.collab-review .collab-card').boundingBox();
+  const x = box.x + box.width / 2; const y = box.y + box.height / 2;
+  await page.mouse.move(x, y);
+  await page.mouse.down();
+  for (let i = 1; i <= 12; i += 1) await page.mouse.move(x + Math.sign(dx) * i * Math.abs(dx) / 12, y);
+  await page.mouse.up();
+};
 const rpcCount = () => st.calls.filter((c) => c.path === '/rest/v1/rpc/respond_connection_request').length;
 
 try {
@@ -52,10 +61,10 @@ try {
     const first = await page.evaluate(() => {
       const d = document.querySelector('dialog.collab-review');
       const r = d.querySelector('.collab-panel').getBoundingClientRect();
-      return { count: d.querySelector('.collab-count')?.textContent, name: d.querySelector('.collab-name')?.textContent, shared: [...d.querySelectorAll('.collab-shared li')].map((li) => li.textContent), note: d.querySelector('.collab-note-text')?.textContent, focus: document.activeElement?.dataset.collabDecide, panelOpen: document.querySelector('#app-notification-panel')?.matches(':popover-open'), bottom: Math.round(r.bottom), width: Math.round(r.width), text: d.innerText };
+      return { count: d.querySelector('.collab-count')?.textContent, name: d.querySelector('.collab-name')?.textContent, shared: [...d.querySelectorAll('.collab-shared li')].map((li) => li.textContent), note: d.querySelector('.collab-note-text')?.textContent, focus: document.activeElement?.matches('.collab-card'), pills: [...d.querySelectorAll('button')].filter((b) => /connect|not now/i.test(b.textContent) && b.closest('.collab-keys, .collab-body').getBoundingClientRect().width > 1).length, dots: d.querySelectorAll('.collab-dots li').length, panelOpen: document.querySelector('#app-notification-panel')?.matches(':popover-open'), bottom: Math.round(r.bottom), width: Math.round(r.width), text: d.innerText };
     });
-    check(`${w}: the sheet shows "1 of 3", the name, shared interests and their note; focus on Connect (${JSON.stringify({ ...first, text: undefined })})`,
-      first.count === '1 of 3' && first.name === 'Asha Band' && first.shared.includes('Badminton') && /weekend doubles/.test(first.note) && first.focus === 'connect' && !first.panelOpen);
+    check(`${w}: the sheet shows "1 of 3", the name, shared interests and their note; focus on the card; no visible Connect / Not now pills; 3 dots (${JSON.stringify({ ...first, text: undefined })})`,
+      first.count === '1 of 3' && first.name === 'Asha Band' && first.shared.includes('Badminton') && /weekend doubles/.test(first.note) && first.focus === true && first.pills === 0 && first.dots === 3 && !first.panelOpen);
     check(`${w}: no dating-app words in the sheet (${(first.text.match(FORBIDDEN) || [''])[0]})`, !FORBIDDEN.test(first.text));
     if (w < 780) check(`390: a bottom sheet, full width (${first.bottom}/${h}, ${first.width})`, Math.abs(first.bottom - h) <= 1 && first.width === w);
     else check(`1440: a centred card up to 440 px (${first.width})`, first.width <= 440 && first.bottom < h);
@@ -63,10 +72,10 @@ try {
     check(`${w}: axe finds no violations in the sheet (${axe.join(' | ')})`, axe.length === 0);
     await shot(page, `sheet-${w}.png`);
 
-    // Connect on Asha: the accept RPC, then "You're connected." with Message.
-    await page.locator('dialog.collab-review [data-collab-decide="connect"]').click();
+    // A right drag on Asha: the accept RPC, then "You're connected." with Message.
+    await drag(page, 240);
     await page.waitForSelector('dialog.collab-review [data-collab-message]');
-    check(`${w}: Connect answers with p_accept true`, JSON.stringify(st.responses.at(-1)) === JSON.stringify({ p_from: ASHA, p_accept: true }));
+    check(`${w}: a right drag answers with p_accept true`, JSON.stringify(st.responses.at(-1)) === JSON.stringify({ p_from: ASHA, p_accept: true }));
     const done = await page.locator('dialog.collab-review .collab-state').innerText();
     check(`${w}: "You're connected." offers Message Asha (${JSON.stringify(done)})`, /You're connected\./.test(done) && /Message Asha/.test(done));
     await shot(page, `connected-${w}.png`);
@@ -84,25 +93,27 @@ try {
 
     // Bilal: a left drag past the threshold declines quietly.
     await page.waitForSelector(`dialog.collab-review .collab-card[data-from="${BILAL}"]`);
-    const box = await page.locator('dialog.collab-review .collab-card').boundingBox();
-    const y = box.y + box.height / 2;
-    await page.mouse.move(box.x + box.width / 2, y);
-    await page.mouse.down();
-    for (let i = 1; i <= 12; i += 1) await page.mouse.move(box.x + box.width / 2 - i * 20, y);
-    await page.mouse.up();
+    await drag(page, -240);
     await page.waitForSelector(`dialog.collab-review .collab-card[data-from="${CARA}"]`);
     check(`${w}: a left drag declines with p_accept false (${JSON.stringify(st.responses.at(-1))})`, JSON.stringify(st.responses.at(-1)) === JSON.stringify({ p_from: BILAL, p_accept: false }));
     check(`${w}: no toast for a quiet decline`, !(await page.locator('#app-toast').textContent()).trim() || !/declin/i.test(await page.locator('#app-toast').textContent()));
 
-    // Cara: a failed answer keeps the card and shows the toast; one RPC per tap even when tapped twice.
+    // Cara: the keyboard keys stay out of sight until Tab reaches them. Then a failed answer keeps the card and shows
+    // the toast; one RPC per decision even when ArrowRight is pressed twice.
+    const keys = await page.evaluate(() => document.querySelector('.collab-keys').getBoundingClientRect().width);
+    await page.locator('dialog.collab-review .collab-card').focus();
+    await page.keyboard.press('Tab');
+    const shown = await page.evaluate(() => ({ focus: document.activeElement?.dataset.collabDecide, width: document.querySelector('.collab-keys').getBoundingClientRect().width }));
+    check(`${w}: the keyboard keys are hidden until focused (${keys} -> ${JSON.stringify(shown)})`, keys <= 1 && shown.focus === 'later' && shown.width > 80);
+    await page.locator('dialog.collab-review .collab-card').focus();
     st.respondFail = true;
     const before = rpcCount();
-    await page.locator('dialog.collab-review [data-collab-decide="connect"]').click();
-    await page.locator('dialog.collab-review [data-collab-decide="connect"]').click({ force: true, timeout: 300 }).catch(() => {});
+    await page.keyboard.press('ArrowRight');
+    await page.keyboard.press('ArrowRight');
     await page.waitForFunction(() => /could not be updated/.test(document.querySelector('#app-toast')?.textContent || ''));
     await page.waitForTimeout(300);
-    const kept = await page.evaluate(() => ({ card: document.querySelector('dialog.collab-review .collab-card')?.dataset.from, enabled: !document.querySelector('[data-collab-decide="connect"]')?.disabled, count: document.querySelector('.collab-count')?.textContent }));
-    check(`${w}: a failed Connect keeps the card, re-enables the buttons, one RPC (${JSON.stringify({ ...kept, rpcs: rpcCount() - before })})`, kept.card === CARA && kept.enabled && kept.count === (w < 780 ? '2 of 2' : '3 of 3') && rpcCount() - before === 1);
+    const kept = await page.evaluate(() => ({ card: document.querySelector('dialog.collab-review .collab-card')?.dataset.from, focus: document.activeElement?.matches('.collab-card'), count: document.querySelector('.collab-count')?.textContent }));
+    check(`${w}: a failed Connect keeps the card, focus back on it, one RPC (${JSON.stringify({ ...kept, rpcs: rpcCount() - before })})`, kept.card === CARA && kept.focus && kept.count === (w < 780 ? '2 of 2' : '3 of 3') && rpcCount() - before === 1);
     st.respondFail = false;
     await page.keyboard.press('ArrowLeft');
     await page.waitForSelector('dialog.collab-review .collab-state h3');
@@ -125,7 +136,7 @@ try {
     await page.locator('#app-notification-button').click();
     await page.locator('[data-collab-review]').click();
     await page.waitForSelector(`dialog.collab-review .collab-card[data-from="${CARA}"]`);
-    await page.locator('dialog.collab-review [data-collab-decide="connect"]').click();
+    await page.keyboard.press('ArrowRight');
     await page.locator('dialog.collab-review [data-collab-message]').click();
     await page.waitForFunction(() => !document.querySelector('dialog.collab-review') && !document.querySelector('#chat-window')?.hidden, null, { timeout: 4000 }).catch(() => {});
     await page.waitForTimeout(300);
@@ -141,7 +152,7 @@ try {
     await page.locator('#app-notification-button').click();
     await page.locator('[data-collab-review]').click();
     await page.waitForSelector(`dialog.collab-review .collab-card[data-from="${BILAL}"]`);
-    await page.locator('dialog.collab-review [data-collab-decide="connect"]').click();
+    await drag(page, 240);
     await page.waitForSelector(`dialog.collab-review .collab-card[data-from="${CARA}"]`, { timeout: 4000 }).catch(() => {});
     const moved = await page.evaluate(() => ({ card: document.querySelector('dialog.collab-review .collab-card')?.dataset.from, count: document.querySelector('.collab-count')?.textContent, toast: document.querySelector('#app-toast')?.textContent }));
     check(`a request that is no longer open moves on with a note, not "try again" (${JSON.stringify(moved)})`, moved.card === CARA && moved.count === '2 of 2' && /no longer open/.test(moved.toast) && !/try again/i.test(moved.toast));

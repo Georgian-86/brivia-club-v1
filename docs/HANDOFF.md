@@ -7,6 +7,10 @@ Update this file at the end of every session. CLAUDE.md holds the aim; this file
 
 ## 1. What is done
 
+**2026-10-31, swipe-only request review (D-113, client only):** "See who wants to collaborate with you" has no Connect /
+Not now pills; drag or arrow keys decide; burgundy sheet, blush card on a pile, cue row, dots; keyboard keys appear
+only on focus. The pending pitch-in-review Task 3 (branch `claude/magical-ptolemy-rbjrw2`) should build on it.
+
 **2026-10-31, signup About you (D-112):** after the photo, a required "About you" step: Looking for (a dropdown of the
 Edit profile suggestions, or the member's own words, up to 8) and a bio (20 to 300 characters). It is now the last
 signup step and creates the account ("Step n of 6", Google "of 5"). A signed-in member without looking for (or, once

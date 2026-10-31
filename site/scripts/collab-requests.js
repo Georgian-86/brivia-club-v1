@@ -1,6 +1,8 @@
 // "See who wants to collaborate with you" (D-108). Incoming connection requests are reviewed one card at a time in a
-// sheet (a native modal <dialog>: focus stays inside, Escape closes). Right drag or Connect accepts, left drag or Not
-// now declines quietly (the sender is never told). The motion is the deck's (deck-swipe.js); stamps read CONNECT and
+// sheet (a native modal <dialog>: focus stays inside, Escape closes). The card is the only control the eye sees
+// (founder, 2026-10-31: no Connect / Not now pills): a right drag or ArrowRight accepts, a left drag or ArrowLeft
+// declines quietly (the sender is never told). Keyboard and screen-reader users also get two buttons that stay
+// visually hidden until one of them has focus. The motion is the deck's (deck-swipe.js); stamps read CONNECT and
 // NOT NOW. Wording rule: collaborate, connect, not now, request; never dating-app words.
 import { createDeckSwipe } from './deck-swipe.js';
 
@@ -40,23 +42,36 @@ export const keyDecision = (key) => (key === 'ArrowRight' ? true : key === 'Arro
 const ICON = {
   connect: '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M5 12.5l4.2 4.2L19 7"/></svg>',
   later: '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M7 7l10 10M17 7 7 17"/></svg>',
+  left: '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M15 6l-6 6 6 6"/></svg>',
+  right: '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M9 6l6 6-6 6"/></svg>',
 };
+const DOTS_MAX = 8;
 
+// The card, then the drag cue, the progress dots and the keyboard-only actions under it. The card itself takes focus
+// (ArrowLeft / ArrowRight decide); the cue row and the dots are decorative, the "1 of N" counter is the position.
 export const reviewCardMarkup = (m, { index, total }, { escapeHtml, renderAvatar }) => {
   const meta = [m.role, m.band].filter(Boolean).map(escapeHtml).join('<span aria-hidden="true"> · </span>');
-  return `<article class="collab-card" data-collab-card data-from="${escapeHtml(m.fromId)}" aria-roledescription="request card" aria-label="Request from ${escapeHtml(m.name)}">`
+  const dots = total > 1 && total <= DOTS_MAX
+    ? `<ol class="collab-dots" aria-hidden="true">${Array.from({ length: total }, (_, i) => `<li${i === index ? ' class="is-current"' : i < index ? ' class="is-done"' : ''}></li>`).join('')}</ol>`
+    : '';
+  return `<article class="collab-card" data-collab-card data-from="${escapeHtml(m.fromId)}" tabindex="0" aria-roledescription="request card" aria-label="Request from ${escapeHtml(m.name)}" aria-describedby="collab-review-keys">`
     + '<span class="collab-stamp collab-stamp--connect" aria-hidden="true">CONNECT</span><span class="collab-stamp collab-stamp--later" aria-hidden="true">NOT NOW</span>'
     + `<p class="collab-count">${index + 1} of ${total}</p>`
-    + `${renderAvatar(m.person || { name: m.name }, 'collab-avatar')}`
+    + `<div class="collab-portrait">${renderAvatar(m.person || { name: m.name }, 'collab-avatar')}</div>`
     + `<h3 class="collab-name">${escapeHtml(m.name)}</h3>`
     + (meta ? `<p class="collab-meta">${meta}</p>` : '')
     + (m.shared.length ? `<p class="collab-label">You both care about</p><ul class="collab-shared">${m.shared.map((s) => `<li>${escapeHtml(s)}</li>`).join('')}</ul>` : '')
-    + (m.note ? `<div class="collab-note"><p class="collab-label">Their note</p><p class="collab-note-text">${escapeHtml(m.note)}</p></div>` : '')
+    + (m.note ? `<figure class="collab-note"><figcaption class="collab-label">Their note</figcaption><blockquote class="collab-note-text">${escapeHtml(m.note)}</blockquote></figure>` : '')
     + '</article>'
-    + '<div class="collab-actions">'
-    + `<button type="button" class="collab-button collab-button--later" data-collab-decide="later">${ICON.later}<span>Not now</span></button>`
-    + `<button type="button" class="collab-button collab-button--connect" data-collab-decide="connect">${ICON.connect}<span>Connect</span></button>`
-    + '</div>';
+    + '<div class="collab-under">'
+    + `<div class="collab-cue" aria-hidden="true"><span class="collab-cue-side collab-cue-side--later">${ICON.left}Not now</span>`
+    + '<span class="collab-cue-mid">Drag the card</span>'
+    + `<span class="collab-cue-side collab-cue-side--connect">Connect${ICON.right}</span></div>`
+    + dots
+    + '<div class="collab-keys" data-collab-keys>'
+    + `<button type="button" class="collab-key" data-collab-decide="later">${ICON.later}<span>Not now</span></button>`
+    + `<button type="button" class="collab-key" data-collab-decide="connect">${ICON.connect}<span>Connect</span></button>`
+    + '</div></div>';
 };
 
 // The sheet. respond(fromId, accept) resolves { ok, connected }; onMessage(fromId) opens the chat; onClose(reason) runs
@@ -76,7 +91,7 @@ export const openCollabReview = ({ requests, respond, onMessage, onClose = () =>
     + '<button type="button" class="collab-close" data-collab-close aria-label="Close">'
     + '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M7 7l10 10M17 7 7 17"/></svg></button></div>'
     + '<div class="collab-body" data-collab-body aria-live="polite"></div>'
-    + '<p class="collab-hint" data-collab-hint>Drag the card, or use the arrow keys: right to connect, left for not now.</p>'
+    + '<p class="collab-sr" id="collab-review-keys" data-collab-hint>Drag the card, or use the arrow keys: right to connect, left for not now.</p>'
     + '</div>';
   document.body.append(dialog);
   const body = dialog.querySelector('[data-collab-body]');
@@ -97,8 +112,10 @@ export const openCollabReview = ({ requests, respond, onMessage, onClose = () =>
     const m = reviewCardModel(queue[index], myInterests);
     body.innerHTML = `<div class="collab-stack" data-collab-stack>${reviewCardMarkup(m, { index, total }, { escapeHtml, renderAvatar })}</div>`;
     const card = body.querySelector('[data-collab-card]');
-    // The actions sit outside the dragged card (deck-swipe ignores nothing else), so move them below the stack.
-    body.append(body.querySelector('.collab-actions'));
+    // The cue, dots and keys sit outside the dragged card, so move them below the stack. The stack shows the cards
+    // still waiting underneath (up to two) so the pile reads as something to work through.
+    body.append(body.querySelector('.collab-under'));
+    body.querySelector('[data-collab-stack]').dataset.behind = String(Math.min(2, queue.length - index - 1));
     swipe = createDeckSwipe({ card, stack: body.querySelector('[data-collab-stack]'), canDrag: () => !busy, onCommit: (direction) => { decide(direction === 'pitch', { dragged: true }); } });
   };
   const connected = (m) => {
@@ -114,7 +131,7 @@ export const openCollabReview = ({ requests, respond, onMessage, onClose = () =>
       + (first ? `<button type="button" class="collab-button collab-button--connect" data-collab-message>Message ${escapeHtml(first)}</button>` : '')
       + '</div></div>';
     body.querySelector('[data-collab-message]')?.addEventListener('click', () => { closeReason = 'message'; close(); onMessage(m.fromId); });
-    body.querySelector('[data-collab-next]').addEventListener('click', () => { index += 1; show(); body.querySelector('[data-collab-decide="connect"], [data-collab-close]')?.focus(); });
+    body.querySelector('[data-collab-next]').addEventListener('click', () => { index += 1; show(); focusCurrent(); });
     (body.querySelector('[data-collab-message]') || body.querySelector('[data-collab-next]')).focus();
   };
   async function decide(accept, { dragged = false } = {}) {
@@ -122,6 +139,7 @@ export const openCollabReview = ({ requests, respond, onMessage, onClose = () =>
     busy = true;
     const m = reviewCardModel(queue[index], myInterests);
     const buttons = [...body.querySelectorAll('[data-collab-decide]')];
+    const from = document.activeElement;
     buttons.forEach((b) => { b.disabled = true; });
     const current = swipe;
     let result = null;
@@ -137,14 +155,16 @@ export const openCollabReview = ({ requests, respond, onMessage, onClose = () =>
       // The request is still pending: the card comes back, ready for another try (the caller showed the toast).
       current.reset();
       buttons.forEach((b) => { b.disabled = false; });
-      buttons.find((b) => b.dataset.collabDecide === (accept ? 'connect' : 'later'))?.focus();
+      // Focus goes back where it was: the key that was pressed, else the card.
+      (buttons.includes(from) ? from : body.querySelector('[data-collab-card]'))?.focus();
       return;
     }
     if (accept && result.connected) { connected(m); return; }
     index += 1;
     show();
-    body.querySelector('[data-collab-decide="connect"], [data-collab-close]')?.focus();
+    focusCurrent();
   }
+  const focusCurrent = () => body.querySelector('[data-collab-card], [data-collab-close]')?.focus();
   const close = () => { if (dialog.open) dialog.close(); };
 
   dialog.addEventListener('click', (event) => {
@@ -162,6 +182,6 @@ export const openCollabReview = ({ requests, respond, onMessage, onClose = () =>
   dialog.addEventListener('close', () => { dialog.remove(); onClose(closeReason); }, { once: true });
   dialog.showModal();
   show();
-  body.querySelector('[data-collab-decide="connect"]')?.focus();
+  focusCurrent();
   return { close };
 };
