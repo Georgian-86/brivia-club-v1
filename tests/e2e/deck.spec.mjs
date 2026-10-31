@@ -99,8 +99,8 @@ try {
   const passes = () => st.calls.filter((c) => c.method === 'POST' && c.path === '/rest/v1/interaction');
   const deckCalls = () => st.calls.filter((c) => c.path === '/rest/v1/rpc/deck_candidates');
 
-  // 1. The card: band, "You both" chips, server order, no City/State (1440 px).
-  resetStub();
+  // 1. The card: band, "You both" chips, server order, no City/State (1440 px). D-115: member_bio answers a bio.
+  resetStub({ routes: { 'rpc/member_bio': { body: 'Designer who runs every Sunday.' } } });
   const wide = await makeContext({ width: 1440, height: 900 });
   let page = await open(wide);
   await waitForCard(page, 'Asha Band');
@@ -115,6 +115,9 @@ try {
   // D-113: the bar says what the member is looking for, and there is no short rule under the name.
   const top = await page.evaluate(() => ({ label: document.querySelector('#swipe-card-label')?.textContent.trim(), rule: getComputedStyle(document.querySelector('#swipe-tags'), '::before').content }));
   check(`card 1's bar shows what they are looking for, no line under the name (${JSON.stringify(top)})`, () => { assert.equal(top.label, 'LOOKING FOR · FRIENDS'); assert.ok(top.rule === 'none' || top.rule === 'normal', top.rule); });
+  await page.waitForFunction(() => !document.querySelector('#swipe-bio')?.hidden, null, { timeout: 5000 }).catch(() => {});
+  const cardBio = await page.evaluate(() => { const el = document.querySelector('#swipe-bio'); return { text: el?.textContent.trim(), shown: !!el && !el.hidden && getComputedStyle(el).display !== 'none' }; });
+  check(`D-115: card 1 shows the member's bio (${JSON.stringify(cardBio)})`, () => { assert.equal(cardBio.text, 'Designer who runs every Sunday.'); assert.equal(cardBio.shown, true); });
   check('the deck loads from rpc/deck_candidates { p_limit: 12 } and never rpc/list_members', () => {
     assert.ok(deckCalls().length >= 1);
     deckCalls().forEach((c) => assert.deepEqual(JSON.parse(c.body || '{}'), { p_limit: 12 }));
