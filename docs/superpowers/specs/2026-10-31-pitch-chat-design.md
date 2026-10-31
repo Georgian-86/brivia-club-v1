@@ -1,3 +1,5 @@
+> Superseded by 2026-11-01-pitch-in-review
+
 # Pitch in chat: accept to chat, swipe right to connect (design, 2026-10-31)
 
 Status: approved in brainstorming (founder, 2026-10-31); spec awaiting founder review. Decision number: D-112.
