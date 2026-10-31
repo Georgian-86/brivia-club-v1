@@ -112,6 +112,9 @@ let pitchThreadsAvailable = true;
 const pitchThreadBusy = new Set();       // one accept / end RPC per thread at a time
 const pitchRequestsOpened = new Set();   // request rows opened this session lose their unread dot
 const pitchEndedOutIds = new Set();      // my own pitches I ended this session: the server reads them as pending again
+// A read of my_pitch_threads applies only if nothing changed the threads locally since it started (as memberSearchSeq):
+// an Accept / End / drop bumps it, so a read that began before one can never bring back the old state.
+let pitchThreadsSeq = 0;
 
 let currentIndex = 0;
 let currentPerson = people[0];
@@ -1304,7 +1307,9 @@ const pitchThreadPerson = (id) => {
 };
 const loadPitchThreads = async () => {
   if (!supabase || !memberProfile.id || !pitchThreadsAvailable) return;
+  const seq = ++pitchThreadsSeq;
   const { data, error, status } = await supabase.rpc('my_pitch_threads');
+  if (seq !== pitchThreadsSeq) return;
   if (error) {
     // The function does not exist yet (before 0019): never ask again; Chat stays as it was.
     if (status === 404 || error.code === 'PGRST202') { pitchThreadsAvailable = false; return; }
@@ -1319,19 +1324,20 @@ const loadPitchThreads = async () => {
     if (profileError) console.warn('Message request senders could not load:', profileError.message);
     const wanted = new Set(unknownIds);
     mergePeople((profileRows || []).filter((row) => wanted.has(String(row?.id))));
+    if (seq !== pitchThreadsSeq) return;
   }
   const next = new Map();
   // One thread per person; an incoming pitch wins over my own (a pair with both would already be matched).
   rows.forEach((row) => { if (!next.has(row.otherId) || row.direction === 'in') next.set(row.otherId, row); });
   const selectedId = selectedChat ? String(selectedChat.id) : '';
   const before = JSON.stringify(pitchThreads.get(selectedId) || null);
-  const wasRequest = pitchThreads.get(selectedId)?.direction === 'in' && !pitchThreads.get(selectedId)?.chatOpen;
+  // A thread that is gone and is not a connection (the other member ended it, a block hid it, it expired) leaves Chat,
+  // as after Decline / End chat here: never a healthy-looking composer for someone who is not a connection.
+  const gone = [...pitchThreads.keys()].filter((id) => !next.has(id) && !isConnectedWith(id));
   pitchThreads = next;
-  if (selectedId && JSON.stringify(next.get(selectedId) || null) !== before) {
-    // A request that is gone (declined elsewhere, expired) closes; any other change redraws the thread.
-    if (wasRequest && !next.has(selectedId) && !remoteMatchIds.some((id) => String(id) === selectedId)) closeSelectedChat();
-    else { syncPitchThreadView(); renderMessages(); }
-  }
+  if (gone.length) remoteMatchIds = remoteMatchIds.filter((known) => !gone.includes(String(known)));
+  if (selectedId && gone.includes(selectedId)) { closeSelectedChat(); return; }
+  if (selectedId && JSON.stringify(next.get(selectedId) || null) !== before) { syncPitchThreadView(); renderMessages(); }
   renderChats();
 };
 // The open thread's pitch chrome: the head's "Not connected" chip, the composer lock and the ⋯ menu's End chat.
@@ -1367,6 +1373,7 @@ const dropPitchThread = (otherId) => {
   const id = String(otherId);
   const row = pitchThreads.get(id);
   if (row?.direction === 'out') pitchEndedOutIds.add(id);
+  pitchThreadsSeq += 1;
   pitchThreads.delete(id);
   pendingRequests = pendingRequests.filter((item) => item.fromId !== id);
   renderNotifications();
@@ -1384,8 +1391,10 @@ const runPitchRpc = async (otherId, rpc, args) => {
   if (!supabase || pitchThreadBusy.has(id)) return null;
   pitchThreadBusy.add(id);
   setPitchButtonsBusy(true);
+  pitchThreadsSeq += 1;   // a read already in flight predates this answer
   let error = null;
   try { ({ error } = await supabase.rpc(rpc, args)); } catch (thrown) { error = thrown || new Error('rpc failed'); }
+  pitchThreadsSeq += 1;   // and so does any read started while it was in flight
   pitchThreadBusy.delete(id);
   if (error?.code === 'P0002') { dropPitchThread(id); showToast(PITCH_COPY.noLongerOpen); return null; }
   if (error) {

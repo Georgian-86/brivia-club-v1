@@ -185,6 +185,57 @@ try {
     await ctx.close();
   }
 
+  // 6b. The other member ends an open chat (or a block hides it): the row drops out of my_pitch_threads. On the next
+  // sync the thread must not stay open with a working composer and "Remove connection": it closes and leaves Chat.
+  for (const [w, h] of [[1440, 900], [390, 844]]) {
+    reset({ pitchThreads: [pitch(ASHA, 'in', ASHA_NOTE, 5, true)], requests: [{ from_id: ASHA, note: ASHA_NOTE, created_at: ago(5) }] });
+    const ctx = await stub.newContext(browser, { width: w, height: h }, w < 780 ? { isMobile: true, hasTouch: true } : {});
+    await ctx.clock.install();
+    const page = await stub.open(ctx, { path: '/app.html?view=chat', errors });
+    page.setDefaultTimeout(6000);
+    await page.waitForSelector(`#chat-list .chat-row-open[data-chat-id="${ASHA}"]`, { timeout: 8000 });
+    await openRow(page, ASHA);
+    const live = await threadState(page);
+    check(`${w}: an accepted chat opens with the composer and "Not connected" (${JSON.stringify(live)})`, live.composerEnabled && live.chip === 'Not connected');
+    st.pitchThreads = [];
+    const reads = callCount('my_pitch_threads');
+    for (let i = 0; i < 7; i += 1) await page.clock.runFor(5000);   // the threads are read on every 6th 5 s sync tick
+    await page.waitForFunction(() => document.querySelector('#chat-window')?.hidden, null, { timeout: 4000 }).catch(() => {});
+    await page.waitForTimeout(200);
+    const after = await page.evaluate((id) => ({
+      read: true,
+      closed: document.querySelector('#chat-window')?.hidden === true,
+      row: Boolean(document.querySelector(`#chat-list .chat-row-open[data-chat-id="${id}"]`)),
+    }), ASHA);
+    check(`${w}: after the other side ends it, the next sync closes the thread and the row leaves (${JSON.stringify({ ...after, reads: callCount('my_pitch_threads') - reads })})`,
+      callCount('my_pitch_threads') - reads >= 1 && after.closed && !after.row);
+    // Reopening is impossible from the list; the open-thread chrome must not offer "Remove connection" for them either.
+    const offered = await page.evaluate(() => [...document.querySelectorAll('#chat-more-menu button')].filter((b) => !b.hidden).map((b) => b.textContent));
+    check(`${w}: no healthy-looking thread is left offering "Remove connection" (${JSON.stringify(offered)})`, after.closed || !offered.includes('Remove connection'));
+    await ctx.close();
+  }
+
+  // 6c. A read that started before Accept answers after it (still "not open"): it must not lock the chat again.
+  {
+    reset({ pitchThreads: [pitch(ASHA, 'in', ASHA_NOTE, 5)], requests: [{ from_id: ASHA, note: ASHA_NOTE, created_at: ago(5) }] });
+    const ctx = await stub.newContext(browser, { width: 1440, height: 900 });
+    await ctx.clock.install();
+    const page = await stub.open(ctx, { path: '/app.html?view=chat', errors });
+    page.setDefaultTimeout(6000);
+    await page.waitForSelector(`#chat-list .chat-requests .chat-row-open[data-chat-id="${ASHA}"]`, { timeout: 8000 });
+    await openRow(page, ASHA);
+    st.routes['rpc/my_pitch_threads'] = { delayMs: 1500, body: [pitch(ASHA, 'in', ASHA_NOTE, 5)] };   // the stale answer
+    const reads = callCount('my_pitch_threads');
+    for (let i = 0; i < 7; i += 1) await page.clock.runFor(5000);
+    await page.locator('#chat-messages [data-pitch-action="accept"]').click();
+    await page.waitForFunction(() => !document.querySelector('#chat-input')?.disabled, null, { timeout: 4000 }).catch(() => {});
+    await page.waitForTimeout(2200);   // the stale read lands
+    const state = await threadState(page);
+    check(`a stale read that started before Accept does not lock the chat again (${JSON.stringify({ reads: callCount('my_pitch_threads') - reads, composer: state.composerEnabled, accept: state.accept, chip: state.chip })})`,
+      callCount('my_pitch_threads') - reads >= 1 && state.composerEnabled && !state.accept && state.chip === 'Not connected');
+    await ctx.close();
+  }
+
   // 7. Before 0019: my_pitch_threads answers 404 / PGRST202. The inbox is as before and the console stays clean.
   {
     reset({ pitchThreads: [pitch(ASHA, 'in', ASHA_NOTE, 5)], requests: [{ from_id: ASHA, note: ASHA_NOTE, created_at: ago(5) }], matchIds: [BILAL] });
