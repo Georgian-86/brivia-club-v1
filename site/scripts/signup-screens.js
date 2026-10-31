@@ -1,8 +1,9 @@
 // Guided signup (polish wave B, D-073; first D-067/D-068): one question per screen, at every width. Renders into
 // #guided-signup (auth.html): the bubble stepper (done / current / pending), "Step n of N", one screen, and Back + one
-// primary button. D-102: two phases. Signup ends on the required profile photo and (D-112) About you (looking for
-// and a bio, both required), whose button calls `submit(answers)` (script.js): it creates the account (email path), saves the profile and the photo and records the 18+ declaration.
-// Setup (area, then interests) follows at once (or after the email is confirmed) and calls `submitSetup(answers)`.
+// primary button. D-102: two phases. Signup ends on the required profile photo, whose button calls `submit(answers)`
+// (script.js): it creates the account (email path), saves the profile and the photo and records the 18+ declaration.
+// Setup (D-114: interests, the location, then About you) follows at once (or after the email is confirmed); About
+// you's Finish calls `submitSetup(answers)`.
 // No email code, no points screen: the interests are saved with an even split. Coordinates live only in
 // `answers.area` (memory) and are dropped once saved.
 import { searchPlaces, fetchInterestNodes, addMemberInterest, isMissingFunction } from './supabase.js';
@@ -11,6 +12,7 @@ import { ImageProcessingError, PHOTO_ERROR_MESSAGE, PHOTO_FRAMER_ERROR } from '.
 import { MAX_INTERESTS } from './passion-budget.js';
 import { POPULAR_INTERESTS, LOOKING_FOR_CATALOG } from './discovery-catalog.js';
 import { BIO_MAX, cleanBio } from './profile-edit.js';
+import { attachEmojiPicker } from './emoji-field.js';
 import { matchTypedCity } from './area-pick.js';
 import { locateOnce, fallbackCopy, STILL_WAITING_TEXT } from './geo-locate.js';
 
@@ -341,7 +343,7 @@ export const initGuidedSignup = ({
     photo: () => {
       let previewUrl = '';
       return {
-        primary: 'Continue',
+        primary: state.hasSession ? 'Continue' : 'Create account',
         html: `${heading('Add a profile photo.', 'Members see it on your card. A clear photo of your face helps people recognise you.')}
           <div class="guided-photo">
             <button class="guided-photo-pick" type="button" data-guided-photo-pick>
@@ -389,21 +391,30 @@ export const initGuidedSignup = ({
         },
         ready: () => Boolean(a.photo || a.photoUrl),
         notReady: () => COPY.photoMissing,
-        submit: async () => nextAfter('photo'),
+        submit: async () => {
+          const result = await submit({ ...a, adult: true });
+          if (!result?.ok) return { screen: result?.screen || 'photo', message: result?.message || COPY.saveFailed };
+          a.password = ''; a.passwordConfirm = '';
+          if (result.photoUrl) { a.photoUrl = result.photoUrl; a.photo = null; }
+          if (!result.session) return 'verify';
+          state.hasSession = true;
+          return SETUP[0];
+        },
       };
     },
 
     // D-112: "About you", both required. Looking for is one dropdown like the interests (the Edit profile suggestions,
-    // or the member's own words, up to LOOKING_MAX); the bio is 20 to BIO_MAX characters. Signup's last screen: its
-    // button creates the account and saves the profile (with the photo picked on the screen before).
+    // or the member's own words, up to LOOKING_MAX); the bio is 20 to BIO_MAX characters. D-114: the last setup screen
+    // (after interests and the location): Finish saves About you, the area and the interests together.
     about: () => {
       let query = '';
+      let submitted = false;
       const shownLabel = (v) => String(v || '').trim().replace(/\s+/g, ' ');
       const key = (v) => shownLabel(v).toLowerCase();
       const has = (v) => a.lookingFor.some((x) => key(x) === key(v));
       const bioOk = () => cleanBio(a.bio).length >= BIO_MIN;
       return {
-        primary: state.hasSession ? 'Continue' : 'Create account',
+        primary: 'Finish',
         html: `${heading('Tell members about you.', 'Who you would like to meet, and a line or two about yourself. Members see both on your profile.')}
           <p class="guided-field-label" id="guided-looking-label">Looking for</p>
           <div class="guided-tray guided-tray--looking" data-guided-tray>
@@ -517,10 +528,14 @@ export const initGuidedSignup = ({
             if (o.classList.contains('is-add')) { input.value = ''; query = ''; active = -1; }
             renderMenu();
           });
-          const outside = (event) => { if (!el.isConnected) { document.removeEventListener('pointerdown', outside, true); return; } if (!combo.contains(event.target)) closeMenu(); };
+          const outside = (event) => { if (!el.isConnected) { document.removeEventListener('pointerdown', outside, true); return; } if (!combo.contains(event.target) && !tray.contains(event.target)) closeMenu(); };
+          // Escape from anywhere (a removed tray chip leaves the focus on the page) closes the list.
+          const onEscape = (event) => { if (!el.isConnected) { document.removeEventListener('keydown', onEscape); return; } if (event.key === 'Escape' && isOpen()) { event.preventDefault(); closeMenu(); } };
+          document.addEventListener('keydown', onEscape);
           document.addEventListener('pointerdown', outside, true);
           tray.addEventListener('click', (event) => { const b = event.target.closest('.guided-pick'); if (b) { toggle(b.dataset.value); renderMenu(); } });
           bio.value = a.bio;
+          attachEmojiPicker(bio, { label: 'Add an emoji to your bio', after: bioCount.parentElement });
           const syncBio = () => { a.bio = bio.value; bioCount.textContent = String(bio.value.length); refreshNext(); };
           bio.addEventListener('input', syncBio);
           syncBio();
@@ -529,14 +544,20 @@ export const initGuidedSignup = ({
         ready: () => a.lookingFor.length >= 1 && bioOk(),
         notReady: () => (a.lookingFor.length ? COPY.bioMissing : COPY.lookingMissing),
         submit: async () => {
+          // One submit per Finish: a second tap or Enter that slips through is ignored (the latch opens again only
+          // when the save failed and the member is asked to try again).
+          if (submitted) return null;
+          submitted = true;
           a.bio = cleanBio(a.bio);
-          const result = await submit({ ...a, adult: true });
-          if (!result?.ok) return { screen: result?.screen || 'about', message: result?.message || COPY.saveFailed };
-          a.password = ''; a.passwordConfirm = '';
-          if (result.photoUrl) { a.photoUrl = result.photoUrl; a.photo = null; }
-          if (!result.session) return 'verify';
-          state.hasSession = true;
-          return SETUP[0];
+          let result;
+          try {
+            result = await submitSetup({ area: a.area, interests: a.interests.map(({ id, label, mode }) => ({ id, label, mode })), lookingFor: [...a.lookingFor], bio: a.bio });
+          } catch (error) { submitted = false; throw error; }
+          if (!result?.ok) { submitted = false; return { screen: result?.screen || 'about', message: result?.message || COPY.saveFailed }; }
+          // Saved: the coordinates leave memory.
+          cancelGeo();
+          if (a.area?.kind === 'geo') a.area = { kind: 'keep', label: '' };
+          return 'reveal';
         },
       };
     },
@@ -546,7 +567,7 @@ export const initGuidedSignup = ({
       let searchSeq = 0;
       let searchTimer = 0;
       return {
-        html: `${kicker('Before you start')}${heading('Where are you based?', 'We show people near you first. Members only ever see a rounded distance, never your address.')}
+        html: `${heading('Where are you based?', 'We show people near you first. Members only ever see a rounded distance, never your address.')}
           <button class="guided-choice guided-choice--geo" type="button" data-guided-geo aria-pressed="false">${svg('pin', 'guided-choice-icon')}<span>Use my location</span></button>
           <div class="guided-or"><span>or pick your city</span></div>
           <p class="guided-fallback" data-guided-area-fallback></p>
@@ -661,14 +682,13 @@ export const initGuidedSignup = ({
 
     interests: () => {
       let query = '';
-      let submitted = false;
       const picked = () => new Set(a.interests.map((p) => p.id));
       return {
-        primary: 'Finish',
+        primary: 'Continue',
         // D-095 (refines D-082b): one dropdown, like "Find your people" (D-092). The field opens a list grouped by
         // category ("Popular" first); typing narrows it to the best matches. Picks stay open for another and land in
         // the compact "Your picks" tray above the field (never under the open list), where a tap removes them.
-        html: `${heading('What are you into?', 'Pick what you genuinely care about, up to twelve. Three to six works best.')}
+        html: `${kicker('Before you start')}${heading('What are you into?', 'Pick what you genuinely care about, up to twelve. Three to six works best.')}
           <div class="guided-tray" data-guided-tray>
             <div class="guided-tray-head"><span>Your picks</span><b data-guided-count aria-hidden="true">0 picked</b></div>
             <ul class="guided-tray-list" aria-label="Your picks"></ul>
@@ -808,7 +828,7 @@ export const initGuidedSignup = ({
             else if (event.key === 'Tab') closeMenu();
             else if (event.key === 'Enter') {
               // Enter picks the highlighted interest (with something typed, the best match); with nothing typed and
-              // nothing highlighted it is Finish.
+              // nothing highlighted it is Continue.
               const id = shown[active] ?? (query.trim() ? shown.find((x) => !picked().has(x)) : undefined);
               if (!isOpen() || !id) { closeMenu(); return; }
               event.preventDefault();
@@ -824,8 +844,12 @@ export const initGuidedSignup = ({
             setActive(shown.indexOf(o.dataset.id), { scroll: false });
             toggle(o.dataset.id);
           });
-          // A press anywhere else closes the list.
-          const outside = (event) => { if (!el.isConnected) { document.removeEventListener('pointerdown', outside, true); return; } if (!combo.contains(event.target)) closeMenu(); };
+          // A press anywhere else closes the list. A press on the tray does not: on a phone the list sits in the page,
+          // and closing it under the finger moved the page before the tap landed.
+          const outside = (event) => { if (!el.isConnected) { document.removeEventListener('pointerdown', outside, true); return; } if (!combo.contains(event.target) && !tray.contains(event.target)) closeMenu(); };
+          // Escape from anywhere (a removed tray chip leaves the focus on the page) closes the list.
+          const onEscape = (event) => { if (!el.isConnected) { document.removeEventListener('keydown', onEscape); return; } if (event.key === 'Escape' && isOpen()) { event.preventDefault(); closeMenu(); } };
+          document.addEventListener('keydown', onEscape);
           document.addEventListener('pointerdown', outside, true);
           tray.addEventListener('click', (event) => { const b = event.target.closest('.guided-pick'); if (b) { toggle(b.dataset.id); renderMenu(); } });
           renderTray();
@@ -851,19 +875,8 @@ export const initGuidedSignup = ({
         },
         ready: () => a.interests.length >= 1 && a.interests.length <= MAX_INTERESTS && Boolean(state.nodes),
         notReady: () => COPY.interestsMissing,
-        submit: async () => {
-          // One submit per Finish: a second tap or Enter that slips through is ignored (the latch opens again only
-          // when the save failed and the member is asked to try again).
-          if (submitted) return null;
-          submitted = true;
-          let result;
-          try { result = await submitSetup({ area: a.area, interests: a.interests.map(({ id, label, mode }) => ({ id, label, mode })) }); } catch (error) { submitted = false; throw error; }
-          if (!result?.ok) { submitted = false; return { screen: result?.screen || 'interests', message: result?.message || COPY.saveFailed }; }
-          // Saved: the coordinates leave memory.
-          cancelGeo();
-          if (a.area?.kind === 'geo') a.area = { kind: 'keep', label: '' };
-          return 'reveal';
-        },
+        // D-114: the location and About you follow; About you's Finish saves the picks.
+        submit: async () => nextAfter('interests'),
       };
     },
 

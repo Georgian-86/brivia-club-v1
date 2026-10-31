@@ -220,3 +220,11 @@ body.app-body .app-view[data-view="home"] .swipe-actions .swipe-action { flex: 0
    labels keep 4.5:1 (the 62% glass let the photo through). */
 html body.app-body[data-app-view="home"] .app-tabbar,
 html body.app-body[data-app-view="explore"] .app-tabbar { background: color-mix(in srgb, var(--color-cream) 92%, transparent) !important; }
+
+/* D-113 (founder, 2026-10-31): no short rule under the name (the tags keep their gap), and the bar's "Looking for"
+   line stays on one row, ending in "…" when it is long. */
+body.app-body .app-view[data-view="home"] .swipe-card .member-tags::before { display: none; content: none; }
+body.app-body .app-view[data-view="home"] .swipe-card .member-tags { margin-top: 12px; }
+body.app-body .app-view[data-view="home"] .swipe-card .swipe-card-topline #swipe-card-label {
+  min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; letter-spacing: .16em;
+}

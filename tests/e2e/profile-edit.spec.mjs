@@ -40,6 +40,8 @@ try {
     page.setDefaultTimeout(8000);
     const about = await page.locator('#profile-bio').isVisible();
     check(`${w}: the profile shows an About card once the bio column exists`, about);
+    const heroBefore = await page.evaluate(() => { const q = document.querySelector('#profile-hero-bio'); return { hidden: q.hidden, text: q.textContent, old: /Same curiosity/.test(document.body.innerText) }; });
+    check(`${w}: D-113 no bio yet: nothing under the name in the hero (the old fixed line is gone)`, heroBefore.hidden && !heroBefore.text && !heroBefore.old, JSON.stringify(heroBefore));
     await page.locator('#profile-bio [data-profile-edit]').click();
     await page.waitForSelector('#profile-edit-modal [data-picker="profile-interests-edit"] [data-chip-remove]');
     const ui = await page.evaluate(() => {
@@ -81,6 +83,20 @@ try {
     await lookInput.press('Enter');
     await page.locator('select[name="experience"]').selectOption('3–7 years');
     await page.locator('textarea[name="bio"]').fill('Home cook and poetry reader in Ludhiana.');
+    // D-113: the emoji panel under the bio adds an emoji at the end and keeps the count right.
+    await page.locator('#profile-edit-modal .emoji-field-toggle').click();
+    await page.locator('#profile-edit-modal .emoji-field-panel [data-emoji-tab="food"]').click();
+    const emoji = await page.locator('#profile-edit-modal .emoji-field-emoji').first().getAttribute('data-emoji');
+    await page.locator('#profile-edit-modal .emoji-field-emoji').first().click();
+    const withEmoji = await page.evaluate(() => ({ value: document.querySelector('textarea[name="bio"]').value, count: document.querySelector('[data-bio-count]').textContent, focus: document.activeElement?.name }));
+    check(`${w}: D-113 the emoji panel inserts ${emoji} into the bio, updates the count and keeps the focus in the box`, withEmoji.value === `Home cook and poetry reader in Ludhiana.${emoji}` && withEmoji.count === String(withEmoji.value.length) && withEmoji.focus === 'bio', JSON.stringify(withEmoji));
+    if (SHOTS) await page.locator('#profile-edit-modal .profile-edit-bio').screenshot({ path: path.join(SHOTS, `edit-emoji-${w}.png`) });
+    const emojiAxe = await axeViolations(page, { include: '#profile-edit-modal .emoji-field' });
+    check(`${w}: D-113 axe on the open emoji panel`, emojiAxe.length === 0, JSON.stringify(emojiAxe));
+    await page.keyboard.press('Escape');
+    const panelClosed = await page.evaluate(() => ({ hidden: document.querySelector('#profile-edit-modal .emoji-field-panel')?.hidden, modal: Boolean(document.querySelector('#profile-edit-modal')) }));
+    check(`${w}: D-113 Escape closes the emoji panel, not the dialog`, panelClosed.hidden === true && panelClosed.modal, JSON.stringify(panelClosed));
+    await page.locator('textarea[name="bio"]').fill('Home cook and poetry reader in Ludhiana.');
     if (SHOTS) await page.locator('#profile-edit-modal .profile-edit-dialog').screenshot({ path: path.join(SHOTS, `edit-filled-${w}.png`) });
     await page.locator('.profile-edit-save').click();
     await page.waitForFunction(() => !document.querySelector('#profile-edit-modal'));
@@ -90,6 +106,9 @@ try {
     check(`${w}: the bio and the experience are saved to the member's row`, patches.some((p) => p.bio === 'Home cook and poetry reader in Ludhiana.') && patches.some((p) => p.experience === '3–7 years'), JSON.stringify(patches.map((p) => ({ bio: p.bio, experience: p.experience }))));
     check(`${w}: looking for keeps the saved value and adds a suggestion and a typed one`, patches.some((p) => JSON.stringify(p.looking_for) === JSON.stringify(['Friends', 'Mentor', 'Supper club'])), JSON.stringify(patches.map((p) => p.looking_for)));
     check(`${w}: the About card shows the bio`, (await page.locator('#profile-bio .profile-bio-text').textContent()) === 'Home cook and poetry reader in Ludhiana.');
+    const heroAfter = await page.evaluate(() => { const q = document.querySelector('#profile-hero-bio'); return { hidden: q.hidden, text: q.textContent }; });
+    check(`${w}: D-113 the hero shows the saved bio under the name`, !heroAfter.hidden && heroAfter.text === 'Home cook and poetry reader in Ludhiana.', JSON.stringify(heroAfter));
+    if (SHOTS) await page.locator('.profile-hero').screenshot({ path: path.join(SHOTS, `hero-bio-${w}.png`) });
 
     // Unchanged interests send nothing; the daily limit is explained and nothing else is saved.
     const before = posted('set_member_interests').length;

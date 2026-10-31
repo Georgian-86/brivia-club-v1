@@ -2264,3 +2264,29 @@ controls (a tester or a seeded test member), never a real member, so no new expo
   at 1440 and 375: listbox, 44 px rows, own words, bio floor, axe; rows store `looking_for` and `bio`; pending profile;
   resume; one submit per tap or Enter), onboarding 269, profile-edit, consent, mobile-polish, launch-polish,
   password-reveal; build and style ratchet OK.
+
+## D-113: Bio emoji, the bio on the profile, a plain cover, "Looking for" on the cards (founder, 2026-10-31)
+
+- **Asked:** an emoji "dashboard" in the bio; on the profile page the bio instead of "Same curiosity. Bigger
+  conversations."; no maroon filter on the cover; on the cards "looking for" instead of "Creative soul"; no line under
+  the name.
+- **Done:** `emoji-field.js` adds an "Emoji" button under both bio boxes (signup About you, Edit profile) that opens
+  the chat's emoji in six tabs; a press inserts at the cursor, never past 300 characters, and keeps the focus in the
+  box; Escape or a press outside closes it (not the dialog). The profile hero shows the member's own bio under the
+  area (3 lines at most; nothing when there is none). The cover's oxblood wash is replaced by a light neutral shade
+  on the left only, so the cream name stays readable. The deck card's bar reads "LOOKING FOR · FRIENDS, MENTOR" (the
+  first two; "BRIVIA MEMBER" with none) instead of a guessed label, and the short rule under the name is gone.
+- **Proof:** unit `emoji-field.test.mjs`; e2e profile-edit (emoji panel, axe, Escape, hero bio), deck (bar, no rule),
+  signup (emoji in About you), launch-polish.
+
+## D-114: Setup after the photo is interests, then the location, then About you (founder, 2026-10-31)
+
+- **Asked:** "after the profile picture ask for interest input then the location and looking for, bio".
+- **Done (revises D-112's placement):** the photo is again the last signup screen and creates the account ("Step n of
+  5", Google "of 4"). Setup is `interests` → `area` → `about` ("Set up n of 3"); Interests has no Back into signup,
+  "Before you start" moved to it, and About you's Finish saves looking for and the bio (bio only once 0016 is live),
+  then the area, then the interests, in one go. Resume order: photo, interests, area, About you. On a phone a tap on
+  a tray chip no longer closes the open list (closing it moved the page under the finger), and Escape closes the list
+  from anywhere on the screen.
+- **Proof:** unit `signup-flow.test.mjs`; e2e signup 365, onboarding 269, location 64, profile-edit, launch-polish,
+  mobile-polish, password-reveal; build, styles, assets OK.

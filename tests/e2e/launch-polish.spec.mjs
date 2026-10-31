@@ -131,12 +131,12 @@ try {
       const sidebar = document.querySelector('.profile-sidebar');
       return { frame: box(frame), avatar: box(document.querySelector('#profile-avatar')), edit: box(document.querySelector('#profile-photo-editor')), gear: box(document.querySelector('#profile-settings-button')), sidebarShown: getComputedStyle(sidebar).display !== 'none', sidebarControls: sidebar.querySelectorAll('a, button, input, [tabindex]').length, quote: document.querySelector('.profile-hero-quote')?.textContent, status: document.querySelectorAll('.profile-status').length, tapInset: getComputedStyle(document.querySelector('#profile-photo-editor'), '::after').top };
     });
-    await check(`${tag} profile: the photo fills a framed card; EDIT PROFILE and ⚙ are 44 px (on phones 32 px with a 44 px tap area, D-098); quote shown; no status pill`, () => {
+    await check(`${tag} profile: the photo fills a framed card; EDIT PROFILE and ⚙ are 44 px (on phones 32 px with a 44 px tap area, D-098); no fixed quote (the bio's place, D-113); no status pill`, () => {
       assert.ok(Math.abs(hero.avatar.w - (hero.frame.w - (tag === '390' ? 12 : 16))) <= 1, JSON.stringify(hero));
       const min = tag === '390' ? 32 : 44;
       assert.ok(hero.edit.h >= min && hero.gear.w >= min && hero.gear.h >= min, JSON.stringify(hero));
       if (tag === '390') assert.equal(hero.tapInset, '-6px');
-      assert.match(hero.quote, /Same curiosity/); assert.equal(hero.status, 0);
+      assert.doesNotMatch(hero.quote || '', /Same curiosity/); assert.equal(hero.status, 0);
     });
     await check(`${tag} profile: the brand sidebar shows on desktop only, with no controls`, () => { assert.equal(hero.sidebarShown, tag === '1440'); assert.equal(hero.sidebarControls, 0); });
     await page.click('#profile-photo-editor');

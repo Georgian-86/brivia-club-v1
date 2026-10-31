@@ -1677,13 +1677,14 @@ const startGoogleAuth = async () => {
 // signUp (email path) or the existing session (Google, a returning member) -> saveProfile with the framed photo ->
 // declare_adult. Without a session (email confirmation on) the profile is kept as the pending profile, the photo as a
 // compressed data:image preview (uploaded after login, pending-profile.js), and the Verify screen shows.
-// Setup's last screen (interests) runs submitGuidedSetup: the area, then the interests (finishOnboarding).
+// Setup's last screen (About you, D-114) runs submitGuidedSetup: looking for and the bio, then the area, then the
+// interests (finishOnboarding).
 // Each resolves { ok: true, ... } or { ok: false, screen, message } (the screen to show the line on).
 let guidedRow = null;  // the signed-in member's own profile row when the flow resumed (kept fields are not cleared)
 let guidedSaved = null;  // their saved budget (my_interests) when the flow resumed: unchanged picks keep its points
 const GUIDED_DEFAULT_COVER = '/Images/Cover%20images/163BDB0C-64AC-44E7-8663-55C323ADB4FE.PNG';
 const guidedStepFor = (message) => (message === ADULT_SAVE_ERROR ? 'adult'
-  : message === AREA_SAVE_ERROR || message === 'Try again later.' ? 'area' : 'interests');
+  : message === AREA_SAVE_ERROR || message === 'Try again later.' ? 'area' : message === ABOUT_SAVE_ERROR ? 'about' : 'interests');
 const submitGuidedSignup = async (answers) => {
   if (!supabaseReady || !supabase) return { ok: false, screen: 'photo', message: 'Supabase is not configured.' };
   const kept = guidedRow ? rowToProfile(guidedRow) : {};
@@ -1697,9 +1698,8 @@ const submitGuidedSignup = async (answers) => {
     phone: `${phoneCountryCode} ${phoneNumber}`.trim(),
     gender: normalizeSignupGender(answers.gender),
     experience: kept.experience || '',
-    // D-112: About you (both required on that screen). The bio is stored once 0016 is applied (saveProfile).
-    lookingFor: (answers.lookingFor || []).join(', ') || kept.lookingFor || '',
-    bio: String(answers.bio || '').trim(),
+    // About you is asked in setup (D-114) and saved there; a resumed row keeps what it has.
+    lookingFor: kept.lookingFor || '',
     coverUrl: normalizeCoverUrl(kept.coverUrl || kept.cover_url || '') || GUIDED_DEFAULT_COVER,
   };
   if (kept.photoUrl || kept.photo_url) profile.photoUrl = kept.photoUrl || kept.photo_url;
@@ -1747,7 +1747,7 @@ const submitGuidedSignup = async (answers) => {
     }
     adultAlreadyDeclared = Boolean(guidedRow?.adult_declared_at);
     const { data: savedRow, error: profileError } = await saveProfile(user.id, profile, photoFile, { photoUrl: kept.photoUrl || kept.photo_url || '' });
-    if (profileError) return { ok: false, screen: profileError.field === 'photo' ? 'photo' : 'about', message: profileError.field === 'photo' ? PHOTO_ERROR_MESSAGE : signupErrorCopy(profileError) };
+    if (profileError) return { ok: false, screen: 'photo', message: profileError.field === 'photo' ? PHOTO_ERROR_MESSAGE : signupErrorCopy(profileError) };
     guidedRow = savedRow || guidedRow;
     await declareAdultStep();
     window.localStorage.removeItem('brivia-pending-profile');
@@ -1755,11 +1755,21 @@ const submitGuidedSignup = async (answers) => {
     return { ok: true, session: true, photoUrl: savedRow?.photo_url || '' };
   } catch (error) {
     if (error instanceof OnboardingStepError) return { ok: false, screen: guidedStepFor(error.message), message: error.message };
-    return { ok: false, screen: 'about', message: signupErrorCopy(error) };
+    return { ok: false, screen: 'photo', message: signupErrorCopy(error) };
   }
 };
-const submitGuidedSetup = async ({ area, interests }) => {
-  if (!supabaseReady || !supabase) return { ok: false, screen: 'interests', message: 'Supabase is not configured.' };
+// D-112 / D-114: About you on the member's own row. The bio column exists once 0016 is applied: before that the
+// looking for is saved alone (the bio is asked for again in Edit profile once it exists).
+const ABOUT_SAVE_ERROR = "Your looking for and bio didn't save. Check your connection and try again.";
+const saveGuidedAbout = async (userId, lookingFor, bio) => {
+  const looking = (lookingFor || []).map((v) => String(v).trim()).filter(Boolean);
+  let { error } = await supabase.from('profiles').update({ looking_for: looking, bio: String(bio || '').trim() || null }).eq('id', userId);
+  if (error && /\bbio\b/i.test(error.message || '')) ({ error } = await supabase.from('profiles').update({ looking_for: looking }).eq('id', userId));
+  if (error) throw new OnboardingStepError(ABOUT_SAVE_ERROR);
+  if (guidedRow) guidedRow = { ...guidedRow, looking_for: looking, bio: String(bio || '').trim() };
+};
+const submitGuidedSetup = async ({ area, interests, lookingFor = [], bio = '' }) => {
+  if (!supabaseReady || !supabase) return { ok: false, screen: 'about', message: 'Supabase is not configured.' };
   areaChoice = area && ['geo', 'city', 'keep'].includes(area.kind) ? { ...area } : null;
   // Unchanged picks over a complete saved budget keep the member's own points and modes and are not saved again (M3).
   const planned = guidedBudget(interests, guidedSaved);
@@ -1769,6 +1779,7 @@ const submitGuidedSetup = async ({ area, interests }) => {
     const user = sessionData?.session?.user || null;
     if (!user) return { ok: false, screen: 'area', message: 'Your session ended. Please log in again.' };
     adultAlreadyDeclared = adultAlreadyDeclared || Boolean(guidedRow?.adult_declared_at);
+    await saveGuidedAbout(user.id, lookingFor, bio);
     await finishOnboarding(user.id, { skipInterests: planned.unchanged });
     areaChoice = null;
     return { ok: true };

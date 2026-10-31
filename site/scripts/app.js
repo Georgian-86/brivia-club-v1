@@ -50,6 +50,7 @@ import { createDeckSwipe, SWIPE } from './deck-swipe.js';
 import { maybeShowDeckTutorial } from './deck-tutorial.js';
 import { whyPanelMarkup, whyRow } from './why-panel.js';
 import { chatEmojiCategories } from './chat-emoji-data.js';
+import { attachEmojiPicker } from './emoji-field.js';
 import { chatGifCatalog } from './chat-gif-data.js';
 import { typingTopic, createTypingSender, createTypingReceiver, TYPING_EVENT } from './chat-typing.js';
 import '../styles/chat-attachments.css';
@@ -80,6 +81,7 @@ import '../styles/app-polish.css';
 // The compact deck without side buttons, and its first-run tutorial (D-094). Loads last.
 import '../styles/deck-compact.css';
 import '../styles/collab-requests.css';  // D-108: the request section and review sheet
+import '../styles/emoji-field.css';  // D-113: the emoji panel under the Edit profile bio
 import '../styles/components.css';  // D-105: the shared field, select, listbox and chip components, last so they win
 import { navMarkup, markCurrentNav, setChatBadges } from './app-nav.js';
 import { parseReadState, serializeReadState, lastReadAt, unreadCount, markRead, sortByLastContact, unreadTotal } from './chat-unread.js';
@@ -993,10 +995,8 @@ const renderHome = (queue = getExplorePeople()) => {
   const name = document.querySelector('#swipe-name'); if (name) name.textContent = currentPerson.name;
   document.querySelector('#card-more')?.setAttribute('aria-label', `More options for ${currentPerson.name}`);
   const cardLabel = document.querySelector('#swipe-card-label');
-  if (cardLabel) {
-    const profileText = `${currentPerson.role || ''} ${currentPerson.lookingFor || ''} ${(currentPerson.tags || []).join(' ')}`.toLowerCase();
-    cardLabel.textContent = /engineer|developer|ai|tech|system|build/.test(profileText) ? 'BUILDING' : /marketing|content|brand|impact|startup/.test(profileText) ? 'IDEAS TO IMPACT' : 'CREATIVE SOUL';
-  }
+  // D-113: the bar says what the member is looking for (their own words, first two), not a guessed label.
+  if (cardLabel) cardLabel.textContent = deckCardLabel(currentPerson.lookingFor);
   const role = document.querySelector('#swipe-role'); if (role) role.textContent = currentPerson.role;
   // The server's distance band only ("~3 km", a place, a region, "Abroad"): never a City/State, cell or km.
   const location = document.querySelector('#swipe-location');
@@ -1042,6 +1042,11 @@ const isUuid = (value) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9
 const CANDIDATE_ID_CAP = 50;
 // Another member's card. Location is only the deck's distance band: a City/State on any row is dropped here, so no
 // surface (card, info sheet, public profile, chat header, lists) can show it.
+// D-113: the deck card's bar: "LOOKING FOR · CO-FOUNDER, MENTOR" (the first two), or the plain club line without any.
+const deckCardLabel = (lookingFor) => {
+  const items = splitProfileValues(lookingFor).slice(0, 2);
+  return items.length ? `LOOKING FOR · ${items.join(', ').toUpperCase()}` : 'BRIVIA MEMBER';
+};
 const toMemberPerson = (row) => {
   const { city, state, email, phone, phone_country_code: phoneCountryCode, phone_number: phoneNumber, ...safeRow } = row || {};
   const profile = rowToProfile(safeRow);
@@ -2739,6 +2744,8 @@ const openProfileEditor = () => {
   const lookingEdit = wireLookingForEditor(modal);
   const bioField = modal.querySelector('textarea[name="bio"]');
   bioField?.addEventListener('input', () => { const count = modal.querySelector('[data-bio-count]'); if (count) count.textContent = String(bioField.value.length); });
+  // D-113: an emoji panel under the bio (emoji-field.js).
+  if (bioField) attachEmojiPicker(bioField, { label: 'Add an emoji to your bio', after: bioField.parentElement.querySelector('.profile-edit-helper') || bioField });
   modal.addEventListener('click', (event) => { if (event.target === modal) close(); });
   // "Frame your photo" (D-080): a picked photo opens the crop dialog first; only the framed square is ever uploaded.
   // Cancel clears the pick, so nothing is uploaded. A file that cannot be decoded shows the inline photo error.
@@ -3299,6 +3306,10 @@ const renderProfile = () => {
   // My area as the server names it (my_onboarding_status().place_label), read-only here (D-036). The legacy free-text
   // City/State are neither shown nor editable: no other member can read them, and the area is the server's cell.
   document.querySelector('#profile-location').textContent = areaInputValue(memberPlaceLabel) || 'Your area';  // no "(city-wide)" (D-106)
+  // D-113: the member's own bio under the name (it replaced the fixed "Same curiosity. Bigger conversations." line);
+  // nothing shows until there is one.
+  const heroBio = document.querySelector('#profile-hero-bio');
+  if (heroBio) { const bio = String(profile.bio || '').trim(); heroBio.textContent = bio; heroBio.hidden = !bio; }
   const profileCover = document.querySelector('#profile-cover-image');
   const safeOwnCover = safeImageUrl(coverUrl) || safeImageUrl(defaultCoverUrl);
   if (profileCover) profileCover.style.backgroundImage = `url("${safeOwnCover}")`;
