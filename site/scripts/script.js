@@ -1697,7 +1697,9 @@ const submitGuidedSignup = async (answers) => {
     phone: `${phoneCountryCode} ${phoneNumber}`.trim(),
     gender: normalizeSignupGender(answers.gender),
     experience: kept.experience || '',
-    lookingFor: kept.lookingFor || kept.looking_for || '',
+    // D-112: About you (both required on that screen). The bio is stored once 0016 is applied (saveProfile).
+    lookingFor: (answers.lookingFor || []).join(', ') || kept.lookingFor || '',
+    bio: String(answers.bio || '').trim(),
     coverUrl: normalizeCoverUrl(kept.coverUrl || kept.cover_url || '') || GUIDED_DEFAULT_COVER,
   };
   if (kept.photoUrl || kept.photo_url) profile.photoUrl = kept.photoUrl || kept.photo_url;
@@ -1745,7 +1747,7 @@ const submitGuidedSignup = async (answers) => {
     }
     adultAlreadyDeclared = Boolean(guidedRow?.adult_declared_at);
     const { data: savedRow, error: profileError } = await saveProfile(user.id, profile, photoFile, { photoUrl: kept.photoUrl || kept.photo_url || '' });
-    if (profileError) return { ok: false, screen: 'photo', message: profileError.field === 'photo' ? PHOTO_ERROR_MESSAGE : signupErrorCopy(profileError) };
+    if (profileError) return { ok: false, screen: profileError.field === 'photo' ? 'photo' : 'about', message: profileError.field === 'photo' ? PHOTO_ERROR_MESSAGE : signupErrorCopy(profileError) };
     guidedRow = savedRow || guidedRow;
     await declareAdultStep();
     window.localStorage.removeItem('brivia-pending-profile');
@@ -1753,7 +1755,7 @@ const submitGuidedSignup = async (answers) => {
     return { ok: true, session: true, photoUrl: savedRow?.photo_url || '' };
   } catch (error) {
     if (error instanceof OnboardingStepError) return { ok: false, screen: guidedStepFor(error.message), message: error.message };
-    return { ok: false, screen: 'photo', message: signupErrorCopy(error) };
+    return { ok: false, screen: 'about', message: signupErrorCopy(error) };
   }
 };
 const submitGuidedSetup = async ({ area, interests }) => {
@@ -1894,6 +1896,8 @@ const openGuidedFor = async (user, row = null, status = null, pendingResult = nu
     has_phone: digits.length >= 7,
     has_gender: Boolean(gender),
     has_photo: Boolean(row?.photo_url),
+    // D-112: looking for, and a bio once the column exists (0016); an older database asks for looking for only.
+    has_about: Boolean(row?.looking_for?.length) && (!row || !Object.prototype.hasOwnProperty.call(row, 'bio') || Boolean(String(row.bio || '').trim())),
     has_cell: Boolean(current?.has_cell),
     interests: Number(current?.interests) || 0,
     points: Number(current?.points) || 0,
@@ -1910,6 +1914,8 @@ const openGuidedFor = async (user, row = null, status = null, pendingResult = nu
     phoneNumber: digits,
     gender,
     photoUrl: row?.photo_url || '',
+    lookingFor: Array.isArray(row?.looking_for) ? row.looking_for : [],
+    bio: typeof row?.bio === 'string' ? row.bio : '',
     area: flow.has_cell ? { kind: 'keep', label: current?.place_label || '' } : null,
     interests,
   };

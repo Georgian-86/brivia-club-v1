@@ -8,17 +8,19 @@
 // SETUP (area, then interests) is not part of signup: it is the first thing a new member sees once the account exists
 // (straight after signup, or after confirming the email and logging in), and nobody reaches the app without it (the
 // server's completion rule needs a home area and interests; the app sends an incomplete member back here).
+// D-112 (founder, 2026-10-31): after the photo, "About you" asks what the member is looking for and a short bio, both
+// required. It is now the last signup screen: its button creates the account and saves the profile.
 export const SETUP = ['area', 'interests'];
 export const SCREENS = {
-  email: ['welcome', 'account', 'adult', 'name', 'details', 'photo', ...SETUP, 'reveal'],
-  google: ['welcome', 'adult', 'name', 'details', 'photo', ...SETUP, 'reveal'],
+  email: ['welcome', 'account', 'adult', 'name', 'details', 'photo', 'about', ...SETUP, 'reveal'],
+  google: ['welcome', 'adult', 'name', 'details', 'photo', 'about', ...SETUP, 'reveal'],
 };
 // The last signup screen: its primary button creates the account and saves the profile.
-export const SIGNUP_LAST = 'photo';
+export const SIGNUP_LAST = 'about';
 export const isSetupScreen = (screen) => SETUP.includes(screen);
 
 // The icon each question shows in its bubble (signup-screens.js draws them as inline SVG).
-export const STEP_ICONS = { account: 'mail', adult: 'shield', name: 'person', details: 'phone', photo: 'camera', area: 'pin', interests: 'spark' };
+export const STEP_ICONS = { account: 'mail', adult: 'shield', name: 'person', details: 'phone', photo: 'camera', about: 'note', area: 'pin', interests: 'spark' };
 const TERMINAL = ['reveal', 'verify'];
 // The questions of the phase `screen` belongs to (signup questions for welcome / verify, setup for reveal).
 const questions = (path, screen) => {
@@ -41,9 +43,9 @@ export const stepStates = (path, screen) => {
   return list.map((s, i) => ({ screen: s, state: i < at ? 'done' : i === at ? 'current' : 'pending' }));
 };
 
-// status: { adult_declared, has_name, has_phone, has_gender, has_photo, has_cell, interests, points, completed }
-// (my_onboarding_status plus the member's own profile row). 'done' means go to the app. A completed member is never
-// sent back for a photo (the requirement is for signups from D-102 on).
+// status: { adult_declared, has_name, has_phone, has_gender, has_photo, has_about, has_cell, interests, points,
+// completed } (my_onboarding_status plus the member's own profile row). 'done' means go to the app. A completed member
+// is never sent back for a photo or About you (the requirements are for signups from D-102 / D-112 on).
 export const resumeScreen = ({ session, status = {} }) => {
   if (!session) return 'welcome';
   if (status.completed) return 'done';
@@ -51,6 +53,7 @@ export const resumeScreen = ({ session, status = {} }) => {
   if (!status.has_name) return 'name';
   if (!status.has_phone || !status.has_gender) return 'details';
   if (status.has_photo === false) return 'photo';
+  if (status.has_about === false) return 'about';
   if (!status.has_cell) return 'area';
   if (!(status.interests > 0 && status.points === 20)) return 'interests';
   return 'done';
