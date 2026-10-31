@@ -2,8 +2,8 @@
 //   PLAYWRIGHT_MODULE=/tmp/pw/node_modules/playwright/index.mjs node tests/e2e/signup.spec.mjs
 //   E2E_SCREENSHOTS=<dir> also saves a screenshot of every screen. E2E_PORT overrides the Vite port (default 5193).
 // D-102: signup ends on a required profile photo; D-112 adds About you after it (looking for + bio, both required),
-// whose button creates the account ("Step n of 6"; Google "of 5"); setup (area, interests: "Set up n of 2") follows
-// and is the only way to the app.
+// D-114 moves it into setup: the photo creates the account ("Step n of 5"; Google "of 4"); setup (interests, area,
+// About you: "Set up n of 3") follows and is the only way to the app.
 // Screens (B2), at 1440 and 375 px plus a 320 px overflow pass: one question per screen (exactly one [data-question]),
 // bubbles done / current / pending, Enter = Continue, Back on every question screen, 18+ required,
 // mismatched passwords blocked, Area with A1's locateOnce (granted: the status line; denied: fallbackCopy and the city
@@ -193,6 +193,14 @@ const addAbout = async (page, { bio = BIO } = {}) => {
   await page.locator('textarea[name="guided-bio"]').fill(bio);
 };
 
+// D-114: interests come first in setup. Picks these from the open list and closes it.
+const pickInterests = async (page, labels = ['Chess', 'Guitar', 'Hackathons']) => {
+  await openInterests(page);
+  for (const label of labels) await page.locator('.guided-menu-option', { hasText: new RegExp(`^${label}$`) }).first().click();
+  await page.keyboard.press('Escape');
+  await page.waitForTimeout(320);
+};
+
 // D-095: the interests step is a dropdown; this opens it and waits for its options.
 const openInterests = async (page) => {
   await page.locator('input[name="guided-interest"]').click();
@@ -314,9 +322,9 @@ try {
     await page.locator('[data-guided-email]').click();
     await waitScreen(page, 'account');
     u = await ui(page);
-    check(`${w} account: one question, "Step 1 of 6", first bubble current, Back shown, Continue disabled (${u.bubbles.join(' ')})`, () => {
-      assert.equal(u.questions, 1); assert.equal(u.h1, 1); assert.equal(u.primaries, 1); assert.equal(u.label, 'Step 1 of 6');
-      assert.deepEqual(u.bubbles, ['account:current', 'adult:pending', 'name:pending', 'details:pending', 'photo:pending', 'about:pending']);
+    check(`${w} account: one question, "Step 1 of 5", first bubble current, Back shown, Continue disabled (${u.bubbles.join(' ')})`, () => {
+      assert.equal(u.questions, 1); assert.equal(u.h1, 1); assert.equal(u.primaries, 1); assert.equal(u.label, 'Step 1 of 5');
+      assert.deepEqual(u.bubbles, ['account:current', 'adult:pending', 'name:pending', 'details:pending', 'photo:pending']);
       assert.equal(u.back, true); assert.equal(u.nextDisabled, true);
     });
     let f = await focusInfo(page);
@@ -337,15 +345,15 @@ try {
     await page.waitForTimeout(250);
     u = await ui(page);
     check(`${w} account: mismatched passwords block with a line (${u.error})`, () => assert.equal(u.error, "The two passwords don't match."));
-    check(`${w} account: still on account after the mismatch`, () => assert.equal(u.label, 'Step 1 of 6'));
+    check(`${w} account: still on account after the mismatch`, () => assert.equal(u.label, 'Step 1 of 5'));
     await page.locator('input[name="guided-password-confirm"]').fill(PASSWORD);
     await shot(page, `${w}-02-account`);
     await auditScreen(page, `${w} account`);
     await page.locator('input[name="guided-password-confirm"]').press('Enter');
     const toAdult = await waitScreen(page, 'adult');
     u = await ui(page);
-    check(`${w} Enter = Continue: account -> 18+ ("Step 2 of 6"), nothing sent to Supabase Auth yet`, () => {
-      assert.equal(toAdult, true); assert.equal(u.label, 'Step 2 of 6'); assert.equal(u.questions, 1);
+    check(`${w} Enter = Continue: account -> 18+ ("Step 2 of 5"), nothing sent to Supabase Auth yet`, () => {
+      assert.equal(toAdult, true); assert.equal(u.label, 'Step 2 of 5'); assert.equal(u.questions, 1);
       assert.deepEqual(u.bubbles.slice(0, 2), ['account:done', 'adult:current']);
       assert.equal(calls.filter((c) => c.path.startsWith('/auth/v1/signup')).length, 0);
     });
@@ -368,8 +376,8 @@ try {
     await page.locator('input[name="guided-adult"]').press('Enter');
     await waitScreen(page, 'name');
     u = await ui(page);
-    check(`${w} name: "Step 3 of 6", one question, Back shown, Continue disabled when empty`, () => {
-      assert.equal(u.label, 'Step 3 of 6'); assert.equal(u.questions, 1); assert.equal(u.back, true); assert.equal(u.nextDisabled, true);
+    check(`${w} name: "Step 3 of 5", one question, Back shown, Continue disabled when empty`, () => {
+      assert.equal(u.label, 'Step 3 of 5'); assert.equal(u.questions, 1); assert.equal(u.back, true); assert.equal(u.nextDisabled, true);
     });
     f = await focusInfo(page);
     check(`${w} name: focus ${mobile ? 'on the question heading (touch)' : 'in the name field, described by the question'} (${JSON.stringify(f)})`, () => {
@@ -382,8 +390,8 @@ try {
     await page.locator('input[name="guided-name"]').press('Enter');
     await waitScreen(page, 'details');
     u = await ui(page);
-    check(`${w} details: phone + gender, "Step 4 of 6", Continue disabled until both`, () => {
-      assert.equal(u.label, 'Step 4 of 6'); assert.equal(u.questions, 1); assert.equal(u.nextDisabled, true); assert.match(u.text, /Prefer not to say/i);
+    check(`${w} details: phone + gender, "Step 4 of 5", Continue disabled until both`, () => {
+      assert.equal(u.label, 'Step 4 of 5'); assert.equal(u.questions, 1); assert.equal(u.nextDisabled, true); assert.match(u.text, /Prefer not to say/i);
     });
     await page.locator('input[name="guided-phone"]').fill('98765 43210');
     u = await ui(page);
@@ -394,10 +402,10 @@ try {
     await page.locator('input[name="guided-phone"]').press('Enter');
     await waitScreen(page, 'photo');
     u = await ui(page);
-    check(`${w} photo: "Step 5 of 6"; Continue disabled until a photo, Enter refused`, () => {
-      assert.equal(u.label, 'Step 5 of 6'); assert.equal(u.questions, 1); assert.equal(u.nextDisabled, true);
-      assert.match(u.text, /Add a profile photo/); assert.match(u.text, /Continue/i);
-      assert.deepEqual(u.bubbles.slice(-3), ['details:done', 'photo:current', 'about:pending']);
+    check(`${w} photo: "Step 5 of 5", the last signup question; "Create account" disabled until a photo, Enter refused`, () => {
+      assert.equal(u.label, 'Step 5 of 5'); assert.equal(u.questions, 1); assert.equal(u.nextDisabled, true);
+      assert.match(u.text, /Add a profile photo/); assert.match(u.text, /Create account/i);
+      assert.deepEqual(u.bubbles.slice(-2), ['details:done', 'photo:current']);
     });
     check(`${w} photo: still no account before the photo screen's button`, () => assert.equal(calls.filter((c) => c.path.startsWith('/auth/v1/signup')).length, 0));
     await page.locator('[data-guided-next]').click({ force: true });
@@ -407,75 +415,19 @@ try {
     await auditScreen(page, `${w} photo`);
     await addPhoto(page);
     u = await ui(page);
-    check(`${w} photo: framed photo previewed, "Change photo", Continue enabled`, () => { assert.match(u.text, /Change photo/i); assert.equal(u.nextDisabled, false); });
+    check(`${w} photo: framed photo previewed, "Change photo", Create account enabled`, () => { assert.match(u.text, /Change photo/i); assert.equal(u.nextDisabled, false); });
     await shot(page, `${w}-05b-photo`);
     await auditScreen(page, `${w} photo framed`);
     await page.locator('[data-guided-next]').click();
-    // D-112: About you, the last signup question. Both fields are required; its button creates the account.
-    await waitScreen(page, 'about');
-    u = await ui(page);
-    check(`${w} about: "Step 6 of 6", the last signup question; "Create account" disabled while empty`, () => {
-      assert.equal(u.label, 'Step 6 of 6'); assert.equal(u.questions, 1); assert.equal(u.nextDisabled, true); assert.equal(u.back, true);
-      assert.match(u.text, /Tell members about you/); assert.match(u.text, /Looking for/i); assert.match(u.text, /Bio/i); assert.match(u.text, /Create account/i);
-      assert.deepEqual(u.bubbles.slice(-2), ['photo:done', 'about:current']);
-    });
-    check(`${w} about: still no account before its button`, () => assert.equal(calls.filter((c) => c.path.startsWith('/auth/v1/signup')).length, 0));
-    await page.locator('input[name="guided-looking"]').click();
-    await page.waitForTimeout(250); // the open list scrolls into view on the next frame
-    const lookingMenu = await page.evaluate(() => {
-      const input = document.querySelector('input[name="guided-looking"]');
-      const menu = document.querySelector('#guided-looking-options');
-      const r = menu.getBoundingClientRect();
-      return { expanded: input.getAttribute('aria-expanded'), role: menu.getAttribute('role'), n: menu.querySelectorAll('[role="option"]').length, rowH: Math.round(menu.querySelector('.guided-menu-option').getBoundingClientRect().height), onScreen: r.top >= 0 && r.bottom <= window.innerHeight + 1 };
-    });
-    check(`${w} about: Looking for opens a listbox of suggestions (${lookingMenu.n}, rows ${lookingMenu.rowH}px)`, () => {
-      assert.equal(lookingMenu.expanded, 'true'); assert.equal(lookingMenu.role, 'listbox'); assert.ok(lookingMenu.n >= 20); assert.ok(lookingMenu.rowH >= 44); assert.equal(lookingMenu.onScreen, true);
-    });
-    await shot(page, `${w}-05c-about-open`);
-    await page.locator('.guided-menu-option[data-value="Co-founder"]').click();
-    await page.locator('input[name="guided-looking"]').fill('Chai buddy');
-    await page.locator('input[name="guided-looking"]').press('Enter');
-    const looking = await page.evaluate(() => [...document.querySelectorAll('.guided-tray--looking .guided-pick')].map((b) => b.dataset.value));
-    check(`${w} about: a suggestion and the member's own words both land in the tray (${looking.join(', ')})`, () => assert.deepEqual(looking, ['Co-founder', 'Chai buddy']));
-    await page.locator('input[name="guided-looking"]').press('Escape');
-    u = await ui(page);
-    check(`${w} about: Looking for alone is not enough (bio required)`, () => assert.equal(u.nextDisabled, true));
-    await page.locator('textarea[name="guided-bio"]').fill('Hi there');
-    u = await ui(page);
-    check(`${w} about: a bio under 20 characters is not enough`, () => assert.equal(u.nextDisabled, true));
-    await page.locator('textarea[name="guided-bio"]').fill(BIO);
-    u = await ui(page);
-    const bioCount = await page.locator('[data-guided-bio-count]').textContent();
-    check(`${w} about: both answered enables Create account; the count reads ${bioCount}`, () => { assert.equal(u.nextDisabled, false); assert.equal(Number(bioCount), BIO.length); });
-    await shot(page, `${w}-05d-about`);
-    await auditScreen(page, `${w} about`);
-    await page.locator('[data-guided-next]').click();
-    await waitScreen(page, 'area', 8000);
-    u = await ui(page);
-    check(`${w} area: setup starts after the account exists ("Set up 1 of 2", "Before you start", no Back into signup), Continue disabled until an area`, () => {
-      assert.equal(u.label, 'Set up 1 of 2'); assert.equal(u.questions, 1); assert.equal(u.nextDisabled, true);
-      assert.match(u.text, /Before you start/i); assert.equal(u.back, false);
-      assert.deepEqual(u.bubbles, ['area:current', 'interests:pending']);
-      assert.equal(calls.filter((c) => c.path.startsWith('/auth/v1/signup')).length, 1);
-    });
-    await page.locator('[data-guided-geo]').click();
-    await page.waitForFunction((t) => document.querySelector('[data-guided-area-status]')?.textContent === t, GOT_IT, { timeout: 4000 }).catch(() => {});
-    u = await ui(page);
-    const dom = await page.evaluate(() => document.documentElement.outerHTML);
-    const stored = await page.evaluate(() => JSON.stringify({ ...localStorage, ...sessionStorage }));
-    check(`${w} area: location granted -> "${GOT_IT}", Continue enabled, no coordinates in the DOM, storage or any request`, () => {
-      assert.match(u.text, /Got it\. We keep only the ~2 km square you're in\./); assert.equal(u.nextDisabled, false);
-      assert.ok(!COORD_RE.test(dom.replace(/src="blob:[^"]*"/g, ''))); assert.ok(!COORD_RE.test(stored));
-      assert.equal(calls.filter((c) => COORD_RE.test(c.url) || COORD_RE.test(c.body)).length, 0);
-    });
-    await shot(page, `${w}-06-area`);
-    await auditScreen(page, `${w} area`);
-    await page.keyboard.press('Enter');
-    await waitScreen(page, 'interests');
+    // D-114: setup starts with the interests, then the location, then About you.
+    await waitScreen(page, 'interests', 8000);
     await openInterests(page);
     u = await ui(page);
-    check(`${w} interests: "Set up 2 of 2", Continue disabled with 0 picks, private ones never offered, popular first, no points input`, () => {
-      assert.equal(u.label, 'Set up 2 of 2'); assert.equal(u.questions, 1); assert.equal(u.nextDisabled, true);
+    check(`${w} interests: setup starts after the account exists ("Set up 1 of 3", "Before you start", no Back into signup), Continue disabled with 0 picks, private ones never offered, popular first, no points input`, () => {
+      assert.equal(u.label, 'Set up 1 of 3'); assert.equal(u.questions, 1); assert.equal(u.nextDisabled, true);
+      assert.match(u.text, /Before you start/i); assert.equal(u.back, false);
+      assert.deepEqual(u.bubbles, ['interests:current', 'area:pending', 'about:pending']);
+      assert.equal(calls.filter((c) => c.path.startsWith('/auth/v1/signup')).length, 1);
       assert.ok(!/A private belief/.test(u.text)); assert.equal(u.firstTab, 'Popular'); assert.match(u.text, /Chess/i);
       assert.equal(u.points, 0); assert.ok(!/passion points|points left/i.test(u.text));
     });
@@ -501,10 +453,77 @@ try {
     await page.waitForTimeout(320);
     await shot(page, `${w}-07-interests`);
     await auditScreen(page, `${w} interests`);
+    await page.keyboard.press('Escape');
+    await page.locator('[data-guided-next]').click();
+    await waitScreen(page, 'area', 8000);
+    u = await ui(page);
+    check(`${w} area: "Set up 2 of 3" after the interests, Back shown, Continue disabled until an area`, () => {
+      assert.equal(u.label, 'Set up 2 of 3'); assert.equal(u.questions, 1); assert.equal(u.nextDisabled, true); assert.equal(u.back, true);
+      assert.deepEqual(u.bubbles, ['interests:done', 'area:current', 'about:pending']);
+    });
+    await page.locator('[data-guided-geo]').click();
+    await page.waitForFunction((t) => document.querySelector('[data-guided-area-status]')?.textContent === t, GOT_IT, { timeout: 4000 }).catch(() => {});
+    u = await ui(page);
+    const dom = await page.evaluate(() => document.documentElement.outerHTML);
+    const stored = await page.evaluate(() => JSON.stringify({ ...localStorage, ...sessionStorage }));
+    check(`${w} area: location granted -> "${GOT_IT}", Continue enabled, no coordinates in the DOM, storage or any request`, () => {
+      assert.match(u.text, /Got it\. We keep only the ~2 km square you're in\./); assert.equal(u.nextDisabled, false);
+      assert.ok(!COORD_RE.test(dom.replace(/src="blob:[^"]*"/g, ''))); assert.ok(!COORD_RE.test(stored));
+      assert.equal(calls.filter((c) => COORD_RE.test(c.url) || COORD_RE.test(c.body)).length, 0);
+    });
+    await shot(page, `${w}-06-area`);
+    await auditScreen(page, `${w} area`);
+    await page.keyboard.press('Enter');
+    // D-112 / D-114: About you, the last setup question. Both fields are required; Finish saves setup.
+    await waitScreen(page, 'about');
+    u = await ui(page);
+    check(`${w} about: "Set up 3 of 3", the last question; Finish disabled while empty`, () => {
+      assert.equal(u.label, 'Set up 3 of 3'); assert.equal(u.questions, 1); assert.equal(u.nextDisabled, true); assert.equal(u.back, true);
+      assert.match(u.text, /Tell members about you/); assert.match(u.text, /Looking for/i); assert.match(u.text, /Bio/i); assert.match(u.text, /Finish/i);
+      assert.deepEqual(u.bubbles, ['interests:done', 'area:done', 'about:current']);
+    });
+    await page.locator('input[name="guided-looking"]').click();
+    await page.waitForTimeout(250); // the open list scrolls into view on the next frame
+    const lookingMenu = await page.evaluate(() => {
+      const input = document.querySelector('input[name="guided-looking"]');
+      const menu = document.querySelector('#guided-looking-options');
+      const r = menu.getBoundingClientRect();
+      return { expanded: input.getAttribute('aria-expanded'), role: menu.getAttribute('role'), n: menu.querySelectorAll('[role="option"]').length, rowH: Math.round(menu.querySelector('.guided-menu-option').getBoundingClientRect().height), onScreen: r.top >= 0 && r.bottom <= window.innerHeight + 1 };
+    });
+    check(`${w} about: Looking for opens a listbox of suggestions (${lookingMenu.n}, rows ${lookingMenu.rowH}px)`, () => {
+      assert.equal(lookingMenu.expanded, 'true'); assert.equal(lookingMenu.role, 'listbox'); assert.ok(lookingMenu.n >= 20); assert.ok(lookingMenu.rowH >= 44); assert.equal(lookingMenu.onScreen, true);
+    });
+    await shot(page, `${w}-05c-about-open`);
+    await page.locator('.guided-menu-option[data-value="Co-founder"]').click();
+    await page.locator('input[name="guided-looking"]').fill('Chai buddy');
+    await page.locator('input[name="guided-looking"]').press('Enter');
+    const looking = await page.evaluate(() => [...document.querySelectorAll('.guided-tray--looking .guided-pick')].map((b) => b.dataset.value));
+    check(`${w} about: a suggestion and the member's own words both land in the tray (${looking.join(', ')})`, () => assert.deepEqual(looking, ['Co-founder', 'Chai buddy']));
+    await page.locator('input[name="guided-looking"]').press('Escape');
+    u = await ui(page);
+    check(`${w} about: Looking for alone is not enough (bio required)`, () => assert.equal(u.nextDisabled, true));
+    await page.locator('textarea[name="guided-bio"]').fill('Hi there');
+    u = await ui(page);
+    check(`${w} about: a bio under 20 characters is not enough`, () => assert.equal(u.nextDisabled, true));
+    // D-113: the emoji panel under the bio adds an emoji at the caret and the count follows.
+    await page.locator('.guided-screen--about .emoji-field-toggle').click();
+    const emoji = await page.locator('.guided-screen--about .emoji-field-emoji').first().getAttribute('data-emoji');
+    await page.locator('.guided-screen--about .emoji-field-emoji').first().click();
+    const withEmoji = await page.evaluate(() => ({ value: document.querySelector('textarea[name="guided-bio"]').value, count: document.querySelector('[data-guided-bio-count]').textContent }));
+    check(`${w} about: the emoji panel adds ${emoji} to the bio (${JSON.stringify(withEmoji)})`, () => { assert.equal(withEmoji.value, `Hi there${emoji}`); assert.equal(withEmoji.count, String(withEmoji.value.length)); });
+    await shot(page, `${w}-05e-about-emoji`);
+    await auditScreen(page, `${w} about emoji panel`);
+    await page.locator('textarea[name="guided-bio"]').press('Escape');
+    await page.locator('textarea[name="guided-bio"]').fill(BIO);
+    u = await ui(page);
+    const bioCount = await page.locator('[data-guided-bio-count]').textContent();
+    check(`${w} about: both answered enables Finish; the count reads ${bioCount}`, () => { assert.equal(u.nextDisabled, false); assert.equal(Number(bioCount), BIO.length); });
+    await shot(page, `${w}-05d-about`);
+    await auditScreen(page, `${w} about`);
     await page.locator('[data-guided-back]').click();
     await waitScreen(page, 'area');
     const areaKept = await ui(page);
-    check(`${w} Back from interests returns to area with the choice kept`, () => assert.equal(areaKept.nextDisabled, false));
+    check(`${w} Back from About you returns to the location with the choice kept`, () => assert.equal(areaKept.nextDisabled, false));
     check(`${w} no page errors (${errors.join(' | ')})`, () => assert.deepEqual(errors, []));
     await context.close();
   }
@@ -533,18 +552,15 @@ try {
     await page.locator('.guided-segment[data-gender="Prefer not to say"]').click();
     await page.locator('[data-guided-next]').click(); await waitScreen(page, 'photo'); await note('photo');
     await addPhoto(page);
-    await page.locator('[data-guided-next]').click(); await waitScreen(page, 'about');
-    await addAbout(page); await note('about');
-    await page.locator('[data-guided-next]').click(); await waitScreen(page, 'area', 8000); await note('area');
-    await page.locator('[data-guided-geo]').click();
-    await page.waitForFunction(() => !document.querySelector('[data-guided-next]').disabled, null, { timeout: 4000 }).catch(() => {});
-    await page.locator('[data-guided-next]').click(); await waitScreen(page, 'interests');
-    await openInterests(page);
-    for (const label of ['Chess', 'Guitar', 'Hackathons']) await page.locator('.guided-menu-option', { hasText: new RegExp(`^${label}$`) }).first().click();
-    await page.keyboard.press('Escape');
-    await page.waitForTimeout(320);
+    await page.locator('[data-guided-next]').click(); await waitScreen(page, 'interests', 8000);
+    await pickInterests(page);
     await note('interests');
     await shot(page, '320-interests', 0);
+    await page.locator('[data-guided-next]').click(); await waitScreen(page, 'area'); await note('area');
+    await page.locator('[data-guided-geo]').click();
+    await page.waitForFunction(() => !document.querySelector('[data-guided-next]').disabled, null, { timeout: 4000 }).catch(() => {});
+    await page.locator('[data-guided-next]').click(); await waitScreen(page, 'about');
+    await addAbout(page); await note('about');
     check(`320: no sideways scroll and 44 px targets on every screen (${over.join(' | ')})`, () => assert.deepEqual(over, []));
     await context.close();
   }
@@ -568,9 +584,9 @@ try {
     await page.locator('.guided-segment[data-gender="Male"]').click();
     await page.locator('[data-guided-next]').click(); await waitScreen(page, 'photo');
     await addPhoto(page);
-    await page.locator('[data-guided-next]').click(); await waitScreen(page, 'about');
-    await addAbout(page);
-    await page.locator('[data-guided-next]').click(); await waitScreen(page, 'area', 8000);
+    await page.locator('[data-guided-next]').click(); await waitScreen(page, 'interests', 8000);
+    await pickInterests(page, ['Chess']);
+    await page.locator('[data-guided-next]').click(); await waitScreen(page, 'area');
     await page.locator('[data-guided-geo]').click();
     await page.waitForFunction((t) => document.querySelector('#guided-signup')?.innerText.includes(t), DENIED, { timeout: 4000 }).catch(() => {});
     await page.waitForSelector('.guided-cities button', { timeout: 4000 }).catch(() => {});
@@ -592,8 +608,8 @@ try {
     const chose = await page.evaluate(() => ({ pressed: document.querySelector('.guided-cities button[aria-pressed="true"]')?.dataset.place, next: document.querySelector('[data-guided-next]').disabled, status: document.querySelector('[data-guided-area-status]')?.textContent }));
     check(`area: a typed city + Enter picks it (${JSON.stringify(chose)})`, () => { assert.equal(chose.pressed, 'in-pune'); assert.equal(chose.next, false); assert.match(chose.status, /Pune/); });
     await page.locator('input[name="guided-city"]').press('Enter');
-    const moved = await waitScreen(page, 'interests');
-    check('area: Enter again = Continue', () => assert.equal(moved, true));
+    const moved = await waitScreen(page, 'about');
+    check('area: Enter again = Continue (to About you)', () => assert.equal(moved, true));
     await context.close();
   }
 
@@ -616,12 +632,7 @@ try {
     await page.locator('.guided-segment[data-gender="Female"]').click();
     await page.locator('[data-guided-next]').click(); await waitScreen(page, 'photo');
     await addPhoto(page);
-    await page.locator('[data-guided-next]').click(); await waitScreen(page, 'about');
-    await addAbout(page);
-    await page.locator('[data-guided-next]').click(); await waitScreen(page, 'area', 8000);
-    await page.locator('[data-guided-geo]').click();
-    await page.waitForFunction(() => !document.querySelector('[data-guided-next]').disabled, null, { timeout: 4000 }).catch(() => {});
-    await page.locator('[data-guided-next]').click(); await waitScreen(page, 'interests');
+    await page.locator('[data-guided-next]').click(); await waitScreen(page, 'interests', 8000);
     await openInterests(page);
     await page.evaluate(() => { window.__ghosts = 0; new MutationObserver((list) => list.forEach((m) => m.addedNodes.forEach((n) => { if (n.classList?.contains('guided-ghost')) window.__ghosts += 1; }))).observe(document.body, { childList: true }); });
     await page.locator('.guided-menu-option', { hasText: /^Chess$/ }).first().click();
@@ -631,22 +642,23 @@ try {
     await context.close();
   }
   // ================================ B3: the answers save through the existing pipeline ================================
-  // Walks from the current screen to the Finish button (or, with { until: 'about' }, to About you's button, which
-  // creates the account, D-112). opts: { area: 'geo' | 'city', picks }.
-  const answerRest = async (page, from, { area = 'city', picks = ['Chess', 'Guitar', 'Hackathons'], name = 'Gia Guided', until = 'interests' } = {}) => {
-    const order = ['account', 'adult', 'name', 'details', 'photo', 'about', 'area', 'interests'];
+  // Walks from the current screen to the Finish button on About you (or, with { until: 'photo' }, to the photo
+  // screen's button, which creates the account; with { until: 'interests' }, to the interests' Continue).
+  // opts: { area: 'geo' | 'city', picks }.
+  const answerRest = async (page, from, { area = 'city', picks = ['Chess', 'Guitar', 'Hackathons'], name = 'Gia Guided', until = 'about' } = {}) => {
+    const order = ['account', 'adult', 'name', 'details', 'photo', 'interests', 'area', 'about'];
     for (const screen of order.slice(order.indexOf(from))) {
       await waitScreen(page, screen, 8000);
       if (screen === 'photo') {
         if (!(await page.locator('[data-guided-photo-preview] img').count())) await addPhoto(page);
+        if (until === 'photo') return;
         await page.locator('[data-guided-next]').click();
         continue;
       }
       if (screen === 'about') {
         if (!(await page.locator('.guided-tray--looking .guided-pick').count())) await addAbout(page);
-        if (until === 'about') return;
-        await page.locator('[data-guided-next]').click();
-        continue;
+        else if (!(await page.locator('textarea[name="guided-bio"]').inputValue())) await page.locator('textarea[name="guided-bio"]').fill(BIO);
+        return;
       }
       if (screen === 'account') {
         await page.locator('input[name="guided-email"]').fill(EMAIL);
@@ -668,11 +680,13 @@ try {
         }
         await page.waitForFunction(() => !document.querySelector('[data-guided-next]').disabled, null, { timeout: 4000 }).catch(() => {});
       } else if (screen === 'interests') {
-        await openInterests(page);
-        for (const label of picks) { await page.locator('.guided-menu-option', { hasText: new RegExp(`^${label}$`) }).first().click(); await page.waitForTimeout(40); }
-        await page.keyboard.press('Escape'); // done picking: the list closes (Escape, Tab or a press outside)
-        await page.waitForTimeout(300);
-        return;
+        if (!(await page.locator('.guided-pick').count())) {
+          await openInterests(page);
+          for (const label of picks) { await page.locator('.guided-menu-option', { hasText: new RegExp(`^${label}$`) }).first().click(); await page.waitForTimeout(40); }
+          await page.keyboard.press('Escape'); // done picking: the list closes (Escape, Tab or a press outside)
+          await page.waitForTimeout(300);
+        }
+        if (until === 'interests') return;
       }
       await page.locator('[data-guided-next]').click();
     }
@@ -708,7 +722,7 @@ try {
     check(`${w} submit: the framed photo is uploaded before the profile row is written, and the row stores it (${upload})`, () => {
       assert.ok(upload >= 0 && upload < at[1]); assert.match(String(state.profile?.photo_url || ''), new RegExp(`/profile-photos/${ME}/`));
     });
-    check(`${w} submit: the account is created on About you, then profile -> declare_adult; setup sends set_home_location -> set_member_interests (${at.join(' < ')})`, () => {
+    check(`${w} submit: the account is created on the photo screen, then profile -> declare_adult; setup sends set_home_location -> set_member_interests (${at.join(' < ')})`, () => {
       assert.equal(revealed, true); assert.ok(at.every((i) => i >= 0)); assert.deepEqual([...at].sort((x, y) => x - y), at);
       assert.equal(signup.email, EMAIL); assert.equal(signup.password, PASSWORD);
     });
@@ -753,7 +767,7 @@ try {
     await page.goto(`${BASE}/auth.html#signup`, { waitUntil: 'load' });
     await waitScreen(page, 'welcome');
     await page.locator('[data-guided-email]').click();
-    await answerRest(page, 'account', { until: 'about' });
+    await answerRest(page, 'account', { until: 'photo' });
     await page.locator('[data-guided-next]').click();
     const verified = await waitScreen(page, 'verify', 8000);
     const u = await ui(page);
@@ -764,11 +778,10 @@ try {
       assert.equal(verified, true); assert.equal(u.title, 'Check your email.'); assert.match(u.text, new RegExp(EMAIL.replace(/\./g, '\\.')));
       assert.ok(u.bubbles.every((b) => b.endsWith(':done'))); assert.equal(u.back, false);
     });
-    check(`${w} confirmation on: Verify comes straight after About you; the pending profile keeps adultDeclared, looking for, the bio and the photo (a compressed data:image), no interests (asked after login), no coordinates, no password`, () => {
+    check(`${w} confirmation on: Verify comes straight after the photo; the pending profile keeps adultDeclared and the photo (a compressed data:image), no interests (asked after login), no coordinates, no password`, () => {
       assert.equal(p.adultDeclared, true); assert.deepEqual(p.interests, []); assert.match(String(p.photoUrl || ''), /^data:image\/(jpeg|webp|png);base64,/);
       assert.match(u.text, /pick your area and interests next/);
       assert.equal(p.phoneNumber, '9876543210'); assert.equal(p.gender, 'Female');
-      assert.equal(p.lookingFor, 'Co-founder'); assert.equal(p.bio, BIO);
       assert.ok(!COORD_RE.test(stored)); assert.ok(!/correct horse/.test(stored));
       assert.equal(calls.filter((c) => c.path.startsWith('/rest/v1/rpc/')).length, 0);
     });
@@ -785,7 +798,7 @@ try {
     await page.goto(`${BASE}/auth.html#signup`, { waitUntil: 'load' });
     await waitScreen(page, 'welcome');
     await page.locator('[data-guided-email]').click();
-    await answerRest(page, 'account', { until: 'about' });
+    await answerRest(page, 'account', { until: 'photo' });
     await page.locator('[data-guided-next]').click();
     const back = await waitScreen(page, 'account', 8000);
     const u = await ui(page);
@@ -803,9 +816,9 @@ try {
     await page.goto(`${BASE}/auth.html?complete-profile=1`, { waitUntil: 'load' });
     const landed = await waitScreen(page, 'adult', 8000);
     let u = await ui(page);
-    check(`${w} Google: lands on 18+ at "Step 1 of 5", bubbles without Account`, () => {
-      assert.equal(landed, true); assert.equal(u.label, 'Step 1 of 5');
-      assert.deepEqual(u.bubbles, ['adult:current', 'name:pending', 'details:pending', 'photo:pending', 'about:pending']);
+    check(`${w} Google: lands on 18+ at "Step 1 of 4", bubbles without Account`, () => {
+      assert.equal(landed, true); assert.equal(u.label, 'Step 1 of 4');
+      assert.deepEqual(u.bubbles, ['adult:current', 'name:pending', 'details:pending', 'photo:pending']);
     });
     await page.locator('[data-guided-back]').click();
     await waitScreen(page, 'welcome');
@@ -819,7 +832,7 @@ try {
     await waitScreen(page, 'name');
     const prefilled = await page.locator('input[name="guided-name"]').inputValue();
     u = await ui(page);
-    check(`${w} Google: name prefilled (${prefilled}), "Step 2 of 5"`, () => { assert.equal(prefilled, 'Gabe Google'); assert.equal(u.label, 'Step 2 of 5'); });
+    check(`${w} Google: name prefilled (${prefilled}), "Step 2 of 4"`, () => { assert.equal(prefilled, 'Gabe Google'); assert.equal(u.label, 'Step 2 of 4'); });
     await page.locator('[data-guided-next]').click();
     await answerRest(page, 'details', { area: 'city', picks: ['Badminton'] });
     await page.locator('[data-guided-next]').click();
@@ -842,16 +855,16 @@ try {
     const { calls } = await setup(context, { signedIn: true, profile: { id: ME, name: 'Ray Resume', email: EMAIL, phone_number: '9876543210', phone_country_code: '+91', gender: 'Male', experience: '3–7 years', looking_for: ['Mentor'], photo_url: `${ORIGIN}/storage/v1/object/public/profile-photos/${ME}/p.jpg` }, adultAt: '2026-10-18T00:00:00Z', failRpc: ['set_member_interests'] });
     const page = await context.newPage();
     await page.goto(`${BASE}/auth.html?complete-profile=1`, { waitUntil: 'load' });
-    const resumed = await waitScreen(page, 'area', 8000);
+    const resumed = await waitScreen(page, 'interests', 8000);
     let u = await ui(page);
-    check(`resume: 18+, name, details, photo and About you done -> Area at "Set up 1 of 2" (${await screenOf(page)})`, () => { assert.equal(resumed, true); assert.equal(u.label, 'Set up 1 of 2'); });
-    await answerRest(page, 'area', { area: 'city', picks: ['Chess', 'Guitar'] });
+    check(`resume: 18+, name, details and photo done -> Interests at "Set up 1 of 3" (${await screenOf(page)})`, () => { assert.equal(resumed, true); assert.equal(u.label, 'Set up 1 of 3'); });
+    await answerRest(page, 'interests', { area: 'city', picks: ['Chess', 'Guitar'] });
     await page.locator('[data-guided-next]').click();
     await page.waitForTimeout(1200);
     u = await ui(page);
     const screen = await screenOf(page);
     const declared = calls.filter(rpcAt('declare_adult')).length;
-    const exp = calls.filter(isProfileWrite).map((c) => JSON.parse(c.body).experience);
+    const exp = calls.filter(isProfileWrite).map((c) => JSON.parse(c.body).experience).filter((e) => e !== undefined);
     check(`resume: a failed interests save keeps Interests with the line (${screen}: ${u.error}); declare_adult not repeated; experience kept`, () => {
       assert.equal(screen, 'interests'); assert.match(u.error, /could not be saved|didn't save/i); assert.equal(declared, 0);
       assert.ok(exp.every((e) => e === '3–7 years'), JSON.stringify(exp));
@@ -883,6 +896,12 @@ try {
     check(`${w} catalogue: Enter on the row adds it through add_member_interest`, () => assert.equal(JSON.parse(posts('add_member_interest').at(-1)?.body || '{}').p_label, 'Kite surfing club'));
     await page.keyboard.press('Escape');
     await page.locator('[data-guided-next]').click();
+    // D-114: the location (kept) and About you follow; Finish there saves.
+    await waitScreen(page, 'area', 8000);
+    await page.locator('[data-guided-next]').click();
+    await waitScreen(page, 'about', 8000);
+    await page.locator('textarea[name="guided-bio"]').fill(BIO);
+    await page.locator('[data-guided-next]').click();
     await page.waitForFunction(() => document.querySelector('#guided-signup')?.dataset.screen === 'reveal', null, { timeout: 6000 }).catch(() => {});
     check(`${w} catalogue: Finish saves the own interest (${JSON.stringify(state.interests.map((i) => i.interest_id))})`, () => assert.deepEqual(state.interests.map((i) => i.interest_id), ['member.custom.kite_surfing_club']));
     await context.close();
@@ -897,15 +916,10 @@ try {
     const label = (await ui(page)).label;
     await addPhoto(page);
     await page.locator('[data-guided-next]').click();
-    const atAbout = await waitScreen(page, 'about', 8000);
-    await addAbout(page);
-    const button = (await page.locator('[data-guided-next]').innerText()).trim();
-    await page.locator('[data-guided-next]').click();
-    const atArea = await waitScreen(page, 'area', 8000);
-    check(`resume without a photo: Photo first ("${label}"), then About you (button "${button}"), then setup; photo, looking for and bio stored, no signUp, no second declaration`, () => {
-      assert.equal(atPhoto, true); assert.equal(label, 'Step 5 of 6'); assert.equal(atAbout, true); assert.match(button, /continue/i); assert.equal(atArea, true);
+    const atInterests = await waitScreen(page, 'interests', 8000);
+    check(`resume without a photo: Photo first ("${label}"), then setup from the interests; the photo is stored, no signUp, no second declaration`, () => {
+      assert.equal(atPhoto, true); assert.equal(label, 'Step 5 of 5'); assert.equal(atInterests, true);
       assert.match(String(state.profile.photo_url || ''), /\/profile-photos\//);
-      assert.deepEqual(state.profile.looking_for, ['Co-founder']); assert.equal(state.profile.bio, BIO);
       assert.equal(calls.filter((c) => c.path === '/auth/v1/signup').length, 0); assert.equal(calls.filter(rpcAt('declare_adult')).length, 0);
     });
     await context.close();
@@ -922,7 +936,7 @@ try {
 
   // ================================ Fix round 1 ================================
   // I1: one submit per button. A double tap (taps keep coming every 10 ms while the screen is on) and Enter+Enter
-  // (a real Enter, then synthetic Enters every 10 ms): on About you of the email path that ends on Verify (no
+  // (a real Enter, then synthetic Enters every 10 ms): on the photo screen of the email path that ends on Verify (no
   // session: one signUp, nothing else), and on Interests of the path that ends on Reveal (a session: one signUp, one
   // declare_adult, one area RPC and one set_member_interests). Back is disabled while the submit is in flight.
   for (const kind of ['verify', 'session']) {
@@ -935,8 +949,8 @@ try {
       await page.goto(`${BASE}/auth.html#signup`, { waitUntil: 'load' });
       await waitScreen(page, 'welcome');
       await page.locator('[data-guided-email]').click();
-      const screenName = kind === 'verify' ? 'about' : 'interests';
-      const field = kind === 'verify' ? 'input[name="guided-looking"]' : 'input[name="guided-interest"]';
+      const screenName = kind === 'verify' ? 'photo' : 'about';
+      const field = kind === 'verify' ? '[data-guided-photo-input]' : 'input[name="guided-looking"]';
       await answerRest(page, 'account', { area: 'city', until: screenName });
       if (how === 'enter') await page.locator(field).focus();
       const run = page.evaluate(([mode, at, sel]) => new Promise((resolve) => {
@@ -1017,7 +1031,7 @@ try {
     await context.close();
   }
 
-  // M3: resuming at Area with a complete saved budget (custom points and modes) and finishing with the same picks keeps
+  // M3: resuming at Area (interests already saved) with a complete saved budget (custom points and modes) and finishing with the same picks keeps
   // them: no set_member_interests call, the saved rows unchanged.
   {
     const context = await browser.newContext({ viewport: { width: 1440, height: 900 } });
@@ -1030,9 +1044,16 @@ try {
     await page.waitForSelector('.guided-cities button[data-place="in-pune"]', { timeout: 4000 }).catch(() => {});
     await page.locator('.guided-cities button[data-place="in-pune"]').click();
     await page.locator('[data-guided-next]').click();
+    await waitScreen(page, 'about');
+    await page.locator('textarea[name="guided-bio"]').fill(BIO);
+    await page.locator('[data-guided-back]').click();
+    await waitScreen(page, 'area');
+    await page.locator('[data-guided-back]').click();
     await waitScreen(page, 'interests');
     await page.waitForSelector('[data-guided-tray]', { timeout: 5000 });
     const tray = await page.evaluate(() => [...document.querySelectorAll('.guided-pick')].map((b) => b.dataset.id));
+    await page.locator('[data-guided-next]').click(); await waitScreen(page, 'area');
+    await page.locator('[data-guided-next]').click(); await waitScreen(page, 'about');
     await page.locator('[data-guided-next]').click();
     const revealed = await waitScreen(page, 'reveal', 8000);
     check(`M3 resume with unchanged picks keeps the custom points and modes (${JSON.stringify({ atArea, tray, interests: calls.filter(rpcAt('set_member_interests')).length, saved: state.interests })})`, () => {
@@ -1186,12 +1207,12 @@ try {
         label: document.querySelector('[data-guided-step-label]').textContent.trim(), labelClipped: getComputedStyle(document.querySelector('[data-guided-step-label]')).clipPath !== 'none' || getComputedStyle(document.querySelector('[data-guided-step-label]')).clip !== 'auto',
       };
     });
-    check(`${tag} the stepper is the classic thin track (done ${bars.fills[0]}%, current ${bars.fills[1]}%, pending ${bars.fills[2]}%; ${bars.h} px tall), no icons or step names, a progressbar 2 of 6, "Step 2 of 6" shown above it (${JSON.stringify(bars.states)})`, () => {
-      assert.equal(bars.n, 6); assert.deepEqual(bars.states, ['done', 'current', 'pending', 'pending', 'pending', 'pending']);
+    check(`${tag} the stepper is the classic thin track (done ${bars.fills[0]}%, current ${bars.fills[1]}%, pending ${bars.fills[2]}%; ${bars.h} px tall), no icons or step names, a progressbar 2 of 5, "Step 2 of 5" shown above it (${JSON.stringify(bars.states)})`, () => {
+      assert.equal(bars.n, 5); assert.deepEqual(bars.states, ['done', 'current', 'pending', 'pending', 'pending']);
       assert.equal(bars.fills[0], 100); assert.equal(bars.fills[1], 100); assert.equal(bars.fills[2], 0);
       assert.ok(bars.h >= 2 && bars.h <= 8); assert.equal(bars.icons, 0); assert.equal(bars.names, false);
-      assert.equal(bars.role, 'progressbar'); assert.equal(bars.now, '2'); assert.equal(bars.max, '6'); assert.equal(bars.text, 'Step 2 of 6');
-      assert.equal(bars.label, 'Step 2 of 6'); assert.equal(bars.labelClipped, false);
+      assert.equal(bars.role, 'progressbar'); assert.equal(bars.now, '2'); assert.equal(bars.max, '5'); assert.equal(bars.text, 'Step 2 of 5');
+      assert.equal(bars.label, 'Step 2 of 5'); assert.equal(bars.labelClipped, false);
     });
     await context.close();
   }

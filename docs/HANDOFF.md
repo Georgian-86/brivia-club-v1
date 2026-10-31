@@ -7,6 +7,10 @@ Update this file at the end of every session. CLAUDE.md holds the aim; this file
 
 ## 1. What is done
 
+**2026-10-31, D-113 / D-114:** emoji panel under the bio (signup and Edit profile), the bio in the profile hero, no
+maroon wash on the cover, "LOOKING FOR · …" in the deck card's bar and no rule under the name; signup setup is now
+interests → location → About you (the photo creates the account again). Bio saving still needs `0016`.
+
 **2026-10-31, signup About you (D-112):** after the photo, a required "About you" step: Looking for (a dropdown of the
 Edit profile suggestions, or the member's own words, up to 8) and a bio (20 to 300 characters). It is now the last
 signup step and creates the account ("Step n of 6", Google "of 5"). A signed-in member without looking for (or, once

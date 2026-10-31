@@ -8,15 +8,16 @@
 // SETUP (area, then interests) is not part of signup: it is the first thing a new member sees once the account exists
 // (straight after signup, or after confirming the email and logging in), and nobody reaches the app without it (the
 // server's completion rule needs a home area and interests; the app sends an incomplete member back here).
-// D-112 (founder, 2026-10-31): after the photo, "About you" asks what the member is looking for and a short bio, both
-// required. It is now the last signup screen: its button creates the account and saves the profile.
-export const SETUP = ['area', 'interests'];
+// D-112 (founder, 2026-10-31): "About you" asks what the member is looking for and a short bio, both required.
+// D-114 (founder, same day): after the photo the order is interests, then the location, then About you. The photo
+// still creates the account; setup is those three, and About you's Finish saves all of them.
+export const SETUP = ['interests', 'area', 'about'];
 export const SCREENS = {
-  email: ['welcome', 'account', 'adult', 'name', 'details', 'photo', 'about', ...SETUP, 'reveal'],
-  google: ['welcome', 'adult', 'name', 'details', 'photo', 'about', ...SETUP, 'reveal'],
+  email: ['welcome', 'account', 'adult', 'name', 'details', 'photo', ...SETUP, 'reveal'],
+  google: ['welcome', 'adult', 'name', 'details', 'photo', ...SETUP, 'reveal'],
 };
 // The last signup screen: its primary button creates the account and saves the profile.
-export const SIGNUP_LAST = 'about';
+export const SIGNUP_LAST = 'photo';
 export const isSetupScreen = (screen) => SETUP.includes(screen);
 
 // The icon each question shows in its bubble (signup-screens.js draws them as inline SVG).
@@ -53,14 +54,14 @@ export const resumeScreen = ({ session, status = {} }) => {
   if (!status.has_name) return 'name';
   if (!status.has_phone || !status.has_gender) return 'details';
   if (status.has_photo === false) return 'photo';
-  if (status.has_about === false) return 'about';
-  if (!status.has_cell) return 'area';
   if (!(status.interests > 0 && status.points === 20)) return 'interests';
+  if (!status.has_cell) return 'area';
+  if (status.has_about === false) return 'about';
   return 'done';
 };
 
 // Once the session exists, Back never returns to Account: the earliest target is Welcome. Setup never goes back into
-// signup (the account exists by then): Area has no Back.
+// signup (the account exists by then): its first screen (Interests) has no Back.
 export const backTarget = (path, screen, hasSession) => {
   const list = SCREENS[path] || SCREENS.email;
   const at = list.indexOf(screen);

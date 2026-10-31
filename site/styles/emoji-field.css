@@ -1,0 +1,30 @@
+/* D-113: the emoji panel under a bio field (emoji-field.js). Tokens only; the deep-wine look of the forms. */
+.emoji-field { position: relative; margin-top: 6px; }
+.emoji-field-toggle {
+  display: inline-flex; min-height: 44px; align-items: center; gap: 6px; padding: 0 12px 0 8px;
+  border: 0; border-radius: 999px; background: transparent; color: var(--color-chat-wine);
+  font: inherit; font-size: var(--text-12); font-weight: 700; letter-spacing: .08em; text-transform: uppercase; cursor: pointer;
+}
+.emoji-field-toggle:hover,
+.emoji-field-toggle[aria-expanded="true"] { background: color-mix(in srgb, var(--color-chat-wine) 8%, transparent); }
+.emoji-field-toggle:focus-visible { outline: 2px solid var(--color-chat-wine); outline-offset: 2px; }
+.emoji-field-toggle svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; }
+.emoji-field-toggle svg circle[r=".9"] { fill: currentColor; stroke: none; }
+.emoji-field-panel {
+  position: relative; z-index: 6; margin-top: 4px; padding: 8px;
+  border: 1px solid color-mix(in srgb, var(--color-chat-wine) 30%, transparent); border-radius: 10px;
+  background: var(--color-cream); box-shadow: 0 12px 30px color-mix(in srgb, var(--color-oxblood) 16%, transparent);
+}
+.emoji-field-panel[hidden] { display: none; }
+.emoji-field-tabs { display: flex; gap: 4px; overflow-x: auto; padding-bottom: 6px; border-bottom: 1px solid color-mix(in srgb, var(--color-chat-wine) 14%, transparent); scrollbar-width: none; }
+.emoji-field-tabs button {
+  flex: 0 0 auto; min-height: 44px; padding: 0 10px; border: 0; border-radius: 7px; background: transparent;
+  color: var(--color-chat-wine); font: inherit; font-size: var(--text-12); font-weight: 600; cursor: pointer;
+}
+.emoji-field-tabs button[aria-selected="true"] { background: color-mix(in srgb, var(--color-chat-wine) 12%, transparent); font-weight: 700; }
+.emoji-field-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(44px, 1fr)); max-height: 200px; margin-top: 6px; overflow-y: auto; overscroll-behavior: contain; }
+.emoji-field-emoji { min-width: 44px; min-height: 44px; border: 0; border-radius: 8px; background: transparent; font-size: 22px; line-height: 1; cursor: pointer; }
+.emoji-field-emoji:hover,
+.emoji-field-emoji:focus-visible { background: color-mix(in srgb, var(--color-chat-wine) 10%, transparent); outline: none; }
+/* Form label rules (`label > span` in Edit profile) must not grey the button's word. */
+.emoji-field button.emoji-field-toggle > span.emoji-field-text { color: var(--color-chat-wine); }

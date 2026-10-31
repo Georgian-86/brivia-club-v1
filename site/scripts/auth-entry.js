@@ -14,6 +14,7 @@ import '../styles/auth-a11y.css';
 import '../styles/signup.css';
 import '../styles/auth-refresh.css';
 import '../styles/signup-classic.css';
+import '../styles/emoji-field.css';  // D-113: the emoji panel under the signup bio
 import '../styles/aura-theme.css';
 import '../styles/handoff.css';
 import '../styles/password-reveal.css';

@@ -345,3 +345,15 @@ body.app-body[data-app-view] .app-view.profile-view[data-view="profile"] .profil
 /* The city list is the shared .b-listbox (components.css, D-105). */
 .profile-edit-area[aria-busy="true"] :is(button, input) { pointer-events: none; opacity: .6; }
 @media (max-width: 560px) { .profile-edit-area-tools { grid-template-columns: 1fr; } }
+
+/* D-113 (founder, 2026-10-31): the cover shows as it is, with no maroon wash; only a soft neutral shade on the left
+   keeps the cream name readable on a light cover. The line under the name is the member's own bio (3 lines at most). */
+body.app-body[data-app-view] .app-view.profile-view[data-view="profile"] .profile-board-content .profile-hero::before {
+  background: linear-gradient(90deg, color-mix(in srgb, var(--color-ink) 50%, transparent) 0%, color-mix(in srgb, var(--color-ink) 18%, transparent) 50%, transparent 78%);
+}
+body.app-body[data-app-view] .app-view.profile-view[data-view="profile"] .profile-board-content .profile-hero-copy { text-shadow: 0 1px 12px color-mix(in srgb, var(--color-ink) 45%, transparent); }
+body.app-body[data-app-view] .app-view.profile-view[data-view="profile"] .profile-hero-quote {
+  display: -webkit-box; max-width: min(46ch, 100%); overflow: hidden; font-size: var(--text-20);
+  -webkit-box-orient: vertical; -webkit-line-clamp: 3; overflow-wrap: anywhere; white-space: pre-line !important;
+}
+body.app-body[data-app-view] .app-view.profile-view[data-view="profile"] .profile-hero-quote[hidden] { display: none; }

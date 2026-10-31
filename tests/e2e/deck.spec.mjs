@@ -112,6 +112,9 @@ try {
     assert.deepEqual(card.chips, ['You both: Badminton', 'You both: Chess', 'Long-distance running', 'Poetry', 'Jazz piano']);
   });
   check(`the quota counter shows under the deck (got "${card.counter}")`, () => assert.equal(card.counter, '30 of 30 signals left'));
+  // D-113: the bar says what the member is looking for, and there is no short rule under the name.
+  const top = await page.evaluate(() => ({ label: document.querySelector('#swipe-card-label')?.textContent.trim(), rule: getComputedStyle(document.querySelector('#swipe-tags'), '::before').content }));
+  check(`card 1's bar shows what they are looking for, no line under the name (${JSON.stringify(top)})`, () => { assert.equal(top.label, 'LOOKING FOR · FRIENDS'); assert.ok(top.rule === 'none' || top.rule === 'normal', top.rule); });
   check('the deck loads from rpc/deck_candidates { p_limit: 12 } and never rpc/list_members', () => {
     assert.ok(deckCalls().length >= 1);
     deckCalls().forEach((c) => assert.deepEqual(JSON.parse(c.body || '{}'), { p_limit: 12 }));
