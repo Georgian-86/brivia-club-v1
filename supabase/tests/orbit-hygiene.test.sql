@@ -91,9 +91,9 @@ begin
   select string_agg(p.proname, ',' order by p.proname) into got
     from pg_proc p where p.pronamespace = 'public'::regnamespace and p.prosecdef
      and has_function_privilege('authenticated', p.oid, 'execute');
-  want := 'add_member_interest,brivia_can_see_author,brivia_has_completed_profile,connection_presence,'
-       || 'deck_candidates,deck_status,deck_why,declare_adult,delete_my_account,get_candidates,member_bio,my_interests,my_onboarding_status,'
-       || 'my_outgoing_requests,my_presence_visible,my_signal_quota,post_activity,report_member,respond_connection_request,search_members,send_signal,set_home_city,'
+  want := 'accept_pitch_chat,add_member_interest,brivia_can_see_author,brivia_has_completed_profile,connection_presence,'
+       || 'deck_candidates,deck_status,deck_why,declare_adult,delete_my_account,end_pitch_chat,get_candidates,member_bio,my_interests,my_onboarding_status,'
+       || 'my_outgoing_requests,my_pitch_threads,my_presence_visible,my_signal_quota,post_activity,report_member,respond_connection_request,search_members,send_signal,set_home_city,'
        || 'set_home_location,set_member_interests,set_presence_visible,set_sensitive_consent,touch_presence';
   if got is distinct from want then raise exception 'FAIL H3: authenticated may execute definer functions %', got; end if;
   if exists (select 1 from pg_proc p where p.pronamespace = 'public'::regnamespace and p.prosecdef

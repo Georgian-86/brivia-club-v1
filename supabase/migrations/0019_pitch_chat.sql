@@ -16,7 +16,7 @@ set lock_timeout = '5s';
 --   3. Every latest caller passes chat_accepted_at: brivia_before_connection_request, brivia_on_connection_request,
 --      respond_connection_request, purge_expired_requests, my_outgoing_requests, deck_candidates, send_signal and the
 --      select policy "Members can view their connection requests".
--- Section 2 (below, next task): accept_pitch_chat, end_pitch_chat, my_pitch_threads, and chat-open brivia_can_send /
+-- Section 2: accept_pitch_chat, end_pitch_chat, my_pitch_threads (all security definer, authenticated), and chat-open brivia_can_send /
 -- brivia_can_message.
 
 -- =============================================================================================
@@ -378,5 +378,187 @@ create policy "Members can view their connection requests"
   );
 
 -- =============================================================================================
--- Section 2: accept_pitch_chat, end_pitch_chat, my_pitch_threads, chat-open sends (D-112, next task)
+-- Section 2: accept_pitch_chat, end_pitch_chat, my_pitch_threads, chat-open sends (D-112)
 -- =============================================================================================
+-- Spec §3 items 3-6. A pitch is a pending request with a non-blank note. The receiver's Accept opens its chat
+-- (chat_accepted_at) without a match; Connect (respond_connection_request / send_signal) still makes the match.
+-- Decline, End chat and Not now set the request to 'declined', which closes the chat (the gates below need 'pending').
+
+-- brivia_can_send: copied from 0013_blocked_sends_withheld.sql:22; only the matched clause gains "or a chat-open
+-- pitch between the pair" (either direction). Still no block clause (0013: a blocked sender's messages are stored and
+-- withheld); a blocked pair never gets chat_accepted_at, because accept_pitch_chat writes nothing for it.
+create or replace function brivia_private.brivia_can_send(p_recipient uuid)
+returns boolean
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select coalesce(
+    (exists (select 1 from public.matches m
+              where (m.user1_id = auth.uid() and m.user2_id = p_recipient)
+                 or (m.user1_id = p_recipient and m.user2_id = auth.uid()))
+     or exists (select 1 from public.connection_requests r
+                 where ((r.from_id = auth.uid() and r.to_id = p_recipient)
+                     or (r.from_id = p_recipient and r.to_id = auth.uid()))
+                   and r.status = 'pending' and r.chat_accepted_at is not null
+                   and public.brivia_request_is_live(r.status, r.created_at, r.chat_accepted_at)))
+    and exists (select 1 from public.profiles a join public.profiles b on public.brivia_in_test_world(a.id) = public.brivia_in_test_world(b.id)
+                 where a.id = auth.uid() and b.id = p_recipient),
+    false);
+$$;
+revoke all on function brivia_private.brivia_can_send(uuid) from public, anon;
+grant execute on function brivia_private.brivia_can_send(uuid) to authenticated;
+
+-- brivia_can_message: copied from 0008_tester_world.sql:256; only the matched clause gains "or a chat-open pitch
+-- between the pair" (either direction). The block clause stays (typing channel, attachments: 0012).
+create or replace function brivia_private.brivia_can_message(p_recipient uuid)
+returns boolean
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select coalesce(
+    (exists (select 1 from public.matches m
+              where (m.user1_id = auth.uid() and m.user2_id = p_recipient)
+                 or (m.user1_id = p_recipient and m.user2_id = auth.uid()))
+     or exists (select 1 from public.connection_requests r
+                 where ((r.from_id = auth.uid() and r.to_id = p_recipient)
+                     or (r.from_id = p_recipient and r.to_id = auth.uid()))
+                   and r.status = 'pending' and r.chat_accepted_at is not null
+                   and public.brivia_request_is_live(r.status, r.created_at, r.chat_accepted_at)))
+    and not public.brivia_pair_is_blocked(auth.uid(), p_recipient)
+    and exists (select 1 from public.profiles a join public.profiles b on public.brivia_in_test_world(a.id) = public.brivia_in_test_world(b.id)
+                 where a.id = auth.uid() and b.id = p_recipient),
+    false);
+$$;
+revoke all on function brivia_private.brivia_can_message(uuid) from public, anon;
+grant execute on function brivia_private.brivia_can_message(uuid) to authenticated;
+
+-- accept_pitch_chat(p_from): the receiver's Accept in Chat. Opens the pitch's chat; never makes a match.
+-- Same pair lock and the same "does not exist" rule as respond_connection_request (0019 section 1, from
+-- 0008_tester_world.sql:577), plus a non-blank note. A blocked pair answers normally and nothing opens (P12).
+create or replace function public.accept_pitch_chat(p_from uuid)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  me uuid := auth.uid();
+begin
+  if me is null or not public.brivia_member_completed(me) then
+    raise exception 'complete your profile' using errcode = '22023';
+  end if;
+  if p_from is null or p_from = me then
+    raise exception 'no pending connection request' using errcode = 'no_data_found';
+  end if;
+  perform public.brivia_lock_pair(p_from, me);
+  if not exists (
+    select 1 from public.connection_requests
+    where from_id = p_from and to_id = me and status = 'pending'
+      and nullif(btrim(note), '') is not null
+      and public.brivia_request_is_live(status, created_at, chat_accepted_at)
+  ) or not public.brivia_member_completed(p_from)
+    or not public.brivia_pair_world_ok(p_from, me)
+    or exists (select 1 from public.matches m
+                where (m.user1_id = p_from and m.user2_id = me) or (m.user1_id = me and m.user2_id = p_from)) then
+    raise exception 'no pending connection request' using errcode = 'no_data_found';
+  end if;
+  if public.brivia_pair_is_blocked(p_from, me) then
+    return;  -- P12: the same success, and the chat stays closed
+  end if;
+  update public.connection_requests set chat_accepted_at = coalesce(chat_accepted_at, now())
+   where from_id = p_from and to_id = me;
+end;
+$$;
+revoke all on function public.accept_pitch_chat(uuid) from public, anon;
+grant execute on function public.accept_pitch_chat(uuid) to authenticated;
+
+-- end_pitch_chat(p_other): Decline (the receiver, before or after Accept) or End chat (the sender, once the chat is
+-- open) on a live pending pitch between an unmatched pair. Sets it to 'declined'; the sender's own views
+-- (my_outgoing_requests, my_pitch_threads) still read it as pending, so they learn only that the chat closed.
+create or replace function public.end_pitch_chat(p_other uuid)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  me uuid := auth.uid();
+  n integer;
+begin
+  if me is null or not public.brivia_member_completed(me) then
+    raise exception 'complete your profile' using errcode = '22023';
+  end if;
+  if p_other is null or p_other = me then
+    raise exception 'no pending connection request' using errcode = 'no_data_found';
+  end if;
+  perform public.brivia_lock_pair(p_other, me);
+  if not public.brivia_member_completed(p_other)
+     or not public.brivia_pair_world_ok(p_other, me)
+     or exists (select 1 from public.matches m
+                 where (m.user1_id = p_other and m.user2_id = me) or (m.user1_id = me and m.user2_id = p_other)) then
+    raise exception 'no pending connection request' using errcode = 'no_data_found';
+  end if;
+  update public.connection_requests r set status = 'declined'
+   where ((r.from_id = p_other and r.to_id = me)                                   -- Decline (receiver)
+       or (r.from_id = me and r.to_id = p_other and r.chat_accepted_at is not null)) -- End chat (sender)
+     and r.status = 'pending'
+     and nullif(btrim(r.note), '') is not null
+     and public.brivia_request_is_live(r.status, r.created_at, r.chat_accepted_at);
+  get diagnostics n = row_count;
+  if n = 0 then
+    raise exception 'no pending connection request' using errcode = 'no_data_found';
+  end if;
+end;
+$$;
+revoke all on function public.end_pitch_chat(uuid) from public, anon;
+grant execute on function public.end_pitch_chat(uuid) to authenticated;
+
+-- my_pitch_threads(): the Chat tab's message requests. Matched pairs and blank notes are left out.
+--   'in':  live pending pitches to me, visible under the request select policy's rule (brivia_incoming_request_visible:
+--          completed sender, not blocked, same world); chat_open once I accepted.
+--   'out': my live pitches, read the way my_outgoing_requests reads them (declined shows as pending, accepted is a
+--          connection, same world); chat_open only while pending with the chat accepted.
+-- No email, phone, place or coordinates: the client loads names and photos through the profile policies.
+create or replace function public.my_pitch_threads()
+returns table (other_id uuid, direction text, note text, created_at timestamptz, chat_open boolean)
+language plpgsql
+stable
+security definer
+set search_path = public
+as $$
+declare
+  me uuid := auth.uid();
+begin
+  if me is null or not public.brivia_member_completed(me) then
+    raise exception 'complete your profile' using errcode = '22023';
+  end if;
+  return query
+  select t.other_id, t.direction, t.note, t.created_at, t.chat_open
+    from (
+      select r.from_id as other_id, 'in'::text as direction, r.note, r.created_at,
+             r.chat_accepted_at is not null as chat_open
+        from public.connection_requests r
+       where r.to_id = me and r.status = 'pending'
+         and public.brivia_request_is_live(r.status, r.created_at, r.chat_accepted_at)
+         and brivia_private.brivia_incoming_request_visible(r.from_id)
+      union all
+      select r.to_id, 'out'::text, r.note, r.created_at,
+             (r.status = 'pending' and r.chat_accepted_at is not null)
+        from public.connection_requests r
+        join public.profiles mp on mp.id = me
+        join public.profiles p on p.id = r.to_id and public.brivia_in_test_world(p.id) = public.brivia_in_test_world(mp.id)
+       where r.from_id = me and r.status in ('pending', 'declined')
+         and public.brivia_request_is_live(r.status, r.created_at, r.chat_accepted_at)
+    ) t
+   where nullif(btrim(t.note), '') is not null
+     and not exists (select 1 from public.matches m
+                      where (m.user1_id = me and m.user2_id = t.other_id) or (m.user1_id = t.other_id and m.user2_id = me))
+   order by t.created_at desc, t.other_id, t.direction;
+end;
+$$;
+revoke all on function public.my_pitch_threads() from public, anon;
+grant execute on function public.my_pitch_threads() to authenticated;
