@@ -1,7 +1,7 @@
 // Guided signup (polish wave B, D-073; first D-067/D-068): one question per screen, at every width. Renders into
 // #guided-signup (auth.html): the bubble stepper (done / current / pending), "Step n of N", one screen, and Back + one
-// primary button. D-102: two phases. Signup ends on the required profile photo, whose button calls `submit(answers)`
-// (script.js): it creates the account (email path), saves the profile and the photo and records the 18+ declaration.
+// primary button. D-102: two phases. Signup ends on the required profile photo and (D-112) About you (looking for
+// and a bio, both required), whose button calls `submit(answers)` (script.js): it creates the account (email path), saves the profile and the photo and records the 18+ declaration.
 // Setup (area, then interests) follows at once (or after the email is confirmed) and calls `submitSetup(answers)`.
 // No email code, no points screen: the interests are saved with an even split. Coordinates live only in
 // `answers.area` (memory) and are dropped once saved.
@@ -9,7 +9,8 @@ import { searchPlaces, fetchInterestNodes, addMemberInterest, isMissingFunction 
 import { SCREENS, STEP_ICONS, SETUP, stepLabel, stepStates, backTarget, groupInterests, isOffered, hasCatalog, catalogGroups, normalizeInterestLabel } from './signup-flow.js';
 import { ImageProcessingError, PHOTO_ERROR_MESSAGE, PHOTO_FRAMER_ERROR } from './image-compress.js';
 import { MAX_INTERESTS } from './passion-budget.js';
-import { POPULAR_INTERESTS } from './discovery-catalog.js';
+import { POPULAR_INTERESTS, LOOKING_FOR_CATALOG } from './discovery-catalog.js';
+import { BIO_MAX, cleanBio } from './profile-edit.js';
 import { matchTypedCity } from './area-pick.js';
 import { locateOnce, fallbackCopy, STILL_WAITING_TEXT } from './geo-locate.js';
 
@@ -19,6 +20,9 @@ const escapeHtml = (value) => String(value ?? '').replace(/[&<>"']/g, (c) => ({ 
 const reducedMotion = () => Boolean(window.matchMedia?.('(prefers-reduced-motion: reduce)').matches);
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const MIN_PASSWORD = 8;
+// D-112: About you. The bio's floor keeps it a sentence, not a placeholder; Looking for matches Edit profile's cap.
+const BIO_MIN = 20;
+const LOOKING_MAX = 8;
 // The stored values (supabase.js normalizeGender), shown as they are.
 export const GENDERS = ['Male', 'Female', 'Prefer not to say'];
 const phoneDigits = (value) => String(value || '').replace(/\D/g, '');
@@ -42,6 +46,7 @@ const ICONS = {
   arrow: '<path d="M5 12h14M13 6l6 6-6 6"/>',
   back: '<path d="M19 12H5M11 6l-6 6 6 6"/>',
   chevron: '<path d="M6 9l6 6 6-6"/>',
+  note: '<path d="M5 4.5h10.5L19 8v11.5H5z"/><path d="M8.5 10h7M8.5 13.5h7M8.5 17h4.5"/>',
   camera: '<path d="M4 8.5A2.5 2.5 0 0 1 6.5 6h1.8l1.4-2h4.6l1.4 2h1.8A2.5 2.5 0 0 1 20 8.5v8a2.5 2.5 0 0 1-2.5 2.5h-11A2.5 2.5 0 0 1 4 16.5z"/><circle cx="12" cy="12.5" r="3.6"/>',
 };
 const svg = (name, cls = '') => `<svg class="${cls}" viewBox="0 0 24 24" aria-hidden="true" focusable="false">${ICONS[name]}</svg>`;
@@ -61,6 +66,9 @@ export const COPY = {
   ownFailed: 'That interest could not be added. Please try again.',
   interestsMissing: 'Pick at least one interest.',
   photoMissing: 'Add a profile photo to continue.',
+  lookingMissing: 'Pick at least one thing you are looking for.',
+  bioMissing: 'Write a short bio, at least 20 characters.',
+  lookingCap: 'You can pick up to 8. Remove one to add another.',
   cap: `You can pick up to ${MAX_INTERESTS}. Remove one to add another.`,
 };
 
@@ -80,7 +88,7 @@ export const initGuidedSignup = ({
   const back = root.querySelector('[data-guided-back]');
   const next = root.querySelector('[data-guided-next]');
   // photo: the framed File picked on the photo screen (D-102); photoUrl: the member's stored photo when resuming.
-  const emptyAnswers = () => ({ email: '', password: '', passwordConfirm: '', adult: false, name: '', phoneCountryCode: '+91', phoneNumber: '', gender: '', photo: null, photoUrl: '', area: null, interests: [] });
+  const emptyAnswers = () => ({ email: '', password: '', passwordConfirm: '', adult: false, name: '', phoneCountryCode: '+91', phoneNumber: '', gender: '', photo: null, photoUrl: '', lookingFor: [], bio: '', area: null, interests: [] });
   const state = { path, hasSession, resumeAt, screen: 'welcome', busy: false, nodes: null, current: null, email: '', answers: { ...emptyAnswers(), ...prefill } };
   const geo = { seq: 0, pending: false, guard: 0 };
 
@@ -333,7 +341,7 @@ export const initGuidedSignup = ({
     photo: () => {
       let previewUrl = '';
       return {
-        primary: state.hasSession ? 'Continue' : 'Create account',
+        primary: 'Continue',
         html: `${heading('Add a profile photo.', 'Members see it on your card. A clear photo of your face helps people recognise you.')}
           <div class="guided-photo">
             <button class="guided-photo-pick" type="button" data-guided-photo-pick>
@@ -381,9 +389,149 @@ export const initGuidedSignup = ({
         },
         ready: () => Boolean(a.photo || a.photoUrl),
         notReady: () => COPY.photoMissing,
+        submit: async () => nextAfter('photo'),
+      };
+    },
+
+    // D-112: "About you", both required. Looking for is one dropdown like the interests (the Edit profile suggestions,
+    // or the member's own words, up to LOOKING_MAX); the bio is 20 to BIO_MAX characters. Signup's last screen: its
+    // button creates the account and saves the profile (with the photo picked on the screen before).
+    about: () => {
+      let query = '';
+      const shownLabel = (v) => String(v || '').trim().replace(/\s+/g, ' ');
+      const key = (v) => shownLabel(v).toLowerCase();
+      const has = (v) => a.lookingFor.some((x) => key(x) === key(v));
+      const bioOk = () => cleanBio(a.bio).length >= BIO_MIN;
+      return {
+        primary: state.hasSession ? 'Continue' : 'Create account',
+        html: `${heading('Tell members about you.', 'Who you would like to meet, and a line or two about yourself. Members see both on your profile.')}
+          <p class="guided-field-label" id="guided-looking-label">Looking for</p>
+          <div class="guided-tray guided-tray--looking" data-guided-tray>
+            <div class="guided-tray-head"><span>Your picks</span><b data-guided-count aria-hidden="true">0 picked</b></div>
+            <ul class="guided-tray-list" aria-label="Looking for"></ul>
+            <p class="guided-tray-empty" data-guided-tray-empty>Open the list below, or type your own.</p>
+            <p class="sr-only" data-guided-announce aria-live="polite"></p>
+          </div>
+          <div class="guided-combo" data-guided-combo>
+            <label class="guided-field guided-field--search guided-field--combo"><span class="sr-only">Looking for</span>${svg('search', 'guided-search-icon')}
+              <input type="text" role="combobox" name="guided-looking" autocomplete="off" maxlength="40" placeholder="Choose or type, e.g. Co-founder" aria-autocomplete="list" aria-expanded="false" aria-controls="guided-looking-options" aria-labelledby="guided-looking-label" />
+              ${svg('chevron', 'guided-combo-chevron')}</label>
+            <div class="guided-menu" id="guided-looking-options" role="listbox" aria-multiselectable="true" aria-label="Looking for" hidden></div>
+          </div>
+          <label class="guided-field guided-field--bio"><span class="guided-field-label">Bio</span>
+            <textarea name="guided-bio" rows="4" maxlength="${BIO_MAX}" placeholder="What you do, what you love, what you're up to." aria-describedby="guided-bio-count"></textarea>
+            <small class="guided-bio-count" id="guided-bio-count"><span data-guided-bio-count>0</span> / ${BIO_MAX}. At least ${BIO_MIN} characters.</small>
+          </label>`,
+        mount: (el) => {
+          const combo = el.querySelector('[data-guided-combo]');
+          const input = el.querySelector('input[name="guided-looking"]');
+          const menu = el.querySelector('.guided-menu');
+          const tray = el.querySelector('.guided-tray-list');
+          const trayEmpty = el.querySelector('[data-guided-tray-empty]');
+          const count = el.querySelector('[data-guided-count]');
+          const announce = el.querySelector('[data-guided-announce]');
+          const bio = el.querySelector('textarea[name="guided-bio"]');
+          const bioCount = el.querySelector('[data-guided-bio-count]');
+          let shown = [];
+          let active = -1;
+          const optionId = (i) => `guided-looking-${i}`;
+          const isOpen = () => !menu.hidden;
+          const renderTray = () => {
+            tray.innerHTML = a.lookingFor.map((v) => `<li><button type="button" class="guided-pick" data-value="${escapeHtml(v)}" aria-label="Remove ${escapeHtml(v)}">${escapeHtml(v)}<span aria-hidden="true">×</span></button></li>`).join('');
+            count.textContent = `${a.lookingFor.length} picked`;
+            trayEmpty.hidden = a.lookingFor.length > 0;
+          };
+          const setActive = (i, { scroll = true } = {}) => {
+            active = shown.length && i >= 0 ? Math.min(i, shown.length - 1) : -1;
+            menu.querySelectorAll('.guided-menu-option').forEach((o, j) => o.classList.toggle('is-active', j === active));
+            if (active < 0) { input.removeAttribute('aria-activedescendant'); return; }
+            input.setAttribute('aria-activedescendant', optionId(active));
+            if (scroll) menu.querySelector(`#${optionId(active)}`)?.scrollIntoView({ block: 'nearest' });
+          };
+          const renderMenu = () => {
+            if (!isOpen()) return;
+            const q = key(query);
+            const list = q
+              ? LOOKING_FOR_CATALOG.filter((v) => v.toLowerCase().includes(q)).sort((x, y) => Number(!x.toLowerCase().startsWith(q)) - Number(!y.toLowerCase().startsWith(q)))
+              : LOOKING_FOR_CATALOG;
+            const own = q.length >= 2 && !LOOKING_FOR_CATALOG.some((v) => v.toLowerCase() === q) && !has(query) ? shownLabel(query) : '';
+            shown = [...list, ...(own ? [own] : [])];
+            menu.innerHTML = shown.map((v, i) => (own && i === shown.length - 1
+              ? `<div class="guided-menu-option is-add" id="${optionId(i)}" role="option" data-value="${escapeHtml(v)}" aria-selected="false"><span class="guided-add-mark" aria-hidden="true">+</span>Add “${escapeHtml(v)}”</div>`
+              : `<div class="guided-menu-option" id="${optionId(i)}" role="option" data-value="${escapeHtml(v)}" aria-selected="${has(v)}">${escapeHtml(v)}${svg('tick', 'guided-menu-tick')}</div>`)).join('');
+            setActive(Math.min(active, shown.length - 1), { scroll: false });
+          };
+          const openMenu = () => {
+            if (isOpen()) return;
+            menu.hidden = false;
+            combo.classList.add('is-open');
+            input.setAttribute('aria-expanded', 'true');
+            active = -1;
+            menu.scrollTop = 0;
+            renderMenu();
+            requestAnimationFrame(() => { if (isOpen()) menu.scrollIntoView({ block: 'nearest' }); });
+          };
+          const closeMenu = () => {
+            if (!isOpen()) return;
+            menu.hidden = true;
+            combo.classList.remove('is-open');
+            input.setAttribute('aria-expanded', 'false');
+            input.removeAttribute('aria-activedescendant');
+            active = -1;
+          };
+          const toggle = (value) => {
+            const v = shownLabel(value);
+            if (!v) return;
+            const on = has(v);
+            if (!on && a.lookingFor.length >= LOOKING_MAX) { setError(COPY.lookingCap); return; }
+            setError('');
+            a.lookingFor = on ? a.lookingFor.filter((x) => key(x) !== key(v)) : [...a.lookingFor, v];
+            renderTray();
+            announce.textContent = `${v} ${on ? 'removed' : 'added'}. ${a.lookingFor.length} picked.`;
+            refreshNext();
+          };
+          input.addEventListener('focus', openMenu);
+          input.addEventListener('click', openMenu);
+          input.addEventListener('input', () => { query = input.value; openMenu(); active = query.trim() ? 0 : -1; renderMenu(); });
+          input.addEventListener('keydown', (event) => {
+            if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+              event.preventDefault();
+              if (!isOpen()) { openMenu(); setActive(0); return; }
+              setActive(active < 0 ? 0 : active + (event.key === 'ArrowDown' ? 1 : -1));
+            } else if (event.key === 'Escape' && isOpen()) { event.preventDefault(); event.stopPropagation(); closeMenu(); }
+            else if (event.key === 'Tab') closeMenu();
+            else if (event.key === 'Enter') {
+              const value = shown[active];
+              if (!isOpen() || value === undefined) { closeMenu(); return; }
+              event.preventDefault();
+              toggle(value);
+              if (query.trim()) { input.value = ''; query = ''; active = -1; }
+              renderMenu();
+            }
+          });
+          menu.addEventListener('mousedown', (event) => event.preventDefault());
+          menu.addEventListener('click', (event) => {
+            const o = event.target.closest('.guided-menu-option');
+            if (!o) return;
+            toggle(o.dataset.value);
+            if (o.classList.contains('is-add')) { input.value = ''; query = ''; active = -1; }
+            renderMenu();
+          });
+          const outside = (event) => { if (!el.isConnected) { document.removeEventListener('pointerdown', outside, true); return; } if (!combo.contains(event.target)) closeMenu(); };
+          document.addEventListener('pointerdown', outside, true);
+          tray.addEventListener('click', (event) => { const b = event.target.closest('.guided-pick'); if (b) { toggle(b.dataset.value); renderMenu(); } });
+          bio.value = a.bio;
+          const syncBio = () => { a.bio = bio.value; bioCount.textContent = String(bio.value.length); refreshNext(); };
+          bio.addEventListener('input', syncBio);
+          syncBio();
+          renderTray();
+        },
+        ready: () => a.lookingFor.length >= 1 && bioOk(),
+        notReady: () => (a.lookingFor.length ? COPY.bioMissing : COPY.lookingMissing),
         submit: async () => {
+          a.bio = cleanBio(a.bio);
           const result = await submit({ ...a, adult: true });
-          if (!result?.ok) return { screen: result?.screen || 'photo', message: result?.message || COPY.saveFailed };
+          if (!result?.ok) return { screen: result?.screen || 'about', message: result?.message || COPY.saveFailed };
           a.password = ''; a.passwordConfirm = '';
           if (result.photoUrl) { a.photoUrl = result.photoUrl; a.photo = null; }
           if (!result.session) return 'verify';

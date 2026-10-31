@@ -2243,6 +2243,28 @@ controls (a tester or a seeded test member), never a real member, so no new expo
 - **Proof:** e2e `collab-requests.spec.mjs` (two new cases), SQL `g-interest-catalog.test.sql` (retired, apostrophes),
   unit `interest-catalog.test.mjs`.
 
+## D-112: "About you" after the profile photo: Looking for and a bio, both required (founder, 2026-10-31)
+
+- **Asked:** "in the signup flow after the profile picture add input for - looking for and bio input that will be
+  mandatory".
+- **Done (refines D-102):** a new signup screen `about` after `photo`, "Tell members about you.", with two required
+  fields. **Looking for** is one dropdown in the interests' style (D-095): the Edit profile suggestions
+  (`LOOKING_FOR_CATALOG`), filtered as you type, plus "Add …" for the member's own words; picks land in a tray above
+  the field; up to 8 (Edit profile's cap). **Bio** is a textarea with a live count, 20 to 300 characters (`BIO_MAX`,
+  `cleanBio`). The button stays disabled until both are answered.
+- **Account creation moves:** About you is now the last signup screen (`SIGNUP_LAST`) and its "Create account" button
+  creates the account and saves the profile, photo, looking for and bio together; the photo screen just continues.
+  Steps read "Step n of 6" (Google "of 5"). With email confirmation on, looking for and the bio wait in the pending
+  profile with the rest and are saved after login.
+- **Resuming:** `resumeScreen` sends a signed-in, not yet completed member with no looking for (and, when the row has a
+  bio column, no bio) to About you, after the photo and before setup. Completed members are never sent back.
+- **Database:** no new SQL. `looking_for` exists since 0001; the bio needs `0016_profile_bio.sql` (owed). Until 0016 is
+  applied `saveProfile` retries without the bio, so signup never fails on it.
+- **Proof:** unit `signup-flow.test.mjs` (lists, labels, resume, Back); e2e `signup.spec.mjs` 355 (the About you screen
+  at 1440 and 375: listbox, 44 px rows, own words, bio floor, axe; rows store `looking_for` and `bio`; pending profile;
+  resume; one submit per tap or Enter), onboarding 269, profile-edit, consent, mobile-polish, launch-polish,
+  password-reveal; build and style ratchet OK.
+
 ## D-113: The request review sheet is swipe only, and restyled in burgundy (founder, 2026-10-31)
 
 - **Asked:** remove the Connect and Not now pill buttons from "See who wants to collaborate with you"; keep the swipe;
@@ -2256,7 +2278,7 @@ controls (a tester or a seeded test member), never a real member, so no new expo
   decide; two Connect / Not now keys remain for keyboard and screen-reader users but are visually hidden until one has
   focus. A pointer user who cannot drag has no visible alternative; this is the founder's call. If it matters later,
   small tap targets on the cue row are the cheapest fix.
-- **Coordination:** branch `claude/magical-ptolemy-rbjrw2` (D-112, pitch in review) has a pending Task 3 that
+- **Coordination:** branch `claude/magical-ptolemy-rbjrw2` (pitch in review; its D-112 number clashes with main's D-112 signup entry) has a pending Task 3 that
   redesigns the same sheet with a reply field and a "Not now · Connect without a note" text row. That task should
   build on this one and keep the swipe-only rule (no visible decide buttons).
 - **Proof:** unit `collab-requests.test.mjs` (no pills, focusable card, cue, dots, keys); e2e

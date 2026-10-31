@@ -98,6 +98,8 @@ export const profileToRow = (profile, userId, photoUrl = '') => ({
   looking_for: splitValues(profile.lookingFor || profile.looking_for),
   photo_url: photoUrl || profile.photoUrl || null,
   cover_url: profile.coverUrl || profile.cover_url || null,
+  // D-112: the signup bio (0016). Sent only when there is one, so a save without it never clears a saved bio.
+  ...(String(profile.bio || '').trim() ? { bio: String(profile.bio).trim().slice(0, 300) } : {}),
   updated_at: new Date().toISOString(),
 });
 
@@ -217,6 +219,11 @@ export const saveProfile = async (userId, profile, photoFile, previous = {}) => 
     return supabase.from('profiles').insert(payload).select().single();
   };
   let result = await write(row);
+  // Before 0016 there is no bio column: save the rest (the bio is asked for again in Edit profile once it exists).
+  if (result.error && row.bio !== undefined && /\bbio\b/i.test(result.error.message || '')) {
+    delete row.bio;
+    result = await write(row);
+  }
   if (result.error && /cover_url|column/i.test(result.error.message || '')) {
     const { cover_url: ignoredCoverUrl, ...legacyRow } = row;
     result = await write(legacyRow);

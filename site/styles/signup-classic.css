@@ -316,3 +316,18 @@ body.auth-page .auth-shell .guided .guided-add-mark { display: grid; flex: none;
 
 /* D-102: setup (area, interests) and Reveal come after the account exists: no "Already a member? Log in" there. */
 body.auth-page .auth-shell:has(#guided-signup:is([data-screen="area"], [data-screen="interests"], [data-screen="reveal"])) .auth-top-signup { visibility: hidden; }
+
+/* D-112: About you. "Looking for" reuses the interests dropdown; the bio is a field in the same skin, with its count. */
+body.auth-page .auth-shell .guided .guided-screen--about .guided-tray { margin-top: 0; }
+body.auth-page .auth-shell .guided .guided-field--bio { margin-top: var(--space-4); }
+body.auth-page .auth-shell .guided .guided-field--bio textarea {
+  display: block; width: 100%; min-height: 104px; padding: 12px 13px; resize: vertical;
+  border: 1px solid var(--k-line); border-radius: 7px; outline: none; background: var(--k-field);
+  color: var(--k-name); font: inherit; font-size: var(--text-14); font-weight: 500; line-height: 1.5;
+}
+body.auth-page .auth-shell .guided .guided-field--bio textarea:focus { border-color: var(--k-wine); box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-chat-wine) 10%, transparent); }
+body.auth-page .auth-shell .guided .guided-field--bio textarea::placeholder { color: color-mix(in srgb, var(--color-chat-wine) 45%, var(--color-cream)); }
+body.auth-page .auth-shell .guided .guided-bio-count { display: block; margin-top: 6px; color: var(--k-label); font-size: var(--text-12); }
+@media (max-width: 780px) {
+  body.auth-page .auth-shell .guided .guided-field--bio textarea { font-size: var(--text-16); }
+}
