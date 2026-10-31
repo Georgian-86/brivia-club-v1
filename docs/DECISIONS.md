@@ -2242,3 +2242,25 @@ controls (a tester or a seeded test member), never a real member, so no new expo
   `docs/MODERATION.md` has the daily check and the retire step. Curly apostrophes (iPhone) count as straight ones.
 - **Proof:** e2e `collab-requests.spec.mjs` (two new cases), SQL `g-interest-catalog.test.sql` (retired, apostrophes),
   unit `interest-catalog.test.mjs`.
+
+## D-112: "About you" after the profile photo: Looking for and a bio, both required (founder, 2026-10-31)
+
+- **Asked:** "in the signup flow after the profile picture add input for - looking for and bio input that will be
+  mandatory".
+- **Done (refines D-102):** a new signup screen `about` after `photo`, "Tell members about you.", with two required
+  fields. **Looking for** is one dropdown in the interests' style (D-095): the Edit profile suggestions
+  (`LOOKING_FOR_CATALOG`), filtered as you type, plus "Add …" for the member's own words; picks land in a tray above
+  the field; up to 8 (Edit profile's cap). **Bio** is a textarea with a live count, 20 to 300 characters (`BIO_MAX`,
+  `cleanBio`). The button stays disabled until both are answered.
+- **Account creation moves:** About you is now the last signup screen (`SIGNUP_LAST`) and its "Create account" button
+  creates the account and saves the profile, photo, looking for and bio together; the photo screen just continues.
+  Steps read "Step n of 6" (Google "of 5"). With email confirmation on, looking for and the bio wait in the pending
+  profile with the rest and are saved after login.
+- **Resuming:** `resumeScreen` sends a signed-in, not yet completed member with no looking for (and, when the row has a
+  bio column, no bio) to About you, after the photo and before setup. Completed members are never sent back.
+- **Database:** no new SQL. `looking_for` exists since 0001; the bio needs `0016_profile_bio.sql` (owed). Until 0016 is
+  applied `saveProfile` retries without the bio, so signup never fails on it.
+- **Proof:** unit `signup-flow.test.mjs` (lists, labels, resume, Back); e2e `signup.spec.mjs` 355 (the About you screen
+  at 1440 and 375: listbox, 44 px rows, own words, bio floor, axe; rows store `looking_for` and `bio`; pending profile;
+  resume; one submit per tap or Enter), onboarding 269, profile-edit, consent, mobile-polish, launch-polish,
+  password-reveal; build and style ratchet OK.

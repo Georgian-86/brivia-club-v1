@@ -7,6 +7,12 @@ Update this file at the end of every session. CLAUDE.md holds the aim; this file
 
 ## 1. What is done
 
+**2026-10-31, signup About you (D-112):** after the photo, a required "About you" step: Looking for (a dropdown of the
+Edit profile suggestions, or the member's own words, up to 8) and a bio (20 to 300 characters). It is now the last
+signup step and creates the account ("Step n of 6", Google "of 5"). A signed-in member without looking for (or, once
+0016 is live, a bio) resumes there; completed members are never sent back. The bio is stored only once
+`0016_profile_bio.sql` is applied: before that the signup saves everything else. Proof: e2e signup 355, unit 376.
+
 **2026-10-29, same branch (D-107 to D-110; plan `docs/superpowers/plans/2026-10-29-collab-requests-interests-presence.md`):**
 - **Post cards (D-107, live):** counts inline beside the icons, one fixed 40 px footer on every card ("Liked by …" /
   "View N comments", or "Be the first to like this"), so action bars line up.
