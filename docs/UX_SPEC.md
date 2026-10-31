@@ -68,11 +68,16 @@ the in-place repaint.
 Incoming connection requests never show Accept / Decline rows. The notification panel has one section: up to three
 overlapping faces, **See who wants to collaborate with you**, "N people want to connect" and **Review**. Review opens a
 modal sheet (`collab-requests.js`; a centred 440 px card on wide screens, a bottom sheet at 640 px and below) with one
-request at a time: photo, name, role · distance band, "You both care about" (up to 3), "Their note", "1 of 3".
-**Connect** (button, right drag, ArrowRight) accepts; when a connection results the sheet shows "You're connected."
-with **Message <name>** and **Next request**. **Not now** (button, left drag, ArrowLeft) declines quietly; the sender is
-never told. A failed answer keeps the card and shows the shared toast. The end reads "You're all caught up." The drag
-is the deck's (`deck-swipe.js`) with CONNECT / NOT NOW stamps; reduced motion fades. Focus stays in the sheet and goes
+request at a time: photo, name, role · distance band, "You both care about" (up to 3), "Their note" (an italic
+quote), "1 of 3". **Swipe only (D-113):** no visible Connect / Not now buttons. A right drag or ArrowRight connects; a
+left drag or ArrowLeft declines quietly (the sender is never told). The card takes focus; a cue row under it reads
+"< Not now · Drag the card · Connect >" (decorative, arrows nudge three times unless reduced motion), then progress
+dots (2 to 8 requests). Two keyboard keys (Not now, Connect, 44 px) stay visually hidden until one has focus. When a
+connection results the sheet shows "You're connected." with **Message <name>** and **Next request**. A failed answer
+keeps the card and shows the shared toast. The end reads "You're all caught up." Look: the sheet is the burgundy
+gradient (`--gradient-burgundy`), cream text; the card is blush paper on a small pile of the requests still waiting;
+the state buttons are cream on burgundy. The drag is the deck's (`deck-swipe.js`) with CONNECT / NOT NOW stamps;
+reduced motion fades. Focus stays in the sheet and goes
 back to the bell on close. Words: collaborate, connect, not now, request; never match, like, pass, swipe, crush or hearts.
 
 ## Active status (D-110)

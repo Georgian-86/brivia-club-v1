@@ -277,7 +277,8 @@ try {
   await page.waitForTimeout(3000); // let the last toast clear
 
   // 4. Requests in the notifications panel (D-108): one "See who wants to collaborate with you" section; Review opens
-  // a sheet with one request at a time (Connect / Not now). No Accept / Decline rows.
+  // a sheet with one request at a time, decided by drag or arrow keys; the Connect / Not now keys exist only for the
+  // keyboard (hidden until focused, 2026-10-31). No Accept / Decline rows.
   // Opening the panel refetches requests and re-renders the list; wait for that before measuring.
   const refetch = page.waitForResponse((res) => res.url().includes('/rest/v1/connection_requests') && res.request().method() === 'GET');
   await page.locator('#app-notification-button').click();
@@ -301,17 +302,23 @@ try {
   check('request note escaped (rendered as text, no <b> element)', () => { assert.equal(noteText, '<b>climb</b> with me?'); assert.equal(noteHasTag, 0); });
   const connect = page.locator('dialog.collab-review [data-collab-decide="connect"]');
   const later = page.locator('dialog.collab-review [data-collab-decide="later"]');
+  const hiddenKeys = await page.locator('dialog.collab-review .collab-keys').evaluate((el) => el.getBoundingClientRect().width);
+  await devCard.focus();
+  await page.keyboard.press('Tab');
+  await page.keyboard.press('Tab');
+  const connectFocused = await connect.evaluate((el) => el === document.activeElement);
+  check(`no visible Connect / Not now pills until Tab reaches the keys (${hiddenKeys}, focused ${connectFocused})`, () => { assert.ok(hiddenKeys <= 1); assert.equal(connectFocused, true); });
   const [connectBox, laterBox] = [await connect.boundingBox(), await later.boundingBox()];
-  check(`Connect / Not now >=44px and equal size (${connectBox.width}x${connectBox.height}, ${laterBox.width}x${laterBox.height})`, () => {
+  check(`Connect / Not now keys >=44px and equal size (${connectBox.width}x${connectBox.height}, ${laterBox.width}x${laterBox.height})`, () => {
     assert.ok(connectBox.height >= 44 && laterBox.height >= 44);
     assert.equal(Math.round(connectBox.width), Math.round(laterBox.width));
   });
   let releaseRpc;
   state.holdRpc = new Promise((resolve) => { releaseRpc = resolve; });
-  await connect.click();
+  await page.keyboard.press('Enter');
   await page.waitForTimeout(150);
   const bothDisabled = (await connect.isDisabled()) && (await later.isDisabled());
-  await connect.click({ force: true, timeout: 500 }).catch(() => {});
+  await page.keyboard.press('ArrowRight');
   releaseRpc(); state.holdRpc = null;
   await page.waitForSelector('dialog.collab-review .collab-state h3');
   const connectedText = await page.locator('dialog.collab-review .collab-state').innerText();

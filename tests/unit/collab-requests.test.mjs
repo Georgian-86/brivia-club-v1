@@ -51,6 +51,21 @@ test('reviewCardMarkup escapes, shows the counter and the note, and never uses d
   assert.match(quiet, /2 of 2/);
 });
 
+test('reviewCardMarkup: swipe only, no Connect / Not now pills; a focusable card, a cue, dots and keyboard-only keys', () => {
+  const m = reviewCardModel(req(1, { name: 'Asha' }), []);
+  const html = reviewCardMarkup(m, { index: 1, total: 4 }, { escapeHtml, renderAvatar });
+  assert.doesNotMatch(html, /collab-button|collab-actions/, 'no visible pill buttons');
+  assert.match(html, /<article class="collab-card"[^>]*tabindex="0"[^>]*aria-describedby="collab-review-keys"/);
+  assert.match(html, /class="collab-cue" aria-hidden="true"/);
+  assert.equal((html.match(/data-collab-decide=/g) || []).length, 2, 'the two keyboard keys');
+  assert.match(html, /class="collab-keys"/);
+  const dots = html.match(/<ol class="collab-dots" aria-hidden="true">(.*?)<\/ol>/)[1];
+  assert.equal((dots.match(/<li/g) || []).length, 4);
+  assert.match(dots, /^<li class="is-done"><\/li><li class="is-current"><\/li><li><\/li><li><\/li>$/);
+  assert.doesNotMatch(reviewCardMarkup(m, { index: 0, total: 1 }, { escapeHtml, renderAvatar }), /collab-dots/, 'no dots for one request');
+  assert.doesNotMatch(reviewCardMarkup(m, { index: 0, total: 12 }, { escapeHtml, renderAvatar }), /collab-dots/, 'no dots past eight');
+});
+
 test('keyDecision: arrows decide, everything else does not', () => {
   assert.equal(keyDecision('ArrowRight'), true);
   assert.equal(keyDecision('ArrowLeft'), false);

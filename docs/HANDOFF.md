@@ -7,6 +7,10 @@ Update this file at the end of every session. CLAUDE.md holds the aim; this file
 
 ## 1. What is done
 
+**2026-10-31, swipe-only request review (D-113, client only):** "See who wants to collaborate with you" has no Connect /
+Not now pills; drag or arrow keys decide; burgundy sheet, blush card on a pile, cue row, dots; keyboard keys appear
+only on focus. The pending D-112 Task 3 (branch `claude/magical-ptolemy-rbjrw2`) should build on it.
+
 **2026-10-29, same branch (D-107 to D-110; plan `docs/superpowers/plans/2026-10-29-collab-requests-interests-presence.md`):**
 - **Post cards (D-107, live):** counts inline beside the icons, one fixed 40 px footer on every card ("Liked by …" /
   "View N comments", or "Be the first to like this"), so action bars line up.

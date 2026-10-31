@@ -2242,3 +2242,23 @@ controls (a tester or a seeded test member), never a real member, so no new expo
   `docs/MODERATION.md` has the daily check and the retire step. Curly apostrophes (iPhone) count as straight ones.
 - **Proof:** e2e `collab-requests.spec.mjs` (two new cases), SQL `g-interest-catalog.test.sql` (retired, apostrophes),
   unit `interest-catalog.test.mjs`.
+
+## D-113: The request review sheet is swipe only, and restyled in burgundy (founder, 2026-10-31)
+
+- **Asked:** remove the Connect and Not now pill buttons from "See who wants to collaborate with you"; keep the swipe;
+  make the sheet look finished (superpowers process, ui-ux-pro-max rules).
+- **Done (client only, no SQL):** the card is the only visible control: right drag / ArrowRight connects, left drag /
+  ArrowLeft declines quietly. A decorative cue row names both directions, progress dots show the position. The sheet
+  is the burgundy gradient (new token `--gradient-burgundy`, built from existing colours), the card is blush paper on
+  a pile of the requests still waiting, the note is an italic quote, the connected and caught-up states are cream on
+  burgundy. The words stay collaborate / connect / not now (never "swipe" on screen).
+- **Accessibility trade-off (ui-ux-pro-max: WCAG 2.2 "dragging movements"):** the card takes focus and the arrow keys
+  decide; two Connect / Not now keys remain for keyboard and screen-reader users but are visually hidden until one has
+  focus. A pointer user who cannot drag has no visible alternative; this is the founder's call. If it matters later,
+  small tap targets on the cue row are the cheapest fix.
+- **Coordination:** branch `claude/magical-ptolemy-rbjrw2` (D-112, pitch in review) has a pending Task 3 that
+  redesigns the same sheet with a reply field and a "Not now · Connect without a note" text row. That task should
+  build on this one and keep the swipe-only rule (no visible decide buttons).
+- **Proof:** unit `collab-requests.test.mjs` (no pills, focusable card, cue, dots, keys); e2e
+  `collab-requests.spec.mjs` (drag and arrow keys decide, keys hidden until focused, one RPC per decision, axe at 1440
+  and 390) and `consent.spec.mjs` section 4 (keys via Tab and Enter).
