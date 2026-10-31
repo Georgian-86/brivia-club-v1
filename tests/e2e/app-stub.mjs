@@ -27,6 +27,13 @@
 //                 An error override may name its PostgREST { code, message } (polish wave C3: '42501' for an RLS refusal,
 //                 '42P01' for a table that does not exist yet); the default is 'XX000' / 'stub failure'.
 //                 A 2xx { status } without a body answers that status with an empty body (polish wave A5: a 201 insert).
+//   pitchThreads  rpc/my_pitch_threads rows (D-112, 0019), as the server answers them: { other_id, direction: 'in'|'out',
+//                 note, created_at, chat_open } (default []). rpc/accept_pitch_chat { p_from } opens the 'in' row from
+//                 p_from (chat_open true) and logs st.pitchAccepts; rpc/end_pitch_chat { p_other } removes an 'in' row
+//                 (and the st.requests row from p_other) or closes an open 'out' row (chat_open false, as the sender's
+//                 views read a declined pitch) and logs st.pitchEnds. Either answers P0002 when there is no such row.
+//                 A 404 / PGRST202 (before 0019) or another error: use `routes` ('rpc/my_pitch_threads': { status: 404,
+//                 code: 'PGRST202' }, 'rpc/accept_pitch_chat': { status: 500 }, { delayMs } for a slow answer).
 import { readFileSync } from 'node:fs';
 import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
@@ -206,6 +213,26 @@ export const startAppStub = async ({ port, state = {}, deckRows = defaultDeckRow
       if (pathName === '/rest/v1/rpc/set_presence_visible') { st.presenceVisible = args.p_visible; return route.fulfill({ status: 204, body: '', headers: { 'access-control-allow-origin': '*' } }); }
       if (pathName === '/rest/v1/rpc/connection_presence') {
         return json(200, (args.p_ids || []).filter((id) => st.matchIds.includes(id)).map((id) => ({ member_id: id, active: st.presenceVisible !== false && (st.activeIds || []).includes(id) })));
+      }
+      if (pathName === '/rest/v1/rpc/my_pitch_threads') return json(200, st.pitchThreads || []);
+      if (pathName === '/rest/v1/rpc/accept_pitch_chat') {
+        const row = (st.pitchThreads || []).find((r) => r.other_id === args.p_from && r.direction === 'in');
+        if (!row) return json(400, { code: 'P0002', message: 'no pending connection request' });
+        row.chat_open = true;
+        (st.pitchAccepts ||= []).push(args);
+        return route.fulfill({ status: 204, body: '', headers: { 'access-control-allow-origin': '*' } });
+      }
+      if (pathName === '/rest/v1/rpc/end_pitch_chat') {
+        const rows = st.pitchThreads || [];
+        const incoming = rows.find((r) => r.other_id === args.p_other && r.direction === 'in');
+        const outgoing = rows.find((r) => r.other_id === args.p_other && r.direction === 'out' && r.chat_open);
+        if (!incoming && !outgoing) return json(400, { code: 'P0002', message: 'no pending connection request' });
+        if (incoming) {
+          st.pitchThreads = rows.filter((r) => r !== incoming);
+          st.requests = (st.requests || []).filter((r) => r.from_id !== args.p_other);
+        } else outgoing.chat_open = false;
+        (st.pitchEnds ||= []).push(args);
+        return route.fulfill({ status: 204, body: '', headers: { 'access-control-allow-origin': '*' } });
       }
       if (pathName === '/rest/v1/community_post_shares' && method === 'POST') return route.fulfill({ status: 201, body: '', headers: { 'access-control-allow-origin': '*' } });
       if (pathName === '/rest/v1/brivia_messages' && method === 'POST') { (st.sent ||= []).push(args); return route.fulfill({ status: 201, body: '', headers: { 'access-control-allow-origin': '*' } }); }

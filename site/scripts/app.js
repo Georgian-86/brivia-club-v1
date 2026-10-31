@@ -38,6 +38,7 @@ import { experienceChoices, cleanBio, BIO_MAX, areaInputValue, planInterestSave 
 import { isOffered, hasCatalog, catalogGroups, normalizeInterestLabel } from './signup-flow.js';
 import { MAX_INTERESTS } from './passion-budget.js';
 import { collabSummary, openCollabReview } from './collab-requests.js';
+import { PITCH_COPY, pitchRowsFromRpc, pitchThreadModel, pitchThreadMarkup } from './pitch-chat.js';
 import { createPresence, presenceDot } from './presence.js';
 import { postCardMarkup, postFooterMarkup, countText, shareData, isSafePostImageSrc } from './post-card.js';
 import { toastSide } from './toast-place.js';
@@ -102,6 +103,15 @@ let notifications = [];
 // Incoming pending connection requests (shown in the notifications panel).
 let pendingRequests = [];
 const respondingRequestIds = new Set();
+// Pitch threads (D-112, 0019): my_pitch_threads() rows (pitch-chat.js shape) by the other member's id. An 'in' row that
+// is not chat-open is a message request ("Message requests" in Chat); an open or 'out' row is a conversation marked
+// "Not connected". A connection (match) always wins: the row is then ignored and dropped. pitchThreadsAvailable turns
+// false for good after a 404 / PGRST202 (before 0019): Chat then behaves exactly as before.
+let pitchThreads = new Map();
+let pitchThreadsAvailable = true;
+const pitchThreadBusy = new Set();       // one accept / end RPC per thread at a time
+const pitchRequestsOpened = new Set();   // request rows opened this session lose their unread dot
+const pitchEndedOutIds = new Set();      // my own pitches I ended this session: the server reads them as pending again
 
 let currentIndex = 0;
 let currentPerson = people[0];
@@ -1191,6 +1201,7 @@ const scheduleMemberSearch = (query) => {
   }, 250);
 };
 const addConnection = (personId) => {
+  pitchThreads.delete(String(personId));
   if (!remoteConnectionIds.some((id) => String(id) === String(personId))) remoteConnectionIds.push(personId);
   if (!remoteMatchIds.some((id) => String(id) === String(personId))) remoteMatchIds.push(personId);
   restoreChatForMe(personId);
@@ -1276,6 +1287,131 @@ const refreshConnections = async () => {
     .forEach(addConnection);
   return remoteConnectionIds.length !== before;
 };
+// Pitch threads (D-112). Loaded with the requests (sign-in and every ~30 s); people not on this page yet are loaded by
+// id exactly as loadConnectionRequests does. A person who still cannot be loaded reads "A Brivia member". A thread can
+// disappear between reads (declined, expired): the open thread then follows the server.
+const isConnectedWith = (id) => remoteConnectionIds.some((known) => String(known) === String(id));
+const pitchThreadFor = (id) => {
+  const row = id == null ? null : pitchThreads.get(String(id));
+  return row && !isConnectedWith(id) ? row : null;
+};
+const pitchFallbackPeople = new Map();
+const pitchThreadPerson = (id) => {
+  const known = findPersonById(id);
+  if (known) return known;
+  if (!pitchFallbackPeople.has(String(id))) pitchFallbackPeople.set(String(id), { ...toMemberPerson({ id }), id: String(id), name: pitchThreadModel({}, null).name, role: 'Brivia member' });
+  return pitchFallbackPeople.get(String(id));
+};
+const loadPitchThreads = async () => {
+  if (!supabase || !memberProfile.id || !pitchThreadsAvailable) return;
+  const { data, error, status } = await supabase.rpc('my_pitch_threads');
+  if (error) {
+    // The function does not exist yet (before 0019): never ask again; Chat stays as it was.
+    if (status === 404 || error.code === 'PGRST202') { pitchThreadsAvailable = false; return; }
+    console.warn('Message requests could not load:', error.message);
+    return;
+  }
+  const rows = pitchRowsFromRpc(data).filter((row) => !isConnectedWith(row.otherId)
+    && !(row.direction === 'out' && !row.chatOpen && pitchEndedOutIds.has(row.otherId)));
+  const unknownIds = [...new Set(rows.map((row) => row.otherId).filter((id) => !findPersonById(id) && isUuid(id)))];
+  if (unknownIds.length) {
+    const { data: profileRows, error: profileError } = await fetchCandidates(unknownIds);
+    if (profileError) console.warn('Message request senders could not load:', profileError.message);
+    const wanted = new Set(unknownIds);
+    mergePeople((profileRows || []).filter((row) => wanted.has(String(row?.id))));
+  }
+  const next = new Map();
+  // One thread per person; an incoming pitch wins over my own (a pair with both would already be matched).
+  rows.forEach((row) => { if (!next.has(row.otherId) || row.direction === 'in') next.set(row.otherId, row); });
+  const selectedId = selectedChat ? String(selectedChat.id) : '';
+  const before = JSON.stringify(pitchThreads.get(selectedId) || null);
+  const wasRequest = pitchThreads.get(selectedId)?.direction === 'in' && !pitchThreads.get(selectedId)?.chatOpen;
+  pitchThreads = next;
+  if (selectedId && JSON.stringify(next.get(selectedId) || null) !== before) {
+    // A request that is gone (declined elsewhere, expired) closes; any other change redraws the thread.
+    if (wasRequest && !next.has(selectedId) && !remoteMatchIds.some((id) => String(id) === selectedId)) closeSelectedChat();
+    else { syncPitchThreadView(); renderMessages(); }
+  }
+  renderChats();
+};
+// The open thread's pitch chrome: the head's "Not connected" chip, the composer lock and the ⋯ menu's End chat.
+const setComposerLocked = (locked) => {
+  const form = document.querySelector('#chat-form');
+  if (!form || (form.dataset.pitchLocked === 'true') === locked) return;
+  form.dataset.pitchLocked = String(locked);
+  form.classList.toggle('is-pitch-locked', locked);
+  form.inert = locked;
+  const input = form.querySelector('#chat-input');
+  if (input) input.disabled = locked;
+  const send = form.querySelector('button[type="submit"]');
+  if (send) send.disabled = locked;
+};
+const syncPitchThreadView = () => {
+  const pitch = selectedChat ? pitchThreadFor(selectedChat.id) : null;
+  const name = document.querySelector('#chat-name');
+  let chip = document.querySelector('#chat-pitch-chip');
+  if (!chip && name) {
+    name.insertAdjacentHTML('afterend', `<em class="chat-pitch-chip" id="chat-pitch-chip" hidden>${escapeHtml(PITCH_COPY.notConnected)}</em>`);
+    chip = document.querySelector('#chat-pitch-chip');
+  }
+  if (chip) chip.hidden = !(pitch?.chatOpen);
+  setComposerLocked(Boolean(pitch && !pitch.chatOpen));
+  const menu = document.querySelector('#chat-more-menu');
+  const end = menu?.querySelector('[data-chat-action="end-pitch"]');
+  if (end) end.hidden = !(pitch?.chatOpen);
+  const remove = menu?.querySelector('[data-chat-action="remove-connection"]');
+  if (remove) remove.hidden = Boolean(pitch);
+};
+// Decline, End chat, Not now and "no longer open": the thread leaves this device's Chat and its review card goes.
+const dropPitchThread = (otherId) => {
+  const id = String(otherId);
+  const row = pitchThreads.get(id);
+  if (row?.direction === 'out') pitchEndedOutIds.add(id);
+  pitchThreads.delete(id);
+  pendingRequests = pendingRequests.filter((item) => item.fromId !== id);
+  renderNotifications();
+  if (!isConnectedWith(id)) remoteMatchIds = remoteMatchIds.filter((known) => String(known) !== id);
+  if (String(selectedChat?.id) === id) closeSelectedChat();
+  else renderChats();
+};
+const setPitchButtonsBusy = (busy) => {
+  document.querySelectorAll('#chat-messages [data-pitch-action]').forEach((button) => { button.disabled = busy; });
+};
+// accept_pitch_chat / end_pitch_chat: one RPC per tap. P0002 (no longer open) drops the thread with a note; any other
+// failure keeps everything as it was (D-111 wording).
+const runPitchRpc = async (otherId, rpc, args) => {
+  const id = String(otherId);
+  if (!supabase || pitchThreadBusy.has(id)) return null;
+  pitchThreadBusy.add(id);
+  setPitchButtonsBusy(true);
+  let error = null;
+  try { ({ error } = await supabase.rpc(rpc, args)); } catch (thrown) { error = thrown || new Error('rpc failed'); }
+  pitchThreadBusy.delete(id);
+  if (error?.code === 'P0002') { dropPitchThread(id); showToast(PITCH_COPY.noLongerOpen); return null; }
+  if (error) {
+    setPitchButtonsBusy(false);
+    showToast(PITCH_COPY.updateFailed);
+    return null;
+  }
+  return true;
+};
+const acceptPitchChat = async (otherId) => {
+  const id = String(otherId);
+  if (!(await runPitchRpc(id, 'accept_pitch_chat', { p_from: id }))) return;
+  const row = pitchThreads.get(id);
+  if (row) pitchThreads.set(id, { ...row, chatOpen: true });
+  renderChats();
+  if (String(selectedChat?.id) === id) {
+    syncPitchThreadView();
+    renderMessages();
+    loadChatMessages(selectedChat);
+    document.querySelector('#chat-input')?.focus({ preventScroll: true });
+  }
+};
+const endPitchChat = async (otherId) => {
+  const id = String(otherId);
+  if (await runPitchRpc(id, 'end_pitch_chat', { p_other: id })) dropPitchThread(id);
+};
 // Answers one request; resolves { ok, connected }. The review sheet (D-108) shows its own outcome, so only a failure
 // toasts here (the member took the action).
 const respondToRequest = async (fromId, accept) => {
@@ -1288,6 +1424,7 @@ const respondToRequest = async (fromId, accept) => {
   if (error?.code === 'P0002') {
     pendingRequests = pendingRequests.filter((item) => item.fromId !== fromId);
     renderNotifications();
+    if (pitchThreads.has(String(fromId))) dropPitchThread(fromId);
     showToast('That request is no longer open.');
     return { ok: true, connected: false };
   }
@@ -1298,7 +1435,8 @@ const respondToRequest = async (fromId, accept) => {
   const request = pendingRequests.find((item) => item.fromId === fromId);
   pendingRequests = pendingRequests.filter((item) => item.fromId !== fromId);
   renderNotifications();
-  if (!accept) return { ok: true, connected: false };
+  // Not now also closes the pitch's chat (D-112): its thread leaves Chat here too.
+  if (!accept) { if (pitchThreads.has(String(fromId))) dropPitchThread(fromId); return { ok: true, connected: false }; }
   // Accepting a blocked pair silently records a decline (Ruling P12): only a real match opens chat.
   if (!(await hasMatchWith(fromId))) return { ok: true, connected: false };
   // A sender who was not in the deck was loaded only for the request: keep them, so the chat list and Message find them.
@@ -1306,6 +1444,8 @@ const respondToRequest = async (fromId, accept) => {
   addConnection(fromId);
   await refreshConnections();
   renderChats();
+  // A pitch thread with them is now a normal conversation (addConnection dropped the row).
+  if (String(selectedChat?.id) === String(fromId)) { syncPitchThreadView(); renderMessages(); }
   return { ok: true, connected: true };
 };
 let requestReviewOpen = false;
@@ -1784,9 +1924,27 @@ const renderChats = () => {
   ensureInboxControls();
   ensureChatMoreMenu();
   const hiddenChatIds = readHiddenChatIds();
+  // Pitch threads (D-112): incoming requests (not chat-open) sit under "Message requests" at the top; open ones and my
+  // own pitches join the conversations, marked "Not connected". A connection is always a normal conversation.
+  const pitchRows = [...pitchThreads.values()].filter((row) => !isConnectedWith(row.otherId));
+  const requestRows = pitchRows.filter((row) => row.direction === 'in' && !row.chatOpen);
+  const requestIds = new Set(requestRows.map((row) => row.otherId));
+  const listed = people.filter((person) => remoteMatchIds.includes(person.id) && !hiddenChatIds.has(String(person.id)) && !requestIds.has(String(person.id)));
+  const listedIds = new Set(listed.map((person) => String(person.id)));
+  const pitchPeople = pitchRows.filter((row) => !requestIds.has(row.otherId) && !listedIds.has(row.otherId) && !hiddenChatIds.has(row.otherId)).map((row) => pitchThreadPerson(row.otherId));
+  // A pitch thread with no messages yet sorts by the pitch's own time.
+  const contactFor = (id) => (chatMessages[id]?.length || !pitchThreadFor(id) ? chatMessages[id] : [{ createdAt: pitchThreadFor(id).createdAt }]);
   // Newest contact first (founder, 2026-10-28): the conversation with the latest message, either way, is on top.
-  const conversations = sortByLastContact(people.filter((person) => remoteMatchIds.includes(person.id) && !hiddenChatIds.has(String(person.id))), (id) => chatMessages[id]);
+  const conversations = sortByLastContact([...listed, ...pitchPeople], contactFor);
   const query = chatSearchQuery.trim().toLowerCase();
+  const requestPeople = requestRows.map((row) => ({ row, person: pitchThreadPerson(row.otherId) })).filter(({ row, person }) => {
+    const unread = !pitchRequestsOpened.has(row.otherId);
+    return (!query || `${person.name} ${person.role} ${row.note}`.toLowerCase().includes(query)) && (activeChatFilter !== 'unread' || unread);
+  });
+  const requestMarkup = requestPeople.length ? `<section class="chat-requests" aria-labelledby="chat-requests-title"><h2 class="chat-section-title" id="chat-requests-title">${escapeHtml(PITCH_COPY.sectionTitle)}</h2>${requestPeople.map(({ row, person }) => {
+    const unread = !pitchRequestsOpened.has(row.otherId);
+    return `<div class="chat-row is-pitch-request${unread ? ' is-unread' : ''}${String(selectedChat?.id) === row.otherId ? ' is-selected' : ''}"><button class="chat-row-open" type="button" data-chat-id="${escapeHtml(row.otherId)}"><span class="member-profile-trigger" aria-hidden="true">${renderAvatar(person)}</span><span class="chat-row-copy"><strong>${escapeHtml(person.name)}</strong><span>${escapeHtml(row.note)}</span></span><span class="chat-row-meta"><time>${escapeHtml(formatChatTime(row.createdAt))}</time></span><span class="sr-only">, ${escapeHtml(PITCH_COPY.label.toLowerCase())}</span></button></div>`;
+  }).join('')}</section>` : '';
   const matches = conversations.filter((person) => {
     const last = chatMessages[person.id]?.at(-1);
     const unread = chatUnreadCount(person.id) > 0;
@@ -1800,13 +1958,15 @@ const renderChats = () => {
   const inboxLoading = !deck.ready;
   if (inboxLoading) list?.setAttribute('aria-busy', 'true');
   else list?.removeAttribute('aria-busy');
-  const inboxMarkup = `<div class="inbox-panel-head"><div><strong>YOUR THREADS</strong><span>Private conversations</span></div>${inboxLoading ? '' : `<b>${conversations.length}</b>`}</div>${referenceRows}${inboxLoading ? skeletonMarkup('list', 4) : matches.length ? matches.map((person) => {
+  const inboxMarkup = `<div class="inbox-panel-head"><div><strong>YOUR THREADS</strong><span>Private conversations</span></div>${inboxLoading ? '' : `<b>${conversations.length}</b>`}</div>${referenceRows}${inboxLoading ? skeletonMarkup('list', 4) : requestMarkup}${inboxLoading ? '' : matches.length ? matches.map((person) => {
     const last = chatMessages[person.id]?.at(-1);
     const unreadMessages = chatUnreadCount(person.id);
     const unread = unreadMessages > 0;
-    const lastPreview = last?.attachment?.kind === 'resume' ? 'Resume (PDF)' : last?.attachment ? `📎 ${last.attachment.name || 'Attachment'}` : parseSharedPost(last?.text) ? 'Shared a post' : (last?.text || 'Start a conversation');
-    return `<div class="chat-row${unread ? ' is-unread' : ''}${selectedChat?.id === person.id ? ' is-selected' : ''}"><button class="chat-row-open" type="button" data-chat-id="${escapeHtml(person.id)}"><span class="member-profile-trigger" data-public-profile-id="${escapeHtml(person.id)}" role="button" tabindex="0" aria-label="Open ${escapeHtml(person.name)} profile">${renderAvatar(person)}${presenceDot(isActiveNow(person.id))}</span><span class="chat-row-copy"><strong data-public-profile-id="${escapeHtml(person.id)}">${escapeHtml(person.name)}${isActiveNow(person.id) ? '<span class="sr-only">, active now</span>' : ''}</strong><span>${escapeHtml(lastPreview)}</span></span><span class="chat-row-meta"><time>${escapeHtml(formatChatTime(last?.createdAt))}</time>${unread ? `<b aria-label="${unreadMessages} unread">${unreadMessages > 99 ? '99+' : unreadMessages}</b>` : ''}</span></button><button class="chat-delete" type="button" data-delete-chat-id="${escapeHtml(person.id)}" aria-label="Delete chat with ${escapeHtml(person.name)}" title="Delete chat"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M4.5 6h11M8 3.5h4M6.5 6l.6 10h5.8l-.6-10M8.5 8.5v5M11.5 8.5v5"/></svg></button></div>`;
-  }).join('') : '<div class="inbox-empty"><strong>No threads found</strong><span>Chats open once a connection is mutual. Send a signal from Connect to start one.</span><button type="button" class="inbox-empty-action" data-nav="explore">CONNECT WITH PEOPLE ↗</button></div>'}`;
+    const pitch = pitchThreadFor(person.id);
+    const lastPreview = last?.attachment?.kind === 'resume' ? 'Resume (PDF)' : last?.attachment ? `📎 ${last.attachment.name || 'Attachment'}` : parseSharedPost(last?.text) ? 'Shared a post' : (last?.text || pitch?.note || 'Start a conversation');
+    const chip = pitch ? `<small class="chat-row-chip">${escapeHtml(PITCH_COPY.notConnected)}</small>` : '';
+    return `<div class="chat-row${unread ? ' is-unread' : ''}${pitch ? ' is-pitch' : ''}${selectedChat?.id === person.id ? ' is-selected' : ''}"><button class="chat-row-open" type="button" data-chat-id="${escapeHtml(person.id)}"><span class="member-profile-trigger" data-public-profile-id="${escapeHtml(person.id)}" role="button" tabindex="0" aria-label="Open ${escapeHtml(person.name)} profile">${renderAvatar(person)}${presenceDot(isActiveNow(person.id))}</span><span class="chat-row-copy"><strong data-public-profile-id="${escapeHtml(person.id)}">${escapeHtml(person.name)}${isActiveNow(person.id) ? '<span class="sr-only">, active now</span>' : ''}</strong><span>${escapeHtml(lastPreview)}</span></span><span class="chat-row-meta"><time>${escapeHtml(formatChatTime(last?.createdAt || pitch?.createdAt))}</time>${chip}${unread ? `<b aria-label="${unreadMessages} unread">${unreadMessages > 99 ? '99+' : unreadMessages}</b>` : ''}</span></button><button class="chat-delete" type="button" data-delete-chat-id="${escapeHtml(person.id)}" aria-label="Delete chat with ${escapeHtml(person.name)}" title="Delete chat"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M4.5 6h11M8 3.5h4M6.5 6l.6 10h5.8l-.6-10M8.5 8.5v5M11.5 8.5v5"/></svg></button></div>`;
+  }).join('') : requestMarkup ? '' : '<div class="inbox-empty"><strong>No threads found</strong><span>Chats open once a connection is mutual. Send a signal from Connect to start one.</span><button type="button" class="inbox-empty-action" data-nav="explore">CONNECT WITH PEOPLE ↗</button></div>'}`;
   const inboxScroll = list?.querySelector('.chat-inbox-scroll');
   if (list && inboxScroll) {
     inboxScroll.innerHTML = inboxMarkup;
@@ -1819,7 +1979,7 @@ const renderChats = () => {
   setChatBadges(document, unreadMessageTotal(conversations));
   list?.querySelectorAll('[data-chat-id]').forEach((button) => button.addEventListener('click', (event) => {
     const profileTrigger = event.target.closest('[data-public-profile-id]');
-    const person = matches.find((item) => item.id === button.dataset.chatId);
+    const person = matches.find((item) => item.id === button.dataset.chatId) || requestPeople.find((item) => item.row.otherId === button.dataset.chatId)?.person;
     if (profileTrigger && person) {
       event.preventDefault();
       event.stopPropagation();
@@ -1843,6 +2003,8 @@ const renderChats = () => {
     renderChats();
     showToast('Chat removed from your inbox on this device.');
   }));
+  // A thread can change state under the open chat (a match from the sheet, a refresh): keep its pitch chrome current.
+  if (selectedChat) syncPitchThreadView();
 };
 
 const loadChatMessages = async (person) => {
@@ -1949,6 +2111,7 @@ const startMessageSync = () => {
     // Every ~30 s: pick up new requests, and matches completed by the other member accepting.
     if (++connectionSyncTick % 6 === 1) {
       loadConnectionRequests().catch((error) => console.warn('Request sync could not complete:', error.message));
+      loadPitchThreads().catch((error) => console.warn('Message request sync could not complete:', error.message));
       refreshConnections().then((changed) => { if (changed) renderChats(); }).catch((error) => console.warn('Connection sync could not complete:', error.message));
     }
   };
@@ -1997,6 +2160,9 @@ const openChat = (person, markAsRead = true) => {
   }
   const chatRole = document.querySelector('#chat-role'); if (chatRole) chatRole.textContent = `${person.role || 'Brivia member'}${person.city ? `, ${person.city}` : ''}`;
   const chatStatus = document.querySelector('#chat-status'); if (chatStatus) chatStatus.textContent = 'MEMBER / PRIVATE THREAD';
+  // A message request loses its unread dot once opened (D-112); the pitch chrome follows the thread's state.
+  if (pitchThreadFor(person.id)) pitchRequestsOpened.add(String(person.id));
+  syncPitchThreadView();
   renderChats();
   if (!chatMessages[person.id]) chatMessages[person.id] = [];
   chatShouldOpenAtLatest = true;
@@ -2010,6 +2176,12 @@ const openChat = (person, markAsRead = true) => {
   });
 };
 document.querySelector('#chat-messages')?.addEventListener('click', (event) => {
+  const pitchButton = event.target.closest('[data-pitch-action]');
+  if (pitchButton && selectedChat && !pitchButton.disabled) {
+    if (pitchButton.dataset.pitchAction === 'accept') acceptPitchChat(selectedChat.id);
+    else if (pitchButton.dataset.pitchAction === 'decline') endPitchChat(selectedChat.id);
+    return;
+  }
   const button = event.target.closest('[data-resume-open]');
   if (button) openSharedResume(button);
   const post = event.target.closest('[data-shared-post-open]');
@@ -2116,7 +2288,11 @@ const renderMessages = () => {
     const kind = isResume || area || sharedPostId ? ' has-attachment has-share' : message.attachment ? ' has-attachment' : '';
     return `<div class="message ${message.from === 'me' ? 'me' : 'them'}${kind}">${content}<small>${escapeHtml(formatChatTime(message.createdAt))}</small></div>`;
   };
-  messages.innerHTML = thread.length ? thread.map(renderBubble).join('') : '<div class="chat-start-note"><strong>Start with context.</strong><span>A thoughtful first message makes a better introduction.</span></div>';
+  // A pitch thread (D-112) starts with the pitch itself, and a request carries its Accept / Decline.
+  const pitch = pitchThreadFor(selectedChat.id);
+  const pitchMarkup = pitch ? `<div class="pitch-thread">${pitchThreadMarkup(pitchThreadModel(pitch, selectedChat), { escapeHtml })}</div>` : '';
+  messages.innerHTML = pitchMarkup + (thread.length ? thread.map(renderBubble).join('') : pitch ? '' : '<div class="chat-start-note"><strong>Start with context.</strong><span>A thoughtful first message makes a better introduction.</span></div>');
+  if (pitch && pitchThreadBusy.has(String(selectedChat.id))) setPitchButtonsBusy(true);
   const isBlocked = readBlockedUserIds().has(String(selectedChat.id));
   if (isBlocked) {
     messages.querySelector('.chat-start-note')?.remove();
@@ -2281,6 +2457,7 @@ const hideReportedMember = (person) => {
 const completeChatAction = async (action) => {
   const person = selectedChat;
   if (!person) return;
+  if (action === 'end-pitch') { await endPitchChat(person.id); return; }
   if (action === 'report') {
     const reported = await openReportDialog({ name: person.name, trigger: document.querySelector('#chat-more'), send: (reason, note) => reportMember(person.id, reason, note) });
     if (!reported) return;
@@ -2337,7 +2514,7 @@ const completeChatAction = async (action) => {
 const ensureChatMoreMenu = () => {
   const header = document.querySelector('.chat-window-head');
   if (!header) return;
-  if (!document.querySelector('#chat-more')) header.insertAdjacentHTML('beforeend', '<button class="chat-more" id="chat-more" type="button" aria-label="More chat options" aria-expanded="false">•••</button><div class="chat-more-menu" id="chat-more-menu" hidden><button type="button" data-chat-action="delete">Delete chat</button><button type="button" data-chat-action="remove-connection">Remove connection</button><button type="button" data-chat-action="block">Block user</button><button type="button" data-chat-action="report">Report and block</button></div>');
+  if (!document.querySelector('#chat-more')) header.insertAdjacentHTML('beforeend', '<button class="chat-more" id="chat-more" type="button" aria-label="More chat options" aria-expanded="false">•••</button><div class="chat-more-menu" id="chat-more-menu" hidden><button type="button" data-chat-action="end-pitch" hidden>' + escapeHtml(PITCH_COPY.endChat) + '</button><button type="button" data-chat-action="delete">Delete chat</button><button type="button" data-chat-action="remove-connection">Remove connection</button><button type="button" data-chat-action="block">Block user</button><button type="button" data-chat-action="report">Report and block</button></div>');
   // Close (D-096): back to "Your messages" on desktop, where the phone's back arrow is hidden. Escape does the same.
   if (!document.querySelector('#chat-close')) {
     document.querySelector('#chat-more-menu')?.insertAdjacentHTML('afterend', `<button class="chat-close" id="chat-close" type="button" aria-label="Close chat" title="Close chat">${CHAT_CLOSE_ICON}</button>`);
@@ -4562,6 +4739,10 @@ document.querySelector('#chat-form')?.addEventListener('submit', async (event) =
   const sendButton = document.querySelector('.chat-send-button') || document.querySelector('#chat-form button[type="submit"]');
   const body = input?.value.trim() || '';
   if (!selectedChat || (!body && !pendingChatFiles.length && !pendingChatGif) || !supabase || !memberProfile.id) return;
+  // A message request or my waiting pitch (D-112) has no composer until the chat opens.
+  const sendTo = selectedChat;
+  const pitch = pitchThreadFor(sendTo.id);
+  if (pitch && !pitch.chatOpen) return;
   typingSession?.sender.stop();
   if (sendButton) sendButton.disabled = true;
   try {
@@ -4585,8 +4766,10 @@ document.querySelector('#chat-form')?.addEventListener('submit', async (event) =
       return;
     }
     showToast(chatSendErrorCopy(error));
+    // Refused on a pitch thread: the chat may have closed; read the threads again (the composer follows).
+    if (error?.code === '42501' && pitch) loadPitchThreads().catch(() => {});
   } finally {
-    if (sendButton) sendButton.disabled = false;
+    if (sendButton) sendButton.disabled = document.querySelector('#chat-form')?.dataset.pitchLocked === 'true';
   }
 });
 document.querySelector('#pitch-form')?.addEventListener('submit', async (event) => {
