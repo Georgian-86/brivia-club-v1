@@ -2,7 +2,7 @@
    an editorial Bodoni heading, one ruled toolbar of uppercase micro-labels (count, Nearby, Find a companion), quiet text
    tabs for categories, and frosted paper cards with a single time-and-place line. The event opens in a drawer (a side
    drawer from 760 px, a full-screen sheet below), so the grid keeps the full width. Tokens only (style ratchet). */
-body.app-body .events-view {
+body.app-body :is(.events-view, .event-detail, .event-detail-backdrop) {
   --ev-wine: var(--brivia-wine, var(--color-wine));
   --ev-wine-deep: var(--brivia-deep-wine, var(--color-wine-deep));
   --ev-ink: var(--color-ink);
@@ -12,12 +12,16 @@ body.app-body .events-view {
   --ev-card: var(--aura-card, color-mix(in srgb, var(--color-cream) 80%, transparent));
   --ev-shadow: 0 1px 2px color-mix(in srgb, var(--ev-wine-deep) 10%, transparent), 0 22px 40px -24px color-mix(in srgb, var(--ev-wine-deep) 55%, transparent);
   --ev-shadow-lift: 0 2px 4px color-mix(in srgb, var(--ev-wine-deep) 12%, transparent), 0 30px 56px -26px color-mix(in srgb, var(--ev-wine-deep) 65%, transparent);
+}
+body.app-body .events-view {
   min-height: calc(100svh - 76px);
   padding: var(--space-6) clamp(20px, 5vw, 72px) var(--space-8);
   background: transparent;
   color: var(--ev-ink);
   font-family: var(--font-body);
 }
+body.app-body .event-detail { color: var(--ev-ink); font-family: var(--font-body); }
+.event-detail svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
 body.app-body .events-view[hidden] { display: none; }
 .events-main { max-width: 1180px; margin: 0 auto; }
 .events-view svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
@@ -190,7 +194,7 @@ body.app-body .event-companion-action[disabled] { border-color: var(--color-line
 .event-companions-note { padding: var(--space-4) 0; color: var(--color-ink-soft); font-size: var(--text-14); }
 
 /* Focus */
-body.app-body .events-view :is(button, [tabindex]):focus-visible,
+body.app-body :is(.events-view, .event-detail) :is(button, [tabindex]):focus-visible,
 body.app-body .event-companions-dialog button:focus-visible { outline: 2px solid var(--ev-wine, var(--color-wine)); outline-offset: 3px; }
 body.app-body .event-open:focus-visible { outline: none; }
 body.app-body .event-card:has(.event-open:focus-visible) { outline: 2px solid var(--ev-wine); outline-offset: 3px; }
