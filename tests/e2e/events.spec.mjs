@@ -1,6 +1,7 @@
 // Explore events (D-117, migration 0020): the nav reads Connect, Explore, Posts, Chat, Profile; Explore lists events
-// near you (hero, Nearby Events, the "Find a companion" switch, category chips, cards with date, ~km, tags, going and
-// "Find a companion"), and an event panel beside the grid at 1440 (a full-screen sheet at 390) with "I'm going",
+// near you (heading, a toolbar with Nearby and the "Find a companion" switch, category tabs, quiet cards with date,
+// category, ~km, time, place, going and "Find a companion"), and an event drawer (side drawer at 1440, full-screen
+// sheet at 390; D-118) with "I'm going",
 // "Looking for a companion?" and "See companions". The community feed is unchanged under Posts. Before 0020 the page
 // says events open soon and points to Posts.
 // PLAYWRIGHT_MODULE=/tmp/pw/node_modules/playwright/index.mjs node tests/e2e/events.spec.mjs   (Vite on :5186)
@@ -63,9 +64,11 @@ try {
       const c = document.querySelector('.event-card[data-event-id="e-jam"]');
       return { text: c.innerText, img: c.querySelector('.event-card-media img')?.complete && c.querySelector('.event-card-media img')?.naturalWidth > 0, date: c.querySelector('.event-date')?.innerText.replace(/\s+/g, ' ') };
     });
-    check(`${w}: the card shows title, time, venue, ~km, tags, going and companions (${JSON.stringify(card.text)})`,
-      /Acoustic Jam Session/.test(card.text) && /6:00 PM – 9:00 PM/.test(card.text) && /The Whitefield Social, Whitefield/.test(card.text)
-      && /~1 km/.test(card.text) && /Networking/.test(card.text) && /\+11 going/.test(card.text) && /8 looking for one/.test(card.text));
+    check(`${w}: the card shows category, ~km, title, time, venue, going and Find a companion (${JSON.stringify(card.text)})`,
+      /MUSIC · ~1 km/.test(card.text) && /Acoustic Jam Session/.test(card.text) && /6:00 PM – 9:00 PM/.test(card.text) && /The Whitefield Social, Whitefield/.test(card.text)
+      && /\+11 going/.test(card.text) && /FIND A COMPANION/.test(card.text));
+    const quiet = await page.evaluate(() => { const c = document.querySelector('.event-card[data-event-id="e-jam"]'); return { tags: c.querySelectorAll('.event-tags').length, buttons: c.querySelectorAll('button').length }; });
+    check(`${w}: the card stays quiet (D-118: no tags, two controls) (${JSON.stringify(quiet)})`, quiet.tags === 0 && quiet.buttons === 2);
     check(`${w}: the card image loads and the date badge reads like "NOV 2 Mon" (${card.date})`, card.img && /^[A-Z]{3} \d{1,2} [A-Z][a-z]{2}$/.test(card.date));
     check(`${w}: no metres anywhere (distances are ~km)`, !(await page.locator('.events-view').innerText()).match(/\d+ m\b/));
     check(`${w}: an open-ended event ends Late`, /7:00 PM – Late/.test(await page.locator('.event-card[data-event-id="e-dandiya"]').innerText()));
@@ -85,22 +88,18 @@ try {
     check(`${w}: Nearby Events hides the 40 km walk`, (await page.locator('.event-card').count()) === 6 && await page.locator('.event-card[data-event-id="e-far"]').count() === 0);
     await page.locator('#events-nearby').click();
 
-    // Panel / sheet.
-    if (phone) {
-      check('390: no panel until a card is tapped', await page.locator('#event-detail').isHidden());
-      await page.locator('.event-card[data-event-id="e-jam"] .event-open').click();
-      await page.waitForSelector('#event-detail.is-sheet');
-      check('390: the sheet is a modal dialog, focus on its title, no tab bar', await page.evaluate(() => document.querySelector('#event-detail').getAttribute('aria-modal') === 'true' && document.activeElement?.id === 'event-detail-title' && getComputedStyle(document.querySelector('.app-tabbar')).display === 'none'));
-    } else {
-      await page.waitForSelector('#event-detail:not([hidden]) #event-detail-title');
-      check('1440: the panel shows the first event beside the grid', (await page.locator('#event-detail-title').innerText()) === 'Acoustic Jam Session');
-      await page.locator('.event-card[data-event-id="e-tech"] .event-open').click();
-      check('1440: a click selects that event', (await page.locator('#event-detail-title').innerText()) === 'Tech & Coffee Night' && await page.locator('.event-card[data-event-id="e-tech"].is-selected').count() === 1);
-      await page.locator('.event-card[data-event-id="e-jam"] .event-open').click();
-    }
+    // The event opens in a drawer at every width (D-118); the grid keeps the full width.
+    check(`${w}: no panel until a card is opened`, await page.locator('#event-detail').isHidden());
+    await page.locator('.event-card[data-event-id="e-jam"] .event-open').click();
+    await page.waitForSelector('#event-detail.is-sheet:not([hidden])');
+    check(`${w}: the drawer is a modal dialog with focus on its title`, await page.evaluate(() => document.querySelector('#event-detail').getAttribute('role') === 'dialog' && document.querySelector('#event-detail').getAttribute('aria-modal') === 'true' && document.activeElement?.id === 'event-detail-title'));
+    const box = await page.locator('#event-detail').boundingBox();
+    const vw = await page.evaluate(() => Math.round(document.body.getBoundingClientRect().right)); // html keeps a stable scrollbar gutter
+    check(`${w}: ${phone ? 'a full-screen sheet' : 'a side drawer on the right'} (${JSON.stringify(box)})`, phone ? box.width === w : box.width <= 460 && Math.round(box.x + box.width) === vw);
+    if (phone) check('390: no tab bar under the sheet', await page.evaluate(() => getComputedStyle(document.querySelector('.app-tabbar')).display === 'none'));
     const detail = await page.locator('#event-detail').innerText();
     check(`${w}: the panel has the date, ~km, tags, copy, going, the companion switch and See companions (8)`,
-      /~1 km/.test(detail) && /Chill/.test(detail) && /good people, better company/.test(detail) && /\+11 going/.test(detail) && /Looking for a companion\?/.test(detail) && /See companions \(8\)/.test(detail));
+      /~1 km/.test(detail) && /Chill/.test(detail) && /good people, better company/.test(detail) && /\+11 going/.test(detail) && /Looking for a companion\?/.test(detail) && /See companions \(8\)/i.test(detail));
     await shot(page, `detail-${w}.png`);
     const axeDetail = await axeViolations(page, { include: '#event-detail' });
     check(`${w}: axe on the panel`, axeDetail.length === 0, JSON.stringify(axeDetail));
@@ -116,13 +115,13 @@ try {
     const wantsCall = JSON.parse(posted('set_event_rsvp').at(-1)?.body || '{}');
     check(`${w}: the companion switch saves wants_companion`, wantsCall.p_going === true && wantsCall.p_wants_companion === true);
     check(`${w}: focus stays on the switch`, await page.evaluate(() => document.activeElement?.hasAttribute('data-event-wants')));
-    check(`${w}: See companions still counts others only (8)`, /See companions \(8\)/.test(await page.locator('#event-detail').innerText()));
+    check(`${w}: See companions still counts others only (8)`, /See companions \(8\)/i.test(await page.locator('#event-detail').innerText()));
 
     // Companions dialog.
     await page.locator('[data-event-companions]').click();
     await page.waitForSelector('#event-companions-dialog[open] .event-companion-row');
     const rows = await page.locator('#event-companions-list').innerText();
-    check(`${w}: companions list shared interests first and offers Message to a connection`, /Ravi Tune[\s\S]*3 shared interests[\s\S]*Say hi[\s\S]*Asha Band[\s\S]*Already a connection[\s\S]*Message/.test(rows), rows);
+    check(`${w}: companions list shared interests first and offers Message to a connection`, /Ravi Tune[\s\S]*3 shared interests[\s\S]*Say hi[\s\S]*Asha Band[\s\S]*Already a connection[\s\S]*Message/i.test(rows), rows);
     await shot(page, `companions-${w}.png`);
     const axeDialog = await axeViolations(page, { include: '#event-companions-dialog' });
     check(`${w}: axe on the companions dialog`, axeDialog.length === 0, JSON.stringify(axeDialog));
@@ -134,14 +133,13 @@ try {
     check(`${w}: Escape closes the dialog`, !(await page.locator('#event-companions-dialog').evaluate((d) => d.open)));
 
     // Card chip opens the panel at the switch.
-    if (phone) {
-      await page.locator('[data-event-close]').click();
-      check('390: ← closes the sheet and focus returns to the card', await page.locator('#event-detail').isHidden() && await page.evaluate(() => Boolean(document.activeElement?.closest('.event-card'))));
-    }
+    await page.locator('.event-detail-back').click();
+    check(`${w}: ← closes the drawer and focus returns to the card`, await page.locator('#event-detail').isHidden() && await page.evaluate(() => Boolean(document.activeElement?.closest('.event-card'))));
     await page.locator('.event-card[data-event-id="e-tech"] [data-event-companion]').click();
     await page.waitForFunction(() => document.activeElement?.hasAttribute('data-event-wants'));
     check(`${w}: "Find a companion" on a card opens that event at the switch`, (await page.locator('#event-detail-title').innerText()) === 'Tech & Coffee Night');
-    if (phone) await page.keyboard.press('Escape');
+    await page.keyboard.press('Escape');
+    check(`${w}: Escape closes the drawer`, await page.locator('#event-detail').isHidden());
 
     // The page switch.
     await page.locator('#events-companion-default').click();

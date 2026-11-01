@@ -82,10 +82,14 @@ test('card markup escapes text and labels the open button with the date and time
   assert.ok(!html.includes('<b>Jam</b>'));
   assert.match(html, /&lt;b&gt;Jam&lt;\/b&gt;/);
   assert.match(html, /aria-label="&lt;b&gt;Jam&lt;\/b&gt;, Friday 30 October, 6:00 PM – 9:00 PM"/);
-  assert.match(html, /~1 km/);
+  assert.match(html, /<p class="event-kicker">Music<span class="event-kicker-distance"> · ~1 km<\/span><\/p>/);
   assert.match(html, /\+11 going/);
-  assert.match(html, /8 looking for one/);
   assert.match(html, />AR</);
+  // D-118: a quiet card: no tags, no counts of companions, two controls (open, Find a companion).
+  assert.ok(!html.includes('event-tags'));
+  assert.equal((html.match(/<button\b/g) || []).length, 2);
+  assert.match(html, /Find a companion<span class="sr-only"> for &lt;b&gt;Jam&lt;\/b&gt;<\/span>/);
+  assert.match(eventCardMarkup(normalizeEvent({ ...row, wants_companion: true, going: true })), /Looking for company/);
 });
 
 test('detail markup: switch state, the see-companions count excludes me, a hint until opted in', () => {
