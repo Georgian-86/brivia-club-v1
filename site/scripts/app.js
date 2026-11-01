@@ -977,7 +977,7 @@ const renderNextCard = (queue) => {
   const back = document.querySelector('#swipe-card-back');
   if (back) back.hidden = !(person && queue[index + 2]);
   if (!person) return;
-  setCardImage(next.querySelector('#swipe-next-image'), deckCoverSrc(person, safeImageUrl), '');
+  setCardImage(next.querySelector('#swipe-next-image'), deckCoverSrc(person, safeImageUrl, defaultCoverUrl), '');
   const name = next.querySelector('#swipe-next-name'); if (name) name.textContent = person.name || '';
 };
 const renderHome = (queue = getExplorePeople()) => {
@@ -1018,7 +1018,7 @@ const renderHome = (queue = getExplorePeople()) => {
     if (card.dataset.personId !== undefined) deckSwipe?.reset();
     card.dataset.personId = String(currentPerson.id);
   }
-  setCardImage(document.querySelector('#swipe-image'), deckCoverSrc(currentPerson, safeImageUrl), `${currentPerson.name} cover image`);
+  setCardImage(document.querySelector('#swipe-image'), deckCoverSrc(currentPerson, safeImageUrl, defaultCoverUrl), `${currentPerson.name} cover image`);
   renderNextCard(queue);
   if (card) card.style.setProperty('--card-avatar-image', `url("${safeImageUrl(currentPerson.image).replace(/["\\\n]/g, encodeURIComponent)}")`);
   const name = document.querySelector('#swipe-name'); if (name) name.textContent = currentPerson.name;
