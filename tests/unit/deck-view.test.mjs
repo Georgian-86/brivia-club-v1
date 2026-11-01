@@ -71,14 +71,19 @@ test('deckEmptyState: caught_up no longer promises "you have met your orbit for 
 });
 
 // Founder live test (2026-10-14): a seeded member with no cover and no photo (Kabir Shetty) showed the img alt text.
-test('deckCoverSrc: the cover, else the photo, else "" (the card then shows the branded placeholder)', async () => {
+// Founder (2026-11-01, D-119): a member with no cover showed their own photo as the cover; covers are presets only.
+test('deckCoverSrc: the chosen cover, else the default preset cover, never the photo', async () => {
   const { deckCoverSrc } = await import('../../site/scripts/deck-view.js');
   const safe = (value) => (typeof value === 'string' && value.startsWith('/') ? value : '');
-  assert.equal(deckCoverSrc({ coverUrl: '/assets/c.webp', image: '/p.jpg' }, safe), '/assets/c.webp');
-  assert.equal(deckCoverSrc({ coverUrl: '', image: '/p.jpg' }, safe), '/p.jpg');
-  assert.equal(deckCoverSrc({ coverUrl: 'https://evil.example/x.png', image: '' }, safe), '');
-  assert.equal(deckCoverSrc({ coverUrl: null, image: null }, safe), '');
+  const dflt = '/assets/default.webp';
+  assert.equal(deckCoverSrc({ coverUrl: '/assets/c.webp', image: '/p.jpg' }, safe, dflt), '/assets/c.webp');
+  assert.equal(deckCoverSrc({ coverUrl: '', image: '/p.jpg' }, safe, dflt), dflt);
+  assert.equal(deckCoverSrc({ coverUrl: null, image: '/p.jpg' }, safe, dflt), dflt);
+  assert.equal(deckCoverSrc({ coverUrl: 'https://evil.example/x.png', image: '/p.jpg' }, safe, dflt), dflt);
+  // A retired or unshipped preset path is not trusted to load: the default cover shows instead.
+  assert.equal(deckCoverSrc({ coverUrl: '/Images/Cover%20images/MISSING.PNG', image: '/p.jpg' }, safe, dflt), dflt);
+  // Without a usable default, the card shows the branded placeholder, still never the photo.
+  assert.equal(deckCoverSrc({ coverUrl: '', image: '/p.jpg' }, safe), '');
+  assert.equal(deckCoverSrc({ coverUrl: null, image: null }, safe, ''), '');
   assert.equal(deckCoverSrc(null, safe), '');
-  // A preset path the build does not ship (normalizeCoverUrl left it unresolved) is not trusted to load.
-  assert.equal(deckCoverSrc({ coverUrl: '/Images/Cover%20images/MISSING.PNG', image: '' }, safe), '');
 });

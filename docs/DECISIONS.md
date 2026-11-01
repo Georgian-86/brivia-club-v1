@@ -2364,3 +2364,19 @@ controls (a tester or a seeded test member), never a real member, so no new expo
   companions, share).
 - **Proof:** unit 390; e2e events (drawer at 1440 and sheet at 390, axe, text audit), app-shell, explore-cards, fit;
   build, style ratchet and asset budget OK.
+
+## D-119: A member with no cover shows the default Brivia cover, never their photo (founder, 2026-11-01)
+
+- **Asked:** "check how are people able to upload a cover pic by themself even though only from our selected is
+  allowed?" (screenshot: a deck card whose cover was the member's own photo).
+- **Cause:** nobody can upload a cover. Since D-080 (0014) there is no upload code, the `profile-covers` insert and
+  update policies are dropped, and a trigger on `profiles.cover_url` accepts only an offered preset path. But the deck
+  card (`deckCoverSrc`, from the 2026-10-14 live test) fell back to the member's **profile photo** when `cover_url` was
+  empty, or named a preset the build no longer ships (0014 nulled uploaded covers, 0019 nulled the retired cover, and
+  members who never picked one have none). So the photo filled the cover area and read as an uploaded cover.
+- **Done:** `deckCoverSrc(person, safe, fallback)` uses the chosen cover, else `defaultCoverUrl` (the first preset, the
+  same default the profile page and the public profile already show), else the branded placeholder. The photo is no
+  longer a candidate. No SQL change: the database already holds only presets or null.
+- **No agent-arena run:** a bug fix that brings the deck in line with D-080 and the other surfaces.
+- **Proof:** unit (`deck-view.test.mjs`), e2e `deck.spec.mjs` (no-cover members show the default preset cover on the
+  card and the next card; never the photo).

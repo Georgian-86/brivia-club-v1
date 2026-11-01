@@ -56,13 +56,15 @@ const EMPTY_STATES = {
 };
 export const deckEmptyState = (cause) => ({ ...(EMPTY_STATES[cause] || EMPTY_STATES.caught_up) });
 
-// The card's image (founder live test, 2026-10-14): the cover, else the photo, else '' and the card shows its branded
-// placeholder (never the img alt text). A preset path still in its stored form (/Images/Cover%20images/<name>) means
-// normalizeCoverUrl found no shipped asset for it, and the build serves no /Images folder, so it would not load.
-// `safe` is app.js safeImageUrl (allowed origins only).
+// The card's image: the member's chosen preset cover, else the default preset cover, else '' and the card shows its
+// branded placeholder (never the img alt text). Covers come only from the Brivia set (D-080), so the member's own photo
+// is never used as the cover (founder, 2026-11-01, D-119: a member with no cover showed their photo there, which read as
+// an uploaded cover). A preset path still in its stored form (/Images/Cover%20images/<name>) means normalizeCoverUrl
+// found no shipped asset for it (for example a retired cover), and the build serves no /Images folder, so it would not
+// load. `safe` is app.js safeImageUrl (allowed origins only); `fallback` is cover-assets.js defaultCoverUrl.
 const UNSHIPPED_PRESET = /^\/Images\/Cover(%20| )images\//;
-export const deckCoverSrc = (person, safe) => {
-  for (const value of [person?.coverUrl, person?.image]) {
+export const deckCoverSrc = (person, safe, fallback = '') => {
+  for (const value of [person?.coverUrl, fallback]) {
     const raw = typeof value === 'string' ? value.trim() : '';
     if (!raw || UNSHIPPED_PRESET.test(raw)) continue;
     const src = safe(raw);
