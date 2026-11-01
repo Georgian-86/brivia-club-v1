@@ -804,3 +804,32 @@ Verify after the apply:
 select cardinality(brivia_private.brivia_offered_cover_keys()),                                   -- 26
        (select count(*) from public.profiles where cover_url like '%163BDB0C-64AC-44E7-8663-55C323ADB4FE%'); -- 0
 ```
+
+## 0020
+
+**Explore lists events near you; the old Explore feed moves to a Posts tab (founder request 2026-11-01, D-117). Not yet
+applied.** Needs only what is already live (`0004` cells, places and `brivia_visible_to`); it does not depend on
+`0011`-`0019`.
+
+What it does: adds `club_event` (curated events; venue as a g7 cell), `event_rsvp` (going, wants a companion) and
+`member_event_pref` (the page's "Find a companion" switch), all RLS on with no client grants, plus five RPCs for
+`authenticated`: `list_events(p_category)`, `set_event_rsvp(p_event, p_going, p_wants_companion)`,
+`set_companion_default(p_on)`, `my_event_prefs()` and `event_companions(p_event)`. It seeds 8 Bengaluru (Whitefield and
+nearby) events dated 1 to 13 days after the day it is first applied. Running it again adds or moves nothing.
+
+Deploy order: either order works. Before `0020` the client's Explore says "Events open soon" and points to Posts; after
+it, events show at once. Expect the new definer functions in the advisor list, like the other member RPCs.
+
+Verify after the apply:
+
+```sql
+select count(*) from public.club_event where is_published;            -- 8
+select has_function_privilege('anon', 'public.list_events(text)', 'execute'),            -- false
+       has_function_privilege('authenticated', 'public.list_events(text)', 'execute');   -- true
+```
+
+Adding an event later (SQL editor, as postgres): insert a `club_event` row with `venue_cell =
+public.brivia_grid_cell(<lat>, <lng>, 7)` from the venue's public address, a category from the check list, and an
+`image_key` the client ships (`site/scripts/event-assets.js`: jam, tech, chess, dandiya, badminton, food, vinyl, photo,
+desk; blank uses the category's image).
+

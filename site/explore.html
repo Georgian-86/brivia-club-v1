@@ -5,15 +5,15 @@
     <link rel="icon" href="/favicon.ico" sizes="48x48" />
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
-    <title>Brivia Club · Connect</title>
+    <title>Brivia Club · Explore</title>
     <script>
-      // A shared post link (post-card.js shareData) lands on that post in the Explore feed (view 'posts'); any other
-      // visit goes to Connect, as before.
+      // A shared post link (post-card.js shareData) lands on that post in the Posts feed (view 'posts'); any other
+      // visit goes to Explore, which lists events near you since D-117 (view 'events').
       var post = new URLSearchParams(window.location.search).get('post');
-      window.location.replace(post ? '/app.html?view=posts&post=' + encodeURIComponent(post) : '/app.html?view=explore');
+      window.location.replace(post ? '/app.html?view=posts&post=' + encodeURIComponent(post) : '/app.html?view=events');
     </script>
   </head>
   <body>
-    <noscript><a href="/app.html?view=explore">Continue to Brivia Club</a></noscript>
+    <noscript><a href="/app.html?view=events">Continue to Brivia Club</a></noscript>
   </body>
 </html>

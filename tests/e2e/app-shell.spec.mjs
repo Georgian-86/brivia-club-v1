@@ -62,7 +62,7 @@ const FINAL_ONLY = Boolean(process.env.APP_SHELL_FINAL_ONLY);
 const A = 'aaaaaaaa-aaaa-4aaa-8aaa-000000000001';
 const NARROW = { width: 375, height: 812 };
 const WIDE = { width: 1440, height: 900 };
-const VIEWS = ['home', 'posts', 'chat', 'profile'];
+const VIEWS = ['home', 'events', 'posts', 'chat', 'profile'];
 // The nav item that is current for a rendered [data-view] section: the deck section is the Connect tab.
 const NAV_FOR_VIEW = { home: 'explore', posts: 'posts', chat: 'chat', profile: 'profile' };
 // Dialogs and menus opened by clicking these selectors in order (Phase C Task 4 pre-review).
@@ -583,9 +583,9 @@ try {
         check(`${tag}: ${view} shows exactly one member nav, the ${expected} (${JSON.stringify(s.visibleNavs)})`, () => assert.deepEqual(s.visibleNavs, [expected]));
       }
       const s = await navState(page);
-      check(`${tag}: header and tab bar list explore, posts, chat, profile (${JSON.stringify([s.headerItems, s.tabbarItems])})`, () => {
-        assert.deepEqual(s.headerItems, ['explore', 'posts', 'chat', 'profile']);
-        assert.deepEqual(s.tabbarItems, ['explore', 'posts', 'chat', 'profile']);
+      check(`${tag}: header and tab bar list explore, events, posts, chat, profile (${JSON.stringify([s.headerItems, s.tabbarItems])})`, () => {
+        assert.deepEqual(s.headerItems, ['explore', 'events', 'posts', 'chat', 'profile']);
+        assert.deepEqual(s.tabbarItems, ['explore', 'events', 'posts', 'chat', 'profile']);
       });
       // 2. The duplicate navs are gone (the chat view has been rendered above).
       const gone = await page.evaluate(() => ['.profile-board-nav', '#app-logout-button', '.chat-sidebar-brand'].filter((sel) => document.querySelector(sel)));
@@ -614,18 +614,18 @@ try {
         const own = [...el.childNodes].some((c) => c.nodeType === 3 && c.textContent.trim()) ? [parseFloat(getComputedStyle(el).fontSize)] : [];
         return { nav: el.dataset.nav, w: Math.round(r.width), h: Math.round(r.height), sizes: [...own, ...sizes], label: el.textContent.trim() };
       }));
-      check(`375: four tab bar items, each >= 44x44 px with >= 12 px labels (${JSON.stringify(items)})`, () => {
-        assert.equal(items.length, 4);
+      check(`375: five tab bar items (D-117), each >= 44x44 px with >= 12 px labels (${JSON.stringify(items)})`, () => {
+        assert.equal(items.length, 5);
         items.forEach((it) => { assert.ok(it.w >= 44 && it.h >= 44, `${it.nav} is ${it.w}x${it.h}`); assert.ok(it.sizes.length >= 1 && it.sizes.every((s) => s >= 12), `${it.nav} label ${it.sizes}`); });
       });
-      check(`375: tab labels read Connect, Explore, Chat, Profile (${items.map((i) => i.label).join(', ')})`, () => assert.deepEqual(items.map((i) => i.label), ['Connect', 'Explore', 'Chat', 'Profile']));
+      check(`375: tab labels read Connect, Explore, Posts, Chat, Profile (${items.map((i) => i.label).join(', ')})`, () => assert.deepEqual(items.map((i) => i.label), ['Connect', 'Explore', 'Posts', 'Chat', 'Profile']));
       const bar = await page.evaluate(() => { const el = document.querySelector('.app-tabbar'); if (!el) return { missing: true }; const r = el.getBoundingClientRect(); return { bottom: Math.round(r.bottom), vh: window.innerHeight, position: getComputedStyle(el).position }; });
       check(`375: the tab bar is fixed to the bottom (${JSON.stringify(bar)})`, () => { assert.equal(bar.position, 'fixed'); assert.equal(bar.bottom, bar.vh); });
 
       // 6. Keyboard: Tab reaches each tab bar item, with a visible outline.
       await page.evaluate(() => { document.activeElement?.blur(); window.scrollTo(0, 0); });
       const reached = {};
-      for (let i = 0; i < 120 && Object.keys(reached).length < 4; i += 1) {
+      for (let i = 0; i < 120 && Object.keys(reached).length < 5; i += 1) {
         await page.keyboard.press('Tab');
         const f = await page.evaluate(() => {
           const el = document.activeElement;
@@ -636,7 +636,7 @@ try {
         if (f && !reached[f.nav]) reached[f.nav] = f;
       }
       check(`375: Tab reaches every tab bar item with a visible focus outline (${JSON.stringify(reached)})`, () => {
-        assert.deepEqual(Object.keys(reached).sort(), ['chat', 'explore', 'posts', 'profile']);
+        assert.deepEqual(Object.keys(reached).sort(), ['chat', 'events', 'explore', 'posts', 'profile']);
         Object.values(reached).forEach((f) => assert.ok(f.visible, `${f.nav}: ${f.outline}`));
       });
       await context.close();

@@ -1004,6 +1004,26 @@ select log_impressions($1, $4);
 
 ---
 
+## 11. Events and companions (D-117, migration 0020)
+
+Explore lists events the club curates. This is location-first ranking outside the deck, so its rules live here.
+
+- **Venue location.** A venue is a public place. It is stored as the g7 cell of its public address (§9.1.4 cells), never
+  as coordinates.
+- **Distance.** `brivia_cell_km(member home cell, venue cell)`, rounded to whole km and never under 1, shown as "~N km".
+  Only for a member whose area came from their own location (precision `cell`); a city pick (`place`) gets no distance,
+  only the venue's area, because a city centroid says nothing about where they are.
+- **Order.** Band first (within 15 km, then within 60 km, then farther or no distance), then soonest. "Nearby Events" in
+  the client keeps only events within 15 km, nearest first. At most 60 events, starting within 60 days.
+- **Who is seen.** Going is private: others see counts, and names only for their own connections (mutual matches) who
+  are going. Counts use `brivia_visible_to` (same world, no block, both completed).
+- **Companions.** Opt-in both ways: a member sees other companions for an event only after turning on "Looking for a
+  companion?" for it, and sees only members who did the same. They are ordered by the number of exact shared interests
+  (`member_interest` ids in common; no taxonomy proximity, no Passion Budget weights yet), then by who joined first. No
+  distance term: everyone listed is going to the same place.
+- **Consent.** Being listed is not a connection. "Say hi" sends an ordinary signal (`send_signal`), so a connection
+  still exists only after the other member agrees.
+
 ## Appendix A (DRAFT, not scheduled): Constellations
 
 These are quorum-consented local micro-groups (3–5 members in ring ≤ 1) around one anchor interest:

@@ -7,17 +7,17 @@ import { NAV_ITEMS, navMarkup } from '../../site/scripts/app-nav.js';
 const items = (html) => [...html.matchAll(/<a\b[^>]*>[\s\S]*?<\/a>/g)].map((m) => m[0]);
 const attr = (tag, name) => (tag.match(new RegExp(`\\s${name}="([^"]*)"`)) || [])[1];
 
-test('NAV_ITEMS: Connect, Explore, Chat, Profile on explore, posts, chat, profile', () => {
-  assert.deepEqual(NAV_ITEMS.map((i) => i.label), ['Connect', 'Explore', 'Chat', 'Profile']);
-  assert.deepEqual(NAV_ITEMS.map((i) => i.view), ['explore', 'posts', 'chat', 'profile']);
+test('NAV_ITEMS: Connect, Explore, Posts, Chat, Profile on explore, events, posts, chat, profile (D-117)', () => {
+  assert.deepEqual(NAV_ITEMS.map((i) => i.label), ['Connect', 'Explore', 'Posts', 'Chat', 'Profile']);
+  assert.deepEqual(NAV_ITEMS.map((i) => i.view), ['explore', 'events', 'posts', 'chat', 'profile']);
   NAV_ITEMS.forEach((i) => assert.match(i.icon, /^<svg\b/));
 });
 
-test('navMarkup header and tabbar list the same four views in the same order', () => {
+test('navMarkup header and tabbar list the same five views in the same order', () => {
   const header = items(navMarkup('header', 'explore'));
   const tabbar = items(navMarkup('tabbar', 'explore'));
-  assert.equal(header.length, 4);
-  assert.deepEqual(header.map((a) => attr(a, 'data-nav')), ['explore', 'posts', 'chat', 'profile']);
+  assert.equal(header.length, 5);
+  assert.deepEqual(header.map((a) => attr(a, 'data-nav')), ['explore', 'events', 'posts', 'chat', 'profile']);
   assert.deepEqual(tabbar.map((a) => attr(a, 'data-nav')), header.map((a) => attr(a, 'data-nav')));
   header.forEach((a) => {
     const view = attr(a, 'data-nav');
@@ -28,7 +28,7 @@ test('navMarkup header and tabbar list the same four views in the same order', (
 
 test('the active item alone has aria-current="page"', () => {
   for (const variant of ['header', 'tabbar']) {
-    for (const view of ['explore', 'posts', 'chat', 'profile']) {
+    for (const view of ['explore', 'events', 'posts', 'chat', 'profile']) {
       const current = items(navMarkup(variant, view)).filter((a) => attr(a, 'aria-current') === 'page');
       assert.equal(current.length, 1, `${variant} ${view}`);
       assert.equal(attr(current[0], 'data-nav'), view);
@@ -45,7 +45,7 @@ test('home is treated as explore', () => {
 test('every icon svg is aria-hidden', () => {
   for (const variant of ['header', 'tabbar']) {
     const svgs = [...navMarkup(variant, 'chat').matchAll(/<svg\b[^>]*>/g)].map((m) => m[0]);
-    assert.ok(svgs.length >= 4, `${variant} has ${svgs.length} icons`);
+    assert.ok(svgs.length >= 5, `${variant} has ${svgs.length} icons`);
     svgs.forEach((svg) => assert.equal(attr(svg, 'aria-hidden'), 'true'));
   }
 });

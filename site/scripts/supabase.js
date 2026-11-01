@@ -327,6 +327,12 @@ export const touchPresence = async () => (supabase ? supabase.rpc('touch_presenc
 export const connectionPresence = async (ids) => (supabase ? supabase.rpc('connection_presence', { p_ids: ids }) : notConfigured());
 export const setPresenceVisible = async (visible) => (supabase ? supabase.rpc('set_presence_visible', { p_visible: Boolean(visible) }) : notConfigured());
 export const myPresenceVisible = async () => (supabase ? supabase.rpc('my_presence_visible') : notConfigured());
+// Club events (0020, D-117). Before 0020 is applied each answers PGRST202 / 404 (isMissingFunction).
+export const listEvents = (category = null) => rpcCall('list_events', { p_category: category && category !== 'all' ? category : null });
+export const setEventRsvp = async (eventId, going, wantsCompanion = null) => firstRow(await rpcCall('set_event_rsvp', { p_event: eventId, p_going: Boolean(going), p_wants_companion: wantsCompanion === null ? null : Boolean(wantsCompanion) }));
+export const setCompanionDefault = (on) => rpcCall('set_companion_default', { p_on: Boolean(on) });
+export const myEventPrefs = async () => firstRow(await rpcCall('my_event_prefs', {}));
+export const eventCompanions = (eventId) => rpcCall('event_companions', { p_event: eventId });
 export const isMissingFunction = (error) => ['PGRST202', '42883'].includes(error?.code) || error?.status === 404;
 
 // City list for "Pick my city": name or region match, launch cities first. Wildcards in the query are dropped.
