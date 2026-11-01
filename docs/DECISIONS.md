@@ -2290,3 +2290,15 @@ controls (a tester or a seeded test member), never a real member, so no new expo
   from anywhere on the screen.
 - **Proof:** unit `signup-flow.test.mjs`; e2e signup 365, onboarding 269, location 64, profile-edit, launch-polish,
   mobile-polish, password-reveal; build, styles, assets OK.
+
+## D-115: The bio on the deck card; the bio needs 0016 on the live database (founder, 2026-10-31)
+
+- **Asked:** "bio is not being shown in the cover page and the cards ... there is no field for bio in the db".
+- **Found:** the client already saves the bio (signup About you, Edit profile) and shows it in the profile hero, but
+  the live database has no `profiles.bio` until `0016_profile_bio.sql` runs, so every save skips it. The client cannot
+  create a column; only the SQL editor can (CLAUDE.md: no direct connection to the live DB).
+- **Done:** the deck card shows the member's bio under the distance (two lines at most), read through `member_bio`
+  (0016, only for a member the viewer can see) and cached per member; before 0016 the line stays hidden and the deck
+  stops asking. Once 0016 is applied, nothing else is needed: signup and Edit profile save it, the hero and the cards
+  show it, and Edit profile keeps it editable.
+- **Proof:** e2e deck 198 (card bio); unit 379; styles OK.

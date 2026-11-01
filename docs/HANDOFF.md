@@ -7,6 +7,9 @@ Update this file at the end of every session. CLAUDE.md holds the aim; this file
 
 ## 1. What is done
 
+**2026-10-31, D-115:** the deck card shows the bio (`member_bio`). **Owed: apply `0016_profile_bio.sql`** in the SQL
+editor; until then no bio is stored anywhere (hero, cards and the saves all wait on it).
+
 **2026-10-31, D-113 / D-114:** emoji panel under the bio (signup and Edit profile), the bio in the profile hero, no
 maroon wash on the cover, "LOOKING FOR · …" in the deck card's bar and no rule under the name; signup setup is now
 interests → location → About you (the photo creates the account again). Bio saving still needs `0016`.

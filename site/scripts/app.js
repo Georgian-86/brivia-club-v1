@@ -998,6 +998,7 @@ const renderHome = (queue = getExplorePeople()) => {
   // D-113: the bar says what the member is looking for (their own words, first two), not a guessed label.
   if (cardLabel) cardLabel.textContent = deckCardLabel(currentPerson.lookingFor);
   const role = document.querySelector('#swipe-role'); if (role) role.textContent = currentPerson.role;
+  renderCardBio(currentPerson);
   // The server's distance band only ("~3 km", a place, a region, "Abroad"): never a City/State, cell or km.
   const location = document.querySelector('#swipe-location');
   if (location) {
@@ -1018,6 +1019,27 @@ const renderHome = (queue = getExplorePeople()) => {
   renderWhy(currentPerson);
   offerDeckTutorial();
 };
+// D-115: the card shows the member's bio (member_bio, 0016: only for a member this viewer can see). Cached per id;
+// before 0016 the RPC is missing, so the line stays hidden and the deck never asks again this visit.
+const cardBioCache = new Map();
+let cardBioAvailable = true;
+function renderCardBio(person) {
+  const el = document.querySelector('#swipe-bio');
+  if (!el) return;
+  const show = (text) => { el.textContent = text || ''; el.hidden = !text; };
+  const known = String(person?.bio || '').trim() || cardBioCache.get(String(person?.id));
+  if (known !== undefined) { show(known); return; }
+  show('');
+  if (!cardBioAvailable || !supabase || !isUuid(person?.id)) return;
+  const id = String(person.id);
+  cardBioCache.set(id, '');
+  supabase.rpc('member_bio', { p_member: id }).then(({ data, error }) => {
+    if (error) { if (/member_bio|PGRST202|404/i.test(`${error.code} ${error.message}`)) cardBioAvailable = false; cardBioCache.delete(id); return; }
+    const text = typeof data === 'string' ? data.trim() : '';
+    cardBioCache.set(id, text);
+    if (String(currentPerson?.id) === id) show(text);
+  }, () => cardBioCache.delete(id));
+}
 // D-094: the first-run tutorial (left = pass, right = pitch) once a card is really on screen: never over the sign-in
 // hand-off, the skeleton or another sheet. deck-tutorial.js decides whether it is due (once a visit until ticked off).
 function offerDeckTutorial() {

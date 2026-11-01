@@ -228,3 +228,19 @@ body.app-body .app-view[data-view="home"] .swipe-card .member-tags { margin-top:
 body.app-body .app-view[data-view="home"] .swipe-card .swipe-card-topline #swipe-card-label {
   min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; letter-spacing: .16em;
 }
+
+/* D-115: the member's bio on the card, under the distance (two lines at most). */
+body.app-body .app-view[data-view="home"] .swipe-card #swipe-bio {
+  display: -webkit-box;
+  margin: 8px 0 0;
+  padding: 0 4px;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  color: var(--color-name-ink);
+  font-family: var(--font-body);
+  font-size: var(--text-14);
+  line-height: 1.4;
+}
+body.app-body .app-view[data-view="home"] .swipe-card #swipe-bio[hidden] { display: none; }
