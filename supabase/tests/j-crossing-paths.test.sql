@@ -35,6 +35,8 @@ begin
             public.brivia_grid_parent(case when g in (1, 6) then home_a else home_far end, 5), 'in-mumbai', 'cell')
     on conflict (member_id) do nothing;
   end loop;
+  insert into public.member_interest (member_id, interest_id, points)
+  values (pg_temp.np(1), 'sports.racket.tennis', 20), (pg_temp.np(2), 'sports.racket.tennis', 20) on conflict do nothing;
   insert into public.matches (user1_id, user2_id)
   select pg_temp.np(1), pg_temp.np(x.k) from unnest(array[2, 3, 5, 6, 7, 8, 9]) x(k) on conflict do nothing;
 end $$;
@@ -62,7 +64,7 @@ begin
               and data_type in ('double precision', 'real', 'numeric', 'point')) then
     raise exception 'FAIL N1: a nearby table has a coordinate-like column'; end if;
   if pg_get_function_result('public.nearby_pulse(double precision, double precision)'::regprocedure) <> 'TABLE(other_id uuid, created_at timestamp with time zone)'
-     or pg_get_function_result('public.my_nearby_alerts()'::regprocedure) <> 'TABLE(other_id uuid, created_at timestamp with time zone)' then
+     or pg_get_function_result('public.my_nearby_alerts()'::regprocedure) <> 'TABLE(other_id uuid, created_at timestamp with time zone, shared_interest text)' then
     raise exception 'FAIL N1: unexpected result shape'; end if;
 end $$;
 select 'j-crossing-paths.test N1 OK';
@@ -93,6 +95,9 @@ begin
   if (select count(*) from public.nearby_alert where (member_id, other_id) in ((pg_temp.np(1), pg_temp.np(2)), (pg_temp.np(2), pg_temp.np(1)))) <> 2 then
     raise exception 'FAIL N3: expected one alert row each way'; end if;
   if not exists (select 1 from public.my_nearby_alerts() a where a.other_id = pg_temp.np(1)) then raise exception 'FAIL N3: B does not list A'; end if;
+  if (select a.shared_interest from public.my_nearby_alerts() a where a.other_id = pg_temp.np(1))
+     is distinct from (select label from public.interest_node where id = 'sports.racket.tennis') then
+    raise exception 'FAIL N3: the shared interest is missing'; end if;
   perform pg_temp.as_member(1);
   if not exists (select 1 from public.my_nearby_alerts() a where a.other_id = pg_temp.np(2)) then raise exception 'FAIL N3: A does not list B'; end if;
   if (select cell from public.nearby_live where member_id = pg_temp.np(1)) !~ '^g7:' then raise exception 'FAIL N3: live cell is not a g7 cell'; end if;
@@ -225,6 +230,7 @@ do $$ begin
 end $$;
 select 'j-crossing-paths.test N13 OK';
 select set_config('request.jwt.claims', '{}', false);
+delete from public.member_interest where member_id::text like '0d210000-%';
 delete from public.member_orbit where member_id::text like '0d210000-%';
 delete from public.profiles where id::text like '0d210000-%';
 delete from auth.users where id::text like '0d210000-%';

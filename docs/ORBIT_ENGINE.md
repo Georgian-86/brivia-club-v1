@@ -871,6 +871,33 @@ select log_impressions($1, $4);
   re-run is a true no-op. Rows left with `n = 0` and both streaks 0 are deleted. `brivia_cell_ok(cell, is_test, k)`
   (internal) reads `okK`; a missing row or any other k is false.
 
+#### 9.1.4a Crossing paths (live "nearby" alerts between connections, D-119, 0021)
+
+A separate, opt-in use of location that never touches ranking: two **connections** who both turned on "Crossing paths"
+get one alert each when their live cells are near each other. Design and copy: `docs/superpowers/specs/2026-11-01-crossing-paths-design.md`.
+
+- **Not ORBIT input.** The live cell lives in `nearby_live(member_id, cell, seen_at)`, never in `member_orbit`; it does
+  not change `home_cell`, rings, bands, the deck, search or the k-anonymity counts, and it does not count against the
+  3-changes-a-day home cap.
+- **Capture.** `nearby_pulse(p_lat, p_lng)` (security definer, volatile, so POST-only; `authenticated` only) snaps to a
+  g7 cell with `brivia_grid_cell` and drops the coordinates, under the same no-logging rules as `set_home_location`. The
+  client sends a coarse fix (`enableHighAccuracy: false`, `maximumAge` 5 min) on load, every 5 minutes and on return to
+  the tab, only while the tab is visible and only when the browser already allows location (it never prompts except on
+  the member's own "Turn on").
+- **Consent and symmetry.** `nearby_setting.enabled` is off by default (`enabled_at` records consent). A pair is eligible
+  only if both are on, they share a `matches` row, `brivia_same_world`, no block either way, and neither muted the other
+  (`nearby_mute`, one-way). Both alert rows are written in one transaction, so neither side learns more than the other.
+- **Nearby.** Live cells' centroids at most **3 km** apart (`brivia_cell_km`), both live cells under **20 minutes** old.
+  Skipped when both homes are geolocated (`precision = 'cell'`) and within 3 km of each other (neighbours).
+- **Frequency.** One alert per pair per 24 h; at most 3 alerts per member per 24 h; alerts are listed for 3 hours
+  (`my_nearby_alerts`, which returns the other id, the time and the pair's top shared non-sensitive interest, never a
+  cell, place or distance). Quiet hours 22:00-07:00 device time suppress the toast only.
+- **Anti-probing.** A pulse at most every 4 minutes and at most 24 changes of live cell per member per 24 h (both
+  `PT429`); cell changes are counted in `nearby_move(member_id, at)`, which stores no cell (no location history).
+- **Location off.** Off, permission denied or the switch turned off: `nearby_clear()` / `set_nearby_enabled(false)`
+  delete the live cell at once; otherwise it is ignored after 20 minutes and purged (`purge_nearby()`, every 30 min with
+  pg_cron). The other member is never told why someone is not nearby.
+
 #### 9.1.5 What leaves the service
 
 - **`toCard` is the only serializer** (`orbit/README.md`). Route handlers return `Card[]` only; a `Scored` object,

@@ -90,8 +90,7 @@ minutes. That covers the common case (both on their phones around town) and is t
   (`enableHighAccuracy: false`, `maximumAge: 5 min`) on load, every **5 minutes**, and when the tab becomes visible
   again, and calls `nearby_pulse(lat, lng)`. It never triggers a permission prompt on its own (Permissions API check
   first).
-- The server accepts at most one pulse per member per 4 minutes and at most 24 **distinct** cells per member per day,
-  so a script cannot sweep a city with fake positions to find someone. A spoofer would be alerted to the victim and the
+- The server accepts at most one pulse per member per 4 minutes and at most 24 **changes** of live cell per member per day, so a script cannot sweep a city with fake positions to find someone. A spoofer would be alerted to the victim and the
   victim to the spoofer anyway (symmetry), and Block ends it immediately.
 
 **Later (not this build):** alerts while the app is closed need Web Push (a service worker, VAPID keys and a Supabase
@@ -120,7 +119,8 @@ All tables RLS on with no client grants; reached only through `security definer`
 
 - `nearby_setting(member_id pk, enabled bool, enabled_at timestamptz)`: the switch and when consent was given.
 - `nearby_live(member_id pk, cell text, seen_at timestamptz)`: the live g7 cell, at most 20 minutes old.
-- `nearby_pulse_log(member_id, cell, at)`: for the pulse rate limits; rows older than 24 h are purged.
+- `nearby_move(member_id, at)`: one row per change of live cell, **no cell stored** (no location history), for the
+  24-a-day cap; rows older than 24 h are purged.
 - `nearby_mute(member_id, other_id, pk both)`: one-way mutes.
 - `nearby_alert(id, member_id, other_id, created_at, seen_at)`: one row per recipient; pair cooldown and daily cap are
   read from it; rows older than 24 h are purged.
@@ -133,9 +133,11 @@ Functions (all `authenticated` only, profile required):
   coordinate), applies the rate limits (`PT429`), stores the cell, finds eligible nearby connections (section 5),
   writes both alert rows and returns the caller's new alerts.
 - `nearby_clear()`: deletes the caller's live cell (permission lost, sign-out).
-- `my_nearby_alerts() -> table(other_id, created_at)`: the caller's alerts from the last 3 hours, never a cell.
+- `my_nearby_alerts() -> table(other_id, created_at, shared_interest)`: the caller's alerts from the last 3 hours with
+  the pair's top shared non-sensitive interest, never a cell.
 - `set_nearby_muted(p_other uuid, p_muted bool)`.
-- Unmatch, block and account deletion remove the pair's rows (cascades and the existing block path).
+- Unmatch and block hide the pair's alerts at once and stop new ones (checked on every read and pulse); account
+  deletion removes every row (cascades). A mute keeps the alert rows, so muting cannot reset the cooldown or the cap.
 
 ## 10. Edge cases
 

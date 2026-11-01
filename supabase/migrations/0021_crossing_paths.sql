@@ -287,9 +287,10 @@ revoke all on function public.nearby_pulse(double precision, double precision) f
 grant execute on function public.nearby_pulse(double precision, double precision) to authenticated;
 
 -- The caller's alerts from the last 3 hours, newest first, for connections who are still connected, visible and not
--- muted. Never a cell, a place or a distance.
+-- muted, with the pair's top shared interest (the deck card's rule: non-sensitive, by summed points, then label) for the
+-- line "You both love chess". Never a cell, a place or a distance.
 create or replace function public.my_nearby_alerts()
-returns table(other_id uuid, created_at timestamptz)
+returns table(other_id uuid, created_at timestamptz, shared_interest text)
 language plpgsql
 stable
 security definer
@@ -299,15 +300,23 @@ declare
   uid uuid := public.brivia_nearby_require_profile();
 begin
   return query
-  select a.other_id, max(a.created_at)
-    from public.nearby_alert a
-   where a.member_id = uid
-     and a.created_at >= now() - interval '3 hours'
-     and public.my_nearby_setting()
-     and public.brivia_nearby_pair_ok(uid, a.other_id)
-     and not exists (select 1 from public.nearby_mute mu where mu.member_id = uid and mu.other_id = a.other_id)
-   group by a.other_id
-   order by max(a.created_at) desc
+  select x.oid, x.at,
+         (select nd.label
+            from public.member_interest mt
+            join public.member_interest mv on mv.member_id = uid and mv.interest_id = mt.interest_id
+            join public.interest_node nd on nd.id = mt.interest_id and nd.status = 'active' and not nd.sensitive
+           where mt.member_id = x.oid
+           order by mv.points + mt.points desc, nd.label
+           limit 1)
+    from (select a.other_id as oid, max(a.created_at) as at
+            from public.nearby_alert a
+           where a.member_id = uid
+             and a.created_at >= now() - interval '3 hours'
+             and public.my_nearby_setting()
+             and public.brivia_nearby_pair_ok(uid, a.other_id)
+             and not exists (select 1 from public.nearby_mute mu where mu.member_id = uid and mu.other_id = a.other_id)
+           group by a.other_id) x
+   order by x.at desc
    limit 20;
 end;
 $$;

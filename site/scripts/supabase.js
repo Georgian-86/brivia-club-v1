@@ -333,6 +333,14 @@ export const setEventRsvp = async (eventId, going, wantsCompanion = null) => fir
 export const setCompanionDefault = (on) => rpcCall('set_companion_default', { p_on: Boolean(on) });
 export const myEventPrefs = async () => firstRow(await rpcCall('my_event_prefs', {}));
 export const eventCompanions = (eventId) => rpcCall('event_companions', { p_event: eventId });
+// Crossing paths (0021, D-119). Before 0021 is applied each answers PGRST202 / 404 (isMissingFunction).
+// nearbyPulse is a POST (volatile RPC), so the coordinates travel in the body only.
+export const setNearbyEnabled = (on) => rpcCall('set_nearby_enabled', { p_enabled: Boolean(on) });
+export const myNearbySetting = () => rpcCall('my_nearby_setting');
+export const nearbyPulse = (lat, lng) => rpcCall('nearby_pulse', { p_lat: lat, p_lng: lng });
+export const nearbyClear = () => rpcCall('nearby_clear');
+export const myNearbyAlerts = () => rpcCall('my_nearby_alerts');
+export const setNearbyMuted = (otherId, muted) => rpcCall('set_nearby_muted', { p_other: otherId, p_muted: Boolean(muted) });
 export const isMissingFunction = (error) => ['PGRST202', '42883'].includes(error?.code) || error?.status === 404;
 
 // City list for "Pick my city": name or region match, launch cities first. Wildcards in the query are dropped.
