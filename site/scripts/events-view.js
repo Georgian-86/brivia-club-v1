@@ -110,8 +110,7 @@ export const filterEvents = (events, category = 'all') => (category === 'all' ? 
 const PIN = '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 21s-6.5-6.2-6.5-11a6.5 6.5 0 0 1 13 0c0 4.8-6.5 11-6.5 11Z"/><circle cx="12" cy="10" r="2.3"/></svg>';
 const CLOCK = '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/></svg>';
 const PEOPLE = '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="9" cy="8.5" r="3"/><circle cx="16.5" cy="9.5" r="2.4"/><path d="M3.5 19c.8-3.3 3-5 5.5-5s4.7 1.7 5.5 5M14.5 14.3c.6-.2 1.3-.3 2-.3 2 0 3.6 1.4 4 4"/></svg>';
-const CHEVRON = '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="m9.5 6 6 6-6 6"/></svg>';
-export const EVENT_ICONS = Object.freeze({ pin: PIN, clock: CLOCK, people: PEOPLE, chevron: CHEVRON });
+export const EVENT_ICONS = Object.freeze({ pin: PIN, clock: CLOCK, people: PEOPLE });
 
 const initials = (name) => String(name || 'M').trim().split(/\s+/).map((w) => w[0] || '').join('').slice(0, 2).toUpperCase() || 'M';
 // friends: [{ name, src }] where src is already checked by the caller (a Storage URL or '').
@@ -128,22 +127,29 @@ const fullDate = (startsAt, style = 'long') => {
   return d ? new Intl.DateTimeFormat('en-GB', { timeZone: EVENT_TIME_ZONE, weekday: style, day: 'numeric', month: style }).format(d) : '';
 };
 
-// One event card. imageSrc: a bundled asset URL (or '' for the wine gradient). friends as for avatarStack.
-export const eventCardMarkup = (event, { imageSrc = '', friends = [], selected = false } = {}) => {
+const categoryLabel = (key) => EVENT_CATEGORIES.find((c) => c.key === key)?.label || 'Event';
+const ARROW = '<span aria-hidden="true">↗</span>';
+const kicker = (event) => {
   const distance = distanceLabel(event.distanceKm);
-  const others = otherCompanions(event);
+  return `<p class="event-kicker">${escapeHtml(categoryLabel(event.category))}${distance ? `<span class="event-kicker-distance"> · ${escapeHtml(distance)}</span>` : ''}</p>`;
+};
+
+// One event card (D-118: editorial and quiet, like Posts and Connect): image with the date, a category and distance
+// micro-label, the title in Bodoni, one time-and-place line, and a foot with who is going and "Find a companion".
+// imageSrc: a bundled asset URL (or '' for the wine gradient). friends as for avatarStack.
+export const eventCardMarkup = (event, { imageSrc = '', friends = [] } = {}) => {
   const label = `${event.title}, ${fullDate(event.startsAt)}, ${eventTimeRange(event.startsAt, event.endsAt)}`;
-  return `<article class="event-card${selected ? ' is-selected' : ''}" data-event-id="${escapeHtml(event.id)}" data-category="${escapeHtml(event.category)}">
-  <div class="event-card-media"${imageSrc ? '' : ' data-fallback'}>${imageSrc ? `<img src="${escapeHtml(imageSrc)}" alt="" loading="lazy" decoding="async" />` : ''}${dateBadgeMarkup(event.startsAt)}${distance ? `<span class="event-distance">${PIN}${escapeHtml(distance)}</span>` : ''}</div>
+  const place = [event.venueName, event.venueArea.split(',')[0]].filter(Boolean).join(', ');
+  return `<article class="event-card" data-event-id="${escapeHtml(event.id)}" data-category="${escapeHtml(event.category)}">
+  <div class="event-card-media"${imageSrc ? '' : ' data-fallback'}>${imageSrc ? `<img src="${escapeHtml(imageSrc)}" alt="" loading="lazy" decoding="async" />` : ''}${dateBadgeMarkup(event.startsAt)}</div>
   <div class="event-card-body">
+    ${kicker(event)}
     <h2 class="event-card-title"><button type="button" class="event-open" data-event-open="${escapeHtml(event.id)}" aria-label="${escapeHtml(label)}">${escapeHtml(event.title)}</button></h2>
-    <span class="event-card-chevron" aria-hidden="true">${CHEVRON}</span>
-    <p class="event-meta">${CLOCK}<span>${escapeHtml(eventTimeRange(event.startsAt, event.endsAt))}</span></p>
-    <p class="event-meta">${PIN}<span>${escapeHtml([event.venueName, event.venueArea.split(',')[0]].filter(Boolean).join(', '))}</span></p>
-    ${event.tags.length ? `<ul class="event-tags" aria-label="Tags">${event.tags.map((t) => `<li>${escapeHtml(t)}</li>`).join('')}</ul>` : ''}
+    <p class="event-card-line">${escapeHtml(eventTimeRange(event.startsAt, event.endsAt))}</p>
+    <p class="event-card-line">${escapeHtml(place)}</p>
     <div class="event-card-foot">
       <span class="event-going">${friends.length ? `<span class="event-avatars">${avatarStack(friends)}</span>` : ''}<span>${escapeHtml(goingLabel(event.goingCount, friends.length))}</span></span>
-      <button type="button" class="event-companion-chip${event.wantsCompanion ? ' is-on' : ''}" data-event-companion="${escapeHtml(event.id)}">${PEOPLE}<span><b>${event.wantsCompanion ? 'Looking for a companion' : 'Find a companion'}<span class="sr-only"> for ${escapeHtml(event.title)}</span></b><small>${escapeHtml(others ? `${others} looking for one` : 'Be the first to look')}</small></span>${CHEVRON}</button>
+      <button type="button" class="event-companion-link${event.wantsCompanion ? ' is-on' : ''}" data-event-companion="${escapeHtml(event.id)}">${event.wantsCompanion ? 'Looking for company' : 'Find a companion'}<span class="sr-only"> for ${escapeHtml(event.title)}</span> ${ARROW}</button>
     </div>
   </div>
 </article>`;
@@ -158,32 +164,27 @@ export const EVENTS_EMPTY = Object.freeze({
 });
 
 export const eventDetailMarkup = (event, { imageSrc = '', friends = [] } = {}) => {
-  const distance = distanceLabel(event.distanceKm);
   const others = otherCompanions(event);
   return `<div class="event-detail-media"${imageSrc ? '' : ' data-fallback'}>${imageSrc ? `<img src="${escapeHtml(imageSrc)}" alt="" />` : ''}${dateBadgeMarkup(event.startsAt)}
-  <button type="button" class="event-detail-icon event-detail-back" data-event-close aria-label="Close event">${'<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M19 12H5M11 6l-6 6 6 6"/></svg>'}</button>
+  <button type="button" class="event-detail-icon event-detail-back" data-event-close aria-label="Close event"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M19 12H5M11 6l-6 6 6 6"/></svg></button>
   <button type="button" class="event-detail-icon event-detail-share" data-event-share aria-label="Share event"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 15V4M8 8l4-4 4 4M6 11v8h12v-8"/></svg></button>
 </div>
 <div class="event-detail-body">
+  ${kicker(event)}
   <h2 class="event-detail-title" id="event-detail-title" tabindex="-1">${escapeHtml(event.title)}</h2>
-  <p class="event-meta event-detail-when">${CLOCK}<span><span class="event-detail-date">${escapeHtml(fullDate(event.startsAt, 'short'))}</span> · ${escapeHtml(eventTimeRange(event.startsAt, event.endsAt))}</span>${distance ? `<span class="event-detail-distance">${escapeHtml(distance)}</span>` : ''}</p>
+  <p class="event-meta">${CLOCK}<span>${escapeHtml(fullDate(event.startsAt, 'short'))} · ${escapeHtml(eventTimeRange(event.startsAt, event.endsAt))}</span></p>
   <p class="event-meta">${PIN}<span>${escapeHtml([event.venueName, event.venueArea].filter(Boolean).join(', '))}</span></p>
-  ${event.tags.length ? `<ul class="event-tags" aria-label="Tags">${event.tags.map((t) => `<li>${escapeHtml(t)}</li>`).join('')}</ul>` : ''}
   ${event.description ? `<p class="event-detail-copy">${escapeHtml(event.description)}</p>` : ''}
-  <div class="event-detail-going">
+  ${event.tags.length ? `<ul class="event-tags" aria-label="Tags">${event.tags.map((t) => `<li>${escapeHtml(t)}</li>`).join('')}</ul>` : ''}
+  <div class="event-detail-row">
     <span class="event-going">${friends.length ? `<span class="event-avatars">${avatarStack(friends)}</span>` : ''}<span>${escapeHtml(goingLabel(event.goingCount, friends.length))}</span></span>
     <button type="button" class="event-going-toggle${event.going ? ' is-on' : ''}" data-event-going aria-pressed="${event.going}">${event.going ? "You're going" : "I'm going"}</button>
   </div>
-  <div class="event-companion-box">
-    <span class="event-companion-icon" aria-hidden="true">${PEOPLE}</span>
-    <div><p class="event-companion-title" id="event-companion-label">Looking for a companion?</p><p class="event-companion-copy" id="event-companion-copy">Let others know you're going and would love some company.</p></div>
+  <div class="event-detail-row event-companion-row-toggle">
+    <div><p class="event-companion-title" id="event-companion-label">Looking for a companion?</p><p class="event-companion-copy" id="event-companion-copy">Let others going know you'd love some company. You're matched with people who also want company, most shared interests first.</p></div>
     <button type="button" class="event-switch" role="switch" data-event-wants aria-checked="${event.wantsCompanion}" aria-labelledby="event-companion-label" aria-describedby="event-companion-copy"><span></span></button>
   </div>
-  <div class="event-match-rules">
-    <p>You'll be matched with people who:</p>
-    <ul><li><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M9 18V6l10-2v12"/><circle cx="6.5" cy="18" r="2.5"/><circle cx="16.5" cy="16" r="2.5"/></svg>Are going to this event</li><li>${PEOPLE}Also want a companion</li><li><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 20s-7.5-4.6-7.5-10A4.3 4.3 0 0 1 12 7.6 4.3 4.3 0 0 1 19.5 10c0 5.4-7.5 10-7.5 10Z"/></svg>Share similar interests</li></ul>
-  </div>
-  <button type="button" class="event-see-companions" data-event-companions${event.wantsCompanion ? '' : ' aria-describedby="event-see-hint"'}>See companions (${others}) <span aria-hidden="true">→</span></button>
+  <button type="button" class="event-see-companions" data-event-companions${event.wantsCompanion ? '' : ' aria-describedby="event-see-hint"'}>See companions (${others}) ${ARROW}</button>
   ${event.wantsCompanion ? '' : '<p class="event-see-hint" id="event-see-hint">Turn on "Looking for a companion?" to see who else is.</p>'}
 </div>`;
 };

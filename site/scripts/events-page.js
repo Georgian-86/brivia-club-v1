@@ -1,29 +1,28 @@
 // Explore: events near you (D-117). The view [data-view="events"] in app.html. app.js creates it once with its
 // helpers and calls show() whenever the view opens. Rendering is in events-view.js (pure, unit-tested).
 //
-// Desktop (>= 1100 px): the event panel sits beside the grid and shows the selected event (the first one by default).
-// Narrower: the panel opens as a full-screen sheet when a card is tapped (focus moves into it; Escape or ← closes it
-// and focus returns to the card).
+// The event panel is a drawer at every width (D-118: a calmer page; the grid gets the full width): a side drawer from
+// 760 px, a full-screen sheet below. Opening moves focus to its title; Escape, ← or the backdrop closes it and focus
+// returns to the card.
 import {
   EVENT_CATEGORIES, EVENTS_EMPTY, isEventCategory, normalizeEvent, withRsvp, filterEvents, nearbyEvents,
   eventCardMarkup, eventDetailMarkup, companionRowMarkup, companionNote,
 } from './events-view.js';
 import { eventImageSrc } from './event-assets.js';
 
-const WIDE = '(min-width: 1100px)';
-
 export const createEventsPage = ({ root, api, safeImage, toast, isMissing, sendHello, openChatWith, signedIn }) => {
   if (!root) return { show() {} };
   const grid = root.querySelector('#events-grid');
   const chips = root.querySelector('#event-chips');
-  const panel = root.querySelector('#event-detail');
+  const panel = document.querySelector('#event-detail');
   const nearbyButton = root.querySelector('#events-nearby');
   const companionSwitch = root.querySelector('#events-companion-default');
   const status = root.querySelector('#events-status');
+  const count = root.querySelector('#events-count');
+  const backdrop = document.querySelector('#event-detail-backdrop');
   const dialog = document.querySelector('#event-companions-dialog');
 
   const state = { events: [], category: 'all', nearby: false, selectedId: null, loaded: false, loading: false, unavailable: false, error: false, companionDefault: false, sent: new Set(), returnFocus: null };
-  const wide = () => window.matchMedia(WIDE).matches;
   const friendsFor = (event) => event.friends.map((f) => ({ name: f.name, src: safeImage(f.photoUrl) }));
   const visible = () => {
     const list = filterEvents(state.events, state.category);
@@ -55,25 +54,15 @@ export const createEventsPage = ({ root, api, safeImage, toast, isMissing, sendH
       grid.innerHTML = `<div class="events-empty" role="status"><h2>${empty.title}</h2><p>${empty.copy}</p>${retry}</div>`;
       status.textContent = '';
     } else {
-      grid.innerHTML = list.map((e) => eventCardMarkup(e, { imageSrc: eventImageSrc(e), friends: friendsFor(e), selected: wide() && e.id === state.selectedId })).join('');
+      grid.innerHTML = list.map((e) => eventCardMarkup(e, { imageSrc: eventImageSrc(e), friends: friendsFor(e) })).join('');
       status.textContent = `${list.length} event${list.length === 1 ? '' : 's'}${state.nearby ? ' within 15 km' : ''}`;
     }
-    // Desktop always shows one event in the panel: keep the selection if it is still listed, else the first card.
-    if (wide()) {
-      if (!list.some((e) => e.id === state.selectedId)) state.selectedId = list[0]?.id || null;
-      root.classList.toggle('has-detail', Boolean(state.selectedId));
-      renderPanel();
-      grid.querySelectorAll('.event-card').forEach((card) => card.classList.toggle('is-selected', card.dataset.eventId === state.selectedId));
-    } else if (!panel.classList.contains('is-sheet')) {
-      panel.hidden = true;
-      root.classList.remove('has-detail');
-    }
+    count.textContent = empty ? 'EVENTS' : `${String(list.length).padStart(2, '0')} ${list.length === 1 ? 'EVENT' : 'EVENTS'}${state.nearby ? ' WITHIN 15 KM' : ''}`;
   };
 
   const renderControls = () => {
     chips.querySelectorAll('[data-event-category]').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.eventCategory === state.category)));
     nearbyButton.setAttribute('aria-pressed', String(state.nearby));
-    nearbyButton.querySelector('.events-nearby-sub').textContent = state.nearby ? 'Showing events within 15 km' : "See what's happening around you";
     companionSwitch.setAttribute('aria-checked', String(state.companionDefault));
   };
 
@@ -93,17 +82,13 @@ export const createEventsPage = ({ root, api, safeImage, toast, isMissing, sendH
 
   const openSheet = (id, focusCompanion = false) => {
     state.selectedId = String(id);
-    if (wide()) {
-      renderGrid();
-    } else {
-      state.returnFocus = document.activeElement;
-      renderPanel();
-      panel.classList.add('is-sheet');
-      panel.setAttribute('role', 'dialog');
-      panel.setAttribute('aria-modal', 'true');
-      panel.setAttribute('aria-labelledby', 'event-detail-title');
-      document.body.classList.add('event-sheet-open');
-    }
+    if (!panel.classList.contains('is-sheet')) state.returnFocus = document.activeElement;
+    renderPanel();
+    panel.classList.add('is-sheet');
+    panel.setAttribute('aria-modal', 'true');
+    panel.setAttribute('aria-labelledby', 'event-detail-title');
+    if (backdrop) backdrop.hidden = false;
+    document.body.classList.add('event-sheet-open');
     const target = focusCompanion ? panel.querySelector('[data-event-wants]') : panel.querySelector('#event-detail-title');
     if (focusCompanion) target?.scrollIntoView({ block: 'center', behavior: 'instant' });
     target?.focus({ preventScroll: !focusCompanion });
@@ -112,8 +97,8 @@ export const createEventsPage = ({ root, api, safeImage, toast, isMissing, sendH
     if (!panel.classList.contains('is-sheet')) return;
     panel.classList.remove('is-sheet');
     ['aria-modal', 'aria-labelledby'].forEach((a) => panel.removeAttribute(a));
-    panel.setAttribute('role', 'region');
     panel.hidden = true;
+    if (backdrop) backdrop.hidden = true;
     document.body.classList.remove('event-sheet-open');
     const back = state.returnFocus?.isConnected ? state.returnFocus : grid.querySelector(`[data-event-open="${CSS.escape(state.selectedId || '')}"]`);
     back?.focus();
@@ -125,7 +110,7 @@ export const createEventsPage = ({ root, api, safeImage, toast, isMissing, sendH
     renderPanel();
     if (focusedAttr) panel.querySelector(`[${focusedAttr}]`)?.focus();
     const card = grid.querySelector(`.event-card[data-event-id="${CSS.escape(next.id)}"]`);
-    if (card) card.outerHTML = eventCardMarkup(next, { imageSrc: eventImageSrc(next), friends: friendsFor(next), selected: wide() && next.id === state.selectedId });
+    if (card) card.outerHTML = eventCardMarkup(next, { imageSrc: eventImageSrc(next), friends: friendsFor(next) });
   };
 
   // going: the new going state; wants: true/false, or null to keep it (a new RSVP takes the page switch's default).
@@ -167,7 +152,7 @@ export const createEventsPage = ({ root, api, safeImage, toast, isMissing, sendH
     dialog._people = people;
   };
 
-  root.addEventListener('click', (e) => {
+  const onClick = (e) => {
     const t = e.target;
     const cat = t.closest('[data-event-category]');
     if (cat && isEventCategory(cat.dataset.eventCategory)) { state.category = cat.dataset.eventCategory; renderControls(); renderGrid(); return; }
@@ -178,7 +163,7 @@ export const createEventsPage = ({ root, api, safeImage, toast, isMissing, sendH
     if (chip) { openSheet(chip.dataset.eventCompanion, true); return; }
     const card = t.closest('.event-card');
     if (card && !t.closest('button:not(.event-open)')) { openSheet(card.dataset.eventId); return; }
-    if (t.closest('[data-event-close]')) { if (wide()) return; closeSheet(); return; }
+    if (t.closest('[data-event-close]')) { closeSheet(); return; }
     const event = byId(state.selectedId);
     if (!event) return;
     if (t.closest('[data-event-going]')) { changeRsvp(event, !event.going, event.going ? false : null); return; }
@@ -190,7 +175,8 @@ export const createEventsPage = ({ root, api, safeImage, toast, isMissing, sendH
       if (navigator.share) navigator.share({ title: event.title, url }).catch(() => {});
       else navigator.clipboard?.writeText(url).then(done, () => toast(url));
     }
-  });
+  };
+  [root, panel, backdrop].forEach((el) => el?.addEventListener('click', onClick));
 
   companionSwitch.addEventListener('click', async () => {
     const next = !state.companionDefault;
@@ -229,7 +215,6 @@ export const createEventsPage = ({ root, api, safeImage, toast, isMissing, sendH
     hi.textContent = 'Request sent';
   });
 
-  window.matchMedia(WIDE).addEventListener?.('change', () => { closeSheet(); renderGrid(); });
 
   return {
     show({ eventId } = {}) {

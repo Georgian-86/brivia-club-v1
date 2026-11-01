@@ -36,20 +36,21 @@
         </section>
 
         <section class="app-view events-view" data-view="events" hidden aria-labelledby="events-heading">
-          <div class="events-layout">
-            <div class="events-main">
-              <div class="events-hero">
-                <div class="events-hero-copy"><p class="app-eyebrow">EXPLORE EVENTS</p><h1 id="events-heading">Good people<br /><em>at better places.</em></h1><p class="events-hero-sub">Events. Experiences. People who get it.</p></div>
-                <div class="events-hero-actions">
-                  <button class="events-nearby" id="events-nearby" type="button" aria-pressed="false"><span class="events-nearby-icon" aria-hidden="true"><svg viewBox="0 0 24 24" focusable="false"><path d="M12 21s-6.5-6.2-6.5-11a6.5 6.5 0 0 1 13 0c0 4.8-6.5 11-6.5 11Z"/><circle cx="12" cy="10" r="2.3"/></svg></span><span class="events-nearby-copy"><strong>Nearby Events</strong><span class="events-nearby-sub">See what's happening around you</span></span><svg class="events-nearby-chevron" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="m9.5 6 6 6-6 6"/></svg></button>
-                  <div class="events-companion-card"><span class="event-companion-icon" aria-hidden="true"><svg viewBox="0 0 24 24" focusable="false"><circle cx="9" cy="8.5" r="3"/><circle cx="16.5" cy="9.5" r="2.4"/><path d="M3.5 19c.8-3.3 3-5 5.5-5s4.7 1.7 5.5 5M14.5 14.3c.6-.2 1.3-.3 2-.3 2 0 3.6 1.4 4 4"/></svg></span><div><p class="events-companion-title" id="events-companion-label">Find a companion</p><p class="events-companion-copy" id="events-companion-copy">Get recommended to people who are also going.</p></div><button class="event-switch" id="events-companion-default" type="button" role="switch" aria-checked="false" aria-labelledby="events-companion-label" aria-describedby="events-companion-copy"><span></span></button></div>
-                </div>
-              </div>
-              <div class="event-chips" id="event-chips" role="group" aria-label="Event categories"></div>
-              <p class="sr-only" id="events-status" role="status" aria-live="polite"></p>
-              <div class="events-grid" id="events-grid" aria-busy="true"><div class="event-card event-card-skeleton" aria-hidden="true"></div><div class="event-card event-card-skeleton" aria-hidden="true"></div><div class="event-card event-card-skeleton" aria-hidden="true"></div></div>
+          <div class="events-main">
+            <div class="events-head">
+              <div><p class="app-eyebrow">EXPLORE / EVENTS</p><h1 id="events-heading">Good people<br /><em>at better places.</em></h1></div>
+              <p class="events-head-note">Events near you, and people who would love the company.</p>
             </div>
-            <div class="event-detail" id="event-detail" role="region" aria-label="Event details" hidden></div>
+            <div class="events-toolbar">
+              <span id="events-count">EVENTS</span>
+              <div class="events-toolbar-actions">
+                <button class="events-nearby" id="events-nearby" type="button" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 21s-6.5-6.2-6.5-11a6.5 6.5 0 0 1 13 0c0 4.8-6.5 11-6.5 11Z"/><circle cx="12" cy="10" r="2.3"/></svg>Nearby</button>
+                <span class="events-companion-toggle"><span id="events-companion-label">Find a companion</span><span class="sr-only" id="events-companion-copy">Get recommended to people who are also going.</span><button class="event-switch event-switch-sm" id="events-companion-default" type="button" role="switch" aria-checked="false" aria-labelledby="events-companion-label" aria-describedby="events-companion-copy"><span></span></button></span>
+              </div>
+            </div>
+            <div class="event-chips" id="event-chips" role="group" aria-label="Event categories"></div>
+            <p class="sr-only" id="events-status" role="status" aria-live="polite"></p>
+            <div class="events-grid" id="events-grid" aria-busy="true"><div class="event-card event-card-skeleton" aria-hidden="true"></div><div class="event-card event-card-skeleton" aria-hidden="true"></div><div class="event-card event-card-skeleton" aria-hidden="true"></div></div>
           </div>
         </section>
 
@@ -124,6 +125,9 @@
     </div>
 
     <div class="app-overlay" id="pitch-modal" hidden><div class="app-overlay-backdrop" data-close-overlay></div><section class="pitch-panel"><button class="overlay-close" type="button" data-close-overlay aria-label="Close and send without a note">×</button><p class="app-eyebrow">A WARM INTRODUCTION</p><h2>Send a pitch<br /><em>with context.</em></h2><p class="pitch-copy">Tell <strong id="pitch-name">them</strong> why you’d like to connect.</p><form id="pitch-form"><textarea id="pitch-message" rows="4" maxlength="500" placeholder="Hey, I noticed we both care about..." required></textarea><button class="pitch-submit" type="submit">SEND PITCH <span>→</span></button><button class="pitch-no-note" type="button">Send without a note</button></form></section></div>
+    <!-- The event drawer (D-118) lives at body level so it is fixed to the viewport, not to the app's scaled frame. -->
+    <div class="event-detail-backdrop" id="event-detail-backdrop" data-event-close hidden></div>
+    <div class="event-detail" id="event-detail" role="dialog" aria-label="Event details" hidden></div>
     <dialog class="event-companions-dialog" id="event-companions-dialog" aria-labelledby="event-companions-title"><div class="event-companions-head"><div><p class="app-eyebrow">FIND A COMPANION</p><h2 id="event-companions-title">Companions</h2></div><button type="button" class="event-companions-close" data-companions-close aria-label="Close companions">×</button></div><p class="event-companions-lede">People going who also want company, most shared interests first. Saying hi sends a request; you connect only if they agree.</p><ul class="event-companions-list" id="event-companions-list"></ul></dialog>
     <div class="app-toast" id="app-toast" role="status"></div>
     <script>

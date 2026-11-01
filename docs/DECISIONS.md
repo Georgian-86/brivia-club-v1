@@ -2345,3 +2345,22 @@ controls (a tester or a seeded test member), never a real member, so no new expo
   events.
 - **Proof:** SQL harness ALL PASSED (new `i-club-events.test.sql`); unit 390 (new `events-view.test.mjs`); e2e
   `events.spec.mjs` at 1440 and 390 (axe, text audit, RSVP and companion calls, before-0020 state).
+
+## D-118: A calmer Explore, in the house style (founder, 2026-11-01)
+
+- **Asked:** "the page looks quite cluttered ... use the ui-ux pro max skill to align the classy and aesthetic theme of
+  the app such that it looks like other parts".
+- **Done (ui-ux-pro-max: visual hierarchy, one primary action per view, consistent type scale; matched to Posts and
+  Connect):** the page sits on the aura like Posts, with the Posts heading pattern ("EXPLORE / EVENTS", Bodoni display,
+  the second line in wine italic like Connect's "CURATED.") and one ruled toolbar of uppercase micro-labels (the event
+  count, Nearby, the Find a companion switch) in place of the two large hero cards. Categories are quiet text tabs
+  underlined like the header nav, not filled pills. Cards are frosted paper like Posts: image with the date, a
+  "MUSIC · ~1 km" micro-label, the title in Bodoni, one time line and one place line, and a ruled foot ("12 going" and
+  a text link "FIND A COMPANION ↗"). Tags, the chevron, the distance badge and the companion count left the card (tags
+  stay in the event view). The event panel is no longer pinned beside the grid: it opens as a side drawer from 760 px
+  (a full-screen sheet below), so the grid has the full width. In the drawer the three-icon "matched with" box became
+  one sentence, and the buttons use the app's uppercase tracked labels.
+- **Unchanged:** data, RPCs and privacy rules (D-117), and every control (Nearby, the switch, categories, going,
+  companions, share).
+- **Proof:** unit 390; e2e events (drawer at 1440 and sheet at 390, axe, text audit), app-shell, explore-cards, fit;
+  build, style ratchet and asset budget OK.
