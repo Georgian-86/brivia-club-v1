@@ -2320,3 +2320,28 @@ controls (a tester or a seeded test member), never a real member, so no new expo
   preset. Deploy the client first, then apply 0019 (after 0014).
 - **Proof:** unit 380; SQL harness ALL PASSED (new `cover-refresh.test.sql`); e2e profile-media 193, deck 198, app-shell
   211, explore-cards 74, post-activity 55, onboarding 269; build and asset budget OK.
+
+## D-117: Explore becomes events near you; the old Explore feed becomes Posts (founder, 2026-11-01)
+
+- **Asked:** "restyle the update page, the current function will come under some other section that you can decide the
+  name, such as posts, but in the explore I want to add nearby events and all", with a mockup: an "Explore events"
+  hero ("Good people at better places."), Nearby Events, a "Find a companion" switch, category chips, event cards
+  (date, distance, tags, going, "Find a companion") and an event panel ("Looking for a companion?", "See companions").
+- **Navigation:** five tabs: Connect, **Explore** (events, new view `events`), **Posts** (the community feed, view
+  `posts`, unchanged apart from its label and eyebrow), Chat, Profile. "Posts" was the founder's own suggestion and says
+  exactly what the feed holds. Shared post links (`explore.html?post=`) still open the post under Posts; a plain
+  `explore.html` now opens Explore (events).
+- **Data (0020):** curated `club_event` rows (no member-created events yet), `event_rsvp`, `member_event_pref`, five RPCs
+  and 8 seeded Bengaluru events. Rules recorded in ORBIT spec §11.
+- **Departures from the mockup, on purpose:** distances read "~1 km", never "800 m" (CLAUDE.md: rounded distances; a
+  home cell is about 2 km across, so metres would be false precision). Faces in "going" are the member's own
+  connections only; everyone else is a count (mutual consent: going is not public). "See companions" lists only
+  people who also turned on "Looking for a companion?", and only after the member does; "Say hi" is a normal signal.
+  Added an "I'm going" button (the mockup had no way to say you are going without asking for company) and a Culture
+  chip (the mockup's Dandiya Night had no category). The mockup's filter icon is left out until there is something to
+  filter beyond category and Nearby.
+- **No agent-arena run:** the choice was the founder's (Explore = events, old feed under another name); the privacy
+  rules follow existing ones (post_activity's connections-only names, D-101). Run one before adding member-created
+  events.
+- **Proof:** SQL harness ALL PASSED (new `i-club-events.test.sql`); unit 390 (new `events-view.test.mjs`); e2e
+  `events.spec.mjs` at 1440 and 390 (axe, text audit, RSVP and companion calls, before-0020 state).

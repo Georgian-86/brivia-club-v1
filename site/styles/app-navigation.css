@@ -123,6 +123,7 @@ body .app-topbar{position:relative}
 body .app-topbar .app-notification-button{position:absolute;top:50%;right:calc(clamp(20px,5vw,72px) + 90px);display:none;width:30px;height:30px;place-items:center;padding:0;border:1px solid rgba(90,6,31,.24);border-radius:50%;background:transparent;color:#5a061f;cursor:pointer;transform:translateY(-50%);transition:background .2s,color .2s,transform .2s}
 body.app-body[data-app-view="explore"] .app-notification-button,
 body.app-body[data-app-view="posts"] .app-notification-button,
+body.app-body[data-app-view="events"] .app-notification-button,
 body.app-body[data-app-view="chat"] .app-notification-button{display:grid}
 body .app-notification-button svg{width:15px;height:15px;fill:none;stroke:currentColor;stroke-linecap:round;stroke-linejoin:round;stroke-width:1.5}
 body .app-notification-button:hover,

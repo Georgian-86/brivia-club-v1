@@ -1,13 +1,15 @@
 // One member navigation (Phase C, Task 2): the same four items in the desktop header and the mobile tab bar.
 // Pure (no DOM): app.js writes navMarkup() into [data-nav-host="header"] and [data-nav-host="tabbar"].
-// Internal view names stay stable: the deck is view 'explore' (labelled Connect), the community feed is view 'posts'
-// (labelled Explore). 'home' is an alias of the deck, so it marks Connect as current.
+// Internal view names stay stable: the deck is view 'explore' (labelled Connect), events near you are view 'events'
+// (labelled Explore, D-117) and the community feed is view 'posts' (labelled Posts; it was Explore before D-117).
+// 'home' is an alias of the deck, so it marks Connect as current.
 
 const svg = (body) => `<svg class="app-nav-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">${body}</svg>`;
 
 export const NAV_ITEMS = Object.freeze([
   { view: 'explore', label: 'Connect', icon: svg('<circle cx="12" cy="12" r="3"/><ellipse cx="12" cy="12" rx="9.5" ry="4.5"/><circle cx="20.5" cy="10.5" r="1"/>') },
-  { view: 'posts', label: 'Explore', icon: svg('<circle cx="12" cy="12" r="9"/><path d="M15.5 8.5 13.4 13.4 8.5 15.5l2.1-4.9 4.9-2.1Z"/>') },
+  { view: 'events', label: 'Explore', icon: svg('<circle cx="12" cy="12" r="9"/><path d="M15.5 8.5 13.4 13.4 8.5 15.5l2.1-4.9 4.9-2.1Z"/>') },
+  { view: 'posts', label: 'Posts', icon: svg('<rect x="4.5" y="4.5" width="15" height="15" rx="3"/><circle cx="9.5" cy="9.5" r="1.6"/><path d="m5 17 4.5-4.5 3 3 2.5-2.5 4.5 4.5"/>') },
   { view: 'chat', label: 'Chat', icon: svg('<path d="M5 6.5h14v9H10l-4 3v-3H5Z"/>') },
   { view: 'profile', label: 'Profile', icon: svg('<circle cx="12" cy="8.5" r="3.5"/><path d="M5 19.5c1.2-3.6 3.8-5.5 7-5.5s5.8 1.9 7 5.5"/>') },
 ].map(Object.freeze));

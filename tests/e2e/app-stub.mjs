@@ -207,6 +207,26 @@ export const startAppStub = async ({ port, state = {}, deckRows = defaultDeckRow
       if (pathName === '/rest/v1/rpc/connection_presence') {
         return json(200, (args.p_ids || []).filter((id) => st.matchIds.includes(id)).map((id) => ({ member_id: id, active: st.presenceVisible !== false && (st.activeIds || []).includes(id) })));
       }
+      // D-117 events (0020): st.events (list_events rows; null answers the PGRST202 "function not found" of a database
+      // without 0020), st.companions (event_companions rows), st.companionDefault; RSVPs change st.events in place.
+      if (['/rest/v1/rpc/list_events', '/rest/v1/rpc/set_event_rsvp', '/rest/v1/rpc/set_companion_default', '/rest/v1/rpc/my_event_prefs', '/rest/v1/rpc/event_companions'].includes(pathName) && !st.events) {
+        return json(404, { code: 'PGRST202', message: 'Could not find the function' });
+      }
+      if (pathName === '/rest/v1/rpc/list_events') return json(200, st.events.filter((e) => !args.p_category || e.category === args.p_category));
+      if (pathName === '/rest/v1/rpc/my_event_prefs') return json(200, [{ companion_default: Boolean(st.companionDefault) }]);
+      if (pathName === '/rest/v1/rpc/set_companion_default') { st.companionDefault = Boolean(args.p_on); st.events.forEach((e) => { if (e.going) e.wants_companion = st.companionDefault; }); return json(200, st.companionDefault); }
+      if (pathName === '/rest/v1/rpc/set_event_rsvp') {
+        (st.rsvps ||= []).push(args);
+        const e = st.events.find((x) => x.id === args.p_event);
+        if (!e) return json(400, { code: '22023', message: 'invalid event' });
+        const going = Boolean(args.p_going || args.p_wants_companion);
+        const wants = going && (args.p_wants_companion === null ? (e.going ? e.wants_companion : Boolean(st.companionDefault)) : Boolean(args.p_wants_companion));
+        e.going_count += going === e.going ? 0 : going ? 1 : -1;
+        e.companion_count += wants === e.wants_companion ? 0 : wants ? 1 : -1;
+        Object.assign(e, { going, wants_companion: wants });
+        return json(200, [{ going, wants_companion: wants }]);
+      }
+      if (pathName === '/rest/v1/rpc/event_companions') return json(200, st.companions || []);
       if (pathName === '/rest/v1/community_post_shares' && method === 'POST') return route.fulfill({ status: 201, body: '', headers: { 'access-control-allow-origin': '*' } });
       if (pathName === '/rest/v1/brivia_messages' && method === 'POST') { (st.sent ||= []).push(args); return route.fulfill({ status: 201, body: '', headers: { 'access-control-allow-origin': '*' } }); }
       if (pathName === '/rest/v1/brivia_messages' && method === 'GET') return json(200, st.messages || []);

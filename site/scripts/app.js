@@ -21,7 +21,7 @@ import '../styles/mobile-app.css';
 import '../styles/skeleton.css';
 import '../styles/aura-theme.css';
 import '../styles/handoff.css';
-import { supabase, rowToProfile, saveProfile, isPresetCoverUrl, onboardingStatus, sendSignal, fetchSignalQuota, isRateLimited, isStorageImageUrl, withoutCredentials, uploadMessageAttachment, removeMessageAttachment, uploadCommunityPostImage, removeCommunityPostImage, ImageProcessingError, PHOTO_ERROR_MESSAGE, PHOTO_FRAMER_ERROR, compressAttachmentFiles, attachmentKind, reportMember, setSensitiveConsent, fetchSensitiveConsentAt, fetchMyInterests, fetchInterestNodes, addMemberInterest, isMissingFunction, touchPresence, connectionPresence, setPresenceVisible, myPresenceVisible, setMemberInterests, uploadResume, removeResume, resumeSignedUrl, resumeInfo, clearResumePath, searchPlaces, setHomeCity, setHomeLocation } from './supabase.js';
+import { supabase, rowToProfile, saveProfile, isPresetCoverUrl, onboardingStatus, sendSignal, fetchSignalQuota, isRateLimited, isStorageImageUrl, withoutCredentials, uploadMessageAttachment, removeMessageAttachment, uploadCommunityPostImage, removeCommunityPostImage, ImageProcessingError, PHOTO_ERROR_MESSAGE, PHOTO_FRAMER_ERROR, compressAttachmentFiles, attachmentKind, reportMember, setSensitiveConsent, fetchSensitiveConsentAt, fetchMyInterests, fetchInterestNodes, addMemberInterest, isMissingFunction, touchPresence, connectionPresence, setPresenceVisible, myPresenceVisible, setMemberInterests, uploadResume, removeResume, resumeSignedUrl, resumeInfo, clearResumePath, searchPlaces, setHomeCity, setHomeLocation, listEvents, setEventRsvp, setCompanionDefault, myEventPrefs, eventCompanions } from './supabase.js';
 import { locateOnce, fallbackCopy } from './geo-locate.js';
 import { areaChangeMessage, AREA_HELPER, AREA_NO_MATCH } from './area-change.js';
 import { areaShareBody, parseAreaBody, resumeShareAttachment, resumeMessageFields, RESUME_SHARE_BODY, NO_RESUME_HINT, RESUME_GONE_COPY, RESUME_SHARE_NOTE, AREA_SHARE_NOTE } from './quick-share.js';
@@ -39,6 +39,8 @@ import { isOffered, hasCatalog, catalogGroups, normalizeInterestLabel } from './
 import { MAX_INTERESTS } from './passion-budget.js';
 import { collabSummary, openCollabReview } from './collab-requests.js';
 import { createPresence, presenceDot } from './presence.js';
+import { createEventsPage } from './events-page.js';
+import '../styles/events.css';
 import { postCardMarkup, postFooterMarkup, countText, shareData, isSafePostImageSrc } from './post-card.js';
 import { toastSide } from './toast-place.js';
 import { loadReactions, setReaction, createReactionGuard } from './post-reactions.js';
@@ -721,6 +723,29 @@ window.addEventListener('scroll', () => {
   else placeProfileSettingsMenu();
 }, { passive: true });
 
+// Explore: events near you (D-117). Created once; show() loads on first open and refreshes after.
+let pendingEventId = null;
+let pendingEventRead = false;
+const eventsPage = createEventsPage({
+  root: document.querySelector('[data-view="events"]'),
+  api: { listEvents, setEventRsvp, setCompanionDefault, myEventPrefs, eventCompanions },
+  safeImage: (url) => (isStorageImageUrl(url) ? safeImageUrl(url) : ''),
+  toast: (message) => showToast(message),
+  isMissing: isMissingFunction,
+  signedIn: () => Boolean(supabase && memberProfile.id),
+  // "Say hi" is an ordinary signal (send_signal): a connection exists only if the other member agrees (CLAUDE.md).
+  sendHello: async (person, note) => {
+    const result = await sendConnectionSignal({ id: person.id, name: person.name }, note);
+    showToast(signalResultToast(person, result));
+    return result;
+  },
+  openChatWith: (person) => {
+    const known = findPersonById(person.id);
+    setView('chat');
+    if (known) openChat(known);
+  },
+});
+
 const setView = (view) => {
   closeProfileSettingsMenu();
   const previousView = document.body.dataset.appView;
@@ -743,6 +768,8 @@ const setView = (view) => {
       if (document.body.dataset.appView === 'posts' && memberProfile.id && !communityPostsLoaded && !communityPostsLoading) loadCommunityPosts();
     }, 450);
   }
+  if (view === 'events') eventsPage.show({ eventId: pendingEventId }); else eventsPage.hide();
+  pendingEventId = null;
   if (view === 'chat') renderChats();
   // Re-tapping Profile on the profile keeps the loaded (or loading) interests: no second read, no skeleton flash.
   if (view === 'profile') {
@@ -753,12 +780,14 @@ const setView = (view) => {
   window.scrollTo({ top: 0, behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'instant' : 'smooth' });
 };
 
-const validViews = ['home', 'explore', 'posts', 'chat', 'profile'];
+const validViews = ['home', 'explore', 'events', 'posts', 'chat', 'profile'];
 const routeFromUrl = () => {
   const params = new URLSearchParams(window.location.search);
   // ?post=<id> (a shared post link, via explore.html) opens that post's detail once the Explore feed has loaded; it is
   // read once per page load, so a later hashchange does not reopen it.
   const postParam = params.get('post');
+  // ?view=events&event=<id> (a shared event link) opens that event once the list has loaded.
+  if (params.get('event') && !pendingEventRead) { pendingEventRead = true; pendingEventId = params.get('event'); }
   if (postParam && !pendingPostParamRead) { pendingPostParamRead = true; pendingPostId = postParam; }
   const view = params.get('view') || window.location.hash.slice(1) || (postParam ? 'posts' : 'explore');
   setView(validViews.includes(view) ? view : 'explore');
@@ -4806,6 +4835,7 @@ const loadSupabaseCommunity = async () => {
   }
   document.body.classList.remove('app-auth-pending');
   if (document.body.dataset.appView === 'posts') loadCommunityPosts();
+  if (document.body.dataset.appView === 'events') eventsPage.show();
   // Back from "Sign in with Google again" (R5 re-auth): reopen the delete dialog on the profile view, but only for the
   // same member who asked (F3): another account picked in Google's chooser gets nothing, and the marker is dropped.
   let reauthReturn = false;

@@ -1,11 +1,18 @@
 # Session handoff (read after CLAUDE.md)
 
-Last updated: 2026-11-01 (D-116 cover set). Before that: 2026-10-28 (D-100 chat inbox, D-101 post activity and 0015, D-102 photo and setup). Before that: 2026-10-20 (live-database correction D-070; "Send without a note" D-071). Before that: 2026-10-16 (design references, D-062). Before that: 2026-10-13, after Phase D of the experience iteration (the test world), on branch
+Last updated: 2026-11-01 (D-117 Explore events, Posts tab). Before that: 2026-11-01 (D-116 cover set). Before that: 2026-10-28 (D-100 chat inbox, D-101 post activity and 0015, D-102 photo and setup). Before that: 2026-10-20 (live-database correction D-070; "Send without a note" D-071). Before that: 2026-10-16 (design references, D-062). Before that: 2026-10-13, after Phase D of the experience iteration (the test world), on branch
 `claude/jolly-edison-49xvza` (repo `Georgian-86/brivia-club-v1`). Phases C and D are not on `main` yet, and Phase D's SQL
 is not applied: the founder applies it in the SQL editor (section 3, item 0).
 Update this file at the end of every session. CLAUDE.md holds the aim; this file holds **where we are**.
 
 ## 1. What is done
+
+**2026-11-01, D-117:** Explore is now events near you (hero, Nearby Events, "Find a companion", category chips, event
+cards and an event panel with "Looking for a companion?" and "See companions"); the old Explore feed is the new
+**Posts** tab (five tabs now). **Owed: apply `0020_club_events.sql`** (README "0020"; it seeds 8 Bengaluru events).
+Until then Explore says "Events open soon" and points to Posts. New events are added by SQL for now (README "0020").
+Files: `site/scripts/events-page.js`, `events-view.js`, `event-assets.js`, `site/styles/events.css`; e2e
+`tests/e2e/events.spec.mjs`; SQL test `supabase/tests/i-club-events.test.sql`.
 
 **2026-11-01, D-116:** "THE THOUGHTFUL ROOM" cover is retired and 9 new covers are added (26 in all); the default
 cover is now "MAKE SOMETHING". **Owed: apply `0019_cover_set_refresh.sql`** after the client deploys (README "0019";
@@ -258,6 +265,10 @@ Tooling: Playwright **and axe-core** at `/tmp/pw` (`npm install --prefix /tmp/pw
 - Real members are **not allowed yet**: see the gate table in `docs/arena/2026-10-07-iteration-4.md`.
 
 ## 3. What to do next (in order)
+
+**Database owed (2026-11-01):** `0019_cover_set_refresh.sql` (after the client deploys) and `0020_club_events.sql`
+(either order; seeds the first 8 events). README "0019" / "0020". Next for events: a way for the founder (or members) to
+add events without SQL, and an agent-arena run before member-created events.
 
 **Database owed (2026-10-29):** in order, whichever are not yet applied: `0015`, `0016`, `0017_interest_catalog.sql`
 (long: the catalogue rows; paste all of it), `0018_member_presence.sql`. README sections "0015"–"0018" have the verify
