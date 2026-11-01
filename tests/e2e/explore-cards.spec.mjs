@@ -46,7 +46,7 @@ const ago = (h) => new Date(Date.now() - h * 36e5).toISOString();
 const preset = (file) => `/Images/Cover%20images/${file}`;
 const LONG = 'Sunday morning rally at the club courts, then filter coffee and a long argument about racket tension. Who is in next week?';
 const POSTS = [
-  { id: 'post-1', author_id: A, image_url: preset('163BDB0C-64AC-44E7-8663-55C323ADB4FE.PNG'), image_path: '', caption: LONG, created_at: ago(1) },
+  { id: 'post-1', author_id: A, image_url: preset('94978B9F-A399-43FC-AC48-0A41088B5D27.PNG'), image_path: '', caption: LONG, created_at: ago(1) },
   { id: 'post-2', author_id: B, image_url: preset('2257522A-04B9-4E3E-AB1A-A73D7BB8CCBF.PNG'), image_path: '', caption: 'First chess club night. Bring a board.', created_at: ago(3) },
   { id: 'post-3', author_id: A, image_url: `${ORIGIN}/storage/v1/object/public/community-posts/${A}/court.jpg`, image_path: `${A}/court.jpg`, caption: 'Court booked.', created_at: ago(5) },
   { id: 'post-4', author_id: ME, image_url: preset('3157077F-6C3B-4D85-BC8B-4646C85B33D1.PNG'), image_path: '', caption: 'Poetry at the bookshop on Thursday, anyone?', created_at: ago(8) },

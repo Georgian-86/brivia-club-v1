@@ -24,7 +24,7 @@ begin
   update public.profiles set name='A2', full_name='A2', phone='1', phone_country_code='+1', phone_number='1',
     gender='Male', experience='x', looking_for='{c}',
     photo_url='https://proj.supabase.co/storage/v1/object/public/profile-photos/a1a1a1a1-0000-0000-0000-0000000000a1/p.jpg',
-    cover_url='/Images/Cover%20images/163BDB0C-64AC-44E7-8663-55C323ADB4FE.PNG', updated_at=now()  -- an offered preset (0014)
+    cover_url='/Images/Cover%20images/F28EA63E-1BEB-49E9-BA01-F62127017DB1.PNG', updated_at=now()  -- an offered preset (0014)
   where id = auth.uid();
   get diagnostics n = row_count;
   if n <> 1 then raise exception 'FAIL: editable update touched % rows', n; end if;
@@ -1536,7 +1536,7 @@ begin
   set local role authenticated;
   perform set_config('request.jwt.claims', json_build_object('sub', f1)::text, true);
   -- accepted: own folder in the right bucket; covers are the offered presets only (0014, D-080)
-  update public.profiles set photo_url = base || 'profile-photos/' || f1 || '/9f2c.jpg', cover_url = '/Images/Cover%20images/163BDB0C-64AC-44E7-8663-55C323ADB4FE.PNG' where id = f1;
+  update public.profiles set photo_url = base || 'profile-photos/' || f1 || '/9f2c.jpg', cover_url = '/Images/Cover%20images/F28EA63E-1BEB-49E9-BA01-F62127017DB1.PNG' where id = f1;
   update public.profiles set cover_url = '/Images/Cover%20images/2257522A-04B9-4E3E-AB1A-A73D7BB8CCBF.PNG' where id = f1;
   update public.profiles set photo_url = null, cover_url = null where id = f1;
   insert into public.community_posts (author_id, image_url, image_path) values (f1, base || 'community-posts/' || f1 || '/ok.jpg', f1 || '/ok.jpg');

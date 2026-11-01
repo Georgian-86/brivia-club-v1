@@ -41,10 +41,10 @@ begin
 end $$;
 -- Live legacy data predates the guard: write it with the guard off (owner only, inside this transaction).
 alter table public.profiles disable trigger brivia_profiles_cover_offered;
-update public.profiles set cover_url = pg_temp.preset('163BDB0C-64AC-44E7-8663-55C323ADB4FE.PNG') where id = pg_temp.cm(1);
+update public.profiles set cover_url = pg_temp.preset('2257522A-04B9-4E3E-AB1A-A73D7BB8CCBF.PNG') where id = pg_temp.cm(1);
 update public.profiles set cover_url = pg_temp.upload(pg_temp.cm(2)) where id = pg_temp.cm(2);
 update public.profiles set cover_url = '/assets/F28EA63E-1BEB-49E9-BA01-F62127017DB1-B4-NibCZ.webp' where id = pg_temp.cm(3);
-update public.profiles set cover_url = '/assets/163BDB0C-64AC-44E7-8663-55C323ADB4FE-Bcr88PbJ.PNG' where id = pg_temp.cm(4);
+update public.profiles set cover_url = '/assets/2257522A-04B9-4E3E-AB1A-A73D7BB8CCBF-Bcr88PbJ.PNG' where id = pg_temp.cm(4);
 update public.profiles set cover_url = '/assets/brand-logo-AbCdEf12.png' where id = pg_temp.cm(5);
 update public.profiles set cover_url = pg_temp.upload(pg_temp.cm(6)) where id = pg_temp.cm(6);
 update public.profiles set cover_url = '/Images/Cover images/3157077F-6C3B-4D85-BC8B-4646C85B33D1.PNG' where id = pg_temp.cm(8);
@@ -67,8 +67,9 @@ begin
     'https://evil.example.com/c.jpg',
     '/assets/c.png',
     '/Images/Cover%20images/not-a-preset.PNG',
-    '/Images/Cover%20images/../163BDB0C-64AC-44E7-8663-55C323ADB4FE.PNG',
-    '/Images/Cover%20images/163bdb0c-64ac-44e7-8663-55c323adb4fe.png',
+    '/Images/Cover%20images/../2257522A-04B9-4E3E-AB1A-A73D7BB8CCBF.PNG',
+    '/Images/Cover%20images/2257522a-04b9-4e3e-ab1a-a73d7bb8ccbf.png',
+    pg_temp.preset('163BDB0C-64AC-44E7-8663-55C323ADB4FE.PNG'),  -- retired by 0019 (D-116)
     'data:image/png;base64,AAAA'
   ] loop
     failed := false;
@@ -119,13 +120,13 @@ begin
               where id in (pg_temp.cm(1), pg_temp.cm(2), pg_temp.cm(3), pg_temp.cm(4), pg_temp.cm(5), pg_temp.cm(6), pg_temp.cm(8)) order by id loop
     raise debug '%', got;
   end loop;
-  if (select cover_url from public.profiles where id = pg_temp.cm(1)) is distinct from pg_temp.preset('163BDB0C-64AC-44E7-8663-55C323ADB4FE.PNG') then
+  if (select cover_url from public.profiles where id = pg_temp.cm(1)) is distinct from pg_temp.preset('2257522A-04B9-4E3E-AB1A-A73D7BB8CCBF.PNG') then
     raise exception 'FAIL V3: an offered cover was changed'; end if;
   if (select cover_url from public.profiles where id = pg_temp.cm(2)) is not null then
     raise exception 'FAIL V3: the uploaded cover was not cleared'; end if;
   if (select cover_url from public.profiles where id = pg_temp.cm(3)) is distinct from pg_temp.preset('F28EA63E-1BEB-49E9-BA01-F62127017DB1.PNG') then
     raise exception 'FAIL V3: legacy webp path not mapped: %', (select cover_url from public.profiles where id = pg_temp.cm(3)); end if;
-  if (select cover_url from public.profiles where id = pg_temp.cm(4)) is distinct from pg_temp.preset('163BDB0C-64AC-44E7-8663-55C323ADB4FE.PNG') then
+  if (select cover_url from public.profiles where id = pg_temp.cm(4)) is distinct from pg_temp.preset('2257522A-04B9-4E3E-AB1A-A73D7BB8CCBF.PNG') then
     raise exception 'FAIL V3: legacy PNG path not mapped: %', (select cover_url from public.profiles where id = pg_temp.cm(4)); end if;
   if (select cover_url from public.profiles where id = pg_temp.cm(5)) is not null then
     raise exception 'FAIL V3: an unknown /assets/ path was not cleared'; end if;

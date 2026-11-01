@@ -14,7 +14,7 @@ const A = 'aaaaaaaa-aaaa-4aaa-8aaa-000000000001';
 const B = 'aaaaaaaa-aaaa-4aaa-8aaa-000000000002';
 const ago = (h) => new Date(Date.now() - h * 36e5).toISOString();
 const POSTS = [
-  { id: 'post-1', author_id: B, image_url: '/Images/Cover%20images/163BDB0C-64AC-44E7-8663-55C323ADB4FE.PNG', image_path: '', caption: 'Sunday rally at the courts.', created_at: ago(1) },
+  { id: 'post-1', author_id: B, image_url: '/Images/Cover%20images/94978B9F-A399-43FC-AC48-0A41088B5D27.PNG', image_path: '', caption: 'Sunday rally at the courts.', created_at: ago(1) },
   { id: 'post-2', author_id: A, image_url: '/Images/Cover%20images/2257522A-04B9-4E3E-AB1A-A73D7BB8CCBF.PNG', image_path: '', caption: 'Chess night.', created_at: ago(3) },
 ];
 const AUTHORS = [
@@ -151,7 +151,7 @@ try {
       const c = document.querySelector('#chat-messages .message-post:not(.is-gone)');
       return { img: c?.querySelector('.message-post-media img')?.getAttribute('src'), author: c?.querySelector('.message-post-author')?.innerText.trim(), caption: c?.querySelector('.message-post-caption')?.textContent, link: document.querySelector('#chat-messages')?.innerText.includes('explore.html'), gone: document.querySelector('#chat-messages .message-post.is-gone')?.innerText.trim() };
     });
-    check(`${w}: the shared post shows as a card with image, author and caption, not a raw link`, /163BDB0C/.test(card.img || '') && card.author === 'Bilal Place' && card.caption === 'Sunday rally at the courts.' && !card.link, JSON.stringify(card));
+    check(`${w}: the shared post shows as a card with image, author and caption, not a raw link`, /94978B9F/.test(card.img || '') && card.author === 'Bilal Place' && card.caption === 'Sunday rally at the courts.' && !card.link, JSON.stringify(card));
     check(`${w}: a post that is gone says so`, /no longer available/.test(card.gone || ''), JSON.stringify(card));
     const axeCard = await axeViolations(page, { include: '#chat-messages .message-post' });
     check(`${w}: axe on the chat with the post card`, axeCard.length === 0, JSON.stringify(axeCard));

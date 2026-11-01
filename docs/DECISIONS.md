@@ -2302,3 +2302,21 @@ controls (a tester or a seeded test member), never a real member, so no new expo
   stops asking. Once 0016 is applied, nothing else is needed: signup and Edit profile save it, the hero and the cards
   show it, and Edit profile keeps it editable.
 - **Proof:** e2e deck 198 (card bio); unit 379; styles OK.
+
+## D-116: Retire "THE THOUGHTFUL ROOM" cover and add 9 new covers (founder, 2026-11-01)
+
+- **Asked:** "remove the thoughtful room cover pic and add these ones in the list" (11 uploads, 2 exact duplicates: 9
+  unique images).
+- **Done:** `163BDB0C-...PNG` ("THE THOUGHTFUL ROOM") is gone from the client (`preset-cover.js`, `cover-assets.js`, the
+  signup picker in `auth.html`, `media/manifest.json`), from `site/media/` and from `source-media/`. The 9 new covers are
+  appended in key order: THE SLOW BAKE, TAKE YOUR SHOT, ON REPEAT, GAME, SET, GO, AFTER PRACTICE, GOLDEN HOUR, LATE NIGHT
+  TAKES, SLOW EVENINGS, MATCH DAY (titles are ours; the founder can rename them). 26 covers in all. Each is encoded
+  like every other cover (`optimize-media.mjs` settings: WebP q78, max 1600 px, ICC kept): 49-111 KB from ~2 MB PNGs.
+- **Default cover:** was the retired one. It is now the first offered cover, "MAKE SOMETHING" (`2257522A-...PNG`):
+  `defaultCoverUrl`, the signup preselect and `GUIDED_DEFAULT_COVER`.
+- **Server (0019):** redefines `brivia_offered_cover_keys()` with the 26 names (0014 stays frozen) and clears every
+  profile whose `cover_url` names the retired file to null (default cover), test members included, since the image is
+  no longer shipped. Community posts are untouched; one that used the retired image shows without it, like any unknown
+  preset. Deploy the client first, then apply 0019 (after 0014).
+- **Proof:** unit 380; SQL harness ALL PASSED (new `cover-refresh.test.sql`); e2e profile-media 193, deck 198, app-shell
+  211, explore-cards 74, post-activity 55, onboarding 269; build and asset budget OK.
