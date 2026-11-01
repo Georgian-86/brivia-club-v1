@@ -86,7 +86,7 @@ const NEW_MEMBER = {
   ],
 };
 const COMPLETE_MEMBER = {
-  own: { ...NEW_MEMBER.own, experience: 'Product designer, 6 years', looking_for: ['Friends', 'Mentor', 'Co-founder'], photo_url: `https://stub.supabase.local/storage/v1/object/public/profile-photos/${ME_ID}/p.jpg`, cover_url: '/Images/Cover%20images/2257522A-04B9-4E3E-AB1A-A73D7BB8CCBF.PNG' },
+  own: { ...NEW_MEMBER.own, experience: 'Product designer, 6 years', looking_for: ['Friends', 'Mentor', 'Co-founder'], photo_url: `https://stub.supabase.local/storage/v1/object/public/profile-photos/${ME_ID}/p.jpg`, cover_url: '/Images/Cover%20images/F28EA63E-1BEB-49E9-BA01-F62127017DB1.PNG' },
   myInterests: [
     { interest_id: 'sports.racket.badminton', label: 'Badminton', points: 8, mode: 'play' },
     { interest_id: 'games.board.chess', label: 'Chess', points: 5, mode: 'teach' },
@@ -887,7 +887,7 @@ try {
       const before = st.posts;
       const ago = (h) => new Date(Date.now() - h * 36e5).toISOString();
       st.posts = [
-        { id: 'post-preset', author_id: A, image_url: '/Images/Cover%20images/163BDB0C-64AC-44E7-8663-55C323ADB4FE.PNG', image_path: '', caption: 'Preset illustration', created_at: ago(1) },
+        { id: 'post-preset', author_id: A, image_url: '/Images/Cover%20images/94978B9F-A399-43FC-AC48-0A41088B5D27.PNG', image_path: '', caption: 'Preset illustration', created_at: ago(1) },
         { id: 'post-external', author_id: A, image_url: 'https://tracker.example/p.jpg', image_path: '', caption: 'External image', created_at: ago(2) },
         { id: 'post-unknown', author_id: A, image_url: '/Images/Cover%20images/NOT-A-PRESET.PNG', image_path: '', caption: 'Unknown preset', created_at: ago(3) },
       ];
@@ -902,7 +902,7 @@ try {
         const preset = cards['Preset illustration'];
         assert.ok(preset && preset.src, 'the preset post has an <img>');
         assert.match(preset.src, /^\/(assets|media)\//);
-        assert.ok(/\.webp$/.test(preset.src) || /163BDB0C/.test(preset.src), preset.src);
+        assert.ok(/\.webp$/.test(preset.src) || /94978B9F/.test(preset.src), preset.src);
         assert.equal(preset.loaded, true, 'the preset image loads');
         assert.equal(preset.missing, false);
         for (const caption of ['External image', 'Unknown preset']) {

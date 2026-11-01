@@ -48,7 +48,7 @@ end $$;
 do $$
 declare
   base text := 'https://proj.supabase.co/storage/v1/object/public/';
-  preset text := '/Images/Cover%20images/163BDB0C-64AC-44E7-8663-55C323ADB4FE.PNG';
+  preset text := '/Images/Cover%20images/2257522A-04B9-4E3E-AB1A-A73D7BB8CCBF.PNG';
   t uuid := pg_temp.dp(1); r uuid := pg_temp.dp(2); x uuid := pg_temp.dp(3);
   stmt text; who uuid; rec record; failed boolean; post_id uuid;
 begin

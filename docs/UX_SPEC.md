@@ -200,7 +200,7 @@ background under a pseudo-element).
      budget; the member can still move points before Next.
    - "What are you looking for?" (unchanged) is required here too.
 4. **Security and presence** (`STEP 4 OF 4 · SECURITY & PRESENCE`): password, photo (framed in "Frame your photo",
-   §E) and cover. The cover is one of the 18 provided covers only (D-080): there is no upload, and the picker stores the
+   §E) and cover. The cover is one of the 26 provided covers only (D-080, D-116): there is no upload, and the picker stores the
    preset path `/Images/Cover%20images/<file>`, never the build URL of the image.
 
 **Submit order.** With a session: save the profile, then `set_home_location` or `set_home_city`, then
@@ -240,7 +240,7 @@ so it never covers "Log in".
 state: "Pick interests in your profile setup") ("These come from your interests and passion
 points. Private interests are never shown.").
 There are no City or State inputs (D-036). **Cover (D-080):** there is no cover upload anywhere. A fieldset "COVER"
-("Choose one of the Brivia covers. Your own pictures can't be used as a cover.") holds the 18 provided covers as a
+("Choose one of the Brivia covers. Your own pictures can't be used as a cover.") holds the 26 provided covers as a
 radio group of 16:9 thumbnails with their uppercase titles (the signup picker's), 2 columns on phones and up to 5 on
 desktop; the current cover is checked (wine ring, a check badge, bold deep-wine title; a legacy value marks its preset,
 none marks the default first cover). Arrow keys move the choice; focus shows a deep-wine ring. SAVE CHANGES stores the

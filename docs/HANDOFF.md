@@ -1,11 +1,15 @@
 # Session handoff (read after CLAUDE.md)
 
-Last updated: 2026-10-28 (D-100 chat inbox, D-101 post activity and 0015, D-102 photo and setup). Before that: 2026-10-20 (live-database correction D-070; "Send without a note" D-071). Before that: 2026-10-16 (design references, D-062). Before that: 2026-10-13, after Phase D of the experience iteration (the test world), on branch
+Last updated: 2026-11-01 (D-116 cover set). Before that: 2026-10-28 (D-100 chat inbox, D-101 post activity and 0015, D-102 photo and setup). Before that: 2026-10-20 (live-database correction D-070; "Send without a note" D-071). Before that: 2026-10-16 (design references, D-062). Before that: 2026-10-13, after Phase D of the experience iteration (the test world), on branch
 `claude/jolly-edison-49xvza` (repo `Georgian-86/brivia-club-v1`). Phases C and D are not on `main` yet, and Phase D's SQL
 is not applied: the founder applies it in the SQL editor (section 3, item 0).
 Update this file at the end of every session. CLAUDE.md holds the aim; this file holds **where we are**.
 
 ## 1. What is done
+
+**2026-11-01, D-116:** "THE THOUGHTFUL ROOM" cover is retired and 9 new covers are added (26 in all); the default
+cover is now "MAKE SOMETHING". **Owed: apply `0019_cover_set_refresh.sql`** after the client deploys (README "0019";
+needs 0014).
 
 **2026-10-31, D-115:** the deck card shows the bio (`member_bio`). **Owed: apply `0016_profile_bio.sql`** in the SQL
 editor; until then no bio is stored anywhere (hero, cards and the saves all wait on it).

@@ -783,3 +783,24 @@ select has_table_privilege('authenticated', 'public.member_presence', 'select'),
 
 Expected advisor additions: `connection_presence`, `my_presence_visible`, `set_presence_visible` and `touch_presence`
 join the intended definer-RPC list (`orbit-hygiene.test.sql` H3).
+
+## 0019
+
+**The cover set changes: "THE THOUGHTFUL ROOM" is retired and 9 covers are added (founder request 2026-11-01, D-116).
+Not yet applied.** Needs `0014` applied first.
+
+What it does: redefines `brivia_private.brivia_offered_cover_keys()` with 26 names (mirrors `PRESET_COVER_KEYS`,
+pinned by `tests/unit/preset-cover.test.mjs`), and adds `brivia_private.brivia_clear_retired_covers()` (definer, no
+client grants) which it runs once: every profile whose `cover_url` names `163BDB0C-64AC-44E7-8663-55C323ADB4FE` gets
+null (the default cover). Running it again changes nothing.
+
+Deploy order: **deploy the client first** (it no longer offers or ships the retired cover), then apply `0019`. Applied
+before the client, a signup on the old page that keeps the old default would have its cover refused (the save then
+drops the cover, as in 0014).
+
+Verify after the apply:
+
+```sql
+select cardinality(brivia_private.brivia_offered_cover_keys()),                                   -- 26
+       (select count(*) from public.profiles where cover_url like '%163BDB0C-64AC-44E7-8663-55C323ADB4FE%'); -- 0
+```

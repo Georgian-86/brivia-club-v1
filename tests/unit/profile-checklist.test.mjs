@@ -4,8 +4,8 @@ import assert from 'node:assert/strict';
 import { profileChecklist } from '../../site/scripts/profile-checklist.js';
 
 // The default cover as cover-assets.js resolves it: the dev path, and the hashed optimized build URL.
-const DEFAULT_DEV = '/media/Images/Cover images/163BDB0C-64AC-44E7-8663-55C323ADB4FE.webp';
-const DEFAULT_BUILD = '/assets/163BDB0C-64AC-44E7-8663-55C323ADB4FE-Ab12_-Cd.webp';
+const DEFAULT_DEV = '/media/Images/Cover images/2257522A-04B9-4E3E-AB1A-A73D7BB8CCBF.webp';
+const DEFAULT_BUILD = '/assets/2257522A-04B9-4E3E-AB1A-A73D7BB8CCBF-Ab12_-Cd.webp';
 const three = [
   { interest_id: 'a', label: 'Badminton', points: 10, mode: 'play' },
   { interest_id: 'b', label: 'Chess', points: 6, mode: 'learn' },
@@ -13,7 +13,7 @@ const three = [
 ];
 const complete = {
   photoUrl: 'https://stub.supabase.local/storage/v1/object/public/profile-photos/me/p.jpg',
-  coverUrl: '/Images/Cover%20images/2257522A-04B9-4E3E-AB1A-A73D7BB8CCBF.PNG',
+  coverUrl: '/Images/Cover%20images/F28EA63E-1BEB-49E9-BA01-F62127017DB1.PNG',
   lookingFor: 'Friends, Mentor',
   experience: 'Product designer',
 };
@@ -32,9 +32,9 @@ test('the default cover does not count, a legacy hashed default cover does not c
   assert.deepEqual(doneKeys(profileChecklist({ coverUrl: DEFAULT_BUILD }, [], DEFAULT_BUILD)), []);
   // Stored values from older builds and the original preset path all name the same default preset.
   for (const stored of [
-    '/assets/163BDB0C-64AC-44E7-8663-55C323ADB4FE-Bcr88PbJ.PNG',
-    '/Images/Cover%20images/163BDB0C-64AC-44E7-8663-55C323ADB4FE.PNG',
-    '/assets/163BDB0C-64AC-44E7-8663-55C323ADB4FE-Ab12_-Cd.webp',
+    '/assets/2257522A-04B9-4E3E-AB1A-A73D7BB8CCBF-Bcr88PbJ.PNG',
+    '/Images/Cover%20images/2257522A-04B9-4E3E-AB1A-A73D7BB8CCBF.PNG',
+    '/assets/2257522A-04B9-4E3E-AB1A-A73D7BB8CCBF-Ab12_-Cd.webp',
   ]) {
     assert.deepEqual(doneKeys(profileChecklist({ coverUrl: stored }, [], DEFAULT_DEV)), [], stored);
     assert.deepEqual(doneKeys(profileChecklist({ coverUrl: stored }, [], DEFAULT_BUILD)), [], stored);

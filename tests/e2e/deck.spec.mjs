@@ -351,7 +351,7 @@ try {
   // 6a. Legacy stored covers (hashed /assets/<name>-<hash>.PNG, original /Images/Cover%20images/<name>.PNG) must show the
   // bundled .webp on other members' swipe cards, and the image must actually load.
   const coverRows = [
-    { id: A, name: 'Legacy Hashed', photo_url: null, cover_url: '/assets/163BDB0C-64AC-44E7-8663-55C323ADB4FE-Bcr88PbJ.PNG', experience: 'Chef', skills: ['Cooking'], looking_for: ['Friends'], distance_band: '~3 km', shared_interests: [] },
+    { id: A, name: 'Legacy Hashed', photo_url: null, cover_url: '/assets/F28EA63E-1BEB-49E9-BA01-F62127017DB1-Bcr88PbJ.PNG', experience: 'Chef', skills: ['Cooking'], looking_for: ['Friends'], distance_band: '~3 km', shared_interests: [] },
     { id: B, name: 'Legacy Original', photo_url: null, cover_url: '/Images/Cover%20images/2257522A-04B9-4E3E-AB1A-A73D7BB8CCBF.PNG', experience: 'Pilot', skills: ['Flying'], looking_for: ['Friends'], distance_band: '~4 km', shared_interests: [] },
   ];
   resetStub({ rows: coverRows });
