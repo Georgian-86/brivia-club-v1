@@ -833,3 +833,25 @@ public.brivia_grid_cell(<lat>, <lng>, 7)` from the venue's public address, a cat
 `image_key` the client ships (`site/scripts/event-assets.js`: jam, tech, chess, dandiya, badminton, food, vinyl, photo,
 desk; blank uses the category's image).
 
+## 0021
+
+**Crossing paths: a quiet alert when two connections are nearby (founder request 2026-11-01, D-119). Not yet applied.**
+Apply after `0020` (it needs nothing from 0016-0020, only 0001-0010).
+
+What it does: adds `nearby_setting`, `nearby_live`, `nearby_move`, `nearby_mute` and `nearby_alert` (RLS on, no grants,
+deleted with the profile), six `authenticated`-only definer RPCs (`set_nearby_enabled`, `my_nearby_setting`,
+`nearby_pulse`, `nearby_clear`, `my_nearby_alerts`, `set_nearby_muted`), the internal `purge_nearby()` and, when pg_cron
+is installed, the job `brivia-purge-nearby` every 30 minutes. No coordinates are stored (spec §9.1.4a).
+
+Deploy order: either. Before 0021 the client hides the Crossing paths switch and sends nothing.
+
+Verify after the apply:
+
+```sql
+select has_table_privilege('authenticated', 'public.nearby_live', 'select'),                                   -- f
+       has_function_privilege('anon', 'public.nearby_pulse(double precision, double precision)', 'execute'),     -- f
+       has_function_privilege('authenticated', 'public.nearby_pulse(double precision, double precision)', 'execute'), -- t
+       (select count(*) from cron.job where jobname = 'brivia-purge-nearby');                                   -- 1
+```
+
+Expected advisor additions: the six RPCs join the intended definer-RPC list (`orbit-hygiene.test.sql` H3).

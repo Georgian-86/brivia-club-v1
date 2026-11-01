@@ -1,0 +1,48 @@
+/* Crossing paths (D-119): the "<name> is nearby" row in the notification panel, the paused line in Settings and the
+   explainer sheet. Tokens only; the row follows the collaboration section (collab-requests.css). */
+
+/* ---------- The panel row ---------- */
+.notification-nearby{
+  display:grid;grid-template-columns:auto minmax(0,1fr);align-items:center;gap:6px var(--space-3);
+  padding:var(--space-3) 15px;border-bottom:1px solid var(--color-line);
+  background:linear-gradient(135deg, color-mix(in srgb, var(--brivia-wine) 5%, var(--color-cream)), var(--color-cream));
+}
+.notification-nearby-copy{display:flex;flex-direction:column;gap:2px;min-width:0}
+.notification-nearby-copy strong{color:var(--color-wine-deep);font-family:var(--font-heading);font-size:var(--text-14);font-weight:600;line-height:1.25}
+.notification-nearby-copy span{overflow:hidden;color:var(--color-ink-soft);font-size:var(--text-12);text-overflow:ellipsis;white-space:nowrap}
+.notification-nearby-actions{grid-column:2;display:flex;align-items:center;gap:var(--space-2)}
+.notification-nearby-hi,.notification-nearby-mute{
+  min-width:44px;min-height:44px;padding:0 var(--space-4);border-radius:var(--radius-pill);
+  font-family:var(--font-body);font-size:var(--text-12);font-weight:700;letter-spacing:.08em;text-transform:uppercase;cursor:pointer;
+  transition:background var(--motion-fast) var(--ease), color var(--motion-fast) var(--ease);
+}
+.notification-nearby-hi{border:0;background:var(--brivia-wine);color:var(--color-cream)}
+.notification-nearby-mute{border:1px solid var(--color-line);background:transparent;color:var(--color-ink-soft)}
+@media (hover:hover){
+  .notification-nearby-hi:hover{background:var(--color-wine-deep)}
+  .notification-nearby-mute:hover{color:var(--color-wine-deep)}
+}
+.notification-nearby-hi:focus-visible,.notification-nearby-mute:focus-visible{outline:2px solid var(--brivia-wine);outline-offset:2px}
+.notification-nearby-mute:disabled{cursor:wait;opacity:.55}
+
+/* ---------- Settings ---------- */
+.settings-toggle-row .settings-nearby-status{color:var(--color-ink-soft)}
+.settings-toggle-row .settings-nearby-status:empty{display:none}
+[data-nearby-setting]{border-top:0}
+
+/* ---------- The explainer ---------- */
+.crossing-paths-modal{z-index:190}
+.crossing-paths-dialog .profile-edit-kicker{color:var(--color-ink-soft)}
+.crossing-paths-points{display:grid;gap:var(--space-3);margin:var(--space-3) 0 var(--space-5);padding:0;list-style:none}
+.crossing-paths-points li{padding-left:var(--space-4);border-left:2px solid color-mix(in srgb, var(--brivia-wine) 30%, transparent);color:var(--color-ink-soft);font-size:var(--text-14);line-height:1.45}
+.crossing-paths-points strong{color:var(--color-wine-deep);font-weight:700}
+.crossing-paths-buttons{display:flex;justify-content:flex-end;gap:var(--space-2)}
+.crossing-paths-later,.crossing-paths-confirm{
+  min-height:44px;padding:0 var(--space-5);border-radius:var(--radius-pill);
+  font-family:var(--font-body);font-size:var(--text-12);font-weight:700;letter-spacing:.08em;text-transform:uppercase;cursor:pointer;
+}
+.crossing-paths-later{border:1px solid var(--color-line);background:transparent;color:var(--color-ink-soft)}
+.crossing-paths-confirm{border:0;background:var(--brivia-wine);color:var(--color-cream)}
+@media (hover:hover){.crossing-paths-confirm:hover{background:var(--color-wine-deep)}}
+.crossing-paths-later:focus-visible,.crossing-paths-confirm:focus-visible{outline:2px solid var(--brivia-wine);outline-offset:2px}
+@media (prefers-reduced-motion:reduce){.notification-nearby-hi,.notification-nearby-mute{transition:none}}
