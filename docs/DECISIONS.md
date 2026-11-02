@@ -2581,3 +2581,13 @@ controls (a tester or a seeded test member), never a real member, so no new expo
 - **Proof:** SQL harness ALL PASSED (N2 now covers a free interest and Register on it); unit 435; e2e events,
   create-event, companions.
 - **Owed:** apply 0025 then 0026 (README); run the removal script.
+
+## D-127 (2026-11-02): a Brivia cover can be the event poster
+
+- **Ask (founder):** "in the events poster add the opt to use the cover pictures as well in the place of poster".
+- **Decision:** the poster field offers "Use a Brivia cover" (empty state) and "Covers" (on a chosen poster). It opens a
+  grid of the 26 profile covers (`PRESET_COVERS`). A picked cover is fetched from the site, goes through the same area
+  step (D-125) and uploads to the organiser's own `event-posters` folder like a photo.
+- **Why client-only:** `club_event.image_url` must be the creator's storage file (0022). Copying the picture keeps that
+  rule, needs no migration and keeps the cropped area. Cost: one small JPEG per event in storage.
+- **Proof:** e2e create-event (covers grid, Escape, pick, area step, upload) at 1440 and 390; build, style ratchet.

@@ -142,6 +142,25 @@ try {
     check(`${w}: Adjust area is offered on the chosen poster`, await page.locator('[data-ec-crop-open]').isVisible());
     check(`${w}: the poster previews with Replace and Remove`, await page.locator('[data-ec-poster-img]').isVisible() && await page.locator('.ec-drop-tools').innerText().then((t) => /Replace/i.test(t) && /Remove/i.test(t)));
     check(`${w}: the poster went to the member's own event-posters folder`, st.calls.some((c) => c.method === 'POST' && c.path.startsWith(`/storage/v1/object/event-posters/${ownRow.id}/`)));
+    // D-127: a Brivia cover can be the poster; it goes through the same area step and upload.
+    const coverUploadsBefore = st.calls.filter((c) => c.method === 'POST' && c.path.startsWith('/storage/v1/object/event-posters/')).length;
+    await page.locator('[data-ec-drop-filled] [data-ec-covers-open]').click();
+    await page.waitForSelector('[data-ec-covers]:not([hidden])');
+    check(`${w}: "Covers" opens the 26 Brivia covers, the first one focused`, (await page.locator('[data-ec-cover]').count()) === 26
+      && await page.evaluate(() => document.activeElement?.matches('[data-ec-cover]')));
+    await page.locator('[data-ec-covers]').scrollIntoViewIfNeeded();
+    await page.waitForFunction(() => [...document.querySelectorAll('[data-ec-cover] img')].slice(0, 4).every((i) => i.complete && i.naturalWidth > 0), null, { timeout: 10000 }).catch(() => {});
+    await shot(page, `create-covers-${w}.png`);
+    await page.keyboard.press('Escape');
+    check(`${w}: Escape closes the covers and keeps the poster`, await page.locator('[data-ec-covers]').isHidden() && await page.locator('[data-ec-poster-img]').isVisible()
+      && await page.locator('#event-create-dialog').isVisible());
+    await page.locator('[data-ec-drop-filled] [data-ec-covers-open]').click();
+    await page.locator('[data-ec-cover]').nth(3).click();
+    await page.waitForSelector('[data-ec-crop]:not([hidden])');
+    check(`${w}: a picked cover opens the area step`, await page.locator('[data-ec-covers]').isHidden());
+    await page.locator('[data-ec-crop-apply]').click();
+    await page.waitForFunction(() => !document.querySelector('[data-ec-drop-filled]').hidden && document.querySelector('[data-ec-poster-busy]').hidden);
+    check(`${w}: the cover uploads as the event's own poster`, st.calls.filter((c) => c.method === 'POST' && c.path.startsWith(`/storage/v1/object/event-posters/${ownRow.id}/`)).length > coverUploadsBefore);
     await page.setInputFiles('#ec-poster', { name: 'notes.pdf', mimeType: 'application/pdf', buffer: PNG });
     check(`${w}: a document is refused inline`, /Choose a photo/.test(await page.locator('#ec-image-error').innerText()));
     check(`${w}: the pickers open the whole gallery (image/*, HEIC) and the camera input asks for the camera`, await page.evaluate(() =>

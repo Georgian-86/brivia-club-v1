@@ -172,6 +172,15 @@ body.app-body .event-btn.ec-camera-only { display: none; }
 .ec-crop-actions { display: flex; justify-content: flex-end; gap: var(--space-2); }
 body.app-body .ec-crop-actions .event-btn-primary { background: var(--ec-wine); color: var(--ec-paper); }
 @media (hover: hover) { body.app-body .ec-crop-actions .event-btn-primary:hover { background: var(--ec-wine-deep); } }
+/* The Brivia covers as the poster (D-127): a grid of the profile covers; a pick goes through the area step above. */
+.ec-covers { display: grid; gap: var(--space-3); padding: var(--space-4); }
+.ec-covers[hidden] { display: none; }
+.ec-cover-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(112px, 1fr)); gap: var(--space-2); max-height: 320px; margin: 0; padding: 4px; overflow-y: auto; list-style: none; }
+body.app-body .ec-cover-option { display: block; width: 100%; padding: 0; overflow: hidden; aspect-ratio: 3 / 2; border: 0; border-radius: var(--radius-m); background: var(--ec-field); cursor: pointer; transition: box-shadow var(--motion-fast) ease, transform var(--motion-fast) ease; }
+.ec-cover-option img { display: block; width: 100%; height: 100%; object-fit: cover; }
+@media (hover: hover) { body.app-body .ec-cover-option:hover { box-shadow: 0 0 0 2px var(--ec-wine); } }
+body.app-body .ec-cover-option:focus-visible { outline: 2px solid var(--ec-wine); outline-offset: 2px; }
+body.app-body .ec-cover-option:active { transform: scale(.97); }
 body.app-body .ec-drop-tools .event-btn svg { width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 1.8; }
 /* The brochure (D-125). */
 .ec-brochure { display: grid; gap: var(--space-2); margin-top: var(--space-4); }

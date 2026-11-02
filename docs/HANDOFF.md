@@ -7,6 +7,8 @@ Update this file at the end of every session. CLAUDE.md holds the aim; this file
 
 ## 1. What is done
 
+**2026-11-02, D-127:** a Brivia cover can be the event poster (client only, no migration).
+
 **2026-11-02, D-126:** Show interest on every event (free too; Register upgrades it). **Owed: apply
 `0026_interest_all_events.sql`** after 0025, and the one-off `keep_only_candlelit_gambit.sql` (project files) to leave
 only Yashika's "The Candlelit Gambit".
