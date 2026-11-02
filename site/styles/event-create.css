@@ -148,9 +148,47 @@ body.app-body .event-btn.ec-camera-only { display: none; }
 .ec-drop-empty u { color: var(--ec-wine); text-underline-offset: 3px; }
 .ec-drop-filled { position: relative; overflow: hidden; aspect-ratio: 16 / 7; border-radius: calc(var(--radius-l) - 1px); }
 .ec-drop-filled img { display: block; width: 100%; height: 100%; object-fit: cover; }
-.ec-drop-tools { position: absolute; right: var(--space-3); bottom: var(--space-3); display: flex; gap: var(--space-2); }
+.ec-drop-tools { position: absolute; right: var(--space-3); bottom: var(--space-3); left: var(--space-3); display: flex; flex-wrap: wrap; justify-content: flex-end; gap: var(--space-2); }
 .ec-uploading { position: absolute; top: var(--space-3); left: var(--space-3); padding: 4px var(--space-3); border-radius: var(--radius-pill); background: color-mix(in srgb, var(--ec-paper) 92%, transparent); color: var(--ec-ink); font-size: var(--text-12); font-weight: 600; }
 .ec-uploading[hidden] { display: none; }
+/* The poster area (D-125): a 3:2 window, like the card; drag, arrow keys or the zoom slider choose what shows. */
+.ec-crop { display: grid; gap: var(--space-2); padding: var(--space-4); }
+.ec-crop[hidden] { display: none; }
+.ec-crop-title { margin: 0; color: var(--ec-ink); font-family: var(--font-heading); font-size: var(--text-20); font-weight: 500; }
+.ec-crop-frame { position: relative; overflow: hidden; aspect-ratio: 3 / 2; border-radius: var(--radius-m); background: var(--ec-ink); cursor: grab; touch-action: none; user-select: none; }
+.ec-crop-frame.is-dragging { cursor: grabbing; }
+.ec-crop-frame:focus-visible { outline: 2px solid var(--ec-wine); outline-offset: 3px; }
+.ec-crop-frame img { position: absolute; top: 0; left: 0; max-width: none; transform-origin: 0 0; pointer-events: none; }
+.ec-crop-frame::after {
+  content: ""; position: absolute; inset: 0; pointer-events: none; border: 1px solid color-mix(in srgb, var(--ec-paper) 70%, transparent);
+  border-radius: inherit;
+  background:
+    linear-gradient(to right, transparent calc(33.33% - .5px), color-mix(in srgb, var(--ec-paper) 35%, transparent) 0 calc(33.33% + .5px), transparent 0 calc(66.66% - .5px), color-mix(in srgb, var(--ec-paper) 35%, transparent) 0 calc(66.66% + .5px), transparent 0),
+    linear-gradient(to bottom, transparent calc(33.33% - .5px), color-mix(in srgb, var(--ec-paper) 35%, transparent) 0 calc(33.33% + .5px), transparent 0 calc(66.66% - .5px), color-mix(in srgb, var(--ec-paper) 35%, transparent) 0 calc(66.66% + .5px), transparent 0);
+}
+.ec-crop-zoom { display: flex; align-items: center; gap: var(--space-3); }
+.ec-crop-zoom label { color: var(--ec-muted); font-size: var(--text-12); font-weight: 700; letter-spacing: .1em; text-transform: uppercase; }
+.ec-crop-zoom input { flex: 1; min-height: 44px; accent-color: var(--ec-wine); }
+.ec-crop-actions { display: flex; justify-content: flex-end; gap: var(--space-2); }
+body.app-body .ec-crop-actions .event-btn-primary { background: var(--ec-wine); color: var(--ec-paper); }
+@media (hover: hover) { body.app-body .ec-crop-actions .event-btn-primary:hover { background: var(--ec-wine-deep); } }
+body.app-body .ec-drop-tools .event-btn svg { width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 1.8; }
+/* The brochure (D-125). */
+.ec-brochure { display: grid; gap: var(--space-2); margin-top: var(--space-4); }
+.ec-brochure [hidden] { display: none; }
+body.app-body .ec-brochure-add {
+  display: inline-flex; align-items: center; gap: var(--space-2); min-height: 48px; padding: 0 var(--space-4);
+  border: 1px dashed color-mix(in srgb, var(--ec-wine) 45%, transparent); border-radius: var(--radius-m); background: transparent;
+  color: var(--ec-wine); font: inherit; font-size: var(--text-14); font-weight: 600; cursor: pointer;
+}
+.ec-brochure:has(input:focus-visible) .ec-brochure-add { outline: 2px solid var(--ec-wine); outline-offset: 2px; }
+.ec-brochure.has-error .ec-brochure-add { border-color: var(--ec-wine); }
+.ec-brochure svg { width: 20px; height: 20px; flex: 0 0 20px; color: var(--ec-wine); fill: none; stroke: currentColor; stroke-width: 1.5; }
+.ec-brochure-file { position: relative; display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-3); padding: var(--space-3) var(--space-4); border: 1px solid color-mix(in srgb, var(--ec-wine) 25%, transparent); border-radius: var(--radius-m); background: var(--ec-field); }
+.ec-brochure-name { flex: 1 1 140px; min-width: 0; overflow: hidden; color: var(--ec-ink); font-size: var(--text-14); font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }
+.ec-brochure-tools { display: flex; flex-wrap: wrap; gap: var(--space-2); }
+body.app-body .ec-brochure-tools a.event-btn { display: inline-flex; align-items: center; text-decoration: none; }
+.ec-brochure-file .ec-uploading { position: static; }
 .ec-gallery { display: grid; gap: var(--space-2); margin-top: var(--space-2); }
 .ec-gallery-list { display: flex; flex-wrap: wrap; gap: var(--space-2); margin: 0; padding: 0; list-style: none; }
 .ec-gallery-list li { position: relative; width: 72px; height: 72px; overflow: hidden; border-radius: var(--radius-m); }

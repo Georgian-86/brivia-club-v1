@@ -933,3 +933,28 @@ select has_function_privilege('authenticated', 'public.send_connect_request(uuid
        (select count(*) from pg_trigger where tgname = 'brivia_matches_deliver_pitches');                 -- 1
 ```
 
+## 0025
+
+**Show interest and the event brochure (founder request 2026-11-02, D-125). Not yet applied.** Apply after `0023`
+(it redefines the Find a Companion functions over the wider pool). Needs `0020`, `0022` and `0023`.
+
+What it does: `event_rsvp.status` also allows `'interested'` (a paid event's half registration: no seat, not going, in
+the companion pool); `brivia_companion_status` names the pool (confirmed, payment hold, interested) and
+`list_events` (two more columns: `interested_count`, `brochure_url`), `set_event_rsvp`, `event_companions`,
+`brivia_companion_eligible`, `companion_events` and `companion_deck` use it. New: `club_event.brochure_url`, the public
+`event-brochures` bucket (application/pdf, 5 MB, own-folder policies), `set_event_interest(uuid, boolean, boolean)` and
+`set_event_brochure(uuid, text)` for `authenticated`.
+
+Deploy order: either. Before 0025, Show interest answers "opens soon" and an event saves without its brochure; the
+rest works. After 0025, members with a payment hold who opted in start seeing companions (they waited before).
+
+Verify after the apply:
+
+```sql
+select has_function_privilege('authenticated', 'public.set_event_interest(uuid, boolean, boolean)', 'execute'),   -- t
+       has_function_privilege('authenticated', 'public.set_event_brochure(uuid, text)', 'execute'),               -- t
+       (select file_size_limit from storage.buckets where id = 'event-brochures'),                                -- 5242880
+       (select count(*) from information_schema.columns where table_name = 'club_event' and column_name = 'brochure_url'); -- 1
+```
+
+Expect the advisor's usual warnings for the two new security-definer RPCs (they check `auth.uid()` themselves).

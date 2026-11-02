@@ -184,7 +184,7 @@ test('drawer: host, Reserve for a paid event, map link, contact only when given,
   const html = eventDetailMarkup(e);
   assert.match(html, /Hosted by<\/span><strong>Kiran/);
   assert.match(html, /Reserve · ₹1,499/);
-  assert.match(html, /confirmed only once payment completes/);
+  assert.match(html, /confirmed once payment completes/);
   assert.match(html, /href="https:\/\/maps\.app\.goo\.gl\/abc" target="_blank" rel="noopener noreferrer nofollow"/);
   assert.match(html, /Looking for a companion\?/);
   assert.match(html, /Going solo\? Find someone attending the same event and make it a shared experience/);
@@ -194,7 +194,7 @@ test('drawer: host, Reserve for a paid event, map link, contact only when given,
   assert.match(withContact, /href="mailto:host@example\.com"/);
   assert.ok(!withContact.includes('javascript:'), 'only https links render');
   assert.match(eventDetailMarkup({ ...e, registeredCount: 20 }), /disabled aria-disabled="true">Registrations closed/);
-  assert.match(eventDetailMarkup({ ...e, myStatus: 'pending_payment', going: true }), /Payment pending[\s\S]*seat is confirmed/);
+  assert.match(eventDetailMarkup({ ...e, myStatus: 'pending_payment', going: true }), /Payment pending[\s\S]*confirmed only after payment succeeds/);
 });
 
 test('drawer for the organiser: counts and tools, never companion choices; inline confirm', () => {
@@ -233,12 +233,14 @@ test('Find my companion: one press does the next right thing for each member', a
   const { companionStep } = await import('../../site/scripts/events-view.js');
   const e = normalizeEvent({ ...row, capacity: 10, registered_count: 2 });
   assert.equal(companionStep(e), 'join', 'free, not registered: one confirm registers and opts in');
-  assert.equal(companionStep({ ...e, feeInr: 499 }), 'reserve');
+  assert.equal(companionStep({ ...e, feeInr: 499 }), 'interest', 'paid, not registered: show interest (no payment) and opt in');
   assert.equal(companionStep({ ...e, registeredCount: 10 }), 'closed');
   assert.equal(companionStep({ ...e, myStatus: 'confirmed', going: true }), 'optin');
   assert.equal(companionStep({ ...e, myStatus: 'confirmed', going: true, wantsCompanion: true }), 'list');
   assert.equal(companionStep({ ...e, myStatus: 'confirmed', registeredCount: 10, going: true, wantsCompanion: true }), 'list', 'a full event still lists for someone with a seat');
-  assert.equal(companionStep({ ...e, myStatus: 'pending_payment', going: true }), 'pending');
+  assert.equal(companionStep({ ...e, myStatus: 'pending_payment', going: true }), 'optin', 'a payment hold is in the pool (D-125)');
+  assert.equal(companionStep({ ...e, feeInr: 499, myStatus: 'interested' }), 'optin');
+  assert.equal(companionStep({ ...e, feeInr: 499, myStatus: 'interested', wantsCompanion: true, registeredCount: 10 }), 'list', 'an interest lists even when full');
   assert.equal(companionStep({ ...e, isMine: true }), 'host');
   assert.equal(companionStep({ ...e, status: 'cancelled' }), 'closed');
 });
@@ -252,4 +254,51 @@ test('Find my companion on the card and in the drawer; Connect on each match', (
   assert.match(html, /data-event-companions[^>]*>.*Find my companion/s);
   assert.match(html, /8 people are looking for company/);
   assert.match(companionRowMarkup({ id: 'p', name: 'Ravi', sharedInterests: 2 }), />Connect<span class="sr-only"> with Ravi/);
+});
+
+test('Show interest (D-125): a half registration for paid events, counted for companions, no seat held', async () => {
+  const { canShowInterest, withInterest, interestedLabel, registrationState, mapLinkLabel } = await import('../../site/scripts/events-view.js');
+  const paid = normalizeEvent({ ...row, fee_inr: 799, capacity: 10, registered_count: 2, interested_count: 3, brochure_url: 'https://x.supabase.co/storage/v1/object/public/event-brochures/u/b.pdf' });
+  assert.equal(paid.interestedCount, 3);
+  assert.match(paid.brochureUrl, /b\.pdf$/);
+  assert.equal(normalizeEvent({ ...row, my_status: 'interested' }).myStatus, 'interested');
+  assert.ok(canShowInterest(paid));
+  assert.ok(!canShowInterest(normalizeEvent(row)), 'free events register in one tap');
+  assert.ok(!canShowInterest({ ...paid, isMine: true }));
+  assert.ok(!canShowInterest({ ...paid, myStatus: 'pending_payment' }));
+  assert.equal(interestedLabel(0), '');
+  let html = eventDetailMarkup(paid);
+  assert.match(html, /data-event-interest aria-pressed="false">.*Show interest/s);
+  assert.match(html, /Reserve · ₹799/);
+  assert.match(html, /3 interested/);
+  assert.match(eventCardMarkup(paid), /₹799 · 8 spots left · 3 interested/);
+  const on = withInterest(paid, true, true);
+  assert.equal(on.myStatus, 'interested');
+  assert.equal(on.going, false);
+  assert.equal(on.interestedCount, 4);
+  assert.equal(on.registeredCount, 2, 'no seat is held');
+  assert.equal(registrationState(on), 'interested');
+  html = eventDetailMarkup(on);
+  assert.match(html, /aria-pressed="true">.*Interested/s);
+  assert.match(html, /data-event-wants aria-checked="true"[^>]*>(?!.*disabled)/, 'the companion switch works on an interest');
+  assert.ok(!/data-event-wants[^>]*disabled/.test(html));
+  const off = withInterest(on, false);
+  assert.equal(off.myStatus, null);
+  assert.equal(off.interestedCount, 3);
+  assert.equal(off.wantsCompanion, false);
+  const reserved = withRsvp(on, true, true, 'pending_payment');
+  assert.equal(reserved.interestedCount, 3, 'reserving moves the interest into a hold');
+  assert.equal(reserved.registeredCount, 3);
+  assert.equal(mapLinkLabel('https://maps.app.goo.gl/x'), 'Open in Google Maps');
+  assert.equal(mapLinkLabel('https://maps.apple.com/?q=x'), 'Open in Maps');
+});
+
+test('drawer: the brochure link only for a checked URL; the map link has its icon', () => {
+  const e = normalizeEvent({ ...row, map_url: 'https://maps.app.goo.gl/abc' });
+  assert.ok(!eventDetailMarkup(e).includes('event-brochure'), 'no brochure without a checked URL');
+  const html = eventDetailMarkup(e, { brochureSrc: 'https://x.supabase.co/storage/v1/object/public/event-brochures/u/b.pdf' });
+  assert.match(html, /class="event-brochure" href="https:\/\/x\.supabase\.co[^"]*b\.pdf" target="_blank" rel="noopener noreferrer">/);
+  assert.match(html, /Event brochure/);
+  assert.match(html, /class="event-map-link"[^>]*><svg[^>]*>.*<span>Open in Google Maps<\/span>/s);
+  assert.ok(!eventDetailMarkup(e, { brochureSrc: 'javascript:alert(1)' }).includes('event-brochure'));
 });

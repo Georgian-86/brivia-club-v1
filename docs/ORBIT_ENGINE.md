@@ -1069,8 +1069,9 @@ Explore lists events the club curates. This is location-first ranking outside th
   row lock on the event; one registration per member per event. A paid event's registration is `pending_payment`: a
   30-minute held seat that counts toward capacity and is not confirmed until the payment provider confirms it
   (`confirm_event_payment`, service role only). The organiser's own registration is confirmed.
-- **Companions for member events.** Opt-in needs a registration, and companions are listed only among **confirmed**
-  registrations that opted in, for a confirmed caller who opted in. Order: exact shared interests (as above), then
+- **Companions for member events.** Opt-in needs a registration (or, since D-125, a shown interest), and companions
+  are listed only among the pool (§11.3; before D-125 **confirmed** registrations only) that opted in, for a caller in
+  the pool who opted in. Order: exact shared interests (as above), then
   shared background (`looking_for` and `skills` values in common, case-insensitive), then the same experience band,
   then who joined first. Still no distance term and no Passion Budget weights. The organiser gets counts only, never a
   list of who registered or who wants company.
@@ -1079,7 +1080,8 @@ Explore lists events the club curates. This is location-first ranking outside th
 
 ### 11.2 Find a Companion: event-based mutual matching (D-123, migration 0023)
 
-- **Pool.** Per event: members with a **confirmed** registration who opted in ("Looking for a companion?"), on a
+- **Pool.** Per event: members in the pool (§11.3: a confirmed seat, a payment hold or a shown interest; confirmed only
+  before D-125) who opted in ("Looking for a companion?"), on a
   published, open, not cancelled event. The caller must be in the pool to see anyone. Others shown only if
   `brivia_visible_to` (same world, no block, both completed), not already a connection, and not yet swiped by the
   caller for that event.
@@ -1094,6 +1096,16 @@ Explore lists events the club curates. This is location-first ranking outside th
   event) and the ordinary Brivia connection (`brivia_create_match`), so Chat opens. One like never creates anything
   visible. The second swiper sees "Looks like you're going together!" at once; the first is notified
   (`my_companion_matches` unseen) until they open it. The chat header names the event ("GOING TOGETHER · EVENT · DATE").
+
+### 11.3 Show interest and the wider pool (D-125, migration 0025)
+
+- **Show interest.** On a paid event a member can show interest without paying (`set_event_interest`): an
+  `event_rsvp` row with status `interested`. It holds no seat, is not "going", and is shown only as a count
+  ("3 interested"). Free events have no interest step. The organiser cannot show interest in their own event.
+- **Pool.** The companion pool for an event (§11 list, §11.1 and the Find a Companion deck in §11.2) is every member
+  with a confirmed seat, a payment hold (live or lapsed) or a shown interest who opted in
+  (`brivia_companion_status`). This replaces "confirmed only" in §11.1 and §11.2, so people can find company before
+  paying. Order, visibility, swipes and the match rule are unchanged; "friends going" still lists confirmed seats only.
 
 ## Appendix A (DRAFT, not scheduled): Constellations
 

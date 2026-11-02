@@ -241,19 +241,48 @@ export const startAppStub = async ({ port, state = {}, deckRows = defaultDeckRow
         }
         if (args.p_going === true && !e.going) {
           if (e.capacity && (e.registered_count || 0) >= e.capacity) return json(400, { code: 'P0001', message: 'event_full' });
-          const wants = args.p_wants_companion === null ? Boolean(st.companionDefault) : Boolean(args.p_wants_companion);
+          const wants = args.p_wants_companion === null ? (e.my_status === 'interested' ? Boolean(e.wants_companion) : Boolean(st.companionDefault)) : Boolean(args.p_wants_companion);
           const status = e.fee_inr > 0 && !e.is_mine ? 'pending_payment' : 'confirmed';
           e.going_count += 1; e.registered_count = (e.registered_count || 0) + 1; if (wants) e.companion_count += 1;
+          if (e.my_status === 'interested') { e.interested_count = Math.max(0, (e.interested_count || 0) - 1); if (e.wants_companion) e.companion_count -= 1; }
           Object.assign(e, { going: true, wants_companion: wants, my_status: status });
           return json(200, [{ going: true, wants_companion: wants, status }]);
         }
         if (args.p_wants_companion !== null && args.p_wants_companion !== undefined) {
-          if (!e.going) return json(400, { code: '22023', message: 'register first' });
+          if (!e.going && e.my_status !== 'interested') return json(400, { code: '22023', message: 'register first' });
           const wants = Boolean(args.p_wants_companion);
           e.companion_count += wants === e.wants_companion ? 0 : wants ? 1 : -1;
           e.wants_companion = wants;
         }
         return json(200, [{ going: e.going, wants_companion: e.wants_companion, status: e.my_status || 'confirmed' }]);
+      }
+      // D-125 (0025): "Show interest" (st.interests records each call) and the brochure (st.brochures). st.noInterest
+      // answers PGRST202 for both, as a database without 0025.
+      if (['/rest/v1/rpc/set_event_interest', '/rest/v1/rpc/set_event_brochure'].includes(pathName) && st.noInterest) {
+        return json(404, { code: 'PGRST202', message: 'Could not find the function' });
+      }
+      if (pathName === '/rest/v1/rpc/set_event_interest') {
+        (st.interests ||= []).push(args);
+        const e = st.events.find((x) => x.id === args.p_event);
+        if (!e || !(e.fee_inr > 0) || e.is_mine) return json(400, { code: '22023', message: e && !(e.fee_inr > 0) ? 'free event' : 'invalid event' });
+        if (e.going) { if (args.p_on && args.p_wants_companion !== null) e.wants_companion = Boolean(args.p_wants_companion); return json(200, [{ interested: true, wants_companion: e.wants_companion, status: e.my_status }]); }
+        const was = e.my_status === 'interested';
+        if (!args.p_on) {
+          if (was) { e.interested_count = Math.max(0, (e.interested_count || 0) - 1); if (e.wants_companion) e.companion_count -= 1; }
+          Object.assign(e, { my_status: null, wants_companion: false });
+          return json(200, [{ interested: false, wants_companion: false, status: null }]);
+        }
+        const wants = args.p_wants_companion === null || args.p_wants_companion === undefined ? (was ? e.wants_companion : Boolean(st.companionDefault)) : Boolean(args.p_wants_companion);
+        if (!was) e.interested_count = (e.interested_count || 0) + 1;
+        e.companion_count += wants === (was && e.wants_companion) ? 0 : wants ? 1 : -1;
+        Object.assign(e, { my_status: 'interested', wants_companion: wants });
+        return json(200, [{ interested: true, wants_companion: wants, status: 'interested' }]);
+      }
+      if (pathName === '/rest/v1/rpc/set_event_brochure') {
+        (st.brochures ||= []).push(args);
+        const e = st.events.find((x) => x.id === args.p_id);
+        if (e) e.brochure_url = args.p_url || null;
+        return json(200, args.p_url || null);
       }
       // save_member_event / cancel / delete (0022): st.saved records each body; st.saveError answers an error once.
       if (pathName === '/rest/v1/rpc/save_member_event') {

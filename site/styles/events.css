@@ -251,7 +251,28 @@ body.app-body .events-create:focus-visible { outline: 2px solid var(--ev-wine); 
 
 .event-detail-status { margin: 0; padding: var(--space-2) var(--space-3); border-radius: var(--radius-m); background: color-mix(in srgb, var(--ev-ink) 7%, var(--ev-paper)); color: var(--ev-ink); font-size: var(--text-14); font-weight: 600; }
 .event-detail-status.is-cancelled { background: color-mix(in srgb, var(--ev-wine) 10%, var(--ev-paper)); color: var(--ev-wine-deep); }
-body.app-body .event-map-link { margin-left: 6px; color: var(--ev-wine); font-weight: 600; text-decoration: underline; text-underline-offset: 3px; white-space: nowrap; }
+/* "Open in Google Maps" (D-125): a quiet pill with a folded-map icon under the address. */
+.event-map-row { margin: var(--space-1) 0 0 calc(16px + var(--space-2)); }
+body.app-body .event-map-link {
+  display: inline-flex; align-items: center; gap: var(--space-2); min-height: 36px; padding: 0 var(--space-3);
+  border: 1px solid color-mix(in srgb, var(--ev-wine) 30%, transparent); border-radius: var(--radius-pill);
+  background: color-mix(in srgb, var(--ev-wine) 5%, var(--ev-paper)); color: var(--ev-wine); font-size: var(--text-12);
+  font-weight: 700; letter-spacing: .08em; text-transform: uppercase; text-decoration: none; white-space: nowrap;
+}
+body.app-body .event-map-link svg { width: 18px; height: 18px; flex: 0 0 18px; fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linejoin: round; }
+body.app-body .event-map-link .event-map-pin { fill: currentColor; stroke: none; }
+@media (hover: hover) { body.app-body .event-map-link:hover { background: color-mix(in srgb, var(--ev-wine) 10%, var(--ev-paper)); } }
+/* The brochure (D-125): one quiet row with a document icon. */
+body.app-body .event-brochure {
+  display: flex; align-items: center; gap: var(--space-3); margin-top: var(--space-3); padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--ev-line); border-radius: var(--radius-m); color: var(--ev-ink); text-decoration: none;
+}
+body.app-body .event-brochure svg { width: 22px; height: 22px; flex: 0 0 22px; color: var(--ev-wine); fill: none; stroke: currentColor; stroke-width: 1.5; }
+.event-brochure-text { display: grid; flex: 1; line-height: 1.25; }
+.event-brochure-text strong { font-size: var(--text-14); font-weight: 600; }
+.event-brochure-text small { color: var(--ev-muted); font-size: var(--text-12); letter-spacing: .08em; }
+.event-brochure > span[aria-hidden] { color: var(--ev-wine); }
+@media (hover: hover) { body.app-body .event-brochure:hover { border-color: color-mix(in srgb, var(--ev-wine) 40%, transparent); } }
 .event-organizer { display: flex; align-items: center; gap: var(--space-3); margin-top: var(--space-2); }
 .event-organizer p { display: grid; margin: 0; line-height: 1.25; }
 .event-organizer span:not(.event-avatar) { color: var(--ev-muted); font-size: var(--text-12); letter-spacing: .08em; text-transform: uppercase; }
@@ -260,6 +281,28 @@ body.app-body .event-map-link { margin-left: 6px; color: var(--ev-wine); font-we
 .event-avatar-club { background: var(--ev-wine); color: var(--ev-paper); font-family: var(--font-heading); }
 
 .event-register-row { align-items: center; }
+/* Reserve and "Show interest" (D-125): one primary and one secondary action, side by side at equal width under the
+   fee (stacked below 360 px), 48 px tall, the same pill shape and type, so they read as one choice. */
+.event-register-row.is-paired { justify-content: flex-start; }
+.event-register-pair { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-2); margin-top: var(--space-3); }
+@media (max-width: 359px) { .event-register-pair { grid-template-columns: 1fr; } }
+body.app-body .event-register-pair > * { width: 100%; min-height: 48px; justify-content: center; }
+body.app-body .event-going-toggle.is-primary { border-color: var(--ev-wine); background: var(--ev-wine); color: var(--ev-paper); box-shadow: var(--ev-shadow); }
+@media (hover: hover) { body.app-body .event-going-toggle.is-primary:hover { background: var(--ev-wine-deep); border-color: var(--ev-wine-deep); } }
+body.app-body .event-going-toggle.is-primary[disabled] { border-color: var(--ev-line); background: transparent; color: var(--ev-muted); box-shadow: none; }
+body.app-body .event-interest-toggle {
+  display: inline-flex; align-items: center; justify-content: center; gap: var(--space-2); min-height: 48px; padding: 0 var(--space-4);
+  border: 1px solid color-mix(in srgb, var(--ev-wine) 45%, transparent); border-radius: var(--radius-pill); background: var(--ev-paper);
+  color: var(--ev-wine); font: inherit; font-size: var(--text-12); font-weight: 700; letter-spacing: .1em; text-transform: uppercase;
+  cursor: pointer; white-space: nowrap;
+}
+body.app-body .event-interest-toggle svg { width: 16px; height: 16px; flex: 0 0 16px; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linejoin: round; }
+body.app-body .event-interest-toggle[aria-pressed="true"] { border-color: var(--ev-wine); background: color-mix(in srgb, var(--ev-wine) 9%, var(--ev-paper)); }
+body.app-body .event-interest-toggle[aria-pressed="true"] svg { fill: currentColor; }
+body.app-body :is(.event-going-toggle, .event-interest-toggle):not([disabled]):active { transform: scale(.97); }
+body.app-body :is(.event-going-toggle, .event-interest-toggle) { transition: background var(--motion-fast, 150ms) ease, transform var(--motion-fast, 150ms) ease; }
+@media (prefers-reduced-motion: reduce) { body.app-body :is(.event-going-toggle, .event-interest-toggle) { transition: none; } body.app-body :is(.event-going-toggle, .event-interest-toggle):active { transform: none; } }
+@media (hover: hover) { body.app-body .event-interest-toggle:hover { background: color-mix(in srgb, var(--ev-wine) 6%, var(--ev-paper)); } }
 .event-register-copy { display: grid; gap: 2px; }
 .event-register-fee { margin: 0; color: var(--ev-ink); font-family: var(--font-heading); font-size: var(--text-20); font-weight: 500; }
 .event-register-seats { margin: 0; color: var(--ev-muted); font-size: var(--text-14); }

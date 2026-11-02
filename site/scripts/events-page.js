@@ -10,7 +10,7 @@
 // note). The organiser edits, cancels or deletes their own event from its drawer.
 import {
   visibleCategories, EVENTS_EMPTY, isEventCategory, normalizeEvent, withRsvp, filterEvents, nearbyEvents,
-  eventCardMarkup, eventDetailMarkup, questionNote, companionStep, feeLabel,
+  eventCardMarkup, eventDetailMarkup, questionNote, companionStep, withInterest,
 } from './events-view.js';
 import { eventImageSrc } from './event-assets.js';
 
@@ -53,6 +53,7 @@ export const createEventsPage = ({ root, api, safeImage, toast, isMissing, sendH
       ...cardOpts(event), confirm: state.confirm,
       organizerSrc: event.organizer?.photoUrl ? safeImage(event.organizer.photoUrl) : '',
       gallery: event.gallery.map((u) => safeImage(u)).filter(Boolean),
+      brochureSrc: event.brochureUrl ? safeImage(event.brochureUrl) : '',
     });
   };
 
@@ -132,7 +133,7 @@ export const createEventsPage = ({ root, api, safeImage, toast, isMissing, sendH
 
   const replaceEvent = (next) => {
     state.events = state.events.map((e) => (e.id === next.id ? next : e));
-    const focusedAttr = ['data-event-wants', 'data-event-going', 'data-event-unregister'].find((a) => document.activeElement?.hasAttribute?.(a));
+    const focusedAttr = ['data-event-wants', 'data-event-going', 'data-event-unregister', 'data-event-interest'].find((a) => document.activeElement?.hasAttribute?.(a));
     if (state.selectedId === next.id) {
       renderPanel();
       // After registering or cancelling the button changes; keep focus in the same row.
@@ -151,9 +152,11 @@ export const createEventsPage = ({ root, api, safeImage, toast, isMissing, sendH
   // going: true registers, false cancels, null keeps the registration; wants: the companion choice or null to keep it
   // (a new registration takes the page switch's default).
   const changeRsvp = async (event, going, wants, { quiet = false } = {}) => {
+    // A shown interest carries the companion choice too (0025): the switch changes it through the interest.
+    if (going === null && event.myStatus === 'interested') return changeInterest(event, true, wants, { quiet });
     const before = event;
     const nextGoing = going === null ? event.going : going;
-    const nextWants = !nextGoing ? false : wants === null ? (event.going ? event.wantsCompanion : state.companionDefault) : wants;
+    const nextWants = !nextGoing ? false : wants === null ? (event.going || event.myStatus === 'interested' ? event.wantsCompanion : state.companionDefault) : wants;
     const optimistic = withRsvp(event, nextGoing, nextWants);
     replaceEvent(optimistic);
     const { data, error } = await api.setEventRsvp(event.id, going, going === false ? null : wants);
@@ -175,12 +178,41 @@ export const createEventsPage = ({ root, api, safeImage, toast, isMissing, sendH
     return true;
   };
 
+  // "Show interest" (D-125, 0025): on a paid event, no seat and no payment, but the member is in the companion pool.
+  // wants: the companion choice, or null to keep it (a new interest takes the page switch's default).
+  const changeInterest = async (event, on, wants, { quiet = false } = {}) => {
+    const before = event;
+    const nextWants = !on ? false : wants === null ? (event.myStatus === 'interested' ? event.wantsCompanion : state.companionDefault) : wants;
+    replaceEvent(withInterest(event, on, nextWants));
+    const { data, error } = await api.setEventInterest(event.id, on, on ? wants : null);
+    if (error) {
+      replaceEvent(before);
+      const message = String(error.message || '');
+      if (isMissing(error)) toast('Showing interest opens soon. You can reserve a seat now.');
+      else if (/invalid event|free event/.test(message)) { toast('This event is no longer open.'); load(); }
+      else toast('That did not save. Try again.');
+      return false;
+    }
+    if (data) {
+      if (!data.interested) replaceEvent(withInterest(before, false));
+      else if (data.status === 'interested') replaceEvent(withInterest(before, true, data.wants_companion));
+      else replaceEvent({ ...before, wantsCompanion: Boolean(data.wants_companion) });   // a seat or a live hold is kept
+    }
+    const after = byId(event.id);
+    if (quiet) return true;
+    if (!on) toast('You are no longer interested in this event.');
+    else if (before.myStatus !== 'interested') toast(after.wantsCompanion ? "Interest saved. People going who want company can find you now." : 'Interest saved. No seat is held until you reserve.');
+    else toast(after.wantsCompanion && !before.wantsCompanion ? "You'll be shown to others going who want company too." : !after.wantsCompanion && before.wantsCompanion ? 'Companion matching is off for this event.' : 'Saved.');
+    return true;
+  };
+
   const ownerAction = async (event, kind) => {
     const result = kind === 'cancel' ? await api.cancelMemberEvent(event.id) : await api.deleteMemberEvent(event.id);
     state.confirm = null;
     if (result.error) { renderPanel(); toast(isMissing(result.error) ? 'Events open soon.' : 'That did not work. Try again.'); return; }
     if (kind === 'delete') {
       api.removeEventImages?.(memberId(), [event.imageUrl, ...event.gallery].filter(Boolean));
+      if (event.brochureUrl) api.removeEventBrochures?.(memberId(), [event.brochureUrl]);
       state.events = state.events.filter((e) => e.id !== event.id);
       closeSheet();
       renderGrid();
@@ -230,9 +262,9 @@ export const createEventsPage = ({ root, api, safeImage, toast, isMissing, sendH
     const step = companionStep(event);
     if (step === 'host') { companionsNote("You're hosting, so you'll meet everyone there. Members going can find each other here."); return; }
     if (step === 'closed') { companionsNote('This event is full or no longer open, so there is no one new to match with.'); return; }
-    if (step === 'pending') { companionsNote('Your seat is waiting for payment. Companions are matched among confirmed seats, so they show here once it is confirmed.'); return; }
-    if (step === 'reserve') {
-      companionsNote(`Companions are matched among people with a seat. Reserve yours (${feeLabel(event.feeInr)}), and once payment completes, come back here.`, '<button type="button" class="event-companion-action is-primary" data-companion-reserve>Go to Reserve</button>');
+    if (step === 'interest') {
+      companionsNote("No need to pay first. You'll be marked as interested (no seat is held) and shown to others going who want company too. You can withdraw either any time.", '<button type="button" class="event-companion-action is-primary" data-companion-interest>Show interest &amp; find company</button>');
+      companionsActions().querySelector('button')?.focus();
       return;
     }
     if (step === 'join') {
@@ -261,7 +293,7 @@ export const createEventsPage = ({ root, api, safeImage, toast, isMissing, sendH
     if (chip) {
       const ev = byId(chip.dataset.eventCompanion);
       if (!ev) return;
-      if (ev.wantsCompanion && ev.going) {
+      if (ev.wantsCompanion && (ev.going || ev.myStatus === 'interested')) {
         changeRsvp(ev, null, false, { quiet: true }).then((ok) => {
           if (ok) toast(`You stopped looking for company at ${ev.title}.`);
           grid.querySelector(`[data-event-companion="${CSS.escape(ev.id)}"]`)?.focus();
@@ -278,6 +310,7 @@ export const createEventsPage = ({ root, api, safeImage, toast, isMissing, sendH
     if (!event) return;
     if (t.closest('[data-event-going]')) { changeRsvp(event, true, null); return; }
     if (t.closest('[data-event-unregister]')) { changeRsvp(event, false, false); return; }
+    if (t.closest('[data-event-interest]')) { changeInterest(event, event.myStatus !== 'interested', null); return; }
     const wants = t.closest('[data-event-wants]');
     if (wants && !wants.disabled) { changeRsvp(event, null, !event.wantsCompanion); return; }
     if (t.closest('[data-event-companions]')) { findCompanion(event); return; }
@@ -364,7 +397,13 @@ export const createEventsPage = ({ root, api, safeImage, toast, isMissing, sendH
       else findCompanion(byId(event.id) || event);
       return;
     }
-    if (e.target.closest('[data-companion-reserve]')) { closeCompanions('[data-event-going]'); return; }
+    const interest = e.target.closest('[data-companion-interest]');
+    if (interest) {
+      interest.disabled = true;
+      companionsNote('Saving your interest and finding company…');
+      if (await changeInterest(event, true, true, { quiet: true })) { toast("You're interested and looking for company."); goSwipe(event); }
+      else findCompanion(byId(event.id) || event);
+    }
   });
 
   return {

@@ -31,7 +31,7 @@ const FORM_KEYS = new Set(EVENT_FORM_CATEGORIES.map((c) => c.key));
 
 export const LIMITS = Object.freeze({
   title: 80, description: 2000, descriptionMin: 20, venueName: 120, venueAddress: 240, capacityMax: 5000, feeMax: 100000,
-  gallery: 6, imageBytes: 25 * 1024 * 1024,
+  gallery: 6, imageBytes: 25 * 1024 * 1024, brochureBytes: 5 * 1024 * 1024,
 });
 export const POSTER_TYPES = Object.freeze(['image/jpeg', 'image/png', 'image/webp']);
 // The photo pickers open the device's whole gallery (iPhones keep photos as HEIC). Every photo is re-encoded to a
@@ -51,7 +51,7 @@ export const emptyDraft = () => ({
   id: null, status: 'new', title: '', category: '', customCategory: '', description: '', date: '', startTime: '', endTime: '',
   venueName: '', venueAddress: '', placeId: '', city: '', pin: null, mapUrl: '', capacity: '', paid: false, fee: '',
   contactEmail: '', contactPhone: '', contactLink: '', contactPublic: false, imageUrl: '', gallery: [],
-  registeredCount: 0,
+  registeredCount: 0, brochureUrl: '', brochureName: '',
 });
 
 const istParts = (iso) => {
@@ -76,6 +76,7 @@ export const draftFromEvent = (event) => {
     mapUrl: event.mapUrl || '', capacity: event.capacity ? String(event.capacity) : '', paid: event.feeInr > 0, fee: event.feeInr > 0 ? String(event.feeInr) : '',
     contactEmail: contact.email || '', contactPhone: contact.phone || '', contactLink: contact.link || '', contactPublic: Boolean(contact.public),
     imageUrl: event.imageUrl || '', gallery: [...(event.gallery || [])], registeredCount: event.registeredCount || 0,
+    brochureUrl: event.brochureUrl || '', brochureName: event.brochureUrl ? 'Event brochure.pdf' : '',
     originalStart: event.startsAt || null,
   };
 };
@@ -203,6 +204,41 @@ export const imageFileProblem = (file) => {
   if (file.size > LIMITS.imageBytes) return 'Keep photos under 25 MB.';
   return '';
 };
+
+// The brochure (D-125, 0025): one PDF, at most 5 MB. '' or the problem.
+export const BROCHURE_ACCEPT = 'application/pdf,.pdf';
+export const brochureFileProblem = (file) => {
+  if (!file) return 'Choose a PDF.';
+  const type = String(file.type || '').toLowerCase();
+  const pdf = type === 'application/pdf' || ((!type || type === 'application/octet-stream') && /\.pdf$/i.test(String(file.name || '')));
+  if (!pdf) return 'The brochure must be a PDF.';
+  if (file.size > LIMITS.brochureBytes) return 'Keep the brochure under 5 MB.';
+  if (!file.size) return 'This PDF is empty.';
+  return '';
+};
+// A short, safe display name for the chosen PDF ('brochure.pdf' without one).
+export const brochureDisplayName = (file) => {
+  const name = String(file?.name || '').replace(/[\u0000-\u001f<>"'`\\/]/g, '').trim();
+  return (name || 'brochure.pdf').slice(-60);
+};
+
+// The poster area (D-125): the member picks which part of the poster the card shows. The card and drawer crop to
+// 3:2, so the chosen area is a 3:2 window. State: zoom (1 = the whole short side fits) and the window's centre in
+// image fractions (cx, cy). Answers the clamped centre, the display scale and the source rectangle in image pixels.
+export const COVER_ASPECT = 3 / 2;
+export const COVER_ZOOM = Object.freeze({ min: 1, max: 4 });
+export const coverCrop = ({ natW, natH, frameW, frameH, zoom = 1, cx = 0.5, cy = 0.5 }) => {
+  const z = Math.min(COVER_ZOOM.max, Math.max(COVER_ZOOM.min, Number(zoom) || 1));
+  const scale = Math.max(frameW / natW, frameH / natH) * z;
+  const sw = Math.min(natW, frameW / scale);
+  const sh = Math.min(natH, frameH / scale);
+  const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
+  const centreX = clamp((Number.isFinite(cx) ? cx : 0.5) * natW, sw / 2, natW - sw / 2);
+  const centreY = clamp((Number.isFinite(cy) ? cy : 0.5) * natH, sh / 2, natH - sh / 2);
+  return { zoom: z, scale, cx: centreX / natW, cy: centreY / natH, sx: centreX - sw / 2, sy: centreY - sh / 2, sw, sh };
+};
+// The output size for the chosen area: at most 1600 px wide, 3:2, never upscaled past the source.
+export const coverOutputSize = (sw) => { const w = Math.max(1, Math.round(Math.min(1600, sw))); return { w, h: Math.max(1, Math.round(w / COVER_ASPECT)) }; };
 
 // The live preview: the draft as a listed event (normalizeEvent's shape), so the real card renders it.
 export const previewEvent = (draft, { organizer = null, imageSrc = '' } = {}) => {

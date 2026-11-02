@@ -11,7 +11,7 @@
 -- M5 registration: capacity checked server-side ('event_full'); registering twice changes nothing; cancelling frees
 --    the seat; the companion choice needs a registration; with registrations the fee is locked and the capacity cannot
 --    drop under the seats taken.
--- M6 paid: a registration is pending_payment (a held seat, not confirmed, not a companion); confirm_event_payment
+-- M6 paid: a registration is pending_payment (a held seat, not confirmed; since 0025 in the companion pool); confirm_event_payment
 --    (service side) confirms it; an expired hold frees the seat.
 -- M7 cancel and delete: a cancelled event leaves others' lists but stays (marked cancelled) for the organiser and the
 --    members registered; a published event cannot be deleted; a draft or cancelled one can, with its registrations.
@@ -249,7 +249,7 @@ begin
   select * into r from public.set_event_rsvp(p, true, true);
   if r.status <> 'pending_payment' then raise exception 'FAIL M6: a paid registration must wait for payment, got %', r.status; end if;
   select * into r from public.list_events(null) where id = p;
-  if r.my_status <> 'pending_payment' or r.registered_count <> 1 or r.fee_inr <> 499 or r.companion_count <> 0 then
+  if r.my_status <> 'pending_payment' or r.registered_count <> 1 or r.fee_inr <> 499 or r.companion_count <> 1 then  -- 0025: a hold is in the companion pool
     raise exception 'FAIL M6: pending row %', r; end if;
   perform pg_temp.as_member(pg_temp.mv(3));
   c := pg_temp.code_of(format('select public.set_event_rsvp(%L, true)', p));

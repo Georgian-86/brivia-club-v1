@@ -367,6 +367,24 @@ export const removeEventImages = async (userId, urls) => {
   if (!paths.length) return;
   try { await supabase.storage.from('event-posters').remove(paths); } catch { /* ignored */ }
 };
+// D-125 (0025): "Show interest" in a paid event (no seat held; puts the member in the companion pool) and the event
+// brochure. Before 0025 each answers PGRST202 (isMissingFunction).
+export const setEventInterest = async (eventId, on, wantsCompanion = null) => firstRow(await rpcCall('set_event_interest', { p_event: eventId, p_on: Boolean(on), p_wants_companion: wantsCompanion === null ? null : Boolean(wantsCompanion) }));
+export const setEventBrochure = (eventId, url) => rpcCall('set_event_brochure', { p_id: eventId, p_url: url || null });
+// The brochure PDF: the member's own folder in the public event-brochures bucket (0025), at most 5 MB, never re-encoded.
+export const uploadEventBrochure = async (userId, file) => {
+  if (!supabase || !userId || !file) throw new Error('Event brochures are not configured.');
+  const path = `${userId}/${crypto.randomUUID()}.pdf`;
+  const { error } = await supabase.storage.from('event-brochures').upload(path, file, { upsert: false, contentType: 'application/pdf' });
+  if (error) throw error;
+  return { path, url: supabase.storage.from('event-brochures').getPublicUrl(path).data.publicUrl };
+};
+export const removeEventBrochures = async (userId, urls) => {
+  if (!supabase || !userId) return;
+  const paths = (urls || []).filter((u) => isStorageImageUrl(u, 'event-brochures', userId)).map((u) => `${userId}/${String(u).split('/').pop()}`);
+  if (!paths.length) return;
+  try { await supabase.storage.from('event-brochures').remove(paths); } catch { /* ignored */ }
+};
 // Crossing paths (0021, D-119). Before 0021 is applied each answers PGRST202 / 404 (isMissingFunction).
 // nearbyPulse is a POST (volatile RPC), so the coordinates travel in the body only.
 export const setNearbyEnabled = (on) => rpcCall('set_nearby_enabled', { p_enabled: Boolean(on) });

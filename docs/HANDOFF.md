@@ -1,11 +1,17 @@
 # Session handoff (read after CLAUDE.md)
 
-Last updated: 2026-11-02 (D-121 Create Event). Before that: 2026-11-01 (D-119 Crossing paths). Before that: 2026-11-01 (D-118 calmer Explore; D-117 Explore events, Posts tab). Before that: 2026-11-01 (D-116 cover set). Before that: 2026-10-28 (D-100 chat inbox, D-101 post activity and 0015, D-102 photo and setup). Before that: 2026-10-20 (live-database correction D-070; "Send without a note" D-071). Before that: 2026-10-16 (design references, D-062). Before that: 2026-10-13, after Phase D of the experience iteration (the test world), on branch
+Last updated: 2026-11-02 (D-125 Show interest, brochure, poster area). Before that: 2026-11-02 (D-121 Create Event). Before that: 2026-11-01 (D-119 Crossing paths). Before that: 2026-11-01 (D-118 calmer Explore; D-117 Explore events, Posts tab). Before that: 2026-11-01 (D-116 cover set). Before that: 2026-10-28 (D-100 chat inbox, D-101 post activity and 0015, D-102 photo and setup). Before that: 2026-10-20 (live-database correction D-070; "Send without a note" D-071). Before that: 2026-10-16 (design references, D-062). Before that: 2026-10-13, after Phase D of the experience iteration (the test world), on branch
 `claude/jolly-edison-49xvza` (repo `Georgian-86/brivia-club-v1`). Phases C and D are not on `main` yet, and Phase D's SQL
 is not applied: the founder applies it in the SQL editor (section 3, item 0).
 Update this file at the end of every session. CLAUDE.md holds the aim; this file holds **where we are**.
 
 ## 1. What is done
+
+**2026-11-02, D-125:** "Show interest" on paid events (no seat, not going, counted; puts the member in the companion
+pool, so Find a companion works before paying; Reserve upgrades it), the companion pool is now seat, hold or interest;
+a PDF brochure (5 MB) in Create Event and the drawer; a poster-area step (3:2 crop, drag/keys/zoom, "Adjust area");
+"Open in Google Maps" as a pill with a map icon. **Owed: apply `0025_event_interest_brochure.sql`** after 0023 (README
+"0025"). Tests `n-event-interest.test.sql`, `create-event.spec.mjs`, `events-view.test.mjs`.
 
 **2026-11-02, D-124:** "Make the first move." composer on Connect and on companion cards (counter, suggested openers,
 Send request, Cancel); requests show "Their message" with Accept / Decline; on Accept the message is the first chat
