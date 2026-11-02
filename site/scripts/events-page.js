@@ -10,7 +10,7 @@
 // note). The organiser edits, cancels or deletes their own event from its drawer.
 import {
   visibleCategories, EVENTS_EMPTY, isEventCategory, normalizeEvent, withRsvp, filterEvents, nearbyEvents,
-  eventCardMarkup, eventDetailMarkup, companionRowMarkup, companionNote, questionNote,
+  eventCardMarkup, eventDetailMarkup, companionRowMarkup, companionNote, questionNote, companionStep, feeLabel,
 } from './events-view.js';
 import { eventImageSrc } from './event-assets.js';
 
@@ -145,7 +145,7 @@ export const createEventsPage = ({ root, api, safeImage, toast, isMissing, sendH
 
   // going: true registers, false cancels, null keeps the registration; wants: the companion choice or null to keep it
   // (a new registration takes the page switch's default).
-  const changeRsvp = async (event, going, wants) => {
+  const changeRsvp = async (event, going, wants, { quiet = false } = {}) => {
     const before = event;
     const nextGoing = going === null ? event.going : going;
     const nextWants = !nextGoing ? false : wants === null ? (event.going ? event.wantsCompanion : state.companionDefault) : wants;
@@ -160,13 +160,14 @@ export const createEventsPage = ({ root, api, safeImage, toast, isMissing, sendH
       else if (/register first/.test(message)) toast('Register first, then look for company.');
       else if (/invalid event/.test(message)) { toast('This event is no longer open.'); load(); }
       else toast('That did not save. Try again.');
-      return;
+      return false;
     }
     if (data) replaceEvent(withRsvp(before, data.going, data.wants_companion, data.status || null));
     const after = byId(event.id);
     if (!after.going) toast(before.going ? 'Registration cancelled. Your spot is free for someone else.' : 'Saved.');
     else if (!before.going) toast(after.myStatus === 'pending_payment' ? 'Seat held for 30 minutes while payment completes.' : after.wantsCompanion ? "You're registered, and open to company." : "You're registered.");
-    else toast(after.wantsCompanion && !before.wantsCompanion ? "You'll be shown to others going who want company too." : !after.wantsCompanion && before.wantsCompanion ? 'Companion matching is off for this event.' : 'Saved.');
+    else if (!quiet) toast(after.wantsCompanion && !before.wantsCompanion ? "You'll be shown to others going who want company too." : !after.wantsCompanion && before.wantsCompanion ? 'Companion matching is off for this event.' : 'Saved.');
+    return true;
   };
 
   const ownerAction = async (event, kind) => {
@@ -197,25 +198,53 @@ export const createEventsPage = ({ root, api, safeImage, toast, isMissing, sendH
     text.focus();
   };
 
-  const showCompanions = async (event) => {
-    if (!dialog) return;
-    const list = dialog.querySelector('#event-companions-list');
-    dialog.querySelector('#event-companions-title').textContent = `Companions for ${event.title}`;
-    if (!event.wantsCompanion) {
-      list.innerHTML = `<li class="event-companions-note">${event.going ? 'Turn on "Looking for company?" first. Only people who did the same can see each other.' : 'Register for this event, then turn on "Looking for company?" to see who else wants company.'}</li>`;
-    } else {
-      list.innerHTML = '<li class="event-companions-note">Loading…</li>';
-    }
-    dialog.showModal();
-    if (!event.wantsCompanion) return;
+  // "Find my companion" (founder, 2026-11-02): one press finds people going to the same event who want company too.
+  // It registers (free event, after one confirm) and opts in as needed, then lists the matches; Connect sends an
+  // ordinary request (mutual consent: a connection exists only if they agree). The steps are companionStep's.
+  const companionsList = () => dialog.querySelector('#event-companions-list');
+  const companionsActions = () => dialog.querySelector('#event-companions-actions');
+  const companionsNote = (text, action = '') => {
+    companionsList().innerHTML = `<li class="event-companions-note">${text}</li>`;
+    companionsActions().innerHTML = action;
+  };
+  const listCompanions = async (event) => {
+    companionsNote('Finding people going who want company…');
     const { data, error } = await api.eventCompanions(event.id);
-    if (error) { list.innerHTML = '<li class="event-companions-note">Companions could not load. Try again.</li>'; return; }
+    if (!dialog.open || dialog.dataset.eventId !== event.id) return;
+    if (error) { companionsNote('Companions could not load.', '<button type="button" class="event-companion-action" data-companion-retry>Try again</button>'); return; }
     const people = (data || []).map((r) => ({ id: String(r.member_id), name: r.name || 'Member', src: safeImage(r.photo_url), sharedInterests: r.shared_interests, sharedBackground: r.shared_background, isConnection: Boolean(r.is_connection) }));
-    list.innerHTML = people.length
-      ? people.map((p) => companionRowMarkup(p, { sent: state.sent.has(p.id) })).join('')
-      : '<li class="event-companions-note">No one else is looking yet. We will show them here as they join.</li>';
-    dialog.dataset.eventId = event.id;
     dialog._people = people;
+    companionsList().innerHTML = people.length
+      ? people.map((p) => companionRowMarkup(p, { sent: state.sent.has(p.id) })).join('')
+      : '<li class="event-companions-note">No one else is looking yet. You are on the list now, so people who join will find you, and they will show here.</li>';
+    companionsActions().innerHTML = '<button type="button" class="event-text-action" data-companion-stop>Stop looking for company at this event</button>';
+  };
+  const findCompanion = async (event) => {
+    if (!dialog) return;
+    dialog.dataset.eventId = event.id;
+    dialog._people = [];
+    dialog.querySelector('#event-companions-title').textContent = 'Find my companion';
+    dialog.querySelector('#event-companions-lede').textContent = `${event.title}: people going who also want company, most shared interests first. Connect sends a request; you connect only if they agree.`;
+    if (!dialog.open) dialog.showModal();
+    const step = companionStep(event);
+    if (step === 'host') { companionsNote("You're hosting, so you'll meet everyone there. Members going can find each other here."); return; }
+    if (step === 'closed') { companionsNote('This event is full or no longer open, so there is no one new to match with.'); return; }
+    if (step === 'pending') { companionsNote('Your seat is waiting for payment. Companions are matched among confirmed seats, so they show here once it is confirmed.'); return; }
+    if (step === 'reserve') {
+      companionsNote(`Companions are matched among people with a seat. Reserve yours (${feeLabel(event.feeInr)}), and once payment completes, come back here.`, '<button type="button" class="event-companion-action is-primary" data-companion-reserve>Go to Reserve</button>');
+      return;
+    }
+    if (step === 'join') {
+      companionsNote("To find company, you'll be registered for this event and shown to others going who want company too. You can cancel either any time.", '<button type="button" class="event-companion-action is-primary" data-companion-join>Register &amp; find company</button>');
+      companionsActions().querySelector('button')?.focus();
+      return;
+    }
+    if (step === 'optin') {
+      companionsNote('Adding you to the people looking for company…');
+      if (!await changeRsvp(event, null, true, { quiet: true })) { companionsNote('That did not save. Try again in a moment.'); return; }
+      toast("You're now looking for company at this event.");
+    }
+    listCompanions(byId(event.id) || event);
   };
 
   const onClick = (e) => {
@@ -226,7 +255,7 @@ export const createEventsPage = ({ root, api, safeImage, toast, isMissing, sendH
     if (t.closest('[data-events-all]')) { state.nearby = false; state.category = 'all'; renderControls(); renderGrid(); return; }
     if (t.closest('[data-events-retry]')) { load(); return; }
     const chip = t.closest('[data-event-companion]');
-    if (chip) { openSheet(chip.dataset.eventCompanion, true); return; }
+    if (chip) { const ev = byId(chip.dataset.eventCompanion); if (ev) { openSheet(ev.id); findCompanion(ev); } return; }
     const detail = t.closest('[data-event-open-detail]');
     if (detail) { openSheet(detail.dataset.eventOpenDetail); return; }
     const card = t.closest('.event-card');
@@ -238,7 +267,7 @@ export const createEventsPage = ({ root, api, safeImage, toast, isMissing, sendH
     if (t.closest('[data-event-unregister]')) { changeRsvp(event, false, false); return; }
     const wants = t.closest('[data-event-wants]');
     if (wants && !wants.disabled) { changeRsvp(event, null, !event.wantsCompanion); return; }
-    if (t.closest('[data-event-companions]')) { showCompanions(event); return; }
+    if (t.closest('[data-event-companions]')) { findCompanion(event); return; }
     if (t.closest('[data-event-ask]')) { askQuestion(event); return; }
     if (t.closest('[data-event-edit]')) { closeSheet(); composer?.open(event); return; }
     const confirmKind = t.closest('[data-event-cancel]') ? 'cancel' : t.closest('[data-event-delete]') ? 'delete' : null;
@@ -301,21 +330,40 @@ export const createEventsPage = ({ root, api, safeImage, toast, isMissing, sendH
     }
   });
 
+  // Closing the companions dialog over an open drawer puts focus back in the drawer (not on the card behind it).
+  dialog?.addEventListener('close', () => {
+    if (!panel.classList.contains('is-sheet')) return;
+    window.setTimeout(() => (panel.querySelector('[data-event-companions]') || panel.querySelector('#event-detail-title'))?.focus(), 0);
+  });
   dialog?.addEventListener('click', async (e) => {
     if (e.target === dialog || e.target.closest('[data-companions-close]')) { dialog.close(); return; }
+    const event = byId(dialog.dataset.eventId);
+    if (!event) return;
+    const join = e.target.closest('[data-companion-join]');
+    if (join) {
+      join.disabled = true;
+      companionsNote('Registering you and finding company…');
+      if (await changeRsvp(event, true, true, { quiet: true })) { toast("You're registered and looking for company."); listCompanions(byId(event.id)); }
+      else findCompanion(byId(event.id) || event);
+      return;
+    }
+    if (e.target.closest('[data-companion-reserve]')) { dialog.close(); panel.querySelector('[data-event-going]')?.focus(); return; }
+    if (e.target.closest('[data-companion-retry]')) { listCompanions(event); return; }
+    if (e.target.closest('[data-companion-stop]')) {
+      if (await changeRsvp(event, null, false, { quiet: true })) { toast('You stopped looking for company at this event.'); dialog.close(); }
+      return;
+    }
     const hi = e.target.closest('[data-companion-hi]');
     const chat = e.target.closest('[data-companion-chat]');
     const person = (dialog._people || []).find((p) => p.id === (hi?.dataset.companionHi || chat?.dataset.companionChat));
     if (chat && person) { dialog.close(); closeSheet(); openChatWith(person); return; }
     if (!hi || !person || hi.disabled) return;
     hi.disabled = true;
-    const event = byId(dialog.dataset.eventId);
-    const result = await sendHello(person, companionNote(event?.title));
+    const result = await sendHello(person, companionNote(event.title));
     if (result?.error) { hi.disabled = false; return; }
     state.sent.add(person.id);
     hi.textContent = 'Request sent';
   });
-
 
   return {
     // After the composer saves: reload, and (for "View event") open that event.

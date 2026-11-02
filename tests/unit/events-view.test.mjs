@@ -89,27 +89,26 @@ test('card markup escapes text and labels the open button with the date and time
   // D-118: a quiet card: no tags, no counts of companions, two controls (open, Find a companion).
   assert.ok(!html.includes('event-tags'));
   assert.equal((html.match(/<button\b/g) || []).length, 2);
-  assert.match(html, /Find a companion<span class="sr-only"> for &lt;b&gt;Jam&lt;\/b&gt;<\/span>/);
-  assert.match(eventCardMarkup(normalizeEvent({ ...row, wants_companion: true, going: true })), /Looking for company/);
+  assert.match(html, /Find my companion<span class="sr-only"> for &lt;b&gt;Jam&lt;\/b&gt;<\/span>/);
+  assert.match(eventCardMarkup(normalizeEvent({ ...row, wants_companion: true, going: true })), /My companions/);
 });
 
 test('detail markup: switch state, the see-companions count excludes me, a hint until opted in', () => {
   const off = eventDetailMarkup(normalizeEvent(row));
   assert.match(off, /role="switch" data-event-wants aria-checked="false"[^>]* disabled/);
-  assert.match(off, /Register first/);
-  assert.match(off, /See companions \(8\)/);
-  assert.match(off, /id="event-see-hint"/);
+  assert.match(off, /Find my companion/);
+  assert.match(off, /8 people are looking for company/);
   const on = eventDetailMarkup(normalizeEvent({ ...row, going: true, wants_companion: true, companion_count: 9 }));
   assert.match(on, /aria-checked="true"/);
-  assert.match(on, /See companions \(8\)/);
+  assert.match(on, /My companions/);
+  assert.match(on, /8 people are looking for company/, 'others only: my own opt-in is not counted');
   assert.match(on, /Registered/);
   assert.match(on, /data-event-unregister/);
   assert.ok(!/data-event-wants[^>]* disabled/.test(on));
-  assert.ok(!on.includes('event-see-hint'));
 });
 
 test('companion rows: shared interests, connections get Message, sent disables', () => {
-  assert.match(companionRowMarkup({ id: 'p', name: 'Ravi', sharedInterests: 2 }), /2 shared interests[\s\S]*Say hi/);
+  assert.match(companionRowMarkup({ id: 'p', name: 'Ravi', sharedInterests: 2 }), /2 shared interests[\s\S]*Connect/);
   assert.match(companionRowMarkup({ id: 'p', name: 'Ravi', sharedInterests: 1 }), /1 shared interest</);
   assert.match(companionRowMarkup({ id: 'p', name: 'Ravi', isConnection: true }), /Already a connection[\s\S]*Message/);
   assert.match(companionRowMarkup({ id: 'p', name: 'Ravi' }, { sent: true }), /disabled>Request sent/);
@@ -170,7 +169,7 @@ test('card: poster, fee badge, seats line, Find a companion; a draft says only y
   assert.match(html, /event-fee-badge is-paid">₹1,499</);
   assert.match(html, /₹1,499 · 8 spots left/);
   assert.match(html, /12 registered/);
-  assert.match(html, /Find a companion/);
+  assert.match(html, /Find my companion/);
   const draft = eventCardMarkup(normalizeEvent({ ...member, status: 'draft', is_mine: true, starts_at: null, ends_at: null }));
   assert.match(draft, /event-status-badge">Draft/);
   assert.match(draft, /only you can see this/);
@@ -228,4 +227,29 @@ test('an Other event shows its own category name', () => {
   const html = eventCardMarkup(normalizeEvent({ ...row, category: 'other', custom_category: 'Book club' }));
   assert.match(html, /event-kicker">Book club/);
   assert.match(eventCardMarkup(normalizeEvent({ ...row, category: 'music', custom_category: 'Ignored' })), /event-kicker">Music/);
+});
+
+test('Find my companion: one press does the next right thing for each member', async () => {
+  const { companionStep } = await import('../../site/scripts/events-view.js');
+  const e = normalizeEvent({ ...row, capacity: 10, registered_count: 2 });
+  assert.equal(companionStep(e), 'join', 'free, not registered: one confirm registers and opts in');
+  assert.equal(companionStep({ ...e, feeInr: 499 }), 'reserve');
+  assert.equal(companionStep({ ...e, registeredCount: 10 }), 'closed');
+  assert.equal(companionStep({ ...e, myStatus: 'confirmed', going: true }), 'optin');
+  assert.equal(companionStep({ ...e, myStatus: 'confirmed', going: true, wantsCompanion: true }), 'list');
+  assert.equal(companionStep({ ...e, myStatus: 'confirmed', registeredCount: 10, going: true, wantsCompanion: true }), 'list', 'a full event still lists for someone with a seat');
+  assert.equal(companionStep({ ...e, myStatus: 'pending_payment', going: true }), 'pending');
+  assert.equal(companionStep({ ...e, isMine: true }), 'host');
+  assert.equal(companionStep({ ...e, status: 'cancelled' }), 'closed');
+});
+
+test('Find my companion on the card and in the drawer; Connect on each match', () => {
+  const e = normalizeEvent(row);
+  assert.match(eventCardMarkup(e), /data-event-companion="e1">Find my companion/);
+  assert.match(eventCardMarkup({ ...e, wantsCompanion: true }), />My companions</);
+  assert.ok(!eventCardMarkup({ ...e, isMine: true }).includes('data-event-companion='), 'no companion button on your own event');
+  const html = eventDetailMarkup(e);
+  assert.match(html, /data-event-companions[^>]*>.*Find my companion/s);
+  assert.match(html, /8 people are looking for company/);
+  assert.match(companionRowMarkup({ id: 'p', name: 'Ravi', sharedInterests: 2 }), />Connect<span class="sr-only"> with Ravi/);
 });

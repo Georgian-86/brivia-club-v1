@@ -1048,8 +1048,13 @@ Explore lists events the club curates. This is location-first ranking outside th
   companion?" for it, and sees only members who did the same. They are ordered by the number of exact shared interests
   (`member_interest` ids in common; no taxonomy proximity, no Passion Budget weights yet), then by who joined first. No
   distance term: everyone listed is going to the same place.
-- **Consent.** Being listed is not a connection. "Say hi" sends an ordinary signal (`send_signal`), so a connection
-  still exists only after the other member agrees.
+- **Consent.** Being listed is not a connection. "Connect" (was "Say hi") sends an ordinary signal (`send_signal`), so
+  a connection still exists only after the other member agrees.
+- **"Find my companion" (D-122).** One button on each event card and in the event drawer. A member already looking sees
+  the matches; a confirmed member not looking is opted in (and told so) first; a member not registered for a free event
+  confirms once ("Register & find company": one `set_event_rsvp(true, true)`); a paid seat is reserved first, and a
+  pending one waits for payment; the organiser gets no list. "Stop looking" turns off only the companion choice. The
+  matching rules above are unchanged.
 
 ### 11.1 Member-created events (D-121, migration 0022)
 

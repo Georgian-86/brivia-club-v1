@@ -237,7 +237,8 @@ export const eventCardMarkup = (event, { imageSrc = '', friends = [] } = {}) => 
     <p class="event-card-seats${spotsLeft(event) === 0 && live ? ' is-full' : ''}">${escapeHtml(seatsLine(event))}</p>
     <div class="event-card-foot">
       <span class="event-going">${friends.length ? `<span class="event-avatars">${avatarStack(friends)}</span>` : ''}<span>${escapeHtml(count)}</span></span>
-      ${live ? `<button type="button" class="event-companion-link${event.wantsCompanion ? ' is-on' : ''}" data-event-companion="${escapeHtml(event.id)}">${event.wantsCompanion ? 'Looking for company' : 'Find a companion'}<span class="sr-only"> for ${escapeHtml(event.title)}</span> ${ARROW}</button>`
+      ${live && !event.isMine ? `<button type="button" class="event-companion-link${event.wantsCompanion ? ' is-on' : ''}" data-event-companion="${escapeHtml(event.id)}">${event.wantsCompanion ? 'My companions' : 'Find my companion'}<span class="sr-only"> for ${escapeHtml(event.title)}</span> ${ARROW}</button>`
+    : live ? `<button type="button" class="event-companion-link" data-event-open-detail="${escapeHtml(event.id)}">Manage<span class="sr-only"> ${escapeHtml(event.title)}</span> ${ARROW}</button>`
     : `<button type="button" class="event-companion-link" data-event-open-detail="${escapeHtml(event.id)}">${event.isMine ? 'Manage' : 'Details'}<span class="sr-only"> ${escapeHtml(event.title)}</span> ${ARROW}</button>`}
     </div>
   </div>
@@ -337,9 +338,11 @@ export const eventDetailMarkup = (event, { imageSrc = '', friends = [], organize
   const where = [event.venueName, event.venueAddress, event.venueArea].filter(Boolean).join(', ');
   const map = event.mapUrl && safeHref(event.mapUrl)
     ? ` <a class="event-map-link" href="${escapeHtml(event.mapUrl)}" target="_blank" rel="noopener noreferrer nofollow">Open in Maps<span class="sr-only"> (opens in a new tab)</span> ${ARROW}</a>` : '';
-  const companionHint = !registered ? 'Register first, then turn this on to find company.'
-    : event.myStatus === 'pending_payment' ? 'You will see companions once your seat is confirmed.'
-      : !event.wantsCompanion ? 'Turn on "Looking for company?" to see who else is.' : '';
+  const step = companionStep(event);
+  const companionHint = step === 'pending' ? 'You will see companions once your seat is confirmed.'
+    : step === 'reserve' ? 'Reserve your seat first; companions are matched among confirmed seats.'
+      : step === 'closed' ? 'This event is full, so there is no one new to match with.'
+        : others ? `${others} ${others === 1 ? 'person is' : 'people are'} looking for company.` : 'Be the first to look for company.';
   return `<div class="event-detail-media"${imageSrc ? '' : ' data-fallback'}>${imageSrc ? `<img src="${escapeHtml(imageSrc)}" alt="" />` : ''}${dateBadgeMarkup(event.startsAt)}
   ${preview ? '' : `<button type="button" class="event-detail-icon event-detail-back" data-event-close aria-label="Close event"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M19 12H5M11 6l-6 6 6 6"/></svg></button>
   ${live ? '<button type="button" class="event-detail-icon event-detail-share" data-event-share aria-label="Share event"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 15V4M8 8l4-4 4 4M6 11v8h12v-8"/></svg></button>' : ''}`}
@@ -360,10 +363,27 @@ export const eventDetailMarkup = (event, { imageSrc = '', friends = [], organize
     <div><p class="event-companion-title" id="event-companion-label">Looking for company?</p><p class="event-companion-copy" id="event-companion-copy">Find people attending this event who would love to go with you. Only people who also turn this on see you, most shared interests first.</p></div>
     <button type="button" class="event-switch" role="switch" data-event-wants aria-checked="${event.wantsCompanion}" aria-labelledby="event-companion-label" aria-describedby="event-companion-copy"${registered && !preview ? '' : ' disabled'}><span></span></button>
   </div>
-  <button type="button" class="event-see-companions" data-event-companions${companionHint ? ' aria-describedby="event-see-hint"' : ''}${preview ? ' disabled' : ''}>See companions (${others}) ${ARROW}</button>
-  ${companionHint ? `<p class="event-see-hint" id="event-see-hint">${escapeHtml(companionHint)}</p>` : ''}` : ''}
+  ${event.isMine ? '' : `<button type="button" class="event-see-companions" data-event-companions aria-describedby="event-see-hint"${preview ? ' disabled' : ''}>${PEOPLE}<span>${event.wantsCompanion && registered ? 'My companions' : 'Find my companion'}</span> ${ARROW}</button>
+  <p class="event-see-hint" id="event-see-hint">${escapeHtml(companionHint)}</p>`}` : ''}
   ${preview ? '' : contactMarkup(event)}
 </div>`;
+};
+
+// "Find my companion" (founder, 2026-11-02): what one press does for this member and event.
+//   'host'    the organiser (they meet everyone there; no list of people for them)
+//   'list'    registered and opted in: show the matches
+//   'optin'   registered (confirmed), not opted in: opt in, then show the matches
+//   'pending' a paid seat waiting for payment: matches come once it is confirmed
+//   'join'    not registered, free event with a seat: one confirm registers and opts in
+//   'reserve' not registered, paid event: reserve the seat first
+//   'closed'  not registered and the event is full, or it is not open
+export const companionStep = (event) => {
+  if (event.isMine) return 'host';
+  if (event.status !== 'published') return 'closed';
+  if (event.myStatus === 'pending_payment') return 'pending';
+  if (event.myStatus === 'confirmed') return event.wantsCompanion ? 'list' : 'optin';
+  if (spotsLeft(event) === 0) return 'closed';
+  return event.feeInr > 0 ? 'reserve' : 'join';
 };
 
 // One row in the companions sheet. person: { id, name, src, sharedInterests, isConnection }, sent: a signal went out.
@@ -374,7 +394,7 @@ export const companionRowMarkup = (person, { sent = false } = {}) => {
     : background ? `${background} goal${background === 1 ? '' : 's'} or skill${background === 1 ? '' : 's'} in common` : 'Going to this event';
   const action = person.isConnection
     ? `<button type="button" class="event-companion-action" data-companion-chat="${escapeHtml(person.id)}">Message</button>`
-    : `<button type="button" class="event-companion-action" data-companion-hi="${escapeHtml(person.id)}"${sent ? ' disabled' : ''}>${sent ? 'Request sent' : 'Say hi'}</button>`;
+    : `<button type="button" class="event-companion-action" data-companion-hi="${escapeHtml(person.id)}"${sent ? ' disabled' : ''}>${sent ? 'Request sent' : 'Connect'}<span class="sr-only"> with ${escapeHtml(person.name)}</span></button>`;
   return `<li class="event-companion-row"><span class="event-avatar event-avatar-lg">${person.src ? `<img src="${escapeHtml(person.src)}" alt="" />` : escapeHtml(initials(person.name))}</span><span class="event-companion-who"><strong>${escapeHtml(person.name)}</strong><small>${escapeHtml(line)}</small></span>${action}</li>`;
 };
 

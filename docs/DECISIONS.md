@@ -2449,3 +2449,24 @@ controls (a tester or a seeded test member), never a real member, so no new expo
   `create-event.spec.mjs` (1440 and 390, axe) and `events.spec.mjs` updated; build, style ratchet and asset budget OK.
 - **Owed:** apply `0022_member_events.sql` (README "0022"); a payment gateway for paid events.
 
+## D-122: "Find my companion", one button to find and connect with people going (founder, 2026-11-02)
+
+- **Asked:** "Add a 'Find My Companion' button that users can click to find and connect with people attending the same
+  event."
+- **Before:** three steps (register, turn on "Looking for company?", then "See companions"), and the card's "Find a
+  companion" only opened the drawer.
+- **Done (client only, no SQL):** "Find my companion" on every live event card and as the drawer's main companion
+  button ("My companions" once looking). One press does the next right thing (`companionStep` in `events-view.js`):
+  list the matches; or opt a confirmed member in first (a toast says they are now visible); or, for a free event the
+  member is not registered for, one confirm "Register & find company" (a single `set_event_rsvp(true, true)`); a paid
+  event asks to reserve first; a pending seat waits for payment; a full or closed event says so; the organiser gets no
+  list. Matches show "Connect" (an ordinary request, mutual consent) or "Message" for a connection, and "Stop looking"
+  turns off only the companion choice (the registration stays).
+- **Why a confirm before registering:** registering takes a seat and shows the member to others, so it is never done
+  silently; opting in an already registered member is (it is what the button says) and is announced.
+- **Fixed on the way:** closing the companions dialog over an open drawer returned focus to the card behind it; focus
+  now goes back into the drawer.
+- **Proof:** unit (`companionStep`, card and drawer labels, Connect), e2e `events.spec.mjs` (straight to matches when
+  looking, the card's one-confirm register and opt-in in one save, Stop looking, axe on the dialog) and
+  `create-event.spec.mjs`; build and style ratchet OK. ORBIT §11 updated.
+

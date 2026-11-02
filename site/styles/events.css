@@ -302,3 +302,12 @@ body.app-body .event-detail a:focus-visible { outline: 2px solid var(--ev-wine);
 
 
 
+
+/* "Find my companion" (founder, 2026-11-02): the drawer's main companion action, and the dialog's steps. */
+body.app-body .event-see-companions svg { flex: 0 0 18px; width: 18px; height: 18px; }
+body.app-body .event-see-companions:disabled { opacity: .6; cursor: default; }
+.event-companions-actions { display: flex; flex-wrap: wrap; justify-content: center; gap: var(--space-3); padding-top: var(--space-3); }
+.event-companions-actions:empty { display: none; }
+body.app-body .event-companion-action.is-primary { border-color: var(--color-wine); background: var(--color-wine); color: var(--color-cream); }
+body.app-body .event-companions-dialog .event-text-action { color: var(--color-ink-soft); }
+body.app-body .event-companions-dialog :is(.event-companion-action, .event-text-action):focus-visible { outline: 2px solid var(--color-wine); outline-offset: 3px; }

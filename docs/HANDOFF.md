@@ -7,6 +7,9 @@ Update this file at the end of every session. CLAUDE.md holds the aim; this file
 
 ## 1. What is done
 
+**2026-11-02, D-122:** "Find my companion" on event cards and in the drawer: one press lists matches, or opts in, or
+(free event, not registered) one confirm registers and opts in; "Connect" sends a request; "Stop looking". Client only.
+
 **2026-11-02, D-121:** "Create event" on Explore. A member opens "Bring people together.", fills the form (twelve
 categories, IST date and times, venue, city from the place list, optional map link or pin, capacity, Free/Paid INR,
 optional contact, poster and gallery) with a live card preview, and saves a draft, previews or publishes. Published
