@@ -33,6 +33,7 @@ New components reuse these tokens. **No raw hex in new components**, and no new 
 6. **Motion:** 150–300 ms context-aware transitions. Respect `prefers-reduced-motion` (no card fling, use a fade). No
    pulsing CTAs.
 7. **Icons:** SVG, not emoji, for new UI. Existing glyphs like `✉ ♙ ◉` in auth are legacy and get replaced when touched.
+8. **Say it once (founder, 2026-11-02):** never repeat "The Brivia Club" (or any label, heading or line) on one screen. The header already names the club, so a dialog or sheet gets no "THE BRIVIA CLUB / …" kicker above its title, and no line restates what a neighbour already says.
 
 ## Shared form components (D-105, binding for every new form)
 

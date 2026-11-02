@@ -32,7 +32,6 @@
 
 /* ---------- The explainer ---------- */
 .crossing-paths-modal{z-index:190}
-.crossing-paths-dialog .profile-edit-kicker{color:var(--color-ink-soft)}
 .crossing-paths-points{display:grid;gap:var(--space-3);margin:var(--space-3) 0 var(--space-5);padding:0;list-style:none}
 .crossing-paths-points li{padding-left:var(--space-4);border-left:2px solid color-mix(in srgb, var(--brivia-wine) 30%, transparent);color:var(--color-ink-soft);font-size:var(--text-14);line-height:1.45}
 .crossing-paths-points strong{color:var(--color-wine-deep);font-weight:700}

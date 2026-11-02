@@ -3127,7 +3127,6 @@ const openCrossingPathsExplainer = ({ onConfirm, returnFocus } = {}) => {
   modal.className = 'profile-settings-modal crossing-paths-modal';
   modal.innerHTML = `<div class="profile-settings-dialog crossing-paths-dialog" role="dialog" aria-modal="true" aria-labelledby="crossing-paths-title">
     <button type="button" class="profile-settings-close" aria-label="Close">×</button>
-    <p class="profile-edit-kicker">THE BRIVIA CLUB / CROSSING PATHS</p>
     <h2 id="crossing-paths-title">Crossing <em>paths.</em></h2>
     <ul class="crossing-paths-points">
       <li><strong>Only connections.</strong> And only those who turned this on too. You both get the alert at the same moment.</li>
