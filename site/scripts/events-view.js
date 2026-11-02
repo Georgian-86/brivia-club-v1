@@ -325,10 +325,14 @@ const registrationMarkup = (event, friends = []) => {
   const interest = canShowInterest(event) && (state !== 'full' || interested)
     ? `<button type="button" class="event-interest-toggle" data-event-interest aria-pressed="${interested}">${STAR}<span>${interested ? 'Interested' : 'Show interest'}</span>${interested ? '<span aria-hidden="true"> ✓</span>' : ''}</button>` : '';
   const counts = [seats, event.feeInr ? interestedLabel(event.interestedCount) : ''].filter(Boolean).join(' · ');
-  return `<div class="event-detail-row event-register-row">
-    <div class="event-register-copy"><p class="event-register-fee">${escapeHtml(fee)}</p><p class="event-register-seats event-going">${friends.length ? `<span class="event-avatars">${avatarStack(friends)}</span>` : ''}<span>${escapeHtml(counts)}</span></p></div>
-    <div class="event-register-actions">${action}${interest}</div>
-  </div>${note ? `<p class="event-register-note">${escapeHtml(note)}</p>` : ''}${cancel ? `<div class="event-register-cancel">${cancel}</div>` : ''}`;
+  const copy = `<div class="event-register-copy"><p class="event-register-fee">${escapeHtml(fee)}</p><p class="event-register-seats event-going">${friends.length ? `<span class="event-avatars">${avatarStack(friends)}</span>` : ''}<span>${escapeHtml(counts)}</span></p></div>`;
+  // With "Show interest" (D-125) the two choices sit side by side under the fee, equal width: Reserve is the one
+  // primary action, Show interest the quiet secondary one.
+  const row = interest
+    ? `<div class="event-detail-row event-register-row is-paired">${copy}</div>
+  <div class="event-register-pair">${action.replace('class="event-going-toggle"', 'class="event-going-toggle is-primary"')}${interest}</div>`
+    : `<div class="event-detail-row event-register-row">${copy}${action}</div>`;
+  return `${row}${note ? `<p class="event-register-note">${escapeHtml(note)}</p>` : ''}${cancel ? `<div class="event-register-cancel">${cancel}</div>` : ''}`;
 };
 
 const organizerMarkup = (event, organizerSrc) => {
