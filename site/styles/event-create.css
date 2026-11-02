@@ -16,7 +16,8 @@ body.app-body .event-create-dialog {
   --ev-card: var(--aura-card, color-mix(in srgb, var(--color-cream) 80%, transparent));
   --ev-shadow: var(--ec-shadow);
   width: min(1180px, calc(100vw - 48px)); max-width: none; height: min(900px, calc(100svh - 48px)); max-height: none;
-  margin: auto; padding: 0; overflow: hidden; border: 1px solid color-mix(in srgb, var(--color-card-edge) 80%, transparent);
+  /* clip, not hidden: a scrollIntoView inside (error focus, the emoji panel) must scroll the form, never the frame */
+  margin: auto; padding: 0; overflow: clip; border: 1px solid color-mix(in srgb, var(--color-card-edge) 80%, transparent);
   border-radius: var(--radius-l); background: var(--ec-paper); color: var(--ec-ink); font-family: var(--font-body);
   box-shadow: 0 40px 120px -40px color-mix(in srgb, var(--color-oxblood-deep) 70%, transparent);
 }
@@ -24,6 +25,11 @@ body.app-body .event-create-dialog::backdrop { background: color-mix(in srgb, va
 body.event-create-open { overflow: hidden; }
 .event-create-dialog svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
 .ec-shell { position: relative; display: grid; grid-template-rows: auto auto minmax(0, 1fr) auto; height: 100%; }
+/* Fixed rows, so the hidden discard bar never shifts the body into an auto row (which pushed the footer out). */
+.ec-head { grid-row: 1; }
+.ec-discard { grid-row: 2; }
+.ec-body { grid-row: 3; }
+.ec-foot { grid-row: 4; }
 
 /* Head */
 .ec-head { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--space-4); padding: var(--space-5) var(--space-6) var(--space-4); border-bottom: 1px solid var(--ec-line); }
@@ -61,6 +67,10 @@ body.app-body .event-create-dialog :is(input, textarea)::placeholder { color: co
 body.app-body .event-create-dialog :is(input, textarea):focus-visible { outline: none; border-color: var(--ec-wine); box-shadow: 0 0 0 3px color-mix(in srgb, var(--ec-wine) 16%, transparent); }
 body.app-body .event-create-dialog :is(input, textarea)[aria-invalid="true"] { border-color: var(--ec-wine); background: color-mix(in srgb, var(--ec-wine) 4%, var(--ec-field)); }
 body.app-body .event-create-dialog :is(input, textarea):disabled { opacity: .6; cursor: not-allowed; }
+/* The emoji panel (emoji-field.css) inside a grid field: let it shrink to the column; its tabs scroll instead. */
+.ec-field > * { min-width: 0; }
+.event-create-dialog .emoji-field, .event-create-dialog .emoji-field-panel { max-width: 100%; }
+.ec-body { overflow-x: clip; }
 .ec-hint { margin: 0; color: var(--ec-muted); font-size: var(--text-12); line-height: 1.45; }
 .event-field-error { margin: 0; color: var(--ec-wine); font-size: var(--text-12); font-weight: 600; line-height: 1.4; }
 .event-field-error:empty { display: none; }
@@ -127,6 +137,11 @@ body.app-body .event-create-dialog .ec-money input { padding-left: 30px; }
 .ec-drop:has(input:focus-visible) { outline: 2px solid var(--ec-wine); outline-offset: 3px; }
 .ec-media.has-error .ec-drop { border-color: var(--ec-wine); }
 .ec-drop-empty { display: grid; place-items: center; align-content: center; gap: 6px; min-height: 168px; padding: var(--space-5); color: var(--ec-muted); font-size: var(--text-14); text-align: center; cursor: pointer; }
+.ec-drop-actions { display: flex; flex-wrap: wrap; justify-content: center; gap: var(--space-2); margin-top: var(--space-2); }
+body.app-body .ec-drop-actions .event-btn svg { width: 16px; height: 16px; color: currentColor; stroke-width: 1.6; }
+/* "Take a photo" only where there is a camera to point (phones and tablets). */
+body.app-body .event-btn.ec-camera-only { display: none; }
+@media (pointer: coarse) { body.app-body .event-btn.ec-camera-only { display: inline-flex; } }
 .ec-drop-empty[hidden], .ec-drop-filled[hidden] { display: none; }
 .ec-drop-empty svg { width: 32px; height: 32px; color: var(--ec-wine); stroke-width: 1.3; }
 .ec-drop-empty strong { color: var(--ec-ink); font-family: var(--font-heading); font-size: var(--text-20); font-weight: 500; }
@@ -142,6 +157,7 @@ body.app-body .event-create-dialog .ec-money input { padding-left: 30px; }
 .ec-gallery-list img { display: block; width: 100%; height: 100%; object-fit: cover; }
 body.app-body .ec-thumb-remove { position: absolute; top: 2px; right: 2px; display: grid; place-items: center; width: 28px; height: 28px; padding: 0; border: 0; border-radius: 50%; background: color-mix(in srgb, var(--ec-paper) 92%, transparent); color: var(--ec-ink); font-size: var(--text-16); line-height: 1; cursor: pointer; }
 body.app-body .ec-thumb-remove::before { content: ''; position: absolute; inset: -8px; }
+body.app-body .ec-thumb-add { padding: 0; background: transparent; font-family: var(--font-body); }
 .ec-thumb-add { display: grid; place-items: center; align-content: center; gap: 2px; width: 100%; height: 100%; border: 1px dashed color-mix(in srgb, var(--ec-wine) 40%, transparent); border-radius: var(--radius-m); color: var(--ec-wine); font-size: var(--text-12); font-weight: 600; text-align: center; cursor: pointer; }
 .ec-gallery:has(input:focus-visible) .ec-thumb-add { outline: 2px solid var(--ec-wine); outline-offset: 2px; }
 

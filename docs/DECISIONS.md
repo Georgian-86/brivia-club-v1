@@ -2436,6 +2436,11 @@ controls (a tester or a seeded test member), never a real member, so no new expo
   chips in two rows of seven (Tech, Startups, Networking, Music, Sports, Chess & Games, Food & Drinks / Art & Culture,
   Wellness, Outdoors, Learning, Workshops, Community, Other); narrow screens scroll both rows together. Other asks for
   "Your category" (2-24 characters, `custom_category`), shown on the card instead of "Other".
+- **Emoji and gallery photos (founder, same day):** the description has the bio's emoji panel (D-113), inserted at
+  the cursor within 2,000 characters; descriptions keep their line breaks. Poster and gallery pickers open the whole
+  device gallery (`image/*`, HEIC), take originals up to 25 MB (each is re-encoded to a <=1280 px JPEG without its
+  metadata before upload, as every member image is) and offer "Take a photo" on touch screens; the gallery strip picks
+  several at once. Fixed on the way: the dialog frame could scroll (now `overflow: clip`, rows pinned).
 - **ORBIT spec:** §11.1 added in the same commit (companion order gains shared background as a tie-break).
 - **Not run:** agent-arena (no second model route in this environment, as for D-119). The privacy rules were checked
   against CLAUDE.md, VISION.md and ORBIT §9.1.4/§11 instead. Run one before 0022 goes live if wanted.

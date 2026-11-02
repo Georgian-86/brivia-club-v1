@@ -6,16 +6,18 @@
 // Images upload as soon as they are chosen (own folder of the event-posters bucket); files that end up unused (replaced,
 // removed or the dialog discarded) are removed again. The venue pin is sent once and only its ~2 km cell is kept.
 import {
-  EVENT_FORM_CATEGORIES, CATEGORY_ROW, LIMITS, POSTER_TYPES, emptyDraft, draftFromEvent, validateEventDraft, firstErrorField,
+  EVENT_FORM_CATEGORIES, CATEGORY_ROW, LIMITS, PHOTO_ACCEPT, emptyDraft, draftFromEvent, validateEventDraft, firstErrorField,
   toServerFields, serverErrorField, serverErrorMessage, imageFileProblem, previewEvent, todayIst,
 } from './event-form.js';
 import { eventCardMarkup, eventDetailMarkup } from './events-view.js';
 import { eventImageSrc } from './event-assets.js';
 import { locateOnce, fallbackCopy } from './geo-locate.js';
+import { attachEmojiPicker } from './emoji-field.js';
 
 const esc = (value = '') => String(value).replace(/[&<>'"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[c]));
 const PLUS = '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 5v14M5 12h14"/></svg>';
 const IMAGE = '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><rect x="3.5" y="4.5" width="17" height="15" rx="2.5"/><circle cx="9" cy="10" r="1.8"/><path d="m4 17 5-4.5 4 3.5 3-2.5 4 3.5"/></svg>';
+const CAMERA = '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M4 8.5h3l1.6-2.5h6.8L17 8.5h3v10H4z"/><circle cx="12" cy="13.2" r="3.3"/></svg>';
 const PIN = '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 21s-6.5-6.2-6.5-11a6.5 6.5 0 0 1 13 0c0 4.8-6.5 11-6.5 11Z"/><circle cx="12" cy="10" r="2.3"/></svg>';
 
 const field = (name, label, control, { hint = '', optional = false, wide = false } = {}) => `<div class="ec-field${wide ? ' is-wide' : ''}" data-field="${name}">
@@ -112,11 +114,14 @@ const shellMarkup = () => `<div class="ec-shell">
         <h3 id="ec-s4"><span aria-hidden="true">04</span>Poster &amp; photos</h3>
         <div class="ec-field ec-media" data-field="image">
           <div class="ec-drop" data-ec-drop>
-            <input class="sr-only" id="ec-poster" type="file" accept="${POSTER_TYPES.join(',')},.jpg,.jpeg,.png,.webp" aria-describedby="ec-image-hint ec-image-error" />
-            <label class="ec-drop-empty" for="ec-poster" data-ec-drop-empty>${IMAGE}<strong>Drop your poster here</strong><span>or <u>browse</u> · JPG, PNG or WebP, up to 10 MB</span></label>
+            <input class="sr-only" id="ec-poster" type="file" accept="${PHOTO_ACCEPT}" tabindex="-1" aria-hidden="true" />
+            <input class="sr-only" id="ec-poster-camera" type="file" accept="image/*" capture="environment" tabindex="-1" aria-hidden="true" />
+            <div class="ec-drop-empty" data-ec-drop-empty>${IMAGE}<strong>Add your poster</strong><span class="ec-drop-copy">Drag it here, or pick one from your device. Any photo up to 25 MB.</span>
+              <span class="ec-drop-actions"><button type="button" class="event-btn event-btn-ghost event-btn-sm" data-ec-pick="poster" aria-describedby="ec-image-hint ec-image-error">${IMAGE}Choose from gallery</button><button type="button" class="event-btn event-btn-ghost event-btn-sm ec-camera-only" data-ec-pick="camera">${CAMERA}Take a photo</button></span>
+            </div>
             <div class="ec-drop-filled" data-ec-drop-filled hidden>
               <img alt="Event poster preview" data-ec-poster-img />
-              <div class="ec-drop-tools"><label for="ec-poster" class="event-btn event-btn-ghost event-btn-sm">Replace</label><button type="button" class="event-btn event-btn-ghost event-btn-sm" data-ec-poster-remove>Remove</button></div>
+              <div class="ec-drop-tools"><button type="button" class="event-btn event-btn-ghost event-btn-sm" data-ec-pick="poster">Replace</button><button type="button" class="event-btn event-btn-ghost event-btn-sm" data-ec-poster-remove>Remove</button></div>
               <span class="ec-uploading" data-ec-poster-busy hidden>Uploading…</span>
             </div>
           </div>
@@ -125,7 +130,7 @@ const shellMarkup = () => `<div class="ec-shell">
           <div class="ec-gallery">
             <span class="ec-label-like">Gallery <span class="ec-optional">Optional · up to 6</span></span>
             <ul class="ec-gallery-list" data-ec-gallery></ul>
-            <input class="sr-only" id="ec-gallery-input" type="file" multiple accept="${POSTER_TYPES.join(',')},.jpg,.jpeg,.png,.webp" />
+            <input class="sr-only" id="ec-gallery-input" type="file" multiple accept="${PHOTO_ACCEPT}" tabindex="-1" aria-hidden="true" />
           </div>
         </div>
       </section>
@@ -166,6 +171,8 @@ export const createEventComposer = ({ dialog, api, memberId, organizer, safeImag
   dialog.innerHTML = shellMarkup();
   const $ = (sel) => dialog.querySelector(sel);
   const form = $('#ec-form');
+  // Emoji straight into the description (the bio's panel, D-113): inserted at the cursor, within the 2,000 limit.
+  attachEmojiPicker(form.elements.description, { label: 'Add an emoji to the description' });
   const formError = $('#ec-form-error');
   const status = $('[data-ec-status]');
   const cityInput = $('#ec-city');
@@ -227,7 +234,7 @@ export const createEventComposer = ({ dialog, api, memberId, organizer, safeImag
   };
   const renderGallery = () => {
     const items = draft.gallery.map((url, i) => `<li><img src="${esc(safeImage(url))}" alt="" /><button type="button" class="ec-thumb-remove" data-ec-gallery-remove="${i}" aria-label="Remove photo ${i + 1}">×</button></li>`);
-    if (draft.gallery.length < LIMITS.gallery) items.push(`<li><label class="ec-thumb-add" for="ec-gallery-input">${PLUS}<span>Add photos</span></label></li>`);
+    if (draft.gallery.length < LIMITS.gallery) items.push(`<li><button type="button" class="ec-thumb-add" data-ec-pick="gallery" aria-label="Add photos from your gallery (${LIMITS.gallery - draft.gallery.length} left)">${PLUS}<span>Add photos</span></button></li>`);
     galleryList.innerHTML = items.join('');
   };
   const renderPin = () => {
@@ -349,9 +356,17 @@ export const createEventComposer = ({ dialog, api, memberId, organizer, safeImag
 
   // Images -----------------------------------------------------------------------------------------------------------
   const imageError = (message) => { $('#ec-image-error').textContent = message; $('.ec-media').classList.toggle('has-error', Boolean(message)); };
-  const upload = async (file) => {
+  // Re-encode first (any gallery format the browser reads becomes a small JPEG without metadata), then upload.
+  const prepare = async (file) => {
     const problem = imageFileProblem(file);
-    if (problem) { imageError(problem); return ''; }
+    if (problem) { imageError(problem); return null; }
+    try { return api.prepareImage ? await api.prepareImage(file) : file; } catch {
+      imageError("This photo couldn't be read here. Try a JPG or PNG, or a screenshot of it.");
+      return null;
+    }
+  };
+  const upload = async (file) => {
+    if (!file) return '';
     imageError('');
     busy += 1;
     try {
@@ -368,10 +383,13 @@ export const createEventComposer = ({ dialog, api, memberId, organizer, safeImag
     gone.forEach((u) => uploads.delete(u));
     if (gone.length) api.removeEventImages(memberId(), gone);
   };
-  const setPoster = async (file) => {
-    if (!file) return;
-    const problem = imageFileProblem(file);
-    if (problem) { imageError(problem); return; }
+  const setPoster = async (original) => {
+    if (!original) return;
+    busy += 1;
+    $('[data-ec-poster-busy]').hidden = false;
+    const file = await prepare(original);
+    busy -= 1;
+    if (!file) { renderPoster(); return; }
     const before = draft.imageUrl;
     if (posterLocal) URL.revokeObjectURL(posterLocal);
     posterLocal = URL.createObjectURL(file);
@@ -381,10 +399,17 @@ export const createEventComposer = ({ dialog, api, memberId, organizer, safeImag
     if (url) { draft.imageUrl = url; dropUnused([before]); }
     renderPoster(); renderPreview();
   };
-  posterInput.addEventListener('change', () => { setPoster(posterInput.files?.[0]); posterInput.value = ''; });
+  const cameraInput = $('#ec-poster-camera');
+  [posterInput, cameraInput].forEach((input) => input.addEventListener('change', () => { setPoster(input.files?.[0]); input.value = ''; }));
+  // The visible buttons open the hidden pickers (a real button is focusable and announced; a label for a hidden input is not).
+  dialog.addEventListener('click', (e) => {
+    const pick = e.target.closest('[data-ec-pick]');
+    if (pick) { ({ poster: posterInput, camera: cameraInput, gallery: galleryInput })[pick.dataset.ecPick]?.click(); return; }
+    if (e.target.closest('[data-ec-drop-empty]') && !e.target.closest('button')) posterInput.click();
+  });
   $('[data-ec-poster-remove]').addEventListener('click', () => {
     const before = draft.imageUrl; draft.imageUrl = ''; dropUnused([before]); renderPoster(); renderPreview();
-    posterInput.focus();
+    dialog.querySelector('[data-ec-pick="poster"]')?.focus();
   });
   const drop = $('[data-ec-drop]');
   ['dragenter', 'dragover'].forEach((t) => drop.addEventListener(t, (e) => { e.preventDefault(); drop.classList.add('is-over'); }));
@@ -393,8 +418,8 @@ export const createEventComposer = ({ dialog, api, memberId, organizer, safeImag
   galleryInput.addEventListener('change', async () => {
     const files = [...(galleryInput.files || [])].slice(0, LIMITS.gallery - draft.gallery.length);
     galleryInput.value = '';
-    for (const file of files) {
-      const url = await upload(file);
+    for (const original of files) {
+      const url = await upload(await prepare(original));
       if (url && draft.gallery.length < LIMITS.gallery) { draft.gallery.push(url); renderGallery(); renderPreview(); }
     }
   });

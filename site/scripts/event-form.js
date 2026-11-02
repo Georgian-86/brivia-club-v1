@@ -31,9 +31,13 @@ const FORM_KEYS = new Set(EVENT_FORM_CATEGORIES.map((c) => c.key));
 
 export const LIMITS = Object.freeze({
   title: 80, description: 2000, descriptionMin: 20, venueName: 120, venueAddress: 240, capacityMax: 5000, feeMax: 100000,
-  gallery: 6, imageBytes: 10 * 1024 * 1024,
+  gallery: 6, imageBytes: 25 * 1024 * 1024,
 });
 export const POSTER_TYPES = Object.freeze(['image/jpeg', 'image/png', 'image/webp']);
+// The photo pickers open the device's whole gallery (iPhones keep photos as HEIC). Every photo is re-encoded to a
+// JPEG of at most 1280 px without its metadata (image-compress.js) before upload, so a large original is fine.
+export const PHOTO_ACCEPT = 'image/*,.heic,.heif';
+const PHOTO_EXTENSION = /\.(jpe?g|png|webp|heic|heif|avif|gif|bmp)$/i;
 
 // Map sites a venue link may point to (the same allow-list as club_event_map_url_check).
 const MAP_URL = /^https:\/\/((www\.)?google\.[a-z.]{2,8}\/maps|maps\.google\.[a-z.]{2,8}\/|maps\.app\.goo\.gl\/|goo\.gl\/maps\/|maps\.apple\.com\/|(www\.)?openstreetmap\.org\/)/;
@@ -190,11 +194,13 @@ export const serverErrorMessage = (error) => {
   return '';
 };
 
-// A poster or gallery file: JPG, PNG or WebP, up to 10 MB. Returns '' or the problem.
+// A poster or gallery photo from the device: any photo format the browser can read, up to 25 MB. '' or the problem.
 export const imageFileProblem = (file) => {
   if (!file) return 'Choose an image.';
-  if (!POSTER_TYPES.includes(String(file.type || '').toLowerCase())) return 'Use a JPG, PNG or WebP image.';
-  if (file.size > LIMITS.imageBytes) return 'Keep images under 10 MB.';
+  const type = String(file.type || '').toLowerCase();
+  const photo = (type.startsWith('image/') && type !== 'image/svg+xml') || (!type && PHOTO_EXTENSION.test(String(file.name || '')));
+  if (!photo) return 'Choose a photo (JPG, PNG, WebP or HEIC).';
+  if (file.size > LIMITS.imageBytes) return 'Keep photos under 25 MB.';
   return '';
 };
 

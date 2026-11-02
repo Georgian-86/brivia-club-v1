@@ -93,6 +93,13 @@ try {
     await page.locator('#event-create-dialog .ec-chip:has-text("Chess & Games")').click();
     check(`${w}: another category hides it again`, await page.locator('#ec-customCategory').isHidden());
     await page.fill('#ec-description', 'Rapid games, a friendly ladder and good conversation. All levels welcome.');
+    await page.locator('#ec-description').press('End');
+    await page.locator('[data-ec-form-emoji], .ec-form .emoji-field-toggle').first().click();
+    await page.locator('.ec-form .emoji-field-panel:not([hidden]) .emoji-field-emoji').first().click();
+    const desc = await page.locator('#ec-description').inputValue();
+    check(`${w}: an emoji goes straight into the description (${JSON.stringify(desc.slice(-4))})`, /welcome\.\p{Extended_Pictographic}/u.test(desc));
+    await page.keyboard.press('Escape');
+    check(`${w}: Escape closes the emoji panel, not the dialog`, await page.locator('.ec-form .emoji-field-panel').isHidden() && await page.evaluate(() => document.querySelector('#event-create-dialog').open));
     await page.fill('#ec-date', ymd(5));
     await page.fill('#ec-startTime', '18:00');
     await page.fill('#ec-endTime', '17:00');
@@ -114,8 +121,20 @@ try {
     await page.waitForFunction(() => !document.querySelector('[data-ec-drop-filled]').hidden && document.querySelector('[data-ec-poster-busy]').hidden);
     check(`${w}: the poster previews with Replace and Remove`, await page.locator('[data-ec-poster-img]').isVisible() && await page.locator('.ec-drop-tools').innerText().then((t) => /Replace/i.test(t) && /Remove/i.test(t)));
     check(`${w}: the poster went to the member's own event-posters folder`, st.calls.some((c) => c.method === 'POST' && c.path.startsWith(`/storage/v1/object/event-posters/${ownRow.id}/`)));
-    await page.setInputFiles('#ec-poster', { name: 'bad.gif', mimeType: 'image/gif', buffer: PNG });
-    check(`${w}: a GIF is refused inline`, /JPG, PNG or WebP/.test(await page.locator('#ec-image-error').innerText()));
+    await page.setInputFiles('#ec-poster', { name: 'notes.pdf', mimeType: 'application/pdf', buffer: PNG });
+    check(`${w}: a document is refused inline`, /Choose a photo/.test(await page.locator('#ec-image-error').innerText()));
+    check(`${w}: the pickers open the whole gallery (image/*, HEIC) and the camera input asks for the camera`, await page.evaluate(() =>
+      document.querySelector('#ec-poster').accept.includes('image/*') && document.querySelector('#ec-gallery-input').multiple
+      && document.querySelector('#ec-poster-camera').getAttribute('capture') === 'environment'));
+    check(`${w}: "Take a photo" is offered only on touch screens`, (await page.evaluate(() => getComputedStyle(document.querySelector('[data-ec-pick="camera"]')).display !== 'none')) === phone);
+    const galleryChooser = page.waitForEvent('filechooser');
+    await page.locator('.ec-thumb-add').click();
+    const chooser = await galleryChooser;
+    check(`${w}: "Add photos" opens a multi-photo picker`, chooser.isMultiple());
+    await chooser.setFiles([{ name: 'a.png', mimeType: 'image/png', buffer: PNG }, { name: 'b.png', mimeType: 'image/png', buffer: PNG }]);
+    await page.waitForFunction(() => document.querySelectorAll('[data-ec-gallery] img').length === 2);
+    const galleryUploads = st.calls.filter((c) => c.method === 'POST' && c.path.startsWith('/storage/v1/object/event-posters/')).length;
+    check(`${w}: two gallery photos upload as JPEGs and show as thumbnails (${galleryUploads} uploads in all)`, galleryUploads >= 3);
 
     // Live preview card.
     const card = await page.locator('[data-ec-preview-card] .event-card').innerText();

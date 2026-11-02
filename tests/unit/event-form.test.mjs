@@ -90,10 +90,14 @@ test('server errors map back to fields and messages', () => {
   assert.match(serverErrorMessage({ code: '42501', message: 'not your event' }), /organiser/);
 });
 
-test('images: JPG, PNG or WebP up to 10 MB', () => {
+test('photos from the device gallery: any photo the browser reads (HEIC too), up to 25 MB; never SVG or a document', () => {
   assert.equal(imageFileProblem({ type: 'image/png', size: 1000 }), '');
-  assert.match(imageFileProblem({ type: 'image/gif', size: 1000 }), /JPG, PNG or WebP/);
-  assert.match(imageFileProblem({ type: 'image/jpeg', size: 11 * 1024 * 1024 }), /10 MB/);
+  assert.equal(imageFileProblem({ type: 'image/heic', size: 1000 }), '');
+  assert.equal(imageFileProblem({ type: '', name: 'IMG_0042.HEIC', size: 1000 }), '', 'browsers often send no type for HEIC');
+  assert.equal(imageFileProblem({ type: 'image/jpeg', size: 18 * 1024 * 1024 }), '', 'a phone original is fine (it is shrunk first)');
+  assert.match(imageFileProblem({ type: 'image/jpeg', size: 26 * 1024 * 1024 }), /25 MB/);
+  assert.match(imageFileProblem({ type: 'image/svg+xml', size: 10 }), /Choose a photo/);
+  assert.match(imageFileProblem({ type: 'application/pdf', name: 'a.pdf', size: 10 }), /Choose a photo/);
 });
 
 test('edit round-trip: a listed event fills the form in IST', () => {

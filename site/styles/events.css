@@ -148,7 +148,7 @@ body.app-body .event-detail-title { margin: 0 0 var(--space-2); color: var(--ev-
 .event-detail-title:focus { outline: none; }
 .event-meta { display: flex; align-items: center; gap: var(--space-2); margin: 0; color: var(--ev-muted); font-size: var(--text-14); }
 .event-meta svg { flex: 0 0 16px; }
-.event-detail-copy { margin: var(--space-3) 0 0; color: var(--ev-ink); font-size: var(--text-16); line-height: 1.6; }
+.event-detail-copy { margin: var(--space-3) 0 0; color: var(--ev-ink); font-size: var(--text-16); line-height: 1.6; white-space: pre-line; overflow-wrap: anywhere; }
 .event-tags { display: flex; flex-wrap: wrap; gap: var(--space-2); margin: var(--space-2) 0 0; padding: 0; list-style: none; }
 .event-tags li { padding: 3px var(--space-3); border: 1px solid var(--ev-line); border-radius: var(--radius-pill); color: var(--ev-muted); font-size: var(--text-12); }
 .event-detail-row { display: flex; align-items: center; justify-content: space-between; gap: var(--space-4); margin-top: var(--space-3); padding-top: var(--space-4); border-top: 1px solid var(--ev-line); }
