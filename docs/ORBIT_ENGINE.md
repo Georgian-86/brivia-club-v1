@@ -1050,7 +1050,8 @@ Explore lists events the club curates. This is location-first ranking outside th
   distance term: everyone listed is going to the same place.
 - **Consent.** Being listed is not a connection. "Connect" (was "Say hi") sends an ordinary signal (`send_signal`), so
   a connection still exists only after the other member agrees.
-- **"Find my companion" (D-122).** One button on each event card and in the event drawer. A member already looking sees
+- **"Find my companion" (D-122).** A "Find a companion" switch on each event card (on: the flow below; off: stop
+  looking) and a "Find my companion" button in the event drawer. A member already looking sees
   the matches; a confirmed member not looking is opted in (and told so) first; a member not registered for a free event
   confirms once ("Register & find company": one `set_event_rsvp(true, true)`); a paid seat is reserved first, and a
   pending one waits for payment; the organiser gets no list. "Stop looking" turns off only the companion choice. The

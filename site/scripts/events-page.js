@@ -140,7 +140,12 @@ export const createEventsPage = ({ root, api, safeImage, toast, isMissing, sendH
       (keep || (focusedAttr ? panel.querySelector('[data-event-going], [data-event-unregister], .event-registered') : null))?.focus?.();
     }
     const card = grid.querySelector(`.event-card[data-event-id="${CSS.escape(next.id)}"]`);
-    if (card) card.outerHTML = eventCardMarkup(next, cardOpts(next));
+    if (card) {
+      // Re-rendering the card must not drop keyboard focus from its switch.
+      const hadFocus = card.contains(document.activeElement) && document.activeElement.hasAttribute('data-event-companion');
+      card.outerHTML = eventCardMarkup(next, cardOpts(next));
+      if (hadFocus) grid.querySelector(`.event-card[data-event-id="${CSS.escape(next.id)}"] [data-event-companion]`)?.focus();
+    }
   };
 
   // going: true registers, false cancels, null keeps the registration; wants: the companion choice or null to keep it
@@ -225,6 +230,7 @@ export const createEventsPage = ({ root, api, safeImage, toast, isMissing, sendH
     dialog._people = [];
     dialog.querySelector('#event-companions-title').textContent = 'Find my companion';
     dialog.querySelector('#event-companions-lede').textContent = `${event.title}: people going who also want company, most shared interests first. Connect sends a request; you connect only if they agree.`;
+    drawerFocus = '[data-event-companions]';
     if (!dialog.open) dialog.showModal();
     const step = companionStep(event);
     if (step === 'host') { companionsNote("You're hosting, so you'll meet everyone there. Members going can find each other here."); return; }
@@ -255,7 +261,19 @@ export const createEventsPage = ({ root, api, safeImage, toast, isMissing, sendH
     if (t.closest('[data-events-all]')) { state.nearby = false; state.category = 'all'; renderControls(); renderGrid(); return; }
     if (t.closest('[data-events-retry]')) { load(); return; }
     const chip = t.closest('[data-event-companion]');
-    if (chip) { const ev = byId(chip.dataset.eventCompanion); if (ev) { openSheet(ev.id); findCompanion(ev); } return; }
+    // The card's "Find a companion" switch (founder's mockup): on runs Find my companion; off stops looking (the
+    // registration stays).
+    if (chip) {
+      const ev = byId(chip.dataset.eventCompanion);
+      if (!ev) return;
+      if (ev.wantsCompanion && ev.going) {
+        changeRsvp(ev, null, false, { quiet: true }).then((ok) => {
+          if (ok) toast(`You stopped looking for company at ${ev.title}.`);
+          grid.querySelector(`[data-event-companion="${CSS.escape(ev.id)}"]`)?.focus();
+        });
+      } else { openSheet(ev.id); findCompanion(ev); }
+      return;
+    }
     const detail = t.closest('[data-event-open-detail]');
     if (detail) { openSheet(detail.dataset.eventOpenDetail); return; }
     const card = t.closest('.event-card');
@@ -330,13 +348,17 @@ export const createEventsPage = ({ root, api, safeImage, toast, isMissing, sendH
     }
   });
 
-  // Closing the companions dialog over an open drawer puts focus back in the drawer (not on the card behind it).
-  dialog?.addEventListener('close', () => {
+  // Closing the companions dialog over an open drawer puts focus back in the drawer (not on the card behind it). Every
+  // close we make goes through closeCompanions (focus moves at once); the close event covers the browser's own Escape.
+  let drawerFocus = '[data-event-companions]';
+  const focusDrawer = () => {
     if (!panel.classList.contains('is-sheet')) return;
-    window.setTimeout(() => (panel.querySelector('[data-event-companions]') || panel.querySelector('#event-detail-title'))?.focus(), 0);
-  });
+    (panel.querySelector(drawerFocus) || panel.querySelector('[data-event-companions]') || panel.querySelector('#event-detail-title'))?.focus();
+  };
+  const closeCompanions = (target = '[data-event-companions]') => { drawerFocus = target; if (dialog.open) dialog.close(); focusDrawer(); };
+  dialog?.addEventListener('close', focusDrawer);
   dialog?.addEventListener('click', async (e) => {
-    if (e.target === dialog || e.target.closest('[data-companions-close]')) { dialog.close(); return; }
+    if (e.target === dialog || e.target.closest('[data-companions-close]')) { closeCompanions(); return; }
     const event = byId(dialog.dataset.eventId);
     if (!event) return;
     const join = e.target.closest('[data-companion-join]');
@@ -347,10 +369,10 @@ export const createEventsPage = ({ root, api, safeImage, toast, isMissing, sendH
       else findCompanion(byId(event.id) || event);
       return;
     }
-    if (e.target.closest('[data-companion-reserve]')) { dialog.close(); panel.querySelector('[data-event-going]')?.focus(); return; }
+    if (e.target.closest('[data-companion-reserve]')) { closeCompanions('[data-event-going]'); return; }
     if (e.target.closest('[data-companion-retry]')) { listCompanions(event); return; }
     if (e.target.closest('[data-companion-stop]')) {
-      if (await changeRsvp(event, null, false, { quiet: true })) { toast('You stopped looking for company at this event.'); dialog.close(); }
+      if (await changeRsvp(event, null, false, { quiet: true })) { toast('You stopped looking for company at this event.'); closeCompanions(); }
       return;
     }
     const hi = e.target.closest('[data-companion-hi]');

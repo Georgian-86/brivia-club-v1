@@ -237,7 +237,7 @@ export const eventCardMarkup = (event, { imageSrc = '', friends = [] } = {}) => 
     <p class="event-card-seats${spotsLeft(event) === 0 && live ? ' is-full' : ''}">${escapeHtml(seatsLine(event))}</p>
     <div class="event-card-foot">
       <span class="event-going">${friends.length ? `<span class="event-avatars">${avatarStack(friends)}</span>` : ''}<span>${escapeHtml(count)}</span></span>
-      ${live && !event.isMine ? `<button type="button" class="event-companion-link${event.wantsCompanion ? ' is-on' : ''}" data-event-companion="${escapeHtml(event.id)}">${event.wantsCompanion ? 'My companions' : 'Find my companion'}<span class="sr-only"> for ${escapeHtml(event.title)}</span> ${ARROW}</button>`
+      ${live && !event.isMine ? `<button type="button" class="event-companion-pill" role="switch" aria-checked="${Boolean(event.wantsCompanion)}" data-event-companion="${escapeHtml(event.id)}"><span>Find a companion</span><span class="sr-only"> for ${escapeHtml(event.title)}</span><span class="event-switch-mini" aria-hidden="true"><span></span></span></button>`
     : live ? `<button type="button" class="event-companion-link" data-event-open-detail="${escapeHtml(event.id)}">Manage<span class="sr-only"> ${escapeHtml(event.title)}</span> ${ARROW}</button>`
     : `<button type="button" class="event-companion-link" data-event-open-detail="${escapeHtml(event.id)}">${event.isMine ? 'Manage' : 'Details'}<span class="sr-only"> ${escapeHtml(event.title)}</span> ${ARROW}</button>`}
     </div>

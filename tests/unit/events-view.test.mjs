@@ -89,8 +89,8 @@ test('card markup escapes text and labels the open button with the date and time
   // D-118: a quiet card: no tags, no counts of companions, two controls (open, Find a companion).
   assert.ok(!html.includes('event-tags'));
   assert.equal((html.match(/<button\b/g) || []).length, 2);
-  assert.match(html, /Find my companion<span class="sr-only"> for &lt;b&gt;Jam&lt;\/b&gt;<\/span>/);
-  assert.match(eventCardMarkup(normalizeEvent({ ...row, wants_companion: true, going: true })), /My companions/);
+  assert.match(html, /role="switch" aria-checked="false" data-event-companion="e1"><span>Find a companion<\/span><span class="sr-only"> for &lt;b&gt;Jam&lt;\/b&gt;<\/span>/);
+  assert.match(eventCardMarkup(normalizeEvent({ ...row, wants_companion: true, going: true })), /role="switch" aria-checked="true"/);
 });
 
 test('detail markup: switch state, the see-companions count excludes me, a hint until opted in', () => {
@@ -169,7 +169,7 @@ test('card: poster, fee badge, seats line, Find a companion; a draft says only y
   assert.match(html, /event-fee-badge is-paid">₹1,499</);
   assert.match(html, /₹1,499 · 8 spots left/);
   assert.match(html, /12 registered/);
-  assert.match(html, /Find my companion/);
+  assert.match(html, /Find a companion/);
   const draft = eventCardMarkup(normalizeEvent({ ...member, status: 'draft', is_mine: true, starts_at: null, ends_at: null }));
   assert.match(draft, /event-status-badge">Draft/);
   assert.match(draft, /only you can see this/);
@@ -245,8 +245,8 @@ test('Find my companion: one press does the next right thing for each member', a
 
 test('Find my companion on the card and in the drawer; Connect on each match', () => {
   const e = normalizeEvent(row);
-  assert.match(eventCardMarkup(e), /data-event-companion="e1">Find my companion/);
-  assert.match(eventCardMarkup({ ...e, wantsCompanion: true }), />My companions</);
+  assert.match(eventCardMarkup(e), /class="event-companion-pill" role="switch" aria-checked="false" data-event-companion="e1"><span>Find a companion/);
+  assert.match(eventCardMarkup({ ...e, wantsCompanion: true }), /aria-checked="true"/);
   assert.ok(!eventCardMarkup({ ...e, isMine: true }).includes('data-event-companion='), 'no companion button on your own event');
   const html = eventDetailMarkup(e);
   assert.match(html, /data-event-companions[^>]*>.*Find my companion/s);

@@ -311,3 +311,27 @@ body.app-body .event-see-companions:disabled { opacity: .6; cursor: default; }
 body.app-body .event-companion-action.is-primary { border-color: var(--color-wine); background: var(--color-wine); color: var(--color-cream); }
 body.app-body .event-companions-dialog .event-text-action { color: var(--color-ink-soft); }
 body.app-body .event-companions-dialog :is(.event-companion-action, .event-text-action):focus-visible { outline: 2px solid var(--color-wine); outline-offset: 3px; }
+
+/* The card's "Find a companion" switch (founder's mockup, 2026-11-02): a soft wine-tinted pill holding the label and a
+   small switch; the whole pill is one role="switch". 44 px tap area. */
+body.app-body .event-companion-pill {
+  position: relative; z-index: 1; display: inline-flex; align-items: center; gap: var(--space-2); min-height: 36px; padding: 0 6px 0 12px;
+  border: 1px solid color-mix(in srgb, var(--ev-wine) 12%, transparent); border-radius: var(--radius-pill);
+  background: color-mix(in srgb, var(--ev-wine) 6%, var(--ev-paper)); color: var(--ev-wine); font-family: var(--font-body);
+  font-size: var(--text-12); font-weight: 700; letter-spacing: .1em; text-transform: uppercase; white-space: nowrap; cursor: pointer;
+  transition: background .2s ease, border-color .2s ease;
+}
+body.app-body .event-companion-pill::before { content: ''; position: absolute; inset: -4px 0; }
+@media (hover: hover) { body.app-body .event-companion-pill:hover { border-color: color-mix(in srgb, var(--ev-wine) 30%, transparent); } }
+body.app-body .event-companion-pill:focus-visible { outline: 2px solid var(--ev-wine); outline-offset: 3px; }
+.event-switch-mini {
+  position: relative; flex: 0 0 34px; width: 34px; height: 20px; border-radius: var(--radius-pill);
+  background: color-mix(in srgb, var(--ev-ink) 20%, var(--ev-paper)); transition: background .2s ease;
+}
+.event-switch-mini span {
+  position: absolute; top: 2px; left: 2px; width: 16px; height: 16px; border-radius: 50%; background: var(--ev-paper);
+  box-shadow: 0 1px 3px color-mix(in srgb, var(--ev-ink) 30%, transparent); transition: transform .2s ease;
+}
+body.app-body .event-companion-pill[aria-checked="true"] .event-switch-mini { background: var(--ev-wine); }
+body.app-body .event-companion-pill[aria-checked="true"] .event-switch-mini span { transform: translateX(14px); }
+@media (prefers-reduced-motion: reduce) { body.app-body .event-companion-pill, .event-switch-mini, .event-switch-mini span { transition: none; } }

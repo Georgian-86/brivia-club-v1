@@ -66,7 +66,7 @@ try {
     });
     check(`${w}: the card shows category, ~km, title, time, venue, going and Find a companion (${JSON.stringify(card.text)})`,
       /MUSIC · ~1 km/.test(card.text) && /Acoustic Jam Session/.test(card.text) && /6:00 PM – 9:00 PM/.test(card.text) && /The Whitefield Social, Whitefield/.test(card.text)
-      && /\+11 going/.test(card.text) && /FIND MY COMPANION/.test(card.text));
+      && /\+11 going/.test(card.text) && /FIND A COMPANION/.test(card.text));
     const quiet = await page.evaluate(() => { const c = document.querySelector('.event-card[data-event-id="e-jam"]'); return { tags: c.querySelectorAll('.event-tags').length, buttons: c.querySelectorAll('button').length }; });
     check(`${w}: the card stays quiet (D-118: no tags, two controls) (${JSON.stringify(quiet)})`, quiet.tags === 0 && quiet.buttons === 2);
     check(`${w}: the card image loads and the date badge reads like "NOV 2 Mon" (${card.date})`, card.img && /^[A-Z]{3} \d{1,2} [A-Z][a-z]{2}$/.test(card.date));
@@ -157,6 +157,20 @@ try {
     check(`${w}: Stop looking turns off only the companion choice (${JSON.stringify(stopCall)})`, stopCall.p_going === null && stopCall.p_wants_companion === false && /Registered/i.test(await page.locator('#event-detail').innerText()));
     await page.keyboard.press('Escape');
     check(`${w}: Escape closes the drawer`, await page.locator('#event-detail').isHidden());
+
+    // The card's switch (founder's mockup): on for an event you look at, and switching it off there stops looking.
+    const jamSwitch = page.locator('.event-card[data-event-id="e-jam"] [data-event-companion]');
+    check(`${w}: the card switch shows on for an event you are looking at`, await jamSwitch.getAttribute('role') === 'switch' && await jamSwitch.getAttribute('aria-checked') === 'true');
+    const offBefore = posted('set_event_rsvp').length;
+    await jamSwitch.click();
+    await page.waitForFunction(() => document.querySelector('.event-card[data-event-id="e-jam"] [data-event-companion]')?.getAttribute('aria-checked') === 'false');
+    const offCall = JSON.parse(posted('set_event_rsvp').at(-1)?.body || '{}');
+    check(`${w}: switching it off on the card stops looking, keeps the registration, opens nothing (${JSON.stringify(offCall)})`, posted('set_event_rsvp').length === offBefore + 1
+      && offCall.p_going === null && offCall.p_wants_companion === false && await page.locator('#event-detail').isHidden() && !(await page.locator('#event-companions-dialog').evaluate((d) => d.open)));
+    check(`${w}: focus stays on the card switch`, await page.evaluate(() => document.activeElement?.closest('.event-card')?.dataset.eventId === 'e-jam' && document.activeElement.hasAttribute('data-event-companion')));
+    await shot(page, `card-switch-${w}.png`);
+    const axeCard = await axeViolations(page, { include: '.events-grid' });
+    check(`${w}: axe on the cards with the switch`, axeCard.length === 0, JSON.stringify(axeCard));
 
     // The page switch.
     await page.locator('#events-companion-default').click();

@@ -2469,4 +2469,9 @@ controls (a tester or a seeded test member), never a real member, so no new expo
 - **Proof:** unit (`companionStep`, card and drawer labels, Connect), e2e `events.spec.mjs` (straight to matches when
   looking, the card's one-confirm register and opt-in in one save, Stop looking, axe on the dialog) and
   `create-event.spec.mjs`; build and style ratchet OK. ORBIT §11 updated.
+- **Card switch (founder's mockup, same day):** on each card the action is a soft wine pill, "FIND A COMPANION" with a
+  small switch (one `role="switch"`, 44 px tap area). Off: it runs Find my companion (as above). On: it stops looking
+  at that event (the registration stays) without opening anything. The drawer keeps the "Find my companion" button.
+  Also fixed: focus stays on the switch when its card re-renders, and every close of the companions dialog puts focus
+  back in the drawer at once (it raced the browser's own focus restore).
 
