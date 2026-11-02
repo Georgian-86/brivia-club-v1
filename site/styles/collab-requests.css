@@ -120,3 +120,17 @@ dialog.collab-review[open]{animation:collab-in var(--motion-slow) var(--ease)}
   .collab-head h2{font-size:var(--text-20)}
 }
 @media (prefers-reduced-motion:reduce){dialog.collab-review[open]{animation:none}}
+
+/* ---------- D-130: the sheet sits on the Explore aura; the pitch is one quiet quote ---------- */
+/* The same pastel aura as Explore (tokens.css --aura-bg), so the sheet reads as part of the app, not a flat cream card. */
+body.app-body dialog.collab-review .collab-panel{background:var(--aura-bg)}
+body.app-body dialog.collab-review .collab-card{border-color:color-mix(in srgb, var(--color-cream) 60%, transparent);background:var(--aura-card);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px)}
+/* The pitch: one wine rule, not two. connect-composer.css also styles .collab-note (the composer's own quote), which
+   nested a second bar and padding around this one and squeezed the text into a narrow column. */
+body.app-body dialog.collab-review .collab-note{align-self:stretch;margin:var(--space-3) 0 0;padding:0;border:0;border-radius:0;background:none}
+body.app-body dialog.collab-review .collab-note .collab-label{margin:0 0 var(--space-2);text-align:center}
+body.app-body dialog.collab-review .collab-note .collab-note-text{
+  margin:0;padding:var(--space-3) var(--space-4);border-left:3px solid var(--brivia-wine);border-radius:0 var(--radius-m) var(--radius-m) 0;
+  background:var(--aura-glass);color:var(--color-ink);font-family:var(--font-heading);font-size:var(--text-16);line-height:1.4;text-align:left;
+  white-space:normal;-webkit-line-clamp:4;
+}

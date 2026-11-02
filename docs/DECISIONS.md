@@ -2641,3 +2641,14 @@ controls (a tester or a seeded test member), never a real member, so no new expo
   after 0028. SQL harness ALL PASSED; unit 437; build.
 - **Still owed:** the other live-only pitch-chat functions (`accept_pitch_chat`, `end_pitch_chat`, `my_pitch_threads`,
   `chat_accepted_at`, 3-arg `brivia_request_is_live`) are still not in this repo.
+
+## D-130 (2026-11-03): the request sheet on the Explore aura; the pitch as one quiet quote
+
+- **Ask (founder):** the collaboration-request sheet should have the Explore page's colour gradient, and the pitch text
+  took too many lines.
+- **Done:** the sheet's panel uses the app's aura (`--aura-bg`, the Explore backdrop) and the card is frosted paper
+  (`--aura-card`, blur) so the glow shows through. The pitch had two nested quote boxes (`connect-composer.css` also
+  styles `.collab-note`), each with its own wine bar and padding, which squeezed it into a narrow column: now one wine
+  rule, one padding, Bodoni 16 px at 1.4 line height, clamped at 4 lines. A two-sentence pitch takes 3 lines at 390 px
+  and 2 at 1440 (was 4-5). CSS only, scoped to the sheet.
+- **Proof:** e2e collab-requests 31/31 at 390 and 1440, screenshots; style ratchet; build.
