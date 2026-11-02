@@ -12,7 +12,10 @@ categories, IST date and times, venue, city from the place list, optional map li
 optional contact, poster and gallery) with a live card preview, and saves a draft, previews or publishes. Published
 events list beside the club's, with fee, spots, host, Register / Reserve, "Looking for company?" (needs a registration)
 and "Ask a question"; the organiser edits, cancels or deletes from the drawer. **Owed: apply `0022_member_events.sql`**
-(README "0022"; needs 0020). **Owed: a payment gateway** (paid seats stay "Payment pending"). Files:
+(README "0022"; needs 0020). **Owed: a payment gateway** (paid seats stay "Payment pending"). Same day, from the founder's
+reviews: the button is a small pill in the hero under the note (reference image); the form has fourteen categories in
+two rows with Other naming its own (`custom_category`); the description has the emoji panel; posters and gallery come
+from the device gallery (HEIC, up to 25 MB, re-encoded) or the camera on phones. Files:
 `site/scripts/event-create.js`, `event-form.js`, `site/styles/event-create.css`; tests `tests/unit/event-form.test.mjs`,
 `tests/e2e/create-event.spec.mjs`, `supabase/tests/k-member-events.test.sql`.
 
