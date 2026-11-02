@@ -787,7 +787,8 @@ join the intended definer-RPC list (`orbit-hygiene.test.sql` H3).
 ## 0019
 
 **The cover set changes: "THE THOUGHTFUL ROOM" is retired and 9 covers are added (founder request 2026-11-01, D-116).
-Not yet applied.** Needs `0014` applied first.
+APPLIED 2026-11-03** (Supabase MCP, immediately before 0027; live was still on 0014's 18 covers, so the 9 newer ones were
+being refused on save; 70 profiles on the retired cover went to the default). Needs `0014` applied first.
 
 What it does: redefines `brivia_private.brivia_offered_cover_keys()` with 26 names (mirrors `PRESET_COVER_KEYS`,
 pinned by `tests/unit/preset-cover.test.mjs`), and adds `brivia_private.brivia_clear_retired_covers()` (definer, no
@@ -972,8 +973,10 @@ returns `interested = t, status = interested`.
 
 ## 0027
 
-**The covers are reordered and renamed, and "OPEN MINDS" is retired (founder request 2026-11-02, D-128). Not yet
-applied.** Apply after `0019` (it redefines the same two functions; applying 0019 after 0027 would bring OPEN MINDS
+**The covers are reordered and renamed, and "OPEN MINDS" is retired (founder request 2026-11-02, D-128). APPLIED
+2026-11-03** after the client deployed (Vercel production at 870a521) and after 0019; verified: 25 offered, first AT WORK,
+OPEN MINDS refused, 0 profiles on a retired or unknown cover (7 OPEN MINDS went to the default), cleanup not
+client-callable, second run 0. Apply after `0019` (it redefines the same two functions; applying 0019 after 0027 would bring OPEN MINDS
 back).
 
 What it does: redefines `brivia_private.brivia_offered_cover_keys()` with 25 names in the founder's order (mirrors

@@ -13,7 +13,7 @@ existing twins. **Applied live 2026-11-03** and verified (README "0028").
 
 **2026-11-02, D-128:** the covers are in the founder's order with new names (25: OPEN MINDS retired, FIND YOUR PACE
 kept last); Edit Profile shows them five across. The default cover picture is unchanged (now named SMASH THEORY).
-**Owed: apply `0027_cover_order_open_minds.sql`** after 0019 and after the client deploys (README "0027").
+`0019` and `0027` **applied live 2026-11-03** after the client deployed, and verified (README "0019", "0027").
 
 **2026-11-02, D-127:** a Brivia cover can be the event poster (client only, no migration).
 
