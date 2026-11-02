@@ -1,11 +1,20 @@
 # Session handoff (read after CLAUDE.md)
 
-Last updated: 2026-11-01 (D-119 Crossing paths). Before that: 2026-11-01 (D-118 calmer Explore; D-117 Explore events, Posts tab). Before that: 2026-11-01 (D-116 cover set). Before that: 2026-10-28 (D-100 chat inbox, D-101 post activity and 0015, D-102 photo and setup). Before that: 2026-10-20 (live-database correction D-070; "Send without a note" D-071). Before that: 2026-10-16 (design references, D-062). Before that: 2026-10-13, after Phase D of the experience iteration (the test world), on branch
+Last updated: 2026-11-02 (D-121 Create Event). Before that: 2026-11-01 (D-119 Crossing paths). Before that: 2026-11-01 (D-118 calmer Explore; D-117 Explore events, Posts tab). Before that: 2026-11-01 (D-116 cover set). Before that: 2026-10-28 (D-100 chat inbox, D-101 post activity and 0015, D-102 photo and setup). Before that: 2026-10-20 (live-database correction D-070; "Send without a note" D-071). Before that: 2026-10-16 (design references, D-062). Before that: 2026-10-13, after Phase D of the experience iteration (the test world), on branch
 `claude/jolly-edison-49xvza` (repo `Georgian-86/brivia-club-v1`). Phases C and D are not on `main` yet, and Phase D's SQL
 is not applied: the founder applies it in the SQL editor (section 3, item 0).
 Update this file at the end of every session. CLAUDE.md holds the aim; this file holds **where we are**.
 
 ## 1. What is done
+
+**2026-11-02, D-121:** "Create event" on Explore. A member opens "Bring people together.", fills the form (twelve
+categories, IST date and times, venue, city from the place list, optional map link or pin, capacity, Free/Paid INR,
+optional contact, poster and gallery) with a live card preview, and saves a draft, previews or publishes. Published
+events list beside the club's, with fee, spots, host, Register / Reserve, "Looking for company?" (needs a registration)
+and "Ask a question"; the organiser edits, cancels or deletes from the drawer. **Owed: apply `0022_member_events.sql`**
+(README "0022"; needs 0020). **Owed: a payment gateway** (paid seats stay "Payment pending"). Files:
+`site/scripts/event-create.js`, `event-form.js`, `site/styles/event-create.css`; tests `tests/unit/event-form.test.mjs`,
+`tests/e2e/create-event.spec.mjs`, `supabase/tests/k-member-events.test.sql`.
 
 **2026-11-01, D-119:** "Crossing paths": two connections who both turned it on get one quiet alert ("Riya is nearby.
 You both love chess.") when their live ~2 km areas are within 3 km; never a place, distance or time. Settings →
@@ -277,6 +286,9 @@ Tooling: Playwright **and axe-core** at `/tmp/pw` (`npm install --prefix /tmp/pw
 - Real members are **not allowed yet**: see the gate table in `docs/arena/2026-10-07-iteration-4.md`.
 
 ## 3. What to do next (in order)
+
+**Database owed (2026-11-02):** `0022_member_events.sql` after `0020` (README "0022"). Then pick a payment gateway for
+paid events (its webhook calls `confirm_event_payment`).
 
 **Database owed (2026-11-01):** `0019_cover_set_refresh.sql` (after the client deploys) and `0020_club_events.sql`
 (either order; seeds the first 8 events). README "0019" / "0020". Next for events: a way for the founder (or members) to

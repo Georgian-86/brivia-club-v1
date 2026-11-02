@@ -44,6 +44,7 @@
             <div class="events-toolbar">
               <span id="events-count">EVENTS</span>
               <div class="events-toolbar-actions">
+                <button class="events-create" id="events-create" type="button" aria-haspopup="dialog"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 5v14M5 12h14"/></svg>Create event</button>
                 <button class="events-nearby" id="events-nearby" type="button" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 21s-6.5-6.2-6.5-11a6.5 6.5 0 0 1 13 0c0 4.8-6.5 11-6.5 11Z"/><circle cx="12" cy="10" r="2.3"/></svg>Nearby</button>
                 <span class="events-companion-toggle"><span id="events-companion-label">Find a companion</span><span class="sr-only" id="events-companion-copy">Get recommended to people who are also going.</span><button class="event-switch event-switch-sm" id="events-companion-default" type="button" role="switch" aria-checked="false" aria-labelledby="events-companion-label" aria-describedby="events-companion-copy"><span></span></button></span>
               </div>
@@ -129,6 +130,9 @@
     <div class="event-detail-backdrop" id="event-detail-backdrop" data-event-close hidden></div>
     <div class="event-detail" id="event-detail" role="dialog" aria-label="Event details" hidden></div>
     <dialog class="event-companions-dialog" id="event-companions-dialog" aria-labelledby="event-companions-title"><div class="event-companions-head"><div><p class="app-eyebrow">FIND A COMPANION</p><h2 id="event-companions-title">Companions</h2></div><button type="button" class="event-companions-close" data-companions-close aria-label="Close companions">×</button></div><p class="event-companions-lede">People going who also want company, most shared interests first. Saying hi sends a request; you connect only if they agree.</p><ul class="event-companions-list" id="event-companions-list"></ul></dialog>
+    <!-- Create Event (D-121): event-create.js fills the dialog; the ask dialog sends a question to an organiser. -->
+    <dialog class="event-create-dialog" id="event-create-dialog" aria-labelledby="event-create-title"></dialog>
+    <dialog class="event-ask-dialog" id="event-ask-dialog" aria-labelledby="event-ask-title"><form method="dialog" class="event-ask-form" id="event-ask-form" novalidate><div class="event-companions-head"><div><p class="app-eyebrow">ASK THE ORGANISER</p><h2 id="event-ask-title">Ask a question</h2></div><button type="button" class="event-companions-close" data-ask-close aria-label="Close">×</button></div><p class="event-companions-lede" id="event-ask-lede">Your question goes to the organiser as a request with a note. You can chat once they accept.</p><label class="event-ask-label" for="event-ask-text">Your question</label><textarea id="event-ask-text" rows="4" maxlength="200" required aria-describedby="event-ask-lede event-ask-error"></textarea><p class="event-field-error" id="event-ask-error" role="alert"></p><div class="event-ask-actions"><button type="button" class="event-btn event-btn-ghost" data-ask-close>Cancel</button><button type="submit" class="event-btn event-btn-primary">Send question</button></div></form></dialog>
     <div class="app-toast" id="app-toast" role="status"></div>
     <script>
       (() => {

@@ -99,21 +99,22 @@ try {
     if (phone) check('390: no tab bar under the sheet', await page.evaluate(() => getComputedStyle(document.querySelector('.app-tabbar')).display === 'none'));
     const detail = await page.locator('#event-detail').innerText();
     check(`${w}: the panel has the date, ~km, tags, copy, going, the companion switch and See companions (8)`,
-      /~1 km/.test(detail) && /Chill/.test(detail) && /good people, better company/.test(detail) && /\+11 going/.test(detail) && /Looking for a companion\?/.test(detail) && /See companions \(8\)/i.test(detail));
+      /~1 km/.test(detail) && /Chill/.test(detail) && /good people, better company/.test(detail) && /\+11 going/.test(detail) && /Looking for company\?/.test(detail) && /Find people attending this event/.test(detail) && /Free entry/.test(detail) && /Hosted by\s*Brivia Club/i.test(detail) && /See companions \(8\)/i.test(detail));
     await shot(page, `detail-${w}.png`);
     const axeDetail = await axeViolations(page, { include: '#event-detail' });
     check(`${w}: axe on the panel`, axeDetail.length === 0, JSON.stringify(axeDetail));
 
-    // Going, then the companion switch (one RPC each, counts move once).
+    // Register, then the companion switch (one RPC each, counts move once). D-121: the switch waits for a registration.
+    check(`${w}: the companion switch is off-limits until registered`, await page.locator('[data-event-wants]').isDisabled() && /Register first/.test(await page.locator('#event-detail').innerText()));
     await page.locator('[data-event-going]').click();
-    await page.waitForFunction(() => document.querySelector('[data-event-going]')?.getAttribute('aria-pressed') === 'true');
+    await page.waitForSelector('#event-detail .event-registered');
     const goingCall = JSON.parse(posted('set_event_rsvp').at(-1)?.body || '{}');
-    check(`${w}: "I'm going" saves going without touching the companion flag (${JSON.stringify(goingCall)})`, goingCall.p_event === 'e-jam' && goingCall.p_going === true && goingCall.p_wants_companion === null);
+    check(`${w}: "Register" saves the registration without touching the companion flag (${JSON.stringify(goingCall)})`, goingCall.p_event === 'e-jam' && goingCall.p_going === true && goingCall.p_wants_companion === null);
     check(`${w}: the count moves to +12`, /\+12 going/.test(await page.locator('#event-detail').innerText()));
     await page.locator('[data-event-wants]').click();
     await page.waitForFunction(() => document.querySelector('[data-event-wants]')?.getAttribute('aria-checked') === 'true');
     const wantsCall = JSON.parse(posted('set_event_rsvp').at(-1)?.body || '{}');
-    check(`${w}: the companion switch saves wants_companion`, wantsCall.p_going === true && wantsCall.p_wants_companion === true);
+    check(`${w}: the companion switch saves only wants_companion (${JSON.stringify(wantsCall)})`, wantsCall.p_going === null && wantsCall.p_wants_companion === true);
     check(`${w}: focus stays on the switch`, await page.evaluate(() => document.activeElement?.hasAttribute('data-event-wants')));
     check(`${w}: See companions still counts others only (8)`, /See companions \(8\)/i.test(await page.locator('#event-detail').innerText()));
 
@@ -136,8 +137,8 @@ try {
     await page.locator('.event-detail-back').click();
     check(`${w}: ← closes the drawer and focus returns to the card`, await page.locator('#event-detail').isHidden() && await page.evaluate(() => Boolean(document.activeElement?.closest('.event-card'))));
     await page.locator('.event-card[data-event-id="e-tech"] [data-event-companion]').click();
-    await page.waitForFunction(() => document.activeElement?.hasAttribute('data-event-wants'));
-    check(`${w}: "Find a companion" on a card opens that event at the switch`, (await page.locator('#event-detail-title').innerText()) === 'Tech & Coffee Night');
+    await page.waitForFunction(() => document.activeElement?.hasAttribute('data-event-going'));
+    check(`${w}: "Find a companion" on a card opens that event at Register (not registered yet)`, (await page.locator('#event-detail-title').innerText()) === 'Tech & Coffee Night');
     await page.keyboard.press('Escape');
     check(`${w}: Escape closes the drawer`, await page.locator('#event-detail').isHidden());
 

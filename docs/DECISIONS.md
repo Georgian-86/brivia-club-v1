@@ -2403,3 +2403,37 @@ controls (a tester or a seeded test member), never a real member, so no new expo
 - **No agent-arena run:** a bug fix that brings the deck in line with D-080 and the other surfaces.
 - **Proof:** unit (`deck-view.test.mjs`), e2e `deck.spec.mjs` (no-cover members show the default preset cover on the
   card and the next card; never the photo).
+
+## D-121: Members create events on Explore (founder, 2026-11-02)
+
+- **Asked:** "Build: Create Event": a "+ Create Event" button on Explore, a "Bring people together." form (name, the
+  twelve categories, description, date and times, venue, address, city, optional map, capacity, Free/Paid in INR,
+  optional contact, poster and gallery), a live card preview, Save as draft / Preview / Publish, companion matching per
+  event, organiser edit and cancel, server-side capacity, duplicate prevention, cancellation, in the house style.
+- **Built on 0020, not beside it:** member events are rows in `club_event` (with `creator_id`), so the 0020 list,
+  distance bands, category tabs, Nearby, RSVPs and companions apply to them unchanged. Migration `0022_member_events.sql`.
+- **Choices made (founder may revisit):**
+  - **Registration and companion are separate.** Turning on "Looking for company?" no longer registers you (0020 did);
+    it needs a registration. Companions are listed only among confirmed seats.
+  - **Paid events are honest about payment.** No payment provider exists yet, so a paid registration is a 30-minute
+    held seat (`pending_payment`) that is never shown as confirmed. `confirm_event_payment` is ready for a provider's
+    webhook (service role only). **Owed: choose a gateway** (e.g. Razorpay) and add the webhook (an Edge Function).
+  - **Contact stays private unless shown.** The organiser types an event contact (never the account email or phone,
+    CLAUDE.md); others see it only when "Show this contact on the event page" is ticked. "Ask a question" sends an
+    ordinary signal with a note, so the organiser still has to accept before a chat exists.
+  - **Organiser sees counts, not people:** registered of capacity; no function lists registrants or companion choices.
+  - **Location:** the city comes from `place`; an optional pin while at the venue becomes a g7 cell inside
+    `save_member_event` and is never stored. A map link is allowed only to Google, Apple or OpenStreetMap maps.
+  - **Lifecycle:** draft (creator only) → published → cancelled (kept for the creator and the registered, marked
+    cancelled) → deleted (draft or cancelled only). Fee is locked and capacity cannot drop under seats once people
+    registered. At most 10 new events per member per day. Visibility follows `brivia_visible_to` on the creator.
+  - **Images** go to a new public `event-posters` bucket (own folder); account deletion empties it (`DELETE_BUCKETS`)
+    and the deletion notice now names events.
+- **ORBIT spec:** §11.1 added in the same commit (companion order gains shared background as a tie-break).
+- **Not run:** agent-arena (no second model route in this environment, as for D-119). The privacy rules were checked
+  against CLAUDE.md, VISION.md and ORBIT §9.1.4/§11 instead. Run one before 0022 goes live if wanted.
+- **Proof:** SQL harness ALL PASSED (new `k-member-events.test.sql` M1-M8; `i-club-events` V3 updated to the separate
+  companion choice; hygiene H3 whitelist); unit (new `event-form.test.mjs`, more in `events-view.test.mjs`); e2e new
+  `create-event.spec.mjs` (1440 and 390, axe) and `events.spec.mjs` updated; build, style ratchet and asset budget OK.
+- **Owed:** apply `0022_member_events.sql` (README "0022"); a payment gateway for paid events.
+

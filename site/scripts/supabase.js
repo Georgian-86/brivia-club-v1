@@ -329,10 +329,36 @@ export const setPresenceVisible = async (visible) => (supabase ? supabase.rpc('s
 export const myPresenceVisible = async () => (supabase ? supabase.rpc('my_presence_visible') : notConfigured());
 // Club events (0020, D-117). Before 0020 is applied each answers PGRST202 / 404 (isMissingFunction).
 export const listEvents = (category = null) => rpcCall('list_events', { p_category: category && category !== 'all' ? category : null });
-export const setEventRsvp = async (eventId, going, wantsCompanion = null) => firstRow(await rpcCall('set_event_rsvp', { p_event: eventId, p_going: Boolean(going), p_wants_companion: wantsCompanion === null ? null : Boolean(wantsCompanion) }));
+// going null keeps the registration and changes only the companion choice (0022).
+export const setEventRsvp = async (eventId, going, wantsCompanion = null) => firstRow(await rpcCall('set_event_rsvp', { p_event: eventId, p_going: going === null ? null : Boolean(going), p_wants_companion: wantsCompanion === null ? null : Boolean(wantsCompanion) }));
 export const setCompanionDefault = (on) => rpcCall('set_companion_default', { p_on: Boolean(on) });
 export const myEventPrefs = async () => firstRow(await rpcCall('my_event_prefs', {}));
 export const eventCompanions = (eventId) => rpcCall('event_companions', { p_event: eventId });
+// Member events (0022, D-121). saveMemberEvent -> { data: event id }; errors 22023 'invalid <field>' name the field,
+// P0001 'event_limit' is the daily cap, 42501 'not your event'. Before 0022 each answers PGRST202 (isMissingFunction).
+export const saveMemberEvent = async (id, fields, publish) => {
+  const { data, error, status } = await rpcCall('save_member_event', { p_id: id || null, p_fields: fields, p_publish: Boolean(publish) });
+  return { data: typeof data === 'string' ? data : null, error, status };
+};
+export const cancelMemberEvent = (id) => rpcCall('cancel_member_event', { p_id: id });
+export const deleteMemberEvent = (id) => rpcCall('delete_member_event', { p_id: id });
+// Posters and gallery images: the member's own folder in the public event-posters bucket (0022), as JPEG.
+export const uploadEventImage = async (userId, file) => {
+  if (!supabase || !userId || !file) throw new Error('Event images are not configured.');
+  const processedFile = await compressImageOnly(file);
+  const path = `${userId}/${crypto.randomUUID()}.jpg`;
+  const { error } = await supabase.storage.from('event-posters').upload(path, processedFile, { upsert: false, contentType: processedFile.type || 'image/jpeg' });
+  if (error) throw error;
+  return { path, url: supabase.storage.from('event-posters').getPublicUrl(path).data.publicUrl };
+};
+// Removes event images by public URL, only the member's own event-posters files. Errors are ignored (a stray file is
+// harmless and account deletion empties the folder).
+export const removeEventImages = async (userId, urls) => {
+  if (!supabase || !userId) return;
+  const paths = (urls || []).filter((u) => isStorageImageUrl(u, 'event-posters', userId)).map((u) => `${userId}/${String(u).split('/').pop()}`);
+  if (!paths.length) return;
+  try { await supabase.storage.from('event-posters').remove(paths); } catch { /* ignored */ }
+};
 // Crossing paths (0021, D-119). Before 0021 is applied each answers PGRST202 / 404 (isMissingFunction).
 // nearbyPulse is a POST (volatile RPC), so the coordinates travel in the body only.
 export const setNearbyEnabled = (on) => rpcCall('set_nearby_enabled', { p_enabled: Boolean(on) });

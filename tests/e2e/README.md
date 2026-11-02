@@ -141,3 +141,11 @@ PLAYWRIGHT_MODULE=/tmp/pw/node_modules/playwright/index.mjs node tests/e2e/chat-
 step (typed email kept, `/auth/v1/recover` with `redirect_to` auth.html, the neutral "if an account exists" line, a rate
 limit, Back to log in), the emailed recovery link opening NEW PASSWORD instead of the app (mismatch caught before any
 call, `PUT /auth/v1/user`, then the app), an expired link, and a recovery link that lands on the home page.
+
+`create-event.spec.mjs` (D-121, Vite on :5187) drives Create Event on Explore at 1440 and 390: the toolbar button, the
+dialog's inline errors and focus, category chips, the city combobox, Free/Paid, the poster upload to the member's own
+`event-posters` folder, the live card, Preview, Publish (the success state and View event), Edit, Cancel with its inline
+confirmation, Save as draft and the discard guard; and a member's side of a paid event (Reserve is "Payment pending"),
+a full event, and Ask a question (one signal to the organiser). `CREATE_SHOTS=<dir>` saves the states. Playwright here:
+`PLAYWRIGHT_MODULE=/opt/node-tools/node_modules/playwright/index.mjs`.
+

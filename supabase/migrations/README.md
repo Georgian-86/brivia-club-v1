@@ -855,3 +855,34 @@ select has_table_privilege('authenticated', 'public.nearby_live', 'select'),    
 ```
 
 Expected advisor additions: the six RPCs join the intended definer-RPC list (`orbit-hygiene.test.sql` H3).
+
+## 0022
+
+**Members create events: Create Event on Explore (founder request 2026-11-02, D-121). Not yet applied.** Needs `0020`
+(it extends `club_event` and `event_rsvp`); apply after `0021`.
+
+What it does: `club_event` gains the creator, address, map link, poster and gallery URLs, capacity, entry fee (INR),
+the organiser's contact (shown only when they choose), cancelled/published timestamps, and the twelve form categories;
+drafts may be incomplete (a published row must be complete). `event_rsvp` gains `status` (`confirmed` |
+`pending_payment`), `paid_at` and `payment_ref`. A public `event-posters` Storage bucket (10 MB, JPEG/PNG/WebP, own
+folder only). It redefines `list_events`, `set_event_rsvp` and `event_companions` (new columns; capacity and paid holds;
+the companion choice needs a registration) and adds `save_member_event`, `cancel_member_event`, `delete_member_event`
+(authenticated) and `confirm_event_payment` (service role only, for the payment webhook, not built yet).
+
+Deploy order: apply 0022 **before or with** the client. The client before 0022 keeps working; the client after 0022 on
+a database without it says "Creating events opens soon" when saving, and the 0020 events still list.
+
+Verify after the apply:
+
+```sql
+select has_function_privilege('authenticated', 'public.save_member_event(uuid, jsonb, boolean)', 'execute'),   -- t
+       has_function_privilege('anon', 'public.save_member_event(uuid, jsonb, boolean)', 'execute'),            -- f
+       has_function_privilege('authenticated', 'public.confirm_event_payment(uuid, uuid, text)', 'execute'),   -- f
+       (select public from storage.buckets where id = 'event-posters');                                        -- t
+select count(*) from public.club_event where is_published and creator_id is null;   -- the 8 seeded events, unchanged
+```
+
+Expected advisor additions: `save_member_event`, `cancel_member_event` and `delete_member_event` join the intended
+definer-RPC list (`orbit-hygiene.test.sql` H3). Paid events: registrations stay `pending_payment` until a payment
+provider is chosen and its webhook calls `confirm_event_payment` (owed, D-121).
+

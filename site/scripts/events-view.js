@@ -15,12 +15,18 @@ export const EVENT_CATEGORIES = Object.freeze([
   { key: 'games', label: 'Games' },
   { key: 'networking', label: 'Networking' },
   { key: 'culture', label: 'Culture' },
+  // D-121 (0022): the create form's other categories, so member events can be filtered too.
+  { key: 'startups', label: 'Startups' },
+  { key: 'education', label: 'Education' },
+  { key: 'workshops', label: 'Workshops' },
+  { key: 'community', label: 'Community' },
+  { key: 'other', label: 'Other' },
 ].map(Object.freeze));
 const CATEGORY_KEYS = new Set(EVENT_CATEGORIES.map((c) => c.key));
 export const isEventCategory = (key) => CATEGORY_KEYS.has(String(key || ''));
 
 const escapeHtml = (value = '') => String(value).replace(/[&<>'"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[c]));
-const toDate = (value) => { const d = new Date(value); return Number.isNaN(d.getTime()) ? null : d; };
+const toDate = (value) => { if (value === null || value === undefined || value === '') return null; const d = new Date(value); return Number.isNaN(d.getTime()) ? null : d; };
 const parts = (date, options) => Object.fromEntries(new Intl.DateTimeFormat('en-US', { timeZone: EVENT_TIME_ZONE, ...options })
   .formatToParts(date).map((p) => [p.type, p.value]));
 
@@ -67,6 +73,43 @@ export const companionLabel = (count, mine = false) => {
 };
 export const otherCompanions = (event) => Math.max(0, (Number(event?.companionCount) || 0) - (event?.wantsCompanion ? 1 : 0));
 
+// Entry fee (D-121): 'Free' or '₹1,499' (whole rupees, Indian grouping).
+export const feeLabel = (fee) => {
+  const n = Math.max(0, Math.round(Number(fee) || 0));
+  return n ? `₹${n.toLocaleString('en-IN')}` : 'Free';
+};
+// Seats (D-121): null without a capacity (the club's open events); otherwise how many are left.
+export const spotsLeft = (event) => (event?.capacity ? Math.max(0, event.capacity - (Number(event.registeredCount) || 0)) : null);
+export const spotsLabel = (event) => {
+  const left = spotsLeft(event);
+  if (left === null) return '';
+  if (left === 0) return 'Registrations closed';
+  return `${left} ${left === 1 ? 'spot' : 'spots'} left`;
+};
+// '12 registered' for an event with a capacity (everyone with a seat, so the spots add up).
+export const registeredLabel = (event) => {
+  const n = Math.max(0, Number(event?.registeredCount) || 0);
+  return n ? `${n} registered` : 'Be the first to register';
+};
+// What the member can do about a seat: 'mine-draft' | 'cancelled' | 'confirmed' | 'pending' | 'expired' | 'full' | 'open'.
+export const registrationState = (event) => {
+  if (event.status === 'cancelled') return 'cancelled';
+  if (event.status === 'draft') return 'mine-draft';
+  if (event.myStatus === 'confirmed') return 'confirmed';
+  if (event.myStatus === 'pending_payment') return 'pending';
+  if (spotsLeft(event) === 0) return 'full';
+  if (event.myStatus === 'expired') return 'expired';
+  return 'open';
+};
+
+const cleanContact = (contact) => {
+  if (!contact || typeof contact !== 'object') return null;
+  const out = {};
+  ['email', 'phone', 'link'].forEach((k) => { if (contact[k]) out[k] = String(contact[k]); });
+  if ('public' in contact) out.public = Boolean(contact.public);
+  return Object.keys(out).length ? out : null;
+};
+
 // A list_events row as the page uses it. Unknown categories fall back to 'networking' for styling only.
 export const normalizeEvent = (row = {}) => ({
   id: String(row.id || ''),
@@ -85,17 +128,38 @@ export const normalizeEvent = (row = {}) => ({
   going: Boolean(row.going),
   wantsCompanion: Boolean(row.wants_companion),
   friends: (Array.isArray(row.friends) ? row.friends : []).slice(0, 3).map((f) => ({ id: String(f?.id || ''), name: String(f?.name || 'Member'), photoUrl: f?.photo_url || '' })),
+  // D-121 (0022). A database without 0022 sends none of these: the club's own events, open, free, no organiser.
+  status: ['draft', 'cancelled'].includes(row.status) ? row.status : 'published',
+  isMine: Boolean(row.is_mine),
+  organizer: row.organizer && row.organizer.id ? { id: String(row.organizer.id), name: String(row.organizer.name || 'Member'), photoUrl: row.organizer.photo_url || '' } : null,
+  imageUrl: String(row.image_url || ''),
+  gallery: (Array.isArray(row.gallery_urls) ? row.gallery_urls : []).map(String).filter(Boolean).slice(0, 6),
+  venueAddress: String(row.venue_address || '').trim(),
+  mapUrl: String(row.map_url || ''),
+  placeId: String(row.place_id || ''),
+  capacity: Number(row.capacity) > 0 ? Number(row.capacity) : null,
+  registeredCount: Math.max(0, Number(row.registered_count ?? row.going_count) || 0),
+  feeInr: Math.max(0, Math.round(Number(row.fee_inr) || 0)),
+  myStatus: ['confirmed', 'pending_payment', 'expired'].includes(row.my_status) ? row.my_status : (row.going ? 'confirmed' : null),
+  contact: cleanContact(row.contact),
 });
 
 // The new state after the member's own change, with counts moved locally (the next load replaces them).
-export const withRsvp = (event, going, wantsCompanion) => {
+// status: the registration status the server answered ('confirmed' | 'pending_payment'); by default a free event's
+// seat is confirmed and a paid one's is pending (D-121).
+export const withRsvp = (event, going, wantsCompanion, status = null) => {
   const nextGoing = Boolean(going || wantsCompanion);
   const nextWants = nextGoing && Boolean(wantsCompanion);
+  const moved = nextGoing === event.going ? 0 : nextGoing ? 1 : -1;
+  const keep = nextGoing && event.going && event.myStatus !== 'expired' ? event.myStatus : null;
+  const myStatus = !nextGoing ? null : status || keep || (event.feeInr > 0 && !event.isMine ? 'pending_payment' : 'confirmed');
   return {
     ...event,
     going: nextGoing,
     wantsCompanion: nextWants,
-    goingCount: Math.max(0, event.goingCount + (nextGoing === event.going ? 0 : nextGoing ? 1 : -1)),
+    myStatus,
+    goingCount: Math.max(0, event.goingCount + moved),
+    registeredCount: Math.max(0, (event.registeredCount || 0) + moved),
     companionCount: Math.max(0, event.companionCount + (nextWants === event.wantsCompanion ? 0 : nextWants ? 1 : -1)),
   };
 };
@@ -134,65 +198,169 @@ const kicker = (event) => {
   return `<p class="event-kicker">${escapeHtml(categoryLabel(event.category))}${distance ? `<span class="event-kicker-distance"> · ${escapeHtml(distance)}</span>` : ''}</p>`;
 };
 
-// One event card (D-118: editorial and quiet, like Posts and Connect): image with the date, a category and distance
-// micro-label, the title in Bodoni, one time-and-place line, and a foot with who is going and "Find a companion".
-// imageSrc: a bundled asset URL (or '' for the wine gradient). friends as for avatarStack.
+const statusBadge = (event) => (event.status === 'draft' ? '<span class="event-status-badge">Draft</span>'
+  : event.status === 'cancelled' ? '<span class="event-status-badge is-cancelled">Cancelled</span>' : '');
+const feeBadge = (event) => `<span class="event-fee-badge${event.feeInr ? ' is-paid' : ''}">${escapeHtml(feeLabel(event.feeInr))}</span>`;
+// 'Free · 8 spots left' (or the fee alone for an open event); a draft's line says who can see it.
+const seatsLine = (event) => {
+  if (event.status === 'draft') return 'Draft · only you can see this';
+  if (event.status === 'cancelled') return 'This event was cancelled';
+  return [feeLabel(event.feeInr), spotsLabel(event)].filter(Boolean).join(' · ');
+};
+
+// One event card (D-118: editorial and quiet, like Posts and Connect): image with the date (and the fee, D-121), a
+// category and distance micro-label, the title in Bodoni, the time, the place, the fee and seats, and a foot with who
+// is registered and "Find a companion". imageSrc: a checked poster URL or a bundled asset ('' for the wine gradient).
 export const eventCardMarkup = (event, { imageSrc = '', friends = [] } = {}) => {
-  const label = `${event.title}, ${fullDate(event.startsAt)}, ${eventTimeRange(event.startsAt, event.endsAt)}`;
-  const place = [event.venueName, event.venueArea.split(',')[0]].filter(Boolean).join(', ');
-  return `<article class="event-card" data-event-id="${escapeHtml(event.id)}" data-category="${escapeHtml(event.category)}">
-  <div class="event-card-media"${imageSrc ? '' : ' data-fallback'}>${imageSrc ? `<img src="${escapeHtml(imageSrc)}" alt="" loading="lazy" decoding="async" />` : ''}${dateBadgeMarkup(event.startsAt)}</div>
+  const label = `${event.title}, ${fullDate(event.startsAt) || 'date to be set'}, ${eventTimeRange(event.startsAt, event.endsAt)}`;
+  const place = [event.venueName, String(event.venueArea || '').split(',')[0]].filter(Boolean).join(', ');
+  const live = event.status === 'published';
+  const count = event.capacity ? registeredLabel(event) : goingLabel(event.goingCount, friends.length);
+  return `<article class="event-card${live ? '' : ` is-${event.status}`}" data-event-id="${escapeHtml(event.id)}" data-category="${escapeHtml(event.category)}">
+  <div class="event-card-media"${imageSrc ? '' : ' data-fallback'}>${imageSrc ? `<img src="${escapeHtml(imageSrc)}" alt="" loading="lazy" decoding="async" />` : ''}${dateBadgeMarkup(event.startsAt)}${statusBadge(event) || feeBadge(event)}</div>
   <div class="event-card-body">
     ${kicker(event)}
     <h2 class="event-card-title"><button type="button" class="event-open" data-event-open="${escapeHtml(event.id)}" aria-label="${escapeHtml(label)}">${escapeHtml(event.title)}</button></h2>
-    <p class="event-card-line">${escapeHtml(eventTimeRange(event.startsAt, event.endsAt))}</p>
-    <p class="event-card-line">${escapeHtml(place)}</p>
+    <p class="event-card-line">${escapeHtml(eventTimeRange(event.startsAt, event.endsAt) || 'Date and time to be set')}</p>
+    <p class="event-card-line">${escapeHtml(place || 'Venue to be set')}</p>
+    <p class="event-card-seats${spotsLeft(event) === 0 && live ? ' is-full' : ''}">${escapeHtml(seatsLine(event))}</p>
     <div class="event-card-foot">
-      <span class="event-going">${friends.length ? `<span class="event-avatars">${avatarStack(friends)}</span>` : ''}<span>${escapeHtml(goingLabel(event.goingCount, friends.length))}</span></span>
-      <button type="button" class="event-companion-link${event.wantsCompanion ? ' is-on' : ''}" data-event-companion="${escapeHtml(event.id)}">${event.wantsCompanion ? 'Looking for company' : 'Find a companion'}<span class="sr-only"> for ${escapeHtml(event.title)}</span> ${ARROW}</button>
+      <span class="event-going">${friends.length ? `<span class="event-avatars">${avatarStack(friends)}</span>` : ''}<span>${escapeHtml(count)}</span></span>
+      ${live ? `<button type="button" class="event-companion-link${event.wantsCompanion ? ' is-on' : ''}" data-event-companion="${escapeHtml(event.id)}">${event.wantsCompanion ? 'Looking for company' : 'Find a companion'}<span class="sr-only"> for ${escapeHtml(event.title)}</span> ${ARROW}</button>`
+    : `<button type="button" class="event-companion-link" data-event-open-detail="${escapeHtml(event.id)}">${event.isMine ? 'Manage' : 'Details'}<span class="sr-only"> ${escapeHtml(event.title)}</span> ${ARROW}</button>`}
     </div>
   </div>
 </article>`;
 };
 
 export const EVENTS_EMPTY = Object.freeze({
-  none: { title: 'No events yet', copy: 'New events near you show up here. Check back soon.' },
+  none: { title: 'No events yet', copy: 'New events near you show up here. Check back soon, or create one.' },
   category: { title: 'Nothing in this category', copy: 'Try another category, or see all events.' },
   nearby: { title: 'Nothing within 15 km yet', copy: 'Set your area from your own location to see what is close by.' },
   unavailable: { title: 'Events open soon', copy: 'Events near you are almost here. Your posts are under Posts.' },
   error: { title: 'Events could not load', copy: 'Check your connection and try again.' },
 });
 
-export const eventDetailMarkup = (event, { imageSrc = '', friends = [] } = {}) => {
+const MAIL = '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><rect x="3.5" y="5.5" width="17" height="13" rx="2"/><path d="m4 7 8 6 8-6"/></svg>';
+const PHONE = '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M6.5 3.5h3l1.5 4-2 1.3a11 11 0 0 0 6.2 6.2l1.3-2 4 1.5v3a2 2 0 0 1-2.2 2A16.5 16.5 0 0 1 4.5 5.7a2 2 0 0 1 2-2.2Z"/></svg>';
+const LINK = '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/></svg>';
+const safeHref = (href) => (/^(https:\/\/|mailto:|tel:)[^\s"'<>\\]+$/.test(href) ? href : '');
+
+const registrationMarkup = (event, friends = []) => {
+  const state = registrationState(event);
+  const seats = event.capacity ? `${registeredLabel(event)}${spotsLeft(event) !== null ? ` · ${spotsLabel(event)}` : ''}` : goingLabel(event.goingCount, friends.length);
+  const fee = event.feeInr ? `${feeLabel(event.feeInr)} entry` : 'Free entry';
+  let action = '';
+  let note = '';
+  if (event.isMine && (state === 'open' || state === 'expired' || state === 'full')) {
+    action = ''; // the organiser hosts; their counts are in "Your event"
+  } else if (state === 'open' || state === 'expired') {
+    action = `<button type="button" class="event-going-toggle" data-event-going aria-pressed="false">${event.feeInr ? `Reserve · ${escapeHtml(feeLabel(event.feeInr))}` : 'Register'}</button>`;
+    if (state === 'expired') note = 'Your held seat expired. Reserve again if a spot is still free.';
+    else if (event.feeInr) note = 'Your seat is held for 30 minutes and confirmed only once payment completes.';
+  } else if (state === 'confirmed') {
+    action = '<span class="event-registered" role="status">Registered <span aria-hidden="true">✓</span></span>';
+  } else if (state === 'pending') {
+    action = '<span class="event-registered is-pending" role="status">Payment pending</span>';
+    note = 'Seat held for 30 minutes. It is confirmed only after payment succeeds; online payment opens soon.';
+  } else if (state === 'full') {
+    action = '<button type="button" class="event-going-toggle" disabled aria-disabled="true">Registrations closed</button>';
+  }
+  const cancel = state === 'confirmed' || state === 'pending'
+    ? '<button type="button" class="event-text-action" data-event-unregister>Cancel registration</button>' : '';
+  return `<div class="event-detail-row event-register-row">
+    <div class="event-register-copy"><p class="event-register-fee">${escapeHtml(fee)}</p><p class="event-register-seats event-going">${friends.length ? `<span class="event-avatars">${avatarStack(friends)}</span>` : ''}<span>${escapeHtml(seats)}</span></p></div>
+    ${action}
+  </div>${note ? `<p class="event-register-note">${escapeHtml(note)}</p>` : ''}${cancel ? `<div class="event-register-cancel">${cancel}</div>` : ''}`;
+};
+
+const organizerMarkup = (event, organizerSrc) => {
+  const o = event.organizer;
+  const who = o ? escapeHtml(o.name) : 'Brivia Club';
+  const avatar = o ? (organizerSrc ? `<span class="event-avatar event-avatar-md"><img src="${escapeHtml(organizerSrc)}" alt="" /></span>` : `<span class="event-avatar event-avatar-md" aria-hidden="true">${escapeHtml(initials(o.name))}</span>`)
+    : '<span class="event-avatar event-avatar-md event-avatar-club" aria-hidden="true">B</span>';
+  return `<div class="event-organizer">${avatar}<p><span>Hosted by</span><strong>${event.isMine ? `${who} (you)` : who}</strong></p></div>`;
+};
+
+const contactMarkup = (event) => {
+  if (event.isMine || !event.organizer || event.status !== 'published') return '';
+  const c = event.contact || {};
+  const items = [
+    c.email && safeHref(`mailto:${c.email}`) ? `<li><a href="${escapeHtml(safeHref(`mailto:${c.email}`))}">${MAIL}<span>${escapeHtml(c.email)}</span></a></li>` : '',
+    c.phone && safeHref(`tel:${c.phone.replace(/[^+0-9]/g, '')}`) ? `<li><a href="${escapeHtml(safeHref(`tel:${c.phone.replace(/[^+0-9]/g, '')}`))}">${PHONE}<span>${escapeHtml(c.phone)}</span></a></li>` : '',
+    c.link && safeHref(c.link) ? `<li><a href="${escapeHtml(safeHref(c.link))}" target="_blank" rel="noopener noreferrer nofollow">${LINK}<span>Contact link</span><span class="sr-only"> (opens in a new tab)</span></a></li>` : '',
+  ].filter(Boolean).join('');
+  return `<section class="event-contact" aria-labelledby="event-contact-title">
+    <p class="event-companion-title" id="event-contact-title">Questions?</p>
+    ${items ? `<ul class="event-contact-list">${items}</ul>` : '<p class="event-companion-copy">Ask the organiser here on Brivia. They see your note and can reply once they accept.</p>'}
+    <button type="button" class="event-ask" data-event-ask>Ask a question ${ARROW}</button>
+  </section>`;
+};
+
+const OWNER_CONFIRM = Object.freeze({
+  cancel: { copy: 'Cancel this event? Registrations close, and the people registered see it as cancelled.', yes: 'Yes, cancel it', no: 'Keep it' },
+  delete: { copy: 'Delete this event for good? This cannot be undone.', yes: 'Delete', no: 'Keep it' },
+});
+const ownerToolsMarkup = (event, confirm = null) => {
+  if (!event.isMine) return '';
+  const ask = OWNER_CONFIRM[confirm];
+  if (ask) {
+    return `<section class="event-owner" aria-label="Your event"><p class="app-eyebrow">YOUR EVENT</p><p class="event-owner-confirm" id="event-owner-confirm" role="alert">${escapeHtml(ask.copy)}</p><div class="event-owner-tools"><button type="button" class="event-owner-action is-quiet" data-event-confirm-no>${escapeHtml(ask.no)}</button><button type="button" class="event-owner-action is-danger" data-event-confirm-yes="${confirm}" aria-describedby="event-owner-confirm">${escapeHtml(ask.yes)}</button></div></section>`;
+  }
+  const counts = event.status === 'published'
+    ? `<p class="event-owner-counts">${escapeHtml(event.capacity ? `${event.registeredCount} of ${event.capacity} registered` : `${event.registeredCount} registered`)}</p>` : '';
+  const tools = [
+    event.status !== 'cancelled' ? `<button type="button" class="event-owner-action" data-event-edit>${event.status === 'draft' ? 'Continue editing' : 'Edit event'}</button>` : '',
+    event.status === 'published' ? '<button type="button" class="event-owner-action is-quiet" data-event-cancel>Cancel event</button>' : '',
+    event.status !== 'published' ? `<button type="button" class="event-owner-action is-quiet" data-event-delete>${event.status === 'draft' ? 'Delete draft' : 'Delete event'}</button>` : '',
+  ].join('');
+  return `<section class="event-owner" aria-label="Your event"><p class="app-eyebrow">YOUR EVENT</p>${counts}<div class="event-owner-tools">${tools}</div></section>`;
+};
+
+// The drawer. opts: imageSrc (checked), friends, organizerSrc (checked), gallery ([checked URL]), preview (no actions),
+// confirm ('cancel' | 'delete': the organiser's inline confirmation).
+export const eventDetailMarkup = (event, { imageSrc = '', friends = [], organizerSrc = '', gallery = [], preview = false, confirm = null } = {}) => {
   const others = otherCompanions(event);
+  const live = event.status === 'published';
+  const registered = event.myStatus === 'confirmed' || event.myStatus === 'pending_payment';
+  const where = [event.venueName, event.venueAddress, event.venueArea].filter(Boolean).join(', ');
+  const map = event.mapUrl && safeHref(event.mapUrl)
+    ? ` <a class="event-map-link" href="${escapeHtml(event.mapUrl)}" target="_blank" rel="noopener noreferrer nofollow">Open in Maps<span class="sr-only"> (opens in a new tab)</span> ${ARROW}</a>` : '';
+  const companionHint = !registered ? 'Register first, then turn this on to find company.'
+    : event.myStatus === 'pending_payment' ? 'You will see companions once your seat is confirmed.'
+      : !event.wantsCompanion ? 'Turn on "Looking for company?" to see who else is.' : '';
   return `<div class="event-detail-media"${imageSrc ? '' : ' data-fallback'}>${imageSrc ? `<img src="${escapeHtml(imageSrc)}" alt="" />` : ''}${dateBadgeMarkup(event.startsAt)}
-  <button type="button" class="event-detail-icon event-detail-back" data-event-close aria-label="Close event"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M19 12H5M11 6l-6 6 6 6"/></svg></button>
-  <button type="button" class="event-detail-icon event-detail-share" data-event-share aria-label="Share event"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 15V4M8 8l4-4 4 4M6 11v8h12v-8"/></svg></button>
+  ${preview ? '' : `<button type="button" class="event-detail-icon event-detail-back" data-event-close aria-label="Close event"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M19 12H5M11 6l-6 6 6 6"/></svg></button>
+  ${live ? '<button type="button" class="event-detail-icon event-detail-share" data-event-share aria-label="Share event"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 15V4M8 8l4-4 4 4M6 11v8h12v-8"/></svg></button>' : ''}`}
 </div>
 <div class="event-detail-body">
+  ${statusBadge(event) ? `<p class="event-detail-status${event.status === 'cancelled' ? ' is-cancelled' : ''}">${event.status === 'cancelled' ? 'Cancelled by the organiser' : 'Draft · only you can see this'}</p>` : ''}
   ${kicker(event)}
-  <h2 class="event-detail-title" id="event-detail-title" tabindex="-1">${escapeHtml(event.title)}</h2>
-  <p class="event-meta">${CLOCK}<span>${escapeHtml(fullDate(event.startsAt, 'short'))} · ${escapeHtml(eventTimeRange(event.startsAt, event.endsAt))}</span></p>
-  <p class="event-meta">${PIN}<span>${escapeHtml([event.venueName, event.venueArea].filter(Boolean).join(', '))}</span></p>
+  <h2 class="event-detail-title" id="${preview ? 'event-preview-title' : 'event-detail-title'}" tabindex="-1">${escapeHtml(event.title)}</h2>
+  <p class="event-meta">${CLOCK}<span>${escapeHtml(event.startsAt ? `${fullDate(event.startsAt, 'short')} · ${eventTimeRange(event.startsAt, event.endsAt)}` : 'Date and time to be set')}</span></p>
+  <p class="event-meta">${PIN}<span>${escapeHtml(where || 'Venue to be set')}${map}</span></p>
+  ${organizerMarkup(event, organizerSrc)}
+  ${ownerToolsMarkup(preview ? { ...event, isMine: false } : event, confirm)}
   ${event.description ? `<p class="event-detail-copy">${escapeHtml(event.description)}</p>` : ''}
   ${event.tags.length ? `<ul class="event-tags" aria-label="Tags">${event.tags.map((t) => `<li>${escapeHtml(t)}</li>`).join('')}</ul>` : ''}
-  <div class="event-detail-row">
-    <span class="event-going">${friends.length ? `<span class="event-avatars">${avatarStack(friends)}</span>` : ''}<span>${escapeHtml(goingLabel(event.goingCount, friends.length))}</span></span>
-    <button type="button" class="event-going-toggle${event.going ? ' is-on' : ''}" data-event-going aria-pressed="${event.going}">${event.going ? "You're going" : "I'm going"}</button>
+  ${gallery.length ? `<ul class="event-gallery" aria-label="Photos">${gallery.map((src) => `<li><img src="${escapeHtml(src)}" alt="" loading="lazy" decoding="async" /></li>`).join('')}</ul>` : ''}
+  ${live || event.status === 'cancelled' ? registrationMarkup(preview ? { ...event, myStatus: null } : event, friends) : ''}
+  ${live ? `<div class="event-detail-row event-companion-row-toggle">
+    <div><p class="event-companion-title" id="event-companion-label">Looking for company?</p><p class="event-companion-copy" id="event-companion-copy">Find people attending this event who would love to go with you. Only people who also turn this on see you, most shared interests first.</p></div>
+    <button type="button" class="event-switch" role="switch" data-event-wants aria-checked="${event.wantsCompanion}" aria-labelledby="event-companion-label" aria-describedby="event-companion-copy"${registered && !preview ? '' : ' disabled'}><span></span></button>
   </div>
-  <div class="event-detail-row event-companion-row-toggle">
-    <div><p class="event-companion-title" id="event-companion-label">Looking for a companion?</p><p class="event-companion-copy" id="event-companion-copy">Let others going know you'd love some company. You're matched with people who also want company, most shared interests first.</p></div>
-    <button type="button" class="event-switch" role="switch" data-event-wants aria-checked="${event.wantsCompanion}" aria-labelledby="event-companion-label" aria-describedby="event-companion-copy"><span></span></button>
-  </div>
-  <button type="button" class="event-see-companions" data-event-companions${event.wantsCompanion ? '' : ' aria-describedby="event-see-hint"'}>See companions (${others}) ${ARROW}</button>
-  ${event.wantsCompanion ? '' : '<p class="event-see-hint" id="event-see-hint">Turn on "Looking for a companion?" to see who else is.</p>'}
+  <button type="button" class="event-see-companions" data-event-companions${companionHint ? ' aria-describedby="event-see-hint"' : ''}${preview ? ' disabled' : ''}>See companions (${others}) ${ARROW}</button>
+  ${companionHint ? `<p class="event-see-hint" id="event-see-hint">${escapeHtml(companionHint)}</p>` : ''}` : ''}
+  ${preview ? '' : contactMarkup(event)}
 </div>`;
 };
 
 // One row in the companions sheet. person: { id, name, src, sharedInterests, isConnection }, sent: a signal went out.
 export const companionRowMarkup = (person, { sent = false } = {}) => {
   const shared = Number(person.sharedInterests) || 0;
-  const line = person.isConnection ? 'Already a connection' : shared ? `${shared} shared interest${shared === 1 ? '' : 's'}` : 'Going to this event';
+  const background = Number(person.sharedBackground) || 0;
+  const line = person.isConnection ? 'Already a connection' : shared ? `${shared} shared interest${shared === 1 ? '' : 's'}`
+    : background ? `${background} goal${background === 1 ? '' : 's'} or skill${background === 1 ? '' : 's'} in common` : 'Going to this event';
   const action = person.isConnection
     ? `<button type="button" class="event-companion-action" data-companion-chat="${escapeHtml(person.id)}">Message</button>`
     : `<button type="button" class="event-companion-action" data-companion-hi="${escapeHtml(person.id)}"${sent ? ' disabled' : ''}>${sent ? 'Request sent' : 'Say hi'}</button>`;
@@ -201,3 +369,6 @@ export const companionRowMarkup = (person, { sent = false } = {}) => {
 
 // The note that travels with "Say hi" (a normal signal: the other member still has to agree, CLAUDE.md).
 export const companionNote = (eventTitle) => `Hi! I saw we're both going to ${String(eventTitle || 'the same event').slice(0, 80)}. Want to go together?`;
+
+// The note that travels with "Ask a question" (a normal signal to the organiser, who still has to accept).
+export const questionNote = (eventTitle, question) => `Question about ${String(eventTitle || 'your event').slice(0, 60)}: ${String(question || '').trim()}`.slice(0, 280);

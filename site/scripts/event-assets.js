@@ -11,7 +11,8 @@ import photo from '../media/Images/Cover images/94978B9F-A399-43FC-AC48-0A41088B
 import desk from '../media/Images/Cover images/9358893B-8EAB-4FD2-8E2E-A4812398D008.webp';
 
 const BY_KEY = Object.freeze({ jam, tech, chess, dandiya, badminton, food, vinyl, photo, desk });
-const BY_CATEGORY = Object.freeze({ music: jam, tech, games: chess, culture: dandiya, sports: badminton, food, art: photo, networking: desk });
+// D-121: the create form's other categories borrow the nearest image in the set.
+const BY_CATEGORY = Object.freeze({ music: jam, tech, games: chess, culture: dandiya, sports: badminton, food, art: photo, networking: desk, startups: tech, education: desk, workshops: desk, community: dandiya, other: desk });
 
 // The image for an event: its own key, else its category's, else '' (the card shows the wine gradient).
 export const eventImageSrc = (event) => BY_KEY[event?.imageKey] || BY_CATEGORY[event?.category] || '';

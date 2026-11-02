@@ -1051,6 +1051,26 @@ Explore lists events the club curates. This is location-first ranking outside th
 - **Consent.** Being listed is not a connection. "Say hi" sends an ordinary signal (`send_signal`), so a connection
   still exists only after the other member agrees.
 
+### 11.1 Member-created events (D-121, migration 0022)
+
+- **Who creates.** Any completed member (`save_member_event`), at most 10 new events per 24 hours. A draft is seen only
+  by its creator. A published event is listed only to members who can see its creator (`brivia_visible_to`), so the
+  test world, blocks and completion apply to events exactly as to people.
+- **Venue location.** The organiser picks the city from `place` (same list as "Pick my city"); the venue cell is that
+  city's centre cell, or, if the organiser pins the venue while there, the g7 cell of the pin. The pin's coordinates
+  are converted inside `save_member_event` and never stored (§9.1.4). Distance and order are as in §11 above.
+- **Registration.** A registration is separate from the companion choice. Capacity is enforced on the server under a
+  row lock on the event; one registration per member per event. A paid event's registration is `pending_payment`: a
+  30-minute held seat that counts toward capacity and is not confirmed until the payment provider confirms it
+  (`confirm_event_payment`, service role only). The organiser's own registration is confirmed.
+- **Companions for member events.** Opt-in needs a registration, and companions are listed only among **confirmed**
+  registrations that opted in, for a confirmed caller who opted in. Order: exact shared interests (as above), then
+  shared background (`looking_for` and `skills` values in common, case-insensitive), then the same experience band,
+  then who joined first. Still no distance term and no Passion Budget weights. The organiser gets counts only, never a
+  list of who registered or who wants company.
+- **Contact.** The organiser's event contact is typed for the event, never taken from the account, and reaches other
+  members only when the organiser ticks "Show on the event page". "Ask a question" is an ordinary signal with a note.
+
 ## Appendix A (DRAFT, not scheduled): Constellations
 
 These are quorum-consented local micro-groups (3–5 members in ring ≤ 1) around one anchor interest:

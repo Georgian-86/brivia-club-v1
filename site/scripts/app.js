@@ -21,7 +21,7 @@ import '../styles/mobile-app.css';
 import '../styles/skeleton.css';
 import '../styles/aura-theme.css';
 import '../styles/handoff.css';
-import { supabase, rowToProfile, saveProfile, isPresetCoverUrl, onboardingStatus, sendSignal, fetchSignalQuota, isRateLimited, isStorageImageUrl, withoutCredentials, uploadMessageAttachment, removeMessageAttachment, uploadCommunityPostImage, removeCommunityPostImage, ImageProcessingError, PHOTO_ERROR_MESSAGE, PHOTO_FRAMER_ERROR, compressAttachmentFiles, attachmentKind, reportMember, setSensitiveConsent, fetchSensitiveConsentAt, fetchMyInterests, fetchInterestNodes, addMemberInterest, isMissingFunction, touchPresence, connectionPresence, setPresenceVisible, myPresenceVisible, setMemberInterests, uploadResume, removeResume, resumeSignedUrl, resumeInfo, clearResumePath, searchPlaces, setHomeCity, setHomeLocation, listEvents, setEventRsvp, setCompanionDefault, myEventPrefs, eventCompanions, setNearbyEnabled, myNearbySetting, nearbyPulse, nearbyClear, myNearbyAlerts, setNearbyMuted } from './supabase.js';
+import { supabase, rowToProfile, saveProfile, isPresetCoverUrl, onboardingStatus, sendSignal, fetchSignalQuota, isRateLimited, isStorageImageUrl, withoutCredentials, uploadMessageAttachment, removeMessageAttachment, uploadCommunityPostImage, removeCommunityPostImage, ImageProcessingError, PHOTO_ERROR_MESSAGE, PHOTO_FRAMER_ERROR, compressAttachmentFiles, attachmentKind, reportMember, setSensitiveConsent, fetchSensitiveConsentAt, fetchMyInterests, fetchInterestNodes, addMemberInterest, isMissingFunction, touchPresence, connectionPresence, setPresenceVisible, myPresenceVisible, setMemberInterests, uploadResume, removeResume, resumeSignedUrl, resumeInfo, clearResumePath, searchPlaces, setHomeCity, setHomeLocation, listEvents, setEventRsvp, setCompanionDefault, myEventPrefs, eventCompanions, saveMemberEvent, cancelMemberEvent, deleteMemberEvent, uploadEventImage, removeEventImages, setNearbyEnabled, myNearbySetting, nearbyPulse, nearbyClear, myNearbyAlerts, setNearbyMuted } from './supabase.js';
 import { locateOnce, fallbackCopy } from './geo-locate.js';
 import { areaChangeMessage, AREA_HELPER, AREA_NO_MATCH } from './area-change.js';
 import { areaShareBody, parseAreaBody, resumeShareAttachment, resumeMessageFields, RESUME_SHARE_BODY, NO_RESUME_HINT, RESUME_GONE_COPY, RESUME_SHARE_NOTE, AREA_SHARE_NOTE } from './quick-share.js';
@@ -42,7 +42,9 @@ import { createPresence, presenceDot } from './presence.js';
 import { createCrossingPaths, isQuietHour, alertHeadline, alertDetail, alertToast, pausedCopy } from './crossing-paths.js';
 import '../styles/crossing-paths.css';
 import { createEventsPage } from './events-page.js';
+import { createEventComposer } from './event-create.js';
 import '../styles/events.css';
+import '../styles/event-create.css';
 import { postCardMarkup, postFooterMarkup, countText, shareData, isSafePostImageSrc } from './post-card.js';
 import { toastSide } from './toast-place.js';
 import { loadReactions, setReaction, createReactionGuard } from './post-reactions.js';
@@ -787,10 +789,27 @@ window.addEventListener('scroll', () => {
 // Explore: events near you (D-117). Created once; show() loads on first open and refreshes after.
 let pendingEventId = null;
 let pendingEventRead = false;
+const eventSafeImage = (url) => (isStorageImageUrl(url) ? safeImageUrl(url) : '');
+// Create Event (D-121, 0022): the composer dialog; a save refreshes Explore, "View event" opens the new event.
+const eventComposer = createEventComposer({
+  dialog: document.querySelector('#event-create-dialog'),
+  api: { saveMemberEvent, uploadEventImage, removeEventImages, searchPlaces },
+  memberId: () => memberProfile.id,
+  organizer: () => (memberProfile.id ? { id: String(memberProfile.id), name: memberProfile.name || 'You', photoUrl: memberProfile.photoUrl || memberProfile.photo_url || '' } : null),
+  safeImage: eventSafeImage,
+  toast: (message) => showToast(message),
+  isMissing: isMissingFunction,
+  onSaved: () => eventsPage.refresh(),
+  onView: (id) => eventsPage.openEvent(id),
+  geo: navigator.geolocation,
+  secure: window.isSecureContext,
+});
 const eventsPage = createEventsPage({
   root: document.querySelector('[data-view="events"]'),
-  api: { listEvents, setEventRsvp, setCompanionDefault, myEventPrefs, eventCompanions },
-  safeImage: (url) => (isStorageImageUrl(url) ? safeImageUrl(url) : ''),
+  composer: eventComposer,
+  memberId: () => memberProfile.id,
+  api: { listEvents, setEventRsvp, setCompanionDefault, myEventPrefs, eventCompanions, cancelMemberEvent, deleteMemberEvent, removeEventImages },
+  safeImage: eventSafeImage,
   toast: (message) => showToast(message),
   isMissing: isMissingFunction,
   signedIn: () => Boolean(supabase && memberProfile.id),

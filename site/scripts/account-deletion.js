@@ -10,7 +10,7 @@
 //   storage.from(bucket).list(prefix, { limit, offset }) / .remove(paths)   (Supabase Storage client shape)
 //   rpc(name, args) -> { error }                                              (Supabase rpc shape)
 // 'resumes' (polish wave D3, 0012 §D): delete_my_account answers storage_not_empty while resumes/<uid>/ holds a file.
-export const DELETE_BUCKETS = ['profile-photos', 'profile-covers', 'message-attachments', 'community-posts', 'resumes'];
+export const DELETE_BUCKETS = ['profile-photos', 'profile-covers', 'message-attachments', 'community-posts', 'resumes', 'event-posters'];
 export const PAGE_SIZE = 100;
 export const REMOVE_BATCH = 100;
 const MAX_PASSES = 50; // a bucket that never empties is reported, not looped on forever
@@ -138,7 +138,7 @@ export const DELETE_DISCLOSURE = {
     'Your profile, photos, interests and points.',
     'Your matches, requests and signals.',
     "Your messages, which disappear from other people's chats too.",
-    'Your posts and the files you uploaded.',
+    'Your posts, the events you created (and their registrations), and the files you uploaded.',
   ],
   remains: [
     'Reports you made are kept for up to a year, without your name.',

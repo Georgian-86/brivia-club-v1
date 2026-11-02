@@ -4,13 +4,17 @@
 // The event panel is a drawer at every width (D-118: a calmer page; the grid gets the full width): a side drawer from
 // 760 px, a full-screen sheet below. Opening moves focus to its title; Escape, ← or the backdrop closes it and focus
 // returns to the card.
+//
+// D-121 (0022): "Create event" opens the composer (event-create.js); members register (capacity and paid holds are
+// the server's), choose "Looking for company?" separately, and ask the organiser a question (an ordinary signal with a
+// note). The organiser edits, cancels or deletes their own event from its drawer.
 import {
   EVENT_CATEGORIES, EVENTS_EMPTY, isEventCategory, normalizeEvent, withRsvp, filterEvents, nearbyEvents,
-  eventCardMarkup, eventDetailMarkup, companionRowMarkup, companionNote,
+  eventCardMarkup, eventDetailMarkup, companionRowMarkup, companionNote, questionNote,
 } from './events-view.js';
 import { eventImageSrc } from './event-assets.js';
 
-export const createEventsPage = ({ root, api, safeImage, toast, isMissing, sendHello, openChatWith, signedIn }) => {
+export const createEventsPage = ({ root, api, safeImage, toast, isMissing, sendHello, openChatWith, signedIn, composer = null, memberId = () => '' }) => {
   if (!root) return { show() {} };
   const grid = root.querySelector('#events-grid');
   const chips = root.querySelector('#event-chips');
@@ -21,9 +25,14 @@ export const createEventsPage = ({ root, api, safeImage, toast, isMissing, sendH
   const count = root.querySelector('#events-count');
   const backdrop = document.querySelector('#event-detail-backdrop');
   const dialog = document.querySelector('#event-companions-dialog');
+  const askDialog = document.querySelector('#event-ask-dialog');
+  const createButton = root.querySelector('#events-create');
 
-  const state = { events: [], category: 'all', nearby: false, selectedId: null, loaded: false, loading: false, unavailable: false, error: false, companionDefault: false, sent: new Set(), returnFocus: null };
+  const state = { events: [], category: 'all', nearby: false, selectedId: null, loaded: false, loading: false, unavailable: false, error: false, companionDefault: false, sent: new Set(), returnFocus: null, confirm: null };
   const friendsFor = (event) => event.friends.map((f) => ({ name: f.name, src: safeImage(f.photoUrl) }));
+  // A member's poster (a checked Storage URL), else the club's bundled image for the event or its category.
+  const imageFor = (event) => (event.imageUrl && safeImage(event.imageUrl)) || eventImageSrc(event);
+  const cardOpts = (event) => ({ imageSrc: imageFor(event), friends: friendsFor(event) });
   const visible = () => {
     const list = filterEvents(state.events, state.category);
     return state.nearby ? nearbyEvents(list) : list;
@@ -36,7 +45,11 @@ export const createEventsPage = ({ root, api, safeImage, toast, isMissing, sendH
     const event = byId(state.selectedId);
     if (!event) { panel.hidden = true; panel.innerHTML = ''; return; }
     panel.hidden = false;
-    panel.innerHTML = eventDetailMarkup(event, { imageSrc: eventImageSrc(event), friends: friendsFor(event) });
+    panel.innerHTML = eventDetailMarkup(event, {
+      ...cardOpts(event), confirm: state.confirm,
+      organizerSrc: event.organizer?.photoUrl ? safeImage(event.organizer.photoUrl) : '',
+      gallery: event.gallery.map((u) => safeImage(u)).filter(Boolean),
+    });
   };
 
   const renderGrid = () => {
@@ -54,7 +67,7 @@ export const createEventsPage = ({ root, api, safeImage, toast, isMissing, sendH
       grid.innerHTML = `<div class="events-empty" role="status"><h2>${empty.title}</h2><p>${empty.copy}</p>${retry}</div>`;
       status.textContent = '';
     } else {
-      grid.innerHTML = list.map((e) => eventCardMarkup(e, { imageSrc: eventImageSrc(e), friends: friendsFor(e) })).join('');
+      grid.innerHTML = list.map((e) => eventCardMarkup(e, cardOpts(e))).join('');
       status.textContent = `${list.length} event${list.length === 1 ? '' : 's'}${state.nearby ? ' within 15 km' : ''}`;
     }
     count.textContent = empty ? 'EVENTS' : `${String(list.length).padStart(2, '0')} ${list.length === 1 ? 'EVENT' : 'EVENTS'}${state.nearby ? ' WITHIN 15 KM' : ''}`;
@@ -64,23 +77,29 @@ export const createEventsPage = ({ root, api, safeImage, toast, isMissing, sendH
     chips.querySelectorAll('[data-event-category]').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.eventCategory === state.category)));
     nearbyButton.setAttribute('aria-pressed', String(state.nearby));
     companionSwitch.setAttribute('aria-checked', String(state.companionDefault));
+    if (createButton) createButton.hidden = state.unavailable;
   };
 
-  const load = async () => {
-    if (state.loading || !signedIn()) return;
-    state.loading = true;
+  const load = () => {
+    if (!signedIn()) return Promise.resolve();
+    if (state.loading) return state.loading;
+    state.loading = fetchEvents().finally(() => { state.loading = null; });
+    return state.loading;
+  };
+  const fetchEvents = async () => {
     if (!state.loaded) grid.setAttribute('aria-busy', 'true');
     const [{ data, error }, prefs] = await Promise.all([api.listEvents(null), api.myEventPrefs()]);
-    state.loading = false;
     state.unavailable = Boolean(error && isMissing(error));
     state.error = Boolean(error && !state.unavailable);
     if (!error) { state.events = (data || []).map(normalizeEvent); state.loaded = true; }
     if (!prefs?.error && prefs?.data) state.companionDefault = Boolean(prefs.data.companion_default);
     renderControls();
     renderGrid();
+    if (panel.classList.contains('is-sheet')) { if (byId(state.selectedId)) renderPanel(); else closeSheet(); }
   };
 
   const openSheet = (id, focusCompanion = false) => {
+    if (state.selectedId !== String(id)) state.confirm = null;
     state.selectedId = String(id);
     if (!panel.classList.contains('is-sheet')) state.returnFocus = document.activeElement;
     renderPanel();
@@ -89,7 +108,8 @@ export const createEventsPage = ({ root, api, safeImage, toast, isMissing, sendH
     panel.setAttribute('aria-labelledby', 'event-detail-title');
     if (backdrop) backdrop.hidden = false;
     document.body.classList.add('event-sheet-open');
-    const target = focusCompanion ? panel.querySelector('[data-event-wants]') : panel.querySelector('#event-detail-title');
+    const wants = panel.querySelector('[data-event-wants]');
+    const target = focusCompanion && wants ? (wants.disabled ? panel.querySelector('[data-event-going]') || wants : wants) : panel.querySelector('#event-detail-title');
     if (focusCompanion) target?.scrollIntoView({ block: 'center', behavior: 'instant' });
     target?.focus({ preventScroll: !focusCompanion });
   };
@@ -98,6 +118,7 @@ export const createEventsPage = ({ root, api, safeImage, toast, isMissing, sendH
     panel.classList.remove('is-sheet');
     ['aria-modal', 'aria-labelledby'].forEach((a) => panel.removeAttribute(a));
     panel.hidden = true;
+    state.confirm = null;
     if (backdrop) backdrop.hidden = true;
     document.body.classList.remove('event-sheet-open');
     const back = state.returnFocus?.isConnected ? state.returnFocus : grid.querySelector(`[data-event-open="${CSS.escape(state.selectedId || '')}"]`);
@@ -106,29 +127,69 @@ export const createEventsPage = ({ root, api, safeImage, toast, isMissing, sendH
 
   const replaceEvent = (next) => {
     state.events = state.events.map((e) => (e.id === next.id ? next : e));
-    const focusedAttr = ['data-event-wants', 'data-event-going'].find((a) => document.activeElement?.hasAttribute?.(a));
-    renderPanel();
-    if (focusedAttr) panel.querySelector(`[${focusedAttr}]`)?.focus();
+    const focusedAttr = ['data-event-wants', 'data-event-going', 'data-event-unregister'].find((a) => document.activeElement?.hasAttribute?.(a));
+    if (state.selectedId === next.id) {
+      renderPanel();
+      // After registering or cancelling the button changes; keep focus in the same row.
+      const keep = focusedAttr && panel.querySelector(`[${focusedAttr}]:not([disabled])`);
+      (keep || (focusedAttr ? panel.querySelector('[data-event-going], [data-event-unregister], .event-registered') : null))?.focus?.();
+    }
     const card = grid.querySelector(`.event-card[data-event-id="${CSS.escape(next.id)}"]`);
-    if (card) card.outerHTML = eventCardMarkup(next, { imageSrc: eventImageSrc(next), friends: friendsFor(next) });
+    if (card) card.outerHTML = eventCardMarkup(next, cardOpts(next));
   };
 
-  // going: the new going state; wants: true/false, or null to keep it (a new RSVP takes the page switch's default).
+  // going: true registers, false cancels, null keeps the registration; wants: the companion choice or null to keep it
+  // (a new registration takes the page switch's default).
   const changeRsvp = async (event, going, wants) => {
     const before = event;
-    const nextWants = wants === null ? (event.going ? event.wantsCompanion : state.companionDefault) : wants;
-    const optimistic = withRsvp(event, going, nextWants);
+    const nextGoing = going === null ? event.going : going;
+    const nextWants = !nextGoing ? false : wants === null ? (event.going ? event.wantsCompanion : state.companionDefault) : wants;
+    const optimistic = withRsvp(event, nextGoing, nextWants);
     replaceEvent(optimistic);
-    const { data, error } = await api.setEventRsvp(event.id, optimistic.going, optimistic.going ? wants : null);
+    const { data, error } = await api.setEventRsvp(event.id, going, going === false ? null : wants);
     if (error) {
       replaceEvent(before);
-      toast(isMissing(error) ? 'Events open soon.' : 'That did not save. Try again.');
+      const message = String(error.message || '');
+      if (isMissing(error)) toast('Events open soon.');
+      else if (/event_full/.test(message)) { toast('Registrations just closed: this event is full.'); load(); }
+      else if (/register first/.test(message)) toast('Register first, then look for company.');
+      else if (/invalid event/.test(message)) { toast('This event is no longer open.'); load(); }
+      else toast('That did not save. Try again.');
       return;
     }
-    if (data && (Boolean(data.going) !== optimistic.going || Boolean(data.wants_companion) !== optimistic.wantsCompanion)) {
-      replaceEvent(withRsvp(before, data.going, data.wants_companion));
+    if (data) replaceEvent(withRsvp(before, data.going, data.wants_companion, data.status || null));
+    const after = byId(event.id);
+    if (!after.going) toast(before.going ? 'Registration cancelled. Your spot is free for someone else.' : 'Saved.');
+    else if (!before.going) toast(after.myStatus === 'pending_payment' ? 'Seat held for 30 minutes while payment completes.' : after.wantsCompanion ? "You're registered, and open to company." : "You're registered.");
+    else toast(after.wantsCompanion && !before.wantsCompanion ? "You'll be shown to others going who want company too." : !after.wantsCompanion && before.wantsCompanion ? 'Companion matching is off for this event.' : 'Saved.');
+  };
+
+  const ownerAction = async (event, kind) => {
+    const result = kind === 'cancel' ? await api.cancelMemberEvent(event.id) : await api.deleteMemberEvent(event.id);
+    state.confirm = null;
+    if (result.error) { renderPanel(); toast(isMissing(result.error) ? 'Events open soon.' : 'That did not work. Try again.'); return; }
+    if (kind === 'delete') {
+      api.removeEventImages?.(memberId(), [event.imageUrl, ...event.gallery].filter(Boolean));
+      state.events = state.events.filter((e) => e.id !== event.id);
+      closeSheet();
+      renderGrid();
+      toast('Event deleted.');
+      return;
     }
-    toast(!optimistic.going ? "You're no longer going." : optimistic.wantsCompanion && !before.wantsCompanion ? "You're going, and open to a companion." : !before.going ? "You're going." : 'Saved.');
+    replaceEvent({ ...event, status: 'cancelled', going: event.going });
+    toast('Event cancelled. People who registered will see it as cancelled.');
+    panel.querySelector('#event-detail-title')?.focus();
+  };
+
+  const askQuestion = (event) => {
+    if (!askDialog || !event.organizer) return;
+    askDialog.dataset.eventId = event.id;
+    askDialog.querySelector('#event-ask-title').textContent = `Ask ${event.organizer.name}`;
+    askDialog.querySelector('#event-ask-error').textContent = '';
+    const text = askDialog.querySelector('#event-ask-text');
+    text.value = '';
+    askDialog.showModal();
+    text.focus();
   };
 
   const showCompanions = async (event) => {
@@ -136,7 +197,7 @@ export const createEventsPage = ({ root, api, safeImage, toast, isMissing, sendH
     const list = dialog.querySelector('#event-companions-list');
     dialog.querySelector('#event-companions-title').textContent = `Companions for ${event.title}`;
     if (!event.wantsCompanion) {
-      list.innerHTML = '<li class="event-companions-note">Turn on "Looking for a companion?" first. Only people who did the same can see each other.</li>';
+      list.innerHTML = `<li class="event-companions-note">${event.going ? 'Turn on "Looking for company?" first. Only people who did the same can see each other.' : 'Register for this event, then turn on "Looking for company?" to see who else wants company.'}</li>`;
     } else {
       list.innerHTML = '<li class="event-companions-note">Loading…</li>';
     }
@@ -144,7 +205,7 @@ export const createEventsPage = ({ root, api, safeImage, toast, isMissing, sendH
     if (!event.wantsCompanion) return;
     const { data, error } = await api.eventCompanions(event.id);
     if (error) { list.innerHTML = '<li class="event-companions-note">Companions could not load. Try again.</li>'; return; }
-    const people = (data || []).map((r) => ({ id: String(r.member_id), name: r.name || 'Member', src: safeImage(r.photo_url), sharedInterests: r.shared_interests, isConnection: Boolean(r.is_connection) }));
+    const people = (data || []).map((r) => ({ id: String(r.member_id), name: r.name || 'Member', src: safeImage(r.photo_url), sharedInterests: r.shared_interests, sharedBackground: r.shared_background, isConnection: Boolean(r.is_connection) }));
     list.innerHTML = people.length
       ? people.map((p) => companionRowMarkup(p, { sent: state.sent.has(p.id) })).join('')
       : '<li class="event-companions-note">No one else is looking yet. We will show them here as they join.</li>';
@@ -161,14 +222,25 @@ export const createEventsPage = ({ root, api, safeImage, toast, isMissing, sendH
     if (t.closest('[data-events-retry]')) { load(); return; }
     const chip = t.closest('[data-event-companion]');
     if (chip) { openSheet(chip.dataset.eventCompanion, true); return; }
+    const detail = t.closest('[data-event-open-detail]');
+    if (detail) { openSheet(detail.dataset.eventOpenDetail); return; }
     const card = t.closest('.event-card');
-    if (card && !t.closest('button:not(.event-open)')) { openSheet(card.dataset.eventId); return; }
+    if (card && grid.contains(card) && !t.closest('button:not(.event-open)')) { openSheet(card.dataset.eventId); return; }
     if (t.closest('[data-event-close]')) { closeSheet(); return; }
     const event = byId(state.selectedId);
     if (!event) return;
-    if (t.closest('[data-event-going]')) { changeRsvp(event, !event.going, event.going ? false : null); return; }
-    if (t.closest('[data-event-wants]')) { changeRsvp(event, event.going || !event.wantsCompanion, !event.wantsCompanion); return; }
+    if (t.closest('[data-event-going]')) { changeRsvp(event, true, null); return; }
+    if (t.closest('[data-event-unregister]')) { changeRsvp(event, false, false); return; }
+    const wants = t.closest('[data-event-wants]');
+    if (wants && !wants.disabled) { changeRsvp(event, null, !event.wantsCompanion); return; }
     if (t.closest('[data-event-companions]')) { showCompanions(event); return; }
+    if (t.closest('[data-event-ask]')) { askQuestion(event); return; }
+    if (t.closest('[data-event-edit]')) { closeSheet(); composer?.open(event); return; }
+    const confirmKind = t.closest('[data-event-cancel]') ? 'cancel' : t.closest('[data-event-delete]') ? 'delete' : null;
+    if (confirmKind) { state.confirm = confirmKind; renderPanel(); panel.querySelector('[data-event-confirm-no]')?.focus(); return; }
+    if (t.closest('[data-event-confirm-no]')) { state.confirm = null; renderPanel(); panel.querySelector('[data-event-edit], [data-event-delete]')?.focus(); return; }
+    const yes = t.closest('[data-event-confirm-yes]');
+    if (yes) { yes.disabled = true; ownerAction(event, yes.dataset.eventConfirmYes); return; }
     if (t.closest('[data-event-share]')) {
       const url = new URL(`/app.html?view=events&event=${encodeURIComponent(event.id)}`, window.location.origin).href;
       const done = () => toast('Event link copied.');
@@ -177,6 +249,30 @@ export const createEventsPage = ({ root, api, safeImage, toast, isMissing, sendH
     }
   };
   [root, panel, backdrop].forEach((el) => el?.addEventListener('click', onClick));
+
+  createButton?.addEventListener('click', () => {
+    if (!composer) return;
+    composer.open();
+  });
+
+  askDialog?.addEventListener('click', (e) => { if (e.target === askDialog || e.target.closest('[data-ask-close]')) askDialog.close(); });
+  askDialog?.querySelector('#event-ask-form')?.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const event = byId(askDialog.dataset.eventId);
+    const text = askDialog.querySelector('#event-ask-text');
+    const out = askDialog.querySelector('#event-ask-error');
+    const question = text.value.trim();
+    if (question.length < 3) { out.textContent = 'Write your question first.'; text.setAttribute('aria-invalid', 'true'); text.focus(); return; }
+    text.removeAttribute('aria-invalid');
+    if (!event?.organizer) { askDialog.close(); return; }
+    const submit = askDialog.querySelector('button[type="submit"]');
+    submit.disabled = true;
+    const result = await sendHello({ id: event.organizer.id, name: event.organizer.name }, questionNote(event.title, question));
+    submit.disabled = false;
+    if (result?.error) { out.textContent = 'That did not send. Try again in a moment.'; return; }
+    askDialog.close();
+    panel.querySelector('[data-event-ask]')?.focus();
+  });
 
   companionSwitch.addEventListener('click', async () => {
     const next = !state.companionDefault;
@@ -192,7 +288,7 @@ export const createEventsPage = ({ root, api, safeImage, toast, isMissing, sendH
   panel.addEventListener('keydown', (e) => {
     if (e.key === 'Escape' && panel.classList.contains('is-sheet')) { e.preventDefault(); e.stopPropagation(); closeSheet(); }
     if (e.key === 'Tab' && panel.classList.contains('is-sheet')) {
-      const items = [...panel.querySelectorAll('button:not([disabled]), [tabindex="0"]')];
+      const items = [...panel.querySelectorAll('button:not([disabled]), a[href], [tabindex="0"]')];
       if (!items.length) return;
       const first = items[0]; const last = items[items.length - 1];
       if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
@@ -217,6 +313,9 @@ export const createEventsPage = ({ root, api, safeImage, toast, isMissing, sendH
 
 
   return {
+    // After the composer saves: reload, and (for "View event") open that event.
+    refresh: () => load(),
+    openEvent: (id) => load().then(() => { if (byId(id)) openSheet(id); }),
     show({ eventId } = {}) {
       if (eventId) state.pendingId = String(eventId);
       renderControls();
@@ -225,6 +324,6 @@ export const createEventsPage = ({ root, api, safeImage, toast, isMissing, sendH
       if (!state.loaded || state.error || state.unavailable) load().then(pick);
       else { renderGrid(); pick(); load(); }
     },
-    hide() { closeSheet(); if (dialog?.open) dialog.close(); },
+    hide() { closeSheet(); if (dialog?.open) dialog.close(); if (askDialog?.open) askDialog.close(); },
   };
 };

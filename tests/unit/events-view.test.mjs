@@ -15,8 +15,9 @@ const row = {
   friends: [{ id: 'f1', name: 'Asha Rao', photo_url: '' }],
 };
 
-test('categories: All first, then the mockup order, plus Culture', () => {
-  assert.deepEqual(EVENT_CATEGORIES.map((c) => c.label), ['All', 'Tech', 'Music', 'Sports', 'Food', 'Art', 'Games', 'Networking', 'Culture']);
+test('categories: All first, then the mockup order, plus Culture, then the create form\'s others (D-121)', () => {
+  assert.deepEqual(EVENT_CATEGORIES.map((c) => c.label), ['All', 'Tech', 'Music', 'Sports', 'Food', 'Art', 'Games', 'Networking', 'Culture',
+    'Startups', 'Education', 'Workshops', 'Community', 'Other']);
   assert.ok(isEventCategory('music'));
   assert.ok(!isEventCategory('<script>'));
 });
@@ -94,13 +95,16 @@ test('card markup escapes text and labels the open button with the date and time
 
 test('detail markup: switch state, the see-companions count excludes me, a hint until opted in', () => {
   const off = eventDetailMarkup(normalizeEvent(row));
-  assert.match(off, /role="switch" data-event-wants aria-checked="false"/);
+  assert.match(off, /role="switch" data-event-wants aria-checked="false"[^>]* disabled/);
+  assert.match(off, /Register first/);
   assert.match(off, /See companions \(8\)/);
   assert.match(off, /id="event-see-hint"/);
   const on = eventDetailMarkup(normalizeEvent({ ...row, going: true, wants_companion: true, companion_count: 9 }));
   assert.match(on, /aria-checked="true"/);
   assert.match(on, /See companions \(8\)/);
-  assert.match(on, /You're going/);
+  assert.match(on, /Registered/);
+  assert.match(on, /data-event-unregister/);
+  assert.ok(!/data-event-wants[^>]* disabled/.test(on));
   assert.ok(!on.includes('event-see-hint'));
 });
 
@@ -110,4 +114,105 @@ test('companion rows: shared interests, connections get Message, sent disables',
   assert.match(companionRowMarkup({ id: 'p', name: 'Ravi', isConnection: true }), /Already a connection[\s\S]*Message/);
   assert.match(companionRowMarkup({ id: 'p', name: 'Ravi' }, { sent: true }), /disabled>Request sent/);
   assert.match(companionNote('Jam'), /both going to Jam/);
+});
+
+// D-121 (0022): member events on the card and in the drawer.
+import { feeLabel, spotsLeft, spotsLabel, registrationState, questionNote } from '../../site/scripts/events-view.js';
+const member = {
+  ...row, id: 'm1', status: 'published', is_mine: false, organizer: { id: 'o1', name: 'Kiran', photo_url: '' },
+  image_url: 'https://x.supabase.co/storage/v1/object/public/event-posters/o1/p.jpg', gallery_urls: [], venue_address: '12 ITPL Road',
+  map_url: 'https://maps.app.goo.gl/abc', place_id: 'in-bengaluru', capacity: 20, registered_count: 12, fee_inr: 1499, my_status: null, contact: null,
+};
+
+test('fee, spots and registration state', () => {
+  assert.equal(feeLabel(0), 'Free');
+  assert.equal(feeLabel(1499), '₹1,499');
+  const e = normalizeEvent(member);
+  assert.equal(spotsLeft(e), 8);
+  assert.equal(spotsLabel(e), '8 spots left');
+  assert.equal(spotsLabel({ ...e, registeredCount: 19 }), '1 spot left');
+  assert.equal(spotsLabel({ ...e, registeredCount: 20 }), 'Registrations closed');
+  assert.equal(spotsLabel(normalizeEvent(row)), '', 'the club\'s open events have no capacity');
+  assert.equal(registrationState(e), 'open');
+  assert.equal(registrationState({ ...e, registeredCount: 20 }), 'full');
+  assert.equal(registrationState({ ...e, myStatus: 'pending_payment' }), 'pending');
+  assert.equal(registrationState({ ...e, myStatus: 'confirmed', registeredCount: 20 }), 'confirmed', 'a member with a seat is never "full"');
+  assert.equal(registrationState({ ...e, myStatus: 'expired' }), 'expired');
+  assert.equal(registrationState({ ...e, status: 'cancelled' }), 'cancelled');
+});
+
+test('normalizeEvent without 0022 columns: published, open, free, no organiser; my status follows going', () => {
+  const e = normalizeEvent({ ...row, going: true });
+  assert.equal(e.status, 'published');
+  assert.equal(e.capacity, null);
+  assert.equal(e.feeInr, 0);
+  assert.equal(e.organizer, null);
+  assert.equal(e.myStatus, 'confirmed');
+});
+
+test('withRsvp: a paid registration is pending, seats move, cancelling clears the status', () => {
+  const e = normalizeEvent(member);
+  const reg = withRsvp(e, true, false);
+  assert.equal(reg.myStatus, 'pending_payment');
+  assert.equal(reg.registeredCount, 13);
+  const confirmed = withRsvp(e, true, false, 'confirmed');
+  assert.equal(confirmed.myStatus, 'confirmed');
+  const off = withRsvp(confirmed, false, false);
+  assert.equal(off.myStatus, null);
+  assert.equal(off.registeredCount, 12);
+  assert.equal(withRsvp(normalizeEvent({ ...member, fee_inr: 0 }), true, false).myStatus, 'confirmed');
+});
+
+test('card: poster, fee badge, seats line, Find a companion; a draft says only you can see it', () => {
+  const e = normalizeEvent(member);
+  const html = eventCardMarkup(e, { imageSrc: e.imageUrl });
+  assert.match(html, /event-posters\/o1\/p\.jpg/);
+  assert.match(html, /event-fee-badge is-paid">₹1,499</);
+  assert.match(html, /₹1,499 · 8 spots left/);
+  assert.match(html, /12 registered/);
+  assert.match(html, /Find a companion/);
+  const draft = eventCardMarkup(normalizeEvent({ ...member, status: 'draft', is_mine: true, starts_at: null, ends_at: null }));
+  assert.match(draft, /event-status-badge">Draft/);
+  assert.match(draft, /only you can see this/);
+  assert.match(draft, /Date and time to be set/);
+  assert.match(draft, /data-event-open-detail="m1">Manage/);
+  assert.ok(!draft.includes('data-event-companion='));
+  assert.ok(!eventCardMarkup(normalizeEvent({ ...member, title: '<img src=x onerror=1>' })).includes('<img src=x'), 'escaped');
+});
+
+test('drawer: host, Reserve for a paid event, map link, contact only when given, Ask a question', () => {
+  const e = normalizeEvent(member);
+  const html = eventDetailMarkup(e);
+  assert.match(html, /Hosted by<\/span><strong>Kiran/);
+  assert.match(html, /Reserve · ₹1,499/);
+  assert.match(html, /confirmed only once payment completes/);
+  assert.match(html, /href="https:\/\/maps\.app\.goo\.gl\/abc" target="_blank" rel="noopener noreferrer nofollow"/);
+  assert.match(html, /Looking for company\?/);
+  assert.match(html, /Find people attending this event who would love to go with you/);
+  assert.match(html, /data-event-ask/);
+  assert.ok(!html.includes('mailto:'));
+  const withContact = eventDetailMarkup(normalizeEvent({ ...member, contact: { email: 'host@example.com', link: 'javascript:alert(1)' } }));
+  assert.match(withContact, /href="mailto:host@example\.com"/);
+  assert.ok(!withContact.includes('javascript:'), 'only https links render');
+  assert.match(eventDetailMarkup({ ...e, registeredCount: 20 }), /disabled aria-disabled="true">Registrations closed/);
+  assert.match(eventDetailMarkup({ ...e, myStatus: 'pending_payment', going: true }), /Payment pending[\s\S]*seat is confirmed/);
+});
+
+test('drawer for the organiser: counts and tools, never companion choices; inline confirm', () => {
+  const mine = normalizeEvent({ ...member, is_mine: true, contact: { email: 'me@example.com', public: false } });
+  const html = eventDetailMarkup(mine);
+  assert.match(html, /12 of 20 registered/);
+  assert.match(html, /data-event-edit/);
+  assert.match(html, /data-event-cancel/);
+  assert.ok(!html.includes('data-event-delete'), 'a published event is cancelled, not deleted');
+  assert.ok(!html.includes('data-event-ask'), 'no asking yourself');
+  assert.ok(!html.includes('data-event-going'), 'the host is not offered Register or Reserve');
+  assert.match(eventDetailMarkup(mine, { confirm: 'cancel' }), /role="alert">Cancel this event\?[\s\S]*data-event-confirm-yes="cancel"/);
+  assert.match(eventDetailMarkup({ ...mine, status: 'draft' }), /Delete draft/);
+});
+
+test('companion row mentions shared goals when interests do not overlap; the question note is capped', () => {
+  assert.match(companionRowMarkup({ id: 'p', name: 'Ravi', sharedInterests: 0, sharedBackground: 2 }), /2 goals or skills in common/);
+  assert.ok(questionNote('Chess', 'x'.repeat(400)).length <= 280);
+  assert.match(questionNote('Chess', 'Is parking free?'), /^Question about Chess: Is parking free\?$/);
 });

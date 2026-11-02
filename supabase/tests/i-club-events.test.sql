@@ -5,7 +5,7 @@
 --    published events with g7 venue cells and no coordinate columns.
 -- V2 list_events: upcoming only, the category filter, distance in whole km (>= 1) for a 'cell' member and null for a
 --    'place' member, nearest band first.
--- V3 set_event_rsvp: going on and off, wants_companion implies going, null keeps the value, a new RSVP takes the
+-- V3 set_event_rsvp: going on and off, wants_companion needs a registration (0022), null keeps the value, a new RSVP takes the
 --    companion default; a past or unknown event is refused (22023); an incomplete member is refused (42501).
 -- V4 counts include only members the caller can see (a blocked member is not counted); friends names only connections.
 -- V5 set_companion_default applies to every upcoming RSVP and is read back by my_event_prefs.
@@ -113,8 +113,11 @@ begin
   if not r.wants_companion then raise exception 'FAIL V3: null must keep wants_companion'; end if;
   select * into r from public.set_event_rsvp(e_jam, false, null);
   if r.going then raise exception 'FAIL V3: going off'; end if;
-  select * into r from public.set_event_rsvp(e_jam, false, true);
-  if not r.going or not r.wants_companion then raise exception 'FAIL V3: wants companion must imply going'; end if;
+  -- 0022 (D-121): the companion choice is separate from registering, and needs a registration.
+  begin perform public.set_event_rsvp(e_jam, null, true); code := 'none'; exception when others then code := sqlstate; end;
+  if code <> '22023' then raise exception 'FAIL V3: a companion without a registration gave %', code; end if;
+  select * into r from public.set_event_rsvp(e_jam, true, true);
+  if not r.going or not r.wants_companion then raise exception 'FAIL V3: register with a companion'; end if;
   begin perform public.set_event_rsvp(e_past, true); code := 'none'; exception when others then code := sqlstate; end;
   if code <> '22023' then raise exception 'FAIL V3: past event gave %', code; end if;
   begin perform public.set_event_rsvp(gen_random_uuid(), true); code := 'none'; exception when others then code := sqlstate; end;

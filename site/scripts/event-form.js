@@ -1,0 +1,203 @@
+// Create Event (D-121, migration 0022). Pure helpers (no DOM, no Supabase) for event-create.js, unit-tested in
+// tests/unit/event-form.test.mjs: the form's categories, an empty draft, a draft from a listed event (edit), the
+// validation the server repeats (save_member_event), the request body, a preview event for the live card, and the
+// mapping from a server error ('invalid <field>') back to the field.
+
+import { EVENT_TIME_ZONE } from './events-view.js';
+
+// The create form's twelve categories (the founder's list). Keys match club_event_category_check in 0022.
+export const EVENT_FORM_CATEGORIES = Object.freeze([
+  { key: 'tech', label: 'Technology' },
+  { key: 'startups', label: 'Startups & Entrepreneurship' },
+  { key: 'networking', label: 'Networking' },
+  { key: 'music', label: 'Music' },
+  { key: 'sports', label: 'Sports' },
+  { key: 'games', label: 'Chess & Games' },
+  { key: 'food', label: 'Food & Dining' },
+  { key: 'art', label: 'Art & Culture' },
+  { key: 'education', label: 'Education' },
+  { key: 'workshops', label: 'Workshops' },
+  { key: 'community', label: 'Community' },
+  { key: 'other', label: 'Other' },
+].map(Object.freeze));
+const FORM_KEYS = new Set(EVENT_FORM_CATEGORIES.map((c) => c.key));
+
+export const LIMITS = Object.freeze({
+  title: 80, description: 2000, descriptionMin: 20, venueName: 120, venueAddress: 240, capacityMax: 5000, feeMax: 100000,
+  gallery: 6, imageBytes: 10 * 1024 * 1024,
+});
+export const POSTER_TYPES = Object.freeze(['image/jpeg', 'image/png', 'image/webp']);
+
+// Map sites a venue link may point to (the same allow-list as club_event_map_url_check).
+const MAP_URL = /^https:\/\/((www\.)?google\.[a-z.]{2,8}\/maps|maps\.google\.[a-z.]{2,8}\/|maps\.app\.goo\.gl\/|goo\.gl\/maps\/|maps\.apple\.com\/|(www\.)?openstreetmap\.org\/)/;
+const UNSAFE = /["'<>\s\\]/;
+export const isMapUrl = (value) => { const v = String(value || '').trim(); return v.length <= 300 && !UNSAFE.test(v) && MAP_URL.test(v); };
+export const isContactEmail = (value) => /^[^@\s<>"']+@[^@\s<>"']+\.[^@\s<>"']+$/.test(String(value || '').trim()) && String(value).trim().length <= 254;
+export const isContactPhone = (value) => /^\+?[0-9][0-9 ()-]{6,19}$/.test(String(value || '').trim());
+export const isContactLink = (value) => { const v = String(value || '').trim(); return v.length <= 300 && /^https:\/\/[^\s"'<>\\]+$/.test(v); };
+
+export const emptyDraft = () => ({
+  id: null, status: 'new', title: '', category: '', description: '', date: '', startTime: '', endTime: '',
+  venueName: '', venueAddress: '', placeId: '', city: '', pin: null, mapUrl: '', capacity: '', paid: false, fee: '',
+  contactEmail: '', contactPhone: '', contactLink: '', contactPublic: false, imageUrl: '', gallery: [],
+  registeredCount: 0,
+});
+
+const istParts = (iso) => {
+  const d = new Date(iso);
+  if (!iso || Number.isNaN(d.getTime())) return null;
+  const p = Object.fromEntries(new Intl.DateTimeFormat('en-CA', { timeZone: EVENT_TIME_ZONE, year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' })
+    .formatToParts(d).map((x) => [x.type, x.value]));
+  return { date: `${p.year}-${p.month}-${p.day}`, time: `${p.hour}:${p.minute}` };
+};
+
+// A listed event (normalizeEvent) back into the form, for Edit.
+export const draftFromEvent = (event) => {
+  const start = istParts(event.startsAt);
+  const end = istParts(event.endsAt);
+  const contact = event.contact || {};
+  return {
+    ...emptyDraft(),
+    id: event.id, status: event.status || 'draft', title: event.title || '', category: FORM_KEYS.has(event.category) ? event.category : '',
+    description: event.description || '', date: start?.date || '', startTime: start?.time || '', endTime: end?.time || '',
+    venueName: event.venueName || '', venueAddress: event.venueAddress || '', placeId: event.placeId || '', city: event.placeId ? event.venueArea || '' : '',
+    mapUrl: event.mapUrl || '', capacity: event.capacity ? String(event.capacity) : '', paid: event.feeInr > 0, fee: event.feeInr > 0 ? String(event.feeInr) : '',
+    contactEmail: contact.email || '', contactPhone: contact.phone || '', contactLink: contact.link || '', contactPublic: Boolean(contact.public),
+    imageUrl: event.imageUrl || '', gallery: [...(event.gallery || [])], registeredCount: event.registeredCount || 0,
+    originalStart: event.startsAt || null,
+  };
+};
+
+// Today in IST as YYYY-MM-DD (the date input's min).
+export const todayIst = (now = new Date()) => istParts(now.toISOString()).date;
+
+// The instant a date + HH:MM means in IST (India has no daylight saving: a fixed +05:30).
+export const istInstant = (date, time) => {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date || '') || !/^\d{2}:\d{2}$/.test(time || '')) return null;
+  const d = new Date(`${date}T${time}:00+05:30`);
+  return Number.isNaN(d.getTime()) ? null : d;
+};
+
+const wholeNumber = (value) => (/^\d+$/.test(String(value ?? '').trim()) ? Number(String(value).trim()) : NaN);
+
+// { field: message } for every problem. A draft needs only a name; publishing needs every mandatory field.
+// Field keys are the form's names (title, category, description, date, startTime, endTime, venueName, venueAddress,
+// city, capacity, fee, mapUrl, contactEmail, contactPhone, contactLink, contactPublic).
+export const validateEventDraft = (draft, { publish = false, now = new Date() } = {}) => {
+  const errors = {};
+  const title = String(draft.title || '').trim();
+  if (!title) errors.title = 'Give your event a name.';
+  else if (title.length > LIMITS.title) errors.title = `Keep the name under ${LIMITS.title} characters.`;
+  const description = String(draft.description || '').trim();
+  if (description.length > LIMITS.description) errors.description = `Keep it under ${LIMITS.description} characters.`;
+  if (String(draft.venueName || '').trim().length > LIMITS.venueName) errors.venueName = `Keep it under ${LIMITS.venueName} characters.`;
+  if (String(draft.venueAddress || '').trim().length > LIMITS.venueAddress) errors.venueAddress = `Keep it under ${LIMITS.venueAddress} characters.`;
+  if (draft.mapUrl && !isMapUrl(draft.mapUrl)) errors.mapUrl = 'Paste a Google Maps, Apple Maps or OpenStreetMap link.';
+  if (draft.contactEmail && !isContactEmail(draft.contactEmail)) errors.contactEmail = 'Check the email address.';
+  if (draft.contactPhone && !isContactPhone(draft.contactPhone)) errors.contactPhone = 'Use digits, with the country code if you like.';
+  if (draft.contactLink && !isContactLink(draft.contactLink)) errors.contactLink = 'Use a full https:// link.';
+  if (String(draft.capacity ?? '').trim()) {
+    const n = wholeNumber(draft.capacity);
+    if (!Number.isInteger(n) || n < 1 || n > LIMITS.capacityMax) errors.capacity = `Between 1 and ${LIMITS.capacityMax.toLocaleString('en-IN')}.`;
+    else if (draft.registeredCount && n < draft.registeredCount) errors.capacity = `${draft.registeredCount} people are already registered.`;
+  }
+  if (draft.paid) {
+    const fee = wholeNumber(draft.fee);
+    if (!String(draft.fee ?? '').trim()) { if (publish) errors.fee = 'Set the entry fee, or choose Free.'; }
+    else if (!Number.isInteger(fee) || fee < 1 || fee > LIMITS.feeMax) errors.fee = `A whole amount from ₹1 to ₹${LIMITS.feeMax.toLocaleString('en-IN')}.`;
+  }
+  if (draft.date && draft.startTime && draft.endTime && draft.endTime <= draft.startTime) errors.endTime = 'The end time must be after the start time.';
+  if (!publish) return errors;
+
+  if (!FORM_KEYS.has(draft.category)) errors.category = 'Choose a category.';
+  if (!errors.description && description.length < LIMITS.descriptionMin) errors.description = 'Tell people a little more (at least 20 characters).';
+  if (!draft.date) errors.date = 'Choose a date.';
+  if (!draft.startTime) errors.startTime = 'Choose a start time.';
+  if (!draft.endTime) errors.endTime = errors.endTime || 'Choose an end time.';
+  const start = istInstant(draft.date, draft.startTime);
+  // An already published event keeps its start (it may be under way); a new or draft one must start in the future.
+  const keepsStart = draft.status === 'published' && draft.originalStart && start && start.getTime() === new Date(draft.originalStart).getTime();
+  if (draft.date && !errors.date && draft.date < todayIst(now)) errors.date = 'Choose today or a later date.';
+  else if (start && start <= now && !keepsStart && !errors.startTime) errors.startTime = 'Choose a time that has not passed.';
+  if (!String(draft.venueName || '').trim()) errors.venueName = 'Name the venue.';
+  if (!String(draft.venueAddress || '').trim()) errors.venueAddress = 'Add the address so people can find it.';
+  if (!draft.placeId) errors.city = 'Choose the city from the list.';
+  if (!String(draft.capacity ?? '').trim()) errors.capacity = 'How many people can come?';
+  if (draft.contactPublic && !draft.contactEmail && !draft.contactPhone && !draft.contactLink) errors.contactPublic = 'Add a contact to show, or untick this.';
+  return errors;
+};
+
+// The order fields appear in, for "focus the first error".
+export const FIELD_ORDER = Object.freeze(['title', 'category', 'description', 'date', 'startTime', 'endTime', 'venueName',
+  'venueAddress', 'city', 'mapUrl', 'capacity', 'fee', 'contactEmail', 'contactPhone', 'contactLink', 'contactPublic', 'image']);
+export const firstErrorField = (errors) => FIELD_ORDER.find((f) => errors[f]) || Object.keys(errors)[0] || null;
+
+// The save_member_event body (p_fields). Empty strings stay empty: the server reads them as "not set".
+export const toServerFields = (draft) => ({
+  title: String(draft.title || '').trim(),
+  category: draft.category || null,
+  description: String(draft.description || '').trim(),
+  date: draft.date || '',
+  start_time: draft.startTime || '',
+  end_time: draft.endTime || '',
+  venue_name: String(draft.venueName || '').trim(),
+  venue_address: String(draft.venueAddress || '').trim(),
+  place_id: draft.placeId || '',
+  ...(draft.pin && Number.isFinite(draft.pin.lat) && Number.isFinite(draft.pin.lng) ? { pin: { lat: draft.pin.lat, lng: draft.pin.lng } } : {}),
+  map_url: String(draft.mapUrl || '').trim(),
+  capacity: String(draft.capacity ?? '').trim(),
+  fee_inr: draft.paid ? String(draft.fee ?? '').trim() : '0',
+  contact_email: String(draft.contactEmail || '').trim(),
+  contact_phone: String(draft.contactPhone || '').trim(),
+  contact_link: String(draft.contactLink || '').trim(),
+  contact_public: Boolean(draft.contactPublic),
+  image_url: draft.imageUrl || '',
+  gallery_urls: (draft.gallery || []).slice(0, LIMITS.gallery),
+});
+
+// save_member_event errors: 22023 'invalid <server field>' names the field; P0001 'event_limit' is the daily cap.
+const SERVER_FIELD = Object.freeze({
+  title: 'title', category: 'category', description: 'description', date: 'date', start_time: 'startTime', end_time: 'endTime',
+  venue_name: 'venueName', venue_address: 'venueAddress', place_id: 'city', pin: 'city', map_url: 'mapUrl', capacity: 'capacity',
+  fee_inr: 'fee', contact_email: 'contactEmail', contact_phone: 'contactPhone', contact_link: 'contactLink',
+  contact_public: 'contactPublic', image_url: 'image', gallery_urls: 'image',
+});
+export const serverErrorField = (error) => {
+  const m = /invalid ([a-z_]+)/.exec(String(error?.message || ''));
+  return m ? SERVER_FIELD[m[1]] || null : null;
+};
+export const serverErrorMessage = (error) => {
+  const message = String(error?.message || '');
+  if (/event_limit/.test(message)) return 'You have created 10 events today. Try again tomorrow.';
+  if (/invalid publish/.test(message)) return 'A published event cannot go back to a draft.';
+  if (/invalid event/.test(message)) return 'This event can no longer be edited.';
+  if (/invalid fee_inr/.test(message) && error?.code === '22023') return 'The fee is locked once people have registered.';
+  if (/not your event|42501/.test(`${message} ${error?.code || ''}`)) return 'Only the organiser can change this event.';
+  return '';
+};
+
+// A poster or gallery file: JPG, PNG or WebP, up to 10 MB. Returns '' or the problem.
+export const imageFileProblem = (file) => {
+  if (!file) return 'Choose an image.';
+  if (!POSTER_TYPES.includes(String(file.type || '').toLowerCase())) return 'Use a JPG, PNG or WebP image.';
+  if (file.size > LIMITS.imageBytes) return 'Keep images under 10 MB.';
+  return '';
+};
+
+// The live preview: the draft as a listed event (normalizeEvent's shape), so the real card renders it.
+export const previewEvent = (draft, { organizer = null, imageSrc = '' } = {}) => {
+  const start = istInstant(draft.date, draft.startTime || '00:00');
+  const end = draft.endTime ? istInstant(draft.date, draft.endTime) : null;
+  const capacity = wholeNumber(draft.capacity);
+  const fee = draft.paid ? wholeNumber(draft.fee) : 0;
+  return {
+    id: 'preview', title: String(draft.title || '').trim() || 'Your event name', description: String(draft.description || '').trim(),
+    category: FORM_KEYS.has(draft.category) ? draft.category : 'other', tags: [], venueName: String(draft.venueName || '').trim() || 'Venue',
+    venueArea: draft.city || '', venueAddress: String(draft.venueAddress || '').trim(), startsAt: draft.date && start ? start.toISOString() : null,
+    endsAt: end && draft.startTime ? end.toISOString() : null, imageKey: '', imageUrl: imageSrc, gallery: [], distanceKm: null,
+    goingCount: draft.registeredCount || 0, companionCount: 0, going: false, wantsCompanion: false, friends: [],
+    status: 'published', isMine: false, organizer, capacity: Number.isInteger(capacity) && capacity > 0 ? capacity : null,
+    registeredCount: draft.registeredCount || 0, feeInr: Number.isInteger(fee) && fee > 0 ? fee : 0, myStatus: null,
+    contact: null, mapUrl: '', placeId: draft.placeId || '', preview: true,
+  };
+};

@@ -99,7 +99,7 @@ body.app-body .event-chip[aria-pressed="true"]::after { opacity: 1; }
 .event-card-body { display: flex; flex: 1; flex-direction: column; gap: 4px; padding: var(--space-4) var(--space-5) var(--space-4); }
 .event-kicker { margin: 0; color: var(--ev-wine); font-size: var(--text-12); font-weight: 700; letter-spacing: .117em; text-transform: uppercase; }
 .event-kicker-distance { color: var(--ev-muted); font-weight: 600; letter-spacing: .04em; text-transform: none; }
-body.app-body .events-view .event-card-title { margin: 2px 0 var(--space-1); font-family: var(--font-heading); font-size: var(--text-24); font-weight: 500; line-height: 1.1; letter-spacing: -.02em; }
+body.app-body :is(.events-view, .ec-preview-card) .event-card-title { margin: 2px 0 var(--space-1); font-family: var(--font-heading); font-size: var(--text-24); font-weight: 500; line-height: 1.1; letter-spacing: -.02em; }
 body.app-body .event-open { padding: 0; border: 0; background: none; color: var(--ev-ink); font: inherit; text-align: left; cursor: pointer; }
 body.app-body .event-open::after { content: ''; position: absolute; inset: 0; }
 .event-card-line { margin: 0; color: var(--ev-muted); font-size: var(--text-14); line-height: 1.45; }
@@ -219,3 +219,88 @@ body.app-body.event-sheet-open .app-tabbar { display: none; }
 @media (max-width: 420px) {
   #events-count { flex-basis: 100%; }
 }
+
+/* D-121 (0022): member events. "Create event" in the toolbar (the Posts "New post" pill, quieter), the fee and status on
+   the card image, a seats line, and in the drawer the host, registration, the organiser's tools, photos and contact. */
+body.app-body .events-create {
+  display: inline-flex; align-items: center; gap: 6px; min-height: 40px; padding: 0 var(--space-4); border: 1px solid var(--ev-wine);
+  border-radius: var(--radius-pill); background: var(--ev-wine); color: var(--ev-paper); font: inherit; letter-spacing: inherit;
+  text-transform: uppercase; cursor: pointer; box-shadow: var(--ev-shadow); transition: background .2s ease;
+}
+body.app-body .events-create svg { width: 16px; height: 16px; stroke-width: 2; }
+body.app-body .events-create[hidden] { display: none; }
+@media (hover: hover) { body.app-body .events-create:hover { background: var(--ev-wine-deep); } }
+body.app-body .events-create:focus-visible { outline: 2px solid var(--ev-wine); outline-offset: 3px; }
+
+.event-fee-badge, .event-status-badge {
+  position: absolute; top: var(--space-3); right: var(--space-3); padding: 5px var(--space-3); border-radius: var(--radius-pill);
+  background: color-mix(in srgb, var(--ev-paper) 94%, transparent); color: var(--ev-ink); font-size: var(--text-12); font-weight: 700; letter-spacing: .08em; text-transform: uppercase;
+}
+.event-fee-badge.is-paid { color: var(--ev-wine); }
+.event-status-badge { background: var(--ev-ink); color: var(--ev-paper); }
+.event-status-badge.is-cancelled { background: var(--ev-wine); }
+.event-card.is-cancelled .event-card-media img, .event-card.is-draft .event-card-media img { filter: saturate(.55); }
+.event-card-seats { margin: 2px 0 0; color: var(--ev-ink); font-size: var(--text-14); font-weight: 600; }
+.event-card-seats.is-full { color: var(--ev-wine); }
+.event-card-seats + .event-card-foot { margin-top: var(--space-4); }
+
+.event-detail-status { margin: 0; padding: var(--space-2) var(--space-3); border-radius: var(--radius-m); background: color-mix(in srgb, var(--ev-ink) 7%, var(--ev-paper)); color: var(--ev-ink); font-size: var(--text-14); font-weight: 600; }
+.event-detail-status.is-cancelled { background: color-mix(in srgb, var(--ev-wine) 10%, var(--ev-paper)); color: var(--ev-wine-deep); }
+body.app-body .event-map-link { margin-left: 6px; color: var(--ev-wine); font-weight: 600; text-decoration: underline; text-underline-offset: 3px; white-space: nowrap; }
+.event-organizer { display: flex; align-items: center; gap: var(--space-3); margin-top: var(--space-2); }
+.event-organizer p { display: grid; margin: 0; line-height: 1.25; }
+.event-organizer span:not(.event-avatar) { color: var(--ev-muted); font-size: var(--text-12); letter-spacing: .08em; text-transform: uppercase; }
+.event-organizer strong { color: var(--ev-ink); font-size: var(--text-14); font-weight: 600; }
+.event-avatar-md { width: 36px; height: 36px; margin: 0; border: 0; font-size: var(--text-14); }
+.event-avatar-club { background: var(--ev-wine); color: var(--ev-paper); font-family: var(--font-heading); }
+
+.event-register-row { align-items: center; }
+.event-register-copy { display: grid; gap: 2px; }
+.event-register-fee { margin: 0; color: var(--ev-ink); font-family: var(--font-heading); font-size: var(--text-20); font-weight: 500; }
+.event-register-seats { margin: 0; color: var(--ev-muted); font-size: var(--text-14); }
+.event-registered { display: inline-flex; align-items: center; gap: 6px; min-height: 44px; padding: 0 var(--space-4); border-radius: var(--radius-pill); background: var(--ev-wine); color: var(--ev-paper); font-size: var(--text-12); font-weight: 700; letter-spacing: .1em; text-transform: uppercase; white-space: nowrap; }
+.event-registered.is-pending { background: color-mix(in srgb, var(--ev-wine) 10%, var(--ev-paper)); color: var(--ev-wine-deep); }
+body.app-body .event-going-toggle[disabled] { border-color: var(--ev-line); color: var(--ev-muted); cursor: not-allowed; }
+.event-register-note { margin: var(--space-2) 0 0; color: var(--ev-muted); font-size: var(--text-12); line-height: 1.5; }
+.event-register-cancel { display: flex; justify-content: flex-end; }
+body.app-body .event-text-action { min-height: 44px; padding: 0; border: 0; background: none; color: var(--ev-muted); font: inherit; font-size: var(--text-14); text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
+@media (hover: hover) { body.app-body .event-text-action:hover { color: var(--ev-wine); } }
+body.app-body .event-switch[disabled] { opacity: .45; cursor: not-allowed; }
+body.app-body .event-see-companions[disabled] { opacity: .6; cursor: default; }
+
+.event-gallery { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--space-2); margin: var(--space-3) 0 0; padding: 0; list-style: none; }
+.event-gallery li { overflow: hidden; aspect-ratio: 1; border-radius: var(--radius-m); background: var(--color-skeleton); }
+.event-gallery img { display: block; width: 100%; height: 100%; object-fit: cover; }
+
+.event-owner { display: grid; gap: var(--space-2); margin-top: var(--space-3); padding: var(--space-4); border: 1px solid var(--ev-line); border-radius: var(--radius-m); background: color-mix(in srgb, var(--ev-wine) 4%, var(--ev-paper)); }
+body.app-body .event-owner .app-eyebrow { margin: 0; color: var(--ev-wine); font-size: var(--text-12); font-weight: 700; letter-spacing: .117em; }
+.event-owner-counts, .event-owner-confirm { margin: 0; color: var(--ev-ink); font-size: var(--text-14); line-height: 1.5; }
+.event-owner-tools { display: flex; flex-wrap: wrap; gap: var(--space-2); }
+body.app-body .event-owner-action {
+  min-height: 44px; padding: 0 var(--space-4); border: 1px solid var(--ev-wine); border-radius: var(--radius-pill); background: var(--ev-wine); color: var(--ev-paper);
+  font-family: var(--font-body); font-size: var(--text-12); font-weight: 700; letter-spacing: .1em; text-transform: uppercase; cursor: pointer;
+}
+body.app-body .event-owner-action.is-quiet { background: transparent; color: var(--ev-wine); }
+body.app-body .event-owner-action.is-danger { border-color: var(--ev-wine-deep); background: var(--ev-wine-deep); }
+body.app-body .event-owner-action:disabled { opacity: .55; cursor: progress; }
+
+.event-contact { display: grid; gap: var(--space-2); margin-top: var(--space-4); padding-top: var(--space-4); border-top: 1px solid var(--ev-line); }
+.event-contact-list { display: grid; gap: var(--space-1); margin: 0; padding: 0; list-style: none; }
+body.app-body .event-contact-list a { display: inline-flex; align-items: center; gap: var(--space-2); min-height: 40px; color: var(--ev-ink); font-size: var(--text-14); text-decoration: none; overflow-wrap: anywhere; }
+body.app-body .event-contact-list a:hover { color: var(--ev-wine); }
+.event-contact-list svg { flex: 0 0 16px; color: var(--ev-wine); }
+body.app-body .event-ask {
+  justify-self: start; min-height: 44px; padding: 0 var(--space-5); border: 1px solid var(--ev-wine); border-radius: var(--radius-pill); background: transparent;
+  color: var(--ev-wine); font-family: var(--font-body); font-size: var(--text-12); font-weight: 700; letter-spacing: .1em; text-transform: uppercase; cursor: pointer;
+}
+body.app-body .event-detail a:focus-visible { outline: 2px solid var(--ev-wine); outline-offset: 3px; }
+
+body.app-body .events-create, .events-companion-toggle { white-space: nowrap; }
+/* Phones: the count and "Create event" on the first line, Nearby and the companion switch on the second. */
+@media (max-width: 759px) {
+  .events-toolbar { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: var(--space-1) var(--space-3); }
+  .events-toolbar-actions { display: contents; }
+  body.app-body .events-create { justify-self: end; min-height: 40px; padding: 0 var(--space-4); }
+  .events-companion-toggle { justify-self: end; }
+}
+

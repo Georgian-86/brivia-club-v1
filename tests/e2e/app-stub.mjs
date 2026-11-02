@@ -222,22 +222,65 @@ export const startAppStub = async ({ port, state = {}, deckRows = defaultDeckRow
       }
       // D-117 events (0020): st.events (list_events rows; null answers the PGRST202 "function not found" of a database
       // without 0020), st.companions (event_companions rows), st.companionDefault; RSVPs change st.events in place.
-      if (['/rest/v1/rpc/list_events', '/rest/v1/rpc/set_event_rsvp', '/rest/v1/rpc/set_companion_default', '/rest/v1/rpc/my_event_prefs', '/rest/v1/rpc/event_companions'].includes(pathName) && !st.events) {
+      if (['/rest/v1/rpc/list_events', '/rest/v1/rpc/set_event_rsvp', '/rest/v1/rpc/set_companion_default', '/rest/v1/rpc/my_event_prefs', '/rest/v1/rpc/event_companions', '/rest/v1/rpc/save_member_event', '/rest/v1/rpc/cancel_member_event', '/rest/v1/rpc/delete_member_event'].includes(pathName) && !st.events) {
         return json(404, { code: 'PGRST202', message: 'Could not find the function' });
       }
       if (pathName === '/rest/v1/rpc/list_events') return json(200, st.events.filter((e) => !args.p_category || e.category === args.p_category));
       if (pathName === '/rest/v1/rpc/my_event_prefs') return json(200, [{ companion_default: Boolean(st.companionDefault) }]);
       if (pathName === '/rest/v1/rpc/set_companion_default') { st.companionDefault = Boolean(args.p_on); st.events.forEach((e) => { if (e.going) e.wants_companion = st.companionDefault; }); return json(200, st.companionDefault); }
+      // 0022 (D-121) semantics: p_going true registers (capacity, a paid event's seat is pending_payment), false cancels,
+      // null keeps the registration and changes only the companion choice (which needs a registration).
       if (pathName === '/rest/v1/rpc/set_event_rsvp') {
         (st.rsvps ||= []).push(args);
         const e = st.events.find((x) => x.id === args.p_event);
-        if (!e) return json(400, { code: '22023', message: 'invalid event' });
-        const going = Boolean(args.p_going || args.p_wants_companion);
-        const wants = going && (args.p_wants_companion === null ? (e.going ? e.wants_companion : Boolean(st.companionDefault)) : Boolean(args.p_wants_companion));
-        e.going_count += going === e.going ? 0 : going ? 1 : -1;
-        e.companion_count += wants === e.wants_companion ? 0 : wants ? 1 : -1;
-        Object.assign(e, { going, wants_companion: wants });
-        return json(200, [{ going, wants_companion: wants }]);
+        if (!e || (e.status && e.status !== 'published')) return json(400, { code: '22023', message: 'invalid event' });
+        if (args.p_going === false) {
+          if (e.going) { e.going_count -= 1; e.registered_count = Math.max(0, (e.registered_count ?? e.going_count) - 1); if (e.wants_companion) e.companion_count -= 1; }
+          Object.assign(e, { going: false, wants_companion: false, my_status: null });
+          return json(200, [{ going: false, wants_companion: false, status: null }]);
+        }
+        if (args.p_going === true && !e.going) {
+          if (e.capacity && (e.registered_count || 0) >= e.capacity) return json(400, { code: 'P0001', message: 'event_full' });
+          const wants = args.p_wants_companion === null ? Boolean(st.companionDefault) : Boolean(args.p_wants_companion);
+          const status = e.fee_inr > 0 && !e.is_mine ? 'pending_payment' : 'confirmed';
+          e.going_count += 1; e.registered_count = (e.registered_count || 0) + 1; if (wants) e.companion_count += 1;
+          Object.assign(e, { going: true, wants_companion: wants, my_status: status });
+          return json(200, [{ going: true, wants_companion: wants, status }]);
+        }
+        if (args.p_wants_companion !== null && args.p_wants_companion !== undefined) {
+          if (!e.going) return json(400, { code: '22023', message: 'register first' });
+          const wants = Boolean(args.p_wants_companion);
+          e.companion_count += wants === e.wants_companion ? 0 : wants ? 1 : -1;
+          e.wants_companion = wants;
+        }
+        return json(200, [{ going: e.going, wants_companion: e.wants_companion, status: e.my_status || 'confirmed' }]);
+      }
+      // save_member_event / cancel / delete (0022): st.saved records each body; st.saveError answers an error once.
+      if (pathName === '/rest/v1/rpc/save_member_event') {
+        (st.saved ||= []).push(args);
+        if (st.saveError) { const err = st.saveError; st.saveError = null; return json(400, err); }
+        const f = args.p_fields || {};
+        const id = args.p_id || `m-${st.saved.length}`;
+        const at = (t) => (f.date && t ? new Date(`${f.date}T${t}:00+05:30`).toISOString() : null);
+        const place = (st.places || []).find((p) => p.id === f.place_id);
+        const old = st.events.find((x) => x.id === id) || {};
+        const row = {
+          ...old, id, title: f.title, description: f.description, category: f.category || 'other', tags: [], venue_name: f.venue_name || null,
+          venue_area: place?.name || null, venue_address: f.venue_address || '', place_id: f.place_id || '', starts_at: at(f.start_time), ends_at: at(f.end_time),
+          image_key: '', image_url: f.image_url || '', gallery_urls: f.gallery_urls || [], map_url: f.map_url || '', distance_km: place ? 3 : null,
+          going_count: old.going_count || 0, companion_count: old.companion_count || 0, going: Boolean(old.going), wants_companion: Boolean(old.wants_companion),
+          friends: [], status: args.p_publish ? 'published' : 'draft', is_mine: true, organizer: { id: (st.own || ownRow).id, name: (st.own || ownRow).name, photo_url: null },
+          capacity: Number(f.capacity) || null, registered_count: old.registered_count || 0, fee_inr: Number(f.fee_inr) || 0, my_status: old.my_status || null,
+          contact: { email: f.contact_email || null, phone: f.contact_phone || null, link: f.contact_link || null, public: Boolean(f.contact_public) },
+        };
+        st.events = [row, ...st.events.filter((x) => x.id !== id)];
+        return json(200, id);
+      }
+      if (pathName === '/rest/v1/rpc/cancel_member_event') { const e = st.events.find((x) => x.id === args.p_id); if (e) e.status = 'cancelled'; return json(200, true); }
+      if (pathName === '/rest/v1/rpc/delete_member_event') { st.events = st.events.filter((x) => x.id !== args.p_id); return json(200, true); }
+      if (pathName === '/rest/v1/place' && st.places) {
+        const q = String(reqUrl.searchParams.get('or') || '').match(/name\.ilike\.\*([^*]*)\*/)?.[1]?.toLowerCase() || '';
+        return json(200, st.places.filter((p) => !q || p.name.toLowerCase().includes(q)).map(({ id, name, region, country }) => ({ id, name, region, country })));
       }
       if (pathName === '/rest/v1/rpc/event_companions') return json(200, st.companions || []);
       if (pathName === '/rest/v1/community_post_shares' && method === 'POST') return route.fulfill({ status: 201, body: '', headers: { 'access-control-allow-origin': '*' } });
