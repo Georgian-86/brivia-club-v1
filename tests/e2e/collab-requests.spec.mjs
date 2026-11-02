@@ -68,7 +68,7 @@ try {
     await page.waitForSelector('dialog.collab-review [data-collab-message]');
     check(`${w}: Connect answers with p_accept true`, JSON.stringify(st.responses.at(-1)) === JSON.stringify({ p_from: ASHA, p_accept: true }));
     const done = await page.locator('dialog.collab-review .collab-state').innerText();
-    check(`${w}: "You're connected." offers Message Asha (${JSON.stringify(done)})`, /You're connected\./.test(done) && /Message Asha/.test(done));
+    check(`${w}: "You're connected." says her message opened the chat and offers Reply Asha (D-124) (${JSON.stringify(done)})`, /You're connected\./.test(done) && /Reply Asha/.test(done) && /first one in your chat/.test(done));
     await shot(page, `connected-${w}.png`);
     if (w < 780) {
       // Message: the sheet closes and Asha's chat opens.

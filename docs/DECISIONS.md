@@ -2506,3 +2506,32 @@ controls (a tester or a seeded test member), never a real member, so no new expo
   gets a thin wine edge), a one-line serif "GOING TO <EVENT>" row (date and venue in its tooltip and for screen
   readers; the picker shows the date), and two stacked paper edges.
 
+## D-124: "Make the first move.", and the pitch becomes the first chat message (founder, 2026-11-02)
+
+- **Asked:** a Connect page like the reference (the companions page with a "4 looking for a companion" pill with
+  faces), a message composer on Connect ("Make the first move." / "Introduce yourself and tell them why you'd like to
+  connect.", a counter, suggested openers, Send Request, Cancel), the recipient sees photo, name, headline and the
+  message with Accept / Decline, and in Chat: accepted -> the exact message is the first message, once; already
+  connected -> appended to the existing chat, no duplicate request or conversation; declined -> never in chat.
+- **Done:** migration `0024_pitch_messages.sql`: a trigger after insert on `matches` delivers each direction's note
+  (pending or accepted request) as a message from its sender with the request's own time, exactly once
+  (`brivia_pitch_delivery`, a separate table so `brivia_messages` keeps its columns, a5 S2), and accepts an open
+  request; `brivia_server_created_at` keeps that time only inside the delivery; `send_connect_request(p_to, p_note)`
+  appends to an existing chat ('chat') or is exactly `send_signal`. This covers every path to a connection: Accept,
+  two requests crossing, a companion match (D-123). Client: the composer on the Connect deck (#pitch-modal restyled)
+  and on companion cards (`connect-composer.js`, heart or right swipe -> composer -> request with the message, then
+  this event's like), the review sheet shows "Their message" first with Accept / Decline and, after Accept, "Their
+  message is the first one in your chat ... Reply". Companions page: the face pill and plain chips per the reference.
+- **Supersedes D-018:** closing the pitch sheet (×, Escape, backdrop, the new Cancel) now sends nothing and the card
+  comes back; "Send without a note" (D-071) is the explicit plain like. Moving to the next card with the sheet open
+  still sends the plain like, as before.
+- **Kept:** the Connect deck still calls `send_signal` (its cards are never connections, so Scenario B cannot arise
+  there); `send_connect_request` is the companions composer's call. Quota, caps, blocks and worlds are unchanged.
+- **Not run:** agent-arena (no second model route here).
+- **Proof:** SQL harness ALL PASSED (new `m-pitch-messages.test.sql` P1-P6; the seed now counts its 3 delivered
+  pitches: 18 messages; hygiene H3); unit 433 (new `connect-composer.test.mjs`); e2e companions (composer, Cancel,
+  suggestions, counter, exact message sent), consent and deck (updated to the new close rule), collab-requests,
+  app-shell, events, create-event, chat-inbox, crossing-paths, fit and the rest. consent keeps one failure that
+  predates this work ("a Supabase storage photo_url renders": the deck card shows the default cover since D-120).
+- **Owed:** apply `0024_pitch_messages.sql` after 0023 (README "0024").
+

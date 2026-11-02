@@ -4,11 +4,12 @@
 // profile. Two likes for the same event make a match (server: companion_swipe), shown as "Looks like you're going
 // together!" with Start conversation. Pure markup lives in companion-view.js.
 import {
-  normalizeCompanionEvent, normalizeCompanion, companionCardMarkup, matchMomentMarkup, eventPickLabel, lookingCount,
+  normalizeCompanionEvent, normalizeCompanion, companionCardMarkup, matchMomentMarkup, eventPickLabel, lookingPillMarkup,
 } from './companion-view.js';
 import { createDeckSwipe } from './deck-swipe.js';
+import { openerSuggestions } from './connect-composer.js';
 
-export const createCompanionsPage = ({ root, api, safeImage, coverFor, me, toast, isMissing, openProfile, openConversation, goExplore }) => {
+export const createCompanionsPage = ({ root, api, safeImage, coverFor, me, toast, isMissing, openProfile, openConversation, goExplore, composer = null, sendRequest = null }) => {
   if (!root) return { show() {}, hide() {}, showMatch() {} };
   const deckEl = root.querySelector('#companion-deck');
   const picker = root.querySelector('#companion-event');
@@ -27,7 +28,10 @@ export const createCompanionsPage = ({ root, api, safeImage, coverFor, me, toast
     picker.innerHTML = state.events.map((e) => `<option value="${e.id}"${e.id === state.eventId ? ' selected' : ''}>${eventPickLabel(e).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]))}</option>`).join('');
     picker.closest('.companion-picker').hidden = !state.events.length;
   };
-  const renderCount = () => { count.textContent = state.eventId ? lookingCount(state.people.length) : ''; };
+  const renderCount = () => {
+    count.innerHTML = state.eventId && state.people.length ? lookingPillMarkup(state.people, { photoSrc: (p) => safeImage(p.photoUrl) }) : '';
+    count.hidden = !count.innerHTML;
+  };
 
   const empty = (title, copy, action = '') => {
     deckEl.innerHTML = `<div class="companion-empty" role="status"><h2>${title}</h2><p>${copy}</p>${action}</div>`;
@@ -59,7 +63,8 @@ export const createCompanionsPage = ({ root, api, safeImage, coverFor, me, toast
       card: current,
       stack: deckEl.querySelector('.companion-row'),
       canDrag: () => !state.busy,
-      onCommit: (direction) => { decide(direction === 'pitch', { flown: false }); return true; },
+      // Right opens the composer (the card waits, parked); left passes.
+      onCommit: (direction) => { if (direction === 'pitch') { connect(); return true; } decide(false); return true; },
     });
     status.textContent = `${state.people[0].name}. ${state.people.length} ${state.people.length === 1 ? 'person' : 'people'} to see.`;
   };
@@ -91,8 +96,29 @@ export const createCompanionsPage = ({ root, api, safeImage, coverFor, me, toast
     await loadDeck();
   };
 
-  // like: true connects, false passes. flown: the drag already started the exit.
-  const decide = async (like) => {
+  // D-124 "Make the first move.": Connect opens the composer. Send = the request with the message (it opens their chat
+  // if they accept, 0024) and this event's like (two likes match at once, D-123). Cancel sends nothing; the card stays.
+  const connect = () => {
+    const person = state.people[0];
+    if (!person || state.busy) return;
+    if (!composer || !sendRequest) { decide(true); return; }
+    state.swipe?.park();
+    const ev = event();
+    composer.open({
+      person,
+      suggestions: openerSuggestions({ name: person.name, shared: person.shared, eventTitle: ev?.title }),
+      onCancel: () => { state.swipe?.settle(); likeBtn.focus({ preventScroll: true }); },
+      onSend: async (note) => {
+        const sent = await sendRequest(person, note);
+        if (sent.error) return false;
+        decide(true, { requested: true });
+        return true;
+      },
+    });
+  };
+
+  // like: true connects, false passes. requested: a connect request with a message went out first.
+  const decide = async (like, { requested = false } = {}) => {
     const person = state.people[0];
     if (!person || state.busy) return;
     state.busy = true;
@@ -122,6 +148,7 @@ export const createCompanionsPage = ({ root, api, safeImage, coverFor, me, toast
     (state.people.length ? likeBtn : deckEl.querySelector('button'))?.focus({ preventScroll: true });
     const row = Array.isArray(data) ? data[0] : data;
     if (row?.matched) showMatch({ matchId: row.match_id, person, event: ev });
+    else if (requested) toast(`Request sent. If ${person.name} accepts, your message opens your chat.`);
     else if (like) toast(`Noted. If ${person.name} wants to go together too, you'll both be told.`);
   };
 
@@ -151,7 +178,7 @@ export const createCompanionsPage = ({ root, api, safeImage, coverFor, me, toast
 
   root.addEventListener('click', (e) => {
     if (e.target.closest('#companion-pass')) { decide(false); return; }
-    if (e.target.closest('#companion-like')) { decide(true); return; }
+    if (e.target.closest('#companion-like')) { connect(); return; }
     if (e.target.closest('[data-companion-explore]')) { goExplore(); return; }
     if (e.target.closest('[data-companion-retry]')) { load(state.eventId); return; }
     const sw = e.target.closest('[data-companion-switch]');
@@ -166,7 +193,7 @@ export const createCompanionsPage = ({ root, api, safeImage, coverFor, me, toast
   root.addEventListener('keydown', (e) => {
     if (!state.people.length || e.target.closest('select, input, textarea') || e.altKey || e.metaKey || e.ctrlKey) return;
     if (e.key === 'ArrowLeft') { e.preventDefault(); decide(false); }
-    if (e.key === 'ArrowRight') { e.preventDefault(); decide(true); }
+    if (e.key === 'ArrowRight') { e.preventDefault(); connect(); }
   });
 
   return {

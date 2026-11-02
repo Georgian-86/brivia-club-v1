@@ -910,3 +910,26 @@ select has_table_privilege('authenticated', 'public.event_companion_swipe', 'sel
 
 Expected advisor additions: the five RPCs join the intended definer-RPC list (`orbit-hygiene.test.sql` H3).
 
+## 0024
+
+**The pitch becomes the first chat message (founder request 2026-11-02, D-124). Not yet applied.** Apply after `0023`
+(it uses `brivia_is_connection`).
+
+What it does: a trigger after insert on `matches` delivers each direction's request note (pending or accepted) as an
+ordinary message from its sender, with the request's own time, exactly once (`brivia_pitch_delivery`, RLS on, no
+grants), and marks the open request accepted; a declined request never makes a match, so its note never reaches chat.
+`brivia_server_created_at` is redefined to keep that time only inside the delivery. New RPC
+`send_connect_request(p_to, p_note)` for `authenticated`: already connected -> the note is added to their chat
+('chat'); otherwise it is `send_signal`.
+
+Deploy order: either. Before 0024 the companions composer's Send answers "could not be sent"; the Connect deck works.
+Existing matches get no back-filled messages (only new connections deliver).
+
+Verify after the apply:
+
+```sql
+select has_function_privilege('authenticated', 'public.send_connect_request(uuid, text)', 'execute'),   -- t
+       has_table_privilege('authenticated', 'public.brivia_pitch_delivery', 'select'),                   -- f
+       (select count(*) from pg_trigger where tgname = 'brivia_matches_deliver_pitches');                 -- 1
+```
+

@@ -289,7 +289,7 @@ begin
     ((f || '000000000005')::uuid, (f || '000000000008')::uuid, 'Test fixture: cross-city pending'),
     ((f || '000000000001')::uuid, (f || '000000000040')::uuid, 'Saw your robotics post. Data for robots, coffee sometime?')
   on conflict do nothing;
-  -- Messages: only between matched pairs, only when the pair has none yet. created_at is staggered (owner session).
+  -- Messages: only between matched pairs, only when the pair has none yet (besides the delivered pitch, 0024). created_at is staggered (owner session).
   insert into public.brivia_messages (sender_id, recipient_id, body, created_at)
   select (f || lpad(v.s::text, 12, '0'))::uuid, (f || lpad(v.r::text, 12, '0'))::uuid, v.body,
          now() - make_interval(mins => v.ago)
@@ -315,7 +315,10 @@ begin
                     and m.user2_id = greatest((f || lpad(v.s::text, 12, '0'))::uuid, (f || lpad(v.r::text, 12, '0'))::uuid))
      and not exists (select 1 from public.brivia_messages b
                       where least(b.sender_id, b.recipient_id) = least((f || lpad(v.s::text, 12, '0'))::uuid, (f || lpad(v.r::text, 12, '0'))::uuid)
-                        and greatest(b.sender_id, b.recipient_id) = greatest((f || lpad(v.s::text, 12, '0'))::uuid, (f || lpad(v.r::text, 12, '0'))::uuid));
+                        and greatest(b.sender_id, b.recipient_id) = greatest((f || lpad(v.s::text, 12, '0'))::uuid, (f || lpad(v.r::text, 12, '0'))::uuid)
+                        -- 0024 (D-124): the request's note already arrived as the first message; it does not count.
+                        and not exists (select 1 from public.connection_requests c
+                                         where c.from_id = b.sender_id and c.to_id = b.recipient_id and c.note = b.body));
   -- Posts: fixed ids (a7e57000-0000-4000-9000-0000000000KK), preset illustration, empty image_path (0008 section 4).
   insert into public.community_posts (id, author_id, image_url, image_path, caption, created_at)
   select ('a7e57000-0000-4000-9000-' || lpad(p.k::text, 12, '0'))::uuid, (f || lpad(p.n::text, 12, '0'))::uuid,

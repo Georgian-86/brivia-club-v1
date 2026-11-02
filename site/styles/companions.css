@@ -36,11 +36,16 @@ body.app-body .companions-view .companions-head h1 { white-space: nowrap; }
 .companion-picker { position: relative; display: inline-flex; align-items: center; gap: var(--space-2); min-height: 44px; padding: 0 var(--space-4); border: 1px solid var(--cp-line); border-radius: var(--radius-pill); background: color-mix(in srgb, var(--cp-paper) 80%, transparent); color: var(--cp-wine); box-shadow: 0 6px 16px -12px color-mix(in srgb, var(--cp-wine-deep) 50%, transparent); }
 .companion-picker[hidden] { display: none; }
 .companion-picker svg { flex: 0 0 18px; width: 18px; height: 18px; }
-body.app-body .companion-picker select { min-width: 0; max-width: 300px; padding: 0 22px 0 0; border: 0; background: transparent; color: var(--cp-wine); font: inherit; font-size: var(--text-14); font-weight: 600; -webkit-appearance: none; appearance: none; cursor: pointer; }
+body.app-body .companion-picker select { min-width: 0; max-width: 230px; text-overflow: ellipsis; padding: 0 22px 0 0; border: 0; background: transparent; color: var(--cp-wine); font: inherit; font-size: var(--text-14); font-weight: 600; -webkit-appearance: none; appearance: none; cursor: pointer; }
 body.app-body .companion-picker select:focus-visible { outline: none; }
 .companion-picker:has(select:focus-visible) { outline: 2px solid var(--cp-wine); outline-offset: 3px; }
 .companion-picker-chevron { position: absolute; right: var(--space-4); pointer-events: none; }
-.companions-count { margin: 0; color: var(--cp-ink); font-size: var(--text-12); font-weight: 700; letter-spacing: .097em; }
+.companions-count { display: inline-flex; align-items: center; gap: var(--space-3); min-height: 48px; margin: 0; padding: 6px var(--space-5) 6px 8px; border-radius: var(--radius-pill); background: color-mix(in srgb, var(--cp-paper) 78%, transparent); color: var(--cp-wine); font-size: var(--text-14); font-weight: 600; box-shadow: 0 6px 16px -12px color-mix(in srgb, var(--cp-wine-deep) 50%, transparent); }
+.companions-count[hidden] { display: none; }
+.companion-faces { display: inline-flex; }
+.companion-face { display: grid; place-items: center; width: 30px; height: 30px; margin-left: -10px; overflow: hidden; border: 2px solid var(--cp-paper); border-radius: 50%; background: color-mix(in srgb, var(--cp-wine) 20%, var(--cp-paper)); color: var(--cp-wine-deep); font-size: var(--text-12); font-weight: 700; }
+.companion-face:first-child { margin-left: 0; }
+.companion-face img { width: 100%; height: 100%; object-fit: cover; }
 
 /* Cards */
 .companion-deck { position: relative; min-height: 520px; outline: none; }
@@ -76,7 +81,7 @@ body.app-body .companions-view .companion-name { margin: 0; color: var(--cp-ink)
 .companion-chips { margin-top: var(--space-3); }
 .companion-chips li { padding: 5px 18px; border-radius: var(--radius-pill); background: color-mix(in srgb, var(--cp-wine) 9%, var(--cp-paper)); color: var(--cp-wine-deep); font-family: var(--font-heading); font-size: 15px; font-weight: 500; }
 /* A shared interest: the same soft pill with a thin wine edge (the reference keeps every chip pale). */
-.companion-chips li.is-shared { box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--cp-wine) 45%, transparent); }
+/* The reference keeps every chip the same pale pill; a shared one is announced to screen readers only. */
 .companion-event { margin: auto var(--space-1) 0; padding: 13px var(--space-4); border-radius: 12px; background: var(--cp-wine-deep); color: var(--cp-paper); font-family: var(--font-heading); font-size: var(--text-14); font-weight: 600; letter-spacing: .13em; line-height: 1.2; text-align: center; text-transform: uppercase; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; box-shadow: 0 8px 16px -10px color-mix(in srgb, var(--cp-wine-deep) 80%, transparent); }
 .companion-card-body { margin-bottom: var(--space-5); }
 .companion-hint { margin: var(--space-2) 0 0; color: var(--cp-muted); font-family: var(--font-heading); font-size: var(--text-14); font-style: italic; text-align: center; }
@@ -120,10 +125,10 @@ body.app-body .companion-match-dialog .event-btn-primary { background: var(--cp-
 .notification-companion { display: flex; align-items: center; gap: var(--space-3); padding: var(--space-3) var(--space-4); border-bottom: 1px solid var(--color-line); background: color-mix(in srgb, var(--color-wine) 6%, transparent); }
 
 @media (min-width: 1080px) {
-  .companions-head { grid-template-columns: auto auto 1fr auto; column-gap: var(--space-6); }
-  .companions-note { width: 250px; padding-left: var(--space-6); border-left: 1px solid var(--cp-line); }
+  .companions-head { grid-template-columns: auto minmax(0, auto) 1fr auto; column-gap: var(--space-5); }
+  .companions-note { width: 230px; padding-left: var(--space-5); border-left: 1px solid var(--cp-line); }
   .companion-picker { justify-self: end; }
-  .companions-count { padding-left: var(--space-5); border-left: 1px solid var(--cp-line); }
+  .companions-count { justify-self: end; }
 }
 @media (max-width: 1079px) {
   .companion-row { grid-template-columns: minmax(0, 380px); }

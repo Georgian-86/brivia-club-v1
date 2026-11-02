@@ -23,7 +23,8 @@
 // ("30 of 30 signals left", then 29 after one like); at 0 a Like keeps the card, sends nothing and shows "More at 3 PM"; a PT429 race
 // puts the card back at the front; passes never call send_signal and nothing is kept in localStorage.
 // Founder live test (2026-10-14): the pitched card stays on screen (parked) while the sheet is open and leaves only
-// when the sheet resolves (D-018 unchanged: submit = note, close / Escape / backdrop / next card = note null).
+// when the sheet resolves (D-124: submit = note, "Send without a note" / next card = note null; close / Escape /
+// backdrop / Cancel send nothing and keep the card).
 // D-071: "Send without a note" under SEND PITCH resolves the sheet like close (one note-null request), never twice.
 import { readFileSync } from 'node:fs';
 import { spawn } from 'node:child_process';
@@ -224,43 +225,66 @@ try {
   check(`submit toast is "Signal sent" (got "${submitToast}")`, () => assert.equal(submitToast, 'Signal sent'));
   check('pitch never POSTs /rest/v1/brivia_messages', () => assert.equal(posts('/rest/v1/brivia_messages').length, 0));
 
-  // 2. Like + close (×): one POST, note null. The stubbed matches lookup returns a row -> "It's mutual".
-  before = requestPosts().length;
-  const cara = await likeAndOpenSheet();
+  // D-124: closing the sheet (×, Escape, the backdrop, Cancel) sends NOTHING and keeps the card; "Send without a note"
+  // is the explicit plain like (one POST, note null). This replaces D-018's "close = plain like".
+  const cancelKeepsCard = async (how, close) => {
+    const beforeCancel = requestPosts().length;
+    const row = await likeAndOpenSheet();
+    await close();
+    await page.waitForFunction(() => document.querySelector('#pitch-modal')?.hidden);
+    await page.waitForTimeout(400);
+    const still = await cardRow();
+    check(`like + ${how} = nothing sent, the same card stays (posts ${requestPosts().length - beforeCancel}, card ${still?.name})`, () => {
+      assert.equal(requestPosts().length - beforeCancel, 0); assert.equal(still?.id, row.id);
+    });
+    return row;
+  };
+  const sendWithoutNote = async () => {
+    await page.waitForSelector('#pitch-modal:not([hidden])');
+    await page.locator('#pitch-modal .pitch-no-note').click();
+  };
+
+  // 2. × cancels; then "Send without a note": one POST, note null. The stubbed matches lookup returns a row -> "It's mutual".
+  const cara = await cancelKeepsCard('close (×)', () => page.locator('#pitch-modal .overlay-close').click());
   state.matchedWith.add(cara.id);
+  before = requestPosts().length;
+  await likeAndOpenSheet();
   check(`no POST before the sheet resolves (${cara.name})`, () => assert.equal(requestPosts().length, before));
   await resetToast();
-  await page.locator('#pitch-modal .overlay-close').click();
+  await sendWithoutNote();
   await waitForToast(/It's mutual/);
   await page.waitForTimeout(300);
   let resolved = requestPosts().slice(before);
-  check(`like + close = one POST with note null (got ${resolved.length})`, () => { assert.equal(resolved.length, 1); assert.deepEqual(signalBody(resolved[0]), { to: cara.id, note: null }); });
+  check(`"Send without a note" = one POST with note null (got ${resolved.length})`, () => { assert.equal(resolved.length, 1); assert.deepEqual(signalBody(resolved[0]), { to: cara.id, note: null }); });
   const mutualToast = await toast();
   check(`mutual toast (got "${mutualToast}")`, () => assert.equal(mutualToast, `It's mutual. Say hi to ${cara.name}.`));
 
-  // 3. Like + Escape: one POST, note null, "Signal sent".
+  // 3. Escape cancels; then "Send without a note": one POST, note null, "Signal sent".
+  const dev = await cancelKeepsCard('Escape', () => page.keyboard.press('Escape'));
   before = requestPosts().length;
-  const dev = await likeAndOpenSheet();
+  await likeAndOpenSheet();
   await resetToast();
-  await page.keyboard.press('Escape');
+  await sendWithoutNote();
   await waitForToast(/Signal sent/);
   await page.waitForTimeout(300);
   resolved = requestPosts().slice(before);
-  check(`like + Escape = one POST with note null (got ${resolved.length})`, () => { assert.equal(resolved.length, 1); assert.deepEqual(signalBody(resolved[0]), { to: dev.id, note: null }); });
+  check(`then "Send without a note" = one POST with note null (got ${resolved.length})`, () => { assert.equal(resolved.length, 1); assert.deepEqual(signalBody(resolved[0]), { to: dev.id, note: null }); });
   const escToast = await toast();
   check(`plain like toast is "Signal sent" (got "${escToast}")`, () => assert.equal(escToast, 'Signal sent'));
 
-  // 4. Like + backdrop: one POST, note null, "Signal sent".
+  // 4. The backdrop cancels too; the Cancel button too.
+  await cancelKeepsCard('backdrop', () => page.locator('#pitch-modal .app-overlay-backdrop').click({ position: { x: 5, y: 5 } }));
+  const again = await cancelKeepsCard('Cancel', () => page.locator('#pitch-modal [data-pitch-cancel]').click());
   before = requestPosts().length;
-  const again = await likeAndOpenSheet();
+  await likeAndOpenSheet();
   await resetToast();
-  await page.locator('#pitch-modal .app-overlay-backdrop').click({ position: { x: 5, y: 5 } });
+  await sendWithoutNote();
   await waitForToast(/Signal sent|It's mutual/);
   await page.waitForTimeout(300);
   resolved = requestPosts().slice(before);
-  check(`like + backdrop = one POST with note null (got ${resolved.length})`, () => { assert.equal(resolved.length, 1); assert.deepEqual(signalBody(resolved[0]), { to: again.id, note: null }); });
+  check(`after cancelling twice, one plain like = one POST with note null (got ${resolved.length})`, () => { assert.equal(resolved.length, 1); assert.deepEqual(signalBody(resolved[0]), { to: again.id, note: null }); });
   const dupToast = await toast();
-  check(`like + backdrop toast reads "Signal sent" (got "${dupToast}")`, () => assert.equal(dupToast, 'Signal sent'));
+  check(`its toast reads "Signal sent" (got "${dupToast}")`, () => assert.equal(dupToast, 'Signal sent'));
 
   // 5. Like, then move to the next card with the sheet open: one POST for the liked person, note null.
   before = requestPosts().length;
@@ -321,7 +345,7 @@ try {
     assert.equal(rpc.length, 1);
     assert.deepEqual(JSON.parse(rpc[0].body), { p_from: DEV, p_accept: true });
   });
-  check(`a real connection shows "You're connected." with Message (got ${JSON.stringify(connectedText)})`, () => { assert.match(connectedText, /You're connected\./); assert.match(connectedText, /Message Dev/); });
+  check(`a real connection shows "You're connected." with Reply (their message opens the chat, D-124) (got ${JSON.stringify(connectedText)})`, () => { assert.match(connectedText, /You're connected\./); assert.match(connectedText, /Reply Dev/); assert.match(connectedText, /first one in your chat/); });
   check('accept checks matches in both orders', () => assert.ok(calls.some((c) => c.path === '/rest/v1/matches' && /and\(user1_id\.eq\.[^,]+,user2_id\.eq\.[^)]+\),and\(/.test(c.search))));
   check('accept refreshed connections from matches', () => assert.ok(calls.filter((c) => c.path === '/rest/v1/matches' && c.method === 'GET' && !c.search.includes('and(')).length >= 2));
   await page.locator('dialog.collab-review [data-collab-next]').click();
@@ -665,11 +689,18 @@ try {
     assert.equal(hardPosts().length - hardBefore, 0);
   });
   await hardResetToast();
+  // D-124: Escape cancels (nothing sent); the explicit plain like follows.
   await hardPage.keyboard.press('Escape');
+  await hardPage.waitForTimeout(400);
+  check(`double-click Like then Escape sends nothing (posts ${hardPosts().length - hardBefore})`, () => assert.equal(hardPosts().length - hardBefore, 0));
+  await hardPage.locator('[data-action="like"]').dispatchEvent('click');
+  await hardPage.waitForSelector('#pitch-modal:not([hidden])');
+  await hardPage.waitForTimeout(600);
+  await hardPage.locator('#pitch-modal .pitch-no-note').click();
   await hardWaitToast(/Signal sent/);
   await hardPage.waitForTimeout(300);
   let hardResolved = hardPosts().slice(hardBefore);
-  check(`double-click Like then Escape = exactly one POST, note null (got ${hardResolved.length})`, () => {
+  check(`then "Send without a note" = exactly one POST, note null (got ${hardResolved.length})`, () => {
     assert.equal(hardResolved.length, 1);
     assert.deepEqual(hardSignal(hardResolved[0]), [HANA, null]);
   });
@@ -730,11 +761,11 @@ try {
     assert.equal(hardPosts().length - hardBefore, 0);
   });
   await hardResetToast();
-  await hardPage.keyboard.press('Escape');
+  await hardPage.locator('#pitch-modal .pitch-no-note').click(); // D-124: the explicit plain like (Escape now cancels)
   await hardWaitToast(/Signal sent/).catch(() => {}); // the old code had already resolved the like (no toast now)
   await hardPage.waitForTimeout(300);
   hardResolved = hardPosts().slice(hardBefore);
-  check(`double Like click then Escape = exactly one POST to ${doubleRow?.name}, note null (got ${hardResolved.length})`, () => {
+  check(`double Like click then Send without a note = exactly one POST to ${doubleRow?.name}, note null (got ${hardResolved.length})`, () => {
     assert.equal(hardResolved.length, 1);
     assert.deepEqual(hardSignal(hardResolved[0]), [doubleRow?.id, null]);
   });
@@ -1006,7 +1037,7 @@ try {
   await quotaPage.locator('[data-action="like"]').dispatchEvent('click');
   await quotaPage.waitForSelector('#pitch-modal:not([hidden])');
   await quotaPage.waitForTimeout(500);
-  await quotaPage.keyboard.press('Escape');
+  await quotaPage.locator('#pitch-modal .pitch-no-note').click(); // D-124: the explicit plain like (Escape now cancels)
   await qWaitToast(/Signal sent/);
   await qWaitCounter('29 of 30 signals left');
   const afterOne = await qCounter();
@@ -1021,7 +1052,7 @@ try {
     await quotaPage.waitForTimeout(500);
     const advanced = await qCard();
     await quotaPage.evaluate(() => { const t = document.querySelector('#app-toast'); if (t) t.textContent = ''; });
-    await quotaPage.keyboard.press('Escape');
+    await quotaPage.locator('#pitch-modal .pitch-no-note').click(); // D-124: the explicit plain like (Escape now cancels)
     return advanced;
   };
   await quotaPage.waitForTimeout(400);
@@ -1053,7 +1084,7 @@ try {
   await quotaPage.waitForSelector('#pitch-modal:not([hidden])');
   await quotaPage.waitForTimeout(500);
   const advancedTo = await qCard();
-  await quotaPage.keyboard.press('Escape');
+  await quotaPage.locator('#pitch-modal .pitch-no-note').click(); // D-124: the explicit plain like (Escape now cancels)
   await qWaitToast(/today's signals/);
   await quotaPage.waitForFunction((n) => document.querySelector('#swipe-card:not([hidden]) #swipe-name')?.textContent?.trim() === n, raceCard, { timeout: 4000 }).catch(() => {});
   await quotaPage.waitForTimeout(400);
@@ -1116,7 +1147,7 @@ try {
     assert.equal(afterClear.notice, false);
   });
   await quotaPage.waitForTimeout(450);
-  await quotaPage.keyboard.press('Escape');
+  await quotaPage.locator('#pitch-modal .pitch-no-note').click(); // D-124: the explicit plain like (Escape now cancels)
   await qWaitToast(/Signal sent/);
   // F4: the quota is read again when the tab becomes visible.
   q.remaining = 0; q.resetsAt = RESETS_AT;

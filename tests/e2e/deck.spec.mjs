@@ -217,7 +217,8 @@ try {
   const pitch = await page.locator('#pitch-message').inputValue();
   check(`A5: the neutral pitch line for a card with no tags/shared (got "${pitch}")`, () => assert.equal(pitch, "Hey Dana Blank, I'd love to connect and exchange ideas."));
   await page.waitForTimeout(450);
-  await page.keyboard.press('Escape');
+  // D-124: closing cancels, so the plain like is the explicit "Send without a note".
+  await page.locator('#pitch-modal .pitch-no-note').click();
   await page.waitForFunction(() => /Signal sent/.test(document.querySelector('#app-toast')?.textContent || ''), null, { timeout: 5000 }).catch(() => {});
   check('A5: no page error from the like', () => assert.deepEqual(pageErrors.slice(errorsBefore), []));
 
@@ -322,7 +323,7 @@ try {
   await page.locator('[data-action="like"]').dispatchEvent('click');
   await page.waitForSelector('#pitch-modal:not([hidden])');
   await page.waitForTimeout(450);
-  await page.keyboard.press('Escape');
+  await page.locator('#pitch-modal .pitch-no-note').click();
   await page.waitForFunction(() => /It's mutual/.test(document.querySelector('#app-toast')?.textContent || ''), null, { timeout: 5000 }).catch(() => {});
   const mutual = await page.locator('#app-toast').textContent();
   check(`a matched like from the deck shows "It's mutual. Say hi to Asha Band." (got "${mutual}")`, () => assert.equal(mutual, "It's mutual. Say hi to Asha Band."));
@@ -1055,9 +1056,23 @@ try {
   const btnPitch = { name: await cardName(kp), parked: await kp.evaluate(() => document.querySelector('#swipe-card').classList.contains('is-parked')) };
   check(`the Pitch button keeps the pitched card on screen behind the sheet (${JSON.stringify(btnPitch)})`, () => { assert.equal(btnPitch.name, 'Asha Band'); assert.equal(btnPitch.parked, true); assert.equal(signals().length, signalsBefore); });
   await kp.keyboard.press('Escape');
+  await kp.waitForTimeout(600);
+  const cancelled = { name: await cardName(kp), sent: signals().length - signalsBefore, sheet: await kp.locator('#pitch-modal').isHidden(), parked: await kp.evaluate(() => document.querySelector('#swipe-card').classList.contains('is-parked')) };
+  check(`D-124: Escape cancels: nothing sent, the sheet closes and the card comes back (${JSON.stringify(cancelled)})`, () => { assert.equal(cancelled.name, 'Asha Band'); assert.equal(cancelled.sent, 0); assert.equal(cancelled.sheet, true); assert.equal(cancelled.parked, false); });
+  await kp.locator('[data-action="like"]').dispatchEvent('click');
+  await kp.waitForSelector('#pitch-modal:not([hidden])');
+  await kp.waitForTimeout(500);
+  await kp.locator('#pitch-modal [data-pitch-cancel]').click();
+  await kp.waitForTimeout(400);
+  const afterCancel = await cardName(kp);
+  check(`D-124: Cancel does the same: nothing sent, Asha stays (${afterCancel})`, () => { assert.equal(signals().length - signalsBefore, 0); assert.equal(afterCancel, 'Asha Band'); });
+  await kp.locator('[data-action="like"]').dispatchEvent('click');
+  await kp.waitForSelector('#pitch-modal:not([hidden])');
+  await kp.waitForTimeout(500);
+  await kp.locator('#pitch-modal .pitch-no-note').click();
   const afterEsc = await waitForCard(kp, 'Bilal Place');
   const escSignals = signals().slice(signalsBefore).map((c) => JSON.parse(c.body || '{}'));
-  check(`closing the sheet sends the plain like (D-018) and only then the card leaves (${JSON.stringify(escSignals)})`, () => { assert.equal(afterEsc, true); assert.deepEqual(escSignals, [{ p_to: A, p_note: null }]); });
+  check(`"Send without a note" sends the plain like and only then the card leaves (${JSON.stringify(escSignals)})`, () => { assert.equal(afterEsc, true); assert.deepEqual(escSignals, [{ p_to: A, p_note: null }]); });
   await kp.waitForTimeout(400);
   passesBefore = passes().length;
   await kp.locator('#swipe-card').focus().catch(() => {});
@@ -1070,7 +1085,7 @@ try {
   await kp.waitForTimeout(500);
   const arrowRightName = await cardName(kp);
   check(`ArrowRight opens the pitch for the current card, which stays (${arrowRightName})`, () => { assert.equal(arrowRight, true); assert.equal(arrowRightName, 'Chen Abroad'); });
-  await kp.keyboard.press('Escape');
+  await kp.locator('#pitch-modal .pitch-no-note').click();
   await waitForCard(kp, 'Dana Blank');
   await kp.waitForTimeout(400);
   passesBefore = passes().length;

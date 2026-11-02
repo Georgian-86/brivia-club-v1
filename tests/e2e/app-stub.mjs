@@ -298,6 +298,14 @@ export const startAppStub = async ({ port, state = {}, deckRows = defaultDeckRow
         }
         return json(200, [{ matched, match_id: matched ? `cm-${args.p_target}` : null }]);
       }
+      // D-124 send_connect_request: 'chat' for a connection (the note joins their chat), else 'sent'; st.connectRequests records each.
+      if (pathName === '/rest/v1/rpc/send_connect_request') {
+        (st.connectRequests ||= []).push(args);
+        if (st.connectFail) return json(500, { code: 'XX000', message: 'stub failure' });
+        const chat = st.matchIds.includes(args.p_to);
+        if (chat) (st.sent ||= []).push({ sender_id: ME, recipient_id: args.p_to, body: args.p_note });
+        return json(200, [{ status: chat ? 'chat' : 'sent', remaining: 29, resets_at: null }]);
+      }
       if (pathName === '/rest/v1/rpc/my_companion_matches') return json(200, st.companionMatches || []);
       if (pathName === '/rest/v1/rpc/mark_companion_match_seen') { (st.companionMatches || []).forEach((m) => { if (m.match_id === args.p_match) m.seen = true; }); return json(200, true); }
       if (pathName === '/rest/v1/rpc/cancel_member_event') { const e = st.events.find((x) => x.id === args.p_id); if (e) e.status = 'cancelled'; return json(200, true); }

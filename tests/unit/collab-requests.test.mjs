@@ -40,14 +40,15 @@ test('reviewCardMarkup escapes, shows the counter and the note, and never uses d
   const html = reviewCardMarkup(m, { index: 0, total: 3 }, { escapeHtml, renderAvatar });
   assert.doesNotMatch(html, /<b>build<\/b>|<i>B<\/i>/);
   assert.match(html, /1 of 3/);
-  assert.match(html, /Their note/);
-  assert.match(html, /Connect/);
-  assert.match(html, /Not now/);
-  assert.match(html, /NOT NOW/);
-  assert.match(html, /CONNECT/);
+  // D-124: their message comes first; Accept and Decline (was Connect / Not now).
+  assert.match(html, /Their message/);
+  assert.match(html, /Accept/);
+  assert.match(html, /Decline/);
+  assert.match(html, /DECLINE/);
+  assert.match(html, /ACCEPT/);
   assert.doesNotMatch(html.replace(/<[^>]+>/g, ' '), /\b(match|like|pass|swipe|crush|heart)/i);
   const quiet = reviewCardMarkup(reviewCardModel({ fromId: 'p', note: '', person: null }, []), { index: 1, total: 2 }, { escapeHtml, renderAvatar });
-  assert.doesNotMatch(quiet, /Their note/);
+  assert.doesNotMatch(quiet, /Their message/);
   assert.match(quiet, /2 of 2/);
 });
 

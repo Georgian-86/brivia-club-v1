@@ -18,10 +18,18 @@ export const eventPickLabel = (event) => {
   const day = d ? new Intl.DateTimeFormat('en-GB', { timeZone: EVENT_TIME_ZONE, day: 'numeric', month: 'short' }).format(d) : '';
   return [event?.title || 'Event', day].filter(Boolean).join(' · ');
 };
-// '03 PEOPLE LOOKING FOR COMPANY' / '01 PERSON …'.
+// '4 looking for a companion' (the founder's reference: a pill with up to three faces before it).
 export const lookingCount = (n) => {
   const k = Math.max(0, Number(n) || 0);
-  return `${String(k).padStart(2, '0')} ${k === 1 ? 'PERSON' : 'PEOPLE'} LOOKING FOR COMPANY`;
+  return `${k} looking for a companion`;
+};
+// The pill: up to three faces (checked photo URLs, or initials) and the count.
+export const lookingPillMarkup = (people = [], { photoSrc = () => '' } = {}) => {
+  const faces = people.slice(0, 3).map((p) => {
+    const src = photoSrc(p);
+    return `<span class="companion-face">${src ? `<img src="${escapeHtml(src)}" alt="" />` : `<span>${escapeHtml(initials(p.name))}</span>`}</span>`;
+  }).join('');
+  return `${faces ? `<span class="companion-faces" aria-hidden="true">${faces}</span>` : ''}<span>${escapeHtml(lookingCount(people.length))}</span>`;
 };
 
 export const normalizeCompanionEvent = (row = {}) => ({

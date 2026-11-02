@@ -1,5 +1,5 @@
 // "See who wants to collaborate with you" (D-108). Incoming connection requests are reviewed one card at a time in a
-// sheet (a native modal <dialog>: focus stays inside, Escape closes). Right drag or Connect accepts, left drag or Not
+// sheet (a native modal <dialog>: focus stays inside, Escape closes). Right drag or Accept accepts, left drag or Decline (D-124; was Connect / Not
 // now declines quietly (the sender is never told). The motion is the deck's (deck-swipe.js); stamps read CONNECT and
 // NOT NOW. Wording rule: collaborate, connect, not now, request; never dating-app words.
 import { createDeckSwipe } from './deck-swipe.js';
@@ -45,17 +45,18 @@ const ICON = {
 export const reviewCardMarkup = (m, { index, total }, { escapeHtml, renderAvatar }) => {
   const meta = [m.role, m.band].filter(Boolean).map(escapeHtml).join('<span aria-hidden="true"> · </span>');
   return `<article class="collab-card" data-collab-card data-from="${escapeHtml(m.fromId)}" aria-roledescription="request card" aria-label="Request from ${escapeHtml(m.name)}">`
-    + '<span class="collab-stamp collab-stamp--connect" aria-hidden="true">CONNECT</span><span class="collab-stamp collab-stamp--later" aria-hidden="true">NOT NOW</span>'
+    + '<span class="collab-stamp collab-stamp--connect" aria-hidden="true">ACCEPT</span><span class="collab-stamp collab-stamp--later" aria-hidden="true">DECLINE</span>'
     + `<p class="collab-count">${index + 1} of ${total}</p>`
     + `${renderAvatar(m.person || { name: m.name }, 'collab-avatar')}`
     + `<h3 class="collab-name">${escapeHtml(m.name)}</h3>`
     + (meta ? `<p class="collab-meta">${meta}</p>` : '')
+    // D-124: their message first, in full: it is why they want to connect (and the first message of your chat if you accept).
+    + (m.note ? `<blockquote class="collab-note"><p class="collab-label">Their message</p><p class="collab-note-text">${escapeHtml(m.note)}</p></blockquote>` : '<p class="collab-note-empty">No message, just a hello.</p>')
     + (m.shared.length ? `<p class="collab-label">You both care about</p><ul class="collab-shared">${m.shared.map((s) => `<li>${escapeHtml(s)}</li>`).join('')}</ul>` : '')
-    + (m.note ? `<div class="collab-note"><p class="collab-label">Their note</p><p class="collab-note-text">${escapeHtml(m.note)}</p></div>` : '')
     + '</article>'
     + '<div class="collab-actions">'
-    + `<button type="button" class="collab-button collab-button--later" data-collab-decide="later">${ICON.later}<span>Not now</span></button>`
-    + `<button type="button" class="collab-button collab-button--connect" data-collab-decide="connect">${ICON.connect}<span>Connect</span></button>`
+    + `<button type="button" class="collab-button collab-button--later" data-collab-decide="later">${ICON.later}<span>Decline</span></button>`
+    + `<button type="button" class="collab-button collab-button--connect" data-collab-decide="connect">${ICON.connect}<span>Accept</span></button>`
     + '</div>';
 };
 
@@ -108,10 +109,10 @@ export const openCollabReview = ({ requests, respond, onMessage, onClose = () =>
     // A sender whose profile did not load has no first name to use and no chat to open from here.
     const first = m.person ? m.name.split(' ')[0] : '';
     body.innerHTML = `<div class="collab-state">${renderAvatar(m.person || { name: m.name }, 'collab-avatar')}`
-      + `<h3>You're connected.</h3><p>${first ? `You and ${escapeHtml(first)} can now message each other.` : 'You can now message each other from Chat.'}</p>`
+      + `<h3>You're connected.</h3><p>${m.note ? `Their message is the first one in your chat${first ? ` with ${escapeHtml(first)}` : ''}. Reply whenever you're ready.` : first ? `You and ${escapeHtml(first)} can now message each other.` : 'You can now message each other from Chat.'}</p>`
       + `<div class="collab-actions${first ? '' : ' collab-actions--single'}">`
       + `<button type="button" class="collab-button collab-button--${first ? 'later' : 'connect'}" data-collab-next>${more ? 'Next request' : 'Done'}</button>`
-      + (first ? `<button type="button" class="collab-button collab-button--connect" data-collab-message>Message ${escapeHtml(first)}</button>` : '')
+      + (first ? `<button type="button" class="collab-button collab-button--connect" data-collab-message>${m.note ? 'Reply' : 'Message'} ${escapeHtml(first)}</button>` : '')
       + '</div></div>';
     body.querySelector('[data-collab-message]')?.addEventListener('click', () => { closeReason = 'message'; close(); onMessage(m.fromId); });
     body.querySelector('[data-collab-next]').addEventListener('click', () => { index += 1; show(); body.querySelector('[data-collab-decide="connect"], [data-collab-close]')?.focus(); });

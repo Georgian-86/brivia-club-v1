@@ -12,8 +12,8 @@ const row = { member_id: 'p1', name: 'Aanya', photo_url: 'x', cover_url: null, h
 const ev = { title: 'Blitz Chess Meetup', startsAt: '2026-11-04T04:30:00Z', venueName: 'Battle Chess Skool' }; // 10:00 IST
 
 test('labels: count, picker, date in IST, band only, headline', () => {
-  assert.equal(lookingCount(3), '03 PEOPLE LOOKING FOR COMPANY');
-  assert.equal(lookingCount(1), '01 PERSON LOOKING FOR COMPANY');
+  assert.equal(lookingCount(4), '4 looking for a companion');
+  assert.equal(lookingCount(0), '0 looking for a companion');
   assert.equal(eventPickLabel(normalizeCompanionEvent({ event_id: 'e', title: 'Blitz Chess Meetup', starts_at: ev.startsAt })), 'Blitz Chess Meetup · 4 Nov');
   assert.equal(shortEventDate(ev.startsAt), 'Wed 4 Nov');
   assert.equal(bandLine('~3 km'), '~3 km away');
@@ -51,4 +51,13 @@ test('match moment and chat context', () => {
 test('the companions view belongs to Connect (no new tab)', () => {
   assert.equal(navViewFor('companions'), 'explore');
   assert.equal(navViewFor('events'), 'events');
+});
+
+test('the count pill shows up to three faces before the count', async () => {
+  const { lookingPillMarkup } = await import('../../site/scripts/companion-view.js');
+  const people = ['Ana', 'Bo', 'Cy', 'Di'].map((name, i) => ({ id: String(i), name, photoUrl: i === 0 ? 'x' : '' }));
+  const html = lookingPillMarkup(people, { photoSrc: (p) => (p.photoUrl ? '/a.jpg' : '') });
+  assert.equal((html.match(/companion-face"/g) || []).length, 3);
+  assert.match(html, /<img src="\/a\.jpg"/);
+  assert.match(html, /4 looking for a companion/);
 });

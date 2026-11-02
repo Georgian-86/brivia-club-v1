@@ -35,7 +35,7 @@ const swipes = () => st.swipes || [];
 
 try {
   for (const [w, h] of [[1440, 1000], [390, 844]]) {
-    Object.assign(st, { companionEvents: EVENTS(), companionDecks: DECKS(), likedMe: [id(2)], companionMatches: [], swipes: [], matchIds: [] });
+    Object.assign(st, { companionEvents: EVENTS(), companionDecks: DECKS(), likedMe: [id(2)], companionMatches: [], swipes: [], matchIds: [], connectRequests: [] });
     st.calls.length = 0;
     const phone = w < 780;
     const ctx = await stub.newContext(browser, { width: w, height: h }, phone ? { isMobile: true, hasTouch: true } : {});
@@ -45,7 +45,7 @@ try {
     await page.waitForTimeout(300);
 
     const head = await page.locator('.companions-head').innerText();
-    check(`${w}: heading, note, picker and count (${JSON.stringify(head)})`, /CONNECT \/ COMPANIONS/.test(head) && /Find your\s*event companion\./.test(head) && /going solo to the same event/.test(head) && /04 PEOPLE LOOKING FOR COMPANY/.test(head));
+    check(`${w}: heading, note, picker and count (${JSON.stringify(head)})`, /CONNECT \/ COMPANIONS/.test(head) && /Find your\s*event companion\./.test(head) && /going solo to the same event/.test(head) && /4 looking for a companion/.test(head) && await page.locator('#companion-count .companion-face').count() === 3);
     check(`${w}: the picker lists the member's events, this one selected`, await page.locator('#companion-event').inputValue() === 'e-chess' && (await page.locator('#companion-event option').count()) === 2);
     check(`${w}: Connect is the current nav item (no new tab)`, await page.evaluate(() => [...document.querySelectorAll('[data-nav-host] [aria-current="page"]')].every((a) => a.dataset.nav === 'explore')) && (await page.locator('[data-nav-host="header"] [data-nav]').count()) === 5);
     const shown = await page.locator('.companion-card').evaluateAll((cards) => cards.filter((c) => getComputedStyle(c).display !== 'none').length);
@@ -74,11 +74,32 @@ try {
     await page.locator('#companion-pass').click();
     await page.waitForFunction(() => /Aanya/.test(document.querySelector('.companion-card.is-current')?.innerText || ''));
     check(`${w}: Pass sends one pass for this event and shows the next person`, swipes().length === 1 && swipes()[0].p_like === false && swipes()[0].p_event === 'e-chess' && swipes()[0].p_target === id(1));
-    check(`${w}: the count moves to 03`, /03 PEOPLE/.test(await page.locator('#companion-count').innerText()));
+    check(`${w}: the count moves to 3`, /^3 looking for a companion/.test((await page.locator('#companion-count').innerText()).trim()));
 
-    // Aanya already liked me: Connect makes the match.
+    // Connect opens "Make the first move." (D-124); Cancel sends nothing and keeps the card.
     await page.locator('#companion-like').click();
+    await page.waitForSelector('#connect-composer-dialog[open]');
+    const composer = await page.locator('#connect-composer-dialog').innerText();
+    check(`${w}: Connect opens the composer with a title, a prompt, suggestions and a counter (${JSON.stringify(composer.slice(0, 160))})`,
+      /CONNECT WITH AANYA/.test(composer) && /Make the\s*first move\./.test(composer) && /Introduce yourself and tell them why you'd like to connect\./.test(composer)
+      && await page.locator('#connect-composer-dialog .composer-suggestion').count() === 3 && /0 \/ 500/.test(composer));
+    check(`${w}: focus is in the message box`, await page.evaluate(() => document.activeElement?.id === 'composer-message'));
+    const axeComposer = await axeViolations(page, { include: '#connect-composer-dialog' });
+    check(`${w}: axe on the composer`, axeComposer.length === 0, JSON.stringify(axeComposer));
+    await shot(page, `composer-${w}.png`);
+    await page.locator('#connect-composer-dialog [data-composer-cancel]').last().click();
+    await page.waitForFunction(() => !document.querySelector('#connect-composer-dialog').open);
+    check(`${w}: Cancel sends nothing and Aanya stays`, (st.connectRequests || []).length === 0 && swipes().length === 1 && /Aanya/.test(await page.locator('.companion-card.is-current').innerText()));
+    // A suggestion fills the box; the counter follows; Send request sends the request with the message, then the like.
+    await page.locator('#companion-like').click();
+    await page.waitForSelector('#connect-composer-dialog[open]');
+    await page.locator('#connect-composer-dialog .composer-suggestion').first().click();
+    const filled = await page.locator('#composer-message').inputValue();
+    check(`${w}: a suggestion fills the message (${JSON.stringify(filled)})`, /^Hi Aanya! I'm going to Blitz Chess Meetup too/.test(filled) && new RegExp(`^${filled.length} / 500$`).test(await page.locator('#composer-count').innerText()));
+    await page.locator('#connect-composer-dialog .composer-send').click();
     await page.waitForSelector('#companion-match-dialog[open]');
+    const req = (st.connectRequests || []).at(-1) || {};
+    check(`${w}: Send request carries the exact message, then the like for this event (${JSON.stringify(req)})`, req.p_to === id(2) && req.p_note === filled && swipes().at(-1).p_like === true && swipes().at(-1).p_target === id(2));
     const moment = await page.locator('#companion-match-dialog').innerText();
     check(`${w}: a mutual like shows "Looks like you're going together!" with the event (${JSON.stringify(moment)})`,
       /Looks like you're going\s*together!/.test(moment) && /You and Aanya both want to experience Blitz Chess Meetup together/.test(moment) && /Battle Chess Skool/.test(moment));
@@ -92,20 +113,27 @@ try {
     const raghav = page.locator('.companion-card.is-current');
     await raghav.waitFor();
     check(`${w}: next is Raghav`, /Raghav/.test(await raghav.innerText()));
+    const sendNote = async () => {
+      await page.waitForSelector('#connect-composer-dialog[open]');
+      await page.fill('#composer-message', 'Hey Raghav, up for a game before it starts?');
+      await page.locator('#connect-composer-dialog .composer-send').click();
+    };
     if (!phone) {
       const box = await raghav.boundingBox();
       await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
       await page.mouse.down();
       for (let i = 1; i <= 12; i += 1) await page.mouse.move(box.x + box.width / 2 + i * 25, box.y + box.height / 2 + i);
       await page.mouse.up();
+      await sendNote();
     } else {
       await page.locator('.companion-deck').focus();
       await page.keyboard.press('ArrowRight');
+      await sendNote();
     }
     await page.waitForFunction(() => /Meera/.test(document.querySelector('.companion-card.is-current')?.innerText || ''));
     const like = swipes().at(-1);
     check(`${w}: ${phone ? '→' : 'a drag right'} likes Raghav (${JSON.stringify(like)})`, like.p_target === id(3) && like.p_like === true);
-    check(`${w}: one like alone opens nothing`, !(await page.locator('#companion-match-dialog').evaluate((d) => d.open)) && !st.matchIds.includes(id(3)));
+    check(`${w}: one like alone opens nothing (the request waits for Raghav)`, !(await page.locator('#companion-match-dialog').evaluate((d) => d.open)) && !st.matchIds.includes(id(3)) && st.connectRequests.at(-1).p_to === id(3));
 
     // ← passes; then the event is done and offers the other event.
     await page.locator('.companion-deck').focus();

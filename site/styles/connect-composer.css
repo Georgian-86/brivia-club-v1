@@ -1,0 +1,50 @@
+/* "Make the first move." (D-124): the connect-request composer, on the Connect deck (#pitch-modal) and on the
+   companions page (dialog). The club's sheet: cream paper, a wine eyebrow with the person's name, the Bodoni title with a
+   wine italic, suggestion pills, a ruled text area with a live counter, Cancel and a wine "Send request". Tokens only. */
+body.app-body :is(#pitch-modal .pitch-panel, .connect-composer-dialog) {
+  --cc-wine: var(--brivia-wine, var(--color-wine));
+  --cc-wine-deep: var(--brivia-deep-wine, var(--color-wine-deep));
+  --cc-ink: var(--color-ink);
+  --cc-muted: var(--color-ink-soft);
+  --cc-line: var(--color-line);
+  --cc-paper: var(--color-cream);
+}
+body.app-body #pitch-modal .pitch-panel { width: min(560px, 100%); padding: var(--space-6) clamp(22px, 5vw, 40px) var(--space-5); border: 1px solid color-mix(in srgb, var(--color-card-edge) 80%, transparent); border-radius: var(--radius-l) var(--radius-l) 0 0; background: var(--cc-paper); color: var(--cc-ink); font-family: var(--font-body); box-shadow: 0 -24px 70px -30px color-mix(in srgb, var(--color-oxblood-deep) 60%, transparent); }
+@media (min-width: 760px) { body.app-body #pitch-modal { place-items: center; } body.app-body #pitch-modal .pitch-panel { border-radius: var(--radius-l); } }
+body.app-body .connect-composer-dialog { width: min(560px, calc(100vw - 24px)); padding: 0; border: 0; border-radius: var(--radius-l); background: var(--cc-paper); color: var(--cc-ink); font-family: var(--font-body); box-shadow: var(--shadow-2); }
+body.app-body .connect-composer-dialog::backdrop { background: color-mix(in srgb, var(--color-oxblood-deep) 50%, transparent); }
+body.app-body .connect-composer-dialog .composer-panel { position: relative; padding: var(--space-6) clamp(22px, 5vw, 40px) var(--space-5); }
+
+body.app-body :is(#pitch-modal, .connect-composer-dialog) .app-eyebrow { margin: 0; color: var(--cc-wine); font-size: var(--text-12); font-weight: 700; letter-spacing: .117em; }
+body.app-body :is(#pitch-modal .pitch-panel, .connect-composer-dialog) h2 { margin: var(--space-3) 0 0; color: var(--cc-ink); font-family: var(--font-heading); font-size: clamp(34px, 5vw, 44px); font-weight: 400; line-height: 1; letter-spacing: -.03em; }
+body.app-body :is(#pitch-modal .pitch-panel, .connect-composer-dialog) h2 em { color: var(--cc-wine); font-style: italic; font-weight: 500; }
+body.app-body :is(#pitch-modal, .connect-composer-dialog) .pitch-copy { margin: var(--space-2) 0 var(--space-4); color: var(--cc-muted); font-size: var(--text-14); line-height: 1.5; }
+body.app-body :is(#pitch-modal, .connect-composer-dialog) .overlay-close { top: var(--space-4); right: var(--space-4); width: 44px; height: 44px; border: 1px solid var(--cc-line); border-radius: 50%; background: transparent; color: var(--cc-ink); font-size: var(--text-24); line-height: 1; }
+
+.composer-suggestions { display: flex; flex-wrap: wrap; gap: var(--space-2); margin-bottom: var(--space-3); }
+.composer-suggestions:empty { display: none; }
+body.app-body .composer-suggestion { max-width: 100%; min-height: 36px; padding: 8px var(--space-4); border: 1px solid color-mix(in srgb, var(--cc-wine) 18%, transparent); border-radius: var(--radius-m); background: color-mix(in srgb, var(--cc-wine) 6%, var(--cc-paper)); color: var(--cc-wine-deep); font-family: var(--font-heading); font-size: var(--text-14); line-height: 1.35; text-align: left; cursor: pointer; }
+@media (hover: hover) { body.app-body .composer-suggestion:hover { border-color: var(--cc-wine); } }
+body.app-body :is(#pitch-modal .pitch-panel, .connect-composer-dialog) textarea {
+  display: block; width: 100%; min-height: 132px; margin: 0; padding: 14px 16px; border: 1px solid var(--cc-line); border-radius: var(--radius-m);
+  background: color-mix(in srgb, var(--cc-paper) 70%, var(--color-card-paper)); color: var(--cc-ink); font-family: var(--font-heading); font-size: var(--text-16); line-height: 1.55; resize: vertical;
+}
+body.app-body :is(#pitch-modal .pitch-panel, .connect-composer-dialog) textarea:focus-visible { outline: none; border-color: var(--cc-wine); box-shadow: 0 0 0 3px color-mix(in srgb, var(--cc-wine) 16%, transparent); }
+.composer-meta { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--space-3); margin-top: 6px; }
+.composer-hint { margin: 0; color: var(--cc-muted); font-size: var(--text-12); line-height: 1.4; }
+.composer-count { margin: 0 0 0 auto; color: var(--cc-muted); font-size: var(--text-12); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.composer-count.is-near { color: var(--cc-wine); font-weight: 700; }
+.connect-composer-dialog .event-field-error { margin: 0; color: var(--cc-wine); font-size: var(--text-12); font-weight: 600; }
+.composer-actions { display: grid; grid-template-columns: auto 1fr; gap: var(--space-3); margin-top: var(--space-4); }
+body.app-body .composer-cancel { min-height: 48px; padding: 0 var(--space-5); border: 1px solid var(--cc-line); border-radius: var(--radius-pill); background: transparent; color: var(--cc-ink); font-family: var(--font-body); font-size: var(--text-12); font-weight: 700; letter-spacing: .1em; text-transform: uppercase; cursor: pointer; }
+body.app-body :is(#pitch-modal .pitch-submit, .connect-composer-dialog .composer-send) { display: flex; align-items: center; justify-content: center; gap: var(--space-2); width: 100%; min-height: 48px; padding: 0 var(--space-5); border: 0; border-radius: var(--radius-pill); background: var(--cc-wine); color: var(--cc-paper); font-family: var(--font-body); font-size: var(--text-12); font-weight: 700; letter-spacing: .12em; text-transform: uppercase; cursor: pointer; box-shadow: 0 10px 22px -14px color-mix(in srgb, var(--cc-wine-deep) 80%, transparent); }
+@media (hover: hover) { body.app-body :is(#pitch-modal .pitch-submit, .connect-composer-dialog .composer-send):hover { background: var(--cc-wine-deep); } }
+body.app-body :is(#pitch-modal .pitch-submit, .connect-composer-dialog .composer-send):disabled { opacity: .6; cursor: progress; }
+body.app-body #pitch-modal .pitch-no-note { display: block; width: 100%; min-height: 44px; margin-top: var(--space-1); border: 0; background: none; color: var(--cc-muted); font-family: var(--font-body); font-size: var(--text-14); text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
+body.app-body :is(#pitch-modal, .connect-composer-dialog) :is(button, textarea):focus-visible { outline: 2px solid var(--cc-wine); outline-offset: 3px; }
+
+/* The request review (collab-requests.js): their message first, as a quote. */
+body.app-body .collab-note { margin: var(--space-3) 0 0; padding: var(--space-3) var(--space-4); border-left: 3px solid var(--color-wine); border-radius: 0 var(--radius-m) var(--radius-m) 0; background: color-mix(in srgb, var(--color-wine) 6%, var(--color-cream)); }
+body.app-body .collab-note .collab-note-text { margin: 4px 0 0; color: var(--color-ink); font-family: var(--font-heading); font-size: var(--text-16); line-height: 1.5; white-space: pre-line; }
+.collab-note-empty { margin: var(--space-3) 0 0; color: var(--color-ink-soft); font-size: var(--text-14); font-style: italic; }
+body.app-body :is(#pitch-name, [data-composer-name]) { text-transform: uppercase; }

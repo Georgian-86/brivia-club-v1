@@ -21,7 +21,7 @@ import '../styles/mobile-app.css';
 import '../styles/skeleton.css';
 import '../styles/aura-theme.css';
 import '../styles/handoff.css';
-import { supabase, compressImageOnly, rowToProfile, saveProfile, isPresetCoverUrl, onboardingStatus, sendSignal, fetchSignalQuota, isRateLimited, isStorageImageUrl, withoutCredentials, uploadMessageAttachment, removeMessageAttachment, uploadCommunityPostImage, removeCommunityPostImage, ImageProcessingError, PHOTO_ERROR_MESSAGE, PHOTO_FRAMER_ERROR, compressAttachmentFiles, attachmentKind, reportMember, setSensitiveConsent, fetchSensitiveConsentAt, fetchMyInterests, fetchInterestNodes, addMemberInterest, isMissingFunction, touchPresence, connectionPresence, setPresenceVisible, myPresenceVisible, setMemberInterests, uploadResume, removeResume, resumeSignedUrl, resumeInfo, clearResumePath, searchPlaces, setHomeCity, setHomeLocation, listEvents, setEventRsvp, setCompanionDefault, myEventPrefs, eventCompanions, saveMemberEvent, cancelMemberEvent, deleteMemberEvent, uploadEventImage, removeEventImages, companionEvents, companionDeck, companionSwipe, myCompanionMatches, markCompanionMatchSeen, setNearbyEnabled, myNearbySetting, nearbyPulse, nearbyClear, myNearbyAlerts, setNearbyMuted } from './supabase.js';
+import { supabase, compressImageOnly, rowToProfile, saveProfile, isPresetCoverUrl, onboardingStatus, sendSignal, fetchSignalQuota, isRateLimited, isStorageImageUrl, withoutCredentials, uploadMessageAttachment, removeMessageAttachment, uploadCommunityPostImage, removeCommunityPostImage, ImageProcessingError, PHOTO_ERROR_MESSAGE, PHOTO_FRAMER_ERROR, compressAttachmentFiles, attachmentKind, reportMember, setSensitiveConsent, fetchSensitiveConsentAt, fetchMyInterests, fetchInterestNodes, addMemberInterest, isMissingFunction, touchPresence, connectionPresence, setPresenceVisible, myPresenceVisible, setMemberInterests, uploadResume, removeResume, resumeSignedUrl, resumeInfo, clearResumePath, searchPlaces, setHomeCity, setHomeLocation, listEvents, setEventRsvp, setCompanionDefault, myEventPrefs, eventCompanions, saveMemberEvent, cancelMemberEvent, deleteMemberEvent, uploadEventImage, removeEventImages, companionEvents, companionDeck, companionSwipe, myCompanionMatches, markCompanionMatchSeen, sendConnectRequest, setNearbyEnabled, myNearbySetting, nearbyPulse, nearbyClear, myNearbyAlerts, setNearbyMuted } from './supabase.js';
 import { locateOnce, fallbackCopy } from './geo-locate.js';
 import { areaChangeMessage, AREA_HELPER, AREA_NO_MATCH } from './area-change.js';
 import { areaShareBody, parseAreaBody, resumeShareAttachment, resumeMessageFields, RESUME_SHARE_BODY, NO_RESUME_HINT, RESUME_GONE_COPY, RESUME_SHARE_NOTE, AREA_SHARE_NOTE } from './quick-share.js';
@@ -44,6 +44,8 @@ import '../styles/crossing-paths.css';
 import { createEventsPage } from './events-page.js';
 import { createEventComposer } from './event-create.js';
 import { createCompanionsPage } from './companions-page.js';
+import { openerSuggestions, composerCount, suggestionsMarkup, createConnectComposer } from './connect-composer.js';
+import '../styles/connect-composer.css';
 import { normalizeCompanionMatch, chatContextLine } from './companion-view.js';
 import '../styles/companions.css';
 import '../styles/events.css';
@@ -890,6 +892,18 @@ const companionsPage = createCompanionsPage({
   openProfile: (person) => openPublicProfile({ id: person.id, name: person.name, image: person.photoUrl, photoUrl: person.photoUrl, role: person.headline || 'Brivia member', tags: person.interests }),
   openConversation: async (person) => { markCompanionSeenLocally(String(companionMatches.find((m) => m.otherId === String(person.id))?.id || '')); await openCompanionConversation(person); },
   goExplore: () => document.querySelector('[data-nav-host] [data-nav="events"]')?.click(),
+  composer: createConnectComposer(document.querySelector('#connect-composer-dialog')),
+  sendRequest: async (person, note) => {
+    const { data, error, status } = await sendConnectRequest(person.id, note);
+    const row = Array.isArray(data) ? data[0] : data;
+    if (error) {
+      if (isRateLimited(error, status)) { showToast(quotaErrorText(error, signalQuota)); return { error }; }
+      showToast('Your request could not be sent. Please try again.');
+      return { error };
+    }
+    refreshSignalQuota();
+    return { status: row?.status || 'sent' };
+  },
 });
 const eventsPage = createEventsPage({
   root: document.querySelector('[data-view="events"]'),
@@ -1590,7 +1604,9 @@ const openOverlay = (id) => document.querySelector(`#${id}`)?.removeAttribute('h
 const closeOverlays = () => {
   const pitchWasOpen = !document.querySelector('#pitch-modal')?.hidden;
   overlayIds.forEach((id) => document.querySelector(`#${id}`)?.setAttribute('hidden', ''));
-  if (pitchWasOpen) dismissPendingPitch();
+  // D-124: closing the sheet (×, Cancel, Escape, the backdrop) sends nothing; the card comes back. "Send without a
+  // note" is the explicit plain like (D-071). This replaces D-018's "close = plain like".
+  if (pitchWasOpen) cancelPendingPitch();
   if (pitchWasOpen && focusEmptyOnSheetClose) focusDeckEmpty();
 };
 
@@ -1711,16 +1727,35 @@ const dismissPendingPitch = () => {
   });
   advanceCard(pending.person, 'pitch');
 };
+// D-124: Cancel. Nothing is sent; the pitched card springs back to the centre and stays the current card.
+const cancelPendingPitch = () => {
+  const pending = claimPendingPitch();
+  if (!pending) return;
+  pitchPerson = null;
+  deckSwipe?.settle();
+};
+const renderPitchCount = () => {
+  const input = document.querySelector('#pitch-message');
+  const out = document.querySelector('#pitch-count');
+  if (!input || !out) return;
+  const c = composerCount(input.value.length);
+  out.textContent = c.text;
+  out.classList.toggle('is-near', c.nearLimit);
+};
+let pitchSuggestions = [];
 const openPitch = (person) => {
   dismissPendingPitch();
   pendingPitch = { person, resolved: false };
   pitchOpenedAt = performance.now();
   pitchPerson = person;
   const pitchName = document.querySelector('#pitch-name'); if (pitchName) pitchName.textContent = person.name || 'them';
+  pitchSuggestions = openerSuggestions({ name: person.name, shared: person.shared || [] });
+  const pitchSuggestionBox = document.querySelector('#pitch-suggestions'); if (pitchSuggestionBox) pitchSuggestionBox.innerHTML = suggestionsMarkup(pitchSuggestions);
   // A note from a failed send comes back when the member tries again.
   const savedNote = unsentNotes.get(String(person.id));
   unsentNotes.delete(String(person.id));
   const pitchMessage = document.querySelector('#pitch-message'); if (pitchMessage) pitchMessage.value = savedNote || pitchLine(person);
+  renderPitchCount();
   openOverlay('pitch-modal');
   window.setTimeout(() => pitchMessage?.focus(), 80);
 };
@@ -4972,7 +5007,21 @@ document.querySelector('#pitch-form')?.addEventListener('submit', async (event) 
 // on it) is ignored, as for the backdrop.
 document.querySelector('#pitch-modal .pitch-no-note')?.addEventListener('click', (event) => {
   if (event.currentTarget.disabled || !pendingPitch || performance.now() - pitchOpenedAt < PITCH_OPENING_MS) return;
-  closeOverlays();
+  // D-124: the explicit plain like (closing now cancels): one request with note null, then the card leaves.
+  document.querySelector('#pitch-modal')?.setAttribute('hidden', '');
+  dismissPendingPitch();
+  if (focusEmptyOnSheetClose) focusDeckEmpty();
+});
+document.querySelector('#pitch-modal [data-pitch-cancel]')?.addEventListener('click', () => { if (performance.now() - pitchOpenedAt >= PITCH_OPENING_MS) closeOverlays(); });
+document.querySelector('#pitch-message')?.addEventListener('input', renderPitchCount);
+document.querySelector('#pitch-suggestions')?.addEventListener('click', (event) => {
+  const chip = event.target.closest('[data-composer-suggestion]');
+  const input = document.querySelector('#pitch-message');
+  if (!chip || !input) return;
+  input.value = pitchSuggestions[Number(chip.dataset.composerSuggestion)] || '';
+  renderPitchCount();
+  input.focus();
+  input.setSelectionRange(input.value.length, input.value.length);
 });
 document.querySelector('#logout-button')?.addEventListener('click', logoutMember);
 document.addEventListener('keydown', (event) => {
