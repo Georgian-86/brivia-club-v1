@@ -2564,3 +2564,30 @@ controls (a tester or a seeded test member), never a real member, so no new expo
   Show interest, map icon, axe), events, companions, app-shell.
 - **Owed:** apply `0025_event_interest_brochure.sql` after 0023 (README "0025"). Until then Show interest says it opens
   soon and an event saves without its brochure.
+
+## D-126: Show interest on every event; only The Candlelit Gambit stays (founder, 2026-11-02)
+
+- **Asked:** "Show interest" on all events, free or paid, and remove every event except the one Yashika posted,
+  "The Candlelit Gambit".
+- **Done:** migration `0026_interest_all_events.sql` redefines `set_event_interest` without the paid-only check. On a
+  free event an interest is the same half registration (no seat, not going, counted, in the companion pool) and
+  Register turns it into a confirmed seat. Client: Register and Show interest sit as the same equal pair as Reserve
+  and Show interest (D-125), with "Not sure yet? Show interest…"; the interested count shows on every event.
+  ORBIT §11.3 updated.
+- **Removing events:** a one-off script for the live database (`keep_only_candlelit_gambit.sql`, in the project files,
+  not a migration): preview, then a guarded delete that stops unless exactly one "Candlelit Gambit" by Yashika exists.
+  Registrations, interests, swipes and event matches go with the events (cascade); Brivia connections made through
+  them stay. Re-running 0020 would bring the 8 seeded events back.
+- **Proof:** SQL harness ALL PASSED (N2 now covers a free interest and Register on it); unit 435; e2e events,
+  create-event, companions.
+- **Owed:** apply 0025 then 0026 (README); run the removal script.
+
+## D-127 (2026-11-02): a Brivia cover can be the event poster
+
+- **Ask (founder):** "in the events poster add the opt to use the cover pictures as well in the place of poster".
+- **Decision:** the poster field offers "Use a Brivia cover" (empty state) and "Covers" (on a chosen poster). It opens a
+  grid of the 26 profile covers (`PRESET_COVERS`). A picked cover is fetched from the site, goes through the same area
+  step (D-125) and uploads to the organiser's own `event-posters` folder like a photo.
+- **Why client-only:** `club_event.image_url` must be the creator's storage file (0022). Copying the picture keeps that
+  rule, needs no migration and keeps the cropped area. Cost: one small JPEG per event in storage.
+- **Proof:** e2e create-event (covers grid, Escape, pick, area step, upload) at 1440 and 390; build, style ratchet.

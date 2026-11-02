@@ -264,7 +264,7 @@ export const startAppStub = async ({ port, state = {}, deckRows = defaultDeckRow
       if (pathName === '/rest/v1/rpc/set_event_interest') {
         (st.interests ||= []).push(args);
         const e = st.events.find((x) => x.id === args.p_event);
-        if (!e || !(e.fee_inr > 0) || e.is_mine) return json(400, { code: '22023', message: e && !(e.fee_inr > 0) ? 'free event' : 'invalid event' });
+        if (!e || e.is_mine) return json(400, { code: '22023', message: 'invalid event' });
         if (e.going) { if (args.p_on && args.p_wants_companion !== null) e.wants_companion = Boolean(args.p_wants_companion); return json(200, [{ interested: true, wants_companion: e.wants_companion, status: e.my_status }]); }
         const was = e.my_status === 'interested';
         if (!args.p_on) {

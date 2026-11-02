@@ -1,11 +1,17 @@
 # Session handoff (read after CLAUDE.md)
 
-Last updated: 2026-11-02 (D-125 Show interest, brochure, poster area). Before that: 2026-11-02 (D-121 Create Event). Before that: 2026-11-01 (D-119 Crossing paths). Before that: 2026-11-01 (D-118 calmer Explore; D-117 Explore events, Posts tab). Before that: 2026-11-01 (D-116 cover set). Before that: 2026-10-28 (D-100 chat inbox, D-101 post activity and 0015, D-102 photo and setup). Before that: 2026-10-20 (live-database correction D-070; "Send without a note" D-071). Before that: 2026-10-16 (design references, D-062). Before that: 2026-10-13, after Phase D of the experience iteration (the test world), on branch
+Last updated: 2026-11-02 (D-126 interest on all events; D-125 Show interest, brochure, poster area). Before that: 2026-11-02 (D-121 Create Event). Before that: 2026-11-01 (D-119 Crossing paths). Before that: 2026-11-01 (D-118 calmer Explore; D-117 Explore events, Posts tab). Before that: 2026-11-01 (D-116 cover set). Before that: 2026-10-28 (D-100 chat inbox, D-101 post activity and 0015, D-102 photo and setup). Before that: 2026-10-20 (live-database correction D-070; "Send without a note" D-071). Before that: 2026-10-16 (design references, D-062). Before that: 2026-10-13, after Phase D of the experience iteration (the test world), on branch
 `claude/jolly-edison-49xvza` (repo `Georgian-86/brivia-club-v1`). Phases C and D are not on `main` yet, and Phase D's SQL
 is not applied: the founder applies it in the SQL editor (section 3, item 0).
 Update this file at the end of every session. CLAUDE.md holds the aim; this file holds **where we are**.
 
 ## 1. What is done
+
+**2026-11-02, D-127:** a Brivia cover can be the event poster (client only, no migration).
+
+**2026-11-02, D-126:** Show interest on every event (free too; Register upgrades it). **Owed: apply
+`0026_interest_all_events.sql`** after 0025, and the one-off `keep_only_candlelit_gambit.sql` (project files) to leave
+only Yashika's "The Candlelit Gambit".
 
 **2026-11-02, D-125:** "Show interest" on paid events (no seat, not going, counted; puts the member in the companion
 pool, so Find a companion works before paying; Reserve upgrades it), the companion pool is now seat, hold or interest;

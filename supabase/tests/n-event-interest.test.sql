@@ -2,7 +2,8 @@
 -- Ids 0e250000-0000-4000-8000-0000000000NN: 01 O (organiser), 02 A, 03 B, 04 C (not looking), 05 K (O blocks K).
 -- N1 structure: the new functions are for members only; the brochure bucket is public, PDF only, 5 MB.
 -- N2 interest on a paid event: no seat held (spots stay), not "going", my_status 'interested', counted in
---    interested_count; refused on a free event, on the organiser's own event and for a member who cannot see it.
+--    interested_count; since 0026 a free event takes an interest too and Register makes it a confirmed seat; refused on
+--    the organiser's own event and for a member who cannot see it.
 -- N3 the pool: an interested member who opted in sees, and is seen by, others who opted in (interested, held or paid);
 --    one who did not opt in is never listed; the companion switch works on an interest (no "register first").
 -- N4 Reserve on an interest becomes the 30-minute hold (going, seat taken, interest count down); withdrawing an
@@ -78,8 +79,14 @@ begin
   select * into r from public.list_events(null) where id = p;
   if r.going or r.my_status <> 'interested' or r.registered_count <> 0 or r.interested_count <> 1 or r.going_count <> 0 then
     raise exception 'FAIL N2: listed interest %', r; end if;
-  c := pg_temp.code_of(format('select public.set_event_interest(%L, true)', f));
-  if c not like '22023:free event%' then raise exception 'FAIL N2: interest in a free event: %', c; end if;
+  select * into r from public.set_event_interest(f, true);
+  if r.status <> 'interested' then raise exception 'FAIL N2: interest in a free event (0026) %', r; end if;
+  select * into r from public.list_events(null) where id = f;
+  if r.going or r.my_status <> 'interested' or r.registered_count <> 0 or r.interested_count <> 1 then raise exception 'FAIL N2: free interest listed %', r; end if;
+  select * into r from public.set_event_rsvp(f, true, null);
+  if not r.going or r.status <> 'confirmed' then raise exception 'FAIL N2: Register on a free interest %', r; end if;
+  select * into r from public.list_events(null) where id = f;
+  if r.my_status <> 'confirmed' or r.registered_count <> 1 or r.interested_count <> 0 then raise exception 'FAIL N2: after Register %', r; end if;
 
   perform pg_temp.as_member(pg_temp.mi(5));
   c := pg_temp.code_of(format('select public.set_event_interest(%L, true)', p));

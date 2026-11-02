@@ -113,9 +113,9 @@ export const registrationState = (event) => {
   return 'open';
 };
 
-// "Show interest" (D-125, 0025): a half registration for a paid event. No seat is held and no payment is taken, but the
-// member is in the event's companion pool, so Find a companion works before paying. Free events register in one tap.
-export const canShowInterest = (event) => event.status === 'published' && event.feeInr > 0 && !event.isMine
+// "Show interest" (D-125, 0025; every event since D-126, 0026): a half registration. No seat is held and no payment is
+// taken, but the member is in the event's companion pool, so Find a companion works before registering or paying.
+export const canShowInterest = (event) => event.status === 'published' && !event.isMine
   && !['confirmed', 'pending_payment'].includes(event.myStatus);
 export const interestedLabel = (count) => { const n = Math.max(0, Number(count) || 0); return n ? `${n} interested` : ''; };
 // A member in the companion pool for the event: a seat, a payment hold or a shown interest (0025).
@@ -248,7 +248,7 @@ const feeBadge = (event) => (event.feeInr ? `<span class="event-fee-badge is-pai
 const seatsLine = (event) => {
   if (event.status === 'draft') return 'Draft · only you can see this';
   if (event.status === 'cancelled') return 'This event was cancelled';
-  return [feeLabel(event.feeInr), spotsLabel(event), event.feeInr ? interestedLabel(event.interestedCount) : ''].filter(Boolean).join(' · ');
+  return [feeLabel(event.feeInr), spotsLabel(event), interestedLabel(event.interestedCount)].filter(Boolean).join(' · ');
 };
 
 // One event card (D-118: editorial and quiet, like Posts and Connect): image with the date (and the fee, D-121), a
@@ -308,9 +308,11 @@ const registrationMarkup = (event, friends = []) => {
     action = state === 'interested' && spotsLeft(event) === 0
       ? '<button type="button" class="event-going-toggle" disabled aria-disabled="true">Registrations closed</button>'
       : `<button type="button" class="event-going-toggle" data-event-going aria-pressed="false">${event.feeInr ? `Reserve · ${escapeHtml(feeLabel(event.feeInr))}` : 'Register'}</button>`;
-    if (state === 'interested') note = "You're interested, so people going can find you as a companion before you pay. Reserve to hold a seat.";
+    if (state === 'interested') note = event.feeInr ? "You're interested, so people going can find you as a companion before you pay. Reserve to hold a seat."
+      : "You're interested, so people going can find you as a companion. Register to save your seat.";
     else if (state === 'expired') note = 'Your held seat expired. Reserve again if a spot is still free.';
     else if (event.feeInr) note = 'Not ready to pay? Show interest: no seat is held, but you can find a companion going. A reserved seat is held for 30 minutes and confirmed once payment completes.';
+    else if (canShowInterest(event)) note = 'Not sure yet? Show interest: no seat is held, but you can find a companion going.';
   } else if (state === 'confirmed') {
     action = '<span class="event-registered" role="status">Registered <span aria-hidden="true">✓</span></span>';
   } else if (state === 'pending') {
@@ -324,7 +326,7 @@ const registrationMarkup = (event, friends = []) => {
   const interested = state === 'interested';
   const interest = canShowInterest(event) && (state !== 'full' || interested)
     ? `<button type="button" class="event-interest-toggle" data-event-interest aria-pressed="${interested}">${STAR}<span>${interested ? 'Interested' : 'Show interest'}</span>${interested ? '<span aria-hidden="true"> ✓</span>' : ''}</button>` : '';
-  const counts = [seats, event.feeInr ? interestedLabel(event.interestedCount) : ''].filter(Boolean).join(' · ');
+  const counts = [seats, interestedLabel(event.interestedCount)].filter(Boolean).join(' · ');
   const copy = `<div class="event-register-copy"><p class="event-register-fee">${escapeHtml(fee)}</p><p class="event-register-seats event-going">${friends.length ? `<span class="event-avatars">${avatarStack(friends)}</span>` : ''}<span>${escapeHtml(counts)}</span></p></div>`;
   // With "Show interest" (D-125) the two choices sit side by side under the fee, equal width: Reserve is the one
   // primary action, Show interest the quiet secondary one.

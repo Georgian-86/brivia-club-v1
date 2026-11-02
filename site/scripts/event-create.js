@@ -14,6 +14,8 @@ import { eventCardMarkup, eventDetailMarkup } from './events-view.js';
 import { eventImageSrc } from './event-assets.js';
 import { locateOnce, fallbackCopy } from './geo-locate.js';
 import { attachEmojiPicker } from './emoji-field.js';
+import { PRESET_COVERS, presetCoverStoredPath } from './preset-cover.js';
+import { normalizeCoverUrl } from './cover-assets.js';
 
 const esc = (value = '') => String(value).replace(/[&<>'"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[c]));
 const PLUS = '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 5v14M5 12h14"/></svg>';
@@ -21,6 +23,13 @@ const IMAGE = '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><re
 const CAMERA = '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M4 8.5h3l1.6-2.5h6.8L17 8.5h3v10H4z"/><circle cx="12" cy="13.2" r="3.3"/></svg>';
 const DOC = '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M14 3.5H7a1.5 1.5 0 0 0-1.5 1.5v14A1.5 1.5 0 0 0 7 20.5h10a1.5 1.5 0 0 0 1.5-1.5V8L14 3.5Z"/><path d="M14 3.5V8h4.5M9 13h6M9 16.5h4"/></svg>';
 const CROP = '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M7 3.5V17h13.5M3.5 7H17v13.5"/></svg>';
+const COVERS = '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><rect x="3.5" y="3.5" width="7" height="7" rx="1.5"/><rect x="13.5" y="3.5" width="7" height="7" rx="1.5"/><rect x="3.5" y="13.5" width="7" height="7" rx="1.5"/><rect x="13.5" y="13.5" width="7" height="7" rx="1.5"/></svg>';
+// The Brivia cover pictures (the profile covers, D-127) an organiser can use as the poster instead of their own.
+const coverPickerMarkup = () => `<div class="ec-covers" data-ec-covers hidden>
+  <p class="ec-crop-title" id="ec-covers-title">Pick a Brivia cover</p>
+  <ul class="ec-cover-grid" aria-labelledby="ec-covers-title">${PRESET_COVERS.map(({ key, title }) => `<li><button type="button" class="ec-cover-option" data-ec-cover="${esc(key)}" aria-label="${esc(title.charAt(0) + title.slice(1).toLowerCase())}"><img src="${esc(normalizeCoverUrl(presetCoverStoredPath(key)))}" alt="" loading="lazy" decoding="async" width="160" height="107" /></button></li>`).join('')}</ul>
+  <div class="ec-crop-actions"><button type="button" class="event-btn event-btn-ghost event-btn-sm" data-ec-covers-close>Back</button></div>
+</div>`;
 const PIN = '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 21s-6.5-6.2-6.5-11a6.5 6.5 0 0 1 13 0c0 4.8-6.5 11-6.5 11Z"/><circle cx="12" cy="10" r="2.3"/></svg>';
 
 const field = (name, label, control, { hint = '', optional = false, wide = false } = {}) => `<div class="ec-field${wide ? ' is-wide' : ''}" data-field="${name}">
@@ -120,13 +129,14 @@ const shellMarkup = () => `<div class="ec-shell">
             <input class="sr-only" id="ec-poster" type="file" accept="${PHOTO_ACCEPT}" tabindex="-1" aria-hidden="true" />
             <input class="sr-only" id="ec-poster-camera" type="file" accept="image/*" capture="environment" tabindex="-1" aria-hidden="true" />
             <div class="ec-drop-empty" data-ec-drop-empty>${IMAGE}<strong>Add your poster</strong><span class="ec-drop-copy">Drag it here, or pick one from your device. Any photo up to 25 MB.</span>
-              <span class="ec-drop-actions"><button type="button" class="event-btn event-btn-ghost event-btn-sm" data-ec-pick="poster" aria-describedby="ec-image-hint ec-image-error">${IMAGE}Choose from gallery</button><button type="button" class="event-btn event-btn-ghost event-btn-sm ec-camera-only" data-ec-pick="camera">${CAMERA}Take a photo</button></span>
+              <span class="ec-drop-actions"><button type="button" class="event-btn event-btn-ghost event-btn-sm" data-ec-pick="poster" aria-describedby="ec-image-hint ec-image-error">${IMAGE}Choose from gallery</button><button type="button" class="event-btn event-btn-ghost event-btn-sm ec-camera-only" data-ec-pick="camera">${CAMERA}Take a photo</button><button type="button" class="event-btn event-btn-ghost event-btn-sm" data-ec-covers-open>${COVERS}Use a Brivia cover</button></span>
             </div>
             <div class="ec-drop-filled" data-ec-drop-filled hidden>
               <img alt="Event poster preview" data-ec-poster-img />
-              <div class="ec-drop-tools"><button type="button" class="event-btn event-btn-ghost event-btn-sm" data-ec-crop-open>${CROP}Adjust area</button><button type="button" class="event-btn event-btn-ghost event-btn-sm" data-ec-pick="poster">Replace</button><button type="button" class="event-btn event-btn-ghost event-btn-sm" data-ec-poster-remove>Remove</button></div>
+              <div class="ec-drop-tools"><button type="button" class="event-btn event-btn-ghost event-btn-sm" data-ec-crop-open>${CROP}Adjust area</button><button type="button" class="event-btn event-btn-ghost event-btn-sm" data-ec-pick="poster">Replace</button><button type="button" class="event-btn event-btn-ghost event-btn-sm" data-ec-covers-open>Covers</button><button type="button" class="event-btn event-btn-ghost event-btn-sm" data-ec-poster-remove>Remove</button></div>
               <span class="ec-uploading" data-ec-poster-busy hidden>Uploading…</span>
             </div>
+            ${coverPickerMarkup()}
             <div class="ec-crop" data-ec-crop hidden>
               <p class="ec-crop-title" id="ec-crop-title">Choose the area for the cover</p>
               <div class="ec-crop-frame" data-ec-crop-frame tabindex="0" role="group" aria-labelledby="ec-crop-title" aria-describedby="ec-crop-hint"><img alt="" draggable="false" data-ec-crop-img /></div>
@@ -135,7 +145,7 @@ const shellMarkup = () => `<div class="ec-shell">
               <div class="ec-crop-actions"><button type="button" class="event-btn event-btn-ghost event-btn-sm" data-ec-crop-cancel>Cancel</button><button type="button" class="event-btn event-btn-primary event-btn-sm" data-ec-crop-apply>Use this area</button></div>
             </div>
           </div>
-          <p class="ec-hint" id="ec-image-hint">The poster becomes the card cover, and you choose which area shows. Without one, the card uses a Brivia image for its category.</p>
+          <p class="ec-hint" id="ec-image-hint">Use your own poster or one of the Brivia covers; it becomes the card cover, and you choose which area shows. Without one, the card uses a Brivia image for its category.</p>
           <p class="event-field-error" id="ec-image-error"></p>
           <div class="ec-gallery">
             <span class="ec-label-like">Gallery <span class="ec-optional">Optional · up to 6</span></span>
@@ -222,6 +232,7 @@ export const createEventComposer = ({ dialog, api, memberId, organizer, safeImag
   let brochureBusy = false;
   let posterSource = null;          // the last poster chosen in this sitting (a File), to adjust its area again
   let crop = null;                  // { img, natW, natH, zoom, cx, cy, url } while choosing the area
+  let coversOpen = false;           // the Brivia cover picker is showing
 
   const imagesOf = (d) => [d.imageUrl, ...(d.gallery || [])].filter(Boolean);
   const snapshot = () => JSON.stringify({ ...draft, pin: draft.pin ? 1 : 0 });
@@ -254,7 +265,8 @@ export const createEventComposer = ({ dialog, api, memberId, organizer, safeImag
   const renderCounts = () => { const c = $('[data-ec-count="description"]'); if (c) c.textContent = String(draft.description.length).replace(/\B(?=(\d{3})+(?!\d))/g, ','); };
   const posterSrc = () => posterLocal || (draft.imageUrl ? safeImage(draft.imageUrl) : '');
   const renderPoster = () => {
-    if (crop) { $('[data-ec-drop-empty]').hidden = true; $('[data-ec-drop-filled]').hidden = true; return; }
+    $('[data-ec-covers]').hidden = !coversOpen || Boolean(crop);
+    if (crop || coversOpen) { $('[data-ec-drop-empty]').hidden = true; $('[data-ec-drop-filled]').hidden = true; return; }
     const src = posterSrc();
     $('[data-ec-drop-empty]').hidden = Boolean(src);
     $('[data-ec-drop-filled]').hidden = !src;
@@ -563,6 +575,35 @@ export const createEventComposer = ({ dialog, api, memberId, organizer, safeImag
     const before = draft.brochureUrl; draft.brochureUrl = ''; draft.brochureName = '';
     dropBrochure(before); renderBrochure(); renderPreview();
     dialog.querySelector('[data-ec-pick="brochure"]')?.focus();
+  });
+
+  // A Brivia cover as the poster (D-127): the bundled picture goes through the same area step and upload as a photo, so
+  // the event keeps its own copy in event-posters and nothing changes on the server.
+  const setCovers = (open) => {
+    coversOpen = open;
+    renderPoster();
+    if (open) $('[data-ec-cover]')?.focus();
+    else dialog.querySelector('[data-ec-drop-empty]:not([hidden]) [data-ec-covers-open], [data-ec-drop-filled]:not([hidden]) [data-ec-covers-open]')?.focus();
+  };
+  dialog.querySelectorAll('[data-ec-covers-open]').forEach((b) => b.addEventListener('click', () => { imageError(''); setCovers(true); }));
+  $('[data-ec-covers-close]').addEventListener('click', () => setCovers(false));
+  $('[data-ec-covers]').addEventListener('keydown', (e) => { if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); setCovers(false); } });
+  $('[data-ec-covers]').addEventListener('click', async (e) => {
+    const pick = e.target.closest('[data-ec-cover]');
+    if (!pick) return;
+    coversOpen = false;
+    $('[data-ec-covers]').hidden = true;
+    $('[data-ec-poster-busy]').hidden = false;
+    busy += 1;
+    let file = null;
+    try {
+      const res = await fetch(normalizeCoverUrl(presetCoverStoredPath(pick.dataset.ecCover)));
+      if (!res.ok) throw new Error(String(res.status));
+      const blob = await res.blob();
+      file = new File([blob], 'brivia-cover.webp', { type: blob.type || 'image/webp' });
+    } catch { file = null; } finally { busy -= 1; }
+    if (!file) { renderPoster(); imageError("That cover didn't load. Try again."); return; }
+    setPoster(file);
   });
 
   const cameraInput = $('#ec-poster-camera');

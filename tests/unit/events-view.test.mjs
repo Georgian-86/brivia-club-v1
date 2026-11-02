@@ -263,7 +263,9 @@ test('Show interest (D-125): a half registration for paid events, counted for co
   assert.match(paid.brochureUrl, /b\.pdf$/);
   assert.equal(normalizeEvent({ ...row, my_status: 'interested' }).myStatus, 'interested');
   assert.ok(canShowInterest(paid));
-  assert.ok(!canShowInterest(normalizeEvent(row)), 'free events register in one tap');
+  assert.ok(canShowInterest(normalizeEvent(row)), 'free events take an interest too (D-126)');
+  assert.match(eventDetailMarkup(normalizeEvent(row)), /Register<\/button><button type="button" class="event-interest-toggle"[^>]*>.*Show interest/s);
+  assert.match(eventDetailMarkup(normalizeEvent(row)), /Not sure yet\? Show interest/);
   assert.ok(!canShowInterest({ ...paid, isMine: true }));
   assert.ok(!canShowInterest({ ...paid, myStatus: 'pending_payment' }));
   assert.equal(interestedLabel(0), '');
