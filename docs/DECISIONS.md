@@ -2652,3 +2652,8 @@ controls (a tester or a seeded test member), never a real member, so no new expo
   rule, one padding, Bodoni 16 px at 1.4 line height, clamped at 4 lines. A two-sentence pitch takes 3 lines at 390 px
   and 2 at 1440 (was 4-5). CSS only, scoped to the sheet.
 - **Proof:** e2e collab-requests 31/31 at 390 and 1440, screenshots; style ratchet; build.
+- **Follow-up (founder: "still looking weird in phone view"):** on a phone the page-sized aura left wine smudges at the
+  sheet's edges and the left-ruled quote sat lopsided in a centred card. Now: the sheet's own placement of the aura glows
+  (lilac top left, a breath of wine top right, mint right, rose and peach low; no wine pools), lighter glass on the card,
+  the pitch as a centred Bodoni pull quote with wine quotation marks in one rounded box, and on touch screens the hint
+  reads "Drag the card right to connect, left for not now." (no arrow keys). e2e collab-requests 31/31.

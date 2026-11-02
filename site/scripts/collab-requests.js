@@ -77,7 +77,7 @@ export const openCollabReview = ({ requests, respond, onMessage, onClose = () =>
     + '<button type="button" class="collab-close" data-collab-close aria-label="Close">'
     + '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M7 7l10 10M17 7 7 17"/></svg></button></div>'
     + '<div class="collab-body" data-collab-body aria-live="polite"></div>'
-    + '<p class="collab-hint" data-collab-hint>Drag the card, or use the arrow keys: right to connect, left for not now.</p>'
+    + '<p class="collab-hint" data-collab-hint><span class="collab-hint-touch">Drag the card right to connect, left for not now.</span><span class="collab-hint-keys">Drag the card, or use the arrow keys: right to connect, left for not now.</span></p>'
     + '</div>';
   document.body.append(dialog);
   const body = dialog.querySelector('[data-collab-body]');
