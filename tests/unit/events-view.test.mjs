@@ -216,3 +216,10 @@ test('companion row mentions shared goals when interests do not overlap; the que
   assert.ok(questionNote('Chess', 'x'.repeat(400)).length <= 280);
   assert.match(questionNote('Chess', 'Is parking free?'), /^Question about Chess: Is parking free\?$/);
 });
+
+test('tabs: the reference nine always; a new category only while an event uses it', async () => {
+  const { visibleCategories } = await import('../../site/scripts/events-view.js');
+  assert.deepEqual(visibleCategories([]).map((c) => c.key), ['all', 'tech', 'music', 'sports', 'food', 'art', 'games', 'networking', 'culture']);
+  assert.deepEqual(visibleCategories([{ category: 'workshops' }]).map((c) => c.key).slice(-1), ['workshops']);
+  assert.ok(visibleCategories([], 'education').some((c) => c.key === 'education'), 'the selected tab never vanishes');
+});

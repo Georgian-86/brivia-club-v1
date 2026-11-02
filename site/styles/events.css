@@ -220,17 +220,21 @@ body.app-body.event-sheet-open .app-tabbar { display: none; }
   #events-count { flex-basis: 100%; }
 }
 
-/* D-121 (0022): member events. "Create event" in the toolbar (the Posts "New post" pill, quieter), the fee and status on
-   the card image, a seats line, and in the drawer the host, registration, the organiser's tools, photos and contact. */
+/* D-121 (0022): member events. "Create event" is a small wine pill in the hero, under the note (the founder's
+   reference); the fee and status on the card image, a seats line, and in the drawer the host, registration, the
+   organiser's tools, photos and contact. */
+.events-head-side { display: grid; justify-items: end; gap: var(--space-3); }
 body.app-body .events-create {
-  display: inline-flex; align-items: center; gap: 6px; min-height: 40px; padding: 0 var(--space-4); border: 1px solid var(--ev-wine);
-  border-radius: var(--radius-pill); background: var(--ev-wine); color: var(--ev-paper); font: inherit; letter-spacing: inherit;
-  text-transform: uppercase; cursor: pointer; box-shadow: var(--ev-shadow); transition: background .2s ease;
+  position: relative; display: inline-flex; align-items: center; gap: 6px; min-height: 32px; padding: 0 var(--space-4); border: 0;
+  border-radius: var(--radius-pill); background: var(--ev-wine); color: var(--ev-paper); font-family: var(--font-body); font-size: var(--text-12);
+  font-weight: 700; letter-spacing: .1em; text-transform: uppercase; white-space: nowrap; cursor: pointer; box-shadow: var(--ev-shadow); transition: background .2s ease;
 }
-body.app-body .events-create svg { width: 16px; height: 16px; stroke-width: 2; }
+body.app-body .events-create::before { content: ''; position: absolute; inset: -6px -2px; }
+body.app-body .events-create svg { width: 14px; height: 14px; stroke-width: 2.2; }
 body.app-body .events-create[hidden] { display: none; }
 @media (hover: hover) { body.app-body .events-create:hover { background: var(--ev-wine-deep); } }
 body.app-body .events-create:focus-visible { outline: 2px solid var(--ev-wine); outline-offset: 3px; }
+@media (max-width: 759px) { .events-head-side { justify-items: start; } }
 
 .event-fee-badge, .event-status-badge {
   position: absolute; top: var(--space-3); right: var(--space-3); padding: 5px var(--space-3); border-radius: var(--radius-pill);
@@ -295,12 +299,5 @@ body.app-body .event-ask {
 }
 body.app-body .event-detail a:focus-visible { outline: 2px solid var(--ev-wine); outline-offset: 3px; }
 
-body.app-body .events-create, .events-companion-toggle { white-space: nowrap; }
-/* Phones: the count and "Create event" on the first line, Nearby and the companion switch on the second. */
-@media (max-width: 759px) {
-  .events-toolbar { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: var(--space-1) var(--space-3); }
-  .events-toolbar-actions { display: contents; }
-  body.app-body .events-create { justify-self: end; min-height: 40px; padding: 0 var(--space-4); }
-  .events-companion-toggle { justify-self: end; }
-}
+
 

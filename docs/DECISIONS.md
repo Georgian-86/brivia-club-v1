@@ -2429,6 +2429,9 @@ controls (a tester or a seeded test member), never a real member, so no new expo
     registered. At most 10 new events per member per day. Visibility follows `brivia_visible_to` on the creator.
   - **Images** go to a new public `event-posters` bucket (own folder); account deletion empties it (`DELETE_BUCKETS`)
     and the deletion notice now names events.
+- **Placement (founder's reference, same day):** "+ Create event" is a small wine pill in the Explore hero under
+  "Events near you…"; the toolbar keeps the count, Nearby and Find a companion; the tabs stay the reference nine (a new
+  category's tab appears only while an event in it is listed); only paid events carry a fee badge on the image.
 - **ORBIT spec:** §11.1 added in the same commit (companion order gains shared background as a tie-break).
 - **Not run:** agent-arena (no second model route in this environment, as for D-119). The privacy rules were checked
   against CLAUDE.md, VISION.md and ORBIT §9.1.4/§11 instead. Run one before 0022 goes live if wanted.

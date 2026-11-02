@@ -51,9 +51,14 @@ try {
     page.setDefaultTimeout(8000);
     await page.waitForSelector('.event-card[data-event-id="paid-1"]');
 
-    // The button sits in the toolbar beside Nearby.
+    // The founder's reference: a small pill in the hero under the note; the toolbar keeps count, Nearby and the switch.
     const button = page.locator('#events-create');
-    check(`${w}: "Create event" is in the Explore toolbar`, await button.isVisible() && await page.evaluate(() => document.querySelector('#events-create').parentElement.contains(document.querySelector('#events-nearby'))));
+    check(`${w}: "Create event" sits in the hero under the note, not in the toolbar`, await button.isVisible() && await page.evaluate(() => {
+      const b = document.querySelector('#events-create');
+      const note = document.querySelector('.events-head-note').getBoundingClientRect();
+      return Boolean(b.closest('.events-head')) && !b.closest('.events-toolbar') && b.getBoundingClientRect().top >= note.bottom;
+    }));
+    check(`${w}: the tabs are the reference nine`, (await page.locator('#event-chips [data-event-category]').count()) === 9);
     check(`${w}: the toolbar does not scroll sideways`, await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth));
     await shot(page, `explore-${w}.png`);
 

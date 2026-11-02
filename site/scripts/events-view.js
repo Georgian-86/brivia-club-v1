@@ -24,6 +24,13 @@ export const EVENT_CATEGORIES = Object.freeze([
 ].map(Object.freeze));
 const CATEGORY_KEYS = new Set(EVENT_CATEGORIES.map((c) => c.key));
 export const isEventCategory = (key) => CATEGORY_KEYS.has(String(key || ''));
+// The tabs Explore always shows (the founder's reference); the create form's other categories get a tab only while an
+// event in them is listed (D-121), so the row stays as designed.
+export const BASE_CATEGORY_KEYS = Object.freeze(['all', 'tech', 'music', 'sports', 'food', 'art', 'games', 'networking', 'culture']);
+export const visibleCategories = (events = [], current = 'all') => {
+  const used = new Set(events.map((e) => e.category));
+  return EVENT_CATEGORIES.filter((c) => BASE_CATEGORY_KEYS.includes(c.key) || used.has(c.key) || c.key === current);
+};
 
 const escapeHtml = (value = '') => String(value).replace(/[&<>'"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[c]));
 const toDate = (value) => { if (value === null || value === undefined || value === '') return null; const d = new Date(value); return Number.isNaN(d.getTime()) ? null : d; };
@@ -200,7 +207,8 @@ const kicker = (event) => {
 
 const statusBadge = (event) => (event.status === 'draft' ? '<span class="event-status-badge">Draft</span>'
   : event.status === 'cancelled' ? '<span class="event-status-badge is-cancelled">Cancelled</span>' : '');
-const feeBadge = (event) => `<span class="event-fee-badge${event.feeInr ? ' is-paid' : ''}">${escapeHtml(feeLabel(event.feeInr))}</span>`;
+// Only a paid event carries a badge on its image (free is the norm; the body line says Free).
+const feeBadge = (event) => (event.feeInr ? `<span class="event-fee-badge is-paid">${escapeHtml(feeLabel(event.feeInr))}</span>` : '');
 // 'Free · 8 spots left' (or the fee alone for an open event); a draft's line says who can see it.
 const seatsLine = (event) => {
   if (event.status === 'draft') return 'Draft · only you can see this';

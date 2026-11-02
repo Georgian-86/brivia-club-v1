@@ -39,12 +39,14 @@
           <div class="events-main">
             <div class="events-head">
               <div><p class="app-eyebrow">EXPLORE / EVENTS</p><h1 id="events-heading">Good people<br /><em>at better places.</em></h1></div>
-              <p class="events-head-note">Events near you, and people who would love the company.</p>
+              <div class="events-head-side">
+                <p class="events-head-note">Events near you, and people who would love the company.</p>
+                <button class="events-create" id="events-create" type="button" aria-haspopup="dialog"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 5v14M5 12h14"/></svg>Create event</button>
+              </div>
             </div>
             <div class="events-toolbar">
               <span id="events-count">EVENTS</span>
               <div class="events-toolbar-actions">
-                <button class="events-create" id="events-create" type="button" aria-haspopup="dialog"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 5v14M5 12h14"/></svg>Create event</button>
                 <button class="events-nearby" id="events-nearby" type="button" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 21s-6.5-6.2-6.5-11a6.5 6.5 0 0 1 13 0c0 4.8-6.5 11-6.5 11Z"/><circle cx="12" cy="10" r="2.3"/></svg>Nearby</button>
                 <span class="events-companion-toggle"><span id="events-companion-label">Find a companion</span><span class="sr-only" id="events-companion-copy">Get recommended to people who are also going.</span><button class="event-switch event-switch-sm" id="events-companion-default" type="button" role="switch" aria-checked="false" aria-labelledby="events-companion-label" aria-describedby="events-companion-copy"><span></span></button></span>
               </div>

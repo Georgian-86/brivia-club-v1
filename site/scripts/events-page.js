@@ -9,7 +9,7 @@
 // the server's), choose "Looking for company?" separately, and ask the organiser a question (an ordinary signal with a
 // note). The organiser edits, cancels or deletes their own event from its drawer.
 import {
-  EVENT_CATEGORIES, EVENTS_EMPTY, isEventCategory, normalizeEvent, withRsvp, filterEvents, nearbyEvents,
+  visibleCategories, EVENTS_EMPTY, isEventCategory, normalizeEvent, withRsvp, filterEvents, nearbyEvents,
   eventCardMarkup, eventDetailMarkup, companionRowMarkup, companionNote, questionNote,
 } from './events-view.js';
 import { eventImageSrc } from './event-assets.js';
@@ -39,7 +39,11 @@ export const createEventsPage = ({ root, api, safeImage, toast, isMissing, sendH
   };
   const byId = (id) => state.events.find((e) => e.id === String(id));
 
-  chips.innerHTML = EVENT_CATEGORIES.map((c) => `<button type="button" class="event-chip" data-event-category="${c.key}" aria-pressed="${c.key === 'all'}">${c.label}</button>`).join('');
+  const renderChips = () => {
+    const html = visibleCategories(state.events, state.category).map((c) => `<button type="button" class="event-chip" data-event-category="${c.key}" aria-pressed="${c.key === state.category}">${c.label}</button>`).join('');
+    if (chips.innerHTML !== html) chips.innerHTML = html;
+  };
+  renderChips();
 
   const renderPanel = () => {
     const event = byId(state.selectedId);
@@ -74,6 +78,7 @@ export const createEventsPage = ({ root, api, safeImage, toast, isMissing, sendH
   };
 
   const renderControls = () => {
+    renderChips();
     chips.querySelectorAll('[data-event-category]').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.eventCategory === state.category)));
     nearbyButton.setAttribute('aria-pressed', String(state.nearby));
     companionSwitch.setAttribute('aria-checked', String(state.companionDefault));
