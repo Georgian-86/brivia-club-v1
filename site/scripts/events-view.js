@@ -100,16 +100,26 @@ export const registeredLabel = (event) => {
   const n = Math.max(0, Number(event?.registeredCount) || 0);
   return n ? `${n} registered` : 'Be the first to register';
 };
-// What the member can do about a seat: 'mine-draft' | 'cancelled' | 'confirmed' | 'pending' | 'expired' | 'full' | 'open'.
+// What the member can do about a seat: 'mine-draft' | 'cancelled' | 'confirmed' | 'pending' | 'interested' | 'expired'
+// | 'full' | 'open'.
 export const registrationState = (event) => {
   if (event.status === 'cancelled') return 'cancelled';
   if (event.status === 'draft') return 'mine-draft';
   if (event.myStatus === 'confirmed') return 'confirmed';
   if (event.myStatus === 'pending_payment') return 'pending';
+  if (event.myStatus === 'interested') return 'interested';
   if (spotsLeft(event) === 0) return 'full';
   if (event.myStatus === 'expired') return 'expired';
   return 'open';
 };
+
+// "Show interest" (D-125, 0025): a half registration for a paid event. No seat is held and no payment is taken, but the
+// member is in the event's companion pool, so Find a companion works before paying. Free events register in one tap.
+export const canShowInterest = (event) => event.status === 'published' && event.feeInr > 0 && !event.isMine
+  && !['confirmed', 'pending_payment'].includes(event.myStatus);
+export const interestedLabel = (count) => { const n = Math.max(0, Number(count) || 0); return n ? `${n} interested` : ''; };
+// A member in the companion pool for the event: a seat, a payment hold or a shown interest (0025).
+export const inCompanionPool = (event) => ['confirmed', 'pending_payment', 'interested'].includes(event.myStatus);
 
 const cleanContact = (contact) => {
   if (!contact || typeof contact !== 'object') return null;
@@ -150,8 +160,11 @@ export const normalizeEvent = (row = {}) => ({
   capacity: Number(row.capacity) > 0 ? Number(row.capacity) : null,
   registeredCount: Math.max(0, Number(row.registered_count ?? row.going_count) || 0),
   feeInr: Math.max(0, Math.round(Number(row.fee_inr) || 0)),
-  myStatus: ['confirmed', 'pending_payment', 'expired'].includes(row.my_status) ? row.my_status : (row.going ? 'confirmed' : null),
+  myStatus: ['confirmed', 'pending_payment', 'expired', 'interested'].includes(row.my_status) ? row.my_status : (row.going ? 'confirmed' : null),
   contact: cleanContact(row.contact),
+  // D-125 (0025). Without 0025: no interest and no brochure.
+  interestedCount: Math.max(0, Number(row.interested_count) || 0),
+  brochureUrl: String(row.brochure_url || ''),
 });
 
 // The new state after the member's own change, with counts moved locally (the next load replaces them).
@@ -163,6 +176,8 @@ export const withRsvp = (event, going, wantsCompanion, status = null) => {
   const moved = nextGoing === event.going ? 0 : nextGoing ? 1 : -1;
   const keep = nextGoing && event.going && event.myStatus !== 'expired' ? event.myStatus : null;
   const myStatus = !nextGoing ? null : status || keep || (event.feeInr > 0 && !event.isMine ? 'pending_payment' : 'confirmed');
+  // Reserving (or cancelling) turns a shown interest into a seat (or nothing): the interest count moves too.
+  const wasInterested = event.myStatus === 'interested' && myStatus !== 'interested';
   return {
     ...event,
     going: nextGoing,
@@ -171,6 +186,23 @@ export const withRsvp = (event, going, wantsCompanion, status = null) => {
     goingCount: Math.max(0, event.goingCount + moved),
     registeredCount: Math.max(0, (event.registeredCount || 0) + moved),
     companionCount: Math.max(0, event.companionCount + (nextWants === event.wantsCompanion ? 0 : nextWants ? 1 : -1)),
+    interestedCount: Math.max(0, (event.interestedCount || 0) - (wasInterested ? 1 : 0)),
+  };
+};
+
+// The state after showing (on) or withdrawing (off) interest (D-125). wantsCompanion: the companion choice (on only).
+export const withInterest = (event, on, wantsCompanion = false) => {
+  if (['confirmed', 'pending_payment'].includes(event.myStatus)) return { ...event, wantsCompanion: on ? Boolean(wantsCompanion) : event.wantsCompanion };
+  const was = event.myStatus === 'interested';
+  const nextWants = on && Boolean(wantsCompanion);
+  const wantsBefore = was && event.wantsCompanion;
+  return {
+    ...event,
+    going: false,
+    myStatus: on ? 'interested' : null,
+    wantsCompanion: nextWants,
+    interestedCount: Math.max(0, (event.interestedCount || 0) + (on === was ? 0 : on ? 1 : -1)),
+    companionCount: Math.max(0, event.companionCount + (nextWants === wantsBefore ? 0 : nextWants ? 1 : -1)),
   };
 };
 
@@ -216,7 +248,7 @@ const feeBadge = (event) => (event.feeInr ? `<span class="event-fee-badge is-pai
 const seatsLine = (event) => {
   if (event.status === 'draft') return 'Draft · only you can see this';
   if (event.status === 'cancelled') return 'This event was cancelled';
-  return [feeLabel(event.feeInr), spotsLabel(event)].filter(Boolean).join(' · ');
+  return [feeLabel(event.feeInr), spotsLabel(event), event.feeInr ? interestedLabel(event.interestedCount) : ''].filter(Boolean).join(' · ');
 };
 
 // One event card (D-118: editorial and quiet, like Posts and Connect): image with the date (and the fee, D-121), a
@@ -257,6 +289,12 @@ const MAIL = '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><rec
 const PHONE = '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M6.5 3.5h3l1.5 4-2 1.3a11 11 0 0 0 6.2 6.2l1.3-2 4 1.5v3a2 2 0 0 1-2.2 2A16.5 16.5 0 0 1 4.5 5.7a2 2 0 0 1 2-2.2Z"/></svg>';
 const LINK = '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/></svg>';
 const safeHref = (href) => (/^(https:\/\/|mailto:|tel:)[^\s"'<>\\]+$/.test(href) ? href : '');
+// A folded map with a pin, for "Open in Google Maps" (D-125).
+const MAP = '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M9 5 4 7v12l5-2 6 2 5-2V5l-5 2-6-2Z"/><path d="M9 5v12M15 7v6"/><path d="M18 16.5s-2.3-2.2-2.3-3.9a2.3 2.3 0 0 1 4.6 0c0 1.7-2.3 3.9-2.3 3.9Z" class="event-map-pin"/></svg>';
+const DOC = '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M14 3.5H7a1.5 1.5 0 0 0-1.5 1.5v14A1.5 1.5 0 0 0 7 20.5h10a1.5 1.5 0 0 0 1.5-1.5V8L14 3.5Z"/><path d="M14 3.5V8h4.5M9 13h6M9 16.5h4"/></svg>';
+const STAR = '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="m12 4.5 2.3 4.7 5.2.8-3.8 3.6.9 5.1-4.6-2.4-4.6 2.4.9-5.1L4.5 10l5.2-.8Z"/></svg>';
+// 'Google Maps' for a Google link, else 'Maps' (Apple Maps, OpenStreetMap).
+export const mapLinkLabel = (url) => (/^https:\/\/((www\.)?google\.|maps\.google\.|maps\.app\.goo\.gl\/|goo\.gl\/maps\/)/.test(String(url || '')) ? 'Open in Google Maps' : 'Open in Maps');
 
 const registrationMarkup = (event, friends = []) => {
   const state = registrationState(event);
@@ -266,10 +304,13 @@ const registrationMarkup = (event, friends = []) => {
   let note = '';
   if (event.isMine && (state === 'open' || state === 'expired' || state === 'full')) {
     action = ''; // the organiser hosts; their counts are in "Your event"
-  } else if (state === 'open' || state === 'expired') {
-    action = `<button type="button" class="event-going-toggle" data-event-going aria-pressed="false">${event.feeInr ? `Reserve · ${escapeHtml(feeLabel(event.feeInr))}` : 'Register'}</button>`;
-    if (state === 'expired') note = 'Your held seat expired. Reserve again if a spot is still free.';
-    else if (event.feeInr) note = 'Your seat is held for 30 minutes and confirmed only once payment completes.';
+  } else if (state === 'open' || state === 'expired' || state === 'interested') {
+    action = state === 'interested' && spotsLeft(event) === 0
+      ? '<button type="button" class="event-going-toggle" disabled aria-disabled="true">Registrations closed</button>'
+      : `<button type="button" class="event-going-toggle" data-event-going aria-pressed="false">${event.feeInr ? `Reserve · ${escapeHtml(feeLabel(event.feeInr))}` : 'Register'}</button>`;
+    if (state === 'interested') note = "You're interested, so people going can find you as a companion before you pay. Reserve to hold a seat.";
+    else if (state === 'expired') note = 'Your held seat expired. Reserve again if a spot is still free.';
+    else if (event.feeInr) note = 'Not ready to pay? Show interest: no seat is held, but you can find a companion going. A reserved seat is held for 30 minutes and confirmed once payment completes.';
   } else if (state === 'confirmed') {
     action = '<span class="event-registered" role="status">Registered <span aria-hidden="true">✓</span></span>';
   } else if (state === 'pending') {
@@ -280,9 +321,13 @@ const registrationMarkup = (event, friends = []) => {
   }
   const cancel = state === 'confirmed' || state === 'pending'
     ? '<button type="button" class="event-text-action" data-event-unregister>Cancel registration</button>' : '';
+  const interested = state === 'interested';
+  const interest = canShowInterest(event) && (state !== 'full' || interested)
+    ? `<button type="button" class="event-interest-toggle" data-event-interest aria-pressed="${interested}">${STAR}<span>${interested ? 'Interested' : 'Show interest'}</span>${interested ? '<span aria-hidden="true"> ✓</span>' : ''}</button>` : '';
+  const counts = [seats, event.feeInr ? interestedLabel(event.interestedCount) : ''].filter(Boolean).join(' · ');
   return `<div class="event-detail-row event-register-row">
-    <div class="event-register-copy"><p class="event-register-fee">${escapeHtml(fee)}</p><p class="event-register-seats event-going">${friends.length ? `<span class="event-avatars">${avatarStack(friends)}</span>` : ''}<span>${escapeHtml(seats)}</span></p></div>
-    ${action}
+    <div class="event-register-copy"><p class="event-register-fee">${escapeHtml(fee)}</p><p class="event-register-seats event-going">${friends.length ? `<span class="event-avatars">${avatarStack(friends)}</span>` : ''}<span>${escapeHtml(counts)}</span></p></div>
+    <div class="event-register-actions">${action}${interest}</div>
   </div>${note ? `<p class="event-register-note">${escapeHtml(note)}</p>` : ''}${cancel ? `<div class="event-register-cancel">${cancel}</div>` : ''}`;
 };
 
@@ -330,19 +375,20 @@ const ownerToolsMarkup = (event, confirm = null) => {
 };
 
 // The drawer. opts: imageSrc (checked), friends, organizerSrc (checked), gallery ([checked URL]), preview (no actions),
-// confirm ('cancel' | 'delete': the organiser's inline confirmation).
-export const eventDetailMarkup = (event, { imageSrc = '', friends = [], organizerSrc = '', gallery = [], preview = false, confirm = null } = {}) => {
+// confirm ('cancel' | 'delete': the organiser's inline confirmation), brochureSrc (a checked brochure PDF URL, D-125).
+export const eventDetailMarkup = (event, { imageSrc = '', friends = [], organizerSrc = '', gallery = [], preview = false, confirm = null, brochureSrc = '' } = {}) => {
   const others = otherCompanions(event);
   const live = event.status === 'published';
-  const registered = event.myStatus === 'confirmed' || event.myStatus === 'pending_payment';
+  const inPool = inCompanionPool(event);
   const where = [event.venueName, event.venueAddress, event.venueArea].filter(Boolean).join(', ');
   const map = event.mapUrl && safeHref(event.mapUrl)
-    ? ` <a class="event-map-link" href="${escapeHtml(event.mapUrl)}" target="_blank" rel="noopener noreferrer nofollow">Open in Maps<span class="sr-only"> (opens in a new tab)</span> ${ARROW}</a>` : '';
+    ? `<a class="event-map-link" href="${escapeHtml(event.mapUrl)}" target="_blank" rel="noopener noreferrer nofollow">${MAP}<span>${mapLinkLabel(event.mapUrl)}</span><span class="sr-only"> (opens in a new tab)</span> ${ARROW}</a>` : '';
+  const brochure = brochureSrc && safeHref(brochureSrc)
+    ? `<a class="event-brochure" href="${escapeHtml(brochureSrc)}" target="_blank" rel="noopener noreferrer">${DOC}<span class="event-brochure-text"><strong>Event brochure</strong><small>PDF</small></span><span class="sr-only"> (opens in a new tab)</span> ${ARROW}</a>` : '';
   const step = companionStep(event);
-  const companionHint = step === 'pending' ? 'You will see companions once your seat is confirmed.'
-    : step === 'reserve' ? 'Reserve your seat first; companions are matched among confirmed seats.'
-      : step === 'closed' ? 'This event is full, so there is no one new to match with.'
-        : others ? `${others} ${others === 1 ? 'person is' : 'people are'} looking for company.` : 'Be the first to look for company.';
+  const companionHint = step === 'interest' ? 'Not paying yet? Show interest and find someone going. No seat is held.'
+    : step === 'closed' ? 'This event is full, so there is no one new to match with.'
+      : others ? `${others} ${others === 1 ? 'person is' : 'people are'} looking for company.` : 'Be the first to look for company.';
   return `<div class="event-detail-media"${imageSrc ? '' : ' data-fallback'}>${imageSrc ? `<img src="${escapeHtml(imageSrc)}" alt="" />` : ''}${dateBadgeMarkup(event.startsAt)}
   ${preview ? '' : `<button type="button" class="event-detail-icon event-detail-back" data-event-close aria-label="Close event"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M19 12H5M11 6l-6 6 6 6"/></svg></button>
   ${live ? '<button type="button" class="event-detail-icon event-detail-share" data-event-share aria-label="Share event"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 15V4M8 8l4-4 4 4M6 11v8h12v-8"/></svg></button>' : ''}`}
@@ -352,38 +398,38 @@ export const eventDetailMarkup = (event, { imageSrc = '', friends = [], organize
   ${kicker(event)}
   <h2 class="event-detail-title" id="${preview ? 'event-preview-title' : 'event-detail-title'}" tabindex="-1">${escapeHtml(event.title)}</h2>
   <p class="event-meta">${CLOCK}<span>${escapeHtml(event.startsAt ? `${fullDate(event.startsAt, 'short')} · ${eventTimeRange(event.startsAt, event.endsAt)}` : 'Date and time to be set')}</span></p>
-  <p class="event-meta">${PIN}<span>${escapeHtml(where || 'Venue to be set')}${map}</span></p>
+  <p class="event-meta">${PIN}<span>${escapeHtml(where || 'Venue to be set')}</span></p>
+  ${map ? `<p class="event-map-row">${map}</p>` : ''}
   ${organizerMarkup(event, organizerSrc)}
   ${ownerToolsMarkup(preview ? { ...event, isMine: false } : event, confirm)}
   ${event.description ? `<p class="event-detail-copy">${escapeHtml(event.description)}</p>` : ''}
+  ${brochure}
   ${event.tags.length ? `<ul class="event-tags" aria-label="Tags">${event.tags.map((t) => `<li>${escapeHtml(t)}</li>`).join('')}</ul>` : ''}
   ${gallery.length ? `<ul class="event-gallery" aria-label="Photos">${gallery.map((src) => `<li><img src="${escapeHtml(src)}" alt="" loading="lazy" decoding="async" /></li>`).join('')}</ul>` : ''}
   ${live || event.status === 'cancelled' ? registrationMarkup(preview ? { ...event, myStatus: null } : event, friends) : ''}
   ${live ? `<div class="event-detail-row event-companion-row-toggle">
     <div><p class="event-companion-title" id="event-companion-label">Looking for a companion?</p><p class="event-companion-copy" id="event-companion-copy">Going solo? Find someone attending the same event and make it a shared experience. Only people who also turn this on see you.</p></div>
-    <button type="button" class="event-switch" role="switch" data-event-wants aria-checked="${event.wantsCompanion}" aria-labelledby="event-companion-label" aria-describedby="event-companion-copy"${registered && !preview ? '' : ' disabled'}><span></span></button>
+    <button type="button" class="event-switch" role="switch" data-event-wants aria-checked="${event.wantsCompanion}" aria-labelledby="event-companion-label" aria-describedby="event-companion-copy"${inPool && !preview ? '' : ' disabled'}><span></span></button>
   </div>
-  ${event.isMine ? '' : `<button type="button" class="event-see-companions" data-event-companions aria-describedby="event-see-hint"${preview ? ' disabled' : ''}>${PEOPLE}<span>${event.wantsCompanion && registered ? 'My companions' : 'Find my companion'}</span> ${ARROW}</button>
+  ${event.isMine ? '' : `<button type="button" class="event-see-companions" data-event-companions aria-describedby="event-see-hint"${preview ? ' disabled' : ''}>${PEOPLE}<span>${event.wantsCompanion && inPool ? 'My companions' : 'Find my companion'}</span> ${ARROW}</button>
   <p class="event-see-hint" id="event-see-hint">${escapeHtml(companionHint)}</p>`}` : ''}
   ${preview ? '' : contactMarkup(event)}
 </div>`;
 };
 
-// "Find my companion" (founder, 2026-11-02): what one press does for this member and event.
-//   'host'    the organiser (they meet everyone there; no list of people for them)
-//   'list'    registered and opted in: show the matches
-//   'optin'   registered (confirmed), not opted in: opt in, then show the matches
-//   'pending' a paid seat waiting for payment: matches come once it is confirmed
-//   'join'    not registered, free event with a seat: one confirm registers and opts in
-//   'reserve' not registered, paid event: reserve the seat first
-//   'closed'  not registered and the event is full, or it is not open
+// "Find my companion" (founder, 2026-11-02; D-125): what one press does for this member and event.
+//   'host'     the organiser (they meet everyone there; no list of people for them)
+//   'list'     in the pool (a seat, a payment hold or a shown interest) and opted in: show the matches
+//   'optin'    in the pool, not opted in: opt in, then show the matches
+//   'join'     not registered, free event with a seat: one confirm registers and opts in
+//   'interest' not registered, paid event with a seat: one confirm shows interest (no payment) and opts in
+//   'closed'   not in the pool and the event is full, or it is not open
 export const companionStep = (event) => {
   if (event.isMine) return 'host';
   if (event.status !== 'published') return 'closed';
-  if (event.myStatus === 'pending_payment') return 'pending';
-  if (event.myStatus === 'confirmed') return event.wantsCompanion ? 'list' : 'optin';
+  if (inCompanionPool(event)) return event.wantsCompanion ? 'list' : 'optin';
   if (spotsLeft(event) === 0) return 'closed';
-  return event.feeInr > 0 ? 'reserve' : 'join';
+  return event.feeInr > 0 ? 'interest' : 'join';
 };
 
 // One row in the companions sheet. person: { id, name, src, sharedInterests, isConnection }, sent: a signal went out.

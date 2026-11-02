@@ -2535,3 +2535,32 @@ controls (a tester or a seeded test member), never a real member, so no new expo
   predates this work ("a Supabase storage photo_url renders": the deck card shows the default cover since D-120).
 - **Owed:** apply `0024_pitch_messages.sql` after 0023 (README "0024").
 
+## D-125: Show interest, the brochure, the poster area and the map icon (founder, 2026-11-02)
+
+- **Asked:** an icon on "Open in Google Maps"; an area selector for the event cover poster; a PDF brochure upload
+  (under 5 MB) in the event fields; and a "Show interest" button that counts as a half registration wherever there is
+  a payment, so Find a companion works with people who showed interest even before they pay.
+- **Done:** migration `0025_event_interest_brochure.sql`:
+  - `event_rsvp.status` also allows `'interested'`. It holds no seat (capacity and "spots left" are unchanged), it is
+    not "going", and it is counted as `interested_count`. `set_event_interest(p_event, p_on, p_wants_companion)` is for
+    paid events only (free events register in one tap); Reserve turns the same row into the 30-minute payment hold.
+  - The companion pool (`brivia_companion_status`) is now a confirmed seat, a payment hold (live or lapsed) or a shown
+    interest, for `event_companions`, `companion_deck`, `companion_events`, `companion_swipe` and `list_events`'
+    counts. Before, only confirmed seats were in it; a pending payment waited. ORBIT §11.3 records the change.
+  - `club_event.brochure_url`, the public `event-brochures` bucket (PDF only, 5 MB, own folder) and
+    `set_event_brochure(p_id, p_url)` (organiser only).
+  - Client: a "Show interest" toggle under Reserve in the drawer and a "Show interest & find company" step in Find my
+    companion; the brochure field in Create Event (PDF, 5 MB, View/Replace/Remove) and a brochure row in the drawer;
+    a poster-area step (3:2 like the card: drag, arrow keys, zoom; "Adjust area" later) that crops before upload; the
+    map link is a pill with a folded-map icon, reading "Open in Google Maps" for Google links.
+- **Reading of "area selector":** which part of the poster the card and drawer show (a crop), not a location area.
+  If a place or region picker was meant, it is a separate change.
+- **Icon:** a generic folded map with a pin in the house wine, not Google's logo (their brand asset).
+- **Kept:** mutual consent (an interest is never a connection), privacy (interest is a count; friends still list only
+  confirmed seats), payments (still owed: the gateway).
+- **Not run:** agent-arena (no second model route here).
+- **Proof:** SQL harness ALL PASSED (new `n-event-interest.test.sql` N1-N5; `k-member-events` M6 and
+  `l-event-companions` L2 updated for the wider pool; hygiene H3); unit 435; e2e create-event (poster area, brochure,
+  Show interest, map icon, axe), events, companions, app-shell.
+- **Owed:** apply `0025_event_interest_brochure.sql` after 0023 (README "0025"). Until then Show interest says it opens
+  soon and an event saves without its brochure.

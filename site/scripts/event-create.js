@@ -8,6 +8,7 @@
 import {
   EVENT_FORM_CATEGORIES, CATEGORY_ROW, LIMITS, PHOTO_ACCEPT, emptyDraft, draftFromEvent, validateEventDraft, firstErrorField,
   toServerFields, serverErrorField, serverErrorMessage, imageFileProblem, previewEvent, todayIst,
+  BROCHURE_ACCEPT, brochureFileProblem, brochureDisplayName, COVER_ZOOM, coverCrop, coverOutputSize,
 } from './event-form.js';
 import { eventCardMarkup, eventDetailMarkup } from './events-view.js';
 import { eventImageSrc } from './event-assets.js';
@@ -18,6 +19,8 @@ const esc = (value = '') => String(value).replace(/[&<>'"]/g, (c) => ({ '&': '&a
 const PLUS = '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 5v14M5 12h14"/></svg>';
 const IMAGE = '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><rect x="3.5" y="4.5" width="17" height="15" rx="2.5"/><circle cx="9" cy="10" r="1.8"/><path d="m4 17 5-4.5 4 3.5 3-2.5 4 3.5"/></svg>';
 const CAMERA = '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M4 8.5h3l1.6-2.5h6.8L17 8.5h3v10H4z"/><circle cx="12" cy="13.2" r="3.3"/></svg>';
+const DOC = '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M14 3.5H7a1.5 1.5 0 0 0-1.5 1.5v14A1.5 1.5 0 0 0 7 20.5h10a1.5 1.5 0 0 0 1.5-1.5V8L14 3.5Z"/><path d="M14 3.5V8h4.5M9 13h6M9 16.5h4"/></svg>';
+const CROP = '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M7 3.5V17h13.5M3.5 7H17v13.5"/></svg>';
 const PIN = '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 21s-6.5-6.2-6.5-11a6.5 6.5 0 0 1 13 0c0 4.8-6.5 11-6.5 11Z"/><circle cx="12" cy="10" r="2.3"/></svg>';
 
 const field = (name, label, control, { hint = '', optional = false, wide = false } = {}) => `<div class="ec-field${wide ? ' is-wide' : ''}" data-field="${name}">
@@ -121,17 +124,36 @@ const shellMarkup = () => `<div class="ec-shell">
             </div>
             <div class="ec-drop-filled" data-ec-drop-filled hidden>
               <img alt="Event poster preview" data-ec-poster-img />
-              <div class="ec-drop-tools"><button type="button" class="event-btn event-btn-ghost event-btn-sm" data-ec-pick="poster">Replace</button><button type="button" class="event-btn event-btn-ghost event-btn-sm" data-ec-poster-remove>Remove</button></div>
+              <div class="ec-drop-tools"><button type="button" class="event-btn event-btn-ghost event-btn-sm" data-ec-crop-open>${CROP}Adjust area</button><button type="button" class="event-btn event-btn-ghost event-btn-sm" data-ec-pick="poster">Replace</button><button type="button" class="event-btn event-btn-ghost event-btn-sm" data-ec-poster-remove>Remove</button></div>
               <span class="ec-uploading" data-ec-poster-busy hidden>Uploading…</span>
             </div>
+            <div class="ec-crop" data-ec-crop hidden>
+              <p class="ec-crop-title" id="ec-crop-title">Choose the area for the cover</p>
+              <div class="ec-crop-frame" data-ec-crop-frame tabindex="0" role="group" aria-labelledby="ec-crop-title" aria-describedby="ec-crop-hint"><img alt="" draggable="false" data-ec-crop-img /></div>
+              <p class="ec-hint" id="ec-crop-hint">Drag the poster (or use the arrow keys) so the part you want sits in the frame. This is what the card and the event page show.</p>
+              <div class="ec-crop-zoom"><label for="ec-crop-zoom">Zoom</label><input id="ec-crop-zoom" type="range" min="${COVER_ZOOM.min}" max="${COVER_ZOOM.max}" step="0.01" value="1" /></div>
+              <div class="ec-crop-actions"><button type="button" class="event-btn event-btn-ghost event-btn-sm" data-ec-crop-cancel>Cancel</button><button type="button" class="event-btn event-btn-primary event-btn-sm" data-ec-crop-apply>Use this area</button></div>
+            </div>
           </div>
-          <p class="ec-hint" id="ec-image-hint">The poster becomes the card cover. Without one, the card uses a Brivia image for its category.</p>
+          <p class="ec-hint" id="ec-image-hint">The poster becomes the card cover, and you choose which area shows. Without one, the card uses a Brivia image for its category.</p>
           <p class="event-field-error" id="ec-image-error"></p>
           <div class="ec-gallery">
             <span class="ec-label-like">Gallery <span class="ec-optional">Optional · up to 6</span></span>
             <ul class="ec-gallery-list" data-ec-gallery></ul>
             <input class="sr-only" id="ec-gallery-input" type="file" multiple accept="${PHOTO_ACCEPT}" tabindex="-1" aria-hidden="true" />
           </div>
+        </div>
+        <div class="ec-field ec-brochure" data-field="brochure">
+          <span class="ec-label-like" id="ec-brochure-label">Brochure <span class="ec-optional">Optional · PDF up to 5 MB</span></span>
+          <input class="sr-only" id="ec-brochure" type="file" accept="${BROCHURE_ACCEPT}" tabindex="-1" aria-hidden="true" />
+          <div data-ec-brochure-empty><button type="button" class="ec-brochure-add" data-ec-pick="brochure" aria-describedby="ec-brochure-hint ec-brochure-error">${DOC}<span>Add a brochure</span></button></div>
+          <div class="ec-brochure-file" data-ec-brochure-filled hidden>
+            ${DOC}<span class="ec-brochure-name" data-ec-brochure-name></span>
+            <span class="ec-brochure-tools"><a class="event-btn event-btn-ghost event-btn-sm" data-ec-brochure-view target="_blank" rel="noopener noreferrer">View<span class="sr-only"> brochure (opens in a new tab)</span></a><button type="button" class="event-btn event-btn-ghost event-btn-sm" data-ec-pick="brochure">Replace</button><button type="button" class="event-btn event-btn-ghost event-btn-sm" data-ec-brochure-remove>Remove</button></span>
+            <span class="ec-uploading" data-ec-brochure-busy hidden>Uploading…</span>
+          </div>
+          <p class="ec-hint" id="ec-brochure-hint">A menu, schedule or flyer members can open from the event page.</p>
+          <p class="event-field-error" id="ec-brochure-error"></p>
         </div>
       </section>
     </form>
@@ -180,6 +202,7 @@ export const createEventComposer = ({ dialog, api, memberId, organizer, safeImag
   const galleryList = $('[data-ec-gallery]');
   const galleryInput = $('#ec-gallery-input');
   const posterInput = $('#ec-poster');
+  const brochureInput = $('#ec-brochure');
 
   let draft = emptyDraft();
   let saved = '';           // JSON of the draft at open / last save (dirty check)
@@ -194,6 +217,11 @@ export const createEventComposer = ({ dialog, api, memberId, organizer, safeImag
   let places = [];
   let activePlace = -1;
   let placeTimer = 0;
+  let brochureUploads = new Set(); // brochure URLs uploaded in this sitting
+  let brochureOriginal = '';        // the brochure the event had when opened (or at the last save)
+  let brochureBusy = false;
+  let posterSource = null;          // the last poster chosen in this sitting (a File), to adjust its area again
+  let crop = null;                  // { img, natW, natH, zoom, cx, cy, url } while choosing the area
 
   const imagesOf = (d) => [d.imageUrl, ...(d.gallery || [])].filter(Boolean);
   const snapshot = () => JSON.stringify({ ...draft, pin: draft.pin ? 1 : 0 });
@@ -213,7 +241,7 @@ export const createEventComposer = ({ dialog, api, memberId, organizer, safeImag
     form.querySelectorAll('input[name="paid"]').forEach((r) => { r.disabled = feeLocked; });
     form.elements.fee.disabled = feeLocked;
     $('#ec-paid-hint').hidden = !feeLocked;
-    renderFee(); renderPoster(); renderGallery(); renderPin(); renderCounts();
+    renderFee(); renderPoster(); renderGallery(); renderPin(); renderCounts(); renderBrochure();
   };
   const read = () => {
     TEXT.forEach((n) => { const el = form.elements[n]; if (el) draft[n] = el.value; });
@@ -226,6 +254,7 @@ export const createEventComposer = ({ dialog, api, memberId, organizer, safeImag
   const renderCounts = () => { const c = $('[data-ec-count="description"]'); if (c) c.textContent = String(draft.description.length).replace(/\B(?=(\d{3})+(?!\d))/g, ','); };
   const posterSrc = () => posterLocal || (draft.imageUrl ? safeImage(draft.imageUrl) : '');
   const renderPoster = () => {
+    if (crop) { $('[data-ec-drop-empty]').hidden = true; $('[data-ec-drop-filled]').hidden = true; return; }
     const src = posterSrc();
     $('[data-ec-drop-empty]').hidden = Boolean(src);
     $('[data-ec-drop-filled]').hidden = !src;
@@ -241,13 +270,23 @@ export const createEventComposer = ({ dialog, api, memberId, organizer, safeImag
     $('[data-ec-pin-text]').textContent = draft.pin ? 'Remove pin' : 'Pin from where I am';
     $('[data-ec-pin]').classList.toggle('is-on', Boolean(draft.pin));
   };
+  const renderBrochure = () => {
+    const url = draft.brochureUrl ? safeImage(draft.brochureUrl) : '';
+    $('[data-ec-brochure-empty]').hidden = Boolean(draft.brochureUrl) || brochureBusy;
+    $('[data-ec-brochure-filled]').hidden = !draft.brochureUrl && !brochureBusy;
+    $('[data-ec-brochure-name]').textContent = brochureBusy ? 'Uploading your PDF…' : draft.brochureName || 'Event brochure.pdf';
+    const view = $('[data-ec-brochure-view]');
+    if (url) view.href = url; else view.removeAttribute('href');
+    view.hidden = !url;
+    $('[data-ec-brochure-busy]').hidden = !brochureBusy;
+  };
   const renderPreview = () => {
     const ev = previewEvent(draft, { organizer: organizer(), imageSrc: posterSrc() });
     const src = posterSrc() || eventImageSrc({ category: ev.category });
     $('[data-ec-preview-card]').innerHTML = eventCardMarkup(ev, { imageSrc: src });
     if (!$('[data-ec-detail-preview]').hidden) {
       const o = organizer();
-      $('[data-ec-detail-preview-body]').innerHTML = eventDetailMarkup(ev, { imageSrc: src, preview: true, organizerSrc: o?.photoUrl ? safeImage(o.photoUrl) : '', gallery: draft.gallery.map(safeImage).filter(Boolean) });
+      $('[data-ec-detail-preview-body]').innerHTML = eventDetailMarkup(ev, { imageSrc: src, preview: true, organizerSrc: o?.photoUrl ? safeImage(o.photoUrl) : '', gallery: draft.gallery.map(safeImage).filter(Boolean), brochureSrc: draft.brochureUrl ? safeImage(draft.brochureUrl) : '' });
     }
   };
 
@@ -383,6 +422,7 @@ export const createEventComposer = ({ dialog, api, memberId, organizer, safeImag
     gone.forEach((u) => uploads.delete(u));
     if (gone.length) api.removeEventImages(memberId(), gone);
   };
+  // A poster from the device is re-encoded, then the member chooses its area (cropCover) before it uploads.
   const setPoster = async (original) => {
     if (!original) return;
     busy += 1;
@@ -390,6 +430,10 @@ export const createEventComposer = ({ dialog, api, memberId, organizer, safeImag
     const file = await prepare(original);
     busy -= 1;
     if (!file) { renderPoster(); return; }
+    posterSource = file;
+    openCrop(file);
+  };
+  const uploadPoster = async (file) => {
     const before = draft.imageUrl;
     if (posterLocal) URL.revokeObjectURL(posterLocal);
     posterLocal = URL.createObjectURL(file);
@@ -399,16 +443,138 @@ export const createEventComposer = ({ dialog, api, memberId, organizer, safeImag
     if (url) { draft.imageUrl = url; dropUnused([before]); }
     renderPoster(); renderPreview();
   };
+
+  // The poster area (D-125) ----------------------------------------------------------------------------------------------
+  const cropBox = $('[data-ec-crop]');
+  const cropFrame = $('[data-ec-crop-frame]');
+  const cropImg = $('[data-ec-crop-img]');
+  const cropZoom = $('#ec-crop-zoom');
+  const frameSize = () => { const r = cropFrame.getBoundingClientRect(); return { frameW: r.width || 300, frameH: r.height || 200 }; };
+  const drawCrop = () => {
+    if (!crop) return;
+    const c = coverCrop({ natW: crop.natW, natH: crop.natH, ...frameSize(), zoom: crop.zoom, cx: crop.cx, cy: crop.cy });
+    crop.cx = c.cx; crop.cy = c.cy; crop.zoom = c.zoom;
+    cropImg.style.width = `${crop.natW * c.scale}px`;
+    cropImg.style.height = `${crop.natH * c.scale}px`;
+    cropImg.style.transform = `translate(${-c.sx * c.scale}px, ${-c.sy * c.scale}px)`;
+    cropZoom.value = String(c.zoom);
+  };
+  const closeCrop = (focus = true) => {
+    if (crop?.url) URL.revokeObjectURL(crop.url);
+    crop = null;
+    cropBox.hidden = true;
+    dialog.classList.remove('is-cropping');
+    renderPoster();
+    if (focus) (dialog.querySelector('[data-ec-crop-open]:not([hidden])') || dialog.querySelector('[data-ec-pick="poster"]'))?.focus();
+  };
+  // source: a File (just chosen) or the current poster URL (Adjust area on a saved poster).
+  const openCrop = (source) => new Promise((resolve) => {
+    const img = new Image();
+    const url = source instanceof Blob ? URL.createObjectURL(source) : '';
+    if (!url) img.crossOrigin = 'anonymous';
+    img.onload = () => {
+      crop = { img, natW: img.naturalWidth, natH: img.naturalHeight, zoom: 1, cx: 0.5, cy: 0.5, url };
+      cropImg.src = img.src;
+      $('[data-ec-drop-empty]').hidden = true;
+      $('[data-ec-drop-filled]').hidden = true;
+      cropBox.hidden = false;
+      dialog.classList.add('is-cropping');
+      drawCrop();
+      cropFrame.focus();
+      resolve(true);
+    };
+    img.onerror = () => { if (url) URL.revokeObjectURL(url); imageError("This poster couldn't be opened to adjust. Choose it again."); renderPoster(); resolve(false); };
+    img.src = url || source;
+  });
+  const applyCrop = async () => {
+    if (!crop) return;
+    const c = coverCrop({ natW: crop.natW, natH: crop.natH, ...frameSize(), zoom: crop.zoom, cx: crop.cx, cy: crop.cy });
+    const { w, h } = coverOutputSize(c.sw);
+    const canvas = document.createElement('canvas');
+    canvas.width = w; canvas.height = h;
+    let blob = null;
+    try {
+      canvas.getContext('2d').drawImage(crop.img, c.sx, c.sy, c.sw, c.sh, 0, 0, w, h);
+      blob = await new Promise((done) => canvas.toBlob(done, 'image/jpeg', 0.9));
+    } catch { blob = null; }
+    closeCrop(false);
+    if (!blob) { imageError("This poster couldn't be cropped here. Choose it again from your device."); return; }
+    await uploadPoster(new File([blob], 'poster.jpg', { type: 'image/jpeg' }));
+    dialog.querySelector('[data-ec-crop-open]')?.focus();
+  };
+  let drag = null;
+  cropFrame.addEventListener('pointerdown', (e) => {
+    if (!crop) return;
+    drag = { x: e.clientX, y: e.clientY };
+    cropFrame.setPointerCapture?.(e.pointerId);
+    cropFrame.classList.add('is-dragging');
+  });
+  cropFrame.addEventListener('pointermove', (e) => {
+    if (!drag || !crop) return;
+    const c = coverCrop({ natW: crop.natW, natH: crop.natH, ...frameSize(), zoom: crop.zoom, cx: crop.cx, cy: crop.cy });
+    crop.cx -= (e.clientX - drag.x) / (c.scale * crop.natW);
+    crop.cy -= (e.clientY - drag.y) / (c.scale * crop.natH);
+    drag = { x: e.clientX, y: e.clientY };
+    drawCrop();
+  });
+  ['pointerup', 'pointercancel', 'lostpointercapture'].forEach((t) => cropFrame.addEventListener(t, () => { drag = null; cropFrame.classList.remove('is-dragging'); }));
+  cropFrame.addEventListener('keydown', (e) => {
+    if (!crop) return;
+    const c = coverCrop({ natW: crop.natW, natH: crop.natH, ...frameSize(), zoom: crop.zoom, cx: crop.cx, cy: crop.cy });
+    const step = (e.shiftKey ? 40 : 10) / c.scale;
+    const moves = { ArrowLeft: [-step, 0], ArrowRight: [step, 0], ArrowUp: [0, -step], ArrowDown: [0, step] };
+    if (moves[e.key]) { e.preventDefault(); crop.cx += moves[e.key][0] / crop.natW; crop.cy += moves[e.key][1] / crop.natH; drawCrop(); return; }
+    if (e.key === '+' || e.key === '=') { e.preventDefault(); crop.zoom += 0.1; drawCrop(); return; }
+    if (e.key === '-' || e.key === '_') { e.preventDefault(); crop.zoom -= 0.1; drawCrop(); return; }
+    if (e.key === 'Enter') { e.preventDefault(); applyCrop(); }
+  });
+  cropFrame.addEventListener('wheel', (e) => { if (!crop) return; e.preventDefault(); crop.zoom -= e.deltaY * 0.002; drawCrop(); }, { passive: false });
+  cropZoom.addEventListener('input', () => { if (!crop) return; crop.zoom = Number(cropZoom.value); drawCrop(); });
+  $('[data-ec-crop-apply]').addEventListener('click', applyCrop);
+  $('[data-ec-crop-cancel]').addEventListener('click', () => closeCrop());
+  $('[data-ec-crop-open]').addEventListener('click', () => { const src = posterSource || posterSrc(); if (src) openCrop(src); });
+  window.addEventListener('resize', () => { if (crop) drawCrop(); });
+
+  // The brochure (D-125): one PDF up to 5 MB, uploaded at once; set on the event after it saves --------------------------
+  const brochureError = (message) => { $('#ec-brochure-error').textContent = message; $('.ec-brochure').classList.toggle('has-error', Boolean(message)); };
+  const dropBrochure = (url) => {
+    if (url && brochureUploads.has(url) && url !== draft.brochureUrl) { brochureUploads.delete(url); api.removeEventBrochures?.(memberId(), [url]); }
+  };
+  brochureInput.addEventListener('change', async () => {
+    const file = brochureInput.files?.[0];
+    brochureInput.value = '';
+    if (!file) return;
+    const problem = brochureFileProblem(file);
+    if (problem) { brochureError(problem); return; }
+    brochureError('');
+    brochureBusy = true; busy += 1; renderBrochure();
+    try {
+      const { url } = await api.uploadEventBrochure(memberId(), file);
+      brochureUploads.add(url);
+      const before = draft.brochureUrl;
+      draft.brochureUrl = url; draft.brochureName = brochureDisplayName(file);
+      dropBrochure(before);
+    } catch (error) {
+      brochureError(/bucket not found/i.test(`${error?.message || ''} ${error?.error || ''}`) ? 'Brochures open soon. You can publish without one.'
+        : /size|large|413/i.test(`${error?.message || ''} ${error?.statusCode || ''}`) ? 'Keep the brochure under 5 MB.' : 'That PDF did not upload. Try again.');
+    } finally { brochureBusy = false; busy -= 1; renderBrochure(); renderPreview(); }
+  });
+  $('[data-ec-brochure-remove]').addEventListener('click', () => {
+    const before = draft.brochureUrl; draft.brochureUrl = ''; draft.brochureName = '';
+    dropBrochure(before); renderBrochure(); renderPreview();
+    dialog.querySelector('[data-ec-pick="brochure"]')?.focus();
+  });
+
   const cameraInput = $('#ec-poster-camera');
   [posterInput, cameraInput].forEach((input) => input.addEventListener('change', () => { setPoster(input.files?.[0]); input.value = ''; }));
   // The visible buttons open the hidden pickers (a real button is focusable and announced; a label for a hidden input is not).
   dialog.addEventListener('click', (e) => {
     const pick = e.target.closest('[data-ec-pick]');
-    if (pick) { ({ poster: posterInput, camera: cameraInput, gallery: galleryInput })[pick.dataset.ecPick]?.click(); return; }
+    if (pick) { ({ poster: posterInput, camera: cameraInput, gallery: galleryInput, brochure: brochureInput })[pick.dataset.ecPick]?.click(); return; }
     if (e.target.closest('[data-ec-drop-empty]') && !e.target.closest('button')) posterInput.click();
   });
   $('[data-ec-poster-remove]').addEventListener('click', () => {
-    const before = draft.imageUrl; draft.imageUrl = ''; dropUnused([before]); renderPoster(); renderPreview();
+    const before = draft.imageUrl; draft.imageUrl = ''; posterSource = null; dropUnused([before]); renderPoster(); renderPreview();
     dialog.querySelector('[data-ec-pick="poster"]')?.focus();
   });
   const drop = $('[data-ec-drop]');
@@ -437,7 +603,8 @@ export const createEventComposer = ({ dialog, api, memberId, organizer, safeImag
     if (saving) return;
     read();
     formError.textContent = '';
-    if (busy) { status.textContent = 'Wait for the image to finish uploading.'; return; }
+    if (crop) { status.textContent = 'Choose the poster area first (Use this area or Cancel).'; cropFrame.focus(); return; }
+    if (busy) { status.textContent = brochureBusy ? 'Wait for the brochure to finish uploading.' : 'Wait for the image to finish uploading.'; return; }
     const errors = validateEventDraft(draft, { publish });
     if (publish) tried = true;
     showErrors(errors);
@@ -473,6 +640,17 @@ export const createEventComposer = ({ dialog, api, memberId, organizer, safeImag
     if (stale.length) api.removeEventImages(memberId(), stale);
     original = new Set(kept);
     uploads = new Set();
+    // The brochure is set on its own (0025) once the event exists; a database without 0025 keeps the event as saved.
+    if ((draft.brochureUrl || '') !== brochureOriginal) {
+      const { error: brochureFail } = await api.setEventBrochure(id, draft.brochureUrl || null);
+      if (brochureFail) {
+        if (draft.brochureUrl) api.removeEventBrochures?.(memberId(), [draft.brochureUrl]);
+        draft.brochureUrl = brochureOriginal; draft.brochureName = brochureOriginal ? 'Event brochure.pdf' : '';
+        toast(isMissing(brochureFail) ? 'Saved. Brochures open soon, so it was saved without the PDF.' : 'Saved, but the brochure did not attach. Add it again from Edit event.');
+      } else if (brochureOriginal) api.removeEventBrochures?.(memberId(), [brochureOriginal]);
+      if (!brochureFail) brochureOriginal = draft.brochureUrl || '';
+    }
+    brochureUploads = new Set();
     draft.id = id; lastId = id;
     draft.status = publish ? 'published' : 'draft';
     draft.pin = null;
@@ -510,10 +688,16 @@ export const createEventComposer = ({ dialog, api, memberId, organizer, safeImag
     $('[data-ec-preview]').setAttribute('aria-pressed', 'false');
     formError.textContent = ''; status.textContent = ''; imageError('');
     $('#ec-pin-status').textContent = 'At the venue now? Pin it for better "~km" distances. Only a ~2 km area is saved.';
-    tried = false; showErrors({}); closeCities();
+    tried = false; showErrors({}); closeCities(); brochureError('');
+    if (crop) closeCrop(false);
   };
   // Uploads from this sitting that were never saved (a successful save empties the set first).
-  const discardUploads = () => { if (uploads.size) api.removeEventImages(memberId(), [...uploads]); uploads = new Set(); };
+  const discardUploads = () => {
+    if (uploads.size) api.removeEventImages(memberId(), [...uploads]);
+    uploads = new Set();
+    if (brochureUploads.size) api.removeEventBrochures?.(memberId(), [...brochureUploads]);
+    brochureUploads = new Set();
+  };
   const close = (force = false) => {
     if (!force && dirty() && !dialog.classList.contains('is-done')) {
       const bar = $('[data-ec-discard-bar]');
@@ -523,12 +707,14 @@ export const createEventComposer = ({ dialog, api, memberId, organizer, safeImag
     }
     discardUploads();
     if (posterLocal) { URL.revokeObjectURL(posterLocal); posterLocal = ''; }
+    if (crop) closeCrop(false);
+    posterSource = null;
     if (dialog.open) dialog.close();
     document.body.classList.remove('event-create-open');
     if (returnFocus?.isConnected) returnFocus.focus();
   };
 
-  dialog.addEventListener('cancel', (e) => { e.preventDefault(); if (!$('[data-ec-discard-bar]').hidden) { $('[data-ec-discard-bar]').hidden = true; return; } if (!cityList.hidden) { closeCities(); return; } close(); });
+  dialog.addEventListener('cancel', (e) => { e.preventDefault(); if (crop) { closeCrop(); return; } if (!$('[data-ec-discard-bar]').hidden) { $('[data-ec-discard-bar]').hidden = true; return; } if (!cityList.hidden) { closeCities(); return; } close(); });
   dialog.addEventListener('click', (e) => {
     const t = e.target;
     if (t.closest('[data-ec-close]')) { close(); return; }
@@ -550,6 +736,9 @@ export const createEventComposer = ({ dialog, api, memberId, organizer, safeImag
       draft = event ? draftFromEvent(event) : emptyDraft();
       original = new Set(imagesOf(draft));
       uploads = new Set();
+      brochureOriginal = draft.brochureUrl || '';
+      brochureUploads = new Set();
+      posterSource = null;
       lastId = draft.id;
       saved = snapshot();
       const editing = Boolean(event);

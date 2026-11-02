@@ -1,8 +1,8 @@
 -- 0023 (D-123): Find a Companion, event-based mutual matching. Ids 0e230000-0000-4000-8000-0000000000NN: 01 A, 02 B,
 -- 03 C, 04 K (A blocked K), 05 D (registered, not looking), 06 P (looking, payment pending).
 -- L1 structure: swipes and matches have RLS on and no client grants; anon runs nothing; the pair check and order hold.
--- L2 the deck: only confirmed, opted-in, visible others for that event (not the caller, D, K or P); none for a caller
---    who is not looking; a location band only (no cell, km or coordinate column).
+-- L2 the deck: only opted-in, visible others in the pool for that event (not the caller, D or K; since 0025 P's payment
+--    hold is in the pool too); none for a caller who is not looking; a location band only (no cell, km or coordinate column).
 -- L3 one like is invisible: no match, no connection; the liked member still sees the liker as an ordinary card.
 -- L4 the second like matches: one event match, one Brivia connection, the second swiper has seen it, the first has not
 --    (their notification) until mark_companion_match_seen; a repeat swipe changes nothing (no duplicate).
@@ -74,16 +74,16 @@ begin
   set local role authenticated;
   perform pg_temp.as_member(pg_temp.cm(1));
   select count(*) into n from public.companion_deck(e1, 20);
-  if n <> 2 then raise exception 'FAIL L2: A should see B and C only, got %', n; end if;
-  if exists (select 1 from public.companion_deck(e1, 20) where member_id in (pg_temp.cm(1), pg_temp.cm(4), pg_temp.cm(5), pg_temp.cm(6))) then
-    raise exception 'FAIL L2: the caller, a blocked, a not-looking or a pending member is listed'; end if;
+  if n <> 3 then raise exception 'FAIL L2: A should see B, C and P only, got %', n; end if;
+  if exists (select 1 from public.companion_deck(e1, 20) where member_id in (pg_temp.cm(1), pg_temp.cm(4), pg_temp.cm(5))) then
+    raise exception 'FAIL L2: the caller, a blocked or a not-looking member is listed'; end if;
   select * into r from public.companion_deck(e1, 20) where member_id = pg_temp.cm(2);
   if r.distance_band <> '~3 km' or r.shared_count <> 1 or r.shared_interests[1] is null then raise exception 'FAIL L2: card %', r; end if;
-  if (select to_see from public.companion_events() where event_id = e1) <> 2 then raise exception 'FAIL L2: companion_events count'; end if;
+  if (select to_see from public.companion_events() where event_id = e1) <> 3 then raise exception 'FAIL L2: companion_events count'; end if;
   perform pg_temp.as_member(pg_temp.cm(5));
   if exists (select 1 from public.companion_deck(e1, 20)) then raise exception 'FAIL L2: a member not looking sees cards'; end if;
   perform pg_temp.as_member(pg_temp.cm(6));
-  if exists (select 1 from public.companion_deck(e1, 20)) then raise exception 'FAIL L2: a pending seat sees cards'; end if;
+  if not exists (select 1 from public.companion_deck(e1, 20)) then raise exception 'FAIL L2: a payment hold must see cards (0025)'; end if;
   reset role;
   if exists (select 1 from information_schema.routines rt join information_schema.parameters pa on pa.specific_name = rt.specific_name
               where rt.routine_name = 'companion_deck' and pa.parameter_mode = 'OUT' and pa.parameter_name ~ '(cell|km|lat|lng|city|email|phone)') then

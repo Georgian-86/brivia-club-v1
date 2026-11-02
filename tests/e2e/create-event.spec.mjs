@@ -4,10 +4,10 @@
 // member event: host, Reserve for a paid event (a held seat, not confirmed), a full event closed, Ask a question.
 // PLAYWRIGHT_MODULE=/opt/node-tools/node_modules/playwright/index.mjs node tests/e2e/create-event.spec.mjs   (Vite on :5187)
 // CREATE_SHOTS=<dir> saves the dialog, the preview, the success state and the drawers at 1440 and 390.
-import { mkdirSync } from 'node:fs';
+import { mkdirSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 import { axeViolations, textAudit, TYPE_FAMILIES } from './a11y.mjs';
-import { startAppStub, PHOTO, ownRow } from './app-stub.mjs';
+import { startAppStub, PHOTO, ownRow, ORIGIN } from './app-stub.mjs';
 
 const { chromium } = await import(process.env.PLAYWRIGHT_MODULE || 'playwright');
 const SHOTS = process.env.CREATE_SHOTS || '';
@@ -15,6 +15,8 @@ let failed = 0;
 const check = (name, ok, detail = '') => { console.log(`${ok ? 'PASS' : 'FAIL'} ${name}${ok ? '' : ` ${detail}`}`); if (!ok) failed += 1; };
 
 const PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAYAAABytg0kAAAAFklEQVR4nGNk+M/AwMDAxMDAwMDAAAAPAAH/k3QhAAAAAElFTkSuQmCC', 'base64');
+// A real cover photo, so the poster-area step has something to frame.
+const POSTER = readFileSync(new URL('../../site/media/Images/Cover images/3453059c-4864-46f7-ae45-6f7049939b9f.webp', import.meta.url));
 const day = (n, h) => { const d = new Date(); d.setUTCDate(d.getUTCDate() + n); d.setUTCHours(h - 5, 30, 0, 0); return d.toISOString(); };
 const ymd = (n) => { const d = new Date(Date.now() + 5.5 * 3600e3); d.setUTCDate(d.getUTCDate() + n); return d.toISOString().slice(0, 10); };
 const HOST = 'dddddddd-dddd-4ddd-8ddd-000000000001';
@@ -26,7 +28,8 @@ const base = (id, title, extra = {}) => ({
   my_status: null, contact: null, ...extra,
 });
 const events = () => [
-  base('paid-1', 'Wine & Words', { category: 'art', fee_inr: 499, registered_count: 6, capacity: 12, contact: { email: 'host@example.com' } }),
+  base('paid-1', 'Wine & Words', { category: 'art', fee_inr: 499, registered_count: 6, capacity: 12, contact: { email: 'host@example.com' }, interested_count: 2,
+    brochure_url: `${ORIGIN}/storage/v1/object/public/event-brochures/${HOST}/wine.pdf` }),
   base('full-1', 'Rooftop Chess', { capacity: 3, registered_count: 3 }),
 ];
 const places = [
@@ -117,8 +120,26 @@ try {
     await page.locator('#event-create-dialog .ec-segment label:has-text("Paid")').click();
     check(`${w}: Paid shows the INR amount`, await page.locator('#ec-fee').isVisible());
     await page.fill('#ec-fee', '499');
-    await page.setInputFiles('#ec-poster', { name: 'poster.png', mimeType: 'image/png', buffer: PNG });
+    await page.setInputFiles('#ec-poster', { name: 'poster.webp', mimeType: 'image/webp', buffer: POSTER });
+    // D-125: the member chooses the poster's area (3:2, like the card) before it uploads.
+    await page.waitForSelector('[data-ec-crop]:not([hidden])');
+    const cropUploadsBefore = st.calls.filter((c) => c.method === 'POST' && c.path.startsWith('/storage/v1/object/event-posters/')).length;
+    check(`${w}: a new poster opens "Choose the area for the cover", focused, nothing uploaded yet`, await page.evaluate(() => document.activeElement?.matches('[data-ec-crop-frame]'))
+      && /Choose the area for the cover/.test(await page.locator('[data-ec-crop]').innerText()) && cropUploadsBefore === 0);
+    const ratio = await page.evaluate(() => { const r = document.querySelector('[data-ec-crop-frame]').getBoundingClientRect(); return r.width / r.height; });
+    check(`${w}: the area frame is 3:2 like the card (${ratio.toFixed(2)})`, Math.abs(ratio - 1.5) < 0.02);
+    const before = await page.evaluate(() => document.querySelector('[data-ec-crop-img]').style.transform);
+    await page.locator('#ec-crop-zoom').fill('2.5');
+    await page.locator('[data-ec-crop-frame]').focus();
+    await page.keyboard.press('ArrowRight');
+    const after = await page.evaluate(() => document.querySelector('[data-ec-crop-img]').style.transform);
+    check(`${w}: zoom and the arrow keys move the area (${before} -> ${after})`, before !== after);
+    check(`${w}: saving waits for the area`, await page.evaluate(() => { document.querySelector('[data-ec-draft]').click(); return /poster area/.test(document.querySelector('[data-ec-status]').textContent); }));
+    await page.locator('[data-ec-crop]').scrollIntoViewIfNeeded();
+    await shot(page, `create-crop-${w}.png`);
+    await page.locator('[data-ec-crop-apply]').click();
     await page.waitForFunction(() => !document.querySelector('[data-ec-drop-filled]').hidden && document.querySelector('[data-ec-poster-busy]').hidden);
+    check(`${w}: Adjust area is offered on the chosen poster`, await page.locator('[data-ec-crop-open]').isVisible());
     check(`${w}: the poster previews with Replace and Remove`, await page.locator('[data-ec-poster-img]').isVisible() && await page.locator('.ec-drop-tools').innerText().then((t) => /Replace/i.test(t) && /Remove/i.test(t)));
     check(`${w}: the poster went to the member's own event-posters folder`, st.calls.some((c) => c.method === 'POST' && c.path.startsWith(`/storage/v1/object/event-posters/${ownRow.id}/`)));
     await page.setInputFiles('#ec-poster', { name: 'notes.pdf', mimeType: 'application/pdf', buffer: PNG });
@@ -135,6 +156,20 @@ try {
     await page.waitForFunction(() => document.querySelectorAll('[data-ec-gallery] img').length === 2);
     const galleryUploads = st.calls.filter((c) => c.method === 'POST' && c.path.startsWith('/storage/v1/object/event-posters/')).length;
     check(`${w}: two gallery photos upload as JPEGs and show as thumbnails (${galleryUploads} uploads in all)`, galleryUploads >= 3);
+
+    // D-125: the brochure, a PDF up to 5 MB.
+    await page.setInputFiles('#ec-brochure', { name: 'menu.txt', mimeType: 'text/plain', buffer: Buffer.from('menu') });
+    check(`${w}: a brochure that is not a PDF is refused inline`, /must be a PDF/.test(await page.locator('#ec-brochure-error').innerText()));
+    await page.setInputFiles('#ec-brochure', { name: 'huge.pdf', mimeType: 'application/pdf', buffer: Buffer.alloc(5 * 1024 * 1024 + 1, 32) });
+    check(`${w}: a brochure over 5 MB is refused inline`, /under 5 MB/.test(await page.locator('#ec-brochure-error').innerText()));
+    await page.setInputFiles('#ec-brochure', { name: 'Chess night menu.pdf', mimeType: 'application/pdf', buffer: Buffer.from('%PDF-1.4\n%%EOF') });
+    await page.waitForFunction(() => !document.querySelector('[data-ec-brochure-filled]').hidden && document.querySelector('[data-ec-brochure-busy]').hidden);
+    check(`${w}: the brochure uploads to the member's own event-brochures folder and shows its name`,
+      st.calls.some((c) => c.method === 'POST' && c.path.startsWith(`/storage/v1/object/event-brochures/${ownRow.id}/`))
+      && /Chess night menu\.pdf/.test(await page.locator('[data-ec-brochure-name]').innerText()) && await page.locator('[data-ec-brochure-view]').isVisible()
+      && (await page.locator('#ec-brochure-error').innerText()) === '');
+    await page.locator('.ec-brochure').scrollIntoViewIfNeeded();
+    await shot(page, `create-brochure-${w}.png`);
 
     // Live preview card.
     const card = await page.locator('[data-ec-preview-card] .event-card').innerText();
@@ -163,6 +198,8 @@ try {
     check(`${w}: Publish sends one save with every field (${JSON.stringify(f).slice(0, 160)}…)`, posted('save_member_event').length === 1 && sent.p_publish === true && sent.p_id === null
       && f.title === 'Bangalore Chess Meetup' && f.category === 'games' && f.date === ymd(5) && f.start_time === '18:00' && f.end_time === '21:00'
       && f.place_id === 'in-bengaluru' && f.capacity === '30' && f.fee_inr === '499' && /event-posters/.test(f.image_url) && !('pin' in f));
+    const br = body('set_event_brochure');
+    check(`${w}: the brochure is set on the new event (${JSON.stringify(br)})`, br?.p_id === 'm-1' && /event-brochures\/.+\.pdf$/.test(br?.p_url || ''));
     check(`${w}: a refined success state`, /It's\s*live\./.test(await page.locator('[data-ec-success]').innerText()) && await page.evaluate(() => document.activeElement?.matches('[data-ec-success]')));
     await shot(page, `create-success-${w}.png`);
     await page.locator('[data-ec-view]').click();
@@ -212,10 +249,25 @@ try {
     await page.waitForSelector('#event-detail [data-event-going]');
     const paid = await page.locator('#event-detail').innerText();
     check(`${w}: the drawer shows the host, fee and spots`, /Kiran Host/.test(paid) && /₹499 entry/.test(paid) && /6 spots left/.test(paid) && /host@example\.com/.test(paid));
+    check(`${w}: "Open in Google Maps" carries a map icon`, /Open in Google Maps/i.test(await page.locator('#event-detail .event-map-link').innerText()) && await page.locator('#event-detail .event-map-link svg').count() === 1);
+    check(`${w}: the brochure opens from the drawer`, (await page.locator('#event-detail a.event-brochure').getAttribute('href'))?.endsWith('/event-brochures/' + HOST + '/wine.pdf'));
+    check(`${w}: a paid event offers Show interest beside Reserve, with the interested count`, /Show interest/i.test(await page.locator('#event-detail [data-event-interest]').innerText()) && /2 interested/.test(paid));
+    check(`${w}: before any step the companion switch is off limits`, await page.locator('#event-detail [data-event-wants]').isDisabled());
+    await page.locator('#event-detail [data-event-interest]').click();
+    await page.waitForSelector('#event-detail [data-event-interest][aria-pressed="true"]');
+    const shown = await page.locator('#event-detail').innerText();
+    check(`${w}: Show interest holds no seat and counts (${JSON.stringify(body('set_event_interest'))})`, body('set_event_interest').p_on === true && /3 interested/.test(shown) && /6 spots left/.test(shown) && /before you pay/.test(shown));
+    check(`${w}: an interest unlocks the companion switch`, !(await page.locator('#event-detail [data-event-wants]').isDisabled()));
+    await page.locator('#event-detail [data-event-wants]').click();
+    await page.waitForSelector('#event-detail [data-event-wants][aria-checked="true"]');
+    check(`${w}: the switch on an interest saves the companion choice`, body('set_event_interest').p_wants_companion === true);
+    const axeInterest = await axeViolations(page, { include: '#event-detail' });
+    check(`${w}: axe on the drawer with an interest`, axeInterest.length === 0, JSON.stringify(axeInterest));
+    await shot(page, `member-interest-${w}.png`);
     await page.locator('#event-detail [data-event-going]').click();
     await page.waitForSelector('#event-detail .event-registered.is-pending');
     check(`${w}: Reserve on a paid event is "Payment pending", not confirmed`, /Payment pending/i.test(await page.locator('#event-detail').innerText()) && body('set_event_rsvp').p_going === true);
-    check(`${w}: the companion switch waits for a confirmed seat`, /once your seat is confirmed/.test(await page.locator('#event-detail').innerText()));
+    check(`${w}: a payment hold keeps the companion choice`, await page.locator('#event-detail [data-event-wants][aria-checked="true"]').count() === 1 && !(await page.locator('#event-detail [data-event-wants]').isDisabled()));
     await page.locator('#event-detail [data-event-ask]').click();
     await page.waitForSelector('#event-ask-dialog[open]');
     await page.locator('#event-ask-dialog button[type="submit"]').click();
