@@ -1099,9 +1099,10 @@ Explore lists events the club curates. This is location-first ranking outside th
 
 ### 11.3 Show interest and the wider pool (D-125, migration 0025)
 
-- **Show interest.** On a paid event a member can show interest without paying (`set_event_interest`): an
-  `event_rsvp` row with status `interested`. It holds no seat, is not "going", and is shown only as a count
-  ("3 interested"). Free events have no interest step. The organiser cannot show interest in their own event.
+- **Show interest.** On any event (paid only until D-126, migration 0026) a member can show interest without
+  registering or paying (`set_event_interest`): an `event_rsvp` row with status `interested`. It holds no seat, is not
+  "going", and is shown only as a count ("3 interested"). Register (free) or Reserve (paid) upgrades the same row. The
+  organiser cannot show interest in their own event.
 - **Pool.** The companion pool for an event (§11 list, §11.1 and the Find a Companion deck in §11.2) is every member
   with a confirmed seat, a payment hold (live or lapsed) or a shown interest who opted in
   (`brivia_companion_status`). This replaces "confirmed only" in §11.1 and §11.2, so people can find company before

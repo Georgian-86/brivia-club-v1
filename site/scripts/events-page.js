@@ -188,8 +188,8 @@ export const createEventsPage = ({ root, api, safeImage, toast, isMissing, sendH
     if (error) {
       replaceEvent(before);
       const message = String(error.message || '');
-      if (isMissing(error)) toast('Showing interest opens soon. You can reserve a seat now.');
-      else if (/invalid event|free event/.test(message)) { toast('This event is no longer open.'); load(); }
+      if (isMissing(error)) toast('Showing interest opens soon. You can register or reserve now.');
+      else if (/invalid event/.test(message)) { toast('This event is no longer open.'); load(); }
       else toast('That did not save. Try again.');
       return false;
     }

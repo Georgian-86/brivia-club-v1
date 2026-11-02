@@ -958,3 +958,14 @@ select has_function_privilege('authenticated', 'public.set_event_interest(uuid, 
 ```
 
 Expect the advisor's usual warnings for the two new security-definer RPCs (they check `auth.uid()` themselves).
+
+## 0026
+
+**Show interest on every event (founder request 2026-11-02, D-126). Not yet applied.** Apply after `0025`.
+
+What it does: redefines `set_event_interest(uuid, boolean, boolean)` without the paid-only check, so free events take
+an interest too (no seat; Register upgrades it). Nothing else changes. Before 0026 a free event's Show interest answers
+"This event is no longer open." (the 'free event' error).
+
+Verify after the apply (as a member, on a free event): `select * from public.set_event_interest('<event id>', true);`
+returns `interested = t, status = interested`.
