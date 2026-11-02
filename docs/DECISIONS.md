@@ -2403,3 +2403,20 @@ controls (a tester or a seeded test member), never a real member, so no new expo
 - **No agent-arena run:** a bug fix that brings the deck in line with D-080 and the other surfaces.
 - **Proof:** unit (`deck-view.test.mjs`), e2e `deck.spec.mjs` (no-cover members show the default preset cover on the
   card and the next card; never the photo).
+
+## D-121: Hiring, a banner on hirers' profiles matched to members who want a role (founder, 2026-11-02; design, awaiting sign-off)
+
+- **Asked:** "show a hiring banner in the profiles of the people whose looking for is hiring candidates. They shall be
+  suggested to people whose looking for is referral or a similar position ... Design when and how will the hiring
+  people post ... and when and where can normal people see the profiles. Also design the complete chart."
+- **Proposed (spec `docs/superpowers/specs/2026-11-02-hiring-design.md`):** up to 3 roles per hirer (title from a role
+  catalogue, level, on-site / hybrid / remote, "I'm hiring" or "I can refer", optional self-reported company, one
+  line, 30 days); explicit seekers only (Job Referral, Internship Referral, new Job opportunities) with "Roles I'm open
+  to", hirers-only visibility by default and an optional private current company; the banner in the deck card's
+  existing bar for everyone, a role strip and a deck lift (at most 1 in 5) only for fitting seekers; the banner in the
+  public profile; "Ask about this role" = a signal with a note and the role tag (3 a day, 25 waiting per role); the
+  hirer answers in the existing request sheet. A hiring bar (14 days, photo, confirmed email, no open report), no
+  links in role text, a "Fake job or asked for money" report reason, a kill switch.
+- **Agent-arena:** a quick panel of two independent agents (product, trust and safety), same model family (disclosed
+  reduced heterogeneity); rulings in spec §13.
+- **Status:** design only; build after the founder signs off. Mock screenshots in the project folder `hiring/`.
