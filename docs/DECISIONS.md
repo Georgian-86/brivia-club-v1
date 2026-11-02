@@ -2426,9 +2426,16 @@ controls (a tester or a seeded test member), never a real member, so no new expo
   Job, Part-time Job, Internship, Freelance Work, Gig Work, Delivery Work, Delivery Partner, Recruiter, Clients,
   Investor, Business Partner (Job Referral and Internship Referral were already there). Plans: Night Walk Buddy,
   Shopping Buddy, Board Game Partner. Video Editor was already there.
+- **Follow-up (founder, same day): "why is software developer not in any list" and "remove the 20 char limit from
+  bio".** The pasted list had "Software Development" (an interest, in the catalogue, shown once 0017 is applied), not
+  the role. Looking for gains tech roles: Software Developer, Software Engineer, Frontend Developer, Backend Developer,
+  Full-stack Developer, Mobile App Developer, Data Scientist, Machine Learning Engineer, DevOps Engineer, Product
+  Manager ("Developer" stays). The signup bio keeps being required but has no minimum length any more (refines D-112's
+  20 to 300; `BIO_MIN` = 1, a blank bio still does not count); the 300 cap is unchanged. Proof: e2e `signup.spec.mjs`
+  (blank refused, "Hi there" accepted).
 - **One list:** Edit profile and the old landing/auth picker had their own copies of the Looking-for list, which had
   drifted from signup's (`Travel Companion` only in one, `Friends` only in the other). All three now read
-  `LOOKING_FOR_CATALOG` (discovery-catalog.js), which keeps every value any of them had. 88 options, no repeats.
+  `LOOKING_FOR_CATALOG` (discovery-catalog.js), which keeps every value any of them had. 98 options, no repeats.
 - **SQL:** the TSV stays the source; 0017's block is regenerated (it was not applied as of the last handoff). New
   `0022_interest_catalog_additions.sql` adds the nine to a database where 0017 already ran and renumbers the catalogue
   A–Z; before 0017 it does nothing; after a fresh 0017 it changes nothing.

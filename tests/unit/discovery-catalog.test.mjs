@@ -16,7 +16,7 @@ test('the interest catalog has the everyday options the founder named', () => {
 
 test('Looking for has the work and creative options the founder added (D-122), and keeps the old ones', () => {
   for (const label of ['Job Opportunities', 'Hiring', 'Job Referral', 'Internship Referral', 'Can Give Referrals',
-    'Delivery Work', 'DJ', 'Rapper', 'Film Director', 'Music Director', 'Actor', 'Actress', 'Model', 'Lyricist',
+    'Delivery Work', 'Software Developer', 'Developer', 'DJ', 'Rapper', 'Film Director', 'Music Director', 'Actor', 'Actress', 'Model', 'Lyricist',
     'Travel Companion', 'Travelling Buddy', 'Friends', 'Shopping Buddy', 'Night Walk Buddy']) {
     assert.ok(has(LOOKING_FOR_CATALOG, label), `${label} missing`);
   }

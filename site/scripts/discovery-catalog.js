@@ -49,6 +49,9 @@ export const LOOKING_FOR_CATALOG = [
   // Work (founder, 2026-11-02, D-122). "Hiring" and "Job Opportunities" are the values the hiring design (D-121) reads.
   'Job Opportunities', 'Hiring', 'Can Give Referrals', 'Full-time Job', 'Part-time Job', 'Internship', 'Freelance Work',
   'Gig Work', 'Delivery Work', 'Delivery Partner', 'Recruiter', 'Clients', 'Investor', 'Business Partner',
+  // Tech roles (founder, 2026-11-02, D-122; "Developer" stays).
+  'Software Developer', 'Software Engineer', 'Frontend Developer', 'Backend Developer', 'Full-stack Developer',
+  'Mobile App Developer', 'Data Scientist', 'Machine Learning Engineer', 'DevOps Engineer', 'Product Manager',
   // Creative roles (founder, 2026-11-02, D-122).
   'DJ', 'Music Producer', 'Mixing and Mastering Engineer', 'Singer', 'Backing Vocalist', 'Songwriter', 'Lyricist',
   'Rapper', 'Music Director', 'Film Director', 'Screenwriter', 'Cinematographer', 'Actor', 'Actress', 'Model',

@@ -502,9 +502,12 @@ try {
     await page.locator('input[name="guided-looking"]').press('Escape');
     u = await ui(page);
     check(`${w} about: Looking for alone is not enough (bio required)`, () => assert.equal(u.nextDisabled, true));
+    await page.locator('textarea[name="guided-bio"]').fill('   ');
+    u = await ui(page);
+    check(`${w} about: a blank bio is not enough`, () => assert.equal(u.nextDisabled, true));
     await page.locator('textarea[name="guided-bio"]').fill('Hi there');
     u = await ui(page);
-    check(`${w} about: a bio under 20 characters is not enough`, () => assert.equal(u.nextDisabled, true));
+    check(`${w} about: a short bio is enough (no minimum length, D-122)`, () => assert.equal(u.nextDisabled, false));
     // D-113: the emoji panel under the bio adds an emoji at the caret and the count follows.
     await page.locator('.guided-screen--about .emoji-field-toggle').click();
     const emoji = await page.locator('.guided-screen--about .emoji-field-emoji').first().getAttribute('data-emoji');

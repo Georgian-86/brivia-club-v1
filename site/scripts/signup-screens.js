@@ -23,7 +23,7 @@ const reducedMotion = () => Boolean(window.matchMedia?.('(prefers-reduced-motion
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const MIN_PASSWORD = 8;
 // D-112: About you. The bio's floor keeps it a sentence, not a placeholder; Looking for matches Edit profile's cap.
-const BIO_MIN = 20;
+const BIO_MIN = 1; // D-122: any length (founder, 2026-11-02); still required, up to BIO_MAX.
 const LOOKING_MAX = 8;
 // The stored values (supabase.js normalizeGender), shown as they are.
 export const GENDERS = ['Male', 'Female', 'Prefer not to say'];
@@ -69,7 +69,7 @@ export const COPY = {
   interestsMissing: 'Pick at least one interest.',
   photoMissing: 'Add a profile photo to continue.',
   lookingMissing: 'Pick at least one thing you are looking for.',
-  bioMissing: 'Write a short bio, at least 20 characters.',
+  bioMissing: 'Write a short bio.',
   lookingCap: 'You can pick up to 8. Remove one to add another.',
   cap: `You can pick up to ${MAX_INTERESTS}. Remove one to add another.`,
 };
@@ -404,7 +404,7 @@ export const initGuidedSignup = ({
     },
 
     // D-112: "About you", both required. Looking for is one dropdown like the interests (the Edit profile suggestions,
-    // or the member's own words, up to LOOKING_MAX); the bio is 20 to BIO_MAX characters. D-114: the last setup screen
+    // or the member's own words, up to LOOKING_MAX); the bio is 1 to BIO_MAX characters (D-122; 20 at first). D-114: the last setup screen
     // (after interests and the location): Finish saves About you, the area and the interests together.
     about: () => {
       let query = '';
@@ -431,7 +431,7 @@ export const initGuidedSignup = ({
           </div>
           <label class="guided-field guided-field--bio"><span class="guided-field-label">Bio</span>
             <textarea name="guided-bio" rows="4" maxlength="${BIO_MAX}" placeholder="What you do, what you love, what you're up to." aria-describedby="guided-bio-count"></textarea>
-            <small class="guided-bio-count" id="guided-bio-count"><span data-guided-bio-count>0</span> / ${BIO_MAX}. At least ${BIO_MIN} characters.</small>
+            <small class="guided-bio-count" id="guided-bio-count"><span data-guided-bio-count>0</span> / ${BIO_MAX}</small>
           </label>`,
         mount: (el) => {
           const combo = el.querySelector('[data-guided-combo]');

@@ -10,6 +10,7 @@ Update this file at the end of every session. CLAUDE.md holds the aim; this file
 **2026-11-02, D-122:** nine more catalogue interests (Backing Vocals, Film Direction, Lyric Writing, Mixing and
 Mastering, Music Direction, Night Walks, Pistol Shooting, Rifle Shooting, Shopping; catalogue 1,138) and work, creative
 and plan options in Looking for (Job Opportunities, Hiring, Can Give Referrals, DJ, Rapper, Film Director, Actress, …).
+Tech roles too (Software Developer, Frontend Developer, …). The signup bio has no minimum length now (still required).
 Edit profile, signup and the old landing picker now share one list, `LOOKING_FOR_CATALOG`. **Owed:** if `0017` is
 already applied, apply `0022_interest_catalog_additions.sql` (README "0022"); if not, apply `0017` (now holds the nine)
 and then `0022` (a no-op). Looking for needs no SQL.
@@ -45,7 +46,7 @@ maroon wash on the cover, "LOOKING FOR · …" in the deck card's bar and no rul
 interests → location → About you (the photo creates the account again). Bio saving still needs `0016`.
 
 **2026-10-31, signup About you (D-112):** after the photo, a required "About you" step: Looking for (a dropdown of the
-Edit profile suggestions, or the member's own words, up to 8) and a bio (20 to 300 characters). It is now the last
+Edit profile suggestions, or the member's own words, up to 8) and a bio (required, up to 300 characters; no minimum since D-122). It is now the last
 signup step and creates the account ("Step n of 6", Google "of 5"). A signed-in member without looking for (or, once
 0016 is live, a bio) resumes there; completed members are never sent back. The bio is stored only once
 `0016_profile_bio.sql` is applied: before that the signup saves everything else. Proof: e2e signup 355, unit 376.
