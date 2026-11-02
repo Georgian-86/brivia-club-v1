@@ -276,8 +276,8 @@ Tooling: Playwright **and axe-core** at `/tmp/pw` (`npm install --prefix /tmp/pw
   authenticated only, `confirm_event_payment` not callable by authenticated, `event-posters` bucket public, the 8 club
   events intact, `event_companion_swipe` and `brivia_pitch_delivery` not selectable, pitch trigger on `matches` present.
   Advisors: only the expected RLS-no-policy INFO and definer-RPC WARN lints, plus leaked-password protection off.
-  `0015` and `0021` are still NOT applied (untouched). The new client is on `claude/amazing-bell-ehn077`, not on `main`:
-  the live site runs the old client, which keeps working against 0022–0024.
+  `0015` and `0021` are still NOT applied (untouched). The new client (Create Event, Find a Companion, the new connect flow)
+  is on `main` (fast-forwarded to `a070586`) and live on thebriviaclub.live since 2026-11-02 (Vercel `dpl_7oJNapZDoFByfYZijFoToMbWm1uH`).
   **Drift found:** live has `accept_pitch_chat(p_from)`, `end_pitch_chat(p_other)`, `my_pitch_threads()`, a
   `connection_requests.chat_accepted_at` column and a 3-arg `brivia_request_is_live`, none of which are in this repo.
   Pull them into a migration and reconcile with 0024 (a note shown in a pre-match pitch chat is also delivered as the
