@@ -993,7 +993,9 @@ select cardinality(brivia_private.brivia_offered_cover_keys()),                 
 
 ## 0028
 
-**A pitch appears once in chat (founder bug report 2026-11-03, D-129).** Apply after `0024`. No client deploy needed
+**A pitch appears once in chat (founder bug report 2026-11-03, D-129). APPLIED 2026-11-03** (Supabase MCP, as postgres;
+verified: `brivia_create_match` writes no message, 0 duplicate groups, 3 twins removed, no delivered pitch lost, cleanup
+not client-callable, second run 0). Apply after `0024`. No client deploy needed
 first (the client never created the copy).
 
 What it does: redefines `public.brivia_create_match(uuid, uuid)` to create the match only (live had a hand-edited

@@ -9,7 +9,7 @@ Update this file at the end of every session. CLAUDE.md holds the aim; this file
 
 **2026-11-03, D-129:** an accepted request's pitch appeared twice in chat: live `brivia_create_match` (hand-edited,
 drift) copied the note and 0024's trigger delivered it too. `0028_pitch_once.sql` fixes the function and removes the
-existing twins. See README "0028" for whether it is applied.
+existing twins. **Applied live 2026-11-03** and verified (README "0028").
 
 **2026-11-02, D-128:** the covers are in the founder's order with new names (25: OPEN MINDS retired, FIND YOUR PACE
 kept last); Edit Profile shows them five across. The default cover picture is unchanged (now named SMASH THEORY).
