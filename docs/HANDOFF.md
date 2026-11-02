@@ -271,6 +271,17 @@ Tooling: Playwright **and axe-core** at `/tmp/pw` (`npm install --prefix /tmp/pw
 
 ## 2. Live Supabase state (project `wfbddovczpfdrspmxgfo`, ap-south-1)
 
+- **2026-11-02:** `0022_member_events.sql`, `0023_event_companions.sql` and `0024_pitch_messages.sql` are **applied**
+  (Supabase MCP, as postgres) and verified: `save_member_event`/`companion_swipe`/`send_connect_request` callable by
+  authenticated only, `confirm_event_payment` not callable by authenticated, `event-posters` bucket public, the 8 club
+  events intact, `event_companion_swipe` and `brivia_pitch_delivery` not selectable, pitch trigger on `matches` present.
+  Advisors: only the expected RLS-no-policy INFO and definer-RPC WARN lints, plus leaked-password protection off.
+  `0015` and `0021` are still NOT applied (untouched). The new client is on `claude/amazing-bell-ehn077`, not on `main`:
+  the live site runs the old client, which keeps working against 0022–0024.
+  **Drift found:** live has `accept_pitch_chat(p_from)`, `end_pitch_chat(p_other)`, `my_pitch_threads()`, a
+  `connection_requests.chat_accepted_at` column and a 3-arg `brivia_request_is_live`, none of which are in this repo.
+  Pull them into a migration and reconcile with 0024 (a note shown in a pre-match pitch chat is also delivered as the
+  first message on match).
 - **2026-10-22:** `0012_polish_wave.sql` (sections C and D) is **applied** and verified read-only (D-075): Explore
   likes and saves, the private `resumes` bucket, resume messages, typing authorization, deletion covers resumes.
   Blocked-send withholding (A5) will be `0013`. Live `brivia_notice_version()` is still `2026-10-20`: `0011` is **applied** (2026-10-22, verified: version `2026-10-05`, accepted after 2026-11-03).

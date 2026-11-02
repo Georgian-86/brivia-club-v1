@@ -858,7 +858,7 @@ Expected advisor additions: the six RPCs join the intended definer-RPC list (`or
 
 ## 0022
 
-**Members create events: Create Event on Explore (founder request 2026-11-02, D-121). Not yet applied.** Needs `0020`
+**Members create events: Create Event on Explore (founder request 2026-11-02, D-121). Applied live 2026-11-02 (before `0021`, which is still not applied; 0022 does not depend on it).** Needs `0020`
 (it extends `club_event` and `event_rsvp`); apply after `0021`.
 
 What it does: `club_event` gains the creator, address, map link, poster and gallery URLs, capacity, entry fee (INR),
@@ -889,7 +889,7 @@ provider is chosen and its webhook calls `confirm_event_payment` (owed, D-121).
 
 ## 0023
 
-**Find a Companion: event-based swipe matching (founder request 2026-11-02, D-123). Not yet applied.** Apply after
+**Find a Companion: event-based swipe matching (founder request 2026-11-02, D-123). Applied live 2026-11-02.** Apply after
 `0022` (it needs `event_rsvp.status` and the member events).
 
 What it does: adds `event_companion_swipe` (one like or pass per member, candidate and event) and
@@ -912,7 +912,7 @@ Expected advisor additions: the five RPCs join the intended definer-RPC list (`o
 
 ## 0024
 
-**The pitch becomes the first chat message (founder request 2026-11-02, D-124). Not yet applied.** Apply after `0023`
+**The pitch becomes the first chat message (founder request 2026-11-02, D-124). Applied live 2026-11-02.** Apply after `0023`
 (it uses `brivia_is_connection`).
 
 What it does: a trigger after insert on `matches` delivers each direction's request note (pending or accepted) as an
