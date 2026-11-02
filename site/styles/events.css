@@ -235,13 +235,7 @@ body.app-body .events-create[hidden] { display: none; }
 @media (hover: hover) { body.app-body .events-create:hover { background: var(--ev-wine-deep); } }
 body.app-body .events-create:focus-visible { outline: 2px solid var(--ev-wine); outline-offset: 3px; }
 @media (max-width: 759px) { .events-head-side { justify-items: start; } }
-/* Desktop: a full-size pill (the club's 44 px buttons) whose bottom sits on the baseline of "at better places.". */
-@media (min-width: 760px) {
-  body.app-body .events-view .events-head-side { gap: var(--space-5); padding-bottom: 14px; }
-  body.app-body .events-create { min-height: 44px; padding: 0 22px; }
-  body.app-body .events-create::before { content: none; }
-  body.app-body .events-create svg { width: 16px; height: 16px; }
-}
+
 
 .event-fee-badge, .event-status-badge {
   position: absolute; top: var(--space-3); right: var(--space-3); padding: 5px var(--space-3); border-radius: var(--radius-pill);
