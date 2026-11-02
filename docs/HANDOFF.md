@@ -1,11 +1,18 @@
 # Session handoff (read after CLAUDE.md)
 
-Last updated: 2026-11-01 (D-119 Crossing paths). Before that: 2026-11-01 (D-118 calmer Explore; D-117 Explore events, Posts tab). Before that: 2026-11-01 (D-116 cover set). Before that: 2026-10-28 (D-100 chat inbox, D-101 post activity and 0015, D-102 photo and setup). Before that: 2026-10-20 (live-database correction D-070; "Send without a note" D-071). Before that: 2026-10-16 (design references, D-062). Before that: 2026-10-13, after Phase D of the experience iteration (the test world), on branch
+Last updated: 2026-11-02 (D-122 catalogue and Looking-for additions). Before that: 2026-11-01 (D-119 Crossing paths). Before that: 2026-11-01 (D-118 calmer Explore; D-117 Explore events, Posts tab). Before that: 2026-11-01 (D-116 cover set). Before that: 2026-10-28 (D-100 chat inbox, D-101 post activity and 0015, D-102 photo and setup). Before that: 2026-10-20 (live-database correction D-070; "Send without a note" D-071). Before that: 2026-10-16 (design references, D-062). Before that: 2026-10-13, after Phase D of the experience iteration (the test world), on branch
 `claude/jolly-edison-49xvza` (repo `Georgian-86/brivia-club-v1`). Phases C and D are not on `main` yet, and Phase D's SQL
 is not applied: the founder applies it in the SQL editor (section 3, item 0).
 Update this file at the end of every session. CLAUDE.md holds the aim; this file holds **where we are**.
 
 ## 1. What is done
+
+**2026-11-02, D-122:** nine more catalogue interests (Backing Vocals, Film Direction, Lyric Writing, Mixing and
+Mastering, Music Direction, Night Walks, Pistol Shooting, Rifle Shooting, Shopping; catalogue 1,138) and work, creative
+and plan options in Looking for (Job Opportunities, Hiring, Can Give Referrals, DJ, Rapper, Film Director, Actress, …).
+Edit profile, signup and the old landing picker now share one list, `LOOKING_FOR_CATALOG`. **Owed:** if `0017` is
+already applied, apply `0022_interest_catalog_additions.sql` (README "0022"); if not, apply `0017` (now holds the nine)
+and then `0022` (a no-op). Looking for needs no SQL.
 
 **2026-11-01, D-119:** "Crossing paths": two connections who both turned it on get one quiet alert ("Riya is nearby.
 You both love chess.") when their live ~2 km areas are within 3 km; never a place, distance or time. Settings →

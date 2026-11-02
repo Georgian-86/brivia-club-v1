@@ -2,6 +2,7 @@
 # `node scripts/build-interest-catalog.mjs` after editing; it rewrites the data section of 0017.
 # Existing 0004 nodes are reused (same label, or the same interest under fuller wording, e.g. "AR and VR");
 # new ones are level-3 nodes under the closest existing category. Left out: Gospel Music (excluded); NLP (same interest as Natural Language Processing).
+# 2026-11-02 (D-122): nine more from the founder (Backing Vocals, Film Direction, Lyric Writing, Mixing and Mastering, Music Direction, Night Walks, Pistol Shooting, Rifle Shooting, Shopping); 0022 adds them where 0017 is already applied.
 Abstract Art	arts.visual.abstract_art	new
 Accessibility Engineering	tech.software.accessibility_engineering	new
 Accounting	business.money.accounting	new
@@ -74,6 +75,7 @@ B2B Sales	business.marketing.b2b_sales	new
 B2C Marketing	business.marketing.b2c_marketing	new
 Backend Development	tech.software.backend_development	new
 Backgammon	games.board.backgammon	new
+Backing Vocals	music.singing.backing_vocals	new
 Badminton	sports.racket.badminton	existing
 Baking	food.cooking.baking	existing
 Ballet	stage_screen.dance.ballet	new
@@ -302,6 +304,7 @@ Fermentation	food.cooking.fermentation	new
 Festival Culture	community.social.festival_culture	new
 Fiction writing	arts.writing.fiction	existing
 Film Criticism	stage_screen.film.film_criticism	new
+Film Direction	stage_screen.film.film_direction	new
 Film Production	stage_screen.film.film_production	new
 Film Scoring	music.making.film_scoring	new
 Filmmaking	stage_screen.film.filmmaking	existing
@@ -566,6 +569,7 @@ Longboarding	outdoors.air_snow.longboarding	new
 Low-Code Development	tech.software.low_code_development	new
 Luxury Fashion	lifestyle.style.luxury_fashion	new
 Luxury Travel	lifestyle.travel.luxury_travel	new
+Lyric Writing	music.making.lyric_writing	new
 Machine learning	tech.ai_data.machine_learning	existing
 Makeup Artistry	lifestyle.style.makeup_artistry	new
 Management	business.careers.management	new
@@ -597,6 +601,7 @@ Middleware	tech.software.middleware	new
 Mindfulness	wellbeing.meditation.mindfulness	existing
 Minimalism	lifestyle.home.minimalism	existing
 Mixed Reality	tech.frontier.mixed_reality	new
+Mixing and Mastering	music.making.mixing_and_mastering	new
 MLOps	tech.ai_data.mlops	new
 Mobile App Development	tech.software.mobile_app_development	new
 Mobile gaming	games.video.mobile	existing
@@ -615,6 +620,7 @@ Movies	stage_screen.film.movies	new
 Multimodal AI	tech.ai_data.multimodal_ai	new
 Museums	learning.humanities.museums	new
 Music Composition	music.making.music_composition	new
+Music Direction	music.making.music_direction	new
 Music Journalism	music.listening.music_journalism	new
 Music production	music.making.production	existing
 Music Theory	music.making.music_theory	new
@@ -641,6 +647,7 @@ Neuroscience	learning.science.neuroscience	existing
 New Media Art	arts.visual.new_media_art	new
 New Product Development	business.startups.new_product_development	new
 News Reporting	arts.writing.news_reporting	new
+Night Walks	outdoors.trekking.night_walks	new
 Nightlife	food.eating_out.nightlife	new
 No-Code Development	tech.software.no_code_development	new
 Nonfiction Reading	learning.reading.nonfiction_reading	new
@@ -713,6 +720,7 @@ Physics Simulation	tech.ai_data.physics_simulation	new
 Piano and keys	music.instruments.piano	existing
 Pickleball	sports.racket.pickleball	existing
 Pilates	sports.fitness.pilates	existing
+Pistol Shooting	sports.precision.pistol_shooting	new
 Plants	lifestyle.home.plants	new
 Platform Engineering	tech.software.platform_engineering	new
 Playwriting	arts.writing.playwriting	new
@@ -805,6 +813,7 @@ Retail Management	business.careers.retail_management	new
 Retrieval-Augmented Generation	tech.ai_data.retrieval_augmented_generation	new
 Retro gaming	games.video.retro	existing
 Reverse Engineering	tech.hardware.reverse_engineering	new
+Rifle Shooting	sports.precision.rifle_shooting	new
 Rifle/Pistol Sport	sports.precision.rifle_pistol_sport	new
 Risk Management	business.careers.risk_management	new
 Road cycling	sports.endurance.cycling.road_cycling	existing
@@ -843,6 +852,7 @@ Security Engineering	tech.security.security_engineering	new
 Semantic Web	tech.software.semantic_web	new
 Serverless Computing	tech.software.serverless_computing	new
 Sewing	arts.crafts.sewing	new
+Shopping	lifestyle.style.shopping	new
 Short Films	stage_screen.film.short_films	new
 Simulation	tech.ai_data.simulation	new
 Singing	music.singing.singing	new

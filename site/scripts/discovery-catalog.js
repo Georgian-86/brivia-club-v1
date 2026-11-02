@@ -38,14 +38,22 @@ export const INTEREST_CATALOG = [
 
 export const LOOKING_FOR_CATALOG = [
   'Hackathon Buddy', 'SIH Buddy', 'Chess Partner', 'Jam Partner', 'Band Member', 'Gym Buddy', 'Running Buddy',
-  'Travelling Buddy', 'Study Partner', 'Project Partner', 'Coding Partner', 'Startup Partner', 'Co-founder', 'Teammate',
-  'Mentor', 'Mentee', 'Freelancer', 'Intern', 'Research Partner', 'Open Source Contributor', 'Developer', 'Designer',
-  'AI Enthusiast', 'ML Enthusiast', 'Entrepreneur', 'Photographer', 'Content Creator', 'Video Editor', 'UI/UX Designer',
-  'Data Analyst', 'Business Analyst', 'Marketer', 'Public Speaker', 'Writer', 'Volunteer', 'Event Participant',
-  'Networking Contact', 'Career Mentor', 'Job Referral', 'Internship Referral', 'Accountability Partner',
-  'Language Exchange Partner', 'Trekking Partner', 'Sports Partner', 'Gaming Partner', 'Photography Partner',
-  'Event Companion', 'Conference Companion', 'Workshop Partner', 'Competition Teammate', 'Roommate', 'Local Guide',
-  'Community Member', 'Collaborator', 'Friends',
+  'Travelling Buddy', 'Travel Companion', 'Study Partner', 'Project Partner', 'Coding Partner', 'Startup Partner',
+  'Co-founder', 'Teammate', 'Mentor', 'Mentee', 'Freelancer', 'Intern', 'Research Partner', 'Open Source Contributor',
+  'Developer', 'Designer', 'AI Enthusiast', 'ML Enthusiast', 'Entrepreneur', 'Photographer', 'Content Creator',
+  'Video Editor', 'UI/UX Designer', 'Data Analyst', 'Business Analyst', 'Marketer', 'Public Speaker', 'Writer',
+  'Volunteer', 'Event Participant', 'Networking Contact', 'Career Mentor', 'Job Referral', 'Internship Referral',
+  'Accountability Partner', 'Language Exchange Partner', 'Trekking Partner', 'Sports Partner', 'Gaming Partner',
+  'Photography Partner', 'Event Companion', 'Conference Companion', 'Workshop Partner', 'Competition Teammate',
+  'Roommate', 'Local Guide', 'Community Member', 'Collaborator', 'Friends',
+  // Work (founder, 2026-11-02, D-122). "Hiring" and "Job Opportunities" are the values the hiring design (D-121) reads.
+  'Job Opportunities', 'Hiring', 'Can Give Referrals', 'Full-time Job', 'Part-time Job', 'Internship', 'Freelance Work',
+  'Gig Work', 'Delivery Work', 'Delivery Partner', 'Recruiter', 'Clients', 'Investor', 'Business Partner',
+  // Creative roles (founder, 2026-11-02, D-122).
+  'DJ', 'Music Producer', 'Mixing and Mastering Engineer', 'Singer', 'Backing Vocalist', 'Songwriter', 'Lyricist',
+  'Rapper', 'Music Director', 'Film Director', 'Screenwriter', 'Cinematographer', 'Actor', 'Actress', 'Model',
+  // Company for plans (founder, 2026-11-02, D-122).
+  'Night Walk Buddy', 'Shopping Buddy', 'Board Game Partner',
 ];
 
 const normalize = (value) => String(value || '').trim().replace(/\s+/g, ' ').toLowerCase();

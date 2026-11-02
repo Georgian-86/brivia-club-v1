@@ -737,9 +737,9 @@ Expected advisor addition: `member_bio` joins the intended definer-RPC list (`or
 
 **The founder's A–Z interest catalogue and "Other" (founder request 2026-10-29, D-109). Not yet applied.**
 
-What it does: adds `interest_node.catalog_order` (the offered catalogue, 1..1129 A–Z); reuses 139 existing 0004 nodes
-(their id and label are unchanged, they only gain `catalog_order`) and adds 990 level-3 nodes under the closest
-existing category (source: `supabase/catalog/interest-catalog.tsv`; the data block is written by
+What it does: adds `interest_node.catalog_order` (the offered catalogue, 1..1138 A–Z since D-122); reuses 139 existing 0004 nodes
+(their id and label are unchanged, they only gain `catalog_order`) and adds 999 level-3 nodes (990 at first; nine
+more since D-122) under the closest existing category (source: `supabase/catalog/interest-catalog.tsv`; the data block is written by
 `node scripts/build-interest-catalog.mjs`). Adds the `member` / `member.custom` branch, `member_custom_interest` (RLS on,
 no grants) and `add_member_interest(text)` (security definer, `search_path = public`, `authenticated` only): returns an
 active public node with that label, or creates `member.custom.<slug>`; refuses bad labels (22023) and a sixth new label
@@ -751,7 +751,7 @@ the A–Z catalogue. Apply after `0016`. The file is long (the catalogue rows); 
 Verify after the apply:
 
 ```sql
-select count(*) filter (where catalog_order is not null),                        -- 1129
+select count(*) filter (where catalog_order is not null),                        -- 1138
        count(*) filter (where catalog_order is not null and (sensitive or level < 3)),  -- 0
        has_function_privilege('authenticated', 'public.add_member_interest(text)', 'execute'),  -- t
        has_function_privilege('anon', 'public.add_member_interest(text)', 'execute')            -- f
@@ -855,3 +855,22 @@ select has_table_privilege('authenticated', 'public.nearby_live', 'select'),    
 ```
 
 Expected advisor additions: the six RPCs join the intended definer-RPC list (`orbit-hygiene.test.sql` H3).
+
+## 0022
+
+**Nine more catalogue interests (founder request 2026-11-02, D-122). Not yet applied.** Apply after `0021`.
+
+What it does: adds Backing Vocals, Film Direction, Lyric Writing, Mixing and Mastering, Music Direction, Night Walks,
+Pistol Shooting, Rifle Shooting and Shopping as level-3 interests under existing categories, and renumbers
+`interest_node.catalog_order` A–Z. Only needed when `0017` is already applied: `0017` itself now holds these nine
+(the TSV is the source), so if `0017` is not applied yet, apply `0017` and then this file, which then changes nothing.
+Before `0017` this file only prints a notice. No functions, grants or policies change.
+
+Verify after the apply:
+
+```sql
+select count(*) filter (where catalog_order is not null),                                   -- 1138
+       max(catalog_order),                                                                   -- 1138
+       count(*) filter (where id = 'lifestyle.style.shopping' and catalog_order is not null)  -- 1
+  from public.interest_node;
+```
