@@ -56,8 +56,15 @@ try {
     const row = await page.locator('.notification-nearby').innerText();
     check(`${w}: the panel row names the connection and the shared interest, never a place or distance (${JSON.stringify(row)})`,
       /Asha Band is nearby/.test(row) && /You both love badminton/.test(row) && /Say hi/i.test(row) && !/km|metres|Pune|Bengaluru/i.test(row));
-    const targets = await page.evaluate(() => [...document.querySelectorAll('.notification-nearby button')].map((b) => { const r = b.getBoundingClientRect(); return Math.min(r.width, r.height); }));
-    check(`${w}: both actions are at least 44 px (${targets})`, targets.length === 2 && targets.every((t) => t >= 44));
+    // The buttons look 32 px but take taps 6 px around them (a 44 px hit area), so the row stays as slim as a message row.
+    const targets = await page.evaluate(() => [...document.querySelectorAll('.notification-nearby button')].map((b) => {
+      const r = b.getBoundingClientRect();
+      const hit = (x, y) => b.contains(document.elementFromPoint(x, y));
+      const cx = r.left + r.width / 2; const cy = r.top + r.height / 2;
+      return { h: Math.round(r.height), hit: [[r.left - 5, cy], [r.right + 5, cy], [cx, r.top - 5], [cx, r.bottom + 5]].every(([x, y]) => hit(x, y)) };
+    }));
+    const rowH = await page.evaluate(() => Math.round(document.querySelector('.notification-nearby').getBoundingClientRect().height));
+    check(`${w}: compact actions with 44 px hit areas, one-line row (${JSON.stringify(targets)}, row ${rowH} px)`, targets.length === 2 && targets.every((t) => t.h === 32 && t.hit) && rowH <= 64);
     const axe = await axeViolations(page, { include: '.notification-nearby' });
     check(`${w}: axe on the alert row`, axe.length === 0, JSON.stringify(axe));
     await shot(page, `panel-${w}.png`);

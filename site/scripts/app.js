@@ -125,6 +125,8 @@ let crossingPaths = null;
 let nearbyAlerts = [];
 let nearbyStatus = 'off';
 const nearbyToasted = new Set();
+// Alerts that were new when the panel last opened: they keep the unread tint while it stays open.
+let nearbyHighlight = new Set();
 let typingSession = null; // the open thread's typing channel (D5): { otherId, channel, sender, receiver, joined }
 let chatShouldOpenAtLatest = false;
 let suppressChatAutoOpen = false;
@@ -482,10 +484,14 @@ const renderNotifications = () => {
   const nearbyHtml = nearbyAlerts.map((alert) => {
     const person = findPersonById(alert.otherId);
     const name = person?.name || 'A connection';
-    return `<section class="notification-nearby" aria-label="${escapeHtml(alertHeadline(name))}">${renderAvatar(person, 'notification-avatar')}`
-      + `<div class="notification-nearby-copy"><strong>${escapeHtml(alertHeadline(name))}</strong><span>${escapeHtml(alertDetail(alert.sharedInterest))}</span></div>`
-      + `<div class="notification-nearby-actions"><button type="button" class="notification-nearby-hi" data-nearby-hi="${escapeHtml(alert.otherId)}">Say hi</button>`
-      + `<button type="button" class="notification-nearby-mute" data-nearby-mute="${escapeHtml(alert.otherId)}" aria-label="Mute alerts about ${escapeHtml(name)}">Mute</button></div></section>`;
+    const unseen = nearbyHighlight.has(alert.key) || !readNearbySeen().has(alert.key);
+    const pin = '<svg class="notification-nearby-pin" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 14.5s4.5-4.2 4.5-8a4.5 4.5 0 0 0-9 0c0 3.8 4.5 8 4.5 8Z"/><circle cx="8" cy="6.5" r="1.6"/></svg>';
+    const bellOff = '<svg viewBox="0 0 20 20" aria-hidden="true"><path d="M6 8a4 4 0 0 1 6.9-2.8M14 9v2.5l1.5 2.5H6M8.5 16.5a1.8 1.8 0 0 0 3 0M3.5 3.5l13 13"/></svg>';
+    return `<section class="notification-nearby${unseen ? ' is-unread' : ''}" aria-label="${escapeHtml(alertHeadline(name))}">`
+      + `<span class="notification-nearby-face">${renderAvatar(person, 'notification-avatar')}${pin}</span>`
+      + `<span class="notification-nearby-copy"><strong>${escapeHtml(alertHeadline(name))}</strong><span>${escapeHtml(alertDetail(alert.sharedInterest))}</span></span>`
+      + `<button type="button" class="notification-nearby-hi" data-nearby-hi="${escapeHtml(alert.otherId)}">Say hi</button>`
+      + `<button type="button" class="notification-nearby-mute" data-nearby-mute="${escapeHtml(alert.otherId)}" aria-label="Mute alerts about ${escapeHtml(name)}" title="Mute alerts about ${escapeHtml(name)}">${bellOff}</button></section>`;
   }).join('');
   const messagesHtml = !enabled ? `<div class="notification-empty"><p>Notifications are off in settings.</p>${settingsAction}</div>` : unreadGroups.length ? unreadGroups.map((group) => {
     const person = findPersonById(group.personId);
@@ -545,6 +551,7 @@ const ensureNotificationControls = () => {
     event.stopPropagation();
     if (notificationPanelOpen()) { closeNotificationPanel({ returnFocus: true }); return; }
     openNotificationPanel();
+    nearbyHighlight = new Set(unseenNearbyAlerts().map((alert) => alert.key));
     markNearbySeen();
     renderNotifications();
     placeNotificationPanel();

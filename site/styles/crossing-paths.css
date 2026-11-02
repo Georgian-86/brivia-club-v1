@@ -1,26 +1,35 @@
 /* Crossing paths (D-119): the "<name> is nearby" row in the notification panel, the paused line in Settings and the
-   explainer sheet. Tokens only; the row follows the collaboration section (collab-requests.css). */
+   explainer sheet. Tokens only. The row is built like a message row (34 px avatar, 14/12 type, 12 px padding, the same
+   unread tint), with one compact primary action and a quiet icon (ui-ux-pro-max: one primary action, consistent scale).
+   Buttons look 32 px but their hit area is 44 px (a transparent ::after, 7 px out from the padding box), so the row stays as slim as its neighbours. */
 
 /* ---------- The panel row ---------- */
 .notification-nearby{
-  display:grid;grid-template-columns:auto minmax(0,1fr);align-items:center;gap:6px var(--space-3);
-  padding:var(--space-3) 15px;border-bottom:1px solid var(--color-line);
-  background:linear-gradient(135deg, color-mix(in srgb, var(--brivia-wine) 5%, var(--color-cream)), var(--color-cream));
+  display:grid;grid-template-columns:34px minmax(0,1fr) auto auto;align-items:center;gap:14px;
+  padding:12px 9px 12px 15px;border-bottom:1px solid var(--color-line);background:transparent;
 }
-.notification-nearby-copy{display:flex;flex-direction:column;gap:2px;min-width:0}
-.notification-nearby-copy strong{color:var(--color-wine-deep);font-family:var(--font-heading);font-size:var(--text-14);font-weight:600;line-height:1.25}
-.notification-nearby-copy span{overflow:hidden;color:var(--color-ink-soft);font-size:var(--text-12);text-overflow:ellipsis;white-space:nowrap}
-.notification-nearby-actions{grid-column:2;display:flex;align-items:center;gap:var(--space-2)}
-.notification-nearby-hi,.notification-nearby-mute{
-  min-width:44px;min-height:44px;padding:0 var(--space-4);border-radius:var(--radius-pill);
-  font-family:var(--font-body);font-size:var(--text-12);font-weight:700;letter-spacing:.08em;text-transform:uppercase;cursor:pointer;
-  transition:background var(--motion-fast) var(--ease), color var(--motion-fast) var(--ease);
+.notification-nearby.is-unread{background:color-mix(in srgb, var(--brivia-wine) 4%, var(--color-cream))}
+.notification-nearby-face{position:relative;width:34px;height:34px}
+.notification-nearby-pin{
+  position:absolute;right:-3px;bottom:-3px;width:16px;height:16px;padding:2px;border:1.5px solid var(--color-cream);border-radius:50%;
+  background:var(--brivia-wine);fill:none;stroke:var(--color-cream);stroke-width:1.6;stroke-linejoin:round;box-sizing:border-box;
 }
-.notification-nearby-hi{border:0;background:var(--brivia-wine);color:var(--color-cream)}
-.notification-nearby-mute{border:1px solid var(--color-line);background:transparent;color:var(--color-ink-soft)}
+.notification-nearby-copy{min-width:0;display:grid;gap:3px}
+.notification-nearby-copy strong{overflow:hidden;color:var(--color-wine-deep);font-family:var(--font-body);font-size:var(--text-14);font-weight:400;text-overflow:ellipsis;white-space:nowrap}
+.notification-nearby-copy span{overflow:hidden;color:var(--color-ink-soft);font-size:var(--text-12);line-height:1.3;text-overflow:ellipsis;white-space:nowrap}
+.notification-nearby-hi,.notification-nearby-mute{position:relative;flex:none;cursor:pointer;transition:background var(--motion-fast) var(--ease), color var(--motion-fast) var(--ease)}
+.notification-nearby-hi::after,.notification-nearby-mute::after{position:absolute;inset:-7px;content:''}
+.notification-nearby-hi{
+  height:32px;padding:0 14px;border:1px solid var(--brivia-wine);border-radius:var(--radius-pill);background:transparent;color:var(--brivia-wine);
+  font-family:var(--font-body);font-size:var(--text-12);font-weight:700;letter-spacing:.06em;white-space:nowrap;
+}
+.notification-nearby-mute{
+  display:grid;place-items:center;width:32px;height:32px;padding:0;border:0;border-radius:50%;background:transparent;color:var(--color-ink-soft);
+}
+.notification-nearby-mute svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:1.5;stroke-linecap:round;stroke-linejoin:round}
 @media (hover:hover){
-  .notification-nearby-hi:hover{background:var(--color-wine-deep)}
-  .notification-nearby-mute:hover{color:var(--color-wine-deep)}
+  .notification-nearby-hi:hover{background:var(--brivia-wine);color:var(--color-cream)}
+  .notification-nearby-mute:hover{background:color-mix(in srgb, var(--brivia-wine) 8%, transparent);color:var(--color-wine-deep)}
 }
 .notification-nearby-hi:focus-visible,.notification-nearby-mute:focus-visible{outline:2px solid var(--brivia-wine);outline-offset:2px}
 .notification-nearby-mute:disabled{cursor:wait;opacity:.55}
