@@ -73,7 +73,7 @@
 .cover-choice.is-selected{border:2px solid #5a061f;box-shadow:0 7px 17px rgba(90,6,31,.16)}
 .cover-choice.is-selected:after{position:absolute;top:7px;right:7px;display:grid;place-items:center;width:18px;height:18px;border-radius:50%;background:#5a061f;color:#fffaf1;content:'✓';font-size:var(--text-12)}
 .cover-choice img{display:block;width:100%;height:74px;object-fit:cover}
-.cover-choice span{padding:0 8px;font-size:var(--text-12);font-weight:700;letter-spacing:.047em;white-space:nowrap}
+.cover-choice span{padding:0 8px 0 calc(8px + .047em);text-align:center;font-size:var(--text-12);font-weight:700;letter-spacing:.047em;white-space:nowrap}
 .cover-input{position:absolute!important;width:1px!important;height:1px!important;padding:0!important;opacity:0;pointer-events:none}
 .cover-upload-drop{display:grid!important;grid-template-columns:31px 1fr;grid-template-rows:auto auto;gap:3px 9px;align-items:center;min-height:53px;padding:8px 10px;border:1px dashed #bca9a0;background:rgba(255,250,241,.6);color:#5a061f!important;cursor:pointer;transition:border-color .2s,background .2s}
 .cover-upload-drop:hover{border-color:#5a061f;background:#fffaf1}

@@ -37,7 +37,8 @@ declare k text[] := brivia_private.brivia_offered_cover_keys();
 begin
   if cardinality(k) <> 25 then raise exception 'FAIL O1: % offered covers, expected 25', cardinality(k); end if;
   if '7423007B-E17D-4D46-A19F-499CC9A8DB99.PNG' = any (k) then raise exception 'FAIL O1: OPEN MINDS is still offered'; end if;
-  if k[1] <> 'b66eff76-068e-4f2a-b789-a27051a11f5a.png' then raise exception 'FAIL O1: first cover is %', k[1]; end if;
+  if k[1] <> 'AE983BB0-AF28-41D3-AA72-B03B4C7F7D8C.PNG' then raise exception 'FAIL O1: first cover is %', k[1]; end if;
+  if k[3] <> 'b66eff76-068e-4f2a-b789-a27051a11f5a.png' then raise exception 'FAIL O1: third cover is %', k[3]; end if;
   if k[20] <> '2257522A-04B9-4E3E-AB1A-A73D7BB8CCBF.PNG' then raise exception 'FAIL O1: 20th cover is %', k[20]; end if;
   if k[25] <> 'DEB7869C-E852-450F-A371-65E2BF6167A2.PNG' then raise exception 'FAIL O1: last cover is %', k[25]; end if;
   if (select count(distinct x) from unnest(k) x) <> 25 then raise exception 'FAIL O1: duplicate keys'; end if;

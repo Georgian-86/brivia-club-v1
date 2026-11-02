@@ -13,9 +13,9 @@ export const isPresetCoverUrl = (value) => {
 // 25 names are brivia_private.brivia_offered_cover_keys() (0014, redefined by 0019 and 0027) and the keys of
 // cover-assets.js; tests/unit/preset-cover.test.mjs pins all four equal.
 export const PRESET_COVERS = [
-  { key: 'b66eff76-068e-4f2a-b789-a27051a11f5a.png', title: 'GOOD ENERGY' },
-  { key: '7C0B5EFA-4E04-4BEC-AB5D-F7FD8FAA3A52.PNG', title: 'GAME, SET, GO' },
   { key: 'AE983BB0-AF28-41D3-AA72-B03B4C7F7D8C.PNG', title: 'AT WORK' },
+  { key: '7C0B5EFA-4E04-4BEC-AB5D-F7FD8FAA3A52.PNG', title: 'GAME, SET, GO' },
+  { key: 'b66eff76-068e-4f2a-b789-a27051a11f5a.png', title: 'GOOD ENERGY' },
   { key: '3453059c-4864-46f7-ae45-6f7049939b9f.png', title: 'MUSIC NOTES' },
   { key: '66F669B5-3A06-4DDA-BDA9-C000623010CC.PNG', title: 'PARTYING' },
   { key: 'A6651B99-E0B9-472B-92FB-BABD5C87D2A0.PNG', title: 'THE GETAWAYS' },

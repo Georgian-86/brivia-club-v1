@@ -11,10 +11,11 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..')
 const read = (file) => readFileSync(path.join(root, file), 'utf8');
 const P = (key) => `/Images/Cover%20images/${key}`;
 
-// The founder's order and names (D-128, 2026-11-02): top to bottom, left to right. OPEN MINDS is retired.
+// The founder's order and names (D-128, 2026-11-02; cards 1 and 3 swapped on a follow-up): top to bottom, left to
+// right. OPEN MINDS is retired.
 const FOUNDER_ORDER = [
-  ['b66eff76-068e-4f2a-b789-a27051a11f5a.png', 'GOOD ENERGY'], ['7C0B5EFA-4E04-4BEC-AB5D-F7FD8FAA3A52.PNG', 'GAME, SET, GO'],
-  ['AE983BB0-AF28-41D3-AA72-B03B4C7F7D8C.PNG', 'AT WORK'], ['3453059c-4864-46f7-ae45-6f7049939b9f.png', 'MUSIC NOTES'],
+  ['AE983BB0-AF28-41D3-AA72-B03B4C7F7D8C.PNG', 'AT WORK'], ['7C0B5EFA-4E04-4BEC-AB5D-F7FD8FAA3A52.PNG', 'GAME, SET, GO'],
+  ['b66eff76-068e-4f2a-b789-a27051a11f5a.png', 'GOOD ENERGY'], ['3453059c-4864-46f7-ae45-6f7049939b9f.png', 'MUSIC NOTES'],
   ['66F669B5-3A06-4DDA-BDA9-C000623010CC.PNG', 'PARTYING'], ['A6651B99-E0B9-472B-92FB-BABD5C87D2A0.PNG', 'THE GETAWAYS'],
   ['BDADEBC8-0C14-4E36-806F-9D23E61E3BD4.PNG', 'STRINGS & SOUL'], ['0F866BC9-857A-4BD6-A73F-70B0E3A1D787.PNG', 'THE SLOW BAKE'],
   ['84F018B6-29FB-4060-B2D9-E7DC157CE87E.PNG', 'BASKETBALL SOCIAL'], ['95DC81FA-C91B-46AE-BAF3-9EE71551A8D7.PNG', 'LUXE TRAVEL'],

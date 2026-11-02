@@ -1,6 +1,6 @@
-import coverFourteen from '../media/Images/Cover images/b66eff76-068e-4f2a-b789-a27051a11f5a.webp';
-import coverTwentyTwo from '../media/Images/Cover images/7C0B5EFA-4E04-4BEC-AB5D-F7FD8FAA3A52.webp';
 import coverThirteen from '../media/Images/Cover images/AE983BB0-AF28-41D3-AA72-B03B4C7F7D8C.webp';
+import coverTwentyTwo from '../media/Images/Cover images/7C0B5EFA-4E04-4BEC-AB5D-F7FD8FAA3A52.webp';
+import coverFourteen from '../media/Images/Cover images/b66eff76-068e-4f2a-b789-a27051a11f5a.webp';
 import coverFive from '../media/Images/Cover images/3453059c-4864-46f7-ae45-6f7049939b9f.webp';
 import coverTwentyOne from '../media/Images/Cover images/66F669B5-3A06-4DDA-BDA9-C000623010CC.webp';
 import coverTwentySix from '../media/Images/Cover images/A6651B99-E0B9-472B-92FB-BABD5C87D2A0.webp';
@@ -26,9 +26,9 @@ import coverSixteen from '../media/Images/Cover images/DEB7869C-E852-450F-A371-6
 import { resolveCoverKey } from './cover-name.js';
 
 const coverAssets = {
-  'b66eff76-068e-4f2a-b789-a27051a11f5a.png': coverFourteen,
-  '7C0B5EFA-4E04-4BEC-AB5D-F7FD8FAA3A52.PNG': coverTwentyTwo,
   'AE983BB0-AF28-41D3-AA72-B03B4C7F7D8C.PNG': coverThirteen,
+  '7C0B5EFA-4E04-4BEC-AB5D-F7FD8FAA3A52.PNG': coverTwentyTwo,
+  'b66eff76-068e-4f2a-b789-a27051a11f5a.png': coverFourteen,
   '3453059c-4864-46f7-ae45-6f7049939b9f.png': coverFive,
   '66F669B5-3A06-4DDA-BDA9-C000623010CC.PNG': coverTwentyOne,
   'A6651B99-E0B9-472B-92FB-BABD5C87D2A0.PNG': coverTwentySix,

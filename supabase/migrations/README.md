@@ -987,6 +987,6 @@ Verify after the apply:
 
 ```sql
 select cardinality(brivia_private.brivia_offered_cover_keys()),                                   -- 25
-       (brivia_private.brivia_offered_cover_keys())[1],                                           -- b66eff76-...png
+       (brivia_private.brivia_offered_cover_keys())[1],                                           -- AE983BB0-...PNG (AT WORK)
        (select count(*) from public.profiles where cover_url like '%7423007B-E17D-4D46-A19F-499CC9A8DB99%'); -- 0
 ```

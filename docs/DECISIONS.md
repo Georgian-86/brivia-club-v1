@@ -2618,3 +2618,7 @@ controls (a tester or a seeded test member), never a real member, so no new expo
   SQL harness ALL PASSED with new `cover-order.test.sql` (order, switch to any cover, OPEN MINDS refused, cleanup,
   one member cannot change another's cover), e2e profile-media and create-event; screenshots at 1440 and 390.
 - **Owed:** apply 0019 (if not yet) then 0027, after the client deploys (README "0027").
+- **Follow-up (founder, same day):** cards 1 and 3 swap, with their names: AT WORK is first, GOOD ENERGY third (client,
+  signup picker and 0027, still unapplied, updated together). Cover names are centred under their thumbnails in Edit
+  Profile and the signup picker; the trailing letter-spacing is offset so the text sits on the card's centre line
+  (measured within 0.01 px at 7 viewports).
