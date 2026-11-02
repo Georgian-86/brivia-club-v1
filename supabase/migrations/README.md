@@ -990,3 +990,22 @@ select cardinality(brivia_private.brivia_offered_cover_keys()),                 
        (brivia_private.brivia_offered_cover_keys())[1],                                           -- AE983BB0-...PNG (AT WORK)
        (select count(*) from public.profiles where cover_url like '%7423007B-E17D-4D46-A19F-499CC9A8DB99%'); -- 0
 ```
+
+## 0028
+
+**A pitch appears once in chat (founder bug report 2026-11-03, D-129).** Apply after `0024`. No client deploy needed
+first (the client never created the copy).
+
+What it does: redefines `public.brivia_create_match(uuid, uuid)` to create the match only (live had a hand-edited
+version that also copied request notes into chat, doubling 0024's delivery), and adds and runs once
+`brivia_private.brivia_remove_duplicate_pitches()` (definer, no client grants): it deletes a message only when it is an
+exact twin (sender, recipient, body, created_at) of a pitch recorded in `brivia_pitch_delivery` and is not itself
+recorded there. Running it again removes nothing.
+
+Verify after the apply:
+
+```sql
+select position('brivia_messages' in pg_get_functiondef('public.brivia_create_match(uuid,uuid)'::regprocedure)); -- 0
+select count(*) from (select 1 from public.brivia_messages group by sender_id, recipient_id, body, created_at
+                      having count(*) > 1) d;                                                                    -- 0
+```

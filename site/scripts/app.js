@@ -2159,7 +2159,7 @@ const appendRemoteMessage = (message) => {
   const otherId = senderId === memberId ? message.recipient_id : message.sender_id;
   if (readBlockedUserIds().has(String(otherId))) return;
   const messages = (chatMessages[otherId] ||= []);
-  if (messages.some((item) => item.id === message.id)) return;
+  if (messages.some((item) => String(item.id) === String(message.id))) return;
   restoreChatForMe(otherId);
   const isIncoming = senderId !== memberId;
   if (isIncoming) {
@@ -5116,7 +5116,10 @@ const loadSupabaseCommunity = async () => {
     (inboxRows || []).sort((a, b) => new Date(a.created_at || 0).getTime() - new Date(b.created_at || 0).getTime()).forEach((message) => {
       const otherId = message.sender_id === session.user.id ? message.recipient_id : message.sender_id;
       inboxIds.add(otherId);
-      (chatMessages[otherId] ||= []).push({
+      // One entry per message id (D-129): a realtime insert that arrived while the inbox loaded is not drawn twice.
+      const thread = (chatMessages[otherId] ||= []);
+      if (thread.some((item) => String(item.id) === String(message.id))) return;
+      thread.push({
         id: message.id,
         createdAt: message.created_at,
         from: message.sender_id === session.user.id ? 'me' : 'them',

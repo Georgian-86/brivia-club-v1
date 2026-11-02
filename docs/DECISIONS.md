@@ -2622,3 +2622,22 @@ controls (a tester or a seeded test member), never a real member, so no new expo
   signup picker and 0027, still unapplied, updated together). Cover names are centred under their thumbnails in Edit
   Profile and the signup picker; the trailing letter-spacing is offset so the text sits on the card's centre line
   (measured within 0.01 px at 7 viewports).
+
+## D-129 (2026-11-03): a pitch appears once in chat
+
+- **Report (founder):** accepting a companion request sent from Explore shows the sender's pitch twice in the chat.
+- **Cause (live database, read-only check):** live `brivia_create_match(uuid, uuid)` had been hand-edited in the SQL
+  editor (the drift flagged in HANDOFF on 2026-11-02) to copy every request note into `brivia_messages` when it makes a
+  match. 0024's `brivia_matches_deliver_pitches` trigger delivers the same notes on the same match insert, so every
+  accepted request with a note landed twice, with the same timestamp. 3 duplicated pitches on live (2026-11-02). Accept,
+  crossing requests and companion matches all go through that function. The client was not creating the copy.
+- **Fix:** `0028_pitch_once.sql` puts `brivia_create_match` back to creating the match only; the keyed 0024 trigger
+  stays the one place a pitch is delivered (once per request, retries included). A one-time cleanup removes a message
+  only when it is an exact twin (sender, recipient, body, timestamp to the microsecond) of a delivered pitch and is not
+  itself the delivered one. Client: the first inbox load skips a message id already in the thread (a realtime insert
+  during load), the same rule the realtime and reload paths already had.
+- **Proof:** new `o-pitch-once.test.sql` reproduces the live bug with the hand-edited function (two copies), shows the
+  cleanup leaving one (and keeping a same-text message sent later), and Accept / crossing requests give one copy each
+  after 0028. SQL harness ALL PASSED; unit 437; build.
+- **Still owed:** the other live-only pitch-chat functions (`accept_pitch_chat`, `end_pitch_chat`, `my_pitch_threads`,
+  `chat_accepted_at`, 3-arg `brivia_request_is_live`) are still not in this repo.
