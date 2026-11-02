@@ -53,8 +53,9 @@ try {
     const card = await page.locator('.companion-card.is-current').innerText();
     check(`${w}: the card: badge, name, band, headline, chips, Going to <event> with date and venue (${JSON.stringify(card)})`,
       /LOOKING FOR A COMPANION/.test(card) && /Vishesh/.test(card) && /~3 km away/.test(card) && /Web developer · Looking for Friends/.test(card)
-      && /Chess/.test(card) && /GOING TO BLITZ CHESS MEETUP/.test(card) && /Battle Chess Skool/.test(card) && /Swipe right to connect/.test(card));
+      && /Chess/.test(card) && /GOING TO BLITZ CHESS MEETUP/.test(card) && /Battle Chess Skool/i.test(card) && /Swipe right to connect/.test(card));
     check(`${w}: a shared interest is marked`, await page.locator('.companion-card.is-current .companion-chips li.is-shared').count() === 1);
+    check(`${w}: the event row carries the date and venue for screen readers and on hover`, /Wed \d{1,2} Nov|[A-Z][a-z]{2} \d{1,2} [A-Z][a-z]{2}/.test(await page.locator('.companion-card.is-current .companion-event').getAttribute('title') || ''));
     check(`${w}: no sideways scroll`, await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth));
     const audit = await textAudit(page, { root: '.companions-view', families: TYPE_FAMILIES });
     check(`${w}: text >= 12 px in the club's two families`, audit.small.length === 0 && audit.family.length === 0, JSON.stringify([audit.small.slice(0, 3), audit.family.slice(0, 3)]));
@@ -63,7 +64,7 @@ try {
     await shot(page, `companions-${w}.png`);
 
     // Tap the photo: the full profile.
-    await page.locator('.companion-card.is-current [data-companion-profile]').click();
+    await page.locator('.companion-card.is-current .companion-card-profile').click();
     await page.waitForSelector('#public-profile-modal');
     check(`${w}: tapping the photo opens the full profile`, /Vishesh/.test(await page.locator('#public-profile-modal').innerText()));
     await page.keyboard.press('Escape');

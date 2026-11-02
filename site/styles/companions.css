@@ -13,7 +13,14 @@ body.app-body .companions-view, body.app-body .companion-match-dialog {
   --cp-card: color-mix(in srgb, var(--color-card-paper) 55%, var(--color-cream));
   --cp-shadow: 0 1px 2px color-mix(in srgb, var(--cp-wine-deep) 10%, transparent), 0 26px 46px -26px color-mix(in srgb, var(--cp-wine-deep) 60%, transparent);
 }
-body.app-body .companions-view { min-height: calc(100svh - 76px); padding: var(--space-6) clamp(20px, 5vw, 72px) var(--space-8); background: transparent; color: var(--cp-ink); font-family: var(--font-body); }
+body.app-body .companions-view { position: relative; isolation: isolate; min-height: calc(100svh - 76px); padding: var(--space-6) clamp(20px, 5vw, 72px) var(--space-8); background: transparent; color: var(--cp-ink); font-family: var(--font-body); }
+/* The reference's room (wine glass, baby's breath, "Good People Brighter Ideas"), washed with cream on the left so the
+   heading and cards stay calm. Fixed, under the content, never under the header. */
+body.app-body .companions-view::before {
+  content: ''; position: fixed; inset: 76px 0 0; z-index: -1; pointer-events: none;
+  background: linear-gradient(90deg, color-mix(in srgb, var(--color-cream) 88%, transparent) 0%, color-mix(in srgb, var(--color-cream) 62%, transparent) 55%, color-mix(in srgb, var(--color-cream) 18%, transparent) 100%),
+              url('../media/assets/companions-room.webp') center 30% / cover no-repeat;
+}
 body.app-body .companions-view[hidden] { display: none; }
 .companions-main { max-width: 1240px; margin: 0 auto; }
 .companions-view svg, .companion-match-dialog svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
@@ -21,7 +28,7 @@ body.app-body .companions-view[hidden] { display: none; }
 /* Head */
 .companions-head { display: grid; gap: var(--space-4); align-items: center; margin: 8px 0 var(--space-6); }
 body.app-body .companions-view .app-eyebrow { margin: 0; color: var(--cp-wine); font-size: var(--text-12); font-weight: 700; letter-spacing: .117em; }
-body.app-body .companions-view .companions-head h1 { margin: var(--space-3) 0 0; color: var(--cp-ink); font-family: var(--font-heading); font-size: clamp(40px, 5vw, 64px); font-weight: 400; line-height: .95; letter-spacing: -.035em; }
+body.app-body .companions-view .companions-head h1 { margin: var(--space-3) 0 0; color: var(--cp-ink); font-family: var(--font-heading); font-size: clamp(40px, 4.4vw, 58px); font-weight: 400; line-height: .98; letter-spacing: -.03em; }
 body.app-body .companions-view .companions-head h1 em { color: var(--cp-wine); font-style: italic; font-weight: 500; }
 body.app-body .companions-view .companions-head h1 { white-space: nowrap; }
 .companions-count { white-space: nowrap; }
@@ -37,39 +44,43 @@ body.app-body .companion-picker select:focus-visible { outline: none; }
 
 /* Cards */
 .companion-deck { position: relative; min-height: 520px; outline: none; }
-.companion-row { display: grid; grid-template-columns: repeat(3, minmax(0, 360px)); justify-content: center; gap: var(--space-5); }
+.companion-row { display: grid; grid-template-columns: repeat(3, minmax(0, 370px)); justify-content: center; align-items: stretch; gap: var(--space-5); padding-bottom: 18px; }
 .companion-card {
   position: relative; display: flex; flex-direction: column; overflow: hidden; padding: 10px 10px var(--space-3); border: 1px solid color-mix(in srgb, var(--color-card-edge) 90%, transparent);
   border-radius: 22px; background: var(--cp-card); box-shadow: var(--cp-shadow); color: var(--cp-ink); touch-action: pan-y; user-select: none;
   transition: opacity .25s ease, transform .25s ease;
 }
 /* The stacked paper edge under each card, as in the reference. */
-.companion-card::after { content: ''; position: absolute; right: 14px; bottom: -7px; left: 14px; z-index: -1; height: 14px; border: 1px solid color-mix(in srgb, var(--color-card-edge) 90%, transparent); border-radius: 0 0 18px 18px; background: var(--cp-card); }
-.companion-card:not(.is-current) { opacity: .82; transform: scale(.98); }
+/* Two stacked paper edges under each card, as in the reference (box-shadow layers: no extra elements). */
+.companion-card { overflow: visible; box-shadow: 0 8px 0 -4px var(--cp-card), 0 9px 0 -3px color-mix(in srgb, var(--cp-wine) 22%, transparent), 0 16px 0 -8px var(--cp-card), 0 17px 0 -7px color-mix(in srgb, var(--cp-wine) 18%, transparent), var(--cp-shadow); }
+.companion-card:focus-within { outline: none; }
 .companion-card.is-current { cursor: grab; }
 .companion-card.is-held { cursor: grabbing; }
 .companion-card.is-skeleton { min-height: 500px; background: linear-gradient(100deg, var(--color-skeleton) 40%, var(--color-skeleton-glint) 50%, var(--color-skeleton) 60%); background-size: 200% 100%; animation: companion-shimmer 1.4s linear infinite; }
 @keyframes companion-shimmer { to { background-position: -200% 0; } }
-.companion-card-bar { display: flex; align-items: center; min-height: 40px; padding: 0 var(--space-4); border-radius: 12px 12px 0 0; background: var(--cp-wine-deep); color: var(--cp-paper); font-size: var(--text-12); font-weight: 700; letter-spacing: .16em; text-transform: uppercase; }
+.companion-card-bar { display: flex; align-items: center; justify-content: space-between; min-height: 40px; padding: 0 var(--space-2) 0 var(--space-4); border-radius: 12px 12px 0 0; background: var(--cp-wine-deep); color: var(--cp-paper); font-size: var(--text-12); font-weight: 700; letter-spacing: .16em; text-transform: uppercase; }
+body.app-body .companion-card-more { display: grid; place-items: center; width: 40px; height: 40px; padding: 0; border: 0; border-radius: 50%; background: none; color: var(--cp-paper); font-size: var(--text-14); letter-spacing: .05em; cursor: pointer; }
+body.app-body .companion-card-more:focus-visible { outline: 2px solid var(--cp-paper); outline-offset: -4px; }
+.companion-card-cover { overflow: hidden; }
 .companion-card-cover { aspect-ratio: 16 / 10; overflow: hidden; background: linear-gradient(135deg, var(--color-oxblood-deep), var(--cp-wine-deep) 60%, var(--color-wine-soft)); }
 .companion-card-cover img { display: block; width: 100%; height: 100%; object-fit: cover; pointer-events: none; }
 body.app-body .companion-card-profile { position: relative; z-index: 1; align-self: flex-start; margin: -52px 0 0 var(--space-4); padding: 0; border: 0; border-radius: 50%; background: none; cursor: pointer; }
 body.app-body .companion-card-profile:focus-visible { outline: 2px solid var(--cp-wine); outline-offset: 3px; }
-.companion-avatar { display: grid; place-items: center; width: 96px; height: 96px; overflow: hidden; border: 4px solid var(--cp-paper); border-radius: 50%; background: color-mix(in srgb, var(--cp-wine) 20%, var(--cp-paper)); box-shadow: 0 8px 18px -10px color-mix(in srgb, var(--cp-wine-deep) 70%, transparent); color: var(--cp-wine-deep); font-family: var(--font-heading); font-size: var(--text-32); }
+.companion-avatar { display: grid; place-items: center; width: 100px; height: 100px; overflow: hidden; border: 4px solid var(--cp-paper); border-radius: 50%; background: color-mix(in srgb, var(--cp-wine) 20%, var(--cp-paper)); box-shadow: 0 8px 18px -10px color-mix(in srgb, var(--cp-wine-deep) 70%, transparent); color: var(--cp-wine-deep); font-family: var(--font-heading); font-size: var(--text-32); }
 .companion-avatar img { width: 100%; height: 100%; object-fit: cover; pointer-events: none; }
 .companion-card-body { display: grid; gap: 4px; padding: var(--space-1) var(--space-3) 0; }
-body.app-body .companions-view .companion-name { margin: 0; color: var(--cp-ink); font-family: var(--font-heading); font-size: clamp(28px, 2.6vw, 34px); font-weight: 500; line-height: 1.05; letter-spacing: -.02em; }
+body.app-body .companions-view .companion-name { margin: 0; color: var(--cp-ink); font-family: var(--font-heading); font-size: clamp(30px, 2.8vw, 38px); font-weight: 600; line-height: 1.02; letter-spacing: -.02em; }
 .companion-place { display: flex; align-items: center; gap: 6px; margin: 0; color: var(--cp-muted); font-family: var(--font-heading); font-size: var(--text-14); }
-.companion-headline { margin: 2px 0 0; color: var(--cp-ink); font-family: var(--font-heading); font-size: var(--text-16); line-height: 1.35; }
+.companion-headline { margin: 2px 0 0; color: var(--cp-ink); font-family: var(--font-heading); font-size: var(--text-16); line-height: 1.35; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
 .companion-chips { display: flex; flex-wrap: wrap; gap: var(--space-2); margin: var(--space-2) 0 0; padding: 0; list-style: none; }
-.companion-chips li { padding: 4px var(--space-4); border-radius: var(--radius-pill); background: color-mix(in srgb, var(--cp-wine) 10%, var(--cp-paper)); color: var(--cp-wine-deep); font-family: var(--font-heading); font-size: var(--text-14); }
-.companion-chips li.is-shared { background: var(--cp-wine); color: var(--cp-paper); }
-.companion-event { display: grid; gap: 2px; margin: var(--space-4) var(--space-2) 0; padding: var(--space-3) var(--space-4); border-radius: 12px; background: var(--cp-wine-deep); color: var(--cp-paper); text-align: center; }
-.companion-event-name { margin: 0; font-size: var(--text-14); font-weight: 700; letter-spacing: .12em; text-transform: uppercase; }
-.companion-event-name span { opacity: .75; }
-.companion-event-when { display: inline-flex; align-items: center; justify-content: center; gap: 6px; margin: 0; color: color-mix(in srgb, var(--cp-paper) 82%, transparent); font-size: var(--text-12); }
+.companion-chips { margin-top: var(--space-3); }
+.companion-chips li { padding: 5px 18px; border-radius: var(--radius-pill); background: color-mix(in srgb, var(--cp-wine) 9%, var(--cp-paper)); color: var(--cp-wine-deep); font-family: var(--font-heading); font-size: 15px; font-weight: 500; }
+/* A shared interest: the same soft pill with a thin wine edge (the reference keeps every chip pale). */
+.companion-chips li.is-shared { box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--cp-wine) 45%, transparent); }
+.companion-event { margin: auto var(--space-1) 0; padding: 13px var(--space-4); border-radius: 12px; background: var(--cp-wine-deep); color: var(--cp-paper); font-family: var(--font-heading); font-size: var(--text-14); font-weight: 600; letter-spacing: .13em; line-height: 1.2; text-align: center; text-transform: uppercase; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; box-shadow: 0 8px 16px -10px color-mix(in srgb, var(--cp-wine-deep) 80%, transparent); }
+.companion-card-body { margin-bottom: var(--space-5); }
 .companion-hint { margin: var(--space-2) 0 0; color: var(--cp-muted); font-family: var(--font-heading); font-size: var(--text-14); font-style: italic; text-align: center; }
-.companion-card:not(.is-current) .companion-hint { visibility: hidden; }
+
 .companion-stamp { position: absolute; top: 64px; z-index: 2; padding: 6px var(--space-3); border: 2px solid currentColor; border-radius: var(--radius-s); background: color-mix(in srgb, var(--cp-paper) 90%, transparent); font-size: var(--text-14); font-weight: 700; letter-spacing: .16em; text-transform: uppercase; pointer-events: none; }
 .companion-stamp-pass { right: 24px; color: var(--cp-muted); opacity: var(--swipe-pass, 0); transform: rotate(8deg); }
 .companion-stamp-like { left: 24px; color: var(--cp-wine); opacity: var(--swipe-pitch, 0); transform: rotate(-8deg); }

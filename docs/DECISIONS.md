@@ -2500,4 +2500,9 @@ controls (a tester or a seeded test member), never a real member, so no new expo
   ratchet and asset budget OK. ORBIT §11.2 added.
 - **Owed:** apply `0023_event_companions.sql` after 0022 (README "0023"). Push notifications when the app is closed
   are not part of this (in-app notification only), as for D-119.
+- **Look (founder's reference, same day):** the page now sits on the reference room (`media/assets/companions-room.webp`,
+  36 KB, from `source-media/Images/after login bg.jpeg`, washed with cream on the left); the three cards are equal (no
+  faded side cards; the buttons act on the first), each with "•••" (opens the profile), soft serif chips (a shared one
+  gets a thin wine edge), a one-line serif "GOING TO <EVENT>" row (date and venue in its tooltip and for screen
+  readers; the picker shows the date), and two stacked paper edges.
 

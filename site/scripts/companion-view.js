@@ -62,7 +62,7 @@ export const companionCardMarkup = (person, { coverSrc = '', photoSrc = '', even
   const when = [shortEventDate(event.startsAt), event.venueName].filter(Boolean).join(' · ');
   const band = bandLine(person.band);
   return `<article class="companion-card${current ? ' is-current' : ''}" data-companion-id="${escapeHtml(person.id)}" data-index="${index}" aria-label="${escapeHtml(`${person.name}, looking for a companion for ${event.title || 'this event'}`)}">
-  <div class="companion-card-bar"><span>Looking for a companion</span></div>
+  <div class="companion-card-bar"><span>Looking for a companion</span><button type="button" class="companion-card-more" data-companion-profile="${escapeHtml(person.id)}" aria-label="More about ${escapeHtml(person.name)}"><span aria-hidden="true">•••</span></button></div>
   <div class="companion-card-cover"${coverSrc ? '' : ' data-fallback'}>${coverSrc ? `<img src="${escapeHtml(coverSrc)}" alt="" loading="lazy" decoding="async" draggable="false" />` : ''}</div>
   <button type="button" class="companion-card-profile" data-companion-profile="${escapeHtml(person.id)}" aria-label="Open ${escapeHtml(person.name)}'s profile">
     <span class="companion-avatar">${photoSrc ? `<img src="${escapeHtml(photoSrc)}" alt="" draggable="false" />` : `<span aria-hidden="true">${escapeHtml(initials(person.name))}</span>`}</span>
@@ -73,10 +73,7 @@ export const companionCardMarkup = (person, { coverSrc = '', photoSrc = '', even
     <p class="companion-headline">${escapeHtml(headlineFor(person))}</p>
     ${chips ? `<ul class="companion-chips" aria-label="Interests">${chips}</ul>` : ''}
   </div>
-  <div class="companion-event">
-    <p class="companion-event-name"><span>Going to</span> ${escapeHtml(event.title || 'this event')}</p>
-    ${when ? `<p class="companion-event-when">${CAL}<span>${escapeHtml(when)}</span></p>` : ''}
-  </div>
+  <p class="companion-event"${when ? ` title="${escapeHtml(when)}"` : ''}><span>Going to</span> ${escapeHtml(event.title || 'this event')}${when ? `<span class="sr-only">, ${escapeHtml(when)}</span>` : ''}</p>
   <p class="companion-hint" aria-hidden="true">Swipe right to connect · left to pass</p>
   <span class="companion-stamp companion-stamp-pass" aria-hidden="true">Pass</span>
   <span class="companion-stamp companion-stamp-like" aria-hidden="true">Connect</span>

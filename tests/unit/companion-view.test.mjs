@@ -30,8 +30,9 @@ test('card: badge, photo button, name, band, chips with the shared one marked, t
   assert.match(html, /data-companion-profile="p1" aria-label="Open Aanya's profile"/);
   assert.match(html, /~3 km away/);
   assert.match(html, /<li class="is-shared">Chess<span class="sr-only"> \(you share this\)/);
-  assert.match(html, /<span>Going to<\/span> Blitz Chess Meetup/);
-  assert.match(html, /Wed 4 Nov · Battle Chess Skool/);
+  assert.match(html, /<span>Going to<\/span> Blitz Chess Meetup<span class="sr-only">, Wed 4 Nov · Battle Chess Skool<\/span>/);
+  assert.match(html, /title="Wed 4 Nov · Battle Chess Skool"/);
+  assert.match(html, /aria-label="More about Aanya"/);
   assert.match(html, /companion-card is-current/);
   assert.ok(!/city|@example|\+91/.test(html));
   assert.ok(!companionCardMarkup(normalizeCompanion({ ...row, name: '<img src=x>' }), { event: ev }).includes('<img src=x>'), 'escaped');
