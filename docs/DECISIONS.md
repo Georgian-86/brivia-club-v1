@@ -2364,3 +2364,26 @@ controls (a tester or a seeded test member), never a real member, so no new expo
   companions, share).
 - **Proof:** unit 390; e2e events (drawer at 1440 and sheet at 390, axe, text audit), app-shell, explore-cards, fit;
   build, style ratchet and asset budget OK.
+
+## D-119: Crossing paths, a quiet alert when two connections are nearby (founder, 2026-11-01)
+
+- **Asked:** "when 2 people are within a certain area and they are connected they shall get a notification. This
+  feature only works when the location is on." Design it product-first (what, why, fit with our design, what happens
+  when location is off), then build.
+- **Decided (spec `docs/superpowers/specs/2026-11-01-crossing-paths-design.md`, ORBIT spec §9.1.4a):** name "Crossing
+  paths"; off by default and mutual (both must turn it on); connections only; both told in the same transaction; the
+  alert says "<name> is nearby" and the top shared interest, never a place, distance or time; nearby = live g7 cells'
+  centres within 3 km; live cell kept 20 minutes, separate from the home area; neighbours (both homes geolocated and
+  within 3 km) are skipped; 1 alert per pair per 24 h, 3 per member per 24 h, listed for 3 hours, no toast 22:00-07:00;
+  one-way mute; pulse at most every 4 minutes and at most 24 cell changes a day (no cell history kept).
+- **Location off:** nothing is asked or sent while the switch is off; with location blocked the live cell is deleted at
+  once and Settings shows "Paused: location is off for Brivia ..."; the other member is never told; the rest of the app
+  is unaffected.
+- **Limit, stated to the founder:** a web app reads location only while open, so an alert needs one of the two to have
+  Brivia open (the other within 20 minutes). Web Push while closed is phase 2 (needs VAPID keys and an Edge Function).
+- **Not run:** agent-arena (it needs a second model route this environment does not have); the privacy rules were
+  checked against CLAUDE.md, VISION.md and ORBIT §9.1.4 instead. Run one before 0021 goes live if wanted.
+- **Proof:** SQL harness ALL PASSED (new `j-crossing-paths.test.sql`, N1-N13); unit 401 (new `crossing-paths.test.mjs`);
+  e2e `crossing-paths.spec.mjs` (panel, toast, Say hi, Mute, explainer, Turn on/off, paused, before 0021; axe at 1440 and
+  390); presence, collab-requests, app-shell and chat-inbox e2e; build and style ratchet OK.
+- **Owed:** apply `0021_crossing_paths.sql` (README "0021"). Before that the switch is hidden and nothing is sent.

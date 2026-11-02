@@ -207,6 +207,19 @@ export const startAppStub = async ({ port, state = {}, deckRows = defaultDeckRow
       if (pathName === '/rest/v1/rpc/connection_presence') {
         return json(200, (args.p_ids || []).filter((id) => st.matchIds.includes(id)).map((id) => ({ member_id: id, active: st.presenceVisible !== false && (st.activeIds || []).includes(id) })));
       }
+      // D-119 Crossing paths (0021): st.nearby = { enabled, alerts: [my_nearby_alerts rows], pulses: [], cleared, muted: [] };
+      // null (the default) answers the PGRST202 "function not found" of a database without 0021.
+      if (pathName.startsWith('/rest/v1/rpc/') && ['set_nearby_enabled', 'my_nearby_setting', 'nearby_pulse', 'nearby_clear', 'my_nearby_alerts', 'set_nearby_muted'].includes(pathName.slice(13))) {
+        if (!st.nearby) return json(404, { code: 'PGRST202', message: 'Could not find the function' });
+        const nb = st.nearby;
+        const fn = pathName.slice(13);
+        if (fn === 'my_nearby_setting') return json(200, Boolean(nb.enabled));
+        if (fn === 'set_nearby_enabled') { nb.enabled = Boolean(args.p_enabled); return json(200, nb.enabled); }
+        if (fn === 'nearby_pulse') { (nb.pulses ||= []).push(args); return json(200, []); }
+        if (fn === 'nearby_clear') { nb.cleared = (nb.cleared || 0) + 1; return route.fulfill({ status: 204, body: '', headers: { 'access-control-allow-origin': '*' } }); }
+        if (fn === 'my_nearby_alerts') return json(200, nb.enabled ? (nb.alerts || []).filter((a) => !(nb.muted || []).includes(a.other_id)) : []);
+        if (fn === 'set_nearby_muted') { (nb.muted ||= []).push(args.p_other); return route.fulfill({ status: 204, body: '', headers: { 'access-control-allow-origin': '*' } }); }
+      }
       // D-117 events (0020): st.events (list_events rows; null answers the PGRST202 "function not found" of a database
       // without 0020), st.companions (event_companions rows), st.companionDefault; RSVPs change st.events in place.
       if (['/rest/v1/rpc/list_events', '/rest/v1/rpc/set_event_rsvp', '/rest/v1/rpc/set_companion_default', '/rest/v1/rpc/my_event_prefs', '/rest/v1/rpc/event_companions'].includes(pathName) && !st.events) {

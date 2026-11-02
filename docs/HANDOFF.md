@@ -1,11 +1,20 @@
 # Session handoff (read after CLAUDE.md)
 
-Last updated: 2026-11-01 (D-118 calmer Explore; D-117 Explore events, Posts tab). Before that: 2026-11-01 (D-116 cover set). Before that: 2026-10-28 (D-100 chat inbox, D-101 post activity and 0015, D-102 photo and setup). Before that: 2026-10-20 (live-database correction D-070; "Send without a note" D-071). Before that: 2026-10-16 (design references, D-062). Before that: 2026-10-13, after Phase D of the experience iteration (the test world), on branch
+Last updated: 2026-11-01 (D-119 Crossing paths). Before that: 2026-11-01 (D-118 calmer Explore; D-117 Explore events, Posts tab). Before that: 2026-11-01 (D-116 cover set). Before that: 2026-10-28 (D-100 chat inbox, D-101 post activity and 0015, D-102 photo and setup). Before that: 2026-10-20 (live-database correction D-070; "Send without a note" D-071). Before that: 2026-10-16 (design references, D-062). Before that: 2026-10-13, after Phase D of the experience iteration (the test world), on branch
 `claude/jolly-edison-49xvza` (repo `Georgian-86/brivia-club-v1`). Phases C and D are not on `main` yet, and Phase D's SQL
 is not applied: the founder applies it in the SQL editor (section 3, item 0).
 Update this file at the end of every session. CLAUDE.md holds the aim; this file holds **where we are**.
 
 ## 1. What is done
+
+**2026-11-01, D-119:** "Crossing paths": two connections who both turned it on get one quiet alert ("Riya is nearby.
+You both love chess.") when their live ~2 km areas are within 3 km; never a place, distance or time. Settings →
+Notifications switch with an explainer, a panel row (Say hi, Mute), a toast outside 22:00-07:00, a coarse position
+every 5 minutes while the tab is open. **Owed: apply `0021_crossing_paths.sql`** (README "0021"); until then the switch
+is hidden. Phase 2 (founder call): Web Push so alerts arrive with the app closed. Spec
+`docs/superpowers/specs/2026-11-01-crossing-paths-design.md`; files `site/scripts/crossing-paths.js`,
+`site/styles/crossing-paths.css`; tests `tests/unit/crossing-paths.test.mjs`, `tests/e2e/crossing-paths.spec.mjs`,
+`supabase/tests/j-crossing-paths.test.sql`.
 
 **2026-11-01, D-118:** Explore restyled to match Posts and Connect (ruled toolbar, text tabs, quiet cards, the event in
 a drawer). Client only.
