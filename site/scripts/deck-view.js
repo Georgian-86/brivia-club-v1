@@ -58,7 +58,7 @@ export const deckEmptyState = (cause) => ({ ...(EMPTY_STATES[cause] || EMPTY_STA
 
 // The card's image: the member's chosen preset cover, else the default preset cover, else '' and the card shows its
 // branded placeholder (never the img alt text). Covers come only from the Brivia set (D-080), so the member's own photo
-// is never used as the cover (founder, 2026-11-01, D-119: a member with no cover showed their photo there, which read as
+// is never used as the cover (founder, 2026-11-01, D-120: a member with no cover showed their photo there, which read as
 // an uploaded cover). A preset path still in its stored form (/Images/Cover%20images/<name>) means normalizeCoverUrl
 // found no shipped asset for it (for example a retired cover), and the build serves no /Images folder, so it would not
 // load. `safe` is app.js safeImageUrl (allowed origins only); `fallback` is cover-assets.js defaultCoverUrl.

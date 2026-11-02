@@ -71,7 +71,7 @@ test('deckEmptyState: caught_up no longer promises "you have met your orbit for 
 });
 
 // Founder live test (2026-10-14): a seeded member with no cover and no photo (Kabir Shetty) showed the img alt text.
-// Founder (2026-11-01, D-119): a member with no cover showed their own photo as the cover; covers are presets only.
+// Founder (2026-11-01, D-120): a member with no cover showed their own photo as the cover; covers are presets only.
 test('deckCoverSrc: the chosen cover, else the default preset cover, never the photo', async () => {
   const { deckCoverSrc } = await import('../../site/scripts/deck-view.js');
   const safe = (value) => (typeof value === 'string' && value.startsWith('/') ? value : '');

@@ -21,7 +21,7 @@ import '../styles/mobile-app.css';
 import '../styles/skeleton.css';
 import '../styles/aura-theme.css';
 import '../styles/handoff.css';
-import { supabase, rowToProfile, saveProfile, isPresetCoverUrl, onboardingStatus, sendSignal, fetchSignalQuota, isRateLimited, isStorageImageUrl, withoutCredentials, uploadMessageAttachment, removeMessageAttachment, uploadCommunityPostImage, removeCommunityPostImage, ImageProcessingError, PHOTO_ERROR_MESSAGE, PHOTO_FRAMER_ERROR, compressAttachmentFiles, attachmentKind, reportMember, setSensitiveConsent, fetchSensitiveConsentAt, fetchMyInterests, fetchInterestNodes, addMemberInterest, isMissingFunction, touchPresence, connectionPresence, setPresenceVisible, myPresenceVisible, setMemberInterests, uploadResume, removeResume, resumeSignedUrl, resumeInfo, clearResumePath, searchPlaces, setHomeCity, setHomeLocation, listEvents, setEventRsvp, setCompanionDefault, myEventPrefs, eventCompanions } from './supabase.js';
+import { supabase, rowToProfile, saveProfile, isPresetCoverUrl, onboardingStatus, sendSignal, fetchSignalQuota, isRateLimited, isStorageImageUrl, withoutCredentials, uploadMessageAttachment, removeMessageAttachment, uploadCommunityPostImage, removeCommunityPostImage, ImageProcessingError, PHOTO_ERROR_MESSAGE, PHOTO_FRAMER_ERROR, compressAttachmentFiles, attachmentKind, reportMember, setSensitiveConsent, fetchSensitiveConsentAt, fetchMyInterests, fetchInterestNodes, addMemberInterest, isMissingFunction, touchPresence, connectionPresence, setPresenceVisible, myPresenceVisible, setMemberInterests, uploadResume, removeResume, resumeSignedUrl, resumeInfo, clearResumePath, searchPlaces, setHomeCity, setHomeLocation, listEvents, setEventRsvp, setCompanionDefault, myEventPrefs, eventCompanions, setNearbyEnabled, myNearbySetting, nearbyPulse, nearbyClear, myNearbyAlerts, setNearbyMuted } from './supabase.js';
 import { locateOnce, fallbackCopy } from './geo-locate.js';
 import { areaChangeMessage, AREA_HELPER, AREA_NO_MATCH } from './area-change.js';
 import { areaShareBody, parseAreaBody, resumeShareAttachment, resumeMessageFields, RESUME_SHARE_BODY, NO_RESUME_HINT, RESUME_GONE_COPY, RESUME_SHARE_NOTE, AREA_SHARE_NOTE } from './quick-share.js';
@@ -39,6 +39,8 @@ import { isOffered, hasCatalog, catalogGroups, normalizeInterestLabel } from './
 import { MAX_INTERESTS } from './passion-budget.js';
 import { collabSummary, openCollabReview } from './collab-requests.js';
 import { createPresence, presenceDot } from './presence.js';
+import { createCrossingPaths, isQuietHour, alertHeadline, alertDetail, alertToast, pausedCopy } from './crossing-paths.js';
+import '../styles/crossing-paths.css';
 import { createEventsPage } from './events-page.js';
 import '../styles/events.css';
 import { postCardMarkup, postFooterMarkup, countText, shareData, isSafePostImageSrc } from './post-card.js';
@@ -118,6 +120,13 @@ let selectedChat = null;
 // Active status (D-110): the presence loop (presence.js), started with the message sync.
 let presence = null;
 const isActiveNow = (id) => Boolean(presence?.isActive(id));
+// Crossing paths (D-119, 0021): the loop (crossing-paths.js), its alerts (from my_nearby_alerts) and its status.
+let crossingPaths = null;
+let nearbyAlerts = [];
+let nearbyStatus = 'off';
+const nearbyToasted = new Set();
+// Alerts that were new when the panel last opened: they keep the unread tint while it stays open.
+let nearbyHighlight = new Set();
 let typingSession = null; // the open thread's typing channel (D5): { otherId, channel, sender, receiver, joined }
 let chatShouldOpenAtLatest = false;
 let suppressChatAutoOpen = false;
@@ -342,6 +351,23 @@ const readNotifications = () => {
 const saveNotifications = () => {
   try { window.localStorage.setItem(notificationsStorageKey(), JSON.stringify(notifications.slice(0, 80))); } catch { /* Continue in memory if storage is unavailable. */ }
 };
+const nearbySeenStorageKey = () => `brivia-nearby-seen:${memberProfile.id || 'anonymous'}`;
+const readNearbySeen = () => {
+  try {
+    const saved = JSON.parse(window.localStorage.getItem(nearbySeenStorageKey()) || '[]');
+    return new Set(Array.isArray(saved) ? saved.slice(-60) : []);
+  } catch { return new Set(); }
+};
+const markNearbySeen = () => {
+  if (!nearbyAlerts.length) return;
+  const seen = readNearbySeen();
+  nearbyAlerts.forEach((alert) => seen.add(alert.key));
+  try { window.localStorage.setItem(nearbySeenStorageKey(), JSON.stringify([...seen].slice(-60))); } catch { /* memory only */ }
+};
+const unseenNearbyAlerts = () => {
+  const seen = readNearbySeen();
+  return nearbyAlerts.filter((alert) => !seen.has(alert.key));
+};
 const findPersonById = (personId) => people.find((person) => String(person.id) === String(personId));
 const notificationPreview = (message) => (parseSharedPost(message?.body) ? 'Shared a post with you.' : message?.body) || ((message?.attachment_url || message?.attachment_path) ? 'Sent an attachment.' : 'Sent you a message.');
 const addMessageNotification = (message) => {
@@ -428,9 +454,12 @@ const renderNotifications = () => {
   const enabled = areNotificationsEnabled();
   const requestCount = pendingRequests.length;
   // Pending requests stay reachable even with message notifications switched off.
-  const unreadCount = (enabled ? notifications.filter((notification) => !notification.read).length : 0) + requestCount;
-  button.toggleAttribute('hidden', !enabled && !requestCount);
-  if (!enabled && !requestCount) closeNotificationPanel();
+  // D-119: Crossing paths alerts have their own switch, so they count even with message notifications off.
+  const nearbyCount = unseenNearbyAlerts().length;
+  const unreadCount = (enabled ? notifications.filter((notification) => !notification.read).length : 0) + requestCount + nearbyCount;
+  const anything = enabled || requestCount || nearbyAlerts.length;
+  button.toggleAttribute('hidden', !anything);
+  if (!anything) closeNotificationPanel();
   badge.textContent = unreadCount > 99 ? '99+' : String(unreadCount);
   badge.toggleAttribute('hidden', unreadCount === 0);
   button.classList.toggle('has-unread', unreadCount > 0);
@@ -451,13 +480,43 @@ const renderNotifications = () => {
     + '<button type="button" class="notification-collab-review" data-collab-review>Review</button></section>' : '';
   // Every empty state offers a next step (Phase C Task 6): here, the notification settings.
   const settingsAction = '<button type="button" class="notification-empty-action" data-notification-settings>Notification settings</button>';
+  // D-119: one row per connection nearby, never a place, a distance or a time of arrival.
+  const nearbyHtml = nearbyAlerts.map((alert) => {
+    const person = findPersonById(alert.otherId);
+    const name = person?.name || 'A connection';
+    const unseen = nearbyHighlight.has(alert.key) || !readNearbySeen().has(alert.key);
+    const pin = '<svg class="notification-nearby-pin" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 14.5s4.5-4.2 4.5-8a4.5 4.5 0 0 0-9 0c0 3.8 4.5 8 4.5 8Z"/><circle cx="8" cy="6.5" r="1.6"/></svg>';
+    const bellOff = '<svg viewBox="0 0 20 20" aria-hidden="true"><path d="M6 8a4 4 0 0 1 6.9-2.8M14 9v2.5l1.5 2.5H6M8.5 16.5a1.8 1.8 0 0 0 3 0M3.5 3.5l13 13"/></svg>';
+    return `<section class="notification-nearby${unseen ? ' is-unread' : ''}" aria-label="${escapeHtml(alertHeadline(name))}">`
+      + `<span class="notification-nearby-face">${renderAvatar(person, 'notification-avatar')}${pin}</span>`
+      + `<span class="notification-nearby-copy"><strong>${escapeHtml(alertHeadline(name))}</strong><span>${escapeHtml(alertDetail(alert.sharedInterest))}</span></span>`
+      + `<button type="button" class="notification-nearby-hi" data-nearby-hi="${escapeHtml(alert.otherId)}">Say hi</button>`
+      + `<button type="button" class="notification-nearby-mute" data-nearby-mute="${escapeHtml(alert.otherId)}" aria-label="Mute alerts about ${escapeHtml(name)}" title="Mute alerts about ${escapeHtml(name)}">${bellOff}</button></section>`;
+  }).join('');
   const messagesHtml = !enabled ? `<div class="notification-empty"><p>Notifications are off in settings.</p>${settingsAction}</div>` : unreadGroups.length ? unreadGroups.map((group) => {
     const person = findPersonById(group.personId);
     const title = person?.name || 'a Brivia member';
     const messageLabel = `${group.count} message${group.count === 1 ? '' : 's'} from ${title}`;
     return `<button type="button" class="notification-item is-unread" data-notification-person="${escapeHtml(group.personId)}">${renderAvatar(person, 'notification-avatar')}<span class="notification-copy"><strong>${escapeHtml(messageLabel)}</strong></span><time>${escapeHtml(formatNotificationTime(group.latest.createdAt))}</time></button>`;
-  }).join('') : (requestCount ? '' : `<div class="notification-empty"><p>You are all caught up.</p>${settingsAction}</div>`);
-  list.innerHTML = requestsHtml + messagesHtml;
+  }).join('') : ((requestCount || nearbyAlerts.length) ? '' : `<div class="notification-empty"><p>You are all caught up.</p>${settingsAction}</div>`);
+  list.innerHTML = requestsHtml + nearbyHtml + messagesHtml;
+  list.querySelectorAll('[data-nearby-hi]').forEach((item) => item.addEventListener('click', (event) => {
+    event.stopPropagation();
+    const person = findPersonById(item.dataset.nearbyHi);
+    closeNotificationPanel();
+    if (person) { setView('chat'); openChat(person); }
+  }));
+  list.querySelectorAll('[data-nearby-mute]').forEach((item) => item.addEventListener('click', async (event) => {
+    event.stopPropagation();
+    const otherId = item.dataset.nearbyMute;
+    const name = findPersonById(otherId)?.name || 'this connection';
+    item.disabled = true;
+    const { error } = await setNearbyMuted(otherId, true);
+    if (error) { item.disabled = false; showToast('That could not be saved. Please try again.'); return; }
+    nearbyAlerts = nearbyAlerts.filter((alert) => alert.otherId !== String(otherId));
+    renderNotifications();
+    showToast(`You won't be alerted about ${name}.`);
+  }));
   list.querySelector('[data-notification-settings]')?.addEventListener('click', (event) => {
     event.stopPropagation();
     closeNotificationPanel();
@@ -492,6 +551,8 @@ const ensureNotificationControls = () => {
     event.stopPropagation();
     if (notificationPanelOpen()) { closeNotificationPanel({ returnFocus: true }); return; }
     openNotificationPanel();
+    nearbyHighlight = new Set(unseenNearbyAlerts().map((alert) => alert.key));
+    markNearbySeen();
     renderNotifications();
     placeNotificationPanel();
     loadConnectionRequests();
@@ -1997,6 +2058,40 @@ const startPresence = () => {
   presence.start().catch((error) => console.warn('Active status could not start:', error.message));
 };
 
+// Crossing paths (D-119, 0021): off by default; when on, the loop sends a coarse position every 5 minutes while the tab
+// is visible and lists alerts. A new alert gets a toast unless it is quiet hours (22:00-07:00) or the tab is hidden.
+const onNearbyAlerts = (alerts) => {
+  nearbyAlerts = alerts;
+  const seen = readNearbySeen();
+  const fresh = alerts.filter((alert) => !seen.has(alert.key) && !nearbyToasted.has(alert.key));
+  fresh.forEach((alert) => nearbyToasted.add(alert.key));
+  if (fresh.length && !isQuietHour() && document.visibilityState === 'visible') {
+    showToast(alertToast(findPersonById(fresh[0].otherId)?.name));
+  }
+  renderNotifications();
+};
+const ensureCrossingPaths = () => {
+  if (!crossingPaths) {
+    crossingPaths = createCrossingPaths({
+      pulse: nearbyPulse,
+      fetchAlerts: myNearbyAlerts,
+      clear: nearbyClear,
+      onAlerts: onNearbyAlerts,
+      onStatus: (status) => {
+        nearbyStatus = status;
+        document.dispatchEvent(new CustomEvent('brivia:nearby-status'));
+      },
+    });
+  }
+  return crossingPaths;
+};
+const startCrossingPaths = async () => {
+  if (!supabase || !memberProfile.id) return;
+  const { data, error } = await myNearbySetting();
+  if (error) return;   // before 0021: the setting stays hidden
+  if (data === true) ensureCrossingPaths().start().catch((err) => console.warn('Crossing paths could not start:', err.message));
+};
+
 const startMessageSync = () => {
   if (messageSyncTimer) window.clearInterval(messageSyncTimer);
   const sync = () => {
@@ -2943,6 +3038,8 @@ const openPrivacy = async (trigger, { autoDelete = false } = {}) => {
 };
 
 const logoutMember = async () => {
+  if (supabase && nearbyStatus !== 'off') { try { await nearbyClear(); } catch { /* the 20-minute expiry still applies */ } }
+  crossingPaths?.stop();
   if (supabase) await supabase.auth.signOut();
   window.localStorage.removeItem('brivia-member-profile');
   window.location.href = '/auth.html';
@@ -2960,6 +3057,7 @@ const openNotificationSettings = () => {
     <p class="profile-settings-note">Choose how the club keeps you updated. Chat messages will still be available in your inbox when alerts are off.</p>
     <label class="settings-toggle-row"><span><strong>MESSAGE NOTIFICATIONS</strong><small>Get an alert when someone sends you a message.</small></span><input id="profile-notifications-toggle" type="checkbox" /><i aria-hidden="true"></i></label>
     <label class="settings-toggle-row" data-presence-setting hidden><span><strong>SHOW WHEN I'M ACTIVE</strong><small>Your connections see a dot when you're here. Turn it off and you won't see theirs either.</small></span><input id="profile-presence-toggle" type="checkbox" /><i aria-hidden="true"></i></label>
+    <label class="settings-toggle-row" data-nearby-setting hidden><span><strong>CROSSING PATHS</strong><small>Get a quiet alert when a connection is nearby. Only connections who also turned this on, never your exact place.</small><small class="settings-nearby-status" data-nearby-status role="status"></small></span><input id="profile-nearby-toggle" type="checkbox" /><i aria-hidden="true"></i></label>
     <p class="profile-settings-feedback" id="notification-settings-feedback" role="status"></p>
   </div>`;
   document.body.append(modal);
@@ -2990,6 +3088,72 @@ const openNotificationSettings = () => {
     feedback.textContent = want ? 'Your connections can see when you are active.' : 'Active status is off. You will not see others either.';
     presence?.refresh();
   });
+  // D-119: Crossing paths. Shown once 0021 answers; turning it on goes through the explainer, then the browser prompt.
+  const nearbyRow = modal.querySelector('[data-nearby-setting]');
+  const nearbyToggle = modal.querySelector('#profile-nearby-toggle');
+  const nearbyStatusLine = modal.querySelector('[data-nearby-status]');
+  const paintNearbyStatus = () => {
+    if (!modal.isConnected) { document.removeEventListener('brivia:nearby-status', paintNearbyStatus); return; }
+    if (nearbyStatus === 'unavailable-server') { nearbyRow.hidden = true; return; }
+    nearbyStatusLine.textContent = nearbyToggle.checked && nearbyStatus.startsWith('paused-') ? pausedCopy(nearbyStatus.slice(7)) : '';
+  };
+  document.addEventListener('brivia:nearby-status', paintNearbyStatus);
+  myNearbySetting().then(({ data, error }) => {
+    if (!modal.isConnected || error) return;
+    nearbyToggle.checked = data === true;
+    nearbyRow.hidden = false;
+    paintNearbyStatus();
+  });
+  const saveNearby = async (want) => {
+    nearbyToggle.disabled = true;
+    const { error } = await setNearbyEnabled(want);
+    nearbyToggle.disabled = false;
+    if (error) { nearbyToggle.checked = !want; showToast('That setting could not be saved. Please try again.'); return; }
+    nearbyToggle.checked = want;
+    if (want) {
+      feedback.textContent = 'Crossing paths is on.';
+      await ensureCrossingPaths().start({ ask: true });
+    } else {
+      crossingPaths?.stop();
+      feedback.textContent = 'Crossing paths is off. Nobody is told when you are nearby.';
+    }
+    paintNearbyStatus();
+  };
+  nearbyToggle.addEventListener('change', () => {
+    if (!nearbyToggle.checked) { saveNearby(false); return; }
+    nearbyToggle.checked = false;   // stays off until the member confirms in the explainer
+    openCrossingPathsExplainer({ onConfirm: () => saveNearby(true), returnFocus: nearbyToggle });
+  });
+};
+
+// The explainer before Crossing paths turns on (spec §8): who sees it, what they see, how to turn it off.
+const openCrossingPathsExplainer = ({ onConfirm, returnFocus } = {}) => {
+  if (document.querySelector('#crossing-paths-explainer')) return;
+  const modal = document.createElement('div');
+  modal.id = 'crossing-paths-explainer';
+  modal.className = 'profile-settings-modal crossing-paths-modal';
+  modal.innerHTML = `<div class="profile-settings-dialog crossing-paths-dialog" role="dialog" aria-modal="true" aria-labelledby="crossing-paths-title">
+    <button type="button" class="profile-settings-close" aria-label="Close">×</button>
+    <h2 id="crossing-paths-title">Crossing <em>paths.</em></h2>
+    <ul class="crossing-paths-points">
+      <li><strong>Only connections.</strong> And only those who turned this on too. You both get the alert at the same moment.</li>
+      <li><strong>Never your exact place.</strong> They see "nearby", never where you are or how far. We keep a rough area for 20 minutes, then forget it.</li>
+      <li><strong>Only while Brivia is open.</strong> Turn it off here any time, or mute one person from an alert.</li>
+    </ul>
+    <div class="crossing-paths-buttons">
+      <button type="button" class="crossing-paths-later" data-nearby-later>Not now</button>
+      <button type="button" class="crossing-paths-confirm" data-nearby-confirm>Turn on</button>
+    </div>
+  </div>`;
+  document.body.append(modal);
+  const close = () => { modal.remove(); document.removeEventListener('keydown', onKey); returnFocus?.focus(); };
+  function onKey(event) { if (event.key === 'Escape') { event.stopPropagation(); close(); } }
+  document.addEventListener('keydown', onKey);
+  modal.querySelector('.profile-settings-close').addEventListener('click', close);
+  modal.querySelector('[data-nearby-later]').addEventListener('click', close);
+  modal.addEventListener('click', (event) => { if (event.target === modal) close(); });
+  modal.querySelector('[data-nearby-confirm]').addEventListener('click', () => { close(); onConfirm?.(); });
+  modal.querySelector('[data-nearby-confirm]').focus();
 };
 
 const openBlockedUsersManager = () => {
@@ -4825,6 +4989,7 @@ const loadSupabaseCommunity = async () => {
   subscribeToMessages();
   startMessageSync();
   startPresence();
+  startCrossingPaths();
   if (!appBackGuardActive) {
     appBackGuardActive = true;
     window.history.pushState(
