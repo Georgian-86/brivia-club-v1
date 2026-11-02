@@ -16,7 +16,7 @@
 // Section "cancel" (375x812, 1440x900): Cancel or Escape closes the dialog, focus returns to the input, the pick is
 // cleared and SAVE uploads nothing.
 // Section "covers" (every viewport above; 0014): no cover file input exists anywhere (profile editor, signup page);
-// the editor shows the 26 provided covers as a radio group with the stored one checked (a legacy /assets/ value marks
+// the editor shows the 25 provided covers as a radio group with the stored one checked (a legacy /assets/ value marks
 // its preset); tiles are at least 44 px, titles at least 12 px, nothing scrolls sideways, axe finds nothing (375,
 // 1440); picking another cover (pointer or arrow keys) and saving PATCHes cover_url = /Images/Cover%20images/<file>;
 // saving without a change sends the stored value back; nothing is ever uploaded to profile-covers.
@@ -240,8 +240,8 @@ try {
       await page.screenshot({ path: path.join(SHOTS, `covers-${tag}.png`) });
     }
     check(`covers ${tag}: no cover file input anywhere; the editor has only the photo one (${JSON.stringify([c.files, c.editorFiles, c.coverFile])})`, () => { assert.deepEqual(c.files, []); assert.deepEqual(c.editorFiles, ['photoFile']); assert.equal(c.coverFile, 0); });
-    check(`covers ${tag}: 26 provided covers as radios, the stored one checked (${JSON.stringify([c.radios, c.types, c.checked, c.legend])})`, () => {
-      assert.equal(c.radios, 26); assert.deepEqual(c.types, ['radio']); assert.deepEqual(c.checked, [P(MOMENTUM)]); assert.equal(c.legend, 'COVER');
+    check(`covers ${tag}: 25 provided covers as radios, the stored one checked (${JSON.stringify([c.radios, c.types, c.checked, c.legend])})`, () => {
+      assert.equal(c.radios, 25); assert.deepEqual(c.types, ['radio']); assert.deepEqual(c.checked, [P(MOMENTUM)]); assert.equal(c.legend, 'COVER');
     });
     check(`covers ${tag}: tiles are at least 44 px tall and wide (${JSON.stringify(c.tiles.slice(0, 2))})`, () => c.tiles.forEach(([w, h]) => { assert.ok(w >= 44 && h >= 44); }));
     check(`covers ${tag}: no sideways scroll (${c.scrollWidth}/${c.innerWidth}, dialog ${c.dialogWidth})`, () => { assert.ok(c.scrollWidth <= c.innerWidth); assert.ok(c.dialogWidth <= 0); });
@@ -261,7 +261,7 @@ try {
       // Pointer pick.
       await page.locator('#profile-photo-editor').click();
       await page.waitForSelector('#profile-edit-modal');
-      await page.locator('.profile-cover-option', { hasText: 'MAKE IT MATTER' }).click();
+      await page.locator('.profile-cover-option', { hasText: 'AFTER PRACTICE' }).click();
       const n = profileWrites().length;
       await page.locator('#profile-edit-form .profile-edit-save').click();
       await page.waitForSelector('#profile-edit-modal', { state: 'detached', timeout: 8000 });
@@ -273,7 +273,7 @@ try {
       await page.locator(`input[name="coverChoice"][value="${P(MOMENTUM)}"]`).focus();
       await page.keyboard.press('ArrowRight');
       const keyed = await page.evaluate(() => ({ value: document.querySelector('input[name="coverChoice"]:checked')?.value, outline: getComputedStyle(document.activeElement.nextElementSibling).outlineStyle }));
-      check(`covers ${tag}: arrow keys move the choice with a visible focus ring (${JSON.stringify(keyed)})`, () => { assert.equal(keyed.value, P('3453059c-4864-46f7-ae45-6f7049939b9f.png')); assert.equal(keyed.outline, 'solid'); });
+      check(`covers ${tag}: arrow keys move the choice with a visible focus ring (${JSON.stringify(keyed)})`, () => { assert.equal(keyed.value, P('94978B9F-A399-43FC-AC48-0A41088B5D27.PNG')); assert.equal(keyed.outline, 'solid'); });
       await page.locator('.profile-edit-close').click();
     }
     await context.close();
@@ -306,7 +306,7 @@ try {
     const pickedValue = await page.evaluate(() => document.querySelector('.cover-value')?.value);
     check(`covers signup: only the photo file input (${JSON.stringify(signup.files)})`, () => assert.deepEqual(signup.files, ['photo-input']));
     check(`covers signup: the picker stores preset paths, never a build URL (${signup.value} -> ${pickedValue})`, () => {
-      assert.equal(signup.value, P('2257522A-04B9-4E3E-AB1A-A73D7BB8CCBF.PNG')); assert.equal(pickedValue, P('EFFF6FA8-4DBE-44CC-8980-661B610AB1A2.PNG'));
+      assert.equal(signup.value, P('2257522A-04B9-4E3E-AB1A-A73D7BB8CCBF.PNG')); assert.equal(pickedValue, P('DEB7869C-E852-450F-A371-65E2BF6167A2.PNG'));
     });
     await context.close();
   }

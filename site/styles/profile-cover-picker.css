@@ -4,7 +4,8 @@
 .profile-edit-grid .profile-cover-picker{grid-column:1/-1;display:flex;flex-direction:column;gap:var(--space-2);min-width:0;margin:0;padding:0;border:0}
 .profile-cover-picker legend{float:left;width:100%;margin:0 0 var(--space-1);padding:0;color:var(--color-wine-soft);font:700 var(--text-12) var(--font-body);letter-spacing:.107em}
 .profile-cover-picker legend+.profile-edit-helper{clear:both;margin:0;color:var(--color-ink-soft)}
-.profile-cover-picker .profile-cover-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(116px,1fr));gap:var(--space-3) 10px}
+/* Five across whenever the dialog is wide enough (D-128), fewer (never under 116px a card) on narrow screens. */
+.profile-cover-picker .profile-cover-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(max(116px,calc((100% - 40px)/5)),1fr));gap:var(--space-3) 10px}
 .profile-cover-picker .profile-cover-option{position:relative;display:grid;align-content:start;gap:6px;min-width:0;cursor:pointer}
 .profile-cover-picker .profile-cover-option input{position:absolute;top:0;left:0;width:1px;height:1px;min-height:0;margin:0;padding:0;border:0;opacity:0}
 .profile-cover-picker .profile-cover-thumb{position:relative;display:block;aspect-ratio:16/9;overflow:hidden;border-radius:var(--radius-s);background:var(--color-skeleton);box-shadow:0 0 0 1px var(--color-line);transition:box-shadow var(--motion-fast) var(--ease)}

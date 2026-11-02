@@ -146,7 +146,7 @@ try {
     const coverUploadsBefore = st.calls.filter((c) => c.method === 'POST' && c.path.startsWith('/storage/v1/object/event-posters/')).length;
     await page.locator('[data-ec-drop-filled] [data-ec-covers-open]').click();
     await page.waitForSelector('[data-ec-covers]:not([hidden])');
-    check(`${w}: "Covers" opens the 26 Brivia covers, the first one focused`, (await page.locator('[data-ec-cover]').count()) === 26
+    check(`${w}: "Covers" opens the 25 Brivia covers, the first one focused`, (await page.locator('[data-ec-cover]').count()) === 25
       && await page.evaluate(() => document.activeElement?.matches('[data-ec-cover]')));
     await page.locator('[data-ec-covers]').scrollIntoViewIfNeeded();
     await page.waitForFunction(() => [...document.querySelectorAll('[data-ec-cover] img')].slice(0, 4).every((i) => i.complete && i.naturalWidth > 0), null, { timeout: 10000 }).catch(() => {});

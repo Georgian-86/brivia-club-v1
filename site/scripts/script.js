@@ -16,7 +16,7 @@ import { signupErrorCopy } from './signup-errors.js';
 import { initGuidedSignup } from './signup-screens.js';
 import { signupFlowMode, resumeScreen } from './signup-flow.js';
 import { defaultCoverUrl, normalizeCoverUrl } from './cover-assets.js';
-import { presetCoverPath } from './preset-cover.js';
+import { DEFAULT_COVER_KEY, presetCoverPath, presetCoverStoredPath } from './preset-cover.js';
 import { motionAllowed, introPlan, pickHeroSource, markLoaded, INTRO_CAP_MS, INTRO_START_GRACE_MS } from './landing-motion.js';
 import { SOUND_LIMIT_MS, SOUND_STORAGE_KEY, soundPreference, soundPlan, isUnlockEvent, barsToSchedule } from './landing-sound.js';
 import heroSoundtrackUrl from '../media/audio/hero-soundtrack.m4a?url';
@@ -855,7 +855,10 @@ if (coverPicker) {
     button.addEventListener('click', () => setCover(coverOptionUrl(button) || defaultCover, button));
   });
   resetCover = () => {
-    const defaultChoice = coverPicker.querySelector('.cover-choice');
+    // The default cover (D-128: SMASH THEORY, 20th in the order), not the first card.
+    const defaultPath = presetCoverStoredPath(DEFAULT_COVER_KEY);
+    const choices = [...coverPicker.querySelectorAll('.cover-choice')];
+    const defaultChoice = choices.find((choice) => choice.dataset.coverOption === defaultPath) || choices[0];
     setCover(coverOptionUrl(defaultChoice) || defaultCover, defaultChoice);
   };
   resetCover();

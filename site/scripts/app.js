@@ -32,7 +32,7 @@ import { openPrivacyAccount } from './privacy-account.js';
 import { isUnderReview, UNDER_REVIEW_COPY } from './onboarding-guard.js';
 import { openReportDialog, bindCardOverflow, cardOverflowOpen, reportSuccessCopy } from './report-dialog.js';
 import { defaultCoverUrl, normalizeCoverUrl } from './cover-assets.js';
-import { PRESET_COVERS, presetCoverPath, presetCoverStoredPath } from './preset-cover.js';
+import { DEFAULT_COVER_KEY, PRESET_COVERS, presetCoverPath, presetCoverStoredPath } from './preset-cover.js';
 import { postImageSrc } from './post-image.js';
 import { experienceChoices, cleanBio, BIO_MAX, areaInputValue, planInterestSave } from './profile-edit.js';
 import { isOffered, hasCatalog, catalogGroups, normalizeInterestLabel } from './signup-flow.js';
@@ -3001,7 +3001,7 @@ const openProfileEditor = () => {
   if (!memberProfile.id || document.querySelector('#profile-edit-modal')) return;
   const profile = memberProfile;
   // The cover marked as current: the stored preset (a legacy value resolves to its preset), else the default cover.
-  const currentCover = presetCoverPath(profile.coverUrl) || presetCoverStoredPath(PRESET_COVERS[0].key);
+  const currentCover = presetCoverPath(profile.coverUrl) || presetCoverStoredPath(DEFAULT_COVER_KEY);
   const modal = document.createElement('div');
   modal.id = 'profile-edit-modal';
   modal.className = 'profile-edit-modal';

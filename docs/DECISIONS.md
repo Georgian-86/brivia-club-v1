@@ -2591,3 +2591,30 @@ controls (a tester or a seeded test member), never a real member, so no new expo
 - **Why client-only:** `club_event.image_url` must be the creator's storage file (0022). Copying the picture keeps that
   rule, needs no migration and keeps the cropped area. Cost: one small JPEG per event in storage.
 - **Proof:** e2e create-event (covers grid, Escape, pick, area step, upload) at 1440 and 390; build, style ratchet.
+
+## D-128 (2026-11-02): the covers are reordered and renamed; "OPEN MINDS" is retired
+
+- **Ask (founder):** rearrange the profile covers in a given order with new names, permanently remove "OPEN MINDS", and
+  let every member change their cover at any time from Edit Profile, reflected everywhere.
+- **Order and names:** GOOD ENERGY, GAME, SET, GO, AT WORK, MUSIC NOTES, PARTYING, THE GETAWAYS, STRINGS & SOUL, THE
+  SLOW BAKE, BASKETBALL SOCIAL, LUXE TRAVEL, TECHNOLOGY, MAKE ROOM, POOL, AFTER PRACTICE, SERENE STATE, SLOW EVENINGS,
+  NOVEL ESCAPES, CHECK & MATE, FRESH START, SMASH THEORY, ME TIME, CRICKET STORIES, SUNDAY STATE, GOLDEN HOUR, then
+  FIND YOUR PACE. The founder's table had 24 rows and left FIND YOUR PACE out; asked, the founder chose to keep it as
+  the 25th. Several new names reuse old ones on different pictures (e.g. "GOOD ENERGY" is the old BUILD TOGETHER
+  picture); a stored cover is the file name, never the title, so no member's cover changes.
+- **Edit Profile:** already the one cover picker (D-080), built from `PRESET_COVERS`, saving `profiles.cover_url`, read
+  by every card (deck, Connect, Nearby, companions, profile) through `normalizeCoverUrl`. It now lists the 25 in the new
+  order, five across whenever the dialog is wide enough (`minmax(max(116px, (100% - 40px)/5), 1fr)`), fewer on phones.
+  No second cover system was added.
+- **Default cover:** stays the same picture (`2257522A-...PNG`, now named SMASH THEORY, 20th). Moving the default to
+  the new first card would have changed the cover of every member without one and the profile checklist's "default
+  cover" test for members who picked it. It is now named (`DEFAULT_COVER_KEY`) instead of "the first"; the signup
+  picker preselects it by key.
+- **OPEN MINDS (`7423007B-...PNG`):** removed from `preset-cover.js`, `cover-assets.js`, the signup picker,
+  `media/manifest.json`, `site/media/` and `source-media/`; the seed's members and posts moved to other covers.
+  Migration `0027_cover_order_open_minds.sql` redefines `brivia_offered_cover_keys()` (25, new order) so the server
+  refuses it, and adds its stem to `brivia_clear_retired_covers()`, run once: profiles naming it go to null (default).
+- **Proof:** unit (founder order, OPEN MINDS gone, every key has a shipped image, lists equal across client/signup/SQL),
+  SQL harness ALL PASSED with new `cover-order.test.sql` (order, switch to any cover, OPEN MINDS refused, cleanup,
+  one member cannot change another's cover), e2e profile-media and create-event; screenshots at 1440 and 390.
+- **Owed:** apply 0019 (if not yet) then 0027, after the client deploys (README "0027").

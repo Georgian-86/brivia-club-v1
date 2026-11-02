@@ -1,5 +1,6 @@
 -- Founder request 2026-11-01 (0019, D-116): "THE THOUGHTFUL ROOM" cover is retired and 9 covers are added.
--- R1 the offered list has 26 names: the retired one is gone, the 9 new ones are in, the old 17 stay
+-- R1 the retired one is gone and the 9 new ones are in (0027, D-128, later retired OPEN MINDS and reordered the list:
+--    cover-order.test.sql pins the current count and order)
 -- R2 a member can set a new cover; setting the retired one is refused (23514)
 -- R3 the cleanup nulls a stored retired cover and a legacy hashed /assets/ value naming it (test members too), leaves
 --    other covers alone, and is a no-op when run again
@@ -35,12 +36,11 @@ end $$;
 do $$
 declare k text[] := brivia_private.brivia_offered_cover_keys();
 begin
-  if cardinality(k) <> 26 then raise exception 'FAIL R1: % offered covers, expected 26', cardinality(k); end if;
   if '163BDB0C-64AC-44E7-8663-55C323ADB4FE.PNG' = any (k) then raise exception 'FAIL R1: the retired cover is still offered'; end if;
   if not ('94978B9F-A399-43FC-AC48-0A41088B5D27.PNG' = any (k) and 'EFFF6FA8-4DBE-44CC-8980-661B610AB1A2.PNG' = any (k)
           and 'F28EA63E-1BEB-49E9-BA01-F62127017DB1.PNG' = any (k)) then
     raise exception 'FAIL R1: a new or kept cover is missing'; end if;
-  if k[1] <> '2257522A-04B9-4E3E-AB1A-A73D7BB8CCBF.PNG' then raise exception 'FAIL R1: the first (default) cover is %', k[1]; end if;
+  if not ('2257522A-04B9-4E3E-AB1A-A73D7BB8CCBF.PNG' = any (k)) then raise exception 'FAIL R1: the default cover is not offered'; end if;
 end $$;
 
 -- R2

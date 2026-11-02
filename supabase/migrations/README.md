@@ -969,3 +969,24 @@ an interest too (no seat; Register upgrades it). Nothing else changes. Before 00
 
 Verify after the apply (as a member, on a free event): `select * from public.set_event_interest('<event id>', true);`
 returns `interested = t, status = interested`.
+
+## 0027
+
+**The covers are reordered and renamed, and "OPEN MINDS" is retired (founder request 2026-11-02, D-128). Not yet
+applied.** Apply after `0019` (it redefines the same two functions; applying 0019 after 0027 would bring OPEN MINDS
+back).
+
+What it does: redefines `brivia_private.brivia_offered_cover_keys()` with 25 names in the founder's order (mirrors
+`PRESET_COVER_KEYS`, pinned by `tests/unit/preset-cover.test.mjs`), and `brivia_private.brivia_clear_retired_covers()`
+with the OPEN MINDS stem `7423007B-E17D-4D46-A19F-499CC9A8DB99` added, which it runs once: those profiles get null (the
+default cover). Titles live only in the client, so renames change no stored value. Running it again changes nothing.
+
+Deploy order: **deploy the client first** (it no longer offers or ships OPEN MINDS), then apply `0027`.
+
+Verify after the apply:
+
+```sql
+select cardinality(brivia_private.brivia_offered_cover_keys()),                                   -- 25
+       (brivia_private.brivia_offered_cover_keys())[1],                                           -- b66eff76-...png
+       (select count(*) from public.profiles where cover_url like '%7423007B-E17D-4D46-A19F-499CC9A8DB99%'); -- 0
+```
