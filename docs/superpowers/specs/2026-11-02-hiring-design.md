@@ -89,6 +89,9 @@ and days left, and an Open / Paused / Not taking asks state; a row opens Manage 
 - **Private: my current company** (optional, never shown): hirers whose company matches never see the seeker's role
   intent and never get them recommended. This is what stops a colleague finding out.
 - Withdrawing (removing the looking-for value, or "Stop showing me roles") deletes the role intent at once.
+- Catalogue values come from PR #35 (D-122): "Hiring", "Job Opportunities" and "Can Give Referrals" are already in
+  `LOOKING_FOR_CATALOG`. "Can Give Referrals" is treated like "Hiring" with "I can refer" preselected. Every match on
+  these values is case-insensitive (members type their own spelling).
 - "Developer", "Designer" and similar looking-for values on their own are **not** job seeking: they usually mean "I want
   to find a developer". Only the three explicit values above make someone a seeker.
 - Profile card **Open to roles**: the roles, level and mode, a lock line ("Only members who are hiring see this"),
@@ -178,7 +181,7 @@ banner goes live on 16 Nov, when your account is two weeks old."
 | Role intent is its own consent (timestamped), withdrawable, deleted at once on withdrawal. | DPDP purpose limitation. |
 | Email and phone never reach other clients, roles included. | CLAUDE.md. |
 
-## 11. Data model and RPCs (migration `0022_hiring.sql`, written at build)
+## 11. Data model and RPCs (migration `0023_hiring.sql`, written at build; 0022 is PR #35's catalogue additions; the build's decision is numbered after D-122)
 
 - `hiring_roles` (id, member_id, title, family, level, work_mode, help ('hiring' | 'refer'), company, about, status
   ('open' | 'paused' | 'closed'), opened_at, expires_at, renewals, created_at). RLS: the owner reads and writes their
