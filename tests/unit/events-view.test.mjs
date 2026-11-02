@@ -17,7 +17,7 @@ const row = {
 
 test('categories: All first, then the mockup order, plus Culture, then the create form\'s others (D-121)', () => {
   assert.deepEqual(EVENT_CATEGORIES.map((c) => c.label), ['All', 'Tech', 'Music', 'Sports', 'Food', 'Art', 'Games', 'Networking', 'Culture',
-    'Startups', 'Education', 'Workshops', 'Community', 'Other']);
+    'Startups', 'Wellness', 'Outdoors', 'Learning', 'Workshops', 'Community', 'Other']);
   assert.ok(isEventCategory('music'));
   assert.ok(!isEventCategory('<script>'));
 });
@@ -222,4 +222,10 @@ test('tabs: the reference nine always; a new category only while an event uses i
   assert.deepEqual(visibleCategories([]).map((c) => c.key), ['all', 'tech', 'music', 'sports', 'food', 'art', 'games', 'networking', 'culture']);
   assert.deepEqual(visibleCategories([{ category: 'workshops' }]).map((c) => c.key).slice(-1), ['workshops']);
   assert.ok(visibleCategories([], 'education').some((c) => c.key === 'education'), 'the selected tab never vanishes');
+});
+
+test('an Other event shows its own category name', () => {
+  const html = eventCardMarkup(normalizeEvent({ ...row, category: 'other', custom_category: 'Book club' }));
+  assert.match(html, /event-kicker">Book club/);
+  assert.match(eventCardMarkup(normalizeEvent({ ...row, category: 'music', custom_category: 'Ignored' })), /event-kicker">Music/);
 });

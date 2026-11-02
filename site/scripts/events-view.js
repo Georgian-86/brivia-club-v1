@@ -17,7 +17,9 @@ export const EVENT_CATEGORIES = Object.freeze([
   { key: 'culture', label: 'Culture' },
   // D-121 (0022): the create form's other categories, so member events can be filtered too.
   { key: 'startups', label: 'Startups' },
-  { key: 'education', label: 'Education' },
+  { key: 'wellness', label: 'Wellness' },
+  { key: 'outdoors', label: 'Outdoors' },
+  { key: 'education', label: 'Learning' },
   { key: 'workshops', label: 'Workshops' },
   { key: 'community', label: 'Community' },
   { key: 'other', label: 'Other' },
@@ -137,6 +139,7 @@ export const normalizeEvent = (row = {}) => ({
   friends: (Array.isArray(row.friends) ? row.friends : []).slice(0, 3).map((f) => ({ id: String(f?.id || ''), name: String(f?.name || 'Member'), photoUrl: f?.photo_url || '' })),
   // D-121 (0022). A database without 0022 sends none of these: the club's own events, open, free, no organiser.
   status: ['draft', 'cancelled'].includes(row.status) ? row.status : 'published',
+  customCategory: row.category === 'other' ? String(row.custom_category || '').trim().slice(0, 24) : '',
   isMine: Boolean(row.is_mine),
   organizer: row.organizer && row.organizer.id ? { id: String(row.organizer.id), name: String(row.organizer.name || 'Member'), photoUrl: row.organizer.photo_url || '' } : null,
   imageUrl: String(row.image_url || ''),
@@ -202,7 +205,7 @@ const categoryLabel = (key) => EVENT_CATEGORIES.find((c) => c.key === key)?.labe
 const ARROW = '<span aria-hidden="true">↗</span>';
 const kicker = (event) => {
   const distance = distanceLabel(event.distanceKm);
-  return `<p class="event-kicker">${escapeHtml(categoryLabel(event.category))}${distance ? `<span class="event-kicker-distance"> · ${escapeHtml(distance)}</span>` : ''}</p>`;
+  return `<p class="event-kicker">${escapeHtml((event.category === 'other' && event.customCategory) || categoryLabel(event.category))}${distance ? `<span class="event-kicker-distance"> · ${escapeHtml(distance)}</span>` : ''}</p>`;
 };
 
 const statusBadge = (event) => (event.status === 'draft' ? '<span class="event-status-badge">Draft</span>'

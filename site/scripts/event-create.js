@@ -6,7 +6,7 @@
 // Images upload as soon as they are chosen (own folder of the event-posters bucket); files that end up unused (replaced,
 // removed or the dialog discarded) are removed again. The venue pin is sent once and only its ~2 km cell is kept.
 import {
-  EVENT_FORM_CATEGORIES, LIMITS, POSTER_TYPES, emptyDraft, draftFromEvent, validateEventDraft, firstErrorField,
+  EVENT_FORM_CATEGORIES, CATEGORY_ROW, LIMITS, POSTER_TYPES, emptyDraft, draftFromEvent, validateEventDraft, firstErrorField,
   toServerFields, serverErrorField, serverErrorMessage, imageFileProblem, previewEvent, todayIst,
 } from './event-form.js';
 import { eventCardMarkup, eventDetailMarkup } from './events-view.js';
@@ -48,9 +48,12 @@ const shellMarkup = () => `<div class="ec-shell">
         ${field('title', 'Event name', `<input id="ec-title" name="title" type="text" maxlength="${LIMITS.title}" autocomplete="off" placeholder="Bangalore Chess Meetup" required ${describedBy('title')} />`)}
         <fieldset class="ec-field ec-categories" data-field="category" aria-describedby="ec-category-error">
           <legend>Category</legend>
-          <div class="ec-chips">${EVENT_FORM_CATEGORIES.map((c) => `<label class="ec-chip"><input type="radio" name="category" value="${c.key}" /><span>${esc(c.label)}</span></label>`).join('')}</div>
+          <div class="ec-chips">${[EVENT_FORM_CATEGORIES.slice(0, CATEGORY_ROW), EVENT_FORM_CATEGORIES.slice(CATEGORY_ROW)].map((row) => `<div class="ec-chip-row">${row.map((c) => `<label class="ec-chip"><input type="radio" name="category" value="${c.key}" /><span>${esc(c.label)}</span></label>`).join('')}</div>`).join('')}</div>
           <p class="event-field-error" id="ec-category-error"></p>
         </fieldset>
+        <div class="ec-other" data-ec-other hidden>
+          ${field('customCategory', 'Your category', `<input id="ec-customCategory" name="customCategory" type="text" maxlength="24" autocomplete="off" placeholder="Book club, Pottery, Salsa…" ${describedBy('customCategory', true)} />`, { hint: 'Shown on your event instead of "Other".' })}
+        </div>
         ${field('description', 'Description', `<textarea id="ec-description" name="description" rows="5" maxlength="${LIMITS.description}" placeholder="What is it about, what can people expect, and who would love it?" required ${describedBy('description', true)}></textarea>`, { hint: '<span data-ec-count="description">0</span> / 2,000 · what it is, what to expect, who should come' })}
       </section>
 
@@ -190,7 +193,7 @@ export const createEventComposer = ({ dialog, api, memberId, organizer, safeImag
   const dirty = () => snapshot() !== saved;
 
   // Form <-> draft ---------------------------------------------------------------------------------------------------
-  const TEXT = ['title', 'description', 'date', 'startTime', 'endTime', 'venueName', 'venueAddress', 'mapUrl', 'capacity', 'fee', 'contactEmail', 'contactPhone', 'contactLink'];
+  const TEXT = ['title', 'customCategory', 'description', 'date', 'startTime', 'endTime', 'venueName', 'venueAddress', 'mapUrl', 'capacity', 'fee', 'contactEmail', 'contactPhone', 'contactLink'];
   const fill = () => {
     TEXT.forEach((n) => { const el = form.elements[n]; if (el) el.value = draft[n] ?? ''; });
     cityInput.value = draft.city || '';
@@ -212,7 +215,7 @@ export const createEventComposer = ({ dialog, api, memberId, organizer, safeImag
     draft.contactPublic = form.elements.contactPublic.checked;
   };
 
-  const renderFee = () => { $('[data-ec-fee]').hidden = !draft.paid; };
+  const renderFee = () => { $('[data-ec-fee]').hidden = !draft.paid; $('[data-ec-other]').hidden = draft.category !== 'other'; };
   const renderCounts = () => { const c = $('[data-ec-count="description"]'); if (c) c.textContent = String(draft.description.length).replace(/\B(?=(\d{3})+(?!\d))/g, ','); };
   const posterSrc = () => posterLocal || (draft.imageUrl ? safeImage(draft.imageUrl) : '');
   const renderPoster = () => {

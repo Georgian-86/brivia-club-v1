@@ -13,9 +13,18 @@ const good = () => ({
   placeId: 'in-bengaluru', city: 'Bengaluru', capacity: '30',
 });
 
-test('the founder\'s twelve categories, in order', () => {
-  assert.deepEqual(EVENT_FORM_CATEGORIES.map((c) => c.label), ['Technology', 'Startups & Entrepreneurship', 'Networking', 'Music', 'Sports',
-    'Chess & Games', 'Food & Dining', 'Art & Culture', 'Education', 'Workshops', 'Community', 'Other']);
+test('fourteen categories, two rows of seven, Other last', () => {
+  assert.deepEqual(EVENT_FORM_CATEGORIES.map((c) => c.label), ['Tech', 'Startups', 'Networking', 'Music', 'Sports', 'Chess & Games', 'Food & Drinks',
+    'Art & Culture', 'Wellness', 'Outdoors', 'Learning', 'Workshops', 'Community', 'Other']);
+});
+
+test('Other needs your own name when publishing; it travels tidied and only with Other', () => {
+  assert.match(validateEventDraft({ ...good(), category: 'other' }, { publish: true, now: NOW }).customCategory, /Name your category/);
+  assert.deepEqual(validateEventDraft({ ...good(), category: 'other', customCategory: 'Book club' }, { publish: true, now: NOW }), {});
+  assert.ok(validateEventDraft({ ...good(), category: 'other', customCategory: '<b>' }, { now: NOW }).customCategory);
+  assert.equal(toServerFields({ ...good(), category: 'other', customCategory: '  Book   club ' }).custom_category, 'Book club');
+  assert.equal(toServerFields({ ...good(), category: 'games', customCategory: 'Book club' }).custom_category, '');
+  assert.equal(serverErrorField({ message: 'invalid custom_category' }), 'customCategory');
 });
 
 test('a complete draft publishes; a draft needs only a name', () => {

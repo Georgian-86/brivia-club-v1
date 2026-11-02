@@ -862,7 +862,8 @@ Expected advisor additions: the six RPCs join the intended definer-RPC list (`or
 (it extends `club_event` and `event_rsvp`); apply after `0021`.
 
 What it does: `club_event` gains the creator, address, map link, poster and gallery URLs, capacity, entry fee (INR),
-the organiser's contact (shown only when they choose), cancelled/published timestamps, and the twelve form categories;
+the organiser's contact (shown only when they choose), cancelled/published timestamps, the fourteen form categories
+(with `custom_category` for Other);
 drafts may be incomplete (a published row must be complete). `event_rsvp` gains `status` (`confirmed` |
 `pending_payment`), `paid_at` and `payment_ref`. A public `event-posters` Storage bucket (10 MB, JPEG/PNG/WebP, own
 folder only). It redefines `list_events`, `set_event_rsvp` and `event_companions` (new columns; capacity and paid holds;

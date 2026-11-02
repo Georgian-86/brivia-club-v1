@@ -265,7 +265,7 @@ export const startAppStub = async ({ port, state = {}, deckRows = defaultDeckRow
         const place = (st.places || []).find((p) => p.id === f.place_id);
         const old = st.events.find((x) => x.id === id) || {};
         const row = {
-          ...old, id, title: f.title, description: f.description, category: f.category || 'other', tags: [], venue_name: f.venue_name || null,
+          ...old, id, title: f.title, description: f.description, category: f.category || 'other', custom_category: f.custom_category || null, tags: [], venue_name: f.venue_name || null,
           venue_area: place?.name || null, venue_address: f.venue_address || '', place_id: f.place_id || '', starts_at: at(f.start_time), ends_at: at(f.end_time),
           image_key: '', image_url: f.image_url || '', gallery_urls: f.gallery_urls || [], map_url: f.map_url || '', distance_km: place ? 3 : null,
           going_count: old.going_count || 0, companion_count: old.companion_count || 0, going: Boolean(old.going), wants_companion: Boolean(old.wants_companion),

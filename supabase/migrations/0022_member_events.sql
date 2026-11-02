@@ -32,7 +32,8 @@ set lock_timeout = '5s';
 -- What changes:
 --   1. club_event gains creator_id, venue_address, map_url, image_url, gallery_urls, capacity, fee_inr, the contact
 --      fields, cancelled_at, published_at, updated_at; drafts may leave venue, category and time empty (a published
---      row must be complete); the category list grows to the twelve of the create form; descriptions up to 2000.
+--      row must be complete); the category list grows to the fourteen of the create form, and "Other" carries the
+--      organiser's own name for it (custom_category); descriptions up to 2000.
 --   2. event_rsvp gains status ('confirmed' | 'pending_payment'), paid_at and payment_ref.
 --   3. Storage bucket event-posters (public, 10 MB, JPEG/PNG/WebP, owner folder only), like community-posts.
 --   4. list_events (more columns), set_event_rsvp (capacity, paid holds, companion needs a registration),
@@ -65,7 +66,13 @@ alter table public.club_event alter column starts_at drop not null;
 alter table public.club_event drop constraint if exists club_event_category_check;
 alter table public.club_event add constraint club_event_category_check
   check (category is null or category in ('tech', 'startups', 'networking', 'music', 'sports', 'games', 'food', 'art',
-                                          'culture', 'education', 'workshops', 'community', 'other'));
+                                          'culture', 'wellness', 'outdoors', 'education', 'workshops', 'community', 'other'));
+-- "Other": the organiser names the category themselves (shown instead of "Other"); only with category 'other'.
+alter table public.club_event add column if not exists custom_category text;
+alter table public.club_event drop constraint if exists club_event_custom_category_check;
+alter table public.club_event add constraint club_event_custom_category_check
+  check (custom_category is null or (category = 'other' and char_length(custom_category) between 2 and 24
+                                     and custom_category ~ '^[[:alnum:]][[:alnum:] &''/+-]*$'));
 alter table public.club_event drop constraint if exists club_event_description_len;
 alter table public.club_event add constraint club_event_description_len check (char_length(description) <= 2000);
 alter table public.club_event drop constraint if exists club_event_published_complete;
@@ -173,7 +180,8 @@ returns table(id uuid, title text, description text, category text, tags text[],
               starts_at timestamptz, ends_at timestamptz, image_key text, distance_km int, going_count int,
               companion_count int, going boolean, wants_companion boolean, friends jsonb,
               status text, is_mine boolean, organizer jsonb, image_url text, gallery_urls text[], venue_address text,
-              map_url text, place_id text, capacity int, registered_count int, fee_inr int, my_status text, contact jsonb)
+              map_url text, place_id text, capacity int, registered_count int, fee_inr int, my_status text, contact jsonb,
+              custom_category text)
 language sql
 stable
 security definer
@@ -229,7 +237,8 @@ as $$
                                                    'link', ev.contact_link, 'public', ev.contact_public)
               when ev.contact_public and (ev.contact_email is not null or ev.contact_phone is not null or ev.contact_link is not null)
                 then jsonb_strip_nulls(jsonb_build_object('email', ev.contact_email, 'phone', ev.contact_phone, 'link', ev.contact_link))
-              else null end
+              else null end,
+         ev.custom_category
     from ev
    order by case when ev.starts_at is null then 3 when ev.km is null then 2 when ev.km <= 15 then 0 when ev.km <= 60 then 1 else 2 end,
             ev.starts_at nulls last, ev.id
@@ -339,7 +348,7 @@ grant execute on function public.event_companions(uuid) to authenticated;
 
 -- save_member_event(p_id, p_fields, p_publish) -> the event id. p_id null creates; otherwise only the creator may edit
 -- (42501), never a cancelled or ended event (22023). p_fields (jsonb): title, category, description, date
--- (YYYY-MM-DD), start_time, end_time (HH:MM, IST), venue_name, venue_address, place_id, pin {lat, lng} (optional,
+-- (YYYY-MM-DD), start_time, end_time (HH:MM, IST), custom_category (with 'other': the organiser's own name), venue_name, venue_address, place_id, pin {lat, lng} (optional,
 -- turned into the g7 cell and dropped), map_url, capacity, fee_inr, contact_email, contact_phone, contact_link,
 -- contact_public, image_url, gallery_urls. A draft needs only a title; publishing needs every mandatory field and a
 -- start in the future. A published event cannot go back to draft. With registrations, the capacity cannot drop under
@@ -359,6 +368,7 @@ declare
   v_id uuid;
   v_title text := nullif(btrim(coalesce(f ->> 'title', '')), '');
   v_category text := nullif(lower(btrim(coalesce(f ->> 'category', ''))), '');
+  v_custom text := nullif(regexp_replace(btrim(coalesce(f ->> 'custom_category', '')), '\s+', ' ', 'g'), '');
   v_description text := btrim(coalesce(f ->> 'description', ''));
   v_venue text := nullif(btrim(coalesce(f ->> 'venue_name', '')), '');
   v_address text := nullif(btrim(coalesce(f ->> 'venue_address', '')), '');
@@ -406,8 +416,12 @@ begin
   -- Parse (a malformed value is the field's error, never a 500).
   if v_title is null or char_length(v_title) > 80 then raise exception 'invalid title' using errcode = '22023'; end if;
   if v_category is not null and v_category not in ('tech', 'startups', 'networking', 'music', 'sports', 'games', 'food',
-                                                   'art', 'education', 'workshops', 'community', 'other') then
+                                                   'art', 'wellness', 'outdoors', 'education', 'workshops', 'community', 'other') then
     raise exception 'invalid category' using errcode = '22023';
+  end if;
+  if v_category is distinct from 'other' then v_custom := null; end if;
+  if v_custom is not null and (char_length(v_custom) not between 2 and 24 or v_custom !~ '^[[:alnum:]][[:alnum:] &''/+-]*$') then
+    raise exception 'invalid custom_category' using errcode = '22023';
   end if;
   if char_length(v_description) > 2000 then raise exception 'invalid description' using errcode = '22023'; end if;
   begin v_date := nullif(f ->> 'date', '')::date; exception when others then raise exception 'invalid date' using errcode = '22023'; end;
@@ -468,6 +482,7 @@ begin
 
   if v_publish then
     if v_category is null then raise exception 'invalid category' using errcode = '22023'; end if;
+    if v_category = 'other' and v_custom is null then raise exception 'invalid custom_category' using errcode = '22023'; end if;
     if char_length(v_description) < 20 then raise exception 'invalid description' using errcode = '22023'; end if;
     if v_date is null then raise exception 'invalid date' using errcode = '22023'; end if;
     if v_start is null then raise exception 'invalid start_time' using errcode = '22023'; end if;
@@ -494,14 +509,14 @@ begin
     insert into public.club_event (id, slug, title, description, category, tags, venue_name, venue_area, venue_cell,
                                    place_id, starts_at, ends_at, image_key, is_published, creator_id, venue_address,
                                    map_url, image_url, gallery_urls, capacity, fee_inr, contact_email, contact_phone,
-                                   contact_link, contact_public, published_at, updated_at)
+                                   contact_link, contact_public, published_at, updated_at, custom_category)
     values (v_id, 'm-' || v_id::text, v_title, v_description, v_category, '{}', v_venue, v_area, v_cell, v_place,
             v_starts, v_ends, '', v_publish, uid, v_address, v_map, v_image, v_gallery, v_capacity, v_fee, v_email,
-            v_phone, v_link, v_contact_public, case when v_publish then now() end, now());
+            v_phone, v_link, v_contact_public, case when v_publish then now() end, now(), v_custom);
   else
     v_id := p_id;
     update public.club_event e
-       set title = v_title, description = v_description, category = v_category, venue_name = v_venue,
+       set title = v_title, description = v_description, category = v_category, custom_category = v_custom, venue_name = v_venue,
            venue_area = v_area, venue_cell = v_cell, place_id = v_place, starts_at = v_starts, ends_at = v_ends,
            is_published = v_publish, venue_address = v_address, map_url = v_map, image_url = v_image,
            gallery_urls = v_gallery, capacity = v_capacity, fee_inr = v_fee, contact_email = v_email,

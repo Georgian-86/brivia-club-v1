@@ -5,21 +5,28 @@
 
 import { EVENT_TIME_ZONE } from './events-view.js';
 
-// The create form's twelve categories (the founder's list). Keys match club_event_category_check in 0022.
+// The create form's fourteen categories, in two rows of seven (founder, 2026-11-02: "only two rows, every kind of
+// category, otherwise Other so they choose themselves"). Keys match club_event_category_check in 0022.
 export const EVENT_FORM_CATEGORIES = Object.freeze([
-  { key: 'tech', label: 'Technology' },
-  { key: 'startups', label: 'Startups & Entrepreneurship' },
+  { key: 'tech', label: 'Tech' },
+  { key: 'startups', label: 'Startups' },
   { key: 'networking', label: 'Networking' },
   { key: 'music', label: 'Music' },
   { key: 'sports', label: 'Sports' },
   { key: 'games', label: 'Chess & Games' },
-  { key: 'food', label: 'Food & Dining' },
+  { key: 'food', label: 'Food & Drinks' },
   { key: 'art', label: 'Art & Culture' },
-  { key: 'education', label: 'Education' },
+  { key: 'wellness', label: 'Wellness' },
+  { key: 'outdoors', label: 'Outdoors' },
+  { key: 'education', label: 'Learning' },
   { key: 'workshops', label: 'Workshops' },
   { key: 'community', label: 'Community' },
   { key: 'other', label: 'Other' },
 ].map(Object.freeze));
+export const CATEGORY_ROW = 7;
+// "Other": the organiser's own category name (2 to 24 letters, digits, spaces and & ' / + -).
+export const CUSTOM_CATEGORY = /^[\p{L}\p{N}][\p{L}\p{N} &'/+-]*$/u;
+export const tidyCustomCategory = (value) => String(value || '').trim().replace(/\s+/g, ' ');
 const FORM_KEYS = new Set(EVENT_FORM_CATEGORIES.map((c) => c.key));
 
 export const LIMITS = Object.freeze({
@@ -37,7 +44,7 @@ export const isContactPhone = (value) => /^\+?[0-9][0-9 ()-]{6,19}$/.test(String
 export const isContactLink = (value) => { const v = String(value || '').trim(); return v.length <= 300 && /^https:\/\/[^\s"'<>\\]+$/.test(v); };
 
 export const emptyDraft = () => ({
-  id: null, status: 'new', title: '', category: '', description: '', date: '', startTime: '', endTime: '',
+  id: null, status: 'new', title: '', category: '', customCategory: '', description: '', date: '', startTime: '', endTime: '',
   venueName: '', venueAddress: '', placeId: '', city: '', pin: null, mapUrl: '', capacity: '', paid: false, fee: '',
   contactEmail: '', contactPhone: '', contactLink: '', contactPublic: false, imageUrl: '', gallery: [],
   registeredCount: 0,
@@ -59,6 +66,7 @@ export const draftFromEvent = (event) => {
   return {
     ...emptyDraft(),
     id: event.id, status: event.status || 'draft', title: event.title || '', category: FORM_KEYS.has(event.category) ? event.category : '',
+    customCategory: event.category === 'other' ? event.customCategory || '' : '',
     description: event.description || '', date: start?.date || '', startTime: start?.time || '', endTime: end?.time || '',
     venueName: event.venueName || '', venueAddress: event.venueAddress || '', placeId: event.placeId || '', city: event.placeId ? event.venueArea || '' : '',
     mapUrl: event.mapUrl || '', capacity: event.capacity ? String(event.capacity) : '', paid: event.feeInr > 0, fee: event.feeInr > 0 ? String(event.feeInr) : '',
@@ -88,6 +96,10 @@ export const validateEventDraft = (draft, { publish = false, now = new Date() } 
   const title = String(draft.title || '').trim();
   if (!title) errors.title = 'Give your event a name.';
   else if (title.length > LIMITS.title) errors.title = `Keep the name under ${LIMITS.title} characters.`;
+  const custom = tidyCustomCategory(draft.customCategory);
+  if (draft.category === 'other' && custom && (custom.length < 2 || custom.length > 24 || !CUSTOM_CATEGORY.test(custom))) {
+    errors.customCategory = 'Use 2 to 24 letters or numbers, like "Book club".';
+  }
   const description = String(draft.description || '').trim();
   if (description.length > LIMITS.description) errors.description = `Keep it under ${LIMITS.description} characters.`;
   if (String(draft.venueName || '').trim().length > LIMITS.venueName) errors.venueName = `Keep it under ${LIMITS.venueName} characters.`;
@@ -110,6 +122,7 @@ export const validateEventDraft = (draft, { publish = false, now = new Date() } 
   if (!publish) return errors;
 
   if (!FORM_KEYS.has(draft.category)) errors.category = 'Choose a category.';
+  else if (draft.category === 'other' && !custom) errors.customCategory = 'Name your category, like "Book club" or "Pottery".';
   if (!errors.description && description.length < LIMITS.descriptionMin) errors.description = 'Tell people a little more (at least 20 characters).';
   if (!draft.date) errors.date = 'Choose a date.';
   if (!draft.startTime) errors.startTime = 'Choose a start time.';
@@ -128,7 +141,7 @@ export const validateEventDraft = (draft, { publish = false, now = new Date() } 
 };
 
 // The order fields appear in, for "focus the first error".
-export const FIELD_ORDER = Object.freeze(['title', 'category', 'description', 'date', 'startTime', 'endTime', 'venueName',
+export const FIELD_ORDER = Object.freeze(['title', 'category', 'customCategory', 'description', 'date', 'startTime', 'endTime', 'venueName',
   'venueAddress', 'city', 'mapUrl', 'capacity', 'fee', 'contactEmail', 'contactPhone', 'contactLink', 'contactPublic', 'image']);
 export const firstErrorField = (errors) => FIELD_ORDER.find((f) => errors[f]) || Object.keys(errors)[0] || null;
 
@@ -136,6 +149,7 @@ export const firstErrorField = (errors) => FIELD_ORDER.find((f) => errors[f]) ||
 export const toServerFields = (draft) => ({
   title: String(draft.title || '').trim(),
   category: draft.category || null,
+  custom_category: draft.category === 'other' ? tidyCustomCategory(draft.customCategory) : '',
   description: String(draft.description || '').trim(),
   date: draft.date || '',
   start_time: draft.startTime || '',
@@ -157,7 +171,7 @@ export const toServerFields = (draft) => ({
 
 // save_member_event errors: 22023 'invalid <server field>' names the field; P0001 'event_limit' is the daily cap.
 const SERVER_FIELD = Object.freeze({
-  title: 'title', category: 'category', description: 'description', date: 'date', start_time: 'startTime', end_time: 'endTime',
+  title: 'title', category: 'category', custom_category: 'customCategory', description: 'description', date: 'date', start_time: 'startTime', end_time: 'endTime',
   venue_name: 'venueName', venue_address: 'venueAddress', place_id: 'city', pin: 'city', map_url: 'mapUrl', capacity: 'capacity',
   fee_inr: 'fee', contact_email: 'contactEmail', contact_phone: 'contactPhone', contact_link: 'contactLink',
   contact_public: 'contactPublic', image_url: 'image', gallery_urls: 'image',
@@ -192,7 +206,7 @@ export const previewEvent = (draft, { organizer = null, imageSrc = '' } = {}) =>
   const fee = draft.paid ? wholeNumber(draft.fee) : 0;
   return {
     id: 'preview', title: String(draft.title || '').trim() || 'Your event name', description: String(draft.description || '').trim(),
-    category: FORM_KEYS.has(draft.category) ? draft.category : 'other', tags: [], venueName: String(draft.venueName || '').trim() || 'Venue',
+    category: FORM_KEYS.has(draft.category) ? draft.category : 'other', customCategory: draft.category === 'other' ? tidyCustomCategory(draft.customCategory) : '', tags: [], venueName: String(draft.venueName || '').trim() || 'Venue',
     venueArea: draft.city || '', venueAddress: String(draft.venueAddress || '').trim(), startsAt: draft.date && start ? start.toISOString() : null,
     endsAt: end && draft.startTime ? end.toISOString() : null, imageKey: '', imageUrl: imageSrc, gallery: [], distanceKm: null,
     goingCount: draft.registeredCount || 0, companionCount: 0, going: false, wantsCompanion: false, friends: [],

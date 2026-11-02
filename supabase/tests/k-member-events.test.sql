@@ -3,7 +3,7 @@
 -- M1 structure: no coordinate columns on club_event; the new functions are authenticated-only (anon cannot run
 --    them); confirm_event_payment is not executable by any client role; the event-posters bucket is public with limits.
 -- M2 save_member_event: a draft needs only a title and is seen only by its creator; publishing names the missing or
---    bad field (22023 'invalid <field>'): category, description, a past date, an end before the start, venue, city,
+--    bad field (22023 'invalid <field>'): category, Other without its own name (and the name is kept), description, a past date, an end before the start, venue, city,
 --    capacity, a map link off the allow-list, a poster outside the creator's folder; a pin becomes a g7 cell only.
 -- M3 visibility: a published event is listed to members who can see the creator (not K, whom O blocked); the
 --    organiser block is {id, name, photo_url}; contact reaches others only when public, and the organiser always.
@@ -91,6 +91,17 @@ begin
 
   c := pg_temp.code_of(format('select public.save_member_event(null, %L::jsonb, true)', pg_temp.fields('{"category": null}')));
   if c not like '22023:invalid category%' then raise exception 'FAIL M2: no category gave %', c; end if;
+  c := pg_temp.code_of(format('select public.save_member_event(null, %L::jsonb, true)', pg_temp.fields('{"category": "other"}')));
+  if c not like '22023:invalid custom_category%' then raise exception 'FAIL M2: Other without a name gave %', c; end if;
+  c := pg_temp.code_of(format('select public.save_member_event(null, %L::jsonb, true)', pg_temp.fields('{"category": "other", "custom_category": "<b>x</b>"}')));
+  if c not like '22023:invalid custom_category%' then raise exception 'FAIL M2: a markup name gave %', c; end if;
+  d := public.save_member_event(null, pg_temp.fields('{"category": "other", "custom_category": "  Book   club "}'), true);
+  if (select custom_category from public.list_events(null) where id = d) <> 'Book club' then raise exception 'FAIL M2: the own category is kept, tidied'; end if;
+  if (select custom_category from public.list_events('other') where id = d) <> 'Book club' then raise exception 'FAIL M2: list_events returns it'; end if;
+  perform public.save_member_event(d, pg_temp.fields('{"category": "games", "custom_category": "Book club"}'), true);
+  if (select custom_category from public.list_events(null) where id = d) is not null then raise exception 'FAIL M2: a named category goes with Other'; end if;
+  perform public.cancel_member_event(d); perform public.delete_member_event(d);
+  d := (select id from k_ids where k = 'draft');
   c := pg_temp.code_of(format('select public.save_member_event(null, %L::jsonb, true)', pg_temp.fields('{"description": "short"}')));
   if c not like '22023:invalid description%' then raise exception 'FAIL M2: short description gave %', c; end if;
   c := pg_temp.code_of(format('select public.save_member_event(null, %L::jsonb, true)',

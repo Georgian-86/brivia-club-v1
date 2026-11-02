@@ -69,7 +69,9 @@ try {
     check(`${w}: heading and subtitle (${JSON.stringify(head)})`, /Bring people\s*together\./.test(head) && /Create an experience worth showing up for\./.test(head));
     check(`${w}: focus starts on Event name`, await page.evaluate(() => document.activeElement?.id === 'ec-title'));
     check(`${w}: the dialog fits the viewport`, await page.evaluate(() => { const r = document.querySelector('#event-create-dialog').getBoundingClientRect(); return r.top >= 0 && r.bottom <= window.innerHeight + 1 && r.right <= window.innerWidth + 1; }));
-    check(`${w}: twelve categories`, (await page.locator('#event-create-dialog input[name="category"]').count()) === 12);
+    check(`${w}: fourteen categories in exactly two rows`, (await page.locator('#event-create-dialog input[name="category"]').count()) === 14 && await page.evaluate(() =>
+      new Set([...document.querySelectorAll('#event-create-dialog .ec-chip')].map((c) => Math.round(c.offsetTop))).size === 2));
+    check(`${w}: the "Your category" field waits for Other`, await page.locator('#ec-customCategory').isHidden());
     await shot(page, `create-empty-${w}.png`);
 
     // Publish empty: inline errors, first field focused, nothing sent.
@@ -84,7 +86,12 @@ try {
     // Fill it in.
     await page.fill('#ec-title', 'Bangalore Chess Meetup');
     check(`${w}: the title error clears as you type`, (await page.locator('#ec-title-error').innerText()) === '');
+    await page.locator('#event-create-dialog .ec-chip:has-text("Other")').click();
+    check(`${w}: Other reveals "Your category"`, await page.locator('#ec-customCategory').isVisible());
+    await page.fill('#ec-customCategory', 'Book club');
+    check(`${w}: the live card shows your own category`, /BOOK CLUB/.test(await page.locator('[data-ec-preview-card] .event-kicker').innerText()));
     await page.locator('#event-create-dialog .ec-chip:has-text("Chess & Games")').click();
+    check(`${w}: another category hides it again`, await page.locator('#ec-customCategory').isHidden());
     await page.fill('#ec-description', 'Rapid games, a friendly ladder and good conversation. All levels welcome.');
     await page.fill('#ec-date', ymd(5));
     await page.fill('#ec-startTime', '18:00');
