@@ -5,6 +5,7 @@ import {
 } from './supabase.js';
 import { buildPendingOnboarding, isPendingExpired, dataUrlToFile } from './pending-profile.js';
 import { isUnderReview, shouldWithdrawConsent } from './onboarding-guard.js';
+import { LOOKING_FOR_CATALOG } from './discovery-catalog.js';
 import { readAuthHash, newPasswordProblem, resetRequestError, passwordUpdateError, RESET_SENT, LINK_EXPIRED } from './password-reset.js';
 import {
   MAX_INTERESTS, MODES, emptyBudget, addInterest, removeInterest, stepPoints, setMode, pointsLeft, isComplete, toPayload,
@@ -861,15 +862,8 @@ if (coverPicker) {
   resetCover();
 }
 
-const lookingOptions = [
-  'Hackathon Buddy', 'SIH Buddy', 'Travelling Buddy', 'Study Partner', 'Project Partner', 'Coding Partner', 'Startup Partner',
-  'Co-founder', 'Teammate', 'Mentor', 'Mentee', 'Freelancer', 'Intern', 'Research Partner', 'Open Source Contributor',
-  'Developer', 'Designer', 'AI Enthusiast', 'ML Enthusiast', 'Entrepreneur', 'Photographer', 'Content Creator', 'Video Editor',
-  'UI/UX Designer', 'Data Analyst', 'Business Analyst', 'Marketer', 'Public Speaker', 'Writer', 'Volunteer', 'Event Participant',
-  'Networking Contact', 'Career Mentor', 'Job Referral', 'Internship Referral', 'Accountability Partner', 'Language Exchange Partner',
-  'Travel Companion', 'Trekking Partner', 'Sports Partner', 'Gaming Partner', 'Photography Partner', 'Event Companion',
-  'Conference Companion', 'Workshop Partner', 'Competition Teammate', 'Roommate', 'Local Guide', 'Community Member', 'Collaborator', 'Other',
-];
+// One list with Edit profile and signup's About you (discovery-catalog.js).
+const lookingOptions = [...LOOKING_FOR_CATALOG, 'Other'];
 
 const lookingPicker = document.querySelector('[data-looking-picker]');
 if (lookingPicker) {

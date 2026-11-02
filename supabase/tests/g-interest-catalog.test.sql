@@ -1,6 +1,6 @@
 -- 0017 (D-109): the founder's interest catalogue (interest_node.catalog_order) and add_member_interest ("Other").
 -- Ids 0c170000-0000-4000-8000-0000000000NN: 01 A (completed), 02 B (completed), 03 N (no profile).
--- C1 the catalogue: 1129 offered nodes, ordered 1..N A-Z, level 3-4, never sensitive, every parent exists; reused 0004
+-- C1 the catalogue: 1138 offered nodes, ordered 1..N A-Z, level 3-4, never sensitive, every parent exists; reused 0004
 --    nodes keep their id and label; "Gospel Music" and "NLP" are not offered.
 -- C2 add_member_interest reuses an existing active node by label (case-insensitive, spaces collapsed).
 -- C3 a new label becomes member.custom.<slug> (level 3), a second call returns it, a slug collision gets _2.
@@ -8,6 +8,8 @@
 -- C5 at most 5 new labels per member per 24 h (PT429); a reused label does not count.
 -- C6 no session (anon / no profile) is refused; anon cannot execute it.
 -- C7 the new node is accepted by set_member_interests and shows in profiles.skills.
+-- C8 0022 (D-122) on a database where 0017 ran without the nine new interests: it adds them and the order matches
+--    0017's (the TSV order) exactly; run again, it changes nothing.
 set brivia.harness_autocomplete = 'off';
 create or replace function pg_temp.gp(n int) returns uuid language sql immutable as $$
   select ('0c170000-0000-4000-8000-' || lpad(n::text, 12, '0'))::uuid $$;
@@ -28,7 +30,7 @@ do $$
 declare n int; m int;
 begin
   select count(*), max(catalog_order) into n, m from public.interest_node where catalog_order is not null;
-  if n <> 1129 or m <> 1129 then raise exception 'FAIL C1: % catalogue nodes, max order %', n, m; end if;
+  if n <> 1138 or m <> 1138 then raise exception 'FAIL C1: % catalogue nodes, max order %', n, m; end if;
   if exists (select 1 from public.interest_node where catalog_order is not null and (level < 3 or sensitive or status <> 'active')) then
     raise exception 'FAIL C1: a catalogue node is not an active, public level-3/4 interest'; end if;
   if exists (select 1 from public.interest_node c where c.catalog_order is not null
@@ -121,3 +123,27 @@ delete from public.member_custom_interest where member_id::text like '0c170000-%
 delete from public.interest_node where id like 'member.custom.%' and not exists (select 1 from public.member_interest mi where mi.interest_id = interest_node.id);
 delete from public.profiles where id::text like '0c170000-%';
 delete from auth.users where id::text like '0c170000-%';
+
+-- C8: take the nine back out (as if 0017 had run before them), replay 0022, compare with 0017's order.
+create temp table g_order_0017 as select id, catalog_order from public.interest_node where catalog_order is not null;
+delete from public.interest_node where id in ('music.singing.backing_vocals', 'stage_screen.film.film_direction',
+  'music.making.lyric_writing', 'music.making.mixing_and_mastering', 'music.making.music_direction',
+  'outdoors.trekking.night_walks', 'sports.precision.pistol_shooting', 'sports.precision.rifle_shooting',
+  'lifestyle.style.shopping');
+update public.interest_node n set catalog_order = s.ord
+  from (select id, row_number() over (order by catalog_order) ord from public.interest_node where catalog_order is not null) s
+ where n.id = s.id;
+do $$ begin
+  if (select count(*) from public.interest_node where catalog_order is not null) <> 1129 then raise exception 'FAIL C8: setup'; end if;
+end $$;
+\ir ../migrations/0022_interest_catalog_additions.sql
+\ir ../migrations/0022_interest_catalog_additions.sql
+do $$ begin
+  if exists (select 1 from g_order_0017 o full join (select id, catalog_order from public.interest_node where catalog_order is not null) n
+               on n.id = o.id where n.catalog_order is distinct from o.catalog_order) then
+    raise exception 'FAIL C8: 0022 order differs from 0017'; end if;
+  if (select parent_id || '/' || level || '/' || label from public.interest_node where id = 'lifestyle.style.shopping')
+     <> 'lifestyle.style/3/Shopping' then raise exception 'FAIL C8: Shopping'; end if;
+end $$;
+drop table g_order_0017;
+select 'g-interest-catalog.test C8 OK';

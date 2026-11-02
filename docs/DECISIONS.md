@@ -2403,3 +2403,37 @@ controls (a tester or a seeded test member), never a real member, so no new expo
 - **No agent-arena run:** a bug fix that brings the deck in line with D-080 and the other surfaces.
 - **Proof:** unit (`deck-view.test.mjs`), e2e `deck.spec.mjs` (no-cover members show the default preset cover on the
   card and the next card; never the photo).
+
+## D-122: Nine more catalogue interests, and work and creative options in Looking for (founder, 2026-11-02)
+
+- **Asked:** add the pasted A–Z list and a screenshot's items (DJ, Mixing and Mastering, Music Production, Backstage
+  Singing, Songwriting, Lyricist, Rapper, Music Director, Film Director, Screenwriting, Video Editor, Cinematography,
+  Model, Actress, Actor, Delivery, Talent Acquisition, Travel, Night Walks, Shopping, Pistol Shooting, Rifle Shooting,
+  Board Games) to interests and the Looking-for dropdown; "mention referral and job and all such things"; keep the
+  current values; never repeat one.
+- **The A–Z list was already the catalogue** (D-109, the same 1,136 lines), so it adds nothing new. Gospel Music and
+  NLP stay out for the D-109 reasons.
+- **Interests (activities):** nine labels the catalogue did not have, as level-3 nodes under the closest category:
+  Backing Vocals (for "Backstage Singing"), Film Direction, Lyric Writing, Mixing and Mastering, Music Direction, Night
+  Walks, Pistol Shooting, Rifle Shooting, Shopping. The rest were already there under the activity's name (DJing, Music
+  production, Songwriting, Rap / Rapping, Screenwriting, Video editing, Cinematography, Modeling, Acting, Talent
+  Acquisition, Travel, Board Games). Pistol and Rifle Shooting sit next to "Rifle/Pistol Sport" under precision sports,
+  since the founder named them separately. Catalogue: 1,138 (1,129 before).
+- **Looking for (people and openings):** the role words become Looking-for options, because a member looks for a DJ or
+  an actress, while the interest is the activity: DJ, Music Producer, Mixing and Mastering Engineer, Singer, Backing
+  Vocalist, Songwriter, Lyricist, Rapper, Music Director, Film Director, Screenwriter, Cinematographer, Actor, Actress,
+  Model. Work: Job Opportunities and Hiring (the values the hiring design D-121 reads), Can Give Referrals, Full-time
+  Job, Part-time Job, Internship, Freelance Work, Gig Work, Delivery Work, Delivery Partner, Recruiter, Clients,
+  Investor, Business Partner (Job Referral and Internship Referral were already there). Plans: Night Walk Buddy,
+  Shopping Buddy, Board Game Partner. Video Editor was already there.
+- **One list:** Edit profile and the old landing/auth picker had their own copies of the Looking-for list, which had
+  drifted from signup's (`Travel Companion` only in one, `Friends` only in the other). All three now read
+  `LOOKING_FOR_CATALOG` (discovery-catalog.js), which keeps every value any of them had. 88 options, no repeats.
+- **SQL:** the TSV stays the source; 0017's block is regenerated (it was not applied as of the last handoff). New
+  `0022_interest_catalog_additions.sql` adds the nine to a database where 0017 already ran and renumbers the catalogue
+  A–Z; before 0017 it does nothing; after a fresh 0017 it changes nothing.
+- **No agent-arena run:** catalogue content the founder supplied, no change to matching or ranking.
+- **Proof:** SQL `g-interest-catalog.test.sql` C1 (1,138) and C8 (0022 replayed on a catalogue without the nine gives
+  0017's exact order, twice); unit `interest-catalog-additions.test.mjs` (0022 rows are TSV rows, 0017 matches the
+  TSV) and `discovery-catalog.test.mjs` (new and kept Looking-for values, no repeats); e2e `profile-edit.spec.mjs` and
+  `signup.spec.mjs` pass.
