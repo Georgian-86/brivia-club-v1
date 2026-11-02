@@ -99,7 +99,7 @@ try {
     if (phone) check('390: no tab bar under the sheet', await page.evaluate(() => getComputedStyle(document.querySelector('.app-tabbar')).display === 'none'));
     const detail = await page.locator('#event-detail').innerText();
     check(`${w}: the panel has the date, ~km, tags, copy, going, the companion switch and See companions (8)`,
-      /~1 km/.test(detail) && /Chill/.test(detail) && /good people, better company/.test(detail) && /\+11 going/.test(detail) && /Looking for company\?/.test(detail) && /Find people attending this event/.test(detail) && /Free entry/.test(detail) && /Hosted by\s*Brivia Club/i.test(detail) && /Find my companion/i.test(detail) && /8 people are looking for company/.test(detail));
+      /~1 km/.test(detail) && /Chill/.test(detail) && /good people, better company/.test(detail) && /\+11 going/.test(detail) && /Looking for a companion\?/.test(detail) && /Going solo\? Find someone attending the same event/.test(detail) && /Free entry/.test(detail) && /Hosted by\s*Brivia Club/i.test(detail) && /Find my companion/i.test(detail) && /8 people are looking for company/.test(detail));
     await shot(page, `detail-${w}.png`);
     const axeDetail = await axeViolations(page, { include: '#event-detail' });
     check(`${w}: axe on the panel`, axeDetail.length === 0, JSON.stringify(axeDetail));
@@ -118,45 +118,34 @@ try {
     check(`${w}: focus stays on the switch`, await page.evaluate(() => document.activeElement?.hasAttribute('data-event-wants')));
     check(`${w}: the button now reads My companions and still counts others only (8)`, /My companions/i.test(await page.locator('[data-event-companions]').innerText()) && /8 people are looking/.test(await page.locator('#event-detail').innerText()));
 
-    // Find my companion (already registered and looking): straight to the matches.
+    // Find my companion (already registered and looking): straight to the swipe cards (D-123).
     const rsvpBefore = posted('set_event_rsvp').length;
     await page.locator('[data-event-companions]').click();
-    await page.waitForSelector('#event-companions-dialog[open] .event-companion-row');
-    check(`${w}: no extra save when already looking`, posted('set_event_rsvp').length === rsvpBefore);
-    const rows = await page.locator('#event-companions-list').innerText();
-    check(`${w}: matches list shared interests first, Connect for new people, Message for a connection`, /Ravi Tune[\s\S]*3 shared interests[\s\S]*Connect[\s\S]*Asha Band[\s\S]*Already a connection[\s\S]*Message/i.test(rows), rows);
-    check(`${w}: Stop looking is offered`, await page.locator('[data-companion-stop]').isVisible());
-    await shot(page, `companions-${w}.png`);
-    const axeDialog = await axeViolations(page, { include: '#event-companions-dialog' });
-    check(`${w}: axe on the companions dialog`, axeDialog.length === 0, JSON.stringify(axeDialog));
-    await page.locator('[data-companion-hi]').click();
-    await page.waitForFunction(() => document.querySelector('[data-companion-hi]')?.textContent === 'Request sent');
-    const signal = JSON.parse(posted('send_signal').at(-1)?.body || '{}');
-    check(`${w}: Connect sends one ordinary request with a note about the event (${JSON.stringify(signal)})`, posted('send_signal').length === 1 && signal.p_to === companions[0].member_id && /Acoustic Jam Session/.test(signal.p_note));
-    await page.keyboard.press('Escape');
-    check(`${w}: Escape closes the dialog`, !(await page.locator('#event-companions-dialog').evaluate((d) => d.open)));
+    await page.waitForSelector('[data-view="companions"]:not([hidden])');
+    check(`${w}: no extra save when already looking, and the companions view opens for this event`, posted('set_event_rsvp').length === rsvpBefore
+      && /view=companions&event=e-jam/.test(page.url()) && await page.locator('#event-detail').isHidden());
+    await page.goBack();
+    await page.waitForSelector('[data-view="events"]:not([hidden])');
+    check(`${w}: Back returns to Explore`, /view=events/.test(page.url()));
 
-    await page.locator('.event-detail-back').click();
-    check(`${w}: ← closes the drawer and focus returns to the card`, await page.locator('#event-detail').isHidden() && await page.evaluate(() => Boolean(document.activeElement?.closest('.event-card'))));
-
-    // Find my companion on a card, not registered (free event): one confirm registers and opts in, then the matches.
+    // Find my companion on a card, not registered (free event): one confirm registers and opts in, then the cards.
     await page.locator('.event-card[data-event-id="e-tech"] [data-event-companion]').click();
     await page.waitForSelector('#event-companions-dialog[open] [data-companion-join]');
     check(`${w}: the card button opens that event and asks once ("Register & find company")`, (await page.locator('#event-detail-title').innerText()) === 'Tech & Coffee Night'
       && /registered for this event and shown to others/.test(await page.locator('#event-companions-list').innerText()) && await page.evaluate(() => document.activeElement?.hasAttribute('data-companion-join')));
     await shot(page, `find-companion-join-${w}.png`);
+    const axeDialog = await axeViolations(page, { include: '#event-companions-dialog' });
+    check(`${w}: axe on the companion dialog`, axeDialog.length === 0, JSON.stringify(axeDialog));
     const before = posted('set_event_rsvp').length;
     await page.locator('[data-companion-join]').click();
-    await page.waitForSelector('#event-companions-dialog[open] .event-companion-row');
+    await page.waitForSelector('[data-view="companions"]:not([hidden])');
     const joinCall = JSON.parse(posted('set_event_rsvp').at(-1)?.body || '{}');
-    check(`${w}: one save registers and opts in (${JSON.stringify(joinCall)})`, posted('set_event_rsvp').length === before + 1 && joinCall.p_event === 'e-tech' && joinCall.p_going === true && joinCall.p_wants_companion === true);
-    check(`${w}: the drawer shows Registered and My companions behind it`, /Registered/i.test(await page.locator('#event-detail').innerText()) && /My companions/i.test(await page.locator('[data-event-companions]').innerText()));
-    await page.locator('[data-companion-stop]').click();
-    await page.waitForFunction(() => !document.querySelector('#event-companions-dialog').open);
-    const stopCall = JSON.parse(posted('set_event_rsvp').at(-1)?.body || '{}');
-    check(`${w}: Stop looking turns off only the companion choice (${JSON.stringify(stopCall)})`, stopCall.p_going === null && stopCall.p_wants_companion === false && /Registered/i.test(await page.locator('#event-detail').innerText()));
-    await page.keyboard.press('Escape');
-    check(`${w}: Escape closes the drawer`, await page.locator('#event-detail').isHidden());
+    check(`${w}: one save registers and opts in, then the cards for that event (${JSON.stringify(joinCall)})`, posted('set_event_rsvp').length === before + 1 && joinCall.p_event === 'e-tech'
+      && joinCall.p_going === true && joinCall.p_wants_companion === true && /event=e-tech/.test(page.url()));
+    await page.goBack();
+    await page.waitForSelector('[data-view="events"]:not([hidden])');
+    const techSwitch = page.locator('.event-card[data-event-id="e-tech"] [data-event-companion]');
+    check(`${w}: back on Explore the card switch shows on`, await techSwitch.getAttribute('aria-checked') === 'true');
 
     // The card's switch (founder's mockup): on for an event you look at, and switching it off there stops looking.
     const jamSwitch = page.locator('.event-card[data-event-id="e-jam"] [data-event-companion]');

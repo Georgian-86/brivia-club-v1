@@ -1,0 +1,128 @@
+/* Find a Companion (D-123): "Connect / Companions". The founder's reference: the Connect page vocabulary (wine eyebrow,
+   Bodoni display with a wine italic second line, a ruled note and an event picker pill, an uppercase count), then
+   up to three paper cards in a row (one on phones), each with a wine "LOOKING FOR A COMPANION" bar, a cover, a round
+   photo over its edge, the name in Bodoni, a band line, a headline, interest chips (shared ones filled), and a solid
+   wine "Going to …" event row. Round Pass and Connect buttons sit under the cards. Tokens only. */
+body.app-body .companions-view, body.app-body .companion-match-dialog {
+  --cp-wine: var(--brivia-wine, var(--color-wine));
+  --cp-wine-deep: var(--brivia-deep-wine, var(--color-wine-deep));
+  --cp-ink: var(--color-ink);
+  --cp-muted: var(--color-ink-soft);
+  --cp-line: var(--color-line);
+  --cp-paper: var(--color-cream);
+  --cp-card: color-mix(in srgb, var(--color-card-paper) 55%, var(--color-cream));
+  --cp-shadow: 0 1px 2px color-mix(in srgb, var(--cp-wine-deep) 10%, transparent), 0 26px 46px -26px color-mix(in srgb, var(--cp-wine-deep) 60%, transparent);
+}
+body.app-body .companions-view { min-height: calc(100svh - 76px); padding: var(--space-6) clamp(20px, 5vw, 72px) var(--space-8); background: transparent; color: var(--cp-ink); font-family: var(--font-body); }
+body.app-body .companions-view[hidden] { display: none; }
+.companions-main { max-width: 1240px; margin: 0 auto; }
+.companions-view svg, .companion-match-dialog svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+
+/* Head */
+.companions-head { display: grid; gap: var(--space-4); align-items: center; margin: 8px 0 var(--space-6); }
+body.app-body .companions-view .app-eyebrow { margin: 0; color: var(--cp-wine); font-size: var(--text-12); font-weight: 700; letter-spacing: .117em; }
+body.app-body .companions-view .companions-head h1 { margin: var(--space-3) 0 0; color: var(--cp-ink); font-family: var(--font-heading); font-size: clamp(40px, 5vw, 64px); font-weight: 400; line-height: .95; letter-spacing: -.035em; }
+body.app-body .companions-view .companions-head h1 em { color: var(--cp-wine); font-style: italic; font-weight: 500; }
+body.app-body .companions-view .companions-head h1 { white-space: nowrap; }
+.companions-count { white-space: nowrap; }
+.companions-note { max-width: 270px; margin: 0; color: var(--cp-ink); font-family: var(--font-heading); font-size: var(--text-16); line-height: 1.4; }
+.companion-picker { position: relative; display: inline-flex; align-items: center; gap: var(--space-2); min-height: 44px; padding: 0 var(--space-4); border: 1px solid var(--cp-line); border-radius: var(--radius-pill); background: color-mix(in srgb, var(--cp-paper) 80%, transparent); color: var(--cp-wine); box-shadow: 0 6px 16px -12px color-mix(in srgb, var(--cp-wine-deep) 50%, transparent); }
+.companion-picker[hidden] { display: none; }
+.companion-picker svg { flex: 0 0 18px; width: 18px; height: 18px; }
+body.app-body .companion-picker select { min-width: 0; max-width: 300px; padding: 0 22px 0 0; border: 0; background: transparent; color: var(--cp-wine); font: inherit; font-size: var(--text-14); font-weight: 600; -webkit-appearance: none; appearance: none; cursor: pointer; }
+body.app-body .companion-picker select:focus-visible { outline: none; }
+.companion-picker:has(select:focus-visible) { outline: 2px solid var(--cp-wine); outline-offset: 3px; }
+.companion-picker-chevron { position: absolute; right: var(--space-4); pointer-events: none; }
+.companions-count { margin: 0; color: var(--cp-ink); font-size: var(--text-12); font-weight: 700; letter-spacing: .097em; }
+
+/* Cards */
+.companion-deck { position: relative; min-height: 520px; outline: none; }
+.companion-row { display: grid; grid-template-columns: repeat(3, minmax(0, 360px)); justify-content: center; gap: var(--space-5); }
+.companion-card {
+  position: relative; display: flex; flex-direction: column; overflow: hidden; padding: 10px 10px var(--space-3); border: 1px solid color-mix(in srgb, var(--color-card-edge) 90%, transparent);
+  border-radius: 22px; background: var(--cp-card); box-shadow: var(--cp-shadow); color: var(--cp-ink); touch-action: pan-y; user-select: none;
+  transition: opacity .25s ease, transform .25s ease;
+}
+/* The stacked paper edge under each card, as in the reference. */
+.companion-card::after { content: ''; position: absolute; right: 14px; bottom: -7px; left: 14px; z-index: -1; height: 14px; border: 1px solid color-mix(in srgb, var(--color-card-edge) 90%, transparent); border-radius: 0 0 18px 18px; background: var(--cp-card); }
+.companion-card:not(.is-current) { opacity: .82; transform: scale(.98); }
+.companion-card.is-current { cursor: grab; }
+.companion-card.is-held { cursor: grabbing; }
+.companion-card.is-skeleton { min-height: 500px; background: linear-gradient(100deg, var(--color-skeleton) 40%, var(--color-skeleton-glint) 50%, var(--color-skeleton) 60%); background-size: 200% 100%; animation: companion-shimmer 1.4s linear infinite; }
+@keyframes companion-shimmer { to { background-position: -200% 0; } }
+.companion-card-bar { display: flex; align-items: center; min-height: 40px; padding: 0 var(--space-4); border-radius: 12px 12px 0 0; background: var(--cp-wine-deep); color: var(--cp-paper); font-size: var(--text-12); font-weight: 700; letter-spacing: .16em; text-transform: uppercase; }
+.companion-card-cover { aspect-ratio: 16 / 10; overflow: hidden; background: linear-gradient(135deg, var(--color-oxblood-deep), var(--cp-wine-deep) 60%, var(--color-wine-soft)); }
+.companion-card-cover img { display: block; width: 100%; height: 100%; object-fit: cover; pointer-events: none; }
+body.app-body .companion-card-profile { position: relative; z-index: 1; align-self: flex-start; margin: -52px 0 0 var(--space-4); padding: 0; border: 0; border-radius: 50%; background: none; cursor: pointer; }
+body.app-body .companion-card-profile:focus-visible { outline: 2px solid var(--cp-wine); outline-offset: 3px; }
+.companion-avatar { display: grid; place-items: center; width: 96px; height: 96px; overflow: hidden; border: 4px solid var(--cp-paper); border-radius: 50%; background: color-mix(in srgb, var(--cp-wine) 20%, var(--cp-paper)); box-shadow: 0 8px 18px -10px color-mix(in srgb, var(--cp-wine-deep) 70%, transparent); color: var(--cp-wine-deep); font-family: var(--font-heading); font-size: var(--text-32); }
+.companion-avatar img { width: 100%; height: 100%; object-fit: cover; pointer-events: none; }
+.companion-card-body { display: grid; gap: 4px; padding: var(--space-1) var(--space-3) 0; }
+body.app-body .companions-view .companion-name { margin: 0; color: var(--cp-ink); font-family: var(--font-heading); font-size: clamp(28px, 2.6vw, 34px); font-weight: 500; line-height: 1.05; letter-spacing: -.02em; }
+.companion-place { display: flex; align-items: center; gap: 6px; margin: 0; color: var(--cp-muted); font-family: var(--font-heading); font-size: var(--text-14); }
+.companion-headline { margin: 2px 0 0; color: var(--cp-ink); font-family: var(--font-heading); font-size: var(--text-16); line-height: 1.35; }
+.companion-chips { display: flex; flex-wrap: wrap; gap: var(--space-2); margin: var(--space-2) 0 0; padding: 0; list-style: none; }
+.companion-chips li { padding: 4px var(--space-4); border-radius: var(--radius-pill); background: color-mix(in srgb, var(--cp-wine) 10%, var(--cp-paper)); color: var(--cp-wine-deep); font-family: var(--font-heading); font-size: var(--text-14); }
+.companion-chips li.is-shared { background: var(--cp-wine); color: var(--cp-paper); }
+.companion-event { display: grid; gap: 2px; margin: var(--space-4) var(--space-2) 0; padding: var(--space-3) var(--space-4); border-radius: 12px; background: var(--cp-wine-deep); color: var(--cp-paper); text-align: center; }
+.companion-event-name { margin: 0; font-size: var(--text-14); font-weight: 700; letter-spacing: .12em; text-transform: uppercase; }
+.companion-event-name span { opacity: .75; }
+.companion-event-when { display: inline-flex; align-items: center; justify-content: center; gap: 6px; margin: 0; color: color-mix(in srgb, var(--cp-paper) 82%, transparent); font-size: var(--text-12); }
+.companion-hint { margin: var(--space-2) 0 0; color: var(--cp-muted); font-family: var(--font-heading); font-size: var(--text-14); font-style: italic; text-align: center; }
+.companion-card:not(.is-current) .companion-hint { visibility: hidden; }
+.companion-stamp { position: absolute; top: 64px; z-index: 2; padding: 6px var(--space-3); border: 2px solid currentColor; border-radius: var(--radius-s); background: color-mix(in srgb, var(--cp-paper) 90%, transparent); font-size: var(--text-14); font-weight: 700; letter-spacing: .16em; text-transform: uppercase; pointer-events: none; }
+.companion-stamp-pass { right: 24px; color: var(--cp-muted); opacity: var(--swipe-pass, 0); transform: rotate(8deg); }
+.companion-stamp-like { left: 24px; color: var(--cp-wine); opacity: var(--swipe-pitch, 0); transform: rotate(-8deg); }
+
+/* Actions */
+.companion-actions { display: flex; justify-content: center; gap: var(--space-7); margin-top: var(--space-6); }
+.companion-actions[hidden] { display: none; }
+body.app-body .companion-action { display: grid; place-items: center; width: 64px; height: 64px; padding: 0; border: 1px solid var(--cp-line); border-radius: 50%; background: var(--cp-paper); color: var(--cp-wine); box-shadow: var(--cp-shadow); cursor: pointer; transition: transform .15s ease, background .15s ease; }
+body.app-body .companion-action svg { width: 26px; height: 26px; stroke-width: 2; }
+body.app-body .companion-action-like { width: 72px; height: 72px; border-color: var(--cp-wine); background: var(--cp-wine); color: var(--cp-paper); }
+body.app-body .companion-action-like svg { fill: currentColor; stroke: none; width: 30px; height: 30px; }
+@media (hover: hover) { body.app-body .companion-action:hover { transform: translateY(-2px); } body.app-body .companion-action-like:hover { background: var(--cp-wine-deep); } }
+body.app-body .companion-action:focus-visible { outline: 2px solid var(--cp-wine); outline-offset: 4px; }
+body.app-body .companion-action:disabled { opacity: .6; cursor: progress; }
+.companion-keys { margin: var(--space-4) 0 0; color: var(--cp-muted); font-size: var(--text-12); text-align: center; }
+
+.companion-empty { max-width: 520px; margin: var(--space-6) auto; padding: var(--space-7) var(--space-5); border: 1px solid var(--cp-line); border-radius: var(--radius-l); background: var(--cp-card); text-align: center; }
+body.app-body .companion-empty h2 { margin: 0; color: var(--cp-ink); font-family: var(--font-heading); font-size: var(--text-32); font-weight: 400; letter-spacing: -.02em; }
+.companion-empty p { margin: var(--space-2) 0 var(--space-5); color: var(--cp-muted); font-size: var(--text-14); line-height: 1.55; }
+
+/* The "going together" moment */
+body.app-body .companion-match-dialog { width: min(520px, calc(100vw - 24px)); padding: var(--space-7) var(--space-6) var(--space-6); border: 0; border-radius: var(--radius-l); background: var(--cp-paper); color: var(--cp-ink); font-family: var(--font-body); text-align: center; box-shadow: var(--shadow-2); }
+body.app-body .companion-match-dialog::backdrop { background: color-mix(in srgb, var(--color-oxblood-deep) 60%, transparent); -webkit-backdrop-filter: blur(3px); backdrop-filter: blur(3px); }
+.companion-match-faces { display: flex; align-items: center; justify-content: center; gap: var(--space-3); margin-bottom: var(--space-5); }
+.companion-avatar-lg { width: 88px; height: 88px; }
+.companion-match-mark { color: var(--cp-wine); font-family: var(--font-heading); font-size: var(--text-32); font-style: italic; }
+body.app-body .companion-match-dialog .app-eyebrow { margin: 0; color: var(--cp-wine); font-size: var(--text-12); font-weight: 700; letter-spacing: .117em; }
+body.app-body .companion-match-dialog h2 { margin: var(--space-3) 0 0; color: var(--cp-ink); font-family: var(--font-heading); font-size: clamp(32px, 5vw, 44px); font-weight: 400; line-height: 1.02; letter-spacing: -.03em; }
+body.app-body .companion-match-dialog h2 em { color: var(--cp-wine); font-style: italic; font-weight: 500; }
+.companion-match-copy { margin: var(--space-3) auto 0; max-width: 380px; color: var(--cp-muted); font-size: var(--text-16); line-height: 1.5; }
+.companion-match-when { display: inline-flex; align-items: center; gap: 6px; margin: var(--space-3) 0 0; padding: 6px var(--space-4); border-radius: var(--radius-pill); background: color-mix(in srgb, var(--cp-wine) 8%, var(--cp-paper)); color: var(--cp-wine-deep); font-size: var(--text-14); }
+.companion-match-actions { display: flex; flex-wrap: wrap; justify-content: center; gap: var(--space-3); margin-top: var(--space-6); }
+body.app-body .companion-match-dialog .event-btn { border: 1px solid var(--cp-wine); }
+body.app-body .companion-match-dialog .event-btn-primary { background: var(--cp-wine); color: var(--cp-paper); }
+
+/* The panel row for a match (notifications) */
+.notification-companion { display: flex; align-items: center; gap: var(--space-3); padding: var(--space-3) var(--space-4); border-bottom: 1px solid var(--color-line); background: color-mix(in srgb, var(--color-wine) 6%, transparent); }
+
+@media (min-width: 1080px) {
+  .companions-head { grid-template-columns: auto auto 1fr auto; column-gap: var(--space-6); }
+  .companions-note { width: 250px; padding-left: var(--space-6); border-left: 1px solid var(--cp-line); }
+  .companion-picker { justify-self: end; }
+  .companions-count { padding-left: var(--space-5); border-left: 1px solid var(--cp-line); }
+}
+@media (max-width: 1079px) {
+  .companion-row { grid-template-columns: minmax(0, 380px); }
+  .companion-card:not(.is-current) { display: none; }
+  .companion-deck { min-height: 0; }
+  .companion-actions { margin-top: var(--space-5); }
+}
+@media (max-width: 759px) {
+  body.app-body .companions-view { padding: var(--space-5) var(--space-4) calc(var(--space-8) + 40px); }
+  .companion-avatar { width: 84px; height: 84px; }
+  .companion-actions { gap: var(--space-6); }
+}
+@media (prefers-reduced-motion: reduce) { .companion-card, body.app-body .companion-action { transition: none; } .companion-card.is-skeleton { animation: none; } }

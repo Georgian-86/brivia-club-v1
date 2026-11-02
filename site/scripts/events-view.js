@@ -360,7 +360,7 @@ export const eventDetailMarkup = (event, { imageSrc = '', friends = [], organize
   ${gallery.length ? `<ul class="event-gallery" aria-label="Photos">${gallery.map((src) => `<li><img src="${escapeHtml(src)}" alt="" loading="lazy" decoding="async" /></li>`).join('')}</ul>` : ''}
   ${live || event.status === 'cancelled' ? registrationMarkup(preview ? { ...event, myStatus: null } : event, friends) : ''}
   ${live ? `<div class="event-detail-row event-companion-row-toggle">
-    <div><p class="event-companion-title" id="event-companion-label">Looking for company?</p><p class="event-companion-copy" id="event-companion-copy">Find people attending this event who would love to go with you. Only people who also turn this on see you, most shared interests first.</p></div>
+    <div><p class="event-companion-title" id="event-companion-label">Looking for a companion?</p><p class="event-companion-copy" id="event-companion-copy">Going solo? Find someone attending the same event and make it a shared experience. Only people who also turn this on see you.</p></div>
     <button type="button" class="event-switch" role="switch" data-event-wants aria-checked="${event.wantsCompanion}" aria-labelledby="event-companion-label" aria-describedby="event-companion-copy"${registered && !preview ? '' : ' disabled'}><span></span></button>
   </div>
   ${event.isMine ? '' : `<button type="button" class="event-see-companions" data-event-companions aria-describedby="event-see-hint"${preview ? ' disabled' : ''}>${PEOPLE}<span>${event.wantsCompanion && registered ? 'My companions' : 'Find my companion'}</span> ${ARROW}</button>

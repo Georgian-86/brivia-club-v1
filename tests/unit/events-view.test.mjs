@@ -186,8 +186,8 @@ test('drawer: host, Reserve for a paid event, map link, contact only when given,
   assert.match(html, /Reserve · ₹1,499/);
   assert.match(html, /confirmed only once payment completes/);
   assert.match(html, /href="https:\/\/maps\.app\.goo\.gl\/abc" target="_blank" rel="noopener noreferrer nofollow"/);
-  assert.match(html, /Looking for company\?/);
-  assert.match(html, /Find people attending this event who would love to go with you/);
+  assert.match(html, /Looking for a companion\?/);
+  assert.match(html, /Going solo\? Find someone attending the same event and make it a shared experience/);
   assert.match(html, /data-event-ask/);
   assert.ok(!html.includes('mailto:'));
   const withContact = eventDetailMarkup(normalizeEvent({ ...member, contact: { email: 'host@example.com', link: 'javascript:alert(1)' } }));

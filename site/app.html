@@ -57,6 +57,25 @@
           </div>
         </section>
 
+        <!-- Find a Companion (D-123): people going solo to the same event, as swipeable cards. Reached from Explore. -->
+        <section class="app-view companions-view" data-view="companions" hidden aria-labelledby="companions-heading">
+          <div class="companions-main">
+            <div class="companions-head">
+              <div><p class="app-eyebrow">CONNECT / COMPANIONS</p><h1 id="companions-heading">Find your<br /><em>event companion.</em></h1></div>
+              <p class="companions-note">People who are also going solo to the same event.</p>
+              <label class="companion-picker"><span class="sr-only">Event</span><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><rect x="4" y="5.5" width="16" height="14" rx="2"/><path d="M4 10h16M8.5 3.5v4M15.5 3.5v4"/></svg><select id="companion-event"></select><svg class="companion-picker-chevron" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M6 9l6 6 6-6"/></svg></label>
+              <p class="companions-count" id="companion-count"></p>
+            </div>
+            <p class="sr-only" id="companion-status" role="status" aria-live="polite"></p>
+            <div class="companion-deck" id="companion-deck" tabindex="-1" aria-label="People looking for a companion"></div>
+            <div class="companion-actions" hidden>
+              <button type="button" class="companion-action companion-action-pass" id="companion-pass" aria-label="Pass"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
+              <button type="button" class="companion-action companion-action-like" id="companion-like" aria-label="Connect: I'd like to go together"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 20s-7.5-4.6-7.5-10.2A4.3 4.3 0 0 1 12 7.2a4.3 4.3 0 0 1 7.5 2.6C19.5 15.4 12 20 12 20Z"/></svg></button>
+            </div>
+            <p class="companion-keys">Use ← and → to pass or connect. Going together needs both of you to connect.</p>
+          </div>
+        </section>
+
         <section class="app-view community-feed-view" data-view="posts" hidden>
           <div class="community-feed-head">
             <div><p class="app-eyebrow">POSTS / COMMUNITY</p><h1>Share what<br /><em>moves you.</em></h1></div>
@@ -135,10 +154,11 @@
     <!-- Create Event (D-121): event-create.js fills the dialog; the ask dialog sends a question to an organiser. -->
     <dialog class="event-create-dialog" id="event-create-dialog" aria-labelledby="event-create-title"></dialog>
     <dialog class="event-ask-dialog" id="event-ask-dialog" aria-labelledby="event-ask-title"><form method="dialog" class="event-ask-form" id="event-ask-form" novalidate><div class="event-companions-head"><div><p class="app-eyebrow">ASK THE ORGANISER</p><h2 id="event-ask-title">Ask a question</h2></div><button type="button" class="event-companions-close" data-ask-close aria-label="Close">×</button></div><p class="event-companions-lede" id="event-ask-lede">Your question goes to the organiser as a request with a note. You can chat once they accept.</p><label class="event-ask-label" for="event-ask-text">Your question</label><textarea id="event-ask-text" rows="4" maxlength="200" required aria-describedby="event-ask-lede event-ask-error"></textarea><p class="event-field-error" id="event-ask-error" role="alert"></p><div class="event-ask-actions"><button type="button" class="event-btn event-btn-ghost" data-ask-close>Cancel</button><button type="submit" class="event-btn event-btn-primary">Send question</button></div></form></dialog>
+    <dialog class="companion-match-dialog" id="companion-match-dialog" aria-labelledby="companion-match-title"><div class="companion-match-body"></div></dialog>
     <div class="app-toast" id="app-toast" role="status"></div>
     <script>
       (() => {
-        const validViews = ['home', 'explore', 'events', 'posts', 'chat', 'profile'];
+        const validViews = ['home', 'explore', 'events', 'posts', 'chat', 'profile', 'companions'];
         const readView = () => new URLSearchParams(window.location.search).get('view') || window.location.hash.slice(1) || 'explore';
         const showView = (view) => {
           if (!validViews.includes(view)) view = 'explore';
@@ -149,7 +169,7 @@
             section.hidden = section.dataset.view !== renderedView;
             section.classList.toggle('is-active', section.dataset.view === renderedView);
           });
-          const current = view === 'home' ? 'explore' : view;
+          const current = view === 'home' || view === 'companions' ? 'explore' : view;
           document.querySelectorAll('[data-nav]').forEach((item) => item.classList.toggle('is-active', item.dataset.nav === current));
           document.querySelectorAll('[data-nav-host] [data-nav]').forEach((item) => {
             if (item.dataset.nav === current) item.setAttribute('aria-current', 'page');

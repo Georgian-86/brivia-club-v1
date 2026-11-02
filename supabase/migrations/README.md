@@ -887,3 +887,26 @@ Expected advisor additions: `save_member_event`, `cancel_member_event` and `dele
 definer-RPC list (`orbit-hygiene.test.sql` H3). Paid events: registrations stay `pending_payment` until a payment
 provider is chosen and its webhook calls `confirm_event_payment` (owed, D-121).
 
+## 0023
+
+**Find a Companion: event-based swipe matching (founder request 2026-11-02, D-123). Not yet applied.** Apply after
+`0022` (it needs `event_rsvp.status` and the member events).
+
+What it does: adds `event_companion_swipe` (one like or pass per member, candidate and event) and
+`event_companion_match` (one per pair and event, with seen flags), both RLS on with no client grants, and five
+`authenticated` definer RPCs: `companion_events()`, `companion_deck(p_event, p_limit)`, `companion_swipe(p_event,
+p_target, p_like)`, `my_companion_matches()`, `mark_companion_match_seen(p_match)`. A mutual like also creates the
+ordinary connection (`brivia_create_match`), so Chat opens. No location beyond the deck's band leaves.
+
+Deploy order: either. Before 0023 the companions view says "Companions open soon".
+
+Verify after the apply:
+
+```sql
+select has_table_privilege('authenticated', 'public.event_companion_swipe', 'select'),                    -- f
+       has_function_privilege('anon', 'public.companion_swipe(uuid, uuid, boolean)', 'execute'),            -- f
+       has_function_privilege('authenticated', 'public.companion_swipe(uuid, uuid, boolean)', 'execute');   -- t
+```
+
+Expected advisor additions: the five RPCs join the intended definer-RPC list (`orbit-hygiene.test.sql` H3).
+

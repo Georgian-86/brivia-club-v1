@@ -21,7 +21,7 @@ import '../styles/mobile-app.css';
 import '../styles/skeleton.css';
 import '../styles/aura-theme.css';
 import '../styles/handoff.css';
-import { supabase, compressImageOnly, rowToProfile, saveProfile, isPresetCoverUrl, onboardingStatus, sendSignal, fetchSignalQuota, isRateLimited, isStorageImageUrl, withoutCredentials, uploadMessageAttachment, removeMessageAttachment, uploadCommunityPostImage, removeCommunityPostImage, ImageProcessingError, PHOTO_ERROR_MESSAGE, PHOTO_FRAMER_ERROR, compressAttachmentFiles, attachmentKind, reportMember, setSensitiveConsent, fetchSensitiveConsentAt, fetchMyInterests, fetchInterestNodes, addMemberInterest, isMissingFunction, touchPresence, connectionPresence, setPresenceVisible, myPresenceVisible, setMemberInterests, uploadResume, removeResume, resumeSignedUrl, resumeInfo, clearResumePath, searchPlaces, setHomeCity, setHomeLocation, listEvents, setEventRsvp, setCompanionDefault, myEventPrefs, eventCompanions, saveMemberEvent, cancelMemberEvent, deleteMemberEvent, uploadEventImage, removeEventImages, setNearbyEnabled, myNearbySetting, nearbyPulse, nearbyClear, myNearbyAlerts, setNearbyMuted } from './supabase.js';
+import { supabase, compressImageOnly, rowToProfile, saveProfile, isPresetCoverUrl, onboardingStatus, sendSignal, fetchSignalQuota, isRateLimited, isStorageImageUrl, withoutCredentials, uploadMessageAttachment, removeMessageAttachment, uploadCommunityPostImage, removeCommunityPostImage, ImageProcessingError, PHOTO_ERROR_MESSAGE, PHOTO_FRAMER_ERROR, compressAttachmentFiles, attachmentKind, reportMember, setSensitiveConsent, fetchSensitiveConsentAt, fetchMyInterests, fetchInterestNodes, addMemberInterest, isMissingFunction, touchPresence, connectionPresence, setPresenceVisible, myPresenceVisible, setMemberInterests, uploadResume, removeResume, resumeSignedUrl, resumeInfo, clearResumePath, searchPlaces, setHomeCity, setHomeLocation, listEvents, setEventRsvp, setCompanionDefault, myEventPrefs, eventCompanions, saveMemberEvent, cancelMemberEvent, deleteMemberEvent, uploadEventImage, removeEventImages, companionEvents, companionDeck, companionSwipe, myCompanionMatches, markCompanionMatchSeen, setNearbyEnabled, myNearbySetting, nearbyPulse, nearbyClear, myNearbyAlerts, setNearbyMuted } from './supabase.js';
 import { locateOnce, fallbackCopy } from './geo-locate.js';
 import { areaChangeMessage, AREA_HELPER, AREA_NO_MATCH } from './area-change.js';
 import { areaShareBody, parseAreaBody, resumeShareAttachment, resumeMessageFields, RESUME_SHARE_BODY, NO_RESUME_HINT, RESUME_GONE_COPY, RESUME_SHARE_NOTE, AREA_SHARE_NOTE } from './quick-share.js';
@@ -43,6 +43,9 @@ import { createCrossingPaths, isQuietHour, alertHeadline, alertDetail, alertToas
 import '../styles/crossing-paths.css';
 import { createEventsPage } from './events-page.js';
 import { createEventComposer } from './event-create.js';
+import { createCompanionsPage } from './companions-page.js';
+import { normalizeCompanionMatch, chatContextLine } from './companion-view.js';
+import '../styles/companions.css';
 import '../styles/events.css';
 import '../styles/event-create.css';
 import { postCardMarkup, postFooterMarkup, countText, shareData, isSafePostImageSrc } from './post-card.js';
@@ -125,6 +128,9 @@ const isActiveNow = (id) => Boolean(presence?.isActive(id));
 // Crossing paths (D-119, 0021): the loop (crossing-paths.js), its alerts (from my_nearby_alerts) and its status.
 let crossingPaths = null;
 let nearbyAlerts = [];
+// D-123: event companion matches (my_companion_matches); unseen ones are notifications.
+let companionMatches = [];
+const companionToasted = new Set();
 let nearbyStatus = 'off';
 const nearbyToasted = new Set();
 // Alerts that were new when the panel last opened: they keep the unread tint while it stays open.
@@ -458,8 +464,10 @@ const renderNotifications = () => {
   // Pending requests stay reachable even with message notifications switched off.
   // D-119: Crossing paths alerts have their own switch, so they count even with message notifications off.
   const nearbyCount = unseenNearbyAlerts().length;
-  const unreadCount = (enabled ? notifications.filter((notification) => !notification.read).length : 0) + requestCount + nearbyCount;
-  const anything = enabled || requestCount || nearbyAlerts.length;
+  // D-123: "going together" matches count until seen, whatever the message switch says (they are a mutual decision).
+  const companionUnseen = unseenCompanionMatches();
+  const unreadCount = (enabled ? notifications.filter((notification) => !notification.read).length : 0) + requestCount + nearbyCount + companionUnseen.length;
+  const anything = enabled || requestCount || nearbyAlerts.length || companionUnseen.length;
   button.toggleAttribute('hidden', !anything);
   if (!anything) closeNotificationPanel();
   badge.textContent = unreadCount > 99 ? '99+' : String(unreadCount);
@@ -500,8 +508,23 @@ const renderNotifications = () => {
     const title = person?.name || 'a Brivia member';
     const messageLabel = `${group.count} message${group.count === 1 ? '' : 's'} from ${title}`;
     return `<button type="button" class="notification-item is-unread" data-notification-person="${escapeHtml(group.personId)}">${renderAvatar(person, 'notification-avatar')}<span class="notification-copy"><strong>${escapeHtml(messageLabel)}</strong></span><time>${escapeHtml(formatNotificationTime(group.latest.createdAt))}</time></button>`;
-  }).join('') : ((requestCount || nearbyAlerts.length) ? '' : `<div class="notification-empty"><p>You are all caught up.</p>${settingsAction}</div>`);
-  list.innerHTML = requestsHtml + nearbyHtml + messagesHtml;
+  }).join('') : ((requestCount || nearbyAlerts.length || companionUnseen.length) ? '' : `<div class="notification-empty"><p>You are all caught up.</p>${settingsAction}</div>`);
+  const companionHtml = companionUnseen.map((match) => {
+    const person = findPersonById(match.otherId) || { name: match.otherName, image: match.otherPhotoUrl };
+    return `<section class="notification-companion is-unread" aria-label="${escapeHtml(`You and ${match.otherName} are going together to ${match.eventTitle}`)}">`
+      + `<span class="notification-nearby-face">${renderAvatar(person, 'notification-avatar')}</span>`
+      + `<span class="notification-nearby-copy"><strong>${escapeHtml(`You and ${match.otherName} are going together`)}</strong><span>${escapeHtml(match.eventTitle)}</span></span>`
+      + `<button type="button" class="notification-nearby-hi" data-companion-match="${escapeHtml(match.id)}">Say hello</button></section>`;
+  }).join('');
+  list.innerHTML = requestsHtml + companionHtml + nearbyHtml + messagesHtml;
+  list.querySelectorAll('[data-companion-match]').forEach((item) => item.addEventListener('click', (event) => {
+    event.stopPropagation();
+    const match = companionMatches.find((m) => m.id === item.dataset.companionMatch);
+    closeNotificationPanel();
+    if (!match) return;
+    markCompanionSeenLocally(match.id);
+    companionsPage.showMatch({ matchId: match.id, person: { id: match.otherId, name: match.otherName, photoUrl: match.otherPhotoUrl }, event: { title: match.eventTitle, startsAt: match.startsAt, venueName: match.venueName } });
+  }));
   list.querySelectorAll('[data-nearby-hi]').forEach((item) => item.addEventListener('click', (event) => {
     event.stopPropagation();
     const person = findPersonById(item.dataset.nearbyHi);
@@ -804,10 +827,75 @@ const eventComposer = createEventComposer({
   geo: navigator.geolocation,
   secure: window.isSecureContext,
 });
+// Find a Companion (D-123, 0023): the companions view, opening a conversation after a match, and match notifications
+// for the member who swiped first (the second sees the moment at once).
+const companionSeenKey = () => `brivia-companion-seen:${memberProfile.id || 'anonymous'}`;
+const readCompanionSeen = () => { try { return new Set(JSON.parse(window.localStorage.getItem(companionSeenKey()) || '[]')); } catch { return new Set(); } };
+const unseenCompanionMatches = () => companionMatches.filter((match) => !match.seen && !readCompanionSeen().has(match.id));
+const markCompanionSeenLocally = (id) => {
+  try { const seen = readCompanionSeen(); seen.add(id); window.localStorage.setItem(companionSeenKey(), JSON.stringify([...seen].slice(-200))); } catch { /* memory only */ }
+  companionMatches = companionMatches.map((match) => (match.id === id ? { ...match, seen: true } : match));
+  renderNotifications();
+};
+const openCompanions = (eventId) => {
+  pendingEventId = eventId ? String(eventId) : null;
+  const next = new URL(window.location.href);
+  next.searchParams.set('view', 'companions');
+  if (eventId) next.searchParams.set('event', String(eventId)); else next.searchParams.delete('event');
+  window.history.pushState({ ...(window.history.state || {}), appView: 'companions' }, '', next.pathname + next.search);
+  setView('companions');
+};
+// After a match: make sure the person and the connection are known locally, then open their chat.
+const openCompanionConversation = async (person) => {
+  const id = String(person.id);
+  if (!findPersonById(id)) {
+    const { data } = await fetchCandidates([id]);
+    if (data?.length) mergePeople(data);
+    else people.push({ id, name: person.name, image: person.photoUrl || '', photoUrl: person.photoUrl || '', role: 'Brivia member', tags: [] });
+  }
+  addConnection(id);
+  await refreshConnections();
+  await loadCompanionMatches();
+  const next = new URL(window.location.href);
+  next.searchParams.set('view', 'chat');
+  next.searchParams.delete('event');
+  window.history.pushState({ ...(window.history.state || {}), appView: 'chat' }, '', next.pathname + next.search);
+  setView('chat');
+  const known = findPersonById(id);
+  if (known) openChat(known);
+};
+const loadCompanionMatches = async () => {
+  if (!supabase || !memberProfile.id) return;
+  const { data, error } = await myCompanionMatches();
+  if (error) return;
+  companionMatches = (data || []).map(normalizeCompanionMatch);
+  const fresh = unseenCompanionMatches().filter((match) => !companionToasted.has(match.id));
+  fresh.forEach((match) => companionToasted.add(match.id));
+  if (fresh.length && document.visibilityState === 'visible') showToast(`You and ${fresh[0].otherName} are going together to ${fresh[0].eventTitle}.`);
+  renderNotifications();
+};
+let companionTimer = 0;
+const startCompanionMatches = () => {
+  loadCompanionMatches();
+  if (!companionTimer) companionTimer = window.setInterval(() => { if (document.visibilityState === 'visible') loadCompanionMatches(); }, 90000);
+};
+const companionsPage = createCompanionsPage({
+  root: document.querySelector('[data-view="companions"]'),
+  api: { companionEvents, companionDeck, companionSwipe, markCompanionMatchSeen },
+  safeImage: eventSafeImage,
+  coverFor: (url) => deckCoverSrc({ coverUrl: url }, safeImageUrl, defaultCoverUrl),
+  me: () => ({ name: memberProfile.name || 'You', photoUrl: memberProfile.photoUrl || memberProfile.photo_url || '' }),
+  toast: (message) => showToast(message),
+  isMissing: isMissingFunction,
+  openProfile: (person) => openPublicProfile({ id: person.id, name: person.name, image: person.photoUrl, photoUrl: person.photoUrl, role: person.headline || 'Brivia member', tags: person.interests }),
+  openConversation: async (person) => { markCompanionSeenLocally(String(companionMatches.find((m) => m.otherId === String(person.id))?.id || '')); await openCompanionConversation(person); },
+  goExplore: () => document.querySelector('[data-nav-host] [data-nav="events"]')?.click(),
+});
 const eventsPage = createEventsPage({
   root: document.querySelector('[data-view="events"]'),
   composer: eventComposer,
   memberId: () => memberProfile.id,
+  openCompanions,
   api: { listEvents, setEventRsvp, setCompanionDefault, myEventPrefs, eventCompanions, cancelMemberEvent, deleteMemberEvent, removeEventImages },
   safeImage: eventSafeImage,
   toast: (message) => showToast(message),
@@ -849,6 +937,7 @@ const setView = (view) => {
     }, 450);
   }
   if (view === 'events') eventsPage.show({ eventId: pendingEventId }); else eventsPage.hide();
+  if (view === 'companions') companionsPage.show({ eventId: pendingEventId }); else companionsPage.hide();
   pendingEventId = null;
   if (view === 'chat') renderChats();
   // Re-tapping Profile on the profile keeps the loaded (or loading) interests: no second read, no skeleton flash.
@@ -860,7 +949,7 @@ const setView = (view) => {
   window.scrollTo({ top: 0, behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'instant' : 'smooth' });
 };
 
-const validViews = ['home', 'explore', 'events', 'posts', 'chat', 'profile'];
+const validViews = ['home', 'explore', 'events', 'posts', 'chat', 'profile', 'companions'];
 const routeFromUrl = () => {
   const params = new URLSearchParams(window.location.search);
   // ?post=<id> (a shared post link, via explore.html) opens that post's detail once the Explore feed has loaded; it is
@@ -2166,7 +2255,9 @@ const openChat = (person, markAsRead = true) => {
     chatName.onkeydown = (event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); openPublicProfile(person); } };
   }
   const chatRole = document.querySelector('#chat-role'); if (chatRole) chatRole.textContent = `${person.role || 'Brivia member'}${person.city ? `, ${person.city}` : ''}`;
-  const chatStatus = document.querySelector('#chat-status'); if (chatStatus) chatStatus.textContent = 'MEMBER / PRIVATE THREAD';
+  // D-123: a pair who met through Find a Companion sees the event that brought them together.
+  const companionContext = companionMatches.find((match) => match.otherId === String(person.id));
+  const chatStatus = document.querySelector('#chat-status'); if (chatStatus) chatStatus.textContent = companionContext ? chatContextLine(companionContext) : 'MEMBER / PRIVATE THREAD';
   renderChats();
   if (!chatMessages[person.id]) chatMessages[person.id] = [];
   chatShouldOpenAtLatest = true;
@@ -5009,6 +5100,7 @@ const loadSupabaseCommunity = async () => {
   startMessageSync();
   startPresence();
   startCrossingPaths();
+  startCompanionMatches();
   if (!appBackGuardActive) {
     appBackGuardActive = true;
     window.history.pushState(

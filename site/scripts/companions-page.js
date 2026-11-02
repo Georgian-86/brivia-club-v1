@@ -1,0 +1,177 @@
+// Find a Companion (D-123, migration 0023): the view [data-view="companions"] ("Connect / Companions"). For one event
+// at a time (the picker lists every event the member is looking for company at), it shows the people also going who
+// want company as cards: swipe right or press Connect to like, left or Pass to pass, tap the photo for the full
+// profile. Two likes for the same event make a match (server: companion_swipe), shown as "Looks like you're going
+// together!" with Start conversation. Pure markup lives in companion-view.js.
+import {
+  normalizeCompanionEvent, normalizeCompanion, companionCardMarkup, matchMomentMarkup, eventPickLabel, lookingCount,
+} from './companion-view.js';
+import { createDeckSwipe } from './deck-swipe.js';
+
+export const createCompanionsPage = ({ root, api, safeImage, coverFor, me, toast, isMissing, openProfile, openConversation, goExplore }) => {
+  if (!root) return { show() {}, hide() {}, showMatch() {} };
+  const deckEl = root.querySelector('#companion-deck');
+  const picker = root.querySelector('#companion-event');
+  const count = root.querySelector('#companion-count');
+  const status = root.querySelector('#companion-status');
+  const actions = root.querySelector('.companion-actions');
+  const passBtn = root.querySelector('#companion-pass');
+  const likeBtn = root.querySelector('#companion-like');
+  const matchDialog = document.querySelector('#companion-match-dialog');
+
+  const state = { events: [], eventId: null, people: [], loading: false, busy: false, unavailable: false, error: false, swipe: null, match: null };
+  const event = () => state.events.find((e) => e.id === state.eventId) || null;
+  const VISIBLE = 3;
+
+  const renderPicker = () => {
+    picker.innerHTML = state.events.map((e) => `<option value="${e.id}"${e.id === state.eventId ? ' selected' : ''}>${eventPickLabel(e).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]))}</option>`).join('');
+    picker.closest('.companion-picker').hidden = !state.events.length;
+  };
+  const renderCount = () => { count.textContent = state.eventId ? lookingCount(state.people.length) : ''; };
+
+  const empty = (title, copy, action = '') => {
+    deckEl.innerHTML = `<div class="companion-empty" role="status"><h2>${title}</h2><p>${copy}</p>${action}</div>`;
+    actions.hidden = true;
+  };
+
+  const renderDeck = () => {
+    state.swipe = null;
+    renderCount();
+    if (state.unavailable) { empty('Companions open soon', 'Event companions are almost here. Meanwhile, find events on Explore.', '<button type="button" class="event-btn event-btn-ghost" data-companion-explore>Go to Explore</button>'); return; }
+    if (state.error) { empty('Companions could not load', 'Check your connection and try again.', '<button type="button" class="event-btn event-btn-ghost" data-companion-retry>Try again</button>'); return; }
+    if (!state.events.length) {
+      empty('Not looking for company yet', 'Register for an event on Explore and turn on "Looking for a companion?". People going solo to the same event will show here.', '<button type="button" class="event-btn event-btn-primary" data-companion-explore>Find an event</button>');
+      return;
+    }
+    if (!state.people.length) {
+      const others = state.events.filter((e) => e.id !== state.eventId && e.toSee > 0);
+      empty('No one new for now', `You've seen everyone looking for company at ${event()?.title || 'this event'}. New people show here as they opt in.`,
+        others.length ? `<button type="button" class="event-btn event-btn-ghost" data-companion-switch="${others[0].id}">See ${others[0].title}</button>` : '');
+      return;
+    }
+    const ev = event();
+    deckEl.innerHTML = `<div class="companion-row">${state.people.slice(0, VISIBLE).map((p, i) => companionCardMarkup(p, {
+      coverSrc: coverFor(p.coverUrl), photoSrc: safeImage(p.photoUrl), event: ev, current: i === 0, index: i,
+    })).join('')}</div>`;
+    actions.hidden = false;
+    const current = deckEl.querySelector('.companion-card.is-current');
+    state.swipe = createDeckSwipe({
+      card: current,
+      stack: deckEl.querySelector('.companion-row'),
+      canDrag: () => !state.busy,
+      onCommit: (direction) => { decide(direction === 'pitch', { flown: false }); return true; },
+    });
+    status.textContent = `${state.people[0].name}. ${state.people.length} ${state.people.length === 1 ? 'person' : 'people'} to see.`;
+  };
+
+  const loadDeck = async () => {
+    if (!state.eventId) { renderDeck(); return; }
+    deckEl.setAttribute('aria-busy', 'true');
+    const { data, error } = await api.companionDeck(state.eventId);
+    deckEl.removeAttribute('aria-busy');
+    state.unavailable = Boolean(error && isMissing(error));
+    state.error = Boolean(error && !state.unavailable);
+    state.people = error ? [] : (data || []).map(normalizeCompanion);
+    renderDeck();
+  };
+
+  const load = async (wanted) => {
+    if (state.loading) return;
+    state.loading = true;
+    deckEl.innerHTML = '<div class="companion-row"><div class="companion-card is-skeleton" aria-hidden="true"></div><div class="companion-card is-skeleton" aria-hidden="true"></div><div class="companion-card is-skeleton" aria-hidden="true"></div></div>';
+    const { data, error } = await api.companionEvents();
+    state.loading = false;
+    state.unavailable = Boolean(error && isMissing(error));
+    state.error = Boolean(error && !state.unavailable);
+    state.events = error ? [] : (data || []).map(normalizeCompanionEvent);
+    const pick = state.events.find((e) => e.id === String(wanted || '')) || state.events.find((e) => e.id === state.eventId) || state.events[0] || null;
+    state.eventId = pick?.id || null;
+    renderPicker();
+    if (state.error || state.unavailable) { renderDeck(); return; }
+    await loadDeck();
+  };
+
+  // like: true connects, false passes. flown: the drag already started the exit.
+  const decide = async (like) => {
+    const person = state.people[0];
+    if (!person || state.busy) return;
+    state.busy = true;
+    [passBtn, likeBtn].forEach((b) => { b.disabled = true; });
+    const flying = state.swipe ? state.swipe.flyOut(like ? 'pitch' : 'pass') : Promise.resolve();
+    const [{ data, error }] = await Promise.all([api.companionSwipe(state.eventId, person.id, like), flying]);
+    state.busy = false;
+    [passBtn, likeBtn].forEach((b) => { b.disabled = false; });
+    if (error) {
+      if (/not available/.test(String(error.message || ''))) {
+        toast(`${person.name} is no longer looking for company at this event.`);
+        state.people.shift();
+      } else if (/not looking/.test(String(error.message || ''))) {
+        toast('You are no longer looking for company at this event.');
+        load();
+        return;
+      } else {
+        toast(isMissing(error) ? 'Companions open soon.' : 'That did not save. Try again.');
+      }
+      renderDeck();
+      return;
+    }
+    state.people.shift();
+    const ev = event();
+    if (ev) ev.toSee = Math.max(0, ev.toSee - 1);
+    renderDeck();
+    (state.people.length ? likeBtn : deckEl.querySelector('button'))?.focus({ preventScroll: true });
+    const row = Array.isArray(data) ? data[0] : data;
+    if (row?.matched) showMatch({ matchId: row.match_id, person, event: ev });
+    else if (like) toast(`Noted. If ${person.name} wants to go together too, you'll both be told.`);
+  };
+
+  // The "going together" moment, from a swipe here or from a notification (app.js). match: { matchId, person { id,
+  // name, photoUrl }, event { title, startsAt, venueName } }.
+  const showMatch = (match) => {
+    if (!matchDialog) return;
+    state.match = match;
+    const mine = me() || {};
+    matchDialog.querySelector('.companion-match-body').innerHTML = matchMomentMarkup({
+      me: { name: mine.name, src: safeImage(mine.photoUrl) },
+      them: { name: match.person.name, src: safeImage(match.person.photoUrl) },
+      event: match.event || {},
+    });
+    if (!matchDialog.open) matchDialog.showModal();
+    matchDialog.querySelector('[data-match-chat]')?.focus();
+    if (match.matchId) api.markCompanionMatchSeen?.(match.matchId);
+  };
+  matchDialog?.addEventListener('click', async (e) => {
+    if (e.target === matchDialog || e.target.closest('[data-match-later]')) { matchDialog.close(); return; }
+    if (e.target.closest('[data-match-chat]') && state.match) {
+      const { person } = state.match;
+      matchDialog.close();
+      await openConversation(person);
+    }
+  });
+
+  root.addEventListener('click', (e) => {
+    if (e.target.closest('#companion-pass')) { decide(false); return; }
+    if (e.target.closest('#companion-like')) { decide(true); return; }
+    if (e.target.closest('[data-companion-explore]')) { goExplore(); return; }
+    if (e.target.closest('[data-companion-retry]')) { load(state.eventId); return; }
+    const sw = e.target.closest('[data-companion-switch]');
+    if (sw) { state.eventId = sw.dataset.companionSwitch; renderPicker(); loadDeck(); return; }
+    const prof = e.target.closest('[data-companion-profile]');
+    if (prof) {
+      const person = state.people.find((p) => p.id === prof.dataset.companionProfile);
+      if (person) openProfile(person);
+    }
+  });
+  picker.addEventListener('change', () => { state.eventId = picker.value; loadDeck(); });
+  root.addEventListener('keydown', (e) => {
+    if (!state.people.length || e.target.closest('select, input, textarea') || e.altKey || e.metaKey || e.ctrlKey) return;
+    if (e.key === 'ArrowLeft') { e.preventDefault(); decide(false); }
+    if (e.key === 'ArrowRight') { e.preventDefault(); decide(true); }
+  });
+
+  return {
+    show({ eventId } = {}) { load(eventId); },
+    hide() { if (matchDialog?.open) matchDialog.close(); },
+    showMatch,
+  };
+};

@@ -7,6 +7,11 @@ Update this file at the end of every session. CLAUDE.md holds the aim; this file
 
 ## 1. What is done
 
+**2026-11-02, D-123:** Find a Companion. `?view=companions&event=<id>` ("Find your event companion."): swipe cards of
+people going to the same event who opted in; two right swipes match, both are told, Chat opens with "GOING TOGETHER ·
+EVENT · DATE". **Owed: apply `0023_event_companions.sql`** after 0022 (README "0023"). Files `companions-page.js`,
+`companion-view.js`, `companions.css`; tests `companion-view.test.mjs`, `companions.spec.mjs`, `l-event-companions.test.sql`.
+
 **2026-11-02, D-122:** "Find my companion" on event cards and in the drawer: one press lists matches, or opts in, or
 (free event, not registered) one confirm registers and opts in; "Connect" sends a request; "Stop looking". Client only.
 
@@ -293,7 +298,7 @@ Tooling: Playwright **and axe-core** at `/tmp/pw` (`npm install --prefix /tmp/pw
 
 ## 3. What to do next (in order)
 
-**Database owed (2026-11-02):** `0022_member_events.sql` after `0020` (README "0022"). Then pick a payment gateway for
+**Database owed (2026-11-02):** `0022_member_events.sql` after `0020` (README "0022"), then `0023_event_companions.sql`. Then pick a payment gateway for
 paid events (its webhook calls `confirm_event_payment`).
 
 **Database owed (2026-11-01):** `0019_cover_set_refresh.sql` (after the client deploys) and `0020_club_events.sql`

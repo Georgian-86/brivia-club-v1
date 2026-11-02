@@ -1077,6 +1077,24 @@ Explore lists events the club curates. This is location-first ranking outside th
 - **Contact.** The organiser's event contact is typed for the event, never taken from the account, and reaches other
   members only when the organiser ticks "Show on the event page". "Ask a question" is an ordinary signal with a note.
 
+### 11.2 Find a Companion: event-based mutual matching (D-123, migration 0023)
+
+- **Pool.** Per event: members with a **confirmed** registration who opted in ("Looking for a companion?"), on a
+  published, open, not cancelled event. The caller must be in the pool to see anyone. Others shown only if
+  `brivia_visible_to` (same world, no block, both completed), not already a connection, and not yet swiped by the
+  caller for that event.
+- **Order.** Exact shared interests (count) desc, then shared goals and skills (`looking_for` and `skills` values in
+  common), then who opted in first. No distance term (same event). At most 50 cards per call.
+- **Card location.** The Connect deck's band only: '~3 km' (ring 0), '~10 km' (ring 1), otherwise the other member's
+  place name, or 'Abroad'. Never a cell, km figure, coordinate, city text, email or phone.
+- **Swipes.** One decision per member, candidate and event (`event_companion_swipe` primary key; a repeat changes
+  nothing). Right = like, left = pass. A pass hides the member in that event's deck only. No swipe is readable by any
+  member: nobody learns who passed, or who liked them before they like back.
+- **Match.** Two likes for the same event, under the pair lock, make one `event_companion_match` (unique per pair and
+  event) and the ordinary Brivia connection (`brivia_create_match`), so Chat opens. One like never creates anything
+  visible. The second swiper sees "Looks like you're going together!" at once; the first is notified
+  (`my_companion_matches` unseen) until they open it. The chat header names the event ("GOING TOGETHER · EVENT · DATE").
+
 ## Appendix A (DRAFT, not scheduled): Constellations
 
 These are quorum-consented local micro-groups (3–5 members in ring ≤ 1) around one anchor interest:

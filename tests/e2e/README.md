@@ -149,3 +149,9 @@ confirmation, Save as draft and the discard guard; and a member's side of a paid
 a full event, and Ask a question (one signal to the organiser). `CREATE_SHOTS=<dir>` saves the states. Playwright here:
 `PLAYWRIGHT_MODULE=/opt/node-tools/node_modules/playwright/index.mjs`.
 
+`companions.spec.mjs` (D-123, Vite on :5188) drives Find a Companion at 1440 and 390: the heading, picker and count,
+three cards (one on phones) and their content, the profile on tap, Pass, a mutual Connect and its "going together"
+moment, a quiet one-sided like by drag or →, ← to pass, another event's own people, the notification for the member
+who liked first, Start conversation into Chat with the event in its header, and the states before 0023 and when not
+looking anywhere. `COMPANION_SHOTS=<dir>` saves the states.
+

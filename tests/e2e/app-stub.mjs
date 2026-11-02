@@ -276,6 +276,30 @@ export const startAppStub = async ({ port, state = {}, deckRows = defaultDeckRow
         st.events = [row, ...st.events.filter((x) => x.id !== id)];
         return json(200, id);
       }
+      // D-123 Find a Companion (0023): st.companionEvents (companion_events rows; null answers PGRST202), st.companionDecks
+      // ({ [event id]: companion_deck rows }), st.likedMe (ids who already liked me: a like on them matches), st.companionMatches
+      // (my_companion_matches rows). A swipe removes the card; a match also adds a connection (matchIds).
+      if (['/rest/v1/rpc/companion_events', '/rest/v1/rpc/companion_deck', '/rest/v1/rpc/companion_swipe', '/rest/v1/rpc/my_companion_matches', '/rest/v1/rpc/mark_companion_match_seen'].includes(pathName) && !st.companionEvents) {
+        return json(404, { code: 'PGRST202', message: 'Could not find the function' });
+      }
+      if (pathName === '/rest/v1/rpc/companion_events') return json(200, st.companionEvents.map((e) => ({ ...e, to_see: (st.companionDecks?.[e.event_id] || []).length })));
+      if (pathName === '/rest/v1/rpc/companion_deck') return json(200, st.companionDecks?.[args.p_event] || []);
+      if (pathName === '/rest/v1/rpc/companion_swipe') {
+        (st.swipes ||= []).push(args);
+        const deckRows = st.companionDecks?.[args.p_event] || [];
+        const row = deckRows.find((r) => r.member_id === args.p_target);
+        if (!row) return json(400, { code: '22023', message: 'not available' });
+        st.companionDecks[args.p_event] = deckRows.filter((r) => r.member_id !== args.p_target);
+        const matched = Boolean(args.p_like && (st.likedMe || []).includes(args.p_target));
+        if (matched) {
+          if (!st.matchIds.includes(args.p_target)) st.matchIds.push(args.p_target);
+          const ev = st.companionEvents.find((e) => e.event_id === args.p_event) || {};
+          (st.companionMatches ||= []).unshift({ match_id: `cm-${args.p_target}`, event_id: args.p_event, event_title: ev.title, starts_at: ev.starts_at, venue_name: ev.venue_name, other_id: row.member_id, other_name: row.name, other_photo_url: row.photo_url, created_at: new Date().toISOString(), seen: true });
+        }
+        return json(200, [{ matched, match_id: matched ? `cm-${args.p_target}` : null }]);
+      }
+      if (pathName === '/rest/v1/rpc/my_companion_matches') return json(200, st.companionMatches || []);
+      if (pathName === '/rest/v1/rpc/mark_companion_match_seen') { (st.companionMatches || []).forEach((m) => { if (m.match_id === args.p_match) m.seen = true; }); return json(200, true); }
       if (pathName === '/rest/v1/rpc/cancel_member_event') { const e = st.events.find((x) => x.id === args.p_id); if (e) e.status = 'cancelled'; return json(200, true); }
       if (pathName === '/rest/v1/rpc/delete_member_event') { st.events = st.events.filter((x) => x.id !== args.p_id); return json(200, true); }
       if (pathName === '/rest/v1/place' && st.places) {

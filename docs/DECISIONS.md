@@ -2475,3 +2475,29 @@ controls (a tester or a seeded test member), never a real member, so no new expo
   Also fixed: focus stays on the switch when its card re-renders, and every close of the companions dialog puts focus
   back in the drawer at once (it raced the browser's own focus restore).
 
+## D-123: Find a Companion, event-based swipe matching (founder, 2026-11-02)
+
+- **Asked:** a dedicated Find a Companion section (reference image: "CONNECT / COMPANIONS", "Find your event
+  companion.", an event picker, a count, wine-barred cards, Pass and heart buttons) where members registered for the
+  same event who opted in swipe on each other; two right swipes make a match, both are told, Chat opens with the event
+  in its header; per event; one decision per pair and event; passes remove the card.
+- **Done:** migration `0023_event_companions.sql` (`event_companion_swipe`, `event_companion_match`, RLS on and no
+  grants; `companion_events`, `companion_deck`, `companion_swipe`, `my_companion_matches`, `mark_companion_match_seen`),
+  the view `?view=companions&event=<id>` (`companions-page.js`, `companion-view.js`, `companions.css`; no new nav tab:
+  it highlights Connect), the match moment, a notification row "You and X are going together" with Say hello, and the
+  chat header line. Explore's Find my companion and the card switch now land on the cards; the old list dialog (with
+  Connect = a signal) is gone, its confirm steps stay. The drawer copy is the founder's: "Looking for a companion?" /
+  "Going solo? Find someone attending the same event and make it a shared experience."
+- **Choices made:** a match is the ordinary Brivia connection (same as an accepted request: unmatch and block work);
+  only confirmed seats are in the pool (a paid seat waits for payment); existing connections are not offered again;
+  location is the deck's band (city text is private since D-036, so "Bengaluru" shows only as the place tier of the
+  band); age is not shown (no age is stored); "Tap the profile" opens the existing public profile. Desktop shows up to
+  three cards and the buttons act on the first (highlighted); phones show one.
+- **Not run:** agent-arena (no second model route here). Privacy checked against CLAUDE.md and ORBIT §9.1.4/§11.
+- **Proof:** SQL harness ALL PASSED (new `l-event-companions.test.sql` L1-L7; hygiene H3 whitelist); unit 428 (new
+  `companion-view.test.mjs`); e2e new `companions.spec.mjs` (49 checks at 1440 and 390, axe), `events.spec.mjs`
+  updated, plus create-event, app-shell, chat-inbox, collab-requests, crossing-paths, deck, fit, presence; build, style
+  ratchet and asset budget OK. ORBIT §11.2 added.
+- **Owed:** apply `0023_event_companions.sql` after 0022 (README "0023"). Push notifications when the app is closed
+  are not part of this (in-app notification only), as for D-119.
+

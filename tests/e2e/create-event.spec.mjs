@@ -150,7 +150,7 @@ try {
     await page.locator('[data-ec-preview]').click();
     await page.waitForSelector('[data-ec-detail-preview]:not([hidden])');
     const pv = await page.locator('[data-ec-detail-preview]').innerText();
-    check(`${w}: Preview event shows the drawer as members see it`, /Bangalore Chess Meetup/.test(pv) && /Hosted by/i.test(pv) && /Alex Me/.test(pv) && /₹499 entry/.test(pv) && /Looking for company\?/.test(pv));
+    check(`${w}: Preview event shows the drawer as members see it`, /Bangalore Chess Meetup/.test(pv) && /Hosted by/i.test(pv) && /Alex Me/.test(pv) && /₹499 entry/.test(pv) && /Looking for a companion\?/.test(pv));
     await shot(page, `create-preview-${w}.png`);
     await page.locator('[data-ec-preview-back]').click();
     check(`${w}: Back to editing returns to the form`, await page.locator('[data-ec-detail-preview]').isHidden());

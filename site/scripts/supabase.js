@@ -341,6 +341,12 @@ export const saveMemberEvent = async (id, fields, publish) => {
   return { data: typeof data === 'string' ? data : null, error, status };
 };
 export const cancelMemberEvent = (id) => rpcCall('cancel_member_event', { p_id: id });
+// Find a Companion (0023, D-123). Before 0023 each answers PGRST202 (isMissingFunction).
+export const companionEvents = () => rpcCall('companion_events', {});
+export const companionDeck = (eventId, limit = 20) => rpcCall('companion_deck', { p_event: eventId, p_limit: limit });
+export const companionSwipe = (eventId, targetId, like) => rpcCall('companion_swipe', { p_event: eventId, p_target: targetId, p_like: Boolean(like) });
+export const myCompanionMatches = () => rpcCall('my_companion_matches', {});
+export const markCompanionMatchSeen = (matchId) => rpcCall('mark_companion_match_seen', { p_match: matchId });
 export const deleteMemberEvent = (id) => rpcCall('delete_member_event', { p_id: id });
 // Posters and gallery images: the member's own folder in the public event-posters bucket (0022), as JPEG.
 export const uploadEventImage = async (userId, file) => {
