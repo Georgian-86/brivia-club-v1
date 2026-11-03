@@ -3030,3 +3030,16 @@ controls (a tester or a seeded test member), never a real member, so no new expo
   start answering; an admin can also upload a logo for them (MODERATION.md).
 - **Proof:** SQL harness ALL PASSED (v-company C5: every seeded company has a website; the pass lists only empty logos,
   stores only directory paths, never a URL; members cannot call it); unit 480 (initials).
+
+## D-149 (2026-11-04): upload a company's logo from the picked-company box
+
+- **Asked:** an option in the same box as the selected organisation where the member can upload the logo.
+- **Done:** the picked company's box has "Upload logo" beside Remove when the company has no logo yet (one of the
+  companies whose site gave no icon, showing its initials), and "Change logo" for an organisation the member just added.
+  The image is made a 128 px WebP in the browser, stored under the member's own folder, and `set_company_logo`
+  (0041) makes it the company's logo, for everyone who works there. A member never overwrites an existing directory
+  logo; they may replace the logo of an organisation they added; 10 logo uploads a day; each upload is logged
+  (`company_logo_upload`) for moderation (MODERATION.md "Companies and logos" removes a bad one).
+- **Proof:** SQL harness ALL PASSED (v-company C6: once only, no overwrite, own folder only, own organisation may
+  replace, 10 a day, not for anon); e2e work-identity (initials tile, the button in the box, upload sets and shows it)
+  at 1440 and 390.

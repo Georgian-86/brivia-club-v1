@@ -467,6 +467,14 @@ export const addCompany = async (userId, { name, website = '', industry = '', lo
   }
   return rpcCall('add_company', { p_name: name, p_website: website || null, p_industry: industry || null, p_logo_path: logoPath });
 };
+// D-149 (0041): a logo for the company the member picked, when it has none (or it is their own organisation).
+export const uploadCompanyLogo = async (userId, companyId, logo) => {
+  if (!supabase || !userId || !companyId || !logo) return notConfigured();
+  const path = `${userId}/${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}.webp`;
+  const up = await supabase.storage.from('company-logos').upload(path, logo, { contentType: 'image/webp', upsert: false });
+  if (up.error) return { data: null, error: up.error };
+  return rpcCall('set_company_logo', { p_company: companyId, p_path: path });
+};
 export const setMyWork = (title, companyId) => rpcCall('set_my_work', { p_title: title || null, p_company: companyId || null });
 export const memberWork = (ids) => rpcCall('member_work', { p_ids: [...new Set((ids || []).map(String))].slice(0, 60) });
 

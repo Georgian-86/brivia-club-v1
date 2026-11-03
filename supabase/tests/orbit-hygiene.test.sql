@@ -101,7 +101,7 @@ begin
        || 'my_presence_visible,my_role_asks,my_role_intent,my_sent_role_asks,my_signal_quota,nearby_clear,nearby_connect,'
        || 'nearby_discover,nearby_pass,nearby_pulse,post_activity,report_fake_job,report_member,'
        || 'respond_connection_request,save_hiring_role,save_member_event,save_push_subscription,save_role_intent,'
-       || 'search_members,send_connect_request,send_signal,set_companion_default,set_event_brochure,set_event_interest,'
+       || 'search_members,send_connect_request,send_signal,set_companion_default,set_company_logo,set_event_brochure,set_event_interest,'
        || 'set_event_rsvp,set_hiring_role_status,set_home_city,set_home_location,set_member_interests,set_my_work,'
        || 'set_nearby_enabled,set_nearby_muted,set_nearby_radius,set_presence_visible,set_sensitive_consent,'
        || 'touch_presence,withdraw_role_intent';

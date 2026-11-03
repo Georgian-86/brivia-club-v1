@@ -21,7 +21,7 @@ import '../styles/mobile-app.css';
 import '../styles/skeleton.css';
 import '../styles/aura-theme.css';
 import '../styles/handoff.css';
-import { supabase, compressImageOnly, rowToProfile, saveProfile, isPresetCoverUrl, onboardingStatus, sendSignal, fetchSignalQuota, isRateLimited, isStorageImageUrl, withoutCredentials, uploadMessageAttachment, removeMessageAttachment, uploadCommunityPostImage, removeCommunityPostImage, ImageProcessingError, PHOTO_ERROR_MESSAGE, PHOTO_FRAMER_ERROR, compressAttachmentFiles, attachmentKind, reportMember, setSensitiveConsent, fetchSensitiveConsentAt, fetchMyInterests, fetchInterestNodes, addMemberInterest, isMissingFunction, touchPresence, connectionPresence, setPresenceVisible, myPresenceVisible, setMemberInterests, uploadResume, removeResume, resumeSignedUrl, resumeInfo, clearResumePath, searchPlaces, setHomeCity, setHomeLocation, listEvents, setEventRsvp, setCompanionDefault, myEventPrefs, eventCompanions, saveMemberEvent, cancelMemberEvent, deleteMemberEvent, uploadEventImage, removeEventImages, setEventInterest, setEventBrochure, uploadEventBrochure, removeEventBrochures, companionEvents, companionDeck, companionSwipe, myCompanionMatches, markCompanionMatchSeen, sendConnectRequest, setNearbyEnabled, myNearbySetting, nearbyPulse, nearbyClear, myNearbyAlerts, setNearbyMuted, nearbyDiscover, nearbyPass, nearbyConnect, myNearbyMatches, myNotifications, markNotificationsRead, dismissNotification, setNearbyRadius, savePushSubscription, deletePushSubscription, sendPendingPush, searchCompanies, searchCompanyDirectory, companyLogoUrl, addCompany, setMyWork, memberWork } from './supabase.js';
+import { supabase, compressImageOnly, rowToProfile, saveProfile, isPresetCoverUrl, onboardingStatus, sendSignal, fetchSignalQuota, isRateLimited, isStorageImageUrl, withoutCredentials, uploadMessageAttachment, removeMessageAttachment, uploadCommunityPostImage, removeCommunityPostImage, ImageProcessingError, PHOTO_ERROR_MESSAGE, PHOTO_FRAMER_ERROR, compressAttachmentFiles, attachmentKind, reportMember, setSensitiveConsent, fetchSensitiveConsentAt, fetchMyInterests, fetchInterestNodes, addMemberInterest, isMissingFunction, touchPresence, connectionPresence, setPresenceVisible, myPresenceVisible, setMemberInterests, uploadResume, removeResume, resumeSignedUrl, resumeInfo, clearResumePath, searchPlaces, setHomeCity, setHomeLocation, listEvents, setEventRsvp, setCompanionDefault, myEventPrefs, eventCompanions, saveMemberEvent, cancelMemberEvent, deleteMemberEvent, uploadEventImage, removeEventImages, setEventInterest, setEventBrochure, uploadEventBrochure, removeEventBrochures, companionEvents, companionDeck, companionSwipe, myCompanionMatches, markCompanionMatchSeen, sendConnectRequest, setNearbyEnabled, myNearbySetting, nearbyPulse, nearbyClear, myNearbyAlerts, setNearbyMuted, nearbyDiscover, nearbyPass, nearbyConnect, myNearbyMatches, myNotifications, markNotificationsRead, dismissNotification, setNearbyRadius, savePushSubscription, deletePushSubscription, sendPendingPush, searchCompanies, searchCompanyDirectory, companyLogoUrl, addCompany, setMyWork, memberWork, uploadCompanyLogo } from './supabase.js';
 import { locateOnce, fallbackCopy } from './geo-locate.js';
 import { areaChangeMessage, AREA_HELPER, AREA_NO_MATCH } from './area-change.js';
 import { areaShareBody, parseAreaBody, resumeShareAttachment, resumeMessageFields, RESUME_SHARE_BODY, NO_RESUME_HINT, RESUME_GONE_COPY, RESUME_SHARE_NOTE, AREA_SHARE_NOTE } from './quick-share.js';
@@ -3207,7 +3207,9 @@ const workEditorMarkup = () => `<div class="profile-edit-wide profile-edit-work"
   + `<div class="profile-work-row"><input class="b-field" name="jobTitle" maxlength="60" placeholder="Your title, e.g. Software Engineer" autocomplete="organization-title" aria-label="Your title" />`
   + `<div class="b-combo"><input class="b-field" type="text" role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="profile-work-list" aria-labelledby="profile-work-label" placeholder="Search a company or organisation" autocomplete="off" spellcheck="false" data-work-search />`
   + `<ul class="b-listbox" id="profile-work-list" role="listbox" aria-label="Companies" hidden></ul></div></div>`
-  + `<div class="profile-work-picked" data-work-picked hidden><span class="profile-work-picked-name" data-work-picked-name></span><button type="button" class="profile-work-remove" data-work-clear>Remove</button></div>`
+  + `<div class="profile-work-picked" data-work-picked hidden><span class="profile-work-picked-name" data-work-picked-name></span>`
+  + `<span class="profile-work-picked-actions"><label class="profile-work-logo-upload" data-work-logo-label hidden><input type="file" accept="image/png,image/jpeg,image/webp,image/gif" data-work-logo-file class="sr-only" /><span data-work-logo-text>Upload logo</span></label>`
+  + `<button type="button" class="profile-work-remove" data-work-clear>Remove</button></span></div>`
   + `<fieldset class="profile-work-new" data-work-new hidden><legend>Add your organisation</legend>`
   + `<label><span>NAME</span><input class="b-field" data-work-new-name maxlength="80" /></label>`
   + `<label><span>WEBSITE (OPTIONAL)</span><input class="b-field" data-work-new-site inputmode="url" placeholder="mystartup.in" /></label>`
@@ -3228,8 +3230,13 @@ const wireWorkEditor = (modal, current) => {
   const status = box.querySelector('[data-work-status]');
   const form = box.querySelector('[data-work-new]');
   title.value = state.title;
+  const logoLabel = box.querySelector('[data-work-logo-label]');
+  const logoFile = box.querySelector('[data-work-logo-file]');
   const showPicked = () => {
     picked.hidden = !state.companyId;
+    // D-149: no logo yet (or the member's own organisation): they can add one right here.
+    logoLabel.hidden = !state.companyId || (Boolean(state.logoUrl) && !state.ownCompany);
+    box.querySelector('[data-work-logo-text]').textContent = state.logoUrl ? 'Change logo' : 'Upload logo';
     pickedName.innerHTML = state.companyId ? `${state.logoUrl ? `<img class="work-logo" src="${escapeHtml(state.logoUrl)}" alt="" width="16" height="16" />` : monogramMarkup(state.company, escapeHtml)}<span>${escapeHtml(state.company)}</span>` : '';
   };
   showPicked();
@@ -3285,9 +3292,29 @@ const wireWorkEditor = (modal, current) => {
     if (!item) return;
     const c = rows.find((r) => r.id === item.dataset.workId);
     if (!c) return;
-    Object.assign(state, { companyId: c.id, company: c.name, logoUrl: c.logo_path ? companyLogoUrl(c.logo_path) : '' });
+    Object.assign(state, { companyId: c.id, company: c.name, logoUrl: c.logo_path ? companyLogoUrl(c.logo_path) : '', ownCompany: c.source === 'member' && String(c.created_by || '') === String(memberProfile.id) });
     search.value = ''; query = ''; close(); showPicked();
     status.textContent = `${c.name} picked. Save changes to show it on your card.`;
+  });
+  logoFile.addEventListener('change', async () => {
+    const file = logoFile.files?.[0];
+    if (!file || !state.companyId) return;
+    status.textContent = 'Adding the logo…';
+    let blob;
+    try { blob = await logoFileToWebp(file); } catch (error) { status.textContent = error.message; logoFile.value = ''; return; }
+    const { data, error } = await uploadCompanyLogo(memberProfile.id, state.companyId, blob);
+    logoFile.value = '';
+    if (error || !data) {
+      status.textContent = /already set/i.test(error?.message || '') ? 'This company already has a logo.'
+        : /try again later|PT429/i.test(`${error?.code} ${error?.message}`) ? 'You have added a few logos today. Try again tomorrow.'
+        : "That logo couldn't be added. Please try again.";
+      return;
+    }
+    state.logoUrl = companyLogoUrl(data);
+    rows = rows.map((r) => (r.id === state.companyId ? { ...r, logo_path: data } : r));
+    showPicked();
+    workCache.clear(); requestWork();
+    status.textContent = `Logo added for ${state.company}. Everyone who works there sees it too.`;
   });
   box.querySelector('[data-work-clear]').addEventListener('click', () => {
     Object.assign(state, { companyId: '', company: '', logoUrl: '' });
@@ -3312,7 +3339,7 @@ const wireWorkEditor = (modal, current) => {
         : /invalid name/i.test(error?.message || '') ? 'Use the organisation’s name (no links).' : "That organisation couldn't be added. Please try again.";
       return;
     }
-    Object.assign(state, { companyId: data, company: name, logoUrl: logo ? URL.createObjectURL(logo) : '' });
+    Object.assign(state, { companyId: data, company: name, logoUrl: logo ? URL.createObjectURL(logo) : '', ownCompany: true });
     form.hidden = true; search.value = ''; query = ''; showPicked();
     status.textContent = `${name} added. Save changes to show it on your card.`;
   });

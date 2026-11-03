@@ -1231,3 +1231,11 @@ service-role functions `brivia_companies_needing_icons` and `brivia_set_company_
 Live, the websites were read from the published `data/company-domains.json` with pg_net, then the logo pass was run
 in batches of 40 ids by `net.http_post` to `/functions/v1/directory` with `{"kind":"logos","ids":[...]}` (project anon key
 as the bearer). Re-running it only fills logos that are still empty.
+
+## 0041
+
+**Members can give a logo-less company its logo (D-149).** **APPLIED 2026-11-04.**
+Apply after `0040`. Adds `company_logo_upload` (log, no client access) and `set_company_logo(company, path)`
+(authenticated): only from the member's own `company-logos/<uid>/` folder, only when the company has no logo yet or is the
+member's own organisation, 10 a day. Verify: `select has_function_privilege('anon', 'public.set_company_logo(uuid,text)', 'execute');` (f).
+To review uploads: `select c.name, u.logo_path, u.created_at, p.name from public.company_logo_upload u join public.company c on c.id = u.company_id join public.profiles p on p.id = u.member_id order by u.created_at desc;`

@@ -96,3 +96,41 @@ begin
   update public.company set logo_path = null where id = first;
 end $$;
 select 'v-company-directory.test C5 OK';
+
+-- C6 (0041, D-149): a member gives a logo-less company a logo once; never overwrites a directory logo; may replace the
+-- logo of an organisation they added; only from their own folder; at most 10 a day.
+begin;
+do $$
+declare a uuid := '0e410000-0000-4000-8000-000000000001'; b uuid := '0e410000-0000-4000-8000-000000000002';
+  bare uuid; logo uuid; mine uuid; refused text; i int;
+begin
+  insert into auth.users(id) values (a), (b) on conflict do nothing;
+  insert into public.profiles (id, name, full_name, email) values (a, 'L A', 'L A', 'la@example.com'), (b, 'L B', 'L B', 'lb@example.com') on conflict (id) do nothing;
+  insert into public.company (name, source, verified) values ('Logoless Bank', 'admin', true) returning id into bare;
+  insert into public.company (name, source, verified, logo_path) values ('Has Logo Ltd', 'admin', true, 'directory/x-icon.png') returning id into logo;
+  perform set_config('request.jwt.claims', json_build_object('sub', a)::text, true);
+  set local role authenticated;
+  if public.set_company_logo(bare, a::text || '/bank.webp') <> a::text || '/bank.webp' then raise exception 'FAIL C6: not set'; end if;
+  refused := 'none';
+  begin perform public.set_company_logo(bare, a::text || '/again.webp'); exception when others then refused := sqlerrm; end;
+  if refused <> 'logo already set' then raise exception 'FAIL C6: overwrote %', refused; end if;
+  refused := 'none';
+  begin perform public.set_company_logo(logo, a::text || '/x.webp'); exception when others then refused := sqlerrm; end;
+  if refused <> 'logo already set' then raise exception 'FAIL C6: a directory logo was replaced'; end if;
+  refused := 'none';
+  begin perform public.set_company_logo(bare, b::text || '/x.webp'); exception when others then refused := sqlerrm; end;
+  if refused <> 'invalid logo' then raise exception 'FAIL C6: another member''s folder'; end if;
+  mine := public.add_company('Own Startup Logo', null, null, a::text || '/one.webp');
+  perform public.set_company_logo(mine, a::text || '/two.webp');
+  reset role;
+  if (select logo_path from public.company where id = mine) <> a::text || '/two.webp' then raise exception 'FAIL C6: own logo not replaced'; end if;
+  insert into public.company_logo_upload (company_id, member_id, logo_path) select mine, a, 'x' from generate_series(1, 9);
+  set local role authenticated;
+  refused := 'none';
+  begin perform public.set_company_logo(mine, a::text || '/three.webp'); exception when others then refused := sqlerrm; end;
+  reset role;
+  if refused <> 'try again later' then raise exception 'FAIL C6: more than 10 a day'; end if;
+  if has_function_privilege('anon', 'public.set_company_logo(uuid,text)', 'execute') then raise exception 'FAIL C6: anon'; end if;
+end $$;
+select 'v-company-directory.test C6 OK';
+rollback;

@@ -2,7 +2,7 @@
 // line without growing; Edit profile searches the directory, picks a company, adds the member's own organisation,
 // saves title and company (set_my_work); the own profile shows it; axe clean.
 // PLAYWRIGHT_MODULE=/tmp/pw/node_modules/playwright/index.mjs node tests/e2e/work-identity.spec.mjs   (Vite on :5177)
-import { startAppStub, defaultDeckRows, ME } from './app-stub.mjs';
+import { startAppStub, defaultDeckRows, ME, STILL } from './app-stub.mjs';
 import { axeViolations } from './a11y.mjs';
 
 const { chromium } = await import(process.env.PLAYWRIGHT_MODULE || 'playwright');
@@ -13,6 +13,7 @@ const st = {
   companies: [
     { id: 'c-google', name: 'Google', domain: 'google.com', logo_path: 'directory/Q95.png', verified: true, source: 'directory' },
     { id: 'c-swiggy', name: 'Swiggy', domain: 'swiggy.com', logo_path: 'directory/Q1.png', verified: false, source: 'directory' },
+    { id: 'c-sbi', name: 'State Bank of India (SBI)', domain: null, logo_path: null, verified: true, source: 'admin' },
   ],
   work: { [ASHA]: { job_title: 'Software Engineer', company_id: 'c-google', company_name: 'Google', logo_path: 'directory/Q95.png', verified: true } },
 };
@@ -21,7 +22,7 @@ const browser = await chromium.launch();
 const errors = [];
 try {
   for (const [w, h, mobile] of [[1440, 900, false], [390, 844, true]]) {
-    st.passed = new Set(); st.signalled = new Set(); st.work = { [ASHA]: st.work[ASHA] }; st.workSaved = []; st.companiesAdded = []; st.companies = st.companies.slice(0, 2);
+    st.passed = new Set(); st.signalled = new Set(); st.work = { [ASHA]: st.work[ASHA] }; st.workSaved = []; st.companiesAdded = []; st.companies = st.companies.slice(0, 3).map((c) => (c.id === 'c-sbi' ? { ...c, logo_path: null } : c)); st.logosSet = [];
     const ctx = await stub.newContext(browser, { width: w, height: h }, mobile ? { isMobile: true, hasTouch: true } : {});
     const page = await stub.open(ctx, { path: '/app.html', errors });
     page.setDefaultTimeout(8000);
@@ -78,6 +79,21 @@ try {
     await page.locator('.profile-edit-save').click();
     await page.waitForFunction(() => !document.querySelector('#profile-edit-modal'));
     check(`${w}: the company can be removed (set_my_work with no company)`, st.workSaved.at(-1)?.p_company === null && st.workSaved.at(-1)?.p_title === 'Founder');
+    // D-149: a company without a logo: the initials tile, and "Upload logo" in the same box.
+    await page.evaluate(() => document.querySelector('#profile-photo-editor')?.click());
+    await page.waitForSelector('[data-work-editor]');
+    await page.locator('[data-work-search]').fill('State');
+    await page.waitForSelector('#profile-work-list [data-work-id="c-sbi"]');
+    const tile = await page.locator('#profile-work-list [data-work-id="c-sbi"] .work-logo--mono').textContent();
+    check(`${w}: D-149 a logo-less company shows its initials (${tile})`, tile === 'SB');
+    await page.locator('#profile-work-list [data-work-id="c-sbi"]').click();
+    const upload = page.locator('[data-work-logo-label]');
+    check(`${w}: D-149 "Upload logo" sits in the picked company's box`, await upload.isVisible() && (await upload.innerText()).trim().toUpperCase() === 'UPLOAD LOGO');
+    await page.locator('[data-work-logo-file]').setInputFiles({ name: 'sbi.png', mimeType: 'image/png', buffer: STILL });
+    await page.waitForFunction(() => Boolean(document.querySelector('[data-work-picked-name] img.work-logo')), null, { timeout: 8000 });
+    const after = await page.evaluate(() => ({ status: document.querySelector('[data-work-status]').textContent, hidden: document.querySelector('[data-work-logo-label]').hidden }));
+    check(`${w}: D-149 the logo is set for the company and shown (${JSON.stringify(after)})`, st.logosSet.at(-1)?.p_company === 'c-sbi' && /^11111111-1111-4111-8111-111111111111\/.+\.webp$/.test(st.logosSet.at(-1)?.p_path || '') && /Logo added/.test(after.status) && after.hidden);
+    await page.keyboard.press('Escape');
     check(`${w}: no page errors`, errors.length === 0, errors.join(' | '));
     await ctx.close();
   }

@@ -406,6 +406,13 @@ export const startAppStub = async ({ port, state = {}, deckRows = defaultDeckRow
         st.work = { ...(st.work || {}), [ME]: { job_title: args.p_title, company_id: args.p_company, company_name: c?.name || null, logo_path: c?.logo_path || null, verified: Boolean(c?.verified) } };
         return route.fulfill({ status: 204, body: '', headers: { 'access-control-allow-origin': '*' } });
       }
+      if (pathName === '/rest/v1/rpc/set_company_logo') {
+        const c = (st.companies || []).find((x) => x.id === args.p_company);
+        (st.logosSet ||= []).push(args);
+        if (c?.logo_path) return json(400, { code: '22023', message: 'logo already set' });
+        if (c) c.logo_path = args.p_path;
+        return json(200, args.p_path);
+      }
       if (pathName === '/rest/v1/rpc/add_company') {
         const c = { id: `c-${(st.companies || []).length + 1}`, name: args.p_name, domain: args.p_website || null, logo_path: args.p_logo_path, verified: false, source: 'member' };
         (st.companies ||= []).push(c); (st.companiesAdded ||= []).push(args);
