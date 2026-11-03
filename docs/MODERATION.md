@@ -176,3 +176,16 @@ select c.id, c.name, c.domain, c.industry, c.logo_path, c.created_at, p.name as 
   line, `on delete set null`), then delete the logo object in Storage, bucket `company-logos`, path `<member uid>/...`.
 - **Merge a duplicate:** point members to the kept row, then delete the other:
   `update public.profiles set company_id = '<kept>' where company_id = '<duplicate>'; delete from public.company where id = '<duplicate>';`
+
+## Hiring (0037, D-141)
+
+- **"Fake job or recruitment scam"** reports arrive as `report_member` rows with reason `fake` and a note starting
+  "Hiring:". The report already paused every open role of that member (`paused_by_report`) and blocked them for the
+  reporter; the member sees "Paused while we review a report" and cannot reopen it.
+- **Check:** the role text (`select title, company, about, status from hiring_role where member_id = '<id>'`), the
+  asks it drew (`role_ask`), and whether anyone was asked for money, ID or a fee. Real referrals are free.
+- **Clear it:** `update hiring_role set paused_by_report = false, status = 'open' where member_id = '<id>' and status =
+  'paused' and paused_by_report;` **Act on it:** close the roles (`status = 'closed', closed_at = now()`) and follow
+  §5 for the member.
+- **Everything at once:** `update brivia_feature set enabled = false where name = 'hiring';` hides every banner,
+  suggestion and ask (data kept). `select purge_hiring();` (owner only) deletes all hiring data.

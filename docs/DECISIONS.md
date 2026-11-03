@@ -2916,3 +2916,32 @@ controls (a tester or a seeded test member), never a real member, so no new expo
   typed country ranked below fuzzy matches. Fixed and verified live: Ludhiana, Bangalore -> Bengaluru, Japan -> Tokyo,
   Yokohama, Osaka, Nagoya; "Springfield, Illinois"; "chandig"; "San Fran". The dataset's native name for a city is one
   script (Bengaluru's is Hindi, not Kannada), so a Kannada spelling is not found yet.
+
+## D-141: Hiring, a banner on hirers' profiles matched to members who want a role (founder, 2026-11-02; built 2026-11-03)
+
+- **Asked:** "show a hiring banner in the profiles of the people whose looking for is hiring candidates. They shall be
+  suggested to people whose looking for is referral or a similar position ... Design when and how will the hiring
+  people post ... and when and where can normal people see the profiles. Also design the complete chart."
+- **Proposed (spec `docs/superpowers/specs/2026-11-02-hiring-design.md`):** up to 3 roles per hirer (title from a role
+  catalogue, level, on-site / hybrid / remote, "I'm hiring" or "I can refer", optional self-reported company, one
+  line, 30 days); explicit seekers only (Job Referral, Internship Referral, new Job opportunities) with "Roles I'm open
+  to", hirers-only visibility by default and an optional private current company; the banner in the deck card's
+  existing bar for everyone, a role strip and a deck lift (at most 1 in 5) only for fitting seekers; the banner in the
+  public profile; "Ask about this role" = a signal with a note and the role tag (3 a day, 25 waiting per role); the
+  hirer answers in the existing request sheet. A hiring bar (14 days, photo, confirmed email, no open report), no
+  links in role text, a "Fake job or asked for money" report reason, a kill switch.
+- **Agent-arena:** a quick panel of two independent agents (product, trust and safety), same model family (disclosed
+  reduced heterogeneity); rulings in spec §13.
+- **Status:** built 2026-11-03 (founder: "proceed with development of the hiring feature"). Migration `0037_hiring.sql`
+  (not applied yet), client `site/scripts/hiring.js` + `hiring-ui.js` + `site/styles/hiring.css`, tests
+  `supabase/tests/s-hiring.test.sql`, `tests/unit/hiring.test.mjs`, `tests/e2e/hiring.spec.mjs`. Mock screenshots in the
+  project folder `hiring/`, the real build's in `hiring/build/`.
+- **Built differently from the design, and why:**
+  - The notification row's action is **See them**: it turns on the Hiring lens on the Connect deck instead of opening a
+    second one-card sheet. One deck, one set of gestures; the lens is also a switch in the filter drawer.
+  - The fake-job reason is its own RPC, `report_fake_job`, which calls `report_member` ('fake', note prefixed
+    "Hiring:") and pauses the member's open roles. `report_member`'s reason list (0004, frozen) is unchanged.
+  - The deck lift is client side (one hiring suggestion in every five cards, never the card on screen);
+    `deck_candidates` is untouched, so ORBIT's ordering of everything else is unchanged (ORBIT_ENGINE.md §12).
+  - The feature hides itself until 0037 is applied: the first hiring RPC answers "function not found" and nothing
+    hiring-shaped renders. A kill switch (`brivia_feature` 'hiring') does the same after it is applied.
