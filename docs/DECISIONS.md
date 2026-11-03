@@ -2790,3 +2790,36 @@ controls (a tester or a seeded test member), never a real member, so no new expo
   music genre; only this label changes. Devotional singing and Sufi and qawwali stay sensitive (a test checks that).
 - **Proof:** SQL harness ALL PASSED (g C1 now 1,131 and both offered; r L4 placement, Gospel Music not sensitive, Sufi
   and qawwali still sensitive).
+
+## D-137 (2026-11-03): a bio is 1 to 20 words; the Brivia sound kit (notification, pass, pitch)
+
+- **Asked:** a word-based bio limit (1 to 20 words, live "8/20 words", a subtle note past 20, no submit past 20, the
+  same everywhere a bio is written); an original, saxophone-like notification sound; a cute, slightly sad cue on a
+  left swipe and a cheerful one on a right swipe, all one sound identity; one on/off switch and a volume; no redesign.
+- **Bio:** `profile-edit.js` `countWords` / `bioWords` (a word is a run of non-space text; extra spaces, line breaks and
+  leading or trailing spaces never count). Signup "About you" and Edit profile show the counter, add a quiet wine note
+  past 20 (`is-over`, `aria-invalid`) and refuse to continue or save (Edit profile checks before anything is sent). The
+  old 20-character floor is gone. Server: `0033_bio_word_limit.sql`, a trigger refusing a bio of more than 20 words
+  when it is written (a longer bio saved earlier stays until its member edits it; empty stays a clear).
+- **Sound:** `notify-sound.js` is now the sound kit. One synthesized voice, "the Brivia horn" (sawtooth plus square
+  through a breathing low-pass filter, a scoop into each note, late vibrato, breath noise, a short warm room), three
+  original cues in B-flat major: notify (a rising B-flat major 7 line settling on a long A), pass (D falling to B-flat,
+  drooping a semitone, darker and quieter), pitch (a quick F, B-flat, D run up to a scooped F with a sparkle). No
+  audio files, no recordings, nothing borrowed. Each cue is rendered once into a buffer when audio unlocks, so a swipe
+  starts its sound instantly; the swipe never waits for audio (`deck-swipe.js` calls the cue after the motion starts).
+- **When:** notify for every genuinely new member notification (once per id, also when a push arrives with Brivia in
+  front). Pass: every committed left swipe (drag, button, ← key) on Explore, Nearby, Event companions and requests.
+  Pitch: the right swipe once (the card parks); the pitched card leaving later is silent; a report or block leaving
+  the deck is silent. One cue at a time (a new one fades the last out); the same cue within 180 ms is the same swipe.
+- **Rules:** nothing plays before a real gesture (the landing page's gesture list: never touchstart); every gesture
+  resumes audio until it runs (iOS can suspend it again). iOS: `navigator.audioSession.type = 'ambient'` where Safari
+  has it, so the cues mix with the member's music and follow the ring/silent switch. Settings: SOUNDS (one switch for
+  all three) and SOUND VOLUME (0 to 100, default 70, previewed on release), per device.
+- **Limits, stated plainly:** a system notification (web push with Brivia closed or in the background) uses the
+  device's own notification sound; browsers do not let a website choose it. The Brivia notify cue plays when the app is
+  open. On iPhone, web push needs Brivia on the Home Screen (D-134), and the silent switch silences the cues.
+- **Proof:** unit (new `sound-kit.test.mjs`: cue shapes, gesture rules, once per id and per swipe, off and zero
+  volume, live fallback, audio session, storage, word counts); SQL harness ALL PASSED (new `s-bio-words.test.sql`);
+  e2e `sounds.spec.mjs` counts real Web Audio playback in the app at 1440 and 390 (touch); signup and profile-edit
+  specs cover the counter, the note and the refusal. Rendered in Chromium: peaks 0.21 to 0.36 at the default volume,
+  no clipping.

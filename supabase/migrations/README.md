@@ -1091,3 +1091,17 @@ Verify after the apply:
 select count(*) from public.interest_node where catalog_order is not null;                          -- 1131
 select label, catalog_order from public.interest_node where id in ('music.listening.gospel_music', 'tech.ai_data.nlp_short');
 ```
+
+## 0033
+
+**A bio is at most 20 words (founder request 2026-11-03, D-137).**
+Apply after `0032`. Adds the trigger `profiles_bio_word_guard` (function `brivia_bio_word_guard`, not callable by
+members): writing a bio of more than 20 words is refused (`check_violation`, message `bio_words: ...`). Bios saved
+earlier are untouched until edited. The client already enforces the limit, so client and migration can deploy in
+either order.
+
+Verify after the apply:
+
+```sql
+select tgname from pg_trigger where tgrelid = 'public.profiles'::regclass and tgname = 'profiles_bio_word_guard';  -- 1 row
+```

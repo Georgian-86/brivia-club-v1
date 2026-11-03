@@ -89,13 +89,31 @@ try {
     const emoji = await page.locator('#profile-edit-modal .emoji-field-emoji').first().getAttribute('data-emoji');
     await page.locator('#profile-edit-modal .emoji-field-emoji').first().click();
     const withEmoji = await page.evaluate(() => ({ value: document.querySelector('textarea[name="bio"]').value, count: document.querySelector('[data-bio-count]').textContent, focus: document.activeElement?.name }));
-    check(`${w}: D-113 the emoji panel inserts ${emoji} into the bio, updates the count and keeps the focus in the box`, withEmoji.value === `Home cook and poetry reader in Ludhiana.${emoji}` && withEmoji.count === String(withEmoji.value.length) && withEmoji.focus === 'bio', JSON.stringify(withEmoji));
+    check(`${w}: D-113 the emoji panel inserts ${emoji} into the bio, updates the count and keeps the focus in the box`, withEmoji.value === `Home cook and poetry reader in Ludhiana.${emoji}` && withEmoji.count === '7/20 words' && withEmoji.focus === 'bio', JSON.stringify(withEmoji));
     if (SHOTS) await page.locator('#profile-edit-modal .profile-edit-bio').screenshot({ path: path.join(SHOTS, `edit-emoji-${w}.png`) });
     const emojiAxe = await axeViolations(page, { include: '#profile-edit-modal .emoji-field' });
     check(`${w}: D-113 axe on the open emoji panel`, emojiAxe.length === 0, JSON.stringify(emojiAxe));
     await page.keyboard.press('Escape');
     const panelClosed = await page.evaluate(() => ({ hidden: document.querySelector('#profile-edit-modal .emoji-field-panel')?.hidden, modal: Boolean(document.querySelector('#profile-edit-modal')) }));
     check(`${w}: D-113 Escape closes the emoji panel, not the dialog`, panelClosed.hidden === true && panelClosed.modal, JSON.stringify(panelClosed));
+    // D-137: 1 to 20 words. 21 words: "21/20 words", a quiet note, and Save refuses before anything is sent.
+    const patchesBefore = st.calls.filter((c) => c.method === 'PATCH' && c.path === '/rest/v1/profiles').length;
+    const interestsBefore = posted('set_member_interests').length;
+    await page.locator('textarea[name="bio"]').fill(`${'word '.repeat(21)}`);
+    const over = await page.evaluate(() => ({ count: document.querySelector('[data-bio-count]').textContent, note: document.querySelector('[data-bio-limit]').textContent, over: document.querySelector('[data-bio-helper]').classList.contains('is-over'), invalid: document.querySelector('textarea[name="bio"]').getAttribute('aria-invalid') !== null }));
+    check(`${w}: D-137 21 words reads 21/20 words with a quiet note (${JSON.stringify(over)})`, over.count === '21/20 words' && /20 words or fewer/.test(over.note) && over.over && over.invalid);
+    if (SHOTS) await page.locator('#profile-edit-modal .profile-edit-bio').screenshot({ path: path.join(SHOTS, `edit-bio-over-${w}.png`) });
+    await page.locator('.profile-edit-save').click();
+    await page.waitForTimeout(300);
+    const refused = await page.evaluate(() => ({ open: Boolean(document.querySelector('#profile-edit-modal')), feedback: document.querySelector('#profile-edit-feedback')?.textContent || '' }));
+    check(`${w}: D-137 Save refuses a 21-word bio and sends nothing (${JSON.stringify(refused)})`, refused.open && /20 words or fewer/.test(refused.feedback)
+      && st.calls.filter((c) => c.method === 'PATCH' && c.path === '/rest/v1/profiles').length === patchesBefore && posted('set_member_interests').length === interestsBefore);
+    await page.locator('textarea[name="bio"]').fill('   ');
+    await page.locator('.profile-edit-save').click();
+    await page.waitForTimeout(200);
+    check(`${w}: D-137 a blank bio is refused too`, /at least one word/i.test(await page.locator('#profile-edit-feedback').textContent()));
+    await page.locator('textarea[name="bio"]').fill('  Home   cook  ');
+    check(`${w}: D-137 extra spaces never count`, (await page.locator('[data-bio-count]').textContent()) === '2/20 words');
     await page.locator('textarea[name="bio"]').fill('Home cook and poetry reader in Ludhiana.');
     if (SHOTS) await page.locator('#profile-edit-modal .profile-edit-dialog').screenshot({ path: path.join(SHOTS, `edit-filled-${w}.png`) });
     await page.locator('.profile-edit-save').click();

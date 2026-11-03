@@ -331,3 +331,5 @@ body.auth-page .auth-shell .guided .guided-bio-count { display: block; margin-to
 @media (max-width: 780px) {
   body.auth-page .auth-shell .guided .guided-field--bio textarea { font-size: var(--text-16); }
 }
+/* D-137: the bio word limit, a quiet wine note when the bio runs past 20 words. */
+body.auth-page .auth-shell .guided .guided-bio-count.is-over { color: var(--k-wine); font-weight: 600; }

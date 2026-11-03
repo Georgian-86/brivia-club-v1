@@ -155,3 +155,7 @@ moment, a quiet one-sided like by drag or →, ← to pass, another event's own 
 who liked first, Start conversation into Chat with the event in its header, and the states before 0023 and when not
 looking anywhere. `COMPANION_SHOTS=<dir>` saves the states.
 
+
+`sounds.spec.mjs` (D-137) counts real Web Audio buffer starts in `app.html` at 1440 and 390 (touch): nothing before a
+gesture, one pass cue per left swipe (button, ← key, drag), one pitch cue per right swipe and none when the pitched
+card leaves, silence with Sounds off. Vite on :5196.

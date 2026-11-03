@@ -34,7 +34,7 @@ import { openReportDialog, bindCardOverflow, cardOverflowOpen, reportSuccessCopy
 import { defaultCoverUrl, normalizeCoverUrl } from './cover-assets.js';
 import { DEFAULT_COVER_KEY, PRESET_COVERS, presetCoverPath, presetCoverStoredPath } from './preset-cover.js';
 import { postImageSrc } from './post-image.js';
-import { experienceChoices, cleanBio, BIO_MAX, areaInputValue, planInterestSave } from './profile-edit.js';
+import { experienceChoices, cleanBio, BIO_MAX, BIO_WORDS_MAX, BIO_COPY, bioWords, areaInputValue, planInterestSave } from './profile-edit.js';
 import { isOffered, hasCatalog, catalogGroups, normalizeInterestLabel } from './signup-flow.js';
 import { MAX_INTERESTS } from './passion-budget.js';
 import { collabSummary, openCollabReview } from './collab-requests.js';
@@ -44,7 +44,7 @@ import '../styles/crossing-paths.css';
 import { createNearbyPage } from './nearby-page.js';
 import { COPY as NEARBY_COPY, bandLabel as nearbyBandLabel } from './nearby-view.js';
 import { createMemberNotifications } from './member-notifications.js';
-import { createChime, soundEnabled, setSoundEnabled } from './notify-sound.js';
+import { createSoundKit, soundEnabled, setSoundEnabled, soundVolume, setSoundVolume } from './notify-sound.js';
 import { createWebPush, pushSupport, PUSH_COPY } from './web-push.js';
 import '../styles/nearby.css';
 import { createEventsPage } from './events-page.js';
@@ -63,7 +63,7 @@ import { loadActivity, withLike, likeSummary, threadComments, cleanCommentBody, 
 import { profileChecklist } from './profile-checklist.js';
 import { quotaLabel, quotaErrorText, quotaBlocked, quotaNotice } from './signal-quota.js';
 import { pitchLine, deckChips, deckEmptyState, deckFields, bandNote, deckCoverSrc } from './deck-view.js';
-import { createDeckSwipe, SWIPE } from './deck-swipe.js';
+import { createDeckSwipe, SWIPE, setSwipeCue } from './deck-swipe.js';
 import { maybeShowDeckTutorial } from './deck-tutorial.js';
 import { whyPanelMarkup, whyRow } from './why-panel.js';
 import { chatEmojiCategories } from './chat-emoji-data.js';
@@ -1067,7 +1067,9 @@ nearbyPage = createNearbyPage({
 // D-134: Nearby notifications. One store on the server (member_notification, 0030), live on every open device through
 // Realtime: a new one plays the chime once and shows in the Nearby section (or a toast elsewhere); read or dismissed
 // anywhere, it is read everywhere and its system notification closes. Web push (optional, per device) is in Settings.
-const chime = createChime();
+// D-137: one sound kit for the whole app (notify-sound.js): the notification cue and the two swipe cues.
+const chime = createSoundKit();
+setSwipeCue((direction) => chime.swipe(direction));
 const webPush = createWebPush({ save: savePushSubscription, remove: deletePushSubscription });
 const openMemberProfileById = async (id) => {
   if (!id) return;
@@ -1090,8 +1092,8 @@ const memberNotes = createMemberNotifications({
     return () => supabase.removeChannel(channel);
   },
   onNew: (n) => {
+    chime.notify(n.id);   // every genuinely new notification, once per id
     if (n.type !== 'nearby_appeared') return;
-    chime.play(n.id);
     if (!nearbyPage.notify(n) && document.visibilityState === 'visible') {
       showToast(`Someone crossed your path. ${n.name || 'A Brivia member'} is nearby${n.band ? ` (${nearbyBandLabel(n.band).toLowerCase()})` : ''}.`);
     }
@@ -2037,13 +2039,13 @@ let capCheckInFlight = false;
 
 // The card leaves in the swipe direction (deck-swipe.js), then the next member takes its place. A card put back at the
 // front meanwhile (a failed signal, F5) is not consumed.
-const advanceCard = (person, direction, { vx = 0, duration } = {}) => {
+const advanceCard = (person, direction, { vx = 0, duration, silent = false } = {}) => {
   if (!person?.id) return;
   const id = String(person.id);
   const generation = requeueGeneration.get(id) || 0;
   deckAdvancing = true;
   const onCard = currentPerson && String(currentPerson.id) === id;
-  const flight = onCard && deckSwipe ? deckSwipe.flyOut(direction, { vx, duration: vx ? undefined : (duration || SWIPE.buttonFly) }) : Promise.resolve();
+  const flight = onCard && deckSwipe ? deckSwipe.flyOut(direction, { vx, duration: vx ? undefined : (duration || SWIPE.buttonFly), silent }) : Promise.resolve();
   flight.then(async () => {
     deckAdvancing = false;
     if ((requeueGeneration.get(id) || 0) !== generation) { renderExplore(); deckSwipe?.settle(); return; }
@@ -2097,7 +2099,7 @@ const swipe = (type, { vx = 0 } = {}) => {
 // card leaves like a Pass visually but sends no pass interaction.
 const dismissCardLikePass = (person) => {
   if (deckAdvancing) return;
-  advanceCard(person, 'pass');
+  advanceCard(person, 'pass', { silent: true });   // not a swipe: no sound
 };
 bindCardOverflow(async (action, trigger) => {
   const person = currentPerson;
@@ -3276,7 +3278,7 @@ const openProfileEditor = () => {
         <label><span>EMAIL</span><input class="b-field" value="${escapeHtml(profile.email || '')}" readonly /></label>
         <label><span>PHONE</span><input class="b-field" name="phone" value="${escapeHtml(profile.phone || '')}" /></label>
         <label><span>EXPERIENCE</span><select class="b-select" name="experience"><option value="">Choose one</option>${experienceChoices(profile.experience).map((choice) => `<option${choice === String(profile.experience || '').trim() ? ' selected' : ''}>${escapeHtml(choice)}</option>`).join('')}</select></label>
-        ${bioAvailable ? `<label class="profile-edit-wide profile-edit-bio"><span>BIO</span><textarea class="b-field" name="bio" rows="3" maxlength="${BIO_MAX}" placeholder="A line or two about you: what you do, what you love, what you're up to.">${escapeHtml(profile.bio || '')}</textarea><small class="profile-edit-helper"><span data-bio-count>${String(profile.bio || '').length}</span> / ${BIO_MAX}. Members who can see you read it on your profile.</small></label>` : ''}
+        ${bioAvailable ? `<label class="profile-edit-wide profile-edit-bio"><span>BIO</span><textarea class="b-field" name="bio" rows="3" maxlength="${BIO_MAX}" placeholder="A line or two about you: what you do, what you love, what you're up to.">${escapeHtml(profile.bio || '')}</textarea><small class="profile-edit-helper" data-bio-helper><span data-bio-count aria-live="polite">${bioWords(profile.bio).label}</span><span data-bio-limit role="status"></span>. Members who can see you read it on your profile.</small></label>` : ''}
         <div class="profile-edit-wide profile-edit-area" data-profile-area><span id="profile-area-label">YOUR AREA</span><p class="profile-edit-area-current" data-area-current>${escapeHtml(memberPlaceLabel || 'Not set yet')}</p><div class="profile-edit-area-tools"><button type="button" class="profile-area-geo" data-area-geo>Use my location</button><div class="profile-area-search b-combo"><input class="b-field" type="text" role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="profile-area-results" aria-labelledby="profile-area-label" placeholder="Or search your city" value="${escapeHtml(areaInputValue(memberPlaceLabel))}" autocomplete="off" spellcheck="false" data-area-search /><ul class="profile-area-results b-listbox" id="profile-area-results" role="listbox" aria-label="Cities" hidden></ul></div></div><small class="profile-edit-helper" data-area-status role="status">${escapeHtml(AREA_HELPER)}</small></div>
         ${chipPickerMarkup({ id: 'profile-interests-edit', label: 'INTERESTS', listLabel: 'Your interests', placeholder: 'Add an interest: type to search', helper: `Pick 1 to ${MAX_INTERESTS}. You can change them up to 3 times a day. Private interests are never shown.` })}
         ${chipPickerMarkup({ id: 'profile-looking-edit', label: 'LOOKING FOR', listLabel: 'What you are looking for', placeholder: 'Add: pick a suggestion or type your own', helper: `Up to ${LOOKING_FOR_MAX}. Members see these on your card.` })}
@@ -3294,7 +3296,19 @@ const openProfileEditor = () => {
   const interestEdit = wireInterestEditor(modal);
   const lookingEdit = wireLookingForEditor(modal);
   const bioField = modal.querySelector('textarea[name="bio"]');
-  bioField?.addEventListener('input', () => { const count = modal.querySelector('[data-bio-count]'); if (count) count.textContent = String(bioField.value.length); });
+  // D-137: 1 to 20 words, counted live ("8/20 words"); past 20 a quiet note shows and Save is refused.
+  const syncBioWords = () => {
+    if (!bioField) return;
+    const w = bioWords(bioField.value);
+    const count = modal.querySelector('[data-bio-count]');
+    const limit = modal.querySelector('[data-bio-limit]');
+    if (count) count.textContent = w.label;
+    if (limit) limit.textContent = w.message ? ` · ${w.message}` : '';
+    bioField.toggleAttribute('aria-invalid', w.over);
+    modal.querySelector('[data-bio-helper]')?.classList.toggle('is-over', w.over);
+  };
+  bioField?.addEventListener('input', syncBioWords);
+  syncBioWords();
   // D-113: an emoji panel under the bio (emoji-field.js).
   if (bioField) attachEmojiPicker(bioField, { label: 'Add an emoji to your bio', after: bioField.parentElement.querySelector('.profile-edit-helper') || bioField });
   modal.addEventListener('click', (event) => { if (event.target === modal) close(); });
@@ -3353,6 +3367,11 @@ const openProfileEditor = () => {
     if (coverChoice && coverChoice !== currentCover) nextProfile.coverUrl = coverChoice;
     const photoFile = framedPhoto;
     if (!nextProfile.name) { feedback.textContent = 'Please add your name.'; return; }
+    // D-137: a bio is 1 to 20 words. Checked before anything is saved.
+    if (bioField) {
+      const w = bioWords(bioField.value);
+      if (!w.ok) { feedback.textContent = w.over ? `Keep your bio to ${BIO_WORDS_MAX} words or fewer.` : `Bio: ${BIO_COPY.empty.toLowerCase()}`; bioField.focus(); return; }
+    }
     // Interests first (the one save with a daily limit): when it is refused nothing else is saved, and the dialog stays.
     const interestPlan = interestEdit.ready ? planInterestSave(interestEdit.saved, interestEdit.picks) : { unchanged: true };
     if (interestPlan.error) { feedback.textContent = 'Pick at least one interest.'; form.querySelector('[data-interest-search]')?.focus(); return; }
@@ -3373,7 +3392,7 @@ const openProfileEditor = () => {
     const nextBio = bioField ? cleanBio(bioField.value) : null;
     if (bioField && nextBio !== cleanBio(memberProfile.bio)) {
       const { error: bioError } = await supabase.from('profiles').update({ bio: nextBio || null }).eq('id', memberProfile.id);
-      if (bioError) { setBusy(submit, false); feedback.textContent = "Your bio couldn't be saved. Please try again."; return; }
+      if (bioError) { setBusy(submit, false); feedback.textContent = /bio_words|20 words/i.test(String(bioError.message)) ? `Keep your bio to ${BIO_WORDS_MAX} words or fewer.` : "Your bio couldn't be saved. Please try again."; return; }
       nextProfile.bio = nextBio;
     }
     const { data, error } = await saveProfile(memberProfile.id, nextProfile, photoFile, { photoUrl: memberProfile.photoUrl });
@@ -3463,7 +3482,8 @@ const openNotificationSettings = () => {
     <label class="settings-toggle-row"><span><strong>MESSAGE NOTIFICATIONS</strong><small>Get an alert when someone sends you a message.</small></span><input id="profile-notifications-toggle" type="checkbox" /><i aria-hidden="true"></i></label>
     <label class="settings-toggle-row" data-presence-setting hidden><span><strong>SHOW WHEN I'M ACTIVE</strong><small>Your connections see a dot when you're here. Turn it off and you won't see theirs either.</small></span><input id="profile-presence-toggle" type="checkbox" /><i aria-hidden="true"></i></label>
     <label class="settings-toggle-row" data-push-setting><span><strong>WEB NOTIFICATIONS</strong><small>Get a notification on this device when someone crosses your path, even when Brivia is closed. Separate from location.</small><small class="settings-nearby-status" data-push-status role="status"></small></span><input id="profile-push-toggle" type="checkbox" /><i aria-hidden="true"></i></label>
-    <label class="settings-toggle-row"><span><strong>NOTIFICATION SOUND</strong><small>A soft chime when someone new is nearby, on this device.</small></span><input id="profile-sound-toggle" type="checkbox" /><i aria-hidden="true"></i></label>
+    <label class="settings-toggle-row"><span><strong>SOUNDS</strong><small>A soft sax chime for new notifications, and a note when you swipe. On this device.</small></span><input id="profile-sound-toggle" type="checkbox" /><i aria-hidden="true"></i></label>
+    <label class="settings-volume-row" data-sound-volume><span><strong>SOUND VOLUME</strong><small data-sound-volume-value></small></span><input id="profile-sound-volume" type="range" min="0" max="100" step="5" /></label>
     <label class="settings-toggle-row" data-nearby-setting hidden><span><strong>CROSSING PATHS</strong><small>Discover when other Brivia members are nearby. Only members who enable this feature can discover you.</small><small class="settings-nearby-status" data-nearby-status role="status"></small></span><input id="profile-nearby-toggle" type="checkbox" /><i aria-hidden="true"></i></label>
     <p class="profile-settings-feedback" id="notification-settings-feedback" role="status"></p>
   </div>`;
@@ -3499,13 +3519,26 @@ const openNotificationSettings = () => {
   const pushToggle = modal.querySelector('#profile-push-toggle');
   const pushStatus = modal.querySelector('[data-push-status]');
   const soundToggle = modal.querySelector('#profile-sound-toggle');
+  const volumeInput = modal.querySelector('#profile-sound-volume');
+  const volumeValue = modal.querySelector('[data-sound-volume-value]');
+  const showVolume = () => {
+    volumeValue.textContent = `${volumeInput.value}%`;
+    volumeInput.setAttribute('aria-valuetext', `${volumeInput.value} percent`);
+    volumeInput.disabled = !soundToggle.checked;
+  };
   soundToggle.checked = soundEnabled();
+  volumeInput.value = String(soundVolume());
+  showVolume();
   soundToggle.addEventListener('change', () => {
     setSoundEnabled(soundToggle.checked);
     chime.unlock();
-    if (soundToggle.checked) chime.play();
-    feedback.textContent = soundToggle.checked ? 'Notification sound is on for this device.' : 'Notification sound is off for this device.';
+    if (soundToggle.checked) chime.preview();
+    showVolume();
+    feedback.textContent = soundToggle.checked ? 'Sounds are on for this device.' : 'Sounds are off for this device.';
   });
+  // Adjusting: saved as it moves, previewed once it is let go.
+  volumeInput.addEventListener('input', () => { setSoundVolume(volumeInput.value); showVolume(); });
+  volumeInput.addEventListener('change', () => { chime.unlock(); chime.preview(); });
   const support = pushSupport();
   if (support !== 'ready') { pushToggle.disabled = support !== 'denied'; pushStatus.textContent = PUSH_COPY[support] || ''; }
   webPush.isOn().then((on) => { if (modal.isConnected) pushToggle.checked = on; }).catch(() => {});
