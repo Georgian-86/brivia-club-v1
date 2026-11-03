@@ -3010,3 +3010,16 @@ controls (a tester or a seeded test member), never a real member, so no new expo
   (https, googleusercontent.com only, no referrer) shows in their own circle only, never to anyone else and never saved;
   initials remain the last fallback. The caught-up card a size down: 380 px, 52 px mark with a quieter halo, a smaller
   heading and copy, a compact pill. e2e deck 201 and app-shell 214 pass.
+
+## D-148 (2026-11-04): a logo for every company
+
+- **Asked:** "I WANT LOGOS FOR EVERY COMPANY" (Swiggy showed the default mark).
+- **Found:** only 5 of 930 companies had logos. The seeded 926 had names only, and the lazy fill (a Wikidata lookup
+  when a member searches) misses whenever the search lands on another entry, as it did for Swiggy.
+- **Done:** `supabase/catalog/company-domains.txt`: the official website of each of the 926 (`scripts/build-company-
+  domains.mjs` writes `0040_company_icons.sql`); `company.icon_domain` (not unique: Oracle's two entries, DMart and
+  Avenue Supermarts, Digit share a site); the directory Edge Function's bulk pass (`kind: 'logos'`) fetches each site's
+  square icon once (Google's icon service at 128 px, then DuckDuckGo's), stores it in `company-logos/directory/`, and
+  sets the logo. It only fills empty logos of directory companies. Members' own organisations keep their uploads.
+- **Proof:** SQL harness ALL PASSED (v-company C5: every seeded company has a website; the pass lists only empty logos,
+  stores only directory paths, never a URL; members cannot call it); live counts in README "## 0040".

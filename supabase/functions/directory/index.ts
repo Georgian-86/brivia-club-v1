@@ -33,6 +33,25 @@ const domainOf = (url: string) => {
 };
 const timed = (url: string, init: RequestInit = {}, ms = 6000) => fetch(url, { ...init, headers: { 'user-agent': UA, ...(init.headers || {}) }, signal: AbortSignal.timeout(ms) });
 
+// A site's square icon, stored once at <base>.<ext>; '' when none could be read. Google's icon service first (128 px),
+// then DuckDuckGo's. Raster only.
+const storeIcon = async (admin: any, site: string, base: string) => {
+  for (const source of [`https://www.google.com/s2/favicons?domain=${encodeURIComponent(site)}&sz=128`, `https://icons.duckduckgo.com/ip3/${encodeURIComponent(site)}.ico`]) {
+    try {
+      const img = await timed(source, {}, 5000);
+      const type = img.headers.get('content-type') || '';
+      const bytes = img.ok ? new Uint8Array(await img.arrayBuffer()) : new Uint8Array();
+      if (bytes.length > 64 && bytes.length < 300_000 && /^image\/(png|jpeg|webp|gif|x-icon|vnd\.microsoft\.icon)/.test(type)) {
+        const ext = type.includes('png') ? 'png' : type.includes('jpeg') ? 'jpg' : type.includes('webp') ? 'webp' : type.includes('gif') ? 'gif' : 'ico';
+        const path = `${base}.${ext}`;
+        const up = await admin.storage.from('company-logos').upload(path, bytes, { contentType: type, upsert: true });
+        if (!up.error) return path;
+      }
+    } catch { /* try the next source */ }
+  }
+  return '';
+};
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: CORS });
   if (req.method !== 'POST') return json(405, { error: 'method' });
@@ -41,13 +60,32 @@ Deno.serve(async (req) => {
   const service = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
   const token = (req.headers.get('authorization') || '').replace(/^Bearer\s+/i, '');
   if (!token) return json(401, { error: 'auth' });
+  const admin = createClient(url, service, { auth: { persistSession: false } });
+  let body: { kind?: string; q?: string; ids?: string[] } = {};
+  try { body = await req.json(); } catch { body = {}; }
+
+  // D-148: the bulk logo pass (README "## 0040"). Given up to 40 company ids, each one still without a logo gets its
+  // site's square icon, fetched once per website and stored. It only fills empty logos of directory companies, never a
+  // member's own organisation, so it needs no member session (the platform still requires the project's key).
+  if (body.kind === 'logos') {
+    const ids = (Array.isArray(body.ids) ? body.ids : []).filter((x) => /^[0-9a-f-]{36}$/.test(String(x))).slice(0, 40);
+    if (!ids.length) return json(200, { done: 0 });
+    const { data: rows } = await admin.from('company').select('id,icon_domain,domain,logo_path,source').in('id', ids);
+    const byDomain = new Map<string, string>();
+    let done = 0;
+    for (const r of rows || []) {
+      const site = r.icon_domain || r.domain;
+      if (r.logo_path || r.source === 'member' || !site) continue;
+      let path = byDomain.get(site);
+      if (path === undefined) { path = await storeIcon(admin, site, `directory/c-${r.id}-icon`); byDomain.set(site, path); }
+      if (path) { await admin.rpc('brivia_set_company_icon', { p_id: r.id, p_path: path }); done += 1; }
+    }
+    return json(200, { done, seen: (rows || []).length });
+  }
+
   const asMember = createClient(url, anon, { global: { headers: { Authorization: `Bearer ${token}` } }, auth: { persistSession: false } });
   const { data: who, error: whoError } = await asMember.auth.getUser(token);
   if (whoError || !who?.user?.id) return json(401, { error: 'auth' });
-  const admin = createClient(url, service, { auth: { persistSession: false } });
-
-  let body: { kind?: string; q?: string } = {};
-  try { body = await req.json(); } catch { body = {}; }
   const q = String(body.q || '').replace(/\s+/g, ' ').trim().slice(0, 60);
   if (q.length < 2) return json(200, { companies: [], places: [] });
 

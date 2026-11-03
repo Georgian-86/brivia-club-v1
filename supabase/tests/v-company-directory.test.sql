@@ -77,3 +77,22 @@ begin
 end $$;
 select 'v-company-directory.test C4 OK';
 rollback;
+
+-- C5 (0040, D-148): every seeded company has a website to read its icon from; the logo pass sees only those without a
+-- logo, writes only a directory path, and never touches a member's own organisation; members cannot call either.
+do $$
+declare first uuid;
+begin
+  if exists (select 1 from public.company where source = 'admin' and icon_domain is null) then
+    raise exception 'FAIL C5: % seeded companies without a website', (select count(*) from public.company where source = 'admin' and icon_domain is null); end if;
+  if (select icon_domain from public.company where name = 'Swiggy') <> 'swiggy.com' then raise exception 'FAIL C5: Swiggy'; end if;
+  select id into first from public.brivia_companies_needing_icons(1, 0);
+  perform public.brivia_set_company_icon(first, 'https://evil.example/x.png');
+  if (select logo_path from public.company where id = first) is not null then raise exception 'FAIL C5: a URL was stored'; end if;
+  perform public.brivia_set_company_icon(first, 'directory/c-test-icon.png');
+  if (select logo_path from public.company where id = first) <> 'directory/c-test-icon.png' then raise exception 'FAIL C5: icon not set'; end if;
+  if exists (select 1 from public.brivia_companies_needing_icons(60, 0) where id = first) then raise exception 'FAIL C5: listed again'; end if;
+  if has_function_privilege('authenticated', 'public.brivia_set_company_icon(uuid,text)', 'execute') then raise exception 'FAIL C5: grants'; end if;
+  update public.company set logo_path = null where id = first;
+end $$;
+select 'v-company-directory.test C5 OK';
