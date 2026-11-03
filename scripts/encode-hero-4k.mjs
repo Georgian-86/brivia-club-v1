@@ -56,9 +56,13 @@ export const panExpression = (path = PORTRAIT_PATH, frameWidth = 3840, cropWidth
 };
 
 const BASE = 'scale=3840:2160:flags=lanczos';
+// D-155: the source carries a generator watermark (a four-point sparkle) bottom right, at the same place for the whole
+// clip (x 3405-3555, y 1720-1875 at 3840x2160). delogo fills it from its surroundings. The portrait crop never reaches
+// x > 3373, so only the full frame needs it.
+const UNMARK = 'delogo=x=3392:y=1708:w=176:h=180';
 const SHARPEN = 'unsharp=11:11:0.7:5:5:0,unsharp=5:5:0.6:5:5:0';
 export const HERO_FRAMES = {
-  'hero-4k': { filter: `${BASE},${SHARPEN}`, poster: { name: 'hero-section-video.webp', scale: '1920:1080' } },
+  'hero-4k': { filter: `${BASE},${UNMARK},${SHARPEN}`, poster: { name: 'hero-section-video.webp', scale: '1920:1080' } },
   'hero-portrait-4k': { filter: `${BASE},crop=1216:2160:'${panExpression()}':0,${SHARPEN}`, poster: { name: 'hero-portrait.webp', scale: '720:1280' } },
 };
 // [codec args, ceiling for the landscape frame, ceiling for the portrait frame] (kbit/s; peaks may exceed briefly).

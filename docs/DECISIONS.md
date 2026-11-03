@@ -3149,3 +3149,13 @@ controls (a tester or a seeded test member), never a real member, so no new expo
 - **Checked live:** the 0012 typing policies are on realtime.messages and allow the founder's matched pairs.
 - **Proof:** unit (nextSuggestion), e2e chat-extras typing T1–T9 (T9 new: rows), companions, chat-search, chat-inbox,
   read-receipts, presence, deck.
+
+## D-155 (2026-11-04): the generator watermark is removed from the desktop hero
+
+- **Asked:** "remove the gemini logo from the video as soon as possible from desktop view".
+- **Done:** the source clip carries a four-point sparkle watermark, bottom right, fixed for the whole clip (x 3405-3555,
+  y 1720-1875 at 3840x2160). The full-frame encodes now run `delogo` over that box (filled from the surrounding
+  pixels) before sharpening; HEVC first (Safari), then AV1 and H.264, and the landscape poster. The portrait crop never
+  reaches that corner (its right edge stops at x 3373), so the phone files were already clean and are unchanged.
+- **Note:** a faint soft patch can show where the mark was on busy frames (the chess board); it reads as background.
+  A clean master from the video tool, exported without the watermark, would remove even that.
