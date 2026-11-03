@@ -1017,7 +1017,9 @@ select count(*) from (select 1 from public.brivia_messages group by sender_id, r
 
 ## 0029
 
-**Nearby: discover members around you (founder request 2026-11-03, D-131). Not yet applied.** Apply after `0021` and
+**Nearby: discover members around you (founder request 2026-11-03, D-131). APPLIED 2026-11-03** (Supabase MCP, as
+postgres; verified: all 12 function bodies equal this file, members may run the 4 RPCs, anon none, `nearby_passed` and
+the pool helper unreachable, 0 discovery consents, 2 alerts-only switches kept). Apply after `0021` and
 `0028`. The client can deploy first: before 0029 the Nearby page says "Nearby opens soon" and requests carry no label.
 
 What it does: a ~1 km live cell next to 0021's (`nearby_live.near_cell`, set by the redefined `nearby_pulse`, which is

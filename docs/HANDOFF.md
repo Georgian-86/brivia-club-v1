@@ -9,7 +9,8 @@ Update this file at the end of every session. CLAUDE.md holds the aim; this file
 
 **2026-11-03, D-131:** Nearby: discover members around you (Connect → Nearby), 1 / 3 / 5 km bands from a ~1 km live
 cell, mutual-consent connect with the prefilled opener, "Well, look who crossed paths!". Client ready (before 0029 it
-says "Nearby opens soon"). **Owed: apply `0029_nearby_discovery.sql`** (README "0029").
+said "Nearby opens soon"). `0029_nearby_discovery.sql` **applied live 2026-11-03** and verified (README "0029").
+**2026-11-03, D-132:** the request sheet has no Accept / Decline buttons; requests are answered by dragging (or → / ←).
 
 **2026-11-03, D-129:** an accepted request's pitch appeared twice in chat: live `brivia_create_match` (hand-edited,
 drift) copied the note and 0024's trigger delivered it too. `0028_pitch_once.sql` fixes the function and removes the

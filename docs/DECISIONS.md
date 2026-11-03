@@ -2687,7 +2687,7 @@ controls (a tester or a seeded test member), never a real member, so no new expo
 - **Proof:** SQL harness ALL PASSED (new `p-nearby-discovery.test.sql` D1-D9; hygiene H3 whitelist); unit 445 (new
   `nearby-view.test.mjs`); e2e new `nearby.spec.mjs` 49/49 at 1440 and 390 (axe clean), plus crossing-paths, companions,
   collab-requests, deck and app-shell; build and style ratchet. ORBIT §9.1.4b and UX_SPEC §B2 added.
-- **Owed:** apply `0029_nearby_discovery.sql` (README "0029").
+- **Owed:** apply `0029_nearby_discovery.sql` (README "0029"). Done 2026-11-03, see README "0029".
 
 ## D-132 (2026-11-03): requests are answered by swiping only
 
