@@ -50,7 +50,9 @@ const ICON = {
 
 export const reviewCardMarkup = (m, { index, total }, { escapeHtml, renderAvatar }) => {
   const meta = [m.role, m.band].filter(Boolean).map(escapeHtml).join('<span aria-hidden="true"> · </span>');
-  return `<article class="collab-card" data-collab-card data-from="${escapeHtml(m.fromId)}" aria-roledescription="request card" aria-label="Request from ${escapeHtml(m.name)}">`
+  // D-132: no Accept / Decline buttons. The card is the control: drag right accepts, left declines; focused, the arrow
+  // keys do the same (→ accept, ← decline), so keyboard and screen-reader members can still answer.
+  return `<article class="collab-card" data-collab-card data-from="${escapeHtml(m.fromId)}" tabindex="0" aria-roledescription="request card" aria-keyshortcuts="ArrowRight ArrowLeft" aria-describedby="collab-gesture" aria-label="Request from ${escapeHtml(m.name)}">`
     + '<span class="collab-stamp collab-stamp--connect" aria-hidden="true">ACCEPT</span><span class="collab-stamp collab-stamp--later" aria-hidden="true">DECLINE</span>'
     + `<p class="collab-count">${index + 1} of ${total}</p>`
     + `${renderAvatar(m.person || { name: m.name }, 'collab-avatar')}`
@@ -60,11 +62,7 @@ export const reviewCardMarkup = (m, { index, total }, { escapeHtml, renderAvatar
     // D-124: their message first, in full: it is why they want to connect (and the first message of your chat if you accept).
     + (m.note ? `<blockquote class="collab-note"><p class="collab-label">Their message</p><p class="collab-note-text">${escapeHtml(m.note)}</p></blockquote>` : '<p class="collab-note-empty">No message, just a hello.</p>')
     + (m.shared.length ? `<p class="collab-label">You both care about</p><ul class="collab-shared">${m.shared.map((s) => `<li>${escapeHtml(s)}</li>`).join('')}</ul>` : '')
-    + '</article>'
-    + '<div class="collab-actions">'
-    + `<button type="button" class="collab-button collab-button--later" data-collab-decide="later">${ICON.later}<span>Decline</span></button>`
-    + `<button type="button" class="collab-button collab-button--connect" data-collab-decide="connect">${ICON.connect}<span>Accept</span></button>`
-    + '</div>';
+    + '</article>';
 };
 
 // The sheet. respond(fromId, accept) resolves { ok, connected }; onMessage(fromId) opens the chat; onClose(reason) runs
@@ -84,7 +82,10 @@ export const openCollabReview = ({ requests, respond, onMessage, onClose = () =>
     + '<button type="button" class="collab-close" data-collab-close aria-label="Close">'
     + '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M7 7l10 10M17 7 7 17"/></svg></button></div>'
     + '<div class="collab-body" data-collab-body aria-live="polite"></div>'
-    + '<p class="collab-hint" data-collab-hint><span class="collab-hint-touch">Drag the card right to connect, left for not now.</span><span class="collab-hint-keys">Drag the card, or use the arrow keys: right to connect, left for not now.</span></p>'
+    // The gesture cue (labels, not buttons): which way declines, which way accepts.
+    + `<div class="collab-gesture" data-collab-hint><span class="collab-gesture-side collab-gesture-side--later">${ICON.later}<span>Decline</span></span>`
+    + '<p class="collab-hint" id="collab-gesture"><span class="collab-hint-touch">Drag the card: right to accept, left to decline.</span><span class="collab-hint-keys">Drag the card, or press → to accept and ← to decline.</span></p>'
+    + `<span class="collab-gesture-side collab-gesture-side--connect"><span>Accept</span>${ICON.connect}</span></div>`
     + '</div>';
   document.body.append(dialog);
   const body = dialog.querySelector('[data-collab-body]');
@@ -105,8 +106,6 @@ export const openCollabReview = ({ requests, respond, onMessage, onClose = () =>
     const m = reviewCardModel(queue[index], myInterests);
     body.innerHTML = `<div class="collab-stack" data-collab-stack>${reviewCardMarkup(m, { index, total }, { escapeHtml, renderAvatar })}</div>`;
     const card = body.querySelector('[data-collab-card]');
-    // The actions sit outside the dragged card (deck-swipe ignores nothing else), so move them below the stack.
-    body.append(body.querySelector('.collab-actions'));
     swipe = createDeckSwipe({ card, stack: body.querySelector('[data-collab-stack]'), canDrag: () => !busy, onCommit: (direction) => { decide(direction === 'pitch', { dragged: true }); } });
   };
   const connected = (m) => {
@@ -122,15 +121,13 @@ export const openCollabReview = ({ requests, respond, onMessage, onClose = () =>
       + (first ? `<button type="button" class="collab-button collab-button--connect" data-collab-message>${m.note ? 'Reply' : 'Message'} ${escapeHtml(first)}</button>` : '')
       + '</div></div>';
     body.querySelector('[data-collab-message]')?.addEventListener('click', () => { closeReason = 'message'; close(); onMessage(m.fromId); });
-    body.querySelector('[data-collab-next]').addEventListener('click', () => { index += 1; show(); body.querySelector('[data-collab-decide="connect"], [data-collab-close]')?.focus(); });
+    body.querySelector('[data-collab-next]').addEventListener('click', () => { index += 1; show(); body.querySelector('[data-collab-card], [data-collab-close]')?.focus(); });
     (body.querySelector('[data-collab-message]') || body.querySelector('[data-collab-next]')).focus();
   };
   async function decide(accept, { dragged = false } = {}) {
     if (busy || !swipe || index >= queue.length) return;
     busy = true;
     const m = reviewCardModel(queue[index], myInterests);
-    const buttons = [...body.querySelectorAll('[data-collab-decide]')];
-    buttons.forEach((b) => { b.disabled = true; });
     const current = swipe;
     let result = null;
     try {
@@ -144,22 +141,19 @@ export const openCollabReview = ({ requests, respond, onMessage, onClose = () =>
     if (!result?.ok) {
       // The request is still pending: the card comes back, ready for another try (the caller showed the toast).
       current.reset();
-      buttons.forEach((b) => { b.disabled = false; });
-      buttons.find((b) => b.dataset.collabDecide === (accept ? 'connect' : 'later'))?.focus();
+      body.querySelector('[data-collab-card]')?.focus();
       return;
     }
     if (accept && result.connected) { connected(m); return; }
     index += 1;
     show();
-    body.querySelector('[data-collab-decide="connect"], [data-collab-close]')?.focus();
+    body.querySelector('[data-collab-card], [data-collab-close]')?.focus();
   }
   const close = () => { if (dialog.open) dialog.close(); };
 
   dialog.addEventListener('click', (event) => {
     if (event.target === dialog) { close(); return; }  // the backdrop
-    if (event.target.closest('[data-collab-close]')) { close(); return; }
-    const decision = event.target.closest('[data-collab-decide]')?.dataset.collabDecide;
-    if (decision) decide(decision === 'connect');
+    if (event.target.closest('[data-collab-close]')) close();
   });
   dialog.addEventListener('keydown', (event) => {
     const accept = keyDecision(event.key);
@@ -170,6 +164,6 @@ export const openCollabReview = ({ requests, respond, onMessage, onClose = () =>
   dialog.addEventListener('close', () => { dialog.remove(); onClose(closeReason); }, { once: true });
   dialog.showModal();
   show();
-  body.querySelector('[data-collab-decide="connect"]')?.focus();
+  body.querySelector('[data-collab-card]')?.focus();
   return { close };
 };

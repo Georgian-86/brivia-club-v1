@@ -383,7 +383,7 @@ Settings → CROSSING PATHS: "Discover when other Brivia members are nearby. Onl
 discover you." The explainer: Discover people around you (within 5 km, only members who turned it on); Never your exact
 place (city and a band, a ~1 km area kept 20 minutes, no history); Connections get a quiet alert; Only while Brivia is
 open, off at once. Requests from Nearby: the panel says "Someone nearby wants to connect with you" (one toast), the
-review card shows "Crossed paths nearby"; a Nearby match tells the member who connected first once (toast and a "You and
+review card shows "Crossed paths nearby" (requests are answered by dragging only, D-132); a Nearby match tells the member who connected first once (toast and a "You and
 <name> crossed paths" row with Say hello).
 
 ### C. Search and Long-Range Request

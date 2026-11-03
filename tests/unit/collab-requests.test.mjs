@@ -40,10 +40,9 @@ test('reviewCardMarkup escapes, shows the counter and the note, and never uses d
   const html = reviewCardMarkup(m, { index: 0, total: 3 }, { escapeHtml, renderAvatar });
   assert.doesNotMatch(html, /<b>build<\/b>|<i>B<\/i>/);
   assert.match(html, /1 of 3/);
-  // D-124: their message comes first; Accept and Decline (was Connect / Not now).
+  // D-124: their message comes first. D-132: no Accept / Decline buttons; the drag stamps still read ACCEPT / DECLINE.
   assert.match(html, /Their message/);
-  assert.match(html, /Accept/);
-  assert.match(html, /Decline/);
+  assert.doesNotMatch(html, /<button|data-collab-decide/);
   assert.match(html, /DECLINE/);
   assert.match(html, /ACCEPT/);
   assert.doesNotMatch(html.replace(/<[^>]+>/g, ' '), /\b(match|like|pass|swipe|crush|heart)/i);

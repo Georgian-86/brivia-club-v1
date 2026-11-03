@@ -156,3 +156,17 @@ body.app-body dialog.collab-review .collab-note-text::after{content:'\201D';colo
 
 /* D-131: a request sent from Nearby. */
 .collab-nearby{margin:2px 0 0;padding:3px 12px;border-radius:var(--radius-pill);background:color-mix(in srgb, var(--brivia-wine) 9%, var(--color-cream));color:var(--color-wine-deep);font-size:var(--text-12);font-weight:700;letter-spacing:.06em}
+
+/* D-132: no Accept / Decline buttons; the card is answered by dragging (or the arrow keys). The cue under it names the
+   two directions as quiet labels, and the focused card shows a wine ring. */
+.collab-gesture{display:grid;grid-template-columns:auto 1fr auto;align-items:center;gap:var(--space-3);margin-top:calc(-1 * var(--space-1))}
+.collab-gesture[hidden]{display:none}
+.collab-gesture .collab-hint{margin:0}
+.collab-gesture-side{display:inline-flex;align-items:center;gap:6px;font-size:var(--text-12);font-weight:700;letter-spacing:.1em;text-transform:uppercase}
+.collab-gesture-side svg{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round}
+.collab-gesture-side--later{color:var(--color-ink-soft)}
+.collab-gesture-side--connect{color:var(--brivia-wine)}
+.collab-gesture-side--later::before{content:'←';font-size:var(--text-14)}
+.collab-gesture-side--connect::after{content:'→';font-size:var(--text-14)}
+body.app-body dialog.collab-review .collab-card:focus-visible{outline:2px solid var(--brivia-wine);outline-offset:4px}
+.collab-gesture-side svg{display:none}

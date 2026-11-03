@@ -24,12 +24,14 @@ test('suggestion pills are escaped buttons', () => {
   assert.match(html, /<button type="button" class="composer-suggestion" data-composer-suggestion="0">&lt;b&gt;hi&lt;\/b&gt;<\/button>/);
 });
 
-test('the request card shows their message first, with Accept and Decline', () => {
+test('the request card shows their message first; answered by dragging, no buttons (D-132)', () => {
   const html = reviewCardMarkup({ fromId: 'f', name: 'Ravi', role: 'Product & AI', band: '~3 km', shared: ['Chess'], note: 'Hi! Going to the chess meetup?' },
     { index: 0, total: 1 }, { escapeHtml: (v) => String(v), renderAvatar: () => '<span></span>' });
   assert.ok(html.indexOf('Their message') < html.indexOf('You both care about'));
   assert.match(html, /Hi! Going to the chess meetup\?/);
-  assert.match(html, /<span>Decline<\/span>[\s\S]*<span>Accept<\/span>/);
+  assert.doesNotMatch(html, /<button/);
+  assert.match(html, /tabindex="0"/);
+  assert.match(html, /aria-keyshortcuts="ArrowRight ArrowLeft"/);
   const none = reviewCardMarkup({ fromId: 'f', name: 'Ravi', shared: [], note: '' }, { index: 0, total: 1 }, { escapeHtml: (v) => String(v), renderAvatar: () => '' });
   assert.match(none, /No message, just a hello\./);
 });

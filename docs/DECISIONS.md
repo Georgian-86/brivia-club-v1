@@ -2688,3 +2688,16 @@ controls (a tester or a seeded test member), never a real member, so no new expo
   `nearby-view.test.mjs`); e2e new `nearby.spec.mjs` 49/49 at 1440 and 390 (axe clean), plus crossing-paths, companions,
   collab-requests, deck and app-shell; build and style ratchet. ORBIT §9.1.4b and UX_SPEC §B2 added.
 - **Owed:** apply `0029_nearby_discovery.sql` (README "0029").
+
+## D-132 (2026-11-03): requests are answered by swiping only
+
+- **Ask (founder):** "there must be no connect decline buttons, connections would only be through swiping right or
+  left, so remove these accept decline buttons" (the request review sheet).
+- **Done:** the sheet has no Accept / Decline buttons. A right drag accepts, a left drag declines (the ACCEPT / DECLINE
+  stamps show while dragging). Under the card a quiet cue reads "← DECLINE · ACCEPT →" (labels, not buttons).
+- **Accessibility kept:** the card itself takes focus when the sheet opens (tabindex 0, aria-keyshortcuts, described by
+  the cue), so → accepts and ← declines from a keyboard or screen reader; after a failed answer focus returns to it.
+- **Scope:** the review sheet only. Nearby keeps Pass / View profile / Connect under its cards (the D-131 brief asked for
+  buttons on desktop); say if those should go too.
+- **Proof:** unit 445; e2e collab-requests 31/31 (a real right drag accepts, a left drag declines, two quick → presses
+  send one answer, no buttons in the sheet, axe clean) and nearby 49/49.
