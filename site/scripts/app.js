@@ -101,7 +101,10 @@ import '../styles/deck-compact.css';
 import '../styles/collab-requests.css';  // D-108: the request section and review sheet
 import '../styles/emoji-field.css';  // D-113: the emoji panel under the Edit profile bio
 import '../styles/work-identity.css';  // D-140: company line and picker
+import '../styles/hiring.css';  // D-141: the hiring bar, banner, sheets and profile cards
 import '../styles/components.css';  // D-105: the shared field, select, listbox and chip components, last so they win
+import { createHiring } from './hiring-ui.js';  // D-141
+import { interleaveLift } from './hiring.js';
 import { navMarkup, markCurrentNav, setChatBadges } from './app-nav.js';
 import { parseReadState, serializeReadState, lastReadAt, unreadCount, markRead, sortByLastContact, unreadTotal } from './chat-unread.js';
 import { skeletonMarkup, setBusy } from './app-skeletons.js';
@@ -127,7 +130,7 @@ const respondingRequestIds = new Set();
 let currentIndex = 0;
 let currentPerson = people[0];
 let activeFilter = 'all';
-const exploreFilters = { query: '', skills: new Set(), lookingFor: new Set() };
+const exploreFilters = { query: '', skills: new Set(), lookingFor: new Set(), hiring: false };
 const filterDrafts = { skills: '', lookingFor: '' };
 let activeChatFilter = 'all';
 let chatSearchQuery = '';
@@ -357,6 +360,20 @@ const showToast = (message) => {
   window.setTimeout(() => toast.classList.remove('show'), 2600);
 };
 
+// D-141: hiring (roles, asks, the banner and the lens). Hidden until migration 0037 answers; deps are wrapped so the
+// functions they name may be defined further down this file.
+let hiring = null;
+const hiringRefresh = (why) => {
+  // 'cards': member_hiring answered with roles. Only the card on screen is redrawn (the cover is not reloaded), unless
+  // the Hiring lens is on, when the queue itself changes.
+  if (why === 'cards' && deck.ready) {
+    if (exploreFilters.hiring) renderExplore();
+    else if (currentPerson && hiring) hiring.decorateCard(currentPerson, { label: document.querySelector('#swipe-card-label'), strip: document.querySelector('#swipe-hiring'), tags: document.querySelector('#swipe-tags') });
+  }
+  if (why === 'boot') { liftHiringCards(); renderFilterOptions(); if (deck.ready) void hiring.ensure(getExplorePeople().slice(0, 12).map((p) => p.id)); }
+  if (why === 'boot' || why === 'mine') { renderPendingRequestTags(); renderProfileHiring(); }
+  renderNotifications();
+};
 const notificationsStorageKey = () => `brivia-notifications:${memberProfile.id || 'anonymous'}`;
 const notificationsEnabledStorageKey = () => `brivia-notifications-enabled:${memberProfile.id || 'anonymous'}`;
 const areNotificationsEnabled = () => {
@@ -487,8 +504,11 @@ const renderNotifications = () => {
   // D-134: "Someone crossed your path" from the shared store (last 24 h, not dismissed); unread ones count.
   const crossedRows = memberNotes.list().filter((n) => n.type === 'nearby_appeared' && !n.dismissedAt && Date.now() - new Date(n.createdAt).getTime() < 24 * 3600 * 1000).slice(0, 5);
   const crossedUnread = crossedRows.filter((n) => !n.readAt).length;
-  const unreadCount = (enabled ? notifications.filter((notification) => !notification.read).length : 0) + requestCount + nearbyCount + companionUnseen.length + nearbyMatchUnseen.length + crossedUnread;
-  const anything = enabled || requestCount || nearbyAlerts.length || companionUnseen.length || nearbyMatchUnseen.length || crossedRows.length;
+  // D-141: "N people near you are hiring" (once a day, new fits only) and "X closed the role" notes.
+  const hiringHtml = hiring?.notificationHtml() || '';
+  const hiringUnread = hiring?.notificationCount() || 0;
+  const unreadCount = (enabled ? notifications.filter((notification) => !notification.read).length : 0) + requestCount + nearbyCount + companionUnseen.length + nearbyMatchUnseen.length + crossedUnread + hiringUnread;
+  const anything = enabled || requestCount || nearbyAlerts.length || companionUnseen.length || nearbyMatchUnseen.length || crossedRows.length || hiringHtml;
   button.toggleAttribute('hidden', !anything);
   if (!anything) closeNotificationPanel();
   badge.textContent = unreadCount > 99 ? '99+' : String(unreadCount);
@@ -529,7 +549,7 @@ const renderNotifications = () => {
     const title = person?.name || 'a Brivia member';
     const messageLabel = `${group.count} message${group.count === 1 ? '' : 's'} from ${title}`;
     return `<button type="button" class="notification-item is-unread" data-notification-person="${escapeHtml(group.personId)}">${renderAvatar(person, 'notification-avatar')}<span class="notification-copy"><strong>${escapeHtml(messageLabel)}</strong></span><time>${escapeHtml(formatNotificationTime(group.latest.createdAt))}</time></button>`;
-  }).join('') : ((requestCount || nearbyAlerts.length || companionUnseen.length || nearbyMatchUnseen.length || crossedRows.length) ? '' : `<div class="notification-empty"><p>You are all caught up.</p>${settingsAction}</div>`);
+  }).join('') : ((requestCount || nearbyAlerts.length || companionUnseen.length || nearbyMatchUnseen.length || crossedRows.length || hiringHtml) ? '' : `<div class="notification-empty"><p>You are all caught up.</p>${settingsAction}</div>`);
   const companionHtml = companionUnseen.map((match) => {
     const person = findPersonById(match.otherId) || { name: match.otherName, image: match.otherPhotoUrl };
     return `<section class="notification-companion is-unread" aria-label="${escapeHtml(`You and ${match.otherName} are going together to ${match.eventTitle}`)}">`
@@ -551,7 +571,8 @@ const renderNotifications = () => {
       + `<span class="notification-nearby-copy"><strong>${escapeHtml(crossingCopy(n).title)}</strong><span>${escapeHtml(crossingCopy(n).line)}</span>${crossingCopy(n).when ? `<small>${escapeHtml(crossingCopy(n).when)}</small>` : ''}</span>`
       + `<button type="button" class="notification-nearby-hi" data-crossed-view="${escapeHtml(n.id)}">Discover</button></section>`;
   }).join('');
-  list.innerHTML = requestsHtml + crossedHtml + nearbyMatchHtml + companionHtml + nearbyHtml + messagesHtml;
+  list.innerHTML = requestsHtml + hiringHtml + crossedHtml + nearbyMatchHtml + companionHtml + nearbyHtml + messagesHtml;
+  if (hiringHtml) hiring.bindNotifications(list, () => closeNotificationPanel());
   list.querySelectorAll('[data-crossed-view]').forEach((item) => item.addEventListener('click', (event) => {
     event.stopPropagation();
     const n = memberNotes.list().find((x) => x.id === item.dataset.crossedView);
@@ -1245,9 +1266,10 @@ const explorePersonMatches = (person) => {
   const hasSkillSearch = !skillQuery || skills.some((skill) => normalizedValue(skill).includes(skillQuery));
   const hasLookingSearch = !lookingQuery || lookingFor.some((item) => normalizedValue(item).includes(lookingQuery));
   const hasName = !query || normalizedValue(person.name).includes(query);
-  return hasName && hasSkill && hasLookingFor && hasSkillSearch && hasLookingSearch;
+  const hasHiring = !exploreFilters.hiring || Boolean(hiring?.matchesLens(person));
+  return hasName && hasSkill && hasLookingFor && hasSkillSearch && hasLookingSearch && hasHiring;
 };
-const filtersActive = () => Boolean(exploreFilters.query || exploreFilters.skills.size || exploreFilters.lookingFor.size || filterDrafts.skills || filterDrafts.lookingFor);
+const filtersActive = () => Boolean(exploreFilters.query || exploreFilters.skills.size || exploreFilters.lookingFor.size || exploreFilters.hiring || filterDrafts.skills || filterDrafts.lookingFor);
 
 // The deck (UX_SPEC §B, Iteration 3 Task 10). deck_candidates returns the next cards in the server's order (k-safe
 // display ring, then shared interests); the client keeps that order. A card is consumed when it is passed or liked:
@@ -1481,6 +1503,11 @@ const renderHome = (queue = getExplorePeople()) => {
     bandNoteEl.hidden = !note;
   }
   const tags = document.querySelector('#swipe-tags'); if (tags) renderCardChips(tags, currentPerson);
+  // D-141: a hirer's bar says HIRING; the role strip shows when the role fits what this member is open to.
+  if (hiring?.available()) {
+    hiring.decorateCard(currentPerson, { label: cardLabel, strip: document.querySelector('#swipe-hiring'), tags });
+    void hiring.ensure(queue.slice(0, 12).map((p) => p.id));
+  } else { const strip = document.querySelector('#swipe-hiring'); if (strip) strip.hidden = true; }
   const count = document.querySelector('#queue-count');
   if (count) count.textContent = `${String(currentIndex + 1).padStart(2, '0')} / ${String(queue.length).padStart(2, '0')}`;
   renderWhy(currentPerson);
@@ -1759,6 +1786,7 @@ const loadConnectionRequests = async () => {
     note: row.note || '',
     createdAt: row.created_at,
     via: row.via || null,
+    role: hiring?.requestRoleTitle(row.from_id) || '',
     person: findPersonById(row.from_id) || extraPeople.get(String(row.from_id)) || null,
   }));
   // One toast per Nearby request, ever on this device (the request itself stays in the panel until answered).
@@ -1768,6 +1796,31 @@ const loadConnectionRequests = async () => {
   if (freshNearby.length) { saveNearbyAnnounced(announced); if (document.visibilityState === 'visible') showToast(NEARBY_COPY.incoming); }
   renderNotifications();
 };
+// D-141: "Asking about: Frontend Developer" on a request that came through a role (my_role_asks, loaded by hiring).
+const renderPendingRequestTags = () => {
+  if (!hiring) return;
+  pendingRequests.forEach((request) => { request.role = hiring.requestRoleTitle(request.fromId) || ''; });
+};
+// D-141: the deck lift. Up to one hiring suggestion in every five cards, never the card already on screen.
+let hiringLifted = false;
+async function liftHiringCards() {
+  if (hiringLifted || !hiring?.available() || !deck.ready) return;
+  hiringLifted = true;
+  const ids = hiring.suggestionIds().filter((id) => !deck.seen.has(id) && id !== String(currentPerson?.id || ''));
+  if (!ids.length) return;
+  const missing = ids.filter((id) => !findPersonById(id));
+  if (missing.length) {
+    const { data } = await fetchCandidates(missing);
+    const bands = new Map(hiring.state.suggestions.map((s) => [String(s.id), s.distance_band]));
+    mergePeople((data || []).map((row) => ({ ...row, distance_band: row.distance_band || bands.get(String(row.id)) || null })));
+  }
+  const known = ids.filter((id) => findPersonById(id));
+  const head = currentPerson ? [String(currentPerson.id)] : [];
+  const rest = deck.ids.filter((id) => !head.includes(id));
+  deck.ids = [...head, ...interleaveLift(rest, known)];
+  void hiring.ensure(known);
+  renderExplore();
+}
 const refreshConnections = async () => {
   if (!supabase || !memberProfile.id) return;
   const { data, error } = await supabase.from('matches').select('user1_id,user2_id').or(`user1_id.eq.${memberProfile.id},user2_id.eq.${memberProfile.id}`);
@@ -1980,6 +2033,8 @@ const openPublicProfile = (person, options = {}) => {
   });
   modal.tabIndex = -1;
   window.setTimeout(() => modal.querySelector('.public-profile-close')?.focus(), 0);
+  // D-141: a hirer's banner first (roles, Ask about this role); a hirer sees a seeker's "Open to roles".
+  if (hiring?.available()) void hiring.decorateProfile(modal, findPersonById(profile.id) || profile);
   // Founder (2026-11-03): interests take at most three lines; the rest wait behind "+N more".
   const interestList = modal.querySelector('.public-profile-chips--interest');
   if (interestList) requestAnimationFrame(() => fitChipRows(interestList, 3));
@@ -2136,6 +2191,14 @@ const swipe = (type, { vx = 0 } = {}) => {
   return true;
 };
 
+// D-141: on a member who is hiring the report dialog offers "Fake job or recruitment scam" first; it pauses their roles.
+const hiringReport = (person) => {
+  const hirer = Boolean(hiring?.hiringOf(person.id));
+  return {
+    extraReasons: hirer ? [['fake_job', 'Fake job or recruitment scam']] : [],
+    send: (reason, note) => (reason === 'fake_job' ? hiring.reportFakeJob(person.id, note) : reportMember(person.id, reason, note)),
+  };
+};
 // Report or block from the card (R4). The server already blocked the member (report) or the block flow just did, so the
 // card leaves like a Pass visually but sends no pass interaction.
 const dismissCardLikePass = (person) => {
@@ -2146,7 +2209,7 @@ bindCardOverflow(async (action, trigger) => {
   const person = currentPerson;
   if (!person || deckAdvancing || pitchSheetVisible()) return;
   if (action === 'report') {
-    const reported = await openReportDialog({ name: person.name, trigger, send: (reason, note) => reportMember(person.id, reason, note) });
+    const reported = await openReportDialog({ name: person.name, trigger, ...hiringReport(person) });
     if (!reported) return;
     hideReportedMember(person);
     showToast(reportSuccessCopy(person.name));
@@ -2275,11 +2338,20 @@ const renderFilterOptions = () => {
   renderFilterDropdown(document.querySelector('#filter-skills-suggestions'), skills, filterDrafts.skills, 'skills', exploreFilters.skills, POPULAR_INTERESTS);
   renderSelectedFilters(document.querySelector('#filter-looking-for-selected'), lookingFor, exploreFilters.lookingFor, 'looking-for');
   renderFilterDropdown(document.querySelector('#filter-looking-for-suggestions'), lookingFor, filterDrafts.lookingFor, 'looking-for', exploreFilters.lookingFor);
+  // D-141: the Hiring lens, only once hiring is live for this member.
+  const lens = document.querySelector('#filter-hiring-group');
+  if (lens) {
+    lens.hidden = !hiring?.available();
+    const input = lens.querySelector('#filter-hiring');
+    if (input) input.checked = exploreFilters.hiring;
+    const line = lens.querySelector('#filter-hiring-label');
+    if (line && hiring?.available()) line.textContent = hiring.lensLabel();
+  }
 };
 const updateDiscoveryFilterResult = (count) => {
   const result = document.querySelector('#discovery-filter-result');
   if (!result) return;
-  const activeCount = exploreFilters.skills.size + exploreFilters.lookingFor.size + (exploreFilters.query ? 1 : 0) + (filterDrafts.skills ? 1 : 0) + (filterDrafts.lookingFor ? 1 : 0);
+  const activeCount = exploreFilters.skills.size + exploreFilters.lookingFor.size + (exploreFilters.query ? 1 : 0) + (exploreFilters.hiring ? 1 : 0) + (filterDrafts.skills ? 1 : 0) + (filterDrafts.lookingFor ? 1 : 0);
   result.textContent = activeCount ? (count + ' ' + (count === 1 ? 'person' : 'people') + ' match') : 'All people';
   const resetButton = document.querySelector('#clear-discovery-filters');
   if (resetButton) {
@@ -2881,7 +2953,7 @@ const completeChatAction = async (action) => {
   const person = selectedChat;
   if (!person) return;
   if (action === 'report') {
-    const reported = await openReportDialog({ name: person.name, trigger: document.querySelector('#chat-more'), send: (reason, note) => reportMember(person.id, reason, note) });
+    const reported = await openReportDialog({ name: person.name, trigger: document.querySelector('#chat-more'), ...hiringReport(person) });
     if (!reported) return;
     hideReportedMember(person);
     closeSelectedChat();
@@ -3598,6 +3670,7 @@ const openProfileEditor = () => {
       return;
     }
     const savedProfile = data ? rowToProfile(data) : {};
+    const previousLookingFor = memberProfile.lookingFor || '';
     memberProfile = { ...memberProfile, ...nextProfile, ...savedProfile, id: memberProfile.id };
     window.localStorage.setItem('brivia-member-profile', JSON.stringify(memberProfile));
     close();
@@ -3611,6 +3684,9 @@ const openProfileEditor = () => {
       deck.ids = []; deck.end = null; refillDeck();  // the deck matches on interests: start it again
     }
     showToast('Profile updated and saved.');
+    // D-141: Hiring / Can Give Referrals just added opens Add a role; Job Referral or Job Opportunities opens the roles
+    // sheet; removing them withdraws the roles you're open to, or (after a confirm) closes your roles.
+    if (hiring) void hiring.afterLookingForSaved(memberProfile.lookingFor || '', previousLookingFor);
   });
 };
 
@@ -4177,6 +4253,33 @@ document.querySelector('[data-view="profile"]')?.addEventListener('click', (even
   if (event.target.closest('[data-checklist-item], [data-profile-edit]')) openProfileEditor();
 });
 
+// D-141: one hiring instance per signed-in member. boot() asks my_role_intent / my_hiring_roles; before 0037 they are
+// missing and everything stays hidden.
+function startHiring() {
+  if (hiring || !supabase || !memberProfile.id) return;
+  hiring = createHiring({
+    supabase, escapeHtml, showToast,
+    renderAvatar: (...args) => renderAvatar(...args),
+    me: () => memberProfile,
+    findPersonById: (id) => findPersonById(id),
+    chipPickerMarkup: (...args) => chipPickerMarkup(...args),
+    wireChipPicker: (...args) => wireChipPicker(...args),
+    signalsLeft: () => (Number.isFinite(Number(signalQuota?.remaining)) ? Number(signalQuota.remaining) : undefined),
+    onSignalSpent: () => { refreshSignalQuota(); },
+    onChange: hiringRefresh,
+    onNotificationsChange: () => renderNotifications(),
+    openRequests: () => { if (pendingRequests.length) openRequestReview(); else showToast('No asks waiting right now.'); },
+    showLens: () => { exploreFilters.hiring = true; setView('home'); void hiring.ensure(deckPeople().map((p) => p.id)); renderExplore(); },
+  });
+  void hiring.boot();
+}
+// D-141: "You're hiring" / "Open to roles" on my profile, and HIRING in the hero eyebrow while a banner is live.
+function renderProfileHiring() {
+  const section = document.querySelector('#profile-hiring');
+  if (!section || !hiring) return;
+  if (!section.dataset.bound) { hiring.bindOwnCard(section); section.dataset.bound = '1'; }
+  hiring.renderOwnCard(section, document.querySelector('.profile-hero-copy .app-eyebrow'));
+}
 const renderProfile = () => {
   const profile = memberProfile;
   const headerAvatar = document.querySelector('#app-avatar-button');
@@ -4205,6 +4308,7 @@ const renderProfile = () => {
   const account = document.querySelector('#profile-settings-menu .profile-settings-account');
   if (account) { account.querySelector('strong').textContent = profile.email || ''; account.hidden = !profile.email; }
   renderProfileChecklist();
+  renderProfileHiring();
   renderProfileInterests();
   renderProfileLookingFor();
   renderProfileExperience();
@@ -4994,11 +5098,17 @@ const clearDiscoveryFilters = () => {
   exploreFilters.query = '';
   exploreFilters.skills.clear();
   exploreFilters.lookingFor.clear();
+  exploreFilters.hiring = false;
   filterDrafts.skills = '';
   filterDrafts.lookingFor = '';
   renderExplore();
 };
 document.querySelector('#clear-discovery-filters')?.addEventListener('click', clearDiscoveryFilters);
+document.querySelector('#filter-hiring')?.addEventListener('change', (event) => {
+  exploreFilters.hiring = event.currentTarget.checked;
+  if (exploreFilters.hiring) void hiring?.ensure(deckPeople().map((p) => p.id));
+  renderExplore();
+});
 // The empty deck's one next action (UX_SPEC §B): its kind comes from deckEmptyState().
 document.querySelector('#deck-empty-action')?.addEventListener('click', async (event) => {
   const kind = event.currentTarget.dataset.deckAction;
@@ -5667,6 +5777,7 @@ const loadSupabaseCommunity = async () => {
   }
   currentPerson = deckPeople()[0] || null;
   deck.ready = true;
+  startHiring();
   renderHome();
   renderExplore();
   renderChats();
