@@ -157,3 +157,17 @@ select n.id, n.label, c.created_at
 To remove one, retire it: `update public.interest_node set status = 'retired' where id = '<id>';`. Nobody can pick
 it again and nobody can recreate that label (add_member_interest refuses a retired label). Members who already hold it
 keep it until their next interest save; clear it from profiles with the same steps as any reported profile text.
+
+## Hiring (0033, D-137)
+
+- **"Fake job or recruitment scam"** reports arrive as `report_member` rows with reason `fake` and a note starting
+  "Hiring:". The report already paused every open role of that member (`paused_by_report`) and blocked them for the
+  reporter; the member sees "Paused while we review a report" and cannot reopen it.
+- **Check:** the role text (`select title, company, about, status from hiring_role where member_id = '<id>'`), the
+  asks it drew (`role_ask`), and whether anyone was asked for money, ID or a fee. Real referrals are free.
+- **Clear it:** `update hiring_role set paused_by_report = false, status = 'open' where member_id = '<id>' and status =
+  'paused' and paused_by_report;` **Act on it:** close the roles (`status = 'closed', closed_at = now()`) and follow
+  §5 for the member.
+- **Everything at once:** `update brivia_feature set enabled = false where name = 'hiring';` hides every banner,
+  suggestion and ask (data kept). `select purge_hiring();` (owner only) deletes all hiring data.
+

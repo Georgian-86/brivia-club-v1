@@ -2791,7 +2791,7 @@ controls (a tester or a seeded test member), never a real member, so no new expo
 - **Proof:** SQL harness ALL PASSED (g C1 now 1,131 and both offered; r L4 placement, Gospel Music not sensitive, Sufi
   and qawwali still sensitive).
 
-## D-137: Hiring, a banner on hirers' profiles matched to members who want a role (founder, 2026-11-02; design, awaiting sign-off)
+## D-137: Hiring, a banner on hirers' profiles matched to members who want a role (founder, 2026-11-02; built 2026-11-03)
 
 - **Asked:** "show a hiring banner in the profiles of the people whose looking for is hiring candidates. They shall be
   suggested to people whose looking for is referral or a similar position ... Design when and how will the hiring
@@ -2806,4 +2806,16 @@ controls (a tester or a seeded test member), never a real member, so no new expo
   links in role text, a "Fake job or asked for money" report reason, a kill switch.
 - **Agent-arena:** a quick panel of two independent agents (product, trust and safety), same model family (disclosed
   reduced heterogeneity); rulings in spec §13.
-- **Status:** design only; build after the founder signs off. Mock screenshots in the project folder `hiring/`.
+- **Status:** built 2026-11-03 (founder: "proceed with development of the hiring feature"). Migration `0033_hiring.sql`
+  (not applied yet), client `site/scripts/hiring.js` + `hiring-ui.js` + `site/styles/hiring.css`, tests
+  `supabase/tests/s-hiring.test.sql`, `tests/unit/hiring.test.mjs`, `tests/e2e/hiring.spec.mjs`. Mock screenshots in the
+  project folder `hiring/`, the real build's in `hiring/build/`.
+- **Built differently from the design, and why:**
+  - The notification row's action is **See them**: it turns on the Hiring lens on the Connect deck instead of opening a
+    second one-card sheet. One deck, one set of gestures; the lens is also a switch in the filter drawer.
+  - The fake-job reason is its own RPC, `report_fake_job`, which calls `report_member` ('fake', note prefixed
+    "Hiring:") and pauses the member's open roles. `report_member`'s reason list (0004, frozen) is unchanged.
+  - The deck lift is client side (one hiring suggestion in every five cards, never the card on screen);
+    `deck_candidates` is untouched, so ORBIT's ordering of everything else is unchanged (ORBIT_ENGINE.md §12).
+  - The feature hides itself until 0033 is applied: the first hiring RPC answers "function not found" and nothing
+    hiring-shaped renders. A kill switch (`brivia_feature` 'hiring') does the same after it is applied.

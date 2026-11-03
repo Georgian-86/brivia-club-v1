@@ -37,6 +37,7 @@ export const reviewCardModel = (request, myInterests = []) => {
     shared,
     note: String(request?.note || '').trim(),
     nearby: request?.via === 'nearby',
+    askingAbout: String(request?.role || '').trim(),  // D-137: the role a seeker asked about
     initials: initialsOf(name),
   };
 };
@@ -46,6 +47,7 @@ export const keyDecision = (key) => (key === 'ArrowRight' ? true : key === 'Arro
 const ICON = {
   connect: '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M5 12.5l4.2 4.2L19 7"/></svg>',
   later: '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M7 7l10 10M17 7 7 17"/></svg>',
+  bag: '<svg class="hiring-bag" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><rect x="3.5" y="7.5" width="17" height="12" rx="2"/><path d="M9 7.5V6a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v1.5M3.5 12.5h17"/></svg>',
 };
 
 export const reviewCardMarkup = (m, { index, total }, { escapeHtml, renderAvatar }) => {
@@ -59,6 +61,7 @@ export const reviewCardMarkup = (m, { index, total }, { escapeHtml, renderAvatar
     + `<h3 class="collab-name">${escapeHtml(m.name)}</h3>`
     + (meta ? `<p class="collab-meta">${meta}</p>` : '')
     + (m.nearby ? '<p class="collab-nearby">Crossed paths nearby</p>' : '')
+    + (m.askingAbout ? `<p class="collab-role"><span class="hiring-icon">${ICON.bag}</span>Asking about: ${escapeHtml(m.askingAbout)}</p>` : '')
     // D-124: their message first, in full: it is why they want to connect (and the first message of your chat if you accept).
     + (m.note ? `<blockquote class="collab-note"><p class="collab-label">Their message</p><p class="collab-note-text">${escapeHtml(m.note)}</p></blockquote>` : '<p class="collab-note-empty">No message, just a hello.</p>')
     + (m.shared.length ? `<p class="collab-label">You both care about</p><ul class="collab-shared">${m.shared.map((s) => `<li>${escapeHtml(s)}</li>`).join('')}</ul>` : '')

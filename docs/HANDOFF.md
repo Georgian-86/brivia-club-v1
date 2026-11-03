@@ -1,11 +1,19 @@
 # Session handoff (read after CLAUDE.md)
 
-Last updated: 2026-11-03 (D-136 Gospel Music and NLP offered; D-135 interest list in the founder's wording, A–Z; D-134 Nearby notifications and web push; D-133 phone location; D-131 Nearby discovery; D-129 pitch shown once; D-128 cover order, names, OPEN MINDS retired; D-126 interest on all events; D-125 Show interest, brochure, poster area). Before that: 2026-11-02 (D-121 Create Event). Before that: 2026-11-01 (D-119 Crossing paths). Before that: 2026-11-01 (D-118 calmer Explore; D-117 Explore events, Posts tab). Before that: 2026-11-01 (D-116 cover set). Before that: 2026-10-28 (D-100 chat inbox, D-101 post activity and 0015, D-102 photo and setup). Before that: 2026-10-20 (live-database correction D-070; "Send without a note" D-071). Before that: 2026-10-16 (design references, D-062). Before that: 2026-10-13, after Phase D of the experience iteration (the test world), on branch
+Last updated: 2026-11-03 (D-137 Hiring, built, 0033 not applied; D-136 Gospel Music and NLP offered; D-135 interest list in the founder's wording, A–Z; D-134 Nearby notifications and web push; D-133 phone location; D-131 Nearby discovery; D-129 pitch shown once; D-128 cover order, names, OPEN MINDS retired; D-126 interest on all events; D-125 Show interest, brochure, poster area). Before that: 2026-11-02 (D-121 Create Event). Before that: 2026-11-01 (D-119 Crossing paths). Before that: 2026-11-01 (D-118 calmer Explore; D-117 Explore events, Posts tab). Before that: 2026-11-01 (D-116 cover set). Before that: 2026-10-28 (D-100 chat inbox, D-101 post activity and 0015, D-102 photo and setup). Before that: 2026-10-20 (live-database correction D-070; "Send without a note" D-071). Before that: 2026-10-16 (design references, D-062). Before that: 2026-10-13, after Phase D of the experience iteration (the test world), on branch
 `claude/jolly-edison-49xvza` (repo `Georgian-86/brivia-club-v1`). Phases C and D are not on `main` yet, and Phase D's SQL
 is not applied: the founder applies it in the SQL editor (section 3, item 0).
 Update this file at the end of every session. CLAUDE.md holds the aim; this file holds **where we are**.
 
 ## 1. What is done
+
+**2026-11-03, D-137:** Hiring. A member whose Looking for is Hiring or Can Give Referrals posts up to 3 roles (Profile →
+You're hiring → Add a role); their deck card's bar reads "HIRING · ROLE" and their profile opens with the banner. A
+member whose Looking for is Job Referral, Internship Referral or Job Opportunities says which roles they're open to
+(private to hirers by default) and gets the role strip, a deck lift (1 in 5), a once-a-day notification and the
+Hiring lens; "Ask about this role" is a signal with a note and the role tag, answered in the request sheet. **Owed:
+apply `0033_hiring.sql`** (README "0033"); until then the client hides all of it. Spec
+`docs/superpowers/specs/2026-11-02-hiring-design.md`, engine lane ORBIT_ENGINE.md §12, moderation MODERATION.md.
 
 **2026-11-03, D-136:** migration 0032 offers Gospel Music and NLP too (founder's choice; overrides D-038 for Gospel
 Music only). The catalogue is 1,131 interests, the founder's whole list.

@@ -1,0 +1,179 @@
+/* Hiring (D-137). Tokens only: no new colours, no new fonts. The deck bar, the role strip, the profile banner, the
+   sheets (Ask, Add a role, Manage, Roles you're open to), the profile cards and the notification row. Every target is
+   at least 44 px; phone inputs are 16 px so iOS never zooms; sheets become bottom sheets at 640 px and below. */
+
+.hiring-bag { width: 100%; height: 100%; display: block; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+
+/* 1. The deck card: the oxblood bar carries the banner; one role strip under the band, only when the role fits. */
+.hiring-bar-icon { display: inline-block; flex: none; width: 15px; height: 15px; margin-right: var(--space-2); vertical-align: -2px; }
+#swipe-card-label.is-hiring { display: inline-flex; align-items: center; min-width: 0; max-width: 100%; white-space: nowrap; overflow: hidden; }
+.hiring-strip {
+  display: grid; grid-template-columns: 32px minmax(0, 1fr); align-items: center; gap: var(--space-3);
+  margin: var(--space-3) 0 0; padding: 10px var(--space-3);
+  border: 1px solid color-mix(in srgb, var(--color-wine) 22%, transparent); border-radius: var(--radius-m);
+  background: color-mix(in srgb, var(--color-wine) 6%, transparent); color: var(--color-name-ink); font-family: var(--font-body);
+}
+.hiring-strip[hidden] { display: none; }
+.hiring-icon { display: grid; place-items: center; flex: none; width: 32px; height: 32px; padding: 7px; border-radius: 50%; background: var(--color-oxblood); color: var(--color-cream); box-sizing: border-box; }
+.hiring-strip-copy { min-width: 0; }
+.hiring-strip-copy strong { display: block; font-size: var(--text-14); font-weight: 700; line-height: 1.25; color: var(--color-wine-deep); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.hiring-strip-copy > span { display: block; margin-top: 2px; font-size: var(--text-12); line-height: 1.3; color: var(--color-ink-soft); }
+.hiring-strip-copy b { color: var(--color-wine); font-weight: 700; }
+
+/* 2. The banner, first in the public profile. */
+.hiring-banner { margin: 0 0 var(--space-4); border: 1px solid var(--color-card-edge); border-radius: var(--radius-m); overflow: hidden; background: var(--color-card-paper); font-family: var(--font-body); }
+.hiring-banner-head { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); padding: var(--space-3) var(--space-4); background: var(--color-oxblood); color: var(--color-cream); }
+.hiring-banner-title { display: inline-flex; align-items: center; font-size: var(--text-12); font-weight: 700; letter-spacing: .16em; text-transform: uppercase; }
+.hiring-banner-head small { font-size: var(--text-12); font-weight: 600; opacity: .86; text-align: right; }
+.hiring-roles { margin: 0; padding: 0; list-style: none; }
+.hiring-role { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: var(--space-3); padding: 14px var(--space-4); }
+.hiring-role + .hiring-role { border-top: 1px solid var(--color-card-edge); }
+.hiring-role-copy { min-width: 0; }
+.hiring-role h4 { margin: 0; font-family: var(--font-heading); font-size: var(--text-20); font-weight: 500; line-height: 1.15; color: var(--color-name-ink); overflow-wrap: anywhere; }
+.hiring-role p { margin: var(--space-1) 0 0; font-size: var(--text-12); line-height: 1.4; color: var(--color-ink-soft); }
+.hiring-role p.hiring-role-note { margin-top: 6px; font-size: var(--text-14); color: var(--color-ink); overflow-wrap: anywhere; }
+.hiring-fit { display: inline-flex; margin-top: var(--space-2); padding: 3px 10px; border-radius: var(--radius-pill); background: color-mix(in srgb, var(--color-wine) 8%, transparent); color: var(--color-wine); font-size: var(--text-12); font-weight: 700; }
+.hiring-ask, .hiring-quiet {
+  min-height: 44px; padding: 0 var(--space-4); border-radius: var(--radius-pill); cursor: pointer; white-space: nowrap;
+  font-family: var(--font-body); font-size: var(--text-12); font-weight: 700; letter-spacing: .12em; text-transform: uppercase;
+  transition: background-color .18s ease, color .18s ease;
+}
+.hiring-ask { border: 0; background: var(--color-oxblood); color: var(--color-cream); }
+.hiring-ask:hover { background: var(--color-wine); }
+.hiring-quiet { border: 1px solid color-mix(in srgb, var(--color-wine) 40%, transparent); background: transparent; color: var(--color-wine); }
+.hiring-quiet:hover { background: color-mix(in srgb, var(--color-wine) 8%, transparent); }
+.hiring-asked { display: inline-flex; align-items: center; min-height: 44px; color: var(--color-ink-soft); font-size: var(--text-12); font-weight: 700; letter-spacing: .12em; text-transform: uppercase; }
+.hiring-foot { margin: 0; padding: 10px var(--space-4) var(--space-3); border-top: 1px solid var(--color-card-edge); font-size: var(--text-12); line-height: 1.45; color: var(--color-ink-soft); }
+.hiring-open-meta { margin: var(--space-2) 0 0; font-family: var(--font-body); font-size: var(--text-12); color: var(--color-ink-soft); }
+
+/* 3. Sheets: a native modal dialog; the app's cream card, a bottom sheet on phones. */
+dialog.hiring-sheet {
+  width: min(500px, calc(100vw - 40px)); max-width: none; max-height: calc(100svh - 40px); margin: auto; padding: 0;
+  border: 1px solid var(--color-card-edge); border-radius: var(--radius-l); background: var(--color-cream); color: var(--color-ink);
+  box-shadow: 0 30px 90px color-mix(in srgb, var(--color-oxblood-deep) 45%, transparent); font-family: var(--font-body); overflow: auto;
+  overscroll-behavior: contain;
+}
+dialog.hiring-sheet::backdrop { background: color-mix(in srgb, var(--color-oxblood-deep) 50%, transparent); }
+.hiring-sheet-inner { position: relative; padding: var(--space-6); }
+.hiring-eyebrow { margin: 0; padding-right: 52px; color: var(--color-wine); font-size: var(--text-12); font-weight: 700; letter-spacing: .16em; text-transform: uppercase; }
+.hiring-sheet h2 { margin: var(--space-2) 0 0; padding-right: 52px; font-family: var(--font-heading); font-size: var(--text-32); font-weight: 500; line-height: 1.05; color: var(--color-name-ink); overflow-wrap: anywhere; }
+.hiring-sheet h2 em { color: var(--color-wine); font-style: italic; }
+.hiring-lede { margin: var(--space-2) 0 0; font-size: var(--text-14); line-height: 1.5; color: var(--color-ink-soft); }
+.hiring-close { position: absolute; top: var(--space-4); right: var(--space-4); display: grid; place-items: center; width: 44px; height: 44px; padding: 0; border: 1px solid color-mix(in srgb, var(--color-wine) 22%, transparent); border-radius: 50%; background: transparent; color: var(--color-wine); cursor: pointer; }
+.hiring-close svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; }
+.hiring-close:hover { background: color-mix(in srgb, var(--color-wine) 8%, transparent); }
+.hiring-form { margin: 0; }
+.hiring-form .profile-edit-picker, .hiring-form > .b-picker { margin-top: var(--space-4); }
+.hiring-field { display: grid; gap: 6px; min-width: 0; margin: var(--space-4) 0 0; padding: 0; border: 0; }
+.hiring-label { display: flex; align-items: baseline; gap: var(--space-2); margin: 0; padding: 0; color: var(--color-ink-soft); font-size: var(--text-12); font-weight: 700; letter-spacing: .1em; text-transform: uppercase; }
+.hiring-optional { color: var(--color-ink-soft); font-weight: 500; letter-spacing: 0; text-transform: none; opacity: .85; }
+.hiring-count { margin-left: auto; color: var(--color-ink-soft); font-weight: 600; letter-spacing: 0; text-transform: none; font-variant-numeric: tabular-nums; }
+.hiring-help, .hiring-note { margin: 6px 0 0; color: var(--color-ink-soft); font-size: var(--text-12); line-height: 1.45; }
+.hiring-note { text-align: center; margin-top: var(--space-3); }
+.hiring-family { color: var(--color-wine); font-weight: 600; }
+.hiring-error { margin: 6px 0 0; color: var(--color-wine); font-size: var(--text-12); font-weight: 700; line-height: 1.4; }
+.hiring-error[hidden], .hiring-help[hidden] { display: none; }
+.hiring-form textarea.b-field { min-height: 96px; resize: vertical; }
+.hiring-two { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: var(--space-3); }
+.hiring-two > .hiring-field { margin-top: var(--space-4); }
+
+.hiring-segment { display: grid; grid-template-columns: repeat(var(--n, 3), minmax(0, 1fr)); gap: var(--space-1); padding: var(--space-1); border: 1px solid color-mix(in srgb, var(--color-wine) 22%, transparent); border-radius: var(--radius-pill); }
+.hiring-segment-option { position: relative; display: block; cursor: pointer; }
+.hiring-segment-option input { position: absolute; inset: 0; width: 100%; height: 100%; margin: 0; opacity: 0; cursor: pointer; }
+.hiring-segment-option span { display: grid; place-items: center; min-height: 40px; padding: 0 var(--space-2); border-radius: var(--radius-pill); color: var(--color-ink-soft); font-size: var(--text-14); font-weight: 600; text-align: center; line-height: 1.15; transition: background-color .18s ease, color .18s ease; }
+.hiring-segment-option input:checked + span { background: var(--color-oxblood); color: var(--color-cream); }
+.hiring-segment-option input:focus-visible + span { outline: 2px solid var(--color-wine); outline-offset: 2px; }
+
+.hiring-checks { display: flex; flex-wrap: wrap; gap: var(--space-2); }
+.hiring-check { position: relative; cursor: pointer; }
+.hiring-check input { position: absolute; inset: 0; width: 100%; height: 100%; margin: 0; opacity: 0; cursor: pointer; }
+.hiring-check span { display: inline-flex; align-items: center; min-height: 44px; padding: 0 var(--space-4); border: 1px solid color-mix(in srgb, var(--color-wine) 22%, transparent); border-radius: var(--radius-pill); color: var(--color-ink); font-size: var(--text-14); font-weight: 600; }
+.hiring-check input:checked + span { border-color: var(--color-wine); background: color-mix(in srgb, var(--color-wine) 8%, transparent); color: var(--color-wine); }
+.hiring-check input:checked + span::before { content: '✓'; margin-right: 6px; }
+.hiring-check input:focus-visible + span { outline: 2px solid var(--color-wine); outline-offset: 2px; }
+
+.hiring-radio { position: relative; display: grid; grid-template-columns: 22px minmax(0, 1fr); gap: var(--space-3); align-items: start; padding: 14px; border: 1px solid color-mix(in srgb, var(--color-wine) 22%, transparent); border-radius: var(--radius-m); cursor: pointer; }
+.hiring-radio + .hiring-radio { margin-top: var(--space-2); }
+.hiring-radio input { width: 20px; height: 20px; margin: 1px 0 0; accent-color: var(--color-wine); }
+.hiring-radio:has(input:checked) { border-color: var(--color-wine); background: color-mix(in srgb, var(--color-wine) 5%, transparent); }
+.hiring-radio strong { display: block; font-size: var(--text-14); color: var(--color-ink); }
+.hiring-radio span span { display: block; margin-top: 2px; font-size: var(--text-12); line-height: 1.4; color: var(--color-ink-soft); }
+
+.hiring-switch { position: relative; display: grid; grid-template-columns: minmax(0, 1fr) 46px; gap: var(--space-3); align-items: center; min-height: 44px; margin-top: var(--space-4); padding-top: var(--space-4); border-top: 1px solid var(--color-card-edge); cursor: pointer; }
+.hiring-switch strong { display: block; font-size: var(--text-14); color: var(--color-ink); }
+.hiring-switch span span { display: block; margin-top: 2px; font-size: var(--text-12); line-height: 1.4; color: var(--color-ink-soft); }
+.hiring-switch input { position: absolute; right: 0; bottom: 0; width: 46px; height: 28px; margin: 0; opacity: 0; cursor: pointer; }
+.hiring-switch i { position: relative; width: 46px; height: 28px; border-radius: var(--radius-pill); background: color-mix(in srgb, var(--color-ink) 22%, transparent); transition: background-color .18s ease; }
+.hiring-switch i::after { content: ''; position: absolute; top: 3px; left: 3px; width: 22px; height: 22px; border-radius: 50%; background: var(--color-cream); box-shadow: 0 1px 3px color-mix(in srgb, var(--color-ink) 30%, transparent); transition: left .18s ease; }
+.hiring-switch input:checked + i { background: var(--color-wine); }
+.hiring-switch input:checked + i::after { left: 21px; }
+.hiring-switch input:focus-visible + i { outline: 2px solid var(--color-wine); outline-offset: 2px; }
+
+.hiring-tag { display: inline-flex; align-items: center; gap: var(--space-2); max-width: 100%; margin-top: var(--space-4); padding: 6px var(--space-3) 6px 6px; border-radius: var(--radius-pill); background: color-mix(in srgb, var(--color-wine) 8%, transparent); color: var(--color-wine-deep); font-size: var(--text-14); font-weight: 600; }
+.hiring-tag .hiring-icon { width: 26px; height: 26px; padding: 5px; }
+.hiring-safety { display: grid; grid-template-columns: 20px minmax(0, 1fr); gap: var(--space-2); margin: var(--space-4) 0 0; padding: 10px var(--space-3); border-radius: 10px; background: var(--color-card-paper); color: var(--color-ink); font-size: var(--text-12); line-height: 1.45; }
+.hiring-safety svg { width: 18px; height: 18px; fill: none; stroke: var(--color-wine); stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+.hiring-primary { display: flex; align-items: center; justify-content: center; gap: 10px; width: 100%; min-height: 52px; margin-top: var(--space-5); border: 0; border-radius: var(--radius-m); background: var(--color-oxblood); color: var(--color-cream); font: 700 var(--text-14) var(--font-body); letter-spacing: .2em; text-transform: uppercase; cursor: pointer; transition: background-color .18s ease; }
+.hiring-primary:hover { background: var(--color-wine); }
+.hiring-primary:disabled { opacity: .7; cursor: progress; }
+.hiring-secondary { display: block; width: 100%; min-height: 44px; margin-top: var(--space-2); border: 0; background: transparent; color: var(--color-wine); font: 600 var(--text-14) var(--font-body); text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
+.hiring-state-line { margin: var(--space-3) 0 0; font-size: var(--text-14); font-weight: 600; color: var(--color-wine); }
+.hiring-actions { display: grid; margin-top: var(--space-4); border-top: 1px solid var(--color-card-edge); }
+.hiring-row-action { display: grid; gap: 2px; min-height: 56px; padding: var(--space-3) 0; border: 0; border-bottom: 1px solid var(--color-card-edge); background: transparent; color: var(--color-ink); font: 600 var(--text-16) var(--font-body); text-align: left; cursor: pointer; }
+.hiring-row-action small { font-size: var(--text-12); font-weight: 500; color: var(--color-ink-soft); }
+.hiring-row-action:hover { color: var(--color-wine); }
+.hiring-row-action.is-danger { color: var(--color-wine); }
+.hiring-sheet button:focus-visible { outline: 2px solid var(--color-wine); outline-offset: 2px; }  /* fields keep the shared b-field focus ring */
+
+/* 4. My profile: "You're hiring" and "Open to roles". */
+.profile-hiring[hidden] { display: none; }
+.hiring-card-roles { margin: var(--space-3) 0 0; padding: 0; list-style: none; }
+.hiring-card-roles li + li { border-top: 1px solid var(--color-line); }
+.hiring-card-roles li:first-child { border-top: 1px solid var(--color-line); }
+.hiring-card-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: var(--space-2); align-items: center; width: 100%; min-height: 56px; padding: var(--space-3) 0; border: 0; background: transparent; color: inherit; font-family: var(--font-body); text-align: left; cursor: pointer; }
+.hiring-card-row-copy { min-width: 0; }
+.hiring-card-row-copy strong { display: block; font-size: var(--text-16); color: var(--color-ink); overflow-wrap: anywhere; }
+.hiring-card-row-copy span { display: block; margin-top: 2px; font-size: var(--text-12); line-height: 1.4; color: var(--color-ink-soft); }
+.hiring-row-end { display: inline-flex; align-items: center; gap: var(--space-2); }
+.hiring-chev { color: var(--color-wine); font-size: var(--text-20); line-height: 1; }
+.hiring-state { padding: var(--space-1) 10px; border-radius: var(--radius-pill); font-size: var(--text-12); font-weight: 700; background: color-mix(in srgb, var(--color-wine) 8%, transparent); color: var(--color-wine); }
+.hiring-state.is-paused { background: var(--color-card-paper); color: var(--color-ink-soft); }
+.hiring-card-alert { margin: var(--space-3) 0 0; padding: 10px var(--space-3); border-radius: 10px; background: color-mix(in srgb, var(--color-wine) 6%, transparent); color: var(--color-wine-deep); font: 600 var(--text-14)/1.4 var(--font-body); }
+.hiring-card-actions { display: flex; flex-wrap: wrap; gap: var(--space-2); margin-top: var(--space-3); }
+.hiring-card-actions:empty { display: none; }
+.hiring-card-note { margin: var(--space-2) 0 0; font-family: var(--font-body); font-size: var(--text-12); line-height: 1.45; color: var(--color-ink-soft); }
+.hiring-card-rule { margin: var(--space-5) 0 var(--space-4); border: 0; border-top: 1px solid var(--color-line); }
+.hiring-pill-row { display: flex; flex-wrap: wrap; gap: var(--space-2); margin: var(--space-3) 0 0; padding: 0; list-style: none; }
+.hiring-pill-row li { padding: 7px 13px; border: 1px solid color-mix(in srgb, var(--color-wine) 22%, transparent); border-radius: var(--radius-pill); background: color-mix(in srgb, var(--color-wine) 6%, transparent); color: var(--color-wine); font: 600 var(--text-14) var(--font-body); }
+.hiring-private { display: inline-flex; align-items: center; gap: 6px; margin: var(--space-3) 0 0; font: 600 var(--text-12) var(--font-body); color: var(--color-ink-soft); }
+.hiring-private svg { width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; }
+.app-eyebrow .hiring-bar-icon { width: 13px; height: 13px; margin-right: 6px; }
+
+/* 5. The request card's role tag, the notification row, the lens chip. */
+.collab-role { display: inline-flex; align-items: center; gap: var(--space-2); max-width: 100%; margin: var(--space-2) auto 0; padding: 5px var(--space-3) 5px 5px; border-radius: var(--radius-pill); background: color-mix(in srgb, var(--color-wine) 8%, transparent); color: var(--color-wine-deep); font: 600 var(--text-14) var(--font-body); }
+.collab-role .hiring-icon { width: 24px; height: 24px; padding: 5px; }
+.notification-hiring-face { display: grid; place-items: center; width: 100%; height: 100%; padding: 25%; border-radius: 50%; background: var(--color-oxblood); color: var(--color-cream); box-sizing: border-box; }
+.hiring-lens-chip { display: inline-flex; align-items: center; gap: var(--space-2); min-height: 44px; padding: 0 var(--space-2) 0 var(--space-3); border: 1px solid color-mix(in srgb, var(--color-wine) 30%, transparent); border-radius: var(--radius-pill); background: color-mix(in srgb, var(--color-wine) 6%, transparent); color: var(--color-wine); font: 700 var(--text-12) var(--font-body); letter-spacing: .08em; text-transform: uppercase; }
+.hiring-lens-chip .hiring-bar-icon { margin-right: 0; }
+.hiring-lens-chip button { display: grid; place-items: center; width: 32px; height: 32px; padding: 0; border: 0; border-radius: 50%; background: transparent; color: inherit; font-size: var(--text-20); cursor: pointer; }
+.hiring-lens-chip[hidden] { display: none; }
+
+@media (max-width: 640px) {
+  dialog.hiring-sheet { width: 100vw; max-height: calc(100svh - 24px); margin: auto 0 0; border-radius: var(--radius-l) var(--radius-l) 0 0; border-bottom: 0; }
+  .hiring-sheet-inner { padding: var(--space-5) var(--space-5) calc(var(--space-5) + env(safe-area-inset-bottom, 0px)); }
+  .hiring-sheet-inner::before { content: ''; display: block; width: 40px; height: 4px; margin: calc(var(--space-2) * -1) auto var(--space-4); border-radius: var(--radius-pill); background: color-mix(in srgb, var(--color-ink) 18%, transparent); }
+  .hiring-sheet h2 { font-size: 28px; }
+  .hiring-close { top: var(--space-4); right: var(--space-4); }
+  .hiring-sheet :is(input, select, textarea) { font-size: var(--text-16); }
+  .hiring-two { grid-template-columns: 1fr; gap: 0; }
+  .hiring-role { grid-template-columns: 1fr; }
+  .hiring-role .hiring-ask, .hiring-role .hiring-quiet { width: 100%; }
+  .hiring-banner-head { flex-wrap: wrap; row-gap: 2px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hiring-ask, .hiring-quiet, .hiring-primary, .hiring-segment-option span, .hiring-switch i, .hiring-switch i::after { transition: none; }
+}
+
+/* The Hiring lens in the Discovery filter drawer. */
+.hiring-filter-switch { margin-top: 0; padding-top: 0; border-top: 0; font-family: var(--font-body); }

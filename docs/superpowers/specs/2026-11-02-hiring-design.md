@@ -89,8 +89,8 @@ and days left, and an Open / Paused / Not taking asks state; a row opens Manage 
 - **Private: my current company** (optional, never shown): hirers whose company matches never see the seeker's role
   intent and never get them recommended. This is what stops a colleague finding out.
 - Withdrawing (removing the looking-for value, or "Stop showing me roles") deletes the role intent at once.
-- Catalogue values come from PR #35 (D-122): "Hiring", "Job Opportunities" and "Can Give Referrals" are already in
-  `LOOKING_FOR_CATALOG`. "Can Give Referrals" is treated like "Hiring" with "I can refer" preselected. Every match on
+- Catalogue values: "Hiring", "Job Opportunities" and "Can Give Referrals" are added to `LOOKING_FOR_CATALOG` by the
+  build (the same three values PR #35 proposes, so the two merge cleanly). "Can Give Referrals" is treated like "Hiring" with "I can refer" preselected. Every match on
   these values is case-insensitive (members type their own spelling).
 - "Developer", "Designer" and similar looking-for values on their own are **not** job seeking: they usually mean "I want
   to find a developer". Only the three explicit values above make someone a seeker.
@@ -105,7 +105,7 @@ and days left, and an Open / Paused / Not taking asks state; a row opens Manage 
 | **Public profile (View profile)** | The **Hiring** banner first in the body: oxblood header ("HIRING", "Self-reported · Can refer"), each role (title in Bodoni, level · mode · company, the line, "Fits what you're open to"), **Ask about this role** on the best fit and **Ask** on others, a foot "Open 6 days · Replies to most asks". | The same banner; the Ask buttons too (anyone may ask, the caps apply). | `profile-banner-*` |
 | **Deck ranking** | Fitting hirers move up, at most **1 in every 5 cards**, only when the seeker has an explicit seeker value. | No ranking change at all. | |
 | **Hiring lens** (filter drawer) | A switch "Hiring for roles like mine" that shows only fitting hirers. | A switch "Only people who are hiring". | |
-| **Notification panel** | At most once a day, only when a **new** fitting role appeared: "2 people near you are hiring / For roles like yours · Frontend Developer", **Review** opens the one-card review sheet (D-108 pattern) with **Ask** / **Not now**. | Never. | `notification-*` |
+| **Notification panel** | At most once a day, only when a **new** fitting role appeared: "2 people near you are hiring / For roles like yours · Frontend Developer", **See them** turns on the Hiring lens on the Connect deck (built: one deck, not a second review sheet), and marks those roles seen. | Never. | `notification-*` |
 | **Search** | "hiring", a role title or a company finds open roles' hirers (search reaches everyone, rule 3). | The same. | |
 
 A hirer appears in the banner surfaces only while the hiring bar (section 9) is met and at least one role is open and
@@ -181,7 +181,7 @@ banner goes live on 16 Nov, when your account is two weeks old."
 | Role intent is its own consent (timestamped), withdrawable, deleted at once on withdrawal. | DPDP purpose limitation. |
 | Email and phone never reach other clients, roles included. | CLAUDE.md. |
 
-## 11. Data model and RPCs (migration `0023_hiring.sql`, written at build; 0022 is PR #35's catalogue additions; the build's decision is numbered after D-122)
+## 11. Data model and RPCs (migration `0033_hiring.sql`, decision D-137)
 
 - `hiring_roles` (id, member_id, title, family, level, work_mode, help ('hiring' | 'refer'), company, about, status
   ('open' | 'paused' | 'closed'), opened_at, expires_at, renewals, created_at). RLS: the owner reads and writes their

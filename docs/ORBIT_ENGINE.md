@@ -1149,6 +1149,33 @@ Explore lists events the club curates. This is location-first ranking outside th
   (`brivia_companion_status`). This replaces "confirmed only" in §11.1 and §11.2, so people can find company before
   paying. Order, visibility, swipes and the match rule are unchanged; "friends going" still lists confirmed seats only.
 
+## 12. The hiring lane (D-137, migration 0033)
+
+Hiring is a lane beside the deck, not a change to it: `deck_candidates` and the ORBIT score are untouched.
+
+- **Who.** A hirer has up to 3 open roles (`hiring_role`: title, family, level, on-site / hybrid / remote, "I'm hiring"
+  or "I can refer"). A seeker has a role intent (`role_intent`: up to 3 titles, their families, a level, work modes),
+  created only by the member, never inferred: "Developer" in Looking for is not job seeking.
+- **The hiring bar.** A role is shown only when its owner is completed, has a photo and a confirmed email, has an
+  account at least 14 days old and no open moderation flag (`brivia_hiring_bar`). Before that the role is saved and the
+  member is told the day it goes live.
+- **Fit** (`brivia_role_fit`, 0..1, rounded to 4 places, never shown as a number): title (the same title 1, the same
+  family 0.7 unless 'other', an adjacent family 0.4, else 0) × level (the same, or no level wanted, 1; one step apart
+  0.6; else 0; an internship pairs only with intern or entry) × mode (the role's mode is one the seeker picked, 1, else
+  0) × (0.8 + 0.2 × min(1, shared skills / 3)). On-site and hybrid pairs must also pass the location admission below.
+  Fit ≥ 0.5 is "Fits what you're open to".
+- **Location first.** `hiring_suggestions` admits pairs with the deck's own location rule (same cell ring first, then
+  city, then region; remote roles anywhere) and answers only the distance band, never a cell, a city or km.
+- **The lift.** The client puts at most one suggestion in every five deck cards (`interleaveLift`), never in place of
+  the card on screen. Suggestions are mutual-consent like everything else: "Ask about this role" sends a signal
+  (`send_connect_request`, the daily quota and the waiting cap apply) with the role tag; a connection exists only when
+  the hirer accepts.
+- **Caps.** 3 role asks a day per seeker, one per role, 25 waiting asks per role (then "not taking asks"), asks expire
+  with the request (14 days). Renewing a role (30 more days) is refused while asks wait unanswered.
+- **Privacy.** A seeker's intent is visible only to members with an open fitting role, unless they choose Everyone. A
+  private current company hides the intent from hirers whose role names that company. "Let hirers find me" (off by
+  default) is the only way a seeker is lifted in a hirer's deck.
+
 ## Appendix A (DRAFT, not scheduled): Constellations
 
 These are quorum-consented local micro-groups (3–5 members in ring ≤ 1) around one anchor interest:

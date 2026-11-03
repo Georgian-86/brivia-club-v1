@@ -28,8 +28,9 @@ let dialogCount = 0;
 // Resolves true once the report was accepted, false when the member cancelled or it failed. The outcome follows the
 // request, not the close (F7): if the dialog is closed while the request is in flight (Chrome closes a modal on a
 // second Escape even though the first was cancelled), the promise waits for the server's answer.
-// send(reason, note) -> { error, status } (supabase.js reportMember).
-export const openReportDialog = ({ name, trigger, send }) => new Promise((resolve) => {
+// send(reason, note) -> { error, status } (supabase.js reportMember). extraReasons go first (D-137: "Fake job or
+// recruitment scam" on a member who is hiring); the caller maps them to their own RPC.
+export const openReportDialog = ({ name, trigger, send, extraReasons = [] }) => new Promise((resolve) => {
   if (document.querySelector('dialog.report-dialog')) { resolve(false); return; }
   dialogCount += 1;
   const id = `report-${dialogCount}`;
@@ -40,7 +41,7 @@ export const openReportDialog = ({ name, trigger, send }) => new Promise((resolv
   dialog.innerHTML = `<form class="report-form" novalidate>
     <h2 id="${id}-title">Report ${who}</h2>
     <p class="report-intro">Reporting also blocks ${who}, so you won't see them again.</p>
-    <fieldset class="report-reasons"><legend>Why are you reporting ${who}?</legend>${REPORT_REASONS.map(([value, label]) => `<label class="report-reason"><input type="radio" name="reason" value="${value}" /><span>${label}</span></label>`).join('')}</fieldset>
+    <fieldset class="report-reasons"><legend>Why are you reporting ${who}?</legend>${[...extraReasons, ...REPORT_REASONS].map(([value, label]) => `<label class="report-reason"><input type="radio" name="reason" value="${value}" /><span>${label}</span></label>`).join('')}</fieldset>
     <p class="report-emergency" data-report-emergency hidden>If anyone is in immediate danger, call <strong>112</strong>.</p>
     <label class="report-note" for="${id}-note">Anything else we should know? (optional) <small>Kept for up to a year so we can review it.</small></label>
     <textarea id="${id}-note" name="note" rows="3" maxlength="${NOTE_MAX}" autocomplete="off"></textarea>
