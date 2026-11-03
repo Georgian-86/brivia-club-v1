@@ -3123,5 +3123,11 @@ controls (a tester or a seeded test member), never a real member, so no new expo
   pans timed to the transitions). Portrait phones also get their own poster (hero-portrait.webp, the first frame of
   that crop), preloaded with a media query and swapped in before first paint, so the landscape poster is never fetched
   on a phone.
+- **Sizes:** landscape AV1 18.9 MB, HEVC 19.3, H.264 19.5; portrait AV1 7.6, HEVC 8.8, H.264 11.5 (all under 20 MB).
+  The `<video>` no longer carries a poster in the markup: an inline script sets the one matching the screen from its
+  preload, so each device downloads exactly one poster.
+- **Proof:** landing spec (poster per orientation, one poster request, LCP, transfer budget), landing-sound, asset
+  budget, unit tests; a 1-per-second contact sheet of the encoded portrait file shows the subject in every scene.
+  Not checked on a physical phone.
 - **Unchanged:** the source order and selection logic (AV1, HEVC, H.264 per frame; MediaCapabilities keeps a smooth
   one), the 20 MB cap, desktop framing.
