@@ -539,3 +539,28 @@ body.app-body .app-view[data-view="home"] .deck-empty p:not(.app-eyebrow) + .dec
   body.app-body .app-view[data-view="home"] .deck-empty-mark { animation: none; }
   body.app-body .app-view[data-view="home"] .deck-empty-action, body.app-body .app-view[data-view="home"] .deck-empty-action::after { transition: none; }
 }
+
+/* D-147 (founder: "a little small and aesthetic"): the caught-up card a size down: 380 px, less padding, a 52 px mark
+   with a quieter halo, a smaller heading and text, a compact pill. */
+body.app-body .app-view[data-view="home"] .deck-empty {
+  width: min(100%, 380px);
+  padding: 34px 28px 28px;
+  border-radius: 24px;
+}
+body.app-body .app-view[data-view="home"] .deck-empty-mark { width: 52px; height: 52px; padding: 11px; }
+@keyframes deck-empty-halo {
+  0%, 100% { box-shadow: 0 0 0 1px color-mix(in srgb, var(--color-wine) 14%, transparent), 0 0 0 6px color-mix(in srgb, var(--color-cream) 45%, transparent), 0 10px 20px -14px color-mix(in srgb, var(--color-wine-deep) 45%, transparent); }
+  50% { box-shadow: 0 0 0 1px color-mix(in srgb, var(--color-wine) 20%, transparent), 0 0 0 11px color-mix(in srgb, var(--color-cream) 20%, transparent), 0 10px 20px -14px color-mix(in srgb, var(--color-wine-deep) 45%, transparent); }
+}
+body.app-body .app-view[data-view="home"] .deck-empty .app-eyebrow { margin-top: 18px; font-size: var(--text-12); letter-spacing: .18em; }
+body.app-body .app-view[data-view="home"] .deck-empty .app-eyebrow::before,
+body.app-body .app-view[data-view="home"] .deck-empty .app-eyebrow::after { width: 16px; }
+body.app-body .app-view[data-view="home"] .deck-empty h2 { margin-top: 8px; font-size: clamp(28px, 2.6vw, 34px); }
+body.app-body .app-view[data-view="home"] .deck-empty p:not(.app-eyebrow) { max-width: 30ch; margin-top: 10px; font-size: var(--text-14); line-height: 1.55; }
+body.app-body .app-view[data-view="home"] .deck-empty p:not(.app-eyebrow)::after { width: 36px; margin-top: 18px; }
+body.app-body .app-view[data-view="home"] .deck-empty p:not(.app-eyebrow) + .deck-empty-action { margin-top: 18px; }
+body.app-body .app-view[data-view="home"] .deck-empty-action { min-height: 44px; padding: 11px 20px 11px 24px; letter-spacing: .12em; }
+@media (max-width: 700px) {
+  body.app-body .app-view[data-view="home"] .deck-empty { width: min(100%, 360px); padding: 30px 22px 26px; }
+  body.app-body .app-view[data-view="home"] .deck-empty h2 { font-size: 28px; }
+}

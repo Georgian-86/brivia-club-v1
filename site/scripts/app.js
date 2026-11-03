@@ -277,6 +277,14 @@ const escapeHtml = (value = '') => String(value).replace(/[&<>'"]/g, (character)
 // project's Storage public URLs (VITE_SUPABASE_URL origin), same-site assets (preset covers) or an inline image
 // preview; anything else (any other https host, a tracking pixel) falls back to initials / the default cover.
 // Always escaped, so a crafted photo_url can never break out of the src attribute (stored XSS).
+// D-147: the member's own sign-in picture (Google), for their own header avatar only: https on Google's picture host.
+let ownSignInPicture = '';
+const ownPictureUrl = (value) => {
+  try {
+    const url = new URL(String(value || ''));
+    return url.protocol === 'https:' && /(^|\.)googleusercontent\.com$/.test(url.hostname) && !/["'<>`\\]/.test(url.href) ? url.href : '';
+  } catch { return ''; }
+};
 const safeImageUrl = (value) => {
   const raw = String(value || '').trim();
   if (!raw || /["'<>`\\]/.test(raw)) return '';
@@ -4287,11 +4295,11 @@ const renderProfile = () => {
   const headerAvatar = document.querySelector('#app-avatar-button');
   if (headerAvatar) {
     // D-145: the member's own photo in the top-right circle; the initials stay as the fallback (no photo, or it fails).
-    const photo = safeImageUrl(profile.photoUrl || profile.photo_url || profile.image);
+    const photo = safeImageUrl(profile.photoUrl || profile.photo_url || profile.image) || ownPictureUrl(ownSignInPicture);
     const shown = headerAvatar.querySelector('img')?.getAttribute('src');
     if (photo && shown !== photo) {
       const img = document.createElement('img');
-      img.src = photo; img.alt = ''; img.decoding = 'async';
+      img.referrerPolicy = 'no-referrer'; img.src = photo; img.alt = ''; img.decoding = 'async';
       img.addEventListener('error', () => { headerAvatar.classList.remove('has-photo'); headerAvatar.textContent = headerInitials(memberProfile.name); }, { once: true });
       headerAvatar.replaceChildren(img);
       headerAvatar.classList.add('has-photo');
@@ -5730,6 +5738,11 @@ const loadSupabaseCommunity = async () => {
   // Skills are server-owned (D-035): always the row's copy, never a stale cached or metadata value.
   memberProfile.skills = rowProfile.skills;
   memberProfile.resumePath = rowProfile.resumePath; // the row's, never a cached copy (0012, D4)
+  // D-147: the photo is the row's when it has one (a stale cached profile must not hide a photo added elsewhere).
+  if (rowProfile.photoUrl) memberProfile.photoUrl = rowProfile.photoUrl;
+  // A member who signed in with Google and has not added a Brivia photo yet: their Google picture, for their own
+  // top-right avatar only (never shown to anyone else, never saved).
+  ownSignInPicture = String(metadata.avatar_url || metadata.picture || '');
   memberProfile = withoutCredentials(memberProfile);  // never cache a password (Ruling I11)
   memberProfile.email = session.user.email || memberProfile.email || '';
   if (!memberProfile.name || memberProfile.name === 'New Member') memberProfile.name = session.user.user_metadata?.name || 'New Member';

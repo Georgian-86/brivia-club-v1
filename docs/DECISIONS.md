@@ -2999,3 +2999,14 @@ controls (a tester or a seeded test member), never a real member, so no new expo
   hairlines; a tighter wine heading; the copy at a balanced 31-character measure; a hairline before the action; the
   action a wine pill with an arrow that nudges on hover. Phone: same card, slightly tighter. e2e deck 201 and
   app-shell 214 pass (copy, focus and the Search members action are unchanged).
+
+## D-147 (2026-11-03): the top-right avatar always finds a photo; a smaller caught-up card
+
+- **Asked:** show the profile picture in the top-right circle (it still read "AM"), and make the caught-up box a little
+  smaller and more aesthetic.
+- **Found:** the circle showed the photo only when it came through the profile; a cached profile on the device could
+  hide a photo added elsewhere, and members who signed in with Google but never added a Brivia photo had only initials.
+- **Done:** the row's photo always wins over a cached copy; with no Brivia photo, the member's own Google picture
+  (https, googleusercontent.com only, no referrer) shows in their own circle only, never to anyone else and never saved;
+  initials remain the last fallback. The caught-up card a size down: 380 px, 52 px mark with a quieter halo, a smaller
+  heading and copy, a compact pill. e2e deck 201 and app-shell 214 pass.
