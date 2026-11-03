@@ -20,7 +20,7 @@ export const COPY = Object.freeze({
   quietTitle: 'Looks a little quiet around here.',
   quietCopy: "We'll let you know when someone crosses your path.",
   offTitle: 'Turn on Crossing Paths to discover people around you.',
-  offCopy: 'Only members who turn it on can discover each other. Nobody ever sees where you are, only roughly how far.',
+  offCopy: 'See who is around and make the first move.',
   matchTitle: 'Well, look who crossed paths!',
   connect: 'Make the first move.',
   incoming: 'Someone nearby wants to connect with you.',

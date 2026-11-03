@@ -131,3 +131,27 @@ body.app-body .nearby-empty .event-btn-primary { background: var(--color-wine); 
 @media (prefers-reduced-motion: reduce) { .nearby-here, body.app-body .nearby-refresh.is-spinning svg { animation: none; } .nearby-row .nearby-card:not(.is-current) { transition: none; } }
 /* Nearby's empty states are full sentences ("Turn on Crossing Paths to …"): a calmer size than the companion's titles. */
 body.app-body .nearby-view .nearby-empty h2 { font-size: var(--text-24); line-height: 1.2; }
+
+/* Refined empty states (founder, phone): no distance tools or lead line while there is nothing to search; a compact
+   panel with a soft radar mark, three short privacy points and a full-width button. */
+.nearby-view:is([data-nearby-state="off"], [data-nearby-state="consent"], [data-nearby-state="unavailable"], [data-nearby-state="loading"]) :is(.nearby-tools, .nearby-lead) { display: none; }
+body.app-body .nearby-view .nearby-empty { margin: var(--space-4) auto 0; padding: var(--space-6) var(--space-5) var(--space-5); text-align: center;
+  background: color-mix(in srgb, var(--color-cream) 86%, transparent); -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px); }
+.nearby-empty-mark { position: relative; width: 64px; height: 64px; margin: 0 auto var(--space-4); background: none; }
+.nearby-empty-mark::before, .nearby-empty-mark::after { content: ''; position: absolute; inset: 0; border-radius: 50%; border: 1px solid color-mix(in srgb, var(--color-wine) 30%, transparent); animation: nearby-ring 2.8s ease-out infinite; }
+.nearby-empty-mark::after { animation-delay: 1.4s; }
+.nearby-empty-mark > span { position: absolute; inset: 22px; border-radius: 50%; background: var(--color-wine); box-shadow: 0 0 0 6px color-mix(in srgb, var(--color-wine) 14%, transparent); }
+@keyframes nearby-ring { from { transform: scale(.35); opacity: 1; } to { transform: scale(1); opacity: 0; } }
+body.app-body .nearby-view .nearby-empty p { margin: var(--space-2) auto var(--space-4); max-width: 34ch; }
+.nearby-points { display: grid; gap: var(--space-3); margin: 0 0 var(--space-5); padding: var(--space-4) 0 0; border-top: 1px solid var(--color-line); list-style: none; text-align: left; }
+.nearby-points li { position: relative; padding-left: 26px; color: var(--color-ink-soft); font-size: var(--text-14); line-height: 1.45; }
+.nearby-points li::before { content: ''; position: absolute; left: 2px; top: 5px; width: 12px; height: 7px; border-left: 2px solid var(--color-wine); border-bottom: 2px solid var(--color-wine); transform: rotate(-45deg); }
+.nearby-points strong { color: var(--color-ink); font-weight: 600; }
+body.app-body .nearby-view .nearby-empty .event-btn { min-height: 48px; padding: 0 var(--space-6); }
+@media (max-width: 759px) {
+  body.app-body .nearby-view .nearby-empty .event-btn-primary { width: 100%; }
+  body.app-body .nearby-view .nearby-head h1 { font-size: 40px; }
+}
+@media (prefers-reduced-motion: reduce) { .nearby-empty-mark::before, .nearby-empty-mark::after { animation: none; opacity: .6; } }
+/* The swipe hint only with cards to swipe. */
+.nearby-view:not([data-nearby-state="cards"]) .nearby-keys { display: none; }

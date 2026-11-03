@@ -33,11 +33,18 @@ export const createNearbyPage = ({
   radiusSelect.innerHTML = RADII.map((km) => `<option value="${km}"${km === state.radius ? ' selected' : ''}>${km} km</option>`).join('');
 
   const setBusy = (busy) => { state.busy = busy; [passBtn, likeBtn, profileBtn].forEach((b) => { b.disabled = busy; }); };
-  const panel = (title, copy, action = '') => {
+  // points: short reassurances under the copy (the off and consent states explain privacy before asking).
+  const panel = (title, copy, action = '', points = []) => {
     state.swipe = null;
-    deckEl.innerHTML = `<div class="companion-empty nearby-empty" role="status"><span class="nearby-empty-mark" aria-hidden="true"></span><h2>${title}</h2><p>${copy}</p>${action}</div>`;
+    const list = points.length ? `<ul class="nearby-points">${points.map(([strong, rest]) => `<li><strong>${strong}</strong> ${rest}</li>`).join('')}</ul>` : '';
+    deckEl.innerHTML = `<div class="companion-empty nearby-empty" role="status"><span class="nearby-empty-mark" aria-hidden="true"><span></span></span><h2>${title}</h2><p>${copy}</p>${list}${action}</div>`;
     actions.hidden = true;
   };
+  const PRIVACY_POINTS = [
+    ['Only members who turn it on.', 'Everyone else never sees you, and you never see them.'],
+    ['Never your exact place.', 'Just your city and roughly how far, like “under 1 km”.'],
+    ['Off any time.', 'You leave Nearby the moment you turn it off.'],
+  ];
   const button = (attr, label, primary = false) => `<button type="button" class="event-btn ${primary ? 'event-btn-primary' : 'event-btn-ghost'}" ${attr}>${label}</button>`;
 
   const render = () => {
@@ -52,8 +59,8 @@ export const createNearbyPage = ({
       return;
     }
     if (view === 'unavailable') { panel('Nearby opens soon', 'Discovering people around you is almost here.'); return; }
-    if (view === 'off') { panel(COPY.offTitle, COPY.offCopy, button('data-nearby-turn-on', 'Turn on Crossing Paths', true)); return; }
-    if (view === 'consent') { panel('Nearby is new', 'Crossing Paths now also lets members around you discover you, and you them. Confirm to start.', button('data-nearby-turn-on', 'Turn on Nearby', true)); return; }
+    if (view === 'off') { panel(COPY.offTitle, COPY.offCopy, button('data-nearby-turn-on', 'Turn on Crossing Paths', true), PRIVACY_POINTS); return; }
+    if (view === 'consent') { panel('Nearby is new', 'Crossing Paths now also lets members around you discover you, and you them.', button('data-nearby-turn-on', 'Turn on Nearby', true), PRIVACY_POINTS); return; }
     if (view === 'paused-prompt') { panel('Brivia needs your location', 'Allow location so we can show who is around you. We keep only a rough area, never where you are.', button('data-nearby-allow', 'Allow location', true)); return; }
     if (view === 'paused-denied') { panel('Location is off for Brivia', pausedCopy('denied').replace(/^Paused: /, ''), button('data-nearby-retry', 'Try again')); return; }
     if (view === 'paused-unavailable') { panel("We couldn't find you", pausedCopy('unavailable').replace(/^Paused: /, ''), button('data-nearby-retry', 'Try again')); return; }
