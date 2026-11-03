@@ -454,3 +454,88 @@ body.app-body :is(button, [role="button"], .filter-button, .discovery-filter-sug
 #pitch-modal .overlay-close:focus-visible { outline: 2px solid var(--color-wine); outline-offset: -2px; }
 /* The sheet's line "Tell <name> why..." was 4.42:1 on the cream panel (axe, D-071 review); ink-soft is 7:1. */
 #pitch-modal .pitch-copy, #pitch-modal .pitch-copy strong { color: var(--color-ink-soft); }
+
+/* D-146 (founder: "refine this caught up box"): the caught-up card as a calm, finished object rather than a flat panel.
+   A narrower card with more air, a soft wine edge and lift; the orbit mark on its own cream disc with a slow halo; the
+   eyebrow as a small wine label between hairlines; a tighter heading; a copy measure that breaks into even lines; a
+   hairline before the action; the action a pill with an arrow. Colours are tokens; the aura background is kept. */
+body.app-body .app-view[data-view="home"] .deck-empty {
+  position: relative;
+  gap: 0;
+  width: min(100%, 460px);
+  padding: 46px clamp(24px, 4vw, 44px) 38px;
+  border: 1px solid color-mix(in srgb, var(--color-wine) 16%, transparent);
+  border-radius: 28px;
+  box-shadow: 0 1px 0 color-mix(in srgb, var(--color-cream) 90%, transparent) inset,
+              0 30px 60px -34px color-mix(in srgb, var(--color-wine-deep) 55%, transparent),
+              0 2px 8px color-mix(in srgb, var(--color-wine-deep) 8%, transparent);
+}
+body.app-body .app-view[data-view="home"] .deck-empty-mark {
+  width: 68px; height: 68px; padding: 14px; box-sizing: border-box;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--color-cream) 88%, transparent);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--color-wine) 14%, transparent),
+              0 0 0 10px color-mix(in srgb, var(--color-cream) 40%, transparent),
+              0 12px 24px -14px color-mix(in srgb, var(--color-wine-deep) 50%, transparent);
+  stroke: var(--color-wine);
+  stroke-width: 1.4;
+  animation: deck-empty-halo 3.2s ease-in-out infinite;
+}
+@keyframes deck-empty-halo {
+  0%, 100% { box-shadow: 0 0 0 1px color-mix(in srgb, var(--color-wine) 14%, transparent), 0 0 0 10px color-mix(in srgb, var(--color-cream) 40%, transparent), 0 12px 24px -14px color-mix(in srgb, var(--color-wine-deep) 50%, transparent); }
+  50% { box-shadow: 0 0 0 1px color-mix(in srgb, var(--color-wine) 20%, transparent), 0 0 0 16px color-mix(in srgb, var(--color-cream) 18%, transparent), 0 12px 24px -14px color-mix(in srgb, var(--color-wine-deep) 50%, transparent); }
+}
+body.app-body .app-view[data-view="home"] .deck-empty .app-eyebrow {
+  display: inline-flex; align-items: center; gap: 10px;
+  margin: 22px 0 0;
+  color: var(--color-wine);
+  font-size: var(--text-12); font-weight: 700; letter-spacing: .2em;
+}
+body.app-body .app-view[data-view="home"] .deck-empty .app-eyebrow::before,
+body.app-body .app-view[data-view="home"] .deck-empty .app-eyebrow::after {
+  content: ''; width: 22px; height: 1px; background: color-mix(in srgb, var(--color-wine) 35%, transparent);
+}
+body.app-body .app-view[data-view="home"] .deck-empty h2 {
+  margin: 12px 0 0;
+  color: var(--color-wine-deep);
+  font-size: clamp(34px, 3.4vw, 44px);
+  line-height: 1.02;
+  letter-spacing: -.02em;
+}
+body.app-body .app-view[data-view="home"] .deck-empty p:not(.app-eyebrow) {
+  max-width: 31ch;
+  margin: 14px 0 0;
+  color: var(--color-ink-soft);
+  font-size: var(--text-14);
+  line-height: 1.65;
+  text-wrap: balance;
+}
+body.app-body .app-view[data-view="home"] .deck-empty-action {
+  display: inline-flex; align-items: center; gap: 10px;
+  min-height: 50px;
+  margin-top: 26px;
+  padding: 14px 26px 14px 30px;
+  border-color: var(--color-wine-deep);
+  background: var(--color-wine-deep);
+  color: var(--color-cream);
+  letter-spacing: .14em;
+  box-shadow: 0 14px 26px -16px color-mix(in srgb, var(--color-wine-deep) 80%, transparent);
+  transition: background .2s, transform .2s, box-shadow .2s;
+}
+body.app-body .app-view[data-view="home"] .deck-empty-action::after { content: '→'; font-size: var(--text-14); letter-spacing: 0; transition: transform .2s; }
+body.app-body .app-view[data-view="home"] .deck-empty-action:hover { background: var(--color-wine); transform: translateY(-1px); }
+body.app-body .app-view[data-view="home"] .deck-empty-action:hover::after { transform: translateX(3px); }
+/* A hairline between the words and the action. */
+body.app-body .app-view[data-view="home"] .deck-empty p:not(.app-eyebrow)::after {
+  content: ''; display: block; width: 48px; height: 1px; margin: 24px auto 0;
+  background: color-mix(in srgb, var(--color-wine) 22%, transparent);
+}
+body.app-body .app-view[data-view="home"] .deck-empty p:not(.app-eyebrow) + .deck-empty-action { margin-top: 22px; }
+@media (max-width: 700px) {
+  body.app-body .app-view[data-view="home"] .deck-empty { padding: 38px 22px 30px; border-radius: 24px; }
+  body.app-body .app-view[data-view="home"] .deck-empty h2 { font-size: 32px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  body.app-body .app-view[data-view="home"] .deck-empty-mark { animation: none; }
+  body.app-body .app-view[data-view="home"] .deck-empty-action, body.app-body .app-view[data-view="home"] .deck-empty-action::after { transition: none; }
+}

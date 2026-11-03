@@ -2990,3 +2990,12 @@ controls (a tester or a seeded test member), never a real member, so no new expo
   no photo or it fails to load. Verified with and without a photo; e2e app-shell 214 and mobile-polish 28 pass.
   consent.spec.mjs fails before and after this change (it still looks for the Accept button removed in D-132); left for
   a separate fix.
+
+## D-146 (2026-11-03): a refined "You're caught up." card
+
+- **Asked:** refine the caught-up box on Connect.
+- **Done (deck.css, tokens only, copy unchanged):** a narrower card (460 px) with more air, a soft wine edge and lift;
+  the orbit mark on a cream disc with a slow halo (still under reduced motion); the eyebrow as a wine label between
+  hairlines; a tighter wine heading; the copy at a balanced 31-character measure; a hairline before the action; the
+  action a wine pill with an arrow that nudges on hover. Phone: same card, slightly tighter. e2e deck 201 and
+  app-shell 214 pass (copy, focus and the Search members action are unchanged).
