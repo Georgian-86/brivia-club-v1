@@ -1,9 +1,9 @@
 # Founder interest catalogue (2026-10-29, D-109), A-Z: label<TAB>node_id<TAB>existing|new. Run
 # `node scripts/build-interest-catalog.mjs` after editing; it rewrites the data section of 0017.
-# 2026-11-03 (D-135): 67 reused nodes now carry the founder's exact wording (migration 0031 relabels them by id and
+# 2026-11-03 (D-135): 65 reused nodes now carry the founder's exact wording (migration 0031 relabels them by id and
 # recomputes catalog_order A-Z). 0017 is live and frozen: further label changes are new migrations, not a rerun.
 # Existing 0004 nodes are reused (same label, or the same interest under fuller wording, e.g. "AR and VR");
-# new ones are level-3 nodes under the closest existing category. Left out: Gospel Music (excluded); NLP (same interest as Natural Language Processing).
+# new ones are level-3 nodes under the closest existing category. 0017 left out Gospel Music and NLP; 0032 (D-136) adds both.
 Abstract Art	arts.visual.abstract_art	new
 Accessibility Engineering	tech.software.accessibility_engineering	new
 Accounting	business.money.accounting	new
@@ -369,6 +369,7 @@ Go-to-Market Strategy	business.startups.go_to_market_strategy	new
 Goal Setting	business.careers.goal_setting	new
 Golf	sports.precision.golf	existing
 Google Cloud	tech.software.google_cloud	new
+Gospel Music	music.listening.gospel_music	new
 Gourmet Cooking	food.cooking.gourmet_cooking	new
 Government Contracting	business.careers.government_contracting	new
 Graffiti Art	arts.visual.graffiti_art	new
@@ -643,6 +644,7 @@ New Media Art	arts.visual.new_media_art	new
 New Product Development	business.startups.new_product_development	new
 News Reporting	arts.writing.news_reporting	new
 Nightlife	food.eating_out.nightlife	new
+NLP	tech.ai_data.nlp_short	new
 No-Code Development	tech.software.no_code_development	new
 Nonfiction Reading	learning.reading.nonfiction_reading	new
 Nonfiction Writing	arts.writing.nonfiction_writing	new

@@ -1077,3 +1077,16 @@ select (select label from public.interest_node where id = 'tech.frontier.ar_vr')
        (select count(*) from public.interest_node where catalog_order is not null),             -- 1129
        (select max(catalog_order) from public.interest_node);                                   -- 1129
 ```
+
+## 0032
+
+**Gospel Music and NLP offered (founder request 2026-11-03, D-136).**
+Apply after `0031`. Data only: inserts two level-3 interest nodes (not sensitive), lists them, renumbers
+`catalog_order` 1..1131 A–Z. Safe to re-run; a moderator's retirement sticks.
+
+Verify after the apply:
+
+```sql
+select count(*) from public.interest_node where catalog_order is not null;                          -- 1131
+select label, catalog_order from public.interest_node where id in ('music.listening.gospel_music', 'tech.ai_data.nlp_short');
+```

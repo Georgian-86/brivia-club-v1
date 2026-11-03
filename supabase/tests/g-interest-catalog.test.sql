@@ -1,6 +1,6 @@
 -- 0017 (D-109): the founder's interest catalogue (interest_node.catalog_order) and add_member_interest ("Other").
 -- Ids 0c170000-0000-4000-8000-0000000000NN: 01 A (completed), 02 B (completed), 03 N (no profile).
--- C1 the catalogue: 1129 offered nodes, ordered 1..N A-Z, level 3-4, never sensitive, every parent exists; reused 0004
+-- C1 the catalogue: 1131 offered (1129 from 0017, Gospel Music and NLP from 0032) nodes, ordered 1..N A-Z, level 3-4, never sensitive, every parent exists; reused 0004
 --    nodes keep their id and label; "Gospel Music" and "NLP" are not offered.
 -- C2 add_member_interest reuses an existing active node by label (case-insensitive, spaces collapsed).
 -- C3 a new label becomes member.custom.<slug> (level 3), a second call returns it, a slug collision gets _2.
@@ -28,7 +28,7 @@ do $$
 declare n int; m int;
 begin
   select count(*), max(catalog_order) into n, m from public.interest_node where catalog_order is not null;
-  if n <> 1129 or m <> 1129 then raise exception 'FAIL C1: % catalogue nodes, max order %', n, m; end if;
+  if n <> 1131 or m <> 1131 then raise exception 'FAIL C1: % catalogue nodes, max order %', n, m; end if;
   if exists (select 1 from public.interest_node where catalog_order is not null and (level < 3 or sensitive or status <> 'active')) then
     raise exception 'FAIL C1: a catalogue node is not an active, public level-3/4 interest'; end if;
   if exists (select 1 from public.interest_node c where c.catalog_order is not null
@@ -42,8 +42,9 @@ begin
   -- 0031 (D-135) puts the founder's wording on reused nodes: same id, the founder's label.
   if (select label from public.interest_node where id = 'tech.frontier.ar_vr') <> 'AR/VR' then raise exception 'FAIL C1: AR/VR is not in the founder''s wording'; end if;
   if (select level from public.interest_node where id = 'tech.software.python') <> 3 then raise exception 'FAIL C1: Python missing'; end if;
-  if exists (select 1 from public.interest_node where catalog_order is not null and lower(label) in ('gospel music', 'nlp')) then
-    raise exception 'FAIL C1: a left-out label is offered'; end if;
+  -- 0032 (D-136): the founder chose to offer the two that 0017 left out.
+  if (select count(*) from public.interest_node where catalog_order is not null and lower(label) in ('gospel music', 'nlp')) <> 2 then
+    raise exception 'FAIL C1: Gospel Music and NLP are not both offered'; end if;
   if (select count(*) from public.interest_node where catalog_order is not null and lower(label) = 'ui design') <> 1 then
     raise exception 'FAIL C1: duplicates were not collapsed'; end if;
 end $$;

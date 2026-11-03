@@ -2778,3 +2778,15 @@ controls (a tester or a seeded test member), never a real member, so no new expo
   are one interest each.
 - **Proof:** SQL harness ALL PASSED (new `r-interest-labels.test.sql`: relabels, 1,129 offered, contiguous A–Z order,
   unique labels, Abstract Art first, Zymology last, nothing sensitive offered).
+
+## D-136 (2026-11-03): Gospel Music and NLP are offered too
+
+- **Asked:** the founder answered "yes" to offering the two interests D-135 had left out.
+- **Decided:** migration `0032_interest_additions.sql` adds `music.listening.gospel_music` ("Gospel Music", a public
+  music genre beside the others) and `tech.ai_data.nlp_short` ("NLP", a sibling of Natural Language Processing so
+  ORBIT scores them as the same category), then renumbers `catalog_order` A–Z. The catalogue is now 1,131 interests:
+  every label on the founder's list.
+- **Overrides:** D-038 counted Gospel Music as a religion proxy and kept it private. The founder chose to offer it as a
+  music genre; only this label changes. Devotional singing and Sufi and qawwali stay sensitive (a test checks that).
+- **Proof:** SQL harness ALL PASSED (g C1 now 1,131 and both offered; r L4 placement, Gospel Music not sensitive, Sufi
+  and qawwali still sensitive).
