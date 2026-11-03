@@ -347,6 +347,8 @@ export const connectionPresence = async (ids) => {
   return supabase.rpc('connection_presence', { p_ids: ids });
 };
 // Delivered and Read (D-150, 0042). Before 0042 both answer PGRST202 / 404 (isMissingFunction) and the app stops asking.
+// D-152 (0044): Chat search for people (connections first, with their status). Before 0044: PGRST202 / 404.
+export const chatPeopleSearch = (query, limit = 20) => rpcCall('chat_people_search', { p_query: query, p_limit: limit });
 // D-151 (0043): the Read receipts switch (default on; off hides Read both ways).
 export const setReadReceipts = (on) => rpcCall('set_read_receipts', { p_on: Boolean(on) });
 export const myReadReceipts = () => rpcCall('my_read_receipts', {});

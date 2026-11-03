@@ -21,7 +21,7 @@ import '../styles/mobile-app.css';
 import '../styles/skeleton.css';
 import '../styles/aura-theme.css';
 import '../styles/handoff.css';
-import { supabase, compressImageOnly, rowToProfile, saveProfile, isPresetCoverUrl, onboardingStatus, sendSignal, fetchSignalQuota, isRateLimited, isStorageImageUrl, withoutCredentials, uploadMessageAttachment, removeMessageAttachment, uploadCommunityPostImage, removeCommunityPostImage, ImageProcessingError, PHOTO_ERROR_MESSAGE, PHOTO_FRAMER_ERROR, compressAttachmentFiles, attachmentKind, reportMember, setSensitiveConsent, fetchSensitiveConsentAt, fetchMyInterests, fetchInterestNodes, addMemberInterest, isMissingFunction, touchPresence, connectionPresence, setPresenceVisible, myPresenceVisible, setMemberInterests, uploadResume, removeResume, resumeSignedUrl, resumeInfo, clearResumePath, searchPlaces, setHomeCity, setHomeLocation, listEvents, setEventRsvp, setCompanionDefault, myEventPrefs, eventCompanions, saveMemberEvent, cancelMemberEvent, deleteMemberEvent, uploadEventImage, removeEventImages, setEventInterest, setEventBrochure, uploadEventBrochure, removeEventBrochures, companionEvents, companionDeck, companionSwipe, myCompanionMatches, markCompanionMatchSeen, sendConnectRequest, setNearbyEnabled, myNearbySetting, nearbyPulse, nearbyClear, myNearbyAlerts, setNearbyMuted, nearbyDiscover, nearbyPass, nearbyConnect, myNearbyMatches, myNotifications, markNotificationsRead, dismissNotification, setNearbyRadius, savePushSubscription, deletePushSubscription, sendPendingPush, searchCompanies, searchCompanyDirectory, companyLogoUrl, addCompany, setMyWork, memberWork, uploadCompanyLogo, markMessagesDelivered, markConversationRead, setReadReceipts, myReadReceipts } from './supabase.js';
+import { supabase, compressImageOnly, rowToProfile, saveProfile, isPresetCoverUrl, onboardingStatus, sendSignal, fetchSignalQuota, isRateLimited, isStorageImageUrl, withoutCredentials, uploadMessageAttachment, removeMessageAttachment, uploadCommunityPostImage, removeCommunityPostImage, ImageProcessingError, PHOTO_ERROR_MESSAGE, PHOTO_FRAMER_ERROR, compressAttachmentFiles, attachmentKind, reportMember, setSensitiveConsent, fetchSensitiveConsentAt, fetchMyInterests, fetchInterestNodes, addMemberInterest, isMissingFunction, touchPresence, connectionPresence, setPresenceVisible, myPresenceVisible, setMemberInterests, uploadResume, removeResume, resumeSignedUrl, resumeInfo, clearResumePath, searchPlaces, setHomeCity, setHomeLocation, listEvents, setEventRsvp, setCompanionDefault, myEventPrefs, eventCompanions, saveMemberEvent, cancelMemberEvent, deleteMemberEvent, uploadEventImage, removeEventImages, setEventInterest, setEventBrochure, uploadEventBrochure, removeEventBrochures, companionEvents, companionDeck, companionSwipe, myCompanionMatches, markCompanionMatchSeen, sendConnectRequest, setNearbyEnabled, myNearbySetting, nearbyPulse, nearbyClear, myNearbyAlerts, setNearbyMuted, nearbyDiscover, nearbyPass, nearbyConnect, myNearbyMatches, myNotifications, markNotificationsRead, dismissNotification, setNearbyRadius, savePushSubscription, deletePushSubscription, sendPendingPush, searchCompanies, searchCompanyDirectory, companyLogoUrl, addCompany, setMyWork, memberWork, uploadCompanyLogo, markMessagesDelivered, markConversationRead, setReadReceipts, myReadReceipts, chatPeopleSearch } from './supabase.js';
 import { locateOnce, fallbackCopy } from './geo-locate.js';
 import { areaChangeMessage, AREA_HELPER, AREA_NO_MATCH } from './area-change.js';
 import { areaShareBody, parseAreaBody, resumeShareAttachment, resumeMessageFields, RESUME_SHARE_BODY, NO_RESUME_HINT, RESUME_GONE_COPY, RESUME_SHARE_NOTE, AREA_SHARE_NOTE } from './quick-share.js';
@@ -39,6 +39,7 @@ import { isOffered, hasCatalog, catalogGroups, normalizeInterestLabel } from './
 import { MAX_INTERESTS } from './passion-budget.js';
 import { collabSummary, openCollabReview } from './collab-requests.js';
 import { createPresence, presenceDot } from './presence.js';
+import { cleanQuery, matchesQuery, STATUS as PERSON_STATUS, peopleResults, localPeople } from './chat-search.js';
 import { receiptState, receiptMarkup, lastOwnMessageId, applyReceipt, needsReadReceipt, needsDeliveredReceipt, lastActiveLabel } from './receipts.js';
 import { createCrossingPaths, isQuietHour, alertHeadline, alertDetail, alertToast, pausedCopy } from './crossing-paths.js';
 import '../styles/crossing-paths.css';
@@ -135,6 +136,11 @@ const exploreFilters = { query: '', skills: new Set(), lookingFor: new Set(), hi
 const filterDrafts = { skills: '', lookingFor: '' };
 let activeChatFilter = 'all';
 let chatSearchQuery = '';
+// D-152: people found by the Chat search (chat_people_search, 0044): { query, status: idle|loading|done|error, rows }.
+let chatPeople = { query: '', status: 'idle', rows: [] };
+let chatPeopleSeq = 0;
+let chatPeopleTimer = 0;
+let chatPeopleMissing = false;
 let selectedChat = null;
 // Active status (D-110): the presence loop (presence.js), started with the message sync.
 let presence = null;
@@ -2054,7 +2060,11 @@ const openPublicProfile = (person, options = {}) => {
   const firstName = name.split(/\s+/)[0];
   // A real bio only: the dialog never invents one (D-092).
   const bio = String(profile.bio || '').trim();
-  const matched = remoteMatchIds.map(String).includes(String(profile.id));
+  // D-152: a connection found by search counts as matched even before their thread is in this device's inbox.
+  const matched = options.status === 'connected' || remoteConnectionIds.map(String).includes(String(profile.id)) || remoteMatchIds.map(String).includes(String(profile.id));
+  const statusAction = !matched && options.status === 'request_received' ? '<button class="public-profile-message" type="button" data-public-profile-review>Review their request</button>'
+    : !matched && options.status === 'request_sent' ? '<p class="public-profile-status" role="status">Request sent. You can message once they accept.</p>'
+      : !matched && options.status === 'none' ? `<button class="public-profile-message" type="button" data-public-profile-connect>Connect with ${escapeHtml(firstName)}</button><p class="public-profile-status">Chats open once you're both connected.</p>` : '';
   const chips = (values, kind) => `<ul class="public-profile-chips public-profile-chips--${kind}">${values.map((value) => `<li>${escapeHtml(value)}</li>`).join('')}</ul>`;
   const group = (title, values, kind) => (values.length ? `<section class="public-profile-group"><h3>${title}</h3>${chips(values, kind)}</section>` : '');
   const groups = group('Interests &amp; skills', interests, 'interest') + group('Looking for', lookingFor, 'looking');
@@ -2075,7 +2085,8 @@ const openPublicProfile = (person, options = {}) => {
     + `<div class="public-profile-body">${bio ? `<p class="public-profile-bio">${escapeHtml(bio)}</p>` : ''}`
     + (groups || `<p class="public-profile-empty">${escapeHtml(firstName)} hasn't added interests yet.</p>`)
     + `</div>`
-    + (matched ? `<footer class="public-profile-actions"><button class="public-profile-message" type="button" data-public-profile-message>Message ${escapeHtml(firstName)}</button></footer>` : '')
+    + (matched ? `<footer class="public-profile-actions"><button class="public-profile-message" type="button" data-public-profile-message>Message ${escapeHtml(firstName)}</button></footer>`
+      : statusAction ? `<footer class="public-profile-actions">${statusAction}</footer>` : '')
     + `</section>`;
   document.body.append(modal);
   const safeCover = safeImageUrl(coverUrl) || safeImageUrl(defaultCoverUrl);
@@ -2085,9 +2096,14 @@ const openPublicProfile = (person, options = {}) => {
     if (event.target.closest('[data-public-profile-close]')) { close(); return; }
     if (event.target.closest('[data-public-profile-message]')) {
       modal.remove();
+      if (options.onMessage) { options.onMessage(); return; }
+      restoreConversation(profile.id);
       setView('chat');
       openChat(findPersonById(profile.id) || profile);
+      return;
     }
+    if (event.target.closest('[data-public-profile-review]')) { modal.remove(); openRequestReview(); return; }
+    if (event.target.closest('[data-public-profile-connect]')) { modal.remove(); openPitch(findPersonById(profile.id) || profile); }
   });
   modal.addEventListener('keydown', (event) => {
     if (event.key === 'Escape') { close(); return; }
@@ -2453,7 +2469,7 @@ const ensureInboxControls = () => {
   const list = layout.querySelector('#chat-list');
   if (list) list.prepend(toolbar);
   else layout.before(toolbar);
-  toolbar.querySelector('#chat-search')?.addEventListener('input', (event) => { chatSearchQuery = event.target.value; renderChats(); });
+  toolbar.querySelector('#chat-search')?.addEventListener('input', (event) => { chatSearchQuery = event.target.value; schedulePeopleSearch(); renderChats(); });
   toolbar.querySelectorAll('[data-chat-filter]').forEach((button) => button.addEventListener('click', () => { activeChatFilter = button.dataset.chatFilter; toolbar.querySelectorAll('[data-chat-filter]').forEach((item) => item.classList.toggle('is-active', item === button)); renderChats(); }));
 };
 
@@ -2472,7 +2488,87 @@ const formatChatTime = (value) => {
   if (Number.isNaN(date.getTime())) return '';
   return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 };
+// D-152: the inbox row says when, not only a clock time: today 08:15 PM, Yesterday, Tue, 28 Oct.
+const formatInboxTime = (value) => {
+  const date = new Date(value || '');
+  if (!value || Number.isNaN(date.getTime())) return '';
+  const now = new Date();
+  const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+  if (date.getTime() >= startOfToday) return formatChatTime(value);
+  if (date.getTime() >= startOfToday - 86400000) return 'Yesterday';
+  if (date.getTime() >= startOfToday - 6 * 86400000) return date.toLocaleDateString('en-GB', { weekday: 'short' });
+  return date.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', ...(date.getFullYear() === now.getFullYear() ? {} : { year: 'numeric' }) });
+};
 
+// D-152: search people on the server a moment after typing stops; a newer query always wins over an older answer.
+const runPeopleSearch = async (query) => {
+  const seq = ++chatPeopleSeq;
+  if (chatPeopleMissing || !supabase) {
+    chatPeople = { query, status: 'done', rows: localPeople(people, remoteConnectionIds, query) };
+    renderChats();
+    return;
+  }
+  const { data, error } = await chatPeopleSearch(query);
+  if (seq !== chatPeopleSeq) return;
+  if (error && isMissingFunction(error)) { chatPeopleMissing = true; runPeopleSearch(query); return; }
+  chatPeople = error ? { query, status: 'error', rows: [] } : { query, status: 'done', rows: data || [] };
+  renderChats();
+};
+function schedulePeopleSearch() {
+  window.clearTimeout(chatPeopleTimer);
+  const query = cleanQuery(chatSearchQuery);
+  if (!query) { chatPeopleSeq += 1; chatPeople = { query: '', status: 'idle', rows: [] }; return; }
+  if (query === chatPeople.query && chatPeople.status !== 'error') return;
+  chatPeople = { query, status: 'loading', rows: chatPeople.query && query.startsWith(chatPeople.query) ? chatPeople.rows : [] };
+  chatPeopleTimer = window.setTimeout(() => runPeopleSearch(query), 180);
+}
+const clearChatSearch = () => {
+  chatSearchQuery = '';
+  const input = document.querySelector('#chat-search');
+  if (input) input.value = '';
+  schedulePeopleSearch();
+};
+// A person from the search (row from chat_people_search) as a card the rest of the app knows; loads the full card
+// (cover, interests) when this device does not have it yet.
+const personFromSearch = async (row) => {
+  const id = String(row.id);
+  let person = findPersonById(id);
+  if (!person && supabase) {
+    const { data } = await fetchCandidates([id]);
+    if (data?.length) { mergePeople(data); person = findPersonById(id); }
+  }
+  if (!person) {
+    person = { id, name: row.name, image: row.photoUrl, photoUrl: row.photoUrl, role: row.title || 'Brivia member', tags: [], skills: '', lookingFor: '', shared: [] };
+    people.push(person);
+  }
+  return person;
+};
+// Message: a connection's conversation opens at once (an existing one, never a second); the thread comes back even
+// if it was removed from this device's inbox.
+const messagePerson = async (row) => {
+  const person = await personFromSearch(row);
+  if (!remoteConnectionIds.some((id) => String(id) === String(person.id))) remoteConnectionIds.push(person.id);
+  restoreConversation(person.id);
+  clearChatSearch();
+  setView('chat');
+  openChat(person);
+};
+const openSearchProfile = async (row) => {
+  const person = await personFromSearch(row);
+  openPublicProfile(person, { status: row.status, onMessage: () => messagePerson(row) });
+};
+const personRowMarkup = (p) => {
+  const status = PERSON_STATUS[p.status];
+  const work = workLine({ title: p.title, company: p.company });
+  const sub = work || p.bio || (p.status === 'connected' ? 'Connected' : '');
+  const chip = p.status === 'connected' ? '' : `<span class="chat-person-status is-${p.status.replace('_', '-')}">${escapeHtml(status.label)}</span>`;
+  const quick = p.status === 'connected'
+    ? `<button type="button" class="chat-person-message" data-person-message="${escapeHtml(p.id)}" aria-label="Message ${escapeHtml(p.name)}">Message</button>` : '';
+  return `<div class="chat-person-row" data-person-id="${escapeHtml(p.id)}">`
+    + `<button type="button" class="chat-person-open" data-person-open="${escapeHtml(p.id)}" aria-label="View ${escapeHtml(p.name)}'s profile">`
+    + `${renderAvatar({ name: p.name, image: p.photoUrl })}<span class="chat-row-copy"><strong>${escapeHtml(p.name)}</strong>`
+    + `${sub ? `<span>${escapeHtml(sub)}</span>` : ''}${work && p.bio ? `<small>${escapeHtml(p.bio)}</small>` : ''}</span>${chip}</button>${quick}</div>`;
+};
 const renderChats = () => {
   ensureInboxControls();
   ensureChatMoreMenu();
@@ -2484,7 +2580,7 @@ const renderChats = () => {
     const last = chatMessages[person.id]?.at(-1);
     const unread = chatUnreadCount(person.id) > 0;
     const haystack = `${person.name} ${person.city} ${person.state || ''} ${person.role} ${person.experience || ''} ${person.skills || ''} ${person.lookingFor || ''} ${last?.text || ''} ${last?.attachment?.name || ''}`.toLowerCase();
-    return (!query || haystack.includes(query)) && (activeChatFilter !== 'unread' || unread);
+    return (!query || haystack.includes(query) || matchesQuery({ name: person.name, text: haystack }, query)) && (activeChatFilter !== 'unread' || unread);
   });
   const list = document.querySelector('#chat-list');
   const inboxToolbar = list?.querySelector('#inbox-toolbar');
@@ -2493,13 +2589,37 @@ const renderChats = () => {
   const inboxLoading = !deck.ready;
   if (inboxLoading) list?.setAttribute('aria-busy', 'true');
   else list?.removeAttribute('aria-busy');
-  const inboxMarkup = `<div class="inbox-panel-head"><div><strong>YOUR THREADS</strong><span>Private conversations</span></div>${inboxLoading ? '' : `<b>${conversations.length}</b>`}</div>${referenceRows}${inboxLoading ? skeletonMarkup('list', 4) : matches.length ? matches.map((person) => {
+  const conversationRow = (person) => {
     const last = chatMessages[person.id]?.at(-1);
     const unreadMessages = chatUnreadCount(person.id);
     const unread = unreadMessages > 0;
     const lastPreview = last?.attachment?.kind === 'resume' ? 'Resume (PDF)' : last?.attachment ? `📎 ${last.attachment.name || 'Attachment'}` : parseSharedPost(last?.text) ? 'Shared a post' : (last?.text || 'Start a conversation');
-    return `<div class="chat-row${unread ? ' is-unread' : ''}${selectedChat?.id === person.id ? ' is-selected' : ''}"><button class="chat-row-open" type="button" data-chat-id="${escapeHtml(person.id)}"><span class="member-profile-trigger" data-public-profile-id="${escapeHtml(person.id)}" role="button" tabindex="0" aria-label="Open ${escapeHtml(person.name)} profile">${renderAvatar(person)}${presenceDot(isActiveNow(person.id))}</span><span class="chat-row-copy"><strong data-public-profile-id="${escapeHtml(person.id)}">${escapeHtml(person.name)}${isActiveNow(person.id) ? '<span class="sr-only">, active now</span>' : ''}</strong><span>${escapeHtml(lastPreview)}</span></span><span class="chat-row-meta"><time>${escapeHtml(formatChatTime(last?.createdAt))}</time>${unread ? `<b aria-label="${unreadMessages} unread">${unreadMessages > 99 ? '99+' : unreadMessages}</b>` : ''}</span></button><button class="chat-delete" type="button" data-delete-chat-id="${escapeHtml(person.id)}" aria-label="Delete chat with ${escapeHtml(person.name)}" title="Delete chat"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M4.5 6h11M8 3.5h4M6.5 6l.6 10h5.8l-.6-10M8.5 8.5v5M11.5 8.5v5"/></svg></button></div>`;
-  }).join('') : '<div class="inbox-empty"><strong>No threads found</strong><span>Chats open once a connection is mutual. Send a signal from Connect to start one.</span><button type="button" class="inbox-empty-action" data-nav="explore">CONNECT WITH PEOPLE ↗</button></div>'}`;
+    return `<div class="chat-row${unread ? ' is-unread' : ''}${selectedChat?.id === person.id ? ' is-selected' : ''}"><button class="chat-row-open" type="button" data-chat-id="${escapeHtml(person.id)}"><span class="member-profile-trigger" data-public-profile-id="${escapeHtml(person.id)}" role="button" tabindex="0" aria-label="Open ${escapeHtml(person.name)} profile">${renderAvatar(person)}${presenceDot(isActiveNow(person.id))}</span><span class="chat-row-copy"><strong data-public-profile-id="${escapeHtml(person.id)}">${escapeHtml(person.name)}${isActiveNow(person.id) ? '<span class="sr-only">, active now</span>' : ''}</strong><span>${escapeHtml(lastPreview)}</span></span><span class="chat-row-meta"><time>${escapeHtml(formatInboxTime(last?.createdAt))}</time>${unread ? `<b aria-label="${unreadMessages} unread">${unreadMessages > 99 ? '99+' : unreadMessages}</b>` : ''}</span></button><button class="chat-delete" type="button" data-delete-chat-id="${escapeHtml(person.id)}" aria-label="Delete chat with ${escapeHtml(person.name)}" title="Delete chat"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M4.5 6h11M8 3.5h4M6.5 6l.6 10h5.8l-.6-10M8.5 8.5v5M11.5 8.5v5"/></svg></button></div>`;
+  };
+  // D-152: while searching, conversations with messages first, then people (connections even without a message, then
+  // members with a request either way, then anyone else), from the server. The empty state only when both are empty.
+  const searching = Boolean(cleanQuery(chatSearchQuery)) && !inboxLoading;
+  let searchPeople = [];
+  let searchMarkup = '';
+  if (searching) {
+    const withMessages = matches.filter((person) => (chatMessages[person.id] || []).length);
+    const knownConnections = matches.filter((person) => !(chatMessages[person.id] || []).length)
+      .map((person) => ({ member_id: person.id, name: person.name, photo_url: person.image || '', status: 'connected', has_conversation: false }));
+    searchPeople = peopleResults([...chatPeople.rows, ...knownConnections], withMessages.map((person) => person.id));
+    const loadingPeople = chatPeople.status === 'loading' && !searchPeople.length;
+    const section = (title, count, body) => `<section class="chat-search-section" aria-label="${title}"><h3 class="chat-search-title">${title}${count ? ` <span>${count}</span>` : ''}</h3>${body}</section>`;
+    const convoSection = withMessages.length ? section('Conversations', withMessages.length, withMessages.map(conversationRow).join('')) : '';
+    const peopleBody = loadingPeople ? `<div class="chat-search-loading" aria-busy="true">${skeletonMarkup('list', 2)}</div>`
+      : searchPeople.length ? searchPeople.map(personRowMarkup).join('')
+        : chatPeople.status === 'error' ? '<div class="chat-search-error"><span>Search is unavailable right now.</span><button type="button" data-chat-search-retry>Try again</button></div>' : '';
+    const peopleSection = peopleBody ? section('People', searchPeople.length, peopleBody) : '';
+    const nothing = !withMessages.length && !searchPeople.length && chatPeople.status === 'done';
+    searchMarkup = `<div class="chat-search-results" aria-live="polite">${convoSection}${peopleSection}${nothing ? `<div class="inbox-empty"><strong>No one found for “${escapeHtml(cleanQuery(chatSearchQuery))}”</strong><span>Try a first name, a surname or a company. Search finds your connections and other members.</span></div>` : ''}</div>`;
+  }
+  const head = searching
+    ? '<div class="inbox-panel-head"><div><strong>SEARCH</strong><span>People and conversations</span></div></div>'
+    : `<div class="inbox-panel-head"><div><strong>YOUR THREADS</strong><span>Private conversations</span></div>${inboxLoading ? '' : `<b>${conversations.length}</b>`}</div>`;
+  const inboxMarkup = `${head}${referenceRows}${inboxLoading ? skeletonMarkup('list', 4) : searching ? searchMarkup : matches.length ? matches.map(conversationRow).join('') : '<div class="inbox-empty"><strong>No conversations yet</strong><span>Chats open once a connection is mutual. Search above for someone you know, or send a signal from Connect.</span><button type="button" class="inbox-empty-action" data-nav="explore">CONNECT WITH PEOPLE ↗</button></div>'}`;
   const inboxScroll = list?.querySelector('.chat-inbox-scroll');
   if (list && inboxScroll) {
     inboxScroll.innerHTML = inboxMarkup;
@@ -2536,6 +2656,17 @@ const renderChats = () => {
     renderChats();
     showToast('Chat removed from your inbox on this device.');
   }));
+  // D-152: people results.
+  const rowFor = (id) => searchPeople.find((p) => p.id === id);
+  list?.querySelectorAll('[data-person-open]').forEach((button) => button.addEventListener('click', () => {
+    const row = rowFor(button.dataset.personOpen);
+    if (row) openSearchProfile(row);
+  }));
+  list?.querySelectorAll('[data-person-message]').forEach((button) => button.addEventListener('click', () => {
+    const row = rowFor(button.dataset.personMessage);
+    if (row) messagePerson(row);
+  }));
+  list?.querySelector('[data-chat-search-retry]')?.addEventListener('click', () => { chatPeople = { query: '', status: 'idle', rows: [] }; schedulePeopleSearch(); renderChats(); });
 };
 
 const loadChatMessages = async (person) => {
@@ -2794,6 +2925,33 @@ const openChat = (person, markAsRead = true) => {
     if (String(selectedChat?.id) === String(person.id) && !document.querySelector('#chat-share-menu')?.hidden) renderShareMenu();
   });
 };
+// D-152 mobile: the thread stays on its latest message when the keyboard (or anything else) resizes it, and on iOS
+// Safari, which does not resize the page for the keyboard, the chat is lifted by the keyboard's height
+// (--chat-kb, from visualViewport) so the composer is never hidden under it.
+(() => {
+  const thread = document.querySelector('#chat-messages');
+  if (thread && 'ResizeObserver' in window) {
+    let lastHeight = thread.clientHeight;
+    let pinned = true;
+    thread.addEventListener('scroll', () => { pinned = thread.scrollHeight - thread.scrollTop - thread.clientHeight < 80; }, { passive: true });
+    new ResizeObserver(() => {
+      if (thread.clientHeight !== lastHeight && pinned) thread.scrollTop = thread.scrollHeight;
+      lastHeight = thread.clientHeight;
+    }).observe(thread);
+  }
+  const vv = window.visualViewport;
+  if (!vv) return;
+  const root = document.documentElement;
+  const update = () => {
+    const covered = Math.max(0, Math.round(window.innerHeight - vv.height - vv.offsetTop));
+    // Under 80 px is browser chrome moving, not a keyboard.
+    root.style.setProperty('--chat-kb', `${covered > 80 ? covered : 0}px`);
+    root.classList.toggle('has-keyboard', covered > 80);
+  };
+  vv.addEventListener('resize', update);
+  vv.addEventListener('scroll', update);
+  update();
+})();
 document.querySelector('#chat-messages')?.addEventListener('click', (event) => {
   const button = event.target.closest('[data-resume-open]');
   if (button) openSharedResume(button);
@@ -5746,7 +5904,7 @@ document.querySelector('#chat-form')?.addEventListener('submit', async (event) =
   const body = input?.value.trim() || '';
   if (!selectedChat || (!body && !pendingChatFiles.length && !pendingChatGif) || !supabase || !memberProfile.id) return;
   typingSession?.sender.stop();
-  if (sendButton) sendButton.disabled = true;
+  if (sendButton) { sendButton.disabled = true; sendButton.classList.add('is-sending'); sendButton.setAttribute('aria-busy', 'true'); }
   try {
     // Re-encode every image BEFORE anything is sent: one failure aborts the whole send (no text, no files) and the
     // composer keeps its state so the member can remove the bad file. Compressed files are not re-encoded on upload.
@@ -5769,8 +5927,12 @@ document.querySelector('#chat-form')?.addEventListener('submit', async (event) =
     }
     showToast(chatSendErrorCopy(error));
   } finally {
-    if (sendButton) sendButton.disabled = false;
+    if (sendButton) { sendButton.disabled = false; sendButton.classList.remove('is-sending'); sendButton.removeAttribute('aria-busy'); }
   }
+});
+// D-152 mobile: tapping Send keeps the keyboard up (the input keeps focus), as in a native messenger.
+document.querySelector('#chat-form')?.addEventListener('pointerdown', (event) => {
+  if (event.pointerType !== 'mouse' && event.target.closest('button[type="submit"], .chat-send-button') && document.activeElement?.id === 'chat-input') event.preventDefault();
 });
 document.querySelector('#pitch-form')?.addEventListener('submit', async (event) => {
   event.preventDefault();

@@ -3082,3 +3082,28 @@ controls (a tester or a seeded test member), never a real member, so no new expo
 - **Notes:** the nav label is Notes; the view id `posts`, its URLs and the data model are unchanged.
 - **Proof:** SQL harness ALL PASSED (x-post-notifications N1–N4; hygiene whitelist); unit tests (grouping and copy);
   e2e post-notifications (panel at 1440 and 390, Settings, before 0043), plus nearby, events, presence, read-receipts.
+
+## D-152 (2026-11-04): Chat search finds people; mobile chat polish
+
+- **Asked:** searching a name in Chat said "No threads found" even for a connection; a connected member must be
+  discoverable from Chat search with no conversation, open their profile, press Message and start chatting; a
+  polished, native-feeling mobile chat.
+- **Cause found:** the sidebar searched only the conversation rows this device had drawn. A connection whose thread
+  was removed from this device's inbox ("Delete chat" hides it locally), or whose card had not loaded, could not be
+  found. Live data confirmed the founder's case (a mutual connection with messages, not shown).
+- **Done:** `chat_people_search` (0044) searches the members the caller may see (same rules as everywhere:
+  same world, no block, both completed) by every word of the query: word starts of the name, or anywhere in title or
+  company. It returns name, photo, title, company, a 140-character bio preview, the relationship (connected,
+  request received, request sent, none; a decline is shown as "request sent" so it is never revealed) and whether a
+  conversation exists. The sidebar shows Conversations (local, with message text) then People (server), each person
+  once. Message opens the existing conversation or a new one with a connection immediately, restores a hidden thread,
+  and never sends a request. Profiles opened from search show Message, Review their request, Connect, or "Request
+  sent". Before 0044 the device's own connections are still found.
+- **Mobile:** keyboard-safe composer (visualViewport on iOS, `interactive-widget=resizes-content` on Android), thread
+  pinned to the latest message on resize, one-line header with ellipsis, 16 px inputs, 44 px targets on touch widths,
+  safe-area padding, contained scrolling, send button state, Send keeps the keyboard up. Inbox times say Yesterday /
+  weekday / date for older messages.
+- **Not changed:** the desktop layout and the design language. No mock users.
+- **Proof:** SQL harness ALL PASSED (y-chat-people-search S1–S5); unit tests (chat-search); e2e chat-search at 1440,
+  390, and layout at 320/375/390/430/768, plus chat-inbox, read-receipts, presence, post-notifications, app-shell,
+  mobile-polish, collab-requests, chat-extras. Not tested on a physical iPhone or Android phone (headless browsers only).

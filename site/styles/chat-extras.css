@@ -837,3 +837,89 @@ body.app-body .app-view[data-view="chat"] .chat-window-head #chat-status.is-acti
   content:"";display:inline-block;width:7px;height:7px;margin-right:6px;border-radius:50%;
   background:var(--color-presence);vertical-align:1px;
 }
+
+/* ---------- Chat search: conversations and people (D-152, 0044) ---------- */
+/* Same row rhythm as the inbox: avatar, serif name, one quiet line; sections get a small spaced-caps label. */
+.chat-search-results{display:block;animation:chat-search-in .18s ease-out}
+@keyframes chat-search-in{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
+@media (prefers-reduced-motion: reduce){.chat-search-results{animation:none}}
+.chat-search-section + .chat-search-section{border-top:1px solid var(--color-line)}
+.chat-search-title{
+  margin:0;padding:14px 18px 6px;color:color-mix(in srgb, var(--color-name-ink) 62%, transparent);
+  font-family:var(--font-body);font-size:var(--text-12);font-weight:700;letter-spacing:.14em;text-transform:uppercase;
+}
+.chat-search-title span{margin-left:6px;color:var(--color-wine);letter-spacing:0}
+.chat-person-row{display:flex;align-items:center;gap:8px;min-height:72px;padding:8px 12px 8px 16px}
+.chat-person-row + .chat-person-row{border-top:1px solid var(--color-line)}
+.chat-person-open{
+  display:flex;flex:1;min-width:0;align-items:center;gap:12px;min-height:56px;padding:4px 0;border:0;
+  background:transparent;color:inherit;font:inherit;text-align:left;cursor:pointer;border-radius:var(--radius-m);
+}
+.chat-person-open:focus-visible,.chat-person-message:focus-visible{outline:2px solid var(--color-wine);outline-offset:2px}
+.chat-person-open .mini-avatar{flex:0 0 46px;width:46px;height:46px}
+.chat-person-open .chat-row-copy{display:grid;flex:1;min-width:0;gap:2px}
+.chat-person-open .chat-row-copy strong{
+  overflow:hidden;color:var(--color-name-ink);font-family:var(--font-heading);font-size:var(--text-16);font-weight:400;
+  text-overflow:ellipsis;white-space:nowrap;
+}
+.chat-person-open .chat-row-copy span,.chat-person-open .chat-row-copy small{
+  overflow:hidden;color:color-mix(in srgb, var(--color-name-ink) 68%, transparent);font-size:var(--text-12);line-height:1.35;
+  text-overflow:ellipsis;white-space:nowrap;
+}
+.chat-person-open .chat-row-copy small{font-style:italic}
+.chat-person-status{
+  flex:none;padding:5px 9px;border:1px solid color-mix(in srgb, var(--color-wine) 26%, transparent);border-radius:var(--radius-pill);
+  color:var(--color-wine);font-size:var(--text-12);font-weight:600;white-space:nowrap;
+}
+.chat-person-status.is-request-received{background:var(--color-wine);border-color:var(--color-wine);color:var(--color-cream)}
+.chat-person-status.is-none{color:color-mix(in srgb, var(--color-name-ink) 62%, transparent)}
+.chat-person-message{
+  flex:none;min-width:44px;min-height:44px;padding:0 16px;border:0;border-radius:var(--radius-pill);background:var(--color-wine);
+  color:var(--color-cream);font-family:var(--font-body);font-size:var(--text-12);font-weight:700;letter-spacing:.08em;
+  text-transform:uppercase;cursor:pointer;transition:background var(--motion-fast) var(--ease), transform var(--motion-fast) var(--ease);
+}
+.chat-person-message:hover{background:var(--color-wine-deep)}
+.chat-person-message:active{transform:scale(.97)}
+.chat-search-loading{padding:4px 0}
+.chat-search-error{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:14px 18px;color:var(--color-ink-soft);font-size:var(--text-14)}
+.chat-search-error button{min-height:44px;padding:0 14px;border:1px solid var(--color-wine);border-radius:var(--radius-pill);background:transparent;color:var(--color-wine);font-weight:600;cursor:pointer}
+.public-profile-status{margin:8px 0 0;color:var(--color-ink-soft);font-size:var(--text-12);text-align:center}
+/* The chat search keeps the screen width on phones; the native clear button stays tappable. */
+.app-view[data-view="chat"] .inbox-search{min-width:0;max-width:100%}
+.app-view[data-view="chat"] .inbox-search input{min-width:0;font-size:max(16px, var(--text-14))}   /* 16 px: iOS does not zoom */
+/* Touch screens up to tablet width: the search box is a full 44 px target (desktop keeps its slim 34 px bar). */
+@media (max-width: 1024px){
+  .app-view[data-view="chat"] .inbox-search{height:44px !important;min-height:44px !important}
+  .app-view[data-view="chat"] .inbox-search input{height:44px !important}
+}
+
+/* ---------- Mobile chat polish (D-152) ---------- */
+@media (max-width: 700px){
+  /* iOS keyboard: the open chat ends where the keyboard starts (Android resizes the page itself). */
+  body.app-body[data-app-view="chat"] #chat-window:not([hidden]){box-sizing:border-box;padding-bottom:var(--chat-kb, 0px)}
+  /* The thread header keeps one line each: a long name or "Active 12 min ago · context" ends in an ellipsis. */
+  body.app-body .app-view[data-view="chat"] .chat-window-head>div:has(#chat-name){min-width:0;flex:1}
+  body.app-body .app-view[data-view="chat"] .chat-window-head :is(#chat-name, #chat-status){
+    display:block;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+  }
+  /* Momentum scrolling and no scroll chaining into the page behind the thread. */
+  body.app-body .app-view[data-view="chat"] #chat-messages{-webkit-overflow-scrolling:touch;overscroll-behavior:contain}
+  /* Results and rows wrap long names instead of pushing buttons off screen. */
+  .chat-person-status{max-width:42%;overflow:hidden;text-overflow:ellipsis}
+  .chat-person-message{padding:0 14px}
+}
+/* Safe areas on notched phones for the composer. */
+@supports (padding: max(0px)){
+  @media (max-width: 700px){
+    body.app-body .app-view[data-view="chat"] #chat-form{padding-bottom:max(9px, env(safe-area-inset-bottom))}
+    html.has-keyboard body.app-body .app-view[data-view="chat"] #chat-form{padding-bottom:9px}
+  }
+}
+/* Sending: the button breathes until the message is stored (then the bubble appears with its tick). */
+#chat-form button.is-sending{animation:chat-sending .9s ease-in-out infinite}
+@keyframes chat-sending{50%{opacity:.55;transform:scale(.94)}}
+@media (prefers-reduced-motion: reduce){#chat-form button.is-sending{animation:none;opacity:.6}}
+@media (max-width: 700px){
+  /* 16 px in the composer and search: iOS Safari zooms the page into any smaller field it focuses. */
+  body.app-body .app-view[data-view="chat"] #chat-input{font-size:16px !important}
+}

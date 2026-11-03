@@ -1261,3 +1261,11 @@ adds triggers on `community_post_likes` and `community_post_comments`, and `my_n
 (v4) and the client after it. Verify:
 `select has_function_privilege('anon', 'public.my_notifications_v3()', 'execute');` (f) and
 `select tgname from pg_trigger where tgname in ('community_post_likes_notify', 'community_post_comments_notify');` (2 rows).
+
+## 0044
+
+**Chat search finds people (D-152).** **APPLIED 2026-11-04.**
+Apply after `0043`. Adds `chat_people_search(query, limit)` (authenticated; members the caller may see, matched by
+name/full name word starts, title or company; status connected / request_received / request_sent / none, a decline
+reads as request_sent; one letter finds connections only; at most 8 non-connections). Verify:
+`select has_function_privilege('anon', 'public.chat_people_search(text,int)', 'execute');` (f).

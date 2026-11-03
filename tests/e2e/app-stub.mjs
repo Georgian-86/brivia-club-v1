@@ -215,6 +215,15 @@ export const startAppStub = async ({ port, state = {}, deckRows = defaultDeckRow
           return { member_id: id, active: shown && (st.activeIds || []).includes(id), last_seen_at: shown ? (st.lastSeen || {})[id] || null : null };
         }));
       }
+      // D-152 (0044): chat_people_search over st.peopleSearch (rows with name); st.noPeopleSearch answers PGRST202,
+      // st.peopleSearchError a 500.
+      if (pathName === '/rest/v1/rpc/chat_people_search') {
+        (st.peopleQueries ||= []).push(args.p_query);
+        if (st.noPeopleSearch) return json(404, { code: 'PGRST202', message: 'Could not find the function' });
+        if (st.peopleSearchError) return json(500, { code: 'XX000', message: 'boom' });
+        const q = String(args.p_query || '').toLowerCase();
+        return json(200, (st.peopleSearch || []).filter((r) => ` ${String(r.name).toLowerCase()}`.includes(` ${q}`)));
+      }
       // D-151: the Read receipts switch, st.readReceipts (default on).
       if (pathName === '/rest/v1/rpc/my_read_receipts' || pathName === '/rest/v1/rpc/set_read_receipts') {
         if (st.noReceipts) return json(404, { code: 'PGRST202', message: 'Could not find the function' });
