@@ -20,7 +20,7 @@
 // Storage origin (a third-party https URL never loads); profileToRow sends no created_at; blocking inserts and
 // treats 23505 as success; no password is ever kept in localStorage (a stale cached one is scrubbed on load).
 // Honest signal quota (Iteration 3, Task 9, D-026/D-032; copy R7, Iteration 4): the counter reads my_signal_quota
-// ("30 of 30 signals left", then 29 after one like); at 0 a Like keeps the card, sends nothing and shows "More at 3 PM"; a PT429 race
+// ("30 of 30 swipes left today", then 29 after one like); at 0 a Like keeps the card, sends nothing and shows "More at 3 PM"; a PT429 race
 // puts the card back at the front; passes never call send_signal and nothing is kept in localStorage.
 // Founder live test (2026-10-14): the pitched card stays on screen (parked) while the sheet is open and leaves only
 // when the sheet resolves (D-124: submit = note, "Send without a note" / next card = note null; close / Escape /
@@ -1025,10 +1025,10 @@ try {
   const qSignals = () => q.calls.filter((c) => c.method === 'POST' && c.path === '/rest/v1/rpc/send_signal');
   const qQuotaReads = () => q.calls.filter((c) => c.path === '/rest/v1/rpc/my_signal_quota');
   await quotaPage.waitForFunction(() => document.querySelector('#swipe-card:not([hidden]) #swipe-name')?.textContent?.trim(), null, { timeout: 15000 });
-  await qWaitCounter('30 of 30 signals left');
+  await qWaitCounter('30 of 30 swipes left today');
   const firstCounter = await qCounter();
-  check(`quota counter reads "30 of 30 signals left" from my_signal_quota (got "${firstCounter}")`, () => {
-    assert.equal(firstCounter, '30 of 30 signals left');
+  check(`quota counter reads "30 of 30 swipes left today" from my_signal_quota (got "${firstCounter}")`, () => {
+    assert.equal(firstCounter, '30 of 30 swipes left today');
     assert.ok(qQuotaReads().length >= 1, 'my_signal_quota was not read at boot');
   });
   const resetLabel = await quotaPage.evaluate((iso) => (() => { const d = new Date(iso); return d.toLocaleTimeString([], d.getMinutes() === 0 ? { hour: 'numeric' } : { hour: 'numeric', minute: '2-digit' }); })(), RESETS_AT);
@@ -1039,10 +1039,10 @@ try {
   await quotaPage.waitForTimeout(500);
   await quotaPage.locator('#pitch-modal .pitch-no-note').click(); // D-124: the explicit plain like (Escape now cancels)
   await qWaitToast(/Signal sent/);
-  await qWaitCounter('29 of 30 signals left');
+  await qWaitCounter('29 of 30 swipes left today');
   const afterOne = await qCounter();
   if (SHOTS) await quotaPage.screenshot({ path: path.join(SHOTS, 'quota-1280-counter.png') });
-  check(`after one like the counter reads "29 of 30 signals left" (got "${afterOne}")`, () => assert.equal(afterOne, '29 of 30 signals left'));
+  check(`after one like the counter reads "29 of 30 swipes left today" (got "${afterOne}")`, () => assert.equal(afterOne, '29 of 30 swipes left today'));
   check('my_signal_quota is read again after send_signal', () => assert.ok(qQuotaReads().length > readsBefore));
   // F1: a failed signal never loses the person. A 500, then a 429 without a cap message: the card comes back to the
   // front each time, with the retry copy; the unknown 429 also reads the quota again.
@@ -1076,7 +1076,7 @@ try {
     if (flag === 'limitedUnknown') check('a 429 without a cap message reads my_signal_quota again', () => assert.ok(qQuotaReads().length > readsAt));
   }
   // A PT429 race (the cached quota said 29): the card comes back to the front, the honest toast shows, and the
-  // counter refreshes to "Your next signal frees up at 3 PM".
+  // counter refreshes to "Your next swipe frees up at 3 PM".
   await quotaPage.waitForTimeout(400);
   const raceCard = await qCard();
   q.race = true;
@@ -1095,7 +1095,7 @@ try {
   });
   check(`PT429 shows the honest toast and refreshes the counter (${JSON.stringify(raceState)})`, () => {
     assert.equal(raceState.toast, `You've used today's signals. More at ${resetLabel}.`);
-    assert.equal(raceState.counter, `Your next signal frees up at ${resetLabel}`);
+    assert.equal(raceState.counter, `Your next swipe frees up at ${resetLabel}`);
   });
   q.race = false;
   // At 0: Like keeps the same card, opens no pitch, sends nothing, and the honest state shows.
@@ -1118,24 +1118,30 @@ try {
     assert.equal(zeroState.pitchOpen, false);
   });
   check('at 0 a Like makes no send_signal call', () => assert.equal(qSignals().length, zeroBefore));
-  check(`at 0 the notice reads "No signals left today. More at HH:MM. Passing is always free." and Pitch is aria-disabled (${JSON.stringify(zeroState)})`, () => {
+  check(`at 0 the notice reads "You've used your N free swipes for today. More at HH:MM." and Pitch is aria-disabled (${JSON.stringify(zeroState)})`, () => {
     assert.equal(zeroState.limitVisible, true);
-    assert.match(zeroState.limitText, new RegExp(`No signals left today\\. More at ${resetLabel}. Passing is always free\\.`));
+    assert.match(zeroState.limitText, new RegExp(`You've used your \\d+ free swipes for today\\. More at ${resetLabel}\\.`));
     assert.match(zeroState.toast, /More at/);
     assert.equal(zeroState.ariaDisabled, 'true');
   });
-  // 20 passes: free, no send_signal call, and no swipe counter in localStorage.
+  // D-156: a Pass uses a swipe too, so at 0 it keeps the card, records no pass and sends nothing; nothing in localStorage.
   const passBefore = qSignals().length;
-  for (let i = 0; i < 20; i += 1) {
-    const name = await qCard();
-    if (!name) break;
-    await quotaPage.locator('[data-action="pass"]').dispatchEvent('click');
-    await quotaPage.waitForFunction((n) => (document.querySelector('#swipe-card:not([hidden]) #swipe-name')?.textContent?.trim() || '') !== n, name, { timeout: 4000 }).catch(() => {});
-  }
-  await quotaPage.waitForTimeout(300);
+  const passPostsBefore = q.calls.filter((c) => c.method === 'POST' && c.path === '/rest/v1/interaction').length;
+  const heldName = await qCard();
+  await quotaPage.evaluate(() => document.querySelector('[data-action="pass"]').click());
+  await quotaPage.waitForTimeout(700);
+  const heldState = await quotaPage.evaluate(() => ({
+    card: document.querySelector('#swipe-card:not([hidden]) #swipe-name')?.textContent?.trim() || '',
+    passDisabled: document.querySelector('[data-action="pass"]')?.getAttribute('aria-disabled'),
+  }));
+  check(`at 0 a Pass keeps the same card and is aria-disabled (${JSON.stringify(heldState)})`, () => {
+    assert.equal(heldState.card, heldName);
+    assert.equal(heldState.passDisabled, 'true');
+  });
+  check('at 0 a Pass records no pass', () => assert.equal(q.calls.filter((c) => c.method === 'POST' && c.path === '/rest/v1/interaction').length, passPostsBefore));
   const swipeKeys = await quotaPage.evaluate(() => Object.keys(window.localStorage).filter((key) => /brivia-daily-swipes|swipe|quota|signal/i.test(key)));
-  check(`20 passes keep no swipe/quota key in localStorage (${JSON.stringify(swipeKeys)})`, () => assert.deepEqual(swipeKeys, []));
-  check(`20 passes make no send_signal call (${qSignals().length - passBefore})`, () => assert.equal(qSignals().length - passBefore, 0));
+  check(`the cap keeps no swipe/quota key in localStorage (${JSON.stringify(swipeKeys)})`, () => assert.deepEqual(swipeKeys, []));
+  check(`a held Pass makes no send_signal call (${qSignals().length - passBefore})`, () => assert.equal(qSignals().length - passBefore, 0));
   // F4: a cached cap clears. The server quota is back (stub at 30): Like re-reads it, and the pitch opens.
   q.remaining = 30; q.resetsAt = null;
   await quotaPage.evaluate(() => document.querySelector('[data-action="like"]').click());
@@ -1240,7 +1246,7 @@ try {
     };
     const tag = `${width}px`;
     await pg.waitForFunction(() => document.querySelector('#swipe-card:not([hidden]) #swipe-name')?.textContent?.trim(), null, { timeout: 15000 });
-    await pg.waitForFunction(() => document.querySelector('#swipe-left-count')?.textContent?.trim() === '30 of 30 signals left', null, { timeout: 6000 }).catch(() => {});
+    await pg.waitForFunction(() => document.querySelector('#swipe-left-count')?.textContent?.trim() === '30 of 30 swipes left today', null, { timeout: 6000 }).catch(() => {});
 
     // Layout and accessibility of the open sheet.
     const first = await openSheet();
@@ -1277,14 +1283,14 @@ try {
     await btn.click();
     await waitSheetHidden();
     const advanced = await waitCardNot(first);
-    await pg.waitForFunction(() => document.querySelector('#swipe-left-count')?.textContent?.trim() === '29 of 30 signals left', null, { timeout: 6000 }).catch(() => {});
+    await pg.waitForFunction(() => document.querySelector('#swipe-left-count')?.textContent?.trim() === '29 of 30 swipes left today', null, { timeout: 6000 }).catch(() => {});
     await pg.waitForTimeout(300);
     let sent = signals().slice(before);
     check(`${tag}: "Send without a note" = exactly one send_signal with note null (${JSON.stringify(sent)})`, () => {
       assert.equal(sent.length, 1); assert.deepEqual(sent[0], { p_to: idOf(first), p_note: null });
     });
     const afterCounter = await counter();
-    check(`${tag}: the quota drops by one, as for close (got "${afterCounter}")`, () => assert.equal(afterCounter, '29 of 30 signals left'));
+    check(`${tag}: the quota drops by one, as for close (got "${afterCounter}")`, () => assert.equal(afterCounter, '29 of 30 swipes left today'));
     check(`${tag}: the card advances past ${first} (now "${await card()}")`, () => assert.equal(advanced, true));
 
     // Double tap: still one request.

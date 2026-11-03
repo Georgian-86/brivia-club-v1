@@ -104,14 +104,14 @@ try {
   const wide = await makeContext({ width: 1440, height: 900 });
   let page = await open(wide);
   await waitForCard(page, 'Asha Band');
-  await page.waitForFunction(() => document.querySelector('#swipe-left-count')?.textContent?.trim() === '30 of 30 signals left', null, { timeout: 5000 }).catch(() => {});
+  await page.waitForFunction(() => document.querySelector('#swipe-left-count')?.textContent?.trim() === '30 of 30 swipes left today', null, { timeout: 5000 }).catch(() => {});
   let card = await cardState(page);
   check(`card 1 shows the band "~3 km" (got "${card.band}")`, () => { assert.equal(card.band, '~3 km'); assert.equal(card.bandHidden, false); });
   check(`card 1 shows 2 "You both" chips then up to 3 tags (${JSON.stringify(card.chips)})`, () => {
     assert.deepEqual(card.shared, ['You both: Badminton', 'You both: Chess']);
     assert.deepEqual(card.chips, ['You both: Badminton', 'You both: Chess', 'Long-distance running', 'Poetry', 'Jazz piano']);
   });
-  check(`the quota counter shows under the deck (got "${card.counter}")`, () => assert.equal(card.counter, '30 of 30 signals left'));
+  check(`the quota counter shows under the deck (got "${card.counter}")`, () => assert.equal(card.counter, '30 of 30 swipes left today'));
   // D-113: the bar says what the member is looking for, and there is no short rule under the name.
   const top = await page.evaluate(() => ({ label: document.querySelector('#swipe-card-label')?.textContent.trim(), rule: getComputedStyle(document.querySelector('#swipe-tags'), '::before').content }));
   check(`card 1's bar shows what they are looking for, no line under the name (${JSON.stringify(top)})`, () => { assert.equal(top.label, 'LOOKING FOR · FRIENDS'); assert.ok(top.rule === 'none' || top.rule === 'normal', top.rule); });
@@ -467,8 +467,8 @@ try {
   });
   const zero = await zeroState(small);
   check(`375 px zero quota: plain copy, no horizontal scroll (${JSON.stringify(zero)})`, () => {
-    assert.match(zero.text, /^No signals left today\. More at \d{1,2}(:\d\d)? ?[AP]M\. Passing is always free\.$/i);
-    assert.match(zero.hint, /^Your next signal frees up at \d{1,2}(:\d\d)? ?[AP]M$/i);
+    assert.match(zero.text, /^You've used your \d+ free swipes for today\. More at \d{1,2}(:\d\d)? ?[AP]M\.$/i);
+    assert.match(zero.hint, /^Your next swipe frees up at \d{1,2}(:\d\d)? ?[AP]M$/i);
     assert.ok(zero.overflow <= 1);
   });
   check(`zero quota: Pitch is aria-disabled, described by the notice and still focusable; the notice has no role=status (${JSON.stringify(zero)})`, () => {

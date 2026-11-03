@@ -8,6 +8,18 @@ import {
 } from './companion-view.js';
 import { createDeckSwipe } from './deck-swipe.js';
 import { openerSuggestions } from './connect-composer.js';
+import { resetTimeLabel } from './signal-quota.js';
+
+// D-156 (0045): 10 companion swipes a day (Connect or Pass, all events together, rolling 24 h). quota = { daily_limit,
+// remaining, resets_at } from my_companion_quota(); null (not loaded, or before 0045) never blocks: the server judges.
+export const companionQuotaLabel = (quota) => {
+  if (!quota || !Number.isFinite(Number(quota.remaining))) return '';
+  const remaining = Math.max(Number(quota.remaining), 0);
+  if (remaining > 0) return `${remaining} of ${Number(quota.daily_limit) || 10} swipes left today`;
+  const time = resetTimeLabel(quota.resets_at);
+  return time ? `No swipes left today. More at ${time}.` : 'No swipes left today.';
+};
+export const companionQuotaBlocked = (quota) => Boolean(quota && Number.isFinite(Number(quota.remaining)) && Number(quota.remaining) <= 0);
 
 export const createCompanionsPage = ({ root, api, safeImage, coverFor, me, toast, isMissing, openProfile, openConversation, goExplore, composer = null, sendRequest = null }) => {
   if (!root) return { show() {}, hide() {}, showMatch() {} };
@@ -20,7 +32,36 @@ export const createCompanionsPage = ({ root, api, safeImage, coverFor, me, toast
   const likeBtn = root.querySelector('#companion-like');
   const matchDialog = document.querySelector('#companion-match-dialog');
 
-  const state = { events: [], eventId: null, people: [], loading: false, busy: false, unavailable: false, error: false, swipe: null, match: null };
+  const state = { events: [], eventId: null, people: [], loading: false, busy: false, unavailable: false, error: false, swipe: null, match: null, quota: null };
+  let quotaLine = root.querySelector('[data-companion-quota]');
+  if (!quotaLine && actions) {
+    quotaLine = document.createElement('p');
+    quotaLine.className = 'companion-quota';
+    quotaLine.dataset.companionQuota = '';
+    quotaLine.setAttribute('aria-live', 'polite');
+    actions.after(quotaLine);
+  }
+  const renderQuota = () => {
+    if (!quotaLine) return;
+    const text = actions?.hidden ? '' : companionQuotaLabel(state.quota);
+    quotaLine.textContent = text;
+    quotaLine.hidden = !text;
+    const capped = companionQuotaBlocked(state.quota);
+    [passBtn, likeBtn].forEach((b) => { if (!b) return; b.classList.toggle('is-capped', capped); b.toggleAttribute('aria-disabled', capped); });
+  };
+  const refreshQuota = async () => {
+    if (!api.companionQuota) return;
+    const { data, error } = await api.companionQuota();
+    const row = Array.isArray(data) ? data[0] : data;
+    if (!error && row) state.quota = row;
+    renderQuota();
+  };
+  const capReached = () => {
+    if (!companionQuotaBlocked(state.quota)) return false;
+    toast(companionQuotaLabel(state.quota) || 'No swipes left today.');
+    state.swipe?.settle();
+    return true;
+  };
   const event = () => state.events.find((e) => e.id === state.eventId) || null;
   const VISIBLE = 3;
 
@@ -36,6 +77,7 @@ export const createCompanionsPage = ({ root, api, safeImage, coverFor, me, toast
   const empty = (title, copy, action = '') => {
     deckEl.innerHTML = `<div class="companion-empty" role="status"><h2>${title}</h2><p>${copy}</p>${action}</div>`;
     actions.hidden = true;
+    renderQuota();
   };
 
   const renderDeck = () => {
@@ -64,8 +106,13 @@ export const createCompanionsPage = ({ root, api, safeImage, coverFor, me, toast
       stack: deckEl.querySelector('.companion-row'),
       canDrag: () => !state.busy,
       // Right opens the composer (the card waits, parked); left passes.
-      onCommit: (direction) => { if (direction === 'pitch') { connect(); return true; } decide(false); return true; },
+      onCommit: (direction) => {
+        if (companionQuotaBlocked(state.quota)) { capReached(); return false; }
+        if (direction === 'pitch') { connect(); return true; }
+        decide(false); return true;
+      },
     });
+    renderQuota();
     status.textContent = `${state.people[0].name}. ${state.people.length} ${state.people.length === 1 ? 'person' : 'people'} to see.`;
   };
 
@@ -78,6 +125,7 @@ export const createCompanionsPage = ({ root, api, safeImage, coverFor, me, toast
     state.error = Boolean(error && !state.unavailable);
     state.people = error ? [] : (data || []).map(normalizeCompanion);
     renderDeck();
+    void refreshQuota();
   };
 
   const load = async (wanted) => {
@@ -101,6 +149,7 @@ export const createCompanionsPage = ({ root, api, safeImage, coverFor, me, toast
   const connect = () => {
     const person = state.people[0];
     if (!person || state.busy) return;
+    if (capReached()) return; // never send a request for a swipe the server would refuse
     if (!composer || !sendRequest) { decide(true); return; }
     state.swipe?.park();
     const ev = event();
@@ -121,6 +170,7 @@ export const createCompanionsPage = ({ root, api, safeImage, coverFor, me, toast
   const decide = async (like, { requested = false } = {}) => {
     const person = state.people[0];
     if (!person || state.busy) return;
+    if (!requested && capReached()) return;
     state.busy = true;
     [passBtn, likeBtn].forEach((b) => { b.disabled = true; });
     const flying = state.swipe ? state.swipe.flyOut(like ? 'pitch' : 'pass') : Promise.resolve();
@@ -128,7 +178,11 @@ export const createCompanionsPage = ({ root, api, safeImage, coverFor, me, toast
     state.busy = false;
     [passBtn, likeBtn].forEach((b) => { b.disabled = false; });
     if (error) {
-      if (/not available/.test(String(error.message || ''))) {
+      if (error.code === 'PT429' || /companion_swipe_quota/.test(String(error.message || ''))) {
+        state.quota = { ...(state.quota || {}), remaining: 0 };
+        await refreshQuota();
+        toast(companionQuotaLabel(state.quota) || 'No swipes left today.');
+      } else if (/not available/.test(String(error.message || ''))) {
         toast(`${person.name} is no longer looking for company at this event.`);
         state.people.shift();
       } else if (/not looking/.test(String(error.message || ''))) {
@@ -142,6 +196,10 @@ export const createCompanionsPage = ({ root, api, safeImage, coverFor, me, toast
       return;
     }
     state.people.shift();
+    if (state.quota && Number.isFinite(Number(state.quota.remaining))) {
+      state.quota = { ...state.quota, remaining: Math.max(Number(state.quota.remaining) - 1, 0) };
+      if (state.quota.remaining <= 0) void refreshQuota(); // learn the reset time
+    }
     const ev = event();
     if (ev) ev.toSee = Math.max(0, ev.toSee - 1);
     renderDeck();

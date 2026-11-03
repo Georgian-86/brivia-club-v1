@@ -93,6 +93,10 @@ body.app-body :is(.companions-view, .nearby-view) .companion-name { margin: 0; c
 /* Actions */
 .companion-actions { display: flex; justify-content: center; gap: var(--space-7); margin-top: var(--space-6); }
 .companion-actions[hidden] { display: none; }
+/* D-156: the daily companion swipe count under the buttons; muted buttons at the cap (still focusable, a tap explains). */
+.companion-quota { margin: var(--space-3) 0 0; color: var(--cp-muted); font-size: var(--text-12); font-weight: 600; letter-spacing: .04em; text-align: center; }
+.companion-quota[hidden] { display: none; }
+body.app-body .companion-action.is-capped { border-color: var(--cp-line); background: var(--cp-paper); color: var(--cp-muted); box-shadow: none; cursor: not-allowed; }
 body.app-body .companion-action { display: grid; place-items: center; width: 64px; height: 64px; padding: 0; border: 1px solid var(--cp-line); border-radius: 50%; background: var(--cp-paper); color: var(--cp-wine); box-shadow: var(--cp-shadow); cursor: pointer; transition: transform .15s ease, background .15s ease; }
 body.app-body .companion-action svg { width: 26px; height: 26px; stroke-width: 2; }
 body.app-body .companion-action-like { width: 72px; height: 72px; border-color: var(--cp-wine); background: var(--cp-wine); color: var(--cp-paper); }

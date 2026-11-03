@@ -354,6 +354,7 @@ export const createEventComposer = ({ dialog, api, memberId, organizer, safeImag
   };
   const searchCities = async () => {
     const q = cityInput.value.trim();
+    if (!q) { places = []; closeCities(); return; } // D-156: no suggestions before the first letter
     const { data, error } = await api.searchPlaces(q, 8);
     if (cityInput.value.trim() !== q) return;
     places = error ? [] : data || [];

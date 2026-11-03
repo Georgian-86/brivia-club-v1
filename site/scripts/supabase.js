@@ -321,9 +321,20 @@ export const fetchSignalQuota = async () => firstRow(await rpcCall('my_signal_qu
 // pickers keep their category groups.
 export const fetchInterestNodes = async () => {
   if (!supabase) return notConfigured();
-  const read = (columns) => supabase.from('interest_node').select(columns).eq('status', 'active').order('id');
-  let { data, error, status } = await read('id,parent_id,level,label,sensitive,catalog_order');
-  if (error?.code === '42703') ({ data, error, status } = await read('id,parent_id,level,label,sensitive'));
+  // D-156: the API answers at most 1,000 rows per request and the tree has 1,431 active nodes, so a single read silently
+  // dropped every interest after row 1,000 (365 of them: most team sports, all of tech). Read it in pages.
+  const PAGE = 1000;
+  const readAll = async (columns) => {
+    const rows = [];
+    for (let from = 0; ; from += PAGE) {
+      const { data, error, status } = await supabase.from('interest_node').select(columns).eq('status', 'active').order('id').range(from, from + PAGE - 1);
+      if (error) return { data: rows, error, status };
+      rows.push(...(data || []));
+      if (!data || data.length < PAGE) return { data: rows, error: null, status };
+    }
+  };
+  let { data, error, status } = await readAll('id,parent_id,level,label,sensitive,catalog_order');
+  if (error?.code === '42703') ({ data, error, status } = await readAll('id,parent_id,level,label,sensitive'));
   return { data: data || [], error, status };
 };
 // "Other" (D-109, 0017): the id of an existing interest with that label, or a new member interest. Errors: 22023 the
@@ -379,6 +390,8 @@ export const cancelMemberEvent = (id) => rpcCall('cancel_member_event', { p_id: 
 export const companionEvents = () => rpcCall('companion_events', {});
 export const companionDeck = (eventId, limit = 20) => rpcCall('companion_deck', { p_event: eventId, p_limit: limit });
 export const companionSwipe = (eventId, targetId, like) => rpcCall('companion_swipe', { p_event: eventId, p_target: targetId, p_like: Boolean(like) });
+// D-156 (0045): { daily_limit, remaining, resets_at } for the 10 companion swipes a day; before 0045 an error (never blocks).
+export const companionQuota = () => rpcCall('my_companion_quota', {});
 export const myCompanionMatches = () => rpcCall('my_companion_matches', {});
 // D-124 (0024): the composer's Send. 'chat' when already connected (the note joined their chat), else send_signal's answer.
 export const sendConnectRequest = (to, note) => rpcCall('send_connect_request', { p_to: to, p_note: note || null });
@@ -524,13 +537,15 @@ export const searchPlaces = async (query, limit = 8) => {
     const postal = await lookupPostalCode(raw);
     if (postal.data?.length) return postal;
   }
-  // Nothing typed yet: the launch cities and metros from the place list, as before (a starting list, D-140).
-  const global = raw.length < 2 ? { error: { code: 'PGRST202' } } : await supabase.rpc('search_cities', { p_q: raw, p_limit: limit });
+  // D-156: nothing typed yet suggests nothing (no city is recommended before the member types). One letter lists the
+  // place-list cities that start with it, launch cities first; two or more go to the worldwide directory.
+  const clean = String(query || '').replace(/[^\p{L}\p{N} '-]/gu, ' ').replace(/\s+/g, ' ').trim().slice(0, 60);
+  if (!clean) return { data: [], error: null, status: 200 };
+  const global = clean.length < 2 ? { error: { code: 'PGRST202' } } : await supabase.rpc('search_cities', { p_q: raw, p_limit: limit });
   if (!global.error) return { data: global.data || [], error: null, status: global.status };
   if (!isMissingFunction(global.error)) return { data: [], error: global.error, status: global.status };
-  const clean = String(query || '').replace(/[^\p{L}\p{N} '-]/gu, ' ').replace(/\s+/g, ' ').trim().slice(0, 60);
   let request = supabase.from('place').select('id,name,region,country');
-  if (clean) request = request.or(`name.ilike.*${clean}*,region.ilike.*${clean}*`);
+  request = clean.length < 2 ? request.ilike('name', `${clean}*`) : request.or(`name.ilike.*${clean}*,region.ilike.*${clean}*`);
   const { data, error, status } = await request.order('is_launch', { ascending: false }).order('name').limit(limit);
   return { data: data || [], error, status };
 };

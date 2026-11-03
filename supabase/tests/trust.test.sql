@@ -664,31 +664,31 @@ begin
 end $$;
 rollback;
 
--- 3.2 The 31st request in 24 h fails honestly: PT429 signal_quota_exhausted, no row, not charged (Ruling A1,
--- which replaces the iteration-2 silent drop).
+-- 3.2 The 11th request in 24 h fails honestly: PT429 signal_quota_exhausted, no row, not charged (Ruling A1,
+-- which replaces the iteration-2 silent drop). The cap was 30 until 0045 (D-156) set it to 10 swipes a day.
 begin;
 set local role authenticated;
 set local request.jwt.claims = '{"sub":"72000000-0000-0000-0000-000000000001"}';
 do $$
 declare i int; st text; msg text;
 begin
-  for i in 101..130 loop
-    if (select status from public.send_signal(pg_temp.t3(i))) <> 'sent' then raise exception 'FAIL T3: signal % of 30 not sent', i - 100; end if;
+  for i in 101..110 loop
+    if (select status from public.send_signal(pg_temp.t3(i))) <> 'sent' then raise exception 'FAIL T3: signal % of 10 not sent', i - 100; end if;
   end loop;
   begin
-    perform public.send_signal(pg_temp.t3(131));
+    perform public.send_signal(pg_temp.t3(111));
   exception when others then st := sqlstate; msg := sqlerrm;
   end;
   if st is distinct from 'PT429' or msg <> 'signal_quota_exhausted' then
-    raise exception 'FAIL T3: the 31st signal in 24 h gave % %', st, msg;
+    raise exception 'FAIL T3: the 11th signal in 24 h gave % %', st, msg;
   end if;
 end $$;
 reset role;
 do $$ begin
-  if (select count(*) from public.connection_requests where from_id = pg_temp.t3(1)) <> 30 then
-    raise exception 'FAIL T3: daily cap wrote % rows (want 30)', (select count(*) from public.connection_requests where from_id = pg_temp.t3(1));
+  if (select count(*) from public.connection_requests where from_id = pg_temp.t3(1)) <> 10 then
+    raise exception 'FAIL T3: daily cap wrote % rows (want 10)', (select count(*) from public.connection_requests where from_id = pg_temp.t3(1));
   end if;
-  if (select count(*) from public.signal_ledger where sender_id = pg_temp.t3(1)) <> 30 then
+  if (select count(*) from public.signal_ledger where sender_id = pg_temp.t3(1)) <> 10 then
     raise exception 'FAIL T3: the refused signal was charged';
   end if;
 end $$;
@@ -699,7 +699,7 @@ rollback;
 begin;
 insert into public.connection_requests (from_id, to_id) values (pg_temp.t3(140), pg_temp.t3(1));
 insert into public.signal_ledger (sender_id, to_id)
-select pg_temp.t3(1), pg_temp.t3(i) from generate_series(101, 130) i;  -- 30 today: at the daily cap
+select pg_temp.t3(1), pg_temp.t3(i) from generate_series(101, 110) i;  -- 10 today: at the daily cap (0045)
 set local role authenticated;
 set local request.jwt.claims = '{"sub":"72000000-0000-0000-0000-000000000001"}';
 do $$

@@ -42,7 +42,9 @@ body.app-body {
 
 /* Pitch at a cap: muted with tokens, still focusable (aria-disabled, not disabled), so a tap explains why. */
 .app-view[data-view="home"] .swipe-like.is-capped,
-.app-view[data-view="home"] .swipe-like.is-capped:hover {
+.app-view[data-view="home"] .swipe-like.is-capped:hover,
+.app-view[data-view="home"] .swipe-pass.is-capped,
+.app-view[data-view="home"] .swipe-pass.is-capped:hover {
   border-color: var(--dk-line);
   background: var(--dk-tint);
   color: var(--dk-soft);
@@ -175,7 +177,8 @@ body.app-body .app-view[data-view="home"] .swipe-action::before { content: none;
 .swipe-glyph { display: block; width: 30px; height: 30px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
 .app-view[data-view="home"] .swipe-pass .swipe-glyph { color: #5a061f; }
 .app-view[data-view="home"] .swipe-like .swipe-glyph { color: #fffaf1; }
-.app-view[data-view="home"] .swipe-like.is-capped .swipe-glyph { color: var(--dk-soft); }
+.app-view[data-view="home"] .swipe-like.is-capped .swipe-glyph,
+.app-view[data-view="home"] .swipe-pass.is-capped .swipe-glyph { color: var(--dk-soft); }
 @media (max-width: 560px) { .swipe-glyph { width: 28px; height: 28px; } }
 body.app-body .app-view[data-view="home"] .home-kicker { font-size: var(--text-12); }
 .app-view[data-view="home"] .swipe-pass::after { color: var(--dk-ink); }

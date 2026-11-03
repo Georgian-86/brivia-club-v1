@@ -20,32 +20,28 @@ test('the local time keeps its minutes only when the zone is off the hour', () =
   if (process.env.TZ === 'UTC') assert.match(localTime, /^3\s?PM$/i);
 });
 
-test('quotaLabel: normal state reads "N of 30 signals left" (30 = the quota\'s daily_limit)', () => {
-  assert.equal(quotaLabel({ remaining: 30, daily_limit: 30, resets_at: null }), '30 of 30 signals left');
-  assert.equal(quotaLabel({ remaining: 12, daily_limit: 30, resets_at: RESETS }), '12 of 30 signals left');
-  assert.equal(quotaLabel({ remaining: 7, daily_limit: 20, resets_at: RESETS }), '7 of 20 signals left', 'the limit comes from the quota object');
+test('quotaLabel: normal state reads "N of 10 swipes left today" (10 = the quota\'s daily_limit, D-156)', () => {
+  assert.equal(quotaLabel({ remaining: 10, daily_limit: 10, resets_at: null }), '10 of 10 swipes left today');
+  assert.equal(quotaLabel({ remaining: 4, daily_limit: 10, resets_at: RESETS }), '4 of 10 swipes left today');
+  assert.equal(quotaLabel({ remaining: 7, daily_limit: 20, resets_at: RESETS }), '7 of 20 swipes left today', 'the limit comes from the quota object');
 });
 
-test('quotaLabel: a quota without daily_limit (send_signal result merged early) falls back to 30', () => {
-  assert.equal(quotaLabel({ remaining: 29, resets_at: RESETS }), '29 of 30 signals left');
+test('quotaLabel: a quota without daily_limit (send_signal result merged early) falls back to 10', () => {
+  assert.equal(quotaLabel({ remaining: 9, resets_at: RESETS }), '9 of 10 swipes left today');
 });
 
-test('quotaLabel: 1 left stays "1 of 30 signals left" (the unit is the window, not the count)', () => {
-  assert.equal(quotaLabel({ remaining: 1, daily_limit: 30, resets_at: RESETS }), '1 of 30 signals left');
-});
-
-test('quotaLabel: 0 left says "Your next signal frees up at 3 PM" in local time, hour numeric', () => {
-  const label = quotaLabel({ remaining: 0, daily_limit: 30, resets_at: RESETS });
-  assert.equal(label, `Your next signal frees up at ${localTime}`);
+test('quotaLabel: 0 left says "Your next swipe frees up at 3 PM" in local time, hour numeric', () => {
+  const label = quotaLabel({ remaining: 0, daily_limit: 10, resets_at: RESETS });
+  assert.equal(label, `Your next swipe frees up at ${localTime}`);
 });
 
 test('quotaLabel: 0 left without a reset time never invents one', () => {
-  assert.equal(quotaLabel({ remaining: 0, daily_limit: 30, resets_at: null }), '0 of 30 signals left');
+  assert.equal(quotaLabel({ remaining: 0, daily_limit: 10, resets_at: null }), '0 of 10 swipes left today');
 });
 
-test('quotaNotice: the zero-quota notice beside the deck', () => {
-  assert.equal(quotaNotice({ remaining: 0, resets_at: RESETS }), `No signals left today. More at ${localTime}. Passing is always free.`);
-  assert.equal(quotaNotice({ remaining: 0, resets_at: null }), 'No signals left today. Passing is always free.');
+test('quotaNotice: the zero-quota notice beside the deck (passes count too, D-156)', () => {
+  assert.equal(quotaNotice({ remaining: 0, daily_limit: 10, resets_at: RESETS }), `You've used your 10 free swipes for today. More at ${localTime}.`);
+  assert.equal(quotaNotice({ remaining: 0, resets_at: null }), "You've used your free swipes for today.");
   assert.equal(quotaNotice({ remaining: 4, live_unanswered: 100, live_limit: 100 }), 'You have 100 signals waiting for an answer. Passing is always free.');
   assert.equal(quotaNotice({ remaining: 4, live_unanswered: 2, live_limit: 100 }), '');
   assert.equal(quotaNotice(null), '');
@@ -60,13 +56,14 @@ test('quotaLabel: an unknown quota (not loaded yet) is an empty string', () => {
   assert.equal(quotaLabel({}), '');
 });
 
-test('quotaErrorText: signal_quota_exhausted', () => {
+test('quotaErrorText: signal_quota_exhausted and swipe_quota_exhausted (a refused pass, D-156)', () => {
   const text = quotaErrorText({ code: 'PT429', message: 'signal_quota_exhausted' }, { remaining: 0, resets_at: RESETS });
-  assert.equal(text, `You've used today's signals. More at ${localTime}.`);
+  assert.equal(text, `You've used today's swipes. More at ${localTime}.`);
+  assert.equal(quotaErrorText({ code: 'PT429', message: 'swipe_quota_exhausted' }, { remaining: 0, resets_at: RESETS }), text);
 });
 
 test('quotaErrorText: signal_quota_exhausted without a known reset time', () => {
-  assert.equal(quotaErrorText({ code: 'PT429', message: 'signal_quota_exhausted' }, null), "You've used today's signals.");
+  assert.equal(quotaErrorText({ code: 'PT429', message: 'signal_quota_exhausted' }, null), "You've used today's swipes.");
   assert.equal(quotaErrorText({ code: 'PT429', message: 'try again later' }, null), null, 'a PT429 without a cap message is not a quota text');
 });
 

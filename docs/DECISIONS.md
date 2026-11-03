@@ -3159,3 +3159,32 @@ controls (a tester or a seeded test member), never a real member, so no new expo
   reaches that corner (its right edge stops at x 3373), so the phone files were already clean and are unchanged.
 - **Note:** a faint soft patch can show where the mark was on busy frames (the chess board); it reads as background.
   A clean master from the video tool, exported without the watermark, would remove even that.
+
+## D-156 (2026-11-04): city suggestions from the first letter; every interest shows; 10 swipes a day
+
+- **Asked:** "dont recommend cities by yourself let them type first letter then based on that recommend", "i want
+  this complete list of interests, nothing must be left", "allow only 10 free swipes a day and for event find my
+  companion also 10 swipes max per day", and real-looking photos for the seeded accounts.
+- **Cities:** an empty search shows no list anywhere (signup area step, guided setup, Edit profile, Create Event).
+  One letter lists place-list cities that **start** with it, launch cities first; two or more letters use the worldwide
+  directory as before (`searchPlaces`).
+- **Interests:** the founder's list (1,131 unique names; it repeats UI Design, UX Research and Extreme Programming)
+  was already the catalogue, except "DJing", now "DJ" (0045). The real gap was the client: `fetchInterestNodes` read
+  `interest_node` in one request, and the API answers at most 1,000 rows. With 1,431 active nodes, **365 interests**
+  (every id after `sports.team.basketball`: most team sports, all of tech, travel, wellbeing...) never reached the
+  pickers. It now reads in pages of 1,000.
+- **Swipes (0045):** Pass and Pitch on the deck share **10 per rolling 24 h** (the existing signal quota, now counting
+  passes; config `signal_daily_limit = 10`). Find my companion: **10 per rolling 24 h** over all events (config
+  `companion_swipe_daily_limit = 10`). Both enforced by the server (PT429), shown as "N of 10 swipes left today",
+  with both buttons held at 0. Rolling 24 h, not midnight, to match the existing quota and its "More at 3 PM" copy.
+  Companion Connect checks the cap **before** the composer opens, so no request is sent for a refused swipe. A
+  companion request still also uses one deck swipe (it goes through `send_signal`). Config rows, so the founder can
+  change either number (or offer more to a paid tier later) without a migration.
+- **Not done: photos on seeded accounts.** The open test world is on (0010, live `open_test_world = true`), so the 60
+  seeded members appear to real members. Real people's photos on invented profiles shown to real members would mislead
+  them (they would spend their 10 daily swipes and send requests to people who do not exist) and use strangers'
+  likenesses without consent. The seed keeps its monogram avatars. Options for the founder: photos of real teammates
+  or friends with their consent, illustrated avatars, or closing the open test world before launch.
+- **Proof:** SQL harness all passed (new `z-daily-swipes.test.sql`; orbit-signals, trust and hygiene updated for the
+  new cap), unit 497, e2e deck 201, onboarding 269, location 64, create-event, companions. consent.spec.mjs crashes at
+  its line 328 (the collab-review Accept button, removed by D-132) on the code before this change too; not fixed here.

@@ -2,12 +2,14 @@
 // lives only on the server (my_signal_quota(), send_signal) and in memory for the current page.
 //
 // quota = { remaining, resets_at, live_unanswered?, live_limit? } as my_signal_quota() / send_signal return it.
+// D-156 (0045): the daily count is swipes, not only signals: a Pass and a Pitch on the deck each use one of the 10 free
+// swipes a day (rolling 24 h), so at the daily cap Pass is blocked too. The live cap (unanswered signals) blocks Pitch only.
 // resets_at is rounded up to the UTC hour by the server, so in a zone with a 30 or 45 minute offset (India, +5:30) it is
 // not on the local hour. It is shown in the member's local time via toLocaleTimeString: "3 PM" when on the hour,
 // "8:30 PM" otherwise (hour: 'numeric', plus minute: '2-digit' only when the minutes are not 0).
 
 const DEFAULT_LIVE_LIMIT = 100;
-const DEFAULT_DAILY_LIMIT = 30;
+const DEFAULT_DAILY_LIMIT = 10;
 
 export const resetTimeLabel = (resetsAt) => {
   if (!resetsAt) return '';
@@ -37,26 +39,26 @@ export const quotaBlocked = (quota) => {
   return null;
 };
 
-// The counter line (iteration 3 R7; plain words since D-096): "N of 30 signals left" (30 = daily_limit from my_signal_quota),
-// and at 0 "Your next signal frees up at 3 PM". Without a reset time it never invents one.
+// The counter line (iteration 3 R7; plain words since D-096; swipes since D-156): "N of 10 swipes left today" (10 =
+// daily_limit from my_signal_quota), and at 0 "Your next swipe frees up at 3 PM". Without a reset time it never invents one.
 export const quotaLabel = (quota) => {
   const blocked = quotaBlocked(quota);
   if (!quota || !Number.isFinite(Number(quota.remaining))) return '';
   if (blocked === 'live') return `You have ${liveLimit(quota)} signals waiting for an answer`;
   if (blocked === 'daily') {
     const time = resetTimeLabel(quota.resets_at);
-    if (time) return `Your next signal frees up at ${time}`;
+    if (time) return `Your next swipe frees up at ${time}`;
   }
   const remaining = Math.max(Number(quota.remaining), 0);
-  return `${remaining} of ${dailyLimit(quota)} signals left`;
+  return `${remaining} of ${dailyLimit(quota)} swipes left today`;
 };
 
-// The notice beside the deck at a cap (empty when nothing blocks): it says plainly that no signal is left.
+// The notice beside the deck at a cap (empty when nothing blocks): it says plainly that no swipe is left.
 export const quotaNotice = (quota) => {
   const blocked = quotaBlocked(quota);
   if (blocked === 'daily') {
     const time = resetTimeLabel(quota.resets_at);
-    return time ? `No signals left today. More at ${time}. Passing is always free.` : 'No signals left today. Passing is always free.';
+    return time ? `You've used your ${dailyLimit(quota)} free swipes for today. More at ${time}.` : "You've used your free swipes for today.";
   }
   if (blocked === 'live') return `You have ${liveLimit(quota)} signals waiting for an answer. Passing is always free.`;
   return '';
@@ -68,9 +70,9 @@ export const quotaNotice = (quota) => {
 export const quotaErrorText = (error, quota, status = 0) => {
   if (!(error?.code === 'PT429' || status === 429)) return null;
   const message = String(error?.message || '');
-  if (message.includes('signal_quota_exhausted')) {
+  if (message.includes('signal_quota_exhausted') || message.includes('swipe_quota_exhausted')) {
     const time = resetTimeLabel(quota?.resets_at);
-    return time ? `You've used today's signals. More at ${time}.` : "You've used today's signals.";
+    return time ? `You've used today's swipes. More at ${time}.` : "You've used today's swipes.";
   }
   if (message.includes('signal_live_cap')) return `You have ${liveLimit(quota)} signals waiting for an answer.`;
   return null;

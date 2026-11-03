@@ -1062,6 +1062,8 @@ const highlightCity = (index) => {
 const renderCityResults = async () => {
   if (!areaSearch || !areaResults) return;
   const seq = ++citySearchSeq;
+  // D-156: no suggestions until the member types the first letter.
+  if (!areaSearch.value.trim()) { cityOptions = []; areaResults.innerHTML = ''; setCityListOpen(false); return; }
   const { data, error } = await searchPlaces(areaSearch.value);
   if (seq !== citySearchSeq) return;
   cityOptions = error ? [] : data;

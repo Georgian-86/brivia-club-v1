@@ -21,7 +21,7 @@ import '../styles/mobile-app.css';
 import '../styles/skeleton.css';
 import '../styles/aura-theme.css';
 import '../styles/handoff.css';
-import { supabase, compressImageOnly, rowToProfile, saveProfile, isPresetCoverUrl, onboardingStatus, sendSignal, fetchSignalQuota, isRateLimited, isStorageImageUrl, withoutCredentials, uploadMessageAttachment, removeMessageAttachment, uploadCommunityPostImage, removeCommunityPostImage, ImageProcessingError, PHOTO_ERROR_MESSAGE, PHOTO_FRAMER_ERROR, compressAttachmentFiles, attachmentKind, reportMember, setSensitiveConsent, fetchSensitiveConsentAt, fetchMyInterests, fetchInterestNodes, addMemberInterest, isMissingFunction, touchPresence, connectionPresence, setPresenceVisible, myPresenceVisible, setMemberInterests, uploadResume, removeResume, resumeSignedUrl, resumeInfo, clearResumePath, searchPlaces, setHomeCity, setHomeLocation, listEvents, setEventRsvp, setCompanionDefault, myEventPrefs, eventCompanions, saveMemberEvent, cancelMemberEvent, deleteMemberEvent, uploadEventImage, removeEventImages, setEventInterest, setEventBrochure, uploadEventBrochure, removeEventBrochures, companionEvents, companionDeck, companionSwipe, myCompanionMatches, markCompanionMatchSeen, sendConnectRequest, setNearbyEnabled, myNearbySetting, nearbyPulse, nearbyClear, myNearbyAlerts, setNearbyMuted, nearbyDiscover, nearbyPass, nearbyConnect, myNearbyMatches, myNotifications, markNotificationsRead, dismissNotification, setNearbyRadius, savePushSubscription, deletePushSubscription, sendPendingPush, searchCompanies, searchCompanyDirectory, companyLogoUrl, addCompany, setMyWork, memberWork, uploadCompanyLogo, markMessagesDelivered, markConversationRead, setReadReceipts, myReadReceipts, chatPeopleSearch } from './supabase.js';
+import { supabase, compressImageOnly, rowToProfile, saveProfile, isPresetCoverUrl, onboardingStatus, sendSignal, fetchSignalQuota, isRateLimited, isStorageImageUrl, withoutCredentials, uploadMessageAttachment, removeMessageAttachment, uploadCommunityPostImage, removeCommunityPostImage, ImageProcessingError, PHOTO_ERROR_MESSAGE, PHOTO_FRAMER_ERROR, compressAttachmentFiles, attachmentKind, reportMember, setSensitiveConsent, fetchSensitiveConsentAt, fetchMyInterests, fetchInterestNodes, addMemberInterest, isMissingFunction, touchPresence, connectionPresence, setPresenceVisible, myPresenceVisible, setMemberInterests, uploadResume, removeResume, resumeSignedUrl, resumeInfo, clearResumePath, searchPlaces, setHomeCity, setHomeLocation, listEvents, setEventRsvp, setCompanionDefault, myEventPrefs, eventCompanions, saveMemberEvent, cancelMemberEvent, deleteMemberEvent, uploadEventImage, removeEventImages, setEventInterest, setEventBrochure, uploadEventBrochure, removeEventBrochures, companionEvents, companionDeck, companionSwipe, companionQuota, myCompanionMatches, markCompanionMatchSeen, sendConnectRequest, setNearbyEnabled, myNearbySetting, nearbyPulse, nearbyClear, myNearbyAlerts, setNearbyMuted, nearbyDiscover, nearbyPass, nearbyConnect, myNearbyMatches, myNotifications, markNotificationsRead, dismissNotification, setNearbyRadius, savePushSubscription, deletePushSubscription, sendPendingPush, searchCompanies, searchCompanyDirectory, companyLogoUrl, addCompany, setMyWork, memberWork, uploadCompanyLogo, markMessagesDelivered, markConversationRead, setReadReceipts, myReadReceipts, chatPeopleSearch } from './supabase.js';
 import { locateOnce, fallbackCopy } from './geo-locate.js';
 import { areaChangeMessage, AREA_HELPER, AREA_NO_MATCH } from './area-change.js';
 import { areaShareBody, parseAreaBody, resumeShareAttachment, resumeMessageFields, RESUME_SHARE_BODY, NO_RESUME_HINT, RESUME_GONE_COPY, RESUME_SHARE_NOTE, AREA_SHARE_NOTE } from './quick-share.js';
@@ -774,6 +774,14 @@ const renderSignalQuota = () => {
     if (copy) { like.setAttribute('aria-disabled', 'true'); like.setAttribute('aria-describedby', 'swipe-limit-copy'); }
     else { like.removeAttribute('aria-disabled'); like.removeAttribute('aria-describedby'); }
   }
+  // D-156: at the daily swipe cap Pass is held too (it uses a swipe); focusable, a tap explains why.
+  const pass = document.querySelector('[data-action="pass"]');
+  if (pass) {
+    const capped = quotaBlocked(signalQuota) === 'daily';
+    pass.classList.toggle('is-capped', capped);
+    if (capped) { pass.setAttribute('aria-disabled', 'true'); pass.setAttribute('aria-describedby', 'swipe-limit-copy'); }
+    else { pass.removeAttribute('aria-disabled'); pass.removeAttribute('aria-describedby'); }
+  }
 };
 const refreshSignalQuota = async () => {
   if (!supabase || !memberProfile.id) return;
@@ -1087,7 +1095,7 @@ document.addEventListener('click', (event) => {
 const connectComposer = createConnectComposer(document.querySelector('#connect-composer-dialog'));
 const companionsPage = createCompanionsPage({
   root: document.querySelector('[data-view="companions"]'),
-  api: { companionEvents, companionDeck, companionSwipe, markCompanionMatchSeen },
+  api: { companionEvents, companionDeck, companionSwipe, companionQuota, markCompanionMatchSeen },
   safeImage: eventSafeImage,
   coverFor: (url) => deckCoverSrc({ coverUrl: url }, safeImageUrl, defaultCoverUrl),
   me: () => ({ name: memberProfile.name || 'You', photoUrl: memberProfile.photoUrl || memberProfile.photo_url || '' }),
@@ -1697,8 +1705,9 @@ const pendingPasses = new Set();
 const recordPass = (personId) => {
   if (!supabase || !memberProfile.id || !isUuid(personId)) return Promise.resolve();
   const stored = (async () => {
-    const { error } = await supabase.from('interaction').insert({ viewer_id: memberProfile.id, target_id: personId, event: 'pass' });
+    const { error, status } = await supabase.from('interaction').insert({ viewer_id: memberProfile.id, target_id: personId, event: 'pass' });
     if (error) console.warn('Pass could not be recorded:', error.message);
+    return { error, status };
   })();
   pendingPasses.add(stored);
   stored.finally(() => pendingPasses.delete(stored));
@@ -2255,13 +2264,15 @@ const swipe = (type, { vx = 0 } = {}) => {
     return true;
   }
   // At a cached cap, read the quota again first: the cap may have cleared (F4). Still capped: a Like sends nothing,
-  // opens no pitch and keeps the card (D-026). Passing is always free.
-  if (type === 'like' && quotaBlocked(signalQuota)) {
+  // opens no pitch and keeps the card (D-026). D-156: a Pass uses one of the daily swipes too, so at the daily cap it
+  // is held the same way (the live cap of unanswered signals still lets a Pass through).
+  const blocks = (kind) => (kind === 'like' ? Boolean(quotaBlocked(signalQuota)) : quotaBlocked(signalQuota) === 'daily');
+  if (blocks(type)) {
     capCheckInFlight = true;
     refreshSignalQuota().finally(() => {
       capCheckInFlight = false;
-      if (quotaBlocked(signalQuota)) { renderSignalQuota(); showToast(quotaBlockedToast()); return; }
-      swipe('like');
+      if (blocks(type)) { renderSignalQuota(); showToast(type === 'like' ? quotaBlockedToast() : quotaErrorText({ code: 'PT429', message: 'swipe_quota_exhausted' }, signalQuota)); return; }
+      swipe(type);
     });
     return false;
   }
@@ -2273,7 +2284,22 @@ const swipe = (type, { vx = 0 } = {}) => {
     openPitch(person);
     return true;
   }
-  recordPass(person.id);
+  // D-156: count the pass down at once; the server is the judge (a refused pass puts the card back and says why).
+  if (Number.isFinite(Number(signalQuota?.remaining))) {
+    signalQuota = { ...signalQuota, remaining: Math.max(Number(signalQuota.remaining) - 1, 0) };
+    renderSignalQuota();
+  }
+  recordPass(person.id).then((result) => {
+    if (!result?.error) {
+      if (Number(signalQuota?.remaining) <= 0) void refreshSignalQuota(); // learn the reset time for the notice
+      return;
+    }
+    const text = quotaErrorText(result.error, signalQuota, result.status);
+    if (!text) return;
+    requeuePerson(person);
+    void refreshSignalQuota();
+    showToast(text);
+  });
   advanceCard(person, 'pass', { vx });
   return true;
 };
@@ -3524,7 +3550,7 @@ const wireAreaChanger = (modal) => {
   search.addEventListener('input', () => {
     window.clearTimeout(timer);
     const term = search.value.trim();
-    if (term.length < 2) { showResults([]); return; }
+    if (!term) { showResults([]); return; } // D-156: suggestions from the first letter, none before
     const ticket = ++seq;
     timer = window.setTimeout(async () => {
       const { data, error } = await searchPlaces(term);

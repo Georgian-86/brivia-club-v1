@@ -1269,3 +1269,20 @@ Apply after `0043`. Adds `chat_people_search(query, limit)` (authenticated; memb
 name/full name word starts, title or company; status connected / request_received / request_sent / none, a decline
 reads as request_sent; one letter finds connections only; at most 8 non-connections). Verify:
 `select has_function_privilege('anon', 'public.chat_people_search(text,int)', 'execute');` (f).
+
+## 0045
+
+**10 free swipes a day; 10 companion swipes a day; "DJ" (D-156).** Not applied yet.
+Apply after `0044`, and deploy the client in the same window (the new client counts Pass as a swipe and reads
+`my_companion_quota`; the old client would show "N of 10 signals left" and let a refused Pass look accepted).
+Adds the config rows `signal_daily_limit = 10` and `companion_swipe_daily_limit = 10` (an existing row is kept), redefines
+`brivia_signal_state` (signals + distinct passes in 24 h), adds the trigger `brivia_interaction_swipe_cap` on
+`interaction`, `brivia_companion_state`, `my_companion_quota()` (authenticated), and `companion_swipe` with the cap.
+Relabels `music.making.djing` to "DJ". Change a limit later without a migration:
+`update public.brivia_config set value = '15' where key = 'signal_daily_limit';`
+Verify:
+`select key, value from public.brivia_config;` (both rows, 10);
+`select label from public.interest_node where id = 'music.making.djing';` (DJ);
+`select has_function_privilege('anon', 'public.my_companion_quota()', 'execute');` (f);
+`select tgname from pg_trigger where tgrelid = 'public.interaction'::regclass and not tgisinternal order by 1;`
+(`brivia_interaction_served`, then `brivia_interaction_swipe_cap`).

@@ -319,6 +319,10 @@ labelled "PRIVATE · ONLY YOU SEE THESE", and the hero and the area stat show th
 
   This replaces the earlier draft ("Widen nothing. We already did.") and the old "Come tomorrow." daily-limit state:
   the only limit left is the signal quota, which keeps the card (below).
+- **D-156 (supersedes the counter copy below):** the counter counts **swipes** (Pass and Pitch): "N of 10 swipes left
+  today"; at 0 "Your next swipe frees up at 3 PM", the notice "You've used your 10 free swipes for today. More at 3 PM."
+  and **both** Pass and Pitch are muted (aria-disabled, still focusable; a tap explains). The live cap still lets Pass
+  through. Find my companion shows "N of 10 swipes left today" under its buttons and holds both at 0.
 - **Signal counter (Ruling A1, D-026, D-032).** The only signal limit is the server quota from `my_signal_quota()`; the
   old localStorage swipe limit is gone and passes are free.
   - Normal: **"N of 30 signals left · 24-hour window"** (N = `remaining`, 30 = `daily_limit` from `my_signal_quota()`,

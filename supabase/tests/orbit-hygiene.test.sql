@@ -96,7 +96,7 @@ begin
        || 'deck_status,deck_why,declare_adult,delete_member_event,delete_my_account,delete_push_subscription,'
        || 'dismiss_notification,ensure_place,event_companions,get_candidates,hiring_suggestions,list_events,'
        || 'mark_companion_match_seen,mark_conversation_read,mark_messages_delivered,mark_notifications_read,member_bio,member_hiring,member_open_to,member_work,'
-       || 'my_companion_matches,my_event_prefs,my_hiring_roles,my_interests,my_nearby_alerts,my_nearby_matches,'
+       || 'my_companion_matches,my_companion_quota,my_event_prefs,my_hiring_roles,my_interests,my_nearby_alerts,my_nearby_matches,'
        || 'my_nearby_setting,my_notifications,my_notifications_v2,my_notifications_v3,my_onboarding_status,my_outgoing_requests,'
        || 'my_presence_visible,my_read_receipts,my_role_asks,my_role_intent,my_sent_role_asks,my_signal_quota,nearby_clear,nearby_connect,'
        || 'nearby_discover,nearby_pass,nearby_pulse,post_activity,report_fake_job,report_member,'

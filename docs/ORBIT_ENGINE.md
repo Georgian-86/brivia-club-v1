@@ -397,6 +397,13 @@ north-star metric (people who actually meet).
   `signal_live_limit`, owner only). Over a cap the send fails **visibly** with `PT429` (HTTP 429) and the message
   `signal_quota_exhausted` (daily) or `signal_live_cap` (live), and nothing is charged. `my_signal_quota()` returns
   the caller's `daily_limit`, `remaining`, `resets_at`, `live_unanswered` and `live_limit`.
+  - **Since 0045 (D-156) the daily count is swipes:** `signal_daily_limit` is set to **10** (a config row), and
+    `used` = signals in the last 24 h **plus distinct members passed on the deck** in the last 24 h (`interaction`
+    rows with `event = 'pass'`). A pass over the cap is refused by the `brivia_interaction_swipe_cap` trigger
+    (`PT429 'swipe_quota_exhausted'`, not stored); a second pass on the same member that day is free. The live cap and
+    the "a completing request is never refused" rule are unchanged. Find my companion has its own cap: 10 swipes per
+    rolling 24 h over all events (`companion_swipe_daily_limit`, `PT429 'companion_swipe_quota'`, `my_companion_quota()`).
+    The numbers below that say 30 describe 0004's coded default, which still applies if the config row is removed.
   - The quota is counted from the **sender-only ledger** `signal_ledger(sender_id, to_id, kind, at)` (RLS on, no
     client grants). Each send writes one row **before** anything about the recipient is looked at. `to_id` has no
     foreign key, so an attempt at an id that does not exist is charged and kept like any other.

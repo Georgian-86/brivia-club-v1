@@ -5,6 +5,9 @@
 --   1 S (sender)       2 N (normal)          3 B (blocked S)       4 X (S blocked X)     5 W (test world)
 --   6 D (declined S)   7 U (not completed)   8 M (asked S first)   9 Q (not completed caller)
 --   100-299: plain targets.
+-- 0045 (D-156) sets signal_daily_limit to 10 as a config row; this file checks 0004's rules against the coded default
+-- (30), so the row is set aside here and put back at the end.
+delete from public.brivia_config where key = 'signal_daily_limit';
 insert into auth.users(id)
 select ('f6000000-0000-0000-0000-' || lpad(g::text, 12, '0'))::uuid from generate_series(1, 299) g
 on conflict do nothing;
@@ -466,5 +469,7 @@ delete from public.matches where user1_id::text like 'f6000000-%' or user2_id::t
 delete from public.brivia_blocks where blocker_id::text like 'f6000000-%';
 delete from public.profiles where id::text like 'f6000000-%';
 delete from auth.users where id::text like 'f6000000-%';
+
+insert into public.brivia_config (key, value) values ('signal_daily_limit', '10') on conflict (key) do nothing;
 
 select 'orbit-signals.test.sql OK' as result;

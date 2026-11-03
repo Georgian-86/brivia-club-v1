@@ -613,6 +613,8 @@ export const initGuidedSignup = ({
           };
           const render = async () => {
             const seq = ++searchSeq;
+            // D-156: no suggestions until the member types the first letter.
+            if (!input.value.trim()) { options = []; list.innerHTML = ''; list.hidden = true; return; }
             const { data, error } = await searchPlaces(input.value, 8);
             if (seq !== searchSeq || !el.isConnected) return;
             options = error ? [] : data;
