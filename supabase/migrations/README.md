@@ -1065,6 +1065,8 @@ select (select count(*) from pg_publication_tables where pubname = 'supabase_rea
 ## 0031
 
 **Interest labels in the founder's wording, catalogue ordered A–Z (founder request 2026-11-03, D-135).**
+**APPLIED 2026-11-03** (AR/VR, Machine Learning, Urban Birding verified; 1129 offered, contiguous A–Z, Abstract Art first,
+Zymology last, none sensitive or retired).
 Apply after `0030`. Data only: relabels 65 `interest_node` rows by id (only where the label still equals 0017's) and
 renumbers `catalog_order` 1..1129 by label. Safe to re-run. No client change needed.
 
