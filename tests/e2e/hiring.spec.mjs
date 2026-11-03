@@ -156,6 +156,18 @@ try {
     await page.waitForTimeout(250);
     await sheetChecks(page, w, 'Roles you\'re open to sheet');
     await shot(page, `intent-sheet-${w}.png`);
+    await page.keyboard.press('Escape');
+    await page.waitForSelector('dialog.hiring-sheet', { state: 'detached' });
+    // Edit profile's Looking for offers the three hiring values (founder, 2026-11-03: "there is no job opportunities").
+    await page.locator('#profile-photo-editor').click();
+    const lookInput = page.locator('[data-picker="profile-looking-edit"] [data-picker-input]');
+    await lookInput.waitFor();
+    const offered = [];
+    for (const [q, value] of [['job', 'Job Opportunities'], ['hiri', 'Hiring'], ['can give', 'Can Give Referrals']]) {
+      await lookInput.fill(q);
+      if (await page.locator(`#profile-looking-edit-list [data-value="${value}"]`).count()) offered.push(value);
+    }
+    check(`${w}: Edit profile's Looking for offers Job Opportunities, Hiring and Can Give Referrals (${offered.join(', ')})`, offered.length === 3);
     await ctx.close();
 
     // 2. The hirer.
