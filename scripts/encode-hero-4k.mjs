@@ -1,19 +1,27 @@
-// The landing hero in 4K (founder, 2026-10-16, D-062): the 1080p downscale looked soft, so the hero ships the 4K
-// master's own pixels only. Two frames, three codecs each, all from source-media/assets/hero-section-video-4k.mp4 (3840x2160):
+// The landing hero in 4K (D-062; re-graded D-153, founder 2026-11-04: "improve the quality of the video ... and make it
+// look better on phone view both angle wise and quality wise").
 //
-//   landscape  3840x2160, the full frame                          (desktops, laptops, tablets, landscape phones)
-//   portrait   1216x2160, the centre 9:16 crop at native density  (portrait phones: object-fit:cover would only
-//              show this centre slice of the full frame anyway, so the phone gets 4K-sharp pixels for ~1/3 of the bytes)
+// Master: source-media/Images/Videos/HEROSECTIONVI.MOV (the original export, 3840x2158, ~24 Mbps), scaled to 3840x2160.
+// The footage is soft (upscaled), so compression was never the limit (the D-062 files were SSIM 0.99 to their master);
+// what reads as "low quality" is softness and gradient banding. So every frame gets:
+//   * a two-pass unsharp (wide radius for the soft edges, small radius for fine lines), luma only, no halos at 100%;
+//   * 10-bit AV1 and HEVC (smooth skies and walls without banding; every AV1 and HEVC Main 10 decoder plays them);
+//   * capped quality: CRF for the look, a bitrate ceiling so each file stays under the 20 MB hero cap.
 //
-//   <name>-av1.mp4   AV1 (SVT-AV1)     Chrome, Edge, Firefox, Opera, Samsung Internet, Safari on AV1 hardware
-//   <name>-hevc.mp4  HEVC, tagged hvc1  Safari on every Apple device (and Chromium with hardware HEVC)
-//   <name>-h264.mp4  H.264 High          the last resort for a browser that decodes neither
+// Two frames, three codecs each:
+//   landscape  3840x2160, the full frame                      (desktops, laptops, tablets, landscape phones)
+//   portrait   1216x2160 at native density, a crop that FOLLOWS THE SUBJECT (D-153): the passports, the tennis kit, the
+//              daisies then the piano, the plane window, the chess game, the HACKATHON tablet... instead of the old fixed
+//              centre slice that cut most scenes in half on a phone. The path is a list of (time, centre) keyframes,
+//              eased between, so pans are slow and land on the cuts.
 //
-// index.html lists them in that order with exact `type` codecs, so each browser fetches exactly one file. No audio
-// (the hero is muted), +faststart (playback starts before the download ends), 2 s GOP so a seek or loop restarts fast.
-// Reruns skip outputs newer than the master.
+//   <name>-av1.mp4   AV1 10-bit (SVT-AV1)  Chrome, Edge, Firefox, Opera, Samsung Internet, Safari on AV1 hardware
+//   <name>-hevc.mp4  HEVC Main 10, hvc1      Safari on every Apple device (and Chromium with hardware HEVC)
+//   <name>-h264.mp4  H.264 High (8-bit)      the last resort
+// No audio (the hero is muted; its soundtrack is separate, encode-hero-audio.mjs), +faststart, 2 s GOP.
+// Posters: hero-section-video.webp (1920x1080) and hero-portrait.webp (720x1280), the first frame of each frame.
 //
-// Usage: npm run media:hero4k   (needs ffmpeg with libsvtav1, libx265 and libx264)
+// Usage: npm run media:hero4k   (needs ffmpeg with libsvtav1, libx265 and libx264; ~40 min on 4 cores)
 import { existsSync, mkdirSync, statSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -21,34 +29,72 @@ import { execFileSync } from 'node:child_process';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const FFMPEG = existsSync('/usr/bin/ffmpeg') ? '/usr/bin/ffmpeg' : 'ffmpeg';
-const master = join(root, 'source-media', 'assets', 'hero-section-video-4k.mp4');
+const master = join(root, 'source-media', 'Images', 'Videos', 'HEROSECTIONVI.MOV');
 const outDir = join(root, 'site', 'media', 'video');
+const posterDir = join(root, 'site', 'media', 'posters');
 
+// Where the subject is, as the crop centre (0 = left edge, 1 = right edge of the 16:9 frame), chosen by eye from a
+// 0.5 s contact sheet of the master. Between two keyframes the centre eases (smoothstep).
+export const PORTRAIT_PATH = [
+  [0, 0.52], [0.4, 0.52], [0.7, 0.55], [2.3, 0.55], [2.6, 0.5], [2.9, 0.5], [3.1, 0.38], [3.3, 0.38], [3.9, 0.6],
+  [4.0, 0.42], [5.4, 0.42], [5.7, 0.5], [5.85, 0.5], [6.1, 0.72], [6.3, 0.72], [6.5, 0.46], [7.3, 0.46], [7.5, 0.5],
+  [9.7, 0.5], [10.0, 0.45], [10.3, 0.45], [10.5, 0.5], [12.2, 0.5], [12.5, 0.6], [12.8, 0.6], [13.0, 0.55],
+  [13.3, 0.55], [13.5, 0.33], [13.8, 0.33], [14.0, 0.5], [14.3, 0.38], [14.9, 0.7], [15.0, 0.65], [15.8, 0.65],
+  [16.0, 0.3], [16.3, 0.3], [16.5, 0.55], [17.7, 0.55],
+];
+
+// The crop's x as an ffmpeg expression of t (nested ifs, smoothstep between keyframes), clamped to the frame.
+export const panExpression = (path = PORTRAIT_PATH, frameWidth = 3840, cropWidth = 1216) => {
+  let e = String(path[path.length - 1][1]);
+  for (let i = path.length - 2; i >= 0; i -= 1) {
+    const [t0, f0] = path[i];
+    const [t1, f1] = path[i + 1];
+    const u = `((t-${t0})/${(t1 - t0).toFixed(4)})`;
+    e = `if(lt(t,${t1}),${f0}+(${f1}-${f0})*(${u}*${u}*(3-2*${u})),${e})`;
+  }
+  return `max(0,min(${frameWidth - cropWidth},(${e})*${frameWidth}-${cropWidth / 2}))`;
+};
+
+const BASE = 'scale=3840:2160:flags=lanczos';
+const SHARPEN = 'unsharp=11:11:0.7:5:5:0,unsharp=5:5:0.6:5:5:0';
 export const HERO_FRAMES = {
-  'hero-4k': { filter: null },
-  'hero-portrait-4k': { filter: 'crop=1216:2160:(in_w-1216)/2:0' },
+  'hero-4k': { filter: `${BASE},${SHARPEN}`, poster: { name: 'hero-section-video.webp', scale: '1920:1080' } },
+  'hero-portrait-4k': { filter: `${BASE},crop=1216:2160:'${panExpression()}':0,${SHARPEN}`, poster: { name: 'hero-portrait.webp', scale: '720:1280' } },
 };
-// Quality: chosen by eye on the shadow edges at 100% (crf 32 AV1 / 25 HEVC keep the window-frame shadows
-// crisp; higher values start to band the wall gradient). H.264 is the last resort (no AV1, no HEVC), at crf 27 to stay
-// under the 20 MB hero cap (about 18 MB).
+// [codec args, ceiling for the landscape frame, ceiling for the portrait frame] (kbit/s; peaks may exceed briefly).
 export const HERO_CODECS = {
-  av1: ['-c:v', 'libsvtav1', '-preset', '6', '-crf', '32', '-svtav1-params', 'tune=0'],
-  hevc: ['-c:v', 'libx265', '-preset', 'medium', '-crf', '25', '-tag:v', 'hvc1', '-x265-params', 'log-level=error'],
-  h264: ['-c:v', 'libx264', '-preset', 'slow', '-crf', '27', '-profile:v', 'high'],
+  av1: { args: ['-c:v', 'libsvtav1', '-preset', '6', '-crf', '25', '-pix_fmt', 'yuv420p10le'], max: { 'hero-4k': 8500, 'hero-portrait-4k': 4500 }, svt: true },
+  hevc: { args: ['-c:v', 'libx265', '-preset', 'medium', '-crf', '21', '-pix_fmt', 'yuv420p10le', '-tag:v', 'hvc1'], max: { 'hero-4k': 8500, 'hero-portrait-4k': 4500 } },
+  h264: { args: ['-c:v', 'libx264', '-preset', 'slow', '-crf', '22', '-profile:v', 'high', '-pix_fmt', 'yuv420p'], max: { 'hero-4k': 8500, 'hero-portrait-4k': 5000 } },
 };
 
-const fresh = (out) => existsSync(out) && statSync(out).mtimeMs >= statSync(master).mtimeMs;
+const fresh = (out) => existsSync(out) && statSync(out).mtimeMs >= statSync(master).mtimeMs && statSync(out).mtimeMs >= statSync(fileURLToPath(import.meta.url)).mtimeMs;
+
+const rateArgs = (codec, frame) => {
+  const max = HERO_CODECS[codec].max[frame];
+  if (HERO_CODECS[codec].svt) return ['-svtav1-params', `tune=0:mbr=${max}`];
+  if (codec === 'hevc') return ['-x265-params', `log-level=error:vbv-maxrate=${max}:vbv-bufsize=${max * 2}`];
+  return ['-maxrate', `${max}k`, '-bufsize', `${max * 2}k`];
+};
 
 const main = () => {
   if (!existsSync(master)) throw new Error(`missing master: ${master}`);
   mkdirSync(outDir, { recursive: true });
-  for (const [frame, { filter }] of Object.entries(HERO_FRAMES)) {
-    for (const [codec, args] of Object.entries(HERO_CODECS)) {
+  const only = process.argv.slice(2);
+  for (const [frame, { filter, poster }] of Object.entries(HERO_FRAMES)) {
+    for (const [codec, { args }] of Object.entries(HERO_CODECS)) {
+      if (only.length && !only.includes(`${frame}-${codec}`)) continue;
       const out = join(outDir, `${frame}-${codec}.mp4`);
       if (fresh(out)) { console.log(`fresh ${out}`); continue; }
-      execFileSync(FFMPEG, ['-y', '-loglevel', 'error', '-i', master, ...(filter ? ['-vf', filter] : []),
-        '-an', ...args, '-g', '60', '-pix_fmt', 'yuv420p', '-movflags', '+faststart', out], { stdio: 'inherit' });
+      execFileSync(FFMPEG, ['-y', '-loglevel', 'error', '-i', master, '-vf', filter, '-an', ...args, ...rateArgs(codec, frame),
+        '-g', '60', '-movflags', '+faststart', out], { stdio: 'inherit' });
       console.log(`video ${frame} ${codec} -> ${Math.round(statSync(out).size / 1024)} KB`);
+    }
+    const posterOut = join(posterDir, poster.name);
+    if (!only.length || only.includes(`${frame}-poster`)) {
+      execFileSync(FFMPEG, ['-y', '-loglevel', 'error', '-i', master, '-vf', `${filter},scale=${poster.scale}:flags=lanczos`, '-frames:v', '1',
+        '-c:v', 'libwebp', '-quality', '82', posterOut], { stdio: 'inherit' });
+      console.log(`poster ${poster.name} -> ${Math.round(statSync(posterOut).size / 1024)} KB`);
     }
   }
 };

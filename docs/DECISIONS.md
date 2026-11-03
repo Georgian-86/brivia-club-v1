@@ -3107,3 +3107,21 @@ controls (a tester or a seeded test member), never a real member, so no new expo
 - **Proof:** SQL harness ALL PASSED (y-chat-people-search S1–S5); unit tests (chat-search); e2e chat-search at 1440,
   390, and layout at 320/375/390/430/768, plus chat-inbox, read-receipts, presence, post-notifications, app-shell,
   mobile-polish, collab-requests, chat-extras. Not tested on a physical iPhone or Android phone (headless browsers only).
+
+## D-153 (2026-11-04): a sharper landing hero, and a phone crop that follows the subject
+
+- **Asked:** "improve the quality of the video on home page ... and also make it look better on phone view both angle
+  wise and quality wise".
+- **Found:** the D-062 encodes were already within SSIM 0.99 of their master, so compression was not the problem. The
+  footage itself is soft (upscaled), and on phones the fixed centre 9:16 crop cut most scenes in half (the passports,
+  the Paris street, the plane window, the tennis kit).
+- **Quality:** re-encoded from the original export (HEROSECTIONVI.MOV) with a two-pass luma unsharp (wide radius for
+  soft edges, small for fine lines; no halos at 100%), AV1 and HEVC in 10-bit (no banding on skies and walls; codec
+  strings updated to Main 10), lower CRFs with a bitrate ceiling so each file stays under the 20 MB hero cap.
+- **Phones (angle):** the portrait file is now a 1216x2160 native-density crop that follows the subject, scene by
+  scene, from a keyframed path chosen on a 0.5 s contact sheet (`PORTRAIT_PATH` in scripts/encode-hero-4k.mjs; eased
+  pans timed to the transitions). Portrait phones also get their own poster (hero-portrait.webp, the first frame of
+  that crop), preloaded with a media query and swapped in before first paint, so the landscape poster is never fetched
+  on a phone.
+- **Unchanged:** the source order and selection logic (AV1, HEVC, H.264 per frame; MediaCapabilities keeps a smooth
+  one), the 20 MB cap, desktop framing.

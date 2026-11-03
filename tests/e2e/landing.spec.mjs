@@ -128,7 +128,9 @@ try {
       const context = await newContext(browser, viewport, { seen: true });
       await context.route('**/*.mp4', (route) => route.abort());
       const page = await context.newPage();
-      const posterResponse = page.waitForResponse((response) => /hero-section-video[^/]*\.webp/.test(response.url()), { timeout: 15000 });
+      // D-153: portrait phones get the portrait poster (the first frame of the subject-following crop).
+      const posterRe = viewport.width / viewport.height <= 10 / 16 ? /hero-portrait[^/]*\.webp/ : /hero-section-video[^/]*\.webp/;
+      const posterResponse = page.waitForResponse((response) => posterRe.test(response.url()), { timeout: 15000 });
       await page.goto(`${BASE}/index.html`, { waitUntil: 'load' });
       const response = await posterResponse;
       await page.waitForTimeout(500);
@@ -136,7 +138,7 @@ try {
       const stats = await sharp(await page.screenshot()).stats();
       await check(`${label}: first paint shows the hero poster (no black hero), even with failing videos`, () => {
         assert.equal(response.status(), 200);
-        assert.match(poster.poster, /hero-section-video[^/]*\.webp$/);
+        assert.match(poster.poster, new RegExp(`${posterRe.source}$`));
         assert.ok(poster.width >= viewport.width * 0.9 && poster.height > 300, `hero video box ${poster.width}x${poster.height}`);
         const brightest = Math.max(...stats.channels.map((channel) => channel.mean));
         assert.ok(brightest > 40, `viewport looks black (brightest channel mean ${brightest.toFixed(1)})`);
@@ -274,7 +276,9 @@ try {
       if (withHero >= MAX_BYTES) console.log(`WARN ${label}: with the whole hero video streamed the initial transfer is ${(withHero / 1e6).toFixed(2)} MB (budget 3 MB)`);
       await check(`${label}: CLS under 0.1 after load + 2 s`, () => assert.ok(cls < 0.1, `CLS ${cls}`));
       const lcp = await page.evaluate(() => window.__lcp);
-      const posterRequests = tracked.urls.filter((url) => /hero-section-video[^/]*\.webp/.test(url));
+      const posterRequests = tracked.urls.filter((url) => (viewport.width / viewport.height <= 10 / 16 ? /hero-portrait[^/]*\.webp/ : /hero-section-video[^/]*\.webp/).test(url));
+      const otherPoster = tracked.urls.filter((url) => (viewport.width / viewport.height <= 10 / 16 ? /hero-section-video[^/]*\.webp/ : /hero-portrait[^/]*\.webp/).test(url));
+      await check(`${label}: only this orientation's poster is fetched (D-153)`, () => assert.deepEqual(otherPoster, []));
       console.log(`INFO ${label}: LCP ${lcp && lcp.time} ms (${lcp && lcp.tag} ${lcp && lcp.url.replace(BASE, '')}); poster requests: ${posterRequests.length}`);
       await check(`${label}: LCP under 2500 ms (local preview, unthrottled)`, () => {
         assert.ok(lcp, 'no largest-contentful-paint entry');

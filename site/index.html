@@ -20,7 +20,9 @@
     <meta property="og:image:height" content="630" />
     <meta property="og:image:alt" content="Brivia Club: find the people near you who love what you love." />
     <meta name="twitter:card" content="summary_large_image" />
-    <link rel="preload" as="image" href="./media/posters/hero-section-video.webp" fetchpriority="high" />
+    <!-- D-153: phones in portrait get the portrait poster (the first frame of the subject-following crop). -->
+    <link rel="preload" as="image" href="./media/posters/hero-section-video.webp" media="(min-aspect-ratio: 10/16)" fetchpriority="high" />
+    <link rel="preload" as="image" href="./media/posters/hero-portrait.webp" media="(max-aspect-ratio: 10/16)" fetchpriority="high" />
     <link rel="preload" as="font" type="font/woff2" fetchpriority="low" href="../node_modules/@fontsource/instrument-sans/files/instrument-sans-latin-700-normal.woff2" crossorigin />
     <script>
       /* D-088: a sign-in that Supabase returns to the Site URL (this page) instead of auth.html goes straight on to the
@@ -82,6 +84,14 @@
           <source src="./media/video/hero-4k-hevc.mp4" type='video/mp4; codecs="hvc1.1.6.L150.90"' data-width="3840" data-height="2160" data-bitrate="6000000" />
           <source src="./media/video/hero-4k-h264.mp4" type='video/mp4; codecs="avc1.640033"' data-width="3840" data-height="2160" data-bitrate="12000000" />
         </video>
+        <script>
+          /* D-153: the portrait poster on portrait phones, set before first paint (a poster cannot take a media query). */
+          (() => {
+            const v = document.currentScript.previousElementSibling;
+            const portrait = document.querySelector('link[rel="preload"][media="(max-aspect-ratio: 10/16)"]');
+            if (v && portrait && window.matchMedia('(max-aspect-ratio: 10/16)').matches) v.poster = portrait.href;
+          })();
+        </script>
         <div class="hero-video-overlay" aria-hidden="true"></div>
         <div class="hero-copy">
           <h1 class="brand-wordmark"><span>the</span> <strong>Brivia Club</strong></h1>
