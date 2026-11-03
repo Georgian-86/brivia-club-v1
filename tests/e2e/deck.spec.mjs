@@ -215,7 +215,7 @@ try {
   await page.locator('[data-action="like"]').dispatchEvent('click');
   await page.waitForSelector('#pitch-modal:not([hidden])');
   const pitch = await page.locator('#pitch-message').inputValue();
-  check(`A5: the neutral pitch line for a card with no tags/shared (got "${pitch}")`, () => assert.equal(pitch, "Hey Dana Blank, I'd love to connect and exchange ideas."));
+  check(`A5: the neutral pitch line for a card with no tags/shared (got "${pitch}")`, () => assert.equal(pitch, "Hi Dana! I'd love to connect and hear what you're working on."));  // D-154: the first opener, first name
   await page.waitForTimeout(450);
   // D-124: closing cancels, so the plain like is the explicit "Send without a note".
   await page.locator('#pitch-modal .pitch-no-note').click();
