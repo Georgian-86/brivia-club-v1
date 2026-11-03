@@ -19,8 +19,11 @@ begin
   if ids is distinct from 'in-ludhiana' then raise exception 'FAIL G1: prefix found %', ids; end if;   -- linked to the existing place
   if (select id from public.search_cities('Bangalore') limit 1) <> 'in-bengaluru' then raise exception 'FAIL G1: alias'; end if;
   if (select id from public.search_cities('Ludhiyana') limit 1) <> 'in-ludhiana' then raise exception 'FAIL G1: typo'; end if;
-  if (select id from public.search_cities('sao paulo') limit 1) <> 'geo-900004' then raise exception 'FAIL G1: accents'; end if;
-  if (select id from public.search_cities('東京') limit 1) <> 'geo-900003' then raise exception 'FAIL G1: native script'; end if;
+  if (select name from public.search_cities('sao paulo') limit 1) <> 'São Paulo' then raise exception 'FAIL G1: accents'; end if;
+  if (select name from public.search_cities('東京') limit 1) is distinct from 'Tokyo' then raise exception 'FAIL G1: native script'; end if;
+  if (select id from public.search_cities('ಬೆಂಗಳೂರು') limit 1) <> 'in-bengaluru' then raise exception 'FAIL G1: Indic script (0037)'; end if;
+  if (select id from public.search_cities('लुधियाना') limit 1) <> 'in-ludhiana' then raise exception 'FAIL G1: Devanagari (0037)'; end if;
+  if (select name from public.search_cities('Japan') limit 1) <> 'Tokyo' then raise exception 'FAIL G1: a country first (0037)'; end if;
   if (select id from public.search_cities('Springfield, Missouri') limit 1) <> 'geo-900002' then raise exception 'FAIL G1: city, state'; end if;
   if (select count(*) from public.search_cities('Springfield')) <> 2 then raise exception 'FAIL G1: same-named cities'; end if;
   if (select id from public.search_cities('Kharar, India') limit 1) <> 'geo-900005' then raise exception 'FAIL G1: city, country'; end if;

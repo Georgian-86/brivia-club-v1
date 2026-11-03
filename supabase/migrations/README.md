@@ -1130,6 +1130,8 @@ select has_function_privilege('authenticated', 'public.my_notifications_v2()', '
 ## 0035
 
 **A worldwide city directory for every "Pick my city" (founder request 2026-11-03, D-140).**
+**APPLIED 2026-11-03**; pg_net enabled; 16 parts imported (156,169 cities, 156,169 centroids; 80 linked to existing
+places; 28 aliases).
 Apply after `0034`. The client can deploy before or after: before 0035 it searches the old place list.
 
 Then load the cities (156,169 rows in 16 parts published with the site; about a minute). In the SQL editor, as postgres:
@@ -1152,6 +1154,7 @@ Verify: `select id, name, region, country from public.search_cities('Ludhiana');
 ## 0036
 
 **A company / organisation on every profile (founder request 2026-11-03, D-140).**
+**APPLIED 2026-11-03**; Edge Function `directory` deployed (v1, verify_jwt on).
 Apply after `0035`. Then deploy the Edge Function `directory` (`supabase/functions/directory/index.ts`, verify_jwt on;
 it uses the platform's SUPABASE_URL, SUPABASE_ANON_KEY and SUPABASE_SERVICE_ROLE_KEY, no extra secret). The client can
 deploy before 0036: without it the company field stays empty and nothing breaks.
@@ -1164,3 +1167,11 @@ select has_function_privilege('authenticated', 'public.member_work(uuid[])', 'ex
        has_function_privilege('authenticated', 'public.brivia_cache_companies(jsonb)', 'execute');  -- f
 ```
 Moderation (verify, add, remove, merge): docs/MODERATION.md "Companies and logos".
+
+## 0037
+
+**City search fixes found on the live directory (D-140).** **APPLIED 2026-11-03.**
+Apply after `0036`. `brivia_fold` removes only spaces and punctuation (it used to drop the vowel signs of Indic scripts,
+so native names could not be found) and the stored keys are recomputed; a country typed alone ("Japan") lists its
+largest cities first. Verify: `select name from public.search_cities('Japan', 4);` (Tokyo, Yokohama, Osaka, Nagoya),
+`select name from public.search_cities('बेंगलुरु');` (Bengaluru).
