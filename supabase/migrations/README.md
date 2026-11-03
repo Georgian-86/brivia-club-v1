@@ -1111,6 +1111,8 @@ select tgname from pg_trigger where tgrelid = 'public.profiles'::regclass and tg
 ## 0034
 
 **A crossing says where; retention is one setting (founder request 2026-11-03, D-138).**
+**APPLIED 2026-11-03** (retention row 20/24/24/7/30; my_notifications_v2 callable by members; nearby_retention and
+brivia_live_place not). Edge Function `push-notify` redeployed (v3, verify_jwt on).
 Apply after `0033`, then redeploy the Edge Function `push-notify` (it now reads `place_name`). The client can deploy
 before 0034: it asks `my_notifications_v2` and falls back to `my_notifications` when it is missing.
 
