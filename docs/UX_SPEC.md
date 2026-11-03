@@ -357,6 +357,35 @@ labelled "PRIVATE · ONLY YOU SEE THESE", and the hero and the area stat show th
       not a signal). A like-back from the deck waits for the reset, even though the server would let a completing
       signal through.
 
+### B2. Nearby (`app.html?view=nearby`, D-131)
+
+Reached from Connect's **Curated / Nearby** switch (under the heading; on phones it sits above the card). The Connect
+tab stays current. Head: "CONNECT / NEARBY", "People *around you.*", "Discover interesting people crossing paths with
+you.", the switch, then the radius line "People within 1 km of you", a 1 km / 3 km / 5 km picker and a refresh button,
+and "Good people might be closer than you think." in wine italic. Desktop uses Connect's two columns (head left, card
+and actions right, one screen at 1440x1000); phones stack.
+
+One card at a time with the next peeking behind (the companion card vocabulary): the "LOOKING FOR · …" bar (one line),
+cover, round photo with a green "here now" dot when seen in the last 5 minutes, name, headline, "City · Under 1 km away"
+(or "1–3 km away", "3–5 km away"; never metres) and a "Here now" pill, the bio (3 lines), "You both: …" chips first then
+other interests, a Skills line, and View profile. "Wants to connect with you" on the cover when they already asked.
+Actions under it, each labelled: Pass, View profile, Connect. Drag right or → opens "Make the first move." prefilled
+with "Hi! Saw you're nearby. Let's connect and share our interests." (editable, two more suggestions); left or ← passes.
+A mutual connect shows "Well, look who *crossed paths!*" with Keep exploring / Start conversation.
+
+States: switch off → "Turn on Crossing Paths to discover people around you." + Turn on Crossing Paths (the explainer,
+then the browser prompt); an alerts-only switch from before 0029 → "Nearby is new" + Turn on Nearby; location blocked or
+unavailable → paused, with why and Try again (or Allow location); waiting for a first fix → "Finding people around
+you…"; nobody → "Looks a little quiet around here. We'll let you know when someone crosses your path." + "Look within
+3 km" (or 5); before 0029 → "Nearby opens soon".
+
+Settings → CROSSING PATHS: "Discover when other Brivia members are nearby. Only members who enable this feature can
+discover you." The explainer: Discover people around you (within 5 km, only members who turned it on); Never your exact
+place (city and a band, a ~1 km area kept 20 minutes, no history); Connections get a quiet alert; Only while Brivia is
+open, off at once. Requests from Nearby: the panel says "Someone nearby wants to connect with you" (one toast), the
+review card shows "Crossed paths nearby"; a Nearby match tells the member who connected first once (toast and a "You and
+<name> crossed paths" row with Say hello).
+
 ### C. Search and Long-Range Request
 
 - Results show the distance band and resonance %. For a person in ring ≥ 3, the primary action is **Send long-range

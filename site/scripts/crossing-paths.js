@@ -9,7 +9,7 @@
 import { locateOnce } from './geo-locate.js';
 
 export const PULSE_MS = 5 * 60 * 1000;
-// A fix up to 5 minutes old is fine; coarse is enough (the server keeps a ~2.3 km cell).
+// A fix up to 5 minutes old is fine; coarse is enough (the server keeps a ~2.3 km cell, and a ~1 km one for Nearby, D-131).
 export const NEARBY_GEO_OPTIONS = Object.freeze({ enableHighAccuracy: false, timeout: 15000, maximumAge: 5 * 60 * 1000 });
 const MISSING = new Set(['PGRST202', '42883']);
 const isMissing = (error) => Boolean(error) && (MISSING.has(error.code) || error.status === 404);
@@ -57,7 +57,7 @@ export const createCrossingPaths = ({
   geo = globalThis.navigator?.geolocation,
   secure = Boolean(globalThis.isSecureContext),
   permission = () => geolocationPermission(),
-  onAlerts = () => {}, onStatus = () => {},
+  onAlerts = () => {}, onStatus = () => {}, onPulse = () => {},
   intervalMs = PULSE_MS,
   doc = globalThis.document, win = globalThis.window,
   setIntervalFn = (fn, ms) => globalThis.setInterval(fn, ms), clearIntervalFn = (id) => globalThis.clearInterval(id),
@@ -107,6 +107,8 @@ export const createCrossingPaths = ({
       const { error } = (await pulse(fix.lat, fix.lng)) || {};
       if (isMissing(error)) { giveUp(); return; }
       if (!error || isRateLimited(error)) setStatus('on');
+      // D-131: a fresh live location (or one under 4 minutes old): Nearby reads who is around again.
+      if (!error) onPulse();
       await refreshAlerts();
     } finally { busy = false; }
   };

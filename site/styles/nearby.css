@@ -1,0 +1,133 @@
+/* Nearby (D-131): "Connect / Nearby". The page and its cards reuse the companion vocabulary (companions.css: the room
+   backdrop, the wine-barred paper card with a round photo over the cover, Bodoni name, pale chips, the match dialog);
+   this file adds only what Nearby has of its own: the Curated / Nearby switch, the radius line, distance picker and
+   refresh, the "here now" mark, the bio and skills lines, and the three labelled actions. Tokens only. */
+body.app-body .nearby-view { --nb-green: var(--color-presence); }
+
+/* The Curated / Nearby switch (also on Connect, under the heading). */
+.connect-mode {
+  display: inline-flex; gap: 4px; margin-top: var(--space-5); padding: 4px; border: 1px solid var(--color-line); border-radius: var(--radius-pill);
+  background: color-mix(in srgb, var(--color-cream) 82%, transparent); box-shadow: 0 8px 20px -14px color-mix(in srgb, var(--color-wine-deep) 50%, transparent);
+  -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px);
+}
+body.app-body .connect-mode-btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-width: 112px; min-height: 40px; padding: 0 var(--space-4);
+  border: 0; border-radius: var(--radius-pill); background: transparent; color: var(--color-ink); font-family: var(--font-heading); font-size: var(--text-16);
+  cursor: pointer; transition: background var(--motion-fast) var(--ease), color var(--motion-fast) var(--ease);
+}
+body.app-body .connect-mode-btn svg { width: 15px; height: 15px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+body.app-body .connect-mode-btn.is-active { background: var(--color-wine-deep); color: var(--color-cream); cursor: default; }
+@media (hover: hover) { body.app-body .connect-mode-btn:not(.is-active):hover { background: color-mix(in srgb, var(--color-wine) 8%, transparent); } }
+body.app-body .connect-mode-btn:focus-visible { outline: 2px solid var(--color-wine); outline-offset: 2px; }
+
+/* Head: the title block, then the radius line, the distance picker and refresh. */
+.nearby-head { display: grid; gap: var(--space-5); align-items: end; margin: 8px 0 var(--space-3); }
+body.app-body .nearby-view .nearby-head h1 { margin: var(--space-3) 0 0; color: var(--color-ink); font-family: var(--font-heading); font-size: clamp(40px, 4.4vw, 58px); font-weight: 400; line-height: .98; letter-spacing: -.03em; }
+body.app-body .nearby-view .nearby-head h1 em { color: var(--color-wine); font-style: italic; font-weight: 500; }
+.nearby-sub { max-width: 360px; margin: var(--space-3) 0 0; color: var(--color-ink-soft); font-size: var(--text-16); line-height: 1.45; }
+.nearby-tools { display: flex; flex-wrap: nowrap; align-items: center; gap: var(--space-3); min-width: 0; }
+.nearby-radius-line span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.nearby-radius-line { flex: 0 1 auto; min-width: 0; display: inline-flex; align-items: center; gap: var(--space-2); margin: 0 var(--space-2) 0 0; color: var(--color-ink); font-family: var(--font-heading); font-size: var(--text-18, 18px); }
+.nearby-radius-line svg { width: 20px; height: 20px; color: var(--color-wine); }
+body.app-body .nearby-radius select { max-width: 110px; }
+body.app-body .nearby-refresh {
+  display: grid; place-items: center; width: 44px; height: 44px; padding: 0; border: 1px solid var(--color-line); border-radius: 50%;
+  background: color-mix(in srgb, var(--color-cream) 80%, transparent); color: var(--color-wine); cursor: pointer;
+}
+body.app-body .nearby-refresh svg { width: 18px; height: 18px; }
+body.app-body .nearby-refresh.is-spinning svg { animation: nearby-spin .9s linear infinite; }
+body.app-body .nearby-refresh:disabled { opacity: .45; cursor: default; }
+body.app-body .nearby-refresh:focus-visible { outline: 2px solid var(--color-wine); outline-offset: 3px; }
+@keyframes nearby-spin { to { transform: rotate(360deg); } }
+.nearby-lead { margin: 0 0 var(--space-5); color: var(--color-wine); font-family: var(--font-heading); font-size: var(--text-16); font-style: italic; }
+
+/* The deck: one card at a time, the next one peeking behind it. */
+.nearby-deck { position: relative; min-height: 560px; outline: none; }
+.nearby-keys { margin: var(--space-4) 0 0; color: var(--color-ink-soft); font-size: var(--text-12); text-align: center; }
+.companion-row.nearby-row { position: relative; display: grid; grid-template-columns: minmax(0, 400px); justify-content: center; }
+.nearby-row .nearby-card { grid-area: 1 / 1; }
+.nearby-row .nearby-card:not(.is-current) { transform: translateY(14px) scale(.96); opacity: .55; pointer-events: none; filter: saturate(.85); }
+.nearby-row .nearby-card.is-current { z-index: 1; }
+.nearby-card .companion-card-cover { position: relative; }
+/* A slightly shorter cover than the companion card, so the card and its actions fit one screen. */
+.nearby-card .companion-card-cover { aspect-ratio: 16 / 9; }
+/* The bar stays one line, as on the Connect card. */
+.nearby-card .companion-card-bar > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.nearby-asked {
+  position: absolute; left: var(--space-3); bottom: var(--space-3); padding: 5px 12px; border-radius: var(--radius-pill);
+  background: color-mix(in srgb, var(--color-cream) 92%, transparent); color: var(--color-wine-deep); font-size: var(--text-12); font-weight: 700; letter-spacing: .06em;
+}
+.nearby-card .companion-card-profile { position: relative; }
+.nearby-here {
+  position: absolute; right: 6px; bottom: 6px; width: 18px; height: 18px; border: 3px solid var(--color-cream); border-radius: 50%; background: var(--nb-green);
+  box-shadow: 0 0 0 0 color-mix(in srgb, var(--nb-green) 50%, transparent); animation: nearby-pulse 2.4s ease-out infinite;
+}
+@keyframes nearby-pulse { 70% { box-shadow: 0 0 0 9px color-mix(in srgb, var(--nb-green) 0%, transparent); } 100% { box-shadow: 0 0 0 0 transparent; } }
+.nearby-headline { margin: 2px 0 0; color: var(--color-ink); font-family: var(--font-heading); font-size: var(--text-16); line-height: 1.35; }
+.nearby-card .companion-place { flex-wrap: wrap; }
+.nearby-now { margin-left: var(--space-2); padding: 2px 9px; border-radius: var(--radius-pill); background: color-mix(in srgb, var(--nb-green) 13%, var(--color-cream)); color: color-mix(in srgb, var(--nb-green) 70%, var(--color-ink)); font-family: var(--font-body); font-size: var(--text-12); font-weight: 700; }
+.nearby-bio { margin: var(--space-2) 0 0; color: var(--color-ink-soft); font-size: var(--text-14); line-height: 1.5; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+.nearby-chips li.is-shared { box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--color-wine) 30%, transparent); }
+.nearby-skills { margin: var(--space-2) 0 0; color: var(--color-ink-soft); font-size: var(--text-12); line-height: 1.5; }
+.nearby-skills span { margin-right: 4px; color: var(--color-wine); font-weight: 700; letter-spacing: .08em; text-transform: uppercase; }
+body.app-body .nearby-view-profile { display: block; width: calc(100% - var(--space-2)); border: 0; font-family: var(--font-heading); cursor: pointer; }
+body.app-body .nearby-view-profile:focus-visible { outline: 2px solid var(--color-wine); outline-offset: 3px; }
+
+/* Actions: Pass, View profile, Connect ("Make the first move."), each labelled. */
+.nearby-actions { display: flex; justify-content: center; align-items: flex-start; gap: var(--space-6); margin-top: var(--space-6); }
+.nearby-actions[hidden] { display: none; }
+body.app-body .nearby-action {
+  display: flex; flex-direction: column; align-items: center; gap: var(--space-2); padding: 0; border: 0; background: none; color: var(--color-ink-soft);
+  font-size: var(--text-12); font-weight: 700; letter-spacing: .08em; text-transform: uppercase; cursor: pointer;
+}
+body.app-body .nearby-action svg {
+  box-sizing: content-box; width: 24px; height: 24px; padding: 18px; border: 1px solid var(--color-line); border-radius: 50%; background: var(--color-cream);
+  color: var(--color-wine); fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round;
+  box-shadow: 0 1px 2px color-mix(in srgb, var(--color-wine-deep) 10%, transparent), 0 18px 32px -20px color-mix(in srgb, var(--color-wine-deep) 60%, transparent);
+  transition: transform var(--motion-fast) var(--ease), background var(--motion-fast) var(--ease);
+}
+body.app-body .nearby-action-profile svg { padding: 14px; }
+body.app-body .nearby-action-like { color: var(--color-wine-deep); }
+body.app-body .nearby-action-like svg { padding: 22px; border-color: var(--color-wine); background: var(--color-wine); color: var(--color-cream); fill: currentColor; stroke: none; }
+@media (hover: hover) { body.app-body .nearby-action:hover svg { transform: translateY(-2px); } body.app-body .nearby-action-like:hover svg { background: var(--color-wine-deep); } }
+body.app-body .nearby-action:focus-visible { outline: none; }
+body.app-body .nearby-action:focus-visible svg { outline: 2px solid var(--color-wine); outline-offset: 4px; }
+body.app-body .nearby-action:disabled { opacity: .6; cursor: progress; }
+
+.nearby-empty { position: relative; }
+.nearby-empty-mark {
+  display: block; width: 56px; height: 56px; margin: 0 auto var(--space-4); border-radius: 50%;
+  background: radial-gradient(circle, var(--color-wine) 0 5px, transparent 6px), radial-gradient(circle, color-mix(in srgb, var(--color-wine) 18%, transparent) 0 18px, transparent 19px), radial-gradient(circle, color-mix(in srgb, var(--color-wine) 8%, transparent) 0 27px, transparent 28px);
+}
+body.app-body .nearby-empty .event-btn { border: 1px solid var(--color-wine); }
+body.app-body .nearby-empty .event-btn-primary { background: var(--color-wine); color: var(--color-cream); }
+
+/* Desktop: Connect's two columns. The title, the switch and the distance tools on the left; the card and its actions
+   on the right, so the whole card and Pass / Connect sit in one screen. */
+@media (min-width: 1080px) {
+  .nearby-main {
+    display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 420px); grid-template-rows: auto auto 1fr auto;
+    grid-template-areas: "head deck" "lead deck" ". deck" ". actions" ". keys"; column-gap: clamp(48px, 7vw, 132px); align-items: start;
+  }
+  .nearby-head { grid-area: head; align-self: start; margin-top: var(--space-6); }
+  .nearby-lead { grid-area: lead; }
+  .nearby-deck { grid-area: deck; min-height: 0; }
+  .nearby-actions { grid-area: actions; margin-top: var(--space-5); }
+  .nearby-main > .nearby-keys { grid-area: keys; }
+  .nearby-tools { margin-top: var(--space-2); }
+  .companion-row.nearby-row { grid-template-columns: minmax(0, 420px); }
+}
+@media (max-width: 759px) {
+  body.app-body .nearby-view { padding: var(--space-5) var(--space-4) calc(var(--space-8) + 40px); }
+  .nearby-head { gap: var(--space-4); }
+  .nearby-tools { flex-wrap: wrap; }
+  .nearby-radius-line { flex: 1 0 100%; font-size: var(--text-16); }
+  body.app-body .nearby-refresh { flex: 0 0 44px; }
+  .nearby-deck { min-height: 0; }
+  .nearby-actions { gap: var(--space-5); margin-top: var(--space-5); }
+  body.app-body .connect-mode-btn { min-width: 0; flex: 1; }
+  .connect-mode { display: flex; }
+}
+@media (prefers-reduced-motion: reduce) { .nearby-here, body.app-body .nearby-refresh.is-spinning svg { animation: none; } .nearby-row .nearby-card:not(.is-current) { transition: none; } }
+/* Nearby's empty states are full sentences ("Turn on Crossing Paths to …"): a calmer size than the companion's titles. */
+body.app-body .nearby-view .nearby-empty h2 { font-size: var(--text-24); line-height: 1.2; }

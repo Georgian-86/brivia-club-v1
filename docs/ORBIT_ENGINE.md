@@ -898,6 +898,39 @@ get one alert each when their live cells are near each other. Design and copy: `
   delete the live cell at once; otherwise it is ignored after 20 minutes and purged (`purge_nearby()`, every 30 min with
   pg_cron). The other member is never told why someone is not nearby.
 
+#### 9.1.4b Nearby (discover members around you, D-131, 0029)
+
+Opt-in discovery of members who are physically near, separate from ORBIT's ranking. It extends Crossing paths (§9.1.4a):
+same switch, same pulse, same caps.
+
+- **Not ORBIT input.** Like §9.1.4a, the live location never reaches `member_orbit`, rings, bands, the deck, search or the
+  k-anonymity counts. Nearby's order is its own: most shared (non-sensitive) interests first, then the distance band,
+  then the most recently here, which keeps the north star (mutual interests drive a match; location comes first).
+- **Precision (founder decision, D-131: "1 km").** The pulse keeps, next to the ~2.3 km g7 cell, one ~1 km cell of the
+  same fix (`brivia_near_cell`, 108 rows per degree, prefix `n8:`, its own functions so the ORBIT grid stays levels 5-7).
+  It lives only in `nearby_live.near_cell` (deleted when the switch goes off or location is lost, ignored after 20
+  minutes, purged every 30). Clients get a band only, from cell centres: `'1'` under 1 km (same or edge-adjacent
+  cell), `'3'` up to 3 km, `'5'` up to 5 km, plus a city (the place nearest the g7 cell). Never metres, a cell or a
+  coordinate. Radius choices are 1, 3 and 5 km (no 500 m: finer than the cell).
+- **Consent and symmetry.** You discover others only while your switch is on, your discovery consent is recorded and
+  your live location is fresh; you are discoverable only under the same three conditions. Discovery consent is
+  `nearby_setting.discoverable_at`, set by every `set_nearby_enabled(true)` from 0029 on (the explainer describes
+  discovery); a switch turned on before 0029 (alerts between connections only) keeps its alerts but neither discovers
+  nor appears until turned on again.
+- **Who appears** (`brivia_nearby_pool`): both on and consented, both live within 20 minutes, `brivia_visible_to`
+  (completed, same world, no block), not already connected, not already asked by the viewer (one request per direction,
+  ever), not passed by the viewer in the last 7 days (`nearby_passed`). A member who asked you is shown (`asked_me`), so
+  your Connect makes it mutual.
+- **Mutual consent.** Connect is `nearby_connect(p_to, p_note)`: exactly `send_connect_request` (quota, caps, 'sent' /
+  'matched' / 'chat') plus `connection_requests.via = 'nearby'` when `p_to` is discoverable to the caller at that moment.
+  A right swipe never makes a match by itself: the match is the existing crossing-request rule (both asked) or Accept.
+  Each note becomes the first chat message exactly once (0024, 0028). A pass is silent (`nearby_pass`).
+- **Telling people.** The recipient's request says "Someone nearby wants to connect with you" (`via`); a match that
+  began on Nearby is listed by `my_nearby_matches()` (7 days) so the member who connected first is told too. Each is
+  announced once per device.
+- **Anti-probing.** Position changes only through `nearby_pulse` (one every 4 minutes, 24 cell changes a day); a cell
+  of ~1 km and three bands bound what repeated reads can reveal to about a cell. `nearby_discover` reads only.
+
 #### 9.1.5 What leaves the service
 
 - **`toCard` is the only serializer** (`orbit/README.md`). Route handlers return `Card[]` only; a `Scored` object,

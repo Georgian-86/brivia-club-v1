@@ -102,7 +102,7 @@ try {
     await page.locator('[data-nearby-setting]').click();
     await page.waitForSelector('#crossing-paths-explainer');
     const text = await page.locator('#crossing-paths-explainer').innerText();
-    check(`${w}: the explainer says who sees it, what they see and how to turn it off`, /Only connections/.test(text) && /Never your exact place/.test(text) && /Turn it off/.test(text));
+    check(`${w}: the explainer says who sees it, what they see and how to turn it off`, /Discover people around you/.test(text) && /Never your exact place/.test(text) && /Connections get a quiet alert/.test(text) && /Turn it off any time/.test(text));   // D-131 wording
     const axe = await axeViolations(page, { include: '#crossing-paths-explainer' });
     check(`${w}: axe on the explainer`, axe.length === 0, JSON.stringify(axe));
     await shot(page, `explainer-${w}.png`);
@@ -110,11 +110,11 @@ try {
     check(`${w}: Not now leaves it off and saves nothing`, !(await page.locator('#profile-nearby-toggle').isChecked()) && posted('set_nearby_enabled').length === 0);
     await page.locator('[data-nearby-setting]').click();
     await page.locator('[data-nearby-confirm]').click();
-    await page.waitForFunction(() => /Crossing paths is on/.test(document.querySelector('#notification-settings-feedback')?.textContent || ''));
+    await page.waitForFunction(() => /Crossing Paths is on/i.test(document.querySelector('#notification-settings-feedback')?.textContent || ''));
     await page.waitForTimeout(300);
     check(`${w}: Turn on saves set_nearby_enabled(true) and sends a position`, JSON.parse(posted('set_nearby_enabled').at(-1)?.body || '{}').p_enabled === true && posted('nearby_pulse').length >= 1 && await page.locator('#profile-nearby-toggle').isChecked());
     await page.locator('[data-nearby-setting]').click();
-    await page.waitForFunction(() => /Crossing paths is off/.test(document.querySelector('#notification-settings-feedback')?.textContent || ''));
+    await page.waitForFunction(() => /Crossing Paths is off/i.test(document.querySelector('#notification-settings-feedback')?.textContent || ''));
     check(`${w}: off saves set_nearby_enabled(false)`, JSON.parse(posted('set_nearby_enabled').at(-1)?.body || '{}').p_enabled === false);
     await ctx.close();
   }

@@ -17,7 +17,7 @@
       <main class="app-main">
         <section class="app-view is-active" data-view="home">
           <div class="view-topline home-layout-spacer" aria-hidden="true"><span>DISCOVERY / 001</span><span id="queue-count">01 / 06</span></div>
-          <div class="home-heading"><button class="app-menu-button" id="open-discovery-filters" type="button" aria-label="Open discovery filters" aria-controls="discovery-filter-drawer" aria-expanded="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 8h16M4 16h16"/><circle cx="10" cy="8" r="1.6"/><circle cx="15" cy="16" r="1.6"/></svg></button><p class="home-kicker"><span>THE BRIVIA CLUB</span></p><h1>CONNECTION<span class="home-comma">,</span><br /><em>CURATED.</em></h1></div>
+          <div class="home-heading"><button class="app-menu-button" id="open-discovery-filters" type="button" aria-label="Open discovery filters" aria-controls="discovery-filter-drawer" aria-expanded="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 8h16M4 16h16"/><circle cx="10" cy="8" r="1.6"/><circle cx="15" cy="16" r="1.6"/></svg></button><p class="home-kicker"><span>THE BRIVIA CLUB</span></p><h1>CONNECTION<span class="home-comma">,</span><br /><em>CURATED.</em></h1><div class="connect-mode" role="group" aria-label="Who to show"><button type="button" class="connect-mode-btn is-active" data-connect-mode="curated" aria-pressed="true">Curated</button><button type="button" class="connect-mode-btn" data-connect-mode="nearby" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 21s-6.5-6.2-6.5-11a6.5 6.5 0 0 1 13 0c0 4.8-6.5 11-6.5 11Z"/><circle cx="12" cy="10" r="2.3"/></svg>Nearby</button></div></div>
           <div class="swipe-stack" id="swipe-stack">
           <div class="swipe-card-back" id="swipe-card-back" aria-hidden="true" hidden></div>
           <div class="swipe-card-next" id="swipe-card-next" aria-hidden="true" hidden><div class="swipe-card-next-image"><img id="swipe-next-image" alt="" draggable="false" hidden /></div><p class="swipe-card-next-name" id="swipe-next-name"></p></div>
@@ -73,6 +73,31 @@
               <button type="button" class="companion-action companion-action-like" id="companion-like" aria-label="Connect: I'd like to go together"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 20s-7.5-4.6-7.5-10.2A4.3 4.3 0 0 1 12 7.2a4.3 4.3 0 0 1 7.5 2.6C19.5 15.4 12 20 12 20Z"/></svg></button>
             </div>
             <p class="companion-keys">Use ← and → to pass or connect. Going together needs both of you to connect.</p>
+          </div>
+        </section>
+
+
+        <!-- Nearby (D-131): members around you who turned Crossing Paths on too, as swipeable cards. Reached from Connect. -->
+        <section class="app-view nearby-view" data-view="nearby" hidden aria-labelledby="nearby-heading">
+          <div class="companions-main nearby-main">
+            <div class="nearby-head">
+              <div class="nearby-title"><p class="app-eyebrow">CONNECT / NEARBY</p><h1 id="nearby-heading">People <em>around you.</em></h1>
+                <p class="nearby-sub">Discover interesting people crossing paths with you.</p><div class="connect-mode" role="group" aria-label="Who to show"><button type="button" class="connect-mode-btn" data-connect-mode="curated" aria-pressed="false">Curated</button><button type="button" class="connect-mode-btn is-active" data-connect-mode="nearby" aria-pressed="true"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 21s-6.5-6.2-6.5-11a6.5 6.5 0 0 1 13 0c0 4.8-6.5 11-6.5 11Z"/><circle cx="12" cy="10" r="2.3"/></svg>Nearby</button></div></div>
+              <div class="nearby-tools">
+                <p class="nearby-radius-line"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M3.5 11.2 20 4l-7.2 16.5-1.9-7.4-7.4-1.9Z"/></svg><span id="nearby-radius-line">People within 1 km of you</span></p>
+                <label class="companion-picker nearby-radius"><span class="sr-only">Distance</span><select id="nearby-radius"></select><svg class="companion-picker-chevron" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M6 9l6 6 6-6"/></svg></label>
+                <button type="button" class="nearby-refresh" id="nearby-refresh" aria-label="Refresh: look for people nearby again"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M20 12a8 8 0 1 1-2.3-5.6M20 4v4.5h-4.5"/></svg></button>
+              </div>
+            </div>
+            <p class="nearby-lead">Good people might be closer than you think.</p>
+            <p class="sr-only" id="nearby-status" role="status" aria-live="polite"></p>
+            <div class="nearby-deck" id="nearby-deck" tabindex="-1" aria-label="People around you"></div>
+            <div class="nearby-actions" hidden>
+              <button type="button" class="nearby-action nearby-action-pass" id="nearby-pass" aria-label="Pass"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M6 6l12 12M18 6 6 18"/></svg><span>Pass</span></button>
+              <button type="button" class="nearby-action nearby-action-profile" id="nearby-profile" aria-label="View profile"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="12" cy="8.5" r="3.5"/><path d="M5 20c.8-3.6 3.6-5.5 7-5.5s6.2 1.9 7 5.5"/></svg><span>View profile</span></button>
+              <button type="button" class="nearby-action nearby-action-like" id="nearby-like" aria-label="Make the first move. Connect"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 20s-7.5-4.6-7.5-10.2A4.3 4.3 0 0 1 12 7.2a4.3 4.3 0 0 1 7.5 2.6C19.5 15.4 12 20 12 20Z"/></svg><span>Connect</span></button>
+            </div>
+            <p class="nearby-keys">Swipe right or press → to make the first move, left or ← to pass. It's a match only when you both connect.</p>
           </div>
         </section>
 
@@ -156,10 +181,11 @@
     <dialog class="event-ask-dialog" id="event-ask-dialog" aria-labelledby="event-ask-title"><form method="dialog" class="event-ask-form" id="event-ask-form" novalidate><div class="event-companions-head"><div><p class="app-eyebrow">ASK THE ORGANISER</p><h2 id="event-ask-title">Ask a question</h2></div><button type="button" class="event-companions-close" data-ask-close aria-label="Close">×</button></div><p class="event-companions-lede" id="event-ask-lede">Your question goes to the organiser as a request with a note. You can chat once they accept.</p><label class="event-ask-label" for="event-ask-text">Your question</label><textarea id="event-ask-text" rows="4" maxlength="200" required aria-describedby="event-ask-lede event-ask-error"></textarea><p class="event-field-error" id="event-ask-error" role="alert"></p><div class="event-ask-actions"><button type="button" class="event-btn event-btn-ghost" data-ask-close>Cancel</button><button type="submit" class="event-btn event-btn-primary">Send question</button></div></form></dialog>
     <dialog class="connect-composer-dialog" id="connect-composer-dialog"></dialog>
     <dialog class="companion-match-dialog" id="companion-match-dialog" aria-labelledby="companion-match-title"><div class="companion-match-body"></div></dialog>
+    <dialog class="companion-match-dialog nearby-match-dialog" id="nearby-match-dialog" aria-labelledby="companion-match-title"><div class="companion-match-body"></div></dialog>
     <div class="app-toast" id="app-toast" role="status"></div>
     <script>
       (() => {
-        const validViews = ['home', 'explore', 'events', 'posts', 'chat', 'profile', 'companions'];
+        const validViews = ['home', 'explore', 'events', 'posts', 'chat', 'profile', 'companions', 'nearby'];
         const readView = () => new URLSearchParams(window.location.search).get('view') || window.location.hash.slice(1) || 'explore';
         const showView = (view) => {
           if (!validViews.includes(view)) view = 'explore';
@@ -170,7 +196,7 @@
             section.hidden = section.dataset.view !== renderedView;
             section.classList.toggle('is-active', section.dataset.view === renderedView);
           });
-          const current = view === 'home' || view === 'companions' ? 'explore' : view;
+          const current = view === 'home' || view === 'companions' || view === 'nearby' ? 'explore' : view;
           document.querySelectorAll('[data-nav]').forEach((item) => item.classList.toggle('is-active', item.dataset.nav === current));
           document.querySelectorAll('[data-nav-host] [data-nav]').forEach((item) => {
             if (item.dataset.nav === current) item.setAttribute('aria-current', 'page');

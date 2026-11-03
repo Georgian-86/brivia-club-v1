@@ -18,7 +18,7 @@ const VARIANTS = ['header', 'tabbar'];
 
 // The nav item that is current for a view: the 'home' alias renders the deck, so Connect.
 // D-123: the companions view belongs to Connect (no new tab).
-export const navViewFor = (view) => (view === 'home' || view === 'companions' ? 'explore' : view);
+export const navViewFor = (view) => (view === 'home' || view === 'companions' || view === 'nearby' ? 'explore' : view);
 
 export const navMarkup = (variant, activeView) => {
   if (!VARIANTS.includes(variant)) throw new Error(`navMarkup: unknown variant "${variant}"`);

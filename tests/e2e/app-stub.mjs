@@ -220,6 +220,33 @@ export const startAppStub = async ({ port, state = {}, deckRows = defaultDeckRow
         if (fn === 'my_nearby_alerts') return json(200, nb.enabled ? (nb.alerts || []).filter((a) => !(nb.muted || []).includes(a.other_id)) : []);
         if (fn === 'set_nearby_muted') { (nb.muted ||= []).push(args.p_other); return route.fulfill({ status: 204, body: '', headers: { 'access-control-allow-origin': '*' } }); }
       }
+      // D-131 Nearby (0029): st.nearbyPeople (nearby_discover rows, each with distance_band '1' | '3' | '5'); null answers
+      // PGRST202 as before 0029. st.nearbyLikedMe: ids whose connect back makes a match. st.nearbyConsent === false: an
+      // alerts-only switch from before 0029. Discovery needs the switch on and a pulse first ('location needed').
+      if (['/rest/v1/rpc/nearby_discover', '/rest/v1/rpc/nearby_pass', '/rest/v1/rpc/nearby_connect', '/rest/v1/rpc/my_nearby_matches'].includes(pathName)) {
+        if (!st.nearbyPeople) return json(404, { code: 'PGRST202', message: 'Could not find the function' });
+        const fn = pathName.slice(13);
+        const nb = st.nearby || {};
+        if (fn === 'nearby_discover') {
+          (st.nearbyDiscovers ||= []).push(args);
+          if (!nb.enabled || st.nearbyConsent === false) return json(400, { code: '22023', message: 'nearby off' });
+          if (!(nb.pulses || []).length) return json(400, { code: '22023', message: 'location needed' });
+          const gone = new Set([...(st.nearbyPassed || []), ...(st.nearbyConnects || []).map((c) => c.p_to), ...st.matchIds]);
+          return json(200, st.nearbyPeople.filter((p) => Number(p.distance_band) <= Number(args.p_radius_km) && !gone.has(p.member_id)));
+        }
+        if (fn === 'nearby_pass') { (st.nearbyPassed ||= []).push(args.p_other); return route.fulfill({ status: 204, body: '', headers: { 'access-control-allow-origin': '*' } }); }
+        if (fn === 'nearby_connect') {
+          (st.nearbyConnects ||= []).push(args);
+          const matched = (st.nearbyLikedMe || []).includes(args.p_to);
+          if (matched) {
+            st.matchIds.push(args.p_to);
+            const row = st.nearbyPeople.find((p) => p.member_id === args.p_to) || {};
+            (st.nearbyMatches ||= []).unshift({ other_id: args.p_to, name: row.name, photo_url: row.photo_url, matched_at: new Date().toISOString() });
+          }
+          return json(200, [{ status: matched ? 'matched' : 'sent', remaining: 28, resets_at: null }]);
+        }
+        if (fn === 'my_nearby_matches') return json(200, st.nearbyMatches || []);
+      }
       // D-117 events (0020): st.events (list_events rows; null answers the PGRST202 "function not found" of a database
       // without 0020), st.companions (event_companions rows), st.companionDefault; RSVPs change st.events in place.
       if (['/rest/v1/rpc/list_events', '/rest/v1/rpc/set_event_rsvp', '/rest/v1/rpc/set_companion_default', '/rest/v1/rpc/my_event_prefs', '/rest/v1/rpc/event_companions', '/rest/v1/rpc/save_member_event', '/rest/v1/rpc/cancel_member_event', '/rest/v1/rpc/delete_member_event'].includes(pathName) && !st.events) {

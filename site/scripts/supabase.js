@@ -393,6 +393,11 @@ export const nearbyPulse = (lat, lng) => rpcCall('nearby_pulse', { p_lat: lat, p
 export const nearbyClear = () => rpcCall('nearby_clear');
 export const myNearbyAlerts = () => rpcCall('my_nearby_alerts');
 export const setNearbyMuted = (otherId, muted) => rpcCall('set_nearby_muted', { p_other: otherId, p_muted: Boolean(muted) });
+// Nearby discovery (D-131, 0029): members around you who turned Crossing paths on too. Bands only ('1' / '3' / '5' km).
+export const nearbyDiscover = (radiusKm = 1, limit = 20) => rpcCall('nearby_discover', { p_radius_km: radiusKm, p_limit: limit });
+export const nearbyPass = (otherId) => rpcCall('nearby_pass', { p_other: otherId });
+export const nearbyConnect = (to, note) => rpcCall('nearby_connect', { p_to: to, p_note: note || null });
+export const myNearbyMatches = () => rpcCall('my_nearby_matches');
 export const isMissingFunction = (error) => ['PGRST202', '42883'].includes(error?.code) || error?.status === 404;
 
 // City list for "Pick my city": name or region match, launch cities first. Wildcards in the query are dropped.

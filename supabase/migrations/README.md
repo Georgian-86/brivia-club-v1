@@ -1014,3 +1014,24 @@ select position('brivia_messages' in pg_get_functiondef('public.brivia_create_ma
 select count(*) from (select 1 from public.brivia_messages group by sender_id, recipient_id, body, created_at
                       having count(*) > 1) d;                                                                    -- 0
 ```
+
+## 0029
+
+**Nearby: discover members around you (founder request 2026-11-03, D-131). Not yet applied.** Apply after `0021` and
+`0028`. The client can deploy first: before 0029 the Nearby page says "Nearby opens soon" and requests carry no label.
+
+What it does: a ~1 km live cell next to 0021's (`nearby_live.near_cell`, set by the redefined `nearby_pulse`, which is
+otherwise 0021's); discovery consent `nearby_setting.discoverable_at` (set by the redefined `set_nearby_enabled(true)`;
+the members who turned Crossing paths on before 0029 keep their alerts but must turn it on again to discover or appear);
+`nearby_passed`; `connection_requests.via` ('nearby' or null); `nearby_discover(radius 1|3|5)`, `nearby_pass`,
+`nearby_connect`, `my_nearby_matches` (authenticated); `purge_nearby` also drops passes older than 7 days. No member
+data is changed when it is applied.
+
+Verify after the apply:
+
+```sql
+select has_function_privilege('authenticated', 'public.nearby_discover(int,int)', 'execute'),   -- t
+       has_function_privilege('anon', 'public.nearby_discover(int,int)', 'execute'),            -- f
+       has_table_privilege('authenticated', 'public.nearby_passed', 'select'),                   -- f
+       (select count(*) from public.nearby_setting where discoverable_at is not null);           -- 0 (nobody consented yet)
+```

@@ -9,10 +9,15 @@ const initialsOf = (name) => name.split(/\s+/).filter(Boolean).slice(0, 2).map((
 const clean = (list) => (Array.isArray(list) ? list.map((x) => String(x || '').trim()).filter(Boolean) : []);
 
 // The panel's one-line summary: up to three faces and "N people want to connect"; null when there is nothing to review.
+// D-131: a request sent from Nearby says so ("Someone nearby wants to connect with you").
 export const collabSummary = (requests = []) => {
   if (!requests.length) return null;
   const n = requests.length;
-  return { avatars: requests.slice(0, 3).map((r) => r.person || { name: 'A Brivia member' }), text: n === 1 ? '1 person wants to connect' : `${n} people want to connect` };
+  const nearby = requests.filter((r) => r?.via === 'nearby').length;
+  let text = n === 1 ? '1 person wants to connect' : `${n} people want to connect`;
+  if (n === 1 && nearby) text = 'Someone nearby wants to connect with you';
+  else if (nearby) text += ` · ${nearby} nearby`;
+  return { avatars: requests.slice(0, 3).map((r) => r.person || { name: 'A Brivia member' }), text };
 };
 
 // What one card shows. A sender whose profile did not load still gets a full card. Shared interests: the server's
@@ -31,6 +36,7 @@ export const reviewCardModel = (request, myInterests = []) => {
     band: person ? String(person.distanceBand || '').trim() : '',
     shared,
     note: String(request?.note || '').trim(),
+    nearby: request?.via === 'nearby',
     initials: initialsOf(name),
   };
 };
@@ -50,6 +56,7 @@ export const reviewCardMarkup = (m, { index, total }, { escapeHtml, renderAvatar
     + `${renderAvatar(m.person || { name: m.name }, 'collab-avatar')}`
     + `<h3 class="collab-name">${escapeHtml(m.name)}</h3>`
     + (meta ? `<p class="collab-meta">${meta}</p>` : '')
+    + (m.nearby ? '<p class="collab-nearby">Crossed paths nearby</p>' : '')
     // D-124: their message first, in full: it is why they want to connect (and the first message of your chat if you accept).
     + (m.note ? `<blockquote class="collab-note"><p class="collab-label">Their message</p><p class="collab-note-text">${escapeHtml(m.note)}</p></blockquote>` : '<p class="collab-note-empty">No message, just a hello.</p>')
     + (m.shared.length ? `<p class="collab-label">You both care about</p><ul class="collab-shared">${m.shared.map((s) => `<li>${escapeHtml(s)}</li>`).join('')}</ul>` : '')

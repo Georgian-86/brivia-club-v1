@@ -21,7 +21,7 @@ import '../styles/mobile-app.css';
 import '../styles/skeleton.css';
 import '../styles/aura-theme.css';
 import '../styles/handoff.css';
-import { supabase, compressImageOnly, rowToProfile, saveProfile, isPresetCoverUrl, onboardingStatus, sendSignal, fetchSignalQuota, isRateLimited, isStorageImageUrl, withoutCredentials, uploadMessageAttachment, removeMessageAttachment, uploadCommunityPostImage, removeCommunityPostImage, ImageProcessingError, PHOTO_ERROR_MESSAGE, PHOTO_FRAMER_ERROR, compressAttachmentFiles, attachmentKind, reportMember, setSensitiveConsent, fetchSensitiveConsentAt, fetchMyInterests, fetchInterestNodes, addMemberInterest, isMissingFunction, touchPresence, connectionPresence, setPresenceVisible, myPresenceVisible, setMemberInterests, uploadResume, removeResume, resumeSignedUrl, resumeInfo, clearResumePath, searchPlaces, setHomeCity, setHomeLocation, listEvents, setEventRsvp, setCompanionDefault, myEventPrefs, eventCompanions, saveMemberEvent, cancelMemberEvent, deleteMemberEvent, uploadEventImage, removeEventImages, setEventInterest, setEventBrochure, uploadEventBrochure, removeEventBrochures, companionEvents, companionDeck, companionSwipe, myCompanionMatches, markCompanionMatchSeen, sendConnectRequest, setNearbyEnabled, myNearbySetting, nearbyPulse, nearbyClear, myNearbyAlerts, setNearbyMuted } from './supabase.js';
+import { supabase, compressImageOnly, rowToProfile, saveProfile, isPresetCoverUrl, onboardingStatus, sendSignal, fetchSignalQuota, isRateLimited, isStorageImageUrl, withoutCredentials, uploadMessageAttachment, removeMessageAttachment, uploadCommunityPostImage, removeCommunityPostImage, ImageProcessingError, PHOTO_ERROR_MESSAGE, PHOTO_FRAMER_ERROR, compressAttachmentFiles, attachmentKind, reportMember, setSensitiveConsent, fetchSensitiveConsentAt, fetchMyInterests, fetchInterestNodes, addMemberInterest, isMissingFunction, touchPresence, connectionPresence, setPresenceVisible, myPresenceVisible, setMemberInterests, uploadResume, removeResume, resumeSignedUrl, resumeInfo, clearResumePath, searchPlaces, setHomeCity, setHomeLocation, listEvents, setEventRsvp, setCompanionDefault, myEventPrefs, eventCompanions, saveMemberEvent, cancelMemberEvent, deleteMemberEvent, uploadEventImage, removeEventImages, setEventInterest, setEventBrochure, uploadEventBrochure, removeEventBrochures, companionEvents, companionDeck, companionSwipe, myCompanionMatches, markCompanionMatchSeen, sendConnectRequest, setNearbyEnabled, myNearbySetting, nearbyPulse, nearbyClear, myNearbyAlerts, setNearbyMuted, nearbyDiscover, nearbyPass, nearbyConnect, myNearbyMatches } from './supabase.js';
 import { locateOnce, fallbackCopy } from './geo-locate.js';
 import { areaChangeMessage, AREA_HELPER, AREA_NO_MATCH } from './area-change.js';
 import { areaShareBody, parseAreaBody, resumeShareAttachment, resumeMessageFields, RESUME_SHARE_BODY, NO_RESUME_HINT, RESUME_GONE_COPY, RESUME_SHARE_NOTE, AREA_SHARE_NOTE } from './quick-share.js';
@@ -41,6 +41,9 @@ import { collabSummary, openCollabReview } from './collab-requests.js';
 import { createPresence, presenceDot } from './presence.js';
 import { createCrossingPaths, isQuietHour, alertHeadline, alertDetail, alertToast, pausedCopy } from './crossing-paths.js';
 import '../styles/crossing-paths.css';
+import { createNearbyPage } from './nearby-page.js';
+import { COPY as NEARBY_COPY } from './nearby-view.js';
+import '../styles/nearby.css';
 import { createEventsPage } from './events-page.js';
 import { createEventComposer } from './event-create.js';
 import { createCompanionsPage } from './companions-page.js';
@@ -134,6 +137,12 @@ let nearbyAlerts = [];
 let companionMatches = [];
 const companionToasted = new Set();
 let nearbyStatus = 'off';
+// Nearby (D-131, 0029): the server switch (null until read), the crossing-paths matches and what was already announced.
+let nearbyEnabled = null;
+let nearbyMatches = [];
+const nearbyMatchToasted = new Set();
+const nearbyRequestToasted = new Set();
+let nearbyPage = null;
 const nearbyToasted = new Set();
 // Alerts that were new when the panel last opened: they keep the unread tint while it stays open.
 let nearbyHighlight = new Set();
@@ -468,8 +477,10 @@ const renderNotifications = () => {
   const nearbyCount = unseenNearbyAlerts().length;
   // D-123: "going together" matches count until seen, whatever the message switch says (they are a mutual decision).
   const companionUnseen = unseenCompanionMatches();
-  const unreadCount = (enabled ? notifications.filter((notification) => !notification.read).length : 0) + requestCount + nearbyCount + companionUnseen.length;
-  const anything = enabled || requestCount || nearbyAlerts.length || companionUnseen.length;
+  // D-131: "you crossed paths" matches count until seen, like companion matches.
+  const nearbyMatchUnseen = unseenNearbyMatches();
+  const unreadCount = (enabled ? notifications.filter((notification) => !notification.read).length : 0) + requestCount + nearbyCount + companionUnseen.length + nearbyMatchUnseen.length;
+  const anything = enabled || requestCount || nearbyAlerts.length || companionUnseen.length || nearbyMatchUnseen.length;
   button.toggleAttribute('hidden', !anything);
   if (!anything) closeNotificationPanel();
   badge.textContent = unreadCount > 99 ? '99+' : String(unreadCount);
@@ -510,7 +521,7 @@ const renderNotifications = () => {
     const title = person?.name || 'a Brivia member';
     const messageLabel = `${group.count} message${group.count === 1 ? '' : 's'} from ${title}`;
     return `<button type="button" class="notification-item is-unread" data-notification-person="${escapeHtml(group.personId)}">${renderAvatar(person, 'notification-avatar')}<span class="notification-copy"><strong>${escapeHtml(messageLabel)}</strong></span><time>${escapeHtml(formatNotificationTime(group.latest.createdAt))}</time></button>`;
-  }).join('') : ((requestCount || nearbyAlerts.length || companionUnseen.length) ? '' : `<div class="notification-empty"><p>You are all caught up.</p>${settingsAction}</div>`);
+  }).join('') : ((requestCount || nearbyAlerts.length || companionUnseen.length || nearbyMatchUnseen.length) ? '' : `<div class="notification-empty"><p>You are all caught up.</p>${settingsAction}</div>`);
   const companionHtml = companionUnseen.map((match) => {
     const person = findPersonById(match.otherId) || { name: match.otherName, image: match.otherPhotoUrl };
     return `<section class="notification-companion is-unread" aria-label="${escapeHtml(`You and ${match.otherName} are going together to ${match.eventTitle}`)}">`
@@ -518,7 +529,22 @@ const renderNotifications = () => {
       + `<span class="notification-nearby-copy"><strong>${escapeHtml(`You and ${match.otherName} are going together`)}</strong><span>${escapeHtml(match.eventTitle)}</span></span>`
       + `<button type="button" class="notification-nearby-hi" data-companion-match="${escapeHtml(match.id)}">Say hello</button></section>`;
   }).join('');
-  list.innerHTML = requestsHtml + companionHtml + nearbyHtml + messagesHtml;
+  const nearbyMatchHtml = nearbyMatchUnseen.map((match) => {
+    const person = findPersonById(match.otherId) || { name: match.name, image: match.photoUrl };
+    return `<section class="notification-companion is-unread" aria-label="${escapeHtml(`You and ${match.name} crossed paths`)}">`
+      + `<span class="notification-nearby-face">${renderAvatar(person, 'notification-avatar')}</span>`
+      + `<span class="notification-nearby-copy"><strong>${escapeHtml(`You and ${match.name} crossed paths`)}</strong><span>It's mutual. Your chat is open.</span></span>`
+      + `<button type="button" class="notification-nearby-hi" data-nearby-match="${escapeHtml(match.otherId)}">Say hello</button></section>`;
+  }).join('');
+  list.innerHTML = requestsHtml + nearbyMatchHtml + companionHtml + nearbyHtml + messagesHtml;
+  list.querySelectorAll('[data-nearby-match]').forEach((item) => item.addEventListener('click', async (event) => {
+    event.stopPropagation();
+    const match = nearbyMatches.find((m) => m.otherId === item.dataset.nearbyMatch);
+    closeNotificationPanel();
+    if (!match) return;
+    markNearbyMatchSeen(match.otherId);
+    await openCompanionConversation({ id: match.otherId, name: match.name, photoUrl: match.photoUrl });
+  }));
   list.querySelectorAll('[data-companion-match]').forEach((item) => item.addEventListener('click', (event) => {
     event.stopPropagation();
     const match = companionMatches.find((m) => m.id === item.dataset.companionMatch);
@@ -881,6 +907,69 @@ const startCompanionMatches = () => {
   loadCompanionMatches();
   if (!companionTimer) companionTimer = window.setInterval(() => { if (document.visibilityState === 'visible') loadCompanionMatches(); }, 90000);
 };
+// Nearby (D-131, 0029). What was already announced on this device (Nearby requests, crossing-paths matches), so the
+// same request or match never toasts twice, even after a reload.
+const nearbyAnnouncedKey = () => `brivia-nearby-announced:${memberProfile.id || 'anonymous'}`;
+const readNearbyAnnounced = () => {
+  try { const saved = JSON.parse(window.localStorage.getItem(nearbyAnnouncedKey()) || '[]'); return new Set(Array.isArray(saved) ? saved : []); } catch { return new Set(); }
+};
+const saveNearbyAnnounced = (set) => {
+  try { window.localStorage.setItem(nearbyAnnouncedKey(), JSON.stringify([...set].slice(-200))); } catch { /* memory only */ }
+};
+const unseenNearbyMatches = () => {
+  const seen = readNearbyAnnounced();
+  return nearbyMatches.filter((m) => !seen.has(`match:${m.otherId}`));
+};
+const markNearbyMatchSeen = (otherId) => {
+  const seen = readNearbyAnnounced();
+  seen.add(`match:${otherId}`);
+  saveNearbyAnnounced(seen);
+  renderNotifications();
+};
+let nearbyMatchesTimer = 0;
+const loadNearbyMatches = async () => {
+  if (!supabase || !memberProfile.id) return;
+  const { data, error } = await myNearbyMatches();
+  if (error) return;   // before 0029
+  nearbyMatches = (data || []).map((row) => ({ otherId: String(row.other_id), name: String(row.name || 'A Brivia member'), photoUrl: row.photo_url || '', matchedAt: String(row.matched_at || '') }));
+  const fresh = unseenNearbyMatches().filter((m) => !nearbyMatchToasted.has(m.otherId));
+  fresh.forEach((m) => { nearbyMatchToasted.add(m.otherId); addConnection(m.otherId); });
+  if (fresh.length) {
+    refreshConnections().then(() => renderChats()).catch(() => {});
+    if (document.visibilityState === 'visible') showToast(`${NEARBY_COPY.matchTitle} You and ${fresh[0].name} are connected.`);
+  }
+  renderNotifications();
+};
+// Crossing Paths on or off, from Settings or from Nearby's "Turn on". On asks the browser for location (the member's own
+// tap); off stops the loop, and the server has already deleted the live location (set_nearby_enabled(false)).
+const setCrossingPaths = async (want) => {
+  const { error } = await setNearbyEnabled(want);
+  if (error) { showToast('That setting could not be saved. Please try again.'); return false; }
+  nearbyEnabled = want;
+  if (want) await ensureCrossingPaths().start({ ask: true });
+  else crossingPaths?.stop();
+  nearbyPage?.onLocation();
+  return true;
+};
+const turnOnCrossingPaths = (returnFocus) => openCrossingPathsExplainer({
+  returnFocus,
+  onConfirm: async () => { if (await setCrossingPaths(true)) showToast('Crossing Paths is on. People around you can discover you too.'); },
+});
+const openConnectMode = (mode) => {
+  const view = mode === 'nearby' ? 'nearby' : 'explore';
+  const next = new URL(window.location.href);
+  next.searchParams.set('view', view);
+  next.searchParams.delete('event');
+  window.history.pushState({ ...(window.history.state || {}), appView: view }, '', next.pathname + next.search);
+  setView(view);
+  document.querySelector(`[data-view="${view === 'nearby' ? 'nearby' : 'home'}"] [data-connect-mode="${mode}"]`)?.focus({ preventScroll: true });
+};
+document.addEventListener('click', (event) => {
+  const button = event.target.closest('[data-connect-mode]');
+  if (button && !button.classList.contains('is-active')) openConnectMode(button.dataset.connectMode);
+});
+// One composer for the whole app (companions and Nearby): building it twice would rebuild the same <dialog>.
+const connectComposer = createConnectComposer(document.querySelector('#connect-composer-dialog'));
 const companionsPage = createCompanionsPage({
   root: document.querySelector('[data-view="companions"]'),
   api: { companionEvents, companionDeck, companionSwipe, markCompanionMatchSeen },
@@ -892,7 +981,7 @@ const companionsPage = createCompanionsPage({
   openProfile: (person) => openPublicProfile({ id: person.id, name: person.name, image: person.photoUrl, photoUrl: person.photoUrl, role: person.headline || 'Brivia member', tags: person.interests }),
   openConversation: async (person) => { markCompanionSeenLocally(String(companionMatches.find((m) => m.otherId === String(person.id))?.id || '')); await openCompanionConversation(person); },
   goExplore: () => document.querySelector('[data-nav-host] [data-nav="events"]')?.click(),
-  composer: createConnectComposer(document.querySelector('#connect-composer-dialog')),
+  composer: connectComposer,
   sendRequest: async (person, note) => {
     const { data, error, status } = await sendConnectRequest(person.id, note);
     const row = Array.isArray(data) ? data[0] : data;
@@ -902,6 +991,48 @@ const companionsPage = createCompanionsPage({
       return { error };
     }
     refreshSignalQuota();
+    return { status: row?.status || 'sent' };
+  },
+});
+nearbyPage = createNearbyPage({
+  root: document.querySelector('[data-view="nearby"]'),
+  api: { discover: nearbyDiscover, pass: nearbyPass },
+  location: {
+    enabled: () => nearbyEnabled,
+    status: () => nearbyStatus,
+    refresh: async ({ ask = false } = {}) => {
+      if (nearbyEnabled !== true) return;
+      const loop = ensureCrossingPaths();
+      if (loop.isRunning()) await loop.check({ ask }); else await loop.start({ ask });
+    },
+    turnOn: () => turnOnCrossingPaths(document.querySelector('[data-nearby-turn-on]')),
+  },
+  safeImage: eventSafeImage,
+  coverFor: (url) => deckCoverSrc({ coverUrl: url }, safeImageUrl, defaultCoverUrl),
+  me: () => ({ name: memberProfile.name || 'You', photoUrl: memberProfile.photoUrl || memberProfile.photo_url || '' }),
+  toast: (message) => showToast(message),
+  isMissing: isMissingFunction,
+  openProfile: (person) => openPublicProfile({ id: person.id, name: person.name, image: person.photoUrl, photoUrl: person.photoUrl, role: person.headline || 'Brivia member', tags: person.interests }),
+  openConversation: async (person) => { markNearbyMatchSeen(person.id); await openCompanionConversation(person); },
+  composer: connectComposer,
+  matchDialog: document.querySelector('#nearby-match-dialog'),
+  onMatchSeen: (otherId) => markNearbyMatchSeen(otherId),
+  // One request, with the message (0029 nearby_connect: send_connect_request plus the "nearby" label). Quota and caps
+  // answer as everywhere else; 'matched' means you both connected.
+  sendRequest: async (person, note) => {
+    const { data, error, status } = await nearbyConnect(person.id, note);
+    const row = Array.isArray(data) ? data[0] : data;
+    if (error) {
+      if (isRateLimited(error, status)) { showToast(quotaErrorText(error, signalQuota)); return { error }; }
+      showToast('Your request could not be sent. Please try again.');
+      return { error };
+    }
+    refreshSignalQuota();
+    if (row?.status === 'matched') {
+      nearbyMatchToasted.add(String(person.id));
+      addConnection(person.id);
+      refreshConnections().then(() => renderChats()).catch(() => {});
+    }
     return { status: row?.status || 'sent' };
   },
 });
@@ -952,6 +1083,7 @@ const setView = (view) => {
   }
   if (view === 'events') eventsPage.show({ eventId: pendingEventId }); else eventsPage.hide();
   if (view === 'companions') companionsPage.show({ eventId: pendingEventId }); else companionsPage.hide();
+  if (view === 'nearby') nearbyPage.show(); else nearbyPage.hide();
   pendingEventId = null;
   if (view === 'chat') renderChats();
   // Re-tapping Profile on the profile keeps the loaded (or loading) interests: no second read, no skeleton flash.
@@ -963,7 +1095,7 @@ const setView = (view) => {
   window.scrollTo({ top: 0, behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'instant' : 'smooth' });
 };
 
-const validViews = ['home', 'explore', 'events', 'posts', 'chat', 'profile', 'companions'];
+const validViews = ['home', 'explore', 'events', 'posts', 'chat', 'profile', 'companions', 'nearby'];
 const routeFromUrl = () => {
   const params = new URLSearchParams(window.location.search);
   // ?post=<id> (a shared post link, via explore.html) opens that post's detail once the Explore feed has loaded; it is
@@ -1485,8 +1617,11 @@ const signalResultToast = (person, result) => {
 
 const loadConnectionRequests = async () => {
   if (!supabase || !memberProfile.id) return;
-  const { data, error } = await supabase.from('connection_requests').select('from_id,note,created_at')
+  // D-131: 'via' says a request came from Nearby (0029); before 0029 the column is missing, so read without it.
+  const requestQuery = (columns) => supabase.from('connection_requests').select(columns)
     .eq('to_id', memberProfile.id).eq('status', 'pending').order('created_at', { ascending: false }).limit(50);
+  let { data, error } = await requestQuery('from_id,note,created_at,via');
+  if (error) ({ data, error } = await requestQuery('from_id,note,created_at'));
   if (error) { console.warn('Connection requests could not load:', error.message); return; }
   const rows = data || [];
   const unknownIds = [...new Set(rows.map((row) => String(row.from_id)).filter((id) => !findPersonById(id) && isUuid(id)))];
@@ -1500,8 +1635,14 @@ const loadConnectionRequests = async () => {
     fromId: String(row.from_id),
     note: row.note || '',
     createdAt: row.created_at,
+    via: row.via || null,
     person: findPersonById(row.from_id) || extraPeople.get(String(row.from_id)) || null,
   }));
+  // One toast per Nearby request, ever on this device (the request itself stays in the panel until answered).
+  const announced = readNearbyAnnounced();
+  const freshNearby = pendingRequests.filter((r) => r.via === 'nearby' && !announced.has(`req:${r.fromId}@${r.createdAt}`) && !nearbyRequestToasted.has(r.fromId));
+  freshNearby.forEach((r) => { nearbyRequestToasted.add(r.fromId); announced.add(`req:${r.fromId}@${r.createdAt}`); });
+  if (freshNearby.length) { saveNearbyAnnounced(announced); if (document.visibilityState === 'visible') showToast(NEARBY_COPY.incoming); }
   renderNotifications();
 };
 const refreshConnections = async () => {
@@ -2223,7 +2364,9 @@ const ensureCrossingPaths = () => {
       onStatus: (status) => {
         nearbyStatus = status;
         document.dispatchEvent(new CustomEvent('brivia:nearby-status'));
+        nearbyPage?.onLocation();
       },
+      onPulse: () => nearbyPage?.onLocation(),
     });
   }
   return crossingPaths;
@@ -2231,7 +2374,16 @@ const ensureCrossingPaths = () => {
 const startCrossingPaths = async () => {
   if (!supabase || !memberProfile.id) return;
   const { data, error } = await myNearbySetting();
-  if (error) return;   // before 0021: the setting stays hidden
+  if (error) {   // before 0021: the setting stays hidden, and Nearby says it opens soon
+    nearbyEnabled = false;
+    if (isMissingFunction(error)) nearbyStatus = 'unavailable-server';
+    nearbyPage?.onLocation();
+    return;
+  }
+  nearbyEnabled = data === true;
+  nearbyPage?.onLocation();
+  loadNearbyMatches();
+  if (!nearbyMatchesTimer) nearbyMatchesTimer = window.setInterval(() => { if (document.visibilityState === 'visible') loadNearbyMatches(); }, 60000);
   if (data === true) ensureCrossingPaths().start().catch((err) => console.warn('Crossing paths could not start:', err.message));
 };
 
@@ -3202,7 +3354,7 @@ const openNotificationSettings = () => {
     <p class="profile-settings-note">Choose how the club keeps you updated. Chat messages will still be available in your inbox when alerts are off.</p>
     <label class="settings-toggle-row"><span><strong>MESSAGE NOTIFICATIONS</strong><small>Get an alert when someone sends you a message.</small></span><input id="profile-notifications-toggle" type="checkbox" /><i aria-hidden="true"></i></label>
     <label class="settings-toggle-row" data-presence-setting hidden><span><strong>SHOW WHEN I'M ACTIVE</strong><small>Your connections see a dot when you're here. Turn it off and you won't see theirs either.</small></span><input id="profile-presence-toggle" type="checkbox" /><i aria-hidden="true"></i></label>
-    <label class="settings-toggle-row" data-nearby-setting hidden><span><strong>CROSSING PATHS</strong><small>Get a quiet alert when a connection is nearby. Only connections who also turned this on, never your exact place.</small><small class="settings-nearby-status" data-nearby-status role="status"></small></span><input id="profile-nearby-toggle" type="checkbox" /><i aria-hidden="true"></i></label>
+    <label class="settings-toggle-row" data-nearby-setting hidden><span><strong>CROSSING PATHS</strong><small>Discover when other Brivia members are nearby. Only members who enable this feature can discover you.</small><small class="settings-nearby-status" data-nearby-status role="status"></small></span><input id="profile-nearby-toggle" type="checkbox" /><i aria-hidden="true"></i></label>
     <p class="profile-settings-feedback" id="notification-settings-feedback" role="status"></p>
   </div>`;
   document.body.append(modal);
@@ -3251,17 +3403,13 @@ const openNotificationSettings = () => {
   });
   const saveNearby = async (want) => {
     nearbyToggle.disabled = true;
-    const { error } = await setNearbyEnabled(want);
+    const saved = await setCrossingPaths(want);
     nearbyToggle.disabled = false;
-    if (error) { nearbyToggle.checked = !want; showToast('That setting could not be saved. Please try again.'); return; }
+    if (!saved) { nearbyToggle.checked = !want; return; }
     nearbyToggle.checked = want;
-    if (want) {
-      feedback.textContent = 'Crossing paths is on.';
-      await ensureCrossingPaths().start({ ask: true });
-    } else {
-      crossingPaths?.stop();
-      feedback.textContent = 'Crossing paths is off. Nobody is told when you are nearby.';
-    }
+    feedback.textContent = want
+      ? 'Crossing Paths is on. Members around you who turned it on can discover you, and you them.'
+      : 'Crossing Paths is off. You no longer appear in Nearby, and your location is not shared.';
     paintNearbyStatus();
   };
   nearbyToggle.addEventListener('change', () => {
@@ -3281,9 +3429,10 @@ const openCrossingPathsExplainer = ({ onConfirm, returnFocus } = {}) => {
     <button type="button" class="profile-settings-close" aria-label="Close">×</button>
     <h2 id="crossing-paths-title">Crossing <em>paths.</em></h2>
     <ul class="crossing-paths-points">
-      <li><strong>Only connections.</strong> And only those who turned this on too. You both get the alert at the same moment.</li>
-      <li><strong>Never your exact place.</strong> They see "nearby", never where you are or how far. We keep a rough area for 20 minutes, then forget it.</li>
-      <li><strong>Only while Brivia is open.</strong> Turn it off here any time, or mute one person from an alert.</li>
+      <li><strong>Discover people around you.</strong> Members within 5 km who turned this on too can find you in Nearby, and you them. Members who keep it off never see you, and you never see them.</li>
+      <li><strong>Never your exact place.</strong> Others see only your city and roughly how far you are (under 1 km, 1–3 km or 3–5 km). We keep a rough ~1 km area for 20 minutes, then forget it. No location history.</li>
+      <li><strong>Connections get a quiet alert</strong> when you are near each other. Nobody can connect with you unless you both agree.</li>
+      <li><strong>Only while Brivia is open.</strong> Turn it off any time and you leave Nearby at once.</li>
     </ul>
     <div class="crossing-paths-buttons">
       <button type="button" class="crossing-paths-later" data-nearby-later>Not now</button>

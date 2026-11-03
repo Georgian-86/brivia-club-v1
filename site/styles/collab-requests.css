@@ -153,3 +153,6 @@ body.app-body dialog.collab-review .collab-note-text::after{content:'\201D';colo
 .collab-hint{text-wrap:balance}
 .collab-hint-touch{display:none}
 @media (hover:none) and (pointer:coarse){.collab-hint-touch{display:inline}.collab-hint-keys{display:none}}
+
+/* D-131: a request sent from Nearby. */
+.collab-nearby{margin:2px 0 0;padding:3px 12px;border-radius:var(--radius-pill);background:color-mix(in srgb, var(--brivia-wine) 9%, var(--color-cream));color:var(--color-wine-deep);font-size:var(--text-12);font-weight:700;letter-spacing:.06em}

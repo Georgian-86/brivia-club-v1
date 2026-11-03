@@ -2657,3 +2657,34 @@ controls (a tester or a seeded test member), never a real member, so no new expo
   (lilac top left, a breath of wine top right, mint right, rose and peach low; no wine pools), lighter glass on the card,
   the pitch as a centred Bodoni pull quote with wine quotation marks in one rounded box, and on touch screens the hint
   reads "Drag the card right to connect, left for not now." (no arrow keys). e2e collab-requests 31/31.
+
+## D-131 (2026-11-03): Nearby, discover members around you, with mutual consent
+
+- **Ask (founder):** a location-based "Nearby / Crossing Paths" discovery in Connect: people around you within a
+  chosen radius, swipeable cards (cover, photo, name, headline, city, approximate distance, active, shared interests,
+  skills, intro), Pass / Connect / View profile, a prefilled editable opener, mutual-consent matching with a match
+  moment, notifications, the Crossing Paths setting as the switch, and strict location privacy.
+- **Precision (asked, answered "1km"):** the founder's spec had 500 m and "300 m away"; CLAUDE.md says coarse cells and
+  rounded distances. Read as: nothing finer than ~1 km. A ~1 km live cell (own `n8:` grid, the ORBIT grid untouched),
+  radius 1 / 3 / 5 km (no 500 m), bands "Under 1 km away", "1–3 km away", "3–5 km away", never metres.
+- **Reuse, not a second system:** the Crossing paths switch, pulse, caps and purge (0021); requests, quota and matching
+  (`send_connect_request` / `send_signal`, the crossing-request trigger, Accept); the pitch delivered once (0024, 0028);
+  the request review sheet; the companion card, composer and match-moment styles and `deck-swipe.js`.
+- **Consent kept honest:** the 2 members who turned Crossing paths on before this agreed to connection alerts only, so
+  discovery has its own recorded consent (`discoverable_at`); they keep their alerts and are asked again on Nearby
+  ("Nearby is new"). The explainer and the Settings line were rewritten to say what discovery means.
+- **Mutual consent:** a right swipe is a request with a message; a match only when both connect (or Accept). A pass is
+  silent and hides that member on Nearby for 7 days; a decline is never told. One request per direction per pair (the
+  table's key), the pair lock and the unique match keep simultaneous swipes to one match and one copy of each note.
+- **Notifications:** "Someone nearby wants to connect with you" (panel line, review-card tag, one toast per request per
+  device); "Well, look who crossed paths!" for the second swiper (the moment) and the first (toast and a panel row, from
+  `my_nearby_matches`); messages after matching use the existing chat notifications.
+- **Not done:** age (profiles hold only an adult declaration, no age); background location or Web Push while Brivia is
+  closed (a web app reads location only while open, as D-119 said). Agent-arena not run (no second model route here, as
+  for D-119); privacy rules checked against CLAUDE.md, VISION.md and ORBIT §9.1.4 instead.
+- **Fixed on the way:** the connect composer was built twice on the same `<dialog>` once a second page used it; one
+  shared instance now. Found, not fixed (separate task): `companion_deck` (0023/0025) lists sensitive interests.
+- **Proof:** SQL harness ALL PASSED (new `p-nearby-discovery.test.sql` D1-D9; hygiene H3 whitelist); unit 445 (new
+  `nearby-view.test.mjs`); e2e new `nearby.spec.mjs` 49/49 at 1440 and 390 (axe clean), plus crossing-paths, companions,
+  collab-requests, deck and app-shell; build and style ratchet. ORBIT §9.1.4b and UX_SPEC §B2 added.
+- **Owed:** apply `0029_nearby_discovery.sql` (README "0029").
