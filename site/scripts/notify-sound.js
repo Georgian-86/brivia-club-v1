@@ -16,14 +16,14 @@ import { isUnlockEvent } from './landing-sound.js';
 
 export const SOUND_KEY = 'brivia-notify-sound';
 export const VOLUME_KEY = 'brivia-sound-volume';
-export const DEFAULT_VOLUME = 70;
+export const DEFAULT_VOLUME = 80;
 
 const hz = (midi) => 440 * 2 ** ((midi - 69) / 12);
 // midi: pitch; at/dur: seconds; gain: 0..1; scoop: cents the note starts below (or above) its pitch; fall: cents it
 // droops by at its end; vib: vibrato depth in cents; bright: filter opening (multiple of the pitch).
 export const CUES = Object.freeze({
   notify: Object.freeze({
-    length: 2.0, level: 0.5, room: 0.32,
+    length: 2.0, level: 0.72, room: 0.32,
     pad: { midi: 58, at: 0, dur: 1.35, gain: 0.08 },
     notes: [
       { midi: 70, at: 0.0, dur: 0.17, gain: 0.7, scoop: -70, bright: 4.2 },
@@ -33,14 +33,14 @@ export const CUES = Object.freeze({
     ],
   }),
   pass: Object.freeze({
-    length: 1.3, level: 0.42, room: 0.26,
+    length: 1.3, level: 0.88, room: 0.26,
     notes: [
       { midi: 74, at: 0.0, dur: 0.15, gain: 0.62, scoop: -40, bright: 3.0 },
       { midi: 70, at: 0.15, dur: 0.5, gain: 0.66, scoop: 30, fall: -100, vib: 10, bright: 2.6 },
     ],
   }),
   pitch: Object.freeze({
-    length: 1.2, level: 0.5, room: 0.24,
+    length: 1.2, level: 0.77, room: 0.24,
     sparkle: { midi: 89, at: 0.22, dur: 0.32, gain: 0.05 },
     notes: [
       { midi: 65, at: 0.0, dur: 0.075, gain: 0.66, scoop: -50, bright: 5.0 },
@@ -62,8 +62,9 @@ export const soundVolume = (storage = globalThis.localStorage) => {
   return read(storage, VOLUME_KEY) === null || !Number.isFinite(v) ? DEFAULT_VOLUME : Math.min(100, Math.max(0, Math.round(v)));
 };
 export const setSoundVolume = (v, storage = globalThis.localStorage) => write(storage, VOLUME_KEY, String(Math.min(100, Math.max(0, Math.round(Number(v) || 0)))));
-// 0..100 to a gain that sounds even across the slider (ears are logarithmic).
-export const volumeGain = (v) => (Math.min(100, Math.max(0, Number(v) || 0)) / 100) ** 2;
+// 0..100 to a gain that sounds even across the slider (ears are logarithmic). Each cue peaks near full scale at 100,
+// about -3 dB at the default 80 (laptop speakers need it: the first mix was about 10 dB too quiet to hear).
+export const volumeGain = (v) => (Math.min(100, Math.max(0, Number(v) || 0)) / 100) ** 1.5;
 
 // The Brivia horn: one note into dest, starting at t0 (seconds on ctx's clock).
 const hornNote = (ctx, dest, n, t0, noise) => {
@@ -184,6 +185,7 @@ export const createSoundKit = ({
   let ctx = null;
   let unlocked = false;
   let current = null;
+  let limiter = null;
   const buffers = {};
   let rendering = null;
   const playedIds = new Set();
@@ -245,7 +247,17 @@ export const createSoundKit = ({
     stopCurrent();
     const gain = ctx.createGain();
     gain.gain.value = level;
-    gain.connect(ctx.destination);
+    // A soft limiter: loud enough on laptop and phone speakers, never distorted at 100%.
+    let out = ctx.destination;
+    if (ctx.createDynamicsCompressor) {
+      if (!limiter) {
+        limiter = ctx.createDynamicsCompressor();
+        [['threshold', -4], ['knee', 4], ['ratio', 12], ['attack', 0.002], ['release', 0.12]].forEach(([k, v]) => { if (limiter[k]) limiter[k].value = v; });
+        limiter.connect(ctx.destination);
+      }
+      out = limiter;
+    }
+    gain.connect(out);
     let src = null;
     if (buffers[name] && ctx.createBufferSource) {
       src = ctx.createBufferSource();

@@ -2822,5 +2822,7 @@ controls (a tester or a seeded test member), never a real member, so no new expo
 - **Proof:** unit (new `sound-kit.test.mjs`: cue shapes, gesture rules, once per id and per swipe, off and zero
   volume, live fallback, audio session, storage, word counts); SQL harness ALL PASSED (new `s-bio-words.test.sql`);
   e2e `sounds.spec.mjs` counts real Web Audio playback in the app at 1440 and 390 (touch) and checks Settings; signup
-  369, profile-edit 64, deck 201, nearby 66, collab-requests 32, companions 64, app-shell 214, all passing. Rendered in Chromium: peaks 0.21 to 0.36 at the default volume,
-  no clipping.
+  369, profile-edit 64, deck 201, nearby 66, collab-requests 32, companions 64, app-shell 214, all passing. Loudness fix the same day (founder: "can't hear any music effect on swiping on the laptop"): the
+  first mix peaked at 0.21 to 0.36 at the default volume, too quiet for laptop speakers. Cue levels up, volume curve
+  ^1.5 instead of ^2, default 80, a soft limiter at the output: peaks now 0.64 to 0.75 at the default (about +8 dB),
+  never distorted at 100%; `sounds.spec.mjs` checks the played buffer's peak.

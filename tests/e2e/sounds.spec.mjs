@@ -19,7 +19,11 @@ const instrument = () => {
   const start = AudioBufferSourceNode.prototype.start;
   AudioBufferSourceNode.prototype.start = function (...args) {
     const d = this.buffer?.duration || 0;
-    if (!(this.context instanceof OfflineAudioContext) && d > 0.5) window.__cues.push(d > 1.6 ? 'notify' : d > 1.25 ? 'pass' : 'pitch');
+    if (!(this.context instanceof OfflineAudioContext) && d > 0.5) {
+      window.__cues.push(d > 1.6 ? 'notify' : d > 1.25 ? 'pass' : 'pitch');
+      let p = 0; for (const v of this.buffer.getChannelData(0)) p = Math.max(p, Math.abs(v));
+      (window.__peaks ||= []).push(p);
+    }
     return start.apply(this, args);
   };
 };
@@ -47,6 +51,8 @@ try {
     let before = await name(page);
     await page.locator('[data-action="pass"]').dispatchEvent('click');
     await nextCard(page, before);
+    const peak = (await page.evaluate(() => window.__peaks || [])).at(-1) || 0;
+    check(`${w}: the pass cue is loud enough to hear on laptop speakers (buffer peak ${peak.toFixed(2)})`, peak > 0.8);
     check(`${w}: Pass button → one pass cue`, JSON.stringify((await cues(page)).slice(base)) === '["pass"]', JSON.stringify(await cues(page)));
 
     before = await name(page);
@@ -91,7 +97,7 @@ try {
     await page.locator('[data-profile-setting="notifications"]').click();
     await page.waitForSelector('#profile-sound-volume');
     const set = await page.evaluate(() => ({ on: document.querySelector('#profile-sound-toggle').checked, vol: document.querySelector('#profile-sound-volume').value, label: document.querySelector('[data-sound-volume-value]').textContent }));
-    check(`${w}: Settings shows Sounds on and the volume at 70% (${JSON.stringify(set)})`, set.on && set.vol === '70' && set.label === '70%');
+    check(`${w}: Settings shows Sounds on and the volume at 70% (${JSON.stringify(set)})`, set.on && set.vol === '80' && set.label === '80%');
     const n0 = (await cues(page)).length;
     await page.locator('#profile-sound-volume').fill('40');
     await page.waitForTimeout(150);

@@ -26,13 +26,12 @@ const fakeAudio = (log) => {
 };
 const fakeDoc = () => { const l = {}; return { l, addEventListener: (t, fn) => { (l[t] ||= []).push(fn); }, fire: (t, e = {}) => (l[t] || []).forEach((fn) => fn({ type: t, ...e })) }; };
 
-test('three cues, one voice: the notification is the longest, pass is the quietest and lowest, pitch the brightest', () => {
+test('three cues, one voice: the notification is the longest, pass is the darkest and lowest, pitch the brightest', () => {
   assert.deepEqual(Object.keys(CUES).sort(), ['notify', 'pass', 'pitch']);
   const top = (c) => Math.max(...c.notes.map((n) => n.midi));
   const end = (c) => Math.max(...c.notes.map((n) => n.at + n.dur));
   const bright = (c) => Math.max(...c.notes.map((n) => n.bright || 0));
   assert.ok(end(CUES.notify) > end(CUES.pitch) && end(CUES.notify) > end(CUES.pass));
-  assert.ok(CUES.pass.level < CUES.pitch.level);
   assert.ok(bright(CUES.pass) < bright(CUES.pitch));
   assert.ok(CUES.pass.notes.at(-1).fall < 0, 'pass droops');
   assert.ok(CUES.pitch.notes.every((n, i, a) => i === 0 || n.midi > a[i - 1].midi), 'pitch climbs');
@@ -116,6 +115,7 @@ test('one switch and one volume per device', () => {
   assert.equal(volumeGain(0), 0);
   assert.equal(volumeGain(100), 1);
   assert.ok(volumeGain(50) < 0.5);
+  assert.ok(volumeGain(DEFAULT_VOLUME) > 0.7, 'loud enough on laptop speakers');
 });
 
 test('bio: words, not characters; spaces and line breaks never count; 1 to 20', () => {
