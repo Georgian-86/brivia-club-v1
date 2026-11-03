@@ -1095,6 +1095,8 @@ select label, catalog_order from public.interest_node where id in ('music.listen
 ## 0033
 
 **A bio is at most 20 words (founder request 2026-11-03, D-137).**
+**APPLIED 2026-11-03** (trigger present; the guard is not callable by members). 3 bios saved earlier are over 20
+words and stay until their members edit them (Edit profile then asks them to trim).
 Apply after `0032`. Adds the trigger `profiles_bio_word_guard` (function `brivia_bio_word_guard`, not callable by
 members): writing a bio of more than 20 words is refused (`check_violation`, message `bio_words: ...`). Bios saved
 earlier are untouched until edited. The client already enforces the limit, so client and migration can deploy in
