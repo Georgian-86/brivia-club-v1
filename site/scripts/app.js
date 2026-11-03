@@ -21,7 +21,7 @@ import '../styles/mobile-app.css';
 import '../styles/skeleton.css';
 import '../styles/aura-theme.css';
 import '../styles/handoff.css';
-import { supabase, compressImageOnly, rowToProfile, saveProfile, isPresetCoverUrl, onboardingStatus, sendSignal, fetchSignalQuota, isRateLimited, isStorageImageUrl, withoutCredentials, uploadMessageAttachment, removeMessageAttachment, uploadCommunityPostImage, removeCommunityPostImage, ImageProcessingError, PHOTO_ERROR_MESSAGE, PHOTO_FRAMER_ERROR, compressAttachmentFiles, attachmentKind, reportMember, setSensitiveConsent, fetchSensitiveConsentAt, fetchMyInterests, fetchInterestNodes, addMemberInterest, isMissingFunction, touchPresence, connectionPresence, setPresenceVisible, myPresenceVisible, setMemberInterests, uploadResume, removeResume, resumeSignedUrl, resumeInfo, clearResumePath, searchPlaces, setHomeCity, setHomeLocation, listEvents, setEventRsvp, setCompanionDefault, myEventPrefs, eventCompanions, saveMemberEvent, cancelMemberEvent, deleteMemberEvent, uploadEventImage, removeEventImages, setEventInterest, setEventBrochure, uploadEventBrochure, removeEventBrochures, companionEvents, companionDeck, companionSwipe, myCompanionMatches, markCompanionMatchSeen, sendConnectRequest, setNearbyEnabled, myNearbySetting, nearbyPulse, nearbyClear, myNearbyAlerts, setNearbyMuted, nearbyDiscover, nearbyPass, nearbyConnect, myNearbyMatches, myNotifications, markNotificationsRead, dismissNotification, setNearbyRadius, savePushSubscription, deletePushSubscription, sendPendingPush } from './supabase.js';
+import { supabase, compressImageOnly, rowToProfile, saveProfile, isPresetCoverUrl, onboardingStatus, sendSignal, fetchSignalQuota, isRateLimited, isStorageImageUrl, withoutCredentials, uploadMessageAttachment, removeMessageAttachment, uploadCommunityPostImage, removeCommunityPostImage, ImageProcessingError, PHOTO_ERROR_MESSAGE, PHOTO_FRAMER_ERROR, compressAttachmentFiles, attachmentKind, reportMember, setSensitiveConsent, fetchSensitiveConsentAt, fetchMyInterests, fetchInterestNodes, addMemberInterest, isMissingFunction, touchPresence, connectionPresence, setPresenceVisible, myPresenceVisible, setMemberInterests, uploadResume, removeResume, resumeSignedUrl, resumeInfo, clearResumePath, searchPlaces, setHomeCity, setHomeLocation, listEvents, setEventRsvp, setCompanionDefault, myEventPrefs, eventCompanions, saveMemberEvent, cancelMemberEvent, deleteMemberEvent, uploadEventImage, removeEventImages, setEventInterest, setEventBrochure, uploadEventBrochure, removeEventBrochures, companionEvents, companionDeck, companionSwipe, myCompanionMatches, markCompanionMatchSeen, sendConnectRequest, setNearbyEnabled, myNearbySetting, nearbyPulse, nearbyClear, myNearbyAlerts, setNearbyMuted, nearbyDiscover, nearbyPass, nearbyConnect, myNearbyMatches, myNotifications, markNotificationsRead, dismissNotification, setNearbyRadius, savePushSubscription, deletePushSubscription, sendPendingPush, searchCompanies, searchCompanyDirectory, companyLogoUrl, addCompany, setMyWork, memberWork } from './supabase.js';
 import { locateOnce, fallbackCopy } from './geo-locate.js';
 import { areaChangeMessage, AREA_HELPER, AREA_NO_MATCH } from './area-change.js';
 import { areaShareBody, parseAreaBody, resumeShareAttachment, resumeMessageFields, RESUME_SHARE_BODY, NO_RESUME_HINT, RESUME_GONE_COPY, RESUME_SHARE_NOTE, AREA_SHARE_NOTE } from './quick-share.js';
@@ -44,6 +44,7 @@ import '../styles/crossing-paths.css';
 import { createNearbyPage } from './nearby-page.js';
 import { COPY as NEARBY_COPY, crossingCopy } from './nearby-view.js';
 import { createMemberNotifications } from './member-notifications.js';
+import { workMarkup, workLine, normalizeWork, mergeCompanies, cleanTitle, cleanCompanyName, INDUSTRIES, logoFileToWebp, ORG_ICON } from './work-identity.js';
 import { createSoundKit, soundEnabled, setSoundEnabled, soundVolume, setSoundVolume, interactionSoundEnabled, setInteractionSoundEnabled, pushSoundEnabled, setPushSoundEnabled } from './notify-sound.js';
 import { createWebPush, pushSupport, PUSH_COPY } from './web-push.js';
 import '../styles/nearby.css';
@@ -99,6 +100,7 @@ import '../styles/app-polish.css';
 import '../styles/deck-compact.css';
 import '../styles/collab-requests.css';  // D-108: the request section and review sheet
 import '../styles/emoji-field.css';  // D-113: the emoji panel under the Edit profile bio
+import '../styles/work-identity.css';  // D-140: company line and picker
 import '../styles/components.css';  // D-105: the shared field, select, listbox and chip components, last so they win
 import { navMarkup, markCurrentNav, setChatBadges } from './app-nav.js';
 import { parseReadState, serializeReadState, lastReadAt, unreadCount, markRead, sortByLastContact, unreadTotal } from './chat-unread.js';
@@ -1069,6 +1071,44 @@ nearbyPage = createNearbyPage({
 // anywhere, it is read everywhere and its system notification closes. Web push (optional, per device) is in Settings.
 // D-137: one sound kit for the whole app (notify-sound.js): the notification cue and the two swipe cues.
 const chime = createSoundKit();
+// D-140: "[logo] Title at Company" on every card and profile. Any element with data-work-for="<member id>" shows the
+// member's work in place of its own text once member_work answers (batched, cached, only members the viewer may see).
+// Cards keep their size: the line replaces the experience line, one line, ellipsised.
+const workCache = new Map();
+const workPending = new Set();
+const paintWork = () => {
+  document.querySelectorAll('[data-work-for]').forEach((el) => {
+    const id = el.dataset.workFor;
+    const work = workCache.get(id);
+    if (!work || !workLine(work)) {
+      // Cleared (Remove, then Save): the own profile line goes away; cards keep their own text.
+      if (el.id === 'profile-work' && workCache.has(id)) { el.innerHTML = ''; el.hidden = true; delete el.dataset.workShown; }
+      return;
+    }
+    const sig = `${id}|${workLine(work)}|${work.logoPath}`;
+    if (el.dataset.workShown === sig && el.querySelector('.work-line')) return;
+    el.dataset.workShown = sig;
+    el.innerHTML = workMarkup(work, { logoUrl: work.logoPath ? companyLogoUrl(work.logoPath) : '', escapeHtml });
+    el.hidden = false;
+  });
+};
+let workTimer = 0;
+const requestWork = () => {
+  window.clearTimeout(workTimer);
+  workTimer = window.setTimeout(async () => {
+    const ids = [...new Set([...document.querySelectorAll('[data-work-for]')].map((el) => el.dataset.workFor))]
+      .filter((id) => id && !workCache.has(id) && !workPending.has(id)).slice(0, 60);
+    if (!ids.length || !supabase) { paintWork(); return; }
+    ids.forEach((id) => workPending.add(id));
+    const { data, error } = await memberWork(ids);
+    ids.forEach((id) => workPending.delete(id));
+    if (error) { if (isMissingFunction(error)) ids.forEach((id) => workCache.set(id, null)); return; }
+    ids.forEach((id) => workCache.set(id, null));
+    (data || []).forEach((row) => workCache.set(String(row.member_id), normalizeWork(row)));
+    paintWork();
+  }, 80);
+};
+new MutationObserver(requestWork).observe(document.body, { subtree: true, childList: true, attributes: true, attributeFilter: ['data-work-for'] });
 setSwipeCue((direction) => chime.swipe(direction));
 const webPush = createWebPush({ save: savePushSubscription, remove: deletePushSubscription });
 const openMemberProfileById = async (id) => {
@@ -1423,7 +1463,8 @@ const renderHome = (queue = getExplorePeople()) => {
   const cardLabel = document.querySelector('#swipe-card-label');
   // D-113: the bar says what the member is looking for (their own words, first two), not a guessed label.
   if (cardLabel) cardLabel.textContent = deckCardLabel(currentPerson.lookingFor);
-  const role = document.querySelector('#swipe-role'); if (role) role.textContent = currentPerson.role;
+  const role = document.querySelector('#swipe-role');
+  if (role) { role.textContent = currentPerson.role; delete role.dataset.workShown; role.dataset.workFor = String(currentPerson.id || ''); paintWork(); }
   renderCardBio(currentPerson);
   // The server's distance band only ("~3 km", a place, a region, "Abroad"): never a City/State, cell or km.
   const location = document.querySelector('#swipe-location');
@@ -1909,7 +1950,7 @@ const openPublicProfile = (person, options = {}) => {
     + `<div class="public-profile-cover"></div>`
     + `<header class="public-profile-head"><div class="public-profile-avatar">${avatarImage(image, profile.name) || escapeHtml(initials(profile.name))}</div>`
     + `<div class="public-profile-id"><h2>${escapeHtml(name)}</h2>`
-    + `<p class="public-profile-meta">${role ? `<span class="public-profile-role">${escapeHtml(role)}</span>` : ''}${location ? `<span class="public-profile-location">${escapeHtml(location)}</span>` : ''}</p></div></header>`
+    + `<p class="public-profile-meta"><span class="public-profile-role" data-work-for="${escapeHtml(String(profile.id || ''))}"${role ? '' : ' hidden'}>${escapeHtml(role)}</span>${location ? `<span class="public-profile-location">${escapeHtml(location)}</span>` : ''}</p></div></header>`
     + `<div class="public-profile-body">${bio ? `<p class="public-profile-bio">${escapeHtml(bio)}</p>` : ''}`
     + (groups || `<p class="public-profile-empty">${escapeHtml(firstName)} hasn't added interests yet.</p>`)
     + `</div>`
@@ -3078,6 +3119,134 @@ const INTEREST_LIMIT_COPY = 'You can change your interests up to 3 times a day. 
 // the active row (aria-activedescendant), Enter picks it, Escape or Tab closes, a press outside closes. allowCustom adds
 // what was typed when nothing matches (looking for); interests only take offered options.
 const CHIP_REMOVE_ICON = '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M6 6l12 12M18 6 6 18"/></svg>';
+// D-140: Company / Organisation in Edit profile. A title, then a company from the directory (search), or the member's
+// own (name, optional website, industry and logo). Saved with the rest of the form (set_my_work).
+const workEditorMarkup = () => `<div class="profile-edit-wide profile-edit-work" data-work-editor><span class="profile-edit-picker-label" id="profile-work-label">COMPANY / ORGANISATION</span>`
+  + `<input class="b-field" name="jobTitle" maxlength="60" placeholder="Your title, e.g. Software Engineer" autocomplete="organization-title" aria-label="Your title" />`
+  + `<div class="profile-work-picked" data-work-picked hidden><span class="profile-work-picked-name" data-work-picked-name></span><button type="button" class="profile-work-remove" data-work-clear>Remove</button></div>`
+  + `<div class="b-combo"><input class="b-field" type="text" role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="profile-work-list" aria-labelledby="profile-work-label" placeholder="Search a company, startup or organisation" autocomplete="off" spellcheck="false" data-work-search />`
+  + `<ul class="b-listbox" id="profile-work-list" role="listbox" aria-label="Companies" hidden></ul></div>`
+  + `<fieldset class="profile-work-new" data-work-new hidden><legend>Add your organisation</legend>`
+  + `<label><span>NAME</span><input class="b-field" data-work-new-name maxlength="80" /></label>`
+  + `<label><span>WEBSITE (OPTIONAL)</span><input class="b-field" data-work-new-site inputmode="url" placeholder="mystartup.in" /></label>`
+  + `<label><span>INDUSTRY (OPTIONAL)</span><select class="b-select" data-work-new-industry><option value="">Choose one</option>${INDUSTRIES.map((i) => `<option>${escapeHtml(i)}</option>`).join('')}</select></label>`
+  + `<label><span>LOGO (OPTIONAL)</span><input class="b-file" type="file" accept="image/png,image/jpeg,image/webp,image/gif" data-work-new-logo /></label>`
+  + `<div class="profile-work-new-actions"><button type="button" class="profile-edit-cancel" data-work-new-cancel>CANCEL</button><button type="button" class="profile-area-geo" data-work-new-add>ADD ORGANISATION</button></div></fieldset>`
+  + `<small class="profile-edit-helper" data-work-status role="status">Shown small on your card, like “Software Engineer at Google”.</small></div>`;
+const wireWorkEditor = (modal, current) => {
+  const box = modal.querySelector('[data-work-editor]');
+  const state = { title: current?.title || '', companyId: current?.companyId || '', company: current?.company || '', logoUrl: current?.logoPath ? companyLogoUrl(current.logoPath) : '', ready: Boolean(current) };
+  if (!box) return { state, changed: () => false };
+  const initial = { title: state.title, companyId: state.companyId };
+  const title = box.querySelector('[name="jobTitle"]');
+  const search = box.querySelector('[data-work-search]');
+  const list = box.querySelector('#profile-work-list');
+  const picked = box.querySelector('[data-work-picked]');
+  const pickedName = box.querySelector('[data-work-picked-name]');
+  const status = box.querySelector('[data-work-status]');
+  const form = box.querySelector('[data-work-new]');
+  title.value = state.title;
+  const showPicked = () => {
+    picked.hidden = !state.companyId;
+    pickedName.innerHTML = state.companyId ? `${state.logoUrl ? `<img class="work-logo" src="${escapeHtml(state.logoUrl)}" alt="" width="16" height="16" />` : ORG_ICON}<span>${escapeHtml(state.company)}</span>` : '';
+  };
+  showPicked();
+  title.addEventListener('input', () => { state.title = title.value; });
+  let seq = 0; let timer = 0; let rows = []; let query = '';
+  const close = () => { list.hidden = true; search.setAttribute('aria-expanded', 'false'); };
+  const render = (note = '') => {
+    const options = rows.map((c, i) => `<li class="b-option" role="option" id="profile-work-opt-${i}" data-work-id="${escapeHtml(c.id)}" tabindex="-1">${c.logo_path ? `<img class="work-logo" src="${escapeHtml(companyLogoUrl(c.logo_path))}" alt="" width="16" height="16" loading="lazy" />` : ORG_ICON}<span>${escapeHtml(c.name)}</span>${c.domain ? `<small>${escapeHtml(c.domain)}</small>` : ''}</li>`).join('');
+    const add = query ? `<li class="b-option b-option-add" role="option" id="profile-work-opt-add" data-work-add tabindex="-1">Add “${escapeHtml(cleanCompanyName(query))}” as your organisation</li>` : '';
+    list.innerHTML = options + (note ? `<li class="b-listbox-note">${escapeHtml(note)}</li>` : '') + add;
+    list.hidden = !list.innerHTML;
+    search.setAttribute('aria-expanded', String(!list.hidden));
+  };
+  search.addEventListener('input', () => {
+    clearTimeout(timer);
+    query = search.value.trim();
+    if (!query) { rows = []; close(); return; }
+    const ticket = ++seq;
+    timer = setTimeout(async () => {
+      const local = await searchCompanies(query);
+      if (ticket !== seq) return;
+      if (local.missing) { rows = []; render(); return; }
+      rows = local.data || [];
+      render(local.needsDirectory ? 'Searching the directory…' : '');
+      if (!local.needsDirectory) return;
+      const remote = await searchCompanyDirectory(query);
+      if (ticket !== seq) return;
+      rows = mergeCompanies(rows, remote.data || []);
+      render(rows.length ? '' : 'No company found. Add it below.');
+    }, 220);
+  });
+  search.addEventListener('keydown', (event) => {
+    if (event.key === 'ArrowDown') { event.preventDefault(); list.querySelector('[role="option"]')?.focus(); }
+    else if (event.key === 'Escape' && !list.hidden) { event.preventDefault(); event.stopPropagation(); close(); }
+  });
+  list.addEventListener('keydown', (event) => {
+    const items = [...list.querySelectorAll('[role="option"]')];
+    const at = items.indexOf(document.activeElement);
+    if (event.key === 'ArrowDown') { event.preventDefault(); items[Math.min(at + 1, items.length - 1)]?.focus(); }
+    else if (event.key === 'ArrowUp') { event.preventDefault(); if (at <= 0) search.focus(); else items[at - 1].focus(); }
+    else if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); document.activeElement?.click(); }
+    else if (event.key === 'Escape') { event.preventDefault(); event.stopPropagation(); close(); search.focus(); }
+  });
+  const openNew = () => {
+    form.hidden = false;
+    form.querySelector('[data-work-new-name]').value = cleanCompanyName(query);
+    close();
+    form.querySelector('[data-work-new-name]').focus();
+  };
+  list.addEventListener('click', (event) => {
+    if (event.target.closest('[data-work-add]')) { openNew(); return; }
+    const item = event.target.closest('[data-work-id]');
+    if (!item) return;
+    const c = rows.find((r) => r.id === item.dataset.workId);
+    if (!c) return;
+    Object.assign(state, { companyId: c.id, company: c.name, logoUrl: c.logo_path ? companyLogoUrl(c.logo_path) : '' });
+    search.value = ''; query = ''; close(); showPicked();
+    status.textContent = `${c.name} picked. Save changes to show it on your card.`;
+  });
+  box.querySelector('[data-work-clear]').addEventListener('click', () => {
+    Object.assign(state, { companyId: '', company: '', logoUrl: '' });
+    showPicked();
+    status.textContent = 'Company removed. Save changes to update your card.';
+    search.focus();
+  });
+  box.querySelector('[data-work-new-cancel]').addEventListener('click', () => { form.hidden = true; search.focus(); });
+  box.querySelector('[data-work-new-add]').addEventListener('click', async (event) => {
+    const button = event.currentTarget;
+    const name = cleanCompanyName(form.querySelector('[data-work-new-name]').value);
+    if (name.length < 2) { status.textContent = 'Add the organisation’s name.'; form.querySelector('[data-work-new-name]').focus(); return; }
+    const file = form.querySelector('[data-work-new-logo]').files?.[0] || null;
+    button.disabled = true;
+    status.textContent = 'Adding your organisation…';
+    let logo = null;
+    try { if (file) logo = await logoFileToWebp(file); } catch (error) { button.disabled = false; status.textContent = error.message; return; }
+    const { data, error } = await addCompany(memberProfile.id, { name, website: form.querySelector('[data-work-new-site]').value, industry: form.querySelector('[data-work-new-industry]').value, logo });
+    button.disabled = false;
+    if (error || !data) {
+      status.textContent = /try again later|PT429/i.test(`${error?.code} ${error?.message}`) ? 'You have added a few organisations today. Try again tomorrow.'
+        : /invalid name/i.test(error?.message || '') ? 'Use the organisation’s name (no links).' : "That organisation couldn't be added. Please try again.";
+      return;
+    }
+    Object.assign(state, { companyId: data, company: name, logoUrl: logo ? URL.createObjectURL(logo) : '' });
+    form.hidden = true; search.value = ''; query = ''; showPicked();
+    status.textContent = `${name} added. Save changes to show it on your card.`;
+  });
+  // The saved work arrives after the dialog opens (member_work): fill it in unless the member already typed.
+  const fill = (work) => {
+    if (!work || state.touched) return;
+    Object.assign(state, { title: work.title || '', companyId: work.companyId || '', company: work.company || '', logoUrl: work.logoPath ? companyLogoUrl(work.logoPath) : '' });
+    Object.assign(initial, { title: state.title, companyId: state.companyId });
+    title.value = state.title;
+    showPicked();
+  };
+  box.addEventListener('input', () => { state.touched = true; });
+  box.addEventListener('click', (event) => { if (event.target.closest('button, [role="option"]')) state.touched = true; });
+  return { state, fill, changed: () => cleanTitle(state.title) !== cleanTitle(initial.title) || state.companyId !== initial.companyId };
+};
+
 const chipPickerMarkup = ({ id, label, placeholder, helper, listLabel }) => `<div class="profile-edit-wide profile-edit-picker" data-picker="${id}"><span class="profile-edit-picker-label" id="${id}-label">${label}</span>`
   + `<ul class="b-chips" data-picker-chips aria-label="${escapeHtml(listLabel)}"><li class="b-chips-empty">Loading…</li></ul>`
   + `<div class="b-combo"><input class="b-field" type="text" role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="${id}-list" aria-labelledby="${id}-label" placeholder="${escapeHtml(placeholder)}" autocomplete="off" spellcheck="false" data-picker-input />`
@@ -3278,6 +3447,7 @@ const openProfileEditor = () => {
         <label><span>EMAIL</span><input class="b-field" value="${escapeHtml(profile.email || '')}" readonly /></label>
         <label><span>PHONE</span><input class="b-field" name="phone" value="${escapeHtml(profile.phone || '')}" /></label>
         <label><span>EXPERIENCE</span><select class="b-select" name="experience"><option value="">Choose one</option>${experienceChoices(profile.experience).map((choice) => `<option${choice === String(profile.experience || '').trim() ? ' selected' : ''}>${escapeHtml(choice)}</option>`).join('')}</select></label>
+        ${workEditorMarkup()}
         ${bioAvailable ? `<label class="profile-edit-wide profile-edit-bio"><span>BIO</span><textarea class="b-field" name="bio" rows="3" maxlength="${BIO_MAX}" placeholder="A line or two about you: what you do, what you love, what you're up to.">${escapeHtml(profile.bio || '')}</textarea><small class="profile-edit-helper" data-bio-helper><span data-bio-count aria-live="polite">${bioWords(profile.bio).label}</span><span data-bio-limit role="status"></span>. Members who can see you read it on your profile.</small></label>` : ''}
         <div class="profile-edit-wide profile-edit-area" data-profile-area><span id="profile-area-label">YOUR AREA</span><p class="profile-edit-area-current" data-area-current>${escapeHtml(memberPlaceLabel || 'Not set yet')}</p><div class="profile-edit-area-tools"><button type="button" class="profile-area-geo" data-area-geo>Use my location</button><div class="profile-area-search b-combo"><input class="b-field" type="text" role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="profile-area-results" aria-labelledby="profile-area-label" placeholder="Or search your city" value="${escapeHtml(areaInputValue(memberPlaceLabel))}" autocomplete="off" spellcheck="false" data-area-search /><ul class="profile-area-results b-listbox" id="profile-area-results" role="listbox" aria-label="Cities" hidden></ul></div></div><small class="profile-edit-helper" data-area-status role="status">${escapeHtml(AREA_HELPER)}</small></div>
         ${chipPickerMarkup({ id: 'profile-interests-edit', label: 'INTERESTS', listLabel: 'Your interests', placeholder: 'Add an interest: type to search', helper: `Pick 1 to ${MAX_INTERESTS}. You can change them up to 3 times a day. Private interests are never shown.` })}
@@ -3295,6 +3465,15 @@ const openProfileEditor = () => {
   wireAreaChanger(modal);
   const interestEdit = wireInterestEditor(modal);
   const lookingEdit = wireLookingForEditor(modal);
+  const workEdit = wireWorkEditor(modal, workCache.get(String(memberProfile.id)) || null);
+  if (!workCache.has(String(memberProfile.id)) && memberProfile.id) {
+    memberWork([memberProfile.id]).then(({ data }) => {
+      const row = (data || [])[0];
+      const work = row ? normalizeWork(row) : null;
+      workCache.set(String(memberProfile.id), work);
+      if (modal.isConnected) workEdit.fill(work);
+    });
+  }
   const bioField = modal.querySelector('textarea[name="bio"]');
   // D-137: 1 to 20 words, counted live ("8/20 words"); past 20 a quiet note shows and Save is refused.
   const syncBioWords = () => {
@@ -3396,6 +3575,13 @@ const openProfileEditor = () => {
       const { error: bioError } = await supabase.from('profiles').update({ bio: nextBio || null }).eq('id', memberProfile.id);
       if (bioError) { setBusy(submit, false); feedback.textContent = /bio_words|20 words/i.test(String(bioError.message)) ? `Keep your bio to ${BIO_WORDS_MAX} words or fewer.` : "Your bio couldn't be saved. Please try again."; return; }
       nextProfile.bio = nextBio;
+    }
+    // D-140: title and company (set_my_work). Before 0036 there is nothing to save.
+    if (workEdit.changed()) {
+      const { error: workError } = await setMyWork(cleanTitle(workEdit.state.title), workEdit.state.companyId || null);
+      if (workError && !isMissingFunction(workError)) { setBusy(submit, false); feedback.textContent = "Your company couldn't be saved. Please try again."; return; }
+      workCache.delete(String(memberProfile.id));
+      requestWork();
     }
     const { data, error } = await saveProfile(memberProfile.id, nextProfile, photoFile, { photoUrl: memberProfile.photoUrl });
     if (error) {
@@ -4004,6 +4190,8 @@ const renderProfile = () => {
   // My area as the server names it (my_onboarding_status().place_label), read-only here (D-036). The legacy free-text
   // City/State are neither shown nor editable: no other member can read them, and the area is the server's cell.
   document.querySelector('#profile-location').textContent = areaInputValue(memberPlaceLabel) || 'Your area';  // no "(city-wide)" (D-106)
+  const ownWork = document.querySelector('#profile-work');
+  if (ownWork && memberProfile.id && ownWork.dataset.workFor !== String(memberProfile.id)) ownWork.dataset.workFor = String(memberProfile.id);
   // D-113: the member's own bio under the name (it replaced the fixed "Same curiosity. Bigger conversations." line);
   // nothing shows until there is one.
   const heroBio = document.querySelector('#profile-hero-bio');

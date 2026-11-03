@@ -386,6 +386,31 @@ export const startAppStub = async ({ port, state = {}, deckRows = defaultDeckRow
       if (pathName === '/rest/v1/rpc/mark_companion_match_seen') { (st.companionMatches || []).forEach((m) => { if (m.match_id === args.p_match) m.seen = true; }); return json(200, true); }
       if (pathName === '/rest/v1/rpc/cancel_member_event') { const e = st.events.find((x) => x.id === args.p_id); if (e) e.status = 'cancelled'; return json(200, true); }
       if (pathName === '/rest/v1/rpc/delete_member_event') { st.events = st.events.filter((x) => x.id !== args.p_id); return json(200, true); }
+      // D-140 (0035/0036): the directories. search_cities answers from st.places; companies from st.companies
+      // (search_companies by name), member_work from st.work ({ [id]: row }), set_my_work / add_company record.
+      if (pathName === '/rest/v1/rpc/search_cities') {
+        const q = String(args.p_q || '').split(',')[0].trim().toLowerCase();
+        return json(200, q.length < 2 ? [] : (st.places || []).filter((p) => p.name.toLowerCase().includes(q) || String(p.region || '').toLowerCase().includes(q)).map(({ id, name, region, country }) => ({ id, name, region, country })));
+      }
+      if (pathName === '/rest/v1/rpc/ensure_place') return json(200, String(args.p_id || '').replace(/^geo-/, 'place-'));
+      if (pathName === '/rest/v1/rpc/search_companies') {
+        const q = String(args.p_q || '').trim().toLowerCase();
+        return json(200, (st.companies || []).filter((c) => c.name.toLowerCase().startsWith(q) || String(c.domain || '').startsWith(q)));
+      }
+      if (pathName === '/rest/v1/rpc/member_work') {
+        return json(200, (args.p_ids || []).map((id) => (st.work || {})[id] && { member_id: id, ...(st.work || {})[id] }).filter(Boolean));
+      }
+      if (pathName === '/rest/v1/rpc/set_my_work') {
+        (st.workSaved ||= []).push(args);
+        const c = (st.companies || []).find((x) => x.id === args.p_company);
+        st.work = { ...(st.work || {}), [ME]: { job_title: args.p_title, company_id: args.p_company, company_name: c?.name || null, logo_path: c?.logo_path || null, verified: Boolean(c?.verified) } };
+        return route.fulfill({ status: 204, body: '', headers: { 'access-control-allow-origin': '*' } });
+      }
+      if (pathName === '/rest/v1/rpc/add_company') {
+        const c = { id: `c-${(st.companies || []).length + 1}`, name: args.p_name, domain: args.p_website || null, logo_path: args.p_logo_path, verified: false, source: 'member' };
+        (st.companies ||= []).push(c); (st.companiesAdded ||= []).push(args);
+        return json(200, c.id);
+      }
       if (pathName === '/rest/v1/place' && st.places) {
         const q = String(reqUrl.searchParams.get('or') || '').match(/name\.ilike\.\*([^*]*)\*/)?.[1]?.toLowerCase() || '';
         return json(200, st.places.filter((p) => !q || p.name.toLowerCase().includes(q)).map(({ id, name, region, country }) => ({ id, name, region, country })));

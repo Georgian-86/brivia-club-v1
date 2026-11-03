@@ -78,7 +78,7 @@ export const companionCardMarkup = (person, { coverSrc = '', photoSrc = '', even
   <div class="companion-card-body">
     <h2 class="companion-name">${escapeHtml(person.name)}</h2>
     ${band ? `<p class="companion-place">${PIN}<span>${escapeHtml(band)}</span></p>` : ''}
-    <p class="companion-headline">${escapeHtml(headlineFor(person))}</p>
+    <p class="companion-headline" data-work-for="${escapeHtml(person.id)}">${escapeHtml(headlineFor(person))}</p>
     ${chips ? `<ul class="companion-chips" aria-label="Interests">${chips}</ul>` : ''}
   </div>
   <p class="companion-event"${when ? ` title="${escapeHtml(when)}"` : ''}><span>Going to</span> ${escapeHtml(event.title || 'this event')}${when ? `<span class="sr-only">, ${escapeHtml(when)}</span>` : ''}</p>

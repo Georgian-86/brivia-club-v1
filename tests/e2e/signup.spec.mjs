@@ -127,6 +127,11 @@ const setup = async (context, opts = {}) => {
     // D-109: opts.catalog gives every public level-3 node a catalog_order (A-Z) and answers add_member_interest.
     if (p === '/rest/v1/interest_node') return json(200, opts.catalog ? nodes.map((n) => ({ ...n, catalog_order: n.level >= 3 && !n.sensitive ? 1 + [...nodes].filter((x) => x.level >= 3 && !x.sensitive).sort((a, b) => a.label.localeCompare(b.label)).findIndex((x) => x.id === n.id) : null })) : nodes);
     if (rpc === 'add_member_interest') return json(200, 'member.custom.kite_surfing_club');
+    // D-140 (0035): the worldwide directory search answers from the same place list (the first comma part is the city).
+    if (p === '/rest/v1/rpc/search_cities') {
+      const q = String(JSON.parse(body || '{}').p_q || '').split(',')[0].trim().toLowerCase();
+      return json(200, q.length < 2 ? [] : places.filter((pl) => pl.name.toLowerCase().includes(q) || String(pl.region || '').toLowerCase().includes(q)).map(({ id, name, region, country }) => ({ id, name, region, country })));
+    }
     if (p === '/rest/v1/place') {
       const q = ((url.searchParams.get('or') || '').match(/name\.ilike\.\*([^*]*)\*/) || [])[1] || '';
       return json(200, places.filter((pl) => !q || pl.name.toLowerCase().includes(q.toLowerCase())));

@@ -88,7 +88,7 @@ export const nearbyCardMarkup = (person, { coverSrc = '', photoSrc = '', current
   </button>
   <div class="companion-card-body">
     <h2 class="companion-name">${escapeHtml(person.name)}</h2>
-    ${person.headline ? `<p class="nearby-headline">${escapeHtml(person.headline)}</p>` : ''}
+    <p class="nearby-headline" data-work-for="${escapeHtml(person.id)}"${person.headline ? '' : ' hidden'}>${escapeHtml(person.headline)}</p>
     <p class="companion-place">${PIN}<span>${escapeHtml(place)}</span>${person.hereNow ? '<span class="nearby-now">Here now</span>' : ''}</p>
     ${person.bio ? `<p class="nearby-bio">${escapeHtml(person.bio)}</p>` : ''}
     ${sharedChips || otherChips ? `<ul class="companion-chips nearby-chips" aria-label="Interests">${sharedChips}${otherChips}</ul>` : ''}

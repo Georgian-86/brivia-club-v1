@@ -274,7 +274,18 @@ export const isRateLimited = (error, status = 0) => status === 429 || error?.cod
 // R1: the 18+ declaration. Must run before set_home_* and set_member_interests (the server refuses them otherwise).
 export const declareAdult = () => rpcCall('declare_adult', { p_notice_version: NOTICE_VERSION });
 export const setHomeLocation = (lat, lng) => rpcCall('set_home_location', { lat, lng });
-export const setHomeCity = (placeId) => rpcCall('set_home_city', { p_place_id: placeId });
+// D-140 (0035): a city picked from the worldwide directory (id 'geo-<n>') becomes a place the first time it is chosen
+// (ensure_place); every other surface keeps using place ids exactly as before.
+export const ensurePlace = async (placeId) => {
+  const id = String(placeId || '');
+  if (!/^geo-\d+$/.test(id)) return { data: id, error: null };
+  return rpcCall('ensure_place', { p_id: id });
+};
+export const setHomeCity = async (placeId) => {
+  const placed = await ensurePlace(placeId);
+  if (placed.error) return placed;
+  return rpcCall('set_home_city', { p_place_id: placed.data });
+};
 export const setMemberInterests = (items) => rpcCall('set_member_interests', { p_items: items });
 // R2: give (true) or withdraw (false) the separate consent for private interests. Withdrawal deletes them server-side.
 export const setSensitiveConsent = (consent) => rpcCall('set_sensitive_consent', { p_consent: consent });
@@ -337,6 +348,11 @@ export const eventCompanions = (eventId) => rpcCall('event_companions', { p_even
 // Member events (0022, D-121). saveMemberEvent -> { data: event id }; errors 22023 'invalid <field>' name the field,
 // P0001 'event_limit' is the daily cap, 42501 'not your event'. Before 0022 each answers PGRST202 (isMissingFunction).
 export const saveMemberEvent = async (id, fields, publish) => {
+  if (fields?.place_id && /^geo-\d+$/.test(fields.place_id)) {
+    const placed = await ensurePlace(fields.place_id);
+    if (placed.error) return { data: null, error: placed.error, status: placed.status };
+    fields = { ...fields, place_id: placed.data };
+  }
   const { data, error, status } = await rpcCall('save_member_event', { p_id: id || null, p_fields: fields, p_publish: Boolean(publish) });
   return { data: typeof data === 'string' ? data : null, error, status };
 };
@@ -415,11 +431,68 @@ export const sendPendingPush = async () => {
   if (!supabase?.functions) return { error: null };
   try { return await supabase.functions.invoke('push-notify', { body: {} }); } catch (error) { return { error }; }
 };
+// D-140 (0036): company / organisation. Database search first; when it has few answers, the directory Edge Function
+// looks the name up on Wikidata, caches the companies (with their logos) and returns them.
+export const searchCompanies = async (query, limit = 8) => {
+  if (!supabase) return notConfigured();
+  const q = String(query || '').replace(/\s+/g, ' ').trim().slice(0, 60);
+  if (q.length < 1) return { data: [], error: null };
+  const local = await supabase.rpc('search_companies', { p_q: q, p_limit: limit });
+  if (local.error) return { data: [], error: local.error, status: local.status, missing: isMissingFunction(local.error) };
+  const rows = local.data || [];
+  return { data: rows, error: null, needsDirectory: q.length >= 2 && rows.length < 4 };
+};
+export const searchCompanyDirectory = async (query) => {
+  if (!supabase?.functions) return { data: [], error: null };
+  try {
+    const { data, error } = await supabase.functions.invoke('directory', { body: { kind: 'company', q: String(query || '').trim().slice(0, 60) } });
+    return { data: Array.isArray(data?.companies) ? data.companies : [], error: error || null };
+  } catch (error) { return { data: [], error }; }
+};
+export const companyLogoUrl = (path) => {
+  if (!supabase || !path) return '';
+  return supabase.storage.from('company-logos').getPublicUrl(String(path)).data?.publicUrl || '';
+};
+// A member's own organisation: the logo (already a 128 px WebP blob) goes to company-logos/<uid>/, then add_company,
+// which answers the existing row when the website or name is already known.
+export const addCompany = async (userId, { name, website = '', industry = '', logo = null } = {}) => {
+  if (!supabase || !userId) return notConfigured();
+  let logoPath = null;
+  if (logo) {
+    const path = `${userId}/${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}.webp`;
+    const { error } = await supabase.storage.from('company-logos').upload(path, logo, { contentType: 'image/webp', upsert: false });
+    if (error) return { data: null, error };
+    logoPath = path;
+  }
+  return rpcCall('add_company', { p_name: name, p_website: website || null, p_industry: industry || null, p_logo_path: logoPath });
+};
+export const setMyWork = (title, companyId) => rpcCall('set_my_work', { p_title: title || null, p_company: companyId || null });
+export const memberWork = (ids) => rpcCall('member_work', { p_ids: [...new Set((ids || []).map(String))].slice(0, 60) });
+
+// D-140: postal codes (OpenStreetMap Photon through the directory Edge Function, mapped to the nearest directory city).
+export const lookupPostalCode = async (code) => {
+  if (!supabase?.functions) return { data: [], error: null };
+  try {
+    const { data, error } = await supabase.functions.invoke('directory', { body: { kind: 'postal', q: code } });
+    return { data: Array.isArray(data?.places) ? data.places : [], error: error || null };
+  } catch (error) { return { data: [], error }; }
+};
 export const isMissingFunction = (error) => ['PGRST202', '42883'].includes(error?.code) || error?.status === 404;
 
 // City list for "Pick my city": name or region match, launch cities first. Wildcards in the query are dropped.
+// D-140 (0035): the worldwide directory first (any city, town or locality; "City, Country" and "City, State" tell
+// same-named places apart; other spellings and native scripts match); a postal code goes to the directory Edge
+// Function. Before 0035 is applied, the original place list answers.
 export const searchPlaces = async (query, limit = 8) => {
   if (!supabase) return notConfigured();
+  const raw = String(query || '').trim().slice(0, 80);
+  if (/^[A-Za-z0-9][A-Za-z0-9 -]{2,9}$/.test(raw) && /\d/.test(raw)) {
+    const postal = await lookupPostalCode(raw);
+    if (postal.data?.length) return postal;
+  }
+  const global = await supabase.rpc('search_cities', { p_q: raw, p_limit: limit });
+  if (!global.error) return { data: global.data || [], error: null, status: global.status };
+  if (!isMissingFunction(global.error)) return { data: [], error: global.error, status: global.status };
   const clean = String(query || '').replace(/[^\p{L}\p{N} '-]/gu, ' ').replace(/\s+/g, ' ').trim().slice(0, 60);
   let request = supabase.from('place').select('id,name,region,country');
   if (clean) request = request.or(`name.ilike.*${clean}*,region.ilike.*${clean}*`);

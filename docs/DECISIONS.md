@@ -2877,3 +2877,36 @@ controls (a tester or a seeded test member), never a real member, so no new expo
   buttons are unchanged.
 - **Proof:** e2e deck-tutorial 26, nearby 66, companions 64, events 76, deck 201, all passing (axe contrast included);
   phone screenshots of the tutorial and Nearby.
+
+## D-140 (2026-11-03): a worldwide city directory, and a company on every profile
+
+- **Asked:** (9) a tiny company logo and name on profile cards ("Software Engineer at Google"), picked in Edit profile
+  from a searchable global company directory that grows (external source, cached, admin-verified), with members always
+  able to add their own (name, logo, website, industry), deduplicated, editable and removable; (10) any city in the
+  world, by city, country or postal code, with state and country to tell same-named cities apart, other spellings,
+  "Use my location" and manual choice, the same directory everywhere, standard identifiers, never exact coordinates.
+- **Cities (0035):** `geo_city`, 156,169 cities, towns and localities in every country from the countries-states-cities
+  database (ODbL), published with the site as `site/public/data/cities/part-NN.json` and imported in SQL with pg_net
+  (no service key leaves the dashboard). Names are public; centroids live in `brivia_private.geo_city_point` (the
+  orbit-location test allows coordinates in the public schema only on `place`). `search_cities(q)` (security invoker,
+  works before sign-in): prefix, typo (trigram), accents folded, native script, aliases (Bangalore, Bombay, Gurgaon...),
+  "City, Country", "City, State", or a country alone. `ensure_place(id)`: a picked city becomes one `place` row the
+  first time (`geo-<id>`), so ORBIT, `member_orbit.place_id`, card labels, Nearby, events and filters keep using `place`
+  unchanged; a city that already is a place answers its id. Postal codes: the `directory` Edge Function asks Photon
+  (OpenStreetMap) and maps the postcode's centre to the nearest directory city in that country.
+- **Companies (0036):** `company` (directory | member | admin, verified, unique domain and Wikidata id), the
+  `company-logos` bucket (raster only, 300 KB, members write only under their own uid), `profiles.job_title` and
+  `company_id`, `set_my_work`, `member_work(ids)` (only members the viewer may see, as `member_bio`),
+  `search_companies`, `add_company` (dedupe by domain then name, 5 a day), `brivia_cache_companies` (service role).
+  The `directory` Edge Function looks a name up on Wikidata (CC0, worldwide, includes Swiggy, Zepto, Razorpay...),
+  keeps results described as organisations, stores each logo once (Commons PNG or the site's icon), caches the rows.
+- **On the card:** "[14 px logo] Title at Company" in place of the experience line, one line, ellipsised, in the card's
+  small type; the default mark when there is no logo. Deck card, Nearby card, Event companions card, public profile,
+  own profile. One painter fills any `data-work-for` element from a batched cache. Card sizes are unchanged (e2e
+  measures the deck card with and without a company).
+- **Not done / limits:** no paid company API (Clearbit, Brandfetch need keys and contracts); Wikidata covers famous and
+  many emerging companies, members add the rest. Postal codes depend on OpenStreetMap coverage. The import needs pg_net
+  enabled once (README "## 0035"). The project rule asks for an agent-arena review of significant decisions; this one
+  was decided inline (data sources: open, free, no keys) and is open to an arena pass.
+- **Proof:** SQL harness ALL PASSED (new u-city-directory G1-G3, v-company-directory C1-C3; hygiene lists updated);
+  unit (work-identity); e2e work-identity (card line, picker, add, remove, card size, axe) and the city-picking specs.

@@ -784,6 +784,10 @@ select log_impressions($1, $4);
 - **`set_home_city(p_place_id text)`** is the "Pick my city" fallback (geolocation denied, timed out or missing). It
   has the same rules (SECURITY DEFINER, volatile, `authenticated` only, profile required, shared cap) and stores the
   cell of the place's centroid with that `place_id`. An unknown id raises `22023 invalid place`.
+- **D-140 (0035): the place list grows from a worldwide directory.** "Pick my city" searches `geo_city` (156k cities,
+  names only in public; centroids in `brivia_private.geo_city_point`). A picked city becomes a `place` row (`geo-<id>`)
+  through `ensure_place` before `set_home_city`, so this section is unchanged: `place` stays the one table with city
+  centroids, the pool still compares place centroids, and a directory city that is already a place answers that id.
 - **Precision (D-038, R2).** `member_orbit.precision text not null default 'cell' check (precision in ('cell',
   'place'))`. `set_home_location` writes `'cell'`; `set_home_city` writes `'place'`, because every picker of a city
   shares the centroid's cell, which says nothing about where they live (A-F2: 12 Mumbai pickers in one cell showed

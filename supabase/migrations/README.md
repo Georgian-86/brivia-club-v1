@@ -1126,3 +1126,41 @@ select * from public.nearby_retention;                                          
 select has_function_privilege('authenticated', 'public.my_notifications_v2()', 'execute'),  -- t
        has_table_privilege('authenticated', 'public.nearby_retention', 'select');            -- f
 ```
+
+## 0035
+
+**A worldwide city directory for every "Pick my city" (founder request 2026-11-03, D-140).**
+Apply after `0034`. The client can deploy before or after: before 0035 it searches the old place list.
+
+Then load the cities (156,169 rows in 16 parts published with the site; about a minute). In the SQL editor, as postgres:
+
+```sql
+create extension if not exists pg_net;
+-- 1. Ask for the 16 parts (the site must be deployed with site/public/data/cities/).
+select net.http_get('https://thebriviaclub.live/data/cities/part-' || lpad(i::text, 2, '0') || '.json', timeout_milliseconds := 60000)
+  from generate_series(0, 15) i;
+-- 2. About 30 seconds later: import every part that arrived (repeat 1 and 2 for any missing part; re-importing is safe).
+select r.id, public.brivia_import_cities(r.content::jsonb)
+  from net._http_response r where r.status_code = 200 and r.content like '[[%';
+-- 3. Link to the existing places and add the other spellings.
+select public.brivia_finish_city_import();     -- {"linked": ~80, "aliases": ~28, "cities": 156169}
+```
+
+Verify: `select id, name, region, country from public.search_cities('Ludhiana');` (in-ludhiana first),
+`select * from public.search_cities('Springfield, Missouri');`, `select count(*) from public.geo_city;` (156169).
+
+## 0036
+
+**A company / organisation on every profile (founder request 2026-11-03, D-140).**
+Apply after `0035`. Then deploy the Edge Function `directory` (`supabase/functions/directory/index.ts`, verify_jwt on;
+it uses the platform's SUPABASE_URL, SUPABASE_ANON_KEY and SUPABASE_SERVICE_ROLE_KEY, no extra secret). The client can
+deploy before 0036: without it the company field stays empty and nothing breaks.
+
+Verify:
+
+```sql
+select id, public from storage.buckets where id = 'company-logos';                        -- public t
+select has_function_privilege('authenticated', 'public.member_work(uuid[])', 'execute'),    -- t
+       has_function_privilege('authenticated', 'public.brivia_cache_companies(jsonb)', 'execute');  -- f
+```
+Moderation (verify, add, remove, merge): docs/MODERATION.md "Companies and logos".

@@ -1,0 +1,31 @@
+/* D-140: the company line ("[logo] Software Engineer at Google") and the Edit profile picker. Quiet by design: a 14 px
+   logo in the card's own small type, one line, ellipsised, in place of the experience line, so no card grows. */
+.work-line { display: inline-flex; align-items: center; gap: 6px; max-width: 100%; min-width: 0; vertical-align: middle; }
+.work-text { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.work-logo { flex: 0 0 14px; width: 14px; height: 14px; border-radius: 3px; object-fit: contain; background: var(--color-cream); box-shadow: 0 0 0 1px color-mix(in srgb, var(--color-wine) 12%, transparent); }
+svg.work-logo { padding: 1px; fill: none; stroke: currentColor; stroke-width: 1.2; stroke-linecap: round; stroke-linejoin: round; background: transparent; box-shadow: none; opacity: .8; }
+.profile-work:not([hidden]) { margin: 6px 0 0; color: var(--color-ink-soft); font-size: var(--text-14); }
+
+/* Edit profile */
+.profile-edit-work { display: grid; gap: 10px; }
+.profile-work-picked { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 14px; border: 1px solid var(--color-card-edge); border-radius: 14px; background: color-mix(in srgb, var(--color-cream) 70%, transparent); }
+.profile-work-picked[hidden] { display: none; }
+.profile-work-picked-name { display: inline-flex; align-items: center; gap: 8px; min-width: 0; color: var(--color-name-ink); font-size: var(--text-16); }
+.profile-work-picked-name .work-logo { flex-basis: 18px; width: 18px; height: 18px; }
+.profile-work-remove { min-height: 44px; padding: 0 4px; border: 0; background: none; color: var(--color-wine); font-size: var(--text-12); font-weight: 700; letter-spacing: .08em; text-transform: uppercase; cursor: pointer; }
+.profile-edit-work .b-option { display: flex; align-items: center; gap: 10px; }
+.profile-edit-work .b-option .work-logo { flex-basis: 16px; width: 16px; height: 16px; }
+.profile-edit-work .b-option small { margin-left: auto; }
+.profile-work-new { display: grid; gap: 10px; margin: 0; padding: 14px; border: 1px solid var(--color-card-edge); border-radius: 16px; background: color-mix(in srgb, var(--color-cream) 60%, transparent); }
+.profile-work-new[hidden] { display: none; }
+.profile-work-new legend { padding: 0 6px; color: var(--color-wine-deep); font-size: var(--text-12); font-weight: 700; letter-spacing: .08em; text-transform: uppercase; }
+.profile-work-new label { display: grid; gap: 6px; }
+.profile-work-new label > span { color: var(--color-ink-soft); font-size: var(--text-12); font-weight: 700; letter-spacing: .08em; }
+.profile-work-new-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 10px; }
+
+/* The deck card hides its role line (card-reference.css); it shows only when it holds a company, in the location line's
+   small type, so it reads as one quiet detail under the name. */
+body.app-body .app-view[data-view="home"] #swipe-role:has(.work-line) {
+  display: block; margin: 3px 0 0; color: var(--dk-soft); font-family: var(--font-body); font-size: var(--text-12);
+  font-weight: 600; letter-spacing: .02em; line-height: 1.3;
+}

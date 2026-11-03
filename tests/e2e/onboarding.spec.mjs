@@ -142,6 +142,11 @@ const stubContext = async (context, opts = {}) => {
     if (['set_home_location', 'set_home_city', 'set_member_interests'].some((n) => p === `/rest/v1/rpc/${n}`) && state.profile && !state.adultAt) return json(400, ADULT_REQUIRED);
     // staleCatalog: a catalog loaded before a node became sensitive (the server still refuses it without consent).
     if (p === '/rest/v1/interest_node') return json(200, opts.staleCatalog ? nodes.map((n) => ({ ...n, sensitive: false })) : nodes);
+    // D-140 (0035): the worldwide directory search answers from the same place list (the first comma part is the city).
+    if (p === '/rest/v1/rpc/search_cities') {
+      const q = String(JSON.parse(body || '{}').p_q || '').split(',')[0].trim().toLowerCase();
+      return json(200, q.length < 2 ? [] : places.filter((pl) => pl.name.toLowerCase().includes(q) || String(pl.region || '').toLowerCase().includes(q)).map(({ id, name, region, country }) => ({ id, name, region, country })));
+    }
     if (p === '/rest/v1/place') {
       const or = url.searchParams.get('or') || '';
       const q = (or.match(/name\.ilike\.\*([^*]*)\*/) || [])[1] || '';
