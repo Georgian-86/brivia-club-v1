@@ -2982,3 +2982,11 @@ controls (a tester or a seeded test member), never a real member, so no new expo
   longer takes places or products (Gothenburg, Google Maps, Google Play, Google Scholar came in through "capital",
   "service", "platform"; removed live, nobody had picked them); a description that says "company", "firm", "bank"...
   still wins over a product word ("American software company"). No website text in the list (D-143).
+
+## D-145 (2026-11-03): the member's photo in the top-right avatar
+
+- **Asked:** show the profile photo in the top-right circle instead of the initials.
+- **Done:** the header avatar shows the member's own photo (cover-fitted in the circle); the initials stay when there is
+  no photo or it fails to load. Verified with and without a photo; e2e app-shell 214 and mobile-polish 28 pass.
+  consent.spec.mjs fails before and after this change (it still looks for the Accept button removed in D-132); left for
+  a separate fix.

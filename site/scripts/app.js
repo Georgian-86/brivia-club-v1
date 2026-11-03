@@ -4285,7 +4285,19 @@ const renderProfile = () => {
   const profile = memberProfile;
   const headerAvatar = document.querySelector('#app-avatar-button');
   if (headerAvatar) {
-    headerAvatar.textContent = headerInitials(profile.name);
+    // D-145: the member's own photo in the top-right circle; the initials stay as the fallback (no photo, or it fails).
+    const photo = safeImageUrl(profile.photoUrl || profile.photo_url || profile.image);
+    const shown = headerAvatar.querySelector('img')?.getAttribute('src');
+    if (photo && shown !== photo) {
+      const img = document.createElement('img');
+      img.src = photo; img.alt = ''; img.decoding = 'async';
+      img.addEventListener('error', () => { headerAvatar.classList.remove('has-photo'); headerAvatar.textContent = headerInitials(memberProfile.name); }, { once: true });
+      headerAvatar.replaceChildren(img);
+      headerAvatar.classList.add('has-photo');
+    } else if (!photo) {
+      headerAvatar.classList.remove('has-photo');
+      headerAvatar.textContent = headerInitials(profile.name);
+    }
     headerAvatar.setAttribute('aria-label', `Open ${profile.name || 'member'} profile`);
   }
   const coverUrl = normalizeCoverUrl(profile.coverUrl || profile.cover_url || profile.cover_image_url) || defaultCoverUrl;
