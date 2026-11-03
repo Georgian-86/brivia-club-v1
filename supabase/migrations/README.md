@@ -1041,6 +1041,9 @@ select has_function_privilege('authenticated', 'public.nearby_discover(int,int)'
 ## 0030
 
 **Nearby notifications, one store across devices, web push subscriptions, 10 km (founder request 2026-11-03, D-134).**
+**APPLIED 2026-11-03** (all 12 function bodies equal this file; realtime on; push_subscription and brivia_notify_nearby
+unreachable for members). Edge Function `push-notify` deployed (v1, verify_jwt on); the three VAPID secrets are set
+by the founder in the dashboard.
 Apply after `0029`. Then deploy the Edge Function `push-notify` (`supabase/functions/push-notify/index.ts`) with the
 secrets `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT` (the public key is also in `site/scripts/web-push.js`;
 a new key pair means updating both and every device re-enabling notifications). The client can deploy before 0030:
