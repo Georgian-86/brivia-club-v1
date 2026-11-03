@@ -14,7 +14,9 @@ const CORS = {
   'access-control-allow-methods': 'POST, OPTIONS',
 };
 const json = (status: number, body: unknown) => new Response(JSON.stringify(body), { status, headers: { ...CORS, 'content-type': 'application/json' } });
-const BAND: Record<string, string> = { '1': 'Under 1 km away', '3': '1–3 km away', '5': '3–5 km away', '10': '5–10 km away' };
+// D-138: the same words as the app (site/scripts/nearby-view.js crossingCopy). A band, never metres; the area is the
+// town or city the receiver was in (0034).
+const APART: Record<string, string> = { '1': 'within 1 km of each other', '3': 'about 1–3 km apart', '5': 'about 3–5 km apart', '10': 'about 5–10 km apart' };
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: CORS });
@@ -43,7 +45,7 @@ Deno.serve(async (req) => {
     .update({ push_sent_at: new Date().toISOString() })
     .is('push_sent_at', null).is('read_at', null).gte('created_at', since)
     .or(`user_id.eq.${uid},source_user_id.eq.${uid}`)
-    .select('id,user_id,source_user_id,band,notification_type');
+    .select('id,user_id,source_user_id,band,notification_type,place_name');
   if (claimError) return json(500, { error: 'claim' });
   if (!claimed?.length) return json(200, { sent: 0 });
 
@@ -61,8 +63,8 @@ Deno.serve(async (req) => {
     const who = nameOf.get(n.source_user_id) || { name: 'A Brivia member', photo_url: null };
     const payload = JSON.stringify({
       id: n.id, tag: n.id, type: n.notification_type,
-      title: 'Someone crossed your path',
-      body: `${who.name} is nearby${n.band && BAND[n.band] ? ` · ${BAND[n.band]}` : ''}. Discover who's around you.`,
+      title: 'Someone interesting crossed your path.',
+      body: `You and ${String(who.name || '').trim().split(/\s+/)[0] || 'a Brivia member'} were ${APART[n.band] || 'close by'}${n.place_name ? `, near ${n.place_name}` : ''}. Discover who you crossed paths with.`,
       url: `/app.html?view=nearby&notification=${n.id}`,
     });
     for (const s of (subs || []).filter((x) => x.member_id === n.user_id)) {

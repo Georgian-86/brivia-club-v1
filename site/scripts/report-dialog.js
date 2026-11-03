@@ -28,7 +28,7 @@ let dialogCount = 0;
 // Resolves true once the report was accepted, false when the member cancelled or it failed. The outcome follows the
 // request, not the close (F7): if the dialog is closed while the request is in flight (Chrome closes a modal on a
 // second Escape even though the first was cancelled), the promise waits for the server's answer.
-// send(reason, note) -> { error, status } (supabase.js reportMember). extraReasons go first (D-138: "Fake job or
+// send(reason, note) -> { error, status } (supabase.js reportMember). extraReasons go first (D-141: "Fake job or
 // recruitment scam" on a member who is hiring); the caller maps them to their own RPC.
 export const openReportDialog = ({ name, trigger, send, extraReasons = [] }) => new Promise((resolve) => {
   if (document.querySelector('dialog.report-dialog')) { resolve(false); return; }

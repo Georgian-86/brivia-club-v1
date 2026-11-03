@@ -63,3 +63,74 @@ html body .orbit-section,
 html body .make-it-happen-section,
 html body .playground-section,
 html body .pillars-section { background: transparent !important; }
+
+/* D-138 (founder, 2026-11-03: "every page, modal, popup, card, overlay ... the same gradient"): every sheet sits on the
+   Explore aura (--aura-sheet) and every scrim is one warm wine veil (--aura-scrim) instead of a grey or near-black one.
+   Fields, cards and photos inside keep their own surfaces, so text contrast is unchanged. */
+html body .profile-edit-dialog,
+html body .profile-settings-dialog,
+html body .public-profile-dialog,
+html body.app-body #pitch-modal .pitch-panel,
+html body .connect-composer-dialog,
+html body .event-ask-dialog,
+html body .event-companions-dialog,
+html body .event-create-dialog,
+html body .companion-match-dialog,
+html body .report-dialog,
+html body .privacy-dialog,
+html body .share-confirm-panel,
+html body .notification-panel {
+  background: var(--aura-sheet) !important;
+}
+html body .connect-composer-dialog .composer-panel,
+html body .report-dialog .report-form { background: transparent !important; }
+html body .profile-edit-modal,
+html body .profile-settings-modal,
+html body .public-profile-modal,
+html body.app-body .app-overlay,
+html body .account-sheet-scrim {
+  background: var(--aura-scrim) !important;
+  -webkit-backdrop-filter: blur(6px);
+  backdrop-filter: blur(6px);
+}
+html body .connect-composer-dialog::backdrop,
+html body .event-ask-dialog::backdrop,
+html body .event-companions-dialog::backdrop,
+html body .event-create-dialog::backdrop,
+html body .companion-match-dialog::backdrop,
+html body .report-dialog::backdrop,
+html body .privacy-dialog::backdrop,
+html body .deck-tutorial::backdrop,
+html body .collab-review::backdrop {
+  background: var(--aura-scrim) !important;
+  -webkit-backdrop-filter: blur(6px);
+  backdrop-filter: blur(6px);
+}
+
+/* D-139 (founder, 2026-11-03, with screenshots of the deck tutorial and Nearby): no flat ivory left on these surfaces.
+   The tutorial's two swipe tiles become light glass, so the sheet aura shows through them with a soft tint each (a
+   breath of blush on "pass", a breath of mint on "pitch"). Nearby and Event companions sit on the page aura instead of
+   the room photo, and their panels (Turn on Crossing Paths, quiet, empty) and the other empty states use the sheet aura. */
+html body .deck-tutorial-step {
+  border-color: color-mix(in srgb, var(--color-wine) 14%, transparent) !important;
+  background: color-mix(in srgb, var(--aura-base) 52%, transparent) !important;
+  -webkit-backdrop-filter: blur(14px);
+  backdrop-filter: blur(14px);
+}
+html body .deck-tutorial-step:first-child {
+  background:
+    radial-gradient(ellipse 80% 90% at 0% 0%, var(--aura-rose), transparent 70%),
+    color-mix(in srgb, var(--aura-base) 52%, transparent) !important;
+}
+html body .deck-tutorial-step:last-child {
+  background:
+    radial-gradient(ellipse 80% 90% at 100% 100%, var(--aura-mint), transparent 70%),
+    color-mix(in srgb, var(--aura-base) 52%, transparent) !important;
+}
+html body.app-body :is(.companions-view, .nearby-view)::before { background: var(--aura-bg) !important; }
+html body.app-body .nearby-view .nearby-empty,
+html body .companion-empty,
+html body .events-empty,
+html body #home-empty-state {
+  background: var(--aura-sheet) !important;
+}

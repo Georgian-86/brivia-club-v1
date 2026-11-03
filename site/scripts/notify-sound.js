@@ -55,8 +55,23 @@ export const CHIME_NOTES = Object.freeze(CUES.notify.notes.map((n) => ({ freq: h
 
 const read = (storage, key) => { try { return storage?.getItem(key) ?? null; } catch { return null; } };
 const write = (storage, key, value) => { try { storage?.setItem(key, value); } catch { /* memory only */ } };
+// D-138: separate choices per device. SOUND_KEY: the notification chime in the app. INTERACTION_KEY: the swipe notes.
+// PUSH_SOUND_KEY: whether system (push) notifications make the device's sound; mirrored into Cache Storage for the
+// service worker (pushSoundPrefs).
+export const INTERACTION_KEY = 'brivia-interaction-sound';
+export const PUSH_SOUND_KEY = 'brivia-push-sound';
 export const soundEnabled = (storage = globalThis.localStorage) => read(storage, SOUND_KEY) !== 'off';
 export const setSoundEnabled = (on, storage = globalThis.localStorage) => write(storage, SOUND_KEY, on ? 'on' : 'off');
+export const interactionSoundEnabled = (storage = globalThis.localStorage) => read(storage, INTERACTION_KEY) !== 'off';
+export const setInteractionSoundEnabled = (on, storage = globalThis.localStorage) => write(storage, INTERACTION_KEY, on ? 'on' : 'off');
+export const pushSoundEnabled = (storage = globalThis.localStorage) => read(storage, PUSH_SOUND_KEY) !== 'off';
+export const setPushSoundEnabled = async (on, storage = globalThis.localStorage, cachesApi = globalThis.caches) => {
+  write(storage, PUSH_SOUND_KEY, on ? 'on' : 'off');
+  try {
+    const cache = await cachesApi?.open?.('brivia-prefs');
+    await cache?.put?.('/__brivia-prefs', new Response(JSON.stringify({ pushSilent: !on }), { headers: { 'content-type': 'application/json' } }));
+  } catch { /* the worker then uses the device's default sound */ }
+};
 export const soundVolume = (storage = globalThis.localStorage) => {
   const v = Number(read(storage, VOLUME_KEY));
   return read(storage, VOLUME_KEY) === null || !Number.isFinite(v) ? DEFAULT_VOLUME : Math.min(100, Math.max(0, Math.round(v)));
@@ -178,7 +193,7 @@ export const renderCue = (ctx, dest, cue, t0 = 0) => {
 // createSoundKit(): { notify(id), swipe(direction), preview(), unlock(), isUnlocked(), ready() }.
 export const createSoundKit = ({
   win = globalThis.window, doc = globalThis.document, nav = globalThis.navigator,
-  enabled = () => soundEnabled(), volume = () => soundVolume(), now = () => Date.now(),
+  enabled = () => soundEnabled(), interactions = () => interactionSoundEnabled(), volume = () => soundVolume(), now = () => Date.now(),
 } = {}) => {
   const AudioCtx = win?.AudioContext || win?.webkitAudioContext;
   const OfflineCtx = win?.OfflineAudioContext || win?.webkitOfflineAudioContext;
@@ -240,7 +255,8 @@ export const createSoundKit = ({
   };
 
   const play = (name) => {
-    if (!enabled() || !unlocked || !ctx) return false;
+    const allowed = name === 'notify' ? enabled() : interactions();
+    if (!allowed || !unlocked || !ctx) return false;
     const level = volumeGain(volume());
     if (level <= 0) return false;
     if (ctx.state !== 'running') ctx.resume?.().catch?.(() => {});

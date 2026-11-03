@@ -784,6 +784,10 @@ select log_impressions($1, $4);
 - **`set_home_city(p_place_id text)`** is the "Pick my city" fallback (geolocation denied, timed out or missing). It
   has the same rules (SECURITY DEFINER, volatile, `authenticated` only, profile required, shared cap) and stores the
   cell of the place's centroid with that `place_id`. An unknown id raises `22023 invalid place`.
+- **D-140 (0035): the place list grows from a worldwide directory.** "Pick my city" searches `geo_city` (156k cities,
+  names only in public; centroids in `brivia_private.geo_city_point`). A picked city becomes a `place` row (`geo-<id>`)
+  through `ensure_place` before `set_home_city`, so this section is unchanged: `place` stays the one table with city
+  centroids, the pool still compares place centroids, and a directory city that is already a place answers that id.
 - **Precision (D-038, R2).** `member_orbit.precision text not null default 'cell' check (precision in ('cell',
   'place'))`. `set_home_location` writes `'cell'`; `set_home_city` writes `'place'`, because every picker of a city
   shares the centroid's cell, which says nothing about where they live (A-F2: 12 Mumbai pickers in one cell showed
@@ -937,7 +941,21 @@ same switch, same pulse, same caps.
 
 - **Notifications (D-134, 0030).** A pulse announces "nearby_appeared" both ways for pairs within each member's chosen
   radius (`nearby_setting.radius_km`, 1/3/5/10), once per pair per day, at most 10 a day, only inside the same pool.
-  A notification carries a member id and a band, never a cell, coordinate or place. Radius 10 km adds band `'10'`.
+  A notification carries a member id and a band, never a cell or coordinate (the receiver's own town: D-138 below). Radius 10 km adds band `'10'`.
+
+
+**D-138 (0034) amendments.**
+- *Where:* a crossing notification carries `place_name`, the town or city nearest the **receiver's own** live cell
+  (`brivia_nearest_place` of the ~2.3 km cell). It says where the receiver was, so it reveals nothing about the other
+  member beyond the band they already see. Never a cell, coordinate or street. Distance stays a band ("within 1 km of
+  each other", "about 1–3 km apart"...), never metres: the Nearby grid is ~1 km and a finer figure would disclose more
+  than members agreed to share.
+- *Retention:* one row, `nearby_retention` (owner only): live area 20 min, moves 24 h, alerts 24 h, passes 7 days,
+  notifications 30 days by default, each with a hard ceiling. `purge_nearby()` reads it on every pulse and every 30 min.
+- *Background:* the client keeps pulsing from a hidden tab (every 5 min, as far as the browser runs it) once that page
+  has had a fix and the permission reads `granted`; never a prompt from a hidden page; a revoked permission clears the
+  live area at once. A closed browser runs nothing: true background crossing needs a native app (iOS significant-change
+  / region monitoring, Android fused location with a foreground service), recorded as the next step in D-138.
 
 #### 9.1.5 What leaves the service
 
@@ -1149,7 +1167,7 @@ Explore lists events the club curates. This is location-first ranking outside th
   (`brivia_companion_status`). This replaces "confirmed only" in §11.1 and §11.2, so people can find company before
   paying. Order, visibility, swipes and the match rule are unchanged; "friends going" still lists confirmed seats only.
 
-## 12. The hiring lane (D-138, migration 0034)
+## 12. The hiring lane (D-141, migration 0037)
 
 Hiring is a lane beside the deck, not a change to it: `deck_candidates` and the ORBIT score are untouched.
 

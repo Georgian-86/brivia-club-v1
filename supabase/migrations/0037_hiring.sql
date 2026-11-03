@@ -1,7 +1,7 @@
 set lock_timeout = '5s';
--- 0034_hiring.sql: Hiring, phase 1 (founder request 2026-11-02, signed off 2026-11-03, D-138). Spec
+-- 0037_hiring.sql: Hiring, phase 1 (founder request 2026-11-02, signed off 2026-11-03, D-141). Spec
 -- docs/superpowers/specs/2026-11-02-hiring-design.md; ORBIT_ENGINE.md §9.1.6 (the hiring lane).
--- Applied by hand in the Supabase SQL editor, as postgres, after 0033 (README "## 0034"). Idempotent: the local
+-- Applied by hand in the Supabase SQL editor, as postgres, after 0036 (README "## 0037"). Idempotent: the local
 -- harness applies every migration twice. Until this runs, every hiring RPC is missing and the client hides the feature.
 --
 -- What:

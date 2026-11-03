@@ -13,6 +13,7 @@ export const normalizeNotification = (row = {}) => ({
   name: String(row.name || '').trim(),
   photoUrl: row.photo_url || '',
   band: row.band ? String(row.band) : '',
+  place: String(row.place_name || '').trim(),
   createdAt: row.created_at || null,
   readAt: row.read_at || null,
   dismissedAt: row.dismissed_at || null,

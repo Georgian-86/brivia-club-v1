@@ -181,7 +181,7 @@ banner goes live on 16 Nov, when your account is two weeks old."
 | Role intent is its own consent (timestamped), withdrawable, deleted at once on withdrawal. | DPDP purpose limitation. |
 | Email and phone never reach other clients, roles included. | CLAUDE.md. |
 
-## 11. Data model and RPCs (migration `0034_hiring.sql`, decision D-138)
+## 11. Data model and RPCs (migration `0037_hiring.sql`, decision D-141)
 
 - `hiring_roles` (id, member_id, title, family, level, work_mode, help ('hiring' | 'refer'), company, about, status
   ('open' | 'paused' | 'closed'), opened_at, expires_at, renewals, created_at). RLS: the owner reads and writes their

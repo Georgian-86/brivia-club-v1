@@ -54,3 +54,7 @@
 @media (hover:hover){.crossing-paths-confirm:hover{background:var(--color-wine-deep)}}
 .crossing-paths-later:focus-visible,.crossing-paths-confirm:focus-visible{outline:2px solid var(--brivia-wine);outline-offset:2px}
 @media (prefers-reduced-motion:reduce){.notification-nearby-hi,.notification-nearby-mute{transition:none}}
+/* D-138: a crossing reads "Someone interesting crossed your path." then "You and Aarav were within 1 km of each other,
+   near Bengaluru." and when. Two lines each at most, never cut mid-word on a phone. */
+.notification-nearby-copy strong,.notification-nearby-copy span{white-space:normal;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2}
+.notification-nearby-copy small{color:var(--color-ink-soft);font-size:var(--text-12);letter-spacing:.02em}

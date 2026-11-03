@@ -2,7 +2,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  createSoundKit, CUES, soundEnabled, setSoundEnabled, soundVolume, setSoundVolume, volumeGain, DEFAULT_VOLUME, renderCue,
+  createSoundKit, interactionSoundEnabled, setInteractionSoundEnabled, pushSoundEnabled, setPushSoundEnabled, CUES, soundEnabled, setSoundEnabled, soundVolume, setSoundVolume, volumeGain, DEFAULT_VOLUME, renderCue,
 } from '../../site/scripts/notify-sound.js';
 import { countWords, bioWords, BIO_WORDS_MAX } from '../../site/scripts/profile-edit.js';
 
@@ -57,7 +57,7 @@ test('a notification id plays once; a swipe cue once per swipe; off and zero vol
   const log = { osc: [], buffers: [] };
   const doc = fakeDoc();
   let on = true; let vol = 70; let t = 1000;
-  const kit = createSoundKit({ win: fakeAudio(log), doc, nav: {}, enabled: () => on, volume: () => vol, now: () => t });
+  const kit = createSoundKit({ win: fakeAudio(log), doc, nav: {}, enabled: () => on, interactions: () => on, volume: () => vol, now: () => t });
   doc.fire('click');
   await kit.ready();
   assert.equal(kit.notify('a'), true);
@@ -132,4 +132,34 @@ test('bio: words, not characters; spaces and line breaks never count; 1 to 20', 
   assert.equal(bioWords(`${twenty} one-more`).label, '21/20 words');
   assert.match(bioWords(`${twenty} x`).message, /20 words or fewer/);
   assert.equal(bioWords('a'.repeat(200)).words, 1, 'a long word is one word');
+});
+
+test('D-138: notification sound and swipe sounds are separate choices; the push sound choice reaches the worker', async () => {
+  const log = { osc: [], buffers: [] };
+  const doc = fakeDoc();
+  let notes = true; let swipes = false; let t = 0;
+  const kit = createSoundKit({ win: fakeAudio(log), doc, nav: {}, enabled: () => notes, interactions: () => swipes, volume: () => 80, now: () => (t += 500) });
+  doc.fire('click');
+  await kit.ready();
+  assert.equal(kit.swipe('pass'), false, 'swipe sounds off');
+  assert.equal(kit.notify('x'), true, 'the notification chime still plays');
+  notes = false; swipes = true;
+  assert.equal(kit.notify('y'), false);
+  assert.equal(kit.swipe('pitch'), true);
+  const mem = new Map();
+  const storage = { getItem: (k) => mem.get(k) ?? null, setItem: (k, v) => mem.set(k, v) };
+  assert.equal(interactionSoundEnabled(storage), true);
+  setInteractionSoundEnabled(false, storage);
+  assert.equal(interactionSoundEnabled(storage), false);
+  const put = [];
+  const cachesApi = { open: async (name) => ({ put: async (key, res) => put.push([name, key, await res.json()]) }) };
+  assert.equal(pushSoundEnabled(storage), true);
+  await setPushSoundEnabled(false, storage, cachesApi);
+  assert.equal(pushSoundEnabled(storage), false);
+  assert.deepEqual(put.at(-1), ['brivia-prefs', '/__brivia-prefs', { pushSilent: true }]);
+  const { readFileSync } = await import('node:fs');
+  const sw = readFileSync(new URL('../../site/public/sw.js', import.meta.url), 'utf8');
+  assert.match(sw, /caches\.open\('brivia-prefs'\)/);
+  assert.match(sw, /'\/__brivia-prefs'/);
+  assert.match(sw, /silent,/);
 });

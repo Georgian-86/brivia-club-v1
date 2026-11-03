@@ -176,7 +176,7 @@ try {
   // D-134: "Someone crossed your path." The same stub is the one server for a laptop and a phone.
   {
     reset({ nearby: { enabled: true }, nearbyPeople: PEOPLE(), notifications: [] });
-    const note = (n, extra = {}) => ({ id: `n-${n}`, notification_type: 'nearby_appeared', source_user_id: id(n === 1 ? 2 : 1), name: n === 1 ? 'Kabir' : 'Yashika', photo_url: PHOTO(id(2)), band: '1', created_at: new Date().toISOString(), read_at: null, dismissed_at: null, ...extra });
+    const note = (n, extra = {}) => ({ id: `n-${n}`, notification_type: 'nearby_appeared', source_user_id: id(n === 1 ? 2 : 1), name: n === 1 ? 'Kabir' : 'Yashika', photo_url: PHOTO(id(2)), band: '1', place_name: 'Bengaluru', created_at: new Date().toISOString(), read_at: null, dismissed_at: null, ...extra });
     const laptop = await newContext({ width: 1440, height: 1000 });
     const phone = await newContext({ width: 390, height: 844 }, { isMobile: true, hasTouch: true });
     const lp = await stub.open(laptop, { path: '/app.html?view=nearby', errors });
@@ -197,8 +197,8 @@ try {
     await lp.locator('#nearby-refresh').click();
     await lp.waitForSelector('.nearby-notice', { timeout: 8000 }).catch(() => {});
     const notice = await lp.evaluate(() => document.querySelector('.nearby-notice')?.innerText || '');
-    check(`the notice: "Someone crossed your path." with the name, distance and View profile (${JSON.stringify(notice)})`,
-      /Someone crossed your path\./.test(notice) && /A new connection is nearby\. Discover who's around you\./.test(notice) && /Kabir · Under 1 km away/.test(notice) && /View profile/i.test(notice));
+    check(`D-138 the notice: "Someone interesting crossed your path." with who, how far, where, when and Discover (${JSON.stringify(notice)})`,
+      /Someone interesting crossed your path\./.test(notice) && /You and Kabir were within 1 km of each other, near Bengaluru\./.test(notice) && /Just now · Discover who you crossed paths with\./.test(notice) && /Discover/i.test(notice));
     check('the push function runs after the pulse', (st.pushCalls || 0) > pushBefore);
     await lp.waitForTimeout(400);
     await shot(lp, 'nearby-notice-1440.png');
@@ -233,7 +233,7 @@ try {
     await lp.locator('[data-profile-setting="notifications"]').click();
     await lp.waitForSelector('#profile-push-toggle');
     const settings = await lp.locator('.notification-settings-dialog').innerText();
-    check('Settings: WEB NOTIFICATIONS, SOUNDS and SOUND VOLUME (D-137)', /WEB NOTIFICATIONS/.test(settings) && /\bSOUNDS\b/.test(settings) && /SOUND VOLUME/.test(settings));
+    check('Settings: WEB NOTIFICATIONS, NOTIFICATION SOUND, SWIPE SOUNDS, PUSH NOTIFICATION SOUND and SOUND VOLUME (D-138)', ['WEB NOTIFICATIONS', 'NOTIFICATION SOUND', 'SWIPE SOUNDS', 'PUSH NOTIFICATION SOUND', 'SOUND VOLUME'].every((t) => settings.includes(t)));
     await lp.locator('label:has(#profile-sound-toggle)').click();
     check('the sound switch is saved for this device', (await lp.evaluate(() => localStorage.getItem('brivia-notify-sound'))) === 'off');
     await laptop.close();

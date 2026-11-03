@@ -85,13 +85,7 @@ body.app-body .app-view[data-view="home"] .swipe-actions .swipe-action { flex: 0
   border-radius: 22px;
   /* Founder (2026-11-03): the same aura as the other sheets (the request sheet, collab-requests.css D-130): lilac top
      left, a breath of wine top right, mint right, rose and peach low, on the warm aura base. */
-  background:
-    radial-gradient(ellipse 70% 38% at 8% 4%, var(--aura-lilac), transparent 70%),
-    radial-gradient(ellipse 50% 26% at 96% 0%, var(--aura-wine-soft), transparent 72%),
-    radial-gradient(ellipse 60% 40% at 100% 46%, var(--aura-mint), transparent 72%),
-    radial-gradient(ellipse 70% 34% at 72% 100%, var(--aura-rose), transparent 72%),
-    radial-gradient(ellipse 56% 32% at 0% 92%, var(--aura-peach), transparent 72%),
-    var(--aura-base);
+  background: var(--aura-sheet);
   color: var(--color-name-ink);
   box-shadow: var(--shadow-2);
   font-family: var(--font-body);

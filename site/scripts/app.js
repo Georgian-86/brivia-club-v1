@@ -21,7 +21,7 @@ import '../styles/mobile-app.css';
 import '../styles/skeleton.css';
 import '../styles/aura-theme.css';
 import '../styles/handoff.css';
-import { supabase, compressImageOnly, rowToProfile, saveProfile, isPresetCoverUrl, onboardingStatus, sendSignal, fetchSignalQuota, isRateLimited, isStorageImageUrl, withoutCredentials, uploadMessageAttachment, removeMessageAttachment, uploadCommunityPostImage, removeCommunityPostImage, ImageProcessingError, PHOTO_ERROR_MESSAGE, PHOTO_FRAMER_ERROR, compressAttachmentFiles, attachmentKind, reportMember, setSensitiveConsent, fetchSensitiveConsentAt, fetchMyInterests, fetchInterestNodes, addMemberInterest, isMissingFunction, touchPresence, connectionPresence, setPresenceVisible, myPresenceVisible, setMemberInterests, uploadResume, removeResume, resumeSignedUrl, resumeInfo, clearResumePath, searchPlaces, setHomeCity, setHomeLocation, listEvents, setEventRsvp, setCompanionDefault, myEventPrefs, eventCompanions, saveMemberEvent, cancelMemberEvent, deleteMemberEvent, uploadEventImage, removeEventImages, setEventInterest, setEventBrochure, uploadEventBrochure, removeEventBrochures, companionEvents, companionDeck, companionSwipe, myCompanionMatches, markCompanionMatchSeen, sendConnectRequest, setNearbyEnabled, myNearbySetting, nearbyPulse, nearbyClear, myNearbyAlerts, setNearbyMuted, nearbyDiscover, nearbyPass, nearbyConnect, myNearbyMatches, myNotifications, markNotificationsRead, dismissNotification, setNearbyRadius, savePushSubscription, deletePushSubscription, sendPendingPush } from './supabase.js';
+import { supabase, compressImageOnly, rowToProfile, saveProfile, isPresetCoverUrl, onboardingStatus, sendSignal, fetchSignalQuota, isRateLimited, isStorageImageUrl, withoutCredentials, uploadMessageAttachment, removeMessageAttachment, uploadCommunityPostImage, removeCommunityPostImage, ImageProcessingError, PHOTO_ERROR_MESSAGE, PHOTO_FRAMER_ERROR, compressAttachmentFiles, attachmentKind, reportMember, setSensitiveConsent, fetchSensitiveConsentAt, fetchMyInterests, fetchInterestNodes, addMemberInterest, isMissingFunction, touchPresence, connectionPresence, setPresenceVisible, myPresenceVisible, setMemberInterests, uploadResume, removeResume, resumeSignedUrl, resumeInfo, clearResumePath, searchPlaces, setHomeCity, setHomeLocation, listEvents, setEventRsvp, setCompanionDefault, myEventPrefs, eventCompanions, saveMemberEvent, cancelMemberEvent, deleteMemberEvent, uploadEventImage, removeEventImages, setEventInterest, setEventBrochure, uploadEventBrochure, removeEventBrochures, companionEvents, companionDeck, companionSwipe, myCompanionMatches, markCompanionMatchSeen, sendConnectRequest, setNearbyEnabled, myNearbySetting, nearbyPulse, nearbyClear, myNearbyAlerts, setNearbyMuted, nearbyDiscover, nearbyPass, nearbyConnect, myNearbyMatches, myNotifications, markNotificationsRead, dismissNotification, setNearbyRadius, savePushSubscription, deletePushSubscription, sendPendingPush, searchCompanies, searchCompanyDirectory, companyLogoUrl, addCompany, setMyWork, memberWork } from './supabase.js';
 import { locateOnce, fallbackCopy } from './geo-locate.js';
 import { areaChangeMessage, AREA_HELPER, AREA_NO_MATCH } from './area-change.js';
 import { areaShareBody, parseAreaBody, resumeShareAttachment, resumeMessageFields, RESUME_SHARE_BODY, NO_RESUME_HINT, RESUME_GONE_COPY, RESUME_SHARE_NOTE, AREA_SHARE_NOTE } from './quick-share.js';
@@ -42,9 +42,10 @@ import { createPresence, presenceDot } from './presence.js';
 import { createCrossingPaths, isQuietHour, alertHeadline, alertDetail, alertToast, pausedCopy } from './crossing-paths.js';
 import '../styles/crossing-paths.css';
 import { createNearbyPage } from './nearby-page.js';
-import { COPY as NEARBY_COPY, bandLabel as nearbyBandLabel } from './nearby-view.js';
+import { COPY as NEARBY_COPY, crossingCopy } from './nearby-view.js';
 import { createMemberNotifications } from './member-notifications.js';
-import { createSoundKit, soundEnabled, setSoundEnabled, soundVolume, setSoundVolume } from './notify-sound.js';
+import { workMarkup, workLine, normalizeWork, mergeCompanies, cleanTitle, cleanCompanyName, INDUSTRIES, logoFileToWebp, ORG_ICON } from './work-identity.js';
+import { createSoundKit, soundEnabled, setSoundEnabled, soundVolume, setSoundVolume, interactionSoundEnabled, setInteractionSoundEnabled, pushSoundEnabled, setPushSoundEnabled } from './notify-sound.js';
 import { createWebPush, pushSupport, PUSH_COPY } from './web-push.js';
 import '../styles/nearby.css';
 import { createEventsPage } from './events-page.js';
@@ -99,9 +100,10 @@ import '../styles/app-polish.css';
 import '../styles/deck-compact.css';
 import '../styles/collab-requests.css';  // D-108: the request section and review sheet
 import '../styles/emoji-field.css';  // D-113: the emoji panel under the Edit profile bio
-import '../styles/hiring.css';  // D-138: the hiring bar, banner, sheets and profile cards
+import '../styles/work-identity.css';  // D-140: company line and picker
+import '../styles/hiring.css';  // D-141: the hiring bar, banner, sheets and profile cards
 import '../styles/components.css';  // D-105: the shared field, select, listbox and chip components, last so they win
-import { createHiring } from './hiring-ui.js';  // D-138
+import { createHiring } from './hiring-ui.js';  // D-141
 import { interleaveLift } from './hiring.js';
 import { navMarkup, markCurrentNav, setChatBadges } from './app-nav.js';
 import { parseReadState, serializeReadState, lastReadAt, unreadCount, markRead, sortByLastContact, unreadTotal } from './chat-unread.js';
@@ -358,7 +360,7 @@ const showToast = (message) => {
   window.setTimeout(() => toast.classList.remove('show'), 2600);
 };
 
-// D-138: hiring (roles, asks, the banner and the lens). Hidden until migration 0034 answers; deps are wrapped so the
+// D-141: hiring (roles, asks, the banner and the lens). Hidden until migration 0037 answers; deps are wrapped so the
 // functions they name may be defined further down this file.
 let hiring = null;
 const hiringRefresh = (why) => {
@@ -502,7 +504,7 @@ const renderNotifications = () => {
   // D-134: "Someone crossed your path" from the shared store (last 24 h, not dismissed); unread ones count.
   const crossedRows = memberNotes.list().filter((n) => n.type === 'nearby_appeared' && !n.dismissedAt && Date.now() - new Date(n.createdAt).getTime() < 24 * 3600 * 1000).slice(0, 5);
   const crossedUnread = crossedRows.filter((n) => !n.readAt).length;
-  // D-138: "N people near you are hiring" (once a day, new fits only) and "X closed the role" notes.
+  // D-141: "N people near you are hiring" (once a day, new fits only) and "X closed the role" notes.
   const hiringHtml = hiring?.notificationHtml() || '';
   const hiringUnread = hiring?.notificationCount() || 0;
   const unreadCount = (enabled ? notifications.filter((notification) => !notification.read).length : 0) + requestCount + nearbyCount + companionUnseen.length + nearbyMatchUnseen.length + crossedUnread + hiringUnread;
@@ -564,10 +566,10 @@ const renderNotifications = () => {
   }).join('');
   const crossedHtml = crossedRows.map((n) => {
     const person = findPersonById(n.sourceId) || { name: n.name, image: n.photoUrl };
-    return `<section class="notification-companion${n.readAt ? '' : ' is-unread'}" aria-label="${escapeHtml(`Someone crossed your path: ${n.name}`)}">`
+    return `<section class="notification-companion${n.readAt ? '' : ' is-unread'}" aria-label="${escapeHtml(`${crossingCopy(n).title} ${crossingCopy(n).line}`)}">`
       + `<span class="notification-nearby-face">${renderAvatar(person, 'notification-avatar')}</span>`
-      + `<span class="notification-nearby-copy"><strong>Someone crossed your path</strong><span>${escapeHtml(`${n.name || 'A Brivia member'} is nearby${n.band ? ` · ${nearbyBandLabel(n.band)}` : ''}`)}</span></span>`
-      + `<button type="button" class="notification-nearby-hi" data-crossed-view="${escapeHtml(n.id)}">View profile</button></section>`;
+      + `<span class="notification-nearby-copy"><strong>${escapeHtml(crossingCopy(n).title)}</strong><span>${escapeHtml(crossingCopy(n).line)}</span>${crossingCopy(n).when ? `<small>${escapeHtml(crossingCopy(n).when)}</small>` : ''}</span>`
+      + `<button type="button" class="notification-nearby-hi" data-crossed-view="${escapeHtml(n.id)}">Discover</button></section>`;
   }).join('');
   list.innerHTML = requestsHtml + hiringHtml + crossedHtml + nearbyMatchHtml + companionHtml + nearbyHtml + messagesHtml;
   if (hiringHtml) hiring.bindNotifications(list, () => closeNotificationPanel());
@@ -1090,6 +1092,44 @@ nearbyPage = createNearbyPage({
 // anywhere, it is read everywhere and its system notification closes. Web push (optional, per device) is in Settings.
 // D-137: one sound kit for the whole app (notify-sound.js): the notification cue and the two swipe cues.
 const chime = createSoundKit();
+// D-140: "[logo] Title at Company" on every card and profile. Any element with data-work-for="<member id>" shows the
+// member's work in place of its own text once member_work answers (batched, cached, only members the viewer may see).
+// Cards keep their size: the line replaces the experience line, one line, ellipsised.
+const workCache = new Map();
+const workPending = new Set();
+const paintWork = () => {
+  document.querySelectorAll('[data-work-for]').forEach((el) => {
+    const id = el.dataset.workFor;
+    const work = workCache.get(id);
+    if (!work || !workLine(work)) {
+      // Cleared (Remove, then Save): the own profile line goes away; cards keep their own text.
+      if (el.id === 'profile-work' && workCache.has(id)) { el.innerHTML = ''; el.hidden = true; delete el.dataset.workShown; }
+      return;
+    }
+    const sig = `${id}|${workLine(work)}|${work.logoPath}`;
+    if (el.dataset.workShown === sig && el.querySelector('.work-line')) return;
+    el.dataset.workShown = sig;
+    el.innerHTML = workMarkup(work, { logoUrl: work.logoPath ? companyLogoUrl(work.logoPath) : '', escapeHtml });
+    el.hidden = false;
+  });
+};
+let workTimer = 0;
+const requestWork = () => {
+  window.clearTimeout(workTimer);
+  workTimer = window.setTimeout(async () => {
+    const ids = [...new Set([...document.querySelectorAll('[data-work-for]')].map((el) => el.dataset.workFor))]
+      .filter((id) => id && !workCache.has(id) && !workPending.has(id)).slice(0, 60);
+    if (!ids.length || !supabase) { paintWork(); return; }
+    ids.forEach((id) => workPending.add(id));
+    const { data, error } = await memberWork(ids);
+    ids.forEach((id) => workPending.delete(id));
+    if (error) { if (isMissingFunction(error)) ids.forEach((id) => workCache.set(id, null)); return; }
+    ids.forEach((id) => workCache.set(id, null));
+    (data || []).forEach((row) => workCache.set(String(row.member_id), normalizeWork(row)));
+    paintWork();
+  }, 80);
+};
+new MutationObserver(requestWork).observe(document.body, { subtree: true, childList: true, attributes: true, attributeFilter: ['data-work-for'] });
 setSwipeCue((direction) => chime.swipe(direction));
 const webPush = createWebPush({ save: savePushSubscription, remove: deletePushSubscription });
 const openMemberProfileById = async (id) => {
@@ -1116,7 +1156,7 @@ const memberNotes = createMemberNotifications({
     chime.notify(n.id);   // every genuinely new notification, once per id
     if (n.type !== 'nearby_appeared') return;
     if (!nearbyPage.notify(n) && document.visibilityState === 'visible') {
-      showToast(`Someone crossed your path. ${n.name || 'A Brivia member'} is nearby${n.band ? ` (${nearbyBandLabel(n.band).toLowerCase()})` : ''}.`);
+      showToast(`${crossingCopy(n).title} ${crossingCopy(n).line}`);
     }
   },
   onChange: () => renderNotifications(),
@@ -1445,7 +1485,8 @@ const renderHome = (queue = getExplorePeople()) => {
   const cardLabel = document.querySelector('#swipe-card-label');
   // D-113: the bar says what the member is looking for (their own words, first two), not a guessed label.
   if (cardLabel) cardLabel.textContent = deckCardLabel(currentPerson.lookingFor);
-  const role = document.querySelector('#swipe-role'); if (role) role.textContent = currentPerson.role;
+  const role = document.querySelector('#swipe-role');
+  if (role) { role.textContent = currentPerson.role; delete role.dataset.workShown; role.dataset.workFor = String(currentPerson.id || ''); paintWork(); }
   renderCardBio(currentPerson);
   // The server's distance band only ("~3 km", a place, a region, "Abroad"): never a City/State, cell or km.
   const location = document.querySelector('#swipe-location');
@@ -1462,7 +1503,7 @@ const renderHome = (queue = getExplorePeople()) => {
     bandNoteEl.hidden = !note;
   }
   const tags = document.querySelector('#swipe-tags'); if (tags) renderCardChips(tags, currentPerson);
-  // D-138: a hirer's bar says HIRING; the role strip shows when the role fits what this member is open to.
+  // D-141: a hirer's bar says HIRING; the role strip shows when the role fits what this member is open to.
   if (hiring?.available()) {
     hiring.decorateCard(currentPerson, { label: cardLabel, strip: document.querySelector('#swipe-hiring'), tags });
     void hiring.ensure(queue.slice(0, 12).map((p) => p.id));
@@ -1755,12 +1796,12 @@ const loadConnectionRequests = async () => {
   if (freshNearby.length) { saveNearbyAnnounced(announced); if (document.visibilityState === 'visible') showToast(NEARBY_COPY.incoming); }
   renderNotifications();
 };
-// D-138: "Asking about: Frontend Developer" on a request that came through a role (my_role_asks, loaded by hiring).
+// D-141: "Asking about: Frontend Developer" on a request that came through a role (my_role_asks, loaded by hiring).
 const renderPendingRequestTags = () => {
   if (!hiring) return;
   pendingRequests.forEach((request) => { request.role = hiring.requestRoleTitle(request.fromId) || ''; });
 };
-// D-138: the deck lift. Up to one hiring suggestion in every five cards, never the card already on screen.
+// D-141: the deck lift. Up to one hiring suggestion in every five cards, never the card already on screen.
 let hiringLifted = false;
 async function liftHiringCards() {
   if (hiringLifted || !hiring?.available() || !deck.ready) return;
@@ -1962,7 +2003,7 @@ const openPublicProfile = (person, options = {}) => {
     + `<div class="public-profile-cover"></div>`
     + `<header class="public-profile-head"><div class="public-profile-avatar">${avatarImage(image, profile.name) || escapeHtml(initials(profile.name))}</div>`
     + `<div class="public-profile-id"><h2>${escapeHtml(name)}</h2>`
-    + `<p class="public-profile-meta">${role ? `<span class="public-profile-role">${escapeHtml(role)}</span>` : ''}${location ? `<span class="public-profile-location">${escapeHtml(location)}</span>` : ''}</p></div></header>`
+    + `<p class="public-profile-meta"><span class="public-profile-role" data-work-for="${escapeHtml(String(profile.id || ''))}"${role ? '' : ' hidden'}>${escapeHtml(role)}</span>${location ? `<span class="public-profile-location">${escapeHtml(location)}</span>` : ''}</p></div></header>`
     + `<div class="public-profile-body">${bio ? `<p class="public-profile-bio">${escapeHtml(bio)}</p>` : ''}`
     + (groups || `<p class="public-profile-empty">${escapeHtml(firstName)} hasn't added interests yet.</p>`)
     + `</div>`
@@ -1992,7 +2033,7 @@ const openPublicProfile = (person, options = {}) => {
   });
   modal.tabIndex = -1;
   window.setTimeout(() => modal.querySelector('.public-profile-close')?.focus(), 0);
-  // D-138: a hirer's banner first (roles, Ask about this role); a hirer sees a seeker's "Open to roles".
+  // D-141: a hirer's banner first (roles, Ask about this role); a hirer sees a seeker's "Open to roles".
   if (hiring?.available()) void hiring.decorateProfile(modal, findPersonById(profile.id) || profile);
   // Founder (2026-11-03): interests take at most three lines; the rest wait behind "+N more".
   const interestList = modal.querySelector('.public-profile-chips--interest');
@@ -2150,7 +2191,7 @@ const swipe = (type, { vx = 0 } = {}) => {
   return true;
 };
 
-// D-138: on a member who is hiring the report dialog offers "Fake job or recruitment scam" first; it pauses their roles.
+// D-141: on a member who is hiring the report dialog offers "Fake job or recruitment scam" first; it pauses their roles.
 const hiringReport = (person) => {
   const hirer = Boolean(hiring?.hiringOf(person.id));
   return {
@@ -2297,7 +2338,7 @@ const renderFilterOptions = () => {
   renderFilterDropdown(document.querySelector('#filter-skills-suggestions'), skills, filterDrafts.skills, 'skills', exploreFilters.skills, POPULAR_INTERESTS);
   renderSelectedFilters(document.querySelector('#filter-looking-for-selected'), lookingFor, exploreFilters.lookingFor, 'looking-for');
   renderFilterDropdown(document.querySelector('#filter-looking-for-suggestions'), lookingFor, filterDrafts.lookingFor, 'looking-for', exploreFilters.lookingFor);
-  // D-138: the Hiring lens, only once hiring is live for this member.
+  // D-141: the Hiring lens, only once hiring is live for this member.
   const lens = document.querySelector('#filter-hiring-group');
   if (lens) {
     lens.hidden = !hiring?.available();
@@ -3150,6 +3191,134 @@ const INTEREST_LIMIT_COPY = 'You can change your interests up to 3 times a day. 
 // the active row (aria-activedescendant), Enter picks it, Escape or Tab closes, a press outside closes. allowCustom adds
 // what was typed when nothing matches (looking for); interests only take offered options.
 const CHIP_REMOVE_ICON = '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M6 6l12 12M18 6 6 18"/></svg>';
+// D-140: Company / Organisation in Edit profile. A title, then a company from the directory (search), or the member's
+// own (name, optional website, industry and logo). Saved with the rest of the form (set_my_work).
+const workEditorMarkup = () => `<div class="profile-edit-wide profile-edit-work" data-work-editor><span class="profile-edit-picker-label" id="profile-work-label">COMPANY / ORGANISATION</span>`
+  + `<input class="b-field" name="jobTitle" maxlength="60" placeholder="Your title, e.g. Software Engineer" autocomplete="organization-title" aria-label="Your title" />`
+  + `<div class="profile-work-picked" data-work-picked hidden><span class="profile-work-picked-name" data-work-picked-name></span><button type="button" class="profile-work-remove" data-work-clear>Remove</button></div>`
+  + `<div class="b-combo"><input class="b-field" type="text" role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="profile-work-list" aria-labelledby="profile-work-label" placeholder="Search a company, startup or organisation" autocomplete="off" spellcheck="false" data-work-search />`
+  + `<ul class="b-listbox" id="profile-work-list" role="listbox" aria-label="Companies" hidden></ul></div>`
+  + `<fieldset class="profile-work-new" data-work-new hidden><legend>Add your organisation</legend>`
+  + `<label><span>NAME</span><input class="b-field" data-work-new-name maxlength="80" /></label>`
+  + `<label><span>WEBSITE (OPTIONAL)</span><input class="b-field" data-work-new-site inputmode="url" placeholder="mystartup.in" /></label>`
+  + `<label><span>INDUSTRY (OPTIONAL)</span><select class="b-select" data-work-new-industry><option value="">Choose one</option>${INDUSTRIES.map((i) => `<option>${escapeHtml(i)}</option>`).join('')}</select></label>`
+  + `<label><span>LOGO (OPTIONAL)</span><input class="b-file" type="file" accept="image/png,image/jpeg,image/webp,image/gif" data-work-new-logo /></label>`
+  + `<div class="profile-work-new-actions"><button type="button" class="profile-edit-cancel" data-work-new-cancel>CANCEL</button><button type="button" class="profile-area-geo" data-work-new-add>ADD ORGANISATION</button></div></fieldset>`
+  + `<small class="profile-edit-helper" data-work-status role="status">Shown small on your card, like “Software Engineer at Google”.</small></div>`;
+const wireWorkEditor = (modal, current) => {
+  const box = modal.querySelector('[data-work-editor]');
+  const state = { title: current?.title || '', companyId: current?.companyId || '', company: current?.company || '', logoUrl: current?.logoPath ? companyLogoUrl(current.logoPath) : '', ready: Boolean(current) };
+  if (!box) return { state, changed: () => false };
+  const initial = { title: state.title, companyId: state.companyId };
+  const title = box.querySelector('[name="jobTitle"]');
+  const search = box.querySelector('[data-work-search]');
+  const list = box.querySelector('#profile-work-list');
+  const picked = box.querySelector('[data-work-picked]');
+  const pickedName = box.querySelector('[data-work-picked-name]');
+  const status = box.querySelector('[data-work-status]');
+  const form = box.querySelector('[data-work-new]');
+  title.value = state.title;
+  const showPicked = () => {
+    picked.hidden = !state.companyId;
+    pickedName.innerHTML = state.companyId ? `${state.logoUrl ? `<img class="work-logo" src="${escapeHtml(state.logoUrl)}" alt="" width="16" height="16" />` : ORG_ICON}<span>${escapeHtml(state.company)}</span>` : '';
+  };
+  showPicked();
+  title.addEventListener('input', () => { state.title = title.value; });
+  let seq = 0; let timer = 0; let rows = []; let query = '';
+  const close = () => { list.hidden = true; search.setAttribute('aria-expanded', 'false'); };
+  const render = (note = '') => {
+    const options = rows.map((c, i) => `<li class="b-option" role="option" id="profile-work-opt-${i}" data-work-id="${escapeHtml(c.id)}" tabindex="-1">${c.logo_path ? `<img class="work-logo" src="${escapeHtml(companyLogoUrl(c.logo_path))}" alt="" width="16" height="16" loading="lazy" />` : ORG_ICON}<span>${escapeHtml(c.name)}</span>${c.domain ? `<small>${escapeHtml(c.domain)}</small>` : ''}</li>`).join('');
+    const add = query ? `<li class="b-option b-option-add" role="option" id="profile-work-opt-add" data-work-add tabindex="-1">Add “${escapeHtml(cleanCompanyName(query))}” as your organisation</li>` : '';
+    list.innerHTML = options + (note ? `<li class="b-listbox-note">${escapeHtml(note)}</li>` : '') + add;
+    list.hidden = !list.innerHTML;
+    search.setAttribute('aria-expanded', String(!list.hidden));
+  };
+  search.addEventListener('input', () => {
+    clearTimeout(timer);
+    query = search.value.trim();
+    if (!query) { rows = []; close(); return; }
+    const ticket = ++seq;
+    timer = setTimeout(async () => {
+      const local = await searchCompanies(query);
+      if (ticket !== seq) return;
+      if (local.missing) { rows = []; render(); return; }
+      rows = local.data || [];
+      render(local.needsDirectory ? 'Searching the directory…' : '');
+      if (!local.needsDirectory) return;
+      const remote = await searchCompanyDirectory(query);
+      if (ticket !== seq) return;
+      rows = mergeCompanies(rows, remote.data || []);
+      render(rows.length ? '' : 'No company found. Add it below.');
+    }, 220);
+  });
+  search.addEventListener('keydown', (event) => {
+    if (event.key === 'ArrowDown') { event.preventDefault(); list.querySelector('[role="option"]')?.focus(); }
+    else if (event.key === 'Escape' && !list.hidden) { event.preventDefault(); event.stopPropagation(); close(); }
+  });
+  list.addEventListener('keydown', (event) => {
+    const items = [...list.querySelectorAll('[role="option"]')];
+    const at = items.indexOf(document.activeElement);
+    if (event.key === 'ArrowDown') { event.preventDefault(); items[Math.min(at + 1, items.length - 1)]?.focus(); }
+    else if (event.key === 'ArrowUp') { event.preventDefault(); if (at <= 0) search.focus(); else items[at - 1].focus(); }
+    else if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); document.activeElement?.click(); }
+    else if (event.key === 'Escape') { event.preventDefault(); event.stopPropagation(); close(); search.focus(); }
+  });
+  const openNew = () => {
+    form.hidden = false;
+    form.querySelector('[data-work-new-name]').value = cleanCompanyName(query);
+    close();
+    form.querySelector('[data-work-new-name]').focus();
+  };
+  list.addEventListener('click', (event) => {
+    if (event.target.closest('[data-work-add]')) { openNew(); return; }
+    const item = event.target.closest('[data-work-id]');
+    if (!item) return;
+    const c = rows.find((r) => r.id === item.dataset.workId);
+    if (!c) return;
+    Object.assign(state, { companyId: c.id, company: c.name, logoUrl: c.logo_path ? companyLogoUrl(c.logo_path) : '' });
+    search.value = ''; query = ''; close(); showPicked();
+    status.textContent = `${c.name} picked. Save changes to show it on your card.`;
+  });
+  box.querySelector('[data-work-clear]').addEventListener('click', () => {
+    Object.assign(state, { companyId: '', company: '', logoUrl: '' });
+    showPicked();
+    status.textContent = 'Company removed. Save changes to update your card.';
+    search.focus();
+  });
+  box.querySelector('[data-work-new-cancel]').addEventListener('click', () => { form.hidden = true; search.focus(); });
+  box.querySelector('[data-work-new-add]').addEventListener('click', async (event) => {
+    const button = event.currentTarget;
+    const name = cleanCompanyName(form.querySelector('[data-work-new-name]').value);
+    if (name.length < 2) { status.textContent = 'Add the organisation’s name.'; form.querySelector('[data-work-new-name]').focus(); return; }
+    const file = form.querySelector('[data-work-new-logo]').files?.[0] || null;
+    button.disabled = true;
+    status.textContent = 'Adding your organisation…';
+    let logo = null;
+    try { if (file) logo = await logoFileToWebp(file); } catch (error) { button.disabled = false; status.textContent = error.message; return; }
+    const { data, error } = await addCompany(memberProfile.id, { name, website: form.querySelector('[data-work-new-site]').value, industry: form.querySelector('[data-work-new-industry]').value, logo });
+    button.disabled = false;
+    if (error || !data) {
+      status.textContent = /try again later|PT429/i.test(`${error?.code} ${error?.message}`) ? 'You have added a few organisations today. Try again tomorrow.'
+        : /invalid name/i.test(error?.message || '') ? 'Use the organisation’s name (no links).' : "That organisation couldn't be added. Please try again.";
+      return;
+    }
+    Object.assign(state, { companyId: data, company: name, logoUrl: logo ? URL.createObjectURL(logo) : '' });
+    form.hidden = true; search.value = ''; query = ''; showPicked();
+    status.textContent = `${name} added. Save changes to show it on your card.`;
+  });
+  // The saved work arrives after the dialog opens (member_work): fill it in unless the member already typed.
+  const fill = (work) => {
+    if (!work || state.touched) return;
+    Object.assign(state, { title: work.title || '', companyId: work.companyId || '', company: work.company || '', logoUrl: work.logoPath ? companyLogoUrl(work.logoPath) : '' });
+    Object.assign(initial, { title: state.title, companyId: state.companyId });
+    title.value = state.title;
+    showPicked();
+  };
+  box.addEventListener('input', () => { state.touched = true; });
+  box.addEventListener('click', (event) => { if (event.target.closest('button, [role="option"]')) state.touched = true; });
+  return { state, fill, changed: () => cleanTitle(state.title) !== cleanTitle(initial.title) || state.companyId !== initial.companyId };
+};
+
 const chipPickerMarkup = ({ id, label, placeholder, helper, listLabel }) => `<div class="profile-edit-wide profile-edit-picker" data-picker="${id}"><span class="profile-edit-picker-label" id="${id}-label">${label}</span>`
   + `<ul class="b-chips" data-picker-chips aria-label="${escapeHtml(listLabel)}"><li class="b-chips-empty">Loading…</li></ul>`
   + `<div class="b-combo"><input class="b-field" type="text" role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="${id}-list" aria-labelledby="${id}-label" placeholder="${escapeHtml(placeholder)}" autocomplete="off" spellcheck="false" data-picker-input />`
@@ -3350,6 +3519,7 @@ const openProfileEditor = () => {
         <label><span>EMAIL</span><input class="b-field" value="${escapeHtml(profile.email || '')}" readonly /></label>
         <label><span>PHONE</span><input class="b-field" name="phone" value="${escapeHtml(profile.phone || '')}" /></label>
         <label><span>EXPERIENCE</span><select class="b-select" name="experience"><option value="">Choose one</option>${experienceChoices(profile.experience).map((choice) => `<option${choice === String(profile.experience || '').trim() ? ' selected' : ''}>${escapeHtml(choice)}</option>`).join('')}</select></label>
+        ${workEditorMarkup()}
         ${bioAvailable ? `<label class="profile-edit-wide profile-edit-bio"><span>BIO</span><textarea class="b-field" name="bio" rows="3" maxlength="${BIO_MAX}" placeholder="A line or two about you: what you do, what you love, what you're up to.">${escapeHtml(profile.bio || '')}</textarea><small class="profile-edit-helper" data-bio-helper><span data-bio-count aria-live="polite">${bioWords(profile.bio).label}</span><span data-bio-limit role="status"></span>. Members who can see you read it on your profile.</small></label>` : ''}
         <div class="profile-edit-wide profile-edit-area" data-profile-area><span id="profile-area-label">YOUR AREA</span><p class="profile-edit-area-current" data-area-current>${escapeHtml(memberPlaceLabel || 'Not set yet')}</p><div class="profile-edit-area-tools"><button type="button" class="profile-area-geo" data-area-geo>Use my location</button><div class="profile-area-search b-combo"><input class="b-field" type="text" role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="profile-area-results" aria-labelledby="profile-area-label" placeholder="Or search your city" value="${escapeHtml(areaInputValue(memberPlaceLabel))}" autocomplete="off" spellcheck="false" data-area-search /><ul class="profile-area-results b-listbox" id="profile-area-results" role="listbox" aria-label="Cities" hidden></ul></div></div><small class="profile-edit-helper" data-area-status role="status">${escapeHtml(AREA_HELPER)}</small></div>
         ${chipPickerMarkup({ id: 'profile-interests-edit', label: 'INTERESTS', listLabel: 'Your interests', placeholder: 'Add an interest: type to search', helper: `Pick 1 to ${MAX_INTERESTS}. You can change them up to 3 times a day. Private interests are never shown.` })}
@@ -3367,6 +3537,15 @@ const openProfileEditor = () => {
   wireAreaChanger(modal);
   const interestEdit = wireInterestEditor(modal);
   const lookingEdit = wireLookingForEditor(modal);
+  const workEdit = wireWorkEditor(modal, workCache.get(String(memberProfile.id)) || null);
+  if (!workCache.has(String(memberProfile.id)) && memberProfile.id) {
+    memberWork([memberProfile.id]).then(({ data }) => {
+      const row = (data || [])[0];
+      const work = row ? normalizeWork(row) : null;
+      workCache.set(String(memberProfile.id), work);
+      if (modal.isConnected) workEdit.fill(work);
+    });
+  }
   const bioField = modal.querySelector('textarea[name="bio"]');
   // D-137: 1 to 20 words, counted live ("8/20 words"); past 20 a quiet note shows and Save is refused.
   const syncBioWords = () => {
@@ -3469,6 +3648,13 @@ const openProfileEditor = () => {
       if (bioError) { setBusy(submit, false); feedback.textContent = /bio_words|20 words/i.test(String(bioError.message)) ? `Keep your bio to ${BIO_WORDS_MAX} words or fewer.` : "Your bio couldn't be saved. Please try again."; return; }
       nextProfile.bio = nextBio;
     }
+    // D-140: title and company (set_my_work). Before 0036 there is nothing to save.
+    if (workEdit.changed()) {
+      const { error: workError } = await setMyWork(cleanTitle(workEdit.state.title), workEdit.state.companyId || null);
+      if (workError && !isMissingFunction(workError)) { setBusy(submit, false); feedback.textContent = "Your company couldn't be saved. Please try again."; return; }
+      workCache.delete(String(memberProfile.id));
+      requestWork();
+    }
     const { data, error } = await saveProfile(memberProfile.id, nextProfile, photoFile, { photoUrl: memberProfile.photoUrl });
     if (error) {
       setBusy(submit, false);
@@ -3498,7 +3684,7 @@ const openProfileEditor = () => {
       deck.ids = []; deck.end = null; refillDeck();  // the deck matches on interests: start it again
     }
     showToast('Profile updated and saved.');
-    // D-138: Hiring / Can Give Referrals just added opens Add a role; Job Referral or Job Opportunities opens the roles
+    // D-141: Hiring / Can Give Referrals just added opens Add a role; Job Referral or Job Opportunities opens the roles
     // sheet; removing them withdraws the roles you're open to, or (after a confirm) closes your roles.
     if (hiring) void hiring.afterLookingForSaved(memberProfile.lookingFor || '', previousLookingFor);
   });
@@ -3560,7 +3746,9 @@ const openNotificationSettings = () => {
     <label class="settings-toggle-row"><span><strong>MESSAGE NOTIFICATIONS</strong><small>Get an alert when someone sends you a message.</small></span><input id="profile-notifications-toggle" type="checkbox" /><i aria-hidden="true"></i></label>
     <label class="settings-toggle-row" data-presence-setting hidden><span><strong>SHOW WHEN I'M ACTIVE</strong><small>Your connections see a dot when you're here. Turn it off and you won't see theirs either.</small></span><input id="profile-presence-toggle" type="checkbox" /><i aria-hidden="true"></i></label>
     <label class="settings-toggle-row" data-push-setting><span><strong>WEB NOTIFICATIONS</strong><small>Get a notification on this device when someone crosses your path, even when Brivia is closed. Separate from location.</small><small class="settings-nearby-status" data-push-status role="status"></small></span><input id="profile-push-toggle" type="checkbox" /><i aria-hidden="true"></i></label>
-    <label class="settings-toggle-row"><span><strong>SOUNDS</strong><small>A soft sax chime for new notifications, and a note when you swipe. On this device.</small></span><input id="profile-sound-toggle" type="checkbox" /><i aria-hidden="true"></i></label>
+    <label class="settings-toggle-row"><span><strong>NOTIFICATION SOUND</strong><small>A soft sax chime when a notification arrives while Brivia is open. On this device.</small></span><input id="profile-sound-toggle" type="checkbox" /><i aria-hidden="true"></i></label>
+    <label class="settings-toggle-row"><span><strong>SWIPE SOUNDS</strong><small>A short note when you pass or pitch. On this device.</small></span><input id="profile-swipe-sound-toggle" type="checkbox" /><i aria-hidden="true"></i></label>
+    <label class="settings-toggle-row" data-push-sound-setting><span><strong>PUSH NOTIFICATION SOUND</strong><small>Your device's own sound for Brivia notifications when Brivia is closed. Off: they arrive silently. On iPhone, set this in Settings, Notifications.</small></span><input id="profile-push-sound-toggle" type="checkbox" /><i aria-hidden="true"></i></label>
     <label class="settings-volume-row" data-sound-volume><span><strong>SOUND VOLUME</strong><small data-sound-volume-value></small></span><input id="profile-sound-volume" type="range" min="0" max="100" step="5" /></label>
     <label class="settings-toggle-row" data-nearby-setting hidden><span><strong>CROSSING PATHS</strong><small>Discover when other Brivia members are nearby. Only members who enable this feature can discover you.</small><small class="settings-nearby-status" data-nearby-status role="status"></small></span><input id="profile-nearby-toggle" type="checkbox" /><i aria-hidden="true"></i></label>
     <p class="profile-settings-feedback" id="notification-settings-feedback" role="status"></p>
@@ -3602,9 +3790,13 @@ const openNotificationSettings = () => {
   const showVolume = () => {
     volumeValue.textContent = `${volumeInput.value}%`;
     volumeInput.setAttribute('aria-valuetext', `${volumeInput.value} percent`);
-    volumeInput.disabled = !soundToggle.checked;
+    volumeInput.disabled = !soundToggle.checked && !swipeSoundToggle.checked;
   };
+  const swipeSoundToggle = modal.querySelector('#profile-swipe-sound-toggle');
+  const pushSoundToggle = modal.querySelector('#profile-push-sound-toggle');
   soundToggle.checked = soundEnabled();
+  swipeSoundToggle.checked = interactionSoundEnabled();
+  pushSoundToggle.checked = pushSoundEnabled();
   volumeInput.value = String(soundVolume());
   showVolume();
   soundToggle.addEventListener('change', () => {
@@ -3612,11 +3804,22 @@ const openNotificationSettings = () => {
     chime.unlock();
     if (soundToggle.checked) chime.preview();
     showVolume();
-    feedback.textContent = soundToggle.checked ? 'Sounds are on for this device.' : 'Sounds are off for this device.';
+    feedback.textContent = soundToggle.checked ? 'Notification sound is on for this device.' : 'Notification sound is off for this device.';
+  });
+  swipeSoundToggle.addEventListener('change', () => {
+    setInteractionSoundEnabled(swipeSoundToggle.checked);
+    chime.unlock();
+    if (swipeSoundToggle.checked) chime.swipe('pitch');
+    showVolume();
+    feedback.textContent = swipeSoundToggle.checked ? 'Swipe sounds are on for this device.' : 'Swipe sounds are off for this device.';
+  });
+  pushSoundToggle.addEventListener('change', async () => {
+    await setPushSoundEnabled(pushSoundToggle.checked);
+    feedback.textContent = pushSoundToggle.checked ? 'Brivia notifications use your device sound.' : 'Brivia notifications arrive silently on this device.';
   });
   // Adjusting: saved as it moves, previewed once it is let go.
   volumeInput.addEventListener('input', () => { setSoundVolume(volumeInput.value); showVolume(); });
-  volumeInput.addEventListener('change', () => { chime.unlock(); chime.preview(); });
+  volumeInput.addEventListener('change', () => { chime.unlock(); if (!chime.preview()) chime.swipe('pitch'); });
   const support = pushSupport();
   if (support !== 'ready') { pushToggle.disabled = support !== 'denied'; pushStatus.textContent = PUSH_COPY[support] || ''; }
   webPush.isOn().then((on) => { if (modal.isConnected) pushToggle.checked = on; }).catch(() => {});
@@ -4050,7 +4253,7 @@ document.querySelector('[data-view="profile"]')?.addEventListener('click', (even
   if (event.target.closest('[data-checklist-item], [data-profile-edit]')) openProfileEditor();
 });
 
-// D-138: one hiring instance per signed-in member. boot() asks my_role_intent / my_hiring_roles; before 0034 they are
+// D-141: one hiring instance per signed-in member. boot() asks my_role_intent / my_hiring_roles; before 0037 they are
 // missing and everything stays hidden.
 function startHiring() {
   if (hiring || !supabase || !memberProfile.id) return;
@@ -4070,7 +4273,7 @@ function startHiring() {
   });
   void hiring.boot();
 }
-// D-138: "You're hiring" / "Open to roles" on my profile, and HIRING in the hero eyebrow while a banner is live.
+// D-141: "You're hiring" / "Open to roles" on my profile, and HIRING in the hero eyebrow while a banner is live.
 function renderProfileHiring() {
   const section = document.querySelector('#profile-hiring');
   if (!section || !hiring) return;
@@ -4090,6 +4293,8 @@ const renderProfile = () => {
   // My area as the server names it (my_onboarding_status().place_label), read-only here (D-036). The legacy free-text
   // City/State are neither shown nor editable: no other member can read them, and the area is the server's cell.
   document.querySelector('#profile-location').textContent = areaInputValue(memberPlaceLabel) || 'Your area';  // no "(city-wide)" (D-106)
+  const ownWork = document.querySelector('#profile-work');
+  if (ownWork && memberProfile.id && ownWork.dataset.workFor !== String(memberProfile.id)) ownWork.dataset.workFor = String(memberProfile.id);
   // D-113: the member's own bio under the name (it replaced the fixed "Same curiosity. Bigger conversations." line);
   // nothing shows until there is one.
   const heroBio = document.querySelector('#profile-hero-bio');

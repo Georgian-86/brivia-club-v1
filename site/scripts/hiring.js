@@ -1,4 +1,4 @@
-// Hiring (D-138, spec docs/superpowers/specs/2026-11-02-hiring-design.md). Pure helpers: the role catalogue, labels,
+// Hiring (D-141, spec docs/superpowers/specs/2026-11-02-hiring-design.md). Pure helpers: the role catalogue, labels,
 // the client mirror of the server's text rule, who counts as a hirer or a seeker, the card bar's words, the deck lift
 // and the notification row. No DOM, no storage, no network: hiring-ui.js and app.js do that.
 
@@ -114,7 +114,7 @@ export const helpBadge = (id) => (id === 'refer' ? 'Can refer' : 'Hiring manager
 // The role's line under its title: "Mid level · Hybrid · Lumen Labs".
 export const roleMeta = (role) => [levelLabel(role?.level), modeLabel(role?.work_mode), tidy(role?.company)].filter(Boolean).join(' · ');
 
-// The client mirror of brivia_role_text_ok (0034): the same refusal, shown by the field before saving.
+// The client mirror of brivia_role_text_ok (0037): the same refusal, shown by the field before saving.
 export const ROLE_TEXT_ERROR = 'Links and contact details go in chat, after you connect.';
 export const roleTextIssue = (text) => {
   const value = String(text || '');

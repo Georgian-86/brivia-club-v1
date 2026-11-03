@@ -2827,7 +2827,93 @@ controls (a tester or a seeded test member), never a real member, so no new expo
   ^1.5 instead of ^2, default 80, a soft limiter at the output: peaks now 0.64 to 0.75 at the default (about +8 dB),
   never distorted at 100%; `sounds.spec.mjs` checks the played buffer's peak.
 
-## D-138: Hiring, a banner on hirers' profiles matched to members who want a role (founder, 2026-11-02; built 2026-11-03)
+## D-138 (2026-11-03): one aura on every sheet; Crossing Paths says where and when, keeps working from a hidden tab
+
+- **Asked:** the Explore aura (reference 4) on every page, modal, popup and overlay; Crossing Paths that works while
+  both people use other apps, with notifications showing approximate distance, when and where; cross-device read sync;
+  configurable retention; separate sound choices for the app and for push notifications; no fake data.
+- **Found:** most of it already existed and is real (D-131/D-133/D-134): opt-in only, a coarse fix every 5 minutes,
+  live areas ignored after 20 minutes (stale positions never notify), revocation clears the live area at once, one
+  server notification store with unique ids and read state synced over Realtime, web push claimed once per id, one
+  notification per pair per day. What was missing: sheets on flat ivory over a grey scrim; no "where" or "when" on a
+  crossing; checks stopped the moment the tab was hidden; retention fixed in code; one sound switch for everything.
+- **Gradient:** `--aura-sheet` and `--aura-scrim` (tokens.css). Every modal, popup and dialog (Edit profile, Settings and
+  its sheets, the pitch composer, the connect composer, public profile, report, privacy, events dialogs, the match
+  moment, share, the notification panel; the deck tutorial and the request sheet already had it) sits on the sheet
+  aura; every scrim is one warm wine veil with a light blur. Fields, cards and photos keep their own surfaces, so text
+  contrast is unchanged. The bottom bar and top bar were already aura glass.
+- **Where and when:** `0034_crossing_where.sql`: `member_notification.place_name` (the town or city of the receiver's
+  own live area, never the other member's), `my_notifications_v2()` (0030's function is left as it was, for clients
+  that have not reloaded), the copy "Someone interesting crossed your path." / "You and Aarav were within 1 km of each
+  other, near Bengaluru." / "8 min ago · Discover who you crossed paths with." in Nearby, the panel, the toast and the
+  push. Distance stays a band, never "300 metres": the grid is ~1 km and the founder chose 1 km precision (D-131);
+  a metre figure would expose more than members agreed to share.
+- **Retention:** `nearby_retention`, one owner-only row (live 20 min, moves 24 h, alerts 24 h, passes 7 days,
+  notifications 30 days, each with a ceiling); `purge_nearby()` reads it.
+- **Background:** a hidden tab keeps pulsing every 5 minutes (as far as the browser runs it) once the page has had a
+  fix and permission reads granted. On a laptop and on Android Chrome this covers "I switched to another app" while the
+  browser keeps Brivia alive; iOS Safari suspends hidden pages within seconds. Never a prompt from a hidden page.
+- **The limit, stated plainly:** a website or PWA cannot read location while the browser is closed or the page is
+  frozen, on any platform. The requested scenario (both people in other apps, phones in pockets, both notified) needs a
+  native app: iOS significant-location-change or region monitoring with "Always" permission, Android fused location
+  with a foreground service and background-location permission, posting to the same `nearby_pulse` (the server,
+  notifications, push and read sync are ready for it). Until then the push still reaches a member whose app is closed
+  whenever the *other* member's app pulses.
+- **Sound:** three switches per device: NOTIFICATION SOUND (the sax chime in the app), SWIPE SOUNDS, PUSH NOTIFICATION
+  SOUND (the service worker shows pushes `silent` when off; read from Cache Storage; iOS uses its own Settings).
+- **Not tested on real phones from here:** two physical devices crossing paths cannot be driven from this environment.
+  What is tested: SQL (both told once with the area, a 20-minute-old location never notifies, switching off is never
+  found, retention follows the setting), unit (hidden-tab pulses only when granted; a revoked permission stops
+  collection), e2e on one stub server for a laptop and a phone (the notice, read on one device is read on the other).
+
+## D-139 (2026-11-03): no flat ivory left on the tutorial tiles, Nearby and the empty states
+
+- **Asked (with screenshots of the deck tutorial and Nearby):** change the colour of the swipe-left and swipe-right
+  tiles and the gradient of the Nearby screen, and wherever else it is relevant.
+- **Done (aura-theme.css, tokens only):** the tutorial's two tiles are light glass over the sheet aura, "pass" with a
+  breath of blush, "pitch" with a breath of mint, a thin wine edge. Nearby and Event companions sit on the page aura
+  (`--aura-bg`) instead of the room photo. The Nearby panels (Turn on Crossing Paths, quiet, unavailable), the deck's
+  empty state, the companions and events empty states use the sheet aura (`--aura-sheet`). Profile cards, photos and
+  buttons are unchanged.
+- **Proof:** e2e deck-tutorial 26, nearby 66, companions 64, events 76, deck 201, all passing (axe contrast included);
+  phone screenshots of the tutorial and Nearby.
+
+## D-140 (2026-11-03): a worldwide city directory, and a company on every profile
+
+- **Asked:** (9) a tiny company logo and name on profile cards ("Software Engineer at Google"), picked in Edit profile
+  from a searchable global company directory that grows (external source, cached, admin-verified), with members always
+  able to add their own (name, logo, website, industry), deduplicated, editable and removable; (10) any city in the
+  world, by city, country or postal code, with state and country to tell same-named cities apart, other spellings,
+  "Use my location" and manual choice, the same directory everywhere, standard identifiers, never exact coordinates.
+- **Cities (0035):** `geo_city`, 156,169 cities, towns and localities in every country from the countries-states-cities
+  database (ODbL), published with the site as `site/public/data/cities/part-NN.json` and imported in SQL with pg_net
+  (no service key leaves the dashboard). Names are public; centroids live in `brivia_private.geo_city_point` (the
+  orbit-location test allows coordinates in the public schema only on `place`). `search_cities(q)` (security invoker,
+  works before sign-in): prefix, typo (trigram), accents folded, native script, aliases (Bangalore, Bombay, Gurgaon...),
+  "City, Country", "City, State", or a country alone. `ensure_place(id)`: a picked city becomes one `place` row the
+  first time (`geo-<id>`), so ORBIT, `member_orbit.place_id`, card labels, Nearby, events and filters keep using `place`
+  unchanged; a city that already is a place answers its id. Postal codes: the `directory` Edge Function asks Photon
+  (OpenStreetMap) and maps the postcode's centre to the nearest directory city in that country.
+- **Companies (0036):** `company` (directory | member | admin, verified, unique domain and Wikidata id), the
+  `company-logos` bucket (raster only, 300 KB, members write only under their own uid), `profiles.job_title` and
+  `company_id`, `set_my_work`, `member_work(ids)` (only members the viewer may see, as `member_bio`),
+  `search_companies`, `add_company` (dedupe by domain then name, 5 a day), `brivia_cache_companies` (service role).
+  The `directory` Edge Function looks a name up on Wikidata (CC0, worldwide, includes Swiggy, Zepto, Razorpay...),
+  keeps results described as organisations, stores each logo once (Commons PNG or the site's icon), caches the rows.
+- **On the card:** "[14 px logo] Title at Company" in place of the experience line, one line, ellipsised, in the card's
+  small type; the default mark when there is no logo. Deck card, Nearby card, Event companions card, public profile,
+  own profile. One painter fills any `data-work-for` element from a batched cache. Card sizes are unchanged (e2e
+  measures the deck card with and without a company).
+- **Not done / limits:** no paid company API (Clearbit, Brandfetch need keys and contracts); Wikidata covers famous and
+  many emerging companies, members add the rest. Postal codes depend on OpenStreetMap coverage. The import needs pg_net
+  enabled once (README "## 0035"). The project rule asks for an agent-arena review of significant decisions; this one
+  was decided inline (data sources: open, free, no keys) and is open to an arena pass.
+- **Proof:** SQL harness ALL PASSED (new u-city-directory G1-G3, v-company-directory C1-C3; hygiene lists updated);
+  unit (work-identity); e2e work-identity 25, signup 369, onboarding 269, location 64, profile-edit 64, create-event 152,
+  events 76, nearby 66, companions 64, deck 201, app-shell 214, collab-requests 32, sounds 31, all passing. An empty
+  city search still lists the launch cities and metros (signup's "location denied" fallback).
+
+## D-141: Hiring, a banner on hirers' profiles matched to members who want a role (founder, 2026-11-02; built 2026-11-03)
 
 - **Asked:** "show a hiring banner in the profiles of the people whose looking for is hiring candidates. They shall be
   suggested to people whose looking for is referral or a similar position ... Design when and how will the hiring
@@ -2842,7 +2928,7 @@ controls (a tester or a seeded test member), never a real member, so no new expo
   links in role text, a "Fake job or asked for money" report reason, a kill switch.
 - **Agent-arena:** a quick panel of two independent agents (product, trust and safety), same model family (disclosed
   reduced heterogeneity); rulings in spec §13.
-- **Status:** built 2026-11-03 (founder: "proceed with development of the hiring feature"). Migration `0034_hiring.sql`
+- **Status:** built 2026-11-03 (founder: "proceed with development of the hiring feature"). Migration `0037_hiring.sql`
   (not applied yet), client `site/scripts/hiring.js` + `hiring-ui.js` + `site/styles/hiring.css`, tests
   `supabase/tests/s-hiring.test.sql`, `tests/unit/hiring.test.mjs`, `tests/e2e/hiring.spec.mjs`. Mock screenshots in the
   project folder `hiring/`, the real build's in `hiring/build/`.
@@ -2853,5 +2939,5 @@ controls (a tester or a seeded test member), never a real member, so no new expo
     "Hiring:") and pauses the member's open roles. `report_member`'s reason list (0004, frozen) is unchanged.
   - The deck lift is client side (one hiring suggestion in every five cards, never the card on screen);
     `deck_candidates` is untouched, so ORBIT's ordering of everything else is unchanged (ORBIT_ENGINE.md §12).
-  - The feature hides itself until 0034 is applied: the first hiring RPC answers "function not found" and nothing
+  - The feature hides itself until 0037 is applied: the first hiring RPC answers "function not found" and nothing
     hiring-shaped renders. A kill switch (`brivia_feature` 'hiring') does the same after it is applied.

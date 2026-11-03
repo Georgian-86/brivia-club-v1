@@ -126,13 +126,7 @@ dialog.collab-review[open]{animation:collab-in var(--motion-slow) var(--ease)}
    at the top of Explore), mint on the right, rose and peach low. The full --aura-bg is sized for a page; on a sheet its
    wine pools read as smudges. The card is lighter glass so the glow shows through it, not only around its edges. */
 body.app-body dialog.collab-review .collab-panel{
-  background:
-    radial-gradient(ellipse 70% 38% at 8% 4%, var(--aura-lilac), transparent 70%),
-    radial-gradient(ellipse 50% 26% at 96% 0%, var(--aura-wine-soft), transparent 72%),
-    radial-gradient(ellipse 60% 40% at 100% 46%, var(--aura-mint), transparent 72%),
-    radial-gradient(ellipse 70% 34% at 72% 100%, var(--aura-rose), transparent 72%),
-    radial-gradient(ellipse 56% 32% at 0% 92%, var(--aura-peach), transparent 72%),
-    var(--aura-base);
+  background: var(--aura-sheet);
 }
 body.app-body dialog.collab-review .collab-card{
   border-color:color-mix(in srgb, var(--color-cream) 70%, transparent);

@@ -88,7 +88,7 @@ export const nearbyCardMarkup = (person, { coverSrc = '', photoSrc = '', current
   </button>
   <div class="companion-card-body">
     <h2 class="companion-name">${escapeHtml(person.name)}</h2>
-    ${person.headline ? `<p class="nearby-headline">${escapeHtml(person.headline)}</p>` : ''}
+    <p class="nearby-headline" data-work-for="${escapeHtml(person.id)}"${person.headline ? '' : ' hidden'}>${escapeHtml(person.headline)}</p>
     <p class="companion-place">${PIN}<span>${escapeHtml(place)}</span>${person.hereNow ? '<span class="nearby-now">Here now</span>' : ''}</p>
     ${person.bio ? `<p class="nearby-bio">${escapeHtml(person.bio)}</p>` : ''}
     ${sharedChips || otherChips ? `<ul class="companion-chips nearby-chips" aria-label="Interests">${sharedChips}${otherChips}</ul>` : ''}
@@ -119,13 +119,40 @@ export const nearbyOpeners = ({ name, shared = [] } = {}) => {
   ];
 };
 
+// D-138: the crossing, in words. Distance is a band (never metres: 0029 keeps a ~1 km grid, and a closer figure would
+// say more than the members agreed to share); "where" is the town or city the member was in (0034); "when" is relative.
+const APART = Object.freeze({ '1': 'within 1 km of each other', '3': 'about 1–3 km apart', '5': 'about 3–5 km apart', '10': 'about 5–10 km apart' });
+export const crossedAgo = (iso, now = Date.now()) => {
+  const t = new Date(iso || '').getTime();
+  if (!Number.isFinite(t)) return '';
+  const min = Math.max(0, Math.round((now - t) / 60000));
+  if (min < 2) return 'Just now';
+  if (min < 60) return `${min} min ago`;
+  const h = Math.round(min / 60);
+  if (h < 24) return `${h} h ago`;
+  const d = Math.round(h / 24);
+  return d === 1 ? 'Yesterday' : `${d} days ago`;
+};
+export const CROSSING_TITLE = 'Someone interesting crossed your path.';
+export const CROSSING_CTA = 'Discover who you crossed paths with.';
+export const crossingCopy = (n = {}, now = Date.now()) => {
+  const first = String(n.name || '').trim().split(/\s+/)[0] || 'a Brivia member';
+  const apart = APART[n.band] || 'close by';
+  const place = String(n.place || '').trim();
+  return {
+    title: CROSSING_TITLE,
+    line: `You and ${first} were ${apart}${place ? `, near ${place}` : ''}.`,
+    when: crossedAgo(n.createdAt, now),
+    cta: CROSSING_CTA,
+  };
+};
+
 // D-134: the in-section notice when someone comes within your radius. n: member-notifications.js shape.
 export const nearbyNoticeMarkup = (n, { photoSrc = '' } = {}) => {
-  const name = escapeHtml(n.name || 'A Brivia member');
-  const where = n.band ? ` · ${escapeHtml(bandLabel(n.band))}` : '';
+  const copy = crossingCopy(n);
   return `<div class="nearby-notice" role="status" data-notice-id="${escapeHtml(n.id)}">
   <span class="nearby-notice-face">${photoSrc ? `<img src="${escapeHtml(photoSrc)}" alt="" />` : `<span aria-hidden="true">${escapeHtml(initials(n.name))}</span>`}</span>
-  <span class="nearby-notice-copy"><strong>Someone crossed your path.</strong><span>A new connection is nearby. Discover who's around you.</span><em>${name}${where}</em></span>
-  <span class="nearby-notice-actions"><button type="button" class="nearby-notice-view" data-notice-view="${escapeHtml(n.sourceId)}">View profile</button><button type="button" class="nearby-notice-close" data-notice-dismiss="${escapeHtml(n.id)}" aria-label="Dismiss"><span aria-hidden="true">×</span></button></span>
+  <span class="nearby-notice-copy"><strong>${escapeHtml(copy.title)}</strong><span>${escapeHtml(copy.line)}</span><em>${escapeHtml([copy.when, copy.cta].filter(Boolean).join(' · '))}</em></span>
+  <span class="nearby-notice-actions"><button type="button" class="nearby-notice-view" data-notice-view="${escapeHtml(n.sourceId)}">Discover</button><button type="button" class="nearby-notice-close" data-notice-dismiss="${escapeHtml(n.id)}" aria-label="Dismiss"><span aria-hidden="true">×</span></button></span>
 </div>`;
 };

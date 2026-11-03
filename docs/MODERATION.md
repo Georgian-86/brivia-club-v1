@@ -158,7 +158,26 @@ To remove one, retire it: `update public.interest_node set status = 'retired' wh
 it again and nobody can recreate that label (add_member_interest refuses a retired label). Members who already hold it
 keep it until their next interest save; clear it from profiles with the same steps as any reported profile text.
 
-## Hiring (0034, D-138)
+
+## Companies and logos (0036, D-140)
+
+Members add their own organisation (name, optional website, industry and logo). Review the new ones weekly:
+
+```sql
+select c.id, c.name, c.domain, c.industry, c.logo_path, c.created_at, p.name as added_by
+  from public.company c left join public.profiles p on p.id = c.created_by
+ where c.source = 'member' and c.created_at > now() - interval '7 days'
+ order by c.created_at desc;
+```
+
+- **Verify a real company** (it then ranks first in search): `update public.company set verified = true, source = 'admin' where id = '<id>';`
+- **Add a verified company by hand:** `insert into public.company (name, domain, website, industry, source, verified) values ('Acme', 'acme.com', 'https://acme.com', 'Manufacturing', 'admin', true);`
+- **Remove an offensive name or logo:** `delete from public.company where id = '<id>';` (members who chose it lose the company
+  line, `on delete set null`), then delete the logo object in Storage, bucket `company-logos`, path `<member uid>/...`.
+- **Merge a duplicate:** point members to the kept row, then delete the other:
+  `update public.profiles set company_id = '<kept>' where company_id = '<duplicate>'; delete from public.company where id = '<duplicate>';`
+
+## Hiring (0037, D-141)
 
 - **"Fake job or recruitment scam"** reports arrive as `report_member` rows with reason `fake` and a note starting
   "Hiring:". The report already paused every open role of that member (`paused_by_report`) and blocked them for the
@@ -170,4 +189,3 @@ keep it until their next interest save; clear it from profiles with the same ste
   §5 for the member.
 - **Everything at once:** `update brivia_feature set enabled = false where name = 'hiring';` hides every banner,
   suggestion and ask (data kept). `select purge_hiring();` (owner only) deletes all hiring data.
-

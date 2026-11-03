@@ -1,7 +1,7 @@
 // Crossing paths (D-119, migration 0021): a quiet alert when a connection is nearby. Design:
 // docs/superpowers/specs/2026-11-01-crossing-paths-design.md; privacy contract: ORBIT spec §9.1.4a.
 //
-// While the feature is on and the tab is visible, the loop reads a coarse position (only if the browser already allows
+// While the feature is on and the tab is visible (or hidden, once granted: D-138), the loop reads a coarse position (only if the browser already allows
 // it: it never prompts on its own), sends it to nearby_pulse, and reads my_nearby_alerts. Coordinates live only in the
 // local variable that is handed to pulse(); they are never stored, logged or put in the DOM.
 // Location blocked or unavailable: the live cell is cleared on the server at once and the setting shows "Paused".
@@ -97,6 +97,7 @@ export const createCrossingPaths = ({
   // again within the same page, so background updates may go on after the first fix.
   let gotFix = false;
   let permissionStatus = null;
+  let lastPermission = 'unknown';
   const visible = () => !doc || doc.visibilityState === 'visible';
   const setStatus = (next) => { if (next !== status) { status = next; onStatus(next); } };
 
@@ -134,7 +135,11 @@ export const createCrossingPaths = ({
   const check = async ({ ask = false } = {}) => {
     // A tap while a background check runs waits for it, then asks the browser itself (never a silent no-op).
     if (busy && ask && inflight) { try { await inflight; } catch { /* its own errors are its own */ } }
-    if (!running || busy || (!ask && !visible())) return;
+    // D-138: a hidden tab keeps checking (every 5 minutes, as far as the browser lets a background page run) once this
+    // page has had a fix and the browser says location is granted, so a member who switched to another app is still
+    // found while the browser keeps Brivia alive. Never a prompt from a hidden page. Phones freeze a background page
+    // after a while; a closed browser cannot run anything (see D-138: background location needs a native app).
+    if (!running || busy || (!ask && !visible() && !(gotFix && lastPermission === 'granted'))) return;
     busy = true;
     inflight = runCheck({ ask });
     try { await inflight; } finally { inflight = null; }
@@ -142,6 +147,7 @@ export const createCrossingPaths = ({
   const runCheck = async ({ ask }) => {
     try {
       const state = await permission();
+      lastPermission = state;
       if (!ask && state === 'prompt' && !gotFix) { await pause('prompt'); await refreshAlerts(); return; }
       let fix = await locateOnce(geo, { secure, options: ask ? NEARBY_FRESH_OPTIONS : NEARBY_GEO_OPTIONS });
       if (!running) return;
