@@ -106,3 +106,31 @@ html body .collab-review::backdrop {
   -webkit-backdrop-filter: blur(6px);
   backdrop-filter: blur(6px);
 }
+
+/* D-139 (founder, 2026-11-03, with screenshots of the deck tutorial and Nearby): no flat ivory left on these surfaces.
+   The tutorial's two swipe tiles become light glass, so the sheet aura shows through them with a soft tint each (a
+   breath of blush on "pass", a breath of mint on "pitch"). Nearby and Event companions sit on the page aura instead of
+   the room photo, and their panels (Turn on Crossing Paths, quiet, empty) and the other empty states use the sheet aura. */
+html body .deck-tutorial-step {
+  border-color: color-mix(in srgb, var(--color-wine) 14%, transparent) !important;
+  background: color-mix(in srgb, var(--aura-base) 52%, transparent) !important;
+  -webkit-backdrop-filter: blur(14px);
+  backdrop-filter: blur(14px);
+}
+html body .deck-tutorial-step:first-child {
+  background:
+    radial-gradient(ellipse 80% 90% at 0% 0%, var(--aura-rose), transparent 70%),
+    color-mix(in srgb, var(--aura-base) 52%, transparent) !important;
+}
+html body .deck-tutorial-step:last-child {
+  background:
+    radial-gradient(ellipse 80% 90% at 100% 100%, var(--aura-mint), transparent 70%),
+    color-mix(in srgb, var(--aura-base) 52%, transparent) !important;
+}
+html body.app-body :is(.companions-view, .nearby-view)::before { background: var(--aura-bg) !important; }
+html body.app-body .nearby-view .nearby-empty,
+html body .companion-empty,
+html body .events-empty,
+html body #home-empty-state {
+  background: var(--aura-sheet) !important;
+}

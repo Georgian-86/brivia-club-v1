@@ -2865,3 +2865,15 @@ controls (a tester or a seeded test member), never a real member, so no new expo
   What is tested: SQL (both told once with the area, a 20-minute-old location never notifies, switching off is never
   found, retention follows the setting), unit (hidden-tab pulses only when granted; a revoked permission stops
   collection), e2e on one stub server for a laptop and a phone (the notice, read on one device is read on the other).
+
+## D-139 (2026-11-03): no flat ivory left on the tutorial tiles, Nearby and the empty states
+
+- **Asked (with screenshots of the deck tutorial and Nearby):** change the colour of the swipe-left and swipe-right
+  tiles and the gradient of the Nearby screen, and wherever else it is relevant.
+- **Done (aura-theme.css, tokens only):** the tutorial's two tiles are light glass over the sheet aura, "pass" with a
+  breath of blush, "pitch" with a breath of mint, a thin wine edge. Nearby and Event companions sit on the page aura
+  (`--aura-bg`) instead of the room photo. The Nearby panels (Turn on Crossing Paths, quiet, unavailable), the deck's
+  empty state, the companions and events empty states use the sheet aura (`--aura-sheet`). Profile cards, photos and
+  buttons are unchanged.
+- **Proof:** e2e deck-tutorial 26, nearby 66, companions 64, events 76, deck 201, all passing (axe contrast included);
+  phone screenshots of the tutorial and Nearby.
