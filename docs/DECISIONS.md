@@ -3043,3 +3043,24 @@ controls (a tester or a seeded test member), never a real member, so no new expo
 - **Proof:** SQL harness ALL PASSED (v-company C6: once only, no overwrite, own folder only, own organisation may
   replace, 10 a day, not for anon); e2e work-identity (initials tile, the button in the box, upload sets and shows it)
   at 1440 and 390.
+
+## D-150 (2026-11-03): Delivered, Read and last active in chat
+
+- **Asked:** "put read receipts, delivered on chat section and also last active time", in the site's own UI.
+- **Done:** every message I send shows one cream tick (Sent: stored), two cream ticks (Delivered: the other member's
+  app loaded it) or two warm amber ticks (Read: they had our conversation open on screen in a visible tab); the newest
+  of mine also says "Delivered" or "Read" in the same small serif as the time. The chat header reads "Active now" with
+  the presence dot, or "Active 12 min ago", "Active 3 h ago", "Active yesterday", "Active 28 Oct".
+- **Server (0042):** `delivered_at` and `read_at` on `brivia_messages`, set only by the recipient through
+  `mark_messages_delivered()` and `mark_conversation_read(other)` (security definer, recipient only, same-world rule;
+  a trigger clears both on insert, and there is no update policy). The sender learns of it through Realtime UPDATE under
+  the existing select policy. `connection_last_seen(ids)` extends 0018: connections only, not blocked, both "Show when
+  I'm active" switches on; the time is rounded down to the minute and never comes with a place.
+- **Privacy:** a message withheld because of a block (0013) is never marked, so the sender sees "Sent" as before and a
+  block stays invisible. Last active follows the existing switch both ways (off: you are not shown and you see no one's).
+  There is no separate read-receipts switch yet; one can be added the same way if members ask.
+- **Backfill:** a message the recipient had already answered is marked read (and delivered) at the time of that answer.
+  Older unanswered messages show Sent until the recipient next opens the app.
+- **Superseded:** D-110's "the open chat's head is unchanged" (the founder now asked for last active there).
+- **Proof:** SQL harness ALL PASSED (w-read-receipts R1–R5; a5 column list and hygiene whitelist updated); unit tests
+  (receipts, presence lastSeen); e2e read-receipts (1440 and 390, before 0042 too), presence, chat-inbox, chat-extras.

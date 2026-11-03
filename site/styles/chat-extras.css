@@ -811,3 +811,29 @@ body.app-body .app-view[data-view="chat"] .chat-layout .message.has-share small 
 }
 /* The Settings switch stays hidden until 0018 answers (a settings row is display:flex, which beats [hidden]). */
 .settings-toggle-row[hidden]{display:none}
+
+/* ---------- Delivered and Read (D-150, 0042): ticks beside the time on my own messages ---------- */
+/* One cream tick when it is stored, two when it reached their app, two in warm peach once they opened the chat.
+   The newest of my messages also says the word, in the same small serif as the time. */
+body.app-body .app-view[data-view="chat"] .chat-layout .message small.message-meta{
+  display:flex;align-items:center;justify-content:flex-end;gap:5px;
+}
+.message-receipt{display:inline-flex;align-items:center;line-height:0}
+.message-receipt svg{
+  width:17px;height:14px;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round;
+}
+.message-receipt.is-sent,.message-receipt.is-delivered{color:var(--color-cream);opacity:.62}
+.message-receipt.is-read{color:var(--color-receipt-read);opacity:1}
+.message-receipt-word{font-style:italic;letter-spacing:.02em}
+.message.me small .message-receipt-word{color:var(--color-cream)}
+@media (prefers-reduced-motion: no-preference){
+  .message-receipt.is-read svg{animation:receipt-read .32s ease-out}
+}
+@keyframes receipt-read{from{transform:scale(.7);opacity:.4}to{transform:none;opacity:1}}
+
+/* Last active in the chat header: the same serif line, with the presence dot when they are here now. */
+body.app-body .app-view[data-view="chat"] .chat-window-head #chat-status.has-last-active{letter-spacing:.02em}
+body.app-body .app-view[data-view="chat"] .chat-window-head #chat-status.is-active-now::before{
+  content:"";display:inline-block;width:7px;height:7px;margin-right:6px;border-radius:50%;
+  background:var(--color-presence);vertical-align:1px;
+}

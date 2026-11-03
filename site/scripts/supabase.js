@@ -335,7 +335,20 @@ export const addMemberInterest = async (label) => {
 };
 // Active status (D-110, 0018): connections only; connection_presence answers true or false, never a time.
 export const touchPresence = async () => (supabase ? supabase.rpc('touch_presence') : notConfigured());
-export const connectionPresence = async (ids) => (supabase ? supabase.rpc('connection_presence', { p_ids: ids }) : notConfigured());
+// D-150 (0042): connection_last_seen also answers the minute a match was last here; before 0042 the 0018 function.
+let lastSeenMissing = false;
+export const connectionPresence = async (ids) => {
+  if (!supabase) return notConfigured();
+  if (!lastSeenMissing) {
+    const result = await supabase.rpc('connection_last_seen', { p_ids: ids });
+    if (!(['PGRST202', '42883'].includes(result.error?.code) || result.error?.status === 404)) return result;
+    lastSeenMissing = true;
+  }
+  return supabase.rpc('connection_presence', { p_ids: ids });
+};
+// Delivered and Read (D-150, 0042). Before 0042 both answer PGRST202 / 404 (isMissingFunction) and the app stops asking.
+export const markMessagesDelivered = () => rpcCall('mark_messages_delivered', {});
+export const markConversationRead = (otherId) => rpcCall('mark_conversation_read', { p_other: otherId });
 export const setPresenceVisible = async (visible) => (supabase ? supabase.rpc('set_presence_visible', { p_visible: Boolean(visible) }) : notConfigured());
 export const myPresenceVisible = async () => (supabase ? supabase.rpc('my_presence_visible') : notConfigured());
 // Club events (0020, D-117). Before 0020 is applied each answers PGRST202 / 404 (isMissingFunction).

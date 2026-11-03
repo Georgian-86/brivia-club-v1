@@ -1239,3 +1239,14 @@ Apply after `0040`. Adds `company_logo_upload` (log, no client access) and `set_
 (authenticated): only from the member's own `company-logos/<uid>/` folder, only when the company has no logo yet or is the
 member's own organisation, 10 a day. Verify: `select has_function_privilege('anon', 'public.set_company_logo(uuid,text)', 'execute');` (f).
 To review uploads: `select c.name, u.logo_path, u.created_at, p.name from public.company_logo_upload u join public.company c on c.id = u.company_id join public.profiles p on p.id = u.member_id order by u.created_at desc;`
+
+## 0042
+
+**Delivered, Read and last active in chat (D-150).** **APPLIED 2026-11-03.**
+Apply after `0041`. Adds `brivia_messages.delivered_at` / `read_at` (cleared on every insert by a trigger; there is still
+no update policy), `mark_messages_delivered()`, `mark_conversation_read(other)` and `connection_last_seen(ids)` (all
+authenticated; recipient only; never a withheld message; last seen rounded to the minute, under the 0018 rules), and
+backfills a message the recipient already answered as read at that answer. Deploy the client after it (the client
+falls back without it). Verify:
+`select count(*) filter (where read_at is not null), count(*) from public.brivia_messages;` and
+`select has_function_privilege('anon', 'public.connection_last_seen(uuid[])', 'execute');` (f).

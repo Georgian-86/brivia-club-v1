@@ -1,11 +1,18 @@
 # Session handoff (read after CLAUDE.md)
 
-Last updated: 2026-11-03 (D-141 Hiring, built, 0037 not applied; D-140 worldwide city directory and company on profiles; D-138 one aura on every sheet, crossings say where and when, hidden-tab pulses, sound switches; D-137 bio 1 to 20 words, the sound kit; D-136 Gospel Music and NLP offered; D-135 interest list in the founder's wording, A–Z; D-134 Nearby notifications and web push; D-133 phone location; D-131 Nearby discovery; D-129 pitch shown once; D-128 cover order, names, OPEN MINDS retired; D-126 interest on all events; D-125 Show interest, brochure, poster area). Before that: 2026-11-02 (D-121 Create Event). Before that: 2026-11-01 (D-119 Crossing paths). Before that: 2026-11-01 (D-118 calmer Explore; D-117 Explore events, Posts tab). Before that: 2026-11-01 (D-116 cover set). Before that: 2026-10-28 (D-100 chat inbox, D-101 post activity and 0015, D-102 photo and setup). Before that: 2026-10-20 (live-database correction D-070; "Send without a note" D-071). Before that: 2026-10-16 (design references, D-062). Before that: 2026-10-13, after Phase D of the experience iteration (the test world), on branch
+Last updated: 2026-11-03 (D-150 Delivered, Read and last active in chat; D-141 Hiring, built, 0037 not applied; D-140 worldwide city directory and company on profiles; D-138 one aura on every sheet, crossings say where and when, hidden-tab pulses, sound switches; D-137 bio 1 to 20 words, the sound kit; D-136 Gospel Music and NLP offered; D-135 interest list in the founder's wording, A–Z; D-134 Nearby notifications and web push; D-133 phone location; D-131 Nearby discovery; D-129 pitch shown once; D-128 cover order, names, OPEN MINDS retired; D-126 interest on all events; D-125 Show interest, brochure, poster area). Before that: 2026-11-02 (D-121 Create Event). Before that: 2026-11-01 (D-119 Crossing paths). Before that: 2026-11-01 (D-118 calmer Explore; D-117 Explore events, Posts tab). Before that: 2026-11-01 (D-116 cover set). Before that: 2026-10-28 (D-100 chat inbox, D-101 post activity and 0015, D-102 photo and setup). Before that: 2026-10-20 (live-database correction D-070; "Send without a note" D-071). Before that: 2026-10-16 (design references, D-062). Before that: 2026-10-13, after Phase D of the experience iteration (the test world), on branch
 `claude/jolly-edison-49xvza` (repo `Georgian-86/brivia-club-v1`). Phases C and D are not on `main` yet, and Phase D's SQL
 is not applied: the founder applies it in the SQL editor (section 3, item 0).
 Update this file at the end of every session. CLAUDE.md holds the aim; this file holds **where we are**.
 
 ## 1. What is done
+
+**2026-11-03, D-150:** chat receipts and last active. My messages show one tick (Sent), two (Delivered: their app
+loaded it) and two warm amber ticks (Read: they had the conversation open on screen); the newest of mine also says
+"Delivered" or "Read". The chat header says "Active now" (with the green dot) or "Active 12 min ago", "Active 3 h ago",
+"Active yesterday", "Active 28 Oct", for connections only, hidden both ways by "Show when I'm active". Migration 0042
+(`delivered_at`, `read_at`, `mark_messages_delivered`, `mark_conversation_read`, `connection_last_seen`; a blocked
+pair's withheld messages never show Delivered or Read). Client `site/scripts/receipts.js`; e2e `read-receipts.spec.mjs`.
 
 **2026-11-03, D-141:** Hiring. A member whose Looking for is Hiring or Can Give Referrals posts up to 3 roles (Profile →
 You're hiring → Add a role); their deck card's bar reads "HIRING · ROLE" and their profile opens with the banner. A

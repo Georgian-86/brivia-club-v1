@@ -98,3 +98,25 @@ test('presenceDot', () => {
   assert.equal(presenceDot(true), '<span class="presence-dot" aria-hidden="true"></span>');
   assert.equal(presenceDot(false), '');
 });
+
+test('D-150: lastSeen reads last_seen_at, and a new time alone fires onChange', async () => {
+  let rows = [{ member_id: 'a', active: false, last_seen_at: '2026-11-03T10:00:00+00:00' }];
+  const changes = [];
+  const presence = createPresence({
+    touch: async () => ({ error: null }),
+    fetch: async () => ({ data: rows, error: null }),
+    ids: () => ['a'],
+    onChange: () => changes.push(presence.lastSeen('a')),
+    doc: { visibilityState: 'visible', addEventListener() {}, removeEventListener() {} },
+    win: { addEventListener() {}, removeEventListener() {} },
+    setIntervalFn: () => 1, clearIntervalFn: () => {},
+  });
+  await presence.start();
+  assert.equal(presence.lastSeen('a'), '2026-11-03T10:00:00+00:00');
+  assert.equal(presence.lastSeen('b'), '');
+  await presence.refresh();
+  assert.equal(changes.length, 1);
+  rows = [{ member_id: 'a', active: false, last_seen_at: '2026-11-03T10:05:00+00:00' }];
+  await presence.refresh();
+  assert.deepEqual(changes, ['2026-11-03T10:00:00+00:00', '2026-11-03T10:05:00+00:00']);
+});

@@ -198,12 +198,27 @@ export const startAppStub = async ({ port, state = {}, deckRows = defaultDeckRow
       }
       // D-110 active status: st.activeIds (members seen just now), st.presenceVisible (my switch, default on);
       // st.noPresence answers PGRST202 as before 0018. Only my matches are answered, as the server does.
-      if (['/rest/v1/rpc/touch_presence', '/rest/v1/rpc/connection_presence', '/rest/v1/rpc/set_presence_visible', '/rest/v1/rpc/my_presence_visible'].includes(pathName) && st.noPresence) {
+      if (['/rest/v1/rpc/touch_presence', '/rest/v1/rpc/connection_presence', '/rest/v1/rpc/connection_last_seen', '/rest/v1/rpc/set_presence_visible', '/rest/v1/rpc/my_presence_visible'].includes(pathName) && st.noPresence) {
         return json(404, { code: 'PGRST202', message: 'Could not find the function' });
       }
       if (pathName === '/rest/v1/rpc/touch_presence') { st.touches = (st.touches || 0) + 1; return route.fulfill({ status: 204, body: '', headers: { 'access-control-allow-origin': '*' } }); }
       if (pathName === '/rest/v1/rpc/my_presence_visible') return json(200, st.presenceVisible !== false);
       if (pathName === '/rest/v1/rpc/set_presence_visible') { st.presenceVisible = args.p_visible; return route.fulfill({ status: 204, body: '', headers: { 'access-control-allow-origin': '*' } }); }
+      // D-150 (0042): connection_last_seen adds st.lastSeen[id] (an ISO time); st.noReceipts answers PGRST202 for it and
+      // for mark_messages_delivered / mark_conversation_read (recorded in st.receiptCalls), as before 0042.
+      if (['/rest/v1/rpc/connection_last_seen', '/rest/v1/rpc/mark_messages_delivered', '/rest/v1/rpc/mark_conversation_read'].includes(pathName) && st.noReceipts) {
+        return json(404, { code: 'PGRST202', message: 'Could not find the function' });
+      }
+      if (pathName === '/rest/v1/rpc/connection_last_seen') {
+        return json(200, (args.p_ids || []).filter((id) => st.matchIds.includes(id)).map((id) => {
+          const shown = st.presenceVisible !== false;
+          return { member_id: id, active: shown && (st.activeIds || []).includes(id), last_seen_at: shown ? (st.lastSeen || {})[id] || null : null };
+        }));
+      }
+      if (pathName === '/rest/v1/rpc/mark_messages_delivered' || pathName === '/rest/v1/rpc/mark_conversation_read') {
+        (st.receiptCalls ||= []).push({ fn: pathName.slice(13), args });
+        return json(200, 1);
+      }
       if (pathName === '/rest/v1/rpc/connection_presence') {
         return json(200, (args.p_ids || []).filter((id) => st.matchIds.includes(id)).map((id) => ({ member_id: id, active: st.presenceVisible !== false && (st.activeIds || []).includes(id) })));
       }

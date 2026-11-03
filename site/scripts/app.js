@@ -21,7 +21,7 @@ import '../styles/mobile-app.css';
 import '../styles/skeleton.css';
 import '../styles/aura-theme.css';
 import '../styles/handoff.css';
-import { supabase, compressImageOnly, rowToProfile, saveProfile, isPresetCoverUrl, onboardingStatus, sendSignal, fetchSignalQuota, isRateLimited, isStorageImageUrl, withoutCredentials, uploadMessageAttachment, removeMessageAttachment, uploadCommunityPostImage, removeCommunityPostImage, ImageProcessingError, PHOTO_ERROR_MESSAGE, PHOTO_FRAMER_ERROR, compressAttachmentFiles, attachmentKind, reportMember, setSensitiveConsent, fetchSensitiveConsentAt, fetchMyInterests, fetchInterestNodes, addMemberInterest, isMissingFunction, touchPresence, connectionPresence, setPresenceVisible, myPresenceVisible, setMemberInterests, uploadResume, removeResume, resumeSignedUrl, resumeInfo, clearResumePath, searchPlaces, setHomeCity, setHomeLocation, listEvents, setEventRsvp, setCompanionDefault, myEventPrefs, eventCompanions, saveMemberEvent, cancelMemberEvent, deleteMemberEvent, uploadEventImage, removeEventImages, setEventInterest, setEventBrochure, uploadEventBrochure, removeEventBrochures, companionEvents, companionDeck, companionSwipe, myCompanionMatches, markCompanionMatchSeen, sendConnectRequest, setNearbyEnabled, myNearbySetting, nearbyPulse, nearbyClear, myNearbyAlerts, setNearbyMuted, nearbyDiscover, nearbyPass, nearbyConnect, myNearbyMatches, myNotifications, markNotificationsRead, dismissNotification, setNearbyRadius, savePushSubscription, deletePushSubscription, sendPendingPush, searchCompanies, searchCompanyDirectory, companyLogoUrl, addCompany, setMyWork, memberWork, uploadCompanyLogo } from './supabase.js';
+import { supabase, compressImageOnly, rowToProfile, saveProfile, isPresetCoverUrl, onboardingStatus, sendSignal, fetchSignalQuota, isRateLimited, isStorageImageUrl, withoutCredentials, uploadMessageAttachment, removeMessageAttachment, uploadCommunityPostImage, removeCommunityPostImage, ImageProcessingError, PHOTO_ERROR_MESSAGE, PHOTO_FRAMER_ERROR, compressAttachmentFiles, attachmentKind, reportMember, setSensitiveConsent, fetchSensitiveConsentAt, fetchMyInterests, fetchInterestNodes, addMemberInterest, isMissingFunction, touchPresence, connectionPresence, setPresenceVisible, myPresenceVisible, setMemberInterests, uploadResume, removeResume, resumeSignedUrl, resumeInfo, clearResumePath, searchPlaces, setHomeCity, setHomeLocation, listEvents, setEventRsvp, setCompanionDefault, myEventPrefs, eventCompanions, saveMemberEvent, cancelMemberEvent, deleteMemberEvent, uploadEventImage, removeEventImages, setEventInterest, setEventBrochure, uploadEventBrochure, removeEventBrochures, companionEvents, companionDeck, companionSwipe, myCompanionMatches, markCompanionMatchSeen, sendConnectRequest, setNearbyEnabled, myNearbySetting, nearbyPulse, nearbyClear, myNearbyAlerts, setNearbyMuted, nearbyDiscover, nearbyPass, nearbyConnect, myNearbyMatches, myNotifications, markNotificationsRead, dismissNotification, setNearbyRadius, savePushSubscription, deletePushSubscription, sendPendingPush, searchCompanies, searchCompanyDirectory, companyLogoUrl, addCompany, setMyWork, memberWork, uploadCompanyLogo, markMessagesDelivered, markConversationRead } from './supabase.js';
 import { locateOnce, fallbackCopy } from './geo-locate.js';
 import { areaChangeMessage, AREA_HELPER, AREA_NO_MATCH } from './area-change.js';
 import { areaShareBody, parseAreaBody, resumeShareAttachment, resumeMessageFields, RESUME_SHARE_BODY, NO_RESUME_HINT, RESUME_GONE_COPY, RESUME_SHARE_NOTE, AREA_SHARE_NOTE } from './quick-share.js';
@@ -39,6 +39,7 @@ import { isOffered, hasCatalog, catalogGroups, normalizeInterestLabel } from './
 import { MAX_INTERESTS } from './passion-budget.js';
 import { collabSummary, openCollabReview } from './collab-requests.js';
 import { createPresence, presenceDot } from './presence.js';
+import { receiptState, receiptMarkup, lastOwnMessageId, applyReceipt, needsReadReceipt, needsDeliveredReceipt, lastActiveLabel } from './receipts.js';
 import { createCrossingPaths, isQuietHour, alertHeadline, alertDetail, alertToast, pausedCopy } from './crossing-paths.js';
 import '../styles/crossing-paths.css';
 import { createNearbyPage } from './nearby-page.js';
@@ -138,6 +139,12 @@ let selectedChat = null;
 // Active status (D-110): the presence loop (presence.js), started with the message sync.
 let presence = null;
 const isActiveNow = (id) => Boolean(presence?.isActive(id));
+// Delivered and Read (D-150, 0042). receiptColumns is turned off when the server has no delivered_at / read_at yet
+// (before 0042), so the message selects fall back to their old column lists; receiptsMissing stops the mark calls.
+let receiptColumns = true;
+let receiptsMissing = false;
+const RECEIPT_COLUMNS = ',delivered_at,read_at';
+const isReceiptColumnError = (error) => /delivered_at|read_at/.test(error?.message || '') || error?.code === '42703';
 // Crossing paths (D-119, 0021): the loop (crossing-paths.js), its alerts (from my_nearby_alerts) and its status.
 let crossingPaths = null;
 let nearbyAlerts = [];
@@ -185,11 +192,37 @@ const saveChatReadState = () => {
 };
 const chatUnreadCount = (personId) => unreadCount(chatMessages[personId], lastReadAt(getChatReadState(), personId));
 const markChatRead = (personId) => {
+  sendReadReceipt(personId);
   const next = markRead(getChatReadState(), personId, chatMessages[personId]);
   if (next === chatReadState) return;
   chatReadState = next;
   saveChatReadState();
 };
+// D-150: tell the sender their messages were read, only while this conversation is on screen in a visible tab.
+const readReceiptInFlight = new Set();
+const chatOnScreen = (personId) => document.visibilityState === 'visible' && document.body.dataset.appView === 'chat'
+  && String(selectedChat?.id) === String(personId) && !document.querySelector('#chat-window')?.hidden;
+function sendReadReceipt(personId) {
+  const key = String(personId || '');
+  if (!key || receiptsMissing || !supabase || readReceiptInFlight.has(key) || !chatOnScreen(key)) return;
+  const thread = chatMessages[personId] || [];
+  if (!needsReadReceipt(thread)) return;
+  readReceiptInFlight.add(key);
+  markConversationRead(key).then(({ error }) => {
+    if (isMissingFunction(error)) { receiptsMissing = true; return; }
+    if (error) return;
+    const at = new Date().toISOString();
+    (chatMessages[personId] || []).forEach((m) => { if (m.from === 'them' && !m.readAt) { m.readAt = at; m.deliveredAt ||= at; } });
+  }).catch(() => {}).finally(() => readReceiptInFlight.delete(key));
+}
+let deliveredInFlight = false;
+const sendDeliveredReceipt = () => {
+  if (receiptsMissing || !supabase || deliveredInFlight) return;
+  deliveredInFlight = true;
+  markMessagesDelivered().then(({ error }) => { if (isMissingFunction(error)) receiptsMissing = true; })
+    .catch(() => {}).finally(() => { deliveredInFlight = false; });
+};
+document.addEventListener('visibilitychange', () => { if (selectedChat) sendReadReceipt(selectedChat.id); });
 const unreadMessageTotal = (conversations) => unreadTotal(conversations.map((p) => p.id), (id) => chatMessages[id], (id) => lastReadAt(getChatReadState(), id));
 // Desktop: the inbox rows scroll inside .chat-inbox-scroll; a wheel over the search box or the heading above them
 // scrolls the rows too (founder, 2026-10-28: the list only moved from its own scrollbar area).
@@ -2482,7 +2515,12 @@ const loadChatMessages = async (person) => {
   if (!supabase || !memberProfile.id || !person?.id) return;
   // Fetch the member's complete inbox first, then narrow it locally. This is
   // more reliable than the compound PostgREST OR/AND filter for older rows.
-  let { data, error } = await supabase.from('brivia_messages').select('id,sender_id,recipient_id,body,created_at,message_type,attachment_url,attachment_path,attachment_name,attachment_mime,attachment_size').or(`sender_id.eq.${memberProfile.id},recipient_id.eq.${memberProfile.id}`);
+  const fullColumns = 'id,sender_id,recipient_id,body,created_at,message_type,attachment_url,attachment_path,attachment_name,attachment_mime,attachment_size';
+  let { data, error } = await supabase.from('brivia_messages').select(fullColumns + (receiptColumns ? RECEIPT_COLUMNS : '')).or(`sender_id.eq.${memberProfile.id},recipient_id.eq.${memberProfile.id}`);
+  if (error && receiptColumns && isReceiptColumnError(error)) {
+    receiptColumns = false;
+    ({ data, error } = await supabase.from('brivia_messages').select(fullColumns).or(`sender_id.eq.${memberProfile.id},recipient_id.eq.${memberProfile.id}`));
+  }
   if (error) {
     ({ data, error } = await supabase.from('brivia_messages').select('id,sender_id,recipient_id,body,created_at').or(`sender_id.eq.${memberProfile.id},recipient_id.eq.${memberProfile.id}`));
   }
@@ -2499,6 +2537,8 @@ const loadChatMessages = async (person) => {
       from: String(message.sender_id) === memberId ? 'me' : 'them',
       text: message.body ?? message.text ?? message.message ?? message.content ?? '',
       attachment: attachmentFromRow(message),
+      deliveredAt: message.delivered_at || '',
+      readAt: message.read_at || '',
     }));
     const previousMessages = chatMessages[person.id] || [];
     const messagesById = new Map(previousMessages.map((message) => [String(message.id), message]));
@@ -2510,12 +2550,15 @@ const loadChatMessages = async (person) => {
         text: message.text || previous?.text || '',
         createdAt: message.createdAt || previous?.createdAt || '',
         attachment: message.attachment || previous?.attachment || null,
+        deliveredAt: message.deliveredAt || previous?.deliveredAt || '',
+        readAt: message.readAt || previous?.readAt || '',
       });
     });
     const mergedMessages = [...messagesById.values()].sort((a, b) => new Date(a.createdAt || 0).getTime() - new Date(b.createdAt || 0).getTime());
     const messagesChanged = previousMessages.length !== mergedMessages.length || mergedMessages.some((message, index) => {
       const previous = previousMessages[index];
-      return !previous || previous.id !== message.id || previous.text !== message.text || previous.createdAt !== message.createdAt || previous.attachment?.url !== message.attachment?.url || previous.attachment?.path !== message.attachment?.path;
+      return !previous || previous.id !== message.id || previous.text !== message.text || previous.createdAt !== message.createdAt || previous.attachment?.url !== message.attachment?.url || previous.attachment?.path !== message.attachment?.path
+        || (previous.deliveredAt || '') !== message.deliveredAt || (previous.readAt || '') !== message.readAt;
     });
     chatMessages[person.id] = mergedMessages;
     if (selectedChat?.id === person.id) markChatRead(person.id);
@@ -2546,11 +2589,24 @@ const appendRemoteMessage = (message) => {
     from: senderId === memberId ? 'me' : 'them',
     text: message.body ?? message.text ?? message.message ?? message.content ?? '',
     attachment: attachmentFromRow(message),
+    deliveredAt: message.delivered_at || '',
+    readAt: message.read_at || '',
   });
+  if (isIncoming) sendDeliveredReceipt();
   messages.sort((a, b) => new Date(a.createdAt || 0).getTime() - new Date(b.createdAt || 0).getTime());
   if (selectedChat?.id === otherId) markChatRead(otherId);
   renderChats();
   if (selectedChat?.id === otherId) renderMessages();
+};
+
+const applyRemoteReceipt = (row) => {
+  if (!row?.id || String(row.sender_id) !== String(memberProfile.id)) return;
+  const otherId = Object.keys(chatMessages).find((id) => String(id) === String(row.recipient_id));
+  if (!otherId) return;
+  const next = applyReceipt(chatMessages[otherId], row);
+  if (next === chatMessages[otherId]) return;
+  chatMessages[otherId] = next;
+  if (String(selectedChat?.id) === String(otherId)) renderMessages();
 };
 
 const subscribeToMessages = () => {
@@ -2558,6 +2614,8 @@ const subscribeToMessages = () => {
   supabase
     .channel(`brivia-messages-${memberProfile.id}`)
     .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'brivia_messages' }, ({ new: message }) => appendRemoteMessage(message))
+    // D-150: the other member's app marked my message delivered or read.
+    .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'brivia_messages', filter: `sender_id=eq.${memberProfile.id}` }, ({ new: row }) => applyRemoteReceipt(row))
     .subscribe((status) => { if (status === 'CHANNEL_ERROR') console.warn('Realtime messages channel could not connect.'); });
 };
 
@@ -2569,7 +2627,7 @@ const startPresence = () => {
     touch: touchPresence,
     fetch: connectionPresence,
     ids: () => remoteConnectionIds.map(String),
-    onChange: () => renderChats(),
+    onChange: () => { renderChats(); paintChatStatus(); },
   });
   presence.start().catch((error) => console.warn('Active status could not start:', error.message));
 };
@@ -2622,7 +2680,7 @@ const startCrossingPaths = async () => {
 const startMessageSync = () => {
   if (messageSyncTimer) window.clearInterval(messageSyncTimer);
   const sync = () => {
-    if (selectedChat) loadChatMessages(selectedChat);
+    if (selectedChat) { loadChatMessages(selectedChat); paintChatStatus(); }
     syncIncomingNotificationsFromServer().catch((error) => console.warn('Notification sync could not complete:', error.message));
     // Every ~30 s: pick up new requests, and matches completed by the other member accepting.
     if (++connectionSyncTick % 6 === 1) {
@@ -2636,10 +2694,29 @@ const startMessageSync = () => {
 
 const syncIncomingNotificationsFromServer = async () => {
   if (!supabase || !memberProfile.id) return;
-  const { data, error } = await supabase.from('brivia_messages').select('id,sender_id,recipient_id,body,created_at,attachment_url,attachment_path').eq('recipient_id', memberProfile.id).order('created_at', { ascending: false }).limit(80);
-  if (!error) await syncIncomingNotifications(data || []);
+  const columns = 'id,sender_id,recipient_id,body,created_at,attachment_url,attachment_path';
+  const query = (cols) => supabase.from('brivia_messages').select(cols).eq('recipient_id', memberProfile.id).order('created_at', { ascending: false }).limit(80);
+  let { data, error } = await query(columns + (receiptColumns ? RECEIPT_COLUMNS : ''));
+  if (error && receiptColumns && isReceiptColumnError(error)) { receiptColumns = false; ({ data, error } = await query(columns)); }
+  if (error) return;
+  // D-150: anything that reached this app and is not marked delivered yet is now.
+  if (receiptColumns && needsDeliveredReceipt(data, memberProfile.id)) sendDeliveredReceipt();
+  await syncIncomingNotifications(data || []);
 };
 
+// D-150: the chat header says when the other member was last here ("Active now", "Active 5 min ago"), from the
+// presence loop (connections only, both switches on). Without it, the companion context or the old line.
+let chatStatusContext = '';
+function paintChatStatus() {
+  const chatStatus = document.querySelector('#chat-status');
+  if (!chatStatus || !selectedChat) return;
+  const active = isActiveNow(selectedChat.id);
+  const activity = lastActiveLabel(active, presence?.lastSeen(selectedChat.id) || '');
+  const text = [activity, chatStatusContext].filter(Boolean).join(' · ') || 'MEMBER / PRIVATE THREAD';
+  if (chatStatus.textContent !== text) chatStatus.textContent = text;
+  chatStatus.classList.toggle('is-active-now', activity === 'Active now');
+  chatStatus.classList.toggle('has-last-active', Boolean(activity));
+}
 const openChat = (person, markAsRead = true) => {
   if (!person) return;
   markNotificationsReadForPerson(person.id);
@@ -2676,7 +2753,8 @@ const openChat = (person, markAsRead = true) => {
   const chatRole = document.querySelector('#chat-role'); if (chatRole) chatRole.textContent = `${person.role || 'Brivia member'}${person.city ? `, ${person.city}` : ''}`;
   // D-123: a pair who met through Find a Companion sees the event that brought them together.
   const companionContext = companionMatches.find((match) => match.otherId === String(person.id));
-  const chatStatus = document.querySelector('#chat-status'); if (chatStatus) chatStatus.textContent = companionContext ? chatContextLine(companionContext) : 'MEMBER / PRIVATE THREAD';
+  chatStatusContext = companionContext ? chatContextLine(companionContext) : '';
+  paintChatStatus();
   renderChats();
   if (!chatMessages[person.id]) chatMessages[person.id] = [];
   chatShouldOpenAtLatest = true;
@@ -2794,8 +2872,11 @@ const renderMessages = () => {
         : sharedPostId ? renderSharedPost(sharedPostId)
           : `${renderAttachment(message.attachment)}${message.text ? `<span class="message-copy">${escapeHtml(message.text)}</span>` : ''}`;
     const kind = isResume || area || sharedPostId ? ' has-attachment has-share' : message.attachment ? ' has-attachment' : '';
-    return `<div class="message ${message.from === 'me' ? 'me' : 'them'}${kind}">${content}<small>${escapeHtml(formatChatTime(message.createdAt))}</small></div>`;
+    const receipt = receiptState(message);
+    const word = receipt && receipt !== 'sent' && String(message.id) === newestOwnId ? `<span class="message-receipt-word">${receipt === 'read' ? 'Read' : 'Delivered'}</span>` : '';
+    return `<div class="message ${message.from === 'me' ? 'me' : 'them'}${kind}">${content}<small${receipt ? ' class="message-meta"' : ''}>${escapeHtml(formatChatTime(message.createdAt))}${word}${receiptMarkup(receipt)}</small></div>`;
   };
+  const newestOwnId = lastOwnMessageId(thread);
   messages.innerHTML = thread.length ? thread.map(renderBubble).join('') : '<div class="chat-start-note"><strong>Start with context.</strong><span>A thoughtful first message makes a better introduction.</span></div>';
   const isBlocked = readBlockedUserIds().has(String(selectedChat.id));
   if (isBlocked) {

@@ -27,6 +27,7 @@
   --color-chat-paper: #f8eee6;
   --color-chat-head: #f7f0e5;
   --color-presence: #2f9e68;   /* D-110: the "active now" dot; 3.25:1 on cream (WCAG 1.4.11 needs 3:1) */
+  --color-receipt-read: #ffb07a;  /* D-150: the "Read" ticks, warm amber-peach on the wine bubble (7.9:1 on --color-chat-wine) */
 
   --space-1: 4px;
   --space-2: 8px;

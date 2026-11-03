@@ -2,6 +2,7 @@
 // minute while the tab is visible and on focus (the server writes it at most every 30 s); the same beat asks which of
 // the member's connections are active (connection_presence answers true or false, never a time). Before 0018 the
 // functions are missing: the loop stops quietly and nobody shows as active. A network error keeps the last state.
+// D-150 (0042): fetch may also answer last_seen_at (connection_last_seen, to the minute); lastSeen(id) reads it.
 const MISSING = new Set(['PGRST202', '42883']);
 const isMissing = (error) => Boolean(error) && (MISSING.has(error.code) || error.status === 404);
 
@@ -13,12 +14,15 @@ export const createPresence = ({
   setIntervalFn = (fn, ms) => globalThis.setInterval(fn, ms), clearIntervalFn = (id) => globalThis.clearInterval(id),
 } = {}) => {
   let active = new Set();
+  let seen = new Map();
   let timer = null;
   let stopped = false;
   const visible = () => !doc || doc.visibilityState === 'visible';
-  const update = (next) => {
-    const same = next.size === active.size && [...next].every((id) => active.has(id));
+  const update = (next, nextSeen = new Map()) => {
+    const same = next.size === active.size && [...next].every((id) => active.has(id))
+      && nextSeen.size === seen.size && [...nextSeen].every(([id, at]) => seen.get(id) === at);
     active = next;
+    seen = nextSeen;
     if (!same) onChange(new Set(active));
   };
   const stop = () => {
@@ -35,7 +39,8 @@ export const createPresence = ({
     const { data, error } = await fetch(list);
     if (isMissing(error)) { giveUp(); return; }
     if (error || !Array.isArray(data)) return;
-    update(new Set(data.filter((row) => row?.active).map((row) => String(row.member_id))));
+    update(new Set(data.filter((row) => row?.active).map((row) => String(row.member_id))),
+      new Map(data.filter((row) => row?.last_seen_at).map((row) => [String(row.member_id), String(row.last_seen_at)])));
   };
   async function beat() {
     if (stopped || !visible()) return;
@@ -51,5 +56,5 @@ export const createPresence = ({
     timer = setIntervalFn(beat, intervalMs);
     await beat();
   };
-  return { start, stop, refresh, isActive: (id) => active.has(String(id)) };
+  return { start, stop, refresh, isActive: (id) => active.has(String(id)), lastSeen: (id) => seen.get(String(id)) || '' };
 };

@@ -1,5 +1,6 @@
 // Active status in chat (D-110, migration 0018): a connection seen in the last few minutes gets one green dot on their
-// avatar in the chat list, nothing else (the open chat's head is unchanged); others get nothing. Settings has
+// avatar in the chat list; others get nothing. D-150 (0042): the open chat's head says "Active now" (or "Active 5 min
+// ago") from connection_last_seen, which the app now asks instead of connection_presence. Settings has
 // "Show when I'm active"; turning it off saves set_presence_visible(false) and the dots go. Before 0018 nothing shows,
 // nothing breaks and the switch is hidden.
 // PLAYWRIGHT_MODULE=/tmp/pw/node_modules/playwright/index.mjs node tests/e2e/presence.spec.mjs   (Vite on :5185)
@@ -35,7 +36,7 @@ try {
     check(`${w}: only the active connection has a dot, named for screen readers (${JSON.stringify(list)})`,
       list.find((r) => r.id === ASHA)?.dot === true && list.find((r) => r.id === ASHA)?.sr === ', active now' && list.find((r) => r.id === BILAL)?.dot === false);
     check(`${w}: the app touched its own presence on load`, st.touches >= 1);
-    const asked = JSON.parse(posted('connection_presence').at(-1)?.body || '{}').p_ids || [];
+    const asked = JSON.parse(posted('connection_last_seen').at(-1)?.body || '{}').p_ids || [];
     check(`${w}: it asks about connections only (${JSON.stringify(asked)})`, asked.length === 2 && asked.includes(ASHA) && asked.includes(BILAL));
     await shot(page, `list-${w}.png`);
     // The chat list's older axe findings (a button inside the row button, the inbox tabs) predate D-110; the dot is
@@ -48,7 +49,7 @@ try {
     await page.waitForSelector('#chat-window:not([hidden]) #chat-name');
     await page.waitForTimeout(200);
     const head = await page.evaluate(() => ({ dots: document.querySelectorAll('#chat-window .presence-dot, #chat-presence').length, after: getComputedStyle(document.querySelector('#chat-avatar'), '::after').content, status: document.querySelector('#chat-status')?.textContent, total: document.querySelectorAll('.presence-dot').length }));
-    check(`${w}: one dot in all, on the list avatar; the open chat's head is unchanged (${JSON.stringify(head)})`, head.dots === 0 && ['none', 'normal'].includes(head.after) && head.status === 'MEMBER / PRIVATE THREAD' && head.total === 1);
+    check(`${w}: one dot in all, on the list avatar; the open chat's head says Active now (${JSON.stringify(head)})`, head.dots === 0 && ['none', 'normal'].includes(head.after) && head.status === 'Active now' && head.total === 1);
     await shot(page, `chat-${w}.png`);
     await ctx.close();
   }

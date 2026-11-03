@@ -109,9 +109,10 @@ begin
   if pg_temp.bodies(b, a) <> 'b-after,b-before' then
     perform pg_temp.as_owner(); raise exception 'FAIL S2: B sees own rows "%"', pg_temp.bodies(b, a); end if;
   perform pg_temp.as_owner();
+  -- 0042 added delivered_at and read_at; both stay null on a withheld message (w-read-receipts R2/R3), so they reveal no block.
   select string_agg(column_name, ',' order by ordinal_position) into cols
     from information_schema.columns where table_schema = 'public' and table_name = 'brivia_messages';
-  if cols <> 'id,sender_id,recipient_id,body,message_type,attachment_url,attachment_path,attachment_name,attachment_mime,attachment_size,created_at' then
+  if cols <> 'id,sender_id,recipient_id,body,message_type,attachment_url,attachment_path,attachment_name,attachment_mime,attachment_size,created_at,delivered_at,read_at' then
     raise exception 'FAIL S2: brivia_messages columns changed: %', cols; end if;
 end $$;
 
