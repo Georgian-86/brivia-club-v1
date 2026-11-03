@@ -1,5 +1,5 @@
 -- 0029 (D-131): Nearby, discover members around you. Ids 0e290000-0000-4000-8000-0000000000NN:
--- 01 A (the viewer), 02 B (same spot), 03 C (~2 km), 04 D (~3.9 km), 05 E (~9 km), 06 F (switch off), 07 G (blocked by A),
+-- 01 A (the viewer), 02 B (same spot), 03 C (~2 km), 04 D (~3.9 km), 05 E (~12 km), 06 F (switch off), 07 G (blocked by A),
 -- 08 H (never turned it on).
 -- D1 discovery needs the caller's switch on ('nearby off'), a live location ('location needed') and a valid radius.
 -- D2 radius: 1 km -> B; 3 km -> B, C; 5 km -> B, C, D. E (9 km), F (off), G (blocked) and H (never on) never appear.
@@ -8,7 +8,7 @@
 -- D4 a pass hides C from A for 7 days (C still sees A; nobody is told).
 -- D5 connect: A -> B is 'sent' and marked via 'nearby'; B sees A with asked_me; A no longer sees B. B -> A matches
 --    at once; each note reaches chat exactly once; both see the match in my_nearby_matches; neither sees the other.
--- D6 a request to someone not discoverable (E, 9 km) is sent but not marked 'nearby'.
+-- D6 a request to someone not discoverable (E, ~12 km) is sent but not marked 'nearby'.
 -- D7 switching off removes the member at once (D disappears for A).
 -- D8 privileges: anon runs nothing; the new table and the helpers are not reachable by clients.
 -- D9 consent: a member who turned it on before 0029 (alerts only, discoverable_at null) neither appears nor discovers
@@ -69,12 +69,12 @@ begin
 end $$;
 
 -- Everyone but H turns it on and sends one fix (A and B the same spot; C +0.02 deg lat ~2.2 km; D +0.035 ~3.9 km;
--- E +0.08 ~8.9 km; F and G at A's spot). F then turns it off.
+-- E +0.11 ~12.2 km (beyond 10 km, 0030); F and G at A's spot). F then turns it off.
 do $$
 declare g int; lat float8;
 begin
   for g in 1..7 loop
-    lat := 12.9716 + case g when 3 then 0.02 when 4 then 0.035 when 5 then 0.08 else 0 end;
+    lat := 12.9716 + case g when 3 then 0.02 when 4 then 0.035 when 5 then 0.11 else 0 end;
     perform pg_temp.as_member(pg_temp.nd(g));
     set local role authenticated;
     perform public.set_nearby_enabled(true);

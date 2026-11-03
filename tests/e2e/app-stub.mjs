@@ -220,6 +220,24 @@ export const startAppStub = async ({ port, state = {}, deckRows = defaultDeckRow
         if (fn === 'my_nearby_alerts') return json(200, nb.enabled ? (nb.alerts || []).filter((a) => !(nb.muted || []).includes(a.other_id)) : []);
         if (fn === 'set_nearby_muted') { (nb.muted ||= []).push(args.p_other); return route.fulfill({ status: 204, body: '', headers: { 'access-control-allow-origin': '*' } }); }
       }
+      // D-134 (0030): st.notifications (my_notifications rows, the server's one store); read and dismiss change them in
+      // place, so two pages on the same stub see the same state (phone and laptop). st.radiusSaved, st.pushSubs,
+      // st.pushCalls (the push-notify Edge Function).
+      if (pathName === '/rest/v1/rpc/my_notifications') return st.notifications ? json(200, st.notifications) : json(404, { code: 'PGRST202', message: 'Could not find the function' });
+      if (pathName === '/rest/v1/rpc/mark_notifications_read') {
+        let n = 0;
+        (st.notifications || []).forEach((row) => { if ((args.p_ids || []).includes(row.id) && !row.read_at) { row.read_at = new Date().toISOString(); n += 1; } });
+        (st.markedRead ||= []).push(...(args.p_ids || []));
+        return json(200, n);
+      }
+      if (pathName === '/rest/v1/rpc/dismiss_notification') {
+        (st.notifications || []).forEach((row) => { if (row.id === args.p_id) { row.dismissed_at = new Date().toISOString(); row.read_at ||= row.dismissed_at; } });
+        return json(200, true);
+      }
+      if (pathName === '/rest/v1/rpc/set_nearby_radius') { st.radiusSaved = args.p_km; return json(200, args.p_km); }
+      if (pathName === '/rest/v1/rpc/save_push_subscription') { (st.pushSubs ||= []).push(args); return json(200, true); }
+      if (pathName === '/rest/v1/rpc/delete_push_subscription') { st.pushSubs = (st.pushSubs || []).filter((x) => x.p_endpoint !== args.p_endpoint); return json(200, true); }
+      if (pathName === '/functions/v1/push-notify') { st.pushCalls = (st.pushCalls || 0) + 1; return json(200, { sent: 0 }); }
       // D-131 Nearby (0029): st.nearbyPeople (nearby_discover rows, each with distance_band '1' | '3' | '5'); null answers
       // PGRST202 as before 0029. st.nearbyLikedMe: ids whose connect back makes a match. st.nearbyConsent === false: an
       // alerts-only switch from before 0029. Discovery needs the switch on and a pulse first ('location needed').

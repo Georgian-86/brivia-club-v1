@@ -2729,3 +2729,37 @@ controls (a tester or a seeded test member), never a real member, so no new expo
   `denied` still shows people; blocked on an iPhone shows the iPhone steps, then allowing and Try again shows people;
   timeout and unavailable each show their state and recover), crossing-paths 33/33; SQL harness ALL PASSED. Not run on
   physical iPhone / Android devices here (Chromium emulation with iPhone and Android user agents).
+
+## D-134 (2026-11-03): Nearby notifications, one store across devices, web push, compact cards, 10 km
+
+- **Ask (founder):** no repeated location screens once allowed; people appear automatically; an elegant in-section
+  notification when someone comes within your radius (photo, name, distance, View profile, soft fade, a premium chime);
+  optional web notifications across devices with read state synced (read on the phone = read on the laptop, no
+  duplicates); a mute; more compact cards; "[ 1 km ▼ ] [ Refresh ↻ ]"; radii up to 10 km.
+- **Location:** the founder's first screenshot ("Brivia needs your location") was the build before D-133; the second
+  shows D-133 working on desktop Safari. Opening Nearby asks the browser itself; the permission screen shows only when
+  the browser really would prompt and nothing has been allowed in this page. Crossing Paths stays a server setting, so
+  it persists across sessions and devices.
+- **One store (0030):** `member_notification` (unique id, user, source member, type, band, created / read / dismissed /
+  push-sent, a per-day dedupe key). Members select only their own rows (RLS), write none; reads go through
+  `mark_notifications_read` / `dismiss_notification`. The table is in `supabase_realtime`, so every open device gets
+  inserts and read-state updates and closes the matching system notification. localStorage is not the source.
+- **Who is told:** `nearby_pulse` calls `brivia_notify_nearby`: each member who comes within the other's chosen radius
+  (`nearby_setting.radius_km`, set by the picker) is announced to them, both ways, once per pair per day, at most 10 a
+  day, only between members who may discover each other (the 0029 pool: both on and consented, live, visible, not
+  connected, not asked, not passed).
+- **Web push:** optional per device in Settings (independent of location). The service worker (`/sw.js`) shows one
+  system notification per notification id (the tag), or hands it to the page when Brivia is in front. Sending is the
+  `push-notify` Edge Function, called by the app after its pulse; it claims each notification once (`push_sent_at` in
+  the same UPDATE) and never one already read. VAPID private key only in the function's secrets. iPhone / iPad: web push
+  needs Brivia added to the Home Screen (iOS 16.4+); Settings says so in a Safari tab. Without pg_net the database
+  cannot call the function itself, so a member whose app is closed is pushed when the *other* member's app pulses.
+- **Sound:** an original two-note Web Audio chime (A5 then E6, soft decay, ~0.9 s), only after an interaction, once
+  per notification id, mute per device in Settings. System notifications use the device's own sound.
+- **Cards:** the same design about 15% smaller (360 px, 16:8 cover, 80 px photo, tighter type and chips); no overflow
+  at 390 px. Header: "Refresh" labelled. Radii 1 / 3 / 5 / 10 km (band "5–10 km away").
+- **Proof:** SQL harness ALL PASSED (new `q-notifications.test.sql` N1-N8; D6 moved beyond 10 km; hygiene H3); unit 457
+  (new `member-notifications.test.mjs`: announce once, never pre-existing or stale ones, read elsewhere closes the
+  system notification, unique mark-read, chime rules, push support); e2e nearby 66/66 (laptop and phone on one server:
+  the notice, read on the laptop is read on the phone, never twice, dismiss, 10 km saved, compact card, no overflow,
+  Settings), plus crossing-paths, collab-requests, companions, deck, app-shell.

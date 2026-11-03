@@ -6,7 +6,7 @@ const escapeHtml = (value = '') => String(value).replace(/[&<>'"]/g, (c) => ({ '
 const initials = (name) => String(name || 'M').trim().split(/\s+/).map((w) => w[0] || '').join('').slice(0, 2).toUpperCase() || 'M';
 const list = (value, max) => (Array.isArray(value) ? value : []).map((x) => String(x || '').trim()).filter(Boolean).slice(0, max);
 
-export const RADII = Object.freeze([1, 3, 5]);
+export const RADII = Object.freeze([1, 3, 5, 10]);
 export const DEFAULT_RADIUS = 1;
 export const normalizeRadius = (value) => (RADII.includes(Number(value)) ? Number(value) : DEFAULT_RADIUS);
 
@@ -29,7 +29,7 @@ export const COPY = Object.freeze({
 // 'People within 1 km of you'
 export const radiusLine = (km) => `People within ${normalizeRadius(km)} km of you`;
 // The card's distance: a band, never a number of metres.
-export const bandLabel = (band) => ({ 1: 'Under 1 km away', 3: '1–3 km away', 5: '3–5 km away' }[String(band || '')] || 'Nearby');
+export const bandLabel = (band) => ({ 1: 'Under 1 km away', 3: '1–3 km away', 5: '3–5 km away', 10: '5–10 km away' }[String(band || '')] || 'Nearby');
 
 // Why the deck is empty or blocked, from the location loop status and the last discover error.
 // status: crossing-paths.js status ('on', 'off', 'paused-denied', 'paused-prompt', 'paused-unavailable',
@@ -117,4 +117,15 @@ export const nearbyOpeners = ({ name, shared = [] } = {}) => {
   return [NEARBY_OPENER,
     interest ? `Hi ${who}! Looks like we're both nearby and both love ${interest}. Coffee sometime?` : `Hi ${who}! We're close by. Would love to hear what you're working on.`,
   ];
+};
+
+// D-134: the in-section notice when someone comes within your radius. n: member-notifications.js shape.
+export const nearbyNoticeMarkup = (n, { photoSrc = '' } = {}) => {
+  const name = escapeHtml(n.name || 'A Brivia member');
+  const where = n.band ? ` · ${escapeHtml(bandLabel(n.band))}` : '';
+  return `<div class="nearby-notice" role="status" data-notice-id="${escapeHtml(n.id)}">
+  <span class="nearby-notice-face">${photoSrc ? `<img src="${escapeHtml(photoSrc)}" alt="" />` : `<span aria-hidden="true">${escapeHtml(initials(n.name))}</span>`}</span>
+  <span class="nearby-notice-copy"><strong>Someone crossed your path.</strong><span>A new connection is nearby. Discover who's around you.</span><em>${name}${where}</em></span>
+  <span class="nearby-notice-actions"><button type="button" class="nearby-notice-view" data-notice-view="${escapeHtml(n.sourceId)}">View profile</button><button type="button" class="nearby-notice-close" data-notice-dismiss="${escapeHtml(n.id)}" aria-label="Dismiss"><span aria-hidden="true">×</span></button></span>
+</div>`;
 };

@@ -398,6 +398,18 @@ export const nearbyDiscover = (radiusKm = 1, limit = 20) => rpcCall('nearby_disc
 export const nearbyPass = (otherId) => rpcCall('nearby_pass', { p_other: otherId });
 export const nearbyConnect = (to, note) => rpcCall('nearby_connect', { p_to: to, p_note: note || null });
 export const myNearbyMatches = () => rpcCall('my_nearby_matches');
+// D-134 (0030): one notification store for every device, the radius notifications use, and web push subscriptions.
+export const myNotifications = () => rpcCall('my_notifications');
+export const markNotificationsRead = (ids) => rpcCall('mark_notifications_read', { p_ids: ids });
+export const dismissNotification = (id) => rpcCall('dismiss_notification', { p_id: id });
+export const setNearbyRadius = (km) => rpcCall('set_nearby_radius', { p_km: km });
+export const savePushSubscription = (endpoint, p256dh, auth) => rpcCall('save_push_subscription', { p_endpoint: endpoint, p_p256dh: p256dh, p_auth: auth });
+export const deletePushSubscription = (endpoint) => rpcCall('delete_push_subscription', { p_endpoint: endpoint });
+// After a location pulse: the push-notify Edge Function sends web push for the notifications it just created.
+export const sendPendingPush = async () => {
+  if (!supabase?.functions) return { error: null };
+  try { return await supabase.functions.invoke('push-notify', { body: {} }); } catch (error) { return { error }; }
+};
 export const isMissingFunction = (error) => ['PGRST202', '42883'].includes(error?.code) || error?.status === 404;
 
 // City list for "Pick my city": name or region match, launch cities first. Wildcards in the query are dropped.

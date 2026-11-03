@@ -935,6 +935,10 @@ same switch, same pulse, same caps.
 - **Anti-probing.** Position changes only through `nearby_pulse` (one every 4 minutes, 24 cell changes a day); a cell
   of ~1 km and three bands bound what repeated reads can reveal to about a cell. `nearby_discover` reads only.
 
+- **Notifications (D-134, 0030).** A pulse announces "nearby_appeared" both ways for pairs within each member's chosen
+  radius (`nearby_setting.radius_km`, 1/3/5/10), once per pair per day, at most 10 a day, only inside the same pool.
+  A notification carries a member id and a band, never a cell, coordinate or place. Radius 10 km adds band `'10'`.
+
 #### 9.1.5 What leaves the service
 
 - **`toCard` is the only serializer** (`orbit/README.md`). Route handlers return `Card[]` only; a `Scored` object,

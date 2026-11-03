@@ -1037,3 +1037,24 @@ select has_function_privilege('authenticated', 'public.nearby_discover(int,int)'
        has_table_privilege('authenticated', 'public.nearby_passed', 'select'),                   -- f
        (select count(*) from public.nearby_setting where discoverable_at is not null);           -- 0 (nobody consented yet)
 ```
+
+## 0030
+
+**Nearby notifications, one store across devices, web push subscriptions, 10 km (founder request 2026-11-03, D-134).**
+Apply after `0029`. Then deploy the Edge Function `push-notify` (`supabase/functions/push-notify/index.ts`) with the
+secrets `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT` (the public key is also in `site/scripts/web-push.js`;
+a new key pair means updating both and every device re-enabling notifications). The client can deploy before 0030:
+without it the store answers "function not found" and nothing is shown.
+
+What it does: `member_notification` (RLS: own rows only, select; in `supabase_realtime`), `push_subscription` (no client
+access), `nearby_setting.radius_km`, the RPCs `my_notifications`, `mark_notifications_read`, `dismiss_notification`,
+`set_nearby_radius`, `save_push_subscription`, `delete_push_subscription`; `brivia_notify_nearby` (internal) called by
+the redefined `nearby_pulse`; radius 10 in `brivia_near_band`, `nearby_discover`, `nearby_connect`; purge after 30 days.
+
+Verify after the apply:
+
+```sql
+select (select count(*) from pg_publication_tables where pubname = 'supabase_realtime' and tablename = 'member_notification'), -- 1
+       has_table_privilege('authenticated', 'public.push_subscription', 'select'),                                         -- f
+       has_function_privilege('authenticated', 'public.brivia_notify_nearby(uuid)', 'execute');                             -- f
+```

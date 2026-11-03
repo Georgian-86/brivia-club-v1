@@ -32,7 +32,7 @@ const browser = await chromium.launch();
 const errors = [];
 const shot = async (page, name) => { if (!SHOTS) return; mkdirSync(SHOTS, { recursive: true }); await page.screenshot({ path: path.join(SHOTS, name) }); };
 const reset = (extra = {}) => {
-  Object.assign(st, { matchIds: [], nearby: { enabled: false }, nearbyPeople: PEOPLE(), nearbyLikedMe: [id(3)], nearbyPassed: [], nearbyConnects: [], nearbyMatches: [], nearbyConsent: true, nearbyDiscovers: [], requests: [] }, extra);
+  Object.assign(st, { matchIds: [], nearby: { enabled: false }, nearbyPeople: PEOPLE(), nearbyLikedMe: [id(3)], nearbyPassed: [], nearbyConnects: [], nearbyMatches: [], nearbyConsent: true, nearbyDiscovers: [], requests: [], notifications: null, markedRead: [], pushCalls: 0, radiusSaved: null }, extra);
   st.calls.length = 0;
 };
 const newContext = async (viewport, options = {}, { allow = true } = {}) => {
@@ -61,7 +61,7 @@ try {
       lead: document.querySelector('.nearby-lead')?.textContent, radius: [...document.querySelectorAll('#nearby-radius option')].map((o) => o.textContent),
     }));
     check(`${w}: Nearby opens under Connect (${JSON.stringify(head)})`, head.url.includes('view=nearby') && head.nav === 'explore' && head.h1 === 'People around you.'
-      && head.sub === 'Discover interesting people crossing paths with you.' && head.lead === 'Good people might be closer than you think.' && head.radius.join() === '1 km,3 km,5 km');
+      && head.sub === 'Discover interesting people crossing paths with you.' && head.lead === 'Good people might be closer than you think.' && head.radius.join() === '1 km,3 km,5 km,10 km');
 
     // Off -> Turn on -> explainer -> cards.
     await page.waitForSelector('[data-nearby-turn-on]');
@@ -171,6 +171,73 @@ try {
     check('a pre-0029 switch asks for discovery consent ("Nearby is new")', await page.locator('[data-nearby-turn-on]').count() === 1);
     await shot(page, 'nearby-consent-390.png');
     await ctx.close();
+  }
+
+  // D-134: "Someone crossed your path." The same stub is the one server for a laptop and a phone.
+  {
+    reset({ nearby: { enabled: true }, nearbyPeople: PEOPLE(), notifications: [] });
+    const note = (n, extra = {}) => ({ id: `n-${n}`, notification_type: 'nearby_appeared', source_user_id: id(n === 1 ? 2 : 1), name: n === 1 ? 'Kabir' : 'Yashika', photo_url: PHOTO(id(2)), band: '1', created_at: new Date().toISOString(), read_at: null, dismissed_at: null, ...extra });
+    const laptop = await newContext({ width: 1440, height: 1000 });
+    const phone = await newContext({ width: 390, height: 844 }, { isMobile: true, hasTouch: true });
+    const lp = await stub.open(laptop, { path: '/app.html?view=nearby', errors });
+    const pp = await stub.open(phone, { path: '/app.html?view=nearby', errors });
+    await lp.waitForSelector('.nearby-card.is-current');
+    await pp.waitForSelector('.nearby-card.is-current');
+    const sizes = await lp.evaluate(() => ({ w: Math.round(document.querySelector('.nearby-card.is-current').getBoundingClientRect().width), refresh: document.querySelector('#nearby-refresh')?.innerText.trim(), radii: [...document.querySelectorAll('#nearby-radius option')].map((o) => o.value).join() }));
+    check(`compact card on desktop (≤ 362 px), "Refresh" labelled, radii 1/3/5/10 (${JSON.stringify(sizes)})`, sizes.w <= 362 && sizes.refresh === 'Refresh' && sizes.radii === '1,3,5,10');
+    const phoneFit = await pp.evaluate(() => ({ overflow: document.documentElement.scrollWidth - innerWidth, w: Math.round(document.querySelector('.nearby-card.is-current').getBoundingClientRect().width) }));
+    check(`the card fits the phone, no horizontal overflow (${JSON.stringify(phoneFit)})`, phoneFit.overflow <= 0 && phoneFit.w <= 362);
+    await lp.locator('#nearby-radius').selectOption('10');
+    await lp.waitForFunction(() => document.querySelector('#nearby-radius-line')?.textContent === 'People within 10 km of you');
+    check('10 km is saved for notifications (set_nearby_radius)', st.radiusSaved === 10);
+
+    // A new nearby person: the in-section notice on the laptop, once, and the push function is called after the pulse.
+    st.notifications.push(note(1));
+    const pushBefore = st.pushCalls || 0;
+    await lp.locator('#nearby-refresh').click();
+    await lp.waitForSelector('.nearby-notice', { timeout: 8000 }).catch(() => {});
+    const notice = await lp.evaluate(() => document.querySelector('.nearby-notice')?.innerText || '');
+    check(`the notice: "Someone crossed your path." with the name, distance and View profile (${JSON.stringify(notice)})`,
+      /Someone crossed your path\./.test(notice) && /A new connection is nearby\. Discover who's around you\./.test(notice) && /Kabir · Under 1 km away/.test(notice) && /View profile/i.test(notice));
+    check('the push function runs after the pulse', (st.pushCalls || 0) > pushBefore);
+    await lp.waitForTimeout(400);
+    await shot(lp, 'nearby-notice-1440.png');
+    await lp.waitForTimeout(3300);
+    check('seen for 3 s on the laptop: read on the server', (st.notifications.find((x) => x.id === 'n-1') || {}).read_at && st.markedRead.includes('n-1'));
+
+    // The phone: the same notification is already read; no notice, not counted as unread.
+    await pp.locator('#nearby-refresh').click();
+    await pp.waitForTimeout(1500);
+    const phoneState = await pp.evaluate(() => ({ notice: Boolean(document.querySelector('.nearby-notice')), badge: document.querySelector('#notification-badge')?.hidden ? 0 : Number(document.querySelector('#notification-badge')?.textContent || 0), unreadRow: Boolean(document.querySelector('#notification-list .notification-companion.is-unread [data-crossed-view]')) }));
+    check(`read on the laptop, so the phone shows it as read: no notice, not unread (${JSON.stringify(phoneState)})`, !phoneState.notice && !phoneState.unreadRow);
+
+    // Never twice: another refresh on the laptop brings no second notice for n-1.
+    await lp.evaluate(() => { const s = document.querySelector('#nearby-notice'); s.innerHTML = ''; s.hidden = true; });
+    await lp.waitForTimeout(4000);   // past the pulse loop's own timing
+    await lp.locator('#nearby-refresh').click();
+    await lp.waitForTimeout(1200);
+    check('the same notification is never shown twice', !(await lp.evaluate(() => Boolean(document.querySelector('.nearby-notice')))));
+
+    // Dismiss: read and dismissed on the server.
+    st.notifications.push(note(2));
+    await lp.locator('#nearby-refresh').click();
+    await lp.waitForSelector('.nearby-notice', { timeout: 8000 }).catch(() => {});
+    await lp.locator('[data-notice-dismiss]').evaluate((b) => b.click());
+    await lp.waitForTimeout(500);
+    const n2 = st.notifications.find((x) => x.id === 'n-2') || {};
+    check('dismiss: dismissed and read on the server', Boolean(n2.dismissed_at && n2.read_at));
+
+    // Settings: web notifications and the sound, independent of location.
+    await lp.evaluate(() => document.querySelector('[data-nav="profile"]')?.click());
+    await lp.locator('#profile-settings-button').click();
+    await lp.locator('[data-profile-setting="notifications"]').click();
+    await lp.waitForSelector('#profile-push-toggle');
+    const settings = await lp.locator('.notification-settings-dialog').innerText();
+    check('Settings: WEB NOTIFICATIONS and NOTIFICATION SOUND switches', /WEB NOTIFICATIONS/.test(settings) && /NOTIFICATION SOUND/.test(settings));
+    await lp.locator('label:has(#profile-sound-toggle)').click();
+    check('the sound switch is saved for this device', (await lp.evaluate(() => localStorage.getItem('brivia-notify-sound'))) === 'off');
+    await laptop.close();
+    await phone.close();
   }
 
   // D-133: the mobile "Location is off" bug. The Permissions API says 'denied' (stale, as on iPhones) while the browser

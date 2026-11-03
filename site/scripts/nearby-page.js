@@ -5,7 +5,7 @@
 // paths!". Location comes only from the Crossing Paths loop (crossing-paths.js, every 5 minutes while visible); this
 // page never reads coordinates itself. Pure markup and copy: nearby-view.js.
 import {
-  COPY, RADII, normalizeRadius, radiusLine, nearbyState, normalizeNearby, nearbyCardMarkup, nearbyMatchMarkup, nearbyOpeners, NEARBY_OPENER,
+  COPY, RADII, normalizeRadius, radiusLine, nearbyState, normalizeNearby, nearbyCardMarkup, nearbyMatchMarkup, nearbyOpeners, NEARBY_OPENER, nearbyNoticeMarkup,
 } from './nearby-view.js';
 import { locationHelp } from './crossing-paths.js';
 import { createDeckSwipe } from './deck-swipe.js';
@@ -16,9 +16,9 @@ const saveRadius = (km) => { try { window.localStorage.setItem(RADIUS_KEY, Strin
 
 export const createNearbyPage = ({
   root, api, location, safeImage, coverFor, me, toast, isMissing, openProfile, openConversation, composer = null, sendRequest,
-  matchDialog = null, onMatchSeen = () => {},
+  matchDialog = null, onMatchSeen = () => {}, notices = null,
 }) => {
-  if (!root) return { show() {}, hide() {}, refresh() {}, showMatch() {}, onLocation() {} };
+  if (!root) return { show() {}, hide() {}, refresh() {}, showMatch() {}, onLocation() {}, notify: () => false, isVisible: () => false };
   const deckEl = root.querySelector('#nearby-deck');
   const radiusSelect = root.querySelector('#nearby-radius');
   const radiusText = root.querySelector('#nearby-radius-line');
@@ -28,6 +28,7 @@ export const createNearbyPage = ({
   const passBtn = root.querySelector('#nearby-pass');
   const likeBtn = root.querySelector('#nearby-like');
   const profileBtn = root.querySelector('#nearby-profile');
+  const noticeEl = root.querySelector('#nearby-notice');
 
   const state = { locating: false, askedThisVisit: false, visible: false, radius: readRadius(), people: [], error: null, loading: false, busy: false, swipe: null, match: null, seq: 0 };
   radiusSelect.innerHTML = RADII.map((km) => `<option value="${km}"${km === state.radius ? ' selected' : ''}>${km} km</option>`).join('');
@@ -204,7 +205,12 @@ export const createNearbyPage = ({
     if (e.target.closest('[data-nearby-retry], [data-nearby-allow]')) { refresh(); return; }
     if (e.target.closest('[data-nearby-turn-on]')) { location.turnOn(); return; }
     const widen = e.target.closest('[data-nearby-widen]');
-    if (widen) { state.radius = normalizeRadius(widen.dataset.nearbyWiden); radiusSelect.value = String(state.radius); saveRadius(state.radius); discover(); return; }
+    if (widen) { state.radius = normalizeRadius(widen.dataset.nearbyWiden); radiusSelect.value = String(state.radius); saveRadius(state.radius); api.setRadius?.(state.radius); discover(); return; }
+    // D-134: the in-section notice. View profile and dismiss both mark it read everywhere.
+    const view = e.target.closest('[data-notice-view]');
+    if (view) { const id = view.closest('[data-notice-id]')?.dataset.noticeId; notices?.open(id, view.dataset.noticeView); hideNotice(); return; }
+    const dismiss = e.target.closest('[data-notice-dismiss]');
+    if (dismiss) { notices?.dismiss(dismiss.dataset.noticeDismiss); hideNotice(); return; }
     const prof = e.target.closest('[data-nearby-profile], #nearby-profile');
     if (prof) {
       const id = prof.dataset.nearbyProfile || state.people[0]?.id;
@@ -212,15 +218,39 @@ export const createNearbyPage = ({
       if (person) openProfile(person);
     }
   });
-  radiusSelect.addEventListener('change', () => { state.radius = normalizeRadius(radiusSelect.value); saveRadius(state.radius); discover(); });
+  radiusSelect.addEventListener('change', () => { state.radius = normalizeRadius(radiusSelect.value); saveRadius(state.radius); api.setRadius?.(state.radius); discover(); });
   root.addEventListener('keydown', (e) => {
     if (!state.people.length || e.target.closest('select, input, textarea') || e.altKey || e.metaKey || e.ctrlKey) return;
     if (e.key === 'ArrowLeft') { e.preventDefault(); pass(); }
     if (e.key === 'ArrowRight') { e.preventDefault(); connect(); }
   });
 
+  // D-134: "Someone crossed your path." inside the section, above the cards. One at a time; shown for 12 s while the
+  // page is in front, and marked read once seen for 3 s (on every device).
+  let noticeTimer = 0;
+  let readTimer = 0;
+  const hideNotice = () => {
+    clearTimeout(noticeTimer); clearTimeout(readTimer);
+    if (!noticeEl) return;
+    noticeEl.classList.remove('is-in');
+    noticeTimer = setTimeout(() => { noticeEl.innerHTML = ''; noticeEl.hidden = true; }, 300);
+  };
+  const notify = (n) => {
+    if (!noticeEl || !state.visible) return false;
+    clearTimeout(noticeTimer); clearTimeout(readTimer);
+    noticeEl.innerHTML = nearbyNoticeMarkup(n, { photoSrc: safeImage(n.photoUrl) });
+    noticeEl.hidden = false;
+    requestAnimationFrame(() => noticeEl.classList.add('is-in'));
+    readTimer = setTimeout(() => { if (document.visibilityState === 'visible') notices?.markRead([n.id]); }, 3000);
+    noticeTimer = setTimeout(hideNotice, 12000);
+    discover({ keepCurrent: true });   // they are around: bring their card in
+    return true;
+  };
+
   return {
-    show() { state.visible = true; state.askedThisVisit = false; if (location.enabled() === true) locateOnOpen(); else discover(); },
+    notify,
+    isVisible: () => state.visible,
+    show() { api.setRadius?.(state.radius); state.visible = true; state.askedThisVisit = false; if (location.enabled() === true) locateOnOpen(); else discover(); },
     hide() { state.visible = false; if (matchDialog?.open) matchDialog.close(); },
     // The location loop changed status or sent a fresh pulse: read again, keeping the card in front.
     // Also runs when the switch is first read as on (app start): then this visit's location request goes out.

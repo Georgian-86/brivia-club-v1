@@ -21,7 +21,7 @@ import '../styles/mobile-app.css';
 import '../styles/skeleton.css';
 import '../styles/aura-theme.css';
 import '../styles/handoff.css';
-import { supabase, compressImageOnly, rowToProfile, saveProfile, isPresetCoverUrl, onboardingStatus, sendSignal, fetchSignalQuota, isRateLimited, isStorageImageUrl, withoutCredentials, uploadMessageAttachment, removeMessageAttachment, uploadCommunityPostImage, removeCommunityPostImage, ImageProcessingError, PHOTO_ERROR_MESSAGE, PHOTO_FRAMER_ERROR, compressAttachmentFiles, attachmentKind, reportMember, setSensitiveConsent, fetchSensitiveConsentAt, fetchMyInterests, fetchInterestNodes, addMemberInterest, isMissingFunction, touchPresence, connectionPresence, setPresenceVisible, myPresenceVisible, setMemberInterests, uploadResume, removeResume, resumeSignedUrl, resumeInfo, clearResumePath, searchPlaces, setHomeCity, setHomeLocation, listEvents, setEventRsvp, setCompanionDefault, myEventPrefs, eventCompanions, saveMemberEvent, cancelMemberEvent, deleteMemberEvent, uploadEventImage, removeEventImages, setEventInterest, setEventBrochure, uploadEventBrochure, removeEventBrochures, companionEvents, companionDeck, companionSwipe, myCompanionMatches, markCompanionMatchSeen, sendConnectRequest, setNearbyEnabled, myNearbySetting, nearbyPulse, nearbyClear, myNearbyAlerts, setNearbyMuted, nearbyDiscover, nearbyPass, nearbyConnect, myNearbyMatches } from './supabase.js';
+import { supabase, compressImageOnly, rowToProfile, saveProfile, isPresetCoverUrl, onboardingStatus, sendSignal, fetchSignalQuota, isRateLimited, isStorageImageUrl, withoutCredentials, uploadMessageAttachment, removeMessageAttachment, uploadCommunityPostImage, removeCommunityPostImage, ImageProcessingError, PHOTO_ERROR_MESSAGE, PHOTO_FRAMER_ERROR, compressAttachmentFiles, attachmentKind, reportMember, setSensitiveConsent, fetchSensitiveConsentAt, fetchMyInterests, fetchInterestNodes, addMemberInterest, isMissingFunction, touchPresence, connectionPresence, setPresenceVisible, myPresenceVisible, setMemberInterests, uploadResume, removeResume, resumeSignedUrl, resumeInfo, clearResumePath, searchPlaces, setHomeCity, setHomeLocation, listEvents, setEventRsvp, setCompanionDefault, myEventPrefs, eventCompanions, saveMemberEvent, cancelMemberEvent, deleteMemberEvent, uploadEventImage, removeEventImages, setEventInterest, setEventBrochure, uploadEventBrochure, removeEventBrochures, companionEvents, companionDeck, companionSwipe, myCompanionMatches, markCompanionMatchSeen, sendConnectRequest, setNearbyEnabled, myNearbySetting, nearbyPulse, nearbyClear, myNearbyAlerts, setNearbyMuted, nearbyDiscover, nearbyPass, nearbyConnect, myNearbyMatches, myNotifications, markNotificationsRead, dismissNotification, setNearbyRadius, savePushSubscription, deletePushSubscription, sendPendingPush } from './supabase.js';
 import { locateOnce, fallbackCopy } from './geo-locate.js';
 import { areaChangeMessage, AREA_HELPER, AREA_NO_MATCH } from './area-change.js';
 import { areaShareBody, parseAreaBody, resumeShareAttachment, resumeMessageFields, RESUME_SHARE_BODY, NO_RESUME_HINT, RESUME_GONE_COPY, RESUME_SHARE_NOTE, AREA_SHARE_NOTE } from './quick-share.js';
@@ -42,7 +42,10 @@ import { createPresence, presenceDot } from './presence.js';
 import { createCrossingPaths, isQuietHour, alertHeadline, alertDetail, alertToast, pausedCopy } from './crossing-paths.js';
 import '../styles/crossing-paths.css';
 import { createNearbyPage } from './nearby-page.js';
-import { COPY as NEARBY_COPY } from './nearby-view.js';
+import { COPY as NEARBY_COPY, bandLabel as nearbyBandLabel } from './nearby-view.js';
+import { createMemberNotifications } from './member-notifications.js';
+import { createChime, soundEnabled, setSoundEnabled } from './notify-sound.js';
+import { createWebPush, pushSupport, PUSH_COPY } from './web-push.js';
 import '../styles/nearby.css';
 import { createEventsPage } from './events-page.js';
 import { createEventComposer } from './event-create.js';
@@ -479,8 +482,11 @@ const renderNotifications = () => {
   const companionUnseen = unseenCompanionMatches();
   // D-131: "you crossed paths" matches count until seen, like companion matches.
   const nearbyMatchUnseen = unseenNearbyMatches();
-  const unreadCount = (enabled ? notifications.filter((notification) => !notification.read).length : 0) + requestCount + nearbyCount + companionUnseen.length + nearbyMatchUnseen.length;
-  const anything = enabled || requestCount || nearbyAlerts.length || companionUnseen.length || nearbyMatchUnseen.length;
+  // D-134: "Someone crossed your path" from the shared store (last 24 h, not dismissed); unread ones count.
+  const crossedRows = memberNotes.list().filter((n) => n.type === 'nearby_appeared' && !n.dismissedAt && Date.now() - new Date(n.createdAt).getTime() < 24 * 3600 * 1000).slice(0, 5);
+  const crossedUnread = crossedRows.filter((n) => !n.readAt).length;
+  const unreadCount = (enabled ? notifications.filter((notification) => !notification.read).length : 0) + requestCount + nearbyCount + companionUnseen.length + nearbyMatchUnseen.length + crossedUnread;
+  const anything = enabled || requestCount || nearbyAlerts.length || companionUnseen.length || nearbyMatchUnseen.length || crossedRows.length;
   button.toggleAttribute('hidden', !anything);
   if (!anything) closeNotificationPanel();
   badge.textContent = unreadCount > 99 ? '99+' : String(unreadCount);
@@ -521,7 +527,7 @@ const renderNotifications = () => {
     const title = person?.name || 'a Brivia member';
     const messageLabel = `${group.count} message${group.count === 1 ? '' : 's'} from ${title}`;
     return `<button type="button" class="notification-item is-unread" data-notification-person="${escapeHtml(group.personId)}">${renderAvatar(person, 'notification-avatar')}<span class="notification-copy"><strong>${escapeHtml(messageLabel)}</strong></span><time>${escapeHtml(formatNotificationTime(group.latest.createdAt))}</time></button>`;
-  }).join('') : ((requestCount || nearbyAlerts.length || companionUnseen.length || nearbyMatchUnseen.length) ? '' : `<div class="notification-empty"><p>You are all caught up.</p>${settingsAction}</div>`);
+  }).join('') : ((requestCount || nearbyAlerts.length || companionUnseen.length || nearbyMatchUnseen.length || crossedRows.length) ? '' : `<div class="notification-empty"><p>You are all caught up.</p>${settingsAction}</div>`);
   const companionHtml = companionUnseen.map((match) => {
     const person = findPersonById(match.otherId) || { name: match.otherName, image: match.otherPhotoUrl };
     return `<section class="notification-companion is-unread" aria-label="${escapeHtml(`You and ${match.otherName} are going together to ${match.eventTitle}`)}">`
@@ -536,7 +542,22 @@ const renderNotifications = () => {
       + `<span class="notification-nearby-copy"><strong>${escapeHtml(`You and ${match.name} crossed paths`)}</strong><span>It's mutual. Your chat is open.</span></span>`
       + `<button type="button" class="notification-nearby-hi" data-nearby-match="${escapeHtml(match.otherId)}">Say hello</button></section>`;
   }).join('');
-  list.innerHTML = requestsHtml + nearbyMatchHtml + companionHtml + nearbyHtml + messagesHtml;
+  const crossedHtml = crossedRows.map((n) => {
+    const person = findPersonById(n.sourceId) || { name: n.name, image: n.photoUrl };
+    return `<section class="notification-companion${n.readAt ? '' : ' is-unread'}" aria-label="${escapeHtml(`Someone crossed your path: ${n.name}`)}">`
+      + `<span class="notification-nearby-face">${renderAvatar(person, 'notification-avatar')}</span>`
+      + `<span class="notification-nearby-copy"><strong>Someone crossed your path</strong><span>${escapeHtml(`${n.name || 'A Brivia member'} is nearby${n.band ? ` · ${nearbyBandLabel(n.band)}` : ''}`)}</span></span>`
+      + `<button type="button" class="notification-nearby-hi" data-crossed-view="${escapeHtml(n.id)}">View profile</button></section>`;
+  }).join('');
+  list.innerHTML = requestsHtml + crossedHtml + nearbyMatchHtml + companionHtml + nearbyHtml + messagesHtml;
+  list.querySelectorAll('[data-crossed-view]').forEach((item) => item.addEventListener('click', (event) => {
+    event.stopPropagation();
+    const n = memberNotes.list().find((x) => x.id === item.dataset.crossedView);
+    closeNotificationPanel();
+    if (!n) return;
+    memberNotes.markRead([n.id]);
+    openMemberProfileById(n.sourceId);
+  }));
   list.querySelectorAll('[data-nearby-match]').forEach((item) => item.addEventListener('click', async (event) => {
     event.stopPropagation();
     const match = nearbyMatches.find((m) => m.otherId === item.dataset.nearbyMatch);
@@ -606,6 +627,7 @@ const ensureNotificationControls = () => {
     openNotificationPanel();
     nearbyHighlight = new Set(unseenNearbyAlerts().map((alert) => alert.key));
     markNearbySeen();
+    memberNotes.markRead(memberNotes.unread().map((n) => n.id));
     renderNotifications();
     placeNotificationPanel();
     loadConnectionRequests();
@@ -996,7 +1018,13 @@ const companionsPage = createCompanionsPage({
 });
 nearbyPage = createNearbyPage({
   root: document.querySelector('[data-view="nearby"]'),
-  api: { discover: nearbyDiscover, pass: nearbyPass },
+  api: { discover: nearbyDiscover, pass: nearbyPass, setRadius: (km) => { if (supabase && memberProfile.id) setNearbyRadius(km).catch(() => {}); } },
+  // D-134: the in-section notice reads and dismisses through the one notification store (every device follows).
+  notices: {
+    markRead: (ids) => memberNotes.markRead(ids),
+    dismiss: (id) => memberNotes.dismiss(id),
+    open: (id, sourceId) => { if (id) memberNotes.markRead([id]); openMemberProfileById(sourceId); },
+  },
   location: {
     enabled: () => nearbyEnabled,
     status: () => nearbyStatus,
@@ -1036,6 +1064,58 @@ nearbyPage = createNearbyPage({
     return { status: row?.status || 'sent' };
   },
 });
+// D-134: Nearby notifications. One store on the server (member_notification, 0030), live on every open device through
+// Realtime: a new one plays the chime once and shows in the Nearby section (or a toast elsewhere); read or dismissed
+// anywhere, it is read everywhere and its system notification closes. Web push (optional, per device) is in Settings.
+const chime = createChime();
+const webPush = createWebPush({ save: savePushSubscription, remove: deletePushSubscription });
+const openMemberProfileById = async (id) => {
+  if (!id) return;
+  let person = findPersonById(id);
+  if (!person && supabase) {
+    const { data } = await fetchCandidates([id]);
+    if (data?.length) { mergePeople(data); person = findPersonById(id); }
+  }
+  if (person) openPublicProfile(person);
+};
+const memberNotes = createMemberNotifications({
+  api: { list: myNotifications, markRead: markNotificationsRead, dismiss: dismissNotification },
+  subscribe: (onInsert, onUpdate) => {
+    if (!supabase || !memberProfile.id) return null;
+    const filter = `user_id=eq.${memberProfile.id}`;
+    const channel = supabase.channel(`brivia-notes-${memberProfile.id}`)
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'member_notification', filter }, ({ new: row }) => onInsert(row))
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'member_notification', filter }, ({ new: row }) => onUpdate(row))
+      .subscribe();
+    return () => supabase.removeChannel(channel);
+  },
+  onNew: (n) => {
+    if (n.type !== 'nearby_appeared') return;
+    chime.play(n.id);
+    if (!nearbyPage.notify(n) && document.visibilityState === 'visible') {
+      showToast(`Someone crossed your path. ${n.name || 'A Brivia member'} is nearby${n.band ? ` (${nearbyBandLabel(n.band).toLowerCase()})` : ''}.`);
+    }
+  },
+  onChange: () => renderNotifications(),
+  closeSystem: (ids) => webPush.closeSystem(ids),
+});
+let memberNotesTimer = 0;
+const startMemberNotes = () => {
+  if (!supabase || !memberProfile.id) return;
+  memberNotes.start().catch(() => {});
+  // Realtime is the fast path; a quiet re-read every minute catches anything a dropped socket missed.
+  if (!memberNotesTimer) memberNotesTimer = window.setInterval(() => { if (document.visibilityState === 'visible') memberNotes.load(); }, 60000);
+  // A push opened the app (?notification=<id>): that notification is read, everywhere.
+  const fromPush = new URLSearchParams(window.location.search).get('notification');
+  if (fromPush) memberNotes.markRead([fromPush]);
+  // The service worker: a push while a Brivia tab is in front is shown here instead; a notification click lands here.
+  navigator.serviceWorker?.addEventListener?.('message', (event) => {
+    const msg = event.data || {};
+    if (msg.type === 'brivia-push') memberNotes.load();
+    if (msg.type === 'brivia-open') { if (msg.id) memberNotes.markRead([msg.id]); openConnectMode('nearby'); }
+  });
+  if (pushSupport() === 'ready' && window.Notification?.permission === 'granted') webPush.register().catch(() => {});
+};
 const eventsPage = createEventsPage({
   root: document.querySelector('[data-view="events"]'),
   composer: eventComposer,
@@ -2366,7 +2446,7 @@ const ensureCrossingPaths = () => {
         document.dispatchEvent(new CustomEvent('brivia:nearby-status'));
         nearbyPage?.onLocation();
       },
-      onPulse: () => nearbyPage?.onLocation(),
+      onPulse: () => { nearbyPage?.onLocation(); sendPendingPush(); memberNotes.load(); },
     });
   }
   return crossingPaths;
@@ -3354,6 +3434,8 @@ const openNotificationSettings = () => {
     <p class="profile-settings-note">Choose how the club keeps you updated. Chat messages will still be available in your inbox when alerts are off.</p>
     <label class="settings-toggle-row"><span><strong>MESSAGE NOTIFICATIONS</strong><small>Get an alert when someone sends you a message.</small></span><input id="profile-notifications-toggle" type="checkbox" /><i aria-hidden="true"></i></label>
     <label class="settings-toggle-row" data-presence-setting hidden><span><strong>SHOW WHEN I'M ACTIVE</strong><small>Your connections see a dot when you're here. Turn it off and you won't see theirs either.</small></span><input id="profile-presence-toggle" type="checkbox" /><i aria-hidden="true"></i></label>
+    <label class="settings-toggle-row" data-push-setting><span><strong>WEB NOTIFICATIONS</strong><small>Get a notification on this device when someone crosses your path, even when Brivia is closed. Separate from location.</small><small class="settings-nearby-status" data-push-status role="status"></small></span><input id="profile-push-toggle" type="checkbox" /><i aria-hidden="true"></i></label>
+    <label class="settings-toggle-row"><span><strong>NOTIFICATION SOUND</strong><small>A soft chime when someone new is nearby, on this device.</small></span><input id="profile-sound-toggle" type="checkbox" /><i aria-hidden="true"></i></label>
     <label class="settings-toggle-row" data-nearby-setting hidden><span><strong>CROSSING PATHS</strong><small>Discover when other Brivia members are nearby. Only members who enable this feature can discover you.</small><small class="settings-nearby-status" data-nearby-status role="status"></small></span><input id="profile-nearby-toggle" type="checkbox" /><i aria-hidden="true"></i></label>
     <p class="profile-settings-feedback" id="notification-settings-feedback" role="status"></p>
   </div>`;
@@ -3384,6 +3466,33 @@ const openNotificationSettings = () => {
     if (error) { presenceToggle.checked = !want; showToast('That setting could not be saved. Please try again.'); return; }
     feedback.textContent = want ? 'Your connections can see when you are active.' : 'Active status is off. You will not see others either.';
     presence?.refresh();
+  });
+  // D-134: web notifications on this device (independent of location) and the chime.
+  const pushToggle = modal.querySelector('#profile-push-toggle');
+  const pushStatus = modal.querySelector('[data-push-status]');
+  const soundToggle = modal.querySelector('#profile-sound-toggle');
+  soundToggle.checked = soundEnabled();
+  soundToggle.addEventListener('change', () => {
+    setSoundEnabled(soundToggle.checked);
+    chime.unlock();
+    if (soundToggle.checked) chime.play();
+    feedback.textContent = soundToggle.checked ? 'Notification sound is on for this device.' : 'Notification sound is off for this device.';
+  });
+  const support = pushSupport();
+  if (support !== 'ready') { pushToggle.disabled = support !== 'denied'; pushStatus.textContent = PUSH_COPY[support] || ''; }
+  webPush.isOn().then((on) => { if (modal.isConnected) pushToggle.checked = on; }).catch(() => {});
+  pushToggle.addEventListener('change', async () => {
+    const want = pushToggle.checked;
+    pushToggle.disabled = true;
+    const result = want ? await webPush.enable() : await webPush.disable();
+    pushToggle.disabled = false;
+    if (want && !result.ok) {
+      pushToggle.checked = false;
+      pushStatus.textContent = PUSH_COPY[result.reason] || 'Notifications could not be turned on. Please try again.';
+      return;
+    }
+    pushStatus.textContent = '';
+    feedback.textContent = want ? 'Web notifications are on for this device.' : 'Web notifications are off for this device.';
   });
   // D-119: Crossing paths. Shown once 0021 answers; turning it on goes through the explainer, then the browser prompt.
   const nearbyRow = modal.querySelector('[data-nearby-setting]');
@@ -5302,6 +5411,7 @@ const loadSupabaseCommunity = async () => {
   startPresence();
   startCrossingPaths();
   startCompanionMatches();
+  startMemberNotes();
   if (!appBackGuardActive) {
     appBackGuardActive = true;
     window.history.pushState(

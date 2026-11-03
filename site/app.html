@@ -6,6 +6,8 @@
     <link rel="icon" href="/favicon.ico" sizes="48x48" />
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="theme-color" content="#101016" />
     <title>Brivia Club · Discover your kind</title>
     <style>.app-nav-button{text-decoration:none}.app-view[hidden]{display:none!important}</style>
@@ -86,11 +88,12 @@
               <div class="nearby-tools">
                 <p class="nearby-radius-line"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M3.5 11.2 20 4l-7.2 16.5-1.9-7.4-7.4-1.9Z"/></svg><span id="nearby-radius-line">People within 1 km of you</span></p>
                 <label class="companion-picker nearby-radius"><span class="sr-only">Distance</span><select id="nearby-radius"></select><svg class="companion-picker-chevron" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M6 9l6 6 6-6"/></svg></label>
-                <button type="button" class="nearby-refresh" id="nearby-refresh" aria-label="Refresh: look for people nearby again"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M20 12a8 8 0 1 1-2.3-5.6M20 4v4.5h-4.5"/></svg></button>
+                <button type="button" class="nearby-refresh" id="nearby-refresh" aria-label="Refresh: look for people nearby again"><span>Refresh</span><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M20 12a8 8 0 1 1-2.3-5.6M20 4v4.5h-4.5"/></svg></button>
               </div>
             </div>
             <p class="nearby-lead">Good people might be closer than you think.</p>
             <p class="sr-only" id="nearby-status" role="status" aria-live="polite"></p>
+            <div class="nearby-notice-slot" id="nearby-notice" hidden></div>
             <div class="nearby-deck" id="nearby-deck" tabindex="-1" aria-label="People around you"></div>
             <div class="nearby-actions" hidden>
               <button type="button" class="nearby-action nearby-action-pass" id="nearby-pass" aria-label="Pass"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M6 6l12 12M18 6 6 18"/></svg><span>Pass</span></button>

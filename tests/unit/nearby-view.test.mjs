@@ -9,11 +9,11 @@ import { collabSummary, reviewCardModel, reviewCardMarkup } from '../../site/scr
 
 const esc = (v = '') => String(v).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 
-test('radius: 1, 3 or 5 km (no 500 m: the founder chose 1 km precision), default 1 km', () => {
-  assert.deepEqual(RADII, [1, 3, 5]);
+test('radius: 1, 3, 5 or 10 km (no 500 m: the founder chose 1 km precision), default 1 km', () => {
+  assert.deepEqual(RADII, [1, 3, 5, 10]);
   assert.equal(DEFAULT_RADIUS, 1);
-  for (const bad of [0, 0.5, 2, 10, 'x', null, undefined]) assert.equal(normalizeRadius(bad), 1, String(bad));
-  assert.equal(normalizeRadius('3'), 3);
+  for (const bad of [0, 0.5, 2, 20, 'x', null, undefined]) assert.equal(normalizeRadius(bad), 1, String(bad));
+  assert.equal(normalizeRadius('10'), 10);
   assert.equal(radiusLine(5), 'People within 5 km of you');
 });
 
@@ -21,9 +21,10 @@ test('the distance is a band, never metres', () => {
   assert.equal(bandLabel('1'), 'Under 1 km away');
   assert.equal(bandLabel('3'), '1–3 km away');
   assert.equal(bandLabel('5'), '3–5 km away');
+  assert.equal(bandLabel('10'), '5–10 km away');
   assert.equal(bandLabel('300'), 'Nearby');
   assert.equal(bandLabel(''), 'Nearby');
-  for (const band of ['1', '3', '5']) assert.doesNotMatch(bandLabel(band), /\bm\b|metre|meter/);
+  for (const band of ['1', '3', '5', '10']) assert.doesNotMatch(bandLabel(band), /\bm\b|metre|meter/);
 });
 
 test('nearbyState: why the deck shows what it shows', () => {
