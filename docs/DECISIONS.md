@@ -2763,3 +2763,18 @@ controls (a tester or a seeded test member), never a real member, so no new expo
   system notification, unique mark-read, chime rules, push support); e2e nearby 66/66 (laptop and phone on one server:
   the notice, read on the laptop is read on the phone, never twice, dismiss, 10 km saved, compact card, no overflow,
   Settings), plus crossing-paths, collab-requests, companions, deck, app-shell.
+
+## D-135 (2026-11-03): the interest list is the founder's A–Z list, in the founder's wording
+
+- **Asked:** use the founder's full A–Z list (Abstract Art … Zymology) as the interest list.
+- **Found:** the live catalogue (0017, D-109) already offers exactly these 1,129 interests; 65 reused nodes were worded
+  differently (e.g. "Machine learning", "AR and VR", "Birding in the city").
+- **Decided:** migration `0031_interest_labels.sql` relabels those 65 by id to the founder's wording (only where the
+  label is still 0017's) and renumbers `catalog_order` A–Z. Ids never change, so members' saved interests and ORBIT
+  topology are untouched. 0017 stays frozen; `supabase/catalog/interest-catalog.tsv` is the source of truth now and
+  `scripts/build-interest-catalog.mjs` no longer rewrites 0017.
+- **Kept out on purpose:** "Gospel Music" (a religion proxy, private by D-038, never offered) and "NLP" (the same
+  interest as "Natural Language Processing"). Three repeats in the list (UI Design, UX Research, Extreme Programming)
+  are one interest each.
+- **Proof:** SQL harness ALL PASSED (new `r-interest-labels.test.sql`: relabels, 1,129 offered, contiguous A–Z order,
+  unique labels, Abstract Art first, Zymology last, nothing sensitive offered).

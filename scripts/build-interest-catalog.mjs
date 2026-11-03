@@ -45,6 +45,12 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
   const rows = parseCatalog(readFileSync(tsvPath, 'utf8'));
   const problems = checkCatalog(rows);
   if (problems.length) { console.error(problems.join('\n')); process.exit(1); }
+  // 0017 is live and frozen (D-135): the TSV is checked, never written back into it. A catalogue change is a new
+  // migration (as 0031 relabels 65 nodes). Pass --write-0017 only to rebuild a database from scratch on purpose.
+  if (!process.argv.includes('--write-0017')) {
+    console.log(`TSV OK: ${rows.length} catalogue rows (${rows.filter((r) => r.kind === 'new').length} new). 0017 is frozen: write a new migration for changes.`);
+    process.exit(0);
+  }
   const sql = readFileSync(sqlPath, 'utf8');
   const start = sql.indexOf(BEGIN);
   const stop = sql.indexOf(END);

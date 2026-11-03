@@ -1,5 +1,7 @@
 # Founder interest catalogue (2026-10-29, D-109), A-Z: label<TAB>node_id<TAB>existing|new. Run
 # `node scripts/build-interest-catalog.mjs` after editing; it rewrites the data section of 0017.
+# 2026-11-03 (D-135): 67 reused nodes now carry the founder's exact wording (migration 0031 relabels them by id and
+# recomputes catalog_order A-Z). 0017 is live and frozen: further label changes are new migrations, not a rerun.
 # Existing 0004 nodes are reused (same label, or the same interest under fuller wording, e.g. "AR and VR");
 # new ones are level-3 nodes under the closest existing category. Left out: Gospel Music (excluded); NLP (same interest as Natural Language Processing).
 Abstract Art	arts.visual.abstract_art	new
@@ -29,7 +31,7 @@ Analytics Engineering	tech.software.analytics_engineering	new
 Android Custom ROMs	tech.software.android_custom_roms	new
 Android Development	tech.software.android_development	new
 Animal Photography	arts.photography.animal_photography	new
-Animal rescue	community.volunteering.animal_rescue	existing
+Animal Rescue	community.volunteering.animal_rescue	existing
 Animal Welfare	community.volunteering.animal_welfare	new
 Animation	stage_screen.film.animation	existing
 Anime	stage_screen.film.anime	new
@@ -41,10 +43,10 @@ App Development	tech.software.app_development	new
 App Monetization	business.startups.app_monetization	new
 Application Security	tech.security.application_security	new
 Applied Mathematics	learning.science.applied_mathematics	new
-Aquarium keeping	lifestyle.home.aquariums	existing
+Aquarium Keeping	lifestyle.home.aquariums	existing
 Aquascaping	lifestyle.home.aquascaping	new
 Aquathlon	sports.endurance.aquathlon	new
-AR and VR	tech.frontier.ar_vr	existing
+AR/VR	tech.frontier.ar_vr	existing
 Archaeology	learning.humanities.archaeology	new
 Archery	sports.precision.archery	existing
 Architecture	arts.design.architecture	new
@@ -79,7 +81,7 @@ Baking	food.cooking.baking	existing
 Ballet	stage_screen.dance.ballet	new
 Ballroom Dance	stage_screen.dance.ballroom_dance	new
 Banking	business.money.banking	new
-Barbecue and tandoor	food.cooking.barbecue	existing
+Barbecue	food.cooking.barbecue	existing
 Basketball	sports.team.basketball	existing
 Battery Technology	tech.frontier.battery_technology	new
 Beach Volleyball	sports.team.beach_volleyball	new
@@ -99,11 +101,10 @@ Biotechnology	learning.science.biotechnology	new
 Bird Conservation	community.environment.bird_conservation	new
 Bird Photography	arts.photography.bird_photography	new
 Bird Watching	outdoors.nature.bird_watching	new
-Birding in the city	outdoors.nature.birdwatching.urban_birding	existing
 Board Games	games.board.board_games	new
 Body Painting	arts.visual.body_painting	new
 Bodybuilding	sports.fitness.bodybuilding	new
-Book clubs	learning.reading.book_clubs	existing
+Book Clubs	learning.reading.book_clubs	existing
 Book Collecting	games.collecting.book_collecting	new
 Book Illustration	arts.visual.book_illustration	new
 Book Reviewing	arts.writing.book_reviewing	new
@@ -162,7 +163,7 @@ Cinema	stage_screen.film.cinema	new
 Cinematography	stage_screen.film.cinematography	new
 Circuit Design	tech.hardware.circuit_design	new
 Classical Music	music.listening.classical_music	new
-Climate action	community.environment.climate_action	existing
+Climate Action	community.environment.climate_action	existing
 Climate Technology	tech.frontier.climate_technology	new
 Climbing	outdoors.climbing.climbing	new
 Cloud Computing	tech.software.cloud_computing	new
@@ -176,12 +177,12 @@ Comic Books	learning.reading.comic_books	new
 Community Building	community.social.community_building	new
 Community Management	business.marketing.community_management	new
 Community Service	community.volunteering.community_service	new
-Competitive programming	tech.software.competitive_programming	existing
+Competitive Programming	tech.software.competitive_programming	existing
 Compilers	tech.software.compilers	new
 Computer Architecture	tech.hardware.computer_architecture	new
 Computer Graphics	tech.ai_data.computer_graphics	new
 Computer Networking	tech.hardware.computer_networking	new
-Computer vision	tech.ai_data.computer_vision	existing
+Computer Vision	tech.ai_data.computer_vision	existing
 Concerts	music.listening.concerts	new
 Configuration Management	tech.software.configuration_management	new
 Conservation	community.environment.conservation	new
@@ -209,7 +210,7 @@ Cycling	sports.endurance.cycling	existing
 Dance Choreography	stage_screen.dance.dance_choreography	new
 Dancing	stage_screen.dance.dancing	new
 Data Analytics	tech.ai_data.data_analytics	new
-Data engineering	tech.ai_data.data_engineering	existing
+Data Engineering	tech.ai_data.data_engineering	existing
 Data Governance	tech.ai_data.data_governance	new
 Data Privacy	tech.security.data_privacy	new
 Data Science	tech.ai_data.data_science	new
@@ -223,12 +224,12 @@ Decision Science	tech.ai_data.decision_science	new
 Deep Learning	tech.ai_data.deep_learning	new
 Demand Generation	business.marketing.demand_generation	new
 Dessert Making	food.cooking.dessert_making	new
-DevOps and cloud	tech.software.devops	existing
+DevOps	tech.software.devops	existing
 Digital Art	arts.visual.digital_art	new
 Digital Commerce	business.startups.digital_commerce	new
 Digital Design	arts.design.digital_design	new
 Digital Forensics	tech.security.digital_forensics	new
-Digital illustration	arts.visual.digital_illustration	existing
+Digital Illustration	arts.visual.digital_illustration	existing
 Digital Marketing	business.marketing.digital_marketing	new
 Digital Photography	arts.photography.digital_photography	new
 Digital Signal Processing	tech.hardware.digital_signal_processing	new
@@ -256,7 +257,7 @@ Edge Computing	tech.software.edge_computing	new
 Education	learning.study.education	new
 Education Technology	tech.frontier.education_technology	new
 Educational Research	learning.science.educational_research	new
-Electronics tinkering	tech.hardware.electronics	existing
+Electronics	tech.hardware.electronics	existing
 Embedded Systems	tech.hardware.embedded_systems	new
 Employee Experience	business.careers.employee_experience	new
 Employer Branding	business.careers.employer_branding	new
@@ -271,7 +272,7 @@ Environmental Engineering	learning.science.environmental_engineering	new
 Environmental Science	learning.science.environmental_science	new
 Esports	games.video.esports	existing
 Ethical Consumption	community.environment.ethical_consumption	new
-Ethical hacking	tech.security.ethical_hacking	existing
+Ethical Hacking	tech.security.ethical_hacking	existing
 Ethics of AI	tech.ai_data.ethics_of_ai	new
 Ethnic Music	music.listening.ethnic_music	new
 Event Management	business.careers.event_management	new
@@ -294,13 +295,13 @@ Fan Fiction	arts.writing.fan_fiction	new
 Fantasy Literature	learning.reading.fantasy_literature	new
 Fashion	lifestyle.style.fashion	existing
 Fashion Collecting	games.collecting.fashion_collecting	new
-Fashion design	arts.design.fashion_design	existing
+Fashion Design	arts.design.fashion_design	existing
 Fashion Photography	arts.photography.fashion_photography	new
 Fashion Styling	lifestyle.style.fashion_styling	new
 Fencing	sports.combat.fencing	new
 Fermentation	food.cooking.fermentation	new
 Festival Culture	community.social.festival_culture	new
-Fiction writing	arts.writing.fiction	existing
+Fiction Writing	arts.writing.fiction	existing
 Film Criticism	stage_screen.film.film_criticism	new
 Film Production	stage_screen.film.film_production	new
 Film Scoring	music.making.film_scoring	new
@@ -333,7 +334,7 @@ Franchise Management	business.startups.franchise_management	new
 Freelancing	business.careers.freelancing	existing
 Freerunning	outdoors.air_snow.freerunning	new
 Frontend Development	tech.software.frontend_development	new
-Functional fitness	sports.fitness.functional	existing
+Functional Fitness	sports.fitness.functional	existing
 Functional Programming	tech.software.functional_programming	new
 Fundraising	business.startups.fundraising	existing
 Fundraising Strategy	business.startups.fundraising_strategy	new
@@ -342,12 +343,12 @@ Futsal	sports.team.futsal	new
 Game AI	tech.ai_data.game_ai	new
 Game Art	arts.design.game_art	new
 Game Design	tech.software.game_design	new
-Game development	tech.software.game_dev	existing
+Game Development	tech.software.game_dev	existing
 Game Modding	tech.software.game_modding	new
 Game Streaming	stage_screen.online.game_streaming	new
 Gaming	games.video.gaming	new
 Garage Rock	music.listening.garage_rock	new
-Garba and dandiya	stage_screen.dance.garba	existing
+Garba	stage_screen.dance.garba	existing
 Gardening	lifestyle.home.gardening	new
 Geocaching	outdoors.trekking.geocaching	new
 Geography	learning.humanities.geography	new
@@ -371,14 +372,15 @@ Google Cloud	tech.software.google_cloud	new
 Gourmet Cooking	food.cooking.gourmet_cooking	new
 Government Contracting	business.careers.government_contracting	new
 Graffiti Art	arts.visual.graffiti_art	new
-Graphic design	arts.design.graphic_design	existing
+Graphic Design	arts.design.graphic_design	existing
+Graphic Novels	learning.reading.graphic_novels	existing
 Gravel Cycling	sports.endurance.gravel_cycling	new
 Green Computing	tech.software.green_computing	new
 Green Hydrogen	tech.frontier.green_hydrogen	new
 Green Living	community.environment.green_living	new
 Green Technology	tech.frontier.green_technology	new
 Growth Equity	business.money.growth_equity	new
-Growth marketing	business.startups.growth	existing
+Growth Marketing	business.startups.growth	existing
 Guitar	music.instruments.guitar	existing
 Guitar Collecting	games.collecting.guitar_collecting	new
 Guitar Making	music.making.guitar_making	new
@@ -397,17 +399,17 @@ Healthcare Technology	tech.frontier.healthcare_technology	new
 Healthy Cooking	food.cooking.healthy_cooking	new
 Herbal Gardening	food.growing.herbal_gardening	new
 Herbalism	food.growing.herbalism	new
-Heritage conservation	community.civic.heritage_conservation	existing
+Heritage Conservation	community.civic.heritage_conservation	existing
 High-Performance Computing	tech.software.high_performance_computing	new
 Hiking	outdoors.trekking.hiking	new
-Hip-hop	music.listening.hip_hop	existing
+Hip-Hop	music.listening.hip_hop	existing
 Historical Fiction	learning.reading.historical_fiction	new
 Historical Photography	arts.photography.historical_photography	new
 History	learning.humanities.history	existing
 Hobby Electronics	tech.hardware.hobby_electronics	new
 Home Automation	tech.hardware.home_automation	new
 Home Brewing	food.drinks.home_brewing	new
-Home decor	lifestyle.home.home_decor	existing
+Home Decor	lifestyle.home.home_decor	existing
 Home Gardening	lifestyle.home.home_gardening	new
 Home Organization	lifestyle.home.home_organization	new
 Homomorphic Encryption	tech.security.homomorphic_encryption	new
@@ -436,7 +438,7 @@ Improv Comedy	stage_screen.theatre.improv_comedy	new
 Indie Filmmaking	stage_screen.film.indie_filmmaking	new
 Indie Games	tech.software.indie_games	new
 Indie Hacking	business.startups.indie_hacking	new
-Indie music	music.listening.indie	existing
+Indie Music	music.listening.indie	existing
 Indigenous Cultures	learning.humanities.indigenous_cultures	new
 Industrial Design	arts.design.industrial_design	new
 Industrial IoT	tech.hardware.industrial_iot	new
@@ -450,7 +452,7 @@ Instrumental Music	music.instruments.instrumental_music	new
 Insurance	business.money.insurance	new
 Intellectual Property	business.careers.intellectual_property	new
 Intelligent Agents	tech.ai_data.intelligent_agents	new
-Interior design	arts.design.interior_design	existing
+Interior Design	arts.design.interior_design	existing
 International Business	business.startups.international_business	new
 International Relations	learning.humanities.international_relations	new
 Internet Privacy	tech.security.internet_privacy	new
@@ -480,7 +482,7 @@ Jazz Dance	stage_screen.dance.jazz_dance	new
 Jazz Music	music.listening.jazz_music	new
 Jewelry Design	arts.design.jewelry_design	new
 Jewelry Making	arts.crafts.jewelry_making	new
-Jigsaw puzzles	games.tabletop.jigsaws	existing
+Jigsaw Puzzles	games.tabletop.jigsaws	existing
 Jiu-Jitsu	sports.combat.jiu_jitsu	new
 Job Hunting	business.careers.job_hunting	new
 Job Interview Preparation	business.careers.job_interview_preparation	new
@@ -515,7 +517,7 @@ Kite Flying	lifestyle.home.kite_flying	new
 Kite Making	arts.crafts.kite_making	new
 Kitesurfing	outdoors.water.kitesurfing	new
 Knife Skills	food.cooking.knife_skills	new
-Knitting and crochet	arts.crafts.knitting	existing
+Knitting	arts.crafts.knitting	existing
 Knowledge Graphs	tech.ai_data.knowledge_graphs	new
 Knowledge Management	business.careers.knowledge_management	new
 Knowledge Sharing	business.careers.knowledge_sharing	new
@@ -539,7 +541,7 @@ Language Technology	tech.ai_data.language_technology	new
 Large Language Models	tech.ai_data.large_language_models	new
 Laser Tag	sports.precision.laser_tag	new
 Latte Art	food.drinks.latte_art	new
-Leading teams	business.careers.leadership	existing
+Leadership	business.careers.leadership	existing
 Learning and Development	business.careers.learning_and_development	new
 Leather Craft	arts.crafts.leather_craft	new
 Legal Practice	business.careers.legal_practice	new
@@ -555,7 +557,7 @@ Linux Kernel Development	tech.software.linux_kernel_development	new
 Literary Criticism	learning.humanities.literary_criticism	new
 Literature	learning.reading.literature	new
 Live Music	music.listening.live_music	new
-Live streaming	stage_screen.online.live_streaming	existing
+Live Streaming	stage_screen.online.live_streaming	existing
 Load Testing	tech.software.load_testing	new
 Local Business	business.startups.local_business	new
 Local Exploration	outdoors.riding.local_exploration	new
@@ -566,12 +568,11 @@ Longboarding	outdoors.air_snow.longboarding	new
 Low-Code Development	tech.software.low_code_development	new
 Luxury Fashion	lifestyle.style.luxury_fashion	new
 Luxury Travel	lifestyle.travel.luxury_travel	new
-Machine learning	tech.ai_data.machine_learning	existing
+Machine Learning	tech.ai_data.machine_learning	existing
 Makeup Artistry	lifestyle.style.makeup_artistry	new
 Management	business.careers.management	new
 Management Consulting	business.careers.management_consulting	new
 Manga	learning.reading.manga	new
-Manga and graphic novels	learning.reading.graphic_novels	existing
 Manufacturing Operations	business.careers.manufacturing_operations	new
 Manufacturing Technology	tech.frontier.manufacturing_technology	new
 Marine Biology	learning.science.marine_biology	new
@@ -579,7 +580,7 @@ Marine Science	learning.science.marine_science	new
 Marketing	business.marketing.marketing	new
 Martial Arts	sports.combat.martial_arts	new
 Mathematics	learning.science.mathematics	new
-Meal prep	food.cooking.meal_prep	existing
+Meal Prep	food.cooking.meal_prep	existing
 Mechanical Keyboards	tech.hardware.mechanical_keyboards	new
 Mechanical Watches	games.collecting.mechanical_watches	new
 Media Buying	business.marketing.media_buying	new
@@ -599,7 +600,7 @@ Minimalism	lifestyle.home.minimalism	existing
 Mixed Reality	tech.frontier.mixed_reality	new
 MLOps	tech.ai_data.mlops	new
 Mobile App Development	tech.software.mobile_app_development	new
-Mobile gaming	games.video.mobile	existing
+Mobile Gaming	games.video.mobile	existing
 Mobile Security	tech.security.mobile_security	new
 Model Making	arts.crafts.model_making	new
 Model Trains	games.collecting.model_trains	new
@@ -609,14 +610,14 @@ Monetization	business.startups.monetization	new
 Motion Graphics	arts.design.motion_graphics	new
 Motion Planning	tech.hardware.motion_planning	new
 Motorsports	sports.fandom.motorsports	new
-Mountain biking	sports.endurance.cycling.mountain_biking	existing
+Mountain Biking	sports.endurance.cycling.mountain_biking	existing
 Mountaineering	outdoors.climbing.mountaineering	existing
 Movies	stage_screen.film.movies	new
 Multimodal AI	tech.ai_data.multimodal_ai	new
 Museums	learning.humanities.museums	new
 Music Composition	music.making.music_composition	new
 Music Journalism	music.listening.music_journalism	new
-Music production	music.making.production	existing
+Music Production	music.making.production	existing
 Music Theory	music.making.music_theory	new
 Musical Theatre	stage_screen.theatre.musical_theatre	new
 Mystery Novels	learning.reading.mystery_novels	new
@@ -624,7 +625,7 @@ Nail Art	arts.design.nail_art	new
 Nail Design	arts.design.nail_design	new
 Natural Computing	tech.ai_data.natural_computing	new
 Natural History	outdoors.nature.natural_history	new
-Natural-language processing	tech.ai_data.nlp	existing
+Natural Language Processing	tech.ai_data.nlp	existing
 Nature Conservation	community.environment.nature_conservation	new
 Nature Photography	arts.photography.nature_photography	new
 Nature Walks	outdoors.trekking.nature_walks	new
@@ -665,7 +666,7 @@ Online Privacy	tech.security.online_privacy	new
 Open Data	tech.software.open_data	new
 Open Hardware	tech.hardware.open_hardware	new
 Open Knowledge	tech.software.open_knowledge	new
-Open source	tech.software.open_source	existing
+Open Source	tech.software.open_source	existing
 Operating Systems	tech.software.operating_systems	new
 Operations Management	business.careers.operations_management	new
 Operations Research	learning.science.operations_research	new
@@ -693,24 +694,24 @@ Paper Quilling	arts.crafts.paper_quilling	new
 Paragliding	outdoors.air_snow.paragliding	existing
 Parallel Computing	tech.software.parallel_computing	new
 Parasailing	outdoors.water.parasailing	new
-Parenting groups	community.social.parenting	existing
+Parenting	community.social.parenting	existing
 Parkour	outdoors.air_snow.parkour	new
 Partnerships	business.careers.partnerships	new
-PC gaming	games.video.pc	existing
+PC Gaming	games.video.pc	existing
 Pencak Silat	sports.combat.pencak_silat	new
 Penetration Testing	tech.security.penetration_testing	new
 Performance Art	arts.visual.performance_art	new
 Perfume Collecting	games.collecting.perfume_collecting	new
 Perfume Design	arts.design.perfume_design	new
 Personal Development	business.careers.personal_development	new
-Personal finance	business.money.personal_finance	existing
+Personal Finance	business.money.personal_finance	existing
 Personal Journaling	arts.writing.personal_journaling	new
 Personal Styling	lifestyle.style.personal_styling	new
 Philosophy	learning.humanities.philosophy	existing
 Photography	arts.photography.photography	new
 Physics	learning.science.physics	existing
 Physics Simulation	tech.ai_data.physics_simulation	new
-Piano and keys	music.instruments.piano	existing
+Piano	music.instruments.piano	existing
 Pickleball	sports.racket.pickleball	existing
 Pilates	sports.fitness.pilates	existing
 Plants	lifestyle.home.plants	new
@@ -731,15 +732,15 @@ Privacy Engineering	tech.security.privacy_engineering	new
 Private Equity	business.money.private_equity	new
 Product Design	arts.design.product_design	new
 Product Engineering	business.startups.product_engineering	new
-Product management	business.startups.product_management	existing
+Product Management	business.startups.product_management	existing
 Product Marketing	business.marketing.product_marketing	new
 Programming	tech.software.programming	new
 Programming Languages	tech.software.programming_languages	new
 Prompt Engineering	tech.ai_data.prompt_engineering	new
 Public Health	learning.science.public_health	new
-Public policy	learning.humanities.policy	existing
+Public Policy	learning.humanities.policy	existing
 Public Relations	business.marketing.public_relations	new
-Public speaking	business.careers.public_speaking	existing
+Public Speaking	business.careers.public_speaking	existing
 Puzzle Hunts	games.tabletop.puzzle_hunts	new
 Puzzles	games.tabletop.puzzles	new
 Python	tech.software.python	new
@@ -753,7 +754,7 @@ Quantitative Finance	business.money.quantitative_finance	new
 Quantitative Marketing	business.marketing.quantitative_marketing	new
 Quantitative Research	learning.science.quantitative_research	new
 Quantum AI	tech.frontier.quantum_ai	new
-Quantum computing	tech.frontier.quantum	existing
+Quantum Computing	tech.frontier.quantum	existing
 Quantum Cryptography	tech.security.quantum_cryptography	new
 Quantum Hardware	tech.frontier.quantum_hardware	new
 Quantum Information	tech.frontier.quantum_information	new
@@ -785,7 +786,7 @@ Rap	music.singing.rap	new
 Rapping	music.singing.rapping	new
 Reading	learning.reading.reading	new
 Reading Clubs	learning.reading.reading_clubs	new
-Real estate	business.money.real_estate	existing
+Real Estate	business.money.real_estate	existing
 Real-Time Systems	tech.software.real_time_systems	new
 Recommendation Systems	tech.ai_data.recommendation_systems	new
 Recording Engineering	music.making.recording_engineering	new
@@ -803,12 +804,12 @@ Resin Art	arts.visual.resin_art	new
 Restaurant Entrepreneurship	food.eating_out.restaurant_entrepreneurship	new
 Retail Management	business.careers.retail_management	new
 Retrieval-Augmented Generation	tech.ai_data.retrieval_augmented_generation	new
-Retro gaming	games.video.retro	existing
+Retro Gaming	games.video.retro	existing
 Reverse Engineering	tech.hardware.reverse_engineering	new
 Rifle/Pistol Sport	sports.precision.rifle_pistol_sport	new
 Risk Management	business.careers.risk_management	new
-Road cycling	sports.endurance.cycling.road_cycling	existing
-Road trips	outdoors.riding.road_trips	existing
+Road Cycling	sports.endurance.cycling.road_cycling	existing
+Road Trips	outdoors.riding.road_trips	existing
 Robotics	tech.hardware.robotics	existing
 Rock Climbing	outdoors.climbing.rock_climbing	new
 Rock Collecting	games.collecting.rock_collecting	new
@@ -835,7 +836,7 @@ Science Communication	learning.science.science_communication	new
 Science Fiction	learning.reading.science_fiction	new
 Scientific Research	learning.science.scientific_research	new
 Screenwriting	arts.writing.screenwriting	existing
-Scuba diving	outdoors.water.scuba	existing
+Scuba Diving	outdoors.water.scuba	existing
 Sculpture	arts.crafts.sculpture	new
 Search Algorithms	tech.ai_data.search_algorithms	new
 Search Engine Optimization	business.marketing.search_engine_optimization	new
@@ -857,7 +858,7 @@ Smart Home Technology	tech.hardware.smart_home_technology	new
 Social Dancing	stage_screen.dance.social_dancing	new
 Social Entrepreneurship	business.startups.social_entrepreneurship	new
 Social Impact	community.civic.social_impact	new
-Social media marketing	business.marketing.social_marketing	existing
+Social Media Marketing	business.marketing.social_marketing	existing
 Sociology	learning.humanities.sociology	new
 Software Architecture	tech.software.software_architecture	new
 Software Development	tech.software.software_development	new
@@ -873,8 +874,8 @@ Sports Analytics	sports.fandom.sports_analytics	new
 Sports Photography	arts.photography.sports_photography	new
 SQL	tech.software.sql	new
 Squash	sports.racket.squash	existing
-Stamp collecting	games.collecting.stamps	existing
-Stand-up comedy	stage_screen.theatre.stand_up	existing
+Stamp Collecting	games.collecting.stamps	existing
+Stand-Up Comedy	stage_screen.theatre.stand_up	existing
 Startups	business.startups.startups	new
 Statistics	tech.ai_data.statistics	new
 Stock Market	business.money.stock_market	new
@@ -882,7 +883,7 @@ Storytelling	arts.writing.storytelling	new
 Strategy	business.careers.strategy	new
 Streaming	stage_screen.online.streaming	new
 Street Art	arts.visual.street_art	new
-Street photography	arts.photography.street_photography	existing
+Street Photography	arts.photography.street_photography	existing
 Streetwear	lifestyle.style.streetwear	new
 Sustainable Agriculture	food.growing.sustainable_agriculture	new
 Sustainable Fashion	lifestyle.style.sustainable_fashion	new
@@ -892,15 +893,15 @@ Swimming	sports.endurance.swimming	existing
 Synthesizers	music.instruments.synthesizers	new
 System Design	tech.software.system_design	new
 Systems Programming	tech.software.systems_programming	new
-Table tennis	sports.racket.table_tennis	existing
+Table Tennis	sports.racket.table_tennis	existing
 Tabletop RPGs	games.tabletop.tabletop_rpgs	new
 Taekwondo	sports.combat.taekwondo	existing
 Talent Acquisition	business.careers.talent_acquisition	new
 Target Shooting	sports.precision.target_shooting	new
 Tarot	learning.humanities.tarot	new
-Tattoo art	lifestyle.style.tattoos	existing
+Tattoo Art	lifestyle.style.tattoos	existing
 Tax Planning	business.money.tax_planning	new
-Tea tasting	food.drinks.tea	existing
+Tea Tasting	food.drinks.tea	existing
 Teaching	learning.study.teaching	new
 Technical Leadership	business.careers.technical_leadership	new
 Technical Recruiting	business.careers.technical_recruiting	new
@@ -928,7 +929,7 @@ Trading	business.money.trading	new
 Traditional Cooking	food.cooking.traditional_cooking	new
 Traditional Dance	stage_screen.dance.traditional_dance	new
 Traditional Textiles	arts.design.traditional_textiles	new
-Trail running	sports.endurance.running.trail_running	existing
+Trail Running	sports.endurance.running.trail_running	existing
 Trainspotting	games.collecting.trainspotting	new
 Travel	lifestyle.travel.travel	new
 Travel Photography	arts.photography.travel_photography	new
@@ -954,12 +955,13 @@ Universal Design	arts.design.universal_design	new
 University Entrepreneurship	business.startups.university_entrepreneurship	new
 Unsupervised Learning	tech.ai_data.unsupervised_learning	new
 Urban Agriculture	food.growing.urban_agriculture	new
+Urban Birding	outdoors.nature.birdwatching.urban_birding	existing
 Urban Exploration	outdoors.riding.urban_exploration	new
 Urban Farming	food.growing.urban_farming	new
 Urban Gardening	food.growing.urban_gardening	new
 Urban History	learning.humanities.urban_history	new
 Urban Photography	arts.photography.urban_photography	new
-Urban planning	community.civic.urban_planning	existing
+Urban Planning	community.civic.urban_planning	existing
 Urban Sketching	arts.visual.urban_sketching	new
 Usability Testing	arts.design.usability_testing	new
 User Acquisition	business.marketing.user_acquisition	new
@@ -977,7 +979,7 @@ Venture Debt	business.money.venture_debt	new
 Verification Engineering	tech.hardware.verification_engineering	new
 Version Control	tech.software.version_control	new
 Video Analytics	tech.ai_data.video_analytics	new
-Video editing	stage_screen.film.video_editing	existing
+Video Editing	stage_screen.film.video_editing	existing
 Video Game Development	tech.software.video_game_development	new
 Video Production	stage_screen.film.video_production	new
 Videography	stage_screen.film.videography	new
@@ -987,6 +989,7 @@ Vintage Film Photography	arts.photography.vintage_film_photography	new
 Vintage Watches	games.collecting.vintage_watches	new
 Vinyl Collecting	games.collecting.vinyl_collecting	new
 Vinyl DJing	music.making.vinyl_djing	new
+Violin	music.instruments.violin	existing
 Virtual Assistance	business.careers.virtual_assistance	new
 Virtual Reality	tech.frontier.virtual_reality	new
 Virtualization	tech.software.virtualization	new
@@ -1014,7 +1017,7 @@ Weather Observation	outdoors.nature.weather_observation	new
 Weaving	arts.crafts.weaving	new
 Web Accessibility	tech.software.web_accessibility	new
 Web Design	arts.design.web_design	new
-Web development	tech.software.web_development	existing
+Web Development	tech.software.web_development	existing
 Web Security	tech.security.web_security	new
 Web3	tech.frontier.web3	new
 WebAssembly	tech.software.webassembly	new
@@ -1022,10 +1025,9 @@ Wedding Photography	arts.photography.wedding_photography	new
 Weightlifting	sports.fitness.weightlifting	new
 Wellness	lifestyle.style.wellness	new
 Wellness Entrepreneurship	business.startups.wellness_entrepreneurship	new
-Western violin	music.instruments.violin	existing
 Whisky Appreciation	food.drinks.whisky_appreciation	new
 Wildlife Conservation	community.environment.wildlife_conservation	new
-Wildlife photography	arts.photography.wildlife_photography	existing
+Wildlife Photography	arts.photography.wildlife_photography	existing
 Wildlife Watching	outdoors.nature.wildlife_watching	new
 Wind Energy	tech.frontier.wind_energy	new
 Windsurfing	outdoors.water.windsurfing	new
@@ -1038,7 +1040,7 @@ Wood Carving	arts.crafts.wood_carving	new
 Woodworking	arts.crafts.woodworking	existing
 Workflow Automation	tech.software.workflow_automation	new
 Workflow Orchestration	tech.software.workflow_orchestration	new
-World cinema	stage_screen.film.world_cinema	existing
+World Cinema	stage_screen.film.world_cinema	existing
 World History	learning.humanities.world_history	new
 World Literature	learning.reading.world_literature	new
 World Music	music.listening.world_music	new

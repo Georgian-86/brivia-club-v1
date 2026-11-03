@@ -1061,3 +1061,17 @@ select (select count(*) from pg_publication_tables where pubname = 'supabase_rea
        has_table_privilege('authenticated', 'public.push_subscription', 'select'),                                         -- f
        has_function_privilege('authenticated', 'public.brivia_notify_nearby(uuid)', 'execute');                             -- f
 ```
+
+## 0031
+
+**Interest labels in the founder's wording, catalogue ordered A–Z (founder request 2026-11-03, D-135).**
+Apply after `0030`. Data only: relabels 65 `interest_node` rows by id (only where the label still equals 0017's) and
+renumbers `catalog_order` 1..1129 by label. Safe to re-run. No client change needed.
+
+Verify after the apply:
+
+```sql
+select (select label from public.interest_node where id = 'tech.frontier.ar_vr'),                -- AR/VR
+       (select count(*) from public.interest_node where catalog_order is not null),             -- 1129
+       (select max(catalog_order) from public.interest_node);                                   -- 1129
+```

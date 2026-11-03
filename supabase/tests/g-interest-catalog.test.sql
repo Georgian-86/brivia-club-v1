@@ -39,7 +39,8 @@ begin
   if (select label from public.interest_node where id = 'sports.racket.badminton') <> 'Badminton'
      or (select catalog_order from public.interest_node where id = 'sports.racket.badminton') is null then
     raise exception 'FAIL C1: Badminton was not reused'; end if;
-  if (select label from public.interest_node where id = 'tech.frontier.ar_vr') <> 'AR and VR' then raise exception 'FAIL C1: an existing label changed'; end if;
+  -- 0031 (D-135) puts the founder's wording on reused nodes: same id, the founder's label.
+  if (select label from public.interest_node where id = 'tech.frontier.ar_vr') <> 'AR/VR' then raise exception 'FAIL C1: AR/VR is not in the founder''s wording'; end if;
   if (select level from public.interest_node where id = 'tech.software.python') <> 3 then raise exception 'FAIL C1: Python missing'; end if;
   if exists (select 1 from public.interest_node where catalog_order is not null and lower(label) in ('gospel music', 'nlp')) then
     raise exception 'FAIL C1: a left-out label is offered'; end if;
