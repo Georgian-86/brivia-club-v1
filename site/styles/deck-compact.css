@@ -83,7 +83,10 @@ body.app-body .app-view[data-view="home"] .swipe-actions .swipe-action { flex: 0
   overflow: auto;
   border: 1.5px solid color-mix(in srgb, var(--color-oxblood) 78%, transparent);
   border-radius: 22px;
-  background: var(--color-card-paper);
+  /* Founder (2026-11-03): the request sheet's palette, warm ivory into soft champagne with a breath of blush. */
+  background:
+    radial-gradient(ellipse 70% 45% at 100% 0%, color-mix(in srgb, var(--aura-rose) 22%, transparent), transparent 70%),
+    linear-gradient(180deg, color-mix(in srgb, var(--color-cream) 72%, var(--color-card-paper)) 0%, color-mix(in srgb, var(--color-cream) 40%, var(--color-card-paper)) 100%);
   color: var(--color-name-ink);
   box-shadow: var(--shadow-2);
   font-family: var(--font-body);
