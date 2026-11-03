@@ -3021,5 +3021,12 @@ controls (a tester or a seeded test member), never a real member, so no new expo
   Avenue Supermarts, Digit share a site); the directory Edge Function's bulk pass (`kind: 'logos'`) fetches each site's
   square icon once (Google's icon service at 128 px, then DuckDuckGo's), stores it in `company-logos/directory/`, and
   sets the logo. It only fills empty logos of directory companies. Members' own organisations keep their uploads.
+- **Sources, in order:** Google's icon service (the site, then its www. host), DuckDuckGo's, the site's own
+  apple-touch-icon and favicon (an .ico served as a plain file is accepted only with the icon signature), then the logo
+  Wikidata lists for an organisation with that website (a Commons PNG).
+- **Result (live, 2026-11-04):** 876 of 930 companies have a stored logo. The other 54 (mostly public-sector banks and
+  PSUs whose sites refuse automated requests, plus a few startups) show an initials tile instead of the building mark:
+  wine initials on cream, the same tile size ("State Bank of India (SBI)" -> "SB"). Re-running the pass fills any that
+  start answering; an admin can also upload a logo for them (MODERATION.md).
 - **Proof:** SQL harness ALL PASSED (v-company C5: every seeded company has a website; the pass lists only empty logos,
-  stores only directory paths, never a URL; members cannot call it); live counts in README "## 0040".
+  stores only directory paths, never a URL; members cannot call it); unit 480 (initials).

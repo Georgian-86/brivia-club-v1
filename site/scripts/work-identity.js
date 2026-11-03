@@ -39,12 +39,24 @@ export const workLine = (work = {}) => {
 // The default mark when a company has no logo: a small building outline (inline SVG, currentColor).
 export const ORG_ICON = '<svg class="work-logo work-logo--default" viewBox="0 0 16 16" aria-hidden="true"><path d="M3 14V3.5L9 2v12M9 6h4v8M5 5.5h2M5 8h2M5 10.5h2M11 8.5h0M11 11h0M2 14h12"/></svg>';
 
+// D-148: a company whose site gives no icon still gets a mark: its initials on a small tile ("State Bank of India
+// (SBI)" -> "SB", "Zudio" -> "Z"). Words like "of", "and", "&" and anything in brackets are skipped.
+export const companyInitials = (name) => {
+  const words = cleanCompanyName(name).replace(/\([^)]*\)/g, ' ').split(/[\s/&+,.-]+/)
+    .filter((w) => w && !/^(of|and|the|for|in|at|de|la|le|des|du|&)$/i.test(w) && /[\p{L}\p{N}]/u.test(w));
+  return (words.length > 1 ? words[0][0] + words[1][0] : (words[0] || '').slice(0, 1)).toUpperCase();
+};
+export const monogramMarkup = (name, escapeHtml = (s) => String(s)) => {
+  const ini = companyInitials(name);
+  return ini ? `<span class="work-logo work-logo--mono" aria-hidden="true">${escapeHtml(ini)}</span>` : ORG_ICON;
+};
+
 // The card line: [logo] Title at Company. escapeHtml is the page's; logoUrl the public URL (or '' for the default mark).
 export const workMarkup = (work, { logoUrl = '', escapeHtml = (s) => String(s) } = {}) => {
   const line = workLine(work);
   if (!line) return '';
   const logo = work.company
-    ? (logoUrl ? `<img class="work-logo" src="${escapeHtml(logoUrl)}" alt="" width="14" height="14" loading="lazy" decoding="async" />` : ORG_ICON)
+    ? (logoUrl ? `<img class="work-logo" src="${escapeHtml(logoUrl)}" alt="" width="14" height="14" loading="lazy" decoding="async" />` : monogramMarkup(work.company, escapeHtml))
     : '';
   return `<span class="work-line" title="${escapeHtml(line)}">${logo}<span class="work-text">${escapeHtml(line)}</span></span>`;
 };

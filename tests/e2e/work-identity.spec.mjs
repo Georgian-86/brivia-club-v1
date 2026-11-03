@@ -71,7 +71,7 @@ try {
     await page.locator('.profile-edit-save').click();
     await page.waitForFunction(() => !document.querySelector('#profile-edit-modal'));
     await page.waitForFunction(() => /Founder at MyStartup/.test(document.querySelector('#profile-work')?.innerText || ''));
-    check(`${w}: "Founder at MyStartup", the default mark when there is no logo`, await page.locator('#profile-work svg.work-logo').count() === 1);
+    check(`${w}: "Founder at MyStartup", the initials tile when there is no logo (D-148)`, (await page.locator('#profile-work .work-logo--mono').textContent()) === 'M');
     await page.evaluate(() => document.querySelector('#profile-photo-editor')?.click());
     await page.waitForSelector('[data-work-picked]:not([hidden])');
     await page.locator('[data-work-clear]').click();

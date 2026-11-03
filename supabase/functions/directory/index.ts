@@ -35,13 +35,37 @@ const timed = (url: string, init: RequestInit = {}, ms = 6000) => fetch(url, { .
 
 // A site's square icon, stored once at <base>.<ext>; '' when none could be read. Google's icon service first (128 px),
 // then DuckDuckGo's. Raster only.
+// D-148 follow-up: then the "www." host, the site's own apple-touch-icon and favicon, and last the logo Wikidata lists
+// for an organisation with that website (a Commons PNG), so a site with an SVG-only icon still gets a mark.
+const commonsLogoFor = async (site: string) => {
+  try {
+    const q = `SELECT ?logo WHERE { ?o wdt:P856 ?w . FILTER(CONTAINS(LCASE(STR(?w)), "${site.replace(/[^a-z0-9.-]/g, '')}")) ?o wdt:P154 ?logo . } LIMIT 1`;
+    const r = await timed(`https://query.wikidata.org/sparql?format=json&query=${encodeURIComponent(q)}`, { headers: { accept: 'application/sparql-results+json' } }, 8000);
+    const file = r.ok ? (await r.json())?.results?.bindings?.[0]?.logo?.value || '' : '';
+    return file ? `${file.replace(/^http:/, 'https:')}?width=128` : '';
+  } catch { return ''; }
+};
 const storeIcon = async (admin: any, site: string, base: string) => {
-  for (const source of [`https://www.google.com/s2/favicons?domain=${encodeURIComponent(site)}&sz=128`, `https://icons.duckduckgo.com/ip3/${encodeURIComponent(site)}.ico`]) {
+  const www = site.startsWith('www.') ? site : `www.${site}`;
+  const sources = [
+    `https://www.google.com/s2/favicons?domain=${encodeURIComponent(site)}&sz=128`,
+    `https://www.google.com/s2/favicons?domain=${encodeURIComponent(www)}&sz=128`,
+    `https://icons.duckduckgo.com/ip3/${encodeURIComponent(site)}.ico`,
+    `https://${www}/apple-touch-icon.png`,
+    `https://${site}/apple-touch-icon.png`,
+    `https://${www}/favicon.ico`,
+    `https://${site}/favicon.ico`,
+    'commons',
+  ];
+  for (let source of sources) {
+    if (source === 'commons') { source = await commonsLogoFor(site); if (!source) continue; }
     try {
       const img = await timed(source, {}, 5000);
-      const type = img.headers.get('content-type') || '';
+      let type = (img.headers.get('content-type') || '').split(';')[0].trim();
       const bytes = img.ok ? new Uint8Array(await img.arrayBuffer()) : new Uint8Array();
-      if (bytes.length > 64 && bytes.length < 300_000 && /^image\/(png|jpeg|webp|gif|x-icon|vnd\.microsoft\.icon)/.test(type)) {
+      // An .ico served as a generic file: trust it only with the icon signature (00 00 01 00).
+      if (!/^image\//.test(type) && bytes[0] === 0 && bytes[1] === 0 && bytes[2] === 1 && bytes[3] === 0) type = 'image/x-icon';
+      if (bytes.length > 64 && bytes.length < 300_000 && /^image\/(png|jpeg|webp|gif|x-icon|vnd\.microsoft\.icon)$/.test(type)) {
         const ext = type.includes('png') ? 'png' : type.includes('jpeg') ? 'jpg' : type.includes('webp') ? 'webp' : type.includes('gif') ? 'gif' : 'ico';
         const path = `${base}.${ext}`;
         const up = await admin.storage.from('company-logos').upload(path, bytes, { contentType: type, upsert: true });

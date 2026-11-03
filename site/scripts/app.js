@@ -44,7 +44,7 @@ import '../styles/crossing-paths.css';
 import { createNearbyPage } from './nearby-page.js';
 import { COPY as NEARBY_COPY, crossingCopy } from './nearby-view.js';
 import { createMemberNotifications } from './member-notifications.js';
-import { workMarkup, workLine, normalizeWork, mergeCompanies, cleanTitle, cleanCompanyName, INDUSTRIES, logoFileToWebp, ORG_ICON } from './work-identity.js';
+import { workMarkup, workLine, normalizeWork, mergeCompanies, cleanTitle, cleanCompanyName, INDUSTRIES, logoFileToWebp, ORG_ICON, monogramMarkup } from './work-identity.js';
 import { createSoundKit, soundEnabled, setSoundEnabled, soundVolume, setSoundVolume, interactionSoundEnabled, setInteractionSoundEnabled, pushSoundEnabled, setPushSoundEnabled } from './notify-sound.js';
 import { createWebPush, pushSupport, PUSH_COPY } from './web-push.js';
 import '../styles/nearby.css';
@@ -3230,14 +3230,14 @@ const wireWorkEditor = (modal, current) => {
   title.value = state.title;
   const showPicked = () => {
     picked.hidden = !state.companyId;
-    pickedName.innerHTML = state.companyId ? `${state.logoUrl ? `<img class="work-logo" src="${escapeHtml(state.logoUrl)}" alt="" width="16" height="16" />` : ORG_ICON}<span>${escapeHtml(state.company)}</span>` : '';
+    pickedName.innerHTML = state.companyId ? `${state.logoUrl ? `<img class="work-logo" src="${escapeHtml(state.logoUrl)}" alt="" width="16" height="16" />` : monogramMarkup(state.company, escapeHtml)}<span>${escapeHtml(state.company)}</span>` : '';
   };
   showPicked();
   title.addEventListener('input', () => { state.title = title.value; });
   let seq = 0; let timer = 0; let rows = []; let query = '';
   const close = () => { list.hidden = true; search.setAttribute('aria-expanded', 'false'); };
   const render = (note = '') => {
-    const options = rows.map((c, i) => `<li class="b-option" role="option" id="profile-work-opt-${i}" data-work-id="${escapeHtml(c.id)}" tabindex="-1">${c.logo_path ? `<img class="work-logo" src="${escapeHtml(companyLogoUrl(c.logo_path))}" alt="" width="16" height="16" loading="lazy" />` : ORG_ICON}<span>${escapeHtml(c.name)}</span></li>`).join('');
+    const options = rows.map((c, i) => `<li class="b-option" role="option" id="profile-work-opt-${i}" data-work-id="${escapeHtml(c.id)}" tabindex="-1">${c.logo_path ? `<img class="work-logo" src="${escapeHtml(companyLogoUrl(c.logo_path))}" alt="" width="16" height="16" loading="lazy" />` : monogramMarkup(c.name, escapeHtml)}<span>${escapeHtml(c.name)}</span></li>`).join('');
     const add = query ? `<li class="b-option b-option-add" role="option" id="profile-work-opt-add" data-work-add tabindex="-1">Add “${escapeHtml(cleanCompanyName(query))}” as your organisation</li>` : '';
     list.innerHTML = options + (note ? `<li class="b-listbox-note">${escapeHtml(note)}</li>` : '') + add;
     list.hidden = !list.innerHTML;

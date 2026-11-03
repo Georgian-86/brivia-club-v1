@@ -1,7 +1,7 @@
 // D-140: the company line and picker helpers. Run: npm run test:unit
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { workLine, workMarkup, normalizeWork, mergeCompanies, domainOf, cleanTitle, ORG_ICON, INDUSTRIES } from '../../site/scripts/work-identity.js';
+import { workLine, workMarkup, normalizeWork, mergeCompanies, domainOf, cleanTitle, ORG_ICON, INDUSTRIES, companyInitials, monogramMarkup } from '../../site/scripts/work-identity.js';
 
 const esc = (v = '') => String(v).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 
@@ -19,7 +19,8 @@ test('the markup: a 14 px logo or the default mark, escaped, one line; nothing w
   assert.match(html, /<img class="work-logo" src="https:\/\/x\/logo.png" alt="" width="14" height="14"/);
   assert.match(html, /Engineer &lt;b&gt; at Acme &amp; Co/);
   assert.doesNotMatch(html, /<b>/);
-  assert.ok(workMarkup({ company: 'NoLogo' }, { escapeHtml: esc }).includes(ORG_ICON));
+  assert.match(workMarkup({ company: 'No Logo' }, { escapeHtml: esc }), /work-logo--mono[^>]*>NL</, 'no logo: the initials tile');
+  assert.ok(monogramMarkup('', esc).includes(ORG_ICON), 'no name at all: the default mark');
   assert.doesNotMatch(workMarkup({ title: 'Freelancer' }, { escapeHtml: esc }), /work-logo/, 'a title alone has no logo');
   assert.equal(workMarkup({}, { escapeHtml: esc }), '');
 });
@@ -35,4 +36,12 @@ test('rows, merging and domains', () => {
   assert.equal(domainOf('mystartup.in'), 'mystartup.in');
   assert.equal(domainOf('not a site'), '');
   assert.ok(INDUSTRIES.includes('Artificial intelligence') && INDUSTRIES.includes('Government and public sector'));
+});
+
+test('D-148: initials for a company without a logo', () => {
+  assert.equal(companyInitials('State Bank of India (SBI)'), 'SB');
+  assert.equal(companyInitials('Zudio'), 'Z');
+  assert.equal(companyInitials('Bank of Maharashtra'), 'BM');
+  assert.equal(companyInitials('Khaitan & Co'), 'KC');
+  assert.equal(companyInitials(''), '');
 });
