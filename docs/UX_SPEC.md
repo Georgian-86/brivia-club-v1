@@ -375,9 +375,10 @@ A mutual connect shows "Well, look who *crossed paths!*" with Keep exploring / S
 
 States: switch off → "Turn on Crossing Paths to discover people around you." + Turn on Crossing Paths (the explainer,
 then the browser prompt); an alerts-only switch from before 0029 → "Nearby is new" + Turn on Nearby; location blocked or
-unavailable → paused, with why and Try again (or Allow location); waiting for a first fix → "Finding people around
-you…"; nobody → "Looks a little quiet around here. We'll let you know when someone crosses your path." + "Look within
-3 km" (or 5); before 0029 → "Nearby opens soon".
+unavailable → one state each (D-133): "Location permission needed" with steps for the device, "Location
+unavailable" (check GPS and connection), "That took too long", unsupported browser, insecure page, each with a Try
+again that asks the browser afresh; opening Nearby asks for a fresh location ("Finding where you are…"); nobody → "It's a
+little quiet around here. Check back as more people cross paths." + "Look within 3 km" (or 5); before 0029 → "Nearby opens soon".
 
 Settings → CROSSING PATHS: "Discover when other Brivia members are nearby. Only members who enable this feature can
 discover you." The explainer: Discover people around you (within 5 km, only members who turned it on); Never your exact

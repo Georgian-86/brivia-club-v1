@@ -2701,3 +2701,31 @@ controls (a tester or a seeded test member), never a real member, so no new expo
   buttons on desktop); say if those should go too.
 - **Proof:** unit 445; e2e collab-requests 31/31 (a real right drag accepts, a left drag declines, two quick → presses
   send one answer, no buttons in the sheet, axe clean) and nearby 49/49.
+
+## D-133 (2026-11-03): Nearby on phones: the browser's real answer decides, not the Permissions API
+
+- **Report (founder, iPhone):** Nearby showed "Location is off for Brivia" although location was allowed; Try again did
+  nothing.
+- **Root cause (`site/scripts/crossing-paths.js`, `check`):** a `denied` from `navigator.permissions.query()` stopped the
+  check before `getCurrentPosition()` was ever called, and Try again ran the same path (`ask: false`), so it only
+  re-read the same answer. That answer is not reliable on phones: iOS Safari keeps a stale `denied` until the page or
+  app restarts, and Chrome on iOS also needs its own iOS location switch. Also: iOS Safari's default "Ask" reports
+  `prompt` every visit, so background updates never sent a location and opening Nearby never asked; timeouts and "no
+  position" shared one message with no retry; an insecure page or unsupported browser read as "location is off"; and
+  the panel's text started in lowercase. Live confirmed it: discovery on for 2 members, no live location rows.
+- **Fix:** the Permissions API is a hint only. Every tap (opening Nearby, Try again, Allow location, refresh, Turn on)
+  calls `getCurrentPosition` with a fresh fix (`maximumAge` 0), and waits for a running background check rather than
+  being dropped. A background update skips the call only when the browser would prompt and the page has had no fix
+  yet (no unsolicited prompts; Safari does not prompt again in the same page). A timeout or no position is retried
+  once with `enableHighAccuracy: true`. Denied, unavailable, timed out, unsupported and insecure are separate states;
+  denied shows steps for the device (iPhone Safari, Chrome on iPhone, Android, desktop). The loop re-checks when the
+  permission changes where the browser reports it. The quiet state reads "It's a little quiet around here. Check back
+  as more people cross paths."
+- **Unchanged on purpose:** no `watchPosition` (a fix every 5 minutes while visible, the server's 4-minute cap, is
+  enough and saves battery); distances stay bands from ~1 km cells (D-131: "1 km"), not "300 m"; nothing is sent
+  while Crossing Paths is off; off and sign-out delete the live area at once. No database change.
+- **Proof:** unit 450 (new: a stale `denied` still reaches the browser and pulses; Try again asks afresh; the GPS retry;
+  iOS "Ask" keeps updating after a first fix; unsupported / insecure; platform help); e2e nearby 55/55 (a forced stale
+  `denied` still shows people; blocked on an iPhone shows the iPhone steps, then allowing and Try again shows people;
+  timeout and unavailable each show their state and recover), crossing-paths 33/33; SQL harness ALL PASSED. Not run on
+  physical iPhone / Android devices here (Chromium emulation with iPhone and Android user agents).

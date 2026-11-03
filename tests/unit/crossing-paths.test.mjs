@@ -3,7 +3,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   createCrossingPaths, isQuietHour, alertHeadline, alertDetail, alertToast, pausedCopy, normaliseAlerts, alertKey,
-  geolocationPermission, NEARBY_GEO_OPTIONS,
+  geolocationPermission, NEARBY_GEO_OPTIONS, NEARBY_FRESH_OPTIONS, NEARBY_RETRY_OPTIONS, platformOf, locationHelp,
 } from '../../site/scripts/crossing-paths.js';
 
 const ALERT = { other_id: 'b', created_at: '2026-11-01T10:00:00Z', shared_interest: 'Chess' };
@@ -61,13 +61,43 @@ test('every 5 minutes while visible; nothing while the tab is hidden; a return t
   assert.equal(h.calls.pulse.length, 3);
 });
 
-test('location blocked: no pulse, the live cell is cleared, the status is paused-denied', async () => {
-  const h = harness({ permission: 'denied' });
+// D-133 (the mobile "Location is off" bug): the Permissions API is a hint. A 'denied' from it used to stop every check
+// before the browser was asked, so a stale denial (iOS Safari, Chrome on iOS) could never clear, even with Try again.
+test('location blocked: the browser itself is asked and refuses; no pulse, the live cell is cleared, paused-denied', async () => {
+  const h = harness({ permission: 'denied', fix: { code: 1 } });
   await h.cp.start();
+  assert.equal(h.calls.geo.length, 1);   // asked the browser, not just the Permissions API
   assert.equal(h.calls.pulse.length, 0);
-  assert.equal(h.calls.geo.length, 0);
   assert.equal(h.calls.clear, 1);
   assert.deepEqual(h.seen.status, ['paused-denied']);
+});
+
+test('a stale "denied" from the Permissions API no longer blocks a real location (the iPhone case)', async () => {
+  const h = harness({ permission: 'denied' });   // the API says denied, the browser gives a position
+  await h.cp.start();
+  assert.equal(h.calls.geo.length, 1);
+  assert.deepEqual(h.calls.pulse, [[12.97, 77.6]]);
+  assert.deepEqual(h.seen.status, ['on']);
+});
+
+test('Try again (ask) always asks the browser for a fresh position, even after a refusal', async () => {
+  const h = harness({ permission: 'denied', fix: { code: 1 } });
+  await h.cp.start();
+  h.state.fix = { lat: 12.97, lng: 77.6 };   // the member allowed it in Settings
+  await h.cp.check({ ask: true });
+  assert.equal(h.calls.geo.length, 2);
+  assert.equal(h.calls.geo[1], NEARBY_FRESH_OPTIONS);
+  assert.equal(NEARBY_FRESH_OPTIONS.maximumAge, 0);
+  assert.equal(h.calls.pulse.length, 1);
+  assert.deepEqual(h.seen.status, ['paused-denied', 'on']);
+});
+
+test('iOS "Ask": after a first fix in this page, background updates go on although the API still says prompt', async () => {
+  const h = harness({ permission: 'prompt' });
+  await h.cp.start({ ask: true });
+  await h.tick();
+  assert.equal(h.calls.geo.length, 2);
+  assert.equal(h.calls.pulse.length, 2);
 });
 
 test('never prompts on its own: permission "prompt" pauses without asking, unless the member just turned it on', async () => {
@@ -88,10 +118,23 @@ test('the browser refuses at the prompt: cleared and paused; no fix (timeout): p
   await h.cp.start();
   assert.equal(h.calls.clear, 1);
   assert.deepEqual(h.seen.status, ['paused-denied']);
+  // A timeout is retried once with GPS and a fresh reading, then reported as its own state; the cell expires on its own.
   const k = harness({ fix: { code: 3 } });
   await k.cp.start();
+  assert.equal(k.calls.geo.length, 2);
+  assert.equal(k.calls.geo[1], NEARBY_RETRY_OPTIONS);
+  assert.equal(NEARBY_RETRY_OPTIONS.enableHighAccuracy, true);
   assert.equal(k.calls.clear, 0);
-  assert.deepEqual(k.seen.status, ['paused-unavailable']);
+  assert.deepEqual(k.seen.status, ['paused-timeout']);
+  // No position (code 2): retried once, then "unavailable", separately from a timeout.
+  const u = harness({ fix: { code: 2 } });
+  await u.cp.start();
+  assert.equal(u.calls.geo.length, 2);
+  assert.deepEqual(u.seen.status, ['paused-unavailable']);
+  // A refusal is not retried (it would not change).
+  const d = harness({ fix: { code: 1 } });
+  await d.cp.start();
+  assert.equal(d.calls.geo.length, 1);
   assert.equal(k.calls.pulse.length, 0);
 });
 
@@ -146,4 +189,29 @@ test('geolocationPermission: the Permissions API state, or unknown without it', 
   assert.equal(await geolocationPermission({}), 'unknown');
   assert.equal(await geolocationPermission({ permissions: { query: async () => ({ state: 'denied' }) } }), 'denied');
   assert.equal(await geolocationPermission({ permissions: { query: async () => { throw new Error('no'); } } }), 'unknown');
+});
+
+test('D-133: unsupported and insecure are their own states, not "location is off"', async () => {
+  const mk = (opts) => createCrossingPaths({ pulse: async () => ({}), fetchAlerts: async () => ({ data: [] }), clear: async () => ({}), permission: async () => 'unknown',
+    doc: { visibilityState: 'visible', addEventListener() {}, removeEventListener() {} }, win: { addEventListener() {}, removeEventListener() {} },
+    setIntervalFn: () => 1, clearIntervalFn() {}, onStatus: (s) => seen.push(s), ...opts });
+  let seen = [];
+  await mk({ geo: undefined, secure: true }).start();
+  assert.deepEqual(seen, ['paused-unsupported']);
+  seen = [];
+  await mk({ geo: { getCurrentPosition() {} }, secure: false }).start();
+  assert.deepEqual(seen, ['paused-insecure']);
+  for (const reason of ['denied', 'prompt', 'unavailable', 'timeout', 'unsupported', 'insecure']) assert.match(pausedCopy(reason), /^Paused: /);
+});
+
+test('D-133: device-specific help for turning location on', () => {
+  const ua = (userAgent, maxTouchPoints = 0) => ({ userAgent, maxTouchPoints });
+  assert.equal(platformOf(ua('Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 Version/18.0 Mobile/15E148 Safari/604.1')), 'ios-safari');
+  assert.equal(platformOf(ua('Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 CriOS/130.0 Mobile/15E148 Safari/604.1')), 'ios-chrome');
+  assert.equal(platformOf(ua('Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 Version/18.0 Safari/605.1.15', 5)), 'ios-safari');   // iPad
+  assert.equal(platformOf(ua('Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 Chrome/130.0 Mobile Safari/537.36')), 'android');
+  assert.equal(platformOf(ua('Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 Chrome/130.0 Safari/537.36')), 'desktop');
+  assert.match(locationHelp(ua('iPhone Safari Version/18.0')), /Safari Websites/);
+  assert.match(locationHelp(ua('iPhone CriOS/130')), /set Chrome to/);
+  assert.match(locationHelp(ua('Android Chrome')), /quick settings/);
 });

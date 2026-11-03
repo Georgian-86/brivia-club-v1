@@ -88,7 +88,7 @@ test('the match moment uses the founder\'s line', () => {
   assert.match(html, /Well, look who <em>crossed paths!<\/em>/);
   assert.match(html, /data-match-chat/);
   assert.equal(COPY.matchTitle, 'Well, look who crossed paths!');
-  assert.equal(COPY.quietTitle + ' ' + COPY.quietCopy, "Looks a little quiet around here. We'll let you know when someone crosses your path.");
+  assert.equal(COPY.quietTitle + ' ' + COPY.quietCopy, "It's a little quiet around here. Check back as more people cross paths.");
 });
 
 test('requests from Nearby say so', () => {

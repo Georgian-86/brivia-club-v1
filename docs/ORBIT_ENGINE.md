@@ -882,8 +882,12 @@ get one alert each when their live cells are near each other. Design and copy: `
 - **Capture.** `nearby_pulse(p_lat, p_lng)` (security definer, volatile, so POST-only; `authenticated` only) snaps to a
   g7 cell with `brivia_grid_cell` and drops the coordinates, under the same no-logging rules as `set_home_location`. The
   client sends a coarse fix (`enableHighAccuracy: false`, `maximumAge` 5 min) on load, every 5 minutes and on return to
-  the tab, only while the tab is visible and only when the browser already allows location (it never prompts except on
-  the member's own "Turn on").
+  the tab, only while the tab is visible. The browser's own answer decides, never the Permissions API alone (D-133:
+  a stale `denied` from `navigator.permissions.query`, as iOS Safari keeps, used to block every request): the member's
+  own tap (Turn on, opening Nearby, Try again, Allow location, refresh) always calls `getCurrentPosition` with a fresh
+  fix; a background update skips it only when the browser would show a prompt and the page has had no fix yet. A
+  timeout or no position is retried once with high accuracy; denied, unavailable, timed out, unsupported and insecure
+  are separate states with device-specific help.
 - **Consent and symmetry.** `nearby_setting.enabled` is off by default (`enabled_at` records consent). A pair is eligible
   only if both are on, they share a `matches` row, `brivia_same_world`, no block either way, and neither muted the other
   (`nearby_mute`, one-way). Both alert rows are written in one transaction, so neither side learns more than the other.

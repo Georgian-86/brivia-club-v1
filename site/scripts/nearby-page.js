@@ -7,7 +7,7 @@
 import {
   COPY, RADII, normalizeRadius, radiusLine, nearbyState, normalizeNearby, nearbyCardMarkup, nearbyMatchMarkup, nearbyOpeners, NEARBY_OPENER,
 } from './nearby-view.js';
-import { pausedCopy } from './crossing-paths.js';
+import { locationHelp } from './crossing-paths.js';
 import { createDeckSwipe } from './deck-swipe.js';
 
 const RADIUS_KEY = 'brivia-nearby-radius';
@@ -29,7 +29,7 @@ export const createNearbyPage = ({
   const likeBtn = root.querySelector('#nearby-like');
   const profileBtn = root.querySelector('#nearby-profile');
 
-  const state = { visible: false, radius: readRadius(), people: [], error: null, loading: false, busy: false, swipe: null, match: null, seq: 0 };
+  const state = { locating: false, askedThisVisit: false, visible: false, radius: readRadius(), people: [], error: null, loading: false, busy: false, swipe: null, match: null, seq: 0 };
   radiusSelect.innerHTML = RADII.map((km) => `<option value="${km}"${km === state.radius ? ' selected' : ''}>${km} km</option>`).join('');
 
   const setBusy = (busy) => { state.busy = busy; [passBtn, likeBtn, profileBtn].forEach((b) => { b.disabled = busy; }); };
@@ -61,9 +61,14 @@ export const createNearbyPage = ({
     if (view === 'unavailable') { panel('Nearby opens soon', 'Discovering people around you is almost here.'); return; }
     if (view === 'off') { panel(COPY.offTitle, COPY.offCopy, button('data-nearby-turn-on', 'Turn on Crossing Paths', true), PRIVACY_POINTS); return; }
     if (view === 'consent') { panel('Nearby is new', 'Crossing Paths now also lets members around you discover you, and you them.', button('data-nearby-turn-on', 'Turn on Nearby', true), PRIVACY_POINTS); return; }
-    if (view === 'paused-prompt') { panel('Brivia needs your location', 'Allow location so we can show who is around you. We keep only a rough area, never where you are.', button('data-nearby-allow', 'Allow location', true)); return; }
-    if (view === 'paused-denied') { panel('Location is off for Brivia', pausedCopy('denied').replace(/^Paused: /, ''), button('data-nearby-retry', 'Try again')); return; }
-    if (view === 'paused-unavailable') { panel("We couldn't find you", pausedCopy('unavailable').replace(/^Paused: /, ''), button('data-nearby-retry', 'Try again')); return; }
+    // D-133: one state per real answer from the browser, each with the way out. Every button asks the browser afresh.
+    if (state.locating && view !== 'cards') { panel('Finding where you are…', 'Your browser may ask to share your location. We keep only a rough area, never where you are.'); return; }
+    if (view === 'paused-prompt') { panel('Allow location to see who is around', 'Your browser will ask to share your location. We keep only a rough ~1 km area for 20 minutes, never where you are.', button('data-nearby-allow', 'Allow location', true)); return; }
+    if (view === 'paused-denied') { panel('Location permission needed', `Brivia can't see your location yet. ${locationHelp()}`, button('data-nearby-retry', 'Try again', true)); return; }
+    if (view === 'paused-unavailable') { panel('Location unavailable', "Your device couldn't find where you are. Check that Location (GPS) and your internet connection are on, then try again.", button('data-nearby-retry', 'Try again', true)); return; }
+    if (view === 'paused-timeout') { panel('That took too long', 'Finding your location timed out. Turning on Wi-Fi or stepping near a window helps. Then try again.', button('data-nearby-retry', 'Try again', true)); return; }
+    if (view === 'paused-unsupported') { panel("This browser can't share your location", 'Open Brivia in Safari or Chrome to use Nearby.'); return; }
+    if (view === 'paused-insecure') { panel('Open the secure Brivia site', 'Location only works on the https version of Brivia.'); return; }
     if (view === 'locating') { panel('Finding people around you…', 'This takes a moment the first time.', button('data-nearby-retry', 'Try again')); return; }
     if (view === 'incomplete') { panel('Finish your profile first', 'Nearby opens once your profile is complete.'); return; }
     if (view === 'error') { panel('Nearby could not load', 'Check your connection and try again.', button('data-nearby-retry', 'Try again')); return; }
@@ -175,18 +180,28 @@ export const createNearbyPage = ({
     }
   });
 
-  const refresh = async ({ ask = false } = {}) => {
+  // A fresh position from the browser, then who is around. Every tap (refresh, Try again, Allow location) and opening
+  // Nearby asks the browser itself (ask: true): it never just re-reads a remembered answer (D-133).
+  const refresh = async () => {
+    if (state.locating) return;
+    state.locating = true;
     refreshBtn.classList.add('is-spinning');
-    try { await location.refresh({ ask }); } finally { refreshBtn.classList.remove('is-spinning'); }
+    if (!state.people.length) render();
+    try { await location.refresh({ ask: true }); } finally { state.locating = false; refreshBtn.classList.remove('is-spinning'); }
     await discover();
+  };
+  // Opening Nearby with Crossing Paths on: ask for the location once per visit, then list.
+  const locateOnOpen = () => {
+    if (!state.visible) return;
+    if (location.enabled() === true && !state.askedThisVisit) { state.askedThisVisit = true; refresh(); return; }
+    discover({ keepCurrent: true });
   };
 
   root.addEventListener('click', (e) => {
     if (e.target.closest('#nearby-pass')) { pass(); return; }
     if (e.target.closest('#nearby-like')) { connect(); return; }
     if (e.target.closest('#nearby-refresh')) { refresh(); return; }
-    if (e.target.closest('[data-nearby-retry]')) { refresh(); return; }
-    if (e.target.closest('[data-nearby-allow]')) { refresh({ ask: true }); return; }
+    if (e.target.closest('[data-nearby-retry], [data-nearby-allow]')) { refresh(); return; }
     if (e.target.closest('[data-nearby-turn-on]')) { location.turnOn(); return; }
     const widen = e.target.closest('[data-nearby-widen]');
     if (widen) { state.radius = normalizeRadius(widen.dataset.nearbyWiden); radiusSelect.value = String(state.radius); saveRadius(state.radius); discover(); return; }
@@ -205,10 +220,11 @@ export const createNearbyPage = ({
   });
 
   return {
-    show() { state.visible = true; discover(); },
+    show() { state.visible = true; state.askedThisVisit = false; if (location.enabled() === true) locateOnOpen(); else discover(); },
     hide() { state.visible = false; if (matchDialog?.open) matchDialog.close(); },
     // The location loop changed status or sent a fresh pulse: read again, keeping the card in front.
-    onLocation() { if (state.visible) discover({ keepCurrent: true }); },
+    // Also runs when the switch is first read as on (app start): then this visit's location request goes out.
+    onLocation() { if (state.visible && !state.locating) locateOnOpen(); },
     refresh,
     showMatch,
   };

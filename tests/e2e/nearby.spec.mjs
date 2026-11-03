@@ -125,8 +125,8 @@ try {
     // Quiet: back to Nearby with nobody left.
     await page.evaluate(() => { history.pushState({}, '', '/app.html?view=nearby'); dispatchEvent(new PopStateEvent('popstate')); });
     await page.waitForSelector('[data-view="nearby"]:not([hidden])');
-    await page.waitForFunction(() => /quiet around here/.test(document.querySelector('#nearby-deck')?.innerText || ''));
-    check(`${w}: the quiet state offers to look further`, /We'll let you know when someone crosses your path\./.test(await page.locator('#nearby-deck').innerText()) && await page.locator('[data-nearby-widen="5"]').count() === 1);
+    await page.waitForFunction(() => /little quiet around here/.test(document.querySelector('#nearby-deck')?.innerText || ''));
+    check(`${w}: the quiet state offers to look further`, /It's a little quiet around here\.[\s\S]*Check back as more people cross paths\./.test(await page.locator('#nearby-deck').innerText()) && await page.locator('[data-nearby-widen="5"]').count() === 1);
     await shot(page, `nearby-quiet-${w}.png`);
     await ctx.close();
   }
@@ -173,15 +173,57 @@ try {
     await ctx.close();
   }
 
-  // Location blocked: paused, explained.
+  // D-133: the mobile "Location is off" bug. The Permissions API says 'denied' (stale, as on iPhones) while the browser
+  // actually allows location: Nearby must ask the browser itself and show people.
   {
     reset({ nearby: { enabled: true } });
-    const ctx = await newContext({ width: 1440, height: 1000 }, {}, { allow: false });
+    const ctx = await newContext({ width: 390, height: 844 }, { isMobile: true, hasTouch: true });
+    await ctx.addInitScript(() => {
+      const query = navigator.permissions?.query?.bind(navigator.permissions);
+      if (query) navigator.permissions.query = (d) => (d?.name === 'geolocation' ? Promise.resolve({ state: 'denied', addEventListener() {}, removeEventListener() {} }) : query(d));
+    });
     const page = await stub.open(ctx, { path: '/app.html?view=nearby', errors });
-    await page.waitForFunction(() => /Location is off for Brivia|Brivia needs your location/.test(document.querySelector('#nearby-deck')?.innerText || ''), null, { timeout: 10000 }).catch(() => {});
+    await page.waitForSelector('.nearby-card.is-current', { timeout: 10000 }).catch(() => {});
+    check('a stale "denied" from the Permissions API no longer blocks Nearby: the browser is asked and people show', await page.locator('.nearby-card.is-current').count() === 1 && (st.nearby.pulses || []).length >= 1);
+    await ctx.close();
+  }
+
+  // Location truly blocked (iPhone): the permission state with iPhone steps; allowing it and tapping Try again asks the
+  // browser afresh and shows people.
+  {
+    reset({ nearby: { enabled: true } });
+    const IPHONE = 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1';
+    const ctx = await newContext({ width: 390, height: 844 }, { isMobile: true, hasTouch: true, userAgent: IPHONE }, { allow: false });
+    const page = await stub.open(ctx, { path: '/app.html?view=nearby', errors });
+    await page.waitForFunction(() => /Location permission needed/.test(document.querySelector('#nearby-deck')?.innerText || ''), null, { timeout: 12000 }).catch(() => {});
     const text = await page.locator('#nearby-deck').innerText();
-    check(`location not allowed: Nearby pauses and explains (${JSON.stringify(text)})`, /Location is off for Brivia|Brivia needs your location/.test(text));
-    await shot(page, 'nearby-paused-1440.png');
+    check(`blocked on an iPhone: "Location permission needed" with the iPhone steps (${JSON.stringify(text.slice(0, 160))})`, /Location permission needed/.test(text) && /Safari Websites/.test(text) && /Try again/i.test(text));
+    await shot(page, 'nearby-denied-390.png');
+    const pulsesBefore = (st.nearby.pulses || []).length;
+    await ctx.grantPermissions(['geolocation'], { origin: stub.url });
+    // The button's own click (Playwright's scroll-into-view fights the page's smooth scrolling near the tab bar).
+    await page.locator('[data-nearby-retry]').evaluate((b) => b.click());
+    await page.waitForSelector('.nearby-card.is-current', { timeout: 10000 }).catch(() => {});
+    check('allowed, then Try again: a fresh request, a pulse, people show', await page.locator('.nearby-card.is-current').count() === 1 && (st.nearby.pulses || []).length > pulsesBefore);
+    await ctx.close();
+  }
+
+  // Timeout and no position are their own states; Try again recovers.
+  for (const [code, title] of [[3, 'That took too long'], [2, 'Location unavailable']]) {
+    reset({ nearby: { enabled: true } });
+    const ctx = await newContext({ width: 1440, height: 1000 });
+    await ctx.addInitScript((c) => {
+      const real = navigator.geolocation.getCurrentPosition.bind(navigator.geolocation);
+      navigator.geolocation.getCurrentPosition = (ok, fail, opts) => (window.__geoFail ?? true ? setTimeout(() => fail({ code: c, message: 'stub' }), 20) : real(ok, fail, opts));
+    }, code);
+    const page = await stub.open(ctx, { path: '/app.html?view=nearby', errors });
+    await page.waitForFunction((t) => (document.querySelector('#nearby-deck')?.innerText || '').includes(t), title, { timeout: 12000 }).catch(() => {});
+    check(`code ${code}: "${title}" with Try again`, (await page.locator('#nearby-deck').innerText()).includes(title) && await page.locator('[data-nearby-retry]').count() === 1);
+    if (code === 3) await shot(page, 'nearby-timeout-1440.png');
+    await page.evaluate(() => { window.__geoFail = false; });
+    await page.locator('[data-nearby-retry]').evaluate((b) => b.click());
+    await page.waitForSelector('.nearby-card.is-current', { timeout: 10000 }).catch(() => {});
+    check(`code ${code}: Try again asks again and recovers`, await page.locator('.nearby-card.is-current').count() === 1);
     await ctx.close();
   }
 
