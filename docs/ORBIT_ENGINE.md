@@ -1149,7 +1149,7 @@ Explore lists events the club curates. This is location-first ranking outside th
   (`brivia_companion_status`). This replaces "confirmed only" in §11.1 and §11.2, so people can find company before
   paying. Order, visibility, swipes and the match rule are unchanged; "friends going" still lists confirmed seats only.
 
-## 12. The hiring lane (D-137, migration 0033)
+## 12. The hiring lane (D-138, migration 0034)
 
 Hiring is a lane beside the deck, not a change to it: `deck_candidates` and the ORBIT score are untouched.
 

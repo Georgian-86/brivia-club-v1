@@ -11,7 +11,7 @@ import { SCREENS, STEP_ICONS, SETUP, stepLabel, stepStates, backTarget, groupInt
 import { ImageProcessingError, PHOTO_ERROR_MESSAGE, PHOTO_FRAMER_ERROR } from './image-compress.js';
 import { MAX_INTERESTS } from './passion-budget.js';
 import { POPULAR_INTERESTS, LOOKING_FOR_CATALOG } from './discovery-catalog.js';
-import { BIO_MAX, cleanBio } from './profile-edit.js';
+import { BIO_MAX, cleanBio, bioWords, BIO_WORDS_MAX } from './profile-edit.js';
 import { attachEmojiPicker } from './emoji-field.js';
 import { matchTypedCity } from './area-pick.js';
 import { locateOnce, fallbackCopy, STILL_WAITING_TEXT } from './geo-locate.js';
@@ -23,7 +23,6 @@ const reducedMotion = () => Boolean(window.matchMedia?.('(prefers-reduced-motion
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const MIN_PASSWORD = 8;
 // D-112: About you. The bio's floor keeps it a sentence, not a placeholder; Looking for matches Edit profile's cap.
-const BIO_MIN = 20;
 const LOOKING_MAX = 8;
 // The stored values (supabase.js normalizeGender), shown as they are.
 export const GENDERS = ['Male', 'Female', 'Prefer not to say'];
@@ -69,7 +68,8 @@ export const COPY = {
   interestsMissing: 'Pick at least one interest.',
   photoMissing: 'Add a profile photo to continue.',
   lookingMissing: 'Pick at least one thing you are looking for.',
-  bioMissing: 'Write a short bio, at least 20 characters.',
+  bioMissing: 'Write a short bio, at least one word.',
+  bioTooLong: `Keep your bio to ${BIO_WORDS_MAX} words or fewer.`,
   lookingCap: 'You can pick up to 8. Remove one to add another.',
   cap: `You can pick up to ${MAX_INTERESTS}. Remove one to add another.`,
 };
@@ -404,7 +404,7 @@ export const initGuidedSignup = ({
     },
 
     // D-112: "About you", both required. Looking for is one dropdown like the interests (the Edit profile suggestions,
-    // or the member's own words, up to LOOKING_MAX); the bio is 20 to BIO_MAX characters. D-114: the last setup screen
+    // or the member's own words, up to LOOKING_MAX); the bio is 1 to 20 words (D-137). D-114: the last setup screen
     // (after interests and the location): Finish saves About you, the area and the interests together.
     about: () => {
       let query = '';
@@ -412,7 +412,7 @@ export const initGuidedSignup = ({
       const shownLabel = (v) => String(v || '').trim().replace(/\s+/g, ' ');
       const key = (v) => shownLabel(v).toLowerCase();
       const has = (v) => a.lookingFor.some((x) => key(x) === key(v));
-      const bioOk = () => cleanBio(a.bio).length >= BIO_MIN;
+      const bioOk = () => bioWords(a.bio).ok;
       return {
         primary: 'Finish',
         html: `${heading('Tell members about you.', 'Who you would like to meet, and a line or two about yourself. Members see both on your profile.')}
@@ -431,7 +431,7 @@ export const initGuidedSignup = ({
           </div>
           <label class="guided-field guided-field--bio"><span class="guided-field-label">Bio</span>
             <textarea name="guided-bio" rows="4" maxlength="${BIO_MAX}" placeholder="What you do, what you love, what you're up to." aria-describedby="guided-bio-count"></textarea>
-            <small class="guided-bio-count" id="guided-bio-count"><span data-guided-bio-count>0</span> / ${BIO_MAX}. At least ${BIO_MIN} characters.</small>
+            <small class="guided-bio-count" id="guided-bio-count"><span data-guided-bio-count aria-live="polite">0/${BIO_WORDS_MAX} words</span><span class="guided-bio-limit" data-guided-bio-limit role="status"></span></small>
           </label>`,
         mount: (el) => {
           const combo = el.querySelector('[data-guided-combo]');
@@ -536,13 +536,22 @@ export const initGuidedSignup = ({
           tray.addEventListener('click', (event) => { const b = event.target.closest('.guided-pick'); if (b) { toggle(b.dataset.value); renderMenu(); } });
           bio.value = a.bio;
           attachEmojiPicker(bio, { label: 'Add an emoji to your bio', after: bioCount.parentElement });
-          const syncBio = () => { a.bio = bio.value; bioCount.textContent = String(bio.value.length); refreshNext(); };
+          const bioLimit = el.querySelector('[data-guided-bio-limit]');
+          const syncBio = () => {
+            a.bio = bio.value;
+            const w = bioWords(bio.value);
+            bioCount.textContent = w.label;
+            bioLimit.textContent = w.message ? ` ${w.message}` : '';
+            bio.toggleAttribute('aria-invalid', w.over);
+            bioCount.parentElement.classList.toggle('is-over', w.over);
+            refreshNext();
+          };
           bio.addEventListener('input', syncBio);
           syncBio();
           renderTray();
         },
         ready: () => a.lookingFor.length >= 1 && bioOk(),
-        notReady: () => (a.lookingFor.length ? COPY.bioMissing : COPY.lookingMissing),
+        notReady: () => (!a.lookingFor.length ? COPY.lookingMissing : (bioWords(a.bio).over ? COPY.bioTooLong : COPY.bioMissing)),
         submit: async () => {
           // One submit per Finish: a second tap or Enter that slips through is ignored (the latch opens again only
           // when the save failed and the member is asked to try again).

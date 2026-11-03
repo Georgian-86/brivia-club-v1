@@ -94,6 +94,12 @@ const SPRING = 'cubic-bezier(.34, 1.56, .64, 1)';   // overshoot, then settle
 const GLIDE = 'cubic-bezier(.2, .7, .2, 1)';        // the --ease token's curve
 const wait = (ms) => new Promise((resolve) => { window.setTimeout(resolve, ms); });
 
+// D-137: the swipe sound. The app sets it once (app.js: the sound kit); every deck (Explore, Nearby, Event companions,
+// requests) shares it. It is called after the motion starts and never awaited, so audio can never delay a swipe.
+let swipeCue = () => {};
+export const setSwipeCue = (fn) => { swipeCue = typeof fn === 'function' ? fn : () => {}; };
+const cue = (direction) => { try { swipeCue(direction); } catch { /* sound is never allowed to break a swipe */ } };
+
 export const createDeckSwipe = ({ card, stack, canDrag = () => true, onCommit = () => false } = {}) => {
   if (!card) return null;
   const reduced = () => Boolean(window.matchMedia?.('(prefers-reduced-motion: reduce)').matches);
@@ -130,8 +136,11 @@ export const createDeckSwipe = ({ card, stack, canDrag = () => true, onCommit = 
   };
 
   // Off-screen in the swipe direction with momentum. Resolves when the card is gone.
-  const flyOut = (direction, { vx = 0, duration } = {}) => {
+  // silent: the card leaves without a swipe (a report or block). A pitch that was parked already had its sound.
+  const flyOut = (direction, { vx = 0, duration, silent = false } = {}) => {
+    const wasParked = card.classList.contains('is-parked');
     card.classList.remove('is-held', 'is-parked');
+    const sound = () => { if (!silent && !(wasParked && direction === 'pitch')) cue(direction); };
     host.classList.add('is-flying');
     vibrate();
     if (reduced()) {
@@ -139,6 +148,7 @@ export const createDeckSwipe = ({ card, stack, canDrag = () => true, onCommit = 
       host.style.setProperty('--swipe-rise-speed', '0ms');
       place(0, 0, 0, 'opacity 140ms linear');
       card.style.opacity = '0';
+      sound();
       return wait(150);
     }
     const rect = card.getBoundingClientRect();
@@ -148,19 +158,22 @@ export const createDeckSwipe = ({ card, stack, canDrag = () => true, onCommit = 
     host.style.setProperty('--swipe-rise-speed', `${ms}ms`);
     setVars({ pass: direction === 'pass' ? 1 : 0, pitch: direction === 'pitch' ? 1 : 0, rise: 1 });
     place(pose.x + distance, pose.y + 24, turn, `transform ${ms}ms ${GLIDE}`);
+    sound();
     return wait(ms + 20);
   };
 
   // A pitch keeps its card on screen, parked a little to the right with the PITCH stamp, until the sheet resolves.
   const park = () => {
+    const already = card.classList.contains('is-parked');
     card.classList.remove('is-held');
     card.classList.add('is-parked');
     host.classList.remove('is-flying');
     host.style.setProperty('--swipe-rise-speed', reduced() ? '0ms' : '360ms');
     setVars({ pitch: 1, rise: 0.35 });
-    if (reduced()) { place(0, 0, 0, 'none'); return; }
+    if (reduced()) { place(0, 0, 0, 'none'); if (!already) cue('pitch'); return; }
     const width = card.offsetWidth || 400;
     place(Math.min(width * 0.08, 40), 4, 3, `transform 360ms ${SPRING}`);
+    if (!already) cue('pitch');
   };
 
   // Snap back to the resting pose with no motion (the card now shows a different member).

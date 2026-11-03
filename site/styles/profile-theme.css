@@ -401,3 +401,13 @@ body:has(.app-view[data-view="profile"]:not([hidden])) .app-wrap{padding-bottom:
 .public-profile-chip-more{padding:0!important;border:0!important;background:none!important}
 .public-profile-chip-more button{min-height:0;padding:5px 12px;border:1px dashed color-mix(in srgb,var(--color-wine) 35%,transparent);border-radius:var(--radius-pill);background:transparent;color:var(--color-wine);font:600 var(--text-14)/1.25 var(--font-body);cursor:pointer}
 .public-profile-chip-more button:focus-visible{outline:2px solid var(--color-wine);outline-offset:2px}
+/* D-137: the bio word limit, a quiet wine note when the bio runs past 20 words. */
+.profile-edit-helper.is-over{color:var(--color-wine);font-weight:600}
+/* D-137: the sound volume, a quiet wine slider under the Sounds switch. */
+.settings-volume-row{display:flex;align-items:center;justify-content:space-between;gap:18px;padding:12px 0 15px;border-bottom:1px solid rgba(90,6,31,.14)}
+.settings-volume-row>span{display:flex;min-width:0;flex-direction:row;align-items:baseline;gap:8px}
+.settings-volume-row strong{color:var(--color-wine-deep);font-size:var(--text-12);letter-spacing:.083em}
+.settings-volume-row small{color:var(--color-ink-soft);font-size:var(--text-12)}
+.settings-volume-row input{flex:0 1 160px;min-width:96px;min-height:44px;accent-color:var(--color-wine)}
+.settings-volume-row input:disabled{opacity:.45}
+.profile-edit-helper [data-bio-count]{color:var(--color-ink);font-weight:600}

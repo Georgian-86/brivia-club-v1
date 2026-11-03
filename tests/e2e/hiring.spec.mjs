@@ -1,4 +1,4 @@
-// Hiring (D-137) against the stubbed Supabase, at 1440 and 390. Before 0033 nothing shows. A seeker sees a hirer's card
+// Hiring (D-138) against the stubbed Supabase, at 1440 and 390. Before 0034 nothing shows. A seeker sees a hirer's card
 // bar ("HIRING · …"), the role strip, the profile banner first with Ask about this role, the Ask sheet (a short note is
 // refused by the field; the ask goes through ask_about_role), the once-a-day notification row, the Hiring lens and the
 // "Open to roles" card. A hirer sees "You're hiring" (Add a role refuses a link, then posts), HIRING in the eyebrow,
@@ -71,16 +71,16 @@ const sheetChecks = async (page, w, label) => {
 };
 
 try {
-  // 0. Before 0033: the RPCs are missing and nothing hiring-shaped appears.
+  // 0. Before 0034: the RPCs are missing and nothing hiring-shaped appears.
   {
     st.routes = { 'rpc/my_role_intent': missing, 'rpc/my_hiring_roles': missing, 'rpc/member_hiring': missing };
     const ctx = await stub.newContext(browser, { width: 1440, height: 900 });
     const page = await stub.open(ctx, { errors });
     await page.waitForSelector('#swipe-card:not([hidden]) #swipe-name');
     await page.waitForTimeout(500);
-    check('before 0033: the bar keeps LOOKING FOR', /LOOKING FOR/.test(await page.locator('#swipe-card-label').innerText()));
-    check('before 0033: no strip, no lens', await page.locator('#swipe-hiring').isHidden() && await page.locator('#filter-hiring-group').isHidden());
-    check('before 0033: member_hiring never asked', callsTo('member_hiring').length === 0);
+    check('before 0034: the bar keeps LOOKING FOR', /LOOKING FOR/.test(await page.locator('#swipe-card-label').innerText()));
+    check('before 0034: no strip, no lens', await page.locator('#swipe-hiring').isHidden() && await page.locator('#filter-hiring-group').isHidden());
+    check('before 0034: member_hiring never asked', callsTo('member_hiring').length === 0);
     await ctx.close();
   }
 

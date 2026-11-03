@@ -158,7 +158,7 @@ To remove one, retire it: `update public.interest_node set status = 'retired' wh
 it again and nobody can recreate that label (add_member_interest refuses a retired label). Members who already hold it
 keep it until their next interest save; clear it from profiles with the same steps as any reported profile text.
 
-## Hiring (0033, D-137)
+## Hiring (0034, D-138)
 
 - **"Fake job or recruitment scam"** reports arrive as `report_member` rows with reason `fake` and a note starting
   "Hiring:". The report already paused every open role of that member (`paused_by_report`) and blocked them for the

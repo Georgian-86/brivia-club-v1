@@ -1,5 +1,5 @@
-// Hiring UI (D-137). The screens of docs/superpowers/specs/2026-11-02-hiring-design.md, wired by app.js through one
-// object: createHiring(deps). Every server call goes through the 0033 RPCs; before 0033 is applied the first call
+// Hiring UI (D-138). The screens of docs/superpowers/specs/2026-11-02-hiring-design.md, wired by app.js through one
+// object: createHiring(deps). Every server call goes through the 0034 RPCs; before 0034 is applied the first call
 // answers "function not found" and the feature stays hidden (available = false), so nothing else changes.
 //
 // Sheets are native modal <dialog>s (focus stays inside, Escape closes, focus returns to the opener), a centred card

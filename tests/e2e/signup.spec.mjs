@@ -502,22 +502,31 @@ try {
     await page.locator('input[name="guided-looking"]').press('Escape');
     u = await ui(page);
     check(`${w} about: Looking for alone is not enough (bio required)`, () => assert.equal(u.nextDisabled, true));
-    await page.locator('textarea[name="guided-bio"]').fill('Hi there');
+    // D-137: a bio is 1 to 20 words, counted live; past 20 a quiet note shows and Finish stays off.
+    await page.locator('textarea[name="guided-bio"]').fill('   ');
     u = await ui(page);
-    check(`${w} about: a bio under 20 characters is not enough`, () => assert.equal(u.nextDisabled, true));
+    check(`${w} about: a blank bio is not enough`, () => assert.equal(u.nextDisabled, true));
+    await page.locator('textarea[name="guided-bio"]').fill(`${'word '.repeat(21)}`);
+    u = await ui(page);
+    const over = await page.evaluate(() => ({ count: document.querySelector('[data-guided-bio-count]').textContent, note: document.querySelector('[data-guided-bio-limit]').textContent.trim(), over: document.querySelector('.guided-bio-count').classList.contains('is-over') }));
+    check(`${w} about: 21 words shows ${over.count} and "${over.note}", Finish stays off`, () => { assert.equal(over.count, '21/20 words'); assert.match(over.note, /20 words or fewer/); assert.equal(over.over, true); assert.equal(u.nextDisabled, true); });
+    await page.locator('textarea[name="guided-bio"]').fill('  Hi    there  ');
+    u = await ui(page);
+    const two = await page.locator('[data-guided-bio-count]').textContent();
+    check(`${w} about: extra spaces never count (${two})`, () => assert.equal(two, '2/20 words'));
     // D-113: the emoji panel under the bio adds an emoji at the caret and the count follows.
     await page.locator('.guided-screen--about .emoji-field-toggle').click();
     const emoji = await page.locator('.guided-screen--about .emoji-field-emoji').first().getAttribute('data-emoji');
     await page.locator('.guided-screen--about .emoji-field-emoji').first().click();
     const withEmoji = await page.evaluate(() => ({ value: document.querySelector('textarea[name="guided-bio"]').value, count: document.querySelector('[data-guided-bio-count]').textContent }));
-    check(`${w} about: the emoji panel adds ${emoji} to the bio (${JSON.stringify(withEmoji)})`, () => { assert.equal(withEmoji.value, `Hi there${emoji}`); assert.equal(withEmoji.count, String(withEmoji.value.length)); });
+    check(`${w} about: the emoji panel adds ${emoji} to the bio (${JSON.stringify(withEmoji)})`, () => { assert.ok(withEmoji.value.endsWith(emoji)); assert.equal(withEmoji.count, `${withEmoji.value.trim().split(/\s+/).length}/20 words`); });
     await shot(page, `${w}-05e-about-emoji`);
     await auditScreen(page, `${w} about emoji panel`);
     await page.locator('textarea[name="guided-bio"]').press('Escape');
     await page.locator('textarea[name="guided-bio"]').fill(BIO);
     u = await ui(page);
     const bioCount = await page.locator('[data-guided-bio-count]').textContent();
-    check(`${w} about: both answered enables Finish; the count reads ${bioCount}`, () => { assert.equal(u.nextDisabled, false); assert.equal(Number(bioCount), BIO.length); });
+    check(`${w} about: both answered enables Finish; the count reads ${bioCount}`, () => { assert.equal(u.nextDisabled, false); assert.equal(bioCount, `${BIO.trim().split(/\s+/).length}/20 words`); });
     await shot(page, `${w}-05d-about`);
     await auditScreen(page, `${w} about`);
     await page.locator('[data-guided-back]').click();

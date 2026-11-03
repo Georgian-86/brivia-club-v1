@@ -233,7 +233,7 @@ try {
     await lp.locator('[data-profile-setting="notifications"]').click();
     await lp.waitForSelector('#profile-push-toggle');
     const settings = await lp.locator('.notification-settings-dialog').innerText();
-    check('Settings: WEB NOTIFICATIONS and NOTIFICATION SOUND switches', /WEB NOTIFICATIONS/.test(settings) && /NOTIFICATION SOUND/.test(settings));
+    check('Settings: WEB NOTIFICATIONS, SOUNDS and SOUND VOLUME (D-137)', /WEB NOTIFICATIONS/.test(settings) && /\bSOUNDS\b/.test(settings) && /SOUND VOLUME/.test(settings));
     await lp.locator('label:has(#profile-sound-toggle)').click();
     check('the sound switch is saved for this device', (await lp.evaluate(() => localStorage.getItem('brivia-notify-sound'))) === 'off');
     await laptop.close();

@@ -37,7 +37,7 @@ export const reviewCardModel = (request, myInterests = []) => {
     shared,
     note: String(request?.note || '').trim(),
     nearby: request?.via === 'nearby',
-    askingAbout: String(request?.role || '').trim(),  // D-137: the role a seeker asked about
+    askingAbout: String(request?.role || '').trim(),  // D-138: the role a seeker asked about
     initials: initialsOf(name),
   };
 };

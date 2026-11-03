@@ -10,6 +10,25 @@ export const experienceChoices = (current) => {
 };
 
 export const BIO_MAX = 300;
+// D-137 (founder, 2026-11-03): a bio is 1 to 20 words. A word is a run of non-space text: extra spaces, line breaks and
+// leading or trailing spaces never count. The 300-character ceiling (0016) stays as a backstop.
+export const BIO_WORDS_MIN = 1;
+export const BIO_WORDS_MAX = 20;
+export const countWords = (value) => {
+  const text = String(value ?? '').trim();
+  return text ? text.split(/\s+/u).length : 0;
+};
+export const BIO_COPY = Object.freeze({
+  empty: 'Write at least one word.',
+  over: `Keep it to ${BIO_WORDS_MAX} words or fewer.`,
+});
+// The live counter ("8/20 words") and whether the bio may be saved.
+export const bioWords = (value) => {
+  const words = countWords(value);
+  const over = words > BIO_WORDS_MAX;
+  const empty = words < BIO_WORDS_MIN;
+  return { words, over, empty, ok: !over && !empty, label: `${words}/${BIO_WORDS_MAX} words`, message: over ? BIO_COPY.over : '' };
+};
 // One paragraph block: line breaks kept (at most two in a row), spaces trimmed, capped.
 export const cleanBio = (value) => String(value ?? '').replace(/\r\n?/g, '\n').replace(/[ \t]+\n/g, '\n').replace(/\n{3,}/g, '\n\n').trim().slice(0, BIO_MAX);
 

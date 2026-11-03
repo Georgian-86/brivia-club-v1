@@ -1094,8 +1094,24 @@ select label, catalog_order from public.interest_node where id in ('music.listen
 
 ## 0033
 
-**Hiring: roles, role intent, role asks, the hiring bar and fit (founder request 2026-11-02/03, D-137).**
-**NOT APPLIED YET.** Apply after `0032`. Schema + RPCs, additive only: new tables `brivia_feature` (seeded 'hiring' on),
+**A bio is at most 20 words (founder request 2026-11-03, D-137).**
+**APPLIED 2026-11-03** (trigger present; the guard is not callable by members). 3 bios saved earlier are over 20
+words and stay until their members edit them (Edit profile then asks them to trim).
+Apply after `0032`. Adds the trigger `profiles_bio_word_guard` (function `brivia_bio_word_guard`, not callable by
+members): writing a bio of more than 20 words is refused (`check_violation`, message `bio_words: ...`). Bios saved
+earlier are untouched until edited. The client already enforces the limit, so client and migration can deploy in
+either order.
+
+Verify after the apply:
+
+```sql
+select tgname from pg_trigger where tgrelid = 'public.profiles'::regclass and tgname = 'profiles_bio_word_guard';  -- 1 row
+```
+
+## 0034
+
+**Hiring: roles, role intent, role asks, the hiring bar and fit (founder request 2026-11-02/03, D-138).**
+**NOT APPLIED YET.** Apply after `0033`. Schema + RPCs, additive only: new tables `brivia_feature` (seeded 'hiring' on),
 `hiring_role`, `role_intent`, `role_ask` (RLS on, no client grants), private helpers, and the authenticated RPCs
 `save_hiring_role`, `set_hiring_role_status`, `my_hiring_roles`, `save_role_intent`, `withdraw_role_intent`,
 `my_role_intent`, `member_hiring`, `member_open_to`, `hiring_suggestions`, `ask_about_role`, `my_role_asks`,

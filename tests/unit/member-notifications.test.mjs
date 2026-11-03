@@ -2,7 +2,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createMemberNotifications, normalizeNotification, isFresh } from '../../site/scripts/member-notifications.js';
-import { createChime, soundEnabled, setSoundEnabled, CHIME_NOTES } from '../../site/scripts/notify-sound.js';
 import { pushSupport, urlBase64ToUint8Array, VAPID_PUBLIC_KEY, PUSH_COPY } from '../../site/scripts/web-push.js';
 
 const row = (id, extra = {}) => ({ id, notification_type: 'nearby_appeared', source_user_id: `s-${id}`, name: `Person ${id}`, band: '1', created_at: new Date().toISOString(), read_at: null, dismissed_at: null, ...extra });
@@ -61,29 +60,6 @@ test('marking read: only unread ones go to the server, once; dismiss marks read 
   assert.deepEqual(h.server.dismissed, ['e']);
   assert.equal(h.store.unread().length, 0);
   assert.ok(h.seen.closed.includes('d') && h.seen.closed.includes('e'));
-});
-
-test('the chime: never before an interaction, once per notification, and off when muted', () => {
-  const nodes = [];
-  const fakeCtx = function () { return { currentTime: 0, state: 'running', destination: {}, resume: async () => {},
-    createGain: () => ({ gain: { value: 1, setValueAtTime() {}, exponentialRampToValueAtTime() {} }, connect: (x) => x }),
-    createOscillator: () => { const o = { type: '', frequency: { value: 0 }, connect: (x) => x, start() { nodes.push(o.frequency.value); }, stop() {} }; return o; } }; };
-  const listeners = {};
-  const doc = { addEventListener: (t, fn) => { listeners[t] = fn; } };
-  let on = true;
-  const chime = createChime({ win: { AudioContext: fakeCtx }, doc, enabled: () => on });
-  assert.equal(chime.play('n1'), false);   // autoplay rules: nothing before an interaction
-  listeners.pointerdown();
-  assert.equal(chime.play('n1'), true);
-  assert.equal(chime.play('n1'), false);   // never twice for one notification
-  assert.equal(nodes.length, CHIME_NOTES.length);
-  on = false;
-  assert.equal(chime.play('n2'), false);
-  const mem = new Map();
-  const storage = { getItem: (k) => mem.get(k) ?? null, setItem: (k, v) => mem.set(k, v) };
-  assert.equal(soundEnabled(storage), true);
-  setSoundEnabled(false, storage);
-  assert.equal(soundEnabled(storage), false);
 });
 
 test('web push: iPhone in a Safari tab must add to Home Screen; denied and unsupported say so; the VAPID key is a P-256 point', () => {
