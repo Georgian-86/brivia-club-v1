@@ -50,13 +50,16 @@ export const workMarkup = (work, { logoUrl = '', escapeHtml = (s) => String(s) }
 };
 
 // Merge the database search with the directory's answer: one row per company, database order first.
+// The same company from both keeps the database's place and takes the directory's logo and website when it has them.
 export const mergeCompanies = (local = [], remote = [], limit = 8) => {
+  const byId = new Map(remote.filter((c) => c?.id).map((c) => [c.id, c]));
   const seen = new Set();
   const out = [];
   for (const c of [...local, ...remote]) {
     if (!c?.id || seen.has(c.id)) continue;
     seen.add(c.id);
-    out.push(c);
+    const r = byId.get(c.id);
+    out.push(r && r !== c ? { ...c, logo_path: c.logo_path || r.logo_path, domain: c.domain || r.domain } : c);
     if (out.length >= limit) break;
   }
   return out;

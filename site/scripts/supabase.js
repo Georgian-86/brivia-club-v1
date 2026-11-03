@@ -440,7 +440,8 @@ export const searchCompanies = async (query, limit = 8) => {
   const local = await supabase.rpc('search_companies', { p_q: q, p_limit: limit });
   if (local.error) return { data: [], error: local.error, status: local.status, missing: isMissingFunction(local.error) };
   const rows = local.data || [];
-  return { data: rows, error: null, needsDirectory: q.length >= 2 && rows.length < 4 };
+  // D-142: also ask the directory when the best answers have no logo yet (a seeded company gets its logo then).
+  return { data: rows, error: null, needsDirectory: q.length >= 2 && (rows.length < 4 || rows.slice(0, 3).some((r) => !r.logo_path)) };
 };
 export const searchCompanyDirectory = async (query) => {
   if (!supabase?.functions) return { data: [], error: null };

@@ -44,7 +44,7 @@ begin
   if (select id from public.search_companies('mysta') limit 1) <> c1 then raise exception 'FAIL C1: prefix'; end if;
   if (select id from public.search_companies('mystartup.in') limit 1) <> c1 then raise exception 'FAIL C1: domain'; end if;
   if (select name from public.search_companies('Swigy') limit 1) <> 'Swiggy' then raise exception 'FAIL C1: typo'; end if;
-  if (select name from public.search_companies('g') limit 1) <> 'Google' then raise exception 'FAIL C2: verified first'; end if;
+  if (select name from public.search_companies('goog') limit 1) <> 'Google' then raise exception 'FAIL C2: verified first'; end if;
 
   -- C3
   perform public.set_my_work('  Software   Engineer ', g);
@@ -60,4 +60,20 @@ begin
      or has_function_privilege('authenticated', 'public.brivia_cache_companies(jsonb)', 'execute') then raise exception 'FAIL C3: grants'; end if;
 end $$;
 select 'v-company-directory.test C1-C3 OK';
+
+-- C4 (0039, D-142): the founder's directory is seeded, verified, searchable by short name; a Wikidata hit fills the
+-- seeded row (website, logo) instead of adding a second one.
+do $$
+declare before int; s uuid;
+begin
+  if (select count(*) from public.company where source = 'admin' and verified) < 900 then raise exception 'FAIL C4: seed %', (select count(*) from public.company where source = 'admin'); end if;
+  if (select name from public.search_companies('tcs') limit 1) <> 'Tata Consultancy Services (TCS)' then raise exception 'FAIL C4: short name'; end if;
+  if (select name from public.search_companies('Zeroda') limit 1) <> 'Zerodha' then raise exception 'FAIL C4: typo'; end if;
+  select id into s from public.company where name = 'Razorpay';
+  before := (select count(*) from public.company);
+  perform public.brivia_cache_companies('[{"wikidata_id":"Q30000001","name":"Razorpay","domain":"https://razorpay.com","logo_path":"directory/Q30000001.png"}]'::jsonb);
+  if (select count(*) from public.company) <> before then raise exception 'FAIL C4: a duplicate Razorpay'; end if;
+  if (select logo_path || ' ' || domain from public.company where id = s) <> 'directory/Q30000001.png razorpay.com' then raise exception 'FAIL C4: not enriched'; end if;
+end $$;
+select 'v-company-directory.test C4 OK';
 rollback;

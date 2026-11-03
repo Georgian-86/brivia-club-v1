@@ -29,6 +29,8 @@ test('rows, merging and domains', () => {
     { title: 'Intern', company: 'Swiggy', companyId: 'c1', logoPath: 'directory/Q1.png', verified: true });
   assert.deepEqual(mergeCompanies([{ id: '1' }, { id: '2' }], [{ id: '2' }, { id: '3' }]).map((c) => c.id), ['1', '2', '3']);
   assert.equal(mergeCompanies(Array.from({ length: 12 }, (_, i) => ({ id: String(i) }))).length, 8);
+  assert.deepEqual(mergeCompanies([{ id: 'r', name: 'Razorpay', logo_path: '' }], [{ id: 'r', name: 'Razorpay', logo_path: 'directory/Q1.png', domain: 'razorpay.com' }]),
+    [{ id: 'r', name: 'Razorpay', logo_path: 'directory/Q1.png', domain: 'razorpay.com' }], 'a seeded company takes its new logo');
   assert.equal(domainOf('https://www.Swiggy.com/about?x=1'), 'swiggy.com');
   assert.equal(domainOf('mystartup.in'), 'mystartup.in');
   assert.equal(domainOf('not a site'), '');

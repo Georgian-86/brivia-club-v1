@@ -1,0 +1,950 @@
+# Founder company directory (2026-11-03, D-142). "## Industry" starts a group; one company per line. Duplicates across
+# groups are kept once (first group wins). Run `node scripts/build-company-seed.mjs` after editing.
+## Technology and software
+Tata Consultancy Services (TCS)
+Infosys
+Wipro
+HCLTech
+Tech Mahindra
+LTIMindtree
+Mphasis
+Persistent Systems
+Coforge
+Hexaware Technologies
+KPIT Technologies
+Tata Elxsi
+Birlasoft
+Cyient
+Zensar Technologies
+Sonata Software
+Newgen Software
+Oracle Financial Services Software
+Zoho
+Quick Heal
+Intellect Design Arena
+Happiest Minds
+Saksoft
+Cigniti Technologies
+3i Infotech
+Nucleus Software
+Aurionpro
+eClerx
+Tata Technologies
+L&T Technology Services
+Bosch Global Software Technologies
+GlobalLogic India
+Nagarro
+UST
+Mastek
+NTT DATA India
+Sutherland
+Genpact
+EXL
+Firstsource
+WNS
+Teleperformance
+Concentrix
+Foundever
+Google
+Microsoft
+Amazon
+Apple
+Meta
+NVIDIA
+Intel
+AMD
+Qualcomm
+Cisco
+IBM
+Dell Technologies
+HP
+Hewlett Packard Enterprise
+Oracle
+SAP
+Salesforce
+Adobe
+ServiceNow
+VMware (Broadcom)
+Red Hat
+Siemens
+Samsung
+Sony
+Lenovo
+Motorola
+Ericsson
+Nokia
+Juniper Networks
+Palo Alto Networks
+Fortinet
+Cloudflare
+Akamai
+Atlassian
+Uber
+Airbnb
+LinkedIn
+Spotify
+Netflix
+PayPal
+Stripe
+Fiserv
+FIS
+Global Payments
+Booking.com
+Expedia Group
+Indeed
+Autodesk
+Dassault Systèmes
+Synopsys
+Cadence Design Systems
+Arm
+Micron Technology
+Western Digital
+Sandisk
+Marvell Technology
+Broadcom
+Applied Materials
+Lam Research
+KLA Corporation
+ASML
+## Consulting
+Accenture
+Deloitte
+EY
+PwC
+KPMG
+McKinsey & Company
+Boston Consulting Group (BCG)
+Bain & Company
+Alvarez & Marsal
+Oliver Wyman
+Roland Berger
+Kearney
+Arthur D. Little
+Grant Thornton
+BDO
+Protiviti
+Mercer
+Aon
+Willis Towers Watson
+Korn Ferry
+FTI Consulting
+Gartner
+Forrester
+ZS Associates
+Avalon Consulting
+Redseer Strategy Consultants
+Fractal Analytics
+Tiger Analytics
+Mu Sigma
+Tredence
+LatentView Analytics
+EXL Analytics
+Axtria
+Quantiphi
+Brillio
+Publicis Sapient
+Thoughtworks
+EPAM Systems
+Globant
+Endava
+## E-commerce and consumer tech
+Flipkart
+Myntra
+Meesho
+Nykaa
+Swiggy
+Zomato
+Blinkit
+Zepto
+BigBasket
+JioMart
+FirstCry
+Pepperfry
+Lenskart
+Urban Company
+Ola
+Rapido
+Porter
+Delhivery
+Shadowfax
+Shiprocket
+Xpressbees
+Udaan
+OfBusiness
+Infra.Market
+Zetwerk
+ElasticRun
+Jumbotail
+DealShare
+Country Delight
+Milkbasket
+Wakefit
+Livspace
+NoBroker
+Urban Ladder
+Cars24
+CarDekho
+Spinny
+ACKO
+Policybazaar
+InsuranceDekho
+RenewBuy
+Square Yards
+Magicbricks
+Housing.com
+99acres
+## Fintech
+Razorpay
+PhonePe
+Paytm
+CRED
+Groww
+Zerodha
+Upstox
+Angel One
+BharatPe
+Pine Labs
+Cashfree Payments
+Juspay
+PayU
+BillDesk
+MobiKwik
+Fino Payments Bank
+Jupiter
+Fi Money
+Navi
+KreditBee
+MoneyView
+Lendingkart
+Slice
+INDmoney
+StockGro
+Smallcase
+Kuvera
+Dezerv
+Perfios
+M2P Fintech
+Zeta
+Setu
+Zaggle
+Raise Financial
+InCred
+Aye Finance
+Northern Arc
+Open Financial Technologies
+Signzy
+Niyo
+Fam (FamPay)
+## SaaS, AI and developer tools
+Freshworks
+Postman
+BrowserStack
+Chargebee
+Druva
+Icertis
+Whatfix
+Amagi
+Hasura
+Yellow.ai
+Uniphore
+Gupshup
+Exotel
+CleverTap
+MoEngage
+WebEngage
+Darwinbox
+Keka
+greytHR
+Wingify
+LeadSquared
+Facilio
+Innovaccer
+Eka Care
+HealthPlix
+Unstop
+HackerRank
+HackerEarth
+InterviewBit
+Scaler
+Apna
+Cutshort
+Sprinto
+DevRev
+Sarvam AI
+Krutrim
+Neysa
+Emergent
+Observe.AI
+Gnani.ai
+Mad Street Den
+Nanonets
+Unbox Robotics
+Ati Motors
+## Education
+upGrad
+PhysicsWallah
+Unacademy
+Vedantu
+Great Learning
+Simplilearn
+Eruditus
+Emeritus
+LEAD School
+Classplus
+Teachmint
+Adda247
+Testbook
+Aakash Educational Services
+Allen Career Institute
+PW Skills
+Scaler School of Technology
+Newton School
+Masai School
+Coding Ninjas
+Internshala
+Toppr
+Cuemath
+Extramarks
+NoBrokerHood
+## Travel and entertainment
+MakeMyTrip
+Goibibo
+EaseMyTrip
+ixigo
+OYO
+Treebo
+FabHotels
+TBO.com
+Cleartrip
+Yatra
+redBus
+BookMyShow
+Paytm Insider
+Dream11
+Games24x7
+MPL
+Nazara Technologies
+WinZO
+Gameskraft
+Pocket FM
+Kuku FM
+ShareChat
+Moj
+Dailyhunt
+Inshorts
+Josh
+Pratilipi
+PhysicsWallah Entertainment
+## Finance and banking
+State Bank of India (SBI)
+HDFC Bank
+ICICI Bank
+Axis Bank
+Kotak Mahindra Bank
+IndusInd Bank
+Yes Bank
+IDFC FIRST Bank
+Federal Bank
+RBL Bank
+Bandhan Bank
+AU Small Finance Bank
+Ujjivan Small Finance Bank
+Equitas Small Finance Bank
+Punjab National Bank
+Bank of Baroda
+Canara Bank
+Union Bank of India
+Indian Bank
+Bank of India
+Central Bank of India
+Bank of Maharashtra
+Indian Overseas Bank
+IDBI Bank
+South Indian Bank
+Karnataka Bank
+City Union Bank
+DCB Bank
+JPMorganChase
+Goldman Sachs
+Morgan Stanley
+Bank of America
+Wells Fargo
+Citibank
+HSBC
+Standard Chartered
+Barclays
+Deutsche Bank
+UBS
+BNP Paribas
+Société Générale
+Crédit Agricole
+MUFG
+Mizuho
+Nomura
+American Express
+Mastercard
+Visa
+BlackRock
+Fidelity Investments
+Northern Trust
+State Street
+BNY
+Capital Group
+Franklin Templeton
+Vanguard
+Invesco
+Morningstar
+S&P Global
+Moody's
+Fitch Ratings
+CRISIL
+CARE Ratings
+ICRA
+## Insurance
+LIC
+HDFC Life
+ICICI Prudential Life
+SBI Life
+Max Life
+Bajaj Allianz Life
+Tata AIA
+Kotak Life
+Aditya Birla Sun Life Insurance
+Star Health
+Niva Bupa
+Care Health Insurance
+ICICI Lombard
+HDFC ERGO
+Bajaj Allianz General Insurance
+Tata AIG
+New India Assurance
+United India Insurance
+Oriental Insurance
+Digit Insurance
+Go Digit
+Zurich Kotak General Insurance
+## FMCG and consumer goods
+Hindustan Unilever
+ITC
+Nestlé India
+Britannia
+Dabur
+Marico
+Godrej Consumer Products
+Tata Consumer Products
+Emami
+Patanjali
+Colgate-Palmolive
+Procter & Gamble
+Reckitt
+Mondelez
+PepsiCo
+Coca-Cola
+Mars
+Ferrero
+Kimberly-Clark
+Johnson & Johnson
+Unilever
+Beiersdorf
+L'Oréal
+Haleon
+Kenvue
+Pidilite
+Asian Paints
+Berger Paints
+Kansai Nerolac
+AkzoNobel
+Havells
+Crompton
+Bajaj Electricals
+## Fashion, beauty and retail
+Reliance Retail
+Tata Trent
+Westside
+Zudio
+Shoppers Stop
+Lifestyle
+Pantaloons
+ABFRL
+Aditya Birla Fashion
+Raymond
+Arvind Fashions
+V-Mart
+V2 Retail
+DMart
+Avenue Supermarts
+Reliance Brands
+H&M
+Zara
+IKEA
+Decathlon
+Uniqlo
+Marks & Spencer
+Adidas
+Nike
+Puma
+Skechers
+Levi Strauss
+Louis Vuitton
+Dior
+Chanel
+Gucci
+Sephora
+Purplle
+Mamaearth
+Honasa Consumer
+Sugar Cosmetics
+Minimalist
+Plum Goodness
+boAt
+Noise
+Titan
+Tanishq
+CaratLane
+BlueStone
+GIVA
+Kalyan Jewellers
+Malabar Gold & Diamonds
+Senco Gold
+## Automotive
+Tata Motors
+Mahindra & Mahindra
+Maruti Suzuki
+Hyundai Motor India
+Kia India
+Toyota Kirloskar
+Honda Cars India
+Volkswagen India
+Škoda Auto India
+Renault India
+Nissan India
+Mercedes-Benz India
+BMW India
+Audi India
+Volvo Cars India
+Jaguar Land Rover India
+MG Motor India
+Ashok Leyland
+Eicher Motors
+TVS Motor
+Bajaj Auto
+Hero MotoCorp
+Royal Enfield
+Ather Energy
+Ola Electric
+Ultraviolette Automotive
+River
+Simple Energy
+Bounce Infinity
+Yulu
+Altigreen
+Greaves Electric Mobility
+Mahindra Electric
+Bosch
+Continental
+ZF
+Valeo
+BorgWarner
+Cummins
+Dana
+Schaeffler
+SKF
+Motherson
+Uno Minda
+Bharat Forge
+Sona Comstar
+Exide Industries
+Amara Raja Energy & Mobility
+## Healthcare and pharma
+Sun Pharma
+Dr. Reddy's Laboratories
+Cipla
+Lupin
+Biocon
+Aurobindo Pharma
+Zydus Lifesciences
+Torrent Pharmaceuticals
+Glenmark Pharmaceuticals
+Alkem Laboratories
+Mankind Pharma
+Divi's Laboratories
+Laurus Labs
+Granules India
+Piramal Pharma
+Abbott India
+Pfizer India
+Novartis India
+Roche India
+AstraZeneca India
+GSK India
+Sanofi India
+Eli Lilly
+Merck
+Novo Nordisk
+Bayer
+Boehringer Ingelheim
+Takeda
+Amgen
+Gilead Sciences
+Thermo Fisher Scientific
+Danaher
+Siemens Healthineers
+GE HealthCare
+Philips Healthcare
+Medtronic
+Stryker
+Becton Dickinson
+IQVIA
+Parexel
+Syneos Health
+Indegene
+CitiusTech
+Narayana Health
+Apollo Hospitals
+Fortis Healthcare
+Max Healthcare
+Manipal Hospitals
+Aster DM Healthcare
+Dr. Lal PathLabs
+Metropolis Healthcare
+Thyrocare
+Practo
+Tata 1mg
+PharmEasy
+MedPlus
+Netmeds
+HealthifyMe
+## Telecom and media
+Reliance Jio
+Bharti Airtel
+Vodafone Idea
+BSNL
+Tata Communications
+Indus Towers
+American Tower
+Starlink
+Hughes Communications
+Dish TV
+Tata Play
+Sony Pictures Networks India
+Disney Star
+JioStar
+Zee Entertainment
+Sun TV Network
+Network18
+NDTV
+Times Network
+India Today Group
+HT Media
+The Indian Express Group
+Condé Nast India
+YouTube
+Amazon Prime Video
+JioHotstar
+ZEE5
+Sony LIV
+MX Player
+Gaana
+JioSaavn
+Wynk Music
+## Manufacturing and energy
+Larsen & Toubro (L&T)
+Tata Projects
+Tata Steel
+JSW Steel
+Jindal Steel
+Steel Authority of India (SAIL)
+Hindalco
+Vedanta
+Adani Enterprises
+Adani Ports
+Adani Green Energy
+Adani Power
+Reliance Industries
+NTPC
+Power Grid Corporation
+NHPC
+ONGC
+Indian Oil Corporation
+Bharat Petroleum
+Hindustan Petroleum
+GAIL
+Oil India
+Coal India
+BHEL
+ABB
+Schneider Electric
+Honeywell
+Emerson
+Rockwell Automation
+Eaton
+Hitachi Energy
+GE Vernova
+Mitsubishi Electric
+Toshiba
+Yokogawa
+Thermax
+Triveni Engineering
+KEC International
+Kalpataru Projects
+Afcons Infrastructure
+Shapoorji Pallonji
+GMR Group
+JSW Energy
+Tata Power
+Suzlon Energy
+Waaree Energies
+ReNew
+Greenko
+Avaada Energy
+ACME Solar
+Vikram Solar
+First Solar
+Siemens Gamesa
+## Aviation and logistics
+IndiGo
+Air India
+Air India Express
+Akasa Air
+SpiceJet
+Alliance Air
+Vistara
+Air India SATS
+Celebi Aviation
+GMR Airports
+Adani Airports
+Airports Authority of India (AAI)
+DHL
+FedEx
+UPS
+Blue Dart
+DTDC
+Ecom Express
+Safexpress
+VRL Logistics
+TCI Express
+Transport Corporation of India
+Mahindra Logistics
+Allcargo Logistics
+Maersk
+Kuehne+Nagel
+DB Schenker
+DSV
+CEVA Logistics
+DP World
+BluSmart
+BlackBuck
+## Food and hospitality
+McDonald's
+Domino's
+Pizza Hut
+KFC
+Burger King
+Subway
+Starbucks
+Tim Hortons
+Taco Bell
+Rebel Foods
+EatClub
+Wow! Momo
+Haldiram's
+Bikanervala
+Barbeque Nation
+Jubilant FoodWorks
+Devyani International
+Sapphire Foods
+Chaayos
+Chai Point
+Third Wave Coffee
+Blue Tokai Coffee
+Cafe Coffee Day
+Theobroma
+Naturals Ice Cream
+Amul
+Mother Dairy
+ITC Hotels
+Taj Hotels
+Oberoi Hotels
+Marriott International
+Hilton
+Hyatt
+Accor
+IHG Hotels
+Radisson Hotel Group
+Lemon Tree Hotels
+The Leela
+Ginger Hotels
+## Aerospace and defence
+ISRO
+DRDO
+Hindustan Aeronautics Limited (HAL)
+Bharat Electronics Limited (BEL)
+Bharat Dynamics Limited (BDL)
+Mazagon Dock Shipbuilders
+Garden Reach Shipbuilders
+Cochin Shipyard
+Data Patterns
+Paras Defence
+ideaForge
+Garuda Aerospace
+Asteria Aerospace
+Skyroot Aerospace
+Agnikul Cosmos
+Pixxel
+Dhruva Space
+Bellatrix Aerospace
+NewSpace Research & Technologies
+Boeing India
+Airbus India
+Lockheed Martin
+RTX
+Northrop Grumman
+GE Aerospace
+Safran
+Thales
+Collins Aerospace
+Honeywell Aerospace
+Rolls-Royce
+SpaceX
+## Real estate
+DLF
+Prestige Group
+Brigade Group
+Sobha Limited
+Godrej Properties
+Lodha Group
+Oberoi Realty
+Embassy Group
+RMZ Corp
+Bagmane Group
+Bhartiya Group
+Puravankara
+Mahindra Lifespaces
+Tata Realty
+Shriram Properties
+Adani Realty
+ATS Infrastructure
+M3M India
+Emaar India
+Experion Developers
+WeWork India
+Smartworks
+Awfis
+IndiQube
+Table Space
+91Springboard
+## Legal, HR and staffing
+Trilegal
+AZB & Partners
+Cyril Amarchand Mangaldas
+Khaitan & Co
+Shardul Amarchand Mangaldas
+JSA Advocates
+DSK Legal
+Luthra and Luthra
+Nishith Desai Associates
+IndusLaw
+A&O Shearman
+Clifford Chance
+Linklaters
+Herbert Smith Freehills
+Randstad
+Adecco
+ManpowerGroup
+TeamLease
+Quess Corp
+CIEL HR
+ABC Consultants
+Michael Page
+Robert Half
+Naukri.com
+Foundit
+iimjobs
+Instahyre
+Hirist
+Wellfound
+## Education and research
+Indian Institutes of Technology (IITs)
+Indian Institutes of Management (IIMs)
+IISc
+IIITs
+NITs
+BITS Pilani
+Amity University
+Manipal Academy of Higher Education
+VIT
+SRM Institute
+Shiv Nadar University
+Ashoka University
+Plaksha University
+OP Jindal Global University
+Chandigarh University
+Lovely Professional University
+Thapar Institute
+Symbiosis International University
+Christ University
+NMIMS
+Bennett University
+Krea University
+FLAME University
+Ahmedabad University
+University of Delhi
+Panjab University
+Coursera
+Udemy
+Pearson
+Cambridge University Press
+Wiley
+Elsevier
+Springer Nature
+McGraw Hill
+## Startups and venture capital
+Peak XV Partners
+Accel
+Lightspeed Venture Partners
+Blume Ventures
+Matrix Partners India / Z47
+Nexus Venture Partners
+Elevation Capital
+Kalaari Capital
+3one4 Capital
+Chiratae Ventures
+Stellaris Venture Partners
+Arkam Ventures
+Rainmatter
+Indian Angel Network
+Venture Catalysts
+100X.VC
+Antler India
+Y Combinator
+General Catalyst
+Bessemer Venture Partners
+Khosla Ventures
+Sequoia Capital
+Tiger Global
+SoftBank Vision Fund
+Temasek
+Prosus
+Accel-KKR
+Warburg Pincus
+KKR
+Blackstone
+Carlyle
+Advent International
+Bain Capital
+Premji Invest
+Omidyar Network
+A91 Partners
+Gaja Capital
+Fireside Ventures
+DSG Consumer Partners
+India Quotient
+Orios Venture Partners
+IVYCap Ventures
+Whiteboard Capital
+Better Capital
+Speciale Invest
+pi Ventures
+Axilor Ventures
+SucSEED Indovation Fund
+Venture Highway

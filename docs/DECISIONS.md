@@ -2945,3 +2945,22 @@ controls (a tester or a seeded test member), never a real member, so no new expo
     `deck_candidates` is untouched, so ORBIT's ordering of everything else is unchanged (ORBIT_ENGINE.md §12).
   - The feature hides itself until 0037 is applied: the first hiring RPC answers "function not found" and nothing
     hiring-shaped renders. A kill switch (`brivia_feature` 'hiring') does the same after it is applied.
+
+## D-142 (2026-11-03): the founder's company list seeds the directory; title and company side by side
+
+- **Asked:** put the title and company boxes side by side, and use the founder's company list (16 groups: IT services,
+  global tech, consulting, Indian startups across consumer, fintech, SaaS and AI, edtech and travel, banks, insurance,
+  FMCG, fashion and retail, automotive, healthcare, telecom and media, manufacturing and energy, aviation and logistics,
+  food and hospitality, aerospace and defence, real estate, legal and HR, education, venture capital).
+- **Done:** `supabase/catalog/companies.txt` (the list, one company per line under its industry) and
+  `scripts/build-company-seed.mjs`, which writes `0039_company_seed.sql`: 926 organisations as verified 'admin' rows
+  (duplicates in the list kept once; a name already in the directory is skipped). Searching "TCS" finds Tata
+  Consultancy Services. The list has names only, so `brivia_cache_companies` now fills a seeded row the first time the
+  Wikidata lookup finds the same name (website, logo) instead of adding a second row, and the client asks the directory
+  whenever the best answers have no logo yet. The directory keeps growing past the list: Wikidata for the rest, members
+  for their own organisations.
+- **Layout:** title and company search share one row of the Edit profile form (two columns, the same width as the
+  other paired fields); on phones the form is one column, so they stack. The picked company and "Add your organisation"
+  sit under them.
+- **Proof:** SQL harness ALL PASSED (new v-company C4: seed size, short name, typo, enrichment without a duplicate);
+  unit 479; e2e work-identity 25, profile-edit 64.

@@ -3194,10 +3194,11 @@ const CHIP_REMOVE_ICON = '<svg viewBox="0 0 24 24" aria-hidden="true" focusable=
 // D-140: Company / Organisation in Edit profile. A title, then a company from the directory (search), or the member's
 // own (name, optional website, industry and logo). Saved with the rest of the form (set_my_work).
 const workEditorMarkup = () => `<div class="profile-edit-wide profile-edit-work" data-work-editor><span class="profile-edit-picker-label" id="profile-work-label">COMPANY / ORGANISATION</span>`
-  + `<input class="b-field" name="jobTitle" maxlength="60" placeholder="Your title, e.g. Software Engineer" autocomplete="organization-title" aria-label="Your title" />`
+  // D-142: title and company side by side (one row on wider screens), the picked company under them.
+  + `<div class="profile-work-row"><input class="b-field" name="jobTitle" maxlength="60" placeholder="Your title, e.g. Software Engineer" autocomplete="organization-title" aria-label="Your title" />`
+  + `<div class="b-combo"><input class="b-field" type="text" role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="profile-work-list" aria-labelledby="profile-work-label" placeholder="Search a company or organisation" autocomplete="off" spellcheck="false" data-work-search />`
+  + `<ul class="b-listbox" id="profile-work-list" role="listbox" aria-label="Companies" hidden></ul></div></div>`
   + `<div class="profile-work-picked" data-work-picked hidden><span class="profile-work-picked-name" data-work-picked-name></span><button type="button" class="profile-work-remove" data-work-clear>Remove</button></div>`
-  + `<div class="b-combo"><input class="b-field" type="text" role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="profile-work-list" aria-labelledby="profile-work-label" placeholder="Search a company, startup or organisation" autocomplete="off" spellcheck="false" data-work-search />`
-  + `<ul class="b-listbox" id="profile-work-list" role="listbox" aria-label="Companies" hidden></ul></div>`
   + `<fieldset class="profile-work-new" data-work-new hidden><legend>Add your organisation</legend>`
   + `<label><span>NAME</span><input class="b-field" data-work-new-name maxlength="80" /></label>`
   + `<label><span>WEBSITE (OPTIONAL)</span><input class="b-field" data-work-new-site inputmode="url" placeholder="mystartup.in" /></label>`
