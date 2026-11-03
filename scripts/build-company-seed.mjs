@@ -81,4 +81,6 @@ do $$ begin
 end $$;
 `;
 writeFileSync('supabase/migrations/0039_company_seed.sql', sql);
+// The same list for the live import (README "## 0039": pg_net reads it from the site, like the city parts).
+writeFileSync('site/public/data/companies.json', JSON.stringify(rows));
 console.log(`${rows.length} companies (${src.filter((l) => l.trim() && !l.startsWith('#')).length} lines, duplicates dropped)`);
