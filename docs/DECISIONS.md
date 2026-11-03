@@ -2964,3 +2964,9 @@ controls (a tester or a seeded test member), never a real member, so no new expo
   sit under them.
 - **Proof:** SQL harness ALL PASSED (new v-company C4: seed size, short name, typo, enrichment without a duplicate);
   unit 479; e2e work-identity 25, profile-edit 64.
+
+## D-143 (2026-11-03): the company list shows logo and name only
+
+- **Asked:** no website links beside the company logo and name in the Edit profile company search.
+- **Done:** the options show the logo and the name, the name left-aligned next to its logo (a company without a website
+  used to push its name to the right). The website is still stored for deduplication and logos, just not shown.

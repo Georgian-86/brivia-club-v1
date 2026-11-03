@@ -35,3 +35,5 @@ body.app-body .app-view[data-view="home"] #swipe-role:has(.work-line) {
 .profile-work-row > .b-combo { min-width: 0; }
 @media (max-width: 560px) { .profile-work-row { grid-template-columns: minmax(0, 1fr); } }
 .profile-edit-grid .profile-edit-work { grid-column: 1 / -1; }
+/* D-143: the list shows the logo and the name only (no website), the name always left-aligned next to its logo. */
+.profile-edit-work .b-option > span { flex: 1 1 auto; min-width: 0; text-align: left; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

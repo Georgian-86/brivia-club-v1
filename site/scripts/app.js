@@ -3228,7 +3228,7 @@ const wireWorkEditor = (modal, current) => {
   let seq = 0; let timer = 0; let rows = []; let query = '';
   const close = () => { list.hidden = true; search.setAttribute('aria-expanded', 'false'); };
   const render = (note = '') => {
-    const options = rows.map((c, i) => `<li class="b-option" role="option" id="profile-work-opt-${i}" data-work-id="${escapeHtml(c.id)}" tabindex="-1">${c.logo_path ? `<img class="work-logo" src="${escapeHtml(companyLogoUrl(c.logo_path))}" alt="" width="16" height="16" loading="lazy" />` : ORG_ICON}<span>${escapeHtml(c.name)}</span>${c.domain ? `<small>${escapeHtml(c.domain)}</small>` : ''}</li>`).join('');
+    const options = rows.map((c, i) => `<li class="b-option" role="option" id="profile-work-opt-${i}" data-work-id="${escapeHtml(c.id)}" tabindex="-1">${c.logo_path ? `<img class="work-logo" src="${escapeHtml(companyLogoUrl(c.logo_path))}" alt="" width="16" height="16" loading="lazy" />` : ORG_ICON}<span>${escapeHtml(c.name)}</span></li>`).join('');
     const add = query ? `<li class="b-option b-option-add" role="option" id="profile-work-opt-add" data-work-add tabindex="-1">Add “${escapeHtml(cleanCompanyName(query))}” as your organisation</li>` : '';
     list.innerHTML = options + (note ? `<li class="b-listbox-note">${escapeHtml(note)}</li>` : '') + add;
     list.hidden = !list.innerHTML;
