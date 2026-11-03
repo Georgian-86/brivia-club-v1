@@ -618,7 +618,7 @@ try {
         assert.equal(items.length, 5);
         items.forEach((it) => { assert.ok(it.w >= 44 && it.h >= 44, `${it.nav} is ${it.w}x${it.h}`); assert.ok(it.sizes.length >= 1 && it.sizes.every((s) => s >= 12), `${it.nav} label ${it.sizes}`); });
       });
-      check(`375: tab labels read Connect, Explore, Posts, Chat, Profile (${items.map((i) => i.label).join(', ')})`, () => assert.deepEqual(items.map((i) => i.label), ['Connect', 'Explore', 'Posts', 'Chat', 'Profile']));
+      check(`375: tab labels read Connect, Explore, Notes, Chat, Profile (${items.map((i) => i.label).join(', ')})`, () => assert.deepEqual(items.map((i) => i.label), ['Connect', 'Explore', 'Notes', 'Chat', 'Profile']));
       const bar = await page.evaluate(() => { const el = document.querySelector('.app-tabbar'); if (!el) return { missing: true }; const r = el.getBoundingClientRect(); return { bottom: Math.round(r.bottom), vh: window.innerHeight, position: getComputedStyle(el).position }; });
       check(`375: the tab bar is fixed to the bottom (${JSON.stringify(bar)})`, () => { assert.equal(bar.position, 'fixed'); assert.equal(bar.bottom, bar.vh); });
 

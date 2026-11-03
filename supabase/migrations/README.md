@@ -1250,3 +1250,14 @@ backfills a message the recipient already answered as read at that answer. Deplo
 falls back without it). Verify:
 `select count(*) filter (where read_at is not null), count(*) from public.brivia_messages;` and
 `select has_function_privilege('anon', 'public.connection_last_seen(uuid[])', 'execute');` (f).
+
+## 0043
+
+**Read receipts switch; notifications for likes and comments on a note (D-151).** **APPLIED 2026-11-04.**
+Apply after `0042`. Adds `member_presence.read_receipts`, `set_read_receipts` / `my_read_receipts`, redefines
+`mark_conversation_read` (Read only when both members have it on, otherwise Delivered only), widens
+`member_notification.notification_type` to `post_like` / `post_comment` (with `post_id`, `comment_id`, `snippet`),
+adds triggers on `community_post_likes` and `community_post_comments`, and `my_notifications_v3`. Deploy push-notify
+(v4) and the client after it. Verify:
+`select has_function_privilege('anon', 'public.my_notifications_v3()', 'execute');` (f) and
+`select tgname from pg_trigger where tgname in ('community_post_likes_notify', 'community_post_comments_notify');` (2 rows).

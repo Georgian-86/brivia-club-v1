@@ -97,13 +97,13 @@ begin
        || 'dismiss_notification,ensure_place,event_companions,get_candidates,hiring_suggestions,list_events,'
        || 'mark_companion_match_seen,mark_conversation_read,mark_messages_delivered,mark_notifications_read,member_bio,member_hiring,member_open_to,member_work,'
        || 'my_companion_matches,my_event_prefs,my_hiring_roles,my_interests,my_nearby_alerts,my_nearby_matches,'
-       || 'my_nearby_setting,my_notifications,my_notifications_v2,my_onboarding_status,my_outgoing_requests,'
-       || 'my_presence_visible,my_role_asks,my_role_intent,my_sent_role_asks,my_signal_quota,nearby_clear,nearby_connect,'
+       || 'my_nearby_setting,my_notifications,my_notifications_v2,my_notifications_v3,my_onboarding_status,my_outgoing_requests,'
+       || 'my_presence_visible,my_read_receipts,my_role_asks,my_role_intent,my_sent_role_asks,my_signal_quota,nearby_clear,nearby_connect,'
        || 'nearby_discover,nearby_pass,nearby_pulse,post_activity,report_fake_job,report_member,'
        || 'respond_connection_request,save_hiring_role,save_member_event,save_push_subscription,save_role_intent,'
        || 'search_members,send_connect_request,send_signal,set_companion_default,set_company_logo,set_event_brochure,set_event_interest,'
        || 'set_event_rsvp,set_hiring_role_status,set_home_city,set_home_location,set_member_interests,set_my_work,'
-       || 'set_nearby_enabled,set_nearby_muted,set_nearby_radius,set_presence_visible,set_sensitive_consent,'
+       || 'set_nearby_enabled,set_nearby_muted,set_nearby_radius,set_presence_visible,set_read_receipts,set_sensitive_consent,'
        || 'touch_presence,withdraw_role_intent';
   if got is distinct from want then raise exception 'FAIL H3: authenticated may execute definer functions %', got; end if;
   if exists (select 1 from pg_proc p where p.pronamespace = 'public'::regnamespace and p.prosecdef

@@ -7,8 +7,8 @@ import { NAV_ITEMS, navMarkup } from '../../site/scripts/app-nav.js';
 const items = (html) => [...html.matchAll(/<a\b[^>]*>[\s\S]*?<\/a>/g)].map((m) => m[0]);
 const attr = (tag, name) => (tag.match(new RegExp(`\\s${name}="([^"]*)"`)) || [])[1];
 
-test('NAV_ITEMS: Connect, Explore, Posts, Chat, Profile on explore, events, posts, chat, profile (D-117)', () => {
-  assert.deepEqual(NAV_ITEMS.map((i) => i.label), ['Connect', 'Explore', 'Posts', 'Chat', 'Profile']);
+test('NAV_ITEMS: Connect, Explore, Notes, Chat, Profile on explore, events, posts, chat, profile (D-117)', () => {
+  assert.deepEqual(NAV_ITEMS.map((i) => i.label), ['Connect', 'Explore', 'Notes', 'Chat', 'Profile']);
   assert.deepEqual(NAV_ITEMS.map((i) => i.view), ['explore', 'events', 'posts', 'chat', 'profile']);
   NAV_ITEMS.forEach((i) => assert.match(i.icon, /^<svg\b/));
 });

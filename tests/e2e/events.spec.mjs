@@ -1,4 +1,4 @@
-// Explore events (D-117, migration 0020): the nav reads Connect, Explore, Posts, Chat, Profile; Explore lists events
+// Explore events (D-117, migration 0020): the nav reads Connect, Explore, Notes, Chat, Profile; Explore lists events
 // near you (heading, a toolbar with Nearby and the "Find a companion" switch, category tabs, quiet cards with date,
 // category, ~km, time, place, going and "Find a companion"), and an event drawer (side drawer at 1440, full-screen
 // sheet at 390; D-118) with "I'm going",
@@ -58,7 +58,7 @@ try {
     await page.evaluate(() => window.scrollTo(0, 0));
     await page.waitForTimeout(300);
 
-    check(`${w}: the nav reads Connect, Explore, Posts, Chat, Profile`, JSON.stringify(await visibleNav(page)) === JSON.stringify(['Connect', 'Explore', 'Posts', 'Chat', 'Profile']), JSON.stringify(await visibleNav(page)));
+    check(`${w}: the nav reads Connect, Explore, Notes, Chat, Profile`, JSON.stringify(await visibleNav(page)) === JSON.stringify(['Connect', 'Explore', 'Notes', 'Chat', 'Profile']), JSON.stringify(await visibleNav(page)));
     check(`${w}: Explore is current`, await page.evaluate(() => [...document.querySelectorAll('[data-nav-host] [aria-current="page"]')].every((a) => a.dataset.nav === 'events')));
     const card = await page.evaluate(() => {
       const c = document.querySelector('.event-card[data-event-id="e-jam"]');

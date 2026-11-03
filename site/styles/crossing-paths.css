@@ -58,3 +58,22 @@
    near Bengaluru." and when. Two lines each at most, never cut mid-word on a phone. */
 .notification-nearby-copy strong,.notification-nearby-copy span{white-space:normal;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2}
 .notification-nearby-copy small{color:var(--color-ink-soft);font-size:var(--text-12);letter-spacing:.02em}
+
+/* ---------- Likes and comments on my notes (D-151, 0043): the same row, a small badge, the note's thumbnail ---------- */
+.notification-post{
+  display:grid;grid-template-columns:34px minmax(0,1fr) auto;align-items:center;gap:14px;width:100%;
+  padding:12px 15px;border:0;border-bottom:1px solid var(--color-line);background:transparent;color:inherit;
+  font:inherit;text-align:left;cursor:pointer;transition:background var(--motion-fast) var(--ease);
+}
+.notification-post.is-unread{background:color-mix(in srgb, var(--brivia-wine) 4%, var(--color-cream))}
+.notification-post:hover{background:color-mix(in srgb, var(--brivia-wine) 7%, var(--color-cream))}
+.notification-post:focus-visible{outline:2px solid var(--color-wine);outline-offset:-2px}
+.notification-post .notification-nearby-copy span{white-space:normal;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;font-style:italic}
+.notification-post-kind{
+  position:absolute;right:-3px;bottom:-3px;display:grid;place-items:center;width:16px;height:16px;padding:2px;
+  border:1.5px solid var(--color-cream);border-radius:50%;background:var(--brivia-wine);box-sizing:border-box;
+}
+.notification-post-kind svg{width:100%;height:100%;fill:none;stroke:var(--color-cream);stroke-width:1.7;stroke-linejoin:round}
+.notification-post-kind.is-like svg{fill:var(--color-cream)}
+.notification-post-thumb{width:40px;height:40px;overflow:hidden;border-radius:8px;background:var(--color-line)}
+.notification-post-thumb img{display:block;width:100%;height:100%;object-fit:cover}

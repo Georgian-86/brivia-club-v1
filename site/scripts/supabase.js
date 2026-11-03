@@ -347,6 +347,9 @@ export const connectionPresence = async (ids) => {
   return supabase.rpc('connection_presence', { p_ids: ids });
 };
 // Delivered and Read (D-150, 0042). Before 0042 both answer PGRST202 / 404 (isMissingFunction) and the app stops asking.
+// D-151 (0043): the Read receipts switch (default on; off hides Read both ways).
+export const setReadReceipts = (on) => rpcCall('set_read_receipts', { p_on: Boolean(on) });
+export const myReadReceipts = () => rpcCall('my_read_receipts', {});
 export const markMessagesDelivered = () => rpcCall('mark_messages_delivered', {});
 export const markConversationRead = (otherId) => rpcCall('mark_conversation_read', { p_other: otherId });
 export const setPresenceVisible = async (visible) => (supabase ? supabase.rpc('set_presence_visible', { p_visible: Boolean(visible) }) : notConfigured());
@@ -429,7 +432,14 @@ export const nearbyConnect = (to, note) => rpcCall('nearby_connect', { p_to: to,
 export const myNearbyMatches = () => rpcCall('my_nearby_matches');
 // D-134 (0030): one notification store for every device, the radius notifications use, and web push subscriptions.
 // D-138 (0034): v2 adds the area each crossing happened in; before 0034 is applied, the 0030 function answers.
+// D-151 (0043): v3 adds likes and comments on my notes (post_id, comment_id, snippet, post_image_url).
+let notificationsV3Missing = false;
 export const myNotifications = async () => {
+  if (!notificationsV3Missing) {
+    const v3 = await rpcCall('my_notifications_v3');
+    if (!v3.error || !isMissingFunction(v3.error)) return v3;
+    notificationsV3Missing = true;
+  }
   const v2 = await rpcCall('my_notifications_v2');
   if (!v2.error || !isMissingFunction(v2.error)) return v2;
   return rpcCall('my_notifications');

@@ -215,6 +215,12 @@ export const startAppStub = async ({ port, state = {}, deckRows = defaultDeckRow
           return { member_id: id, active: shown && (st.activeIds || []).includes(id), last_seen_at: shown ? (st.lastSeen || {})[id] || null : null };
         }));
       }
+      // D-151: the Read receipts switch, st.readReceipts (default on).
+      if (pathName === '/rest/v1/rpc/my_read_receipts' || pathName === '/rest/v1/rpc/set_read_receipts') {
+        if (st.noReceipts) return json(404, { code: 'PGRST202', message: 'Could not find the function' });
+        if (pathName === '/rest/v1/rpc/set_read_receipts') st.readReceipts = args.p_on;
+        return json(200, st.readReceipts !== false);
+      }
       if (pathName === '/rest/v1/rpc/mark_messages_delivered' || pathName === '/rest/v1/rpc/mark_conversation_read') {
         (st.receiptCalls ||= []).push({ fn: pathName.slice(13), args });
         return json(200, 1);
@@ -239,6 +245,12 @@ export const startAppStub = async ({ port, state = {}, deckRows = defaultDeckRow
       // place, so two pages on the same stub see the same state (phone and laptop). st.radiusSaved, st.pushSubs,
       // st.pushCalls (the push-notify Edge Function).
       // D-138 (0034): my_notifications_v2 adds place_name; st.notificationsV1Only answers it as "not found" (before 0034).
+      // D-151 (0043): my_notifications_v3 adds post_id, comment_id, snippet, post_image_url; st.notificationsV2Only
+      // (or V1Only) answers it as "not found" (before 0043).
+      if (pathName === '/rest/v1/rpc/my_notifications_v3') {
+        if (st.notificationsV1Only || st.notificationsV2Only || !st.notifications) return json(404, { code: 'PGRST202', message: 'Could not find the function' });
+        return json(200, st.notifications);
+      }
       if (pathName === '/rest/v1/rpc/my_notifications_v2' && (st.notificationsV1Only || !st.notifications)) return json(404, { code: 'PGRST202', message: 'Could not find the function' });
       if (pathName === '/rest/v1/rpc/my_notifications_v2' || pathName === '/rest/v1/rpc/my_notifications') return st.notifications ? json(200, st.notifications) : json(404, { code: 'PGRST202', message: 'Could not find the function' });
       if (pathName === '/rest/v1/rpc/mark_notifications_read') {

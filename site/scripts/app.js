@@ -21,7 +21,7 @@ import '../styles/mobile-app.css';
 import '../styles/skeleton.css';
 import '../styles/aura-theme.css';
 import '../styles/handoff.css';
-import { supabase, compressImageOnly, rowToProfile, saveProfile, isPresetCoverUrl, onboardingStatus, sendSignal, fetchSignalQuota, isRateLimited, isStorageImageUrl, withoutCredentials, uploadMessageAttachment, removeMessageAttachment, uploadCommunityPostImage, removeCommunityPostImage, ImageProcessingError, PHOTO_ERROR_MESSAGE, PHOTO_FRAMER_ERROR, compressAttachmentFiles, attachmentKind, reportMember, setSensitiveConsent, fetchSensitiveConsentAt, fetchMyInterests, fetchInterestNodes, addMemberInterest, isMissingFunction, touchPresence, connectionPresence, setPresenceVisible, myPresenceVisible, setMemberInterests, uploadResume, removeResume, resumeSignedUrl, resumeInfo, clearResumePath, searchPlaces, setHomeCity, setHomeLocation, listEvents, setEventRsvp, setCompanionDefault, myEventPrefs, eventCompanions, saveMemberEvent, cancelMemberEvent, deleteMemberEvent, uploadEventImage, removeEventImages, setEventInterest, setEventBrochure, uploadEventBrochure, removeEventBrochures, companionEvents, companionDeck, companionSwipe, myCompanionMatches, markCompanionMatchSeen, sendConnectRequest, setNearbyEnabled, myNearbySetting, nearbyPulse, nearbyClear, myNearbyAlerts, setNearbyMuted, nearbyDiscover, nearbyPass, nearbyConnect, myNearbyMatches, myNotifications, markNotificationsRead, dismissNotification, setNearbyRadius, savePushSubscription, deletePushSubscription, sendPendingPush, searchCompanies, searchCompanyDirectory, companyLogoUrl, addCompany, setMyWork, memberWork, uploadCompanyLogo, markMessagesDelivered, markConversationRead } from './supabase.js';
+import { supabase, compressImageOnly, rowToProfile, saveProfile, isPresetCoverUrl, onboardingStatus, sendSignal, fetchSignalQuota, isRateLimited, isStorageImageUrl, withoutCredentials, uploadMessageAttachment, removeMessageAttachment, uploadCommunityPostImage, removeCommunityPostImage, ImageProcessingError, PHOTO_ERROR_MESSAGE, PHOTO_FRAMER_ERROR, compressAttachmentFiles, attachmentKind, reportMember, setSensitiveConsent, fetchSensitiveConsentAt, fetchMyInterests, fetchInterestNodes, addMemberInterest, isMissingFunction, touchPresence, connectionPresence, setPresenceVisible, myPresenceVisible, setMemberInterests, uploadResume, removeResume, resumeSignedUrl, resumeInfo, clearResumePath, searchPlaces, setHomeCity, setHomeLocation, listEvents, setEventRsvp, setCompanionDefault, myEventPrefs, eventCompanions, saveMemberEvent, cancelMemberEvent, deleteMemberEvent, uploadEventImage, removeEventImages, setEventInterest, setEventBrochure, uploadEventBrochure, removeEventBrochures, companionEvents, companionDeck, companionSwipe, myCompanionMatches, markCompanionMatchSeen, sendConnectRequest, setNearbyEnabled, myNearbySetting, nearbyPulse, nearbyClear, myNearbyAlerts, setNearbyMuted, nearbyDiscover, nearbyPass, nearbyConnect, myNearbyMatches, myNotifications, markNotificationsRead, dismissNotification, setNearbyRadius, savePushSubscription, deletePushSubscription, sendPendingPush, searchCompanies, searchCompanyDirectory, companyLogoUrl, addCompany, setMyWork, memberWork, uploadCompanyLogo, markMessagesDelivered, markConversationRead, setReadReceipts, myReadReceipts } from './supabase.js';
 import { locateOnce, fallbackCopy } from './geo-locate.js';
 import { areaChangeMessage, AREA_HELPER, AREA_NO_MATCH } from './area-change.js';
 import { areaShareBody, parseAreaBody, resumeShareAttachment, resumeMessageFields, RESUME_SHARE_BODY, NO_RESUME_HINT, RESUME_GONE_COPY, RESUME_SHARE_NOTE, AREA_SHARE_NOTE } from './quick-share.js';
@@ -44,7 +44,7 @@ import { createCrossingPaths, isQuietHour, alertHeadline, alertDetail, alertToas
 import '../styles/crossing-paths.css';
 import { createNearbyPage } from './nearby-page.js';
 import { COPY as NEARBY_COPY, crossingCopy } from './nearby-view.js';
-import { createMemberNotifications } from './member-notifications.js';
+import { createMemberNotifications, groupPostNotifications, postNotificationCopy, POST_TYPES } from './member-notifications.js';
 import { workMarkup, workLine, normalizeWork, mergeCompanies, cleanTitle, cleanCompanyName, INDUSTRIES, logoFileToWebp, ORG_ICON, monogramMarkup } from './work-identity.js';
 import { createSoundKit, soundEnabled, setSoundEnabled, soundVolume, setSoundVolume, interactionSoundEnabled, setInteractionSoundEnabled, pushSoundEnabled, setPushSoundEnabled } from './notify-sound.js';
 import { createWebPush, pushSupport, PUSH_COPY } from './web-push.js';
@@ -546,10 +546,13 @@ const renderNotifications = () => {
   const crossedRows = memberNotes.list().filter((n) => n.type === 'nearby_appeared' && !n.dismissedAt && Date.now() - new Date(n.createdAt).getTime() < 24 * 3600 * 1000).slice(0, 5);
   const crossedUnread = crossedRows.filter((n) => !n.readAt).length;
   // D-141: "N people near you are hiring" (once a day, new fits only) and "X closed the role" notes.
+  // D-151: likes and comments on my notes (0043), one row per note's likes and one per comment.
+  const postGroups = groupPostNotifications(memberNotes.list()).slice(0, 12);
+  const postUnread = postGroups.filter((g) => g.unread).length;
   const hiringHtml = hiring?.notificationHtml() || '';
   const hiringUnread = hiring?.notificationCount() || 0;
-  const unreadCount = (enabled ? notifications.filter((notification) => !notification.read).length : 0) + requestCount + nearbyCount + companionUnseen.length + nearbyMatchUnseen.length + crossedUnread + hiringUnread;
-  const anything = enabled || requestCount || nearbyAlerts.length || companionUnseen.length || nearbyMatchUnseen.length || crossedRows.length || hiringHtml;
+  const unreadCount = (enabled ? notifications.filter((notification) => !notification.read).length : 0) + requestCount + nearbyCount + companionUnseen.length + nearbyMatchUnseen.length + crossedUnread + hiringUnread + postUnread;
+  const anything = enabled || requestCount || nearbyAlerts.length || companionUnseen.length || nearbyMatchUnseen.length || crossedRows.length || hiringHtml || postGroups.length;
   button.toggleAttribute('hidden', !anything);
   if (!anything) closeNotificationPanel();
   badge.textContent = unreadCount > 99 ? '99+' : String(unreadCount);
@@ -590,7 +593,7 @@ const renderNotifications = () => {
     const title = person?.name || 'a Brivia member';
     const messageLabel = `${group.count} message${group.count === 1 ? '' : 's'} from ${title}`;
     return `<button type="button" class="notification-item is-unread" data-notification-person="${escapeHtml(group.personId)}">${renderAvatar(person, 'notification-avatar')}<span class="notification-copy"><strong>${escapeHtml(messageLabel)}</strong></span><time>${escapeHtml(formatNotificationTime(group.latest.createdAt))}</time></button>`;
-  }).join('') : ((requestCount || nearbyAlerts.length || companionUnseen.length || nearbyMatchUnseen.length || crossedRows.length || hiringHtml) ? '' : `<div class="notification-empty"><p>You are all caught up.</p>${settingsAction}</div>`);
+  }).join('') : ((requestCount || nearbyAlerts.length || companionUnseen.length || nearbyMatchUnseen.length || crossedRows.length || hiringHtml || postGroups.length) ? '' : `<div class="notification-empty"><p>You are all caught up.</p>${settingsAction}</div>`);
   const companionHtml = companionUnseen.map((match) => {
     const person = findPersonById(match.otherId) || { name: match.otherName, image: match.otherPhotoUrl };
     return `<section class="notification-companion is-unread" aria-label="${escapeHtml(`You and ${match.otherName} are going together to ${match.eventTitle}`)}">`
@@ -612,7 +615,27 @@ const renderNotifications = () => {
       + `<span class="notification-nearby-copy"><strong>${escapeHtml(crossingCopy(n).title)}</strong><span>${escapeHtml(crossingCopy(n).line)}</span>${crossingCopy(n).when ? `<small>${escapeHtml(crossingCopy(n).when)}</small>` : ''}</span>`
       + `<button type="button" class="notification-nearby-hi" data-crossed-view="${escapeHtml(n.id)}">Discover</button></section>`;
   }).join('');
-  list.innerHTML = requestsHtml + hiringHtml + crossedHtml + nearbyMatchHtml + companionHtml + nearbyHtml + messagesHtml;
+  const heartIcon = '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 13.6S2.2 10.2 2.2 6.1A2.9 2.9 0 0 1 8 4.6a2.9 2.9 0 0 1 5.8 1.5c0 4.1-5.8 7.5-5.8 7.5Z"/></svg>';
+  const commentIcon = '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3 12.8V4.5A1.5 1.5 0 0 1 4.5 3h7A1.5 1.5 0 0 1 13 4.5v5A1.5 1.5 0 0 1 11.5 11H5.5Z"/></svg>';
+  const postHtml = postGroups.map((g) => {
+    const copy = postNotificationCopy(g);
+    const lead = g.people[0] || {};
+    const person = findPersonById(lead.id) || { name: lead.name, image: lead.photoUrl };
+    const thumb = g.postImage && isStorageImageUrl(g.postImage) ? `<img src="${escapeHtml(g.postImage)}" alt="" loading="lazy" decoding="async" />` : '';
+    return `<button type="button" class="notification-post${g.unread ? ' is-unread' : ''}" data-post-note="${escapeHtml(g.key)}" aria-label="${escapeHtml(`${copy.title}. ${copy.line}`.trim())}">`
+      + `<span class="notification-nearby-face">${renderAvatar(person, 'notification-avatar')}<i class="notification-post-kind is-${g.type === 'post_like' ? 'like' : 'comment'}">${g.type === 'post_like' ? heartIcon : commentIcon}</i></span>`
+      + `<span class="notification-nearby-copy"><strong>${escapeHtml(copy.title)}</strong>${copy.line ? `<span>${escapeHtml(copy.line)}</span>` : ''}<small>${escapeHtml(formatNotificationTime(g.createdAt))}</small></span>`
+      + `${thumb ? `<span class="notification-post-thumb">${thumb}</span>` : ''}</button>`;
+  }).join('');
+  list.innerHTML = requestsHtml + hiringHtml + postHtml + crossedHtml + nearbyMatchHtml + companionHtml + nearbyHtml + messagesHtml;
+  list.querySelectorAll('[data-post-note]').forEach((item) => item.addEventListener('click', (event) => {
+    event.stopPropagation();
+    const g = postGroups.find((x) => x.key === item.dataset.postNote);
+    closeNotificationPanel();
+    if (!g) return;
+    memberNotes.markRead(g.ids);
+    openSharedPost(g.postId);
+  }));
   if (hiringHtml) hiring.bindNotifications(list, () => closeNotificationPanel());
   list.querySelectorAll('[data-crossed-view]').forEach((item) => item.addEventListener('click', (event) => {
     event.stopPropagation();
@@ -1195,6 +1218,10 @@ const memberNotes = createMemberNotifications({
   },
   onNew: (n) => {
     chime.notify(n.id);   // every genuinely new notification, once per id
+    if (POST_TYPES.has(n.type)) {
+      if (document.visibilityState === 'visible') showToast(postNotificationCopy({ type: n.type, people: [{ name: n.name }], snippet: n.snippet }).title + '.');
+      return;
+    }
     if (n.type !== 'nearby_appeared') return;
     if (!nearbyPage.notify(n) && document.visibilityState === 'visible') {
       showToast(`${crossingCopy(n).title} ${crossingCopy(n).line}`);
@@ -3863,7 +3890,8 @@ const openNotificationSettings = () => {
     <p class="profile-settings-note">Choose how the club keeps you updated. Chat messages will still be available in your inbox when alerts are off.</p>
     <label class="settings-toggle-row"><span><strong>MESSAGE NOTIFICATIONS</strong><small>Get an alert when someone sends you a message.</small></span><input id="profile-notifications-toggle" type="checkbox" /><i aria-hidden="true"></i></label>
     <label class="settings-toggle-row" data-presence-setting hidden><span><strong>SHOW WHEN I'M ACTIVE</strong><small>Your connections see a dot when you're here. Turn it off and you won't see theirs either.</small></span><input id="profile-presence-toggle" type="checkbox" /><i aria-hidden="true"></i></label>
-    <label class="settings-toggle-row" data-push-setting><span><strong>WEB NOTIFICATIONS</strong><small>Get a notification on this device when someone crosses your path, even when Brivia is closed. Separate from location.</small><small class="settings-nearby-status" data-push-status role="status"></small></span><input id="profile-push-toggle" type="checkbox" /><i aria-hidden="true"></i></label>
+    <label class="settings-toggle-row" data-receipts-setting hidden><span><strong>READ RECEIPTS</strong><small>Others see when you've read their messages. Turn it off and you won't see when they've read yours either.</small></span><input id="profile-receipts-toggle" type="checkbox" /><i aria-hidden="true"></i></label>
+    <label class="settings-toggle-row" data-push-setting><span><strong>WEB NOTIFICATIONS</strong><small>Get a notification on this device when someone crosses your path, or likes or comments on your note, even when Brivia is closed. Separate from location.</small><small class="settings-nearby-status" data-push-status role="status"></small></span><input id="profile-push-toggle" type="checkbox" /><i aria-hidden="true"></i></label>
     <label class="settings-toggle-row"><span><strong>NOTIFICATION SOUND</strong><small>A soft sax chime when a notification arrives while Brivia is open. On this device.</small></span><input id="profile-sound-toggle" type="checkbox" /><i aria-hidden="true"></i></label>
     <label class="settings-toggle-row"><span><strong>SWIPE SOUNDS</strong><small>A short note when you pass or pitch. On this device.</small></span><input id="profile-swipe-sound-toggle" type="checkbox" /><i aria-hidden="true"></i></label>
     <label class="settings-toggle-row" data-push-sound-setting><span><strong>PUSH NOTIFICATION SOUND</strong><small>Your device's own sound for Brivia notifications when Brivia is closed. Off: they arrive silently. On iPhone, set this in Settings, Notifications.</small></span><input id="profile-push-sound-toggle" type="checkbox" /><i aria-hidden="true"></i></label>
@@ -3898,6 +3926,22 @@ const openNotificationSettings = () => {
     if (error) { presenceToggle.checked = !want; showToast('That setting could not be saved. Please try again.'); return; }
     feedback.textContent = want ? 'Your connections can see when you are active.' : 'Active status is off. You will not see others either.';
     presence?.refresh();
+  });
+  // D-151 (0043): Read receipts, both ways. Hidden until the server answers (before 0043 it stays hidden).
+  const receiptsRow = modal.querySelector('[data-receipts-setting]');
+  const receiptsToggle = modal.querySelector('#profile-receipts-toggle');
+  myReadReceipts().then(({ data, error }) => {
+    if (error || !receiptsRow) return;
+    receiptsToggle.checked = data !== false;
+    receiptsRow.hidden = false;
+  }).catch(() => {});
+  receiptsToggle?.addEventListener('change', async () => {
+    const want = receiptsToggle.checked;
+    receiptsToggle.disabled = true;
+    const { error } = await setReadReceipts(want);
+    receiptsToggle.disabled = false;
+    if (error) { receiptsToggle.checked = !want; showToast('That setting could not be saved. Please try again.'); return; }
+    feedback.textContent = want ? 'Read receipts are on.' : "Read receipts are off. You won't see when others have read yours either.";
   });
   // D-134: web notifications on this device (independent of location) and the chime.
   const pushToggle = modal.querySelector('#profile-push-toggle');
@@ -4623,6 +4667,7 @@ const toggleCommunityReaction = async (postId, kind) => {
     markReaction(postId, kind, next, { pop: true });
     if (kind === 'like') bumpActivity(postId, (a) => withLike(a, next));
     const { error } = await setReaction(supabase, kind, postId, memberProfile.id, next);
+    if (!error && kind === 'like' && next) sendPendingPush();   // D-151: the author's devices hear about it
     if (error) {
       markReaction(postId, kind, !next);
       if (kind === 'like') bumpActivity(postId, (a) => withLike(a, !next));
@@ -4817,6 +4862,7 @@ const mountPostComments = async (dialog, post, author) => {
     send.removeAttribute('aria-busy');
     if (!dialog.isConnected) return;
     if (error) { send.disabled = false; showToast(COMMENT_FAILED); return; }
+    sendPendingPush();   // D-151: the note's author is notified (server trigger); push it to their devices
     rows.push({ ...row, author_id: row.author_id || memberProfile.id });
     input.value = '';
     fit();

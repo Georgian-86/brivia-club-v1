@@ -75,3 +75,30 @@ test('web push: iPhone in a Safari tab must add to Home Screen; denied and unsup
   assert.equal(key.length, 65);
   assert.equal(key[0], 4);
 });
+
+// D-151 (0043): likes and comments on my notes.
+import { groupPostNotifications, postNotificationCopy } from '../../site/scripts/member-notifications.js';
+test('groupPostNotifications: likes per note in one row, each comment its own row, newest first', () => {
+  const now = Date.parse('2026-11-04T12:00:00Z');
+  const n = (id, type, postId, sourceId, name, at, extra = {}) => ({ id, type, postId, sourceId, name, createdAt: at, readAt: null, dismissedAt: null, snippet: '', ...extra });
+  const list = [
+    n('1', 'post_like', 'p1', 'a', 'Asha Rao', '2026-11-04T10:00:00Z', { readAt: 'x' }),
+    n('2', 'post_like', 'p1', 'b', 'Ravi', '2026-11-04T11:00:00Z'),
+    n('3', 'post_comment', 'p1', 'b', 'Ravi', '2026-11-04T11:30:00Z', { snippet: 'Where?' }),
+    n('4', 'post_like', 'p2', 'c', 'Meera', '2026-10-20T11:00:00Z'),
+    n('5', 'nearby_appeared', '', 'd', 'D', '2026-11-04T11:59:00Z'),
+    n('6', 'post_like', 'p3', 'e', 'E', '2026-11-04T09:00:00Z', { dismissedAt: 'x' }),
+  ];
+  const groups = groupPostNotifications(list, now);
+  assert.deepEqual(groups.map((g) => g.key), ['c:3', 'l:p1']);
+  assert.deepEqual(groups[1].ids, ['1', '2']);
+  assert.equal(groups[1].unread, true);
+  assert.equal(groups[1].people.length, 2);
+});
+test('postNotificationCopy: one, two, many likers; a comment quotes its words', () => {
+  assert.equal(postNotificationCopy({ type: 'post_like', people: [{ name: 'Asha Rao' }] }).title, 'Asha liked your note');
+  assert.equal(postNotificationCopy({ type: 'post_like', people: [{ name: 'Asha' }, { name: 'Ravi K' }] }).title, 'Asha and Ravi liked your note');
+  assert.equal(postNotificationCopy({ type: 'post_like', people: [{ name: 'Asha' }, { name: 'B' }, { name: 'C' }, { name: 'D' }] }).title, 'Asha and 3 others liked your note');
+  assert.deepEqual(postNotificationCopy({ type: 'post_comment', people: [{ name: 'Ravi' }], snippet: 'Where?' }), { title: 'Ravi commented on your note', line: '“Where?”' });
+  assert.equal(postNotificationCopy({ type: 'post_like', people: [{ name: '' }] }).title, 'A member liked your note');
+});

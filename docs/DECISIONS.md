@@ -3064,3 +3064,21 @@ controls (a tester or a seeded test member), never a real member, so no new expo
 - **Superseded:** D-110's "the open chat's head is unchanged" (the founder now asked for last active there).
 - **Proof:** SQL harness ALL PASSED (w-read-receipts R1–R5; a5 column list and hygiene whitelist updated); unit tests
   (receipts, presence lastSeen); e2e read-receipts (1440 and 390, before 0042 too), presence, chat-inbox, chat-extras.
+
+## D-151 (2026-11-04): Read receipts switch, like and comment notifications, Posts renamed Notes
+
+- **Asked:** "add the read receipts toggle", "notify users about the likes and comments if someone does on their
+  posts", and "change the name of posts to Notes in nav bar".
+- **Read receipts:** Settings → READ RECEIPTS, default on. Like WhatsApp it is mutual: when either member has it off,
+  opening a conversation marks the messages Delivered only, so neither sees Read. Stored in `member_presence`
+  (no client access) beside the active-status switch; 0043 redefines 0042's `mark_conversation_read`.
+- **Notifications:** triggers on likes and comments write a `member_notification` for the note's author (never for
+  their own, never across a block or the tester world). One like notification per liker and note (un-like removes an
+  unread one; like again does not repeat); one per comment with an 80-character snippet (deleting the comment removes
+  it). The bell groups likes per note ("Ravi and Asha liked your note") and shows each comment on its own, with the
+  note's thumbnail; a row opens the note. While Brivia is open the chime and a toast announce it; when closed, web push
+  (push-notify v4, sent by the liker's or commenter's app right after it saves). Replies to a comment notify the note's
+  author only, not the person replied to (a later addition if wanted).
+- **Notes:** the nav label is Notes; the view id `posts`, its URLs and the data model are unchanged.
+- **Proof:** SQL harness ALL PASSED (x-post-notifications N1–N4; hygiene whitelist); unit tests (grouping and copy);
+  e2e post-notifications (panel at 1440 and 390, Settings, before 0043), plus nearby, events, presence, read-receipts.

@@ -1,4 +1,5 @@
-// push-notify (D-134): sends Web Push for new Nearby notifications. Called by the signed-in app right after its location
+// push-notify (D-134): sends Web Push for new Nearby notifications, and (D-151, 0043) likes and comments on a note,
+// called by the liker's or commenter's app right after it saves. Called by the signed-in app right after its location
 // pulse (nearby_pulse writes member_notification rows, 0030). Each notification is claimed once (push_sent_at set in the
 // same UPDATE that selects it), never one already read, so no device gets a push for something viewed elsewhere and no
 // notification is pushed twice. The push tag is the notification id: a device that shows it twice replaces it.
@@ -45,7 +46,7 @@ Deno.serve(async (req) => {
     .update({ push_sent_at: new Date().toISOString() })
     .is('push_sent_at', null).is('read_at', null).gte('created_at', since)
     .or(`user_id.eq.${uid},source_user_id.eq.${uid}`)
-    .select('id,user_id,source_user_id,band,notification_type,place_name');
+    .select('id,user_id,source_user_id,band,notification_type,place_name,post_id,snippet');
   if (claimError) return json(500, { error: 'claim' });
   if (!claimed?.length) return json(200, { sent: 0 });
 
@@ -61,10 +62,17 @@ Deno.serve(async (req) => {
   const gone: string[] = [];
   for (const n of claimed) {
     const who = nameOf.get(n.source_user_id) || { name: 'A Brivia member', photo_url: null };
-    const payload = JSON.stringify({
+    const first = String(who.name || '').trim().split(/\s+/)[0] || 'A Brivia member';
+    const post = n.notification_type === 'post_like' || n.notification_type === 'post_comment';
+    const payload = JSON.stringify(post ? {
+      id: n.id, tag: n.id, type: n.notification_type,
+      title: n.notification_type === 'post_like' ? `${first} liked your note` : `${first} commented on your note`,
+      body: n.notification_type === 'post_comment' && n.snippet ? `“${n.snippet}”` : 'Open Brivia to see it.',
+      url: `/app.html?view=posts&post=${n.post_id}&notification=${n.id}`,
+    } : {
       id: n.id, tag: n.id, type: n.notification_type,
       title: 'Someone interesting crossed your path.',
-      body: `You and ${String(who.name || '').trim().split(/\s+/)[0] || 'a Brivia member'} were ${APART[n.band] || 'close by'}${n.place_name ? `, near ${n.place_name}` : ''}. Discover who you crossed paths with.`,
+      body: `You and ${first === 'A Brivia member' ? 'a Brivia member' : first} were ${APART[n.band] || 'close by'}${n.place_name ? `, near ${n.place_name}` : ''}. Discover who you crossed paths with.`,
       url: `/app.html?view=nearby&notification=${n.id}`,
     });
     for (const s of (subs || []).filter((x) => x.member_id === n.user_id)) {
