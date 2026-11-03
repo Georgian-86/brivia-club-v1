@@ -35,3 +35,13 @@ test('the request card shows their message first; answered by dragging, no butto
   const none = reviewCardMarkup({ fromId: 'f', name: 'Ravi', shared: [], note: '' }, { index: 0, total: 1 }, { escapeHtml: (v) => String(v), renderAvatar: () => '' });
   assert.match(none, /No message, just a hello\./);
 });
+
+// D-154: one opener at a time.
+import { nextSuggestion } from '../../site/scripts/connect-composer.js';
+test('nextSuggestion: the next opener, round the list; anything typed starts from the first', () => {
+  const list = ['a', 'b', 'c'];
+  assert.equal(nextSuggestion(list, 'a'), 'b');
+  assert.equal(nextSuggestion(list, 'c'), 'a');
+  assert.equal(nextSuggestion(list, 'my own words'), 'a');
+  assert.equal(nextSuggestion([], 'x'), '');
+});

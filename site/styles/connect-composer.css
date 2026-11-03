@@ -48,3 +48,23 @@ body.app-body .collab-note { margin: var(--space-3) 0 0; padding: var(--space-3)
 body.app-body .collab-note .collab-note-text { margin: 4px 0 0; color: var(--color-ink); font-family: var(--font-heading); font-size: var(--text-16); line-height: 1.5; white-space: pre-line; }
 .collab-note-empty { margin: var(--space-3) 0 0; color: var(--color-ink-soft); font-size: var(--text-14); font-style: italic; }
 body.app-body :is(#pitch-name, [data-composer-name]) { text-transform: uppercase; }
+
+/* D-154: one opener, already written; "Another idea" swaps it. A calmer sheet: the box, a quiet row under it, the hint. */
+body.app-body .composer-another{
+  display:inline-flex;align-items:center;gap:6px;min-height:36px;margin:0;padding:0 12px 0 10px;
+  border:1px solid color-mix(in srgb, var(--cc-wine) 22%, transparent);border-radius:var(--radius-pill);background:transparent;
+  color:var(--cc-wine);font-family:var(--font-body);font-size:var(--text-12);font-weight:600;letter-spacing:.02em;cursor:pointer;
+  transition:background var(--motion-fast) var(--ease), border-color var(--motion-fast) var(--ease);
+}
+body.app-body .composer-another[hidden]{display:none}
+body.app-body .composer-another svg{width:14px;height:14px;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round;transition:transform .35s var(--ease)}
+@media (hover: hover){body.app-body .composer-another:hover{background:color-mix(in srgb, var(--cc-wine) 6%, transparent);border-color:var(--cc-wine)}}
+body.app-body .composer-another:active svg{transform:rotate(180deg)}
+body.app-body :is(#pitch-modal, .connect-composer-dialog) .composer-meta{align-items:center;margin-top:var(--space-2)}
+body.app-body #pitch-modal #pitch-hint{margin:var(--space-2) 0 0}
+body.app-body :is(#pitch-modal .pitch-panel, .connect-composer-dialog) textarea{min-height:112px}
+@media (max-width: 480px){
+  body.app-body :is(#pitch-modal .pitch-panel, .connect-composer-dialog) h2{font-size:34px}
+  body.app-body :is(#pitch-modal, .connect-composer-dialog) .pitch-copy{margin-bottom:var(--space-3)}
+  body.app-body :is(#pitch-modal .pitch-panel, .connect-composer-dialog) textarea{font-size:16px}
+}

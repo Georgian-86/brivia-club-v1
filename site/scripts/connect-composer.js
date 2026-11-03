@@ -19,6 +19,15 @@ export const openerSuggestions = ({ name, shared = [], eventTitle = '' } = {}) =
   return [...new Set(out)].slice(0, 3);
 };
 
+// D-154 (founder: "just one text suggestion is enough"): the composer opens with ONE opener already written in the box,
+// and "Another idea" swaps it for the next one (round the list). Whatever the member typed is theirs until they ask.
+export const nextSuggestion = (list = [], current = '') => {
+  if (!list.length) return '';
+  const at = list.indexOf(String(current).trim());
+  return list[(at + 1) % list.length];
+};
+export const ANOTHER_IDEA_ICON = '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M13 3.5v3h-3M3 12.5v-3h3"/><path d="M12.6 6.5A5 5 0 0 0 3.8 5M3.4 9.5a5 5 0 0 0 8.8 1.5"/></svg>';
+
 // '120 / 500'; nearLimit from 90%.
 export const composerCount = (length) => ({ text: `${Math.max(0, Number(length) || 0)} / ${NOTE_MAX}`, nearLimit: (Number(length) || 0) >= NOTE_MAX * 0.9 });
 
@@ -34,10 +43,9 @@ export const createConnectComposer = (dialog) => {
     <p class="app-eyebrow">CONNECT WITH <span data-composer-name>THEM</span></p>
     <h2 id="composer-title">Make the <em>first move.</em></h2>
     <p class="pitch-copy" id="composer-copy">Introduce yourself and tell them why you'd like to connect.</p>
-    <div class="composer-suggestions" data-composer-suggestions role="group" aria-label="Suggested openers"></div>
     <label class="sr-only" for="composer-message">Your message</label>
-    <textarea id="composer-message" rows="5" maxlength="${NOTE_MAX}" aria-describedby="composer-copy composer-count composer-error" required></textarea>
-    <div class="composer-meta"><p class="event-field-error" id="composer-error" role="alert"></p><p class="composer-count" id="composer-count" aria-live="polite">0 / ${NOTE_MAX}</p></div>
+    <textarea id="composer-message" rows="4" maxlength="${NOTE_MAX}" aria-describedby="composer-copy composer-count composer-error" required></textarea>
+    <div class="composer-meta"><p class="event-field-error" id="composer-error" role="alert"></p><button type="button" class="composer-another" data-composer-another>${ANOTHER_IDEA_ICON}<span>Another idea</span></button><p class="composer-count" id="composer-count" aria-live="polite">0 / ${NOTE_MAX}</p></div>
     <div class="composer-actions"><button type="button" class="composer-cancel" data-composer-cancel>Cancel</button><button type="submit" class="composer-send">Send request <span aria-hidden="true">→</span></button></div>
   </form>`;
   dialog.setAttribute('aria-labelledby', 'composer-title');
@@ -54,8 +62,7 @@ export const createConnectComposer = (dialog) => {
   dialog.addEventListener('cancel', (e) => { e.preventDefault(); cancel(); });
   dialog.addEventListener('click', (e) => {
     if (e.target === dialog || e.target.closest('[data-composer-cancel]')) { cancel(); return; }
-    const s = e.target.closest('[data-composer-suggestion]');
-    if (s) { text.value = suggestions[Number(s.dataset.composerSuggestion)] || ''; renderCount(); text.focus(); text.setSelectionRange(text.value.length, text.value.length); }
+    if (e.target.closest('[data-composer-another]')) { text.value = nextSuggestion(suggestions, text.value); error.textContent = ''; renderCount(); text.focus(); text.setSelectionRange(text.value.length, text.value.length); }
   });
   form.addEventListener('submit', async (e) => {
     e.preventDefault();
@@ -72,8 +79,8 @@ export const createConnectComposer = (dialog) => {
       current = { onSend, onCancel };
       suggestions = list;
       dialog.querySelector('[data-composer-name]').textContent = person.name || 'them';
-      dialog.querySelector('[data-composer-suggestions]').innerHTML = suggestionsMarkup(list);
-      text.value = prefill;
+      dialog.querySelector('[data-composer-another]').hidden = list.length < 2;
+      text.value = prefill || list[0] || '';
       error.textContent = '';
       renderCount();
       dialog.showModal();

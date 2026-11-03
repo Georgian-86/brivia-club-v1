@@ -53,7 +53,7 @@ import '../styles/nearby.css';
 import { createEventsPage } from './events-page.js';
 import { createEventComposer } from './event-create.js';
 import { createCompanionsPage } from './companions-page.js';
-import { openerSuggestions, composerCount, suggestionsMarkup, createConnectComposer } from './connect-composer.js';
+import { openerSuggestions, composerCount, nextSuggestion, ANOTHER_IDEA_ICON, createConnectComposer } from './connect-composer.js';
 import '../styles/connect-composer.css';
 import { normalizeCompanionMatch, chatContextLine } from './companion-view.js';
 import '../styles/companions.css';
@@ -1289,6 +1289,7 @@ const setView = (view) => {
   });
   document.querySelectorAll('[data-nav]').forEach((button) => button.classList.toggle('is-active', button.dataset.nav === view));
   markCurrentNav(document, view);
+  if (previousView === 'chat' || view === 'chat') { try { scheduleRowTyping(); } catch { /* best-effort */ } }
   if (view === 'explore') renderExplore();
   if (view === 'home' || view === 'explore') offerDeckTutorial();
   if (view === 'posts') {
@@ -2181,11 +2182,13 @@ const openPitch = (person) => {
   pitchPerson = person;
   const pitchName = document.querySelector('#pitch-name'); if (pitchName) pitchName.textContent = person.name || 'them';
   pitchSuggestions = openerSuggestions({ name: person.name, shared: person.shared || [] });
-  const pitchSuggestionBox = document.querySelector('#pitch-suggestions'); if (pitchSuggestionBox) pitchSuggestionBox.innerHTML = suggestionsMarkup(pitchSuggestions);
+  // D-154: one opener, already in the box; "Another idea" swaps it.
+  const another = document.querySelector('#pitch-another');
+  if (another) { another.hidden = pitchSuggestions.length < 2; if (!another.querySelector('svg')) another.insertAdjacentHTML('afterbegin', ANOTHER_IDEA_ICON); }
   // A note from a failed send comes back when the member tries again.
   const savedNote = unsentNotes.get(String(person.id));
   unsentNotes.delete(String(person.id));
-  const pitchMessage = document.querySelector('#pitch-message'); if (pitchMessage) pitchMessage.value = savedNote || pitchLine(person);
+  const pitchMessage = document.querySelector('#pitch-message'); if (pitchMessage) pitchMessage.value = savedNote || pitchSuggestions[0] || pitchLine(person);
   renderPitchCount();
   openOverlay('pitch-modal');
   window.setTimeout(() => pitchMessage?.focus(), 80);
@@ -2628,6 +2631,9 @@ const renderChats = () => {
     if (inboxToolbar) list.prepend(inboxToolbar);
   }
   bindInboxWheel(list);
+  // D-154: rows of the most recent conversations show "typing…" (never while searching).
+  lastRowTypingIds = cleanQuery(chatSearchQuery) ? [] : conversations.map((person) => person.id);
+  scheduleRowTyping();
   document.querySelector('#chat-count').textContent = `${String(conversations.length).padStart(2, '0')} CONVERSATIONS`;
   setChatBadges(document, unreadMessageTotal(conversations));
   list?.querySelectorAll('[data-chat-id]').forEach((button) => button.addEventListener('click', (event) => {
@@ -2870,9 +2876,11 @@ function paintChatStatus() {
   if (!chatStatus || !selectedChat) return;
   const active = isActiveNow(selectedChat.id);
   const activity = lastActiveLabel(active, presence?.lastSeen(selectedChat.id) || '');
-  const text = [activity, chatStatusContext].filter(Boolean).join(' · ') || 'MEMBER / PRIVATE THREAD';
+  // D-154: while they type, the line says so (the bubble in the thread says it too).
+  const text = typingBubbleShown ? 'typing…' : ([activity, chatStatusContext].filter(Boolean).join(' · ') || 'MEMBER / PRIVATE THREAD');
   if (chatStatus.textContent !== text) chatStatus.textContent = text;
-  chatStatus.classList.toggle('is-active-now', activity === 'Active now');
+  chatStatus.classList.toggle('is-typing', typingBubbleShown);
+  chatStatus.classList.toggle('is-active-now', !typingBubbleShown && activity === 'Active now');
   chatStatus.classList.toggle('has-last-active', Boolean(activity));
 }
 const openChat = (person, markAsRead = true) => {
@@ -3063,6 +3071,7 @@ const renderMessages = () => {
   };
   const newestOwnId = lastOwnMessageId(thread);
   messages.innerHTML = thread.length ? thread.map(renderBubble).join('') : '<div class="chat-start-note"><strong>Start with context.</strong><span>A thoughtful first message makes a better introduction.</span></div>';
+  placeTypingBubble();
   const isBlocked = readBlockedUserIds().has(String(selectedChat.id));
   if (isBlocked) {
     messages.querySelector('.chat-start-note')?.remove();
@@ -3134,9 +3143,31 @@ const typingLine = () => {
   }
   return document.querySelector('#chat-typing');
 };
+// D-154: the same moment as a bubble at the foot of the thread (three dots in the other member's bubble style), so it
+// is seen where the eyes are. It is not part of the thread: renderMessages puts it back after each redraw.
+let typingBubbleShown = false;
+const placeTypingBubble = () => {
+  const thread = document.querySelector('#chat-messages');
+  if (!thread) return;
+  let bubble = thread.querySelector('#chat-typing-bubble');
+  if (!typingBubbleShown) { bubble?.remove(); return; }
+  const nearBottom = thread.scrollHeight - thread.scrollTop - thread.clientHeight < 120;
+  if (!bubble) {
+    bubble = document.createElement('div');
+    bubble.id = 'chat-typing-bubble';
+    bubble.className = 'message them chat-typing-bubble';
+    bubble.setAttribute('aria-hidden', 'true');
+    bubble.innerHTML = '<i></i><i></i><i></i>';
+  }
+  thread.append(bubble);
+  if (nearBottom) thread.scrollTop = thread.scrollHeight;
+};
 const showTyping = (visible, person) => {
   const line = typingLine();
   if (line) line.hidden = !visible;
+  typingBubbleShown = Boolean(visible);
+  placeTypingBubble();
+  paintChatStatus();
   const live = document.querySelector('#chat-typing-live');
   // One announcement per burst: set on show, cleared on hide.
   if (live) live.textContent = visible && person ? `${String(person.name || 'They').trim().split(/\s+/)[0]} is typing` : '';
@@ -3155,6 +3186,9 @@ const joinTyping = (person) => {
   leaveTyping();
   typingLine(); // the (hidden) pill and live region exist before any signal, so the first one never moves anything
   if (!supabase || !memberProfile.id || !person?.id || readBlockedUserIds().has(String(person.id))) return;
+  // D-154: realtime-js hands back the existing channel for a topic, so a row's receive-only listener on this pair is
+  // dropped first (Realtime removes a leaving channel locally at once) and the thread gets its own.
+  dropRowTyping(String(person.id));
   // A reopen right after a leave gets a fresh channel: Realtime drops a leaving channel locally at once.
   const channel = supabase.channel(typingTopic(memberProfile.id, person.id), { config: { private: true, broadcast: { self: false } } });
   const session = { otherId: String(person.id), channel, joined: false };
@@ -3185,6 +3219,70 @@ const joinTyping = (person) => {
       }
     });
 };
+// D-154: "typing…" in the inbox rows. While the Chat screen is open, the 8 most recent conversations other than the open
+// one listen (receive only) on their pair's private typing channel: the same topic and the same 0012 authorization as
+// the open thread, so a signal can only come from that member. Never for a blocked member; a refused join stays quiet
+// and is not retried until the list changes.
+const ROW_TYPING_MAX = 8;
+const rowTyping = new Map();      // otherId -> { channel, receiver, refused }
+const rowTypingNow = new Set();   // otherIds typing right now
+const paintRowTyping = (otherId) => {
+  const row = document.querySelector(`#chat-list [data-chat-id="${CSS.escape(String(otherId))}"] .chat-row-copy > span`);
+  if (!row) return;
+  if (rowTypingNow.has(String(otherId))) {
+    if (!row.classList.contains('is-typing')) { row.dataset.preview = row.textContent; row.textContent = 'typing…'; row.classList.add('is-typing'); }
+  } else if (row.classList.contains('is-typing')) {
+    row.textContent = row.dataset.preview || ''; row.classList.remove('is-typing');
+  }
+};
+const dropRowTyping = (otherId) => {
+  const entry = rowTyping.get(otherId);
+  if (!entry) return;
+  rowTyping.delete(otherId);
+  entry.receiver.reset();
+  rowTypingNow.delete(otherId);
+  paintRowTyping(otherId);
+  supabase?.removeChannel(entry.channel)?.catch?.(() => {});
+};
+function syncRowTyping(conversationIds = []) {
+  if (!supabase || !memberProfile.id) return;
+  const blocked = readBlockedUserIds();
+  const want = new Set(document.body.dataset.appView === 'chat' && document.visibilityState === 'visible'
+    ? conversationIds.map(String).filter((id) => id !== String(selectedChat?.id || '') && id !== String(typingSession?.otherId || '') && !blocked.has(id) && (chatMessages[id] || []).length).slice(0, ROW_TYPING_MAX)
+    : []);
+  [...rowTyping.keys()].forEach((id) => { if (!want.has(id)) dropRowTyping(id); });
+  want.forEach((id) => {
+    if (rowTyping.has(id)) { paintRowTyping(id); return; }
+    const channel = supabase.channel(typingTopic(memberProfile.id, id), { config: { private: true, broadcast: { self: false } } });
+    const entry = { channel, refused: false };
+    entry.receiver = createTypingReceiver({ onChange: (visible) => {
+      if (rowTyping.get(id) !== entry) return;
+      if (visible) rowTypingNow.add(id); else rowTypingNow.delete(id);
+      paintRowTyping(id);
+    } });
+    rowTyping.set(id, entry);
+    channel
+      .on('broadcast', { event: TYPING_EVENT }, ({ payload } = {}) => {
+        if (rowTyping.get(id) !== entry || readBlockedUserIds().has(id)) return;
+        entry.receiver.onSignal({ typing: payload?.typing === true });
+      })
+      .subscribe((status) => {
+        if (rowTyping.get(id) !== entry) return;
+        if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') { entry.refused = true; entry.receiver.reset(); rowTypingNow.delete(id); paintRowTyping(id); }
+      });
+  });
+}
+let lastRowTypingIds = [];
+// Joins wait until the list has been still for 1.5 s (a thread opened straight away is never joined twice); leaving
+// the Chat screen drops them at once. Rows already listening are only repainted.
+let rowTypingTimer = 0;
+const refreshRowTyping = () => { window.clearTimeout(rowTypingTimer); try { syncRowTyping(lastRowTypingIds); } catch { /* best-effort */ } };
+function scheduleRowTyping() {
+  rowTypingNow.forEach((id) => paintRowTyping(id));
+  window.clearTimeout(rowTypingTimer);
+  if (document.body.dataset.appView !== 'chat') { refreshRowTyping(); return; }
+  rowTypingTimer = window.setTimeout(refreshRowTyping, 1500);
+}
 function syncTypingForSelectedChat() {
   if (!selectedChat) { if (typingSession) leaveTyping(); return; }
   if (readBlockedUserIds().has(String(selectedChat.id))) leaveTyping();
@@ -3199,6 +3297,7 @@ const noteTyping = () => {
 document.addEventListener('visibilitychange', () => {
   if (document.visibilityState === 'hidden') typingSession?.sender.stop();
   else rejoinTypingOnce();
+  try { scheduleRowTyping(); } catch { /* best-effort */ }
 });
 // One join attempt per user-side event (tab visible again, back online) when the open thread has no typing session:
 // covers a dropped socket (screen lock, app switch) without ever looping on a refused join. Never for a blocked pair.
@@ -5988,11 +6087,10 @@ document.querySelector('#pitch-modal .pitch-no-note')?.addEventListener('click',
 });
 document.querySelector('#pitch-modal [data-pitch-cancel]')?.addEventListener('click', () => { if (performance.now() - pitchOpenedAt >= PITCH_OPENING_MS) closeOverlays(); });
 document.querySelector('#pitch-message')?.addEventListener('input', renderPitchCount);
-document.querySelector('#pitch-suggestions')?.addEventListener('click', (event) => {
-  const chip = event.target.closest('[data-composer-suggestion]');
+document.querySelector('#pitch-another')?.addEventListener('click', () => {
   const input = document.querySelector('#pitch-message');
-  if (!chip || !input) return;
-  input.value = pitchSuggestions[Number(chip.dataset.composerSuggestion)] || '';
+  if (!input) return;
+  input.value = nextSuggestion(pitchSuggestions, input.value);
   renderPitchCount();
   input.focus();
   input.setSelectionRange(input.value.length, input.value.length);

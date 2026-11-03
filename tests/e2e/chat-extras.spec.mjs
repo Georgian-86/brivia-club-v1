@@ -826,17 +826,19 @@ try {
       await page.waitForTimeout(700);
       return { context, page, rt, consoleLines };
     };
+    // D-154: the indicator is the bubble at the foot of the thread (#chat-typing-bubble) and the header line reading
+    // "typing…" (#chat-status); the old floating pill is gone.
     const typingState = (page) => page.evaluate(() => {
-      const el = document.querySelector('#chat-typing');
+      const el = document.querySelector('#chat-typing-bubble');
       const live = document.querySelector('#chat-typing-live');
       const head = document.querySelector('.chat-window-head')?.getBoundingClientRect();
       const msgs = document.querySelector('#chat-messages')?.getBoundingClientRect();
       const visible = Boolean(el && !el.hidden && el.getClientRects().length && getComputedStyle(el).visibility !== 'hidden' && Number(getComputedStyle(el).opacity) > 0);
       const r = el?.getBoundingClientRect();
-      const dot = el?.querySelector('.chat-typing-dots i');
+      const dot = el?.querySelector('i');
       return {
         visible,
-        text: visible ? el.innerText.replace(/\s+/g, ' ').trim() : '',
+        text: visible ? (document.querySelector('#chat-status')?.textContent || '').trim() : '',
         live: live?.textContent.trim() || '',
         liveRole: live ? `${live.getAttribute('role')}/${live.getAttribute('aria-live')}` : null,
         box: r ? { top: Math.round(r.top), left: Math.round(r.left), right: Math.round(r.right), h: Math.round(r.height) } : null,
@@ -844,13 +846,13 @@ try {
         msgs: msgs ? { top: Math.round(msgs.top), h: Math.round(msgs.height) } : null,
         win: (() => { const w = document.querySelector('#chat-window').getBoundingClientRect(); return { left: Math.round(w.left), right: Math.round(w.right) }; })(),
         anim: dot ? getComputedStyle(dot).animationName : null,
-        fontSize: el ? parseFloat(getComputedStyle(el.querySelector('.chat-typing-text') || el).fontSize) : null,
+        fontSize: parseFloat(getComputedStyle(document.querySelector('#chat-status')).fontSize),
         doc: document.documentElement.scrollWidth - document.documentElement.clientWidth,
       };
     });
     const waitTyping = (page, shown) => page.waitForFunction((want) => {
-      const el = document.querySelector('#chat-typing');
-      return Boolean(el && !el.hidden) === want;
+      const el = document.querySelector('#chat-typing-bubble');
+      return Boolean(el && el.isConnected) === want;
     }, shown, { timeout: 6000 }).catch(() => null);
 
     if (process.env.TYPING_SHOTS) {
@@ -882,7 +884,7 @@ try {
           await waitTyping(page, true);
           const shown = await typingState(page);
           const shownAt = Date.now();
-          check(`T1 ${width}: "typing…" shows under the header, the thread does not move, the live region says it once (${JSON.stringify({ before: before.msgs, shown })})`, () => {
+          check(`T1 ${width}: "typing…" shows (header line and a bubble in the thread), the thread does not move, the live region says it once (${JSON.stringify({ before: before.msgs, shown })})`, () => {
             assert.equal(before.visible, false);
             assert.equal(shown.visible, true);
             assert.match(shown.text, /^typing…$/);
@@ -1134,6 +1136,35 @@ try {
           assert.equal(s.visible, true);
           assert.deepEqual(rt.typingFrames().map((f) => f.payload), [{ typing: true }]);
         });
+        await context.close();
+      });
+
+      // D-154: the inbox rows of other recent conversations say "typing…" (receive-only, the pair's own channel).
+      await scenario('T9 typing in the inbox rows', async () => {
+        const B = 'aaaaaaaa-aaaa-4aaa-8aaa-000000000002';
+        const TOPIC_B = `realtime:typing:${[ME, B].sort().join(':')}`;
+        const fromB = { id: 'msg-b', sender_id: B, recipient_id: ME, body: 'Coffee later?', created_at: new Date(Date.now() - 3e5).toISOString() };
+        const { context, page, rt } = await openTyping(1440, { matchIds: [A, B] });
+        st.messages = [hello, fromB];
+        await page.reload();
+        await page.waitForSelector(`#chat-list [data-chat-id="${A}"]`, { timeout: 8000 });
+        await page.locator(`#chat-list [data-chat-id="${A}"]`).click();
+        await page.waitForTimeout(2200);
+        const joinsB = rt.typingJoins().filter((j) => j.topic === TOPIC_B);
+        check(`T9 the other conversation listens on its own private pair channel once (${joinsB.length})`, () => { assert.equal(joinsB.length, 1); assert.equal(joinsB[0].config.private, true); });
+        rt.ws?.send(JSON.stringify([null, null, TOPIC_B, 'broadcast', { type: 'broadcast', event: 'typing', payload: { typing: true } }]));
+        await page.waitForTimeout(300);
+        const row = () => page.$eval(`#chat-list [data-chat-id="${B}"] .chat-row-copy > span`, (el) => ({ text: el.textContent, typing: el.classList.contains('is-typing') }));
+        const on = await row();
+        check(`T9 Bilal's row says typing… (${JSON.stringify(on)})`, () => { assert.equal(on.text, 'typing…'); assert.equal(on.typing, true); });
+        const header = await typingState(page);
+        check('T9 the open thread (Asha) shows nothing for Bilal', () => assert.equal(header.visible, false));
+        await page.waitForTimeout(4300);
+        const off = await row();
+        check(`T9 after 4 s idle the row shows the last message again (${JSON.stringify(off)})`, () => { assert.equal(off.text, 'Coffee later?'); assert.equal(off.typing, false); });
+        await page.evaluate(() => document.querySelector('[data-nav="explore"]')?.click());
+        await page.waitForTimeout(400);
+        check('T9 leaving Chat leaves the row channels', () => assert.ok(rt.leaves.includes(TOPIC_B)));
         await context.close();
       });
 

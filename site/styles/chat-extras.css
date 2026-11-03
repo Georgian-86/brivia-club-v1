@@ -923,3 +923,23 @@ body.app-body .app-view[data-view="chat"] .chat-window-head #chat-status.is-acti
   /* 16 px in the composer and search: iOS Safari zooms the page into any smaller field it focuses. */
   body.app-body .app-view[data-view="chat"] #chat-input{font-size:16px !important}
 }
+
+/* ---------- Typing, everywhere it matters (D-154) ---------- */
+/* The floating pill under the header gives way to the header line itself ("typing…") and a bubble in the thread. */
+.app-view[data-view="chat"] .chat-window-head .chat-typing{display:none !important}
+body.app-body .app-view[data-view="chat"] .chat-window-head #chat-status.is-typing{color:var(--color-wine);font-style:italic}
+/* The bubble: the other member's bubble shape, three wine dots rising in turn. */
+body.app-body .app-view[data-view="chat"] .chat-layout .message.chat-typing-bubble{
+  display:inline-flex !important;flex-direction:row !important;align-items:center;align-self:flex-start;gap:5px;
+  width:auto;min-width:0;max-width:none;padding:14px 16px;animation:chat-typing-in .18s ease-out;
+}
+.chat-typing-bubble i{display:block;width:7px;height:7px;border-radius:50%;background:var(--color-wine);opacity:.35;animation:chat-typing-dot 1.2s var(--ease) infinite}
+.chat-typing-bubble i:nth-child(2){animation-delay:.15s}
+.chat-typing-bubble i:nth-child(3){animation-delay:.3s}
+@keyframes chat-typing-in{from{opacity:0;transform:translateY(6px) scale(.96)}to{opacity:1;transform:none}}
+/* The inbox row: the preview line reads "typing…" in wine italics. */
+#chat-list .chat-row-copy > span.is-typing{color:var(--color-wine) !important;font-style:italic}
+@media (prefers-reduced-motion: reduce){
+  .chat-typing-bubble i{animation:none;opacity:.6}
+  body.app-body .app-view[data-view="chat"] .chat-layout .message.chat-typing-bubble{animation:none}
+}

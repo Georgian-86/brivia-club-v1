@@ -82,7 +82,8 @@ try {
     const composer = await page.locator('#connect-composer-dialog').innerText();
     check(`${w}: Connect opens the composer with a title, a prompt, suggestions and a counter (${JSON.stringify(composer.slice(0, 160))})`,
       /CONNECT WITH AANYA/.test(composer) && /Make the\s*first move\./.test(composer) && /Introduce yourself and tell them why you'd like to connect\./.test(composer)
-      && await page.locator('#connect-composer-dialog .composer-suggestion').count() === 3 && /0 \/ 500/.test(composer));
+      && await page.locator('#connect-composer-dialog .composer-suggestion').count() === 0 && await page.locator('#connect-composer-dialog [data-composer-another]').isVisible()
+      && /^Hi Aanya! I'm going to Blitz Chess Meetup too/.test(await page.locator('#composer-message').inputValue()));
     check(`${w}: focus is in the message box`, await page.evaluate(() => document.activeElement?.id === 'composer-message'));
     const axeComposer = await axeViolations(page, { include: '#connect-composer-dialog' });
     check(`${w}: axe on the composer`, axeComposer.length === 0, JSON.stringify(axeComposer));
@@ -93,7 +94,12 @@ try {
     // A suggestion fills the box; the counter follows; Send request sends the request with the message, then the like.
     await page.locator('#companion-like').click();
     await page.waitForSelector('#connect-composer-dialog[open]');
-    await page.locator('#connect-composer-dialog .composer-suggestion').first().click();
+    // D-154: one opener is already written; "Another idea" swaps it for the next, round the list.
+    await page.locator('#connect-composer-dialog [data-composer-another]').click();
+    const swapped = await page.locator('#composer-message').inputValue();
+    check(`${w}: Another idea swaps the opener (${JSON.stringify(swapped)})`, /we both love chess/.test(swapped));
+    await page.locator('#connect-composer-dialog [data-composer-another]').click();
+    await page.locator('#connect-composer-dialog [data-composer-another]').click();
     const filled = await page.locator('#composer-message').inputValue();
     check(`${w}: a suggestion fills the message (${JSON.stringify(filled)})`, /^Hi Aanya! I'm going to Blitz Chess Meetup too/.test(filled) && new RegExp(`^${filled.length} / 500$`).test(await page.locator('#composer-count').innerText()));
     await page.locator('#connect-composer-dialog .composer-send').click();

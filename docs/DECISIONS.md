@@ -3131,3 +3131,21 @@ controls (a tester or a seeded test member), never a real member, so no new expo
   Not checked on a physical phone.
 - **Unchanged:** the source order and selection logic (AV1, HEVC, H.264 per frame; MediaCapabilities keeps a smooth
   one), the 20 MB cap, desktop framing.
+
+## D-154 (2026-11-04): one opener in "Make the first move", and typing you can see
+
+- **Asked:** "just one text suggestion is enough to pitch, refine this box" and "add a typing feature in chats section".
+- **Pitch box:** the three suggestion pills and the different pre-filled line (four openers at once) are replaced by
+  one opener already written in the box (the most specific: the shared event, then a shared interest, then a general
+  line, first name only) and a small "Another idea" button that swaps it for the next. Shorter box, the hint under the
+  counter, 16 px on phones. Same for the companions page composer. `nextSuggestion` in connect-composer.js.
+- **Typing:** the D5 indicator (a small pill under the header) was easy to miss. Now: the header line reads
+  "typing…" in wine italics, and a bubble with three rising dots sits at the foot of the thread in the other member's
+  bubble style. The inbox rows of the 8 most recent other conversations say "typing…" in place of the last message,
+  receive-only, on each pair's own private channel (the same 0012 authorization, so no one can fake it), only while
+  the Chat screen is open, never for a blocked member; joins wait 1.5 s after the list settles and leave at once when
+  Chat closes. realtime-js hands back the existing channel for a topic, so a row's listener is dropped before its
+  thread joins.
+- **Checked live:** the 0012 typing policies are on realtime.messages and allow the founder's matched pairs.
+- **Proof:** unit (nextSuggestion), e2e chat-extras typing T1–T9 (T9 new: rows), companions, chat-search, chat-inbox,
+  read-receipts, presence, deck.
