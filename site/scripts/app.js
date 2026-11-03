@@ -1844,6 +1844,31 @@ const resolvePublicPerson = (person = {}) => {
   return { ...person, image: person.image || person.photoUrl || '', role: person.role || person.experience || 'Brivia member', tags: person.tags?.length ? person.tags : [...skills, ...lookingFor], bio: person.bio || '' };
 };
 
+// Keeps a wrapping chip list to `maxRows` lines: chips past the last line are hidden behind a final "+N more" chip
+// (a button) that shows them all. Measured after layout, so it follows the real width (dialog, phone, font).
+const fitChipRows = (list, maxRows = 3) => {
+  const items = [...list.querySelectorAll(':scope > li')];
+  if (!items.length) return;
+  const rowOf = () => { const tops = [...new Set(items.filter((li) => !li.hidden).map((li) => li.offsetTop))].sort((a, b) => a - b); return (li) => tops.indexOf(li.offsetTop); };
+  if (rowOf()(items.at(-1)) < maxRows) return;   // already fits
+  const more = document.createElement('li');
+  more.className = 'public-profile-chip-more';
+  more.innerHTML = '<button type="button"></button>';
+  list.append(more);
+  const button = more.querySelector('button');
+  // Hide from the end until the "+N more" chip itself sits within the last allowed line.
+  let hidden = 0;
+  const render = () => { button.textContent = `+${hidden} more`; button.setAttribute('aria-label', `Show ${hidden} more interests`); };
+  for (let k = items.length - 1; k >= 0; k -= 1) {
+    render();
+    const row = rowOf();
+    if (row(more) < maxRows && row(items[k]) < maxRows) break;
+    items[k].hidden = true;
+    hidden += 1;
+  }
+  render();
+  button.addEventListener('click', () => { items.forEach((li) => { li.hidden = false; }); more.remove(); });
+};
 const openPublicProfile = (person, options = {}) => {
   const profile = resolvePublicPerson(person);
   document.querySelector('#public-profile-modal')?.remove();
@@ -1912,6 +1937,9 @@ const openPublicProfile = (person, options = {}) => {
   });
   modal.tabIndex = -1;
   window.setTimeout(() => modal.querySelector('.public-profile-close')?.focus(), 0);
+  // Founder (2026-11-03): interests take at most three lines; the rest wait behind "+N more".
+  const interestList = modal.querySelector('.public-profile-chips--interest');
+  if (interestList) requestAnimationFrame(() => fitChipRows(interestList, 3));
   // D-104: cards carry no bio; ask for it (member_bio answers only for a member this viewer can see).
   if (!bio && supabase && profile.id && String(profile.id) !== String(memberProfile.id)) {
     supabase.rpc('member_bio', { p_member: profile.id }).then(({ data, error }) => {
