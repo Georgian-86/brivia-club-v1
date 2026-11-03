@@ -2798,7 +2798,8 @@ controls (a tester or a seeded test member), never a real member, so no new expo
   left swipe and a cheerful one on a right swipe, all one sound identity; one on/off switch and a volume; no redesign.
 - **Bio:** `profile-edit.js` `countWords` / `bioWords` (a word is a run of non-space text; extra spaces, line breaks and
   leading or trailing spaces never count). Signup "About you" and Edit profile show the counter, add a quiet wine note
-  past 20 (`is-over`, `aria-invalid`) and refuse to continue or save (Edit profile checks before anything is sent). The
+  past 20 (`is-over`, `aria-invalid`) and refuse to continue or save (Edit profile checks before anything is sent). Edit profile refuses clearing a saved bio;
+  a member who never wrote one (an account from before signup asked for it) can still save other changes. The
   old 20-character floor is gone. Server: `0033_bio_word_limit.sql`, a trigger refusing a bio of more than 20 words
   when it is written (a longer bio saved earlier stays until its member edits it; empty stays a clear).
 - **Sound:** `notify-sound.js` is now the sound kit. One synthesized voice, "the Brivia horn" (sawtooth plus square
@@ -2820,6 +2821,6 @@ controls (a tester or a seeded test member), never a real member, so no new expo
   open. On iPhone, web push needs Brivia on the Home Screen (D-134), and the silent switch silences the cues.
 - **Proof:** unit (new `sound-kit.test.mjs`: cue shapes, gesture rules, once per id and per swipe, off and zero
   volume, live fallback, audio session, storage, word counts); SQL harness ALL PASSED (new `s-bio-words.test.sql`);
-  e2e `sounds.spec.mjs` counts real Web Audio playback in the app at 1440 and 390 (touch); signup and profile-edit
-  specs cover the counter, the note and the refusal. Rendered in Chromium: peaks 0.21 to 0.36 at the default volume,
+  e2e `sounds.spec.mjs` counts real Web Audio playback in the app at 1440 and 390 (touch) and checks Settings; signup
+  369, profile-edit 64, deck 201, nearby 66, collab-requests 32, companions 64, app-shell 214, all passing. Rendered in Chromium: peaks 0.21 to 0.36 at the default volume,
   no clipping.

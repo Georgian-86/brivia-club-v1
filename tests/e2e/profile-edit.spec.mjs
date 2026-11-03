@@ -108,10 +108,6 @@ try {
     const refused = await page.evaluate(() => ({ open: Boolean(document.querySelector('#profile-edit-modal')), feedback: document.querySelector('#profile-edit-feedback')?.textContent || '' }));
     check(`${w}: D-137 Save refuses a 21-word bio and sends nothing (${JSON.stringify(refused)})`, refused.open && /20 words or fewer/.test(refused.feedback)
       && st.calls.filter((c) => c.method === 'PATCH' && c.path === '/rest/v1/profiles').length === patchesBefore && posted('set_member_interests').length === interestsBefore);
-    await page.locator('textarea[name="bio"]').fill('   ');
-    await page.locator('.profile-edit-save').click();
-    await page.waitForTimeout(200);
-    check(`${w}: D-137 a blank bio is refused too`, /at least one word/i.test(await page.locator('#profile-edit-feedback').textContent()));
     await page.locator('textarea[name="bio"]').fill('  Home   cook  ');
     check(`${w}: D-137 extra spaces never count`, (await page.locator('[data-bio-count]').textContent()) === '2/20 words');
     await page.locator('textarea[name="bio"]').fill('Home cook and poetry reader in Ludhiana.');

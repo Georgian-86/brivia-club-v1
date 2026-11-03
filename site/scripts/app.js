@@ -3370,7 +3370,9 @@ const openProfileEditor = () => {
     // D-137: a bio is 1 to 20 words. Checked before anything is saved.
     if (bioField) {
       const w = bioWords(bioField.value);
-      if (!w.ok) { feedback.textContent = w.over ? `Keep your bio to ${BIO_WORDS_MAX} words or fewer.` : `Bio: ${BIO_COPY.empty.toLowerCase()}`; bioField.focus(); return; }
+      // A member who never wrote one (an account from before signup asked for it) can still save other changes.
+      const blankAndNeverSaved = w.empty && !cleanBio(memberProfile.bio);
+      if (!w.ok && !blankAndNeverSaved) { feedback.textContent = w.over ? `Keep your bio to ${BIO_WORDS_MAX} words or fewer.` : `Bio: ${BIO_COPY.empty.toLowerCase()}`; bioField.focus(); return; }
     }
     // Interests first (the one save with a daily limit): when it is refused nothing else is saved, and the dialog stays.
     const interestPlan = interestEdit.ready ? planInterestSave(interestEdit.saved, interestEdit.picks) : { unchanged: true };
