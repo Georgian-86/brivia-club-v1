@@ -223,7 +223,9 @@ export const startAppStub = async ({ port, state = {}, deckRows = defaultDeckRow
       // D-134 (0030): st.notifications (my_notifications rows, the server's one store); read and dismiss change them in
       // place, so two pages on the same stub see the same state (phone and laptop). st.radiusSaved, st.pushSubs,
       // st.pushCalls (the push-notify Edge Function).
-      if (pathName === '/rest/v1/rpc/my_notifications') return st.notifications ? json(200, st.notifications) : json(404, { code: 'PGRST202', message: 'Could not find the function' });
+      // D-138 (0034): my_notifications_v2 adds place_name; st.notificationsV1Only answers it as "not found" (before 0034).
+      if (pathName === '/rest/v1/rpc/my_notifications_v2' && (st.notificationsV1Only || !st.notifications)) return json(404, { code: 'PGRST202', message: 'Could not find the function' });
+      if (pathName === '/rest/v1/rpc/my_notifications_v2' || pathName === '/rest/v1/rpc/my_notifications') return st.notifications ? json(200, st.notifications) : json(404, { code: 'PGRST202', message: 'Could not find the function' });
       if (pathName === '/rest/v1/rpc/mark_notifications_read') {
         let n = 0;
         (st.notifications || []).forEach((row) => { if ((args.p_ids || []).includes(row.id) && !row.read_at) { row.read_at = new Date().toISOString(); n += 1; } });

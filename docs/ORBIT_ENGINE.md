@@ -937,7 +937,21 @@ same switch, same pulse, same caps.
 
 - **Notifications (D-134, 0030).** A pulse announces "nearby_appeared" both ways for pairs within each member's chosen
   radius (`nearby_setting.radius_km`, 1/3/5/10), once per pair per day, at most 10 a day, only inside the same pool.
-  A notification carries a member id and a band, never a cell, coordinate or place. Radius 10 km adds band `'10'`.
+  A notification carries a member id and a band, never a cell or coordinate (the receiver's own town: D-138 below). Radius 10 km adds band `'10'`.
+
+
+**D-138 (0034) amendments.**
+- *Where:* a crossing notification carries `place_name`, the town or city nearest the **receiver's own** live cell
+  (`brivia_nearest_place` of the ~2.3 km cell). It says where the receiver was, so it reveals nothing about the other
+  member beyond the band they already see. Never a cell, coordinate or street. Distance stays a band ("within 1 km of
+  each other", "about 1–3 km apart"...), never metres: the Nearby grid is ~1 km and a finer figure would disclose more
+  than members agreed to share.
+- *Retention:* one row, `nearby_retention` (owner only): live area 20 min, moves 24 h, alerts 24 h, passes 7 days,
+  notifications 30 days by default, each with a hard ceiling. `purge_nearby()` reads it on every pulse and every 30 min.
+- *Background:* the client keeps pulsing from a hidden tab (every 5 min, as far as the browser runs it) once that page
+  has had a fix and the permission reads `granted`; never a prompt from a hidden page; a revoked permission clears the
+  live area at once. A closed browser runs nothing: true background crossing needs a native app (iOS significant-change
+  / region monitoring, Android fused location with a foreground service), recorded as the next step in D-138.
 
 #### 9.1.5 What leaves the service
 

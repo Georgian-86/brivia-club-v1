@@ -73,6 +73,16 @@
   /* A touch of the brand wine in the aura (founder, 2026-10-25, D-093): low behind the left of the page, faint at the top. */
   --aura-wine: rgba(110, 14, 46, .30);
   --aura-wine-soft: rgba(128, 30, 62, .20);
+  /* D-138: one sheet aura for every modal, popup and dialog (the Explore aura placed for a small surface: lilac top left,
+     a breath of wine top right, mint right, rose and peach low), and one warm scrim behind them. */
+  --aura-sheet:
+    radial-gradient(ellipse 70% 38% at 8% 4%, var(--aura-lilac), transparent 70%),
+    radial-gradient(ellipse 50% 26% at 96% 0%, var(--aura-wine-soft), transparent 72%),
+    radial-gradient(ellipse 60% 40% at 100% 46%, var(--aura-mint), transparent 72%),
+    radial-gradient(ellipse 70% 34% at 72% 100%, var(--aura-rose), transparent 72%),
+    radial-gradient(ellipse 56% 32% at 0% 92%, var(--aura-peach), transparent 72%),
+    var(--aura-base);
+  --aura-scrim: color-mix(in srgb, var(--color-wine-deep) 34%, rgba(251, 248, 244, .18));
   --aura-glass: rgba(255, 252, 248, .62);
   --aura-card: rgba(255, 252, 248, .66);
   --aura-bg:

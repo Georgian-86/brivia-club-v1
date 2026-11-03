@@ -102,3 +102,23 @@ test('requests from Nearby say so', () => {
   const plain = reviewCardModel({ fromId: 'a', note: 'Hi', person: { name: 'Asha' } });
   assert.doesNotMatch(reviewCardMarkup(plain, { index: 0, total: 1 }, { escapeHtml: esc, renderAvatar: () => '' }), /Crossed paths/);
 });
+
+test('D-138: a crossing in words: band never metres, the area, when; the same words the push uses', async () => {
+  const { crossingCopy, crossedAgo, CROSSING_TITLE } = await import('../../site/scripts/nearby-view.js');
+  const now = Date.parse('2026-11-03T12:00:00Z');
+  const c = crossingCopy({ name: 'Aarav Mehta', band: '1', place: 'Bengaluru', createdAt: '2026-11-03T11:52:00Z' }, now);
+  assert.equal(c.title, 'Someone interesting crossed your path.');
+  assert.equal(c.line, 'You and Aarav were within 1 km of each other, near Bengaluru.');
+  assert.equal(c.when, '8 min ago');
+  assert.equal(c.cta, 'Discover who you crossed paths with.');
+  assert.equal(crossingCopy({ name: '', band: '5' }, now).line, 'You and a Brivia member were about 3–5 km apart.');
+  for (const band of ['1', '3', '5', '10']) assert.doesNotMatch(crossingCopy({ name: 'A', band }).line, /\d+\s?m\b|metre|meter/);
+  assert.equal(crossedAgo('2026-11-03T11:59:30Z', now), 'Just now');
+  assert.equal(crossedAgo('2026-11-03T09:00:00Z', now), '3 h ago');
+  assert.equal(crossedAgo('2026-11-02T10:00:00Z', now), 'Yesterday');
+  assert.equal(crossedAgo('nope', now), '');
+  const { readFileSync } = await import('node:fs');
+  const push = readFileSync(new URL('../../supabase/functions/push-notify/index.ts', import.meta.url), 'utf8');
+  assert.ok(push.includes(`'${CROSSING_TITLE}'`), 'push title matches the app');
+  for (const words of ['within 1 km of each other', 'about 1–3 km apart', 'about 3–5 km apart', 'about 5–10 km apart', 'Discover who you crossed paths with.']) assert.ok(push.includes(words), words);
+});

@@ -42,9 +42,9 @@ import { createPresence, presenceDot } from './presence.js';
 import { createCrossingPaths, isQuietHour, alertHeadline, alertDetail, alertToast, pausedCopy } from './crossing-paths.js';
 import '../styles/crossing-paths.css';
 import { createNearbyPage } from './nearby-page.js';
-import { COPY as NEARBY_COPY, bandLabel as nearbyBandLabel } from './nearby-view.js';
+import { COPY as NEARBY_COPY, crossingCopy } from './nearby-view.js';
 import { createMemberNotifications } from './member-notifications.js';
-import { createSoundKit, soundEnabled, setSoundEnabled, soundVolume, setSoundVolume } from './notify-sound.js';
+import { createSoundKit, soundEnabled, setSoundEnabled, soundVolume, setSoundVolume, interactionSoundEnabled, setInteractionSoundEnabled, pushSoundEnabled, setPushSoundEnabled } from './notify-sound.js';
 import { createWebPush, pushSupport, PUSH_COPY } from './web-push.js';
 import '../styles/nearby.css';
 import { createEventsPage } from './events-page.js';
@@ -544,10 +544,10 @@ const renderNotifications = () => {
   }).join('');
   const crossedHtml = crossedRows.map((n) => {
     const person = findPersonById(n.sourceId) || { name: n.name, image: n.photoUrl };
-    return `<section class="notification-companion${n.readAt ? '' : ' is-unread'}" aria-label="${escapeHtml(`Someone crossed your path: ${n.name}`)}">`
+    return `<section class="notification-companion${n.readAt ? '' : ' is-unread'}" aria-label="${escapeHtml(`${crossingCopy(n).title} ${crossingCopy(n).line}`)}">`
       + `<span class="notification-nearby-face">${renderAvatar(person, 'notification-avatar')}</span>`
-      + `<span class="notification-nearby-copy"><strong>Someone crossed your path</strong><span>${escapeHtml(`${n.name || 'A Brivia member'} is nearby${n.band ? ` · ${nearbyBandLabel(n.band)}` : ''}`)}</span></span>`
-      + `<button type="button" class="notification-nearby-hi" data-crossed-view="${escapeHtml(n.id)}">View profile</button></section>`;
+      + `<span class="notification-nearby-copy"><strong>${escapeHtml(crossingCopy(n).title)}</strong><span>${escapeHtml(crossingCopy(n).line)}</span>${crossingCopy(n).when ? `<small>${escapeHtml(crossingCopy(n).when)}</small>` : ''}</span>`
+      + `<button type="button" class="notification-nearby-hi" data-crossed-view="${escapeHtml(n.id)}">Discover</button></section>`;
   }).join('');
   list.innerHTML = requestsHtml + crossedHtml + nearbyMatchHtml + companionHtml + nearbyHtml + messagesHtml;
   list.querySelectorAll('[data-crossed-view]').forEach((item) => item.addEventListener('click', (event) => {
@@ -1095,7 +1095,7 @@ const memberNotes = createMemberNotifications({
     chime.notify(n.id);   // every genuinely new notification, once per id
     if (n.type !== 'nearby_appeared') return;
     if (!nearbyPage.notify(n) && document.visibilityState === 'visible') {
-      showToast(`Someone crossed your path. ${n.name || 'A Brivia member'} is nearby${n.band ? ` (${nearbyBandLabel(n.band).toLowerCase()})` : ''}.`);
+      showToast(`${crossingCopy(n).title} ${crossingCopy(n).line}`);
     }
   },
   onChange: () => renderNotifications(),
@@ -3484,7 +3484,9 @@ const openNotificationSettings = () => {
     <label class="settings-toggle-row"><span><strong>MESSAGE NOTIFICATIONS</strong><small>Get an alert when someone sends you a message.</small></span><input id="profile-notifications-toggle" type="checkbox" /><i aria-hidden="true"></i></label>
     <label class="settings-toggle-row" data-presence-setting hidden><span><strong>SHOW WHEN I'M ACTIVE</strong><small>Your connections see a dot when you're here. Turn it off and you won't see theirs either.</small></span><input id="profile-presence-toggle" type="checkbox" /><i aria-hidden="true"></i></label>
     <label class="settings-toggle-row" data-push-setting><span><strong>WEB NOTIFICATIONS</strong><small>Get a notification on this device when someone crosses your path, even when Brivia is closed. Separate from location.</small><small class="settings-nearby-status" data-push-status role="status"></small></span><input id="profile-push-toggle" type="checkbox" /><i aria-hidden="true"></i></label>
-    <label class="settings-toggle-row"><span><strong>SOUNDS</strong><small>A soft sax chime for new notifications, and a note when you swipe. On this device.</small></span><input id="profile-sound-toggle" type="checkbox" /><i aria-hidden="true"></i></label>
+    <label class="settings-toggle-row"><span><strong>NOTIFICATION SOUND</strong><small>A soft sax chime when a notification arrives while Brivia is open. On this device.</small></span><input id="profile-sound-toggle" type="checkbox" /><i aria-hidden="true"></i></label>
+    <label class="settings-toggle-row"><span><strong>SWIPE SOUNDS</strong><small>A short note when you pass or pitch. On this device.</small></span><input id="profile-swipe-sound-toggle" type="checkbox" /><i aria-hidden="true"></i></label>
+    <label class="settings-toggle-row" data-push-sound-setting><span><strong>PUSH NOTIFICATION SOUND</strong><small>Your device's own sound for Brivia notifications when Brivia is closed. Off: they arrive silently. On iPhone, set this in Settings, Notifications.</small></span><input id="profile-push-sound-toggle" type="checkbox" /><i aria-hidden="true"></i></label>
     <label class="settings-volume-row" data-sound-volume><span><strong>SOUND VOLUME</strong><small data-sound-volume-value></small></span><input id="profile-sound-volume" type="range" min="0" max="100" step="5" /></label>
     <label class="settings-toggle-row" data-nearby-setting hidden><span><strong>CROSSING PATHS</strong><small>Discover when other Brivia members are nearby. Only members who enable this feature can discover you.</small><small class="settings-nearby-status" data-nearby-status role="status"></small></span><input id="profile-nearby-toggle" type="checkbox" /><i aria-hidden="true"></i></label>
     <p class="profile-settings-feedback" id="notification-settings-feedback" role="status"></p>
@@ -3526,9 +3528,13 @@ const openNotificationSettings = () => {
   const showVolume = () => {
     volumeValue.textContent = `${volumeInput.value}%`;
     volumeInput.setAttribute('aria-valuetext', `${volumeInput.value} percent`);
-    volumeInput.disabled = !soundToggle.checked;
+    volumeInput.disabled = !soundToggle.checked && !swipeSoundToggle.checked;
   };
+  const swipeSoundToggle = modal.querySelector('#profile-swipe-sound-toggle');
+  const pushSoundToggle = modal.querySelector('#profile-push-sound-toggle');
   soundToggle.checked = soundEnabled();
+  swipeSoundToggle.checked = interactionSoundEnabled();
+  pushSoundToggle.checked = pushSoundEnabled();
   volumeInput.value = String(soundVolume());
   showVolume();
   soundToggle.addEventListener('change', () => {
@@ -3536,11 +3542,22 @@ const openNotificationSettings = () => {
     chime.unlock();
     if (soundToggle.checked) chime.preview();
     showVolume();
-    feedback.textContent = soundToggle.checked ? 'Sounds are on for this device.' : 'Sounds are off for this device.';
+    feedback.textContent = soundToggle.checked ? 'Notification sound is on for this device.' : 'Notification sound is off for this device.';
+  });
+  swipeSoundToggle.addEventListener('change', () => {
+    setInteractionSoundEnabled(swipeSoundToggle.checked);
+    chime.unlock();
+    if (swipeSoundToggle.checked) chime.swipe('pitch');
+    showVolume();
+    feedback.textContent = swipeSoundToggle.checked ? 'Swipe sounds are on for this device.' : 'Swipe sounds are off for this device.';
+  });
+  pushSoundToggle.addEventListener('change', async () => {
+    await setPushSoundEnabled(pushSoundToggle.checked);
+    feedback.textContent = pushSoundToggle.checked ? 'Brivia notifications use your device sound.' : 'Brivia notifications arrive silently on this device.';
   });
   // Adjusting: saved as it moves, previewed once it is let go.
   volumeInput.addEventListener('input', () => { setSoundVolume(volumeInput.value); showVolume(); });
-  volumeInput.addEventListener('change', () => { chime.unlock(); chime.preview(); });
+  volumeInput.addEventListener('change', () => { chime.unlock(); if (!chime.preview()) chime.swipe('pitch'); });
   const support = pushSupport();
   if (support !== 'ready') { pushToggle.disabled = support !== 'denied'; pushStatus.textContent = PUSH_COPY[support] || ''; }
   webPush.isOn().then((on) => { if (modal.isConnected) pushToggle.checked = on; }).catch(() => {});

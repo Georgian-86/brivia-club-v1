@@ -48,17 +48,37 @@ test('granted: one coarse fix goes to the pulse, then the alerts are listed', as
   assert.deepEqual(h.seen.alerts.at(-1), [{ otherId: 'b', createdAt: ALERT.created_at, sharedInterest: 'Chess', key: alertKey(ALERT) }]);
 });
 
-test('every 5 minutes while visible; nothing while the tab is hidden; a return to the tab checks at once', async () => {
+test('every 5 minutes; a hidden tab keeps going once location is granted and a fix worked (D-138); a return checks at once', async () => {
   const h = harness();
   await h.cp.start();
   await h.tick();
   assert.equal(h.calls.pulse.length, 2);
   h.doc.visibilityState = 'hidden';
   await h.tick();
-  assert.equal(h.calls.pulse.length, 2);
+  assert.equal(h.calls.pulse.length, 3, 'the member switched to another app: still found while the browser runs the page');
   h.doc.visibilityState = 'visible';
   await h.listeners.doc.visibilitychange();
-  assert.equal(h.calls.pulse.length, 3);
+  assert.equal(h.calls.pulse.length, 4);
+});
+
+test('a hidden tab never checks without a granted permission (iOS "Ask", or revoked): no prompt, no pulse', async () => {
+  const h = harness();
+  await h.cp.start();
+  assert.equal(h.calls.pulse.length, 1);
+  h.state.permission = 'prompt';
+  await h.tick();                               // visible: learns the permission is now "ask"
+  const geoBefore = h.calls.geo.length;
+  h.doc.visibilityState = 'hidden';
+  await h.tick();
+  assert.equal(h.calls.geo.length, geoBefore, 'nothing asked from a hidden page');
+  h.state.permission = 'denied'; h.state.fix = { code: 1 };
+  h.doc.visibilityState = 'visible';
+  await h.tick();                               // revoked: the live area is cleared at once
+  assert.ok(h.calls.clear >= 1);
+  const pulses = h.calls.pulse.length;
+  h.doc.visibilityState = 'hidden';
+  await h.tick();
+  assert.equal(h.calls.pulse.length, pulses, 'revoked: nothing collected in the background');
 });
 
 // D-133 (the mobile "Location is off" bug): the Permissions API is a hint. A 'denied' from it used to stop every check

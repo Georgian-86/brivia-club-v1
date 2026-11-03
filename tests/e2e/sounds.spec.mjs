@@ -83,13 +83,13 @@ try {
     await page.waitForTimeout(300);
     check(`${w}: the pitched card leaves without a second cue`, JSON.stringify((await cues(page)).slice(base + 3)) === '["pitch"]', JSON.stringify(await cues(page)));
 
-    // Sounds off: swipes are silent.
-    await page.evaluate(() => localStorage.setItem('brivia-notify-sound', 'off'));
+    // Swipe sounds off: swipes are silent.
+    await page.evaluate(() => localStorage.setItem('brivia-interaction-sound', 'off'));
     before = await name(page);
     await page.locator('[data-action="pass"]').dispatchEvent('click');
     await nextCard(page, before);
-    check(`${w}: Sounds off → silent`, (await cues(page)).length === base + 4, JSON.stringify(await cues(page)));
-    await page.evaluate(() => localStorage.removeItem('brivia-notify-sound'));
+    check(`${w}: Swipe sounds off → silent`, (await cues(page)).length === base + 4, JSON.stringify(await cues(page)));
+    await page.evaluate(() => localStorage.removeItem('brivia-interaction-sound'));
 
     // Settings: one SOUNDS switch and a SOUND VOLUME slider; moving it saves and previews the notification cue once.
     await page.evaluate(() => document.querySelector('[data-nav="profile"]')?.click());
@@ -104,8 +104,16 @@ try {
     const after = await page.evaluate(() => ({ stored: localStorage.getItem('brivia-sound-volume'), label: document.querySelector('[data-sound-volume-value]').textContent }));
     check(`${w}: the volume saves (${JSON.stringify(after)}) and previews once`, after.stored === '40' && after.label === '40%' && JSON.stringify((await cues(page)).slice(n0)) === '["notify"]', JSON.stringify(await cues(page)));
     if (process.env.SOUND_SHOTS) await page.locator('#profile-notification-settings-modal').screenshot({ path: `${process.env.SOUND_SHOTS}/settings-${w}.png` });
+    const rows = await page.evaluate(() => ({ swipe: document.querySelector('#profile-swipe-sound-toggle')?.checked, push: document.querySelector('#profile-push-sound-toggle')?.checked }));
+    check(`${w}: D-138 separate switches for swipe sounds and push sound, both on by default (${JSON.stringify(rows)})`, rows.swipe === true && rows.push === true);
+    await page.locator('#profile-push-sound-toggle').evaluate((el) => el.click());
+    await page.waitForTimeout(200);
+    const pushPref = await page.evaluate(async () => { const r = await (await caches.open('brivia-prefs')).match('/__brivia-prefs'); return r ? r.json() : null; });
+    check(`${w}: D-138 push sound off reaches the service worker's store (${JSON.stringify(pushPref)})`, pushPref?.pushSilent === true);
     await page.locator('#profile-sound-toggle').evaluate((el) => el.click());
-    check(`${w}: Sounds off disables the volume`, await page.locator('#profile-sound-volume').isDisabled());
+    check(`${w}: notification sound off alone keeps the volume (swipe sounds still on)`, !(await page.locator('#profile-sound-volume').isDisabled()));
+    await page.locator('#profile-swipe-sound-toggle').evaluate((el) => el.click());
+    check(`${w}: both off disables the volume`, await page.locator('#profile-sound-volume').isDisabled());
     check(`${w}: no page errors`, errors.length === 0, errors.join(' | '));
     await ctx.close();
   }

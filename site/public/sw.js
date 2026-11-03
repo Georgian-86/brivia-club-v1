@@ -11,8 +11,17 @@ self.addEventListener('push', (event) => {
     const pages = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
     const front = pages.find((page) => page.focused || page.visibilityState === 'visible');
     if (front) { pages.forEach((page) => page.postMessage({ type: 'brivia-push', data })); return; }
+    // D-138: the member's per-device "Push notification sound" choice, written by the page into Cache Storage (the
+    // worker cannot read localStorage). Off: the system notification arrives silently (Android, desktop; iOS decides
+    // in its own Settings > Notifications).
+    let silent = false;
+    try {
+      const prefs = await (await caches.open('brivia-prefs')).match('/__brivia-prefs');
+      if (prefs) silent = Boolean((await prefs.json()).pushSilent);
+    } catch { silent = false; }
     await self.registration.showNotification(data.title || 'Brivia Club', {
-      body: data.body || 'Someone crossed your path.',
+      silent,
+      body: data.body || 'Someone interesting crossed your path.',
       tag: data.tag || data.id || 'brivia',
       icon: '/apple-touch-icon.png',
       badge: '/favicon.svg',

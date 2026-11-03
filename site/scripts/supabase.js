@@ -399,7 +399,12 @@ export const nearbyPass = (otherId) => rpcCall('nearby_pass', { p_other: otherId
 export const nearbyConnect = (to, note) => rpcCall('nearby_connect', { p_to: to, p_note: note || null });
 export const myNearbyMatches = () => rpcCall('my_nearby_matches');
 // D-134 (0030): one notification store for every device, the radius notifications use, and web push subscriptions.
-export const myNotifications = () => rpcCall('my_notifications');
+// D-138 (0034): v2 adds the area each crossing happened in; before 0034 is applied, the 0030 function answers.
+export const myNotifications = async () => {
+  const v2 = await rpcCall('my_notifications_v2');
+  if (!v2.error || !isMissingFunction(v2.error)) return v2;
+  return rpcCall('my_notifications');
+};
 export const markNotificationsRead = (ids) => rpcCall('mark_notifications_read', { p_ids: ids });
 export const dismissNotification = (id) => rpcCall('dismiss_notification', { p_id: id });
 export const setNearbyRadius = (km) => rpcCall('set_nearby_radius', { p_km: km });

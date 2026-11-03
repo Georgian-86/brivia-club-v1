@@ -93,7 +93,7 @@ begin
      and has_function_privilege('authenticated', p.oid, 'execute');
   want := 'add_member_interest,brivia_can_see_author,brivia_has_completed_profile,cancel_member_event,companion_deck,companion_events,companion_swipe,connection_presence,deck_candidates,deck_status,deck_why,'
        || 'declare_adult,delete_member_event,delete_my_account,delete_push_subscription,dismiss_notification,event_companions,get_candidates,list_events,mark_companion_match_seen,mark_notifications_read,'
-       || 'member_bio,my_companion_matches,my_event_prefs,my_interests,my_nearby_alerts,my_nearby_matches,my_nearby_setting,my_notifications,my_onboarding_status,my_outgoing_requests,my_presence_visible,'
+       || 'member_bio,my_companion_matches,my_event_prefs,my_interests,my_nearby_alerts,my_nearby_matches,my_nearby_setting,my_notifications,my_notifications_v2,my_onboarding_status,my_outgoing_requests,my_presence_visible,'
        || 'my_signal_quota,nearby_clear,nearby_connect,nearby_discover,nearby_pass,nearby_pulse,post_activity,report_member,respond_connection_request,save_member_event,save_push_subscription,search_members,'
        || 'send_connect_request,send_signal,set_companion_default,set_event_brochure,set_event_interest,set_event_rsvp,set_home_city,set_home_location,set_member_interests,set_nearby_enabled,set_nearby_muted,'
        || 'set_nearby_radius,set_presence_visible,set_sensitive_consent,touch_presence';

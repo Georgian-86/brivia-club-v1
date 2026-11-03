@@ -1107,3 +1107,20 @@ Verify after the apply:
 ```sql
 select tgname from pg_trigger where tgrelid = 'public.profiles'::regclass and tgname = 'profiles_bio_word_guard';  -- 1 row
 ```
+
+## 0034
+
+**A crossing says where; retention is one setting (founder request 2026-11-03, D-138).**
+Apply after `0033`, then redeploy the Edge Function `push-notify` (it now reads `place_name`). The client can deploy
+before 0034: it asks `my_notifications_v2` and falls back to `my_notifications` when it is missing.
+
+Adds `member_notification.place_name`, `nearby_retention` (owner only), `brivia_live_place(uid)` (internal),
+`my_notifications_v2()`; redefines `brivia_notify_nearby` (fills the area) and `purge_nearby` (reads the retention row).
+
+Verify after the apply:
+
+```sql
+select * from public.nearby_retention;                                                    -- 20, 24, 24, 7, 30
+select has_function_privilege('authenticated', 'public.my_notifications_v2()', 'execute'),  -- t
+       has_table_privilege('authenticated', 'public.nearby_retention', 'select');            -- f
+```

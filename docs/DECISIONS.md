@@ -2826,3 +2826,42 @@ controls (a tester or a seeded test member), never a real member, so no new expo
   first mix peaked at 0.21 to 0.36 at the default volume, too quiet for laptop speakers. Cue levels up, volume curve
   ^1.5 instead of ^2, default 80, a soft limiter at the output: peaks now 0.64 to 0.75 at the default (about +8 dB),
   never distorted at 100%; `sounds.spec.mjs` checks the played buffer's peak.
+
+## D-138 (2026-11-03): one aura on every sheet; Crossing Paths says where and when, keeps working from a hidden tab
+
+- **Asked:** the Explore aura (reference 4) on every page, modal, popup and overlay; Crossing Paths that works while
+  both people use other apps, with notifications showing approximate distance, when and where; cross-device read sync;
+  configurable retention; separate sound choices for the app and for push notifications; no fake data.
+- **Found:** most of it already existed and is real (D-131/D-133/D-134): opt-in only, a coarse fix every 5 minutes,
+  live areas ignored after 20 minutes (stale positions never notify), revocation clears the live area at once, one
+  server notification store with unique ids and read state synced over Realtime, web push claimed once per id, one
+  notification per pair per day. What was missing: sheets on flat ivory over a grey scrim; no "where" or "when" on a
+  crossing; checks stopped the moment the tab was hidden; retention fixed in code; one sound switch for everything.
+- **Gradient:** `--aura-sheet` and `--aura-scrim` (tokens.css). Every modal, popup and dialog (Edit profile, Settings and
+  its sheets, the pitch composer, the connect composer, public profile, report, privacy, events dialogs, the match
+  moment, share, the notification panel; the deck tutorial and the request sheet already had it) sits on the sheet
+  aura; every scrim is one warm wine veil with a light blur. Fields, cards and photos keep their own surfaces, so text
+  contrast is unchanged. The bottom bar and top bar were already aura glass.
+- **Where and when:** `0034_crossing_where.sql`: `member_notification.place_name` (the town or city of the receiver's
+  own live area, never the other member's), `my_notifications_v2()` (0030's function is left as it was, for clients
+  that have not reloaded), the copy "Someone interesting crossed your path." / "You and Aarav were within 1 km of each
+  other, near Bengaluru." / "8 min ago · Discover who you crossed paths with." in Nearby, the panel, the toast and the
+  push. Distance stays a band, never "300 metres": the grid is ~1 km and the founder chose 1 km precision (D-131);
+  a metre figure would expose more than members agreed to share.
+- **Retention:** `nearby_retention`, one owner-only row (live 20 min, moves 24 h, alerts 24 h, passes 7 days,
+  notifications 30 days, each with a ceiling); `purge_nearby()` reads it.
+- **Background:** a hidden tab keeps pulsing every 5 minutes (as far as the browser runs it) once the page has had a
+  fix and permission reads granted. On a laptop and on Android Chrome this covers "I switched to another app" while the
+  browser keeps Brivia alive; iOS Safari suspends hidden pages within seconds. Never a prompt from a hidden page.
+- **The limit, stated plainly:** a website or PWA cannot read location while the browser is closed or the page is
+  frozen, on any platform. The requested scenario (both people in other apps, phones in pockets, both notified) needs a
+  native app: iOS significant-location-change or region monitoring with "Always" permission, Android fused location
+  with a foreground service and background-location permission, posting to the same `nearby_pulse` (the server,
+  notifications, push and read sync are ready for it). Until then the push still reaches a member whose app is closed
+  whenever the *other* member's app pulses.
+- **Sound:** three switches per device: NOTIFICATION SOUND (the sax chime in the app), SWIPE SOUNDS, PUSH NOTIFICATION
+  SOUND (the service worker shows pushes `silent` when off; read from Cache Storage; iOS uses its own Settings).
+- **Not tested on real phones from here:** two physical devices crossing paths cannot be driven from this environment.
+  What is tested: SQL (both told once with the area, a 20-minute-old location never notifies, switching off is never
+  found, retention follows the setting), unit (hidden-tab pulses only when granted; a revoked permission stops
+  collection), e2e on one stub server for a laptop and a phone (the notice, read on one device is read on the other).
