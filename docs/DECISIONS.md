@@ -2909,4 +2909,6 @@ controls (a tester or a seeded test member), never a real member, so no new expo
   enabled once (README "## 0035"). The project rule asks for an agent-arena review of significant decisions; this one
   was decided inline (data sources: open, free, no keys) and is open to an arena pass.
 - **Proof:** SQL harness ALL PASSED (new u-city-directory G1-G3, v-company-directory C1-C3; hygiene lists updated);
-  unit (work-identity); e2e work-identity (card line, picker, add, remove, card size, axe) and the city-picking specs.
+  unit (work-identity); e2e work-identity 25, signup 369, onboarding 269, location 64, profile-edit 64, create-event 152,
+  events 76, nearby 66, companions 64, deck 201, app-shell 214, collab-requests 32, sounds 31, all passing. An empty
+  city search still lists the launch cities and metros (signup's "location denied" fallback).

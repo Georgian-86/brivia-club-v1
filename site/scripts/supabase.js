@@ -490,7 +490,8 @@ export const searchPlaces = async (query, limit = 8) => {
     const postal = await lookupPostalCode(raw);
     if (postal.data?.length) return postal;
   }
-  const global = await supabase.rpc('search_cities', { p_q: raw, p_limit: limit });
+  // Nothing typed yet: the launch cities and metros from the place list, as before (a starting list, D-140).
+  const global = raw.length < 2 ? { error: { code: 'PGRST202' } } : await supabase.rpc('search_cities', { p_q: raw, p_limit: limit });
   if (!global.error) return { data: global.data || [], error: null, status: global.status };
   if (!isMissingFunction(global.error)) return { data: [], error: global.error, status: global.status };
   const clean = String(query || '').replace(/[^\p{L}\p{N} '-]/gu, ' ').replace(/\s+/g, ' ').trim().slice(0, 60);
