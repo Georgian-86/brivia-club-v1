@@ -1168,10 +1168,11 @@ select has_function_privilege('authenticated', 'public.member_work(uuid[])', 'ex
 ```
 Moderation (verify, add, remove, merge): docs/MODERATION.md "Companies and logos".
 
-## 0037
+## 0038
 
-**City search fixes found on the live directory (D-140).** **APPLIED 2026-11-03.**
-Apply after `0036`. `brivia_fold` removes only spaces and punctuation (it used to drop the vowel signs of Indic scripts,
+**City search fixes found on the live directory (D-140).** **APPLIED 2026-11-03** (recorded in Supabase's history as
+`0037_city_search_fixes`, before the hiring migration took the number 0037; it touches nothing hiring uses).
+Apply after `0037`. `brivia_fold` removes only spaces and punctuation (it used to drop the vowel signs of Indic scripts,
 so native names could not be found) and the stored keys are recomputed; a country typed alone ("Japan") lists its
 largest cities first. Verify: `select name from public.search_cities('Japan', 4);` (Tokyo, Yokohama, Osaka, Nagoya),
 `select name from public.search_cities('बेंगलुरु');` (Bengaluru).

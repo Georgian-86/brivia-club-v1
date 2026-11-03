@@ -1,6 +1,6 @@
 set lock_timeout = '5s';
--- 0037_city_search_fixes.sql: two fixes found on the live directory right after the 156k import (D-140). Applied by hand
--- after 0036 (README "## 0037"). 0001-0036 are frozen. Idempotent.
+-- 0038_city_search_fixes.sql: two fixes found on the live directory right after the 156k import (D-140). Applied by hand
+-- after 0037 (README "## 0038"). 0001-0037 are frozen. Idempotent.
 --   1. brivia_fold kept only [:alnum:] characters, which dropped the vowel signs of Indic scripts (ಬೆಂಗಳೂರು became
 --      "ಬ ಗಳ ರ"), so native-script names could not be found. It now removes only spaces and punctuation. The stored
 --      search keys are recomputed (geo_city, geo_alias, company).
