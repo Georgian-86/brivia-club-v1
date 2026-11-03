@@ -14,4 +14,4 @@ chrome-out.txt
 /screenshots/
 
 # design review screenshots (tests/e2e/design-shots.mjs)
-.superpowers/shots/
+.superpowers/

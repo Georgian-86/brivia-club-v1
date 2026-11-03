@@ -1091,3 +1091,27 @@ Verify after the apply:
 select count(*) from public.interest_node where catalog_order is not null;                          -- 1131
 select label, catalog_order from public.interest_node where id in ('music.listening.gospel_music', 'tech.ai_data.nlp_short');
 ```
+
+## 0033
+
+**Hiring: roles, role intent, role asks, the hiring bar and fit (founder request 2026-11-02/03, D-137).**
+**NOT APPLIED YET.** Apply after `0032`. Schema + RPCs, additive only: new tables `brivia_feature` (seeded 'hiring' on),
+`hiring_role`, `role_intent`, `role_ask` (RLS on, no client grants), private helpers, and the authenticated RPCs
+`save_hiring_role`, `set_hiring_role_status`, `my_hiring_roles`, `save_role_intent`, `withdraw_role_intent`,
+`my_role_intent`, `member_hiring`, `member_open_to`, `hiring_suggestions`, `ask_about_role`, `my_role_asks`,
+`my_sent_role_asks`, `report_fake_job`; `purge_hiring()` is owner only. Safe to re-run. The client hides hiring until
+these functions exist, so the deploy order does not matter; apply it, then hard-reload the app.
+
+Expect new advisor notes only for the intended `security definer` RPCs above (the same pattern as 0024).
+
+Verify after the apply:
+
+```sql
+select (select enabled from public.brivia_feature where name = 'hiring'),                                    -- t
+       has_table_privilege('authenticated', 'public.hiring_role', 'select'),                                 -- f
+       has_function_privilege('authenticated', 'public.member_hiring(uuid[])', 'execute'),                   -- t
+       has_function_privilege('anon', 'public.member_hiring(uuid[])', 'execute');                            -- f
+```
+
+Kill switch (hides every banner, suggestion and ask at once; data kept): `update public.brivia_feature set enabled =
+false where name = 'hiring';`
