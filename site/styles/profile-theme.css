@@ -393,3 +393,8 @@ body:has(.app-view[data-view="profile"]:not([hidden])) .app-wrap{padding-bottom:
 .profile-edit-grid .profile-edit-readonly>span{color:var(--brivia-wine-soft);font-size:var(--text-12);font-weight:700;letter-spacing:.107em}
 .profile-edit-grid .profile-edit-readonly>p{margin:0;padding:10px 12px;border:1px dashed color-mix(in srgb,var(--brivia-deep-wine) 22%,transparent);border-radius:8px;color:var(--brivia-deep-wine);font:400 var(--text-12) var(--font-body)}
 @media(max-width:600px){.profile-edit-grid .profile-edit-readonly{grid-column:auto}}
+/* Founder (2026-11-03): interest chips on an even grid, equal columns and centred labels, so the rows line up
+   (three across in the dialog on desktop, two on phones). "Looking for" keeps its natural pills. */
+.public-profile-chips--interest{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,176px),1fr));gap:var(--space-2)}
+.public-profile-chips--interest li{display:flex;align-items:center;justify-content:center;min-height:40px;text-align:center;text-wrap:balance}
+@media (max-width:520px){.public-profile-chips--interest{grid-template-columns:repeat(2,minmax(0,1fr))}}
