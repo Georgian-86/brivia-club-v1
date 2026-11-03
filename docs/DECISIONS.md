@@ -2970,3 +2970,15 @@ controls (a tester or a seeded test member), never a real member, so no new expo
 - **Asked:** no website links beside the company logo and name in the Edit profile company search.
 - **Done:** the options show the logo and the name, the name left-aligned next to its logo (a company without a website
   used to push its name to the right). The website is still stored for deduplication and logos, just not shown.
+
+## D-144 (2026-11-03): company logos like LinkedIn's: the square mark on a white tile; no places or products
+
+- **Asked (with LinkedIn's Google result):** the right Google logo, logos set the way LinkedIn sets them, no links
+  after the name.
+- **Done:** the directory Edge Function (v2) stores the company's square mark (the site's own icon at 128 px; Google's
+  "G") before the Commons logo, which is often a wordmark that blurs at 16 px; logos stored before are fetched again
+  (path `directory/<Qid>-icon.<ext>`; the old Google wordmark was cleared). Logos sit on a white rounded tile with a
+  hairline edge: 28 px in the search list, 24 px for the picked company, 14 px on cards. The organisation filter no
+  longer takes places or products (Gothenburg, Google Maps, Google Play, Google Scholar came in through "capital",
+  "service", "platform"; removed live, nobody had picked them); a description that says "company", "firm", "bank"...
+  still wins over a product word ("American software company"). No website text in the list (D-143).

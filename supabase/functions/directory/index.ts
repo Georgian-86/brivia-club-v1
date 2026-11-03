@@ -20,7 +20,13 @@ const UA = 'BriviaClub/1.0 (https://thebriviaclub.live; directory lookup)';
 const json = (status: number, body: unknown) => new Response(JSON.stringify(body), { status, headers: { ...CORS, 'content-type': 'application/json' } });
 // Wikidata descriptions that name an organisation ("Indian food delivery company", "American multinational technology
 // company", "public research university", "investment bank", "ministry of the Government of India"...).
-const ORG = /\b(company|companies|corporation|conglomerate|startup|start-up|enterprise|business|firm|bank|banking|insurer|insurance|fund|venture|capital|holding|group|brand|retailer|chain|restaurant|marketplace|platform|manufacturer|maker|producer|developer|publisher|studio|agency|consultancy|consulting|organi[sz]ation|non-profit|nonprofit|ngo|foundation|institute|institution|university|college|school|academy|hospital|clinic|airline|carrier|operator|exchange|ministry|department|government|authority|council|regulator|service|subsidiary|cooperative|co-operative|law firm|unicorn)\b/i;
+const ORG = /\b(company|companies|corporation|conglomerate|startup|start-up|enterprise|business|firm|bank|banking|insurer|insurance|fund|venture capital|private equity|holding|group|brand|retailer|chain|restaurant|marketplace|manufacturer|maker|producer|developer|publisher|studio|agency|consultancy|consulting|organi[sz]ation|non-profit|nonprofit|ngo|foundation|institute|institution|university|college|school|academy|hospital|clinic|airline|carrier|operator|exchange|ministry|department|government|authority|council|regulator|subsidiary|cooperative|co-operative|law firm|unicorn|delivery platform|food delivery|fintech|e-commerce)\b/i;
+// D-144: never a place or a product (Gothenburg, Google Maps, Google Play and Google Scholar slipped in through
+// "capital", "service" and "platform"): a description naming one of these is not an organisation.
+// A description that says what it is ("American software company") wins over a product word in it.
+const STRONG_ORG = /\b(company|companies|corporation|conglomerate|firm|bank|university|startup|start-up|organi[sz]ation|institute|ministry|subsidiary)\b/i;
+const isOrg = (d: string) => ORG.test(d) && (STRONG_ORG.test(d) || !NOT_ORG.test(d));
+const NOT_ORG = /\b(city|town|village|municipality|capital of|river|country|province|state of|district|software|app|application|website|web site|search engine|mapping|web browser|operating system|video game|film|album|song|programming language|feature|product|service by|service of|service from|distribution platform)\b/i;
 
 const domainOf = (url: string) => {
   try { return new URL(url).hostname.replace(/^www\./, '').toLowerCase(); } catch { return ''; }
@@ -68,7 +74,7 @@ Deno.serve(async (req) => {
   try {
     const search = await timed(`https://www.wikidata.org/w/api.php?action=wbsearchentities&format=json&type=item&language=en&uselang=en&limit=12&search=${encodeURIComponent(q)}`);
     const found = search.ok ? (await search.json()).search || [] : [];
-    const orgs = found.filter((r: any) => ORG.test(String(r.description || ''))).slice(0, 8);
+    const orgs = found.filter((r: any) => isOrg(String(r.description || ''))).slice(0, 8);
     if (!orgs.length) return json(200, { companies: [] });
     const ids = orgs.map((r: any) => r.id).filter((id: string) => /^Q\d+$/.test(id));
     // Already cached with a logo: no second trip.
@@ -82,11 +88,17 @@ Deno.serve(async (req) => {
       const website = claims.P856?.[0]?.mainsnak?.datavalue?.value || '';
       const logoFile = claims.P154?.[0]?.mainsnak?.datavalue?.value || '';
       const domain = website ? domainOf(website) : '';
-      let logo_path = knownLogo.get(r.id) || '';
-      if (!logo_path) {
-        const source = logoFile ? `https://commons.wikimedia.org/wiki/Special:FilePath/${encodeURIComponent(logoFile)}?width=96`
-          : domain ? `https://icons.duckduckgo.com/ip3/${domain}.ico` : '';
-        if (source) {
+      // D-144: the square mark, like LinkedIn (Google's "G", not its wordmark): the site's own icon at 128 px first, the
+      // Commons logo only when there is no website. Logos stored before carry no "-icon" and are fetched again.
+      const known = knownLogo.get(r.id) || '';
+      let logo_path = /-icon\.[a-z]+$/.test(known) ? known : '';
+      const sources = [
+        domain ? `https://www.google.com/s2/favicons?domain=${encodeURIComponent(domain)}&sz=128` : '',
+        logoFile ? `https://commons.wikimedia.org/wiki/Special:FilePath/${encodeURIComponent(logoFile)}?width=128` : '',
+      ].filter(Boolean);
+      for (const source of logo_path ? [] : sources) {
+        if (logo_path) break;
+        {
           try {
             const img = await timed(source, {}, 5000);
             const type = img.headers.get('content-type') || '';
@@ -94,7 +106,7 @@ Deno.serve(async (req) => {
             // Raster only (an SVG can carry script): Commons serves SVG logos as PNG thumbnails at ?width=96.
             if (bytes.length > 64 && bytes.length < 300_000 && /^image\/(png|jpeg|webp|gif|x-icon|vnd\.microsoft\.icon)/.test(type)) {
               const ext = type.includes('png') ? 'png' : type.includes('jpeg') ? 'jpg' : type.includes('webp') ? 'webp' : type.includes('gif') ? 'gif' : 'ico';
-              const path = `directory/${r.id}.${ext}`;
+              const path = `directory/${r.id}-icon.${ext}`;
               const up = await admin.storage.from('company-logos').upload(path, bytes, { contentType: type, upsert: true });
               if (!up.error) logo_path = path;
             }

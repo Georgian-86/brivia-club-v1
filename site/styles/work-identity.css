@@ -37,3 +37,14 @@ body.app-body .app-view[data-view="home"] #swipe-role:has(.work-line) {
 .profile-edit-grid .profile-edit-work { grid-column: 1 / -1; }
 /* D-143: the list shows the logo and the name only (no website), the name always left-aligned next to its logo. */
 .profile-edit-work .b-option > span { flex: 1 1 auto; min-width: 0; text-align: left; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* D-144 (founder: "take inspiration from LinkedIn"): every logo sits on a white rounded square with a hairline edge,
+   the mark contained with a little padding, so square icons and odd shapes read the same. 28 px in the search list,
+   24 px for the picked company; the card keeps its quiet 14 px. */
+img.work-logo { box-sizing: border-box; padding: 1px; border-radius: 3px; background: var(--color-white, white); object-fit: contain;
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--color-ink) 10%, transparent); }
+.profile-edit-work .b-option { gap: 12px; min-height: 48px; }
+.profile-edit-work .b-option .work-logo { flex: 0 0 28px; width: 28px; height: 28px; border-radius: 6px; padding: 3px; }
+.profile-edit-work .b-option svg.work-logo { padding: 5px; color: var(--color-ink-soft); background: var(--color-cream);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--color-ink) 10%, transparent); }
+.profile-work-picked-name .work-logo { flex: 0 0 24px; width: 24px; height: 24px; border-radius: 5px; padding: 2px; }
