@@ -1206,7 +1206,7 @@ Hiring is a lane beside the deck, not a change to it: `deck_candidates` and the 
   `brivia_role_shown`, `member_open_to` and both sides of `hiring_suggestions`). Seeded members skip the photo and
   14-day parts of the bar (they never carry a photo, D-156); completed, confirmed email and no open flag still apply.
 - **The toggle.** Connect carries a one-tap Hiring switch beside the discovery-filter button (`#hiring-toggle`,
-  `role="switch"`, D-163).
+  `role="switch"`, D-166).
   It is the same lens as the drawer's switch, filters the loaded deck only and never changes the ORBIT order.
 
 ## Appendix A (DRAFT, not scheduled): Constellations

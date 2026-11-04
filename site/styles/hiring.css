@@ -178,7 +178,7 @@ dialog.hiring-sheet::backdrop { background: color-mix(in srgb, var(--color-oxblo
 /* The Hiring lens in the Discovery filter drawer. */
 .hiring-filter-switch { margin-top: 0; padding-top: 0; border-top: 0; font-family: var(--font-body); }
 
-/* The Hiring switch on Connect (D-162, redesigned D-163): a quick filter beside the discovery-filter button, in the
+/* The Hiring switch on Connect (D-162, redesigned D-166): a quick filter beside the discovery-filter button, in the
    same cream-and-wine frame, so the two read as one filter group above the heading. Off: cream with a pale track; on:
    deep wine with a cream knob, like the filter button when its drawer is open. Shown only once hiring is live. */
 .home-tools { display: flex; align-items: center; gap: var(--space-2); margin: 0 0 var(--space-4); }

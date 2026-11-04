@@ -102,7 +102,7 @@ try {
     check(`${w}: the deck never scrolls sideways`, await noSideScroll(page));
     await shot(page, `deck-seeker-${w}.png`);
 
-    // D-162/D-163: the one-tap Hiring switch beside the filter button turns the same lens on and off.
+    // D-162/D-166: the one-tap Hiring switch beside the filter button turns the same lens on and off.
     const toggle = page.locator('#hiring-toggle');
     check(`${w}: the Hiring switch shows, off`, await toggle.isVisible() && await toggle.getAttribute('aria-checked') === 'false' && await toggle.getAttribute('role') === 'switch');
     const tb = await toggle.boundingBox();
