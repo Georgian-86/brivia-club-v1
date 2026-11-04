@@ -10,7 +10,7 @@ Update this file at the end of every session. CLAUDE.md holds the aim; this file
 **2026-11-04, D-157:** long-press (or right-click / Enter) a chat bubble: Copy, Edit (15 min, plain text), Unsend (for
 both, any time), Delete for me. Files `site/scripts/message-actions.js`, `site/styles/message-actions.css`; tests
 `tests/unit/message-actions.test.mjs`, `tests/e2e/message-actions.spec.mjs`, `supabase/tests/za-message-edit-unsend.test.sql`.
-**Owed: apply `0046_message_edit_unsend.sql`** with the client deploy (README "0046").
+`0046_message_edit_unsend.sql` **applied live 2026-11-04** right after the client deployed, and verified (README "0046").
 
 **2026-11-04, D-156:** no city is suggested before the first letter (signup, setup, Edit profile, Create Event). The
 interest pickers now get every interest: `fetchInterestNodes` reads in pages (the API's 1,000-row cap had hidden 365).

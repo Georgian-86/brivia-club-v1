@@ -1289,7 +1289,7 @@ Verify:
 
 ## 0046
 
-**Edit, unsend and delete for me (D-157).** Not applied yet.
+**Edit, unsend and delete for me (D-157).** **APPLIED 2026-11-04** (after the client deployed) and verified, including a rolled-back edit, unsend and delete-for-me as a real member.
 Apply after `0045`, with the client deploy (the client works either way: before 0046 it reads the old columns and
 the menu's actions say "Editing and unsending open soon."). Adds `brivia_messages.edited_at` and `unsent_at`,
 `brivia_private.hidden_message`, redefines `brivia_private.brivia_message_visible` (0013) to also hide a member's own
