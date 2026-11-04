@@ -57,14 +57,19 @@ export const playDeckIntro = ({ stack, card, next, back, controls = [], reduced 
     gloss?.remove();
     gsap.set([stack, ...layers.map((l) => l.el), ...rows], { clearProps: CLEARED });
     stack.classList.remove('is-intro');
-    ['pointerdown', 'keydown'].forEach((type) => doc?.removeEventListener?.(type, skip, true));
+    listeners.forEach(([type, fn]) => doc?.removeEventListener?.(type, fn, true));
     onDone?.();
   };
   // Paused until the next frame: the render that showed the deck (cover decode, layout) can take a long frame, and a
   // timeline that is already running would jump past the first cards' flight. The first painted frame is the start pose.
   const tl = gsap.timeline({ paused: true, onComplete: cleanup, onInterrupt: cleanup });
-  // Any interaction with the page skips straight to the resting stack, so the deck never makes anyone wait.
+  // Any interaction with the page skips straight to the resting stack, so the deck never makes anyone wait. A press on
+  // a button or link skips on release, not on press: jumping the cards under a pointer that is going down would move
+  // the button away and lose the click. A press anywhere else (a drag starting on the card) skips at once.
   function skip() { if (!ended) tl.progress(1); }
+  const INTERACTIVE = 'button, a, input, select, textarea, label, [role="button"], [role="menuitem"], [tabindex]:not([tabindex="-1"])';
+  const onDown = (e) => { if (!e.target?.closest?.(INTERACTIVE)) skip(); };
+  const listeners = [['pointerdown', onDown], ['pointerup', skip], ['keydown', skip]];
   stack.classList.add('is-intro');
   // The cards carry CSS transitions on transform (app.css, deck.css); they would fight the timeline.
   gsap.set(layers.map((l) => l.el), { transition: 'none' });
@@ -101,7 +106,7 @@ export const playDeckIntro = ({ stack, card, next, back, controls = [], reduced 
       tl.from(rows, { y: 14, opacity: 0, duration: INTRO.controls.dur, ease: 'power3.out', stagger: INTRO.controls.stagger, immediateRender: true }, INTRO.controls.at);
     }
   }
-  ['pointerdown', 'keydown'].forEach((type) => doc?.addEventListener?.(type, skip, true));
+  listeners.forEach(([type, fn]) => doc?.addEventListener?.(type, fn, true));
   const raf = globalThis.requestAnimationFrame || ((fn) => setTimeout(fn, 16));
   raf(() => raf(() => { if (!ended) tl.play(0); }));
   return { finish: skip, timeline: tl };

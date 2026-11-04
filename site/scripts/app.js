@@ -70,6 +70,7 @@ import { pitchLine, deckChips, deckEmptyState, deckFields, bandNote, deckCoverSr
 import { createDeckSwipe, SWIPE, setSwipeCue } from './deck-swipe.js';
 import { maybeShowDeckTutorial } from './deck-tutorial.js';
 import { playDeckIntro, introAllowed } from './deck-intro.js';
+import { mutualMoment, pitchSentFlight, flipIn, attachCardTilt, shimmerShared, slideModePill, markArrivals, revealOnScroll } from './motion-moments.js';
 import { whyPanelMarkup, whyRow } from './why-panel.js';
 import { chatEmojiCategories } from './chat-emoji-data.js';
 import { attachEmojiPicker } from './emoji-field.js';
@@ -102,6 +103,7 @@ import '../styles/chat-layout.css';
 import '../styles/app-polish.css';
 // The compact deck without side buttons, and its first-run tutorial (D-094). Loads last.
 import '../styles/deck-compact.css';
+import '../styles/motion.css';  // D-163: mutual moment, pitch letter, tilt, shimmer, sliding pill, radar, bubbles
 import '../styles/collab-requests.css';  // D-108: the request section and review sheet
 import '../styles/emoji-field.css';  // D-113: the emoji panel under the Edit profile bio
 import '../styles/work-identity.css';  // D-140: company line and picker
@@ -258,6 +260,7 @@ let connectionSyncTick = 0;
 const overlayIds = ['pitch-modal'];
 let deckTutorialTimer = 0; // offerDeckTutorial (D-094)
 const deckIntro = { played: false, running: null }; // maybePlayDeckIntro (D-162)
+let homeHadCard = false; // D-163 N3: the deck showed a card on its last render
 const hiddenChatsStorageKey = () => `brivia-hidden-chats:${memberProfile.id || 'anonymous'}`;
 const readHiddenChatIds = () => {
   try {
@@ -1091,13 +1094,20 @@ const turnOnCrossingPaths = (returnFocus) => openCrossingPathsExplainer({
 });
 const openConnectMode = (mode) => {
   const view = mode === 'nearby' ? 'nearby' : 'explore';
+  const modes = ['curated', 'nearby'];
   const next = new URL(window.location.href);
   next.searchParams.set('view', view);
   next.searchParams.delete('event');
   window.history.pushState({ ...(window.history.state || {}), appView: view }, '', next.pathname + next.search);
   setView(view);
-  document.querySelector(`[data-view="${view === 'nearby' ? 'nearby' : 'home'}"] [data-connect-mode="${mode}"]`)?.focus({ preventScroll: true });
+  const target = document.querySelector(`[data-view="${view === 'nearby' ? 'nearby' : 'home'}"] [data-connect-mode="${mode}"]`);
+  // D-163 (N7): the pill slides over from the option the member left.
+  slideModePill(target?.closest('.connect-mode'), { fromIndex: modes.indexOf(mode === 'nearby' ? 'curated' : 'nearby') });
+  target?.focus({ preventScroll: true });
 };
+// The pill sits under the active option whenever a Connect view shows (and after a resize).
+const placeModePills = () => document.querySelectorAll('.connect-mode').forEach((group) => { if (!group.closest('[hidden]')) slideModePill(group); });
+window.addEventListener('resize', placeModePills, { passive: true });
 document.addEventListener('click', (event) => {
   const button = event.target.closest('[data-connect-mode]');
   if (button && !button.classList.contains('is-active')) openConnectMode(button.dataset.connectMode);
@@ -1285,7 +1295,7 @@ const eventsPage = createEventsPage({
   // "Say hi" is an ordinary signal (send_signal): a connection exists only if the other member agrees (CLAUDE.md).
   sendHello: async (person, note) => {
     const result = await sendConnectionSignal({ id: person.id, name: person.name }, note);
-    showToast(signalResultToast(person, result));
+    announceSignal(person, result);
     return result;
   },
   openChatWith: (person) => {
@@ -1323,6 +1333,7 @@ const setView = (view) => {
   if (view === 'events') eventsPage.show({ eventId: pendingEventId }); else eventsPage.hide();
   if (view === 'companions') companionsPage.show({ eventId: pendingEventId }); else companionsPage.hide();
   if (view === 'nearby') nearbyPage.show(); else nearbyPage.hide();
+  if (['home', 'explore', 'nearby'].includes(view)) requestAnimationFrame(placeModePills);
   pendingEventId = null;
   if (view === 'chat') renderChats();
   // Re-tapping Profile on the profile keeps the loaded (or loading) interests: no second read, no skeleton flash.
@@ -1575,6 +1586,8 @@ const renderHome = (queue = getExplorePeople()) => {
     return;
   }
   setDeckLoading(card, false);
+  const hadCard = homeHadCard;
+  homeHadCard = Boolean(currentPerson);
   if (!currentPerson) {
     renderWhy(null);
     card?.setAttribute('hidden', '');
@@ -1582,6 +1595,8 @@ const renderHome = (queue = getExplorePeople()) => {
     hint?.setAttribute('hidden', '');
     limitState?.setAttribute('hidden', '');
     if (emptyState) renderDeckEmpty(emptyState);
+    // D-163 (N3): the last card was just swiped away: the reason turns in like the back of that card.
+    if (hadCard && emptyState && !emptyState.closest('[hidden]')) flipIn(emptyState);
     const count = document.querySelector('#queue-count'); if (count) count.textContent = '00 / 00';
     return;
   }
@@ -1591,6 +1606,7 @@ const renderHome = (queue = getExplorePeople()) => {
   emptyState?.setAttribute('hidden', '');
   renderSignalQuota();
   // A new member on the card: drop any drag / park pose left from the previous one (no motion).
+  const newCardShown = Boolean(card && card.dataset.personId !== String(currentPerson.id));
   if (card && card.dataset.personId !== String(currentPerson.id)) {
     if (card.dataset.personId !== undefined) deckSwipe?.reset();
     card.dataset.personId = String(currentPerson.id);
@@ -1620,7 +1636,7 @@ const renderHome = (queue = getExplorePeople()) => {
     bandNoteEl.textContent = note;
     bandNoteEl.hidden = !note;
   }
-  const tags = document.querySelector('#swipe-tags'); if (tags) renderCardChips(tags, currentPerson);
+  const tags = document.querySelector('#swipe-tags'); if (tags) { renderCardChips(tags, currentPerson); if (newCardShown) shimmerShared(tags); }
   // D-141: a hirer's bar says HIRING; the role strip shows when the role fits what this member is open to.
   if (hiring?.available()) {
     hiring.decorateCard(currentPerson, { label: cardLabel, strip: document.querySelector('#swipe-hiring'), tags });
@@ -1910,6 +1926,28 @@ const signalResultToast = (person, result) => {
   if (result.error) return result.quotaText || signalErrorToast;
   if (result.matched) return mutualToast(person);
   return result.status === 'sent' ? 'Signal sent' : signalErrorToast;
+};
+// D-163: a signal's outcome, shown. 'matched' gets the "It's mutual" moment (N1) over the toast; a sent pitch
+// flies a small letter from where it left (origin: a DOMRect or element) to the bell (N2), then the usual toast.
+const announceSignal = (person, result, origin = null) => {
+  if (!result?.error && result?.matched) {
+    const known = findPersonById(person?.id) || person;
+    void mutualMoment({
+      me: { name: memberProfile.name || 'You', photoUrl: safeImageUrl(memberProfile.photoUrl || memberProfile.photo_url || '') },
+      person: { name: known?.name || 'your new connection', photoUrl: safeImageUrl(known?.image || known?.photoUrl || '') },
+      shared: known?.shared || [],
+      onSound: () => chime.notify(`mutual:${known?.id || ''}`),
+    }).then((choice) => {
+      if (choice !== 'chat') return;
+      const target = findPersonById(known?.id);
+      setView('chat');
+      if (target) openChat(target);
+    });
+    showToast(signalResultToast(person, result));   // the live-region sentence, also under the moment
+    return;
+  }
+  if (!result?.error && result?.status === 'sent' && origin) void pitchSentFlight({ from: origin, to: document.querySelector('#app-notification-button') });
+  showToast(signalResultToast(person, result));
 };
 
 const loadConnectionRequests = async () => {
@@ -2225,9 +2263,10 @@ const dismissPendingPitch = () => {
   const pending = claimPendingPitch();
   if (!pending) return;
   pitchPerson = null;
+  const origin = document.querySelector('#swipe-card')?.getBoundingClientRect() || null;
   sendConnectionSignal(pending.person).then((result) => {
     if (result.error) requeuePerson(pending.person);
-    showToast(signalResultToast(pending.person, result));
+    announceSignal(pending.person, result, origin);
   });
   advanceCard(pending.person, 'pitch');
 };
@@ -3195,6 +3234,7 @@ const renderMessages = () => {
   };
   const newestOwnId = lastOwnMessageId(thread);
   messages.innerHTML = thread.length ? thread.map(renderBubble).join('') : '<div class="chat-start-note"><strong>Start with context.</strong><span>A thoughtful first message makes a better introduction.</span></div>';
+  markArrivals(messages, selectedChat.id);   // D-163 N9: only bubbles new since the last render of this chat rise in
   placeTypingBubble();
   const isBlocked = readBlockedUserIds().has(String(selectedChat.id));
   if (isBlocked) {
@@ -5554,6 +5594,17 @@ deckSwipe = createDeckSwipe({
     && !document.querySelector('#swipe-card')?.classList.contains('is-loading'),
   onCommit: (direction, { vx }) => swipe(direction === 'pitch' ? 'like' : 'pass', { vx }),
 });
+// D-163 (N5): on desktop the top card leans towards the cursor (never while dragging or during the intro).
+attachCardTilt({ card: document.querySelector('#swipe-card'), stack: document.querySelector('#swipe-stack'), enabled: () => Boolean(currentPerson) && !deckIntro.running });
+// D-163 (N10): event covers settle in as they scroll into view (first 8 of each render, once).
+{
+  const eventsRoot = document.querySelector('[data-view="events"]');
+  if (eventsRoot && typeof MutationObserver === 'function') {
+    let queued = 0;
+    new MutationObserver(() => { cancelAnimationFrame(queued); queued = requestAnimationFrame(() => revealOnScroll(eventsRoot)); })
+      .observe(eventsRoot, { childList: true, subtree: true });
+  }
+}
 document.querySelectorAll('[data-close-overlay]').forEach((button) => button.addEventListener('click', (event) => {
   const pitchBackdrop = event.currentTarget.classList.contains('app-overlay-backdrop') && event.currentTarget.closest('#pitch-modal');
   if (pitchBackdrop && performance.now() - pitchOpenedAt < PITCH_OPENING_MS) return;
@@ -6299,7 +6350,7 @@ document.querySelector('#pitch-form')?.addEventListener('submit', async (event) 
     }
     pitchPerson = null;
     closeOverlays();
-    showToast(signalResultToast(pending.person, result));
+    announceSignal(pending.person, result, document.querySelector('#swipe-card')?.getBoundingClientRect() || null);
     advanceCard(pending.person, 'pitch');
   } finally {
     setBusy(submit, false);

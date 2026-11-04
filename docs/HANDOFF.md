@@ -7,6 +7,10 @@ Update this file at the end of every session. CLAUDE.md holds the aim; this file
 
 ## 1. What is done
 
+**2026-11-04, D-163:** motion moments: "It's mutual" dialog, pitch letter to the bell, caught-up flip, desktop card
+tilt, chip shimmer, sliding Curated/Nearby pill, Nearby radar, chat bubble rise, events reveal. Files
+`site/scripts/motion-moments.js`, `site/styles/motion.css`; test `tests/unit/motion-moments.test.mjs`.
+
 **2026-11-04, D-162:** the Connect deck is dealt in on load (three cards from below, a soft landing, a gloss) with a
 quiet synthesized "deal" sound that follows the swipe-sounds switch. Files `site/scripts/deck-intro.js`, `INTRO_CUE` in
 `site/scripts/notify-sound.js`, `.deck-intro-gloss` in `site/styles/deck.css`; test `tests/unit/deck-intro.test.mjs`.

@@ -1,0 +1,78 @@
+/* D-163: the moments after the deck's arrival (site/scripts/motion-moments.js). Brand tokens only. Every moving part
+   stops under prefers-reduced-motion (the JS also skips travel there). */
+
+/* ---- N1: It's mutual ---- */
+.mutual-moment { position: fixed; z-index: 80; inset: 0; display: grid; place-items: center; padding: var(--space-4); }
+.mutual-backdrop { position: absolute; inset: 0; background: var(--aura-scrim, color-mix(in srgb, var(--color-wine-deep) 42%, transparent)); -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px); }
+.mutual-panel {
+  position: relative; width: min(420px, 100%); padding: var(--space-7) var(--space-5) var(--space-6); text-align: center;
+  border: 1px solid var(--color-card-edge); border-radius: var(--radius-l); background: var(--aura-blush-box, var(--color-card-paper));
+  box-shadow: 0 30px 80px -30px color-mix(in srgb, var(--color-wine-deep) 55%, transparent);
+}
+.mutual-pair { position: relative; display: flex; justify-content: center; margin: 0 auto var(--space-5); }
+.mutual-avatar {
+  position: relative; z-index: 1; display: grid; place-items: center; width: 96px; height: 96px; overflow: hidden; border: 3px solid var(--color-cream);
+  border-radius: 50%; background: var(--color-wine-deep); color: var(--color-cream); font-family: var(--font-heading); font-size: var(--text-32);
+  box-shadow: 0 12px 28px -12px color-mix(in srgb, var(--color-wine-deep) 70%, transparent);
+}
+.mutual-avatar.is-them { margin-left: -18px; background: var(--color-wine); }
+.mutual-avatar img { width: 100%; height: 100%; object-fit: cover; }
+.mutual-ring { position: absolute; z-index: 0; top: 50%; left: 50%; width: 120px; height: 120px; margin: -60px 0 0 -60px; border: 2px solid var(--color-wine); border-radius: 50%; opacity: 0; pointer-events: none; }
+.mutual-eyebrow { margin: 0; color: var(--color-wine); letter-spacing: .18em; }
+.mutual-title { margin: var(--space-2) 0 0; color: var(--color-name-ink); font-family: var(--font-heading); font-size: var(--text-32); font-weight: 400; line-height: 1.05; }
+.mutual-title em { color: var(--color-wine); font-style: italic; }
+.mutual-chips { display: flex; flex-wrap: wrap; justify-content: center; gap: var(--space-2); margin-top: var(--space-4); }
+.mutual-chips span { padding: 6px 12px; border: 1px solid color-mix(in srgb, var(--color-wine) 30%, transparent); border-radius: var(--radius-pill); background: var(--color-chip); color: var(--color-ink); font-size: var(--text-14); }
+.mutual-actions { display: grid; gap: var(--space-2); margin-top: var(--space-5); }
+.mutual-actions button { min-height: 48px; border-radius: var(--radius-pill); font-family: var(--font-body); font-size: var(--text-14); font-weight: 700; letter-spacing: .08em; text-transform: uppercase; cursor: pointer; }
+.mutual-hi { border: 0; background: var(--color-wine-deep); color: var(--color-cream); }
+.mutual-later { border: 1px solid var(--color-line); background: transparent; color: var(--color-ink); }
+.mutual-actions button:focus-visible { outline: 2px solid var(--color-wine); outline-offset: 3px; }
+
+/* ---- N2: the pitch letter ---- */
+.pitch-letter { position: fixed; z-index: 90; top: 0; left: 0; display: grid; place-items: center; width: 34px; height: 34px; border-radius: 50%; background: var(--color-wine-deep); box-shadow: 0 10px 22px -8px color-mix(in srgb, var(--color-wine-deep) 70%, transparent); pointer-events: none; will-change: transform; }
+.pitch-letter svg { width: 18px; height: 18px; fill: none; stroke: var(--color-cream); stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+
+/* ---- N5: desktop card tilt (the light follows the cursor) ---- */
+.app-view[data-view="home"] .swipe-stack { perspective: 1100px; }
+.app-view[data-view="home"] .swipe-card .deck-tilt-light {
+  position: absolute; z-index: 4; inset: 0; border-radius: inherit; opacity: 0; pointer-events: none;
+  background: radial-gradient(circle at var(--tilt-lx, 50%) var(--tilt-ly, 30%), color-mix(in srgb, white 26%, transparent), transparent 55%);
+  mix-blend-mode: soft-light; transition: opacity var(--motion-base) var(--ease);
+}
+.app-view[data-view="home"] .swipe-card.is-tilting .deck-tilt-light { opacity: 1; }
+
+/* ---- N6: "You both" chips catch the light once ---- */
+.app-view[data-view="home"] .member-tags .chip-shared.is-shimmer {
+  background-image: linear-gradient(110deg, transparent 30%, color-mix(in srgb, white 70%, transparent) 50%, transparent 70%);
+  background-repeat: no-repeat; background-size: 220% 100%; background-position: 160% 0;
+  animation: chip-shimmer .9s var(--ease) var(--shimmer-delay, .35s) 1 both;
+}
+@keyframes chip-shimmer { from { background-position: 160% 0; } to { background-position: -60% 0; } }
+
+/* ---- N7: the sliding Curated / Nearby pill ---- */
+.connect-mode.has-pill { position: relative; }
+.connect-mode-pill { position: absolute; z-index: 0; top: 4px; bottom: 4px; left: 0; border-radius: var(--radius-pill); background: var(--color-wine-deep); pointer-events: none; }
+body.app-body .connect-mode.has-pill .connect-mode-btn { position: relative; z-index: 1; }
+body.app-body .connect-mode.has-pill .connect-mode-btn.is-active { background: transparent; }
+
+/* ---- N8: Nearby looks around while it loads (a radar sweep over the waiting card) ---- */
+.nearby-row .companion-card.is-skeleton { position: relative; overflow: hidden; }
+.nearby-row .companion-card.is-skeleton::after {
+  content: ''; position: absolute; top: 50%; left: 50%; width: 220%; aspect-ratio: 1; translate: -50% -50%; border-radius: 50%;
+  background: conic-gradient(from 0deg, transparent 0 300deg, color-mix(in srgb, var(--color-wine) 16%, transparent) 345deg, transparent 360deg);
+  animation: nearby-sweep 2.4s linear infinite;
+}
+@keyframes nearby-sweep { to { rotate: 1turn; } }
+
+/* ---- N9: a new chat bubble rises in ---- */
+.message.is-arriving { animation: bubble-in .32s cubic-bezier(.2, .8, .2, 1) both; transform-origin: 100% 100%; }
+.message.them.is-arriving { transform-origin: 0 100%; }
+@keyframes bubble-in { from { opacity: 0; transform: translateY(8px) scale(.96); } to { opacity: 1; transform: none; } }
+
+@media (prefers-reduced-motion: reduce) {
+  .app-view[data-view="home"] .member-tags .chip-shared.is-shimmer { animation: none; background-image: none; }
+  .nearby-row .companion-card.is-skeleton::after { animation: none; display: none; }
+  .message.is-arriving { animation: none; }
+  .app-view[data-view="home"] .swipe-card .deck-tilt-light { display: none; }
+}

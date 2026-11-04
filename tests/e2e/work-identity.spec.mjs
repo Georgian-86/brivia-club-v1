@@ -28,6 +28,8 @@ try {
     page.setDefaultTimeout(8000);
     await page.waitForSelector('#swipe-name:not(:empty)');
     await page.waitForSelector('#swipe-role .work-line', { state: 'attached' });
+    // D-162: measure the resting card, after the deck's deal-in.
+    await page.waitForFunction(() => !document.querySelector('#swipe-stack')?.classList.contains('is-intro'));
     const card = await page.evaluate(() => ({ text: document.querySelector('#swipe-role').innerText.trim(), logo: Boolean(document.querySelector('#swipe-role img.work-logo')), size: document.querySelector('#swipe-role img.work-logo')?.getBoundingClientRect().width, h: Math.round(document.querySelector('#swipe-card').getBoundingClientRect().height), lines: Math.round(document.querySelector('#swipe-role').getBoundingClientRect().height) }));
     check(`${w}: the card reads "Software Engineer at Google" with a 14 px logo (${JSON.stringify(card)})`, card.text === 'Software Engineer at Google' && card.logo && card.size === 14);
     await page.locator('[data-action="pass"]').dispatchEvent('click');

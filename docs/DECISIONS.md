@@ -3272,3 +3272,31 @@ controls (a tester or a seeded test member), never a real member, so no new expo
   screen while the deck loads, so moving it later reads as a glitch); replaying on every tab return (gets tiring).
 - **Proof:** unit 510 (tests/unit/deck-intro.test.mjs: timing, sound-to-motion sync, once-only rule, autoplay rules,
   mute); frame-exact captures at 390 and 1440 with Playwright's clock; swipe after the intro still works.
+
+## D-163 (2026-11-04): the motion moments after the deal
+
+- **Asked:** "this animation is good to go now work with other suggested animations" (the "Where motion fits next"
+  list: N1-N10, on top of the launch-ux checklist's M1-M11).
+- **Built (`site/scripts/motion-moments.js`, `site/styles/motion.css`):**
+  - **N1 It's mutual:** a dialog when a signal comes back `matched`: both avatars glide in and touch, one wine ring
+    pulses out, "You and X / both said yes.", the shared interests pop in, Say hi (opens the chat) / Keep exploring.
+    About 1.4 s; Escape, the backdrop or either button closes it; focus stays inside. The existing toast still shows
+    under it (it is the live-region sentence). Sound: the notify horn, under the notification-sound switch.
+  - **N2 Pitch sent:** a small wine letter flies from the card in an arc to the bell, which rings once. ~0.8 s.
+  - **N3 Caught up:** when the last card is swiped away, the "You're caught up" box turns in (a Y-axis flip).
+  - **N5 Tilt (desktop, fine pointer only):** the top card leans up to 4 degrees towards the cursor with a soft light,
+    through the CSS `rotate` property so it composes with deck-swipe.js's inline transform; off while dragging, during
+    the deal and under reduced motion.
+  - **N6:** a new card's "You both" chips catch the light once.
+  - **N7 (M9):** the Curated / Nearby pill slides from the option the member left.
+  - **N8:** while Nearby loads, a slow radar sweep crosses the waiting card (the empty state already had rings).
+  - **N9:** a chat bubble that was not on screen at the last render of that chat rises in (no replay on open).
+  - **N10:** event cards (first 8 per render) fade up and their covers settle from 1.06x as they scroll into view.
+  - **Not built:** N4 (Passion Budget fill) waits for the profile redesign. The accept-a-request path keeps its review
+    sheet outcome (the moment shows for deck pitches and event hellos).
+- **D-162 fix found by the deck e2e:** the deal skipped to its end on any pointerdown, which moved a button out from
+  under a press and lost the click ("Why this person?" during the deal). A press on a button or link now skips on
+  release; a press elsewhere (a drag) still skips at once. `tests/e2e/deck.spec.mjs` waits for the deal to end
+  before its layout checks (it measures the resting stack).
+- **Proof:** unit 513 (`tests/unit/motion-moments.test.mjs`); deck e2e 201/201 (main 201/201); screenshots of N1 and
+  N2 at 390 and 1440 with the stubbed Supabase.
