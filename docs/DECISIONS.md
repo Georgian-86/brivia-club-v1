@@ -3382,7 +3382,19 @@ controls (a tester or a seeded test member), never a real member, so no new expo
 - **Scope:** the founder's override of CLAUDE.md rule 4 ("far-away recommendations are earned") for the hiring lane
   only. The connection deck (`deck_candidates`, the Escape-Velocity gate) is unchanged. Supersedes D-169's order.
 
-## D-171 (2026-11-04): the profile hero's text fits beside the photo card
+## D-171 (2026-11-04): seeded hiring posts follow the open test world
+
+- **Asked:** "im testing with yashika's account. I want everyone to show all the hiring posts just the nearest location
+  first".
+- **Found:** the account under test was not a `brivia_tester`, so 0047 hid every seeded role from it, although
+  `open_test_world` already shows it the seeded members themselves.
+- **Done (0050):** `brivia_hiring_seen_by` uses `brivia_in_test_world` (the deck's own world rule). While the open test
+  world is on, every member sees all seeded roles and seeded "Open to roles", nearest first (D-170); switching
+  `open_test_world` off hides them from everyone but testers. Real members' roles are unchanged.
+- **Trade-off:** supersedes D-162's "only testers": real members can now see, and ask about, seeded roles at invented
+  companies while the world is open. The founder's call for the test phase; turn the world off before a real launch.
+
+## D-172 (2026-11-04): the profile hero's text fits beside the photo card
 
 - **Asked:** "fix the overflow of the text in the mobile view for the bio. Make it look professionally designed", with
   a 390 px screenshot where the work line ("Talent Acquisition at Stealth Startup") ran under the photo card and the

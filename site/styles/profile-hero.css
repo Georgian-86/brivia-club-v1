@@ -1,4 +1,4 @@
-/* D-171: the own profile hero's text column (name, work line, area, bio) always fits beside the photo card.
+/* D-172: the own profile hero's text column (name, work line, area, bio) always fits beside the photo card.
    Loaded after profile-layout.css and work-identity.css, so these rules win at the same specificity.
    - The name wraps (balanced) to two lines at most instead of an ellipsis after a few letters; a short name stays on
      one line.
@@ -142,7 +142,7 @@ body.app-body[data-app-view] .app-view.profile-view[data-view="profile"] .profil
   }
 }
 
-/* Readability on any cover (D-171): a neutral ink shade under the text column only (no maroon wash, D-113), dense
+/* Readability on any cover (D-172): a neutral ink shade under the text column only (no maroon wash, D-113), dense
    enough that cream text keeps 4.5:1 on the lightest covers, fading out before the photo card. A tight shadow keeps
    the thin Bodoni strokes crisp. */
 body.app-body[data-app-view] .app-view.profile-view[data-view="profile"] .profile-board-content .profile-hero::before {

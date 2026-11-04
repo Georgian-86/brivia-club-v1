@@ -107,7 +107,7 @@ import '../styles/motion.css';  // D-165: mutual moment, pitch letter, tilt, shi
 import '../styles/collab-requests.css';  // D-108: the request section and review sheet
 import '../styles/emoji-field.css';  // D-113: the emoji panel under the Edit profile bio
 import '../styles/work-identity.css';  // D-140: company line and picker
-import '../styles/profile-hero.css';  // D-171: the profile hero's text column fits beside the photo card
+import '../styles/profile-hero.css';  // D-172: the profile hero's text column fits beside the photo card
 import '../styles/hiring.css';  // D-141: the hiring bar, banner, sheets and profile cards
 import '../styles/message-actions.css';  // D-157: the long-press message menu and the editing bar
 import '../styles/components.css';  // D-105: the shared field, select, listbox and chip components, last so they win
