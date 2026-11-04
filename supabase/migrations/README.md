@@ -1318,3 +1318,9 @@ only. The client works either way (before 0048 the switch filters the loaded dec
 `select has_function_privilege('authenticated', 'public.hiring_people(int)', 'execute');` (t);
 `select has_function_privilege('anon', 'public.hiring_people(int)', 'execute');` (f).
 
+## 0049
+
+**Hiring matches at any distance (D-170).** Apply after `0048`. Redefines `hiring_suggestions` (no 60 km / ~10 km
+admission; fit 0.5 or more still decides; nearest first) and `hiring_people` (up to 200, nearest first). No grant
+change. Verify: `select pg_get_functiondef('public.hiring_suggestions(int)'::regprocedure) like '%place_km <= 60%';` (f).
+

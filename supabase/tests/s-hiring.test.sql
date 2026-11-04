@@ -207,7 +207,10 @@ begin
   perform pg_temp.as_member(2);
   select array_agg(id) into ids from public.hiring_suggestions(20);
   if not (pg_temp.hp(1) = any(ids)) then raise exception 'FAIL H6: H not suggested to S: %', ids; end if;
-  if pg_temp.hp(5) = any(ids) then raise exception 'FAIL H6: a far hirer (Delhi) was suggested'; end if;
+  -- 0049 (D-170): no distance cut; the far hirer (Delhi) is suggested, after the near one, with its place band only
+  if not (pg_temp.hp(5) = any(ids)) then raise exception 'FAIL H6: the far hirer (Delhi) is not suggested: %', ids; end if;
+  if array_position(ids, pg_temp.hp(5)) < array_position(ids, pg_temp.hp(1)) then raise exception 'FAIL H6: the far hirer comes before the near one'; end if;
+  if (select distance_band from public.hiring_suggestions(20) where id = pg_temp.hp(5)) ~ 'km' then raise exception 'FAIL H6: far band'; end if;
   if pg_temp.hp(4) = any(ids) or pg_temp.hp(11) = any(ids) then raise exception 'FAIL H6: an under-bar or blocked hirer'; end if;
   if pg_temp.hp(10) = any(ids) and (select fit from public.hiring_suggestions(20) where id = pg_temp.hp(10)) < 0.5 then
     raise exception 'FAIL H6: an unfit suggestion'; end if;
