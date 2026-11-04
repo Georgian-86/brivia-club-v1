@@ -3341,3 +3341,20 @@ controls (a tester or a seeded test member), never a real member, so no new expo
   baseline, so old matches never replay. Nearby keeps its own match dialog (those ids are marked seen).
 - **Proof:** `tests/e2e/mutual-moment.spec.mjs` (new: baseline, other member accepts, made while away, no replay);
   `collab-requests.spec.mjs` now expects the moment over the sheet; deck 201/201, app-shell 214/214, sounds, hiring pass.
+
+## D-168 (2026-11-04): four motion moments that did not play on live, fixed
+
+- **Asked:** "check other animations work perfectly in the live site". A frame-by-frame walk-through of every moment
+  (`tests/e2e/motion.spec.mjs`, new) found four that never showed in real use:
+  - **N6 "You both" shimmer:** the deck redraws the card several times while data arrives; the next draw replaced the
+    chips and wiped the shimmer. `renderCardChips` now keeps the same chips (keyed by person and chip labels).
+  - **N2 letter on desktop:** it aimed at the Chat link's icon, which the desktop header hides (width 0), so it never
+    flew. It now aims at the visible icon (phone tab bar) or else the Chat link, and looks for it over ~0.6 s while the
+    pitch sheet closes.
+  - **N3 caught-up flip:** the box often shows a moment later (when `deck_status` answers), by which point "the last
+    render had a card" was already false. That flag is now kept until the box really shows.
+  - **N7 sliding pill:** `setView` re-placed the pills on the next frame, which killed the slide. A plain re-place
+    now leaves a running slide alone.
+- **Proof:** motion.spec 10/10 (deal-in, shimmer, tilt, letter + Chat pop, flip, pill, radar, mutual, bubble, events);
+  deck 201/201, app-shell 214/214, collab-requests, mutual-moment, sounds, deck-tutorial, events, nearby, work-identity
+  pass; unit 513.
