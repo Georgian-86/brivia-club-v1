@@ -273,15 +273,11 @@ export const createHiring = (deps) => {
           close();
           await reloadMine();
           const live = state.roles.some((r) => r.banner_live);
-          const from = state.roles[0]?.live_from;
-          showToast(role ? 'Role saved.' : live ? 'Your role is up. Members open to it will see it.' : `Your role is saved. Your banner goes live on ${formatDay(from)}.`);
+          showToast(role ? 'Role saved.' : live ? 'Your role is up. Members open to it will see it.' : 'Your role is saved. It shows once your profile has a photo and a confirmed email.');
           deps.onRolePosted?.();
         });
       },
     });
-  };
-  const formatDay = (iso) => {
-    try { return new Date(`${iso}T12:00:00`).toLocaleDateString(undefined, { day: 'numeric', month: 'short' }); } catch { return iso; }
   };
 
   // Manage one role: edit, pause or reopen, renew, close.
@@ -458,7 +454,7 @@ export const createHiring = (deps) => {
         + (waiting ? `<button class="profile-card-action" type="button" data-hiring-review>Review ${waiting} ask${waiting === 1 ? '' : 's'}</button>` : '')
         + (state.roles.length < ROLES_MAX ? '<button class="profile-card-action" type="button" data-hiring-add>Add a role</button>' : '')
         + '</div>'
-        + (state.roles.length ? `<p class="hiring-card-note">${live ? 'Your card shows "HIRING" to everyone. Members open to this kind of role see it first.' : `Your banner goes live on ${esc(formatDay(state.roles[0].live_from))}, once your account is two weeks old and has a photo.`}</p>` : '');
+        + (state.roles.length ? `<p class="hiring-card-note">${live ? 'Your card shows "HIRING" to everyone. Members open to this kind of role see it first.' : 'Your banner goes live once your profile has a photo and a confirmed email.'}</p>` : '');
     }
     if (isSeeker() || (wants.seeker && !isHirer())) {
       const intent = state.intent;

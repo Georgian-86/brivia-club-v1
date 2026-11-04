@@ -71,7 +71,7 @@ You're hiring → Add a role); their deck card's bar reads "HIRING · ROLE" and 
 member whose Looking for is Job Referral, Internship Referral or Job Opportunities says which roles they're open to
 (private to hirers by default) and gets the role strip, a deck lift (1 in 5), a once-a-day notification and the
 Hiring lens; "Ask about this role" is a signal with a note and the role tag, answered in the request sheet. **Owed:
-apply `0037_hiring.sql`** (README "0037"), **then `0047_hiring_test_world.sql`, then `0048_hiring_people.sql`, then `0049_hiring_anywhere.sql`, then `0050_hiring_open_world.sql` (D-171: seeded roles for everyone while the open test world is on), then
+apply `0037_hiring.sql`** (README "0037"), **then `0047_hiring_test_world.sql`, then `0048_hiring_people.sql`, then `0049_hiring_anywhere.sql`, then `0050_hiring_open_world.sql` (D-171: seeded roles for everyone while the open test world is on), then `0051_hiring_no_wait.sql` (D-173: no 14-day wait), then
 `supabase/seed/hiring-test-members.sql`** and the `brivia_tester` insert for the founder (seed README, D-162); until 0037 the
 client hides all of it, including the Hiring toggle beside Curated / Nearby. Spec
 `docs/superpowers/specs/2026-11-02-hiring-design.md`, engine lane ORBIT_ENGINE.md §12, moderation MODERATION.md.
