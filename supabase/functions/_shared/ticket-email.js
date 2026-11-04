@@ -1,4 +1,4 @@
-// The event ticket email (D-166): an invitation in the club's colours (blush paper, a deep wine ticket with a champagne
+// The event ticket email (D-177): an invitation in the club's colours (blush paper, a deep wine ticket with a champagne
 // frame, serif type), a plain-text twin, and a calendar invite (.ics). Pure functions, shared by the Edge Functions
 // (event-ticket, razorpay-verify, razorpay-webhook) and the Node unit tests (tests/unit/event-ticket-email.test.mjs).
 // Email clients ignore most CSS: the layout is tables with inline styles; the gradient has a solid fallback colour.

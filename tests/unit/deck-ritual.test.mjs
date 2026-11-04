@@ -1,4 +1,4 @@
-// D-162: the deck ritual's choreography (pure). Run: npm run test:unit
+// D-173: the deck ritual's choreography (pure). Run: npm run test:unit
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
@@ -17,7 +17,7 @@ test('the intro lands deepest first, one back every 120 ms, then the top card ri
   assert.ok(introTotal() >= 1400 && introTotal() <= 2000, `intro ${introTotal()} ms`);
 });
 
-test('the completion shuffle is fast, like Solitaire (D-163): two riffles; the cards are squared by about 1.1 s, the message shows by 1.7 s', () => {
+test('the completion shuffle is fast, like Solitaire (D-174): two riffles; the cards are squared by about 1.1 s, the message shows by 1.7 s', () => {
   const total = completeTotal();
   assert.ok(total >= 1000 && total <= 1700, `shuffle ${total} ms`);
   assert.ok(completeSquareAt() <= 1200, `squared at ${completeSquareAt()} ms`);
@@ -85,15 +85,13 @@ test('the intro plays once per visit (session storage), and a broken storage nev
   assert.doesNotThrow(() => markIntroPlayed(broken));
 });
 
-test('the ritual cues are timed to the choreography and quieter than a swipe', () => {
-  const { deal, complete } = RITUAL_CUES;
-  const ticks = deal.keys.slice(0, RITUAL.backs).map((k) => Math.round((k.at + 0.02) * 1000));
-  assert.deepEqual(ticks, introLandings());
-  assert.ok(deal.notes[0].at * 1000 >= introRiseAt() - 1);
+test('the shuffle cue is timed to the choreography and quieter than a swipe', () => {
+  const { complete } = RITUAL_CUES;
+  assert.equal(RITUAL_CUES.deal, undefined, 'the opening deal is D-164 (deck-intro.js), not a ritual cue');
   const resolution = complete.notes.at(-1);
   assert.equal(resolution.midi, 70, 'the deck resolves home, on B-flat');
   assert.ok(Math.abs(complete.notes[0].at * 1000 - completeSquareAt()) <= 1);
-  [deal, complete].forEach((c) => {
+  [complete].forEach((c) => {
     assert.ok(c.level <= 0.6);
     [...c.keys, ...c.notes].forEach((n) => assert.ok(n.gain <= 0.45, JSON.stringify(n)));
   });

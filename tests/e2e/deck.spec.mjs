@@ -84,7 +84,9 @@ try {
   };
   const cardName = (page) => page.evaluate(() => document.querySelector('#swipe-card:not([hidden]) #swipe-name')?.textContent?.trim() || '');
   // Both waits resolve to true / false (logged), so a failed state shows up as a FAIL line, not a crash.
-  const waitForCard = (page, name) => page.waitForFunction((n) => document.querySelector('#swipe-card:not([hidden]) #swipe-name')?.textContent?.trim() === n, name, { timeout: 8000 })
+  // D-164: the first card is dealt in (about 1 s); the layout checks measure the resting stack, after the deal.
+  const waitForCard = (page, name) => page.waitForFunction((n) => document.querySelector('#swipe-card:not([hidden]) #swipe-name')?.textContent?.trim() === n
+    && !document.querySelector('#swipe-stack')?.classList.contains('is-intro'), name, { timeout: 8000 })
     .then(() => true, async () => { console.log(`card "${name}" did not show (got "${await cardName(page)}")`); return false; });
   const waitForEmpty = (page, title) => page.waitForFunction((t) => { const el = document.querySelector('#home-empty-state'); return el && !el.hidden && document.querySelector('#deck-empty-title')?.textContent?.trim() === t; }, title, { timeout: 8000 })
     .then(() => true, async () => { console.log(`empty state "${title}" did not show:`, await page.evaluate(() => document.querySelector('#home-empty-state')?.outerHTML?.slice(0, 300))); return false; });
@@ -443,7 +445,7 @@ try {
   await small.locator('.swipe-hint').scrollIntoViewIfNeeded();
   await shot(small, 'deck-375-quota-counter.png');
 
-  // Zero quota at both widths (D-162, replaces D-026's "the card stays with a notice"): no profile is offered; the
+  // Zero quota at both widths (D-173, replaces D-026's "the card stays with a notice"): no profile is offered; the
   // finished deck shows "That's your deck for today." with the refresh time, and nothing scrolls sideways.
   resetStub({ remaining: 0, resetsAt: '2026-10-04T15:00:00+00:00' });
   await small.reload({ waitUntil: 'domcontentloaded' });

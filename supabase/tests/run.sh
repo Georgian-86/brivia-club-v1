@@ -86,6 +86,8 @@ grep -q 'try again later' "$DATA/log" || { echo "FAIL: the over-cap probe error 
   for m in "$STAGE"/migrations/*.sql; do run "migrations/$(basename "$m")"; done
   run seed/purge-test-members.sql   # safe when nothing is seeded
   run seed/test-members.sql; run seed/test-members.sql
+  run seed/hiring-test-members.sql; run seed/hiring-test-members.sql   # D-162: needs 0037, 0047 and the member seed
+  run tests/seed-hiring.check.sql
   "${PSQL[@]}" -d $DB -v phase=seeded -f "$STAGE/tests/seed.test.sql"
   "${PSQL[@]}" -d $DB -v phase=extras -f "$STAGE/tests/seed.test.sql"
   "${PSQL[@]}" -d $DB -v phase=tester -f "$STAGE/tests/seed.test.sql"   # founder path: a real account becomes a tester

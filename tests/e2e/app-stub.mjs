@@ -83,8 +83,6 @@ export const startAppStub = async ({ port, state = {}, deckRows = defaultDeckRow
     await context.addInitScript(([key]) => { if (!window.localStorage.getItem(key)) window.localStorage.setItem(key, JSON.stringify({ baseline: '2020-01-01T00:00:00.000Z', read: {} })); }, [`brivia-chat-read:${ME}`]);
     // The first-run deck tutorial (D-094) stays out of the way unless a spec asks for it (state.deckTutorial).
     if (!st.deckTutorial) await context.addInitScript(() => { try { if (location.pathname === '/app.html') window.localStorage.setItem('brivia-deck-tutorial', 'hidden'); } catch { /* none */ } });
-    // The deck ritual's intro (D-162) counts as played this visit unless a spec asks for it (state.deckRitual).
-    if (!st.deckRitual) await context.addInitScript(() => { try { window.sessionStorage.setItem('brivia-deck-ritual', 'played'); } catch { /* none */ } });
     await context.grantPermissions(['clipboard-read', 'clipboard-write'], { origin: url });
     await context.route(`${ORIGIN}/**`, async (route) => {
       const request = route.request();
@@ -283,7 +281,7 @@ export const startAppStub = async ({ port, state = {}, deckRows = defaultDeckRow
       if (pathName === '/rest/v1/rpc/set_nearby_radius') { st.radiusSaved = args.p_km; return json(200, args.p_km); }
       if (pathName === '/rest/v1/rpc/save_push_subscription') { (st.pushSubs ||= []).push(args); return json(200, true); }
       if (pathName === '/rest/v1/rpc/delete_push_subscription') { st.pushSubs = (st.pushSubs || []).filter((x) => x.p_endpoint !== args.p_endpoint); return json(200, true); }
-      // D-166: payments and tickets. st.pay: { order: 'ok' | 'not_configured' | 'hold_expired', verify: 'confirmed' | 'full' |
+      // D-177: payments and tickets. st.pay: { order: 'ok' | 'not_configured' | 'hold_expired', verify: 'confirmed' | 'full' |
       // 'error', ticketSent: true | false }; every call is recorded in st.payCalls.
       if (['/functions/v1/razorpay-order', '/functions/v1/razorpay-verify', '/functions/v1/event-ticket'].includes(pathName)) {
         const fn = pathName.slice(14);

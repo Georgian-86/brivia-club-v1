@@ -1189,8 +1189,9 @@ Hiring is a lane beside the deck, not a change to it: `deck_candidates` and the 
   0.6; else 0; an internship pairs only with intern or entry) × mode (the role's mode is one the seeker picked, 1, else
   0) × (0.8 + 0.2 × min(1, shared skills / 3)). On-site and hybrid pairs must also pass the location admission below.
   Fit ≥ 0.5 is "Fits what you're open to".
-- **Location first.** `hiring_suggestions` admits pairs with the deck's own location rule (same cell ring first, then
-  city, then region; remote roles anywhere) and answers only the distance band, never a cell, a city or km.
+- **Location first, never a cut (D-170, 0049).** `hiring_suggestions` and `hiring_people` show every vacancy at any
+  distance, nearest first (own ~3 / ~10 km rings, then the nearest place; fit breaks ties), and answer only the
+  distance band, never a cell, a city or km. This is the hiring lane only: the deck's Escape-Velocity gate is unchanged.
 - **The lift.** The client puts at most one suggestion in every five deck cards (`interleaveLift`), never in place of
   the card on screen. Suggestions are mutual-consent like everything else: "Ask about this role" sends a signal
   (`send_connect_request`, the daily quota and the waiting cap apply) with the role tag; a connection exists only when
@@ -1200,6 +1201,15 @@ Hiring is a lane beside the deck, not a change to it: `deck_candidates` and the 
 - **Privacy.** A seeker's intent is visible only to members with an open fitting role, unless they choose Everyone. A
   private current company hides the intent from hirers whose role names that company. "Let hirers find me" (off by
   default) is the only way a seeker is lifted in a hirer's deck.
+- **Seeded members (D-162, migration 0047).** A role or intent owned by a seeded test member (`is_test`) is shown only
+  to that member and to the test world (`brivia_in_test_world`; since D-171 / 0050 that includes every member while
+  `open_test_world` is on, the same rule as the deck; switching it off leaves only testers) (`brivia_hiring_seen_by`, applied in
+  `brivia_role_shown`, `member_open_to` and both sides of `hiring_suggestions`). Seeded members skip the photo and
+  14-day parts of the bar (they never carry a photo, D-156); completed, confirmed email and no open flag still apply.
+- **The toggle.** Connect carries a one-tap Hiring switch beside the discovery-filter button (`#hiring-toggle`,
+  `role="switch"`, D-166). Turning it on calls `hiring_people` (0048, D-169): everyone with a shown role the member can
+  see, roles that fit first, then nearest, no distance cut, distance band only; those cards join the front of the deck.
+  It is the same lens as the drawer's switch, filters the loaded deck only and never changes the ORBIT order.
 
 ## Appendix A (DRAFT, not scheduled): Constellations
 

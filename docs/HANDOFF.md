@@ -1,22 +1,40 @@
 # Session handoff (read after CLAUDE.md)
 
-Last updated: 2026-11-04 (D-166 Razorpay payments, emailed invitation tickets, ticket sound; D-162 the deck ritual: intro deal, daily-cap shuffle, deck sounds; D-157 edit, unsend and delete for me from a long press on a message; D-156 city suggestions from the first letter, all 1,131 interests reach the pickers, 10 swipes a day on the deck and on companions; D-154 one opener in the pitch box, typing bubble and inbox typing; D-153 sharper hero video, subject-following phone crop; D-152 Chat search finds people, mobile chat polish; D-151 Read receipts switch, like and comment notifications, Posts tab renamed Notes; D-150 Delivered, Read and last active in chat; D-141 Hiring, built, 0037 not applied; D-140 worldwide city directory and company on profiles; D-138 one aura on every sheet, crossings say where and when, hidden-tab pulses, sound switches; D-137 bio 1 to 20 words, the sound kit; D-136 Gospel Music and NLP offered; D-135 interest list in the founder's wording, A–Z; D-134 Nearby notifications and web push; D-133 phone location; D-131 Nearby discovery; D-129 pitch shown once; D-128 cover order, names, OPEN MINDS retired; D-126 interest on all events; D-125 Show interest, brochure, poster area). Before that: 2026-11-02 (D-121 Create Event). Before that: 2026-11-01 (D-119 Crossing paths). Before that: 2026-11-01 (D-118 calmer Explore; D-117 Explore events, Posts tab). Before that: 2026-11-01 (D-116 cover set). Before that: 2026-10-28 (D-100 chat inbox, D-101 post activity and 0015, D-102 photo and setup). Before that: 2026-10-20 (live-database correction D-070; "Send without a note" D-071). Before that: 2026-10-16 (design references, D-062). Before that: 2026-10-13, after Phase D of the experience iteration (the test world), on branch
+Last updated: 2026-11-05 (D-173 to D-177 merged from a parallel branch: the daily-limit shuffle, blush card, landing button, Razorpay and tickets; D-168 four motion moments fixed on live; D-167 "It's mutual" for every new match; D-164 the deck deal-in with a sound; D-165 motion moments; D-162 one-tap Hiring toggle on Connect, seeded hirers for testing, visible only to testers (0047); D-157 edit, unsend and delete for me from a long press on a message; D-156 city suggestions from the first letter, all 1,131 interests reach the pickers, 10 swipes a day on the deck and on companions; D-154 one opener in the pitch box, typing bubble and inbox typing; D-153 sharper hero video, subject-following phone crop; D-152 Chat search finds people, mobile chat polish; D-151 Read receipts switch, like and comment notifications, Posts tab renamed Notes; D-150 Delivered, Read and last active in chat; D-141 Hiring, built, 0037 not applied; D-140 worldwide city directory and company on profiles; D-138 one aura on every sheet, crossings say where and when, hidden-tab pulses, sound switches; D-137 bio 1 to 20 words, the sound kit; D-136 Gospel Music and NLP offered; D-135 interest list in the founder's wording, A–Z; D-134 Nearby notifications and web push; D-133 phone location; D-131 Nearby discovery; D-129 pitch shown once; D-128 cover order, names, OPEN MINDS retired; D-126 interest on all events; D-125 Show interest, brochure, poster area). Before that: 2026-11-02 (D-121 Create Event). Before that: 2026-11-01 (D-119 Crossing paths). Before that: 2026-11-01 (D-118 calmer Explore; D-117 Explore events, Posts tab). Before that: 2026-11-01 (D-116 cover set). Before that: 2026-10-28 (D-100 chat inbox, D-101 post activity and 0015, D-102 photo and setup). Before that: 2026-10-20 (live-database correction D-070; "Send without a note" D-071). Before that: 2026-10-16 (design references, D-062). Before that: 2026-10-13, after Phase D of the experience iteration (the test world), on branch
 `claude/jolly-edison-49xvza` (repo `Georgian-86/brivia-club-v1`). Phases C and D are not on `main` yet, and Phase D's SQL
 is not applied: the founder applies it in the SQL editor (section 3, item 0).
 Update this file at the end of every session. CLAUDE.md holds the aim; this file holds **where we are**.
 
 ## 1. What is done
 
-**2026-11-04, D-166:** paid events take payment with Razorpay (order, verify, webhook; refunds a lost seat) and every
+**2026-11-04, D-177:** paid events take payment with Razorpay (order, verify, webhook; refunds a lost seat) and every
 confirmed seat gets an emailed invitation ticket via Resend (with a calendar invite) and a ticket sound. **Owed: the
-founder's Resend domain + key and Razorpay keys + webhook (migrations README "0047"), then apply 0047 and deploy the four
+founder's Resend domain + key and Razorpay keys + webhook (migrations README "0051"), then apply 0051 and deploy the four
 functions (razorpay-webhook with JWT verification off), and a test-mode payment.** Until then Reserve holds the seat
 and says payment opens soon.
 
-**2026-11-04, D-162:** the deck ritual on Connect: card backs deal into a Solitaire stack and the top one rises into the
-live card (once per visit); at the daily swipe cap the deck fans, riffles, reforms and reads "That's your deck for
+**2026-11-04, D-173:** the deck ritual's daily-limit shuffle (Connect opens with the D-164 deal; founder 2026-11-05): at the daily swipe cap the deck fans, riffles, reforms and reads "That's your deck for
 today." with the refresh time; two new deck cues. Files `site/scripts/deck-ritual.js`, `site/styles/deck-ritual.css`;
 tests `tests/unit/deck-ritual.test.mjs`, `tests/e2e/deck-ritual.spec.mjs`. Client only (no migration).
+**2026-11-04, D-172:** the own profile hero's text never runs under the photo card: the work line and bio wrap or
+clamp inside their column, the name wraps to two lines instead of an early ellipsis, one type scale per breakpoint
+(`site/styles/profile-hero.css`). Test `tests/e2e/profile-hero.spec.mjs` (long, real and short profiles at 390 and 1440).
+
+**2026-11-04, D-168:** shimmer, desktop letter, caught-up flip and sliding pill fixed (they never played on live).
+`tests/e2e/motion.spec.mjs` checks all ten moments fire, frame by frame.
+
+**2026-11-04, D-167:** "It's mutual" now plays for every new match, once per device (my signal, accepting a request,
+the other member accepting, or a match made while away), as a modal dialog above the request sheet. Seen ids:
+localStorage `brivia:mutual-seen:<member id>`. Test `tests/e2e/mutual-moment.spec.mjs`.
+
+**2026-11-04, D-165:** motion moments: "It's mutual" dialog, pitch letter to the Chat tab, caught-up flip, desktop card
+tilt, chip shimmer, sliding Curated/Nearby pill, Nearby radar, chat bubble rise, events reveal. Files
+`site/scripts/motion-moments.js`, `site/styles/motion.css`; test `tests/unit/motion-moments.test.mjs`.
+
+**2026-11-04, D-164:** the Connect deck is dealt in on load (three cards from below, a soft landing, a gloss) with a
+quiet synthesized "deal" sound that follows the swipe-sounds switch. Files `site/scripts/deck-intro.js`, `INTRO_CUE` in
+`site/scripts/notify-sound.js`, `.deck-intro-gloss` in `site/styles/deck.css`; test `tests/unit/deck-intro.test.mjs`.
+New dependency: `gsap` 3.15.1 (core only). More motion ideas: the launch-ux checklist M1-M11 plus the D-164 PR notes.
 
 **2026-11-04, D-157:** long-press (or right-click / Enter) a chat bubble: Copy, Edit (15 min, plain text), Unsend (for
 both, any time), Delete for me. Files `site/scripts/message-actions.js`, `site/styles/message-actions.css`; tests
@@ -62,7 +80,9 @@ You're hiring → Add a role); their deck card's bar reads "HIRING · ROLE" and 
 member whose Looking for is Job Referral, Internship Referral or Job Opportunities says which roles they're open to
 (private to hirers by default) and gets the role strip, a deck lift (1 in 5), a once-a-day notification and the
 Hiring lens; "Ask about this role" is a signal with a note and the role tag, answered in the request sheet. **Owed:
-apply `0037_hiring.sql`** (README "0037"); until then the client hides all of it. Spec
+apply `0037_hiring.sql`** (README "0037"), **then `0047_hiring_test_world.sql`, then `0048_hiring_people.sql`, then `0049_hiring_anywhere.sql`, then `0050_hiring_open_world.sql` (D-171: seeded roles for everyone while the open test world is on), then
+`supabase/seed/hiring-test-members.sql`** and the `brivia_tester` insert for the founder (seed README, D-162); until 0037 the
+client hides all of it, including the Hiring toggle beside Curated / Nearby. Spec
 `docs/superpowers/specs/2026-11-02-hiring-design.md`, engine lane ORBIT_ENGINE.md §12, moderation MODERATION.md.
 
 **2026-11-03, D-140:** any city in the world (0035, `geo_city`, 156k rows imported with pg_net from the site's

@@ -77,6 +77,7 @@ delete from public.community_posts where author_id in (select id from _purge_ids
 delete from public.brivia_blocks where blocker_id in (select id from _purge_ids) or blocked_id in (select id from _purge_ids);
 delete from public.matches where user1_id in (select id from _purge_ids) or user2_id in (select id from _purge_ids);
 delete from public.connection_requests where from_id in (select id from _purge_ids) or to_id in (select id from _purge_ids);
+-- Their hiring rows (0037: hiring_role, role_intent, role_ask; seeded by hiring-test-members.sql) go with the profile (on delete cascade).
 delete from public.profiles where id in (select id from _purge_ids);
 delete from auth.identities where user_id in (select id from _purge_ids);
 delete from auth.users where id in (select id from _purge_ids);

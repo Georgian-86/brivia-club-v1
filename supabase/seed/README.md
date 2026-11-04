@@ -104,6 +104,26 @@ twice, checks all of this (counts, roles, the deck order for each city's first m
 invisible, the far match absent from the deck but found by search, and that a real member sees nothing and cannot
 request or message them), purges, and checks 0 rows remain.
 
+## Hiring test profiles (D-162)
+
+`hiring-test-members.sql` gives 12 seeded members 14 open roles (invented companies, realistic titles: Robotics Software
+Engineer in Thane, Backend Engineer and Brand Marketing Manager in Mumbai, Product Manager and DevOps Engineer in
+Bengaluru, Senior Data Engineer in Pune, Data Analyst in Delhi, a few remote roles) and 6 seeded seekers a findable
+"Roles I'm open to". The test world sees them (migrations `0047`, `0050`): while `open_test_world` is on that is every
+member (D-171); with it off, add your account as a tester first (above).
+
+1. Apply `0037_hiring.sql`, then `0047_hiring_test_world.sql`, then `0048_hiring_people.sql`, then
+   `0049_hiring_anywhere.sql`, then `0050_hiring_open_world.sql` (migrations README).
+2. Run `test-members.sql` if the test members are not there yet, then run `hiring-test-members.sql` (safe to re-run:
+   it reopens every seeded role for 30 days). It stops with a clear message if 0037, 0047 or the members are missing.
+3. With `open_test_world` off, run the `brivia_tester` insert above with your email. Then reload the app.
+
+To test as a seeker: Profile → Looking for → Job Opportunities, save the roles you're open to (for example Robotics
+Software Engineer, mid, on-site), then use the Hiring toggle on Connect. As a hirer: post a role (Profile → You're
+hiring); seekers such as Siddhi Joshi (Thane) appear as suggestions. Seeded members never reply, so an ask stays
+"Asked". Verify: `select count(*) from public.hiring_role where id::text like 'a7e57000-0000-4000-9000-%';` (14).
+The purge removes all of it (deleting the seeded profiles cascades to their roles, intents and asks).
+
 ## Purge before launch
 
 Paste `supabase/seed/purge-test-members.sql` into the SQL editor and Run (as `postgres`). It is one transaction and prints

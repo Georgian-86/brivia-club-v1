@@ -1,4 +1,4 @@
-// Sends a confirmed registration's ticket once (D-166). Used by event-ticket (free events), razorpay-verify and
+// Sends a confirmed registration's ticket once (D-177). Used by event-ticket (free events), razorpay-verify and
 // razorpay-webhook (paid events, after confirm_event_payment). admin: a service-role client.
 //
 // Once only: the row is claimed with UPDATE ... WHERE ticket_sent_at IS NULL (and status = 'confirmed'), so concurrent

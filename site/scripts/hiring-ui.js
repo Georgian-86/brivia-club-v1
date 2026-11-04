@@ -548,10 +548,19 @@ export const createHiring = (deps) => {
     }));
   };
   // The Hiring lens: a seeker sees only hirers whose roles fit; anyone else, everyone who is hiring.
-  const lensLabel = () => (isSeeker() ? 'Hiring for roles like mine' : 'Only people who are hiring');
+  // D-169: the lens shows everyone who is hiring (roles that fit come first in hiring_people's order).
+  const lensLabel = () => 'Only people who are hiring';
+  // hiring_people (0048): members with a live role, nearest first. null when the RPC is not there yet.
+  const findPeople = async () => {
+    await boot();
+    if (!state.available) return null;
+    const { data, error } = await rpc('hiring_people', { p_limit: 200 });
+    if (error) return null;
+    return data || [];
+  };
   const matchesLens = (person) => {
     const hiring = hiringOf(person?.id);
-    return Boolean(hiring && (isSeeker() ? hiring.fits : true));
+    return Boolean(hiring);
   };
   const suggestionIds = () => state.suggestions.map((s) => String(s.id));
   const reportFakeJob = async (personId, note) => {
@@ -563,7 +572,7 @@ export const createHiring = (deps) => {
   return {
     state, boot, ensure, hiringOf, decorateCard, decorateProfile, renderOwnCard, bindOwnCard, openRoleSheet, openIntentSheet,
     openAskSheet, afterLookingForSaved, requestRoleTitle, refreshAsks, notificationHtml, notificationCount, bindNotifications,
-    lensLabel, matchesLens, suggestionIds, reportFakeJob, available: () => state.available === true, isSeeker, isHirer,
+    lensLabel, matchesLens, findPeople, suggestionIds, reportFakeJob, available: () => state.available === true, isSeeker, isHirer,
     reloadMine,
   };
 };

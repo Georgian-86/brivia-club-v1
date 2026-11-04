@@ -1,4 +1,4 @@
--- 0047 (D-166): ticket and payment columns on event_rsvp.
+-- 0051 (D-177): ticket and payment columns on event_rsvp.
 -- T1 the columns exist; members still have no policy to read or write event_rsvp rows directly (RLS on, no policy).
 -- T2 a ticket code must be BRV- and six of A-Z / 2-9; one hold per Razorpay order; one row per ticket code.
 set brivia.harness_autocomplete = 'off';

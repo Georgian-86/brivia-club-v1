@@ -316,7 +316,7 @@ const registrationMarkup = (event, friends = []) => {
   } else if (state === 'confirmed') {
     action = '<span class="event-registered" role="status">Registered <span aria-hidden="true">✓</span></span>';
   } else if (state === 'pending') {
-    // D-166: the hold can be paid from here (Razorpay); the seat is confirmed by the server once payment succeeds.
+    // D-177: the hold can be paid from here (Razorpay); the seat is confirmed by the server once payment succeeds.
     action = `<button type="button" class="event-going-toggle is-primary" data-event-pay>Complete payment · ${escapeHtml(feeLabel(event.feeInr))}</button>`;
     note = 'Your seat is held for 30 minutes. It is confirmed, and your ticket emailed, as soon as payment succeeds.';
   } else if (state === 'full') {

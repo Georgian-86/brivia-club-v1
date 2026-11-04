@@ -1,4 +1,4 @@
-// The Brivia deck ritual (D-162, founder 2026-11-04: "the signature card deck experience").
+// The Brivia deck ritual (D-173, founder 2026-11-04: "the signature card deck experience").
 //   intro     Connect opens: card backs glide in from different directions, settle into a Solitaire-style stack, and the
 //             top one rises into the live profile card. Once per visit (a browser session), not on every return.
 //   complete  the daily free swipes are used (the server's quota, never a timer): the deck spreads, gathers back in a
@@ -16,7 +16,7 @@ export const RITUAL = Object.freeze({
   introDur: 680,        // ms per back's flight
   riseGap: 70,          // ms after the last back lands before the top one rises
   riseDur: 460,         // ms: the top back becomes the live card
-  // D-163 (founder: "shuffle fast, just like Solitaire"): a quick fan, two fast riffles with a cut between, a snap square.
+  // D-174 (founder: "shuffle fast, just like Solitaire"): a quick fan, two fast riffles with a cut between, a snap square.
   completeSpread: 200,  // ms: the deck fans out
   gatherStagger: 30,    // ms between backs dropping in, riffled
   gatherDur: 260,       // ms per back's flight to the centre

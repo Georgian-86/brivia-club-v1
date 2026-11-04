@@ -3249,7 +3249,177 @@ controls (a tester or a seeded test member), never a real member, so no new expo
   box: the deck's "You're caught up", Nearby's "It's a little quiet around here" / "Nearby opens soon", Companions,
   Explore's empty events and Notes' "Start the conversation". Supersedes D-159's plain paper for the caught-up box.
 
-## D-162 (2026-11-04): the signature deck ritual (intro deal, daily-cap shuffle, deck sounds)
+## D-162 (2026-11-04): a one-tap Hiring toggle on Connect; seeded hirers only for testers
+
+- **Asked:** "i need a toggle button so that it is easy for the users to search for hiring people. Also for sometime
+  add some real looking profiles who are hiring so that the feature can be tested end to end".
+- **Done:** a "Hiring" pill beside Curated / Nearby (`#hiring-toggle`, 50 px like the switch it sits beside,
+  `aria-pressed`, deep wine when on). It is the same Hiring lens as the drawer switch, kept in sync both ways, shown
+  only once hiring is live. `supabase/seed/hiring-test-members.sql`: 12 seeded hirers, 14 roles at invented
+  companies, 6 findable seekers, idempotent with fixed ids, removed by the purge.
+- **Why the gate (0047):** `open_test_world` is on live, so real members see seeded members; a seeded Hiring banner
+  would be a job that does not exist, the same harm D-156 refused for seeded photos. Seeded roles and intents are
+  shown only to the strict test world (seeded members and `brivia_tester` accounts), and real members cannot ask about
+  them. Seeded members skip the photo and 14-day parts of the hiring bar, since they never carry a photo.
+- **Not done:** seeded members' Looking for is unchanged (no "Hiring" tag a real member could see).
+
+## D-164 (2026-11-04): the deck is dealt in, with a soft "deal" sound
+
+- **Asked:** "design an animation for the cards coming and stacking with a sound while the connection curated page is
+  loaded ... super smooth and professionally designed ... not a very large time span, just it should catch the
+  attention". Skills named: GSAP skill pack, Animate, Claude Motion Graphics, Impeccable. None of the four is installed in
+  this repo or session (`.claude/skills/` has frontend-design and ui-ux-pro-max); built with GSAP's own best practices.
+- **Motion (`site/scripts/deck-intro.js`, GSAP 3.15.1 core only):** once per page load, the first time real people are
+  on the deck, and again when switching Nearby back to Curated. The back layer is dealt in from the lower left, the next
+  layer from the lower right (90 ms later), the top card straight up last (180 ms) with a small overshoot; the stack
+  gives 4 px under it and recovers; one soft light band crosses the top card; Pass / Pitch and the hint rise in. About
+  0.9 s of motion, 1.2 s in all. Transforms and opacity only; every inline style is cleared at the end so deck-swipe.js
+  owns the card again. Any tap, click or key finishes it at once. The timeline starts on the second frame after render
+  and lag smoothing is 100 ms, so a slow frame slows the deal instead of skipping it. The deck tutorial waits for it.
+- **Sound (`INTRO_CUE` in notify-sound.js):** three soft card taps (filtered noise over a low thump) in step with the
+  three cards, then a two-note bell, B-flat to F (the kit's key), on the landing. About 1.1 s, quieter than the swipe
+  cues. It follows the existing "swipe sounds" switch and the volume slider in Settings (that is the mute). Browsers
+  allow sound only after the member's first tap on the page, so a cold reload is silent unless the browser already
+  allows audio (`userActivation.hasBeenActive`, `getAutoplayPolicy`); the Curated tap always has sound.
+- **Reduced motion:** no travel, rotation, gloss or sound; the cards and controls fade in over 150 ms.
+- **Not chosen:** a bundled audio file (the kit is synthesized, no downloads); animating the headline (it is already on
+  screen while the deck loads, so moving it later reads as a glitch); replaying on every tab return (gets tiring).
+- **Proof:** unit 510 (tests/unit/deck-intro.test.mjs: timing, sound-to-motion sync, once-only rule, autoplay rules,
+  mute); frame-exact captures at 390 and 1440 with Playwright's clock; swipe after the intro still works.
+
+## D-165 (2026-11-04): the motion moments after the deal
+
+- **Asked:** "this animation is good to go now work with other suggested animations" (the "Where motion fits next"
+  list: N1-N10, on top of the launch-ux checklist's M1-M11).
+- **Built (`site/scripts/motion-moments.js`, `site/styles/motion.css`):**
+  - **N1 It's mutual:** a dialog when a signal comes back `matched`: both avatars glide in and touch, one wine ring
+    pulses out, "You and X / both said yes.", the shared interests pop in, Say hi (opens the chat) / Keep exploring.
+    About 1.4 s; Escape, the backdrop or either button closes it; focus stays inside. The existing toast still shows
+    under it (it is the live-region sentence). Sound: the notify horn, under the notification-sound switch.
+  - **N2 Pitch sent:** a small wine letter flies from the card in an arc to the Chat tab, which pops once. ~0.8 s.
+    Founder, same day: "dont send the animation that goes to notification ... should go to the messages section".
+  - **N3 Caught up:** when the last card is swiped away, the "You're caught up" box turns in (a Y-axis flip).
+  - **N5 Tilt (desktop, fine pointer only):** the top card leans up to 4 degrees towards the cursor with a soft light,
+    through the CSS `rotate` property so it composes with deck-swipe.js's inline transform; off while dragging, during
+    the deal and under reduced motion.
+  - **N6:** a new card's "You both" chips catch the light once.
+  - **N7 (M9):** the Curated / Nearby pill slides from the option the member left.
+  - **N8:** while Nearby loads, a slow radar sweep crosses the waiting card (the empty state already had rings).
+  - **N9:** a chat bubble that was not on screen at the last render of that chat rises in (no replay on open).
+  - **N10:** event cards (first 8 per render) fade up and their covers settle from 1.06x as they scroll into view.
+  - **Not built:** N4 (Passion Budget fill) waits for the profile redesign. The accept-a-request path keeps its review
+    sheet outcome (the moment shows for deck pitches and event hellos).
+- **D-164 fix found by the deck e2e:** the deal skipped to its end on any pointerdown, which moved a button out from
+  under a press and lost the click ("Why this person?" during the deal). A press on a button or link now skips on
+  release; a press elsewhere (a drag) still skips at once. `tests/e2e/deck.spec.mjs` waits for the deal to end
+  before its layout checks (it measures the resting stack).
+- **Proof:** unit 513 (`tests/unit/motion-moments.test.mjs`); deck e2e 201/201 (main 201/201); screenshots of N1 and
+  N2 at 390 and 1440 with the stubbed Supabase.
+
+## D-166 (2026-11-04): the Hiring toggle moves beside the filter button, as a quick-filter switch
+
+- **Asked:** "the toggle button is not looking good. Seach for a good spot to fit the button and redesign it
+  professionally" (ui-ux-pro-max).
+- **Done:** the D-162 pill sat in the Curated / Nearby row, a second wine block with the same weight as a mode that
+  read as a third mode. It is a filter, so it now sits beside the discovery-filter button (`.home-tools`), where the two
+  read as one filter group, and the Curated / Nearby switch keeps its full width on phones. It is a `role="switch"`
+  with `aria-checked`: briefcase, "Hiring" in the body font at 14 px, and a 30 × 18 track. Off it uses the filter
+  button's cream-and-wine frame, and on it fills deep wine with a cream knob, like the filter button when its drawer
+  is open. It is 44 px tall and adds no height to the deck.
+
+## D-167 (2026-11-04): "It's mutual" for every new match, not only the one my swipe completes
+
+- **Reported:** "the mutual match animation is not working in live site". D-165 played it only when my own signal
+  came back `matched`. On live, most matches are made the other way: I accept a request in the review sheet, or the
+  other member accepts mine. Neither path showed it, and the review sheet is a modal `<dialog>` (top layer), so a fixed
+  div could not have covered it anyway.
+- **Now:** the moment is itself a modal `<dialog>`, so it shows above any sheet. It plays once per match per device:
+  when my signal completes it, when I accept a request (Say hi closes the sheet and opens the chat; Keep exploring
+  returns to the sheet), when the ~30 s connection sync finds a match the other member completed, and at the next load
+  for a match made while I was away (one moment, not a queue). The ids already celebrated live in
+  `brivia:mutual-seen:<member id>` (localStorage); the first visit on a device takes the existing matches as the
+  baseline, so old matches never replay. Nearby keeps its own match dialog (those ids are marked seen).
+- **Proof:** `tests/e2e/mutual-moment.spec.mjs` (new: baseline, other member accepts, made while away, no replay);
+  `collab-requests.spec.mjs` now expects the moment over the sheet; deck 201/201, app-shell 214/214, sounds, hiring pass.
+
+## D-168 (2026-11-04): four motion moments that did not play on live, fixed
+
+- **Asked:** "check other animations work perfectly in the live site". A frame-by-frame walk-through of every moment
+  (`tests/e2e/motion.spec.mjs`, new) found four that never showed in real use:
+  - **N6 "You both" shimmer:** the deck redraws the card several times while data arrives; the next draw replaced the
+    chips and wiped the shimmer. `renderCardChips` now keeps the same chips (keyed by person and chip labels).
+  - **N2 letter on desktop:** it aimed at the Chat link's icon, which the desktop header hides (width 0), so it never
+    flew. It now aims at the visible icon (phone tab bar) or else the Chat link, and looks for it over ~0.6 s while the
+    pitch sheet closes.
+  - **N3 caught-up flip:** the box often shows a moment later (when `deck_status` answers), by which point "the last
+    render had a card" was already false. That flag is now kept until the box really shows.
+  - **N7 sliding pill:** `setView` re-placed the pills on the next frame, which killed the slide. A plain re-place
+    now leaves a running slide alone.
+- **Proof:** motion.spec 10/10 (deal-in, shimmer, tilt, letter + Chat pop, flip, pill, radar, mutual, bubble, events);
+  deck 201/201, app-shell 214/214, collab-requests, mutual-moment, sounds, deck-tutorial, events, nearby, work-identity
+  pass; unit 513.
+
+## D-169 (2026-11-04): the Hiring switch searches everyone who is hiring
+
+- **Asked:** "still no one in hiring even though the new script is successful" (a tester, 16 open roles, with
+  "Roles I'm open to" saved).
+- **Cause:** the lens (D-141) only filtered the cards already loaded in the deck, and for a member with an intent it
+  kept only roles that fit (0.5 or more). The seeded roles were neither loaded nor a fit, so the switch showed no one.
+- **Done:** migration 0048 adds `hiring_people(limit)`: members with a shown role whom the caller can see, roles that
+  fit first, then nearest (own rings, then the nearest place), no distance cut (search reaches everyone), the
+  distance band only, never a matched member or one with a live request from the caller, at most 50. Turning the
+  switch on loads those cards to the front of the deck. The lens now keeps everyone hiring for every member ("Only
+  people who are hiring"); fit only orders. With the switch alone on and no one hiring, the deck says "No one is
+  hiring near you yet." Before 0048 the switch falls back to the loaded deck.
+
+## D-170 (2026-11-04): hiring matches are not cut by distance
+
+- **Asked:** "make the hiring match not use the location. Ofc show the nearest first but show all the vacancies".
+- **Done (0049):** `hiring_suggestions` (the deck lift and the "someone near you is hiring" row) drops the ~10 km /
+  60 km admission; who is suggested still needs a fit of 0.5 or more, and the nearest come first. `hiring_people` (the
+  Hiring switch) returns up to 200 hirers (was 50), nearest first with fit breaking ties (was fit first). Both answer
+  the distance band only.
+- **Scope:** the founder's override of CLAUDE.md rule 4 ("far-away recommendations are earned") for the hiring lane
+  only. The connection deck (`deck_candidates`, the Escape-Velocity gate) is unchanged. Supersedes D-169's order.
+
+## D-171 (2026-11-04): seeded hiring posts follow the open test world
+
+- **Asked:** "im testing with yashika's account. I want everyone to show all the hiring posts just the nearest location
+  first".
+- **Found:** the account under test was not a `brivia_tester`, so 0047 hid every seeded role from it, although
+  `open_test_world` already shows it the seeded members themselves.
+- **Done (0050):** `brivia_hiring_seen_by` uses `brivia_in_test_world` (the deck's own world rule). While the open test
+  world is on, every member sees all seeded roles and seeded "Open to roles", nearest first (D-170); switching
+  `open_test_world` off hides them from everyone but testers. Real members' roles are unchanged.
+- **Trade-off:** supersedes D-162's "only testers": real members can now see, and ask about, seeded roles at invented
+  companies while the world is open. The founder's call for the test phase; turn the world off before a real launch.
+
+## D-172 (2026-11-04): the profile hero's text fits beside the photo card
+
+- **Asked:** "fix the overflow of the text in the mobile view for the bio. Make it look professionally designed", with
+  a 390 px screenshot where the work line ("Talent Acquisition at Stealth Startup") ran under the photo card and the
+  name ended in an ellipsis after a few letters.
+- **Cause:** the work line was a nowrap line in a flex column that sized it to its own text, so its ellipsis never
+  applied; the bio's 3-line clamp was undone by an `overflow: visible` rule and a later 20 px size on phones.
+- **Done (`site/styles/profile-hero.css`, CSS only):** the work line wraps to 2 lines inside the column (logo on the
+  first line); the name wraps, balanced, to 2 lines at most, and a name that fits stays on one line (D-098's one-line
+  check for "georgian-86" still holds); the area is one line; the bio is 3 lines at most with an ellipsis (the whole bio
+  is in About). Type scale: 1440 name 40-64 px, work 15 px, area 20 px, bio 18 px italic; phones name 24-32 px, work
+  13 px, area 16 px, bio 14 px italic. The phone photo card is a little slimmer (32vw, 112-160 px, was 36vw, 124-172 px)
+  so the column has room. Supersedes D-098's "the name on one line" for names that do not fit.
+- **Readable on every cover (founder: "make sure it is readable"):** the neutral ink shade under the text column is
+  denser (76-80% at the left, fading out before the photo card; still no maroon wash, D-113) and the copy has a tight
+  shadow. Measured against all 25 covers at 390 and 1440, cream text over the 90th-percentile background pixel: 5.0:1
+  or better everywhere (was as low as 2.2:1 on the lightest covers).
+- **Check:** `tests/e2e/profile-hero.spec.mjs`.
+
+## Renumbering note (2026-11-05)
+
+Two sessions logged decisions in parallel on 2026-11-04. The entries below were written as D-162 to D-166 on branch
+`claude/eloquent-ramanujan-w942g9` while `main` used those numbers for other decisions; they are kept here as
+D-173 to D-177 (same order and wording), and their migration 0047 is 0051. Founder, 2026-11-05: Connect opens with the
+D-164 deal (`deck-intro.js`); D-173's own intro deal is not used, only its daily-limit shuffle.
+## D-173 (2026-11-04): the signature deck ritual (intro deal, daily-cap shuffle, deck sounds)
 
 - **Asked:** a Solitaire-inspired, cinematic deck on Connect: the deck assembles on arrival and the top card rises into
   the live profile; Pass sinks left, Pitch lifts right; when the daily free swipes are used the deck spreads, gathers,
@@ -3281,16 +3451,16 @@ controls (a tester or a seeded test member), never a real member, so no new expo
   onboarding 269. The app-stub counts passes as swipes with `passesUseSwipes` and marks the intro played unless a spec
   sets `deckRitual`.
 
-## D-163 (2026-11-04): the daily-cap shuffle is fast, like Solitaire
+## D-174 (2026-11-04): the daily-cap shuffle is fast, like Solitaire
 
 - **Asked:** "make the cards shuffle too fast just like they do in the solitaire game".
 - **Done:** the completion is now a quick fan (0.2 s), a fast riffle (cards drop 30 ms apart, 0.26 s each, a crisp
   ease with no overshoot), a cut (top half right, bottom half left, 0.15 s), a second riffle, then a snap square-up.
   The cards are squared by 1.1 s and the message shows by 1.6 s (was about 2.3 s). The `complete` cue follows: a quicker
   falling arpeggio and light riffle ticks, one per card across both riffles, then the same closing horn line. The
-  intro deal is unchanged. Supersedes D-162's 1.5-2.5 s target for the shuffle.
+  intro deal is unchanged. Supersedes D-173's 1.5-2.5 s target for the shuffle.
 
-## D-164 (2026-11-04): the Connect profile card on the warm pink blush
+## D-175 (2026-11-04): the Connect profile card on the warm pink blush
 
 - **Asked:** "change the color of these profile cards acc to our gradient".
 - **Done:** new token `--aura-blush-card` (deepest blush low left under the name and chips, a softer blush right, a
@@ -3298,12 +3468,12 @@ controls (a tester or a seeded test member), never a real member, so no new expo
   under it; the avatar ring matches; the chips are frosted cream with a hairline. The wine title bar, cover, layout and
   View profile are unchanged. Dark ink on the blush stays well above WCAG AA.
 
-## D-165 (2026-11-04): the landing's START SWIPING sits lower on phones
+## D-176 (2026-11-04): the landing's START SWIPING sits lower on phones
 
 - **Asked:** "move the start swiping button little down". On phones it sat 9 px from the top edge; it is now 12 px
   lower (a transform, so the header's layout is unchanged). Desktop is unchanged.
 
-## D-166 (2026-11-04): Razorpay payments for paid events; an emailed invitation ticket; a ticket sound
+## D-177 (2026-11-04): Razorpay payments for paid events; an emailed invitation ticket; a ticket sound
 
 - **Asked:** "when a user registers for an event after making payment, a music effect should come and the user should
   get his ticket of the event on his mail with some aesthetic theme colored invitation". There was no payment gateway
@@ -3323,7 +3493,7 @@ controls (a tester or a seeded test member), never a real member, so no new expo
   played on confirmation; same Settings switch as the swipe and deck sounds.
 - **Code:** `supabase/functions/{razorpay-order,razorpay-verify,razorpay-webhook,event-ticket}`, shared
   `_shared/{razorpay.js,ticket-email.js,send-ticket.ts,http.ts}` (the .js files are unit-tested in Node);
-  `site/scripts/payment-checkout.js`; migration 0047. Setup steps: migrations README "0047".
+  `site/scripts/payment-checkout.js`; migration 0051. Setup steps: migrations README "0051".
 - **Proof:** unit 525 (signatures against Node's HMAC, tampering, amounts, hold window, email content and escaping,
   https-only links, the .ics, Checkout options, the cue); SQL harness (zb-event-tickets); e2e `event-payment.spec.mjs`
   EP1-EP6 (17 checks), events 75, create-event 151, companions 65. The Deno functions were not run here (no Deno in

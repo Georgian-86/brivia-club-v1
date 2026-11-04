@@ -1302,7 +1302,38 @@ Members still have no UPDATE or DELETE policy on `brivia_messages`. Verify:
 
 ## 0047
 
-**Razorpay payments and emailed tickets (D-166).** Not applied yet.
+**Seeded hirers stay in the test world (D-162).** Apply after `0037` (it redefines four 0037 functions; it fails if
+0037 is missing). Adds the owner-only helper `brivia_hiring_seen_by(viewer, member)` and redefines
+`brivia_hiring_bar` (a seeded member skips the photo and 14-day parts), `brivia_role_shown`, `member_open_to` and
+`hiring_suggestions` so a seeded member's role or "Open to roles" is shown only to testers. No new RPC, no grant change.
+Then run `supabase/seed/hiring-test-members.sql` (seed README, "Hiring test profiles"). Verify:
+`select has_function_privilege('authenticated', 'public.brivia_hiring_seen_by(uuid, uuid)', 'execute');` (f);
+`select public.brivia_hiring_seen_by(null, 'a7e57000-0000-4000-8000-000000000040');` (f once the seed exists).
+
+## 0048
+
+**The Hiring switch finds everyone who is hiring (D-169).** Apply after `0047`. Adds `hiring_people(limit)`
+(authenticated): members with a shown role whom the caller can see, roles that fit first, then nearest, distance band
+only. The client works either way (before 0048 the switch filters the loaded deck only). Verify:
+`select has_function_privilege('authenticated', 'public.hiring_people(int)', 'execute');` (t);
+`select has_function_privilege('anon', 'public.hiring_people(int)', 'execute');` (f).
+
+## 0049
+
+**Hiring matches at any distance (D-170).** Apply after `0048`. Redefines `hiring_suggestions` (no 60 km / ~10 km
+admission; fit 0.5 or more still decides; nearest first) and `hiring_people` (up to 200, nearest first). No grant
+change. Verify: `select pg_get_functiondef('public.hiring_suggestions(int)'::regprocedure) like '%place_km <= 60%';` (f).
+
+## 0050
+
+**Seeded hiring posts follow the open test world (D-171).** Apply after `0047`. Redefines `brivia_hiring_seen_by` to use
+`brivia_in_test_world` instead of `brivia_tester_world`: while `open_test_world` is on, every member sees the seeded
+roles and seeded "Open to roles" (nearest first, like real ones); with it off, only testers do. No grant change.
+Verify: `select pg_get_functiondef('public.brivia_hiring_seen_by(uuid,uuid)'::regprocedure) like '%brivia_in_test_world%';` (t).
+
+## 0051
+
+**Razorpay payments and emailed tickets (D-177).** Not applied yet. Apply after `0050`.
 Adds `event_rsvp.payment_order_id`, `ticket_code` (BRV-XXXXXX) and `ticket_sent_at`, with a unique index on each of the
 first two. Members still have no direct access to `event_rsvp` (RLS on, no policy); four Edge Functions do the work with
 the service role. Apply with the client deploy; until the functions and secrets are in, Reserve keeps the 30-minute
@@ -1316,7 +1347,7 @@ Setup, in this order (only the founder can do 1-3: they are accounts, keys and D
    `payment.captured` and `order.paid`, and a webhook secret of your choice. Payment capture: automatic (the default).
 3. **Supabase > Edge Functions > Secrets**: `RAZORPAY_KEY_ID`, `RAZORPAY_KEY_SECRET`, `RAZORPAY_WEBHOOK_SECRET`,
    `RESEND_API_KEY`, and optionally `TICKET_FROM` (default `The Brivia Club <tickets@thebriviaclub.live>`).
-4. Apply `0047`, then deploy the functions `event-ticket`, `razorpay-order`, `razorpay-verify` (JWT verification on) and
+4. Apply `0051`, then deploy the functions `event-ticket`, `razorpay-order`, `razorpay-verify` (JWT verification on) and
    `razorpay-webhook` (**JWT verification off**: Razorpay sends no Supabase token; the function checks Razorpay's
    signature on every request). Each imports `../_shared/`.
 5. Test with Razorpay's test cards/UPI on a paid event: the seat turns Registered, the ticket email arrives with the

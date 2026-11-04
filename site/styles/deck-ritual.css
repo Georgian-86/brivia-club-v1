@@ -1,4 +1,4 @@
-/* The deck ritual (D-162): the card backs that assemble on arrival and reshuffle when the day's swipes are used.
+/* The deck ritual (D-173): the card backs that assemble on arrival and reshuffle when the day's swipes are used.
    Tokens only (tokens.css): no raw colours, no font stacks. The profile card is never restyled here; the stack only
    hides it (opacity / visibility, so it keeps its size) while the backs move, and shows it again. */
 

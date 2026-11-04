@@ -1,4 +1,4 @@
-// razorpay-verify (D-166): Checkout's success handler posts { razorpay_order_id, razorpay_payment_id,
+// razorpay-verify (D-177): Checkout's success handler posts { razorpay_order_id, razorpay_payment_id,
 // razorpay_signature }. The signature is checked with the key secret; the order must be the caller's own hold; then
 // confirm_event_payment (0022, service role only) confirms the seat and the ticket is emailed. If the hold had expired
 // and the seat was taken meanwhile, the payment is refunded at once. Idempotent: razorpay-webhook may get there first.

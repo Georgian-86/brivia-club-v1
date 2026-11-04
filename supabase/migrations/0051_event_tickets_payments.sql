@@ -1,8 +1,8 @@
 set lock_timeout = '5s';
--- 0047_event_tickets_payments.sql: Razorpay payments for paid events and an emailed invitation ticket for every
--- confirmed registration (founder request 2026-11-04, D-166: "when a user registers for an event after making payment,
+-- 0051_event_tickets_payments.sql: Razorpay payments for paid events and an emailed invitation ticket for every
+-- confirmed registration (founder request 2026-11-04, D-177: "when a user registers for an event after making payment,
 -- a music effect should come and the user should get his ticket of the event on his mail with some aesthetic theme
--- colored invitation"; gateway: Razorpay; email: Resend). Applied after 0046 (README "## 0047"). 0001-0046 are frozen.
+-- colored invitation"; gateway: Razorpay; email: Resend). Applied after 0050 (README "## 0051"). 0001-0050 are frozen.
 --
 -- The money and the email are handled by Edge Functions (service role): razorpay-order, razorpay-verify,
 -- razorpay-webhook and event-ticket. This migration only gives them the columns they need on event_rsvp:

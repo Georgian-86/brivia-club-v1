@@ -1,4 +1,4 @@
-// Event payments and tickets (D-166), against stubbed Supabase and a stand-in for Razorpay Checkout.
+// Event payments and tickets (D-177), against stubbed Supabase and a stand-in for Razorpay Checkout.
 // PLAYWRIGHT_MODULE=/path/to/playwright/index.mjs node tests/e2e/event-payment.spec.mjs   (Vite on :5188)
 // EP1 Reserve on a paid event holds the seat, asks razorpay-order for the order, and opens Checkout with the server's
 //     order id, key and amount, in the club wine.
