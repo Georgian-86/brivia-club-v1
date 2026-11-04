@@ -1,4 +1,4 @@
-// D-163: pure parts of the motion moments (site/scripts/motion-moments.js). Run: npm run test:unit
+// D-165: pure parts of the motion moments (site/scripts/motion-moments.js). Run: npm run test:unit
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { MOMENTS, tiltFor, arrivalsBetween } from '../../site/scripts/motion-moments.js';

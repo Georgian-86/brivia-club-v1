@@ -190,7 +190,7 @@ export const renderCue = (ctx, dest, cue, t0 = 0) => {
   if (cue.sparkle) sine(ctx, bus, cue.sparkle, t0);
 };
 
-// D-162: the deck's arrival cue, "the deal". Not the horn: three soft card taps as the stack is dealt (a felt-tipped
+// D-164: the deck's arrival cue, "the deal". Not the horn: three soft card taps as the stack is dealt (a felt-tipped
 // click of filtered noise over a small low thump), then a warm two-note bell, B-flat up to F (the kit's key), that
 // rings out under the gloss. Quieter than the swipe cues and about 1.1 s long. Times match deck-intro.js INTRO.
 export const INTRO_CUE = Object.freeze({
@@ -377,7 +377,7 @@ export const createSoundKit = ({
     lastCue[name] = t;
     return play(name);
   };
-  // D-162: the deck's arrival. Follows the swipe-sounds switch and the volume. Browsers only let a page make sound
+  // D-164: the deck's arrival. Follows the swipe-sounds switch and the volume. Browsers only let a page make sound
   // after the member's first tap, click or key on it, so on a fresh reload the arrival is silent unless this page was
   // already allowed (unlockIfAllowed); after any tap (Curated / Nearby, Try again, sign-in on this page) it plays.
   const intro = () => play('intro');

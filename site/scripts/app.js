@@ -103,7 +103,7 @@ import '../styles/chat-layout.css';
 import '../styles/app-polish.css';
 // The compact deck without side buttons, and its first-run tutorial (D-094). Loads last.
 import '../styles/deck-compact.css';
-import '../styles/motion.css';  // D-163: mutual moment, pitch letter, tilt, shimmer, sliding pill, radar, bubbles
+import '../styles/motion.css';  // D-165: mutual moment, pitch letter, tilt, shimmer, sliding pill, radar, bubbles
 import '../styles/collab-requests.css';  // D-108: the request section and review sheet
 import '../styles/emoji-field.css';  // D-113: the emoji panel under the Edit profile bio
 import '../styles/work-identity.css';  // D-140: company line and picker
@@ -259,8 +259,8 @@ let messageSyncTimer = null;
 let connectionSyncTick = 0;
 const overlayIds = ['pitch-modal'];
 let deckTutorialTimer = 0; // offerDeckTutorial (D-094)
-const deckIntro = { played: false, running: null }; // maybePlayDeckIntro (D-162)
-let homeHadCard = false; // D-163 N3: the deck showed a card on its last render
+const deckIntro = { played: false, running: null }; // maybePlayDeckIntro (D-164)
+let homeHadCard = false; // D-165 N3: the deck showed a card on its last render
 const hiddenChatsStorageKey = () => `brivia-hidden-chats:${memberProfile.id || 'anonymous'}`;
 const readHiddenChatIds = () => {
   try {
@@ -1101,7 +1101,7 @@ const openConnectMode = (mode) => {
   window.history.pushState({ ...(window.history.state || {}), appView: view }, '', next.pathname + next.search);
   setView(view);
   const target = document.querySelector(`[data-view="${view === 'nearby' ? 'nearby' : 'home'}"] [data-connect-mode="${mode}"]`);
-  // D-163 (N7): the pill slides over from the option the member left.
+  // D-165 (N7): the pill slides over from the option the member left.
   slideModePill(target?.closest('.connect-mode'), { fromIndex: modes.indexOf(mode === 'nearby' ? 'curated' : 'nearby') });
   target?.focus({ preventScroll: true });
 };
@@ -1319,7 +1319,7 @@ const setView = (view) => {
   document.querySelectorAll('[data-nav]').forEach((button) => button.classList.toggle('is-active', button.dataset.nav === view));
   markCurrentNav(document, view);
   if (previousView === 'chat' || view === 'chat') { try { scheduleRowTyping(); } catch { /* best-effort */ } }
-  // D-162: Nearby back to Curated deals the deck again (the member's tap also lets the sound play).
+  // D-164: Nearby back to Curated deals the deck again (the member's tap also lets the sound play).
   if (view === 'explore' && previousView === 'nearby') deckIntro.played = false;
   if (view === 'explore') renderExplore();
   if (view === 'home' || view === 'explore') offerDeckTutorial();
@@ -1595,7 +1595,7 @@ const renderHome = (queue = getExplorePeople()) => {
     hint?.setAttribute('hidden', '');
     limitState?.setAttribute('hidden', '');
     if (emptyState) renderDeckEmpty(emptyState);
-    // D-163 (N3): the last card was just swiped away: the reason turns in like the back of that card.
+    // D-165 (N3): the last card was just swiped away: the reason turns in like the back of that card.
     if (hadCard && emptyState && !emptyState.closest('[hidden]')) flipIn(emptyState);
     const count = document.querySelector('#queue-count'); if (count) count.textContent = '00 / 00';
     return;
@@ -1650,7 +1650,7 @@ const renderHome = (queue = getExplorePeople()) => {
   maybePlayDeckIntro();
   offerDeckTutorial();
 };
-// D-162: the deck's arrival (deck-intro.js): once per page load, the first time real people are on screen, and again
+// D-164: the deck's arrival (deck-intro.js): once per page load, the first time real people are on screen, and again
 // when the member switches from Nearby back to Curated. With the "deal" sound when this page may play audio.
 function maybePlayDeckIntro() {
   const stack = document.querySelector('#swipe-stack');
@@ -1927,7 +1927,7 @@ const signalResultToast = (person, result) => {
   if (result.matched) return mutualToast(person);
   return result.status === 'sent' ? 'Signal sent' : signalErrorToast;
 };
-// D-163: a signal's outcome, shown. 'matched' gets the "It's mutual" moment (N1) over the toast; a sent pitch
+// D-165: a signal's outcome, shown. 'matched' gets the "It's mutual" moment (N1) over the toast; a sent pitch
 // flies a small letter from where it left (origin: a DOMRect or element) to the Chat tab (N2), then the usual toast.
 const announceSignal = (person, result, origin = null) => {
   if (!result?.error && result?.matched) {
@@ -2566,6 +2566,13 @@ const renderFilterOptions = () => {
     if (input) input.checked = exploreFilters.hiring;
     const line = lens.querySelector('#filter-hiring-label');
     if (line && hiring?.available()) line.textContent = hiring.lensLabel();
+  }
+  // D-162: the one-tap Hiring toggle beside Curated / Nearby mirrors the same lens.
+  const toggle = document.querySelector('#hiring-toggle');
+  if (toggle) {
+    toggle.hidden = !hiring?.available();
+    toggle.setAttribute('aria-pressed', String(Boolean(exploreFilters.hiring)));
+    if (hiring?.available()) toggle.title = hiring.lensLabel();
   }
 };
 const updateDiscoveryFilterResult = (count) => {
@@ -3238,7 +3245,7 @@ const renderMessages = () => {
   };
   const newestOwnId = lastOwnMessageId(thread);
   messages.innerHTML = thread.length ? thread.map(renderBubble).join('') : '<div class="chat-start-note"><strong>Start with context.</strong><span>A thoughtful first message makes a better introduction.</span></div>';
-  markArrivals(messages, selectedChat.id);   // D-163 N9: only bubbles new since the last render of this chat rise in
+  markArrivals(messages, selectedChat.id);   // D-165 N9: only bubbles new since the last render of this chat rise in
   placeTypingBubble();
   const isBlocked = readBlockedUserIds().has(String(selectedChat.id));
   if (isBlocked) {
@@ -5598,9 +5605,9 @@ deckSwipe = createDeckSwipe({
     && !document.querySelector('#swipe-card')?.classList.contains('is-loading'),
   onCommit: (direction, { vx }) => swipe(direction === 'pitch' ? 'like' : 'pass', { vx }),
 });
-// D-163 (N5): on desktop the top card leans towards the cursor (never while dragging or during the intro).
+// D-165 (N5): on desktop the top card leans towards the cursor (never while dragging or during the intro).
 attachCardTilt({ card: document.querySelector('#swipe-card'), stack: document.querySelector('#swipe-stack'), enabled: () => Boolean(currentPerson) && !deckIntro.running });
-// D-163 (N10): event covers settle in as they scroll into view (first 8 of each render, once).
+// D-165 (N10): event covers settle in as they scroll into view (first 8 of each render, once).
 {
   const eventsRoot = document.querySelector('[data-view="events"]');
   if (eventsRoot && typeof MutationObserver === 'function') {
@@ -5718,6 +5725,11 @@ const clearDiscoveryFilters = () => {
   renderExplore();
 };
 document.querySelector('#clear-discovery-filters')?.addEventListener('click', clearDiscoveryFilters);
+document.querySelector('#hiring-toggle')?.addEventListener('click', () => {
+  exploreFilters.hiring = !exploreFilters.hiring;
+  if (exploreFilters.hiring) void hiring?.ensure(deckPeople().map((p) => p.id));
+  renderExplore();
+});
 document.querySelector('#filter-hiring')?.addEventListener('change', (event) => {
   exploreFilters.hiring = event.currentTarget.checked;
   if (exploreFilters.hiring) void hiring?.ensure(deckPeople().map((p) => p.id));

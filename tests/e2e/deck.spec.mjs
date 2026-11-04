@@ -84,7 +84,7 @@ try {
   };
   const cardName = (page) => page.evaluate(() => document.querySelector('#swipe-card:not([hidden]) #swipe-name')?.textContent?.trim() || '');
   // Both waits resolve to true / false (logged), so a failed state shows up as a FAIL line, not a crash.
-  // D-162: the first card is dealt in (about 1 s); the layout checks measure the resting stack, after the deal.
+  // D-164: the first card is dealt in (about 1 s); the layout checks measure the resting stack, after the deal.
   const waitForCard = (page, name) => page.waitForFunction((n) => document.querySelector('#swipe-card:not([hidden]) #swipe-name')?.textContent?.trim() === n
     && !document.querySelector('#swipe-stack')?.classList.contains('is-intro'), name, { timeout: 8000 })
     .then(() => true, async () => { console.log(`card "${name}" did not show (got "${await cardName(page)}")`); return false; });

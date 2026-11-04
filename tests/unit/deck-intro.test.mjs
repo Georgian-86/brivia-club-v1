@@ -1,4 +1,4 @@
-// D-162: the deck's arrival (deck-intro.js) and its "deal" cue (notify-sound.js INTRO_CUE). Run: npm run test:unit
+// D-164: the deck's arrival (deck-intro.js) and its "deal" cue (notify-sound.js INTRO_CUE). Run: npm run test:unit
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { INTRO, introLength, introAllowed } from '../../site/scripts/deck-intro.js';

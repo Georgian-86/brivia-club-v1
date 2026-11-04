@@ -1,4 +1,4 @@
-// D-163: the moments after the deck's arrival (D-162), from "Where motion fits next" (N1-N10). GSAP for the
+// D-165: the moments after the deck's arrival (D-164), from "Where motion fits next" (N1-N10). GSAP for the
 // choreographed ones, CSS (site/styles/motion.css) for the small ones. Every one respects prefers-reduced-motion:
 // no travel, no rotation, a short fade at most. Nothing here decides anything: mutual consent, signals and chat stay
 // where they were (app.js); these only show what already happened.

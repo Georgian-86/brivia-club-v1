@@ -1299,3 +1299,14 @@ Members still have no UPDATE or DELETE policy on `brivia_messages`. Verify:
 `select column_name from information_schema.columns where table_name = 'brivia_messages' and column_name in ('edited_at', 'unsent_at');` (2 rows);
 `select has_function_privilege('anon', 'public.unsend_message(uuid)', 'execute');` (f);
 `select count(*) from pg_policies where tablename = 'brivia_messages' and cmd in ('UPDATE', 'DELETE', 'ALL');` (0).
+
+## 0047
+
+**Seeded hirers stay in the test world (D-162).** Apply after `0037` (it redefines four 0037 functions; it fails if
+0037 is missing). Adds the owner-only helper `brivia_hiring_seen_by(viewer, member)` and redefines
+`brivia_hiring_bar` (a seeded member skips the photo and 14-day parts), `brivia_role_shown`, `member_open_to` and
+`hiring_suggestions` so a seeded member's role or "Open to roles" is shown only to testers. No new RPC, no grant change.
+Then run `supabase/seed/hiring-test-members.sql` (seed README, "Hiring test profiles"). Verify:
+`select has_function_privilege('authenticated', 'public.brivia_hiring_seen_by(uuid, uuid)', 'execute');` (f);
+`select public.brivia_hiring_seen_by(null, 'a7e57000-0000-4000-8000-000000000040');` (f once the seed exists).
+

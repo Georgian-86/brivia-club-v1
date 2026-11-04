@@ -1,4 +1,4 @@
-// The deck's arrival (D-162): when the Connect deck first shows real people, the three layers of the stack are dealt
+// The deck's arrival (D-164): when the Connect deck first shows real people, the three layers of the stack are dealt
 // in from below, one after the other, and settle into the stack with a soft landing; a single gloss crosses the top
 // card and Pass / Pitch rise in under it. About 0.9 s of motion (the gloss trails to 1.2 s), never blocking: a touch,
 // a click or a key on the deck finishes it at once. Paired with the "deal" sound (notify-sound.js INTRO_CUE).
