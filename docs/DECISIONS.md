@@ -3316,7 +3316,18 @@ controls (a tester or a seeded test member), never a real member, so no new expo
 - **Proof:** unit 513 (`tests/unit/motion-moments.test.mjs`); deck e2e 201/201 (main 201/201); screenshots of N1 and
   N2 at 390 and 1440 with the stubbed Supabase.
 
-## D-166 (2026-11-04): "It's mutual" for every new match, not only the one my swipe completes
+## D-166 (2026-11-04): the Hiring toggle moves beside the filter button, as a quick-filter switch
+
+- **Asked:** "the toggle button is not looking good. Seach for a good spot to fit the button and redesign it
+  professionally" (ui-ux-pro-max).
+- **Done:** the D-162 pill sat in the Curated / Nearby row, a second wine block with the same weight as a mode that
+  read as a third mode. It is a filter, so it now sits beside the discovery-filter button (`.home-tools`), where the two
+  read as one filter group, and the Curated / Nearby switch keeps its full width on phones. It is a `role="switch"`
+  with `aria-checked`: briefcase, "Hiring" in the body font at 14 px, and a 30 × 18 track. Off it uses the filter
+  button's cream-and-wine frame, and on it fills deep wine with a cream knob, like the filter button when its drawer
+  is open. It is 44 px tall and adds no height to the deck.
+
+## D-167 (2026-11-04): "It's mutual" for every new match, not only the one my swipe completes
 
 - **Reported:** "the mutual match animation is not working in live site". D-165 played it only when my own signal
   came back `matched`. On live, most matches are made the other way: I accept a request in the review sheet, or the
