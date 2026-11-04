@@ -201,3 +201,5 @@ body.app-body .hiring-toggle[aria-checked="true"] .hiring-toggle-track i { trans
 @media (hover: hover) { body.app-body .hiring-toggle[aria-checked="false"]:hover { background: var(--color-cream); border-color: color-mix(in srgb, var(--color-wine-deep) 40%, transparent); } }
 body.app-body .hiring-toggle:focus-visible { outline: 2px solid var(--color-wine); outline-offset: 2px; }
 @media (prefers-reduced-motion: reduce) { body.app-body .hiring-toggle, .hiring-toggle-track, .hiring-toggle-track i { transition: none; } }
+/* Phones (founder, 2026-11-04): the filter button stays left, the Hiring switch sits at the right end of the row. */
+@media (max-width: 849px) { body.app-body .home-tools .hiring-toggle { margin-left: auto; } }

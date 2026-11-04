@@ -107,7 +107,7 @@ try {
     check(`${w}: the Hiring switch shows, off`, await toggle.isVisible() && await toggle.getAttribute('aria-checked') === 'false' && await toggle.getAttribute('role') === 'switch');
     const tb = await toggle.boundingBox();
     const mb = await page.locator('#open-discovery-filters').boundingBox();
-    check(`${w}: the switch is 44 px and sits beside the filter button (${JSON.stringify(tb)} vs ${JSON.stringify(mb)})`, tb.height >= 44 && Math.abs((tb.y + tb.height / 2) - (mb.y + mb.height / 2)) <= 1 && tb.x > mb.x + mb.width && tb.x - (mb.x + mb.width) <= 12 && tb.x + tb.width <= w);
+    check(`${w}: the switch is 44 px and sits beside the filter button, right-aligned on phones (${JSON.stringify(tb)} vs ${JSON.stringify(mb)})`, tb.height >= 44 && Math.abs((tb.y + tb.height / 2) - (mb.y + mb.height / 2)) <= 1 && tb.x > mb.x + mb.width && (w < 850 ? Math.abs(tb.x + tb.width - (w - (mb.x))) <= 2 : tb.x - (mb.x + mb.width) <= 12) && tb.x + tb.width <= w);
     await toggle.click();
     await page.waitForFunction(() => document.querySelector('#hiring-toggle')?.getAttribute('aria-checked') === 'true');
     check(`${w}: the toggle turns the drawer's lens on too`, await page.evaluate(() => document.querySelector('#filter-hiring')?.checked === true));
