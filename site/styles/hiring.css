@@ -177,3 +177,28 @@ dialog.hiring-sheet::backdrop { background: color-mix(in srgb, var(--color-oxblo
 
 /* The Hiring lens in the Discovery filter drawer. */
 .hiring-filter-switch { margin-top: 0; padding-top: 0; border-top: 0; font-family: var(--font-body); }
+
+/* The Hiring toggle on Connect (D-162): one tap beside Curated / Nearby turns the Hiring lens on or off. Same frame as
+   the Curated / Nearby switch; on, it fills with deep wine and its light turns cream. Shown only once hiring is live. */
+.connect-tools { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); margin-top: var(--space-5); }
+.connect-tools .connect-mode { margin-top: 0; }
+body.app-body .hiring-toggle {
+  display: inline-flex; align-items: center; gap: var(--space-2); min-height: 50px; padding: 0 var(--space-4) 0 var(--space-3);
+  border: 1px solid var(--color-line); border-radius: var(--radius-pill); background: color-mix(in srgb, var(--color-cream) 82%, transparent);
+  box-shadow: 0 8px 20px -14px color-mix(in srgb, var(--color-wine-deep) 50%, transparent); -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px);
+  color: var(--color-ink); font-family: var(--font-heading); font-size: var(--text-16); white-space: nowrap; cursor: pointer;
+  transition: background var(--motion-fast) var(--ease), color var(--motion-fast) var(--ease), border-color var(--motion-fast) var(--ease);
+}
+body.app-body .hiring-toggle[hidden] { display: none; }
+body.app-body .hiring-toggle svg { flex: 0 0 auto; width: 17px; height: 17px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+.hiring-toggle-dot { flex: 0 0 auto; width: 8px; height: 8px; border: 1.5px solid color-mix(in srgb, var(--color-ink) 45%, transparent); border-radius: 50%; transition: background var(--motion-fast) var(--ease), border-color var(--motion-fast) var(--ease); }
+body.app-body .hiring-toggle[aria-pressed="true"] { border-color: var(--color-wine-deep); background: var(--color-wine-deep); color: var(--color-cream); }
+body.app-body .hiring-toggle[aria-pressed="true"] .hiring-toggle-dot { border-color: var(--color-cream); background: var(--color-cream); box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-cream) 22%, transparent); }
+@media (hover: hover) { body.app-body .hiring-toggle[aria-pressed="false"]:hover { background: color-mix(in srgb, var(--color-wine) 8%, var(--color-cream)); } }
+body.app-body .hiring-toggle:focus-visible { outline: 2px solid var(--color-wine); outline-offset: 2px; }
+@media (max-width: 759px) {
+  .connect-tools { flex-wrap: nowrap; }
+  .connect-tools .connect-mode { flex: 1 1 auto; min-width: 0; }
+  body.app-body .hiring-toggle { flex: 0 0 auto; padding: 0 var(--space-3); }
+}
+@media (prefers-reduced-motion: reduce) { body.app-body .hiring-toggle, .hiring-toggle-dot { transition: none; } }

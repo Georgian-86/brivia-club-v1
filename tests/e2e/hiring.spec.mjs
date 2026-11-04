@@ -79,7 +79,7 @@ try {
     await page.waitForSelector('#swipe-card:not([hidden]) #swipe-name');
     await page.waitForTimeout(500);
     check('before 0037: the bar keeps LOOKING FOR', /LOOKING FOR/.test(await page.locator('#swipe-card-label').innerText()));
-    check('before 0037: no strip, no lens', await page.locator('#swipe-hiring').isHidden() && await page.locator('#filter-hiring-group').isHidden());
+    check('before 0037: no strip, no lens', await page.locator('#swipe-hiring').isHidden() && await page.locator('#filter-hiring-group').isHidden() && await page.locator('#hiring-toggle').isHidden());
     check('before 0037: member_hiring never asked', callsTo('member_hiring').length === 0);
     await ctx.close();
   }
@@ -101,6 +101,24 @@ try {
     check(`${w}: no duplicate "Hiring" chip on the card`, !(await page.locator('#swipe-tags').innerText()).match(/^Hiring$/m));
     check(`${w}: the deck never scrolls sideways`, await noSideScroll(page));
     await shot(page, `deck-seeker-${w}.png`);
+
+    // D-162: the one-tap Hiring toggle beside Curated / Nearby turns the same lens on and off.
+    const toggle = page.locator('#hiring-toggle');
+    check(`${w}: the Hiring toggle shows, off`, await toggle.isVisible() && await toggle.getAttribute('aria-pressed') === 'false');
+    const tb = await toggle.boundingBox();
+    const mb = await page.locator('[data-view="home"] .connect-mode').boundingBox();
+    check(`${w}: the toggle is 44 px or more and sits on the Curated / Nearby row (${JSON.stringify(tb)} vs ${JSON.stringify(mb)})`, tb.height >= 44 && Math.abs((tb.y + tb.height / 2) - (mb.y + mb.height / 2)) <= 2 && tb.x + tb.width <= w);
+    await toggle.click();
+    await page.waitForFunction(() => document.querySelector('#hiring-toggle')?.getAttribute('aria-pressed') === 'true');
+    check(`${w}: the toggle turns the drawer's lens on too`, await page.evaluate(() => document.querySelector('#filter-hiring')?.checked === true));
+    check(`${w}: with the toggle on, only the fitting hirer is in the deck (${await page.locator('#discovery-filter-result').textContent()})`, /Asha/.test(await page.locator('#swipe-name').innerText()) && /^1 person match/.test(await page.locator('#discovery-filter-result').textContent()));
+    check(`${w}: the deck still never scrolls sideways with the toggle on`, await noSideScroll(page));
+    const axeToggle = await axeViolations(page, { include: '[data-view="home"] .connect-tools' });
+    check(`${w}: the Connect controls are axe clean`, axeToggle.length === 0, axeToggle.join(' | '));
+    await shot(page, `deck-toggle-on-${w}.png`);
+    await toggle.click();
+    await page.waitForFunction(() => document.querySelector('#hiring-toggle')?.getAttribute('aria-pressed') === 'false');
+    check(`${w}: a second tap turns it off`, await page.evaluate(() => document.querySelector('#filter-hiring')?.checked === false) && /All people/.test(await page.locator('#discovery-filter-result').textContent()));
 
     await page.locator('[data-action="full-info"]').click();
     await page.waitForSelector('#public-profile-modal .hiring-banner');

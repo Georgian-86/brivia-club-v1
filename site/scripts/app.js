@@ -2494,6 +2494,13 @@ const renderFilterOptions = () => {
     const line = lens.querySelector('#filter-hiring-label');
     if (line && hiring?.available()) line.textContent = hiring.lensLabel();
   }
+  // D-162: the one-tap Hiring toggle beside Curated / Nearby mirrors the same lens.
+  const toggle = document.querySelector('#hiring-toggle');
+  if (toggle) {
+    toggle.hidden = !hiring?.available();
+    toggle.setAttribute('aria-pressed', String(Boolean(exploreFilters.hiring)));
+    if (hiring?.available()) toggle.title = hiring.lensLabel();
+  }
 };
 const updateDiscoveryFilterResult = (count) => {
   const result = document.querySelector('#discovery-filter-result');
@@ -5633,6 +5640,11 @@ const clearDiscoveryFilters = () => {
   renderExplore();
 };
 document.querySelector('#clear-discovery-filters')?.addEventListener('click', clearDiscoveryFilters);
+document.querySelector('#hiring-toggle')?.addEventListener('click', () => {
+  exploreFilters.hiring = !exploreFilters.hiring;
+  if (exploreFilters.hiring) void hiring?.ensure(deckPeople().map((p) => p.id));
+  renderExplore();
+});
 document.querySelector('#filter-hiring')?.addEventListener('change', (event) => {
   exploreFilters.hiring = event.currentTarget.checked;
   if (exploreFilters.hiring) void hiring?.ensure(deckPeople().map((p) => p.id));
