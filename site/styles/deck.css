@@ -580,3 +580,40 @@ body.app-body .app-view[data-view="home"] .deck-empty-action { min-height: 44px;
   pointer-events: none;
   will-change: transform;
 }
+
+/* D-174: the shuffle's pack (deck-intro.js). Card backs in the top card's place, above the stack, removed when the deal
+   ends: deep wine with a fine cream lattice, a hairline inner frame and the club's italic B. */
+.app-view[data-view="home"] .swipe-stack .deck-shuffle { position: absolute; z-index: 3; inset: 0; pointer-events: none; }
+.app-view[data-view="home"] .deck-shuffle-card {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  border: 2px solid var(--dk-ink);
+  border-radius: 18px;
+  background:
+    radial-gradient(circle at 50% 46%, color-mix(in srgb, var(--color-cream) 16%, transparent), transparent 42%),
+    repeating-linear-gradient(45deg, color-mix(in srgb, var(--color-cream) 7%, transparent) 0 1px, transparent 1px 14px),
+    repeating-linear-gradient(-45deg, color-mix(in srgb, var(--color-cream) 7%, transparent) 0 1px, transparent 1px 14px),
+    var(--color-wine-deep);
+  box-shadow: 0 10px 24px var(--dk-line);
+  backface-visibility: hidden;
+}
+.app-view[data-view="home"] .deck-shuffle-card::after {
+  position: absolute;
+  inset: 12px;
+  border: 1px solid color-mix(in srgb, var(--color-cream) 40%, transparent);
+  border-radius: 12px;
+  content: '';
+}
+.app-view[data-view="home"] .deck-shuffle-card::before {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  color: color-mix(in srgb, var(--color-cream) 72%, transparent);
+  font-family: var(--font-heading);
+  font-size: var(--text-32);
+  font-style: italic;
+  content: 'B';
+}
+@media (max-width: 760px) { .app-view[data-view="home"] .deck-shuffle-card { border-radius: 17px; } }

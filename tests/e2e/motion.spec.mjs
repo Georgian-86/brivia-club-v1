@@ -1,4 +1,4 @@
-// D-168: every motion moment fires (D-164 deal-in, D-165 N1-N10, D-169 mutual), watched frame by frame in a real browser
+// D-168: every motion moment fires (D-164 deal-in, D-165 N1-N10, D-174 mutual), watched frame by frame in a real browser
 // against the stubbed Supabase. Run: PLAYWRIGHT_MODULE=/tmp/pw/node_modules/playwright/index.mjs node tests/e2e/motion.spec.mjs
 import { startAppStub, defaultDeckRows, PHOTO, ME } from './app-stub.mjs';
 const { chromium } = await import(process.env.PLAYWRIGHT_MODULE || 'playwright');
@@ -44,7 +44,8 @@ try {
     const ctx = await stub.newContext(browser, { width: 1440, height: 900 });
     await ctx.addInitScript(recorder);
     const page = await stub.open(ctx, { path: '/app.html' });
-    await page.waitForSelector('#swipe-card'); await page.waitForTimeout(2200);
+    await page.waitForSelector('#swipe-card'); await page.waitForTimeout(800);
+    await page.waitForFunction(() => !document.querySelector('#swipe-stack.is-intro'), null, { timeout: 8000 }); await page.waitForTimeout(300);
     let s = await seen(page);
     check('1 deck deal-in plays on load', !!s.intro && !!s.gloss);
     check('2 "You both" chips shimmer', !!s.shimmer);

@@ -3424,3 +3424,23 @@ controls (a tester or a seeded test member), never a real member, so no new expo
 - **Trade-off:** supersedes the 14-day part of D-141's bar. A scam account can post on its first day; reports
   (`report_fake_job`, which pause the role) are the remaining guard. Revisit before a real launch.
 
+
+## D-174 (2026-11-04): the deck arrives with a solitaire-style shuffle
+
+- **Asked:** "Make the stacking animation more lenghty and better kinda like shuffle in solitaire. Use the
+  professionally designing skills". Supersedes D-164's 0.9 s deal-in.
+- **Motion (`site/scripts/deck-intro.js`, about 3 s, five beats):** a squared pack of eight card backs (deep wine,
+  a fine cream lattice, a hairline frame, the club's italic B) rises into the card's place; it splits into two halves
+  that lean apart; the halves riffle back together one card at a time, alternating, bottom cards first; the pack is
+  squared with a small tap; then the back two cards slide out behind it, the pack's top card turns edge-on and the
+  member's card flips face up in its place. The stack takes the weight, the gloss crosses, Pass / Pitch rise in. On a
+  phone the halves part less (22% instead of 36%) so they stay on screen. Transforms and opacity only; the pack is
+  removed and every inline style cleared at the end. Any tap or key still skips to the resting stack.
+- **Sound (`INTRO_CUE`):** a swish on the split, a light tick as each riffled card lands, a muffled tap on the
+  square-up, three soft taps on the deal, then the same B-flat to F bell on the landing. Same switch and autoplay rules.
+- **Design rules followed (ui-ux-pro-max / frontend-design):** one orchestrated load moment, deceleration on arrival,
+  acceleration on the riffle drops, interruptible, never blocks input, reduced motion keeps the 150 ms fade.
+- **Fix found while capturing:** later-positioned from-tweens painted the first frame before their start (an edge-on
+  card showed for one frame); the dealt cards and controls are now hidden with a set and revealed with a to-tween.
+- **Proof:** unit 516 (`deck-intro.test.mjs`: beat order, a real riffle, sound in sync); deck 201/201, app-shell
+  214/214, deck-tutorial, motion (10/10), sounds, work-identity; frame captures at 390 and 1440.

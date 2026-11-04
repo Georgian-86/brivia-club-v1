@@ -2062,7 +2062,7 @@ const renderPendingRequestTags = () => {
 };
 // D-141: the deck lift. Up to one hiring suggestion in every five cards, never the card already on screen.
 let hiringLifted = false;
-// D-169: turning the Hiring lens on searches for everyone who is hiring (hiring_people, 0048), not only the cards
+// D-174: turning the Hiring lens on searches for everyone who is hiring (hiring_people, 0048), not only the cards
 // already loaded: their cards join the deck right after the card on screen, nearest first. Before 0048 the lens
 // filters the loaded deck only.
 let hiringPeopleLoaded = false;

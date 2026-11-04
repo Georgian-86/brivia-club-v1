@@ -544,7 +544,7 @@ export const createHiring = (deps) => {
     }));
   };
   // The Hiring lens: a seeker sees only hirers whose roles fit; anyone else, everyone who is hiring.
-  // D-169: the lens shows everyone who is hiring (roles that fit come first in hiring_people's order).
+  // D-174: the lens shows everyone who is hiring (roles that fit come first in hiring_people's order).
   const lensLabel = () => 'Only people who are hiring';
   // hiring_people (0048): members with a live role, nearest first. null when the RPC is not there yet.
   const findPeople = async () => {

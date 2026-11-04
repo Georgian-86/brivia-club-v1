@@ -190,58 +190,78 @@ export const renderCue = (ctx, dest, cue, t0 = 0) => {
   if (cue.sparkle) sine(ctx, bus, cue.sparkle, t0);
 };
 
-// D-164: the deck's arrival cue, "the deal". Not the horn: three soft card taps as the stack is dealt (a felt-tipped
-// click of filtered noise over a small low thump), then a warm two-note bell, B-flat up to F (the kit's key), that
-// rings out under the gloss. Quieter than the swipe cues and about 1.1 s long. Times match deck-intro.js INTRO.
+// D-164 / D-174: the deck's arrival cue, "the shuffle". Not the horn: a soft swish as the pack splits, a quick run of
+// light card ticks as the halves riffle together (one per card), a muffled tap as the pack is squared, three soft
+// card taps as the cards are dealt (a felt-tipped click of filtered noise over a small low thump), then a warm
+// two-note bell, B-flat up to F (the kit's key), on the landing. Quieter than the swipe cues. Times match
+// deck-intro.js INTRO (unit-tested).
 export const INTRO_CUE = Object.freeze({
-  length: 1.45, level: 0.58,
-  taps: Object.freeze([0.11, 0.2, 0.31]),
+  length: 3.4, level: 0.58,
+  swish: Object.freeze({ at: 0.5, dur: 0.24 }),
+  ticks: Object.freeze([0.97, 1.026, 1.082, 1.138, 1.194, 1.25, 1.306, 1.362]),
+  square: 1.4,
+  taps: Object.freeze([1.72, 1.82, 1.98]),
   bells: Object.freeze([
-    Object.freeze({ midi: 82, at: 0.4, dur: 0.9, gain: 0.2 }),
-    Object.freeze({ midi: 89, at: 0.5, dur: 0.8, gain: 0.14 }),
+    Object.freeze({ midi: 82, at: 2.2, dur: 0.9, gain: 0.2 }),
+    Object.freeze({ midi: 89, at: 2.3, dur: 0.8, gain: 0.14 }),
   ]),
 });
+const noiseBuffer = (ctx, seconds, seed0) => {
+  if (!ctx.createBuffer) return null;
+  const rate = ctx.sampleRate || 44100;
+  const buf = ctx.createBuffer(1, Math.ceil(rate * seconds), rate);
+  const data = buf.getChannelData(0);
+  let seed = seed0;
+  for (let i = 0; i < data.length; i += 1) { seed = (seed * 16807) % 2147483647; data[i] = (seed / 2147483647) * 2 - 1; }
+  return buf;
+};
+// One burst of filtered noise: type/freq/Q shape it, level and decay its envelope.
+const burst = (ctx, bus, noise, { start, type = 'bandpass', freq, q = 1, level, decay, sweepTo = 0 }) => {
+  if (!noise || !ctx.createBufferSource) return;
+  const src = ctx.createBufferSource();
+  src.buffer = noise;
+  const band = ctx.createBiquadFilter();
+  band.type = type;
+  band.frequency.setValueAtTime(freq, start);
+  if (sweepTo) band.frequency.exponentialRampToValueAtTime(sweepTo, start + decay);
+  band.Q.value = q;
+  const g = ctx.createGain();
+  g.gain.setValueAtTime(0.0001, start);
+  g.gain.exponentialRampToValueAtTime(level, start + Math.min(0.004, decay / 4));
+  g.gain.exponentialRampToValueAtTime(0.0001, start + decay);
+  src.connect(band).connect(g).connect(bus);
+  src.start(start);
+  src.stop(start + decay + 0.02);
+};
+const thump = (ctx, bus, start, from, level) => {
+  const osc = ctx.createOscillator();
+  const g = ctx.createGain();
+  osc.type = 'sine';
+  osc.frequency.setValueAtTime(from, start);
+  osc.frequency.exponentialRampToValueAtTime(90, start + 0.08);
+  g.gain.setValueAtTime(0.0001, start);
+  g.gain.exponentialRampToValueAtTime(level, start + 0.006);
+  g.gain.exponentialRampToValueAtTime(0.0001, start + 0.1);
+  osc.connect(g).connect(bus);
+  osc.start(start);
+  osc.stop(start + 0.12);
+};
 export const renderIntroCue = (ctx, dest, t0 = 0, cue = INTRO_CUE) => {
   const bus = ctx.createGain();
   bus.gain.value = cue.level;
   bus.connect(dest);
-  const rate = ctx.sampleRate || 44100;
-  let noise = null;
-  if (ctx.createBuffer) {
-    noise = ctx.createBuffer(1, Math.ceil(rate * 0.06), rate);
-    const data = noise.getChannelData(0);
-    let seed = 11;
-    for (let i = 0; i < data.length; i += 1) { seed = (seed * 16807) % 2147483647; data[i] = (seed / 2147483647) * 2 - 1; }
-  }
+  const noise = noiseBuffer(ctx, 0.3, 11);
+  // The split: air moving as the two halves part (a quiet band of noise sweeping down).
+  if (cue.swish) burst(ctx, bus, noise, { start: t0 + cue.swish.at, freq: 3200, sweepTo: 900, q: 0.7, level: 0.12, decay: cue.swish.dur });
+  // The riffle: short bright ticks, each card a touch different, slightly louder towards the end of the run.
+  (cue.ticks || []).forEach((at, i) => burst(ctx, bus, noise, { start: t0 + at, type: 'highpass', freq: 3600 + (i % 3) * 420, q: 0.8, level: 0.16 + i * 0.012, decay: 0.022 }));
+  // The square-up: a muffled tap of the whole pack.
+  if (cue.square) { burst(ctx, bus, noise, { start: t0 + cue.square, freq: 900, q: 0.9, level: 0.3, decay: 0.05 }); thump(ctx, bus, t0 + cue.square, 160, 0.3); }
   cue.taps.forEach((at, i) => {
     const start = t0 + at;
     const level = 0.5 + i * 0.12;                        // the top card lands a touch firmer
-    if (noise && ctx.createBufferSource) {
-      const src = ctx.createBufferSource();
-      src.buffer = noise;
-      const band = ctx.createBiquadFilter();
-      band.type = 'bandpass';
-      band.frequency.value = 2600 - i * 300;
-      band.Q.value = 1.1;
-      const g = ctx.createGain();
-      g.gain.setValueAtTime(0.0001, start);
-      g.gain.exponentialRampToValueAtTime(level, start + 0.004);
-      g.gain.exponentialRampToValueAtTime(0.0001, start + 0.05);
-      src.connect(band).connect(g).connect(bus);
-      src.start(start);
-      src.stop(start + 0.06);
-    }
-    const osc = ctx.createOscillator();
-    const g = ctx.createGain();
-    osc.type = 'sine';
-    osc.frequency.setValueAtTime(190 - i * 12, start);
-    osc.frequency.exponentialRampToValueAtTime(90, start + 0.08);
-    g.gain.setValueAtTime(0.0001, start);
-    g.gain.exponentialRampToValueAtTime(level * 0.55, start + 0.006);
-    g.gain.exponentialRampToValueAtTime(0.0001, start + 0.1);
-    osc.connect(g).connect(bus);
-    osc.start(start);
-    osc.stop(start + 0.12);
+    burst(ctx, bus, noise, { start, freq: 2600 - i * 300, q: 1.1, level, decay: 0.05 });
+    thump(ctx, bus, start, 190 - i * 12, level * 0.55);
   });
   // A soft bell: a sine with a quiet inharmonic partial (2.76x, a struck bar) that dies faster than the fundamental.
   cue.bells.forEach(({ midi, at, dur, gain }) => {

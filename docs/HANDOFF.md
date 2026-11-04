@@ -7,6 +7,10 @@ Update this file at the end of every session. CLAUDE.md holds the aim; this file
 
 ## 1. What is done
 
+**2026-11-04, D-174:** the deck now arrives with a ~3 s solitaire-style shuffle (pack, split, riffle, square, deal and
+flip) and a matching shuffle sound. Files `site/scripts/deck-intro.js`, `INTRO_CUE` in `site/scripts/notify-sound.js`,
+`.deck-shuffle` in `site/styles/deck.css`.
+
 **2026-11-04, D-172:** the own profile hero's text never runs under the photo card: the work line and bio wrap or
 clamp inside their column, the name wraps to two lines instead of an early ellipsis, one type scale per breakpoint
 (`site/styles/profile-hero.css`). Test `tests/e2e/profile-hero.spec.mjs` (long, real and short profiles at 390 and 1440).
