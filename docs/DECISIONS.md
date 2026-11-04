@@ -3394,7 +3394,26 @@ controls (a tester or a seeded test member), never a real member, so no new expo
 - **Trade-off:** supersedes D-162's "only testers": real members can now see, and ask about, seeded roles at invented
   companies while the world is open. The founder's call for the test phase; turn the world off before a real launch.
 
-## D-172 (2026-11-04): no account-age wait before a hirer's role shows
+## D-172 (2026-11-04): the profile hero's text fits beside the photo card
+
+- **Asked:** "fix the overflow of the text in the mobile view for the bio. Make it look professionally designed", with
+  a 390 px screenshot where the work line ("Talent Acquisition at Stealth Startup") ran under the photo card and the
+  name ended in an ellipsis after a few letters.
+- **Cause:** the work line was a nowrap line in a flex column that sized it to its own text, so its ellipsis never
+  applied; the bio's 3-line clamp was undone by an `overflow: visible` rule and a later 20 px size on phones.
+- **Done (`site/styles/profile-hero.css`, CSS only):** the work line wraps to 2 lines inside the column (logo on the
+  first line); the name wraps, balanced, to 2 lines at most, and a name that fits stays on one line (D-098's one-line
+  check for "georgian-86" still holds); the area is one line; the bio is 3 lines at most with an ellipsis (the whole bio
+  is in About). Type scale: 1440 name 40-64 px, work 15 px, area 20 px, bio 18 px italic; phones name 24-32 px, work
+  13 px, area 16 px, bio 14 px italic. The phone photo card is a little slimmer (32vw, 112-160 px, was 36vw, 124-172 px)
+  so the column has room. Supersedes D-098's "the name on one line" for names that do not fit.
+- **Readable on every cover (founder: "make sure it is readable"):** the neutral ink shade under the text column is
+  denser (76-80% at the left, fading out before the photo card; still no maroon wash, D-113) and the copy has a tight
+  shadow. Measured against all 25 covers at 390 and 1440, cream text over the 90th-percentile background pixel: 5.0:1
+  or better everywhere (was as low as 2.2:1 on the lightest covers).
+- **Check:** `tests/e2e/profile-hero.spec.mjs`.
+
+## D-173 (2026-11-04): no account-age wait before a hirer's role shows
 
 - **Asked:** a real hirer (a new account) was missing from Hiring. The check showed no open role yet and an account
   0 days old; the founder chose "Remove the wait" over 1 day or keeping 14 days.

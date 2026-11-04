@@ -112,7 +112,7 @@ select 's-hiring.test H2 OK';
 do $$
 begin
   if not public.brivia_hiring_bar(pg_temp.hp(1)) then raise exception 'FAIL H3: H is under the bar'; end if;
-  -- D-172 (0051): no account-age wait; a 2-day-old account with a photo is over the bar
+  -- D-173 (0051): no account-age wait; a 2-day-old account with a photo is over the bar
   if not public.brivia_hiring_bar(pg_temp.hp(4)) then raise exception 'FAIL H3: a 2-day-old account is under the bar (0051)'; end if;
   update public.profiles set photo_url = null where id = pg_temp.hp(9);
   if public.brivia_hiring_bar(pg_temp.hp(9)) then raise exception 'FAIL H3: no photo is over the bar'; end if;

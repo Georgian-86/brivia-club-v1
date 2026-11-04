@@ -1183,7 +1183,7 @@ Hiring is a lane beside the deck, not a change to it: `deck_candidates` and the 
   created only by the member, never inferred: "Developer" in Looking for is not job seeking.
 - **The hiring bar.** A role is shown only when its owner is completed, has a photo and a confirmed email and no open
   moderation flag (`brivia_hiring_bar`). Before that the role is saved and the member is told what is missing. There is
-  no account-age wait since D-172 (migration 0051; it was 14 days).
+  no account-age wait since D-173 (migration 0051; it was 14 days).
 - **Fit** (`brivia_role_fit`, 0..1, rounded to 4 places, never shown as a number): title (the same title 1, the same
   family 0.7 unless 'other', an adjacent family 0.4, else 0) × level (the same, or no level wanted, 1; one step apart
   0.6; else 0; an internship pairs only with intern or entry) × mode (the role's mode is one the seeker picked, 1, else

@@ -1,5 +1,5 @@
 set lock_timeout = '5s';
--- 0051_hiring_no_wait.sql: a new hirer's role shows at once, no 14-day wait (founder decision 2026-11-04, D-172).
+-- 0051_hiring_no_wait.sql: a new hirer's role shows at once, no 14-day wait (founder decision 2026-11-04, D-173).
 -- Applied by hand in the Supabase SQL editor, as postgres, after 0047 (README "## 0051"). Idempotent.
 -- What: brivia_hiring_bar drops the 14-day account age. Completed profile, a photo (seeded members exempt, 0047), a
 -- confirmed email, no open flag and the hiring switch still apply. brivia_hiring_live_from is the account's first day,
