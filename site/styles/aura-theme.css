@@ -134,3 +134,22 @@ html body .events-empty,
 html body #home-empty-state {
   background: var(--aura-sheet) !important;
 }
+
+/* Connect (founder, 2026-11-04, D-158): the room photo takes a light veil of the same aura (lilac top left, a breath of
+   wine low left and top right, mint right, rose and peach low), so Connect reads like the other pages without losing
+   the scene. A layer under the content: the card, buttons and text are untouched. "Not too much": .62 overall. */
+html body.app-body .app-view[data-view="home"]::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  opacity: .62;
+  background:
+    radial-gradient(ellipse 46% 52% at 8% 82%, var(--aura-wine-soft), transparent 70%),
+    radial-gradient(ellipse 38% 34% at 76% 4%, var(--aura-wine-soft), transparent 72%),
+    radial-gradient(ellipse 52% 46% at 18% 22%, var(--aura-lilac), transparent 72%),
+    radial-gradient(ellipse 44% 44% at 92% 40%, var(--aura-mint), transparent 72%),
+    radial-gradient(ellipse 54% 42% at 60% 96%, var(--aura-rose), transparent 72%),
+    radial-gradient(ellipse 42% 38% at 2% 100%, var(--aura-peach), transparent 72%);
+}

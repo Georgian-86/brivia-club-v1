@@ -3212,3 +3212,10 @@ controls (a tester or a seeded test member), never a real member, so no new expo
   504 (new message-actions), e2e message-actions MA1–MA6 (phone long press, desktop right-click, keyboard, before 0046),
   read-receipts, chat-extras 150, chat-inbox. chat-search.spec.mjs times out on a profile dialog on the code before this
   change too; not fixed here.
+
+## D-158 (2026-11-04): Connect takes a light veil of the aura gradient
+
+- **Asked:** "change the color of this slide to the gradient we are using, but not too much" (the Connect page).
+- **Done:** the room photo keeps its place; a layer under the content (`aura-theme.css`, `.app-view[data-view="home"]::before`)
+  adds the aura's lilac, wine, mint, rose and peach glows at 62% opacity, so Connect reads like the other pages. The
+  card, buttons and text are untouched. To make it stronger or softer, change that one opacity. Not deployed yet.
