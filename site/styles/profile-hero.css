@@ -141,3 +141,26 @@ body.app-body[data-app-view] .app-view.profile-view[data-view="profile"] .profil
     line-height: 1.42;
   }
 }
+
+/* Readability on any cover (D-171): a neutral ink shade under the text column only (no maroon wash, D-113), dense
+   enough that cream text keeps 4.5:1 on the lightest covers, fading out before the photo card. A tight shadow keeps
+   the thin Bodoni strokes crisp. */
+body.app-body[data-app-view] .app-view.profile-view[data-view="profile"] .profile-board-content .profile-hero::before {
+  background: linear-gradient(90deg,
+    color-mix(in srgb, var(--color-ink) 80%, transparent) 0%,
+    color-mix(in srgb, var(--color-ink) 68%, transparent) 42%,
+    color-mix(in srgb, var(--color-ink) 28%, transparent) 64%,
+    transparent 84%);
+}
+body.app-body[data-app-view] .app-view.profile-view[data-view="profile"] .profile-board-content .profile-hero-copy {
+  text-shadow: 0 1px 2px color-mix(in srgb, var(--color-ink) 55%, transparent), 0 0 16px color-mix(in srgb, var(--color-ink) 40%, transparent);
+}
+@media (max-width: 780px) {
+  body.app-body[data-app-view] .app-view.profile-view[data-view="profile"] .profile-board-content .profile-hero::before {
+    background: linear-gradient(90deg,
+      color-mix(in srgb, var(--color-ink) 76%, transparent) 0%,
+      color-mix(in srgb, var(--color-ink) 66%, transparent) 52%,
+      color-mix(in srgb, var(--color-ink) 30%, transparent) 70%,
+      transparent 88%);
+  }
+}

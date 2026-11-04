@@ -3395,5 +3395,9 @@ controls (a tester or a seeded test member), never a real member, so no new expo
   is in About). Type scale: 1440 name 40-64 px, work 15 px, area 20 px, bio 18 px italic; phones name 24-32 px, work
   13 px, area 16 px, bio 14 px italic. The phone photo card is a little slimmer (32vw, 112-160 px, was 36vw, 124-172 px)
   so the column has room. Supersedes D-098's "the name on one line" for names that do not fit.
+- **Readable on every cover (founder: "make sure it is readable"):** the neutral ink shade under the text column is
+  denser (76-80% at the left, fading out before the photo card; still no maroon wash, D-113) and the copy has a tight
+  shadow. Measured against all 25 covers at 390 and 1440, cream text over the 90th-percentile background pixel: 5.0:1
+  or better everywhere (was as low as 2.2:1 on the lightest covers).
 - **Check:** `tests/e2e/profile-hero.spec.mjs`.
 
