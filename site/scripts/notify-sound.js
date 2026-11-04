@@ -190,7 +190,78 @@ export const renderCue = (ctx, dest, cue, t0 = 0) => {
   if (cue.sparkle) sine(ctx, bus, cue.sparkle, t0);
 };
 
-// createSoundKit(): { notify(id), swipe(direction), preview(), unlock(), isUnlocked(), ready() }.
+// D-162: the deck's arrival cue, "the deal". Not the horn: three soft card taps as the stack is dealt (a felt-tipped
+// click of filtered noise over a small low thump), then a warm two-note bell, B-flat up to F (the kit's key), that
+// rings out under the gloss. Quieter than the swipe cues and about 1.1 s long. Times match deck-intro.js INTRO.
+export const INTRO_CUE = Object.freeze({
+  length: 1.45, level: 0.58,
+  taps: Object.freeze([0.11, 0.2, 0.31]),
+  bells: Object.freeze([
+    Object.freeze({ midi: 82, at: 0.4, dur: 0.9, gain: 0.2 }),
+    Object.freeze({ midi: 89, at: 0.5, dur: 0.8, gain: 0.14 }),
+  ]),
+});
+export const renderIntroCue = (ctx, dest, t0 = 0, cue = INTRO_CUE) => {
+  const bus = ctx.createGain();
+  bus.gain.value = cue.level;
+  bus.connect(dest);
+  const rate = ctx.sampleRate || 44100;
+  let noise = null;
+  if (ctx.createBuffer) {
+    noise = ctx.createBuffer(1, Math.ceil(rate * 0.06), rate);
+    const data = noise.getChannelData(0);
+    let seed = 11;
+    for (let i = 0; i < data.length; i += 1) { seed = (seed * 16807) % 2147483647; data[i] = (seed / 2147483647) * 2 - 1; }
+  }
+  cue.taps.forEach((at, i) => {
+    const start = t0 + at;
+    const level = 0.5 + i * 0.12;                        // the top card lands a touch firmer
+    if (noise && ctx.createBufferSource) {
+      const src = ctx.createBufferSource();
+      src.buffer = noise;
+      const band = ctx.createBiquadFilter();
+      band.type = 'bandpass';
+      band.frequency.value = 2600 - i * 300;
+      band.Q.value = 1.1;
+      const g = ctx.createGain();
+      g.gain.setValueAtTime(0.0001, start);
+      g.gain.exponentialRampToValueAtTime(level, start + 0.004);
+      g.gain.exponentialRampToValueAtTime(0.0001, start + 0.05);
+      src.connect(band).connect(g).connect(bus);
+      src.start(start);
+      src.stop(start + 0.06);
+    }
+    const osc = ctx.createOscillator();
+    const g = ctx.createGain();
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(190 - i * 12, start);
+    osc.frequency.exponentialRampToValueAtTime(90, start + 0.08);
+    g.gain.setValueAtTime(0.0001, start);
+    g.gain.exponentialRampToValueAtTime(level * 0.55, start + 0.006);
+    g.gain.exponentialRampToValueAtTime(0.0001, start + 0.1);
+    osc.connect(g).connect(bus);
+    osc.start(start);
+    osc.stop(start + 0.12);
+  });
+  // A soft bell: a sine with a quiet inharmonic partial (2.76x, a struck bar) that dies faster than the fundamental.
+  cue.bells.forEach(({ midi, at, dur, gain }) => {
+    const start = t0 + at;
+    [[1, gain, dur], [2.76, gain * 0.18, dur * 0.35]].forEach(([ratio, level, length]) => {
+      const osc = ctx.createOscillator();
+      const g = ctx.createGain();
+      osc.type = 'sine';
+      osc.frequency.value = hz(midi) * ratio;
+      g.gain.setValueAtTime(0.0001, start);
+      g.gain.exponentialRampToValueAtTime(level, start + 0.012);
+      g.gain.exponentialRampToValueAtTime(0.0001, start + length);
+      osc.connect(g).connect(bus);
+      osc.start(start);
+      osc.stop(start + length + 0.05);
+    });
+  });
+};
+
+// createSoundKit(): { notify(id), swipe(direction), preview(), unlock(), isUnlocked(), ready(), intro(), unlockIfAllowed() }.
 export const createSoundKit = ({
   win = globalThis.window, doc = globalThis.document, nav = globalThis.navigator,
   enabled = () => soundEnabled(), interactions = () => interactionSoundEnabled(), volume = () => soundVolume(), now = () => Date.now(),
@@ -209,11 +280,11 @@ export const createSoundKit = ({
   // Pre-render each cue once into a buffer, so playback is one buffer start (no synthesis at swipe time).
   const prerender = () => {
     if (rendering || !OfflineCtx || !ctx) return rendering;
-    rendering = Promise.all(Object.entries(CUES).map(async ([name, cue]) => {
+    rendering = Promise.all([...Object.entries(CUES), ['intro', INTRO_CUE]].map(async ([name, cue]) => {
       try {
         const rate = ctx.sampleRate || 44100;
         const off = new OfflineCtx(1, Math.ceil(rate * cue.length), rate);
-        renderCue(off, off.destination, cue, 0.01);
+        if (name === 'intro') renderIntroCue(off, off.destination, 0.01); else renderCue(off, off.destination, cue, 0.01);
         const done = off.startRendering();
         buffers[name] = await (done && typeof done.then === 'function' ? done : new Promise((resolve) => { off.oncomplete = (e) => resolve(e.renderedBuffer); }));
       } catch { /* live synthesis instead */ }
@@ -281,7 +352,8 @@ export const createSoundKit = ({
       src.connect(gain);
       src.start();
     } else {
-      renderCue(ctx, gain, CUES[name], (ctx.currentTime || 0) + 0.01);   // not rendered yet: synthesize live
+      const at = (ctx.currentTime || 0) + 0.01;            // not rendered yet: synthesize live
+      if (name === 'intro') renderIntroCue(ctx, gain, at); else renderCue(ctx, gain, CUES[name], at);
     }
     const entry = { src, gain };
     current = entry;
@@ -305,8 +377,19 @@ export const createSoundKit = ({
     lastCue[name] = t;
     return play(name);
   };
+  // D-162: the deck's arrival. Follows the swipe-sounds switch and the volume. Browsers only let a page make sound
+  // after the member's first tap, click or key on it, so on a fresh reload the arrival is silent unless this page was
+  // already allowed (unlockIfAllowed); after any tap (Curated / Nearby, Try again, sign-in on this page) it plays.
+  const intro = () => play('intro');
+  const unlockIfAllowed = () => {
+    if (unlocked) return true;
+    let allowed = false;
+    try { allowed = Boolean(nav?.userActivation?.hasBeenActive) || nav?.getAutoplayPolicy?.('audiocontext') === 'allowed'; } catch { allowed = false; }
+    if (allowed) unlock();
+    return unlocked;
+  };
   return {
-    notify, swipe, unlock, preview: () => play('notify'),
+    notify, swipe, unlock, intro, unlockIfAllowed, preview: () => play('notify'),
     play: notify,                                    // D-134 name
     isUnlocked: () => unlocked, ready: () => rendering || Promise.resolve(),
   };

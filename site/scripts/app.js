@@ -69,6 +69,7 @@ import { quotaLabel, quotaErrorText, quotaBlocked, quotaNotice } from './signal-
 import { pitchLine, deckChips, deckEmptyState, deckFields, bandNote, deckCoverSrc } from './deck-view.js';
 import { createDeckSwipe, SWIPE, setSwipeCue } from './deck-swipe.js';
 import { maybeShowDeckTutorial } from './deck-tutorial.js';
+import { playDeckIntro, introAllowed } from './deck-intro.js';
 import { whyPanelMarkup, whyRow } from './why-panel.js';
 import { chatEmojiCategories } from './chat-emoji-data.js';
 import { attachEmojiPicker } from './emoji-field.js';
@@ -256,6 +257,7 @@ let messageSyncTimer = null;
 let connectionSyncTick = 0;
 const overlayIds = ['pitch-modal'];
 let deckTutorialTimer = 0; // offerDeckTutorial (D-094)
+const deckIntro = { played: false, running: null }; // maybePlayDeckIntro (D-162)
 const hiddenChatsStorageKey = () => `brivia-hidden-chats:${memberProfile.id || 'anonymous'}`;
 const readHiddenChatIds = () => {
   try {
@@ -1307,6 +1309,8 @@ const setView = (view) => {
   document.querySelectorAll('[data-nav]').forEach((button) => button.classList.toggle('is-active', button.dataset.nav === view));
   markCurrentNav(document, view);
   if (previousView === 'chat' || view === 'chat') { try { scheduleRowTyping(); } catch { /* best-effort */ } }
+  // D-162: Nearby back to Curated deals the deck again (the member's tap also lets the sound play).
+  if (view === 'explore' && previousView === 'nearby') deckIntro.played = false;
   if (view === 'explore') renderExplore();
   if (view === 'home' || view === 'explore') offerDeckTutorial();
   if (view === 'posts') {
@@ -1627,8 +1631,33 @@ const renderHome = (queue = getExplorePeople()) => {
   const count = document.querySelector('#queue-count');
   if (count) count.textContent = `${String(currentIndex + 1).padStart(2, '0')} / ${String(queue.length).padStart(2, '0')}`;
   renderWhy(currentPerson);
+  maybePlayDeckIntro();
   offerDeckTutorial();
 };
+// D-162: the deck's arrival (deck-intro.js): once per page load, the first time real people are on screen, and again
+// when the member switches from Nearby back to Curated. With the "deal" sound when this page may play audio.
+function maybePlayDeckIntro() {
+  const stack = document.querySelector('#swipe-stack');
+  const card = document.querySelector('#swipe-card');
+  if (!introAllowed({
+    played: deckIntro.played,
+    cardShown: Boolean(currentPerson && card && !card.hidden && !card.classList.contains('is-loading')),
+    viewShown: Boolean(stack && !stack.closest('[hidden]')),
+    pageVisible: document.visibilityState !== 'hidden',
+  })) return;
+  deckIntro.played = true;
+  const reduced = reducedMotion();
+  deckIntro.running = playDeckIntro({
+    stack,
+    card,
+    next: document.querySelector('#swipe-card-next'),
+    back: document.querySelector('#swipe-card-back'),
+    controls: [document.querySelector('.app-view[data-view="home"] .swipe-actions'), document.querySelector('.app-view[data-view="home"] .swipe-hint')],
+    reduced,
+    onStart: () => { if (!reduced && chime.unlockIfAllowed()) chime.intro(); },
+    onDone: () => { deckIntro.running = null; },
+  });
+}
 // D-115: the card shows the member's bio (member_bio, 0016: only for a member this viewer can see). Cached per id;
 // before 0016 the RPC is missing, so the line stays hidden and the deck never asks again this visit.
 const cardBioCache = new Map();
@@ -1655,6 +1684,7 @@ function renderCardBio(person) {
 function offerDeckTutorial() {
   window.clearTimeout(deckTutorialTimer);
   deckTutorialTimer = window.setTimeout(() => {
+    if (deckIntro.running) { offerDeckTutorial(); return; }
     const card = document.querySelector('#swipe-card');
     if (!currentPerson || !card || card.hidden || card.closest('[hidden]') || document.body.classList.contains('app-auth-pending')) return;
     if (!['home', 'explore'].includes(document.body.dataset.appView)) return;

@@ -7,6 +7,11 @@ Update this file at the end of every session. CLAUDE.md holds the aim; this file
 
 ## 1. What is done
 
+**2026-11-04, D-162:** the Connect deck is dealt in on load (three cards from below, a soft landing, a gloss) with a
+quiet synthesized "deal" sound that follows the swipe-sounds switch. Files `site/scripts/deck-intro.js`, `INTRO_CUE` in
+`site/scripts/notify-sound.js`, `.deck-intro-gloss` in `site/styles/deck.css`; test `tests/unit/deck-intro.test.mjs`.
+New dependency: `gsap` 3.15.1 (core only). More motion ideas: the launch-ux checklist M1-M11 plus the D-162 PR notes.
+
 **2026-11-04, D-157:** long-press (or right-click / Enter) a chat bubble: Copy, Edit (15 min, plain text), Unsend (for
 both, any time), Delete for me. Files `site/scripts/message-actions.js`, `site/styles/message-actions.css`; tests
 `tests/unit/message-actions.test.mjs`, `tests/e2e/message-actions.spec.mjs`, `supabase/tests/za-message-edit-unsend.test.sql`.
