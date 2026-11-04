@@ -3,10 +3,11 @@
 -- back. R is a completed real member who is not a tester; T is a completed real member who is a tester.
 --   HS1 counts: 14 open seeded roles on 12 seeded hirers, 6 seeded seekers, none duplicated by the second run
 --   HS2 every seeded hirer is over the hiring bar without a photo or a 14-day-old account (0047 exemption)
---   HS3 with open_test_world on, R sees the seeded hirer's card (positive control) but no banner, no "Open to roles",
---       and cannot ask about a seeded role; T sees the banner and the seeded seeker's "Open to roles"
+--   HS3 (0050, D-171) with open_test_world on, R sees the seeded banners and the seeded "Open to roles", like T; with it
+--       off, R sees no seeded banner, no seeded "Open to roles" and cannot ask about a seeded role, while T still does
 --   HS4 a real hirer's banner is unchanged for R (only seeded members are gated)
---   HS5 hiring_people (0048, D-169): T finds all 12 seeded hirers plus H, nearest first; R finds only H
+--   HS5 hiring_people (0048, D-169): with the world open R and T both find all 12 seeded hirers plus H, nearest first;
+--       with it closed R finds only H
 begin;
 create or replace function pg_temp.t(n int) returns uuid language sql immutable as $$
   select ('a7e57000-0000-4000-8000-' || lpad(n::text, 12, '0'))::uuid $$;
@@ -56,21 +57,30 @@ begin
   -- HS3
   if not public.brivia_visible_to(r, pg_temp.t(40)) then raise exception 'FAIL HS3: positive control, R cannot see t40 with the world open'; end if;
   perform pg_temp.as_member(r);
-  select count(*) into n from public.member_hiring(array[pg_temp.t(40), pg_temp.t(42), pg_temp.t(11)]);
-  if n <> 0 then raise exception 'FAIL HS3: a real non-tester sees % seeded banners', n; end if;
+  select count(*) into n from public.member_hiring(array[pg_temp.t(40), pg_temp.t(42)]);
+  if n <> 2 then raise exception 'FAIL HS3: with the world open a real member sees % seeded banners, expected 2', n; end if;
   select count(*) into n from public.member_open_to(pg_temp.t(39));
-  if n <> 0 then raise exception 'FAIL HS3: a real non-tester sees a seeded "Open to roles"'; end if;
+  if n <> 1 then raise exception 'FAIL HS3: with the world open a real member does not see t39''s "Open to roles"'; end if;
+
+  update public.brivia_world_switch set open_test_world = false, changed_at = now();
+  select count(*) into n from public.member_hiring(array[pg_temp.t(40), pg_temp.t(42), pg_temp.t(11)]);
+  if n <> 0 then raise exception 'FAIL HS3: with the world closed a real non-tester sees % seeded banners', n; end if;
+  select count(*) into n from public.member_open_to(pg_temp.t(39));
+  if n <> 0 then raise exception 'FAIL HS3: with the world closed a real non-tester sees a seeded "Open to roles"'; end if;
   begin
     perform public.ask_about_role('a7e57000-0000-4000-9000-000000000001'::uuid, 'Four years of ROS and C++ on real robots, happy to talk.');
     ok := false;
   exception when others then ok := true; end;
-  if not ok then raise exception 'FAIL HS3: a real non-tester asked about a seeded role'; end if;
+  if not ok then raise exception 'FAIL HS3: with the world closed a real non-tester asked about a seeded role'; end if;
+  select count(*) into n from public.hiring_people(50);
+  if n <> 1 then raise exception 'FAIL HS5: with the world closed a real non-tester finds % hiring people, expected only H', n; end if;
 
   perform pg_temp.as_member(t);
   select count(*) into n from public.member_hiring(array[pg_temp.t(40), pg_temp.t(42)]);
   if n <> 2 then raise exception 'FAIL HS3: the tester sees % seeded banners, expected 2', n; end if;
   select count(*) into n from public.member_open_to(pg_temp.t(39));
   if n <> 1 then raise exception 'FAIL HS3: the tester does not see t39''s "Open to roles"'; end if;
+  update public.brivia_world_switch set open_test_world = true, changed_at = now();
 
   -- HS4
   perform pg_temp.as_member(r);
@@ -79,7 +89,7 @@ begin
 
   -- HS5
   select count(*) into n from public.hiring_people(50);
-  if n <> 1 then raise exception 'FAIL HS5: a real non-tester finds % hiring people, expected only H', n; end if;
+  if n <> 13 then raise exception 'FAIL HS5: with the world open a real member finds % hiring people, expected 13', n; end if;
   perform pg_temp.as_member(t);
   select count(*) into n from public.hiring_people(50);
   if n <> 13 then raise exception 'FAIL HS5: the tester finds % hiring people, expected 13', n; end if;
@@ -95,5 +105,5 @@ begin
   select count(*) into n from public.hiring_people(3);
   if n <> 3 then raise exception 'FAIL HS5: the limit is not applied (% rows)', n; end if;
 end $$;
-select 'seed-hiring HS1-HS5 (seeded hirers only in the test world) OK';
+select 'seed-hiring HS1-HS5 (seeded hirers follow the open test world) OK';
 rollback;

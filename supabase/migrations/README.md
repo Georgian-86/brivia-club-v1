@@ -1324,3 +1324,10 @@ only. The client works either way (before 0048 the switch filters the loaded dec
 admission; fit 0.5 or more still decides; nearest first) and `hiring_people` (up to 200, nearest first). No grant
 change. Verify: `select pg_get_functiondef('public.hiring_suggestions(int)'::regprocedure) like '%place_km <= 60%';` (f).
 
+## 0050
+
+**Seeded hiring posts follow the open test world (D-171).** Apply after `0047`. Redefines `brivia_hiring_seen_by` to use
+`brivia_in_test_world` instead of `brivia_tester_world`: while `open_test_world` is on, every member sees the seeded
+roles and seeded "Open to roles" (nearest first, like real ones); with it off, only testers do. No grant change.
+Verify: `select pg_get_functiondef('public.brivia_hiring_seen_by(uuid,uuid)'::regprocedure) like '%brivia_in_test_world%';` (t).
+
