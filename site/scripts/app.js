@@ -1398,7 +1398,8 @@ const syncExploreQueue = () => {
 };
 
 // Why the deck is empty: the filters (when the loaded deck has cards they hide), else the server's deck_status().
-const deckEmptyCause = () => (filtersActive() && deckPeople().length ? 'filters' : deck.end);
+const onlyHiringLens = () => exploreFilters.hiring && !exploreFilters.query && !exploreFilters.skills.size && !exploreFilters.lookingFor.size;
+const deckEmptyCause = () => (filtersActive() && (deckPeople().length || exploreFilters.hiring) ? (onlyHiringLens() ? 'hiring' : 'filters') : deck.end);
 const renderDeckEmpty = (emptyState) => {
   const cause = deckEmptyCause();
   if (!cause) { emptyState.hidden = true; return; }
@@ -2060,6 +2061,34 @@ const renderPendingRequestTags = () => {
 };
 // D-141: the deck lift. Up to one hiring suggestion in every five cards, never the card already on screen.
 let hiringLifted = false;
+// D-169: turning the Hiring lens on searches for everyone who is hiring (hiring_people, 0048), not only the cards
+// already loaded: their cards join the deck right after the card on screen, nearest first. Before 0048 the lens
+// filters the loaded deck only.
+let hiringPeopleLoaded = false;
+async function pullHiringPeople() {
+  if (hiringPeopleLoaded || !hiring?.available()) return;
+  hiringPeopleLoaded = true;
+  const rows = await hiring.findPeople();
+  if (!rows) { hiringPeopleLoaded = false; return; }
+  const ids = rows.map((r) => String(r.id)).filter((id) => id !== String(memberProfile.id || '') && !deck.seen.has(id));
+  if (!ids.length) { renderExplore(); return; }
+  const missing = ids.filter((id) => !findPersonById(id));
+  if (missing.length) {
+    const { data } = await fetchCandidates(missing);
+    const bands = new Map(rows.map((r) => [String(r.id), r.distance_band]));
+    mergePeople((data || []).map((row) => ({ ...row, distance_band: row.distance_band || bands.get(String(row.id)) || null })));
+  }
+  const known = ids.filter((id) => findPersonById(id));
+  const rest = deck.ids.filter((id) => !known.includes(id));
+  deck.ids = [...known, ...rest];
+  await hiring.ensure(known);
+  renderExplore();
+}
+const setHiringLens = (on) => {
+  exploreFilters.hiring = on;
+  if (on) { void hiring?.ensure(deckPeople().map((p) => p.id)); void pullHiringPeople(); }
+  renderExplore();
+};
 async function liftHiringCards() {
   if (hiringLifted || !hiring?.available() || !deck.ready) return;
   hiringLifted = true;
@@ -4937,7 +4966,7 @@ function startHiring() {
     onChange: hiringRefresh,
     onNotificationsChange: () => renderNotifications(),
     openRequests: () => { if (pendingRequests.length) openRequestReview(); else showToast('No asks waiting right now.'); },
-    showLens: () => { exploreFilters.hiring = true; setView('home'); void hiring.ensure(deckPeople().map((p) => p.id)); renderExplore(); },
+    showLens: () => { setView('home'); setHiringLens(true); },
   });
   void hiring.boot();
 }
@@ -5797,16 +5826,8 @@ const clearDiscoveryFilters = () => {
   renderExplore();
 };
 document.querySelector('#clear-discovery-filters')?.addEventListener('click', clearDiscoveryFilters);
-document.querySelector('#hiring-toggle')?.addEventListener('click', () => {
-  exploreFilters.hiring = !exploreFilters.hiring;
-  if (exploreFilters.hiring) void hiring?.ensure(deckPeople().map((p) => p.id));
-  renderExplore();
-});
-document.querySelector('#filter-hiring')?.addEventListener('change', (event) => {
-  exploreFilters.hiring = event.currentTarget.checked;
-  if (exploreFilters.hiring) void hiring?.ensure(deckPeople().map((p) => p.id));
-  renderExplore();
-});
+document.querySelector('#hiring-toggle')?.addEventListener('click', () => setHiringLens(!exploreFilters.hiring));
+document.querySelector('#filter-hiring')?.addEventListener('change', (event) => setHiringLens(event.currentTarget.checked));
 // The empty deck's one next action (UX_SPEC §B): its kind comes from deckEmptyState().
 document.querySelector('#deck-empty-action')?.addEventListener('click', async (event) => {
   const kind = event.currentTarget.dataset.deckAction;

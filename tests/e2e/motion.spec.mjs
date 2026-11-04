@@ -1,4 +1,4 @@
-// D-168: every motion moment fires (D-164 deal-in, D-165 N1-N10, D-167 mutual), watched frame by frame in a real browser
+// D-168: every motion moment fires (D-164 deal-in, D-165 N1-N10, D-169 mutual), watched frame by frame in a real browser
 // against the stubbed Supabase. Run: PLAYWRIGHT_MODULE=/tmp/pw/node_modules/playwright/index.mjs node tests/e2e/motion.spec.mjs
 import { startAppStub, defaultDeckRows, PHOTO, ME } from './app-stub.mjs';
 const { chromium } = await import(process.env.PLAYWRIGHT_MODULE || 'playwright');

@@ -111,7 +111,7 @@ Engineer in Thane, Backend Engineer and Brand Marketing Manager in Mumbai, Produ
 Bengaluru, Senior Data Engineer in Pune, Data Analyst in Delhi, a few remote roles) and 6 seeded seekers a findable
 "Roles I'm open to". Only the test world sees them (migration `0047`): add your account as a tester first (above).
 
-1. Apply `0037_hiring.sql`, then `0047_hiring_test_world.sql` (migrations README).
+1. Apply `0037_hiring.sql`, then `0047_hiring_test_world.sql`, then `0048_hiring_people.sql` (migrations README).
 2. Run `test-members.sql` if the test members are not there yet, then run `hiring-test-members.sql` (safe to re-run:
    it reopens every seeded role for 30 days). It stops with a clear message if 0037, 0047 or the members are missing.
 3. Run the `brivia_tester` insert above with your email, then reload the app.
