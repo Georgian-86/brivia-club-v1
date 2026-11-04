@@ -86,6 +86,16 @@ body.app-body .app-view[data-view="home"] .swipe-card .swipe-card-info {
   background: transparent;
   color: var(--color-name-ink);
 }
+/* View profile never leaves the card: when the cover is at its minimum and late lines arrive (the hiring strip, the
+   work line), the info block may shrink, and only the chip area gives up rows (fitCardChips hides a half chip). */
+body.app-body .app-view[data-view="home"] .swipe-card .swipe-card-info {
+  display: flex;
+  flex: 0 1 auto;
+  flex-direction: column;
+}
+body.app-body .app-view[data-view="home"] .swipe-card .swipe-card-info > * { flex: 0 0 auto; }
+body.app-body .app-view[data-view="home"] .swipe-card .swipe-card-info > #swipe-tags { position: relative; flex: 0 1 auto; min-height: 0; overflow: hidden; }
+body.app-body .app-view[data-view="home"] .swipe-card .swipe-card-info > [hidden] { display: none; }
 body.app-body .app-view[data-view="home"] .swipe-card .swipe-card-info::before {
   top: calc(var(--ref-avatar) * -.6);
   left: 10px;

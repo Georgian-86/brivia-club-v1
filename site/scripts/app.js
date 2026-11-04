@@ -1457,8 +1457,10 @@ const fitCardChips = () => {
   const chips = [...container.children].filter((el) => el.tagName === 'SPAN');
   chips.forEach((chip) => { chip.hidden = false; });
   if (container.scrollHeight <= container.clientHeight + 1) return;
-  const limit = container.getBoundingClientRect().bottom + 1;
-  chips.forEach((chip) => { if (chip.getBoundingClientRect().bottom > limit) chip.hidden = true; });
+  // Layout offsets, not screen boxes: the deal-in turns the card in 3D, which skews getBoundingClientRect. The chip
+  // area is position: relative, so each chip's offsetTop is measured from it.
+  const limit = container.clientHeight + 1;
+  chips.forEach((chip) => { if (chip.offsetTop + chip.offsetHeight > limit) chip.hidden = true; });
 };
 let chipFitObserver = null;
 const watchCardChips = () => {
@@ -1466,8 +1468,18 @@ const watchCardChips = () => {
   const card = document.querySelector('#swipe-card');
   if (!card) return;
   let frame = 0;
-  chipFitObserver = new ResizeObserver(() => { cancelAnimationFrame(frame); frame = requestAnimationFrame(fitCardChips); });
+  const refit = () => { cancelAnimationFrame(frame); frame = requestAnimationFrame(fitCardChips); };
+  chipFitObserver = new ResizeObserver(refit);
   chipFitObserver.observe(card);
+  // Lines that arrive after the card is drawn (the hiring strip, the work line, a bio) change the room left for the
+  // chips without resizing the card. Changes inside the chip area itself (fitCardChips hiding a chip) are ignored.
+  const info = card.querySelector('.swipe-card-info');
+  const tags = card.querySelector('#swipe-tags');
+  if (tags) chipFitObserver.observe(tags);   // squeezed by a late line or an image that loads after it
+  if (info && typeof MutationObserver === 'function') {
+    new MutationObserver((records) => { if (records.some((r) => !tags?.contains(r.target) || r.target === tags)) refit(); })
+      .observe(info, { childList: true, subtree: true, characterData: true, attributes: true, attributeFilter: ['hidden'] });
+  }
 };
 
 // While the deck loads (first load, a refill, Try again) the card keeps its place and shows one skeleton card, so the
