@@ -3429,8 +3429,8 @@ controls (a tester or a seeded test member), never a real member, so no new expo
 
 - **Asked:** "Make the stacking animation more lenghty and better kinda like shuffle in solitaire. Use the
   professionally designing skills". Supersedes D-164's 0.9 s deal-in.
-- **Motion (`site/scripts/deck-intro.js`, about 3 s, five beats):** a squared pack of eight card backs (deep wine,
-  a fine cream lattice, a hairline frame, the club's italic B) rises into the card's place; it splits into two halves
+- **Motion (`site/scripts/deck-intro.js`, about 3 s, five beats):** a squared pack of eight card backs (
+  cream with a faint wine lattice, a hairline frame, the club wordmark "the Brivia CLUB · Swipe. Match. Build") rises into the card's place; it splits into two halves
   that lean apart; the halves riffle back together one card at a time, alternating, bottom cards first; the pack is
   squared with a small tap; then the back two cards slide out behind it, the pack's top card turns edge-on and the
   member's card flips face up in its place. The stack takes the weight, the gloss crosses, Pass / Pitch rise in. On a
@@ -3444,3 +3444,6 @@ controls (a tester or a seeded test member), never a real member, so no new expo
   card showed for one frame); the dealt cards and controls are now hidden with a set and revealed with a to-tween.
 - **Proof:** unit 516 (`deck-intro.test.mjs`: beat order, a real riffle, sound in sync); deck 201/201, app-shell
   214/214, deck-tutorial, motion (10/10), sounds, work-identity; frame captures at 390 and 1440.
+- **Card backs (follow-up, same PR):** Arovas asked for their logo on the backs instead of the B. The PNG was cut to a
+  transparent, trimmed `site/media/assets/brivia-wordmark.webp` (560 px, ~36 KB; original kept in `source-media/`),
+  the backs went cream so its ink and rust read clearly, and `app.js` preloads it so the first shuffle frame has it.

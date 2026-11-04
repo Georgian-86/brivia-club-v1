@@ -70,6 +70,9 @@ import { pitchLine, deckChips, deckEmptyState, deckFields, bandNote, deckCoverSr
 import { createDeckSwipe, SWIPE, setSwipeCue } from './deck-swipe.js';
 import { maybeShowDeckTutorial } from './deck-tutorial.js';
 import { playDeckIntro, introAllowed } from './deck-intro.js';
+import shuffleWordmark from '../media/assets/brivia-wordmark.webp';
+// D-174: the shuffle's card backs carry the wordmark; fetch it now so the first frame of the shuffle already has it.
+try { const img = new Image(); img.decoding = 'async'; img.src = shuffleWordmark; } catch { /* no Image: no preload */ }
 import { mutualMoment, pitchSentFlight, flipIn, attachCardTilt, shimmerShared, slideModePill, markArrivals, revealOnScroll } from './motion-moments.js';
 import { whyPanelMarkup, whyRow } from './why-panel.js';
 import { chatEmojiCategories } from './chat-emoji-data.js';
