@@ -2494,11 +2494,11 @@ const renderFilterOptions = () => {
     const line = lens.querySelector('#filter-hiring-label');
     if (line && hiring?.available()) line.textContent = hiring.lensLabel();
   }
-  // D-162: the one-tap Hiring toggle beside Curated / Nearby mirrors the same lens.
+  // D-162/D-163: the one-tap Hiring switch beside the filter button mirrors the same lens.
   const toggle = document.querySelector('#hiring-toggle');
   if (toggle) {
     toggle.hidden = !hiring?.available();
-    toggle.setAttribute('aria-pressed', String(Boolean(exploreFilters.hiring)));
+    toggle.setAttribute('aria-checked', String(Boolean(exploreFilters.hiring)));
     if (hiring?.available()) toggle.title = hiring.lensLabel();
   }
 };

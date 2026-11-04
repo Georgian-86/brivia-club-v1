@@ -3263,3 +3263,14 @@ controls (a tester or a seeded test member), never a real member, so no new expo
   them. Seeded members skip the photo and 14-day parts of the hiring bar, since they never carry a photo.
 - **Not done:** seeded members' Looking for is unchanged (no "Hiring" tag a real member could see).
 
+## D-163 (2026-11-04): the Hiring toggle moves beside the filter button, as a quick-filter switch
+
+- **Asked:** "the toggle button is not looking good. Seach for a good spot to fit the button and redesign it
+  professionally" (ui-ux-pro-max).
+- **Done:** the D-162 pill sat in the Curated / Nearby row, a second wine block with the same weight as a mode that
+  read as a third mode. It is a filter, so it now sits beside the discovery-filter button (`.home-tools`), where the two
+  read as one filter group, and the Curated / Nearby switch keeps its full width on phones. It is a `role="switch"`
+  with `aria-checked`: briefcase, "Hiring" in the body font at 14 px, and a 30 × 18 track. Off it uses the filter
+  button's cream-and-wine frame, and on it fills deep wine with a cream knob, like the filter button when its drawer
+  is open. It is 44 px tall and adds no height to the deck.
+
