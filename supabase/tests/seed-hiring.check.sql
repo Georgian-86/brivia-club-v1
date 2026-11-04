@@ -6,8 +6,9 @@
 --   HS3 (0050, D-171) with open_test_world on, R sees the seeded banners and the seeded "Open to roles", like T; with it
 --       off, R sees no seeded banner, no seeded "Open to roles" and cannot ask about a seeded role, while T still does
 --   HS4 a real hirer's banner is unchanged for R (only seeded members are gated)
---   HS5 hiring_people (0048, D-169): with the world open R and T both find all 12 seeded hirers plus H, nearest first;
---       with it closed R finds only H
+--   HS5 hiring_people (0048, D-169; 0052, D-178): with the world open R and T both find all 12 seeded hirers plus H,
+--       and the seeded seekers who chose Everyone; with it closed R finds only H. Order by score, never by distance
+--       (D-178 supersedes D-170's nearest first); the band is a place name or 'Abroad', never km.
 begin;
 create or replace function pg_temp.t(n int) returns uuid language sql immutable as $$
   select ('a7e57000-0000-4000-8000-' || lpad(n::text, 12, '0'))::uuid $$;
@@ -74,6 +75,7 @@ begin
   if not ok then raise exception 'FAIL HS3: with the world closed a real non-tester asked about a seeded role'; end if;
   select count(*) into n from public.hiring_people(50);
   if n <> 1 then raise exception 'FAIL HS5: with the world closed a real non-tester finds % hiring people, expected only H', n; end if;
+  if (select hiring_kind from public.hiring_people(50) limit 1) <> 'hiring' then raise exception 'FAIL HS5: H is not kind hiring'; end if;
 
   perform pg_temp.as_member(t);
   select count(*) into n from public.member_hiring(array[pg_temp.t(40), pg_temp.t(42)]);
@@ -88,20 +90,18 @@ begin
   if n <> 1 then raise exception 'FAIL HS4: a real hirer''s banner is hidden from a real member (% rows)', n; end if;
 
   -- HS5
-  select count(*) into n from public.hiring_people(50);
+  select count(*) into n from public.hiring_people(50) where hiring_kind = 'hiring';
   if n <> 13 then raise exception 'FAIL HS5: with the world open a real member finds % hiring people, expected 13', n; end if;
+  select count(*) into n from public.hiring_people(50) where hiring_kind = 'open_to';
+  if n <> (select count(*) from public.role_intent i where i.member_id::text like 'a7e57000-%' and i.visibility = 'everyone') then
+    raise exception 'FAIL HS5: % seeded seekers open to everyone, expected every one of them', n; end if;
   perform pg_temp.as_member(t);
-  select count(*) into n from public.hiring_people(50);
+  select count(*) into n from public.hiring_people(50) where hiring_kind = 'hiring';
   if n <> 13 then raise exception 'FAIL HS5: the tester finds % hiring people, expected 13', n; end if;
-  -- nearest first: every hirer in the caller's own place (Thane, or a ~3 / ~10 km ring) before anyone farther
-  if exists (select 1 from (select row_number() over () as k, distance_band b from public.hiring_people(50)) x
-              where x.b not in ('~3 km', '~10 km', (select name from public.place where id = public.brivia_nearest_place(c)))
-                and exists (select 1 from (select row_number() over () as k, distance_band b from public.hiring_people(50)) y
-                             where y.k > x.k and y.b in ('~3 km', '~10 km', (select name from public.place where id = public.brivia_nearest_place(c)))))
-  then raise exception 'FAIL HS5: a farther hirer comes before a nearer one'; end if;
-  if (select count(*) from public.hiring_people(50) where distance_band in ('~3 km', '~10 km', (select name from public.place where id = public.brivia_nearest_place(c)))) < 3 then
-    raise exception 'FAIL HS5: the Thane hirers are missing'; end if;
-  if exists (select 1 from public.hiring_people(50) where distance_band ~ '[0-9]+\.[0-9]') then raise exception 'FAIL HS5: an exact distance leaked'; end if;
+  -- D-178: ranked by score, never by distance; one page after another repeats no one
+  if exists (select 1 from (select score, lag(score) over (order by k) prev from (select row_number() over () k, score from public.hiring_people(50)) z) q
+              where q.prev < q.score) then raise exception 'FAIL HS5: not in score order'; end if;
+  if exists (select 1 from public.hiring_people(50) where distance_band ~ '[0-9]') then raise exception 'FAIL HS5: a distance leaked'; end if;
   select count(*) into n from public.hiring_people(3);
   if n <> 3 then raise exception 'FAIL HS5: the limit is not applied (% rows)', n; end if;
 end $$;

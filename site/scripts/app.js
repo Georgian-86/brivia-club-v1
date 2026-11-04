@@ -1412,7 +1412,7 @@ const explorePersonMatches = (person) => {
   const hasSkillSearch = !skillQuery || skills.some((skill) => normalizedValue(skill).includes(skillQuery));
   const hasLookingSearch = !lookingQuery || lookingFor.some((item) => normalizedValue(item).includes(lookingQuery));
   const hasName = !query || normalizedValue(person.name).includes(query);
-  const hasHiring = !exploreFilters.hiring || Boolean(hiring?.matchesLens(person));
+  const hasHiring = !exploreFilters.hiring || hiringPool.kinds.has(String(person.id)) || Boolean(hiring?.matchesLens(person));
   return hasName && hasSkill && hasLookingFor && hasSkillSearch && hasLookingSearch && hasHiring;
 };
 const filtersActive = () => Boolean(exploreFilters.query || exploreFilters.skills.size || exploreFilters.lookingFor.size || exploreFilters.hiring || filterDrafts.skills || filterDrafts.lookingFor);
@@ -1686,12 +1686,19 @@ const renderHome = (queue = getExplorePeople()) => {
   if (bandNoteEl) {
     const note = bandNote(currentPerson.distanceBand);
     bandNoteEl.textContent = note;
-    bandNoteEl.hidden = !note;
+    // D-178: Global hiring discovery ignores distance, so the "distances appear as your area fills up" note is noise there.
+    bandNoteEl.hidden = !note || exploreFilters.hiring;
   }
   const tags = document.querySelector('#swipe-tags'); if (tags) { renderCardChips(tags, currentPerson); if (newCardShown) shimmerShared(tags); }
   // D-141: a hirer's bar says HIRING; the role strip shows when the role fits what this member is open to.
   if (hiring?.available()) {
     hiring.decorateCard(currentPerson, { label: cardLabel, strip: document.querySelector('#swipe-hiring'), tags });
+    // D-178: a member who is open to a role (not hiring) reads OPEN TO · <title> while the hiring lens is on.
+    const poolId = String(currentPerson.id || '');
+    if (cardLabel && exploreFilters.hiring && hiringPool.kinds.get(poolId) === 'open_to' && !cardLabel.classList.contains('is-hiring')) {
+      const title = hiringPool.titles.get(poolId);
+      cardLabel.textContent = title ? `Open to · ${title}` : 'Open to opportunities';
+    }
     void hiring.ensure(queue.slice(0, 12).map((p) => p.id));
   } else { const strip = document.querySelector('#swipe-hiring'); if (strip) strip.hidden = true; }
   fitCardChips();
@@ -2102,32 +2109,73 @@ const renderPendingRequestTags = () => {
 };
 // D-141: the deck lift. Up to one hiring suggestion in every five cards, never the card already on screen.
 let hiringLifted = false;
-// D-169: turning the Hiring lens on searches for everyone who is hiring (hiring_people, 0048), not only the cards
-// already loaded: their cards join the deck right after the card on screen, nearest first. Before 0048 the lens
-// filters the loaded deck only.
-let hiringPeopleLoaded = false;
-async function pullHiringPeople() {
-  if (hiringPeopleLoaded || !hiring?.available()) return;
-  hiringPeopleLoaded = true;
-  const rows = await hiring.findPeople();
-  if (!rows) { hiringPeopleLoaded = false; return; }
+// D-169 / D-178: Global Hiring Discovery. With the Hiring switch on, the deck is everyone hiring or open to roles,
+// anywhere (hiring_people, 0052: best fit first, never by distance), paged 30 at a time as the queue runs low. The
+// pool remembers each member's kind ('hiring' | 'open_to') and role title for the card's bar. While the switch is on
+// it refreshes every minute and when the tab returns: new people join the end of the queue, and anyone who closed
+// their role (or is no longer open) leaves it. Nearby is separate and untouched. Before 0052: one page of hirers.
+const hiringPool = { kinds: new Map(), titles: new Map(), after: null, end: false, loading: null, timer: 0 };
+const addHiringRows = async (rows, { front = false } = {}) => {
+  rows.forEach((r) => { hiringPool.kinds.set(String(r.id), r.hiring_kind || 'hiring'); hiringPool.titles.set(String(r.id), r.role_title || ''); });
   const ids = rows.map((r) => String(r.id)).filter((id) => id !== String(memberProfile.id || '') && !deck.seen.has(id));
-  if (!ids.length) { renderExplore(); return; }
+  if (!ids.length) return 0;
   const missing = ids.filter((id) => !findPersonById(id));
   if (missing.length) {
     const { data } = await fetchCandidates(missing);
     const bands = new Map(rows.map((r) => [String(r.id), r.distance_band]));
-    mergePeople((data || []).map((row) => ({ ...row, distance_band: row.distance_band || bands.get(String(row.id)) || null })));
+    mergePeople((data || []).map((row) => ({ ...row, distance_band: bands.get(String(row.id)) || row.distance_band || null })));
   }
   const known = ids.filter((id) => findPersonById(id));
-  const rest = deck.ids.filter((id) => !known.includes(id));
-  deck.ids = [...known, ...rest];
+  const fresh = known.filter((id) => !deck.ids.includes(id));
+  if (front) deck.ids = [...known, ...deck.ids.filter((id) => !known.includes(id))];
+  else deck.ids = [...deck.ids, ...fresh];
   await hiring.ensure(known);
-  renderExplore();
+  return front ? known.length : fresh.length;
+};
+async function pullHiringPeople({ restart = false } = {}) {
+  if (!hiring?.available() || !exploreFilters.hiring) return;
+  if (hiringPool.loading) return hiringPool.loading;
+  if (restart) { hiringPool.after = null; hiringPool.end = false; }
+  if (hiringPool.end) return;
+  hiringPool.loading = (async () => {
+    const page = await hiring.findPeople(hiringPool.after);
+    if (!page) return;
+    hiringPool.end = page.end;
+    const last = page.rows.at(-1);
+    if (last) hiringPool.after = { score: last.score ?? null, id: last.id };
+    await addHiringRows(page.rows, { front: restart });
+  })().finally(() => { hiringPool.loading = null; });
+  await hiringPool.loading;
+  if (exploreFilters.hiring) renderExplore();
 }
+// Live changes: the first page again. New people go to the end of the queue; when that page is the whole list, queued
+// members it no longer has (role closed, no longer open) leave the queue (never the card on screen).
+async function refreshHiringPool() {
+  if (!exploreFilters.hiring || !hiring?.available() || document.visibilityState === 'hidden' || hiringPool.loading) return;
+  const page = await hiring.findPeople(null);
+  if (!page || !exploreFilters.hiring) return;
+  const added = await addHiringRows(page.rows);
+  let removed = 0;
+  if (page.end) {
+    const still = new Set(page.rows.map((r) => String(r.id)));
+    const onScreen = String(currentPerson?.id || '');
+    const gone = [...hiringPool.kinds.keys()].filter((id) => !still.has(id) && id !== onScreen);
+    gone.forEach((id) => hiringPool.kinds.delete(id));
+    const before = deck.ids.length;
+    deck.ids = deck.ids.filter((id) => !gone.includes(id));
+    removed = before - deck.ids.length;
+  }
+  if (added || removed) renderExplore();
+}
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') void refreshHiringPool(); });
 const setHiringLens = (on) => {
   exploreFilters.hiring = on;
-  if (on) { void hiring?.ensure(deckPeople().map((p) => p.id)); void pullHiringPeople(); }
+  window.clearInterval(hiringPool.timer);
+  if (on) {
+    void hiring?.ensure(deckPeople().map((p) => p.id));
+    void pullHiringPeople({ restart: true });
+    hiringPool.timer = window.setInterval(() => { void refreshHiringPool(); }, 60000);
+  }
   renderExplore();
 };
 async function liftHiringCards() {
@@ -2717,6 +2765,18 @@ const renderFilterOptions = () => {
     toggle.setAttribute('aria-checked', String(Boolean(exploreFilters.hiring)));
     if (hiring?.available()) toggle.title = hiring.lensLabel();
   }
+  // D-178: while the switch is on, a quiet label says the deck is global, not local.
+  const tools = document.querySelector('.app-view[data-view="home"] .home-tools');
+  let globalLabel = document.querySelector('#hiring-global-label');
+  if (!globalLabel && tools) {
+    globalLabel = document.createElement('p');
+    globalLabel.id = 'hiring-global-label';
+    globalLabel.className = 'hiring-global-label';
+    globalLabel.setAttribute('role', 'status');
+    globalLabel.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="8.5"/><path d="M3.5 12h17M12 3.5c2.4 2.4 3.6 5.2 3.6 8.5s-1.2 6.1-3.6 8.5c-2.4-2.4-3.6-5.2-3.6-8.5S9.6 5.9 12 3.5Z"/></svg><span>Global hiring discovery</span>';
+    tools.after(globalLabel);
+  }
+  if (globalLabel) globalLabel.hidden = !(exploreFilters.hiring && hiring?.available());
 };
 const updateDiscoveryFilterResult = (count) => {
   const result = document.querySelector('#discovery-filter-result');
@@ -2735,6 +2795,8 @@ const renderExplore = () => {
   renderFilterOptions();
   updateDiscoveryFilterResult(queue.length);
   renderHome(queue);
+  // D-178: Global Hiring Discovery pages on as the queue runs low.
+  if (exploreFilters.hiring && queue.length < 5 && !hiringPool.end && !hiringPool.loading) void pullHiringPeople();
   // The queue ran out (not just filtered away): load once more, then deck_status() decides the empty state.
   if (!queue.length && deck.ready && !deckPeople().length && !deck.end && !deck.loading) refillDeck();
 };

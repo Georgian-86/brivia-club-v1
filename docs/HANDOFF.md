@@ -7,6 +7,11 @@ Update this file at the end of every session. CLAUDE.md holds the aim; this file
 
 ## 1. What is done
 
+**2026-11-04, D-178:** Global Hiring Discovery: the Connect Hiring switch shows everyone, anywhere, who is hiring or
+open to roles, ranked by fit + shared interests + skills (not distance), paged, refreshed live, with a "Global hiring
+discovery" label (migration 0052). Fixes the once-per-session hiring load and unstored passes on hiring cards.
+**Owed: apply 0052 with the client deploy** (README "0052").
+
 **2026-11-04, D-177:** paid events take payment with Razorpay (order, verify, webhook; refunds a lost seat) and every
 confirmed seat gets an emailed invitation ticket via Resend (with a calendar invite) and a ticket sound. **Owed: the
 founder's Resend domain + key and Razorpay keys + webhook (migrations README "0051"), then apply 0051 and deploy the four

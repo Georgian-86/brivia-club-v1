@@ -203,3 +203,18 @@ body.app-body .hiring-toggle:focus-visible { outline: 2px solid var(--color-wine
 @media (prefers-reduced-motion: reduce) { body.app-body .hiring-toggle, .hiring-toggle-track, .hiring-toggle-track i { transition: none; } }
 /* Phones (founder, 2026-11-04): the filter button stays left, the Hiring switch sits at the right end of the row. */
 @media (max-width: 849px) { body.app-body .home-tools .hiring-toggle { margin-left: auto; } }
+
+/* D-178: the subtle "Global hiring discovery" label under the Connect tools, only while the Hiring lens is on. */
+.hiring-global-label {
+  display: inline-flex; align-items: center; gap: var(--space-2); margin: var(--space-2) 0 0; padding: 4px 10px;
+  border: 1px solid color-mix(in srgb, var(--color-wine) 18%, transparent); border-radius: 999px;
+  background: color-mix(in srgb, var(--color-wine) 5%, transparent); color: var(--color-wine-deep);
+  font-family: var(--font-body); font-size: var(--text-12); font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase;
+  line-height: 1.2; max-width: 100%;
+}
+.hiring-global-label[hidden] { display: none; }
+.hiring-global-label svg { flex: none; width: 13px; height: 13px; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; }
+@media (prefers-reduced-motion: no-preference) {
+  .hiring-global-label:not([hidden]) { animation: hiring-global-in 240ms ease-out; }
+  @keyframes hiring-global-in { from { opacity: 0; transform: translateY(-2px); } to { opacity: 1; transform: none; } }
+}

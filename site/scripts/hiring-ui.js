@@ -550,13 +550,24 @@ export const createHiring = (deps) => {
   // The Hiring lens: a seeker sees only hirers whose roles fit; anyone else, everyone who is hiring.
   // D-169: the lens shows everyone who is hiring (roles that fit come first in hiring_people's order).
   const lensLabel = () => 'Only people who are hiring';
-  // hiring_people (0048): members with a live role, nearest first. null when the RPC is not there yet.
-  const findPeople = async () => {
+  // hiring_people: D-178 (0052) pages through everyone hiring or open to roles, anywhere, best fit first
+  // ({ rows, end }; after = { score, id } of the last row seen). Before 0052 the D-169 call (200 hirers, one page).
+  // null when the RPC is not there yet.
+  const PAGE = 30;
+  let paged = true;
+  const findPeople = async (after = null) => {
     await boot();
     if (!state.available) return null;
+    if (paged) {
+      const { data, error } = await rpc('hiring_people', { p_limit: PAGE, p_after_score: after?.score ?? null, p_after_id: after?.id ?? null });
+      if (!error) return { rows: data || [], end: (data || []).length < PAGE };
+      if (!['PGRST202', '42883'].includes(error.code)) return null;
+      paged = false;                                   // before 0052: the single-page call
+    }
+    if (after) return { rows: [], end: true };
     const { data, error } = await rpc('hiring_people', { p_limit: 200 });
     if (error) return null;
-    return data || [];
+    return { rows: data || [], end: true };
   };
   const matchesLens = (person) => {
     const hiring = hiringOf(person?.id);

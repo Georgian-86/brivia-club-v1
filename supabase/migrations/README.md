@@ -1354,3 +1354,14 @@ Setup, in this order (only the founder can do 1-3: they are accounts, keys and D
    calendar invite, and Razorpay's dashboard shows the webhook delivered. Then switch Razorpay to Live mode (new live
    keys in the secrets; the webhook re-added for live).
 Verify: `select column_name from information_schema.columns where table_name = 'event_rsvp' and column_name in ('payment_order_id','ticket_code','ticket_sent_at');` (3 rows).
+
+## 0052
+
+**Global Hiring Discovery (D-178).** Not applied yet. Apply after `0050` (independent of `0051`), with the client
+deploy (the new client falls back to the old call until it is in; the old client still reads the new answer).
+Replaces `hiring_people` with `hiring_people(int, numeric, uuid)`: members with a shown role and members open to roles,
+anywhere, ranked by fit, shared interests and skills, paged; logs an impression per row (surface `hiring`). Grant:
+`authenticated` only. Expect the usual advisor warning for a security-definer RPC.
+Verify: `select count(*) from pg_proc where proname = 'hiring_people';` (1) and
+`select pg_get_function_identity_arguments('public.hiring_people'::regproc);` (`p_limit integer, p_after_score numeric, p_after_id uuid`).
+

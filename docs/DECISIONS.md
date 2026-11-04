@@ -3498,3 +3498,26 @@ D-164 deal (`deck-intro.js`); D-173's own intro deal is not used, only its daily
   https-only links, the .ics, Checkout options, the cue); SQL harness (zb-event-tickets); e2e `event-payment.spec.mjs`
   EP1-EP6 (17 checks), events 75, create-event 151, companions 65. The Deno functions were not run here (no Deno in
   this environment): their logic lives in the tested shared files, and they need a test-mode run once deployed.
+
+## D-178 (2026-11-04): Global Hiring Discovery: the Hiring switch reaches everyone, ranked by fit, not distance
+- **Asked (founder, 2026-11-05):** "Toggle Hiring ON → instantly discover professionals who are open to hiring
+  opportunities anywhere in the world. No geographical restrictions whatsoever." Rank by skills, interests, experience
+  and compatibility; page; live updates; respect privacy, blocks and deleted accounts; a subtle "GLOBAL HIRING
+  DISCOVERY" label; Curated, Nearby and Hiring stay independent. Founder chose "Extend the live one": one query.
+- **Decision:** migration 0052 replaces `hiring_people` under the same name. It adds members open to roles
+  (`member_open_to`'s rule, so a seeker who chose "open roles only" is shown only to a hirer with an open role) to
+  members with a shown role; drops distance from the order (supersedes D-170's nearest first for this query only;
+  `hiring_suggestions` keeps it); scores 0.5 fit + 0.35 shared interests + 0.15 shared skills; pages by keyset; logs an
+  impression per row served. The client keeps a paging pool (`hiringPool`), refreshes every 60 s and on tab return
+  while the switch is on, and falls back to the old single call if 0052 is not applied yet.
+- **Found on the way:** (1) the old client loaded the hiring cards once per session (`hiringPeopleLoaded` never reset),
+  so turning the switch off and on again, or a new role elsewhere, showed nothing new: the likely cause of the founder's
+  empty hiring deck. (2) Those cards came from `get_candidates`, which logs no impression, so a Pass on a far hiring
+  card was dropped by `brivia_interaction_served` and did not count toward the 10 daily swipes. Both fixed.
+- **Privacy:** the band is a place name or "Abroad", never a cell, a city/state pair or km; no email or phone is sent;
+  mutual consent unchanged (a card still needs a like back or an accepted request).
+- **Proof:** SQL harness `zc-global-hiring.test.sql` G1-G6 (grants, eligibility across cities, ranking, pages with no
+  repeats, impressions and stored passes, close/reopen, kill switch, incomplete caller) and `seed-hiring.check.sql` HS5;
+  unit 535; e2e hiring (all pass), deck 201, deck-ritual, explore-cards 74. `nearby.spec` (D-138 settings row) and
+  `consent.spec` (cancelKeepsCard timeout) fail the same way without this change.
+

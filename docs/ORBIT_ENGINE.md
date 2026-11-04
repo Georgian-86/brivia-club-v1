@@ -1189,9 +1189,10 @@ Hiring is a lane beside the deck, not a change to it: `deck_candidates` and the 
   0.6; else 0; an internship pairs only with intern or entry) × mode (the role's mode is one the seeker picked, 1, else
   0) × (0.8 + 0.2 × min(1, shared skills / 3)). On-site and hybrid pairs must also pass the location admission below.
   Fit ≥ 0.5 is "Fits what you're open to".
-- **Location first, never a cut (D-170, 0049).** `hiring_suggestions` and `hiring_people` show every vacancy at any
-  distance, nearest first (own ~3 / ~10 km rings, then the nearest place; fit breaks ties), and answer only the
-  distance band, never a cell, a city or km. This is the hiring lane only: the deck's Escape-Velocity gate is unchanged.
+- **Location first, never a cut (D-170, 0049).** `hiring_suggestions` shows every vacancy at any distance, nearest
+  first (own ~3 / ~10 km rings, then the nearest place; fit breaks ties), and answers only the distance band, never a
+  cell, a city or km. This is the hiring lane only: the deck's Escape-Velocity gate is unchanged. (`hiring_people`, the
+  Hiring switch, no longer orders by distance: see "The toggle", D-178.)
 - **The lift.** The client puts at most one suggestion in every five deck cards (`interleaveLift`), never in place of
   the card on screen. Suggestions are mutual-consent like everything else: "Ask about this role" sends a signal
   (`send_connect_request`, the daily quota and the waiting cap apply) with the role tag; a connection exists only when
@@ -1206,10 +1207,20 @@ Hiring is a lane beside the deck, not a change to it: `deck_candidates` and the 
   `open_test_world` is on, the same rule as the deck; switching it off leaves only testers) (`brivia_hiring_seen_by`, applied in
   `brivia_role_shown`, `member_open_to` and both sides of `hiring_suggestions`). Seeded members skip the photo and
   14-day parts of the bar (they never carry a photo, D-156); completed, confirmed email and no open flag still apply.
-- **The toggle.** Connect carries a one-tap Hiring switch beside the discovery-filter button (`#hiring-toggle`,
-  `role="switch"`, D-166). Turning it on calls `hiring_people` (0048, D-169): everyone with a shown role the member can
-  see, roles that fit first, then nearest, no distance cut, distance band only; those cards join the front of the deck.
-  It is the same lens as the drawer's switch, filters the loaded deck only and never changes the ORBIT order.
+- **The toggle: Global Hiring Discovery (D-178, migration 0052; was D-169/D-170).** Connect carries a one-tap Hiring
+  switch beside the discovery-filter button (`#hiring-toggle`, `role="switch"`, D-166). Turning it on calls
+  `hiring_people(p_limit, p_after_score, p_after_id)`: every member, anywhere, who has a shown role (kind `hiring`) or
+  is open to roles under `member_open_to`'s rule (kind `open_to`: they chose Everyone, or the caller has an open role
+  and is not at their private company). No distance cut and no distance in the order: score = 0.5 × role fit (either
+  way round) + 0.35 × shared interests (shared points / 20, as the deck) + 0.15 × min(1, shared skills / 3), ties by
+  id; never shown as a number. Keyset pages of 30 (cap 200) with no repeats; the client pages when fewer than 5 cards
+  remain and re-asks every 60 s and on returning to the tab while the switch is on, adding new people to the front.
+  Never served: the caller, connections, the caller's live requests, a pass in the last 7 days, and anyone
+  `brivia_visible_to` refuses (blocks either way, other world, incomplete, deleted). Each row served logs one
+  `impression` (surface `hiring`), so a Pass on those cards is stored and counts toward the daily swipes. The answer
+  carries the place name or "Abroad" as the band, never a cell or km; the card hides the "distances appear" note and a
+  seeker's bar reads "Open to · <title>"; a quiet "Global hiring discovery" label sits under the Connect tools. The
+  switch filters the deck only: Curated keeps the ORBIT order and Nearby (Crossing Paths) is untouched.
 
 ## Appendix A (DRAFT, not scheduled): Constellations
 

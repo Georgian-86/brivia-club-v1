@@ -50,7 +50,7 @@ export const pitchLine = (person) => {
 const EMPTY_STATES = {
   filters: { title: 'No one in this deck matches these filters.', copy: 'Clear them to see everyone in your deck again.', action: 'Clear filters', kind: 'clear-filters' },
   // D-169: only the Hiring switch is on and no one shown is hiring.
-  hiring: { title: 'No one is hiring near you yet.', copy: 'Turn Hiring off to see everyone in your deck again.', action: 'Show everyone', kind: 'clear-filters' },
+  hiring: { title: 'No one is hiring yet.', copy: "When members anywhere open a role or say they're open to one, they show up here. Turn Hiring off to see everyone in your deck again.", action: 'Show everyone', kind: 'clear-filters' },
   caught_up: { title: "You're caught up.", copy: "You've seen everyone we can show you for now. New people near you show up as they join. Search can reach anyone, anywhere.", action: 'Search members', kind: 'search' },
   no_members_yet: { title: 'Your area is just opening.', copy: 'Brivia Club is new around you. Invite a friend who shares your interests.', action: 'Invite a friend', kind: 'invite' },
   complete_profile: { title: 'Finish your orbit to see people near you.', copy: 'Add your area and place your 20 interest points so we can find your people.', action: 'Finish profile', kind: 'finish-profile' },
