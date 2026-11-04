@@ -7,6 +7,10 @@ Update this file at the end of every session. CLAUDE.md holds the aim; this file
 
 ## 1. What is done
 
+**2026-11-04, D-171:** the own profile hero's text never runs under the photo card: the work line and bio wrap or
+clamp inside their column, the name wraps to two lines instead of an early ellipsis, one type scale per breakpoint
+(`site/styles/profile-hero.css`). Test `tests/e2e/profile-hero.spec.mjs` (long, real and short profiles at 390 and 1440).
+
 **2026-11-04, D-168:** shimmer, desktop letter, caught-up flip and sliding pill fixed (they never played on live).
 `tests/e2e/motion.spec.mjs` checks all ten moments fire, frame by frame.
 
