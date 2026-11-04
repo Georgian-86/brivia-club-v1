@@ -10,7 +10,7 @@ Update this file at the end of every session. CLAUDE.md holds the aim; this file
 **2026-11-04, D-156:** no city is suggested before the first letter (signup, setup, Edit profile, Create Event). The
 interest pickers now get every interest: `fetchInterestNodes` reads in pages (the API's 1,000-row cap had hidden 365).
 "DJing" reads "DJ". 10 swipes a day (Pass and Pitch) on the deck and 10 on Find my companion, server-enforced.
-**Owed: apply `0045_daily_swipes_dj.sql`** with the client deploy (README "0045"). Photos for the seeded accounts were
+`0045_daily_swipes_dj.sql` **applied live 2026-11-04** right after the client deployed to production, and verified (README "0045"). Photos for the seeded accounts were
 not added (see D-156); the open test world is still on live.
 
 **2026-11-04, D-154:** "Make the first move" opens with one opener in the box and an "Another idea" button. Typing

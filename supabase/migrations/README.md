@@ -1272,7 +1272,7 @@ reads as request_sent; one letter finds connections only; at most 8 non-connecti
 
 ## 0045
 
-**10 free swipes a day; 10 companion swipes a day; "DJ" (D-156).** Not applied yet.
+**10 free swipes a day; 10 companion swipes a day; "DJ" (D-156).** **APPLIED 2026-11-04** (after the client deployed) and verified.
 Apply after `0044`, and deploy the client in the same window (the new client counts Pass as a swipe and reads
 `my_companion_quota`; the old client would show "N of 10 signals left" and let a refused Pass look accepted).
 Adds the config rows `signal_daily_limit = 10` and `companion_swipe_daily_limit = 10` (an existing row is kept), redefines
