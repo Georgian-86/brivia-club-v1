@@ -567,3 +567,16 @@ body.app-body .app-view[data-view="home"] .deck-empty-action { min-height: 44px;
   body.app-body .app-view[data-view="home"] .deck-empty { width: min(100%, 360px); padding: 30px 22px 26px; }
   body.app-body .app-view[data-view="home"] .deck-empty h2 { font-size: 28px; }
 }
+
+/* The deck's arrival (D-164, deck-intro.js): one soft light band crosses the top card while the stack settles. The
+   element exists only during the intro; GSAP moves it. Under reduced motion it is never created. */
+.app-view[data-view="home"] .swipe-stack.is-intro { pointer-events: auto; }
+.app-view[data-view="home"] .swipe-card .deck-intro-gloss {
+  position: absolute;
+  z-index: 5;
+  inset: -10% -20%;
+  background: linear-gradient(105deg, transparent 32%, rgb(255 255 255 / 0) 38%, rgb(255 246 240 / .34) 50%, rgb(255 255 255 / 0) 62%, transparent 68%);
+  mix-blend-mode: soft-light;
+  pointer-events: none;
+  will-change: transform;
+}

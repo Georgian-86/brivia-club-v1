@@ -3263,3 +3263,55 @@ controls (a tester or a seeded test member), never a real member, so no new expo
   them. Seeded members skip the photo and 14-day parts of the hiring bar, since they never carry a photo.
 - **Not done:** seeded members' Looking for is unchanged (no "Hiring" tag a real member could see).
 
+## D-164 (2026-11-04): the deck is dealt in, with a soft "deal" sound
+
+- **Asked:** "design an animation for the cards coming and stacking with a sound while the connection curated page is
+  loaded ... super smooth and professionally designed ... not a very large time span, just it should catch the
+  attention". Skills named: GSAP skill pack, Animate, Claude Motion Graphics, Impeccable. None of the four is installed in
+  this repo or session (`.claude/skills/` has frontend-design and ui-ux-pro-max); built with GSAP's own best practices.
+- **Motion (`site/scripts/deck-intro.js`, GSAP 3.15.1 core only):** once per page load, the first time real people are
+  on the deck, and again when switching Nearby back to Curated. The back layer is dealt in from the lower left, the next
+  layer from the lower right (90 ms later), the top card straight up last (180 ms) with a small overshoot; the stack
+  gives 4 px under it and recovers; one soft light band crosses the top card; Pass / Pitch and the hint rise in. About
+  0.9 s of motion, 1.2 s in all. Transforms and opacity only; every inline style is cleared at the end so deck-swipe.js
+  owns the card again. Any tap, click or key finishes it at once. The timeline starts on the second frame after render
+  and lag smoothing is 100 ms, so a slow frame slows the deal instead of skipping it. The deck tutorial waits for it.
+- **Sound (`INTRO_CUE` in notify-sound.js):** three soft card taps (filtered noise over a low thump) in step with the
+  three cards, then a two-note bell, B-flat to F (the kit's key), on the landing. About 1.1 s, quieter than the swipe
+  cues. It follows the existing "swipe sounds" switch and the volume slider in Settings (that is the mute). Browsers
+  allow sound only after the member's first tap on the page, so a cold reload is silent unless the browser already
+  allows audio (`userActivation.hasBeenActive`, `getAutoplayPolicy`); the Curated tap always has sound.
+- **Reduced motion:** no travel, rotation, gloss or sound; the cards and controls fade in over 150 ms.
+- **Not chosen:** a bundled audio file (the kit is synthesized, no downloads); animating the headline (it is already on
+  screen while the deck loads, so moving it later reads as a glitch); replaying on every tab return (gets tiring).
+- **Proof:** unit 510 (tests/unit/deck-intro.test.mjs: timing, sound-to-motion sync, once-only rule, autoplay rules,
+  mute); frame-exact captures at 390 and 1440 with Playwright's clock; swipe after the intro still works.
+
+## D-165 (2026-11-04): the motion moments after the deal
+
+- **Asked:** "this animation is good to go now work with other suggested animations" (the "Where motion fits next"
+  list: N1-N10, on top of the launch-ux checklist's M1-M11).
+- **Built (`site/scripts/motion-moments.js`, `site/styles/motion.css`):**
+  - **N1 It's mutual:** a dialog when a signal comes back `matched`: both avatars glide in and touch, one wine ring
+    pulses out, "You and X / both said yes.", the shared interests pop in, Say hi (opens the chat) / Keep exploring.
+    About 1.4 s; Escape, the backdrop or either button closes it; focus stays inside. The existing toast still shows
+    under it (it is the live-region sentence). Sound: the notify horn, under the notification-sound switch.
+  - **N2 Pitch sent:** a small wine letter flies from the card in an arc to the Chat tab, which pops once. ~0.8 s.
+    Founder, same day: "dont send the animation that goes to notification ... should go to the messages section".
+  - **N3 Caught up:** when the last card is swiped away, the "You're caught up" box turns in (a Y-axis flip).
+  - **N5 Tilt (desktop, fine pointer only):** the top card leans up to 4 degrees towards the cursor with a soft light,
+    through the CSS `rotate` property so it composes with deck-swipe.js's inline transform; off while dragging, during
+    the deal and under reduced motion.
+  - **N6:** a new card's "You both" chips catch the light once.
+  - **N7 (M9):** the Curated / Nearby pill slides from the option the member left.
+  - **N8:** while Nearby loads, a slow radar sweep crosses the waiting card (the empty state already had rings).
+  - **N9:** a chat bubble that was not on screen at the last render of that chat rises in (no replay on open).
+  - **N10:** event cards (first 8 per render) fade up and their covers settle from 1.06x as they scroll into view.
+  - **Not built:** N4 (Passion Budget fill) waits for the profile redesign. The accept-a-request path keeps its review
+    sheet outcome (the moment shows for deck pitches and event hellos).
+- **D-164 fix found by the deck e2e:** the deal skipped to its end on any pointerdown, which moved a button out from
+  under a press and lost the click ("Why this person?" during the deal). A press on a button or link now skips on
+  release; a press elsewhere (a drag) still skips at once. `tests/e2e/deck.spec.mjs` waits for the deal to end
+  before its layout checks (it measures the resting stack).
+- **Proof:** unit 513 (`tests/unit/motion-moments.test.mjs`); deck e2e 201/201 (main 201/201); screenshots of N1 and
+  N2 at 390 and 1440 with the stubbed Supabase.
