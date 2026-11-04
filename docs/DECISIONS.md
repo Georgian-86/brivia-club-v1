@@ -3239,3 +3239,12 @@ controls (a tester or a seeded test member), never a real member, so no new expo
   soft blush and `--aura-mint` a pale apricot (names kept so no gradient changes shape). The aura is blush, peach, rose
   and wine everywhere (pages, sheets, Connect's veil). The filters drawer gets `--aura-sheet`, a frosted footer and the
   shared `--aura-scrim`. Old landing-only styles (style.css bubbles, auth-modal constellation) were not touched.
+
+## D-161 (2026-11-04): pinker warm blush; one blush gradient on every status box
+
+- **Asked:** "remove bluish gradient lil more, pinkish warm blush would work and change the caught up box for all slides
+  into warm pink blush gradient box".
+- **Done:** `--aura-lilac` and `--aura-mint` are both warm pink blushes now (pinker than D-160). New token
+  `--aura-blush-box` (deep blush top left, a breath of wine top right, peach low, on blush-tinted paper) on every status
+  box: the deck's "You're caught up", Nearby's "It's a little quiet around here" / "Nearby opens soon", Companions,
+  Explore's empty events and Notes' "Start the conversation". Supersedes D-159's plain paper for the caught-up box.

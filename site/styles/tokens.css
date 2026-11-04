@@ -68,10 +68,10 @@
      tinted to the wine brand. Painted once by aura-theme.css on a fixed layer behind every page. */
   --aura-base: #fbf8f4;
   /* D-160 (founder, 2026-11-04: "remove the bluish gradient everywhere"): the two cool glows are warm now. The names
-     stay so every gradient keeps its shape: "lilac" is a soft blush, "mint" a pale apricot. All warm, wine-friendly. */
-  --aura-lilac: rgba(242, 206, 214, .55);
+     stay so every gradient keeps its shape. D-161 ("pinkish warm blush"): both are warm pink blushes now. */
+  --aura-lilac: rgba(240, 194, 210, .55);   /* D-161: a pinker warm blush */
   --aura-rose: rgba(236, 184, 202, .5);
-  --aura-mint: rgba(246, 218, 200, .45);
+  --aura-mint: rgba(244, 204, 206, .45);    /* D-161: a warm rose-blush */
   --aura-peach: rgba(248, 220, 198, .55);
   /* A touch of the brand wine in the aura (founder, 2026-10-25, D-093): low behind the left of the page, faint at the top. */
   --aura-wine: rgba(110, 14, 46, .30);
@@ -85,6 +85,14 @@
     radial-gradient(ellipse 70% 34% at 72% 100%, var(--aura-rose), transparent 72%),
     radial-gradient(ellipse 56% 32% at 0% 92%, var(--aura-peach), transparent 72%),
     var(--aura-base);
+  /* D-161: the status boxes ("You're caught up", "It's a little quiet around here", empty Explore and Notes): one warm
+     pink blush, deeper at the top left, a breath of wine top right, peach low, on a blush-tinted paper. */
+  --aura-blush-box:
+    radial-gradient(ellipse 85% 70% at 0% 0%, rgba(238, 182, 200, .6), transparent 70%),
+    radial-gradient(ellipse 60% 50% at 100% 0%, var(--aura-wine-soft), transparent 72%),
+    radial-gradient(ellipse 85% 70% at 100% 100%, rgba(244, 196, 196, .55), transparent 72%),
+    radial-gradient(ellipse 60% 50% at 0% 100%, var(--aura-peach), transparent 72%),
+    rgb(252, 242, 242);
   --aura-scrim: color-mix(in srgb, var(--color-wine-deep) 34%, rgba(251, 248, 244, .18));
   --aura-glass: rgba(255, 252, 248, .62);
   --aura-card: rgba(255, 252, 248, .66);

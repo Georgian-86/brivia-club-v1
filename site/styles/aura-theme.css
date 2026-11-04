@@ -133,8 +133,14 @@ html body .companion-empty,
 html body .events-empty {
   background: var(--aura-sheet) !important;
 }
-/* D-159: the deck's "You're caught up" box is plain warm paper, like the member card it stands in for (no gradient). */
-html body #home-empty-state { background: var(--color-card-paper) !important; }
+/* D-161 (supersedes D-159's plain paper): every status box on every tab is the same warm pink blush. */
+html body #home-empty-state,
+html body .companion-empty,
+html body.app-body .nearby-view .nearby-empty,
+html body .events-empty,
+html body .community-feed-view .community-post-empty {
+  background: var(--aura-blush-box) !important;
+}
 
 /* Connect (founder, 2026-11-04, D-158): the room photo takes a light veil of the same aura (lilac top left, a breath of
    wine low left and top right, mint right, rose and peach low), so Connect reads like the other pages without losing
