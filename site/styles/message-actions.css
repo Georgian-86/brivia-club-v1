@@ -1,0 +1,97 @@
+/* D-157: the long-press message menu, unsent and edited bubbles, and the "Editing message" bar above the composer.
+   Tokens only (tokens.css): no raw colours, no font stacks. */
+
+/* Phones: a long press opens our menu, so the system callout and text selection stay out of the way (Copy is in it). */
+@media (hover: none) {
+  .chat-messages .message[data-message-id] { -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; }
+}
+.chat-messages .message[data-message-id] { transition: transform .15s ease, box-shadow .15s ease; }
+.chat-messages .message[data-message-id]:focus-visible { outline: 2px solid var(--color-wine-soft); outline-offset: 3px; }
+.chat-messages .message.is-menu-open { transform: scale(.98); box-shadow: 0 0 0 2px var(--color-wine-soft); }
+.chat-messages .message.is-editing { box-shadow: 0 0 0 2px var(--color-receipt-read); }
+
+/* "You unsent a message" / "This message was unsent": quiet italic, no fill. */
+.app-view[data-view="chat"] .message.is-unsent,
+.chat-messages .message.is-unsent {
+  border: 1px dashed var(--color-line);
+  background: transparent;
+  color: var(--color-ink-soft);
+  box-shadow: none;
+}
+.chat-messages .message.is-unsent .message-copy { font-style: italic; }
+.chat-messages .message.is-unsent small { color: var(--color-ink-soft); }
+
+.message-edited { margin-right: var(--space-1); font-style: italic; opacity: .8; }
+
+/* The menu: a small card next to the bubble (placed by message-actions.js), above every chat layer. */
+.message-menu {
+  position: fixed;
+  z-index: 1200;
+  display: grid;
+  min-width: 196px;
+  max-width: calc(100vw - 24px);
+  padding: var(--space-1);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-m);
+  background: var(--color-cream);
+  box-shadow: var(--shadow-1);
+  animation: message-menu-in .14s ease-out;
+}
+@keyframes message-menu-in { from { opacity: 0; transform: translateY(4px) scale(.98); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) { .message-menu { animation: none; } .chat-messages .message[data-message-id] { transition: none; } }
+.message-menu-item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-height: 44px;
+  padding: 0 var(--space-3);
+  border: 0;
+  border-radius: var(--radius-s);
+  background: transparent;
+  color: var(--color-ink);
+  font-family: var(--font-body);
+  font-size: var(--text-14);
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+}
+.message-menu-item svg { width: 20px; height: 20px; flex: 0 0 20px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+.message-menu-item:hover, .message-menu-item:focus-visible { background: var(--color-card-paper); outline: none; }
+.message-menu-item.is-danger { color: var(--color-wine); }
+.message-menu-item.is-strong { justify-content: center; background: var(--color-wine); color: var(--color-cream); }
+.message-menu-item.is-strong:hover, .message-menu-item.is-strong:focus-visible { background: var(--color-wine-deep); }
+.message-menu-title { margin: var(--space-2) var(--space-3) 0; color: var(--color-ink); font-family: var(--font-body); font-size: var(--text-14); font-weight: 700; }
+.message-menu-copy { margin: var(--space-1) var(--space-3) var(--space-2); color: var(--color-ink-soft); font-family: var(--font-body); font-size: var(--text-12); }
+.message-menu-confirm { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-1); }
+.message-menu-confirm .message-menu-item { justify-content: center; }
+
+/* The bar above the composer while a message is being edited. */
+.chat-edit-bar {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-2) var(--space-4);
+  border-top: 1px solid var(--color-line);
+  border-left: 3px solid var(--color-wine);
+  background: var(--color-chat-head);
+  color: var(--color-ink);
+}
+.chat-edit-bar[hidden] { display: none; }
+.chat-edit-bar > svg { width: 18px; height: 18px; flex: 0 0 18px; fill: none; stroke: var(--color-wine); stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.chat-edit-copy { display: grid; min-width: 0; flex: 1; }
+.chat-edit-copy strong { color: var(--color-wine); font-size: var(--text-12); letter-spacing: .04em; }
+.chat-edit-copy span { overflow: hidden; color: var(--color-ink-soft); font-size: var(--text-12); text-overflow: ellipsis; white-space: nowrap; }
+.chat-edit-cancel {
+  display: grid;
+  width: 44px;
+  height: 44px;
+  flex: 0 0 44px;
+  place-items: center;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--color-ink-soft);
+  font-size: var(--text-20);
+  cursor: pointer;
+}
+.chat-edit-cancel:hover, .chat-edit-cancel:focus-visible { background: var(--color-card-paper); color: var(--color-ink); }

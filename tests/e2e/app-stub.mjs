@@ -460,6 +460,27 @@ export const startAppStub = async ({ port, state = {}, deckRows = defaultDeckRow
       }
       if (pathName === '/rest/v1/rpc/event_companions') return json(200, st.companions || []);
       if (pathName === '/rest/v1/community_post_shares' && method === 'POST') return route.fulfill({ status: 201, body: '', headers: { 'access-control-allow-origin': '*' } });
+      // D-157 (0046): edit_message / unsend_message / delete_message_for_me change st.messages as the server would and
+      // are recorded in st.messageActions; st.noMessageActions answers PGRST202 (before 0046).
+      if (['/rest/v1/rpc/edit_message', '/rest/v1/rpc/unsend_message', '/rest/v1/rpc/delete_message_for_me'].includes(pathName)) {
+        const fn = pathName.slice(13);
+        (st.messageActions ||= []).push({ fn, args });
+        if (st.noMessageActions) return json(404, { code: 'PGRST202', message: 'Could not find the function' });
+        const row = (st.messages || []).find((m) => m.id === args.p_id);
+        if (!row) return json(400, { code: 'P0002', message: 'message not found' });
+        if (fn === 'edit_message') {
+          if (Date.now() - Date.parse(row.created_at) > 15 * 60e3) return json(400, { code: '22023', message: 'edit window closed' });
+          row.body = String(args.p_body).trim(); row.edited_at = new Date().toISOString();
+          return json(200, [{ id: row.id, body: row.body, edited_at: row.edited_at }]);
+        }
+        if (fn === 'unsend_message') {
+          const removed = row.message_type && row.message_type !== 'resume' ? row.attachment_path || null : null;
+          Object.assign(row, { body: '', unsent_at: new Date().toISOString(), edited_at: null, message_type: 'text', attachment_path: null, attachment_name: null });
+          return json(200, [{ id: row.id, unsent_at: row.unsent_at, removed_path: removed }]);
+        }
+        st.messages = st.messages.filter((m) => m.id !== args.p_id);
+        return json(200, true);
+      }
       if (pathName === '/rest/v1/brivia_messages' && method === 'POST') { (st.sent ||= []).push(args); return route.fulfill({ status: 201, body: '', headers: { 'access-control-allow-origin': '*' } }); }
       if (pathName === '/rest/v1/brivia_messages' && method === 'GET') return json(200, st.messages || []);
       if (pathName.startsWith('/rest/v1/')) return json(200, []);

@@ -1286,3 +1286,16 @@ Verify:
 `select has_function_privilege('anon', 'public.my_companion_quota()', 'execute');` (f);
 `select tgname from pg_trigger where tgrelid = 'public.interaction'::regclass and not tgisinternal order by 1;`
 (`brivia_interaction_served`, then `brivia_interaction_swipe_cap`).
+
+## 0046
+
+**Edit, unsend and delete for me (D-157).** Not applied yet.
+Apply after `0045`, with the client deploy (the client works either way: before 0046 it reads the old columns and
+the menu's actions say "Editing and unsending open soon."). Adds `brivia_messages.edited_at` and `unsent_at`,
+`brivia_private.hidden_message`, redefines `brivia_private.brivia_message_visible` (0013) to also hide a member's own
+"deleted for me" messages, and adds `edit_message(id, body)` (sender, plain text, 15 minutes), `unsend_message(id)`
+(sender, any time, both sides) and `delete_message_for_me(id)` (either member, their view only), all authenticated.
+Members still have no UPDATE or DELETE policy on `brivia_messages`. Verify:
+`select column_name from information_schema.columns where table_name = 'brivia_messages' and column_name in ('edited_at', 'unsent_at');` (2 rows);
+`select has_function_privilege('anon', 'public.unsend_message(uuid)', 'execute');` (f);
+`select count(*) from pg_policies where tablename = 'brivia_messages' and cmd in ('UPDATE', 'DELETE', 'ALL');` (0).

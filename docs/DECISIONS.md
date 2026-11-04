@@ -3188,3 +3188,27 @@ controls (a tester or a seeded test member), never a real member, so no new expo
 - **Proof:** SQL harness all passed (new `z-daily-swipes.test.sql`; orbit-signals, trust and hygiene updated for the
   new cap), unit 497, e2e deck 201, onboarding 269, location 64, create-event, companions. consent.spec.mjs crashes at
   its line 328 (the collab-review Accept button, removed by D-132) on the code before this change too; not fixed here.
+
+## D-157 (2026-11-04): edit, unsend and delete for me, from a long press on a message
+
+- **Asked:** "add edit message and unsend message feature and delete for me message in the chats section popping after
+  long pressing the text".
+- **Menu:** a long press (450 ms, cancelled by a 10 px move or a scroll) on any bubble opens a small menu beside it;
+  right-click on desktop and Android's own long-press menu open the same one; Enter, Shift+F10 or the context-menu key
+  on a focused bubble too. Items: **Copy** (text messages), **Edit** (my plain text message, within 15 minutes),
+  **Unsend** (my message, any time), **Delete for me** (any message). Unsend and Delete for me ask once inside the menu.
+  On phones the system callout and text selection are off on bubbles, so Copy lives in the menu.
+- **Edit:** the text goes back into the composer under an "Editing message" bar (× or Escape cancels); Send saves it.
+  The bubble says "Edited" for both members. 15 minutes, like the large messengers: long enough for a typo, short
+  enough that an answer is not rewritten under the other person. Plain text only (not photos, files, shared cards).
+- **Unsend:** "delete for everyone", any time: both apps show "You unsent a message" / "This message was unsent" in
+  place of it (also on the inbox row); the content and attachment are cleared on the server and a chat upload is removed
+  from storage (never the member's resume). It cannot pull back a web push already delivered.
+- **Delete for me:** the message leaves my view on every device (server mark, not localStorage); the other member keeps it.
+- **Server (0046):** three SECURITY DEFINER RPCs; still no UPDATE/DELETE policy for members. Each finds the message
+  under the select policy's world rule. Realtime: a second UPDATE stream (recipient = me) brings their edits and
+  unsends live; "deleted for me" is enforced by brivia_message_visible, so those rows leave reads and Realtime.
+- **Proof:** SQL harness all passed (new `za-message-edit-unsend.test.sql`; a5 column pin, hygiene allow-list), unit
+  504 (new message-actions), e2e message-actions MA1–MA6 (phone long press, desktop right-click, keyboard, before 0046),
+  read-receipts, chat-extras 150, chat-inbox. chat-search.spec.mjs times out on a profile dialog on the code before this
+  change too; not fixed here.

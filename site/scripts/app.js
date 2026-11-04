@@ -21,7 +21,7 @@ import '../styles/mobile-app.css';
 import '../styles/skeleton.css';
 import '../styles/aura-theme.css';
 import '../styles/handoff.css';
-import { supabase, compressImageOnly, rowToProfile, saveProfile, isPresetCoverUrl, onboardingStatus, sendSignal, fetchSignalQuota, isRateLimited, isStorageImageUrl, withoutCredentials, uploadMessageAttachment, removeMessageAttachment, uploadCommunityPostImage, removeCommunityPostImage, ImageProcessingError, PHOTO_ERROR_MESSAGE, PHOTO_FRAMER_ERROR, compressAttachmentFiles, attachmentKind, reportMember, setSensitiveConsent, fetchSensitiveConsentAt, fetchMyInterests, fetchInterestNodes, addMemberInterest, isMissingFunction, touchPresence, connectionPresence, setPresenceVisible, myPresenceVisible, setMemberInterests, uploadResume, removeResume, resumeSignedUrl, resumeInfo, clearResumePath, searchPlaces, setHomeCity, setHomeLocation, listEvents, setEventRsvp, setCompanionDefault, myEventPrefs, eventCompanions, saveMemberEvent, cancelMemberEvent, deleteMemberEvent, uploadEventImage, removeEventImages, setEventInterest, setEventBrochure, uploadEventBrochure, removeEventBrochures, companionEvents, companionDeck, companionSwipe, companionQuota, myCompanionMatches, markCompanionMatchSeen, sendConnectRequest, setNearbyEnabled, myNearbySetting, nearbyPulse, nearbyClear, myNearbyAlerts, setNearbyMuted, nearbyDiscover, nearbyPass, nearbyConnect, myNearbyMatches, myNotifications, markNotificationsRead, dismissNotification, setNearbyRadius, savePushSubscription, deletePushSubscription, sendPendingPush, searchCompanies, searchCompanyDirectory, companyLogoUrl, addCompany, setMyWork, memberWork, uploadCompanyLogo, markMessagesDelivered, markConversationRead, setReadReceipts, myReadReceipts, chatPeopleSearch } from './supabase.js';
+import { supabase, compressImageOnly, rowToProfile, saveProfile, isPresetCoverUrl, onboardingStatus, sendSignal, fetchSignalQuota, isRateLimited, isStorageImageUrl, withoutCredentials, uploadMessageAttachment, removeMessageAttachment, uploadCommunityPostImage, removeCommunityPostImage, ImageProcessingError, PHOTO_ERROR_MESSAGE, PHOTO_FRAMER_ERROR, compressAttachmentFiles, attachmentKind, reportMember, setSensitiveConsent, fetchSensitiveConsentAt, fetchMyInterests, fetchInterestNodes, addMemberInterest, isMissingFunction, touchPresence, connectionPresence, setPresenceVisible, myPresenceVisible, setMemberInterests, uploadResume, removeResume, resumeSignedUrl, resumeInfo, clearResumePath, searchPlaces, setHomeCity, setHomeLocation, listEvents, setEventRsvp, setCompanionDefault, myEventPrefs, eventCompanions, saveMemberEvent, cancelMemberEvent, deleteMemberEvent, uploadEventImage, removeEventImages, setEventInterest, setEventBrochure, uploadEventBrochure, removeEventBrochures, companionEvents, companionDeck, companionSwipe, companionQuota, editMessage, unsendMessage, deleteMessageForMe, myCompanionMatches, markCompanionMatchSeen, sendConnectRequest, setNearbyEnabled, myNearbySetting, nearbyPulse, nearbyClear, myNearbyAlerts, setNearbyMuted, nearbyDiscover, nearbyPass, nearbyConnect, myNearbyMatches, myNotifications, markNotificationsRead, dismissNotification, setNearbyRadius, savePushSubscription, deletePushSubscription, sendPendingPush, searchCompanies, searchCompanyDirectory, companyLogoUrl, addCompany, setMyWork, memberWork, uploadCompanyLogo, markMessagesDelivered, markConversationRead, setReadReceipts, myReadReceipts, chatPeopleSearch } from './supabase.js';
 import { locateOnce, fallbackCopy } from './geo-locate.js';
 import { areaChangeMessage, AREA_HELPER, AREA_NO_MATCH } from './area-change.js';
 import { areaShareBody, parseAreaBody, resumeShareAttachment, resumeMessageFields, RESUME_SHARE_BODY, NO_RESUME_HINT, RESUME_GONE_COPY, RESUME_SHARE_NOTE, AREA_SHARE_NOTE } from './quick-share.js';
@@ -41,6 +41,7 @@ import { collabSummary, openCollabReview } from './collab-requests.js';
 import { createPresence, presenceDot } from './presence.js';
 import { cleanQuery, matchesQuery, STATUS as PERSON_STATUS, peopleResults, localPeople } from './chat-search.js';
 import { receiptState, receiptMarkup, lastOwnMessageId, applyReceipt, needsReadReceipt, needsDeliveredReceipt, lastActiveLabel } from './receipts.js';
+import { createMessageMenu, applyMessageUpdate, unsentLabel, previewForUnsent, canEditMessage } from './message-actions.js';
 import { createCrossingPaths, isQuietHour, alertHeadline, alertDetail, alertToast, pausedCopy } from './crossing-paths.js';
 import '../styles/crossing-paths.css';
 import { createNearbyPage } from './nearby-page.js';
@@ -104,6 +105,7 @@ import '../styles/collab-requests.css';  // D-108: the request section and revie
 import '../styles/emoji-field.css';  // D-113: the emoji panel under the Edit profile bio
 import '../styles/work-identity.css';  // D-140: company line and picker
 import '../styles/hiring.css';  // D-141: the hiring bar, banner, sheets and profile cards
+import '../styles/message-actions.css';  // D-157: the long-press message menu and the editing bar
 import '../styles/components.css';  // D-105: the shared field, select, listbox and chip components, last so they win
 import { createHiring } from './hiring-ui.js';  // D-141
 import { interleaveLift } from './hiring.js';
@@ -151,6 +153,13 @@ let receiptColumns = true;
 let receiptsMissing = false;
 const RECEIPT_COLUMNS = ',delivered_at,read_at';
 const isReceiptColumnError = (error) => /delivered_at|read_at/.test(error?.message || '') || error?.code === '42703';
+// Edit and unsend (D-157, 0046): edited_at / unsent_at, dropped from the selects before 0046 is applied.
+let editColumns = true;
+const EDIT_COLUMNS = ',edited_at,unsent_at';
+const isEditColumnError = (error) => /edited_at|unsent_at/.test(error?.message || '');
+// The message being edited in the composer: { personId, id } or null.
+let editingMessage = null;
+let messageMenu = null; // createMessageMenu, set once the chat composer exists
 // Crossing paths (D-119, 0021): the loop (crossing-paths.js), its alerts (from my_nearby_alerts) and its status.
 let crossingPaths = null;
 let nearbyAlerts = [];
@@ -2622,7 +2631,7 @@ const renderChats = () => {
     const last = chatMessages[person.id]?.at(-1);
     const unreadMessages = chatUnreadCount(person.id);
     const unread = unreadMessages > 0;
-    const lastPreview = last?.attachment?.kind === 'resume' ? 'Resume (PDF)' : last?.attachment ? `📎 ${last.attachment.name || 'Attachment'}` : parseSharedPost(last?.text) ? 'Shared a post' : (last?.text || 'Start a conversation');
+    const lastPreview = previewForUnsent(last) || (last?.attachment?.kind === 'resume' ? 'Resume (PDF)' : last?.attachment ? `📎 ${last.attachment.name || 'Attachment'}` : parseSharedPost(last?.text) ? 'Shared a post' : (last?.text || 'Start a conversation'));
     return `<div class="chat-row${unread ? ' is-unread' : ''}${selectedChat?.id === person.id ? ' is-selected' : ''}"><button class="chat-row-open" type="button" data-chat-id="${escapeHtml(person.id)}"><span class="member-profile-trigger" data-public-profile-id="${escapeHtml(person.id)}" role="button" tabindex="0" aria-label="Open ${escapeHtml(person.name)} profile">${renderAvatar(person)}${presenceDot(isActiveNow(person.id))}</span><span class="chat-row-copy"><strong data-public-profile-id="${escapeHtml(person.id)}">${escapeHtml(person.name)}${isActiveNow(person.id) ? '<span class="sr-only">, active now</span>' : ''}</strong><span>${escapeHtml(lastPreview)}</span></span><span class="chat-row-meta"><time>${escapeHtml(formatInboxTime(last?.createdAt))}</time>${unread ? `<b aria-label="${unreadMessages} unread">${unreadMessages > 99 ? '99+' : unreadMessages}</b>` : ''}</span></button><button class="chat-delete" type="button" data-delete-chat-id="${escapeHtml(person.id)}" aria-label="Delete chat with ${escapeHtml(person.name)}" title="Delete chat"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M4.5 6h11M8 3.5h4M6.5 6l.6 10h5.8l-.6-10M8.5 8.5v5M11.5 8.5v5"/></svg></button></div>`;
   };
   // D-152: while searching, conversations with messages first, then people (connections even without a message, then
@@ -2706,10 +2715,16 @@ const loadChatMessages = async (person) => {
   // Fetch the member's complete inbox first, then narrow it locally. This is
   // more reliable than the compound PostgREST OR/AND filter for older rows.
   const fullColumns = 'id,sender_id,recipient_id,body,created_at,message_type,attachment_url,attachment_path,attachment_name,attachment_mime,attachment_size';
-  let { data, error } = await supabase.from('brivia_messages').select(fullColumns + (receiptColumns ? RECEIPT_COLUMNS : '')).or(`sender_id.eq.${memberProfile.id},recipient_id.eq.${memberProfile.id}`);
+  const mine = `sender_id.eq.${memberProfile.id},recipient_id.eq.${memberProfile.id}`;
+  const select = () => supabase.from('brivia_messages').select(fullColumns + (receiptColumns ? RECEIPT_COLUMNS : '') + (editColumns ? EDIT_COLUMNS : '')).or(mine);
+  let { data, error } = await select();
+  if (error && editColumns && isEditColumnError(error)) {
+    editColumns = false;
+    ({ data, error } = await select());
+  }
   if (error && receiptColumns && isReceiptColumnError(error)) {
     receiptColumns = false;
-    ({ data, error } = await supabase.from('brivia_messages').select(fullColumns).or(`sender_id.eq.${memberProfile.id},recipient_id.eq.${memberProfile.id}`));
+    ({ data, error } = await supabase.from('brivia_messages').select(fullColumns + (editColumns ? EDIT_COLUMNS : '')).or(mine));
   }
   if (error) {
     ({ data, error } = await supabase.from('brivia_messages').select('id,sender_id,recipient_id,body,created_at').or(`sender_id.eq.${memberProfile.id},recipient_id.eq.${memberProfile.id}`));
@@ -2726,20 +2741,27 @@ const loadChatMessages = async (person) => {
       createdAt: message.created_at,
       from: String(message.sender_id) === memberId ? 'me' : 'them',
       text: message.body ?? message.text ?? message.message ?? message.content ?? '',
-      attachment: attachmentFromRow(message),
+      attachment: message.unsent_at ? null : attachmentFromRow(message),
       deliveredAt: message.delivered_at || '',
       readAt: message.read_at || '',
+      editedAt: message.edited_at || '',
+      unsentAt: message.unsent_at || '',
     }));
     const previousMessages = chatMessages[person.id] || [];
-    const messagesById = new Map(previousMessages.map((message) => [String(message.id), message]));
+    // D-157: a message deleted for me (on any device) is no longer returned: drop it, unless it is newer than this
+    // read (a realtime insert that arrived meanwhile).
+    const newestServer = Math.max(0, ...nextMessages.map((m) => new Date(m.createdAt || 0).getTime()));
+    const returned = new Set(nextMessages.map((m) => String(m.id)));
+    const keptPrevious = previousMessages.filter((m) => returned.has(String(m.id)) || new Date(m.createdAt || 0).getTime() > newestServer);
+    const messagesById = new Map(keptPrevious.map((message) => [String(message.id), message]));
     nextMessages.forEach((message) => {
       const previous = messagesById.get(String(message.id));
       messagesById.set(String(message.id), {
         ...previous,
         ...message,
-        text: message.text || previous?.text || '',
+        text: message.unsentAt ? '' : (editColumns ? message.text : (message.text || previous?.text || '')),
         createdAt: message.createdAt || previous?.createdAt || '',
-        attachment: message.attachment || previous?.attachment || null,
+        attachment: message.unsentAt ? null : (message.attachment || previous?.attachment || null),
         deliveredAt: message.deliveredAt || previous?.deliveredAt || '',
         readAt: message.readAt || previous?.readAt || '',
       });
@@ -2748,7 +2770,8 @@ const loadChatMessages = async (person) => {
     const messagesChanged = previousMessages.length !== mergedMessages.length || mergedMessages.some((message, index) => {
       const previous = previousMessages[index];
       return !previous || previous.id !== message.id || previous.text !== message.text || previous.createdAt !== message.createdAt || previous.attachment?.url !== message.attachment?.url || previous.attachment?.path !== message.attachment?.path
-        || (previous.deliveredAt || '') !== message.deliveredAt || (previous.readAt || '') !== message.readAt;
+        || (previous.deliveredAt || '') !== message.deliveredAt || (previous.readAt || '') !== message.readAt
+        || (previous.editedAt || '') !== (message.editedAt || '') || (previous.unsentAt || '') !== (message.unsentAt || '');
     });
     chatMessages[person.id] = mergedMessages;
     if (selectedChat?.id === person.id) markChatRead(person.id);
@@ -2781,6 +2804,8 @@ const appendRemoteMessage = (message) => {
     attachment: attachmentFromRow(message),
     deliveredAt: message.delivered_at || '',
     readAt: message.read_at || '',
+    editedAt: message.edited_at || '',
+    unsentAt: message.unsent_at || '',
   });
   if (isIncoming) sendDeliveredReceipt();
   messages.sort((a, b) => new Date(a.createdAt || 0).getTime() - new Date(b.createdAt || 0).getTime());
@@ -2789,13 +2814,21 @@ const appendRemoteMessage = (message) => {
   if (selectedChat?.id === otherId) renderMessages();
 };
 
-const applyRemoteReceipt = (row) => {
-  if (!row?.id || String(row.sender_id) !== String(memberProfile.id)) return;
-  const otherId = Object.keys(chatMessages).find((id) => String(id) === String(row.recipient_id));
+// D-150 receipts on my messages, and D-157 edits and unsends by either of us (one UPDATE stream per side).
+const applyRemoteUpdate = (row) => {
+  if (!row?.id || !memberProfile.id) return;
+  const me = String(memberProfile.id);
+  const mine = String(row.sender_id) === me;
+  if (!mine && String(row.recipient_id) !== me) return;
+  const otherKey = String(mine ? row.recipient_id : row.sender_id);
+  const otherId = Object.keys(chatMessages).find((id) => String(id) === otherKey);
   if (!otherId) return;
-  const next = applyReceipt(chatMessages[otherId], row);
+  let next = mine ? applyReceipt(chatMessages[otherId], row) : chatMessages[otherId];
+  if ('unsent_at' in row || 'edited_at' in row) next = applyMessageUpdate(next, row);
   if (next === chatMessages[otherId]) return;
   chatMessages[otherId] = next;
+  if (editingMessage && row.unsent_at && String(editingMessage.id) === String(row.id)) cancelMessageEdit();
+  renderChats();
   if (String(selectedChat?.id) === String(otherId)) renderMessages();
 };
 
@@ -2805,7 +2838,9 @@ const subscribeToMessages = () => {
     .channel(`brivia-messages-${memberProfile.id}`)
     .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'brivia_messages' }, ({ new: message }) => appendRemoteMessage(message))
     // D-150: the other member's app marked my message delivered or read.
-    .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'brivia_messages', filter: `sender_id=eq.${memberProfile.id}` }, ({ new: row }) => applyRemoteReceipt(row))
+    .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'brivia_messages', filter: `sender_id=eq.${memberProfile.id}` }, ({ new: row }) => applyRemoteUpdate(row))
+    // D-157: their edits and unsends of messages to me.
+    .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'brivia_messages', filter: `recipient_id=eq.${memberProfile.id}` }, ({ new: row }) => applyRemoteUpdate(row))
     .subscribe((status) => { if (status === 'CHANNEL_ERROR') console.warn('Realtime messages channel could not connect.'); });
 };
 
@@ -2915,6 +2950,8 @@ const openChat = (person, markAsRead = true) => {
   renderNotifications();
   ensureChatMoreMenu();
   ensureChatWallpaper();
+  if (editingMessage && String(editingMessage.personId) !== String(person.id)) cancelMessageEdit({ keepInput: false });
+  messageMenu?.close();
   selectedChat = person;
   joinTyping(person);
   if (markAsRead) markChatRead(person.id);
@@ -3083,6 +3120,11 @@ const renderMessages = () => {
   };
   const renderSharedArea = (area) => `<span class="message-place"><span class="message-place-icon">${SHARE_PIN_ICON}</span><span class="message-place-copy"><span class="message-place-eyebrow">Shared area</span><span class="message-place-name">${escapeHtml(area.place)}</span><span class="message-place-scope">${escapeHtml(area.scope)}</span></span></span>`;
   const renderBubble = (message) => {
+    const idAttr = escapeHtml(String(message.id));
+    const mineClass = message.from === 'me' ? 'me' : 'them';
+    if (message.unsentAt) {
+      return `<div class="message ${mineClass} is-unsent" data-message-id="${idAttr}" tabindex="0" aria-haspopup="menu"><span class="message-copy">${escapeHtml(unsentLabel(message.from))}</span><small>${escapeHtml(formatChatTime(message.createdAt))}</small></div>`;
+    }
     const isResume = message.attachment?.kind === 'resume' && Boolean(message.attachment.path);
     const area = !message.attachment ? parseAreaBody(message.text) : null;
     const sharedPostId = !message.attachment && !area ? parseSharedPost(message.text) : null;
@@ -3093,7 +3135,9 @@ const renderMessages = () => {
     const kind = isResume || area || sharedPostId ? ' has-attachment has-share' : message.attachment ? ' has-attachment' : '';
     const receipt = receiptState(message);
     const word = receipt && receipt !== 'sent' && String(message.id) === newestOwnId ? `<span class="message-receipt-word">${receipt === 'read' ? 'Read' : 'Delivered'}</span>` : '';
-    return `<div class="message ${message.from === 'me' ? 'me' : 'them'}${kind}">${content}<small${receipt ? ' class="message-meta"' : ''}>${escapeHtml(formatChatTime(message.createdAt))}${word}${receiptMarkup(receipt)}</small></div>`;
+    const edited = message.editedAt ? '<span class="message-edited">Edited</span>' : '';
+    const editing = editingMessage && String(editingMessage.id) === String(message.id) ? ' is-editing' : '';
+    return `<div class="message ${mineClass}${kind}${editing}" data-message-id="${idAttr}" tabindex="0" aria-haspopup="menu">${content}<small${receipt ? ' class="message-meta"' : ''}>${edited}${escapeHtml(formatChatTime(message.createdAt))}${word}${receiptMarkup(receipt)}</small></div>`;
   };
   const newestOwnId = lastOwnMessageId(thread);
   messages.innerHTML = thread.length ? thread.map(renderBubble).join('') : '<div class="chat-start-note"><strong>Start with context.</strong><span>A thoughtful first message makes a better introduction.</span></div>';
@@ -3129,7 +3173,7 @@ const renderMessages = () => {
 
 const CHAT_CLOSE_ICON = '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true" focusable="false"><path d="M6 6l12 12M18 6 6 18"/></svg>';
 // Something layered over the open thread (a menu, a picker, a dialog) takes Escape first.
-const CHAT_LAYERS = '#chat-more-menu:not([hidden]), #chat-emoji-picker:not([hidden]), #chat-attachment-menu:not([hidden]), #chat-gif-picker:not([hidden]), #chat-share-menu:not([hidden]), #chat-camera-modal:not([hidden]), #public-profile-modal, #profile-edit-modal, #app-notification-panel:not([hidden]), [popover]:popover-open, dialog[open], .app-overlay:not([hidden])';
+const CHAT_LAYERS = '#chat-more-menu:not([hidden]), #chat-emoji-picker:not([hidden]), #chat-attachment-menu:not([hidden]), #chat-gif-picker:not([hidden]), #chat-share-menu:not([hidden]), #chat-camera-modal:not([hidden]), #public-profile-modal, #profile-edit-modal, #app-notification-panel:not([hidden]), [popover]:popover-open, dialog[open], .app-overlay:not([hidden]), .message-menu, #chat-edit-bar:not([hidden])'; // D-157: the message menu and the editing bar take Escape first
 const closeChatToInbox = () => {
   if (!selectedChat) return;
   const id = selectedChat.id;
@@ -3145,6 +3189,8 @@ window.addEventListener('keydown', (event) => {
 }, true);
 const closeSelectedChat = () => {
   closeShareMenu();
+  cancelMessageEdit({ keepInput: false });
+  messageMenu?.close();
   leaveTyping();
   selectedChat = null;
   document.querySelector('#chat-window')?.setAttribute('hidden', '');
@@ -6022,11 +6068,117 @@ const insertChatMessage = async (body, attachment = null, extra = null) => {
     throw error;
   }
 };
+// D-157 (0046): long-press a bubble for Copy, Edit, Unsend or Delete for me.
+const findThreadMessage = (id) => (selectedChat ? (chatMessages[selectedChat.id] || []).find((m) => String(m.id) === String(id)) : null);
+const isSpecialMessage = (message) => Boolean(message?.attachment || parseAreaBody(message?.text) || parseSharedPost(message?.text));
+const actionErrorCopy = (error, fallback) => {
+  if (isMissingFunction(error)) return 'Editing and unsending open soon.';
+  const text = String(error?.message || '');
+  if (/edit window closed/.test(text)) return 'Messages can be edited for 15 minutes after sending.';
+  if (/cannot be edited/.test(text)) return 'This message can no longer be edited.';
+  if (/not found/.test(text)) return 'This message is no longer available.';
+  return fallback;
+};
+const patchThreadMessage = (personId, id, patch) => {
+  const thread = chatMessages[personId];
+  if (!thread) return;
+  chatMessages[personId] = thread.map((m) => (String(m.id) === String(id) ? { ...m, ...patch } : m));
+};
+const editBar = () => {
+  let bar = document.querySelector('#chat-edit-bar');
+  const form = document.querySelector('#chat-form');
+  if (!bar && form) {
+    bar = document.createElement('div');
+    bar.id = 'chat-edit-bar';
+    bar.className = 'chat-edit-bar';
+    bar.hidden = true;
+    bar.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h4L19 9l-4-4L4 16v4Z"/><path d="m13.5 6.5 4 4"/></svg><span class="chat-edit-copy"><strong>Editing message</strong><span id="chat-edit-preview"></span></span><button type="button" class="chat-edit-cancel" aria-label="Cancel editing">×</button>';
+    form.before(bar);
+    bar.querySelector('.chat-edit-cancel').addEventListener('click', () => { cancelMessageEdit({ keepInput: false }); document.querySelector('#chat-input')?.focus(); });
+  }
+  return bar;
+};
+function cancelMessageEdit({ keepInput = true } = {}) {
+  if (!editingMessage) return;
+  editingMessage = null;
+  const bar = document.querySelector('#chat-edit-bar');
+  if (bar) bar.hidden = true;
+  document.querySelector('#chat-form')?.classList.remove('is-editing');
+  const input = document.querySelector('#chat-input');
+  if (input && !keepInput) input.value = '';
+  if (selectedChat) renderMessages();
+}
+const startMessageEdit = (message) => {
+  if (!selectedChat || !canEditMessage(message, { special: isSpecialMessage(message) })) { showToast('Messages can be edited for 15 minutes after sending.'); return; }
+  editingMessage = { personId: selectedChat.id, id: message.id, original: message.text };
+  const bar = editBar();
+  if (bar) { bar.hidden = false; bar.querySelector('#chat-edit-preview').textContent = message.text; }
+  document.querySelector('#chat-form')?.classList.add('is-editing');
+  const input = document.querySelector('#chat-input');
+  if (input) { input.value = message.text; input.focus(); input.setSelectionRange?.(input.value.length, input.value.length); }
+  renderMessages();
+};
+async function saveMessageEdit(body) {
+  const { personId, id, original } = editingMessage;
+  if (!body) { showToast('A message cannot be empty. To remove it, use Unsend.'); return; }
+  if (body === original) { cancelMessageEdit({ keepInput: false }); return; }
+  const sendButton = document.querySelector('.chat-send-button') || document.querySelector('#chat-form button[type="submit"]');
+  if (sendButton) { sendButton.disabled = true; sendButton.setAttribute('aria-busy', 'true'); }
+  const { data, error } = await editMessage(id, body);
+  if (sendButton) { sendButton.disabled = false; sendButton.removeAttribute('aria-busy'); }
+  if (error) { showToast(actionErrorCopy(error, 'That edit did not save. Try again.')); return; }
+  const row = Array.isArray(data) ? data[0] : data;
+  patchThreadMessage(personId, id, { text: row?.body ?? body, editedAt: row?.edited_at || new Date().toISOString() });
+  cancelMessageEdit({ keepInput: false });
+  renderChats();
+}
+const unsendThreadMessage = async (message) => {
+  const personId = selectedChat?.id;
+  if (!personId) return;
+  const { data, error } = await unsendMessage(message.id);
+  if (error) { showToast(actionErrorCopy(error, 'That message could not be unsent. Try again.')); return; }
+  const row = Array.isArray(data) ? data[0] : data;
+  patchThreadMessage(personId, message.id, { text: '', attachment: null, editedAt: '', unsentAt: row?.unsent_at || new Date().toISOString() });
+  if (editingMessage && String(editingMessage.id) === String(message.id)) cancelMessageEdit({ keepInput: false });
+  if (row?.removed_path) Promise.resolve().then(() => removeMessageAttachment(row.removed_path)).catch(() => {});
+  renderChats();
+  if (String(selectedChat?.id) === String(personId)) renderMessages();
+  showToast('Message unsent.');
+};
+const deleteThreadMessageForMe = async (message) => {
+  const personId = selectedChat?.id;
+  if (!personId) return;
+  const { error } = await deleteMessageForMe(message.id);
+  if (error) { showToast(actionErrorCopy(error, 'That message could not be deleted. Try again.')); return; }
+  chatMessages[personId] = (chatMessages[personId] || []).filter((m) => String(m.id) !== String(message.id));
+  if (editingMessage && String(editingMessage.id) === String(message.id)) cancelMessageEdit({ keepInput: false });
+  renderChats();
+  if (String(selectedChat?.id) === String(personId)) renderMessages();
+  showToast('Deleted for you.');
+};
+messageMenu = createMessageMenu({
+  container: document.querySelector('#chat-messages'),
+  getMessage: (id) => {
+    const message = findThreadMessage(id);
+    return message ? { message, special: isSpecialMessage(message) } : null;
+  },
+  onAction: async (action, message) => {
+    if (action === 'copy') {
+      try { await navigator.clipboard.writeText(message.text); showToast('Copied.'); } catch { showToast('Copy is not available here.'); }
+    } else if (action === 'edit') startMessageEdit(message);
+    else if (action === 'unsend') await unsendThreadMessage(message);
+    else if (action === 'delete') await deleteThreadMessageForMe(message);
+  },
+});
+document.querySelector('#chat-input')?.addEventListener('keydown', (event) => {
+  if (event.key === 'Escape' && editingMessage) { event.preventDefault(); event.stopPropagation(); cancelMessageEdit({ keepInput: false }); }
+});
 document.querySelector('#chat-form')?.addEventListener('submit', async (event) => {
   event.preventDefault();
   const input = document.querySelector('#chat-input');
   const sendButton = document.querySelector('.chat-send-button') || document.querySelector('#chat-form button[type="submit"]');
   const body = input?.value.trim() || '';
+  if (editingMessage && selectedChat && String(editingMessage.personId) === String(selectedChat.id)) { await saveMessageEdit(body); return; }
   if (!selectedChat || (!body && !pendingChatFiles.length && !pendingChatGif) || !supabase || !memberProfile.id) return;
   typingSession?.sender.stop();
   if (sendButton) { sendButton.disabled = true; sendButton.classList.add('is-sending'); sendButton.setAttribute('aria-busy', 'true'); }
@@ -6201,7 +6353,9 @@ const loadSupabaseCommunity = async () => {
   const inboxFilter = `sender_id.eq.${session.user.id},recipient_id.eq.${session.user.id}`;
   const loadInbox = async () => {
     // Sort in the browser so an older Supabase schema cache cannot block inbox loading.
-    const full = await supabase.from('brivia_messages').select('id,sender_id,recipient_id,body,created_at,message_type,attachment_url,attachment_path,attachment_name,attachment_mime,attachment_size').or(inboxFilter);
+    const base = 'id,sender_id,recipient_id,body,created_at,message_type,attachment_url,attachment_path,attachment_name,attachment_mime,attachment_size';
+    let full = await supabase.from('brivia_messages').select(base + (editColumns ? EDIT_COLUMNS : '')).or(inboxFilter);
+    if (full.error && editColumns && isEditColumnError(full.error)) { editColumns = false; full = await supabase.from('brivia_messages').select(base).or(inboxFilter); }
     return full.error ? supabase.from('brivia_messages').select('id,sender_id,recipient_id,body').or(inboxFilter) : full;
   };
   const [, { data: matchRows, error: matchError }, { data: inboxRows, error: inboxError }] = await Promise.all([
@@ -6227,7 +6381,9 @@ const loadSupabaseCommunity = async () => {
         createdAt: message.created_at,
         from: message.sender_id === session.user.id ? 'me' : 'them',
         text: message.body ?? message.text ?? message.message ?? message.content ?? '',
-        attachment: attachmentFromRow(message),
+        attachment: message.unsent_at ? null : attachmentFromRow(message),
+        editedAt: message.edited_at || '',
+        unsentAt: message.unsent_at || '',
       });
     });
     remoteMatchIds = [...inboxIds];

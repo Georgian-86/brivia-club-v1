@@ -390,6 +390,11 @@ export const cancelMemberEvent = (id) => rpcCall('cancel_member_event', { p_id: 
 export const companionEvents = () => rpcCall('companion_events', {});
 export const companionDeck = (eventId, limit = 20) => rpcCall('companion_deck', { p_event: eventId, p_limit: limit });
 export const companionSwipe = (eventId, targetId, like) => rpcCall('companion_swipe', { p_event: eventId, p_target: targetId, p_like: Boolean(like) });
+// D-157 (0046): edit (15 minutes, plain text), unsend (any time, both sides) and delete for me. Each answers
+// { data, error }; before 0046 the error is PGRST202 / 42883 (isMissingFunction).
+export const editMessage = (id, body) => rpcCall('edit_message', { p_id: id, p_body: body });
+export const unsendMessage = (id) => rpcCall('unsend_message', { p_id: id });
+export const deleteMessageForMe = (id) => rpcCall('delete_message_for_me', { p_id: id });
 // D-156 (0045): { daily_limit, remaining, resets_at } for the 10 companion swipes a day; before 0045 an error (never blocks).
 export const companionQuota = () => rpcCall('my_companion_quota', {});
 export const myCompanionMatches = () => rpcCall('my_companion_matches', {});
