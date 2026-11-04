@@ -2358,7 +2358,9 @@ const swipe = (type, { vx = 0 } = {}) => {
     openPitch(person);
     return true;
   }
-  // D-156: count the pass down at once; the server is the judge (a refused pass puts the card back and says why).
+  // The card starts leaving first (D-162: so a pass that uses the last free swipe lets it fly out before the deck
+  // reshuffles), then the count goes down at once; the server is the judge (a refused pass puts the card back).
+  advanceCard(person, 'pass', { vx });
   if (Number.isFinite(Number(signalQuota?.remaining))) {
     signalQuota = { ...signalQuota, remaining: Math.max(Number(signalQuota.remaining) - 1, 0) };
     renderSignalQuota();
@@ -2374,7 +2376,6 @@ const swipe = (type, { vx = 0 } = {}) => {
     void refreshSignalQuota();
     showToast(text);
   });
-  advanceCard(person, 'pass', { vx });
   return true;
 };
 

@@ -133,7 +133,7 @@ export const startAppStub = async ({ port, state = {}, deckRows = defaultDeckRow
         if (code >= 400) return json(code, { code: 'XX000', message: 'stub failure' });
       }
       if (pathName === '/rest/v1/rpc/deck_why') return json(200, st.why && st.why[args.p_target] ? [st.why[args.p_target]] : []);
-      if (pathName === '/rest/v1/rpc/my_signal_quota') return json(200, [{ daily_limit: 30, remaining: st.remaining, resets_at: st.resetsAt, live_unanswered: 0, live_limit: 100 }]);
+      if (pathName === '/rest/v1/rpc/my_signal_quota') return json(200, [{ daily_limit: st.dailyLimit || 30, remaining: st.remaining, resets_at: st.resetsAt, live_unanswered: 0, live_limit: 100 }]);
       if (pathName === '/rest/v1/rpc/send_signal') {
         st.signalled.add(args.p_to); st.remaining = Math.max(0, st.remaining - 1); st.resetsAt = '2026-10-04T15:00:00+00:00';
         return json(200, [{ status: st.matchAll ? 'matched' : 'sent', remaining: st.remaining, resets_at: st.resetsAt }]);
