@@ -10,16 +10,19 @@
 .chat-messages .message.is-menu-open { transform: scale(.98); box-shadow: 0 0 0 2px var(--color-wine-soft); }
 .chat-messages .message.is-editing { box-shadow: 0 0 0 2px var(--color-receipt-read); }
 
-/* "You unsent a message" / "This message was unsent": quiet italic, no fill. */
-.app-view[data-view="chat"] .message.is-unsent,
-.chat-messages .message.is-unsent {
-  border: 1px dashed var(--color-line);
-  background: transparent;
+/* "You unsent a message" / "This message was unsent": quiet italic on a soft cream fill (readable on any wallpaper). */
+body.app-body .app-view[data-view="chat"] .chat-messages .message.is-unsent,
+body.app-body .chat-messages .message.is-unsent {
+  border: 1px dashed var(--color-ink-soft);
+  background: color-mix(in srgb, var(--color-cream) 88%, transparent);
+  -webkit-backdrop-filter: blur(6px);
+  backdrop-filter: blur(6px);
   color: var(--color-ink-soft);
   box-shadow: none;
 }
-.chat-messages .message.is-unsent .message-copy { font-style: italic; }
-.chat-messages .message.is-unsent small { color: var(--color-ink-soft); }
+body.app-body .chat-messages .message.is-unsent .message-copy { font-style: italic; color: var(--color-ink-soft); }
+body.app-body .chat-messages .message.is-unsent small,
+body.app-body .app-view[data-view="chat"] .chat-messages .message.me.is-unsent small { color: var(--color-ink-soft); opacity: 1; }
 
 .message-edited { margin-right: var(--space-1); font-style: italic; opacity: .8; }
 
