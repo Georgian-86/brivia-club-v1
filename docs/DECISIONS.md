@@ -3448,3 +3448,7 @@ controls (a tester or a seeded test member), never a real member, so no new expo
   backs to stay with the logo in gold. The PNG was cut to a transparent, trimmed wordmark and filled with a metallic
   gold gradient: `site/media/assets/brivia-wordmark-gold.webp` (560 px, ~24 KB; original kept in `source-media/`).
   New token `--color-gold` tints the lattice and frame; `app.js` preloads the image so the first shuffle frame has it.
+  Then, as asked, "the" and the tagline went black (near-black ink with a thin gold keyline, since plain black on deep
+  wine would not read), and the tagline was reset as tracked capitals "SWIPE. MATCH. BUILD" in Bodoni Moda 600 spanning
+  the full width of the wordmark like a subtitle. The image is now 640 px (~77 KB) and is rebuilt from the original
+  with `scripts/build-wordmark-gold.py`.
