@@ -1071,6 +1071,7 @@ const loadNearbyMatches = async () => {
   nearbyMatches = (data || []).map((row) => ({ otherId: String(row.other_id), name: String(row.name || 'A Brivia member'), photoUrl: row.photo_url || '', matchedAt: String(row.matched_at || '') }));
   const fresh = unseenNearbyMatches().filter((m) => !nearbyMatchToasted.has(m.otherId));
   fresh.forEach((m) => { nearbyMatchToasted.add(m.otherId); addConnection(m.otherId); });
+  markMutualSeen(fresh.map((m) => m.otherId));   // Nearby has its own match dialog
   if (fresh.length) {
     refreshConnections().then(() => renderChats()).catch(() => {});
     if (document.visibilityState === 'visible') showToast(`${NEARBY_COPY.matchTitle} You and ${fresh[0].name} are connected.`);
@@ -1181,6 +1182,7 @@ nearbyPage = createNearbyPage({
     if (row?.status === 'matched') {
       nearbyMatchToasted.add(String(person.id));
       addConnection(person.id);
+      markMutualSeen([person.id]);   // Nearby's own match dialog shows this one
       refreshConnections().then(() => renderChats()).catch(() => {});
     }
     return { status: row?.status || 'sent' };
@@ -1929,20 +1931,60 @@ const signalResultToast = (person, result) => {
 };
 // D-165: a signal's outcome, shown. 'matched' gets the "It's mutual" moment (N1) over the toast; a sent pitch
 // flies a small letter from where it left (origin: a DOMRect or element) to the Chat tab (N2), then the usual toast.
+// Every new match gets the moment once on this device, however it was made: my signal completed it, I accepted their
+// request, or they accepted mine (found by the ~30 s connection sync, or at the next load). The ids already celebrated
+// (or already matched the first time this device saw the account) are kept per member, so old matches never replay.
+const mutualSeenKey = () => `brivia:mutual-seen:${memberProfile.id || 'anon'}`;
+const readMutualSeen = () => {
+  try { const raw = window.localStorage.getItem(mutualSeenKey()); return raw === null ? null : new Set(JSON.parse(raw).map(String)); } catch { return null; }
+};
+const writeMutualSeen = (ids) => {
+  try { window.localStorage.setItem(mutualSeenKey(), JSON.stringify([...ids].slice(-500))); } catch { /* in memory only */ }
+};
+const markMutualSeen = (ids) => { const seen = readMutualSeen() || new Set(); ids.forEach((id) => seen.add(String(id))); writeMutualSeen(seen); };
+let mutualShowing = false;
+const celebrateMatch = (person, { beforeChat } = {}) => {
+  const id = String(person?.id || '');
+  const seen = readMutualSeen() || new Set();
+  if (!id || seen.has(id) || mutualShowing) { if (id) { seen.add(id); writeMutualSeen(seen); } return false; }
+  seen.add(id);
+  writeMutualSeen(seen);
+  mutualShowing = true;
+  const known = findPersonById(id) || person;
+  void mutualMoment({
+    me: { name: memberProfile.name || 'You', photoUrl: safeImageUrl(memberProfile.photoUrl || memberProfile.photo_url || '') },
+    person: { name: known?.name || 'your new connection', photoUrl: safeImageUrl(known?.image || known?.photoUrl || '') },
+    shared: known?.shared || [],
+    onSound: () => chime.notify(`mutual:${id}`),
+  }).then((choice) => {
+    mutualShowing = false;
+    if (choice !== 'chat') return;
+    beforeChat?.();
+    const target = findPersonById(id);
+    setView('chat');
+    if (target) openChat(target);
+  });
+  return true;
+};
+// New matches found by a sync (the other member accepted or liked back): the first gets the moment, the rest are only
+// marked, so a member back after a while sees one moment, not a queue.
+const celebrateNewMatches = async (ids) => {
+  const fresh = ids.map(String).filter((id) => !(readMutualSeen() || new Set()).has(id));
+  if (!fresh.length || document.visibilityState !== 'visible') return;
+  const [first, ...rest] = fresh;
+  if (!findPersonById(first)) {
+    const { data } = await fetchCandidates([first]);
+    if (data?.length) mergePeople(data);
+  }
+  const person = findPersonById(first);
+  if (person) celebrateMatch(person);
+  const seen = readMutualSeen() || new Set();
+  [first, ...rest].forEach((id) => seen.add(id));
+  writeMutualSeen(seen);
+};
 const announceSignal = (person, result, origin = null) => {
   if (!result?.error && result?.matched) {
-    const known = findPersonById(person?.id) || person;
-    void mutualMoment({
-      me: { name: memberProfile.name || 'You', photoUrl: safeImageUrl(memberProfile.photoUrl || memberProfile.photo_url || '') },
-      person: { name: known?.name || 'your new connection', photoUrl: safeImageUrl(known?.image || known?.photoUrl || '') },
-      shared: known?.shared || [],
-      onSound: () => chime.notify(`mutual:${known?.id || ''}`),
-    }).then((choice) => {
-      if (choice !== 'chat') return;
-      const target = findPersonById(known?.id);
-      setView('chat');
-      if (target) openChat(target);
-    });
+    celebrateMatch(person);
     showToast(signalResultToast(person, result));   // the live-region sentence, also under the moment
     return;
   }
@@ -2010,16 +2052,17 @@ async function liftHiringCards() {
   void hiring.ensure(known);
   renderExplore();
 }
+let lastAddedConnections = [];   // the ids the last refreshConnections added (for celebrateNewMatches)
 const refreshConnections = async () => {
   if (!supabase || !memberProfile.id) return;
   const { data, error } = await supabase.from('matches').select('user1_id,user2_id').or(`user1_id.eq.${memberProfile.id},user2_id.eq.${memberProfile.id}`);
   if (error) { console.warn('Connections could not refresh:', error.message); return; }
-  const before = remoteConnectionIds.length;
   // Only newly matched people are added, so chats hidden on this device stay hidden.
-  (data || []).map((match) => String(match.user1_id) === String(memberProfile.id) ? match.user2_id : match.user1_id)
-    .filter((id) => !remoteConnectionIds.some((known) => String(known) === String(id)))
-    .forEach(addConnection);
-  return remoteConnectionIds.length !== before;
+  const added = (data || []).map((match) => String(match.user1_id) === String(memberProfile.id) ? match.user2_id : match.user1_id)
+    .filter((id) => !remoteConnectionIds.some((known) => String(known) === String(id)));
+  added.forEach(addConnection);
+  lastAddedConnections = added.map(String);
+  return added.length > 0;
 };
 // Answers one request; resolves { ok, connected }. The review sheet (D-108) shows its own outcome, so only a failure
 // toasts here (the member took the action).
@@ -2051,14 +2094,17 @@ const respondToRequest = async (fromId, accept) => {
   addConnection(fromId);
   await refreshConnections();
   renderChats();
+  // The moment shows over the review sheet; Say hi closes the sheet and opens the chat.
+  celebrateMatch(findPersonById(fromId) || request?.person || { id: fromId }, { beforeChat: () => requestReview?.close() });
   return { ok: true, connected: true };
 };
 let requestReviewOpen = false;
+let requestReview = null;
 const openRequestReview = () => {
   if (requestReviewOpen || !pendingRequests.length) return;
   requestReviewOpen = true;
   closeNotificationPanel();
-  openCollabReview({
+  requestReview = openCollabReview({
     requests: pendingRequests,
     respond: respondToRequest,
     myInterests: (profileInterests.rows || []).map((row) => row.label).filter(Boolean),
@@ -3014,7 +3060,7 @@ const startMessageSync = () => {
     // Every ~30 s: pick up new requests, and matches completed by the other member accepting.
     if (++connectionSyncTick % 6 === 1) {
       loadConnectionRequests().catch((error) => console.warn('Request sync could not complete:', error.message));
-      refreshConnections().then((changed) => { if (changed) renderChats(); }).catch((error) => console.warn('Connection sync could not complete:', error.message));
+      refreshConnections().then((changed) => { if (changed) { renderChats(); celebrateNewMatches(lastAddedConnections).catch(() => {}); } }).catch((error) => console.warn('Connection sync could not complete:', error.message));
     }
   };
   sync();
@@ -6487,6 +6533,10 @@ const loadSupabaseCommunity = async () => {
   if (!matchError) {
     remoteConnectionIds = (matchRows || []).map((match) => match.user1_id === session.user.id ? match.user2_id : match.user1_id);
     remoteMatchIds = [...remoteConnectionIds];
+    // The first time this device sees the account, its matches are the baseline (no moment for old matches);
+    // after that, a match made while the member was away gets the moment once the app has drawn.
+    if (readMutualSeen() === null) writeMutualSeen(new Set(remoteConnectionIds.map(String)));
+    else window.setTimeout(() => { celebrateNewMatches(remoteConnectionIds).catch(() => {}); }, 1600);
   }
   if (!inboxError) {
     try { await syncIncomingNotifications(inboxRows || []); } catch (error) { console.warn('Notifications could not load:', error.message); }

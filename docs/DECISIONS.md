@@ -3327,3 +3327,17 @@ controls (a tester or a seeded test member), never a real member, so no new expo
   button's cream-and-wine frame, and on it fills deep wine with a cream knob, like the filter button when its drawer
   is open. It is 44 px tall and adds no height to the deck.
 
+## D-167 (2026-11-04): "It's mutual" for every new match, not only the one my swipe completes
+
+- **Reported:** "the mutual match animation is not working in live site". D-165 played it only when my own signal
+  came back `matched`. On live, most matches are made the other way: I accept a request in the review sheet, or the
+  other member accepts mine. Neither path showed it, and the review sheet is a modal `<dialog>` (top layer), so a fixed
+  div could not have covered it anyway.
+- **Now:** the moment is itself a modal `<dialog>`, so it shows above any sheet. It plays once per match per device:
+  when my signal completes it, when I accept a request (Say hi closes the sheet and opens the chat; Keep exploring
+  returns to the sheet), when the ~30 s connection sync finds a match the other member completed, and at the next load
+  for a match made while I was away (one moment, not a queue). The ids already celebrated live in
+  `brivia:mutual-seen:<member id>` (localStorage); the first visit on a device takes the existing matches as the
+  baseline, so old matches never replay. Nearby keeps its own match dialog (those ids are marked seen).
+- **Proof:** `tests/e2e/mutual-moment.spec.mjs` (new: baseline, other member accepts, made while away, no replay);
+  `collab-requests.spec.mjs` now expects the moment over the sheet; deck 201/201, app-shell 214/214, sounds, hiring pass.

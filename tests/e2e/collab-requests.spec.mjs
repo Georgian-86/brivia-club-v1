@@ -78,16 +78,23 @@ try {
     check(`${w}: a right drag accepts (p_accept true)`, JSON.stringify(st.responses.at(-1)) === JSON.stringify({ p_from: ASHA, p_accept: true }));
     const done = await page.locator('dialog.collab-review .collab-state').innerText();
     check(`${w}: "You're connected." says her message opened the chat and offers Reply Asha (D-124) (${JSON.stringify(done)})`, /You're connected\./.test(done) && /Reply Asha/.test(done) && /first one in your chat/.test(done));
-    await shot(page, `connected-${w}.png`);
+    // D-165: accepting makes a match, so "It's mutual" shows over the sheet (both are modal dialogs, it is on top).
+    await page.waitForSelector('dialog.mutual-moment[open] .mutual-hi');
+    const moment = await page.locator('dialog.mutual-moment .mutual-title').innerText();
+    check(`${w}: accepting shows "It's mutual" with Asha over the sheet (${JSON.stringify(moment)})`, /You and Asha Band/.test(moment) && /both said yes/.test(moment));
     if (w < 780) {
-      // Message: the sheet closes and Asha's chat opens.
-      await page.locator('dialog.collab-review [data-collab-message]').click();
+      // Say hi: the moment and the sheet close and Asha's chat opens.
+      await page.locator('dialog.mutual-moment .mutual-hi').click();
       await page.waitForFunction(() => !document.querySelector('dialog.collab-review') && !document.querySelector('#chat-window')?.hidden);
-      check('390: Message opens the chat with Asha', (await page.locator('#chat-name').textContent()) === 'Asha Band');
+      check('390: Say hi opens the chat with Asha', (await page.locator('#chat-name').textContent()) === 'Asha Band');
       await page.locator('#app-notification-button').click();
       await page.locator('[data-collab-review]').click();
       await page.waitForSelector('dialog.collab-review[open] .collab-card');
     } else {
+      // Keep exploring: back to the sheet's "You're connected." and on to the next request.
+      await page.locator('dialog.mutual-moment .mutual-later').click();
+      await page.waitForFunction(() => !document.querySelector('dialog.mutual-moment'));
+      await shot(page, `connected-${w}.png`);
       await page.locator('dialog.collab-review [data-collab-next]').click();
     }
 
@@ -131,6 +138,9 @@ try {
     await page.locator('[data-collab-review]').click();
     await page.waitForSelector(`dialog.collab-review .collab-card[data-from="${CARA}"]`);
     await page.keyboard.press('ArrowRight');
+    // D-165: the "It's mutual" moment first; Keep exploring returns to the sheet's Message.
+    await page.locator('dialog.mutual-moment .mutual-later').click();
+    await page.waitForFunction(() => !document.querySelector('dialog.mutual-moment'));
     await page.locator('dialog.collab-review [data-collab-message]').click();
     await page.waitForFunction(() => !document.querySelector('dialog.collab-review') && !document.querySelector('#chat-window')?.hidden, null, { timeout: 4000 }).catch(() => {});
     await page.waitForTimeout(300);

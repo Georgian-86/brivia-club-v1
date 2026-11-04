@@ -60,10 +60,12 @@ const avatar = (doc, { name, photoUrl }, side) => {
 export const mutualMoment = ({ me = {}, person = {}, shared = [], doc = globalThis.document, reduced = prefersReduced(), onSound } = {}) => new Promise((resolve) => {
   if (!doc?.body) { resolve('close'); return; }
   const returnFocus = doc.activeElement;
-  const root = doc.createElement('div');
+  // A modal <dialog> (top layer), so the moment shows above any open sheet, such as the request review (also a
+  // modal dialog, which a fixed div can never cover).
+  const modal = typeof doc.createElement('dialog').showModal === 'function';
+  const root = doc.createElement(modal ? 'dialog' : 'div');
   root.className = 'mutual-moment';
-  root.setAttribute('role', 'dialog');
-  root.setAttribute('aria-modal', 'true');
+  if (!modal) { root.setAttribute('role', 'dialog'); root.setAttribute('aria-modal', 'true'); }
   root.setAttribute('aria-labelledby', 'mutual-moment-title');
   const backdrop = doc.createElement('div');
   backdrop.className = 'mutual-backdrop';
@@ -108,13 +110,17 @@ export const mutualMoment = ({ me = {}, person = {}, shared = [], doc = globalTh
   panel.append(pair, eyebrow, title, ...(chips.childElementCount ? [chips] : []), actions);
   root.append(backdrop, panel);
   doc.body.append(root);
+  if (modal) {
+    root.addEventListener('cancel', (e) => { e.preventDefault(); close('close'); });   // Escape
+    try { root.showModal(); } catch { root.setAttribute('open', ''); }
+  }
 
   let done = false;
   const close = (result) => {
     if (done) return;
     done = true;
     (doc.defaultView || doc).removeEventListener('keydown', onKey, true);
-    const finish = () => { root.remove(); if (result !== 'chat') returnFocus?.focus?.({ preventScroll: true }); resolve(result); };
+    const finish = () => { if (modal && root.open) root.close(); root.remove(); if (result !== 'chat') returnFocus?.focus?.({ preventScroll: true }); resolve(result); };
     if (reduced) finish();
     else gsap.to(root, { opacity: 0, duration: 0.18, ease: 'power1.in', onComplete: finish });
   };
