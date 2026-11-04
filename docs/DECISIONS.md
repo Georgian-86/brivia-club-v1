@@ -3219,3 +3219,14 @@ controls (a tester or a seeded test member), never a real member, so no new expo
 - **Done:** the room photo keeps its place; a layer under the content (`aura-theme.css`, `.app-view[data-view="home"]::before`)
   adds the aura's lilac, wine, mint, rose and peach glows at 62% opacity, so Connect reads like the other pages. The
   card, buttons and text are untouched. To make it stronger or softer, change that one opacity. Deployed 2026-11-04.
+
+## D-159 (2026-11-04): the deck card never hides View profile; the "caught up" box is plain paper
+
+- **Asked:** "pls fix this bug, its getting overlapped, also remove little gradient from You are caught up box".
+- **Phones:** the card had a fixed height (460-560 px) sized before the location line and "Distances appear as your
+  area fills up." were added; with five chips View profile was pushed past the card's edge, under the swipe hint. The
+  height is now a minimum: the card grows to fit and the hint sits below it.
+- **Short desktop windows:** the chip area's two-row cap cut the third row in half just above View profile.
+  `fitCardChips` (app.js) hides any chip that would not show whole (re-run on resize); "You both" chips come first.
+- **Caught up:** `#home-empty-state` is plain `--color-card-paper`, like the member card (no aura).
+- **Proof:** measured at 1800x990, 1440x800, 1280x720, 390x844, 390x664, 360x640; unit 504; e2e deck 201.

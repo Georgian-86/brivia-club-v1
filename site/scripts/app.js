@@ -1420,6 +1420,28 @@ const renderCardChips = (container, person) => {
   }));
 };
 
+// D-159: where the chip area is capped (short windows: two rows), a chip that would only partly show is hidden whole,
+// so a half chip never peeks out above View profile. "You both" chips come first, so they are the ones kept. Re-run
+// when the card changes size (window resize, bio arriving).
+const fitCardChips = () => {
+  const container = document.querySelector('#swipe-tags');
+  if (!container) return;
+  const chips = [...container.children].filter((el) => el.tagName === 'SPAN');
+  chips.forEach((chip) => { chip.hidden = false; });
+  if (container.scrollHeight <= container.clientHeight + 1) return;
+  const limit = container.getBoundingClientRect().bottom + 1;
+  chips.forEach((chip) => { if (chip.getBoundingClientRect().bottom > limit) chip.hidden = true; });
+};
+let chipFitObserver = null;
+const watchCardChips = () => {
+  if (chipFitObserver || typeof ResizeObserver !== 'function') return;
+  const card = document.querySelector('#swipe-card');
+  if (!card) return;
+  let frame = 0;
+  chipFitObserver = new ResizeObserver(() => { cancelAnimationFrame(frame); frame = requestAnimationFrame(fitCardChips); });
+  chipFitObserver.observe(card);
+};
+
 // While the deck loads (first load, a refill, Try again) the card keeps its place and shows one skeleton card, so the
 // real card replaces it without a layout shift; the home view is aria-busy. A failure ends it: deck.end = 'error'.
 const deckLoadingNow = () => !deckEmptyCause() && (!deck.ready || Boolean(deck.loading) || deck.refilling);
@@ -1600,6 +1622,8 @@ const renderHome = (queue = getExplorePeople()) => {
     hiring.decorateCard(currentPerson, { label: cardLabel, strip: document.querySelector('#swipe-hiring'), tags });
     void hiring.ensure(queue.slice(0, 12).map((p) => p.id));
   } else { const strip = document.querySelector('#swipe-hiring'); if (strip) strip.hidden = true; }
+  fitCardChips();
+  watchCardChips();
   const count = document.querySelector('#queue-count');
   if (count) count.textContent = `${String(currentIndex + 1).padStart(2, '0')} / ${String(queue.length).padStart(2, '0')}`;
   renderWhy(currentPerson);

@@ -50,7 +50,9 @@ body.app-body .app-view[data-view="home"] .swipe-actions .swipe-action { flex: 0
 }
 /* Phones and tablets: about 50 px to 100 px shorter than before. */
 @media (max-width: 849px) {
-  body.app-body .app-view[data-view="home"] .swipe-stack .swipe-card { height: clamp(460px, calc(100svh - 250px), 560px); }
+  /* D-159: a minimum, not a fixed height: a card with a location note and five chips grows to fit, so View profile
+     stays inside it and the hint below never covers it. */
+  body.app-body .app-view[data-view="home"] .swipe-stack .swipe-card { height: auto; min-height: clamp(460px, calc(100svh - 250px), 560px); }
   /* With no buttons in between, the hint sits right under the stack, over the photo: a frosted label keeps it legible. */
   body.app-body .app-view[data-view="home"] .swipe-hint:not([hidden]) {
     width: fit-content;
