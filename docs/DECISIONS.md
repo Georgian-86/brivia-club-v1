@@ -3248,3 +3248,35 @@ controls (a tester or a seeded test member), never a real member, so no new expo
   `--aura-blush-box` (deep blush top left, a breath of wine top right, peach low, on blush-tinted paper) on every status
   box: the deck's "You're caught up", Nearby's "It's a little quiet around here" / "Nearby opens soon", Companions,
   Explore's empty events and Notes' "Start the conversation". Supersedes D-159's plain paper for the caught-up box.
+
+## D-162 (2026-11-04): the signature deck ritual (intro deal, daily-cap shuffle, deck sounds)
+
+- **Asked:** a Solitaire-inspired, cinematic deck on Connect: the deck assembles on arrival and the top card rises into
+  the live profile; Pass sinks left, Pitch lifts right; when the daily free swipes are used the deck spreads, gathers,
+  shuffles and reforms with "That's your deck for today."; a musical language to match; reduced motion and sound
+  preferences respected; never touching the swipe-limit logic.
+- **Built:** `site/scripts/deck-ritual.js` (pure choreography, unit-tested, plus one controller) and
+  `site/styles/deck-ritual.css`. Five card backs (deep wine, champagne frame, the wordmark, a faint lattice) live in an
+  overlay over the stack; the profile card is never restyled, only hidden while they move (it keeps its size).
+  - Intro: deepest back first, one every 120 ms from a different side, a gentle spring (CSS `linear()` easing, about 3%
+    overshoot; a cubic-bezier elsewhere), squared Solitaire offsets; the top back lifts clear and the live card rises;
+    the peek layers fade in. About 1.7 s. Once per visit (sessionStorage), not on every return; a new swipe window
+    (the quota freeing up) deals again. Swipes are held while it runs (no double or accidental swipes).
+  - Completion: driven only by `quotaBlocked(signalQuota) === 'daily'` (the server's quota, D-156), never a timer, and
+    only after the last card has flown out. Fan (0.45 s, narrower on phones so nothing leaves the screen), riffle back
+    (the halves interleave and drop one by one), square up, then the words on the top card with the refresh time from
+    `resets_at`. About 2.3 s. Opening Connect already capped shows the finished deck at once (no replay). No profile is
+    offered (card hidden and inert), and the shuffle never counts, resets or grants a swipe.
+  - Supersedes D-026's "at zero, the card stays with a notice" for the daily cap (the live cap keeps its notice).
+  - Pitch now lifts as it leaves (y -64 px); Pass still sinks a little. Everything else about the swipe is unchanged.
+- **Sound:** two new cues in the same horn / B-flat language (notify-sound.js `RITUAL_CUES`), timed from the
+  choreography constants so each soft piano tick lands with its card: `deal` (rising ticks, then F to B-flat over a
+  B-flat chord) and `complete` (a falling arpeggio as the deck fans, riffle ticks, a closing F-D-B-flat over B-flat
+  major 9). Quieter than a swipe; follow the existing browser unlock (silent until a gesture) and the Settings switch,
+  now "SWIPE & DECK SOUNDS"; at most once per 4 s each, so a re-render can never stack them.
+- **Proof:** unit 514 (new deck-ritual tests: timings, riffle, squared stack, symmetric fan, spring overshoot, copy,
+  once-per-visit, cue timing); e2e `deck-ritual.spec.mjs` DR1-DR8 (intro, held swipes, once per visit, the shuffle at
+  the cap with no extra swipes, finished deck on return, a fresh deal on a new window, reduced motion, phone); deck 201
+  (zero-quota checks updated to the finished deck), companions 65, message-actions 30, read-receipts 23, chat-inbox 15,
+  onboarding 269. The app-stub counts passes as swipes with `passesUseSwipes` and marks the intro played unless a spec
+  sets `deckRitual`.

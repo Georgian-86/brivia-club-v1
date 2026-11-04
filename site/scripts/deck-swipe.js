@@ -157,7 +157,8 @@ export const createDeckSwipe = ({ card, stack, canDrag = () => true, onCommit = 
     const turn = (direction === 'pitch' ? 1 : -1) * (SWIPE.maxRotate + 6);
     host.style.setProperty('--swipe-rise-speed', `${ms}ms`);
     setVars({ pass: direction === 'pass' ? 1 : 0, pitch: direction === 'pitch' ? 1 : 0, rise: 1 });
-    place(pose.x + distance, pose.y + 24, turn, `transform ${ms}ms ${GLIDE}`);
+    // D-162: a pass sinks a little as it leaves; a pitch lifts, as if handed on.
+    place(pose.x + distance, pose.y + (direction === 'pitch' ? -64 : 24), turn, `transform ${ms}ms ${GLIDE}`);
     sound();
     return wait(ms + 20);
   };

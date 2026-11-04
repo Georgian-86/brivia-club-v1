@@ -68,6 +68,7 @@ import { profileChecklist } from './profile-checklist.js';
 import { quotaLabel, quotaErrorText, quotaBlocked, quotaNotice } from './signal-quota.js';
 import { pitchLine, deckChips, deckEmptyState, deckFields, bandNote, deckCoverSrc } from './deck-view.js';
 import { createDeckSwipe, SWIPE, setSwipeCue } from './deck-swipe.js';
+import { createDeckRitual, introDue, markIntroPlayed } from './deck-ritual.js';
 import { maybeShowDeckTutorial } from './deck-tutorial.js';
 import { whyPanelMarkup, whyRow } from './why-panel.js';
 import { chatEmojiCategories } from './chat-emoji-data.js';
@@ -105,7 +106,8 @@ import '../styles/collab-requests.css';  // D-108: the request section and revie
 import '../styles/emoji-field.css';  // D-113: the emoji panel under the Edit profile bio
 import '../styles/work-identity.css';  // D-140: company line and picker
 import '../styles/hiring.css';  // D-141: the hiring bar, banner, sheets and profile cards
-import '../styles/message-actions.css';  // D-157: the long-press message menu and the editing bar
+import '../styles/message-actions.css';
+import '../styles/deck-ritual.css';  // D-162: the deck ritual's card backs  // D-157: the long-press message menu and the editing bar
 import '../styles/components.css';  // D-105: the shared field, select, listbox and chip components, last so they win
 import { createHiring } from './hiring-ui.js';  // D-141
 import { interleaveLift } from './hiring.js';
@@ -159,6 +161,9 @@ const EDIT_COLUMNS = ',edited_at,unsent_at';
 const isEditColumnError = (error) => /edited_at|unsent_at/.test(error?.message || '');
 // The message being edited in the composer: { personId, id } or null.
 let editingMessage = null;
+// D-162: the deck ritual (deck-ritual.js) and whether this page has seen swipes left (only then does the cap animate).
+let deckRitual = null;
+let sawSwipesLeft = false;
 let messageMenu = null; // createMessageMenu, set once the chat composer exists
 // Crossing paths (D-119, 0021): the loop (crossing-paths.js), its alerts (from my_nearby_alerts) and its status.
 let crossingPaths = null;
@@ -775,7 +780,8 @@ const renderSignalQuota = () => {
   const copy = quotaNotice(signalQuota);
   const limitCopy = document.querySelector('#swipe-limit-copy');
   if (limitCopy) limitCopy.textContent = copy;
-  limitState?.toggleAttribute('hidden', !copy || !currentPerson);
+  // D-162: at the daily cap the finished deck says it; the notice stays for the live cap only.
+  limitState?.toggleAttribute('hidden', !copy || !currentPerson || quotaBlocked(signalQuota) === 'daily');
   // At a cap, Pitch says so to assistive tech and looks muted, but stays focusable: a tap explains why (F2).
   const like = document.querySelector('[data-action="like"]');
   if (like) {
@@ -791,7 +797,38 @@ const renderSignalQuota = () => {
     if (capped) { pass.setAttribute('aria-disabled', 'true'); pass.setAttribute('aria-describedby', 'swipe-limit-copy'); }
     else { pass.removeAttribute('aria-disabled'); pass.removeAttribute('aria-describedby'); }
   }
+  syncDeckRitual();
 };
+// D-162: the deck ritual follows the real state. The intro plays once per visit when Connect shows a card; the
+// completion follows the server's daily quota (never a timer) and only animates when this page saw the cap arrive.
+// When the quota frees up again (the next window), the finished deck clears and a fresh deck is dealt.
+function syncDeckRitual() {
+  if (!deckRitual) return;
+  const view = document.body.dataset.appView;
+  const onConnect = (view === 'home' || view === 'explore') && !document.querySelector('[data-view="home"]')?.hidden;
+  const capped = quotaBlocked(signalQuota) === 'daily';
+  if (!capped && Number.isFinite(Number(signalQuota?.remaining))) sawSwipesLeft = true;
+  if (capped) {
+    // A card still on its way out (or parked beside the pitch sheet) leaves first; renderHome calls back after it.
+    if (deckAdvancing || deckLoadingNow() || pendingPitch || document.querySelector('#swipe-card')?.classList.contains('is-parked')) return;
+    document.querySelector('#home-empty-state')?.setAttribute('hidden', '');
+    document.querySelector('#swipe-limit-state')?.setAttribute('hidden', '');
+    document.querySelector('#swipe-card')?.setAttribute('inert', '');
+    void deckRitual.complete({ quota: signalQuota, animate: onConnect && sawSwipesLeft && !deckRitual.isComplete() });
+    return;
+  }
+  document.querySelector('#swipe-card')?.removeAttribute('inert');
+  let freshDeal = false;
+  if (deckRitual.isComplete()) {
+    deckRitual.clear();
+    freshDeal = true;                                        // a new swipe window: deal the new deck
+    if (!currentPerson) { renderExplore(); return; }
+  }
+  const card = document.querySelector('#swipe-card');
+  if (!onConnect || !currentPerson || deckLoadingNow() || !card || card.hidden || (!freshDeal && !introDue())) return;
+  markIntroPlayed();
+  deckRitual.intro().then(() => offerDeckTutorial());
+}
 const refreshSignalQuota = async () => {
   if (!supabase || !memberProfile.id) return;
   const { data, error } = await fetchSignalQuota();
@@ -1308,7 +1345,7 @@ const setView = (view) => {
   markCurrentNav(document, view);
   if (previousView === 'chat' || view === 'chat') { try { scheduleRowTyping(); } catch { /* best-effort */ } }
   if (view === 'explore') renderExplore();
-  if (view === 'home' || view === 'explore') offerDeckTutorial();
+  if (view === 'home' || view === 'explore') { offerDeckTutorial(); window.setTimeout(syncDeckRitual, 0); }
   if (view === 'posts') {
     showCommunityPostsLoading();
     loadCommunityPosts();
@@ -1577,6 +1614,8 @@ const renderHome = (queue = getExplorePeople()) => {
     actions?.setAttribute('hidden', '');
     hint?.setAttribute('hidden', '');
     limitState?.setAttribute('hidden', '');
+    // D-162: the day's swipes are used: the finished deck, not "You're caught up".
+    if (quotaBlocked(signalQuota) === 'daily') { hint?.removeAttribute('hidden'); emptyState?.setAttribute('hidden', ''); syncDeckRitual(); return; }
     if (emptyState) renderDeckEmpty(emptyState);
     const count = document.querySelector('#queue-count'); if (count) count.textContent = '00 / 00';
     return;
@@ -1628,6 +1667,7 @@ const renderHome = (queue = getExplorePeople()) => {
   if (count) count.textContent = `${String(currentIndex + 1).padStart(2, '0')} / ${String(queue.length).padStart(2, '0')}`;
   renderWhy(currentPerson);
   offerDeckTutorial();
+  syncDeckRitual();
 };
 // D-115: the card shows the member's bio (member_bio, 0016: only for a member this viewer can see). Cached per id;
 // before 0016 the RPC is missing, so the line stays hidden and the deck never asks again this visit.
@@ -1657,6 +1697,7 @@ function offerDeckTutorial() {
   deckTutorialTimer = window.setTimeout(() => {
     const card = document.querySelector('#swipe-card');
     if (!currentPerson || !card || card.hidden || card.closest('[hidden]') || document.body.classList.contains('app-auth-pending')) return;
+    if (deckRitual?.busy() || deckRitual?.isComplete()) return;   // D-162: after the deck is dealt (intro calls back)
     if (!['home', 'explore'].includes(document.body.dataset.appView)) return;
     if (overlayIds.some((id) => !document.querySelector(`#${id}`)?.hidden) || document.querySelector('#public-profile-modal') || cardOverflowOpen()) return;
     maybeShowDeckTutorial({ returnFocus: document.activeElement === document.body ? null : document.activeElement });
@@ -2285,7 +2326,7 @@ const advanceCard = (person, direction, { vx = 0, duration, silent = false } = {
 
 // type: 'pass' | 'like'. Returns false when nothing happened (the dragged card springs back).
 const swipe = (type, { vx = 0 } = {}) => {
-  if (!currentPerson || deckAdvancing || capCheckInFlight) return false;
+  if (!currentPerson || deckAdvancing || capCheckInFlight || deckRitual?.busy() || deckRitual?.isComplete()) return false;
   // A Like while the pitch sheet is opening or open is ignored: a repeated click/keypress must not resolve
   // the pending like as a plain like and drop the note (Task 3b).
   if (type === 'like' && pendingPitch && pitchSheetVisible()) return false;
@@ -4246,7 +4287,7 @@ const openNotificationSettings = () => {
     <label class="settings-toggle-row" data-receipts-setting hidden><span><strong>READ RECEIPTS</strong><small>Others see when you've read their messages. Turn it off and you won't see when they've read yours either.</small></span><input id="profile-receipts-toggle" type="checkbox" /><i aria-hidden="true"></i></label>
     <label class="settings-toggle-row" data-push-setting><span><strong>WEB NOTIFICATIONS</strong><small>Get a notification on this device when someone crosses your path, or likes or comments on your note, even when Brivia is closed. Separate from location.</small><small class="settings-nearby-status" data-push-status role="status"></small></span><input id="profile-push-toggle" type="checkbox" /><i aria-hidden="true"></i></label>
     <label class="settings-toggle-row"><span><strong>NOTIFICATION SOUND</strong><small>A soft sax chime when a notification arrives while Brivia is open. On this device.</small></span><input id="profile-sound-toggle" type="checkbox" /><i aria-hidden="true"></i></label>
-    <label class="settings-toggle-row"><span><strong>SWIPE SOUNDS</strong><small>A short note when you pass or pitch. On this device.</small></span><input id="profile-swipe-sound-toggle" type="checkbox" /><i aria-hidden="true"></i></label>
+    <label class="settings-toggle-row"><span><strong>SWIPE &amp; DECK SOUNDS</strong><small>A short note when you pass or pitch, and when your deck is dealt. On this device.</small></span><input id="profile-swipe-sound-toggle" type="checkbox" /><i aria-hidden="true"></i></label>
     <label class="settings-toggle-row" data-push-sound-setting><span><strong>PUSH NOTIFICATION SOUND</strong><small>Your device's own sound for Brivia notifications when Brivia is closed. Off: they arrive silently. On iPhone, set this in Settings, Notifications.</small></span><input id="profile-push-sound-toggle" type="checkbox" /><i aria-hidden="true"></i></label>
     <label class="settings-volume-row" data-sound-volume><span><strong>SOUND VOLUME</strong><small data-sound-volume-value></small></span><input id="profile-sound-volume" type="range" min="0" max="100" step="5" /></label>
     <label class="settings-toggle-row" data-nearby-setting hidden><span><strong>CROSSING PATHS</strong><small>Discover when other Brivia members are nearby. Only members who enable this feature can discover you.</small><small class="settings-nearby-status" data-nearby-status role="status"></small></span><input id="profile-nearby-toggle" type="checkbox" /><i aria-hidden="true"></i></label>
@@ -5521,9 +5562,11 @@ deckSwipe = createDeckSwipe({
   card: document.querySelector('#swipe-card'),
   stack: document.querySelector('#swipe-stack'),
   canDrag: () => Boolean(currentPerson) && !deckAdvancing && !capCheckInFlight && !pitchSheetVisible() && !cardOverflowOpen()
+    && !deckRitual?.busy() && !deckRitual?.isComplete()
     && !document.querySelector('#swipe-card')?.classList.contains('is-loading'),
   onCommit: (direction, { vx }) => swipe(direction === 'pitch' ? 'like' : 'pass', { vx }),
 });
+deckRitual = createDeckRitual({ stack: document.querySelector('#swipe-stack'), cue: (name) => chime.ritual(name) });
 document.querySelectorAll('[data-close-overlay]').forEach((button) => button.addEventListener('click', (event) => {
   const pitchBackdrop = event.currentTarget.classList.contains('app-overlay-backdrop') && event.currentTarget.closest('#pitch-modal');
   if (pitchBackdrop && performance.now() - pitchOpenedAt < PITCH_OPENING_MS) return;

@@ -83,6 +83,8 @@ export const startAppStub = async ({ port, state = {}, deckRows = defaultDeckRow
     await context.addInitScript(([key]) => { if (!window.localStorage.getItem(key)) window.localStorage.setItem(key, JSON.stringify({ baseline: '2020-01-01T00:00:00.000Z', read: {} })); }, [`brivia-chat-read:${ME}`]);
     // The first-run deck tutorial (D-094) stays out of the way unless a spec asks for it (state.deckTutorial).
     if (!st.deckTutorial) await context.addInitScript(() => { try { if (location.pathname === '/app.html') window.localStorage.setItem('brivia-deck-tutorial', 'hidden'); } catch { /* none */ } });
+    // The deck ritual's intro (D-162) counts as played this visit unless a spec asks for it (state.deckRitual).
+    if (!st.deckRitual) await context.addInitScript(() => { try { window.sessionStorage.setItem('brivia-deck-ritual', 'played'); } catch { /* none */ } });
     await context.grantPermissions(['clipboard-read', 'clipboard-write'], { origin: url });
     await context.route(`${ORIGIN}/**`, async (route) => {
       const request = route.request();
@@ -137,6 +139,12 @@ export const startAppStub = async ({ port, state = {}, deckRows = defaultDeckRow
         return json(200, [{ status: st.matchAll ? 'matched' : 'sent', remaining: st.remaining, resets_at: st.resetsAt }]);
       }
       if (pathName === '/rest/v1/interaction' && method === 'POST') {
+        // D-156 (0045): with st.passesUseSwipes a pass costs a daily swipe, as on the server: at 0 it is refused (PT429).
+        if (args.event === 'pass' && st.passesUseSwipes && !st.passed.has(args.target_id)) {
+          if (st.remaining <= 0) return json(429, { code: 'PT429', message: 'swipe_quota_exhausted' });
+          st.remaining -= 1;
+          st.resetsAt = st.resetsAt || '2026-10-04T15:00:00+00:00';
+        }
         if (args.event === 'pass') st.passed.add(args.target_id);
         return route.fulfill({ status: 201, body: '', headers: { 'access-control-allow-origin': '*' } });
       }

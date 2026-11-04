@@ -13,6 +13,7 @@
 // id plays once; the same swipe cue within 180 ms plays once. One on/off switch and one volume for this device.
 
 import { isUnlockEvent } from './landing-sound.js';
+import { introLandings, introRiseAt, completeLandings, completeSquareAt } from './deck-ritual.js';
 
 export const SOUND_KEY = 'brivia-notify-sound';
 export const VOLUME_KEY = 'brivia-sound-volume';
@@ -50,6 +51,50 @@ export const CUES = Object.freeze({
     ],
   }),
 });
+// D-162: the deck ritual's two cues, timed from the choreography itself (deck-ritual.js), so each soft piano tick lands
+// as its card settles. Same B-flat major language, same horn, plus warm keys and a low pad; quieter than a swipe.
+//   deal      five soft ascending piano ticks as the backs land, then the horn resolves F to B-flat over a B-flat chord
+//   complete  a soft falling arpeggio as the deck fans out, riffle ticks as it gathers, then a closing horn line
+//             (F, D, a long B-flat with vibrato) over a warm B-flat major 9 chord
+const sec = (ms) => Math.round(ms) / 1000;
+const dealCue = () => {
+  const lands = introLandings();
+  const rise = sec(introRiseAt());
+  const ladder = [70, 74, 77, 79, 82];
+  return {
+    length: rise + 1.5, level: 0.6, room: 0.3,
+    pads: [{ midi: 46, at: rise - 0.05, dur: 1.3, gain: 0.05 }, { midi: 58, at: rise - 0.05, dur: 1.2, gain: 0.05 }],
+    keys: [
+      ...lands.map((t, i) => ({ midi: ladder[i % ladder.length], at: sec(t) - 0.02, dur: 0.55, gain: 0.13 + i * 0.015 })),
+      { midi: 62, at: rise, dur: 1.1, gain: 0.09 }, { midi: 65, at: rise + 0.02, dur: 1.1, gain: 0.08 }, { midi: 69, at: rise + 0.04, dur: 1.1, gain: 0.07 },
+    ],
+    notes: [
+      { midi: 77, at: rise, dur: 0.14, gain: 0.34, scoop: -40, bright: 3.4 },
+      { midi: 82, at: rise + 0.13, dur: 0.72, gain: 0.4, scoop: -50, vib: 12, bright: 3.6 },
+    ],
+  };
+};
+const completeCue = () => {
+  const lands = completeLandings();
+  const square = sec(completeSquareAt());
+  const riffle = [70, 77, 74, 81, 79, 84];
+  return {
+    length: square + 2.0, level: 0.6, room: 0.34,
+    pads: [{ midi: 46, at: square - 0.05, dur: 1.8, gain: 0.05 }, { midi: 58, at: square, dur: 1.7, gain: 0.05 }],
+    keys: [
+      ...[82, 79, 77, 74].map((midi, i) => ({ midi, at: 0.04 + i * 0.08, dur: 0.42, gain: 0.1 })),
+      ...lands.map((t, k) => ({ midi: riffle[k % riffle.length], at: sec(t) - 0.02, dur: 0.32, gain: 0.12 })),
+      ...[62, 65, 69, 72].map((midi, i) => ({ midi, at: square + 0.02 + i * 0.03, dur: 1.6, gain: 0.075 })),
+    ],
+    notes: [
+      { midi: 77, at: square, dur: 0.16, gain: 0.34, scoop: -50, bright: 3.4 },
+      { midi: 74, at: square + 0.15, dur: 0.16, gain: 0.36, bright: 3.4 },
+      { midi: 70, at: square + 0.3, dur: 1.05, gain: 0.42, scoop: -40, vib: 14, bright: 3.2 },
+    ],
+  };
+};
+export const RITUAL_CUES = Object.freeze({ deal: Object.freeze(dealCue()), complete: Object.freeze(completeCue()) });
+
 // Kept for D-134 callers and tests: the notification cue's pitches.
 export const CHIME_NOTES = Object.freeze(CUES.notify.notes.map((n) => ({ freq: hz(n.midi), at: n.at, gain: n.gain, decay: n.dur })));
 
@@ -158,6 +203,31 @@ const sine = (ctx, dest, { midi, at, dur, gain }, t0) => {
   osc.stop(t0 + at + dur + 0.05);
 };
 
+// D-162: a warm electric-piano tone: a sine with two soft overtones, a quick onset and a natural decay.
+const keysNote = (ctx, dest, { midi, at, dur, gain }, t0) => {
+  const f = hz(midi);
+  const start = t0 + at;
+  const amp = ctx.createGain();
+  amp.gain.setValueAtTime(0.0001, start);
+  amp.gain.exponentialRampToValueAtTime(gain, start + 0.006);
+  amp.gain.exponentialRampToValueAtTime(gain * 0.35, start + Math.min(0.18, dur * 0.4));
+  amp.gain.exponentialRampToValueAtTime(0.0001, start + dur);
+  const tone = ctx.createBiquadFilter();
+  tone.type = 'lowpass';
+  tone.frequency.value = Math.min(4200, f * 6);
+  tone.connect(amp).connect(dest);
+  [[1, 1], [2, 0.28], [3, 0.08]].forEach(([mult, level]) => {
+    const osc = ctx.createOscillator();
+    const g = ctx.createGain();
+    osc.type = 'sine';
+    osc.frequency.value = f * mult;
+    g.gain.value = level;
+    osc.connect(g).connect(tone);
+    osc.start(start);
+    osc.stop(start + dur + 0.05);
+  });
+};
+
 // A whole cue into dest: the notes, then a short warm room (a filtered echo) under them.
 export const renderCue = (ctx, dest, cue, t0 = 0) => {
   const bus = ctx.createGain();
@@ -186,6 +256,8 @@ export const renderCue = (ctx, dest, cue, t0 = 0) => {
     for (let i = 0; i < data.length; i += 1) { seed = (seed * 16807) % 2147483647; data[i] = (seed / 2147483647) * 2 - 1; }
   }
   if (cue.pad) sine(ctx, bus, cue.pad, t0);
+  (cue.pads || []).forEach((p) => sine(ctx, bus, p, t0));
+  (cue.keys || []).forEach((k) => keysNote(ctx, bus, k, t0));
   cue.notes.forEach((n) => hornNote(ctx, bus, n, t0, noise));
   if (cue.sparkle) sine(ctx, bus, cue.sparkle, t0);
 };
@@ -209,7 +281,7 @@ export const createSoundKit = ({
   // Pre-render each cue once into a buffer, so playback is one buffer start (no synthesis at swipe time).
   const prerender = () => {
     if (rendering || !OfflineCtx || !ctx) return rendering;
-    rendering = Promise.all(Object.entries(CUES).map(async ([name, cue]) => {
+    rendering = Promise.all(Object.entries({ ...CUES, ...RITUAL_CUES }).map(async ([name, cue]) => {
       try {
         const rate = ctx.sampleRate || 44100;
         const off = new OfflineCtx(1, Math.ceil(rate * cue.length), rate);
@@ -281,7 +353,7 @@ export const createSoundKit = ({
       src.connect(gain);
       src.start();
     } else {
-      renderCue(ctx, gain, CUES[name], (ctx.currentTime || 0) + 0.01);   // not rendered yet: synthesize live
+      renderCue(ctx, gain, CUES[name] || RITUAL_CUES[name], (ctx.currentTime || 0) + 0.01);   // not rendered yet: synthesize live
     }
     const entry = { src, gain };
     current = entry;
@@ -305,8 +377,17 @@ export const createSoundKit = ({
     lastCue[name] = t;
     return play(name);
   };
+  // D-162: the deck ritual ('deal' | 'complete'). Follows the swipe-sounds switch; at most once per 4 s per cue, so a
+  // re-render can never stack the sequence.
+  const ritual = (name) => {
+    if (!RITUAL_CUES[name]) return false;
+    const t = now();
+    if (t - (lastCue[name] || 0) < 4000) return false;
+    lastCue[name] = t;
+    return play(name);
+  };
   return {
-    notify, swipe, unlock, preview: () => play('notify'),
+    notify, swipe, ritual, unlock, preview: () => play('notify'),
     play: notify,                                    // D-134 name
     isUnlocked: () => unlocked, ready: () => rendering || Promise.resolve(),
   };

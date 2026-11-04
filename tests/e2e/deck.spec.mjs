@@ -443,51 +443,56 @@ try {
   await small.locator('.swipe-hint').scrollIntoViewIfNeeded();
   await shot(small, 'deck-375-quota-counter.png');
 
-  // Zero quota at both widths: the card stays, with the honest notice.
+  // Zero quota at both widths (D-162, replaces D-026's "the card stays with a notice"): no profile is offered; the
+  // finished deck shows "That's your deck for today." with the refresh time, and nothing scrolls sideways.
   resetStub({ remaining: 0, resetsAt: '2026-10-04T15:00:00+00:00' });
   await small.reload({ waitUntil: 'domcontentloaded' });
-  await waitForCard(small, 'Asha Band');
-  await small.waitForFunction(() => !document.querySelector('#swipe-limit-state')?.hidden, null, { timeout: 5000 }).catch(() => {});
+  await small.waitForSelector('.deck-complete-face', { timeout: 8000 }).catch(() => {});
+  await small.waitForTimeout(600);
   const zeroState = (p) => p.evaluate(() => {
     const like = document.querySelector('[data-action="like"]');
+    const card = document.querySelector('#swipe-card');
+    const face = document.querySelector('.deck-complete-face');
+    const deck = document.querySelector('#swipe-stack')?.getBoundingClientRect();
     return {
-      text: document.querySelector('#swipe-limit-copy')?.textContent || '',
+      complete: document.querySelector('#swipe-stack')?.classList.contains('is-deck-complete'),
+      title: face?.querySelector('.deck-complete-title')?.textContent || '',
+      refresh: face?.querySelector('.deck-complete-refresh')?.textContent || '',
+      liveRegion: face?.getAttribute('aria-live'),
+      cardOffered: card ? getComputedStyle(card).visibility !== 'hidden' && !card.hasAttribute('inert') : false,
+      notice: !document.querySelector('#swipe-limit-state')?.hidden,
       hint: document.querySelector('#swipe-left-count')?.textContent || '',
-      role: document.querySelector('#swipe-limit-state')?.getAttribute('role'),
       ariaDisabled: like?.getAttribute('aria-disabled'),
-      describedBy: like?.getAttribute('aria-describedby'),
-      focusable: like ? !like.disabled && like.tabIndex >= 0 : false,
       overflow: document.documentElement.scrollWidth - window.innerWidth,
-      cardTop: document.querySelector('#swipe-card')?.getBoundingClientRect().top,
+      deckTop: deck?.top,
+      deckBottom: deck?.bottom,
       barBottom: document.querySelector('.app-topbar')?.getBoundingClientRect().bottom,
-      noticeBottom: document.querySelector('#swipe-limit-state')?.getBoundingClientRect().bottom,
       scroll: document.documentElement.scrollHeight - innerHeight,
       vh: innerHeight,
     };
   });
   const zero = await zeroState(small);
-  check(`375 px zero quota: plain copy, no horizontal scroll (${JSON.stringify(zero)})`, () => {
-    assert.match(zero.text, /^You've used your \d+ free swipes for today\. More at \d{1,2}(:\d\d)? ?[AP]M\.$/i);
+  check(`375 px zero quota: the finished deck, no profile offered, the refresh time, no horizontal scroll (${JSON.stringify(zero)})`, () => {
+    assert.equal(zero.complete, true);
+    assert.equal(zero.title, "That's your deck for today.");
+    assert.match(zero.refresh, /^Fresh swipes at \d{1,2}(:\d\d)? ?[AP]M$/i);
+    assert.equal(zero.liveRegion, 'polite');
+    assert.equal(zero.cardOffered, false);
+    assert.equal(zero.notice, false);
     assert.match(zero.hint, /^Your next swipe frees up at \d{1,2}(:\d\d)? ?[AP]M$/i);
     assert.ok(zero.overflow <= 1);
   });
-  check(`zero quota: Pitch is aria-disabled, described by the notice and still focusable; the notice has no role=status (${JSON.stringify(zero)})`, () => {
-    assert.equal(zero.ariaDisabled, 'true');
-    assert.equal(zero.describedBy, 'swipe-limit-copy');
-    assert.equal(zero.focusable, true);
-    assert.equal(zero.role, null);
-  });
-  await small.locator('#swipe-limit-state').scrollIntoViewIfNeeded();
+  check(`zero quota: Pitch stays aria-disabled (${zero.ariaDisabled})`, () => assert.equal(zero.ariaDisabled, 'true'));
   await shot(small, 'deck-375-zero-quota.png');
   const wide2 = await makeContext({ width: 1440, height: 900 });
   const wpage = await open(wide2);
-  await waitForCard(wpage, 'Asha Band');
-  await wpage.waitForFunction(() => !document.querySelector('#swipe-limit-state')?.hidden, null, { timeout: 5000 }).catch(() => {});
-  await wpage.waitForTimeout(300);
+  await wpage.waitForSelector('.deck-complete-face', { timeout: 8000 }).catch(() => {});
+  await wpage.waitForTimeout(600);
   const wideZero = await zeroState(wpage);
-  check(`1440 px zero quota: the card top is at or below the top bar (card ${wideZero.cardTop}, bar ${wideZero.barBottom}), the notice is on screen (${wideZero.noticeBottom} <= ${wideZero.vh}) and nothing scrolls (${wideZero.scroll})`, () => {
-    assert.ok(wideZero.cardTop >= wideZero.barBottom - 0.5);
-    assert.ok(wideZero.noticeBottom <= wideZero.vh + 0.5);
+  check(`1440 px zero quota: the deck is below the top bar (deck ${wideZero.deckTop}, bar ${wideZero.barBottom}), fully on screen (${wideZero.deckBottom} <= ${wideZero.vh}) and nothing scrolls (${wideZero.scroll})`, () => {
+    assert.equal(wideZero.complete, true);
+    assert.ok(wideZero.deckTop >= wideZero.barBottom - 0.5);
+    assert.ok(wideZero.deckBottom <= wideZero.vh + 0.5);
     assert.ok(wideZero.scroll <= 1);
   });
   await shot(wpage, 'deck-1440-zero-quota.png');
