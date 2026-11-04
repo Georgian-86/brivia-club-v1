@@ -3394,3 +3394,14 @@ controls (a tester or a seeded test member), never a real member, so no new expo
 - **Trade-off:** supersedes D-162's "only testers": real members can now see, and ask about, seeded roles at invented
   companies while the world is open. The founder's call for the test phase; turn the world off before a real launch.
 
+## D-172 (2026-11-04): no account-age wait before a hirer's role shows
+
+- **Asked:** a real hirer (a new account) was missing from Hiring. The check showed no open role yet and an account
+  0 days old; the founder chose "Remove the wait" over 1 day or keeping 14 days.
+- **Done (0051):** `brivia_hiring_bar` drops the 14-day account age; a completed profile, a photo (seeded members
+  exempt), a confirmed email, no open flag and the hiring switch still apply. `brivia_hiring_live_from` is the
+  account's first day, and the client no longer promises a go-live date: an under-bar role says it shows once the
+  profile has a photo and a confirmed email.
+- **Trade-off:** supersedes the 14-day part of D-141's bar. A scam account can post on its first day; reports
+  (`report_fake_job`, which pause the role) are the remaining guard. Revisit before a real launch.
+

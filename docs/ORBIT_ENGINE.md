@@ -1181,9 +1181,9 @@ Hiring is a lane beside the deck, not a change to it: `deck_candidates` and the 
 - **Who.** A hirer has up to 3 open roles (`hiring_role`: title, family, level, on-site / hybrid / remote, "I'm hiring"
   or "I can refer"). A seeker has a role intent (`role_intent`: up to 3 titles, their families, a level, work modes),
   created only by the member, never inferred: "Developer" in Looking for is not job seeking.
-- **The hiring bar.** A role is shown only when its owner is completed, has a photo and a confirmed email, has an
-  account at least 14 days old and no open moderation flag (`brivia_hiring_bar`). Before that the role is saved and the
-  member is told the day it goes live.
+- **The hiring bar.** A role is shown only when its owner is completed, has a photo and a confirmed email and no open
+  moderation flag (`brivia_hiring_bar`). Before that the role is saved and the member is told what is missing. There is
+  no account-age wait since D-172 (migration 0051; it was 14 days).
 - **Fit** (`brivia_role_fit`, 0..1, rounded to 4 places, never shown as a number): title (the same title 1, the same
   family 0.7 unless 'other', an adjacent family 0.4, else 0) × level (the same, or no level wanted, 1; one step apart
   0.6; else 0; an internship pairs only with intern or entry) × mode (the role's mode is one the seeker picked, 1, else
@@ -1204,8 +1204,8 @@ Hiring is a lane beside the deck, not a change to it: `deck_candidates` and the 
 - **Seeded members (D-162, migration 0047).** A role or intent owned by a seeded test member (`is_test`) is shown only
   to that member and to the test world (`brivia_in_test_world`; since D-171 / 0050 that includes every member while
   `open_test_world` is on, the same rule as the deck; switching it off leaves only testers) (`brivia_hiring_seen_by`, applied in
-  `brivia_role_shown`, `member_open_to` and both sides of `hiring_suggestions`). Seeded members skip the photo and
-  14-day parts of the bar (they never carry a photo, D-156); completed, confirmed email and no open flag still apply.
+  `brivia_role_shown`, `member_open_to` and both sides of `hiring_suggestions`). Seeded members skip the photo
+  part of the bar (they never carry a photo, D-156); completed, confirmed email and no open flag still apply.
 - **The toggle.** Connect carries a one-tap Hiring switch beside the discovery-filter button (`#hiring-toggle`,
   `role="switch"`, D-166). Turning it on calls `hiring_people` (0048, D-169): everyone with a shown role the member can
   see, roles that fit first, then nearest, no distance cut, distance band only; those cards join the front of the deck.

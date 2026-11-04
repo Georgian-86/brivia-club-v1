@@ -1331,3 +1331,10 @@ change. Verify: `select pg_get_functiondef('public.hiring_suggestions(int)'::reg
 roles and seeded "Open to roles" (nearest first, like real ones); with it off, only testers do. No grant change.
 Verify: `select pg_get_functiondef('public.brivia_hiring_seen_by(uuid,uuid)'::regprocedure) like '%brivia_in_test_world%';` (t).
 
+## 0051
+
+**No account-age wait for hirers (D-172).** Apply after `0047`. Redefines `brivia_hiring_bar` without the 14-day
+account age (completed, photo unless seeded, confirmed email, no open flag still apply) and `brivia_hiring_live_from`
+(the account's first day). No grant change. Verify:
+`select pg_get_functiondef('public.brivia_hiring_bar(uuid)'::regprocedure) like '%14 days%';` (f).
+

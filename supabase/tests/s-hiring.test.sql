@@ -112,7 +112,8 @@ select 's-hiring.test H2 OK';
 do $$
 begin
   if not public.brivia_hiring_bar(pg_temp.hp(1)) then raise exception 'FAIL H3: H is under the bar'; end if;
-  if public.brivia_hiring_bar(pg_temp.hp(4)) then raise exception 'FAIL H3: a 2-day-old account is over the bar'; end if;
+  -- D-172 (0051): no account-age wait; a 2-day-old account with a photo is over the bar
+  if not public.brivia_hiring_bar(pg_temp.hp(4)) then raise exception 'FAIL H3: a 2-day-old account is under the bar (0051)'; end if;
   update public.profiles set photo_url = null where id = pg_temp.hp(9);
   if public.brivia_hiring_bar(pg_temp.hp(9)) then raise exception 'FAIL H3: no photo is over the bar'; end if;
   update public.profiles set photo_url = 'https://x.supabase.co/storage/v1/object/public/profile-photos/' || pg_temp.hp(9) || '/p.jpg' where id = pg_temp.hp(9);
@@ -125,11 +126,11 @@ begin
   if not public.brivia_hiring_bar(pg_temp.hp(9)) then raise exception 'FAIL H3: the bar did not come back'; end if;
   set local role authenticated;
   perform pg_temp.as_member(4);
-  if (select live_from from public.my_hiring_roles() limit 1) <> (now() - interval '2 days' + interval '14 days')::date
-     or (select banner_live from public.my_hiring_roles() limit 1) then
+  if (select live_from from public.my_hiring_roles() limit 1) > current_date
+     or not (select banner_live from public.my_hiring_roles() limit 1) then
     raise exception 'FAIL H3: my_hiring_roles live_from / banner_live wrong'; end if;
   perform pg_temp.as_member(3);
-  if exists (select 1 from public.member_hiring(array[pg_temp.hp(4)])) then raise exception 'FAIL H3: N''s banner shows'; end if;
+  if not exists (select 1 from public.member_hiring(array[pg_temp.hp(4)])) then raise exception 'FAIL H3: N''s banner is hidden (0051)'; end if;
   if (select jsonb_array_length(roles) from public.member_hiring(array[pg_temp.hp(1)])) <> 3 then raise exception 'FAIL H3: H''s banner'; end if;
   reset role;
 end $$;
@@ -179,13 +180,13 @@ declare row record;
 begin
   set local role authenticated;
   perform pg_temp.as_member(2);
-  select * into row from public.member_hiring(array[pg_temp.hp(1), pg_temp.hp(11), pg_temp.hp(4)]);
+  select * into row from public.member_hiring(array[pg_temp.hp(1), pg_temp.hp(11), pg_temp.hp(4)]) where member_id = pg_temp.hp(1);
   if row.member_id <> pg_temp.hp(1) or not row.fits or row.best_title <> 'Frontend Developer'
      or (row.roles -> 0 ->> 'fit')::numeric <> 0.8667 or (row.roles -> 0 ->> 'accepting')::boolean is not true
      or (row.roles -> 0 ->> 'asked')::boolean or row.roles -> 0 ? 'member_id' or row.roles::text ~ 'city' then
     raise exception 'FAIL H5: S''s view of H: %', row; end if;
-  if (select count(*) from public.member_hiring(array[pg_temp.hp(1), pg_temp.hp(11), pg_temp.hp(4)])) <> 1 then
-    raise exception 'FAIL H5: more than one banner'; end if;
+  if (select count(*) from public.member_hiring(array[pg_temp.hp(1), pg_temp.hp(11), pg_temp.hp(4)])) <> 2 then
+    raise exception 'FAIL H5: expected the banners of H and N (0051: no age wait), not the blocked B'; end if;
   perform pg_temp.as_member(3);
   select * into row from public.member_hiring(array[pg_temp.hp(1)]);
   if row.fits or row.roles -> 0 ->> 'fit' is not null then raise exception 'FAIL H5: O got a fit'; end if;
@@ -211,7 +212,7 @@ begin
   if not (pg_temp.hp(5) = any(ids)) then raise exception 'FAIL H6: the far hirer (Delhi) is not suggested: %', ids; end if;
   if array_position(ids, pg_temp.hp(5)) < array_position(ids, pg_temp.hp(1)) then raise exception 'FAIL H6: the far hirer comes before the near one'; end if;
   if (select distance_band from public.hiring_suggestions(20) where id = pg_temp.hp(5)) ~ 'km' then raise exception 'FAIL H6: far band'; end if;
-  if pg_temp.hp(4) = any(ids) or pg_temp.hp(11) = any(ids) then raise exception 'FAIL H6: an under-bar or blocked hirer'; end if;
+  if pg_temp.hp(11) = any(ids) then raise exception 'FAIL H6: a blocked hirer'; end if;   -- N (2 days old) may show since 0051
   if pg_temp.hp(10) = any(ids) and (select fit from public.hiring_suggestions(20) where id = pg_temp.hp(10)) < 0.5 then
     raise exception 'FAIL H6: an unfit suggestion'; end if;
   -- a cell under the k-anonymity floor shows the place band, exactly as the deck does
