@@ -7,7 +7,7 @@ Update this file at the end of every session. CLAUDE.md holds the aim; this file
 
 ## 1. What is done
 
-**2026-11-04, D-163:** motion moments: "It's mutual" dialog, pitch letter to the bell, caught-up flip, desktop card
+**2026-11-04, D-163:** motion moments: "It's mutual" dialog, pitch letter to the Chat tab, caught-up flip, desktop card
 tilt, chip shimmer, sliding Curated/Nearby pill, Nearby radar, chat bubble rise, events reveal. Files
 `site/scripts/motion-moments.js`, `site/styles/motion.css`; test `tests/unit/motion-moments.test.mjs`.
 

@@ -1928,7 +1928,7 @@ const signalResultToast = (person, result) => {
   return result.status === 'sent' ? 'Signal sent' : signalErrorToast;
 };
 // D-163: a signal's outcome, shown. 'matched' gets the "It's mutual" moment (N1) over the toast; a sent pitch
-// flies a small letter from where it left (origin: a DOMRect or element) to the bell (N2), then the usual toast.
+// flies a small letter from where it left (origin: a DOMRect or element) to the Chat tab (N2), then the usual toast.
 const announceSignal = (person, result, origin = null) => {
   if (!result?.error && result?.matched) {
     const known = findPersonById(person?.id) || person;
@@ -1946,7 +1946,11 @@ const announceSignal = (person, result, origin = null) => {
     showToast(signalResultToast(person, result));   // the live-region sentence, also under the moment
     return;
   }
-  if (!result?.error && result?.status === 'sent' && origin) void pitchSentFlight({ from: origin, to: document.querySelector('#app-notification-button') });
+  if (!result?.error && result?.status === 'sent' && origin) {
+    // Founder, 2026-11-04: the letter goes to Chat (where an accepted pitch opens), never to the notification bell.
+    const chatNav = [...document.querySelectorAll('[data-nav-host] [data-nav="chat"]')].find((el) => el.getBoundingClientRect().width > 0);
+    void pitchSentFlight({ from: origin, to: chatNav?.querySelector('.app-nav-icon') || chatNav });
+  }
   showToast(signalResultToast(person, result));
 };
 

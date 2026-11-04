@@ -4,7 +4,7 @@
 // where they were (app.js); these only show what already happened.
 //
 //   N1 mutualMoment      "It's mutual": both avatars glide in and meet, one wine ring, the shared interests pop in.
-//   N2 pitchSentFlight   a small letter flies from the card to the bell, which gives a little ring.
+//   N2 pitchSentFlight   a small letter flies from the card to the Chat tab, which takes it with a small pop.
 //   N3 flipIn            the "You're caught up" box turns in like the back of the last card.
 //   N5 attachCardTilt    desktop only: the top card leans a few degrees towards the cursor, with a soft light.
 //   N6 shimmerShared     a new card's "You both" chips catch the light once.
@@ -151,7 +151,7 @@ export const mutualMoment = ({ me = {}, person = {}, shared = [], doc = globalTh
   tl.eventCallback('onComplete', () => gsap.set([left, right, ring, panel, eyebrow, title, ...actions.children, ...chips.children], { clearProps: 'transform,opacity' }));
 });
 
-// N2. from: an element or DOMRect where the pitch left (the card); to: the bell. Fire and forget.
+// N2. from: an element or DOMRect where the pitch left (the card); to: the Chat tab's icon. Fire and forget.
 export const pitchSentFlight = ({ from, to, doc = globalThis.document, reduced = prefersReduced() } = {}) => {
   if (reduced || !doc?.body || !from || !to) return Promise.resolve(false);
   const a = typeof from.getBoundingClientRect === 'function' ? from.getBoundingClientRect() : from;
@@ -167,7 +167,7 @@ export const pitchSentFlight = ({ from, to, doc = globalThis.document, reduced =
   const y0 = a.top + a.height * 0.42 - size / 2;
   const x1 = b.left + b.width / 2 - size / 2;
   const y1 = b.top + b.height / 2 - size / 2;
-  const peak = Math.min(y0, y1) - Math.max(60, Math.abs(x1 - x0) * 0.18);   // an arc, up and over
+  const peak = Math.min(y0, y1) - Math.max(40, Math.abs(x1 - x0) * 0.18);   // a small hop, then over
   const L = MOMENTS.letter;
   return new Promise((resolve) => {
     gsap.set(letter, { x: x0, y: y0, scale: 0.4, opacity: 0, rotation: -12 });
@@ -175,7 +175,7 @@ export const pitchSentFlight = ({ from, to, doc = globalThis.document, reduced =
       .to(letter, { scale: 1, opacity: 1, rotation: 0, duration: L.pop, ease: 'back.out(2)' })
       .to(letter, { keyframes: { x: [x0, (x0 + x1) / 2, x1], y: [y0, peak, y1], easeEach: 'sine.inOut' }, duration: L.fly, ease: 'power1.inOut' })
       .to(letter, { scale: 0.3, opacity: 0, rotation: 18, duration: L.fly * 0.35, ease: 'power2.in' }, `-=${L.fly * 0.35}`)
-      .to(to, { keyframes: { rotation: [0, -14, 11, -6, 3, 0] }, duration: L.ring, ease: 'none', transformOrigin: '50% 8%', clearProps: 'transform' }, '-=0.06');
+      .to(to, { keyframes: { scale: [1, 1.28, 0.94, 1.04, 1] }, duration: L.ring, ease: 'none', transformOrigin: '50% 50%', clearProps: 'transform' }, '-=0.06');
   });
 };
 

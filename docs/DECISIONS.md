@@ -3282,7 +3282,8 @@ controls (a tester or a seeded test member), never a real member, so no new expo
     pulses out, "You and X / both said yes.", the shared interests pop in, Say hi (opens the chat) / Keep exploring.
     About 1.4 s; Escape, the backdrop or either button closes it; focus stays inside. The existing toast still shows
     under it (it is the live-region sentence). Sound: the notify horn, under the notification-sound switch.
-  - **N2 Pitch sent:** a small wine letter flies from the card in an arc to the bell, which rings once. ~0.8 s.
+  - **N2 Pitch sent:** a small wine letter flies from the card in an arc to the Chat tab, which pops once. ~0.8 s.
+    Founder, same day: "dont send the animation that goes to notification ... should go to the messages section".
   - **N3 Caught up:** when the last card is swiped away, the "You're caught up" box turns in (a Y-axis flip).
   - **N5 Tilt (desktop, fine pointer only):** the top card leans up to 4 degrees towards the cursor with a soft light,
     through the CSS `rotate` property so it composes with deck-swipe.js's inline transform; off while dragging, during
