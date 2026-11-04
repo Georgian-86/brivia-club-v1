@@ -3289,3 +3289,11 @@ controls (a tester or a seeded test member), never a real member, so no new expo
   The cards are squared by 1.1 s and the message shows by 1.6 s (was about 2.3 s). The `complete` cue follows: a quicker
   falling arpeggio and light riffle ticks, one per card across both riffles, then the same closing horn line. The
   intro deal is unchanged. Supersedes D-162's 1.5-2.5 s target for the shuffle.
+
+## D-164 (2026-11-04): the Connect profile card on the warm pink blush
+
+- **Asked:** "change the color of these profile cards acc to our gradient".
+- **Done:** new token `--aura-blush-card` (deepest blush low left under the name and chips, a softer blush right, a
+  breath of wine low right, peach at the top edge, on blush-tinted paper) on the deck card and the two cards peeking
+  under it; the avatar ring matches; the chips are frosted cream with a hairline. The wine title bar, cover, layout and
+  View profile are unchanged. Dark ink on the blush stays well above WCAG AA.

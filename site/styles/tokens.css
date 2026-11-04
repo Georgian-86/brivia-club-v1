@@ -93,6 +93,15 @@
     radial-gradient(ellipse 85% 70% at 100% 100%, rgba(244, 196, 196, .55), transparent 72%),
     radial-gradient(ellipse 60% 50% at 0% 100%, var(--aura-peach), transparent 72%),
     rgb(252, 242, 242);
+  /* D-164: the Connect profile card's paper: the same warm pink blush, deepest low left under the name and chips, a breath
+     of wine low right, peach at the top edge, on blush-tinted paper (dark ink stays above 11:1). */
+  --aura-blush-card:
+    radial-gradient(ellipse 100% 50% at 0% 100%, rgba(236, 176, 196, .7), transparent 72%),
+    radial-gradient(ellipse 75% 45% at 100% 72%, rgba(242, 190, 192, .62), transparent 72%),
+    radial-gradient(ellipse 70% 30% at 30% 52%, rgba(240, 196, 210, .4), transparent 72%),
+    radial-gradient(ellipse 55% 26% at 100% 100%, var(--aura-wine-soft), transparent 72%),
+    radial-gradient(ellipse 80% 30% at 50% 0%, var(--aura-peach), transparent 72%),
+    rgb(252, 242, 242);
   --aura-scrim: color-mix(in srgb, var(--color-wine-deep) 34%, rgba(251, 248, 244, .18));
   --aura-glass: rgba(255, 252, 248, .62);
   --aura-card: rgba(255, 252, 248, .66);

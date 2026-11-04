@@ -170,3 +170,18 @@ html body .discovery-filter-footer {
   backdrop-filter: blur(14px);
 }
 html body .discovery-filter-backdrop { background: var(--aura-scrim) !important; }
+
+/* D-164 (founder, 2026-11-04: "change the color of these profile cards acc to our gradient"): the Connect card and the
+   two cards peeking under it take the warm pink blush. The wine title bar, cover, avatar ring and layout are unchanged;
+   the chips turn to frosted cream so they read cleanly on the blush. */
+html body.app-body .app-view[data-view="home"] .swipe-stack .swipe-card,
+html body.app-body .app-view[data-view="home"] .swipe-card-next,
+html body.app-body .app-view[data-view="home"] .swipe-card-back {
+  background: var(--aura-blush-card) !important;
+}
+html body.app-body .app-view[data-view="home"] .swipe-card .swipe-card-info::before { border-color: rgb(252, 242, 242); }
+html body.app-body .app-view[data-view="home"] .swipe-card .member-tags span,
+html body.app-body .app-view[data-view="home"] .swipe-card .member-tags span.chip-shared {
+  background: color-mix(in srgb, var(--color-cream) 78%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--color-oxblood) 10%, transparent);
+}
