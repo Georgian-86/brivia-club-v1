@@ -180,8 +180,9 @@ begin
   if n < 15 then raise exception 'FAIL S2: only % distinct cells (per-member offset missing)', n; end if;
   if exists (select 1 from public.location_change lc join public.profiles p on p.id = lc.member_id where p.is_test) then
     raise exception 'FAIL S2: the seed wrote location_change rows'; end if;
-  if exists (select 1 from public.profiles where is_test and photo_url is not null) then
-    raise exception 'FAIL S2: a test member has a photo (monograms only)'; end if;
+  -- D-177: only a faceless /test-avatars photo (the hiring seed's), never an uploaded one
+  if exists (select 1 from public.profiles where is_test and photo_url is not null and photo_url !~ '^/test-avatars/t[0-9]{2}\.(svg|webp|jpg)$') then
+    raise exception 'FAIL S2: a test member has a photo (monograms or the faceless test-avatars only)'; end if;
   if exists (select 1 from public.profiles where is_test and cover_url is not null and not public.brivia_is_preset_cover(cover_url)) then
     raise exception 'FAIL S2: a test cover is not a preset'; end if;
   if (select is_test from public.profiles where id = 'eeeeeeee-0000-0000-0000-0000000000e1') then

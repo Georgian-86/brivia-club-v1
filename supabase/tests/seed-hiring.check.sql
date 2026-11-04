@@ -8,6 +8,7 @@
 --   HS4 a real hirer's banner is unchanged for R (only seeded members are gated)
 --   HS5 hiring_people (0048, D-169): with the world open R and T both find all 12 seeded hirers plus H, nearest first;
 --       with it closed R finds only H
+--   HS6 (0052, D-177) the 12 seeded hirers carry a faceless /test-avatars photo; a real member cannot use the path
 begin;
 create or replace function pg_temp.t(n int) returns uuid language sql immutable as $$
   select ('a7e57000-0000-4000-8000-' || lpad(n::text, 12, '0'))::uuid $$;
@@ -102,8 +103,18 @@ begin
   if (select count(*) from public.hiring_people(50) where distance_band in ('~3 km', '~10 km', (select name from public.place where id = public.brivia_nearest_place(c)))) < 3 then
     raise exception 'FAIL HS5: the Thane hirers are missing'; end if;
   if exists (select 1 from public.hiring_people(50) where distance_band ~ '[0-9]+\.[0-9]') then raise exception 'FAIL HS5: an exact distance leaked'; end if;
+  -- HS6
+  select count(*) into n from public.profiles p
+   where p.is_test and p.photo_url ~ '^/test-avatars/t[0-9]{2}\.(svg|webp|jpg)$'
+     and p.id in (select member_id from public.hiring_role where id::text like 'a7e57000-0000-4000-9000-%');
+  if n <> 12 then raise exception 'FAIL HS6: % seeded hirers carry a portrait, expected 12', n; end if;
+  begin
+    update public.profiles set photo_url = '/test-avatars/t40.webp' where id = r;
+    ok := false;
+  exception when check_violation then ok := true; end;
+  if not ok then raise exception 'FAIL HS6: a real member took a test-avatar path as their photo'; end if;
   select count(*) into n from public.hiring_people(3);
   if n <> 3 then raise exception 'FAIL HS5: the limit is not applied (% rows)', n; end if;
 end $$;
-select 'seed-hiring HS1-HS5 (seeded hirers follow the open test world) OK';
+select 'seed-hiring HS1-HS6 (seeded hirers follow the open test world, faceless photos) OK';
 rollback;

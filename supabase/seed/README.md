@@ -113,7 +113,8 @@ Bengaluru, Senior Data Engineer in Pune, Data Analyst in Delhi, a few remote rol
 member (D-171); with it off, add your account as a tester first (above).
 
 1. Apply `0037_hiring.sql`, then `0047_hiring_test_world.sql`, then `0048_hiring_people.sql`, then
-   `0049_hiring_anywhere.sql`, then `0050_hiring_open_world.sql` (migrations README).
+   `0049_hiring_anywhere.sql`, then `0050_hiring_open_world.sql`, then `0051_hiring_no_wait.sql`, then
+   `0052_test_avatars.sql` (migrations README).
 2. Run `test-members.sql` if the test members are not there yet, then run `hiring-test-members.sql` (safe to re-run:
    it reopens every seeded role for 30 days). It stops with a clear message if 0037, 0047 or the members are missing.
 3. With `open_test_world` off, run the `brivia_tester` insert above with your email. Then reload the app.
@@ -138,3 +139,27 @@ remove those files in the Storage dashboard. The seed itself uploads nothing.
 Note: `purge-test-members.sql` now sets `storage.allow_delete_query`, which removes **only the `storage.objects` metadata rows**.
 The files themselves stay in the buckets. If test members ever uploaded files, remove them through the Storage API or the
 dashboard first (or accept orphaned test files; the orphan report in `docs/BREACH_RUNBOOK.md` section 7 will list them).
+
+### Test hirer photos (D-177)
+
+The 12 seeded hirers carry real-looking photos in which no face is visible, so no stranger's likeness sits on an
+invented profile (D-156). They are free photos under the Unsplash License, cropped to 480 px WebP, in
+`site/public/test-avatars/` (served at `/test-avatars/tNN.webp`):
+
+| File | Unsplash photo | Shows |
+|---|---|---|
+| t06 | photo-1515378791036-0648a3ef77b2 | Person in a mustard sweater on a laptop |
+| t08 | photo-1484480974693-6ca0a78fb36b | Hand writing a checklist |
+| t11 | photo-1507679799987-c73779587ccf | Suit, face out of frame |
+| t13 | photo-1517048676732-d65bc937f952 | Hands with notebooks at a meeting |
+| t18 | photo-1553877522-43269d4ea984 | Person seen from behind at a laptop |
+| t23 | photo-1521791136064-7986c2920216 | Handshake |
+| t25 | photo-1717496331312-3e8aacfa27a7 | Hands holding a tablet |
+| t26 | photo-1577100078279-b3445eae827c | Hands on a laptop, phone beside it |
+| t34 | photo-1516321318423-f06f85e504b3 | Hands pointing at a laptop |
+| t40 | photo-1486312338219-ce68d2c6f44d | Hands typing |
+| t42 | photo-1564697259644-03cd5e7363fa | Over-the-shoulder, tablet |
+| t50 | photo-1434030216411-0b793f4b4173 | Hand writing beside a coffee cup |
+
+Source URL: `https://images.unsplash.com/<photo>`. The purge script clears them with the profiles.
+

@@ -3483,3 +3483,18 @@ controls (a tester or a seeded test member), never a real member, so no new expo
   notice version is unchanged (no new personal data and no new consent).
 - **Needs the dashboard:** both products must be switched on (Speed Insights already was on 2026-11-04; Web Analytics was not) for the project in Vercel (Analytics and Speed Insights
   tabs), otherwise `/_vercel/insights/*` returns 404 and nothing is counted.
+
+## D-177 (2026-11-04): faceless real-looking photos for the test hirers
+
+- **Asked:** "i need to add picture in the profile for test hireres", then "i need real looking picture in which faces
+  are not visible".
+- **Done (0052):** the 12 seeded hirers get Unsplash License photos with no face in them (hands at a laptop, a
+  handshake, a suit with the face out of frame, a person seen from behind), cropped to 480 px WebP and shipped in
+  `site/public/test-avatars`. `profiles_photo_url_storage` accepts `/test-avatars/tNN.(webp|jpg|svg)` on a seeded row
+  only; `hiring-test-members.sql` sets them once 0052 is in. Sources are listed in `supabase/seed/README.md`.
+- **Why faceless:** D-156 refused strangers' faces on invented profiles. Photos without a face carry no one's
+  likeness, and many real members use a picture like this. The seeded profiles are still invented, so the open test
+  world should close before a real launch.
+- **Not done:** an AI image generator was tried for these and returned a generic page mock-up with faces, so
+  none of its output was used.
+
