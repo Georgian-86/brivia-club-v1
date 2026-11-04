@@ -102,6 +102,9 @@ try {
     check(`${w}: the bar reads HIRING and is never clipped (${JSON.stringify(bar)})`, /^HIRING/.test(bar.text) && !bar.clipped);
     const strip = await page.locator('#swipe-hiring').innerText().catch(() => '');
     check(`${w}: the strip names the fitting role (${JSON.stringify(strip)})`, /Frontend Developer · Hybrid/.test(strip) && /Fits what you're open to/.test(strip) && /Can refer/.test(strip));
+    await page.waitForTimeout(1200);   // the deal-in settles; the strip arrived after the card was drawn
+    const inside = await page.evaluate(() => { const c = document.querySelector('#swipe-card').getBoundingClientRect(); const b = document.querySelector('#swipe-card .view-info-button').getBoundingClientRect(); const t = document.querySelector('#swipe-tags'); const half = [...t.children].filter((x) => !x.hidden && x.offsetTop + x.offsetHeight > t.clientHeight + 1).length; return { ok: b.bottom <= c.bottom + 1 && b.height >= 44, half }; });
+    check(`${w}: View profile stays inside the card with the hiring strip, and no chip is cut in half (${JSON.stringify(inside)})`, inside.ok && inside.half === 0);
     check(`${w}: no duplicate "Hiring" chip on the card`, !(await page.locator('#swipe-tags').innerText()).match(/^Hiring$/m));
     check(`${w}: the deck never scrolls sideways`, await noSideScroll(page));
     await shot(page, `deck-seeker-${w}.png`);
