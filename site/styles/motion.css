@@ -3,6 +3,8 @@
 
 /* ---- N1: It's mutual ---- */
 .mutual-moment { position: fixed; z-index: 80; inset: 0; display: grid; place-items: center; padding: var(--space-4); }
+dialog.mutual-moment { width: 100%; max-width: none; height: 100%; max-height: none; margin: 0; border: 0; background: transparent; color: inherit; overflow: auto; }
+dialog.mutual-moment::backdrop { background: transparent; }
 .mutual-backdrop { position: absolute; inset: 0; background: var(--aura-scrim, color-mix(in srgb, var(--color-wine-deep) 42%, transparent)); -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px); }
 .mutual-panel {
   position: relative; width: min(420px, 100%); padding: var(--space-7) var(--space-5) var(--space-6); text-align: center;
