@@ -283,6 +283,27 @@ export const startAppStub = async ({ port, state = {}, deckRows = defaultDeckRow
       if (pathName === '/rest/v1/rpc/set_nearby_radius') { st.radiusSaved = args.p_km; return json(200, args.p_km); }
       if (pathName === '/rest/v1/rpc/save_push_subscription') { (st.pushSubs ||= []).push(args); return json(200, true); }
       if (pathName === '/rest/v1/rpc/delete_push_subscription') { st.pushSubs = (st.pushSubs || []).filter((x) => x.p_endpoint !== args.p_endpoint); return json(200, true); }
+      // D-166: payments and tickets. st.pay: { order: 'ok' | 'not_configured' | 'hold_expired', verify: 'confirmed' | 'full' |
+      // 'error', ticketSent: true | false }; every call is recorded in st.payCalls.
+      if (['/functions/v1/razorpay-order', '/functions/v1/razorpay-verify', '/functions/v1/event-ticket'].includes(pathName)) {
+        const fn = pathName.slice(14);
+        const pay = st.pay || {};
+        (st.payCalls ||= []).push({ fn, args });
+        const ev = (st.events || []).find((x) => x.id === args.event_id);
+        if (fn === 'razorpay-order') {
+          if (pay.order === 'not_configured') return json(503, { error: 'payments_not_configured' });
+          if (pay.order === 'hold_expired') return json(409, { error: 'hold_expired' });
+          return json(200, { status: 'pending', key_id: 'rzp_test_key', order_id: `order_TEST${String((st.payCalls.length)).padStart(6, '0')}`, amount: (ev?.fee_inr || 0) * 100, currency: 'INR', name: 'The Brivia Club', description: ev?.title || '', prefill: { name: 'Alex Me', email: 'alex@test.brivia.club' } });
+        }
+        if (fn === 'razorpay-verify') {
+          if (pay.verify === 'error') return json(500, { error: 'confirm' });
+          if (pay.verify === 'full') return json(200, { status: 'full', refunded: true });
+          const held = (st.events || []).find((x) => x.my_status === 'pending_payment');
+          if (held) held.my_status = 'confirmed';
+          return json(200, { status: 'confirmed', event_id: held?.id, ticket: { sent: pay.ticketSent !== false } });
+        }
+        return json(200, pay.ticketSent === false ? { sent: false, reason: 'email_not_configured' } : { sent: true });
+      }
       if (pathName === '/functions/v1/push-notify') { st.pushCalls = (st.pushCalls || 0) + 1; return json(200, { sent: 0 }); }
       // D-131 Nearby (0029): st.nearbyPeople (nearby_discover rows, each with distance_band '1' | '3' | '5'); null answers
       // PGRST202 as before 0029. st.nearbyLikedMe: ids whose connect back makes a match. st.nearbyConsent === false: an

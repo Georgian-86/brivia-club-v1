@@ -13,6 +13,7 @@ import {
   eventCardMarkup, eventDetailMarkup, questionNote, companionStep, withInterest,
 } from './events-view.js';
 import { eventImageSrc } from './event-assets.js';
+import { openCheckout } from './payment-checkout.js';
 
 export const createEventsPage = ({ root, api, safeImage, toast, isMissing, sendHello, openChatWith, signedIn, composer = null, memberId = () => '', openCompanions = null }) => {
   if (!root) return { show() {} };
@@ -28,7 +29,7 @@ export const createEventsPage = ({ root, api, safeImage, toast, isMissing, sendH
   const askDialog = document.querySelector('#event-ask-dialog');
   const createButton = root.querySelector('#events-create');
 
-  const state = { events: [], category: 'all', nearby: false, selectedId: null, loaded: false, loading: false, unavailable: false, error: false, companionDefault: false, sent: new Set(), returnFocus: null, confirm: null };
+  const state = { events: [], category: 'all', nearby: false, selectedId: null, loaded: false, loading: false, unavailable: false, error: false, companionDefault: false, sent: new Set(), returnFocus: null, confirm: null, paying: null };
   const friendsFor = (event) => event.friends.map((f) => ({ name: f.name, src: safeImage(f.photoUrl) }));
   // A member's poster (a checked Storage URL), else the club's bundled image for the event or its category.
   const imageFor = (event) => (event.imageUrl && safeImage(event.imageUrl)) || eventImageSrc(event);
@@ -173,9 +174,57 @@ export const createEventsPage = ({ root, api, safeImage, toast, isMissing, sendH
     if (data) replaceEvent(withRsvp(before, data.going, data.wants_companion, data.status || null));
     const after = byId(event.id);
     if (!after.going) toast(before.going ? 'Registration cancelled. Your spot is free for someone else.' : 'Saved.');
-    else if (!before.going) toast(after.myStatus === 'pending_payment' ? 'Seat held for 30 minutes while payment completes.' : after.wantsCompanion ? "You're registered, and open to company." : "You're registered.");
+    else if (!before.going && after.myStatus === 'pending_payment') { void pay(after); return true; }   // D-166: straight to payment
+    else if (!before.going && after.myStatus === 'confirmed') { void celebrate(after, { paid: false }); return true; }
     else if (!quiet) toast(after.wantsCompanion && !before.wantsCompanion ? "You'll be shown to others going who want company too." : !after.wantsCompanion && before.wantsCompanion ? 'Companion matching is off for this event.' : 'Saved.');
     return true;
+  };
+
+  // D-166: a confirmed seat. The sound plays; a free seat asks the server for its ticket (a paid seat's ticket was sent
+  // when the payment was confirmed). The toast only promises an email the server says it sent.
+  const celebrate = async (event, { paid = false, emailed = null } = {}) => {
+    api.playTicket?.();
+    let sent = emailed;
+    if (!paid && api.sendEventTicket) {
+      const { data } = await api.sendEventTicket(event.id);
+      sent = Boolean(data?.sent);
+    }
+    const lead = paid ? "You're in. Payment confirmed." : "You're in.";
+    toast(sent ? `${lead} Your ticket is on its way to your inbox.` : `${lead} See you there.`);
+  };
+
+  // D-166: pay for a held seat with Razorpay. The server creates the order (its amount), Checkout takes the payment, the
+  // server verifies it and confirms the seat (and emails the ticket). If this page closes mid-payment, Razorpay's
+  // webhook confirms it instead. Nothing here can confirm a seat by itself.
+  const pay = async (event) => {
+    if (state.paying) return;
+    state.paying = event.id;
+    try {
+      if (!api.createPaymentOrder) { toast('Online payment opens soon. Your seat is held for 30 minutes.'); return; }
+      const { data: order, error } = await api.createPaymentOrder(event.id);
+      if (error) {
+        const m = String(error.message || '');
+        if (/hold_expired/.test(m)) { toast('Your held seat expired. Reserve again if a spot is still free.'); load(); }
+        else if (/not_payable/.test(m)) { toast('This event is no longer taking payments.'); load(); }
+        else if (/payments_not_configured/.test(m) || isMissing(error) || error.status === 404) toast('Online payment opens soon. Your seat is held for 30 minutes.');
+        else toast('Payment could not start. Try again in a moment.');
+        return;
+      }
+      if (order?.status === 'confirmed') { replaceEvent(withRsvp(event, true, event.wantsCompanion, 'confirmed')); toast("You're already in. See you there."); return; }
+      const result = await openCheckout(order);
+      if (result.status !== 'paid') {
+        toast(result.status === 'failed' ? 'Payment could not open. Check your connection and try again.' : 'Payment not completed. Your seat stays held for 30 minutes.');
+        return;
+      }
+      toast('Confirming your payment…');
+      const { data: verified, error: verifyError } = await api.verifyPayment(result.response);
+      if (verifyError) { toast("Payment received. We're confirming your seat, and your ticket will arrive by email."); load(); return; }
+      if (verified?.status === 'full') { toast('Sorry, the last seat went while you paid. Your payment is being refunded.'); load(); return; }
+      replaceEvent(withRsvp(byId(event.id) || event, true, event.wantsCompanion, 'confirmed'));
+      await celebrate(event, { paid: true, emailed: Boolean(verified?.ticket?.sent) });
+    } finally {
+      state.paying = null;
+    }
   };
 
   // "Show interest" (D-125, 0025): on a paid event, no seat and no payment, but the member is in the companion pool.
@@ -310,6 +359,7 @@ export const createEventsPage = ({ root, api, safeImage, toast, isMissing, sendH
     if (!event) return;
     if (t.closest('[data-event-going]')) { changeRsvp(event, true, null); return; }
     if (t.closest('[data-event-unregister]')) { changeRsvp(event, false, false); return; }
+    if (t.closest('[data-event-pay]')) { void pay(event); return; }
     if (t.closest('[data-event-interest]')) { changeInterest(event, event.myStatus !== 'interested', null); return; }
     const wants = t.closest('[data-event-wants]');
     if (wants && !wants.disabled) { changeRsvp(event, null, !event.wantsCompanion); return; }

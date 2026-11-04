@@ -1299,3 +1299,27 @@ Members still have no UPDATE or DELETE policy on `brivia_messages`. Verify:
 `select column_name from information_schema.columns where table_name = 'brivia_messages' and column_name in ('edited_at', 'unsent_at');` (2 rows);
 `select has_function_privilege('anon', 'public.unsend_message(uuid)', 'execute');` (f);
 `select count(*) from pg_policies where tablename = 'brivia_messages' and cmd in ('UPDATE', 'DELETE', 'ALL');` (0).
+
+## 0047
+
+**Razorpay payments and emailed tickets (D-166).** Not applied yet.
+Adds `event_rsvp.payment_order_id`, `ticket_code` (BRV-XXXXXX) and `ticket_sent_at`, with a unique index on each of the
+first two. Members still have no direct access to `event_rsvp` (RLS on, no policy); four Edge Functions do the work with
+the service role. Apply with the client deploy; until the functions and secrets are in, Reserve keeps the 30-minute
+hold and says "Online payment opens soon", and free registrations say "You're in. See you there." (no email promised).
+
+Setup, in this order (only the founder can do 1-3: they are accounts, keys and DNS):
+1. **Resend** (resend.com): create an account, add the domain `thebriviaclub.live`, add the DNS records it shows at your
+   DNS host (SPF/DKIM), wait for "Verified", then create an API key.
+2. **Razorpay** (dashboard.razorpay.com): start in **Test mode**. Settings > API Keys: generate a key id and secret.
+   Settings > Webhooks: add `https://wfbddovczpfdrspmxgfo.supabase.co/functions/v1/razorpay-webhook`, events
+   `payment.captured` and `order.paid`, and a webhook secret of your choice. Payment capture: automatic (the default).
+3. **Supabase > Edge Functions > Secrets**: `RAZORPAY_KEY_ID`, `RAZORPAY_KEY_SECRET`, `RAZORPAY_WEBHOOK_SECRET`,
+   `RESEND_API_KEY`, and optionally `TICKET_FROM` (default `The Brivia Club <tickets@thebriviaclub.live>`).
+4. Apply `0047`, then deploy the functions `event-ticket`, `razorpay-order`, `razorpay-verify` (JWT verification on) and
+   `razorpay-webhook` (**JWT verification off**: Razorpay sends no Supabase token; the function checks Razorpay's
+   signature on every request). Each imports `../_shared/`.
+5. Test with Razorpay's test cards/UPI on a paid event: the seat turns Registered, the ticket email arrives with the
+   calendar invite, and Razorpay's dashboard shows the webhook delivered. Then switch Razorpay to Live mode (new live
+   keys in the secrets; the webhook re-added for live).
+Verify: `select column_name from information_schema.columns where table_name = 'event_rsvp' and column_name in ('payment_order_id','ticket_code','ticket_sent_at');` (3 rows).

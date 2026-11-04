@@ -311,13 +311,14 @@ const registrationMarkup = (event, friends = []) => {
     if (state === 'interested') note = event.feeInr ? "You're interested, so people going can find you as a companion before you pay. Reserve to hold a seat."
       : "You're interested, so people going can find you as a companion. Register to save your seat.";
     else if (state === 'expired') note = 'Your held seat expired. Reserve again if a spot is still free.';
-    else if (event.feeInr) note = 'Not ready to pay? Show interest: no seat is held, but you can find a companion going. A reserved seat is held for 30 minutes and confirmed once payment completes.';
+    else if (event.feeInr) note = 'Not ready to pay? Show interest: no seat is held, but you can find a companion going. Reserve holds a seat for 30 minutes while you pay; your ticket arrives by email.';
     else if (canShowInterest(event)) note = 'Not sure yet? Show interest: no seat is held, but you can find a companion going.';
   } else if (state === 'confirmed') {
     action = '<span class="event-registered" role="status">Registered <span aria-hidden="true">✓</span></span>';
   } else if (state === 'pending') {
-    action = '<span class="event-registered is-pending" role="status">Payment pending</span>';
-    note = 'Seat held for 30 minutes. It is confirmed only after payment succeeds; online payment opens soon.';
+    // D-166: the hold can be paid from here (Razorpay); the seat is confirmed by the server once payment succeeds.
+    action = `<button type="button" class="event-going-toggle is-primary" data-event-pay>Complete payment · ${escapeHtml(feeLabel(event.feeInr))}</button>`;
+    note = 'Your seat is held for 30 minutes. It is confirmed, and your ticket emailed, as soon as payment succeeds.';
   } else if (state === 'full') {
     action = '<button type="button" class="event-going-toggle" disabled aria-disabled="true">Registrations closed</button>';
   }

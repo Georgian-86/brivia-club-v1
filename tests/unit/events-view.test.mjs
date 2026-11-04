@@ -184,7 +184,7 @@ test('drawer: host, Reserve for a paid event, map link, contact only when given,
   const html = eventDetailMarkup(e);
   assert.match(html, /Hosted by<\/span><strong>Kiran/);
   assert.match(html, /Reserve · ₹1,499/);
-  assert.match(html, /confirmed once payment completes/);
+  assert.match(html, /Reserve holds a seat for 30 minutes while you pay; your ticket arrives by email/);   // D-166
   assert.match(html, /href="https:\/\/maps\.app\.goo\.gl\/abc" target="_blank" rel="noopener noreferrer nofollow"/);
   assert.match(html, /Looking for a companion\?/);
   assert.match(html, /Going solo\? Find someone attending the same event and make it a shared experience/);
@@ -194,7 +194,7 @@ test('drawer: host, Reserve for a paid event, map link, contact only when given,
   assert.match(withContact, /href="mailto:host@example\.com"/);
   assert.ok(!withContact.includes('javascript:'), 'only https links render');
   assert.match(eventDetailMarkup({ ...e, registeredCount: 20 }), /disabled aria-disabled="true">Registrations closed/);
-  assert.match(eventDetailMarkup({ ...e, myStatus: 'pending_payment', going: true }), /Payment pending[\s\S]*confirmed only after payment succeeds/);
+  assert.match(eventDetailMarkup({ ...e, myStatus: 'pending_payment', going: true }), /data-event-pay>Complete payment · ₹1,499<\/button>[\s\S]*confirmed, and your ticket emailed, as soon as payment succeeds/);
 });
 
 test('drawer for the organiser: counts and tools, never companion choices; inline confirm', () => {

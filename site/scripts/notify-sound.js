@@ -94,7 +94,24 @@ const completeCue = () => {
     ],
   };
 };
-export const RITUAL_CUES = Object.freeze({ deal: Object.freeze(dealCue()), complete: Object.freeze(completeCue()) });
+// D-166: a seat confirmed (a free registration, or a payment that went through): a bright rising F, B-flat, D, F on the
+// horn over a warm piano bloom of B-flat major 9, a little sparkle, and a long final B-flat with vibrato. About 2 s.
+const ticketCue = () => ({
+  length: 2.4, level: 0.66, room: 0.32,
+  pads: [{ midi: 46, at: 0.3, dur: 1.6, gain: 0.05 }, { midi: 58, at: 0.32, dur: 1.5, gain: 0.05 }],
+  sparkle: { midi: 94, at: 0.5, dur: 0.6, gain: 0.04 },
+  keys: [
+    ...[70, 74, 77, 81, 84].map((midi, i) => ({ midi, at: 0.3 + i * 0.045, dur: 1.3, gain: 0.09 })),
+  ],
+  notes: [
+    { midi: 65, at: 0.0, dur: 0.09, gain: 0.5, scoop: -50, bright: 5.0 },
+    { midi: 70, at: 0.09, dur: 0.09, gain: 0.54, bright: 5.2 },
+    { midi: 74, at: 0.18, dur: 0.09, gain: 0.58, bright: 5.4 },
+    { midi: 77, at: 0.27, dur: 0.2, gain: 0.62, scoop: -40, bright: 5.6 },
+    { midi: 82, at: 0.5, dur: 0.95, gain: 0.6, scoop: -60, vib: 15, bright: 5.0 },
+  ],
+});
+export const RITUAL_CUES = Object.freeze({ deal: Object.freeze(dealCue()), complete: Object.freeze(completeCue()), ticket: Object.freeze(ticketCue()) });
 
 // Kept for D-134 callers and tests: the notification cue's pitches.
 export const CHIME_NOTES = Object.freeze(CUES.notify.notes.map((n) => ({ freq: hz(n.midi), at: n.at, gain: n.gain, decay: n.dur })));
@@ -387,8 +404,10 @@ export const createSoundKit = ({
     lastCue[name] = t;
     return play(name);
   };
+  // D-166: a confirmed seat. Once per 4 s (a re-render or a double confirmation never plays it twice).
+  const ticket = () => ritual('ticket');
   return {
-    notify, swipe, ritual, unlock, preview: () => play('notify'),
+    notify, swipe, ritual, ticket, unlock, preview: () => play('notify'),
     play: notify,                                    // D-134 name
     isUnlocked: () => unlocked, ready: () => rendering || Promise.resolve(),
   };

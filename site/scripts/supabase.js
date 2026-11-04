@@ -390,6 +390,25 @@ export const cancelMemberEvent = (id) => rpcCall('cancel_member_event', { p_id: 
 export const companionEvents = () => rpcCall('companion_events', {});
 export const companionDeck = (eventId, limit = 20) => rpcCall('companion_deck', { p_event: eventId, p_limit: limit });
 export const companionSwipe = (eventId, targetId, like) => rpcCall('companion_swipe', { p_event: eventId, p_target: targetId, p_like: Boolean(like) });
+// D-166 (0047): Razorpay payments for a held seat, and the emailed ticket. Each answers { data, error }; a function that
+// is not deployed yet answers an error the caller treats as "payments open soon".
+const invoke = async (name, body) => {
+  if (!supabase) return notConfigured();
+  try {
+    const { data, error } = await supabase.functions.invoke(name, { body });
+    if (error) {
+      let detail = null;
+      try { detail = await error.context?.json?.(); } catch { /* not JSON */ }
+      return { data: null, error: { message: detail?.error || error.message || 'failed', status: error.context?.status || 0 } };
+    }
+    return { data, error: null };
+  } catch (error) { return { data: null, error }; }
+};
+export const createPaymentOrder = (eventId) => invoke('razorpay-order', { event_id: eventId });
+export const verifyPayment = (response) => invoke('razorpay-verify', {
+  razorpay_order_id: response?.razorpay_order_id, razorpay_payment_id: response?.razorpay_payment_id, razorpay_signature: response?.razorpay_signature,
+});
+export const sendEventTicket = (eventId) => invoke('event-ticket', { event_id: eventId });
 // D-157 (0046): edit (15 minutes, plain text), unsend (any time, both sides) and delete for me. Each answers
 // { data, error }; before 0046 the error is PGRST202 / 42883 (isMissingFunction).
 export const editMessage = (id, body) => rpcCall('edit_message', { p_id: id, p_body: body });

@@ -36,7 +36,7 @@ const places = [
   { id: 'in-bengaluru', name: 'Bengaluru', region: 'Karnataka', country: 'India' },
   { id: 'in-mumbai', name: 'Mumbai', region: 'Maharashtra', country: 'India' },
 ];
-const st = { events: events(), places, companionDefault: false };
+const st = { events: events(), places, companionDefault: false, pay: { order: 'not_configured' } };   // D-166: no Razorpay here
 const stub = await startAppStub({ port: 5187, state: st });
 const browser = await chromium.launch();
 const errors = [];
@@ -284,8 +284,10 @@ try {
     check(`${w}: axe on the drawer with an interest`, axeInterest.length === 0, JSON.stringify(axeInterest));
     await shot(page, `member-interest-${w}.png`);
     await page.locator('#event-detail [data-event-going]').click();
-    await page.waitForSelector('#event-detail .event-registered.is-pending');
-    check(`${w}: Reserve on a paid event is "Payment pending", not confirmed`, /Payment pending/i.test(await page.locator('#event-detail').innerText()) && body('set_event_rsvp').p_going === true);
+    // D-166: Reserve holds the seat and goes to payment; with payments not set up (st.pay) the hold stays, payable.
+    await page.waitForSelector('#event-detail [data-event-pay]');
+    const held = await page.locator('#event-detail').innerText();
+    check(`${w}: Reserve on a paid event holds the seat and offers "Complete payment", not confirmed (${JSON.stringify(held.slice(0, 400))})`, /Complete payment · ₹499/i.test(held) && !/Registered ✓/.test(held) && body('set_event_rsvp').p_going === true);
     check(`${w}: a payment hold keeps the companion choice`, await page.locator('#event-detail [data-event-wants][aria-checked="true"]').count() === 1 && !(await page.locator('#event-detail [data-event-wants]').isDisabled()));
     await page.locator('#event-detail [data-event-ask]').click();
     await page.waitForSelector('#event-ask-dialog[open]');

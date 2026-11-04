@@ -3297,3 +3297,34 @@ controls (a tester or a seeded test member), never a real member, so no new expo
   breath of wine low right, peach at the top edge, on blush-tinted paper) on the deck card and the two cards peeking
   under it; the avatar ring matches; the chips are frosted cream with a hairline. The wine title bar, cover, layout and
   View profile are unchanged. Dark ink on the blush stays well above WCAG AA.
+
+## D-165 (2026-11-04): the landing's START SWIPING sits lower on phones
+
+- **Asked:** "move the start swiping button little down". On phones it sat 9 px from the top edge; it is now 12 px
+  lower (a transform, so the header's layout is unchanged). Desktop is unchanged.
+
+## D-166 (2026-11-04): Razorpay payments for paid events; an emailed invitation ticket; a ticket sound
+
+- **Asked:** "when a user registers for an event after making payment, a music effect should come and the user should
+  get his ticket of the event on his mail with some aesthetic theme colored invitation". There was no payment gateway
+  (D-121 left paid seats "Payment pending") and no email sender. Founder's choices: **Razorpay** and **Resend**.
+- **Payments:** Reserve keeps the 0022 hold (30 minutes) and opens Razorpay Checkout at once (club wine, asks before
+  closing). `razorpay-order` creates the order with the event's fee from the database (never the browser's) for a live
+  hold only; `razorpay-verify` checks Razorpay's HMAC signature with the key secret and that the order is the caller's
+  own, then calls `confirm_event_payment` (0022, service role only, idempotent); `razorpay-webhook` (signature over
+  the raw body) confirms the same way when the tab closed mid-payment. If the hold had expired and the last seat went
+  meanwhile, the payment is refunded at once. A closed Checkout keeps the hold with "Complete payment · ₹X".
+- **Ticket:** every confirmed seat (paid, or a free registration) gets one email via Resend: an invitation in the
+  club's colours (blush paper, the poster, a deep wine ticket with a champagne frame, serif type, date and time in IST,
+  venue, guest, a perforated stub with BRV-XXXXXX and Paid/Free), View event and Directions, a plain-text twin and a
+  calendar invite (.ics). Sent once: the row is claimed with `ticket_sent_at` in one UPDATE (verify and webhook can
+  race); a failed send releases the claim. The app only says "Your ticket is on its way" when the server sent it.
+- **Sound:** a new `ticket` cue (horn F, B-flat, D, F rising to a long B-flat over a warm B-flat major 9, a sparkle),
+  played on confirmation; same Settings switch as the swipe and deck sounds.
+- **Code:** `supabase/functions/{razorpay-order,razorpay-verify,razorpay-webhook,event-ticket}`, shared
+  `_shared/{razorpay.js,ticket-email.js,send-ticket.ts,http.ts}` (the .js files are unit-tested in Node);
+  `site/scripts/payment-checkout.js`; migration 0047. Setup steps: migrations README "0047".
+- **Proof:** unit 525 (signatures against Node's HMAC, tampering, amounts, hold window, email content and escaping,
+  https-only links, the .ics, Checkout options, the cue); SQL harness (zb-event-tickets); e2e `event-payment.spec.mjs`
+  EP1-EP6 (17 checks), events 75, create-event 151, companions 65. The Deno functions were not run here (no Deno in
+  this environment): their logic lives in the tested shared files, and they need a test-mode run once deployed.
