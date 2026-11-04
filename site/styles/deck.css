@@ -610,7 +610,7 @@ body.app-body .app-view[data-view="home"] .deck-empty-action { min-height: 44px;
 .app-view[data-view="home"] .deck-shuffle-card::before {
   position: absolute;
   inset: 0;
-  background: url('../media/assets/brivia-wordmark-gold.webp') center 46% / 62% auto no-repeat;
+  background: url('../media/assets/brivia-wordmark-gold.webp') center 47% / 62% auto no-repeat;
   content: '';
 }
 @media (max-width: 760px) { .app-view[data-view="home"] .deck-shuffle-card { border-radius: 17px; } }

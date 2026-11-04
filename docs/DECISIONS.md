@@ -3430,7 +3430,7 @@ controls (a tester or a seeded test member), never a real member, so no new expo
 - **Asked:** "Make the stacking animation more lenghty and better kinda like shuffle in solitaire. Use the
   professionally designing skills". Supersedes D-164's 0.9 s deal-in.
 - **Motion (`site/scripts/deck-intro.js`, about 3 s, five beats):** a squared pack of eight card backs (deep
-  wine, a fine gold lattice, a hairline gold frame, the club wordmark "the Brivia CLUB · Swipe. Match. Build" in gold) rises into the card's place; it splits into two halves
+  wine, a fine gold lattice, a hairline gold frame, the club wordmark "the Brivia CLUB" in gold) rises into the card's place; it splits into two halves
   that lean apart; the halves riffle back together one card at a time, alternating, bottom cards first; the pack is
   squared with a small tap; then the back two cards slide out behind it, the pack's top card turns edge-on and the
   member's card flips face up in its place. The stack takes the weight, the gloss crosses, Pass / Pitch rise in. On a
@@ -3448,7 +3448,6 @@ controls (a tester or a seeded test member), never a real member, so no new expo
   backs to stay with the logo in gold. The PNG was cut to a transparent, trimmed wordmark and filled with a metallic
   gold gradient: `site/media/assets/brivia-wordmark-gold.webp` (560 px, ~24 KB; original kept in `source-media/`).
   New token `--color-gold` tints the lattice and frame; `app.js` preloads the image so the first shuffle frame has it.
-  Then, as asked, "the" and the tagline went black (near-black ink with a thin gold keyline, since plain black on deep
-  wine would not read), and the tagline was reset as tracked capitals "SWIPE. MATCH. BUILD" in Bodoni Moda 600 spanning
-  the full width of the wordmark like a subtitle. The image is now 640 px (~77 KB) and is rebuilt from the original
-  with `scripts/build-wordmark-gold.py`.
+  A black "the" and a full-width tagline were tried and reverted on Arovas's call: the final back is the all-gold
+  wordmark with no "Swipe. Match. Build" line (560 px, ~42 KB), rebuilt from the original by
+  `scripts/build-wordmark-gold.py`.
