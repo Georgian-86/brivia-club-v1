@@ -1,0 +1,9 @@
+# Brivia Club
+# The public pages are open to crawlers. The member app (app, chat, explore, profile) sends
+# "noindex" in a meta tag and an X-Robots-Tag header; it is not blocked here on purpose, because a
+# crawler has to fetch a page to see its noindex.
+User-agent: *
+Allow: /
+Disallow: /data/
+
+Sitemap: https://thebriviaclub.live/sitemap.xml

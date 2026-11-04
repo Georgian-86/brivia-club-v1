@@ -7,6 +7,12 @@ Update this file at the end of every session. CLAUDE.md holds the aim; this file
 
 ## 1. What is done
 
+**2026-11-04, D-175:** Google Search Console verified by file (`site/public/google4d360d183cb779a9.html`, keep it:
+removing it unverifies the property) and a first SEO pass: `robots.txt`, `sitemap.xml` (public pages only),
+canonical + Open Graph + Twitter tags on `/`, `/auth.html`, `/careers.html`, `/privacy.html`, Organization/WebSite
+JSON-LD on `/`, and `noindex` (meta + `X-Robots-Tag` in `vercel.json`) on app, chat, explore and profile. Add any new
+public page to `sitemap.xml`.
+
 **2026-11-04, D-174:** the deck now arrives with a ~3 s solitaire-style shuffle (pack, split, riffle, square, deal and
 flip) and a matching shuffle sound. Files `site/scripts/deck-intro.js`, `INTRO_CUE` in `site/scripts/notify-sound.js`,
 `.deck-shuffle` in `site/styles/deck.css`.

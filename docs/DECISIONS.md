@@ -3451,3 +3451,20 @@ controls (a tester or a seeded test member), never a real member, so no new expo
   A black "the" and a full-width tagline were tried and reverted on Arovas's call: the final back is the all-gold
   wordmark with no "Swipe. Match. Build" line (560 px, ~42 KB), rebuilt from the original by
   `scripts/build-wordmark-gold.py`.
+
+## D-175 (2026-11-04): Search Console verification and the first SEO pass
+
+- **Asked:** "add the file for search console and do SEO" (Arovas).
+- **Verification:** the HTML file Google issued lives at `site/public/google4d360d183cb779a9.html` and is served at the
+  site root (shipped first, PR #53). It must stay, or the property loses verification.
+- **Index only the public pages:** `/`, `/auth.html`, `/careers.html`, `/privacy.html` are in `sitemap.xml` with a
+  canonical URL, a description, Open Graph and Twitter card tags (shared `og-image.jpg`, 1200×630).
+- **Keep the member app out:** `app.html`, `chat.html`, `explore.html`, `profile.html` send `noindex, nofollow` as a
+  meta tag and as an `X-Robots-Tag` header. They are deliberately **not** `Disallow`ed in `robots.txt`: a crawler that
+  cannot fetch a page cannot see its noindex, and a blocked URL can still be indexed from links. `robots.txt` blocks
+  only `/data/` (static lookup JSON). No member data is in any static page; profiles render client-side after sign-in.
+- **Structured data:** one Organization + WebSite JSON-LD graph on the landing page (name, logo, contact email, the
+  Instagram and LinkedIn profiles). No JobPosting on careers yet: Google requires a posting date, full description and
+  location rules per role, which the page does not carry.
+- **Performance basics:** already in place (hashed `/assets/*` cached immutable, hero poster preloaded, below-fold
+  images lazy with sizes). Added a one-day cache with a week of stale-while-revalidate for the icons and OG image.
