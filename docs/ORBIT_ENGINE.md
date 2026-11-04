@@ -1189,8 +1189,9 @@ Hiring is a lane beside the deck, not a change to it: `deck_candidates` and the 
   0.6; else 0; an internship pairs only with intern or entry) × mode (the role's mode is one the seeker picked, 1, else
   0) × (0.8 + 0.2 × min(1, shared skills / 3)). On-site and hybrid pairs must also pass the location admission below.
   Fit ≥ 0.5 is "Fits what you're open to".
-- **Location first.** `hiring_suggestions` admits pairs with the deck's own location rule (same cell ring first, then
-  city, then region; remote roles anywhere) and answers only the distance band, never a cell, a city or km.
+- **Location first, never a cut (D-170, 0049).** `hiring_suggestions` and `hiring_people` show every vacancy at any
+  distance, nearest first (own ~3 / ~10 km rings, then the nearest place; fit breaks ties), and answer only the
+  distance band, never a cell, a city or km. This is the hiring lane only: the deck's Escape-Velocity gate is unchanged.
 - **The lift.** The client puts at most one suggestion in every five deck cards (`interleaveLift`), never in place of
   the card on screen. Suggestions are mutual-consent like everything else: "Ask about this role" sends a signal
   (`send_connect_request`, the daily quota and the waiting cap apply) with the role tag; a connection exists only when

@@ -554,7 +554,7 @@ export const createHiring = (deps) => {
   const findPeople = async () => {
     await boot();
     if (!state.available) return null;
-    const { data, error } = await rpc('hiring_people', { p_limit: 40 });
+    const { data, error } = await rpc('hiring_people', { p_limit: 200 });
     if (error) return null;
     return data || [];
   };

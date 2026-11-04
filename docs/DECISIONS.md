@@ -3372,3 +3372,13 @@ controls (a tester or a seeded test member), never a real member, so no new expo
   people who are hiring"); fit only orders. With the switch alone on and no one hiring, the deck says "No one is
   hiring near you yet." Before 0048 the switch falls back to the loaded deck.
 
+## D-170 (2026-11-04): hiring matches are not cut by distance
+
+- **Asked:** "make the hiring match not use the location. Ofc show the nearest first but show all the vacancies".
+- **Done (0049):** `hiring_suggestions` (the deck lift and the "someone near you is hiring" row) drops the ~10 km /
+  60 km admission; who is suggested still needs a fit of 0.5 or more, and the nearest come first. `hiring_people` (the
+  Hiring switch) returns up to 200 hirers (was 50), nearest first with fit breaking ties (was fit first). Both answer
+  the distance band only.
+- **Scope:** the founder's override of CLAUDE.md rule 4 ("far-away recommendations are earned") for the hiring lane
+  only. The connection deck (`deck_candidates`, the Escape-Velocity gate) is unchanged. Supersedes D-169's order.
+
