@@ -550,12 +550,14 @@ begin
   -- brivia_posts_image_rule, 0008 section 4: a test member's
   -- preset post image; it reads the author's own flag and compares no two members' worlds; brivia_cleanup_custom_covers,
   -- 0014: the one-time cover cleanup skips seeded test members by their own flag, never comparing two members, and
-  -- deliberately not brivia_in_test_world, so a real account that became a tester is still cleaned)
+  -- deliberately not brivia_in_test_world, so a real account that became a tester is still cleaned; brivia_hiring_bar
+  -- and brivia_hiring_seen_by, 0047 (D-162): a seeded member's own flag exempts it from the photo and age bar and keeps
+  -- its roles to testers, never comparing two members' worlds)
   select string_agg(n.nspname || '.' || p.proname, ', ' order by p.proname) into bad
     from pg_proc p join pg_namespace n on n.oid = p.pronamespace
    where n.nspname in ('public', 'brivia_private') and p.prosrc ~ 'is_test'
      and p.proname not in ('brivia_guard_is_test', 'brivia_in_test_world', 'brivia_tester_world', 'brivia_cell_ok', 'refresh_cell_density',
-                           'brivia_posts_image_rule', 'brivia_cleanup_custom_covers');
+                           'brivia_posts_image_rule', 'brivia_cleanup_custom_covers', 'brivia_hiring_bar', 'brivia_hiring_seen_by');
   if bad is not null then raise exception 'FAIL guard: is_test still read by %', bad; end if;
   select string_agg(schemaname || '.' || tablename || '.' || policyname, ', ') into bad
     from pg_policies where coalesce(qual, '') || coalesce(with_check, '') ~ 'is_test';

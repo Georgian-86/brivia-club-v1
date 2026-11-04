@@ -1200,6 +1200,13 @@ Hiring is a lane beside the deck, not a change to it: `deck_candidates` and the 
 - **Privacy.** A seeker's intent is visible only to members with an open fitting role, unless they choose Everyone. A
   private current company hides the intent from hirers whose role names that company. "Let hirers find me" (off by
   default) is the only way a seeker is lifted in a hirer's deck.
+- **Seeded members (D-162, migration 0047).** A role or intent owned by a seeded test member (`is_test`) is shown only
+  to that member and to the strict test world (`brivia_tester_world`: seeded members and `brivia_tester` accounts);
+  `open_test_world` does not widen it, so no real member sees an invented job (`brivia_hiring_seen_by`, applied in
+  `brivia_role_shown`, `member_open_to` and both sides of `hiring_suggestions`). Seeded members skip the photo and
+  14-day parts of the bar (they never carry a photo, D-156); completed, confirmed email and no open flag still apply.
+- **The toggle.** Connect carries a one-tap Hiring toggle beside Curated / Nearby (`#hiring-toggle`, `aria-pressed`).
+  It is the same lens as the drawer's switch, filters the loaded deck only and never changes the ORBIT order.
 
 ## Appendix A (DRAFT, not scheduled): Constellations
 

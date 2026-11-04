@@ -3248,3 +3248,18 @@ controls (a tester or a seeded test member), never a real member, so no new expo
   `--aura-blush-box` (deep blush top left, a breath of wine top right, peach low, on blush-tinted paper) on every status
   box: the deck's "You're caught up", Nearby's "It's a little quiet around here" / "Nearby opens soon", Companions,
   Explore's empty events and Notes' "Start the conversation". Supersedes D-159's plain paper for the caught-up box.
+
+## D-162 (2026-11-04): a one-tap Hiring toggle on Connect; seeded hirers only for testers
+
+- **Asked:** "i need a toggle button so that it is easy for the users to search for hiring people. Also for sometime
+  add some real looking profiles who are hiring so that the feature can be tested end to end".
+- **Done:** a "Hiring" pill beside Curated / Nearby (`#hiring-toggle`, 50 px like the switch it sits beside,
+  `aria-pressed`, deep wine when on). It is the same Hiring lens as the drawer switch, kept in sync both ways, shown
+  only once hiring is live. `supabase/seed/hiring-test-members.sql`: 12 seeded hirers, 14 roles at invented
+  companies, 6 findable seekers, idempotent with fixed ids, removed by the purge.
+- **Why the gate (0047):** `open_test_world` is on live, so real members see seeded members; a seeded Hiring banner
+  would be a job that does not exist, the same harm D-156 refused for seeded photos. Seeded roles and intents are
+  shown only to the strict test world (seeded members and `brivia_tester` accounts), and real members cannot ask about
+  them. Seeded members skip the photo and 14-day parts of the hiring bar, since they never carry a photo.
+- **Not done:** seeded members' Looking for is unchanged (no "Hiring" tag a real member could see).
+
