@@ -3,8 +3,8 @@
 // DR1 first visit: five card backs assemble, swipes are held while they do (no pass is recorded), then the live card
 //     shows and the backs are gone; about 1.7 s.
 // DR2 the intro plays once per visit: a reload in the same session shows the card at once.
-// DR3 swiping works after the intro; the last free swipe brings the shuffle: the deck spreads, gathers and reforms,
-//     then "That's your deck for today." with the refresh time, in 1.5-2.5 s; no profile is offered after it.
+// DR3 swiping works after the intro; the last free swipe brings the shuffle: the deck spreads, riffles twice and
+//     reforms, then "That's your deck for today." with the refresh time, fast (D-163); no profile is offered after it.
 // DR4 the shuffle is visual only: no extra pass or signal is sent, the quota is not re-requested by it, and a pass
 //     attempt on the finished deck sends nothing.
 // DR5 opening Connect with the swipes already used shows the finished deck at once (no shuffle replay).
@@ -67,7 +67,7 @@ try {
   if (shots) await page.screenshot({ path: `${shots}/spread-1440.png` });
   await page.waitForFunction(() => getComputedStyle(document.querySelector('.deck-complete-face') || document.body).opacity === '1' && document.querySelector('.deck-complete-face'), null, { timeout: 6000 }).catch(() => {});
   const doneMs = Date.now() - lastSwipe;
-  check(`DR3 the shuffle and message take 1.5-2.5 s after the card leaves (${doneMs} ms incl. the ~0.3 s fly-out)`, doneMs >= 1500 && doneMs <= 3300);
+  check(`DR3 the fast shuffle and message are done within 2.5 s of the last swipe (${doneMs} ms incl. the card's ~0.5 s exit)`, doneMs >= 1000 && doneMs <= 2500);
   const done = await page.evaluate(() => {
     const backs = [...document.querySelectorAll('#swipe-stack .deck-back')].map((b) => b.getBoundingClientRect());
     return {

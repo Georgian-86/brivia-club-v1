@@ -3280,3 +3280,12 @@ controls (a tester or a seeded test member), never a real member, so no new expo
   (zero-quota checks updated to the finished deck), companions 65, message-actions 30, read-receipts 23, chat-inbox 15,
   onboarding 269. The app-stub counts passes as swipes with `passesUseSwipes` and marks the intro played unless a spec
   sets `deckRitual`.
+
+## D-163 (2026-11-04): the daily-cap shuffle is fast, like Solitaire
+
+- **Asked:** "make the cards shuffle too fast just like they do in the solitaire game".
+- **Done:** the completion is now a quick fan (0.2 s), a fast riffle (cards drop 30 ms apart, 0.26 s each, a crisp
+  ease with no overshoot), a cut (top half right, bottom half left, 0.15 s), a second riffle, then a snap square-up.
+  The cards are squared by 1.1 s and the message shows by 1.6 s (was about 2.3 s). The `complete` cue follows: a quicker
+  falling arpeggio and light riffle ticks, one per card across both riffles, then the same closing horn line. The
+  intro deal is unchanged. Supersedes D-162's 1.5-2.5 s target for the shuffle.

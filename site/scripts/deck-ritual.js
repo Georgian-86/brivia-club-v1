@@ -16,11 +16,14 @@ export const RITUAL = Object.freeze({
   introDur: 680,        // ms per back's flight
   riseGap: 70,          // ms after the last back lands before the top one rises
   riseDur: 460,         // ms: the top back becomes the live card
-  completeSpread: 450,  // ms: the deck fans out
-  gatherStagger: 75,    // ms between backs falling back in, riffled
-  gatherDur: 640,       // ms per back's flight to the centre
-  squareDur: 420,       // ms: the deck squares up
-  messageDur: 420,      // ms: the message fades in
+  // D-163 (founder: "shuffle fast, just like Solitaire"): a quick fan, two fast riffles with a cut between, a snap square.
+  completeSpread: 200,  // ms: the deck fans out
+  gatherStagger: 30,    // ms between backs dropping in, riffled
+  gatherDur: 260,       // ms per back's flight to the centre
+  riffles: 2,           // riffle passes (the deck is cut between them)
+  cutDur: 150,          // ms: the deck is cut into two halves
+  squareDur: 220,       // ms: the deck squares up
+  messageDur: 280,      // ms: the message fades in
   reducedFade: 220,     // ms: every step with reduced motion
 });
 
@@ -37,8 +40,13 @@ export const riffleOrder = (count = RITUAL.backs) => {
   while (left.length || right.length) { if (left.length) out.push(left.shift()); if (right.length) out.push(right.shift()); }
   return out;
 };
-export const completeLandings = (count = RITUAL.backs) => riffleOrder(count).map((_, k) => RITUAL.completeSpread + k * RITUAL.gatherStagger + RITUAL.gatherDur);
-export const completeSquareAt = (count = RITUAL.backs) => RITUAL.completeSpread + (count - 1) * RITUAL.gatherStagger + RITUAL.gatherDur;
+const riffleSpan = (count) => (count - 1) * RITUAL.gatherStagger + RITUAL.gatherDur;
+// When each back lands, riffle after riffle (ms from the start of the completion).
+export const completeLandings = (count = RITUAL.backs) => Array.from({ length: RITUAL.riffles }, (_, pass) => {
+  const start = RITUAL.completeSpread + pass * (riffleSpan(count) + RITUAL.cutDur);
+  return Array.from({ length: count }, (__, k) => start + k * RITUAL.gatherStagger + RITUAL.gatherDur);
+}).flat();
+export const completeSquareAt = (count = RITUAL.backs) => RITUAL.completeSpread + RITUAL.riffles * riffleSpan(count) + (RITUAL.riffles - 1) * RITUAL.cutDur;
 export const completeTotal = (count = RITUAL.backs) => completeSquareAt(count) + RITUAL.squareDur + RITUAL.messageDur;
 
 // A back's resting pose in the stack: depth 0 is the top. Small, deliberate offsets and turns (a hand-squared deck,
@@ -74,6 +82,9 @@ export const spreadPose = (index, count, w, h, reach = 0.42) => {
   return { x: Math.round(k * w * reach), y: Math.round(Math.abs(k) * h * 0.05 - h * 0.03), z: 20, r: Math.round(k * 12 * 10) / 10, s: 0.98 };
 };
 
+// The cut between riffles: the top half to one side, the bottom half to the other, lifted a little (i: place in half).
+export const cutPose = (side, i, w, reach = 0.42) => ({ x: Math.round(side * w * reach * 0.62), y: -10 - i * 4, z: 20 + i * 4, r: side * 5, s: 0.99 });
+
 // A gentle spring as a CSS linear() easing (about 3% overshoot, settled): no bounce, no robotic stop. Older engines get
 // a close cubic-bezier.
 export const springEasing = (damping = 0.74, samples = 40) => {
@@ -89,6 +100,7 @@ export const springEasing = (damping = 0.74, samples = 40) => {
 };
 export const SPRING_FALLBACK = 'cubic-bezier(.22, 1.12, .36, 1)';
 export const GLIDE = 'cubic-bezier(.2, .7, .2, 1)';
+export const SNAP = 'cubic-bezier(.25, .9, .3, 1)';      // the riffle: fast out, crisp landing, no overshoot
 
 // The words on the finished deck. quota as my_signal_quota returns it; the refresh time only when the server gave one.
 export const completionCopy = (quota) => {
@@ -265,40 +277,63 @@ export const createDeckRitual = ({ stack, cue = () => {}, win = globalThis.windo
     }
     const { w, h } = size();
     const n = backs.length;
-    const spring = SPRING();
     const reach = spreadReach(w, win?.innerWidth || Infinity);
     sound('complete');
-    // 1. Fan out from where the last card was.
+    // 1. Fan out from where the last card was: quick.
     await Promise.all(backs.map((b, d) => run(b, [
       { transform: poseTransform(stackPose(d)), opacity: d === 0 ? 0.6 : 1 },
       { transform: poseTransform(spreadPose(n - 1 - d, n, w, h, reach)), opacity: 1 },
-    ], { duration: RITUAL.completeSpread, delay: d * 30, easing: GLIDE })));
+    ], { duration: RITUAL.completeSpread, delay: d * 12, easing: GLIDE })));
     if (my !== token) return;
-    // 2. Gather in a riffle: the halves cross over each other and fall into their new places, one by one.
-    const order = riffleOrder(n);                 // order[k]: the fan position landing k-th
-    const flights = order.map((fanIndex, k) => {
-      const back = backs[n - 1 - fanIndex];       // the back that sat at that fan position
-      const depth = n - 1 - k;                    // the first to land ends deepest; the last on top
-      const from = spreadPose(fanIndex, n, w, h, reach);
-      const lift = { x: Math.round(-from.x * 0.18), y: -22 - (k % 2) * 8, z: 60, r: Math.round(-from.r * 0.3 * 10) / 10, s: 1.01 };
-      back.style.zIndex = String(n - depth);
-      return run(back, [
-        { transform: poseTransform(from), offset: 0 },
-        { transform: poseTransform(lift), offset: 0.55 },
-        { transform: poseTransform(stackPose(depth)), offset: 1 },
-      ], { duration: RITUAL.gatherDur, delay: k * RITUAL.gatherStagger, easing: spring })
-        .then(() => ({ back, depth }));
-    });
-    const landed = await Promise.all(flights);
+    // A riffle: the cards drop in one after another, each lifting over the one before; the first to land ends deepest.
+    const riffleIn = async (sequence) => {
+      const flights = sequence.map(({ back, from }, k) => {
+        const depth = n - 1 - k;
+        const lift = { x: Math.round(-from.x * 0.18), y: -16 - (k % 2) * 6, z: 50, r: Math.round(-from.r * 0.3 * 10) / 10, s: 1.01 };
+        back.style.zIndex = String(n - depth);
+        return run(back, [
+          { transform: poseTransform(from), offset: 0 },
+          { transform: poseTransform(lift), offset: 0.5 },
+          { transform: poseTransform(stackPose(depth)), offset: 1 },
+        ], { duration: RITUAL.gatherDur, delay: k * RITUAL.gatherStagger, easing: SNAP }).then(() => ({ back, depth }));
+      });
+      const landed = await Promise.all(flights);
+      return landed.sort((a, b) => a.depth - b.depth).map((l) => l.back);
+    };
+    // 2. First riffle, from the fan: the halves cross over each other.
+    let byDepth = await riffleIn(riffleOrder(n).map((fanIndex) => ({ back: backs[n - 1 - fanIndex], from: spreadPose(fanIndex, n, w, h, reach) })));
     if (my !== token) return;
-    const byDepth = landed.sort((a, b) => a.depth - b.depth).map((l) => l.back);
+    // 3. Cut and riffle again, as many times as RITUAL.riffles asks: the top half goes right, the bottom half left,
+    //    then they riffle together from the bottom of each half.
+    for (let pass = 1; pass < RITUAL.riffles; pass += 1) {
+      const half = Math.ceil(n / 2);
+      const top = byDepth.slice(0, half);                // right
+      const bottom = byDepth.slice(half);                // left
+      const cut = new Map();
+      top.forEach((b, i) => cut.set(b, cutPose(1, top.length - 1 - i, w, reach)));
+      bottom.forEach((b, i) => cut.set(b, cutPose(-1, bottom.length - 1 - i, w, reach)));
+      await Promise.all(byDepth.map((b, d) => run(b, [
+        { transform: poseTransform(stackPose(d)) },
+        { transform: poseTransform(cut.get(b)) },
+      ], { duration: RITUAL.cutDur, easing: GLIDE })));
+      if (my !== token) return;
+      const left = [...bottom].reverse();                // deepest of each half drops first
+      const right = [...top].reverse();
+      const sequence = [];
+      while (left.length || right.length) {
+        if (left.length) { const b = left.shift(); sequence.push({ back: b, from: cut.get(b) }); }
+        if (right.length) { const b = right.shift(); sequence.push({ back: b, from: cut.get(b) }); }
+      }
+      byDepth = await riffleIn(sequence);
+      if (my !== token) return;
+    }
     markTop(byDepth);
     // 3. Square up: the whole deck settles as one, as if tapped on the table.
     await run(layer, [
       { transform: 'translate3d(0, 0, 0) scale(1)' },
       { transform: 'translate3d(0, -6px, 0) scale(1.012)', offset: 0.4 },
       { transform: 'translate3d(0, 0, 0) scale(1)' },
-    ], { duration: RITUAL.squareDur, easing: spring });
+    ], { duration: RITUAL.squareDur, easing: GLIDE });
     if (my !== token) return;
     // 4. The words appear on the top card.
     const face = showMessage(byDepth, quota);

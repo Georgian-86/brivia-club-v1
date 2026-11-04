@@ -17,10 +17,15 @@ test('the intro lands deepest first, one back every 120 ms, then the top card ri
   assert.ok(introTotal() >= 1400 && introTotal() <= 2000, `intro ${introTotal()} ms`);
 });
 
-test('the completion shuffle lasts 1.5 to 2.5 s, as asked', () => {
+test('the completion shuffle is fast, like Solitaire (D-163): two riffles; the cards are squared by about 1.1 s, the message shows by 1.7 s', () => {
   const total = completeTotal();
-  assert.ok(total >= 1500 && total <= 2500, `shuffle ${total} ms`);
-  assert.ok(completeSquareAt() > Math.max(...completeLandings()) - 1);
+  assert.ok(total >= 1000 && total <= 1700, `shuffle ${total} ms`);
+  assert.ok(completeSquareAt() <= 1200, `squared at ${completeSquareAt()} ms`);
+  assert.equal(completeLandings().length, RITUAL.backs * RITUAL.riffles);
+  const lands = completeLandings();
+  lands.slice(1).forEach((t, i) => assert.ok(t > lands[i], 'every card lands after the one before'));
+  assert.ok(RITUAL.gatherStagger <= 40, 'cards drop in quick succession');
+  assert.ok(completeSquareAt() >= Math.max(...lands));
 });
 
 test('the riffle interleaves the two halves and keeps every card exactly once', () => {

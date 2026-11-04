@@ -54,7 +54,7 @@ export const CUES = Object.freeze({
 // D-162: the deck ritual's two cues, timed from the choreography itself (deck-ritual.js), so each soft piano tick lands
 // as its card settles. Same B-flat major language, same horn, plus warm keys and a low pad; quieter than a swipe.
 //   deal      five soft ascending piano ticks as the backs land, then the horn resolves F to B-flat over a B-flat chord
-//   complete  a soft falling arpeggio as the deck fans out, riffle ticks as it gathers, then a closing horn line
+//   complete  a quick falling arpeggio as the deck fans out, fast riffle ticks (two riffles), then a closing horn line
 //             (F, D, a long B-flat with vibrato) over a warm B-flat major 9 chord
 const sec = (ms) => Math.round(ms) / 1000;
 const dealCue = () => {
@@ -82,8 +82,9 @@ const completeCue = () => {
     length: square + 2.0, level: 0.6, room: 0.34,
     pads: [{ midi: 46, at: square - 0.05, dur: 1.8, gain: 0.05 }, { midi: 58, at: square, dur: 1.7, gain: 0.05 }],
     keys: [
-      ...[82, 79, 77, 74].map((midi, i) => ({ midi, at: 0.04 + i * 0.08, dur: 0.42, gain: 0.1 })),
-      ...lands.map((t, k) => ({ midi: riffle[k % riffle.length], at: sec(t) - 0.02, dur: 0.32, gain: 0.12 })),
+      ...[82, 79, 77, 74].map((midi, i) => ({ midi, at: 0.02 + i * 0.04, dur: 0.3, gain: 0.09 })),
+      // D-163: a quick riffle of light ticks, one per card (two riffles), like a deck shuffled by hand.
+      ...lands.map((t, k) => ({ midi: riffle[k % riffle.length], at: sec(t) - 0.015, dur: 0.16, gain: 0.1 })),
       ...[62, 65, 69, 72].map((midi, i) => ({ midi, at: square + 0.02 + i * 0.03, dur: 1.6, gain: 0.075 })),
     ],
     notes: [
