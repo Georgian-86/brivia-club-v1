@@ -1429,7 +1429,13 @@ const focusDeckEmpty = () => {
   emptyState.querySelector('#deck-empty-title')?.focus({ preventScroll: true });
 };
 const renderCardChips = (container, person) => {
-  container.replaceChildren(...deckChips(person).map((chip) => {
+  // The deck redraws the card several times while data arrives; the same chips are kept, so the "You both" shimmer
+  // (D-165 N6) started on the first draw is not wiped by the next one.
+  const chips = deckChips(person);
+  const key = `${person?.id || ''}|${chips.map((chip) => `${chip.kind}:${chip.label}`).join('|')}`;
+  if (container.dataset.chipKey === key && container.children.length) return;
+  container.dataset.chipKey = key;
+  container.replaceChildren(...chips.map((chip) => {
     const element = document.createElement('span');
     if (chip.kind === 'shared') element.className = 'chip-shared';
     element.textContent = chip.label;
@@ -1589,7 +1595,6 @@ const renderHome = (queue = getExplorePeople()) => {
   }
   setDeckLoading(card, false);
   const hadCard = homeHadCard;
-  homeHadCard = Boolean(currentPerson);
   if (!currentPerson) {
     renderWhy(null);
     card?.setAttribute('hidden', '');
@@ -1598,10 +1603,15 @@ const renderHome = (queue = getExplorePeople()) => {
     limitState?.setAttribute('hidden', '');
     if (emptyState) renderDeckEmpty(emptyState);
     // D-165 (N3): the last card was just swiped away: the reason turns in like the back of that card.
-    if (hadCard && emptyState && !emptyState.closest('[hidden]')) flipIn(emptyState);
+    // The reason often arrives a moment later (deck_status), so "had a card" is kept until the box really shows.
+    if (emptyState && !emptyState.closest('[hidden]')) {
+      if (hadCard) flipIn(emptyState);
+      homeHadCard = false;
+    }
     const count = document.querySelector('#queue-count'); if (count) count.textContent = '00 / 00';
     return;
   }
+  homeHadCard = true;
   card?.removeAttribute('hidden');
   actions?.removeAttribute('hidden');
   hint?.removeAttribute('hidden');
@@ -1990,8 +2000,24 @@ const announceSignal = (person, result, origin = null) => {
   }
   if (!result?.error && result?.status === 'sent' && origin) {
     // Founder, 2026-11-04: the letter goes to Chat (where an accepted pitch opens), never to the notification bell.
-    const chatNav = [...document.querySelectorAll('[data-nav-host] [data-nav="chat"]')].find((el) => el.getBoundingClientRect().width > 0);
-    void pitchSentFlight({ from: origin, to: chatNav?.querySelector('.app-nav-icon') || chatNav });
+    // The target is the Chat tab's icon where it shows (phone tab bar), else the Chat link itself (the desktop header
+    // shows text, its icon is hidden). The tab bar can be hidden for a moment while the pitch sheet closes, so the
+    // target is looked for over the next ~0.6 s.
+    const chatTarget = () => {
+      for (const nav of document.querySelectorAll('[data-nav-host] [data-nav="chat"]')) {
+        const icon = nav.querySelector('.app-nav-icon');
+        if (icon?.getBoundingClientRect().width > 0) return icon;
+        if (nav.getBoundingClientRect().width > 0) return nav;
+      }
+      return null;
+    };
+    const started = performance.now();
+    const fly = () => {
+      const to = chatTarget();
+      if (to) { void pitchSentFlight({ from: origin, to }); return; }
+      if (performance.now() - started < 600) requestAnimationFrame(fly);
+    };
+    fly();
   }
   showToast(signalResultToast(person, result));
 };

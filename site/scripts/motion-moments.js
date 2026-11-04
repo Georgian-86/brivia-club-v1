@@ -262,6 +262,8 @@ export const slideModePill = (group, { fromIndex = null, reduced = prefersReduce
   }
   const place = (b) => ({ x: b.offsetLeft, width: b.offsetWidth });
   const to = place(buttons[active]);
+  // A plain re-place (resize, a view change a frame later) leaves a running slide alone; it already ends there.
+  if (fromIndex === null && gsap.isTweening(pill)) return;
   gsap.killTweensOf(pill);
   if (reduced || fromIndex === null || fromIndex === active || !buttons[fromIndex]) { gsap.set(pill, to); return; }
   gsap.fromTo(pill, place(buttons[fromIndex]), { ...to, duration: 0.42, ease: 'power3.inOut' });
