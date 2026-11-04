@@ -3358,3 +3358,17 @@ controls (a tester or a seeded test member), never a real member, so no new expo
 - **Proof:** motion.spec 10/10 (deal-in, shimmer, tilt, letter + Chat pop, flip, pill, radar, mutual, bubble, events);
   deck 201/201, app-shell 214/214, collab-requests, mutual-moment, sounds, deck-tutorial, events, nearby, work-identity
   pass; unit 513.
+
+## D-169 (2026-11-04): the Hiring switch searches everyone who is hiring
+
+- **Asked:** "still no one in hiring even though the new script is successful" (a tester, 16 open roles, with
+  "Roles I'm open to" saved).
+- **Cause:** the lens (D-141) only filtered the cards already loaded in the deck, and for a member with an intent it
+  kept only roles that fit (0.5 or more). The seeded roles were neither loaded nor a fit, so the switch showed no one.
+- **Done:** migration 0048 adds `hiring_people(limit)`: members with a shown role whom the caller can see, roles that
+  fit first, then nearest (own rings, then the nearest place), no distance cut (search reaches everyone), the
+  distance band only, never a matched member or one with a live request from the caller, at most 50. Turning the
+  switch on loads those cards to the front of the deck. The lens now keeps everyone hiring for every member ("Only
+  people who are hiring"); fit only orders. With the switch alone on and no one hiring, the deck says "No one is
+  hiring near you yet." Before 0048 the switch falls back to the loaded deck.
+

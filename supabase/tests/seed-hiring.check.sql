@@ -6,6 +6,7 @@
 --   HS3 with open_test_world on, R sees the seeded hirer's card (positive control) but no banner, no "Open to roles",
 --       and cannot ask about a seeded role; T sees the banner and the seeded seeker's "Open to roles"
 --   HS4 a real hirer's banner is unchanged for R (only seeded members are gated)
+--   HS5 hiring_people (0048, D-169): T finds all 12 seeded hirers plus H, nearest first; R finds only H
 begin;
 create or replace function pg_temp.t(n int) returns uuid language sql immutable as $$
   select ('a7e57000-0000-4000-8000-' || lpad(n::text, 12, '0'))::uuid $$;
@@ -75,6 +76,24 @@ begin
   perform pg_temp.as_member(r);
   select count(*) into n from public.member_hiring(array[h]);
   if n <> 1 then raise exception 'FAIL HS4: a real hirer''s banner is hidden from a real member (% rows)', n; end if;
+
+  -- HS5
+  select count(*) into n from public.hiring_people(50);
+  if n <> 1 then raise exception 'FAIL HS5: a real non-tester finds % hiring people, expected only H', n; end if;
+  perform pg_temp.as_member(t);
+  select count(*) into n from public.hiring_people(50);
+  if n <> 13 then raise exception 'FAIL HS5: the tester finds % hiring people, expected 13', n; end if;
+  -- nearest first: every hirer in the caller's own place (Thane, or a ~3 / ~10 km ring) before anyone farther
+  if exists (select 1 from (select row_number() over () as k, distance_band b from public.hiring_people(50)) x
+              where x.b not in ('~3 km', '~10 km', (select name from public.place where id = public.brivia_nearest_place(c)))
+                and exists (select 1 from (select row_number() over () as k, distance_band b from public.hiring_people(50)) y
+                             where y.k > x.k and y.b in ('~3 km', '~10 km', (select name from public.place where id = public.brivia_nearest_place(c)))))
+  then raise exception 'FAIL HS5: a farther hirer comes before a nearer one'; end if;
+  if (select count(*) from public.hiring_people(50) where distance_band in ('~3 km', '~10 km', (select name from public.place where id = public.brivia_nearest_place(c)))) < 3 then
+    raise exception 'FAIL HS5: the Thane hirers are missing'; end if;
+  if exists (select 1 from public.hiring_people(50) where distance_band ~ '[0-9]+\.[0-9]') then raise exception 'FAIL HS5: an exact distance leaked'; end if;
+  select count(*) into n from public.hiring_people(3);
+  if n <> 3 then raise exception 'FAIL HS5: the limit is not applied (% rows)', n; end if;
 end $$;
-select 'seed-hiring HS1-HS4 (seeded hirers only in the test world) OK';
+select 'seed-hiring HS1-HS5 (seeded hirers only in the test world) OK';
 rollback;

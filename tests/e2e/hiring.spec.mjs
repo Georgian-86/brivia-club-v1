@@ -25,12 +25,16 @@ const ashaHiring = [{
     { id: ROLE_B, title: 'Design Intern', family: 'design', level: 'intern', work_mode: 'onsite', help: 'refer', company: null, about: null, opened_days: 3, fit: 0.2, accepting: true, asked: false },
   ],
 }];
+// D-169: Bilal is hiring too, for a role that does not fit; the Hiring switch shows him after Asha.
+const bilalHiring = { member_id: BILAL, best_title: 'Data Analyst', fits: false, roles: [
+  { id: 'a0a00000-0000-4000-8000-000000000003', title: 'Data Analyst', family: 'data', level: 'entry', work_mode: 'onsite', help: 'hiring', company: null, about: null, opened_days: 1, fit: 0, accepting: true, asked: false }] };
 const seekerIntent = [{ titles: ['Frontend Developer', 'React Developer'], families: ['software'], level: 'mid', work_modes: ['hybrid', 'remote'], visibility: 'hirers', findable: false, private_company: null, consented_at: new Date().toISOString(), updated_at: new Date().toISOString() }];
 const seekerRoutes = () => ({
   'rpc/my_role_intent': { body: seekerIntent },
   'rpc/my_hiring_roles': { body: [] },
-  'rpc/member_hiring': { body: ashaHiring },
+  'rpc/member_hiring': { body: [...ashaHiring, bilalHiring] },
   'rpc/hiring_suggestions': { body: [{ id: ASHA, fit: 0.86, role_title: 'Frontend Developer', distance_band: '~3 km' }] },
+  'rpc/hiring_people': { body: [{ id: ASHA, fit: 0.86, role_title: 'Frontend Developer', distance_band: '~3 km' }, { id: BILAL, fit: 0, role_title: 'Data Analyst', distance_band: '~10 km' }] },
   'rpc/my_sent_role_asks': { body: [] },
   'rpc/member_open_to': { body: [] },
   'rpc/ask_about_role': { body: [{ status: 'sent', remaining: 29, resets_at: null, asks_left: 2 }] },
@@ -111,7 +115,8 @@ try {
     await toggle.click();
     await page.waitForFunction(() => document.querySelector('#hiring-toggle')?.getAttribute('aria-checked') === 'true');
     check(`${w}: the toggle turns the drawer's lens on too`, await page.evaluate(() => document.querySelector('#filter-hiring')?.checked === true));
-    check(`${w}: with the toggle on, only the fitting hirer is in the deck (${await page.locator('#discovery-filter-result').textContent()})`, /Asha/.test(await page.locator('#swipe-name').innerText()) && /^1 person match/.test(await page.locator('#discovery-filter-result').textContent()));
+    await page.waitForFunction(() => /^2 people match/.test(document.querySelector('#discovery-filter-result')?.textContent || ''));
+    check(`${w}: the switch searches everyone hiring (hiring_people), fitting roles first, a non-fitting hirer too (${await page.locator('#discovery-filter-result').textContent()})`, callsTo('hiring_people').length === 1 && /Asha/.test(await page.locator('#swipe-name').innerText()));
     check(`${w}: the deck still never scrolls sideways with the toggle on`, await noSideScroll(page));
     const axeToggle = await axeViolations(page, { include: '[data-view="home"] .home-tools' });
     check(`${w}: the filter button and Hiring switch are axe clean`, axeToggle.length === 0, axeToggle.join(' | '));
@@ -157,7 +162,7 @@ try {
     await page.locator('[data-hiring-row]').click();
     await page.waitForTimeout(300);
     check(`${w}: See them turns on the Hiring lens`, await page.evaluate(() => document.querySelector('#filter-hiring')?.checked === true));
-    check(`${w}: the lens keeps only the fitting hirer`, /Asha/.test(await page.locator('#swipe-name').innerText()));
+    check(`${w}: the lens puts the fitting hirer first`, /Asha/.test(await page.locator('#swipe-name').innerText()));
     await ctx.close();
 
     // The seeker's own profile card.

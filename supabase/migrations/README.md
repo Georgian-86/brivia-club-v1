@@ -1310,3 +1310,11 @@ Then run `supabase/seed/hiring-test-members.sql` (seed README, "Hiring test prof
 `select has_function_privilege('authenticated', 'public.brivia_hiring_seen_by(uuid, uuid)', 'execute');` (f);
 `select public.brivia_hiring_seen_by(null, 'a7e57000-0000-4000-8000-000000000040');` (f once the seed exists).
 
+## 0048
+
+**The Hiring switch finds everyone who is hiring (D-169).** Apply after `0047`. Adds `hiring_people(limit)`
+(authenticated): members with a shown role whom the caller can see, roles that fit first, then nearest, distance band
+only. The client works either way (before 0048 the switch filters the loaded deck only). Verify:
+`select has_function_privilege('authenticated', 'public.hiring_people(int)', 'execute');` (t);
+`select has_function_privilege('anon', 'public.hiring_people(int)', 'execute');` (f).
+
