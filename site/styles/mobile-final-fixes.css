@@ -847,3 +847,8 @@
     letter-spacing:-.45px!important;
   }
 }
+
+/* D-165 (founder, 2026-11-04): on phones the hero's START SWIPING sits a little lower, clear of the top edge. */
+@media (max-width: 700px) {
+  body:not(.auth-page):not(.app-body):not(.careers-page) .hero-nav>.cta-button { transform: translateY(12px); }
+}
