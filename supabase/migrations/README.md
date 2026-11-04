@@ -1338,3 +1338,11 @@ account age (completed, photo unless seeded, confirmed email, no open flag still
 (the account's first day). No grant change. Verify:
 `select pg_get_functiondef('public.brivia_hiring_bar(uuid)'::regprocedure) like '%14 days%';` (f).
 
+## 0052
+
+**Faceless profile photos for the seeded hirers (D-177).** Apply after `0003`. Redefines the
+`profiles_photo_url_storage` check so a seeded row (`is_test`) may also use `/test-avatars/tNN.webp` (photos shipped
+with the site in `site/public/test-avatars`). Real members are unchanged: every client write is still a storage URL in
+their own folder. Then re-run `supabase/seed/hiring-test-members.sql`, which sets the 12 hirers' photos. Verify:
+`select count(*) from public.profiles where is_test and photo_url like '/test-avatars/%';` (12).
+

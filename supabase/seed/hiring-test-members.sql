@@ -103,4 +103,15 @@ begin
   raise notice 'hiring seed: % open seeded roles, % seeded seekers', roles, intents;
 end $$;
 
+-- D-177 (0052): the 12 seeded hirers get a faceless profile photo (site/public/test-avatars). Never a face (D-156).
+-- Skipped quietly before 0052, whose constraint is what allows the path.
+do $$
+begin
+  if pg_get_constraintdef((select oid from pg_constraint where conname = 'profiles_photo_url_storage')) like '%test-avatars%' then
+    update public.profiles p set photo_url = '/test-avatars/t' || lpad(s.n::text, 2, '0') || '.webp'
+      from (values (6), (8), (11), (13), (18), (23), (25), (26), (34), (40), (42), (50)) s(n)
+     where p.id = ('a7e57000-0000-4000-8000-' || lpad(s.n::text, 12, '0'))::uuid and p.is_test;
+  end if;
+end $$;
+
 commit;
