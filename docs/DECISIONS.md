@@ -3230,3 +3230,12 @@ controls (a tester or a seeded test member), never a real member, so no new expo
   `fitCardChips` (app.js) hides any chip that would not show whole (re-run on resize); "You both" chips come first.
 - **Caught up:** `#home-empty-state` is plain `--color-card-paper`, like the member card (no aura).
 - **Proof:** measured at 1800x990, 1440x800, 1280x720, 390x844, 390x664, 360x640; unit 504; e2e deck 201.
+
+## D-160 (2026-11-04): no bluish glows; the Filters drawer on the aura
+
+- **Asked:** "add gradients to it as well, remove the bluish gradient everywhere" (the Discovery filters sheet; the
+  lavender and blue-green patches on Nearby and the sheets).
+- **Done:** every aura gradient takes its colours from tokens, so the two cool ones are warm now: `--aura-lilac` is a
+  soft blush and `--aura-mint` a pale apricot (names kept so no gradient changes shape). The aura is blush, peach, rose
+  and wine everywhere (pages, sheets, Connect's veil). The filters drawer gets `--aura-sheet`, a frosted footer and the
+  shared `--aura-scrim`. Old landing-only styles (style.css bubbles, auth-modal constellation) were not touched.

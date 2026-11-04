@@ -154,3 +154,13 @@ html body.app-body .app-view[data-view="home"]::before {
     radial-gradient(ellipse 54% 42% at 60% 96%, var(--aura-rose), transparent 72%),
     radial-gradient(ellipse 42% 38% at 2% 100%, var(--aura-peach), transparent 72%);
 }
+
+/* D-160: the Discovery filters drawer joins the other sheets: the sheet aura, a frosted footer so the glows carry under
+   the buttons, and the shared warm scrim behind it. */
+html body .discovery-filter-panel { background: var(--aura-sheet) !important; }
+html body .discovery-filter-footer {
+  background: var(--aura-glass) !important;
+  -webkit-backdrop-filter: blur(14px);
+  backdrop-filter: blur(14px);
+}
+html body .discovery-filter-backdrop { background: var(--aura-scrim) !important; }

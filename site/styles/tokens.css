@@ -67,9 +67,11 @@
   /* Aura background (2026-10-24, D-087): a light, Vampr-style mesh of soft pastel glows on a warm near-white,
      tinted to the wine brand. Painted once by aura-theme.css on a fixed layer behind every page. */
   --aura-base: #fbf8f4;
-  --aura-lilac: rgba(208, 192, 242, .55);
+  /* D-160 (founder, 2026-11-04: "remove the bluish gradient everywhere"): the two cool glows are warm now. The names
+     stay so every gradient keeps its shape: "lilac" is a soft blush, "mint" a pale apricot. All warm, wine-friendly. */
+  --aura-lilac: rgba(242, 206, 214, .55);
   --aura-rose: rgba(236, 184, 202, .5);
-  --aura-mint: rgba(188, 228, 216, .45);
+  --aura-mint: rgba(246, 218, 200, .45);
   --aura-peach: rgba(248, 220, 198, .55);
   /* A touch of the brand wine in the aura (founder, 2026-10-25, D-093): low behind the left of the page, faint at the top. */
   --aura-wine: rgba(110, 14, 46, .30);
