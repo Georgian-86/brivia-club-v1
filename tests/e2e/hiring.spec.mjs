@@ -25,7 +25,7 @@ const ashaHiring = [{
     { id: ROLE_B, title: 'Design Intern', family: 'design', level: 'intern', work_mode: 'onsite', help: 'refer', company: null, about: null, opened_days: 3, fit: 0.2, accepting: true, asked: false },
   ],
 }];
-// D-169: Bilal is hiring too, for a role that does not fit; the Hiring switch shows him after Asha.
+// D-174: Bilal is hiring too, for a role that does not fit; the Hiring switch shows him after Asha.
 const bilalHiring = { member_id: BILAL, best_title: 'Data Analyst', fits: false, roles: [
   { id: 'a0a00000-0000-4000-8000-000000000003', title: 'Data Analyst', family: 'data', level: 'entry', work_mode: 'onsite', help: 'hiring', company: null, about: null, opened_days: 1, fit: 0, accepting: true, asked: false }] };
 const seekerIntent = [{ titles: ['Frontend Developer', 'React Developer'], families: ['software'], level: 'mid', work_modes: ['hybrid', 'remote'], visibility: 'hirers', findable: false, private_company: null, consented_at: new Date().toISOString(), updated_at: new Date().toISOString() }];

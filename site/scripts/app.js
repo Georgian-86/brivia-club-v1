@@ -70,6 +70,9 @@ import { pitchLine, deckChips, deckEmptyState, deckFields, bandNote, deckCoverSr
 import { createDeckSwipe, SWIPE, setSwipeCue } from './deck-swipe.js';
 import { maybeShowDeckTutorial } from './deck-tutorial.js';
 import { playDeckIntro, introAllowed } from './deck-intro.js';
+import shuffleWordmark from '../media/assets/brivia-wordmark-gold.webp';
+// D-174: the shuffle's card backs carry the wordmark; fetch it now so the first frame of the shuffle already has it.
+try { const img = new Image(); img.decoding = 'async'; img.src = shuffleWordmark; } catch { /* no Image: no preload */ }
 import { mutualMoment, pitchSentFlight, flipIn, attachCardTilt, shimmerShared, slideModePill, markArrivals, revealOnScroll } from './motion-moments.js';
 import { whyPanelMarkup, whyRow } from './why-panel.js';
 import { chatEmojiCategories } from './chat-emoji-data.js';
@@ -2062,7 +2065,7 @@ const renderPendingRequestTags = () => {
 };
 // D-141: the deck lift. Up to one hiring suggestion in every five cards, never the card already on screen.
 let hiringLifted = false;
-// D-169: turning the Hiring lens on searches for everyone who is hiring (hiring_people, 0048), not only the cards
+// D-174: turning the Hiring lens on searches for everyone who is hiring (hiring_people, 0048), not only the cards
 // already loaded: their cards join the deck right after the card on screen, nearest first. Before 0048 the lens
 // filters the loaded deck only.
 let hiringPeopleLoaded = false;
