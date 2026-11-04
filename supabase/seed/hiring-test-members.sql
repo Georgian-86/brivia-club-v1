@@ -25,12 +25,11 @@ begin
   end if;
 end $$;
 
-create temp table _seed_roles (
-  k int primary key, n int not null, title text not null, family text not null, level text not null,
-  work_mode text not null, help text not null, company text, about text, opened_days int not null
-) on commit drop;
-
-insert into _seed_roles (k, n, title, family, level, work_mode, help, company, about, opened_days) values
+-- Role ids: a7e57000-0000-4000-9000-0000000000KK. Only for a seeded member who exists and is not under review.
+-- One statement each (no temporary tables), so the SQL editor can run the file whole or in parts.
+insert into public.hiring_role as r (id, member_id, title, family, level, work_mode, help, company, about, status,
+                                     paused_by_report, opened_at, expires_at, renewals, closed_at, created_at, updated_at)
+with s (k, n, title, family, level, work_mode, help, company, about, opened_days) as (values
   -- Thane
   (1, 40, 'Robotics Software Engineer', 'software', 'mid', 'onsite', 'hiring', 'Kestrel Motion Works',
       'ROS 2 and C++ for warehouse robots. A small team, with real hardware on the bench every week.', 4),
@@ -63,16 +62,13 @@ insert into _seed_roles (k, n, title, family, level, work_mode, help, company, a
   (13, 13, 'Data Analyst', 'data', 'entry', 'hybrid', 'hiring', 'Ledgerline Fintech',
       'SQL and dashboards for lending risk. Freshers with strong SQL are welcome.', 4),
   (14, 18, 'Site Reliability Engineer', 'software', 'senior', 'remote', 'refer', null,
-      'On-call that is actually calm. I can refer experienced SREs.', 11);
-
--- Role ids: a7e57000-0000-4000-9000-0000000000KK. Only for a seeded member who exists and is not under review.
-insert into public.hiring_role as r (id, member_id, title, family, level, work_mode, help, company, about, status,
-                                     paused_by_report, opened_at, expires_at, renewals, closed_at, created_at, updated_at)
+      'On-call that is actually calm. I can refer experienced SREs.', 11)
+)
 select ('a7e57000-0000-4000-9000-' || lpad(s.k::text, 12, '0'))::uuid, p.id, s.title, s.family, s.level, s.work_mode,
        s.help, s.company, s.about, 'open', false, now() - make_interval(days => s.opened_days),
        now() - make_interval(days => s.opened_days) + interval '30 days', 0, null,
        now() - make_interval(days => s.opened_days), now()
-  from _seed_roles s
+  from s
   join public.profiles p on p.id = ('a7e57000-0000-4000-8000-' || lpad(s.n::text, 12, '0'))::uuid and p.is_test
 on conflict (id) do update
    set title = excluded.title, family = excluded.family, level = excluded.level, work_mode = excluded.work_mode,
@@ -82,21 +78,17 @@ on conflict (id) do update
  where r.member_id = excluded.member_id;
 
 -- Seekers who let hirers find them (the hirer side: post a role as a tester and they appear as suggestions).
-create temp table _seed_intents (
-  n int primary key, titles text[] not null, families text[] not null, level text, work_modes text[] not null,
-  visibility text not null
-) on commit drop;
-insert into _seed_intents (n, titles, families, level, work_modes, visibility) values
+insert into public.role_intent (member_id, titles, families, level, work_modes, visibility, findable, private_company)
+with s (n, titles, families, level, work_modes, visibility) as (values
   (39, array['Robotics Software Engineer'], array['software'], 'mid', array['onsite', 'hybrid'], 'everyone'),
   (41, array['Robotics Engineer', 'Embedded Systems Engineer'], array['software', 'research'], 'entry', array['onsite', 'hybrid'], 'hirers'),
   (10, array['Software Engineer Intern', 'Backend Developer'], array['software'], 'intern', array['onsite', 'hybrid', 'remote'], 'everyone'),
   (35, array['Content Writer', 'Copywriter'], array['content', 'marketing'], 'entry', array['remote'], 'hirers'),
   (27, array['Product Designer', 'UI/UX Designer'], array['design'], 'entry', array['hybrid', 'remote'], 'hirers'),
-  (22, array['Frontend Developer', 'Software Engineer'], array['software'], 'entry', array['hybrid', 'remote'], 'hirers');
-
-insert into public.role_intent (member_id, titles, families, level, work_modes, visibility, findable, private_company)
+  (22, array['Frontend Developer', 'Software Engineer'], array['software'], 'entry', array['hybrid', 'remote'], 'hirers')
+)
 select p.id, s.titles, s.families, s.level, s.work_modes, s.visibility, true, null
-  from _seed_intents s
+  from s
   join public.profiles p on p.id = ('a7e57000-0000-4000-8000-' || lpad(s.n::text, 12, '0'))::uuid and p.is_test
 on conflict (member_id) do update
    set titles = excluded.titles, families = excluded.families, level = excluded.level, work_modes = excluded.work_modes,
