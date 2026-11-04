@@ -3468,3 +3468,18 @@ controls (a tester or a seeded test member), never a real member, so no new expo
   location rules per role, which the page does not carry.
 - **Performance basics:** already in place (hashed `/assets/*` cached immutable, hero poster preloaded, below-fold
   images lazy with sizes). Added a one-day cache with a week of stale-while-revalidate for the icons and OG image.
+
+## D-176 (2026-11-04): Vercel Web Analytics and Speed Insights
+
+- **Asked:** "now add analytics" (Arovas).
+- **Choice:** Vercel Web Analytics (page views, referrers, countries, devices) and Speed Insights (Core Web Vitals),
+  through `@vercel/analytics` and `@vercel/speed-insights`, loaded by `site/scripts/analytics.js` on the five real
+  pages (landing, auth, app, careers, privacy). Picked over Google Analytics because the site is already on Vercel and
+  both are cookieless with a daily-reset visitor hash, so no cookie banner is needed and no third-party ad tracker sees
+  members. GA4 or a product-analytics tool can be added later if per-feature funnels are needed.
+- **Privacy:** `analytics-url.js` drops every query parameter except `view` and the whole hash before an event leaves
+  the page, because sign-in hand-offs carry one-time codes and tokens there (unit `analytics-url.test.mjs`). No custom
+  events, no user ids, nothing from Supabase is sent. The privacy notice names the analytics and Vercel as host; the
+  notice version is unchanged (no new personal data and no new consent).
+- **Needs the dashboard:** both products must be switched on (Speed Insights already was on 2026-11-04; Web Analytics was not) for the project in Vercel (Analytics and Speed Insights
+  tabs), otherwise `/_vercel/insights/*` returns 404 and nothing is counted.

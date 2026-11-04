@@ -7,6 +7,9 @@ Update this file at the end of every session. CLAUDE.md holds the aim; this file
 
 ## 1. What is done
 
+**2026-11-04, D-176:** Vercel Web Analytics + Speed Insights on every real page (`site/scripts/analytics.js`, URLs
+scrubbed by `analytics-url.js`). Both must be enabled in the Vercel project's Analytics and Speed Insights tabs.
+
 **2026-11-04, D-175:** Google Search Console verified by file (`site/public/google4d360d183cb779a9.html`, keep it:
 removing it unverifies the property) and a first SEO pass: `robots.txt`, `sitemap.xml` (public pages only),
 canonical + Open Graph + Twitter tags on `/`, `/auth.html`, `/careers.html`, `/privacy.html`, Organization/WebSite
