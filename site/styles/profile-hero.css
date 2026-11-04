@@ -1,0 +1,166 @@
+/* D-172: the own profile hero's text column (name, work line, area, bio) always fits beside the photo card.
+   Loaded after profile-layout.css and work-identity.css, so these rules win at the same specificity.
+   - The name wraps (balanced) to two lines at most instead of an ellipsis after a few letters; a short name stays on
+     one line.
+   - The work line wraps to two lines inside the column (it was a nowrap line sized to its own text, so it ran under
+     the photo card); the full line stays in its title.
+   - The area is one line; the bio is three lines at most, with an ellipsis (the whole bio is in About below).
+   - One type scale per breakpoint, in proportion to the column. */
+
+body.app-body[data-app-view] .app-view.profile-view[data-view="profile"] .profile-board-content .profile-hero-copy {
+  gap: 0;
+  width: 100%;
+}
+body.app-body[data-app-view] .app-view.profile-view[data-view="profile"] .profile-board-content .profile-hero-copy > * { max-width: 100%; }
+
+/* MEMBER / HIRING */
+body.app-body[data-app-view] .app-view.profile-view[data-view="profile"] .profile-board-content .profile-hero-copy .app-eyebrow {
+  margin: 0 0 var(--space-3);
+  line-height: 1;
+}
+
+/* The name */
+body.app-body[data-app-view] .app-view.profile-view[data-view="profile"] .profile-board-content .profile-hero h1#profile-name {
+  display: -webkit-box;
+  max-width: 100%;
+  margin: 0;
+  overflow: hidden;
+  font-size: clamp(40px, 4.2vw, 64px);
+  line-height: 1.04;
+  letter-spacing: -.02em;
+  white-space: normal;
+  text-overflow: clip;
+  overflow-wrap: break-word;
+  text-wrap: balance;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  padding-bottom: .06em; /* the second line's descenders stay inside the clip */
+}
+
+/* The work line: "[logo] Title at Company" */
+body.app-body[data-app-view] .app-view.profile-view[data-view="profile"] .profile-board-content .profile-hero-copy > #profile-work:not([hidden]) {
+  align-self: stretch;
+  margin: var(--space-3) 0 0;
+  color: color-mix(in srgb, var(--color-cream) 90%, transparent);
+  font-family: var(--font-body);
+  font-size: 15px;
+  font-weight: 500;
+  line-height: 1.4;
+  letter-spacing: .005em;
+}
+body.app-body[data-app-view] .app-view.profile-view[data-view="profile"] .profile-board-content .profile-hero-copy > #profile-work .work-line {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  max-width: 100%;
+}
+body.app-body[data-app-view] .app-view.profile-view[data-view="profile"] .profile-board-content .profile-hero-copy > #profile-work .work-logo {
+  flex: 0 0 16px;
+  width: 16px;
+  height: 16px;
+  margin-top: calc((1.4em - 16px) / 2); /* centred on the first line */
+}
+body.app-body[data-app-view] .app-view.profile-view[data-view="profile"] .profile-board-content .profile-hero-copy > #profile-work .work-text {
+  display: -webkit-box;
+  min-width: 0;
+  overflow: hidden;
+  white-space: normal;
+  overflow-wrap: break-word;
+  text-wrap: pretty;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+}
+
+/* The area */
+body.app-body[data-app-view] .app-view.profile-view[data-view="profile"] .profile-board-content .profile-hero-copy > #profile-location {
+  align-self: stretch;
+  margin: var(--space-2) 0 0;
+  overflow: hidden;
+  font-size: var(--text-20);
+  line-height: 1.3;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* The bio */
+body.app-body[data-app-view] .app-view.profile-view[data-view="profile"] .profile-board-content .profile-hero-copy > #profile-hero-bio:not([hidden]) {
+  display: -webkit-box;
+  max-width: min(44ch, 100%);
+  margin: var(--space-4) 0 0;
+  overflow: hidden;
+  font-size: 18px;
+  line-height: 1.45;
+  white-space: pre-line !important; /* profile-layout.css sets it with !important */
+  overflow-wrap: break-word;
+  text-wrap: pretty;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  line-clamp: 3;
+}
+
+/* ---------- Tablets and phones: the same composition, a slimmer photo card and a type scale for a narrow column ---------- */
+@media (max-width: 780px) {
+  body.app-body[data-app-view] .app-view.profile-view[data-view="profile"] {
+    --frame-w: clamp(112px, 32vw, 160px);
+    --hero-h: calc(var(--frame-h) + 48px);
+  }
+  body.app-body[data-app-view] .app-view.profile-view[data-view="profile"] .profile-board-content .profile-hero {
+    padding: var(--space-5) calc(var(--frame-w) + var(--frame-right) + var(--space-4)) var(--space-5) var(--space-5);
+  }
+  body.app-body[data-app-view] .app-view.profile-view[data-view="profile"] .profile-board-content .profile-hero-copy .app-eyebrow {
+    margin-bottom: var(--space-2);
+    letter-spacing: .22em;
+  }
+  body.app-body[data-app-view] .app-view.profile-view[data-view="profile"] .profile-board-content .profile-hero h1#profile-name {
+    font-size: clamp(24px, 6.8vw, 32px);
+    line-height: 1.06;
+    letter-spacing: -.015em;
+  }
+  body.app-body[data-app-view] .app-view.profile-view[data-view="profile"] .profile-board-content .profile-hero-copy > #profile-work:not([hidden]) {
+    margin-top: var(--space-2);
+    font-size: 13px;
+    line-height: 1.35;
+  }
+  body.app-body[data-app-view] .app-view.profile-view[data-view="profile"] .profile-board-content .profile-hero-copy > #profile-work .work-line { gap: 6px; }
+  body.app-body[data-app-view] .app-view.profile-view[data-view="profile"] .profile-board-content .profile-hero-copy > #profile-work .work-logo {
+    flex-basis: 14px;
+    width: 14px;
+    height: 14px;
+    margin-top: calc((1.35em - 14px) / 2);
+  }
+  body.app-body[data-app-view] .app-view.profile-view[data-view="profile"] .profile-board-content .profile-hero-copy > #profile-location {
+    margin-top: 6px;
+    font-size: var(--text-16);
+  }
+  body.app-body[data-app-view] .app-view.profile-view[data-view="profile"] .profile-board-content .profile-hero-copy > #profile-hero-bio:not([hidden]) {
+    max-width: 100%;
+    margin-top: var(--space-3);
+    font-size: 14px;
+    line-height: 1.42;
+  }
+}
+
+/* Readability on any cover (D-172): a neutral ink shade under the text column only (no maroon wash, D-113), dense
+   enough that cream text keeps 4.5:1 on the lightest covers, fading out before the photo card. A tight shadow keeps
+   the thin Bodoni strokes crisp. */
+body.app-body[data-app-view] .app-view.profile-view[data-view="profile"] .profile-board-content .profile-hero::before {
+  background: linear-gradient(90deg,
+    color-mix(in srgb, var(--color-ink) 80%, transparent) 0%,
+    color-mix(in srgb, var(--color-ink) 68%, transparent) 42%,
+    color-mix(in srgb, var(--color-ink) 28%, transparent) 64%,
+    transparent 84%);
+}
+body.app-body[data-app-view] .app-view.profile-view[data-view="profile"] .profile-board-content .profile-hero-copy {
+  text-shadow: 0 1px 2px color-mix(in srgb, var(--color-ink) 55%, transparent), 0 0 16px color-mix(in srgb, var(--color-ink) 40%, transparent);
+}
+@media (max-width: 780px) {
+  body.app-body[data-app-view] .app-view.profile-view[data-view="profile"] .profile-board-content .profile-hero::before {
+    background: linear-gradient(90deg,
+      color-mix(in srgb, var(--color-ink) 76%, transparent) 0%,
+      color-mix(in srgb, var(--color-ink) 66%, transparent) 52%,
+      color-mix(in srgb, var(--color-ink) 30%, transparent) 70%,
+      transparent 88%);
+  }
+}
