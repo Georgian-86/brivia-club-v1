@@ -3968,3 +3968,13 @@ Pass and Pitch".
   no `brivia-ignition-settled` still-cut hand-over. The landing's intro (`#intro-burst`) keeps the ignition and its music.
 - **Proof:** unit `brivia-ignition.test.mjs` now checks the title is on the landing and the classic loader (not the
   ignition) is on auth and app; screenshots of the landing intro and the auth loader at 390 and 1440 px.
+
+## D-213 (2026-11-05): the landing says what Brivia Club is on first paint; automated visitors skip the intro
+
+Google rejected the OAuth branding again after D-205: "update your home page to clearly outline your application's
+purpose". Its checker loads the page as a first-time visitor, and a first visit opened on the ignition intro (a black
+screen for about 5 seconds), then a hero that only said "the Brivia Club", with the plain description far below. So:
+the hero now carries one plain line ("A networking app that introduces you to people near you who share your
+interests"), the About section (D-205) moves to just after the "Swipe. Match. Build." tagline, the meta description
+says "networking app", and crawlers and automated browsers (navigator.webdriver, bot/headless user agents) skip the
+intro. They get the same page with no animation; people still see the intro on a first visit.

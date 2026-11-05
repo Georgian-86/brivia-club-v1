@@ -32,8 +32,15 @@ export function pickHeroSource(infos) {
 }
 
 // The intro plays once per tab (D-196: each time the site is opened); arriving back from an auth page skips it.
-export function introPlan({ seenBefore = false, fromAuth = false } = {}) {
-  return seenBefore || fromAuth ? 'skip' : 'play';
+export function introPlan({ seenBefore = false, fromAuth = false, automated = false } = {}) {
+  return seenBefore || fromAuth || automated ? 'skip' : 'play';
+}
+
+// D-213: crawlers and automated reviewers (Google's OAuth branding check among them) get the page without the intro
+// title, so the first thing they see is the hero and its plain description. Same content, no animation.
+const BOT_UA = /bot|crawl|spider|slurp|headless|lighthouse|google-inspectiontool|googleother|google-site-verification|apis-google|mediapartners|feedfetcher/i;
+export function isAutomatedVisitor({ webdriver = false, userAgent = '' } = {}) {
+  return Boolean(webdriver) || BOT_UA.test(String(userAgent));
 }
 
 // Drops the `.skeleton` shimmer from an image's wrapper once the image has loaded (or failed, so it never shimmers forever).

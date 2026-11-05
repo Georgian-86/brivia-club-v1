@@ -17,7 +17,7 @@ import { initGuidedSignup } from './signup-screens.js';
 import { signupFlowMode, resumeScreen } from './signup-flow.js';
 import { defaultCoverUrl, normalizeCoverUrl } from './cover-assets.js';
 import { DEFAULT_COVER_KEY, presetCoverPath, presetCoverStoredPath } from './preset-cover.js';
-import { motionAllowed, introPlan, pickHeroSource, markLoaded, INTRO_CAP_MS, INTRO_HOLD_MS } from './landing-motion.js';
+import { motionAllowed, introPlan, isAutomatedVisitor, pickHeroSource, markLoaded, INTRO_CAP_MS, INTRO_HOLD_MS } from './landing-motion.js';
 import { SOUND_LIMIT_MS, SOUND_STORAGE_KEY, soundPreference, soundPlan, isUnlockEvent, barsToSchedule } from './landing-sound.js';
 import { IGNITION, IGNITION_CUE, createIgnitionSound } from './brivia-ignition.js';
 import heroSoundtrackUrl from '../media/audio/hero-soundtrack.m4a?url';
@@ -68,7 +68,8 @@ try {
   window.sessionStorage.removeItem('brivia-skip-intro-once');
   // D-196: the intro plays each time the site is opened in a new tab (sessionStorage), not once ever.
   const seenBefore = window.sessionStorage.getItem('brivia-intro-seen') === 'true';
-  plan = introPlan({ seenBefore, fromAuth });
+  const automated = isAutomatedVisitor({ webdriver: navigator.webdriver, userAgent: navigator.userAgent });
+  plan = introPlan({ seenBefore, fromAuth, automated });
   if (plan === 'skip' || fromAuth) window.sessionStorage.setItem('brivia-intro-seen', 'true');
 } catch {}
 if (!landingMotion) plan = 'skip';
