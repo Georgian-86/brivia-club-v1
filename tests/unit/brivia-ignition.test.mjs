@@ -4,7 +4,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { IGNITION, IGNITION_CUE, IGNITION_WORD, ignitionMarkup, lettersDone, renderIgnitionCue, createIgnitionSound } from '../../site/scripts/brivia-ignition.js';
-import { INTRO_CAP_MS } from '../../site/scripts/landing-motion.js';
+import { INTRO_CAP_MS, INTRO_HOLD_MS } from '../../site/scripts/landing-motion.js';
 
 const css = readFileSync(new URL('../../site/styles/ignition.css', import.meta.url), 'utf8');
 const prop = (name) => Number((css.match(new RegExp(`--ign-${name}:\\s*([\\d.]+)s`)) || [])[1]);
@@ -24,7 +24,8 @@ test('the CSS runs on the same clock as IGNITION (the music is timed from these)
 test('the order: light, ignition, streak, then the name from the centre; all inside the landing cap', () => {
   assert.ok(IGNITION.ignite < IGNITION.letters.at && IGNITION.letters.at < IGNITION.reveal, 'letters start as the streak is still opening');
   assert.ok(lettersDone() < IGNITION.total, `name complete at ${lettersDone()} s, before the ${IGNITION.total} s pass ends`);
-  assert.ok(IGNITION.total * 1000 + 450 <= INTRO_CAP_MS, 'the title and its fade fit the 2.5 s intro cap');
+  assert.ok(lettersDone() * 1000 + 450 <= INTRO_HOLD_MS, 'D-201: the name is complete and has held before the landing fades in');
+  assert.ok(INTRO_HOLD_MS + 450 <= INTRO_CAP_MS);
 });
 
 test('the markup: one letter span per character, centre first, aria-hidden, no video', () => {

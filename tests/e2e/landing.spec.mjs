@@ -146,7 +146,7 @@ try {
       await context.close();
     }
 
-    // 2. Intro (D-196): opening the site plays it; it holds about 5.6 s and is gone within 6600 ms; a reload in the same
+    // 2. Intro (D-196): opening the site plays it; it holds about 3.2 s and is gone within 4100 ms (D-201); a reload in the same
     //    tab never replays it (a new tab would).
     {
       const context = await newContext(browser, viewport);
@@ -158,9 +158,9 @@ try {
       const bodyLocked = await page.evaluate(() => document.body.classList.contains('intro-active'));
       const stored = await page.evaluate(() => { try { return sessionStorage.getItem('brivia-intro-seen'); } catch { return null; } });
       console.log(`INFO ${label}: first-visit intro present at DOMContentLoaded=${introSeenAtStart}, gone at ${goneAt} ms`);
-      await check(`${label}: intro holds at least 5 s and is gone within 6600 ms`, () => {
+      await check(`${label}: intro holds at least 3 s and is gone within 4100 ms`, () => {
         assert.equal(introSeenAtStart, true, 'a first visit should start with the intro');
-        assert.ok(goneAt !== null && goneAt >= 5000 && goneAt <= 6600, `intro gone at ${goneAt} ms`);
+        assert.ok(goneAt !== null && goneAt >= 3000 && goneAt <= 4100, `intro gone at ${goneAt} ms`);
         assert.equal(bodyLocked, false, 'body.intro-active still set');
         assert.equal(stored, 'true', 'brivia-intro-seen not stored for this tab');
       });
@@ -187,8 +187,8 @@ try {
       await page.waitForFunction(() => window.__introGoneAt !== null, null, { timeout: 8000 }).catch(() => {});
       const goneAt = await page.evaluate(() => window.__introGoneAt);
       console.log(`INFO ${label}: playing-video intro gone at ${goneAt} ms`);
-      await check(`${label}: a playing intro holds at least 5 s and is gone by the 6500 ms cap (6600 ms)`, () => {
-        assert.ok(goneAt !== null && goneAt >= 5000 && goneAt <= 6600, `gone at ${goneAt} ms`);
+      await check(`${label}: a playing intro holds at least 3 s and is gone by the 4000 ms cap (4100 ms)`, () => {
+        assert.ok(goneAt !== null && goneAt >= 3000 && goneAt <= 4100, `gone at ${goneAt} ms`);
       });
       await context.close();
     }

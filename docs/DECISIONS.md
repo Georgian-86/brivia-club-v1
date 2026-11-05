@@ -3824,3 +3824,10 @@ restriction like this". Supersedes D-199's year: the end date has no upper limit
 has no lower limit in the picker. What remains: the end date is on or after the start date, the end comes after the
 start, and a published event must not have ended.
 
+## D-201 (2026-11-05): a shorter intro, about 3.2 s
+
+Founder: "reduce 2-3 secs time from intro video before landing page". Supersedes D-196's 5.6 s hold. The ignition draws
+THE BRIVIA CLUB completely by 2.67 s (`lettersDone`); the name now holds about half a second and the landing fades in
+from 3.2 s (`INTRO_HOLD_MS`, was 5600), with the hard cap at 4.0 s (`INTRO_CAP_MS`, was 6500). The ignition animation
+and its sound are unchanged; the fade simply comes sooner. It still plays on every open (once per tab, D-196).
+

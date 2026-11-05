@@ -91,7 +91,7 @@ if (introBurst && plan === 'play') {
   introClock.start = performance.now();
   introClock.active = true;
   // The title is drawn by CSS from the first frame; it holds for a moment on the name, then fades.
-  // D-196: the name holds on screen until INTRO_HOLD_MS (about 5.6 s), then the landing fades in.
+  // D-196: the name holds on screen until INTRO_HOLD_MS (about 3.2 s, D-201), then the landing fades in.
   window.setTimeout(() => finishIntro(), INTRO_HOLD_MS);
   introSkip?.addEventListener('click', () => finishIntro());
   // The cap counts from navigation start (not from when this script ran) and leaves room for the 120 ms fade.
