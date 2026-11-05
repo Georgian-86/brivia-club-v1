@@ -93,3 +93,16 @@ test('pickHeroSource prefers a hardware (power-efficient) smooth decode over a s
   // power-efficient but not smooth never beats smooth
   assert.equal(pickHeroSource([av1Soft, { supported: true, smooth: false, powerEfficient: true }]), 0);
 });
+
+test('introPlan skips for automated visitors (D-213)', () => {
+  assert.equal(introPlan({ seenBefore: false, fromAuth: false, automated: true }), 'skip');
+});
+
+test('isAutomatedVisitor spots webdriver and crawler user agents, not people', async () => {
+  const { isAutomatedVisitor } = await import('../../site/scripts/landing-motion.js');
+  assert.equal(isAutomatedVisitor({ webdriver: true, userAgent: 'Mozilla/5.0' }), true);
+  assert.equal(isAutomatedVisitor({ userAgent: 'Mozilla/5.0 (compatible; Googlebot/2.1)' }), true);
+  assert.equal(isAutomatedVisitor({ userAgent: 'Mozilla/5.0 HeadlessChrome/130.0' }), true);
+  assert.equal(isAutomatedVisitor({ userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0) Safari/604.1' }), false);
+  assert.equal(isAutomatedVisitor({ userAgent: 'Mozilla/5.0 (Windows NT 10.0) Chrome/130.0 Safari/537.36' }), false);
+});

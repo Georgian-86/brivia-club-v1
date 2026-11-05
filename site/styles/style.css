@@ -563,3 +563,6 @@ footer.site-footer{display:block!important;background:#1d1d1f;color:#fff;padding
 .about-body h3{margin:34px 0 12px;font-size:15px;letter-spacing:.06em;text-transform:uppercase}
 .about-body a{color:#8d301b;text-decoration:underline}
 @media(max-width:700px){.about-section h2{letter-spacing:-1.5px}.about-body p{font-size:16px}}
+/* D-213: one plain line under the wordmark saying what the app is, visible on first paint. */
+.hero .hero-purpose{max-width:520px;margin:0;padding:0 24px;color:#fff;text-align:center;font-size:clamp(15px,1.4vw,19px);line-height:1.45;text-shadow:0 1px 14px rgba(0,0,0,.55)}
+.hero .hero-purpose a{color:#fff;text-decoration:underline;text-underline-offset:3px;white-space:nowrap}

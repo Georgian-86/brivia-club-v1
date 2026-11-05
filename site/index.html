@@ -7,7 +7,7 @@
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
     <meta name="theme-color" content="#ffffff" />
-    <meta name="description" content="Brivia Club: find the people near you who love what you love, and the rare people far away who are worth the distance." />
+    <meta name="description" content="Brivia Club is a networking app that introduces you to people near you who share your interests, and to people far away when the match is strong. Connections open only when both people agree." />
     <title>Brivia Club · Swipe, match, build</title>
     <link rel="canonical" href="https://thebriviaclub.live/" />
     <meta property="og:type" content="website" />
@@ -82,7 +82,8 @@
           var reduced = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
           var saveData = !!(navigator.connection && navigator.connection.saveData);
           var slow = !!(navigator.connection && /^(slow-2g|2g)$/.test(navigator.connection.effectiveType || ''));
-          if (seen || fromAuth || reduced || saveData || slow) document.documentElement.classList.add('no-intro');
+          var bot = !!navigator.webdriver || /bot|crawl|spider|slurp|headless|lighthouse|google-inspectiontool|googleother|google-site-verification|apis-google|mediapartners|feedfetcher/i.test(navigator.userAgent || '');
+          if (seen || fromAuth || reduced || saveData || slow || bot) document.documentElement.classList.add('no-intro');
         } catch (e) {}
       })();
     </script>
@@ -128,6 +129,7 @@
         <div class="hero-video-overlay" aria-hidden="true"></div>
         <div class="hero-copy">
           <h1 class="brand-wordmark"><span>the</span> <strong>Brivia Club</strong></h1>
+          <p class="hero-purpose">A networking app that introduces you to people near you who share your interests. <a href="#about">How it works</a></p>
         </div>
       </section>
 
@@ -136,6 +138,18 @@
         <!--
           <span class="services-scroll-hint">SCROLL TO EXPLORE ↓</span>
         -->
+      </section>
+
+      <!-- What the app is and what it does with Google sign-in, in plain words (Google OAuth branding review). -->
+      <section class="about-section" id="about" aria-labelledby="about-title">
+        <p class="section-eyebrow">ABOUT</p>
+        <h2 id="about-title">What Brivia Club is.</h2>
+        <div class="about-body">
+          <p>Brivia Club is a networking app that introduces you to people who care about the same things you do, starting with the people near you. You pick your interests and give more weight to the ones that matter most. We then show you members with similar interests in your neighbourhood first, then your city, then your region.</p>
+          <p>You can also search for anyone, anywhere, and send them a request. A conversation only opens when both people agree. We never show your exact location, only a rounded distance. Members must be 18 or older.</p>
+          <h3>Signing in with Google</h3>
+          <p>You can create an account with your email or with your Google account. If you choose Google, Google shares only your name, email address and profile picture with us, and we use them to set up your Brivia Club account. We do not post to your Google account or read anything else from it. <a href="/privacy.html#google">Read our privacy policy</a>.</p>
+        </div>
       </section>
 
       <section class="showreel-section" id="showreel" aria-labelledby="showreel-title">
@@ -327,17 +341,6 @@
         </div>
       </section>
 
-      <!-- What the app is and what it does with Google sign-in, in plain words (Google OAuth branding review). -->
-      <section class="about-section" id="about" aria-labelledby="about-title">
-        <p class="section-eyebrow">ABOUT</p>
-        <h2 id="about-title">What Brivia Club is.</h2>
-        <div class="about-body">
-          <p>Brivia Club is a networking app that introduces you to people who care about the same things you do, starting with the people near you. You pick your interests and give more weight to the ones that matter most. We then show you members with similar interests in your neighbourhood first, then your city, then your region.</p>
-          <p>You can also search for anyone, anywhere, and send them a request. A conversation only opens when both people agree. We never show your exact location, only a rounded distance. Members must be 18 or older.</p>
-          <h3>Signing in with Google</h3>
-          <p>You can create an account with your email or with your Google account. If you choose Google, Google shares only your name, email address and profile picture with us, and we use them to set up your Brivia Club account. We do not post to your Google account or read anything else from it. <a href="/privacy.html#google">Read our privacy policy</a>.</p>
-        </div>
-      </section>
     </main>
 
     <footer class="site-footer" id="site-footer">
