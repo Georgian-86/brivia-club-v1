@@ -235,6 +235,19 @@ try {
     const mine = await page.locator('#event-detail').innerText();
     check(`${w}: View event opens it with the organiser's tools`, /Bangalore Chess Meetup/.test(mine) && /0 of 30 registered/.test(mine) && /Edit event/i.test(mine) && /Cancel event/i.test(mine));
     check(`${w}: the new event is on Explore`, await page.locator('.event-card[data-event-id="m-1"]').count() === 1);
+    // D-203: a gallery photo opens full screen; arrows move between photos; Escape closes and gives focus back.
+    await page.locator('#event-detail [data-event-photo="0"]').click();
+    await page.waitForSelector('dialog.photo-viewer[open]');
+    check(`${w}: a gallery photo opens full screen`, /1 \/ 2/.test(await page.locator('.photo-viewer-count').innerText()));
+    await page.keyboard.press('ArrowRight');
+    check(`${w}: the arrow key shows the next photo`, /2 \/ 2/.test(await page.locator('.photo-viewer-count').innerText()));
+    const axeViewer = await axeViolations(page, { include: 'dialog.photo-viewer' });
+    check(`${w}: axe on the photo viewer`, axeViewer.length === 0, JSON.stringify(axeViewer));
+    check(`${w}: the photo fits the screen`, await page.evaluate(() => { const r = document.querySelector('dialog.photo-viewer img').getBoundingClientRect(); const w = document.documentElement.clientWidth; const b = [...document.querySelectorAll('.photo-viewer-btn')].every((x) => x.getBoundingClientRect().right <= w); return b && r.top >= 0 && r.bottom <= innerHeight && r.left >= 0 && r.right <= w; }));
+    await shot(page, `photo-viewer-${w}.png`);
+    await page.keyboard.press('Escape');
+    await page.waitForFunction(() => !document.querySelector('dialog.photo-viewer'));
+    check(`${w}: Escape closes it and focus goes back to the photo`, await page.evaluate(() => document.activeElement?.matches('[data-event-photo="0"]')));
     const axeMine = await axeViolations(page, { include: '#event-detail' });
     check(`${w}: axe on the organiser's drawer`, axeMine.length === 0, JSON.stringify(axeMine));
     await shot(page, `organiser-drawer-${w}.png`);

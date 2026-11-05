@@ -262,6 +262,12 @@ export const startAppStub = async ({ port, state = {}, deckRows = defaultDeckRow
       // D-138 (0034): my_notifications_v2 adds place_name; st.notificationsV1Only answers it as "not found" (before 0034).
       // D-151 (0043): my_notifications_v3 adds post_id, comment_id, snippet, post_image_url; st.notificationsV2Only
       // (or V1Only) answers it as "not found" (before 0043).
+      // D-203 (0060): my_notifications_v4 adds event_id and event_image_url; st.notificationsV3Only (or an older flag)
+      // answers it as "not found" (before 0060).
+      if (pathName === '/rest/v1/rpc/my_notifications_v4') {
+        if (st.notificationsV1Only || st.notificationsV2Only || st.notificationsV3Only || !st.notifications) return json(404, { code: 'PGRST202', message: 'Could not find the function' });
+        return json(200, st.notifications);
+      }
       if (pathName === '/rest/v1/rpc/my_notifications_v3') {
         if (st.notificationsV1Only || st.notificationsV2Only || !st.notifications) return json(404, { code: 'PGRST202', message: 'Could not find the function' });
         return json(200, st.notifications);

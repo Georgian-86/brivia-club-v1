@@ -3848,3 +3848,18 @@ same holds for many Indian districts.
   while the founder asked for all cities; OpenStreetMap covers every country and level and grows only with real use.
 - Applies to every city picker (Create Event, signup, guided setup, Edit profile), since they share `searchPlaces`.
 
+## D-203 (2026-11-05): gallery photos open full screen; organisers hear about registrations
+
+Founder: "user must be able to open these images from event's gallery and when someone registers in user's event, the
+user may get a notification".
+- **Gallery:** each photo in an event's drawer is a button that opens a full-screen viewer (`photo-viewer.js`): a modal
+  dialog on a solid wine-black background, the photo fitted to the screen, previous/next buttons, arrow keys and
+  swipe, "2 / 3", Escape or a tap outside the photo closes it and focus returns to the photo. No fade, so it is solid
+  from the first frame.
+- **Registrations (0060):** a trigger on `event_rsvp` writes an `event_registered` notification for the organiser when a
+  registration becomes confirmed: a free seat at once, a paid one only when the payment is confirmed (a held seat is
+  not a registration yet). Never their own, never across a block or worlds; one per member and event; cancelling
+  removes it while unread. The panel groups them per event with the poster ("Ravi and Asha registered for Goa
+  Buildathon"); tapping opens Explore on that event and marks them read. The organiser's devices get a web push
+  (`push-notify`, sent when the registrant's app confirms the seat) and an open tab shows a toast.
+

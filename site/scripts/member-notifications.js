@@ -18,6 +18,8 @@ export const normalizeNotification = (row = {}) => ({
   commentId: row.comment_id ? String(row.comment_id) : '',
   snippet: String(row.snippet || '').trim(),
   postImage: row.post_image_url || '',
+  eventId: row.event_id ? String(row.event_id) : '',
+  eventImage: row.event_image_url || '',
   createdAt: row.created_at || null,
   readAt: row.read_at || null,
   dismissedAt: row.dismissed_at || null,
@@ -133,3 +135,30 @@ export const postNotificationCopy = (g) => {
   const who = people.length === 1 ? lead : people.length === 2 ? `${lead} and ${firstName(people[1]?.name)}` : `${lead} and ${people.length - 1} others`;
   return { title: `${who} liked your note`, line: '' };
 };
+
+// D-203 (0060): registrations for my events, one row per event, newest first.
+// [{ key, type, eventId, eventImage, title, people: [{ id, name, photoUrl }], createdAt, unread, ids }]
+export const EVENT_TYPES = new Set(['event_registered']);
+export const groupEventNotifications = (list = [], now = Date.now(), days = 7) => {
+  const groups = new Map();
+  for (const n of list) {
+    if (!EVENT_TYPES.has(n?.type) || !n.eventId || n.dismissedAt) continue;
+    if (n.createdAt && now - new Date(n.createdAt).getTime() > days * 86400000) continue;
+    const key = `e:${n.eventId}`;
+    const g = groups.get(key) || { key, type: n.type, eventId: n.eventId, eventImage: n.eventImage, title: n.snippet, people: [], createdAt: n.createdAt, unread: false, ids: [] };
+    if (!g.people.some((p) => p.id === n.sourceId)) g.people.push({ id: n.sourceId, name: n.name, photoUrl: n.photoUrl });
+    if (String(n.createdAt) > String(g.createdAt)) g.createdAt = n.createdAt;
+    g.unread ||= !n.readAt;
+    g.ids.push(n.id);
+    groups.set(key, g);
+  }
+  return [...groups.values()].sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)));
+};
+// "Asha registered for Goa Buildathon" · "Asha and Ravi registered…" · "Asha and 3 others registered…"
+export const eventNotificationCopy = (g) => {
+  const people = g?.people || [];
+  const lead = firstName(people[0]?.name);
+  const who = people.length <= 1 ? lead : people.length === 2 ? `${lead} and ${firstName(people[1]?.name)}` : `${lead} and ${people.length - 1} others`;
+  return { title: `${who} registered for ${g?.title || 'your event'}`, line: 'Tap to see your event.' };
+};
+

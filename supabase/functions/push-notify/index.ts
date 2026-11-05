@@ -46,7 +46,7 @@ Deno.serve(async (req) => {
     .update({ push_sent_at: new Date().toISOString() })
     .is('push_sent_at', null).is('read_at', null).gte('created_at', since)
     .or(`user_id.eq.${uid},source_user_id.eq.${uid}`)
-    .select('id,user_id,source_user_id,band,notification_type,place_name,post_id,snippet');
+    .select('id,user_id,source_user_id,band,notification_type,place_name,post_id,snippet,event_id');
   if (claimError) return json(500, { error: 'claim' });
   if (!claimed?.length) return json(200, { sent: 0 });
 
@@ -64,7 +64,14 @@ Deno.serve(async (req) => {
     const who = nameOf.get(n.source_user_id) || { name: 'A Brivia member', photo_url: null };
     const first = String(who.name || '').trim().split(/\s+/)[0] || 'A Brivia member';
     const post = n.notification_type === 'post_like' || n.notification_type === 'post_comment';
-    const payload = JSON.stringify(post ? {
+    // D-203 (0060): someone registered for the member's event.
+    const registered = n.notification_type === 'event_registered';
+    const payload = JSON.stringify(registered ? {
+      id: n.id, tag: n.id, type: n.notification_type,
+      title: `${first} registered for ${n.snippet || 'your event'}`,
+      body: 'Open Brivia to see who is coming.',
+      url: `/app.html?view=events&event=${n.event_id}&notification=${n.id}`,
+    } : post ? {
       id: n.id, tag: n.id, type: n.notification_type,
       title: n.notification_type === 'post_like' ? `${first} liked your note` : `${first} commented on your note`,
       body: n.notification_type === 'post_comment' && n.snippet ? `“${n.snippet}”` : 'Open Brivia to see it.',

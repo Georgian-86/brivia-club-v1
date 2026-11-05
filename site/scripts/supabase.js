@@ -473,8 +473,15 @@ export const myNearbyMatches = () => rpcCall('my_nearby_matches');
 // D-134 (0030): one notification store for every device, the radius notifications use, and web push subscriptions.
 // D-138 (0034): v2 adds the area each crossing happened in; before 0034 is applied, the 0030 function answers.
 // D-151 (0043): v3 adds likes and comments on my notes (post_id, comment_id, snippet, post_image_url).
+// D-203 (0060): v4 adds registrations for my events (event_id, event_image_url).
 let notificationsV3Missing = false;
+let notificationsV4Missing = false;
 export const myNotifications = async () => {
+  if (!notificationsV4Missing) {
+    const v4 = await rpcCall('my_notifications_v4');
+    if (!v4.error || !isMissingFunction(v4.error)) return v4;
+    notificationsV4Missing = true;
+  }
   if (!notificationsV3Missing) {
     const v3 = await rpcCall('my_notifications_v3');
     if (!v3.error || !isMissingFunction(v3.error)) return v3;

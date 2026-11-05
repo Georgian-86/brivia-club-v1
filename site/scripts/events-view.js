@@ -441,7 +441,7 @@ export const eventDetailMarkup = (event, { imageSrc = '', friends = [], organize
   ${event.description ? `<p class="event-detail-copy">${escapeHtml(event.description)}</p>` : ''}
   ${brochure}
   ${event.tags.length ? `<ul class="event-tags" aria-label="Tags">${event.tags.map((t) => `<li>${escapeHtml(t)}</li>`).join('')}</ul>` : ''}
-  ${gallery.length ? `<ul class="event-gallery" aria-label="Photos">${gallery.map((src) => `<li><img src="${escapeHtml(src)}" alt="" loading="lazy" decoding="async" /></li>`).join('')}</ul>` : ''}
+  ${gallery.length ? `<ul class="event-gallery" aria-label="Photos">${gallery.map((src, i) => `<li><button type="button" class="event-gallery-open" data-event-photo="${i}" aria-label="Open photo ${i + 1} of ${gallery.length}"><img src="${escapeHtml(src)}" alt="" loading="lazy" decoding="async" /></button></li>`).join('')}</ul>` : ''}
   ${live || event.status === 'cancelled' ? registrationMarkup(preview ? { ...event, myStatus: null } : event, friends) : ''}
   ${live ? `<div class="event-detail-row event-companion-row-toggle">
     <div><p class="event-companion-title" id="event-companion-label">Looking for a companion?</p><p class="event-companion-copy" id="event-companion-copy">Going solo? Find someone attending the same event and make it a shared experience. Only people who also turn this on see you.</p></div>

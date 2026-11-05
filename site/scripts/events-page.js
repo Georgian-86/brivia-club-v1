@@ -14,6 +14,7 @@ import {
 } from './events-view.js';
 import { eventImageSrc } from './event-assets.js';
 import { openCheckout } from './payment-checkout.js';
+import { openPhotoViewer } from './photo-viewer.js';
 
 export const createEventsPage = ({ root, api, safeImage, toast, isMissing, sendHello, openChatWith, signedIn, composer = null, memberId = () => '', openCompanions = null }) => {
   if (!root) return { show() {} };
@@ -184,6 +185,7 @@ export const createEventsPage = ({ root, api, safeImage, toast, isMissing, sendH
   // when the payment was confirmed). The toast only promises an email the server says it sent.
   const celebrate = async (event, { paid = false, emailed = null } = {}) => {
     api.playTicket?.();
+    api.sendPendingPush?.();   // D-203: the organiser hears about the registration on their devices (0060's trigger)
     let sent = emailed;
     if (!paid && api.sendEventTicket) {
       const { data } = await api.sendEventTicket(event.id);
@@ -355,6 +357,13 @@ export const createEventsPage = ({ root, api, safeImage, toast, isMissing, sendH
     const card = t.closest('.event-card');
     if (card && grid.contains(card) && !t.closest('button:not(.event-open)')) { openSheet(card.dataset.eventId); return; }
     if (t.closest('[data-event-close]')) { closeSheet(); return; }
+    // D-203: a gallery photo opens full screen.
+    const photo = t.closest('[data-event-photo]');
+    if (photo && panel.contains(photo)) {
+      const srcs = [...panel.querySelectorAll('[data-event-photo] img')].map((im) => im.currentSrc || im.src);
+      openPhotoViewer(srcs, Number(photo.dataset.eventPhoto) || 0, { label: `Photos of ${byId(state.selectedId)?.title || 'the event'}` });
+      return;
+    }
     const event = byId(state.selectedId);
     if (!event) return;
     if (t.closest('[data-event-going]')) { changeRsvp(event, true, null); return; }

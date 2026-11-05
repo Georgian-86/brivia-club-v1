@@ -47,7 +47,7 @@ import { createCrossingPaths, isQuietHour, alertHeadline, alertDetail, alertToas
 import '../styles/crossing-paths.css';
 import { createNearbyPage } from './nearby-page.js';
 import { COPY as NEARBY_COPY, crossingCopy } from './nearby-view.js';
-import { createMemberNotifications, groupPostNotifications, postNotificationCopy, POST_TYPES } from './member-notifications.js';
+import { createMemberNotifications, groupPostNotifications, postNotificationCopy, POST_TYPES, groupEventNotifications, eventNotificationCopy, EVENT_TYPES } from './member-notifications.js';
 import { workMarkup, workLine, normalizeWork, mergeCompanies, cleanTitle, cleanCompanyName, INDUSTRIES, logoFileToWebp, ORG_ICON, monogramMarkup } from './work-identity.js';
 import { createSoundKit, soundEnabled, setSoundEnabled, soundVolume, setSoundVolume, interactionSoundEnabled, setInteractionSoundEnabled, pushSoundEnabled, setPushSoundEnabled } from './notify-sound.js';
 import { createWebPush, pushSupport, PUSH_COPY } from './web-push.js';
@@ -586,10 +586,13 @@ const renderNotifications = () => {
   // D-151: likes and comments on my notes (0043), one row per note's likes and one per comment.
   const postGroups = groupPostNotifications(memberNotes.list()).slice(0, 12);
   const postUnread = postGroups.filter((g) => g.unread).length;
+  // D-203: registrations for my events (0060), one row per event.
+  const eventGroups = groupEventNotifications(memberNotes.list()).slice(0, 12);
+  const eventUnread = eventGroups.filter((g) => g.unread).length;
   const hiringHtml = hiring?.notificationHtml() || '';
   const hiringUnread = hiring?.notificationCount() || 0;
-  const unreadCount = (enabled ? notifications.filter((notification) => !notification.read).length : 0) + requestCount + nearbyCount + companionUnseen.length + nearbyMatchUnseen.length + crossedUnread + hiringUnread + postUnread;
-  const anything = enabled || requestCount || nearbyAlerts.length || companionUnseen.length || nearbyMatchUnseen.length || crossedRows.length || hiringHtml || postGroups.length;
+  const unreadCount = (enabled ? notifications.filter((notification) => !notification.read).length : 0) + requestCount + nearbyCount + companionUnseen.length + nearbyMatchUnseen.length + crossedUnread + hiringUnread + postUnread + eventUnread;
+  const anything = enabled || requestCount || nearbyAlerts.length || companionUnseen.length || nearbyMatchUnseen.length || crossedRows.length || hiringHtml || postGroups.length || eventGroups.length;
   button.toggleAttribute('hidden', !anything);
   if (!anything) closeNotificationPanel();
   badge.textContent = unreadCount > 99 ? '99+' : String(unreadCount);
@@ -630,7 +633,7 @@ const renderNotifications = () => {
     const title = person?.name || 'a Brivia member';
     const messageLabel = `${group.count} message${group.count === 1 ? '' : 's'} from ${title}`;
     return `<button type="button" class="notification-item is-unread" data-notification-person="${escapeHtml(group.personId)}">${renderAvatar(person, 'notification-avatar')}<span class="notification-copy"><strong>${escapeHtml(messageLabel)}</strong></span><time>${escapeHtml(formatNotificationTime(group.latest.createdAt))}</time></button>`;
-  }).join('') : ((requestCount || nearbyAlerts.length || companionUnseen.length || nearbyMatchUnseen.length || crossedRows.length || hiringHtml || postGroups.length) ? '' : `<div class="notification-empty"><p>You are all caught up.</p>${settingsAction}</div>`);
+  }).join('') : ((requestCount || nearbyAlerts.length || companionUnseen.length || nearbyMatchUnseen.length || crossedRows.length || hiringHtml || postGroups.length || eventGroups.length) ? '' : `<div class="notification-empty"><p>You are all caught up.</p>${settingsAction}</div>`);
   const companionHtml = companionUnseen.map((match) => {
     const person = findPersonById(match.otherId) || { name: match.otherName, image: match.otherPhotoUrl };
     return `<section class="notification-companion is-unread" aria-label="${escapeHtml(`You and ${match.otherName} are going together to ${match.eventTitle}`)}">`
@@ -664,7 +667,18 @@ const renderNotifications = () => {
       + `<span class="notification-nearby-copy"><strong>${escapeHtml(copy.title)}</strong>${copy.line ? `<span>${escapeHtml(copy.line)}</span>` : ''}<small>${escapeHtml(formatNotificationTime(g.createdAt))}</small></span>`
       + `${thumb ? `<span class="notification-post-thumb">${thumb}</span>` : ''}</button>`;
   }).join('');
-  list.innerHTML = requestsHtml + hiringHtml + postHtml + crossedHtml + nearbyMatchHtml + companionHtml + nearbyHtml + messagesHtml;
+  const ticketIcon = '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2.5 5.5V4h11v1.5a1.5 1.5 0 0 0 0 3V10h-11V8.5a1.5 1.5 0 0 0 0-3Z"/><path d="M9.5 4v6" stroke-dasharray="1.2 1.2"/></svg>';
+  const eventHtml = eventGroups.map((g) => {
+    const copy = eventNotificationCopy(g);
+    const lead = g.people[0] || {};
+    const person = findPersonById(lead.id) || { name: lead.name, image: lead.photoUrl };
+    const thumb = g.eventImage && isStorageImageUrl(g.eventImage) ? `<img src="${escapeHtml(g.eventImage)}" alt="" loading="lazy" decoding="async" />` : '';
+    return `<button type="button" class="notification-post${g.unread ? ' is-unread' : ''}" data-event-note="${escapeHtml(g.key)}" aria-label="${escapeHtml(copy.title)}">`
+      + `<span class="notification-nearby-face">${renderAvatar(person, 'notification-avatar')}<i class="notification-post-kind is-event">${ticketIcon}</i></span>`
+      + `<span class="notification-nearby-copy"><strong>${escapeHtml(copy.title)}</strong><span>${escapeHtml(copy.line)}</span><small>${escapeHtml(formatNotificationTime(g.createdAt))}</small></span>`
+      + `${thumb ? `<span class="notification-post-thumb">${thumb}</span>` : ''}</button>`;
+  }).join('');
+  list.innerHTML = requestsHtml + hiringHtml + eventHtml + postHtml + crossedHtml + nearbyMatchHtml + companionHtml + nearbyHtml + messagesHtml;
   list.querySelectorAll('[data-post-note]').forEach((item) => item.addEventListener('click', (event) => {
     event.stopPropagation();
     const g = postGroups.find((x) => x.key === item.dataset.postNote);
@@ -672,6 +686,15 @@ const renderNotifications = () => {
     if (!g) return;
     memberNotes.markRead(g.ids);
     openSharedPost(g.postId);
+  }));
+  list.querySelectorAll('[data-event-note]').forEach((item) => item.addEventListener('click', (event) => {
+    event.stopPropagation();
+    const g = eventGroups.find((x) => x.key === item.dataset.eventNote);
+    closeNotificationPanel();
+    if (!g) return;
+    memberNotes.markRead(g.ids);
+    setView('events');
+    eventsPage.openEvent(g.eventId);
   }));
   if (hiringHtml) hiring.bindNotifications(list, () => closeNotificationPanel());
   list.querySelectorAll('[data-crossed-view]').forEach((item) => item.addEventListener('click', (event) => {
@@ -1303,6 +1326,10 @@ const memberNotes = createMemberNotifications({
   },
   onNew: (n) => {
     chime.notify(n.id);   // every genuinely new notification, once per id
+    if (EVENT_TYPES.has(n.type)) {
+      if (document.visibilityState === 'visible') showToast(eventNotificationCopy({ title: n.snippet, people: [{ name: n.name }] }).title + '.');
+      return;
+    }
     if (POST_TYPES.has(n.type)) {
       if (document.visibilityState === 'visible') showToast(postNotificationCopy({ type: n.type, people: [{ name: n.name }], snippet: n.snippet }).title + '.');
       return;
@@ -1337,7 +1364,7 @@ const eventsPage = createEventsPage({
   composer: eventComposer,
   memberId: () => memberProfile.id,
   openCompanions,
-  api: { listEvents, setEventRsvp, setEventInterest, setCompanionDefault, myEventPrefs, eventCompanions, cancelMemberEvent, deleteMemberEvent, removeEventImages, removeEventBrochures,
+  api: { sendPendingPush, listEvents, setEventRsvp, setEventInterest, setCompanionDefault, myEventPrefs, eventCompanions, cancelMemberEvent, deleteMemberEvent, removeEventImages, removeEventBrochures,
     createPaymentOrder, verifyPayment, sendEventTicket, playTicket: () => chime.ticket() },   // D-183
   safeImage: eventSafeImage,
   toast: (message) => showToast(message),

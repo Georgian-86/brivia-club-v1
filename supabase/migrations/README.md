@@ -1422,3 +1422,12 @@ state is typed alone ("Goa"). Before the function is deployed the client simply 
 Verify: `select count(*) from public.search_cities('Goa');` (8) and, after one search for "South Goa" in the app,
 `select count(*) from public.geo_city where name = 'South Goa';` (1).
 
+## 0060
+
+**Registration notifications (D-203).** Apply after `0059`, then deploy the `push-notify` Edge Function, then the
+client. `member_notification` gains `event_id` and the type `event_registered`; a trigger on `event_rsvp` notifies the
+organiser when a registration becomes confirmed (free at once, paid once the payment is confirmed; never their own,
+never across a block); cancelling removes an unread one. `my_notifications_v4()` adds `event_id` and the poster. The
+client falls back to v3 before this is applied.
+Verify: `select count(*) from pg_trigger where tgname = 'event_rsvp_notify';` (1).
+
