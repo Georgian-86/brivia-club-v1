@@ -140,6 +140,9 @@ Note: `purge-test-members.sql` now sets `storage.allow_delete_query`, which remo
 The files themselves stay in the buckets. If test members ever uploaded files, remove them through the Storage API or the
 dashboard first (or accept orphaned test files; the orphan report in `docs/BREACH_RUNBOOK.md` section 7 will list them).
 
+**Retired (D-193, 2026-11-05):** `hiring-test-members.sql` is no longer run: the founder removed every seeded hiring role
+and "Open to roles" entry from the live data. Running it again would bring them back.
+
 ### Test hirer photos (D-177)
 
 The 12 seeded hirers carry real-looking photos in which no face is visible, so no stranger's likeness sits on an

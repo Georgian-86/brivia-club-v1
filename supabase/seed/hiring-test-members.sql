@@ -1,3 +1,5 @@
+-- RETIRED (D-193, 2026-11-05): the founder removed all seeded hiring roles and intents from the live data. Do not run
+-- this again against production; it is kept for the SQL harness (seed-hiring.check.sql) only.
 -- hiring-test-members.sql: open hiring roles and "Roles I'm open to" for seeded test members (founder request
 -- 2026-11-04: "add some real looking profiles who are hiring so that the feature can be tested end to end", D-162).
 -- Run in the Supabase SQL editor as postgres (never through the service_role key), AFTER test-members.sql and after

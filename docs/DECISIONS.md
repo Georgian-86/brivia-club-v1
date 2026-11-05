@@ -3732,3 +3732,14 @@ solitaire shuffle; D-179's intro deal and D-185's pile-and-flip deal are not use
   card at most, 62% at least; 74% on phones, as before) and grows into the card's place as the pack is squared, just
   before the deal (`handScaleFor`, unit-tested). Timing, motion and sound are unchanged.
 
+## D-193 (2026-11-05): no seeded hiring cards; every seeded member keeps a photo
+- **Asked:** "remove all the fake hiring profile cards from hiring section and make sure there is no fake profile we
+  created without pfp".
+- **Done (live data, no migration):** the 14 seeded hiring roles and the 6 seeded "Open to roles" entries were deleted
+  (no asks were attached), so the Hiring switch and the role suggestions show real members only (for the founder's
+  account it is empty until a real member opens a role). All 68 seeded members have a photo (0 without).
+- `supabase/seed/hiring-test-members.sql` is retired: do not run it again (it would bring the roles back). The seeded
+  members themselves stay (the open test world, D-171) until the purge script removes them.
+- **Pending (D-194):** the founder asked for sky, office-desk, laptop and mirror-selfie photos (real, not AI). The image
+  search's credits ran out; the swap is scheduled for when they refresh (21:00 UTC).
+
