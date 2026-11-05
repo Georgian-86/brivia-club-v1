@@ -1412,3 +1412,13 @@ Verify: `select prosrc like '%v_date + 365%' from pg_proc where proname = 'save_
 the end after the start). Grants as 0022.
 Verify: `select prosrc not like '%v_date + 365%' from pg_proc where proname = 'save_member_event';` (true).
 
+## 0059
+
+**More places (D-202).** Apply after `0058`, then deploy the `directory` Edge Function (it gains kind `places`), then
+the client. Adds `brivia_add_osm_places` (service role only): a place found in OpenStreetMap Photon and missing from
+the directory is added to `geo_city` once (ids from 90,000,000; centroid in `brivia_private.geo_city_point`;
+`brivia_private.geo_osm` remembers the OpenStreetMap ref). `search_cities` also lists a state's largest places when the
+state is typed alone ("Goa"). Before the function is deployed the client simply gets no extra places.
+Verify: `select count(*) from public.search_cities('Goa');` (8) and, after one search for "South Goa" in the app,
+`select count(*) from public.geo_city where name = 'South Goa';` (1).
+

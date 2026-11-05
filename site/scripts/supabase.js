@@ -1,4 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
+import { needsWiderSearch } from './place-search.js';
 import { NOTICE_VERSION } from './notice-version.js';
 import { isPresetCoverUrl, presetCoverPath } from './preset-cover.js';
 import { createResumeApi } from './resume-file.js';
@@ -550,6 +551,14 @@ export const lookupPostalCode = async (code) => {
 };
 export const isMissingFunction = (error) => ['PGRST202', '42883'].includes(error?.code) || error?.status === 404;
 
+const lookupMorePlaces = async (q) => {
+  if (!supabase?.functions) return [];
+  try {
+    const { data } = await supabase.functions.invoke('directory', { body: { kind: 'places', q } });
+    return Array.isArray(data?.places) ? data.places : [];
+  } catch { return []; }
+};
+
 // City list for "Pick my city": name or region match, launch cities first. Wildcards in the query are dropped.
 // D-140 (0035): the worldwide directory first (any city, town or locality; "City, Country" and "City, State" tell
 // same-named places apart; other spellings and native scripts match); a postal code goes to the directory Edge
@@ -566,7 +575,17 @@ export const searchPlaces = async (query, limit = 8) => {
   const clean = String(query || '').replace(/[^\p{L}\p{N} '-]/gu, ' ').replace(/\s+/g, ' ').trim().slice(0, 60);
   if (!clean) return { data: [], error: null, status: 200 };
   const global = clean.length < 2 ? { error: { code: 'PGRST202' } } : await supabase.rpc('search_cities', { p_q: raw, p_limit: limit });
-  if (!global.error) return { data: global.data || [], error: null, status: global.status };
+  if (!global.error) {
+    const found = global.data || [];
+    // D-202: nothing in the directory starts with what was typed ("South Goa"): ask OpenStreetMap too (directory Edge
+    // Function); what it finds is added to the directory, so the next search answers from the database alone.
+    if (needsWiderSearch(raw, found)) {
+      const wider = await lookupMorePlaces(raw);
+      const seen = new Set(found.map((p) => p.id));
+      return { data: [...wider.filter((p) => !seen.has(p.id)), ...found].slice(0, limit), error: null, status: global.status };
+    }
+    return { data: found, error: null, status: global.status };
+  }
   if (!isMissingFunction(global.error)) return { data: [], error: global.error, status: global.status };
   let request = supabase.from('place').select('id,name,region,country');
   request = clean.length < 2 ? request.ilike('name', `${clean}*`) : request.or(`name.ilike.*${clean}*,region.ilike.*${clean}*`);

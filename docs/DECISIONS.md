@@ -3831,3 +3831,20 @@ page must be of 5 secs only". Supersedes D-196's 5.6 s hold (gone by about 6.1 s
 completely by 2.67 s (`lettersDone`) and the name holds; the landing starts fading in at 4.5 s (`INTRO_HOLD_MS`, was
 5600) and the intro is gone at 5.0 s (500 ms fade), with the hard cap at 5.0 s too (`INTRO_CAP_MS`, was 6500). The
 animation and its sound are unchanged. It still plays on every open (once per tab, D-196).
+
+## D-202 (2026-11-05): every city, town and district can be picked (OpenStreetMap fills the gaps)
+
+Founder, on the Create Event city list: "there is no option of south goa, pls try to include all the cities, specially
+for india". The directory (D-140, about 156,000 places from the countries-states-cities database) has every town in Goa
+(Panaji, Madgaon, Vasco da Gama, Mapusa...) but its districts are patchy: North Goa is in it, South Goa is not, and the
+same holds for many Indian districts.
+- When nothing in the directory starts with the typed name (three letters or more), the client also asks the
+  directory Edge Function (kind `places`), which searches OpenStreetMap Photon (worldwide: cities, towns, villages,
+  suburbs, districts; never streets, shops, states or countries) and adds what it finds to the directory
+  (`brivia_add_osm_places`, 0059). The next search for it answers from the database alone, for everyone. Only the
+  typed text goes to Photon, as with postal codes. Attribution is on the privacy page.
+- A state typed alone ("Goa", "Kerala") now lists its largest places after any name that starts with the text.
+- Considered: importing a full list of India's ~780 districts. Rejected for now: it covers one country and one level,
+  while the founder asked for all cities; OpenStreetMap covers every country and level and grows only with real use.
+- Applies to every city picker (Create Event, signup, guided setup, Edit profile), since they share `searchPlaces`.
+

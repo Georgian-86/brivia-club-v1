@@ -795,6 +795,11 @@ select log_impressions($1, $4);
   names only in public; centroids in `brivia_private.geo_city_point`). A picked city becomes a `place` row (`geo-<id>`)
   through `ensure_place` before `set_home_city`, so this section is unchanged: `place` stays the one table with city
   centroids, the pool still compares place centroids, and a directory city that is already a place answers that id.
+- **D-202 (0059): the directory grows from OpenStreetMap.** A name the directory lacks ("South Goa", a district or
+  village) is looked up in Photon by the directory Edge Function and added as a `geo_city` row (id from 90,000,000,
+  centroid in `brivia_private.geo_city_point`, never to clients), unless the same name in the same country is already
+  within 25 km. It then behaves as any directory city (`ensure_place`). A state typed alone lists its largest places.
+  Matching is unchanged: only the set of places a member can pick grows.
 - **Precision (D-038, R2).** `member_orbit.precision text not null default 'cell' check (precision in ('cell',
   'place'))`. `set_home_location` writes `'cell'`; `set_home_city` writes `'place'`, because every picker of a city
   shares the centroid's cell, which says nothing about where they live (A-F2: 12 Mumbai pickers in one cell showed

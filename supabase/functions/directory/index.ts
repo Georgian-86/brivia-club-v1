@@ -7,6 +7,9 @@
 //                           verified, source }] }. Next time the same company comes from the database search alone.
 //   { kind: 'postal', q }   A postal code through OpenStreetMap Photon, mapped to the nearest directory city in its
 //                           country (brivia_nearest_cities). Answers { places: [{ id, name, region, country, postal }] }.
+//   { kind: 'places', q }   D-202: a city, town, village or district the directory does not have yet ("South Goa"),
+//                           looked up in OpenStreetMap Photon and added to the directory (brivia_add_osm_places), so it
+//                           is there for everyone after. Answers { places: [{ id, name, region, country, country_code }] }.
 //
 // Nothing about the member is sent to either service: only the typed company name or postal code.
 import { createClient } from 'npm:@supabase/supabase-js@2.45.4';
@@ -27,6 +30,16 @@ const ORG = /\b(company|companies|corporation|conglomerate|startup|start-up|ente
 const STRONG_ORG = /\b(company|companies|corporation|conglomerate|firm|bank|university|startup|start-up|organi[sz]ation|institute|ministry|subsidiary)\b/i;
 const isOrg = (d: string) => ORG.test(d) && (STRONG_ORG.test(d) || !NOT_ORG.test(d));
 const NOT_ORG = /\b(city|town|village|municipality|capital of|river|country|province|state of|district|software|app|application|website|web site|search engine|mapping|web browser|operating system|video game|film|album|song|programming language|feature|product|service by|service of|service from|distribution platform)\b/i;
+
+// D-202: the OpenStreetMap objects that are somewhere a member lives or an event happens: cities, towns, villages,
+// suburbs and districts (a county-level "South Goa", a city district), never a street, a shop, a state or a country.
+const SETTLEMENT = new Set(['city', 'town', 'village', 'hamlet', 'suburb', 'quarter', 'neighbourhood', 'municipality', 'locality',
+  'borough', 'county', 'district', 'state_district', 'region', 'island']);
+const isSettlement = (p: any) => {
+  if (p.osm_key === 'place') return SETTLEMENT.has(String(p.osm_value));
+  if (p.osm_key === 'boundary' && p.osm_value === 'administrative') return ['city', 'district', 'county', 'locality'].includes(String(p.type));
+  return false;
+};
 
 const domainOf = (url: string) => {
   try { return new URL(url).hostname.replace(/^www\./, '').toLowerCase(); } catch { return ''; }
@@ -129,6 +142,31 @@ Deno.serve(async (req) => {
         for (const p of data || []) { if (!seen.has(p.id)) { seen.add(p.id); places.push({ ...p, postal: q }); } }
       }
       return json(200, { places });
+    } catch { return json(200, { places: [] }); }
+  }
+
+  if (body.kind === 'places') {
+    try {
+      // Only the typed text goes to Photon. "South Goa, India" searches "South Goa" and keeps hits in India.
+      const [name, ...rest] = q.split(',');
+      const want = rest.join(',').trim().toLowerCase();
+      const res = await timed(`https://photon.komoot.io/api/?q=${encodeURIComponent(name.trim())}&limit=12&lang=en`);
+      const geo = res.ok ? await res.json() : { features: [] };
+      const rows = [];
+      for (const f of geo.features || []) {
+        const p = f?.properties || {};
+        const [lng, lat] = f?.geometry?.coordinates || [];
+        const cc = String(p.countrycode || '').toUpperCase();
+        if (!isSettlement(p) || typeof lat !== 'number' || typeof lng !== 'number' || !/^[A-Z]{2}$/.test(cc) || !p.name) continue;
+        if (want && !`${p.country || ''} ${p.state || ''} ${cc}`.toLowerCase().includes(want)) continue;
+        rows.push({ osm_ref: `${String(p.osm_type || '').toUpperCase()}${p.osm_id}`, name: String(p.name).slice(0, 120),
+          region: String(p.state || '').slice(0, 120), country: String(p.country || '').slice(0, 80), country_code: cc, lat, lng,
+          kind: String(p.osm_value || p.type || '').slice(0, 20) });
+        if (rows.length >= 6) break;
+      }
+      if (!rows.length) return json(200, { places: [] });
+      const { data, error } = await admin.rpc('brivia_add_osm_places', { p_rows: rows });
+      return json(200, { places: error ? [] : data || [] });
     } catch { return json(200, { places: [] }); }
   }
 
