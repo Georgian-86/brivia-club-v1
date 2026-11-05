@@ -8,6 +8,8 @@ Update this file at the end of every session. CLAUDE.md holds the aim; this file
 ## 1. What is done
 
 **2026-11-05, D-191:** reply to any chat message (long-press > Reply; quote on the reply, tap to jump), migration 0055.
+Live 2026-11-05 (deploy dbba0ce): D-185-D-191 client, migrations 0052 (main's) and 0055 applied, all 68 seeded members
+have their `/test-avatars` photo.
 
 **2026-11-05, D-188-D-190:** every seeded member has a faceless photo (`site/public/test-avatars`, applied with 0052 and
 `test-members.sql` at deploy; t59-t68 are temporary second crops); the finished "That's your deck for today." deck is
