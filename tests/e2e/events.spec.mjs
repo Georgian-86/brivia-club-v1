@@ -104,7 +104,7 @@ try {
     const axeDetail = await axeViolations(page, { include: '#event-detail' });
     check(`${w}: axe on the panel`, axeDetail.length === 0, JSON.stringify(axeDetail));
 
-    // D-206: Share opens a menu (Copy link, WhatsApp, More where the device has a share sheet); Copy link copies the
+    // D-207: Share opens a menu (Copy link, WhatsApp, More where the device has a share sheet); Copy link copies the
     // event's link; Escape closes the menu and returns to the button, and the drawer stays open.
     await page.evaluate(() => { window.__copied = null; try { Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText: async (t) => { window.__copied = t; } } }); } catch {} });
     await page.locator('#event-detail [data-event-share]').click();

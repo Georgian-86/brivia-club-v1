@@ -555,3 +555,11 @@ footer.site-footer{display:block!important;background:#1d1d1f;color:#fff;padding
 .menu-drawer nav a b{color:#722039!important}
 .menu-drawer nav a:hover{color:#5a061f!important}
 
+/* About: what the app is, in plain words, for visitors and Google's OAuth review. */
+.about-section{background:#f8f6ef;color:#1d1d1f;padding:clamp(70px,10vw,140px) clamp(24px,4vw,60px);border-top:1px solid rgba(0,0,0,.08)}
+.about-section h2{margin:20px 0 34px;font-size:clamp(40px,5.5vw,80px);line-height:.9;letter-spacing:-3px}
+.about-body{max-width:640px}
+.about-body p{margin:0 0 18px;font-size:17px;line-height:1.55;color:#3b3633}
+.about-body h3{margin:34px 0 12px;font-size:15px;letter-spacing:.06em;text-transform:uppercase}
+.about-body a{color:#8d301b;text-decoration:underline}
+@media(max-width:700px){.about-section h2{letter-spacing:-1.5px}.about-body p{font-size:16px}}

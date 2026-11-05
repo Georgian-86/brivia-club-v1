@@ -184,7 +184,7 @@ export const createEventsPage = ({ root, api, safeImage, toast, isMissing, sendH
 
   // D-183: a confirmed seat. The sound plays; a free seat asks the server for its ticket (a paid seat's ticket was sent
   // when the payment was confirmed). The toast only promises an email the server says it sent.
-  // D-206: the share menu.
+  // D-207: the share menu.
   const shareParts = () => ({ button: panel.querySelector('[data-event-share]'), menu: panel.querySelector('[data-event-share-menu]') });
   const closeShareMenu = (focusButton) => {
     const { button, menu } = shareParts();
@@ -413,7 +413,7 @@ export const createEventsPage = ({ root, api, safeImage, toast, isMissing, sendH
     if (t.closest('[data-event-confirm-no]')) { state.confirm = null; renderPanel(); panel.querySelector('[data-event-edit], [data-event-delete]')?.focus(); return; }
     const yes = t.closest('[data-event-confirm-yes]');
     if (yes) { yes.disabled = true; ownerAction(event, yes.dataset.eventConfirmYes); return; }
-    // D-206: the share button opens a small menu: Copy link, WhatsApp, More options (the device's share sheet).
+    // D-207: the share button opens a small menu: Copy link, WhatsApp, More options (the device's share sheet).
     if (t.closest('[data-event-share]')) { toggleShareMenu(); return; }
     const url = eventShareUrl(event.id);
     if (t.closest('[data-event-share-copy]')) {

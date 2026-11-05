@@ -151,7 +151,7 @@ test('D-197: an event can run over several days, ending after it starts with no 
   assert.equal(p.endsAt, '2026-11-09T11:30:00.000Z');
 });
 
-test('D-206: a pasted contact with invisible direction marks or no-break spaces is accepted and sent clean', async () => {
+test('D-207: a pasted contact with invisible direction marks or no-break spaces is accepted and sent clean', async () => {
   const { isContactPhone, isContactEmail } = await import('../../site/scripts/event-form.js');
   assert.equal(isContactPhone('‪91 7837714469‬'), true);
   assert.equal(isContactPhone('+91 78377 14469'), true);

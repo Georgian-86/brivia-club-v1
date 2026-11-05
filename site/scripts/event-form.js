@@ -44,7 +44,7 @@ const MAP_URL = /^https:\/\/((www\.)?google\.[a-z.]{2,8}\/maps|maps\.google\.[a-
 const UNSAFE = /["'<>\s\\]/;
 export const isMapUrl = (value) => { const v = String(value || '').trim(); return v.length <= 300 && !UNSAFE.test(v) && MAP_URL.test(v); };
 export const isContactEmail = (value) => /^[^@\s<>"']+@[^@\s<>"']+\.[^@\s<>"']+$/.test(cleanContact(value)) && cleanContact(value).length <= 254;
-// D-206: a contact pasted from WhatsApp or a phone book can carry invisible direction marks and no-break spaces.
+// D-207: a contact pasted from WhatsApp or a phone book can carry invisible direction marks and no-break spaces.
 export const cleanContact = (value) => String(value ?? '').replace(/[\u200B-\u200F\u202A-\u202E\u2060-\u2069\uFEFF]/g, '').replace(/[\u00A0\u2007\u202F]/g, ' ').trim();
 export const isContactPhone = (value) => /^\+?[0-9][0-9 ()-]{6,19}$/.test(cleanContact(value));
 export const isContactLink = (value) => { const v = cleanContact(value); return v.length <= 300 && /^https:\/\/[^\s"'<>\\]+$/.test(v); };

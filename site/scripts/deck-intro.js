@@ -146,7 +146,7 @@ export const playDeckIntro = ({ stack, card, next, back, controls = [], reduced 
   const onDown = (e) => { if (!e.target?.closest?.(INTERACTIVE)) skip(); };
   const listeners = [['pointerdown', onDown], ['pointerup', skip], ['keydown', skip]];
   stack.classList.add('is-intro');
-  // D-205: decode the dealt cards' photos now, off the main thread, so none is decoded on the frame it turns up.
+  // D-206: decode the dealt cards' photos now, off the main thread, so none is decoded on the frame it turns up.
   [card, next, back].forEach((el) => el?.querySelectorAll?.('img').forEach((img) => {
     if (img.loading === 'lazy') img.loading = 'eager';
     img.decode?.().catch(() => {});
@@ -203,7 +203,7 @@ export const playDeckIntro = ({ stack, card, next, back, controls = [], reduced 
         .to(wrap, { scaleX: 1, scaleY: 1, duration: INTRO.square.dur * 0.65, ease: 'power3.out' }, INTRO.square.at + INTRO.square.dur * 0.35);
       // 5. The pack's top card turns edge-on (the member's card finishes the turn), and the rest of the pack goes.
       const last = cards[riffleOrder().at(-1).card];
-      // D-205: the perspective is set, not tweened (tweened, it grew from nothing and warped the start of the turn).
+      // D-206: the perspective is set, not tweened (tweened, it grew from nothing and warped the start of the turn).
       gsap.set(last, { transformPerspective: INTRO_PERSPECTIVE });
       tl.to(last, { rotationY: 88, duration: INTRO.flip.dur, ease: 'power1.in' }, INTRO.flip.at)
         .to(cards.filter((c) => c !== last), { opacity: 0, duration: INTRO.packOut.dur, ease: 'power1.in' }, INTRO.packOut.at)
@@ -211,14 +211,14 @@ export const playDeckIntro = ({ stack, card, next, back, controls = [], reduced 
     }
     layers.forEach(({ el, spec }, i) => {
       const top = i === layers.length - 1;
-      // D-205: the top card's perspective is fixed for the whole turn. Inside the from() it was tweened with the angle,
+      // D-206: the top card's perspective is fixed for the whole turn. Inside the from() it was tweened with the angle,
       // from 1200 px down to none: near the end the perspective was a few pixels, which blew a 3-degree angle up into a
       // steep tilt that held, then snapped flat when both reached zero. That was the card "getting stuck".
       if (top) gsap.set(el, { transformPerspective: INTRO_PERSPECTIVE });
       tl.from(el, {
         ...spec.from,
         duration: spec.dur,
-        // D-205: the top card turns with no overshoot (back.out swung it past flat and back, a lurch at the end).
+        // D-206: the top card turns with no overshoot (back.out swung it past flat and back, a lurch at the end).
         ease: 'power3.out',
         transformOrigin: top ? '50% 50%' : '50% 100%',
         force3D: true,
@@ -226,7 +226,7 @@ export const playDeckIntro = ({ stack, card, next, back, controls = [], reduced 
       }, spec.at);
       // Hidden until dealt (set now, so the first painted frame never shows a card early); the top card shows the
       // moment it turns up, when it is edge-on.
-      // D-205: the top card waits at 1% opacity, not 0: a fully transparent layer is not painted ahead (Safari), so its
+      // D-206: the top card waits at 1% opacity, not 0: a fully transparent layer is not painted ahead (Safari), so its
       // photo was decoded and the whole card rasterised in 3D on the first frames of the turn, which stalled it
       // mid-turn on a phone. At 1%, edge-on and under the pack, it is painted during the shuffle and never seen.
       gsap.set(el, { opacity: top ? 0.01 : 0 });

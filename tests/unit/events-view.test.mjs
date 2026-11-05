@@ -325,7 +325,7 @@ test('D-198: untimed events read as all day, and one under way says so', () => {
   assert.equal(eventUnderWay('2026-10-30T18:30:00Z', '2026-11-01T13:30:00Z', now), false);
 });
 
-test('D-206: the share link opens Explore on the event; WhatsApp gets the title and the link', async () => {
+test('D-207: the share link opens Explore on the event; WhatsApp gets the title and the link', async () => {
   const { eventShareUrl, whatsappShareUrl } = await import('../../site/scripts/events-view.js');
   assert.equal(eventShareUrl('m-1 x', 'https://thebriviaclub.live'), 'https://thebriviaclub.live/app.html?view=events&event=m-1%20x');
   assert.equal(whatsappShareUrl('Goa Buildathon', 'https://b.live/e'), `https://wa.me/?text=${encodeURIComponent('Goa Buildathon https://b.live/e')}`);

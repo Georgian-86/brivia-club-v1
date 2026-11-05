@@ -410,7 +410,7 @@ const ownerToolsMarkup = (event, confirm = null) => {
   return `<section class="event-owner" aria-label="Your event"><p class="app-eyebrow">YOUR EVENT</p>${counts}<div class="event-owner-tools">${tools}</div></section>`;
 };
 
-// D-206: the share menu under the drawer's share button: Copy link, WhatsApp, and the device's own share sheet (shown
+// D-207: the share menu under the drawer's share button: Copy link, WhatsApp, and the device's own share sheet (shown
 // only where the browser has one).
 const LINK_ICON = '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1"/><path d="M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/></svg>';
 const CHAT_ICON = '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M4 20l1.3-3.9A8 8 0 1 1 8 19.1Z"/></svg>';

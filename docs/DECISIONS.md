@@ -3871,7 +3871,15 @@ so are list_events' 80-row cap and its 60-day window (events starting more than 
 others), so Explore always lists every open event, however far ahead. Spam is left to reporting and moderation
 (docs/MODERATION.md); a cap can come back later if abuse appears.
 
-## D-205 (2026-11-05): the first card turns over smoothly after the shuffle
+
+## D-205 (2026-11-05): the landing page says plainly what the app is, for Google's OAuth branding review
+
+Google refused to verify the sign-in branding: it could not tell the app's purpose from the home page, and the home page
+had no link to the privacy policy. The landing now ends with an "About" section in plain words (what Brivia Club does,
+mutual consent, rounded distances, 18+, and exactly what Google sign-in shares and what we do with it), the footer links
+the privacy policy, and the policy gains a "Signing in with Google" section (#google). The consent-screen logo is now the
+"the Brivia Club" wordmark on the wine square, since the plain "B" was flagged as not identifying the brand.
+## D-206 (2026-11-05): the first card turns over smoothly after the shuffle
 
 Founder (screen recording on an iPhone): "the card after shuffling gets stuck, pls fix it make the turn very smooth".
 Frame by frame, the member's card appeared tilted mid-turn, held there for about 0.6 s, then snapped flat. Two causes:
@@ -3891,7 +3899,7 @@ jumped to flat; after, it eases 88 -> 0 continuously. Timings are unchanged (the
   caught-up box (motion-moments.js flipIn) had the same mistake and are fixed the same way; a unit test keeps
   transformPerspective out of every tween.
 
-## D-206 (2026-11-05): Share on an event offers Copy link
+## D-207 (2026-11-05): Share on an event offers Copy link
 
 Founder: "there must be a copy link option in the share button for every event". The drawer's Share button went
 straight to the device's share sheet (or, without one, copied silently), so on a laptop there was no visible way to copy
