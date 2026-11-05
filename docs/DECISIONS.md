@@ -3867,6 +3867,7 @@ user may get a notification".
 
 Founder: "remove the 10 events listing limit". The founder had created 10 events in a day and the 11th was refused:
 save_member_event allowed 10 new events per member per 24 hours (D-121, 'event_limit'). That cap is gone (0061), and
-so is list_events' 80-row cap, so Explore always lists every open event. Spam is left to reporting and moderation
+so are list_events' 80-row cap and its 60-day window (events starting more than 60 days ahead were hidden from
+others), so Explore always lists every open event, however far ahead. Spam is left to reporting and moderation
 (docs/MODERATION.md); a cap can come back later if abuse appears.
 

@@ -1434,6 +1434,6 @@ Verify: `select count(*) from pg_trigger where tgname = 'event_rsvp_notify';` (1
 ## 0061
 
 **No event caps (D-204).** Apply after `0060`. `save_member_event` without the 10-new-events-per-24-hours cap
-(`event_limit`), and `list_events` without its 80-row cap. Grants unchanged.
+(`event_limit`), and `list_events` without its 80-row cap and its 60-day window. Grants unchanged.
 Verify: `select prosrc not like '%event_limit%' from pg_proc where proname = 'save_member_event';` (true).
 

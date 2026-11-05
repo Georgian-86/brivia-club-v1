@@ -3,7 +3,8 @@ set lock_timeout = '5s';
 -- (README "## 0061"), with the client deploy. 0001-0060 are frozen. Idempotent.
 --   1. save_member_event (0058's) without the daily cap: a member may create any number of events (it was 10 per 24 h,
 --      P0001 'event_limit', D-121). Everything else is unchanged.
---   2. list_events (0025's) without its 80-row cap: Explore lists every open event.
+--   2. list_events (0025's) without its 80-row cap and without its 60-day window: Explore lists every open event,
+--      however far ahead it starts.
 
 create or replace function public.save_member_event(p_id uuid, p_fields jsonb, p_publish boolean default false)
 returns uuid
@@ -214,8 +215,7 @@ as $$
       from public.club_event e, me
      where (p_category is null or lower(p_category) = 'all' or e.category = lower(p_category))
        and (
-         (e.is_published and public.brivia_event_open(e.starts_at, e.ends_at)
-          and e.starts_at < now() + interval '60 days'
+         (e.is_published and public.brivia_event_open(e.starts_at, e.ends_at)   -- D-204: any start date (was the next 60 days)
           and (e.creator_id is null or e.creator_id = me.id or public.brivia_visible_to(me.id, e.creator_id)))
          or (e.creator_id = me.id and (e.starts_at is null or public.brivia_event_open(e.starts_at, e.ends_at)))
          or (e.cancelled_at is not null and public.brivia_event_open(e.starts_at, e.ends_at)

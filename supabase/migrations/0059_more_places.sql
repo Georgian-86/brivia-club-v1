@@ -73,6 +73,8 @@ end;
 $$;
 revoke all on function public.brivia_add_osm_places(jsonb) from public, anon, authenticated;
 
+create index if not exists geo_city_region_idx on public.geo_city (region_search, population desc nulls last);
+
 create or replace function public.search_cities(p_q text, p_limit int default 8)
 returns table(id text, name text, region text, country text, country_code text)
 language plpgsql

@@ -15,7 +15,8 @@
 --    (service side) confirms it; an expired hold frees the seat.
 -- M7 cancel and delete: a cancelled event leaves others' lists but stays (marked cancelled) for the organiser and the
 --    members registered; a published event cannot be deleted; a draft or cancelled one can, with its registrations.
--- M8 D-204 (0061): no daily cap: an 11th and 12th event in 24 hours save (0022's 10-a-day 'event_limit' is gone).
+-- M8 D-204 (0061): no daily cap: an 11th and 12th event in 24 hours save (0022's 10-a-day 'event_limit' is gone); an
+--    event 90 days ahead is listed to others.
 set brivia.harness_autocomplete = 'off';
 
 create or replace function pg_temp.mv(n int) returns uuid language sql immutable as $$
@@ -332,6 +333,9 @@ begin
   if c <> 'none' then raise exception 'FAIL M8: an 11th event in 24 h: %', c; end if;
   c := pg_temp.code_of(format('select public.save_member_event(null, %L::jsonb, false)', '{"title": "And another"}'));
   if c <> 'none' then raise exception 'FAIL M8: a 12th event in 24 h: %', c; end if;
+  perform public.save_member_event(null, pg_temp.fields(jsonb_build_object('title', 'Far ahead', 'date', to_char((now() at time zone 'Asia/Kolkata')::date + 90, 'YYYY-MM-DD'))), true);
+  perform pg_temp.as_member(pg_temp.mv(2));
+  if not exists (select 1 from public.list_events(null) where title = 'Far ahead') then raise exception 'FAIL M8: an event 90 days ahead is not listed'; end if;
   reset role;
 end $$;
 
