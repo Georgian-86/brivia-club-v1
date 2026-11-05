@@ -1,4 +1,4 @@
-// D-211 (0063): someone already connected who also wants company at the event is shown first in Companions, marked
+// D-214 (0063): someone already connected who also wants company at the event is shown first in Companions, marked
 // "You're already connected", with Text them · Make a plan (opens the chat) and Next instead of Pass / Connect; Next
 // records no swipe; their profile says so too.
 // PLAYWRIGHT_MODULE=/path/to/playwright/index.mjs node tests/e2e/companions-connected.spec.mjs   (Vite on :5189)

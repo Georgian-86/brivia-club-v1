@@ -1445,7 +1445,7 @@ Verify: `select pg_get_constraintdef(oid) like '%college%' from pg_constraint wh
 
 ## 0063
 
-**Connections in Companions (D-211).** Apply after `0062`, with the client deploy. Adds `companion_deck_v2(event, limit)`:
+**Connections in Companions (D-214).** Apply after `0062`, with the client deploy. Adds `companion_deck_v2(event, limit)`:
 0025's deck plus members the caller is already connected with who want company at that event (a `connected` column;
 first in the order; shown even if swiped before). `companion_deck` is unchanged for the older client; the new client
 falls back to it until this is applied. `companion_events.to_see` counts the same way.
@@ -1454,7 +1454,7 @@ Verify: `select count(*) from pg_proc where proname = 'companion_deck_v2';` (1).
 
 ## 0064
 
-**Chats read on any device (D-213).** Apply after `0063`, with the client deploy. A private per-member marker,
+**Chats read on any device (D-215).** Apply after `0063`, with the client deploy. A private per-member marker,
 `brivia_private.chat_seen`: the newest message seen in each conversation, and when the Chats tab was last opened.
 `mark_chat_seen(other, at)` (other null for the tab) never moves it backwards; `my_chat_seen()` returns the caller's rows.
 Opening a chat, or the Chats tab, on one device clears the bell's message rows on the others. The client works as before
@@ -1463,7 +1463,7 @@ Verify: `select count(*) from pg_proc where proname in ('mark_chat_seen', 'my_ch
 
 ## 0065
 
-**Title and organisation at signup (D-214).** Apply after `0064`, with the client deploy and the `directory` Edge
+**Title and organisation at signup (D-216).** Apply after `0064`, with the client deploy and the `directory` Edge
 Function. `search_companies` may be called without a session, and anon reads only the directory's own companies
 (`source <> 'member'`); members' own organisations stay signed-in only. The Edge Function's logo pass also tries the
 logo Wikidata lists for the company's name.
@@ -1471,6 +1471,6 @@ Verify: `select has_function_privilege('anon', 'public.search_companies(text,int
 
 ## 0066
 
-**Unlimited roles, 1000-word descriptions (D-215).** Apply after `0065`, with the client deploy. `hiring_role.about`
+**Unlimited roles, 1000-word descriptions (D-217).** Apply after `0065`, with the client deploy. `hiring_role.about`
 holds up to 8000 characters; `save_hiring_role` accepts up to 1000 words there and no longer caps open roles at 3.
 Verify: `select prosrc not like '%role_cap%' from pg_proc where proname = 'save_hiring_role';` (true).

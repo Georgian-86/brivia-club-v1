@@ -117,7 +117,7 @@ try {
     check(`${w}: the switch is 44 px and sits beside the filter button, right-aligned on phones (${JSON.stringify(tb)} vs ${JSON.stringify(mb)})`, tb.height >= 44 && Math.abs((tb.y + tb.height / 2) - (mb.y + mb.height / 2)) <= 1 && tb.x > mb.x + mb.width && (w < 850 ? Math.abs(tb.x + tb.width - (w - (mb.x))) <= 2 : tb.x - (mb.x + mb.width) <= 12) && tb.x + tb.width <= w);
     await toggle.click();
     await page.waitForFunction(() => document.querySelector('#hiring-toggle')?.getAttribute('aria-checked') === 'true');
-    // D-213: on, the switch is a deep-wine pill with its cream label and knob, never a blank cream pill.
+    // D-215: on, the switch is a deep-wine pill with its cream label and knob, never a blank cream pill.
     await page.waitForTimeout(450); // past the colour transition
     const onLook = await page.$eval('#hiring-toggle', (el) => ({ bg: getComputedStyle(el).backgroundColor, color: getComputedStyle(el).color, label: el.querySelector('.hiring-toggle-label')?.getBoundingClientRect().width || 0 }));
     check(`${w}: on, the switch is wine with a readable label (${JSON.stringify(onLook)})`, onLook.bg !== onLook.color && /^rgb\((\d+), (\d+), (\d+)\)$/.test(onLook.bg) && Number(onLook.bg.match(/\d+/)[0]) < 140 && onLook.label > 20);

@@ -50,7 +50,7 @@ export const stepStates = (path, screen) => {
 export const resumeScreen = ({ session, status = {} }) => {
   if (!session) return 'welcome';
   if (status.completed) return 'done';
-  if (!status.adult_declared) return 'work';  // D-214: the work screen replaced the 18+ one (continuing confirms it)
+  if (!status.adult_declared) return 'work';  // D-216: the work screen replaced the 18+ one (continuing confirms it)
   if (!status.has_name) return 'name';
   if (!status.has_phone || !status.has_gender) return 'details';
   if (status.has_photo === false) return 'photo';

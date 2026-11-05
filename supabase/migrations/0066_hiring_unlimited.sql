@@ -1,5 +1,5 @@
 set lock_timeout = '5s';
--- 0066_hiring_unlimited.sql (D-215, founder 2026-11-06: "make the limit to 1000 words for this, also hirings can be
+-- 0066_hiring_unlimited.sql (D-217, founder 2026-11-06: "make the limit to 1000 words for this, also hirings can be
 -- unlimited"). Apply after 0065 (README "## 0066"), with the client deploy. 0001-0065 are frozen. Idempotent.
 --   1. A role's "A line about it" holds up to 1000 words (was 200 characters); at most 8000 characters.
 --   2. save_hiring_role: 0037's body without the 3-open-roles cap ('role_cap'), and with the new about limit.
@@ -24,7 +24,7 @@ begin
   if not public.brivia_member_completed(me) then raise exception 'complete your profile' using errcode = '22023'; end if;
   if v_title is null or char_length(v_title) not between 3 and 60 then raise exception 'role title' using errcode = '22023'; end if;
   if v_company is not null and char_length(v_company) not between 2 and 60 then raise exception 'company' using errcode = '22023'; end if;
-  -- D-215: up to 1000 words (and 8000 characters, so one word cannot be a wall of text).
+  -- D-217: up to 1000 words (and 8000 characters, so one word cannot be a wall of text).
   if v_about is not null and (char_length(v_about) > 8000
      or coalesce(array_length(regexp_split_to_array(v_about, '\s+'), 1), 0) > 1000) then
     raise exception 'about too long' using errcode = '22001';

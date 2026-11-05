@@ -58,7 +58,7 @@ const commonsLogoFor = async (site: string) => {
     return file ? `${file.replace(/^http:/, 'https:')}?width=128` : '';
   } catch { return ''; }
 };
-// D-214: a company whose site gives no icon at all: the logo Wikidata lists for the organisation of that name (the
+// D-216: a company whose site gives no icon at all: the logo Wikidata lists for the organisation of that name (the
 // first search result described as an organisation), as a Commons PNG.
 const commonsLogoByName = async (name: string) => {
   try {

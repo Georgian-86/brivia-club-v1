@@ -48,7 +48,7 @@ export const normalizeCompanion = (row = {}) => ({
   shared: (Array.isArray(row.shared_interests) ? row.shared_interests : []).map(String).filter(Boolean).slice(0, 4),
   band: String(row.distance_band || '').trim(),
   sharedCount: Math.max(0, Number(row.shared_count) || 0),
-  connected: row.connected === true,   // D-211 (0063): already a connection; shown first, no swipe
+  connected: row.connected === true,   // D-214 (0063): already a connection; shown first, no swipe
 });
 
 // The professional line: 'Founder · Looking for Friends, Co-founder', or the shared interests when there is no headline.

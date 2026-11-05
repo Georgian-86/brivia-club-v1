@@ -30,7 +30,7 @@ test('introPlan plays on a first visit', () => {
 });
 
 test('intro timing constants', () => {
-  assert.equal(INTRO_CAP_MS, 4000); // D-210
+  assert.equal(INTRO_CAP_MS, 4000); // D-213
   assert.equal(INTRO_HOLD_MS + 500, 4000, 'the intro (hold + fade) lasts 4 s');
   assert.equal(INTRO_START_GRACE_MS, 800);
 });

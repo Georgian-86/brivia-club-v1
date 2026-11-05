@@ -41,7 +41,7 @@ export const createCompanionsPage = ({ root, api, safeImage, coverFor, me, toast
     quotaLine.setAttribute('aria-live', 'polite');
     actions.after(quotaLine);
   }
-  // D-211: for a card of someone already connected, a text-them row stands in for Pass / Connect (no swipe is used).
+  // D-214: for a card of someone already connected, a text-them row stands in for Pass / Connect (no swipe is used).
   let connectedRow = root.querySelector('[data-companion-connected]');
   if (!connectedRow && actions) {
     connectedRow = document.createElement('div');
@@ -170,7 +170,7 @@ export const createCompanionsPage = ({ root, api, safeImage, coverFor, me, toast
     await loadDeck();
   };
 
-  // D-211: Next on a connected card moves it to the back of the deck (nothing is recorded; it stays in the deck).
+  // D-214: Next on a connected card moves it to the back of the deck (nothing is recorded; it stays in the deck).
   const nextConnected = () => {
     if (state.people.length < 2) return;
     state.people.push(state.people.shift());

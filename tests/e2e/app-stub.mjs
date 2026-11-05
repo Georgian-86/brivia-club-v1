@@ -236,7 +236,7 @@ export const startAppStub = async ({ port, state = {}, deckRows = defaultDeckRow
         if (pathName === '/rest/v1/rpc/set_read_receipts') st.readReceipts = args.p_on;
         return json(200, st.readReceipts !== false);
       }
-      // D-213 (0064): st.chatSeen = [{ other_id, seen_at }] (other_id null: the Chats tab); undefined answers PGRST202.
+      // D-215 (0064): st.chatSeen = [{ other_id, seen_at }] (other_id null: the Chats tab); undefined answers PGRST202.
       if (pathName === '/rest/v1/rpc/my_chat_seen' || pathName === '/rest/v1/rpc/mark_chat_seen') {
         if (!st.chatSeen) return json(404, { code: 'PGRST202', message: 'Could not find the function' });
         if (pathName === '/rest/v1/rpc/my_chat_seen') return json(200, st.chatSeen);

@@ -7,6 +7,12 @@ Update this file at the end of every session. CLAUDE.md holds the aim; this file
 
 ## 1. What is done
 
+**2026-11-05, D-211:** 25 seeded members' photos are now pets or instruments (matched to interests); no SQL.
+
+**2026-11-05, D-210:** all 68 seeded members have new faceless profile photos (mirror selfies with the phone over the
+face, sky and city views from behind, sunset silhouettes, desks with laptops); same file names, so live with the deploy
+(no SQL). Delivers D-194.
+
 **2026-11-05, D-193:** seeded hiring roles and intents deleted live (hiring shows real members only); `hiring-test-members.sql` retired. D-194 (sky / desk / laptop / mirror-selfie photos for the seeded members) is scheduled for 21:00 UTC when the image-search credits refresh.
 
 **2026-11-05, D-191:** reply to any chat message (long-press > Reply; quote on the reply, tap to jump), migration 0055.
@@ -19,6 +25,9 @@ blush like the shuffle, and the shuffle no longer plays under it; the Brivia int
 
 **2026-11-05, D-187:** the deck's shuffle wears the founder's mock-up: blush paper cards, a fanned hand behind a framed
 front card reading "Shuffling Your Matches" with pulsing dots, a short hold, then the D-174 riffle and deal.
+
+**2026-11-05, D-212:** the sign-in loading screen (auth.html, app.html) is the classic D-088 "Opening your club"
+splash again; the ignition stays on the landing intro only.
 
 **2026-11-05, D-186:** the landing intro and the "Opening your club" loading screen are the Brivia ignition, drawn
 live (`brivia-ignition.js`, `ignition.css`) with its own music cue; the blurry 58 kbps intro video is gone.

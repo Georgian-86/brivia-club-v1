@@ -366,7 +366,7 @@ export const setReadReceipts = (on) => rpcCall('set_read_receipts', { p_on: Bool
 export const myReadReceipts = () => rpcCall('my_read_receipts', {});
 export const markMessagesDelivered = () => rpcCall('mark_messages_delivered', {});
 export const markConversationRead = (otherId) => rpcCall('mark_conversation_read', { p_other: otherId });
-// D-213 (0064): the member's own "seen up to" per conversation, kept on the server so every device agrees. otherId null
+// D-215 (0064): the member's own "seen up to" per conversation, kept on the server so every device agrees. otherId null
 // is the Chats tab. Before 0064 both answer PGRST202 / 404 (isMissingFunction).
 export const markChatSeen = (otherId, at = null) => rpcCall('mark_chat_seen', { p_other: otherId || null, p_at: at });
 export const myChatSeen = () => rpcCall('my_chat_seen', {});
@@ -393,7 +393,7 @@ export const saveMemberEvent = async (id, fields, publish) => {
 export const cancelMemberEvent = (id) => rpcCall('cancel_member_event', { p_id: id });
 // Find a Companion (0023, D-123). Before 0023 each answers PGRST202 (isMissingFunction).
 export const companionEvents = () => rpcCall('companion_events', {});
-// D-211 (0063): v2 also lists connections who want company at the event (connected: true); v1 before 0063.
+// D-214 (0063): v2 also lists connections who want company at the event (connected: true); v1 before 0063.
 let companionDeckV2Missing = false;
 export const companionDeck = async (eventId, limit = 20) => {
   if (!companionDeckV2Missing) {

@@ -143,88 +143,87 @@ dashboard first (or accept orphaned test files; the orphan report in `docs/BREAC
 **Retired (D-193, 2026-11-05):** `hiring-test-members.sql` is no longer run: the founder removed every seeded hiring role
 and "Open to roles" entry from the live data. Running it again would bring them back.
 
-### Profile photos for every seeded member (D-212)
+### Seeded member photos (D-210; replaces the D-177 and D-188 sets)
 
-All 68 seeded members (`tNN` = seed number NN) show one of four kinds of photo, as the founder asked: a **sky**, an
-**office desk**, a **laptop**, or a **mirror selfie in which the phone or camera hides the face**. No face is visible
-in any of them, so no stranger's likeness sits on an invented profile (D-156). They replace the D-177 / D-188 photos
-under the same file names, so the database needs no change.
+Every seeded member (tNN = seed number NN, t61-t68 for any extra test rows) has a real photo, under the Unsplash
+License, in which no face can be seen: a mirror selfie with the phone or camera over the face, someone seen from behind
+against the sky or a city, a silhouette at sunset, or a desk with a laptop and coffee. That keeps any stranger's face off
+an invented profile (D-156). Men's and women's profiles get photos that match; the seeded hirers get desk and laptop
+photos; "Prefer not to say" and t61-t68 get neutral ones. Each is cropped to 480 px WebP in `site/public/test-avatars/`
+and was checked by eye for faces. File names are unchanged, so a deploy is all it takes (no SQL).
 
-They are real photographs from Unsplash search results filtered to the free license
-(`https://unsplash.com/s/photos/<search>?license=free`; Unsplash License: free to use, no attribution required). None is
-from Unsplash+ and none is AI-generated (results credited to "Microsoft Copilot" were left out, as were 3D renders). The
-container cannot reach Unsplash, so each search page was captured with Firecrawl and each photo cut from it, cropped to a
-480 px square WebP and checked by eye for faces. The number after the search is the photo's position on that page.
+D-211 turned 25 of them into pets (dogs, cats) and instruments (guitar, piano, violin, tabla), matched to the member's
+interests where one fits. Source URL: `https://images.unsplash.com/<photo>`; a `page <slug>` entry is
+`https://unsplash.com/photos/<slug>`. The purge script clears them with the profiles.
 
-| File | Shows | Unsplash search (`?license=free`) |
+| File | Unsplash photo | Shows |
 |---|---|---|
-| t01 | Sky | `sky` #1 |
-| t02 | Sky | `sky` #2 |
-| t03 | Office desk | `office-desk` #1 |
-| t04 | Laptop | `laptop` #1 |
-| t05 | Sky | `sky` #5 |
-| t06 | Sky | `sky` #6 |
-| t07 | Office desk | `office-desk` #2 |
-| t08 | Sky | `sky` #7 |
-| t09 | Laptop | `laptop` #2 |
-| t10 | Sky | `sky` #8 |
-| t11 | Sky | `sky` #9 |
-| t12 | Office desk | `office-desk` #4 |
-| t13 | Laptop | `laptop` #4 |
-| t14 | Sky | `sky` #10 |
-| t15 | Mirror selfie, face hidden by the phone or camera | `mirror-selfie-phone-covering-face` #3 |
-| t16 | Sky | `sky` #11 |
-| t17 | Office desk | `office-desk` #5 |
-| t18 | Sky | `sky` #12 |
-| t19 | Laptop | `laptop` #6 |
-| t20 | Sky | `sky` #13 |
-| t21 | Office desk | `office-desk` #6 |
-| t22 | Sky | `sky` #14 |
-| t23 | Laptop | `laptop` #7 |
-| t24 | Sky | `sky` #15 |
-| t25 | Sky | `sky` #16 |
-| t26 | Office desk | `office-desk` #7 |
-| t27 | Sky | `sky` #17 |
-| t28 | Laptop | `laptop` #8 |
-| t29 | Sky | `sky` #18 |
-| t30 | Office desk | `office-desk` #8 |
-| t31 | Sky | `sky` #19 |
-| t32 | Laptop | `laptop` #9 |
-| t33 | Mirror selfie, face hidden by the phone or camera | `mirror-selfie-phone-covering-face` #5 |
-| t34 | Sky | `sky` #21 |
-| t35 | Office desk | `office-desk` #10 |
-| t36 | Sky | `sky` #3 |
-| t37 | Sky | `sky` #20 |
-| t38 | Laptop | `laptop` #10 |
-| t39 | Sky | `clouds` #1 |
-| t40 | Office desk | `office-desk` #14 |
-| t41 | Sky | `clouds` #2 |
-| t42 | Laptop | `laptop` #11 |
-| t43 | Sky | `clouds` #3 |
-| t44 | Office desk | `workspace` #7 |
-| t45 | Sky | `clouds` #5 |
-| t46 | Sky | `clouds` #7 |
-| t47 | Laptop | `laptop` #12 |
-| t48 | Office desk | `workspace` #8 |
-| t49 | Sky | `clouds` #8 |
-| t50 | Mirror selfie, face hidden by the phone or camera | `mirror-selfie-phone-covering-face` #12 |
-| t51 | Sky | `clouds` #10 |
-| t52 | Laptop | `laptop` #13 |
-| t53 | Sky | `clouds` #11 |
-| t54 | Office desk | `workspace` #10 |
-| t55 | Sky | `clouds` #12 |
-| t56 | Sky | `clouds` #13 |
-| t57 | Laptop | `laptop` #14 |
-| t58 | Office desk | `workspace` #15 |
-| t59 | Sky | `clouds` #16 |
-| t60 | Sky | `clouds` #17 |
-| t61 | Laptop | `laptop` #16 |
-| t62 | Office desk | `workspace` #6 |
-| t63 | Sky | `clouds` #19 |
-| t64 | Sky | `clouds` #18 |
-| t65 | Sky | `macbook` #14 |
-| t66 | Office desk | `workspace` #3 |
-| t67 | Laptop | `laptop` #17 |
-| t68 | Mirror selfie, face hidden by the phone or camera | `mirror-selfie-phone-covering-face` #20 |
+| t01 | photo-1785663292283-04a0e6a3bb19 | Mirror selfie, camera over the face |
+| t02 | photo-1647975647816-5d3ff813e404 | Hand forming a chord on a guitar |
+| t03 | photo-1789981552903-504c5a33169c | White hoodie above the hills |
+| t04 | photo-1747374373804-df8fa149716e | Mirror selfie, camera over the face |
+| t05 | photo-1569291364147-60a038bda755 | Seen from behind over the city |
+| t06 | photo-1768295984707-64ab37e539dd | Latte beside a keyboard on a white desk |
+| t07 | photo-1743109811511-dbd694fb3457 | City skyline at night |
+| t08 | photo-1785474445369-409f6acec42b | Laptop and coffee on a monochrome desk |
+| t09 | photo-1530281700549-e82e7bf110d6 | Dog running out of the sea |
+| t10 | photo-1761472082698-3d51618aeb45 | Hand on an acoustic guitar's frets |
+| t11 | photo-1689467909244-631e55404336 | Seen from behind, working at two screens |
+| t12 | photo-1774979517562-9b47c3761c71 | Cat sitting on a wooden counter |
+| t13 | photo-1673442981926-fefc73d04878 | Laptop, tablet and coffee on a marble desk |
+| t14 | photo-1704122873190-e92f977f78aa | Fluffy cat curled on a cushion |
+| t15 | photo-1657256794209-0daf23db892b | Silhouette against a violet sunset |
+| t16 | photo-1786152532472-caec53399382 | Seen from behind on a rooftop |
+| t17 | photo-1783244725627-6a2ce2815451 | Camera held over the face |
+| t18 | photo-1497032628192-86f99bcd76bc | Desk from above: laptop, coffee, notebook |
+| t19 | photo-1606055413678-7561ef89bbbc | Walking a road, seen from behind |
+| t20 | photo-1582456891925-a53965520520 | Pomeranian on the steps |
+| t21 | photo-1600753575717-9e38cce25f3c | Red top on a forest path |
+| t22 | photo-1778585041100-507f3eafe63f | Hands on piano keys |
+| t23 | photo-1741229395001-6d8d2a97f05e | Fingers on a guitar neck in low light |
+| t24 | photo-1768198566500-9ec0160d88ec | Fluffy cat on a sofa by a window |
+| t25 | photo-1750322769212-fb7750247387 | Latte art beside a laptop |
+| t26 | photo-1630532852017-9b14723a72c5 | Laptop and iced coffee by a window |
+| t27 | photo-1510771463146-e89e6e86560e | Golden retriever holding a flower |
+| t28 | photo-1780545311196-f8b507b08b94 | Silhouette in golden light |
+| t29 | page hand-holding-violin-bow-and-strings-YqSVAieps84 | Hand on a violin and bow |
+| t30 | photo-1711419398242-d8ca79c6e9c1 | Silhouette at sunset by the water |
+| t31 | photo-1479502806991-251c94be6b15 | Seen from behind on a city rooftop |
+| t32 | photo-1722934181894-eb1323604b84 | Walking a park path, seen from behind |
+| t33 | photo-1783746893555-9367486518ec | Sun hat, overlooking the city |
+| t34 | photo-1688158307264-c949b2d68ffe | Coffee and a leather wallet on a desk |
+| t35 | photo-1772982822877-4cd058eea507 | Brown cat by a window |
+| t36 | photo-1773561213080-cf7b71cda100 | Silhouette with the sun at hand height |
+| t37 | page a-close-up-of-a-person-playing-a-violin-KGGsJI6r-0U | Violin and bow, close |
+| t38 | photo-1634826833404-b51e7ddcc3b0 | Mirror selfie in a dark doorway |
+| t39 | photo-1568219656418-15c329312bf1 | Hand on a tabla |
+| t40 | photo-1519639715757-0c88449f9048 | Laptop at a window desk |
+| t41 | photo-1753272363249-d9bd81d80f89 | Silhouette at a sunset balcony |
+| t42 | photo-1633411988188-6e63354a9019 | Hands on a tabla |
+| t43 | photo-1772714037381-cf6a20be3152 | Tabby cat beside a potted plant |
+| t44 | photo-1570797803365-c6eb43b1f040 | Hands playing a tabla pair |
+| t45 | page a-person-holding-a-violin-ya6PWTtPlkw | Fingers on violin strings |
+| t46 | photo-1761934798152-bf0c739808f7 | Back of the head at night |
+| t47 | photo-1586149663840-3d4dc1b6c681 | Seen from behind in black and white |
+| t48 | photo-1779081764094-150614ee6371 | Silhouette on the shore at sunset |
+| t49 | photo-1760146933340-d7697ffb0fd6 | Hands at a grand piano |
+| t50 | photo-1654686474914-bb98f6280d10 | Hands on a laptop by a window |
+| t51 | photo-1589666629225-750e2f7875f5 | Fingers on piano keys, close |
+| t52 | photo-1638029351298-6f5966e8754c | Orange hoodie in a garden |
+| t53 | photo-1758748930304-4f2735578156 | Black and white cat on a windowsill |
+| t54 | photo-1751554827598-c96cb294c0e6 | Car mirror selfie with a camera |
+| t55 | photo-1776729870224-36f0bf5c2cda | Tabby cat at a window |
+| t56 | photo-1518020382113-a7e8fc38eac9 | Pug in a denim jacket |
+| t57 | photo-1743506444917-38047eabb60a | Black and white dog |
+| t58 | photo-1516366434321-728a48e6b7bf | Golden dog resting its chin |
+| t59 | photo-1778945469600-bef900cec017 | Small figure under a dramatic sky |
+| t60 | photo-1642789009978-209023f28a5d | Phone held up at night |
+| t61 | photo-1724390409130-20e9b8ddf921 | Phone held up, taking a photo |
+| t62 | photo-1774269792790-bfa70fecb79a | Silhouette against a sunset sky |
+| t63 | photo-1765161794532-4dd677d321d2 | Silhouette on a hill at dusk |
+| t64 | photo-1777132769515-ea5d119ec102 | Seen from behind at sunset |
+| t65 | photo-1772234153865-71128db6ad87 | Grey hoodie, seen from behind |
+| t66 | photo-1724441400168-b46f8b0ff41e | Navy hoodie, seen from behind |
+| t67 | photo-1742522197047-0fbf649b17bc | Hood up, seen from behind |
+| t68 | photo-1610901190603-a334521b81b5 | Orange jacket on a snowy street |
 
-The purge script clears them with the profiles.

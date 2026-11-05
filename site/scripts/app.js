@@ -21,7 +21,6 @@ import '../styles/mobile-app.css';
 import '../styles/skeleton.css';
 import '../styles/aura-theme.css';
 import '../styles/handoff.css';
-import '../styles/ignition.css'; // D-186: the loading screen's title
 import { supabase, compressImageOnly, rowToProfile, saveProfile, isPresetCoverUrl, onboardingStatus, sendSignal, fetchSignalQuota, isRateLimited, isStorageImageUrl, withoutCredentials, uploadMessageAttachment, removeMessageAttachment, uploadCommunityPostImage, removeCommunityPostImage, ImageProcessingError, PHOTO_ERROR_MESSAGE, PHOTO_FRAMER_ERROR, compressAttachmentFiles, attachmentKind, reportMember, setSensitiveConsent, fetchSensitiveConsentAt, fetchMyInterests, fetchInterestNodes, addMemberInterest, isMissingFunction, touchPresence, connectionPresence, setPresenceVisible, myPresenceVisible, setMemberInterests, uploadResume, removeResume, resumeSignedUrl, resumeInfo, clearResumePath, searchPlaces, setHomeCity, setHomeLocation, listEvents, setEventRsvp, setCompanionDefault, myEventPrefs, eventCompanions, saveMemberEvent, cancelMemberEvent, deleteMemberEvent, uploadEventImage, removeEventImages, setEventInterest, setEventBrochure, uploadEventBrochure, removeEventBrochures, companionEvents, companionDeck, companionSwipe, companionQuota, createPaymentOrder, verifyPayment, sendEventTicket, editMessage, unsendMessage, deleteMessageForMe, myCompanionMatches, markCompanionMatchSeen, sendConnectRequest, setNearbyEnabled, myNearbySetting, nearbyPulse, nearbyClear, myNearbyAlerts, setNearbyMuted, nearbyDiscover, nearbyPass, nearbyConnect, myNearbyMatches, myNotifications, markNotificationsRead, dismissNotification, setNearbyRadius, savePushSubscription, deletePushSubscription, sendPendingPush, searchCompanies, searchCompanyDirectory, companyLogoUrl, addCompany, setMyWork, memberWork, uploadCompanyLogo, markMessagesDelivered, markConversationRead, markChatSeen, myChatSeen, setReadReceipts, myReadReceipts, chatPeopleSearch } from './supabase.js';
 import { locateOnce, fallbackCopy } from './geo-locate.js';
 import { areaChangeMessage, AREA_HELPER, AREA_NO_MATCH } from './area-change.js';
@@ -233,7 +232,7 @@ const markChatRead = (personId) => {
   const at = chatReadState.read[String(personId)];
   if (at) pushChatSeen(personId, at);
 };
-// D-213 (0064): what the member has seen is also kept on the server, so a chat read (or the Chats tab opened) on the
+// D-215 (0064): what the member has seen is also kept on the server, so a chat read (or the Chats tab opened) on the
 // phone clears the laptop's bell and unread counts, and the other way round. Only the member's own rows; before 0064
 // both calls are missing and everything stays per device as before.
 let chatSeenMissing = false;
@@ -1267,7 +1266,7 @@ const companionsPage = createCompanionsPage({
   me: () => ({ name: memberProfile.name || 'You', photoUrl: memberProfile.photoUrl || memberProfile.photo_url || '' }),
   toast: (message) => showToast(message),
   isMissing: isMissingFunction,
-  // D-211: a connected companion's profile says so and offers to text them to make a plan.
+  // D-214: a connected companion's profile says so and offers to text them to make a plan.
   openProfile: (person) => openPublicProfile({ id: person.id, name: person.name, image: person.photoUrl, photoUrl: person.photoUrl, role: person.headline || 'Brivia member', tags: person.interests },
     person.connected ? { status: 'connected', makePlan: true, onMessage: () => { void openCompanionConversation(person); } } : {}),
   openConversation: async (person) => { markCompanionSeenLocally(String(companionMatches.find((m) => m.otherId === String(person.id))?.id || '')); await openCompanionConversation(person); },

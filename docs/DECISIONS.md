@@ -3936,13 +3936,46 @@ Pass and Pitch".
   the headline column, where that fill read as a pale strip; from 850 px it has none. On a phone the hint sits over
   the room photo, where the fill keeps it readable (the deck spec's contrast check), so it stays there.
 
-## D-210 (2026-11-05): the intro lasts 4 seconds
+
+## D-210 (2026-11-05): new profile photos for every seeded member: mirror selfies, sky, city and desks
+- **Asked:** "for all the test profiles add some good profile pictures for all those whose profile picture was updated
+  today". This also delivers D-194 (the founder's earlier ask for sky, office-desk, laptop and mirror-selfie photos).
+- **Done:** all 68 `site/public/test-avatars/tNN.webp` files replaced. The D-188 set was mostly close-ups of hands and
+  objects, and t59-t68 were second crops of other members' photos; the new set looks like photos people actually use
+  on a profile: mirror selfies with the phone or camera over the face, people seen from behind against the sky or a
+  city, sunset silhouettes, hoodies on a street, and desk-and-laptop shots. All 68 are distinct, free under the Unsplash
+  License, cropped to 480 px WebP (2.4 MB in total) and checked by eye: no face is visible in any of them (D-156 still
+  holds). Men's and women's profiles get matching photos, the seeded hirers get desk photos, and "Prefer not to say"
+  and t61-t68 get neutral ones. The sources are listed in `supabase/seed/README.md`; the D-177 and D-188 tables are
+  superseded.
+- **Live:** the file names did not change, so the deploy is all it takes. There is no SQL to run.
+
+## D-211 (2026-11-05): pets and instruments for some seeded profiles
+- **Asked:** "use some pets, music instruments and all as well for some people picture".
+- **Done:** 25 of the 68 D-210 photos are now a pet or an instrument, so the deck no longer looks like 68 people seen
+  from behind. Members whose interests include an instrument get it: guitar (t02, t10, t23), piano (t22, t49, t51),
+  violin (t29, t37, t45, the D-188 photos brought back) and tabla (t39, t42, t44). Thirteen others get a dog or a cat
+  (t09, t12, t14, t20, t24, t27, t35, t43 with her houseplants, t53, t55, t56, t57, t58). No human face in any of them;
+  sources in `supabase/seed/README.md`. Same file names, so live with the deploy and no SQL.
+
+## D-212 (2026-11-05): the sign-in loading screen is the classic "Opening your club" splash again
+- **Asked (founder, 2026-11-05):** "before today i had a loader for signup and register; now the animation I added
+  before the landing page took over the loaders also. Let the black Brivia Club animation be there on the landing page
+  but bring back the loader screens as they were."
+- **Decision:** D-186 (was D-180) put the ignition on black into `.brivia-handoff` on auth.html and app.html. That part
+  is reverted to the D-088 splash exactly as it was before (aura background, "the Brivia Club" mark, sliding wine line,
+  OPENING YOUR CLUB): markup, `handoff.css`, no ignition.css or Bodoni preload on those pages, no cue on sign-in, and
+  no `brivia-ignition-settled` still-cut hand-over. The landing's intro (`#intro-burst`) keeps the ignition and its music.
+- **Proof:** unit `brivia-ignition.test.mjs` now checks the title is on the landing and the classic loader (not the
+  ignition) is on auth and app; screenshots of the landing intro and the auth loader at 390 and 1440 px.
+
+## D-213 (2026-11-05): the intro lasts 4 seconds
 
 Founder: "reduce the intro video before landing page a little". Supersedes D-201's 5 s. THE BRIVIA CLUB is complete at
 2.67 s and now holds for about a second; the landing starts fading in at 3.5 s (`INTRO_HOLD_MS`) and the intro is gone
 at 4.0 s, also the cap (`INTRO_CAP_MS`). Measured: gone at 3.96-3.98 s at 375 and 1440 px.
 
-## D-211 (2026-11-05): connections who want company show in Companions, with "Text them · Make a plan"
+## D-214 (2026-11-05): connections who want company show in Companions, with "Text them · Make a plan"
 
 Founder: "no matter if the person is added or not, if they turn on companion button i want their profile to be shown in
 that section, and when i view it, it must show you are already connected, and then a button of Text Them and make a
@@ -3956,22 +3989,8 @@ new for now").
   the same button.
 - Mutual consent is unchanged: only existing connections are marked, and nothing is sent or matched by viewing.
 
-## D-212 (2026-11-05): seeded members' photos are skies, desks, laptops and faceless mirror selfies
 
-Founder: "set pfps of sky, office desk, laptop aur mirror selfies of people but must not look ai" (for every seeded
-member). Supersedes the D-177 / D-188 photos (which matched each member's interests; t59-t68 were temporary crops).
-- All 68 seeded members now show a real Unsplash photograph (free license only, no Unsplash+): 35 skies and clouds, 15
-  office desks and workspaces, 14 laptops, 4 mirror selfies, mixed evenly across t01-t68. Same file names in
-  `site/public/test-avatars/`, so no database change.
-- Not AI: Unsplash results credited to "Microsoft Copilot" (AI images) and 3D-rendered offices were left out.
-- No faces: every crop was checked by eye. Mirror selfies where the face shows even partly were rejected; only four of
-  the free ones hide the face completely behind the phone or camera, so the other kinds take the remaining places.
-- How: the container cannot reach Unsplash, so Unsplash search pages filtered to the free license were captured with
-  Firecrawl (7 captures instead of one per photo) and each photo cut from the page; sources in supabase/seed/README.md.
-  (Planned as D-194 while Firecrawl's credits were exhausted; done once they reset.)
-
-
-## D-213 (2026-11-05): a chat read on one device is read on all; the Hiring switch stays visible when on
+## D-215 (2026-11-05): a chat read on one device is read on all; the Hiring switch stays visible when on
 
 - Founder: "pls do clear old notifications once the user opens the chats on either phone or laptop, also the hiring
   button once we turn on gets disappeared, how will user turn it off".
@@ -3985,7 +4004,7 @@ member). Supersedes the D-177 / D-188 photos (which matched each member's intere
 - Hiring: `smooth.css` forced a cream background (`!important`) on `#hiring-toggle`, so when on, its cream label and
   knob sat on cream: a blank white pill. The on state now keeps the deep-wine background. Checked in hiring.spec.
 
-## D-214 (2026-11-06): signup's second screen asks for title and organisation, not "Are you 18 or older?"
+## D-216 (2026-11-06): signup's second screen asks for title and organisation, not "Are you 18 or older?"
 
 - Founder (with a screenshot of Step 2 of 5): "remove this 18 year or older and instead put those title and company
   organisation box make sure logo for every company is there".
@@ -4004,7 +4023,7 @@ member). Supersedes the D-177 / D-188 photos (which matched each member's intere
   fetches) never got one from the site-icon sources. The directory Edge Function's logo pass now also tries the logo
   Wikidata lists for the company's name; it runs when the function is deployed.
 
-## D-215 (2026-11-06): unlimited hiring roles; a role's description up to 1000 words
+## D-217 (2026-11-06): unlimited hiring roles; a role's description up to 1000 words
 
 - Founder (screenshots of the role sheet, "Role 2 of 3", "0 / 200"): "make the limit to 1000 words for this, also
   hirings can be unlimited".

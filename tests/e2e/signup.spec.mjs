@@ -136,7 +136,7 @@ const setup = async (context, opts = {}) => {
       const q = ((url.searchParams.get('or') || '').match(/name\.ilike\.\*([^*]*)\*/) || [])[1] || '';
       return json(200, places.filter((pl) => !q || pl.name.toLowerCase().includes(q.toLowerCase())));
     }
-    // D-214: the organisation search on the work screen (0065: no session needed), and the save at setup's Finish.
+    // D-216: the organisation search on the work screen (0065: no session needed), and the save at setup's Finish.
     if (p.startsWith('/storage/v1/object/public/company-logos/')) return route.fulfill({ status: 200, contentType: 'image/png', body: PHOTO_PNG, headers });
     if (rpc === 'search_companies') {
       const q = String(JSON.parse(body || '{}').p_q || '').toLowerCase();
@@ -753,7 +753,7 @@ try {
     const leaked = calls.filter((c) => (COORD_RE.test(c.url) || COORD_RE.test(c.body)) && !c.path.endsWith('/set_home_location'));
     const stored = await page.evaluate(() => JSON.stringify({ ...localStorage, ...sessionStorage }));
     const upload = calls.findIndex((c) => c.path.startsWith('/storage/v1/object/profile-photos/'));
-    check(`${w} D-214: Finish saves the title from the work screen (set_my_work ${JSON.stringify(state.work)})`, () => {
+    check(`${w} D-216: Finish saves the title from the work screen (set_my_work ${JSON.stringify(state.work)})`, () => {
       assert.equal(state.work?.p_title, 'Analyst'); assert.equal(stored.includes('brivia-pending-work'), false);
     });
     check(`${w} submit: the framed photo is uploaded before the profile row is written, and the row stores it (${upload})`, () => {

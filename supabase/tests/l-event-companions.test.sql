@@ -120,12 +120,12 @@ begin
   reset role;
   if (select count(*) from public.event_companion_match where event_id = e1) <> 1 then raise exception 'FAIL L4: duplicate match'; end if;
   if not public.brivia_is_connection(pg_temp.cm(1), pg_temp.cm(2)) then raise exception 'FAIL L4: no Brivia connection (chat)'; end if;
-  -- D-211 (0063): now connected, each still sees the other while both want company: first, flagged connected.
+  -- D-214 (0063): now connected, each still sees the other while both want company: first, flagged connected.
   set local role authenticated;
   perform pg_temp.as_member(pg_temp.cm(1));
   if (select member_id from public.companion_deck_v2(e1, 20) limit 1) is distinct from pg_temp.cm(2)
      or not (select connected from public.companion_deck_v2(e1, 20) where member_id = pg_temp.cm(2)) then
-    raise exception 'FAIL L4: a connection who wants company is shown first, marked connected (D-211)'; end if;
+    raise exception 'FAIL L4: a connection who wants company is shown first, marked connected (D-214)'; end if;
   if exists (select 1 from public.companion_deck_v2(e1, 20) where member_id <> pg_temp.cm(2) and connected) then
     raise exception 'FAIL L4: only connections are marked connected'; end if;
   reset role;

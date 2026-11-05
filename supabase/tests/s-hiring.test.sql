@@ -91,7 +91,7 @@ begin
                                'React and TypeScript, a small product team.');
   perform public.save_hiring_role(null, 'Backend Developer', 'software', 'senior', 'onsite', 'refer', 'Lumen Labs', null);
   perform public.save_hiring_role(null, 'Design Intern', 'design', 'intern', 'remote', 'hiring', 'Lumen Labs', null);
-  -- D-215 (0066): no cap on roles; the about holds 1000 words, not 1001.
+  -- D-217 (0066): no cap on roles; the about holds 1000 words, not 1001.
   if pg_temp.err($q$select public.save_hiring_role(null, 'Data Analyst', 'data', 'mid', 'remote', 'hiring', null, repeat('word ', 1001))$q$) <> '22001' then
     raise exception 'FAIL H2: a 1001-word about was accepted'; end if;
   v4 := public.save_hiring_role(null, 'Data Analyst', 'data', 'mid', 'remote', 'hiring', null, btrim(repeat('word ', 1000)));

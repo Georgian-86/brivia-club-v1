@@ -1,5 +1,5 @@
 set lock_timeout = '5s';
--- 0065_signup_company_search.sql (D-214, founder 2026-11-06: "remove this 18 year or older and instead put those title
+-- 0065_signup_company_search.sql (D-216, founder 2026-11-06: "remove this 18 year or older and instead put those title
 -- and company organisation box make sure logo for every company is there"). Apply after 0064 (README "## 0065"), with
 -- the client deploy. 0001-0064 are frozen. Idempotent.
 --

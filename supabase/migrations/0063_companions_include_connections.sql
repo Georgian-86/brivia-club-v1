@@ -1,5 +1,5 @@
 set lock_timeout = '5s';
--- 0063_companions_include_connections.sql (D-211, founder 2026-11-05: "no matter if the person is added or not, if they
+-- 0063_companions_include_connections.sql (D-214, founder 2026-11-05: "no matter if the person is added or not, if they
 -- turn on companion button i want their profile to be shown in that section, and when i view it, it must show you are
 -- already connected, and then a button of Text Them and make a plan"). Apply after 0062 (README "## 0063"), with the
 -- client deploy. 0001-0062 are frozen. Idempotent.
@@ -32,7 +32,7 @@ as $$
       left join public.member_orbit o on o.member_id = p.id
       left join public.place pl on pl.id = o.place_id
      where public.brivia_visible_to(me.id, p.id)
-       -- D-211: a connection who also wants company is always shown (marked connected); others until swiped.
+       -- D-214: a connection who also wants company is always shown (marked connected); others until swiped.
        and (public.brivia_is_connection(me.id, p.id)
             or not exists (select 1 from public.event_companion_swipe s
                             where s.event_id = p_event and s.actor_id = me.id and s.target_id = p.id))),
@@ -79,7 +79,7 @@ as $$
          (select count(*)::int from public.event_rsvp r
            where r.event_id = e.id and r.member_id <> me.id and r.wants_companion and public.brivia_companion_status(r.status)
              and public.brivia_visible_to(me.id, r.member_id)
-             and (public.brivia_is_connection(me.id, r.member_id)   -- D-211: connections count, always
+             and (public.brivia_is_connection(me.id, r.member_id)   -- D-214: connections count, always
                   or not exists (select 1 from public.event_companion_swipe s
                                   where s.event_id = e.id and s.actor_id = me.id and s.target_id = r.member_id)))
     from me join public.club_event e on public.brivia_companion_eligible(e.id, me.id)

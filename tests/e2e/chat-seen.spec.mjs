@@ -1,4 +1,4 @@
-// Chats read on any device (D-213, 0064), against stubbed Supabase.
+// Chats read on any device (D-215, 0064), against stubbed Supabase.
 // PLAYWRIGHT_MODULE=/path/to/playwright/index.mjs node tests/e2e/chat-seen.spec.mjs   (Vite on :5191)
 // CS1 a conversation read on another device (my_chat_seen) clears its "messages from" row from the bell here.
 // CS2 opening the Chats tab clears the bell's message rows and tells the server (mark_chat_seen with p_other null).

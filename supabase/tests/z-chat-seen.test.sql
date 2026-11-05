@@ -1,4 +1,4 @@
--- 0064 (D-213): chats read on any device.
+-- 0064 (D-215): chats read on any device.
 -- Ids 0d640000-0000-4000-8000-0000000000NN: 01 A, 02 B.
 -- S1 mark_chat_seen stores the time for the caller only; it never moves backwards and never ahead of now().
 -- S2 p_other null is the Chats tab: my_chat_seen returns it with other_id null.

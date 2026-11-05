@@ -334,7 +334,7 @@ body.auth-page .auth-shell .guided .guided-bio-count { display: block; margin-to
 /* D-137: the bio word limit, a quiet wine note when the bio runs past 20 words. */
 body.auth-page .auth-shell .guided .guided-bio-count.is-over { color: var(--k-wine); font-weight: 600; }
 
-/* D-214: the organisation picker on signup's second screen. Every option leads with its logo on a white tile (or the
+/* D-216: the organisation picker on signup's second screen. Every option leads with its logo on a white tile (or the
    company's initials when it has none), like LinkedIn (D-144). */
 body.auth-page .auth-shell .guided .guided-company-option { display: flex; align-items: center; justify-content: flex-start; gap: 12px; text-align: left; }
 body.auth-page .auth-shell .guided :is(.guided-company-option, .guided-company-picked) .work-logo {

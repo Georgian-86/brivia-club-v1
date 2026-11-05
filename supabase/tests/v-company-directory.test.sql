@@ -3,7 +3,7 @@
 --    logo folder, at most 5 new ones a day; search finds it by name, prefix, typo and domain.
 -- C2 the directory cache dedupes by Wikidata id and domain; a verified company is ranked first.
 -- C3 set_my_work sets and clears title and company; member_work returns them for yourself; anon cannot call any of it.
---    0065 (D-214): anon may call search_companies (signup), and sees only the directory's own companies.
+--    0065 (D-216): anon may call search_companies (signup), and sees only the directory's own companies.
 set brivia.harness_autocomplete = 'off';
 begin;
 do $$
@@ -59,7 +59,7 @@ begin
   reset role;
   if not has_function_privilege('anon', 'public.search_companies(text,int)', 'execute') or has_function_privilege('anon', 'public.member_work(uuid[])', 'execute')
      or has_function_privilege('authenticated', 'public.brivia_cache_companies(jsonb)', 'execute') then raise exception 'FAIL C3: grants'; end if;
-  -- D-214: signed out, the directory's companies are found, a member's own organisation is not.
+  -- D-216: signed out, the directory's companies are found, a member's own organisation is not.
   set local role anon;
   if (select name from public.search_companies('goog') limit 1) is distinct from 'Google' then raise exception 'FAIL C3: anon search'; end if;
   if exists (select 1 from public.search_companies('mystartup')) then raise exception 'FAIL C3: anon sees a member''s organisation'; end if;

@@ -146,7 +146,7 @@ try {
       await context.close();
     }
 
-    // 2. Intro (D-196): opening the site plays it; it lasts 4 s: gone between 3500 and 4150 ms (D-210); a reload in the same
+    // 2. Intro (D-196): opening the site plays it; it lasts 4 s: gone between 3500 and 4150 ms (D-213); a reload in the same
     //    tab never replays it (a new tab would).
     {
       const context = await newContext(browser, viewport);

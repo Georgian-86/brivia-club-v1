@@ -1,5 +1,5 @@
 set lock_timeout = '5s';
--- 0064_chat_seen.sql (D-213, founder 2026-11-05: "pls do clear old notifications once the user opens the chats on
+-- 0064_chat_seen.sql (D-215, founder 2026-11-05: "pls do clear old notifications once the user opens the chats on
 -- either phone or laptop"). Apply after 0063 (README "## 0064"), with the client deploy. 0001-0063 are frozen.
 -- Idempotent.
 --

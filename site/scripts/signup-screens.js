@@ -258,7 +258,7 @@ export const initGuidedSignup = ({
       },
     }),
 
-    // D-214 (founder, 2026-11-06): the second screen asks for the member's title and organisation (it replaced "Are
+    // D-216 (founder, 2026-11-06): the second screen asks for the member's title and organisation (it replaced "Are
     // you 18 or older?"; continuing confirms it, and declare_adult is still recorded when the account is created).
     // Both optional. The organisation comes from the company directory, every option with its logo (or its initials on
     // a tile); a name the directory does not have is kept as typed and added once the account exists (setup's Finish).
@@ -498,7 +498,7 @@ export const initGuidedSignup = ({
         ready: () => Boolean(a.photo || a.photoUrl),
         notReady: () => COPY.photoMissing,
         submit: async () => {
-          // D-214: the title and organisation are saved with setup's Finish; kept here so a confirm-email detour keeps them.
+          // D-216: the title and organisation are saved with setup's Finish; kept here so a confirm-email detour keeps them.
           try { window.localStorage.setItem('brivia-pending-work', JSON.stringify({ title: cleanTitle(a.title), companyId: a.companyId, companyName: a.companyName })); } catch { /* answers stay in memory */ }
           const result = await submit({ ...a, adult: true });
           if (!result?.ok) return { screen: result?.screen || 'photo', message: result?.message || COPY.saveFailed };
