@@ -3949,3 +3949,11 @@ Pass and Pitch".
   and t61-t68 get neutral ones. The sources are listed in `supabase/seed/README.md`; the D-177 and D-188 tables are
   superseded.
 - **Live:** the file names did not change, so the deploy is all it takes. There is no SQL to run.
+
+## D-211 (2026-11-05): pets and instruments for some seeded profiles
+- **Asked:** "use some pets, music instruments and all as well for some people picture".
+- **Done:** 25 of the 68 D-210 photos are now a pet or an instrument, so the deck no longer looks like 68 people seen
+  from behind. Members whose interests include an instrument get it: guitar (t02, t10, t23), piano (t22, t49, t51),
+  violin (t29, t37, t45, the D-188 photos brought back) and tabla (t39, t42, t44). Thirteen others get a dog or a cat
+  (t09, t12, t14, t20, t24, t27, t35, t43 with her houseplants, t53, t55, t56, t57, t58). No human face in any of them;
+  sources in `supabase/seed/README.md`. Same file names, so live with the deploy and no SQL.

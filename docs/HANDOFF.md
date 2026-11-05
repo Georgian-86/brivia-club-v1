@@ -7,6 +7,8 @@ Update this file at the end of every session. CLAUDE.md holds the aim; this file
 
 ## 1. What is done
 
+**2026-11-05, D-211:** 25 seeded members' photos are now pets or instruments (matched to interests); no SQL.
+
 **2026-11-05, D-210:** all 68 seeded members have new faceless profile photos (mirror selfies with the phone over the
 face, sky and city views from behind, sunset silhouettes, desks with laptops); same file names, so live with the deploy
 (no SQL). Delivers D-194.
