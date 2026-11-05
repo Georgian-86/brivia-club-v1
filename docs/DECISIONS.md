@@ -3817,3 +3817,10 @@ too tight for long hackathons, exhibitions and seasons. The end date may now be 
 (0057, `MAX_EVENT_DAYS`), and the start-date picker goes back up to a year for an event already under way (the rule
 that it must not have ended is unchanged).
 
+## D-200 (2026-11-05): no limit on an event's length or how long ago it started
+
+Founder, seeing "An event can run for at most 30 days" (a tab still on the pre-D-199 client): "there must be no
+restriction like this". Supersedes D-199's year: the end date has no upper limit (form and 0058), and the start date
+has no lower limit in the picker. What remains: the end date is on or after the start date, the end comes after the
+start, and a published event must not have ended.
+

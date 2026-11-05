@@ -3,7 +3,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   EVENT_FORM_CATEGORIES, emptyDraft, draftFromEvent, validateEventDraft, firstErrorField, toServerFields, serverErrorField,
-  serverErrorMessage, imageFileProblem, previewEvent, isMapUrl, istInstant, todayIst, addDays, MAX_EVENT_DAYS, eventSpan,
+  serverErrorMessage, imageFileProblem, previewEvent, isMapUrl, istInstant, todayIst, addDays, eventSpan,
 } from '../../site/scripts/event-form.js';
 
 const NOW = new Date('2026-11-02T06:30:00Z'); // 12:00 IST
@@ -134,13 +134,12 @@ test('preview event: placeholders until filled, spots from capacity, fee', () =>
   assert.equal(q.organizer.name, 'Me');
 });
 
-test('D-197: an event can run over several days, ending after it starts and at most a year on', () => {
+test('D-197: an event can run over several days, ending after it starts with no upper limit', () => {
   assert.equal(addDays('2026-11-28', 5), '2026-12-03');
   assert.deepEqual(validateEventDraft({ ...good(), endDate: '2026-11-07' }, { publish: true, now: NOW }), {}, 'the same day is fine');
   assert.deepEqual(validateEventDraft({ ...good(), endDate: '2026-11-09', endTime: '17:00' }, { publish: true, now: NOW }), {}, 'ends earlier in the day, two days on');
   assert.match(validateEventDraft({ ...good(), endDate: '2026-11-06' }, { publish: true, now: NOW }).endDate, /before the start/);
-  assert.match(validateEventDraft({ ...good(), endDate: addDays('2026-11-07', MAX_EVENT_DAYS + 1) }, { now: NOW }).endDate, /at most a year/);
-  assert.deepEqual(validateEventDraft({ ...good(), endDate: addDays('2026-11-07', MAX_EVENT_DAYS) }, { publish: true, now: NOW }), {});
+  assert.deepEqual(validateEventDraft({ ...good(), endDate: '2028-02-15' }, { publish: true, now: NOW }), {}, 'D-200: no upper limit');
   assert.match(validateEventDraft({ ...good(), endDate: '2026-11-07', endTime: '17:00' }, { publish: true, now: NOW }).endTime, /after the start/);
   assert.equal(toServerFields({ ...good(), endDate: '2026-11-09' }).end_date, '2026-11-09');
   assert.equal(toServerFields(good()).end_date, '', 'blank: the server ends it on the start date');

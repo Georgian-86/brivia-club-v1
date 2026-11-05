@@ -7,7 +7,7 @@
 // removed or the dialog discarded) are removed again. The venue pin is sent once and only its ~2 km cell is kept.
 import {
   EVENT_FORM_CATEGORIES, CATEGORY_ROW, LIMITS, PHOTO_ACCEPT, emptyDraft, draftFromEvent, validateEventDraft, firstErrorField,
-  toServerFields, serverErrorField, serverErrorMessage, imageFileProblem, previewEvent, todayIst, addDays, MAX_EVENT_DAYS,
+  toServerFields, serverErrorField, serverErrorMessage, imageFileProblem, previewEvent, todayIst,
   BROCHURE_ACCEPT, brochureFileProblem, brochureDisplayName, COVER_ZOOM, coverCrop, coverOutputSize,
 } from './event-form.js';
 import { eventCardMarkup, eventDetailMarkup } from './events-view.js';
@@ -79,7 +79,7 @@ const shellMarkup = () => `<div class="ec-shell">
           ${field('endDate', 'End date', `<input id="ec-endDate" name="endDate" type="date" ${describedBy('endDate')} />`)}
           ${field('endTime', 'Ends', `<input id="ec-endTime" name="endTime" type="time" step="900" ${describedBy('endTime')} />`, { optional: true })}
         </div>
-        <p class="ec-hint ec-when-hint">Running over several days? Set the end date (up to a year). Already under way? Pick the day it started. No times means all day.</p>
+        <p class="ec-hint ec-when-hint">Running over several days? Set the end date. Already under way? Pick the day it started. No times means all day.</p>
         <div class="ec-row">
           ${field('venueName', 'Venue name', `<input id="ec-venueName" name="venueName" type="text" maxlength="${LIMITS.venueName}" autocomplete="off" placeholder="Battle Chess Skool" required ${describedBy('venueName')} />`)}
           ${field('city', 'City', `<div class="ec-combo"><input id="ec-city" name="city" type="text" role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="ec-city-list" autocomplete="off" spellcheck="false" placeholder="Start typing your city" required ${describedBy('city', true)} /><ul class="ec-combo-list" id="ec-city-list" role="listbox" aria-label="Cities" hidden></ul></div>`, { hint: 'Choose from the list, so people nearby can find it.' })}
@@ -249,7 +249,6 @@ export const createEventComposer = ({ dialog, api, memberId, organizer, safeImag
     form.querySelectorAll('input[name="paid"]').forEach((r) => { r.checked = (r.value === 'paid') === Boolean(draft.paid); });
     form.elements.contactPublic.checked = Boolean(draft.contactPublic);
     $('[data-ec-contact]').open = Boolean(draft.contactEmail || draft.contactPhone || draft.contactLink);
-    form.elements.date.min = addDays(todayIst(), -MAX_EVENT_DAYS);
     if (!draft.endDate || draft.endDate === draft.date) form.elements.endDate.dataset.follows = '1'; else delete form.elements.endDate.dataset.follows;
     syncEndDate();
     const feeLocked = draft.registeredCount > 0;
@@ -332,7 +331,6 @@ export const createEventComposer = ({ dialog, api, memberId, organizer, safeImag
   const syncEndDate = () => {
     const end = form.elements.endDate;
     end.min = draft.date || todayIst();
-    end.max = draft.date ? addDays(draft.date, MAX_EVENT_DAYS) : '';
   };
   const update = (e) => {
     if (e?.target === form.elements.date) {

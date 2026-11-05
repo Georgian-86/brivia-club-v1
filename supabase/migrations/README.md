@@ -1405,3 +1405,10 @@ and `select count(*) from pg_constraint where conname = 'club_event_member_capac
 `save_member_event` as 0056 with the end date allowed up to 365 days after the start date (was 30). Grants as 0022.
 Verify: `select prosrc like '%v_date + 365%' from pg_proc where proname = 'save_member_event';` (true).
 
+## 0058
+
+**No limit on how long an event runs (D-200).** Apply after `0057`, with the client deploy. Redefines
+`save_member_event` as 0057 without the upper limit on `end_date` (it must still be on or after the start date, and
+the end after the start). Grants as 0022.
+Verify: `select prosrc not like '%v_date + 365%' from pg_proc where proname = 'save_member_event';` (true).
+

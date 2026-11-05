@@ -116,11 +116,8 @@ begin
   c := pg_temp.code_of(format('select public.save_member_event(null, %L::jsonb, true)',
          pg_temp.fields(jsonb_build_object('end_date', to_char((now() at time zone 'Asia/Kolkata')::date + 4, 'YYYY-MM-DD')))));
   if c not like '22023:invalid end_date%' then raise exception 'FAIL M2: an end date before the start gave %', c; end if;
-  c := pg_temp.code_of(format('select public.save_member_event(null, %L::jsonb, true)',
-         pg_temp.fields(jsonb_build_object('end_date', to_char((now() at time zone 'Asia/Kolkata')::date + 371, 'YYYY-MM-DD')))));
-  if c not like '22023:invalid end_date%' then raise exception 'FAIL M2: an end date over a year gave %', c; end if;
-  -- D-199 (0057): up to a year is fine.
-  d := public.save_member_event(null, pg_temp.fields(jsonb_build_object('end_date', to_char((now() at time zone 'Asia/Kolkata')::date + 300, 'YYYY-MM-DD'))), true);
+  -- D-200 (0058): no upper limit on the end date.
+  d := public.save_member_event(null, pg_temp.fields(jsonb_build_object('end_date', to_char((now() at time zone 'Asia/Kolkata')::date + 800, 'YYYY-MM-DD'))), true);
   perform public.cancel_member_event(d); perform public.delete_member_event(d);
   c := pg_temp.code_of(format('select public.save_member_event(null, %L::jsonb, true)', pg_temp.fields('{"end_date": "2026-13-40"}')));
   if c not like '22023:invalid end_date%' then raise exception 'FAIL M2: a malformed end date gave %', c; end if;
