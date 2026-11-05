@@ -25,8 +25,16 @@ export const whenLines = (startsAt, endsAt) => {
   const date = start.toLocaleDateString('en-GB', { timeZone: IST, weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
   const t = (d) => d.toLocaleTimeString('en-US', { timeZone: IST, hour: 'numeric', minute: '2-digit' });
   const end = endsAt ? new Date(endsAt) : null;
-  const time = end && !Number.isNaN(end.getTime()) ? `${t(start)} – ${t(end)} IST` : `${t(start)} IST`;
-  return { date, time };
+  if (!end || Number.isNaN(end.getTime())) return { date, time: `${t(start)} IST` };
+  const day = (d) => d.toLocaleDateString('en-CA', { timeZone: IST });
+  if (day(end) !== day(start)) {
+    // D-197: a multi-day event, "Saturday, 8 November – Monday, 10 November 2026" and "7:00 PM, 8 Nov – 10:00 PM, 10 Nov IST".
+    const long = (d, year) => `${d.toLocaleDateString('en-GB', { timeZone: IST, weekday: 'long' })}, ${d.toLocaleDateString('en-GB', { timeZone: IST, day: 'numeric', month: 'long', ...(year ? { year: 'numeric' } : {}) })}`;
+    const short = (d) => d.toLocaleDateString('en-GB', { timeZone: IST, day: 'numeric', month: 'short' });
+    const sameYear = start.toLocaleDateString('en-GB', { timeZone: IST, year: 'numeric' }) === end.toLocaleDateString('en-GB', { timeZone: IST, year: 'numeric' });
+    return { date: `${long(start, !sameYear)} – ${long(end, true)}`, time: `${t(start)}, ${short(start)} – ${t(end)}, ${short(end)} IST` };
+  }
+  return { date, time: `${t(start)} – ${t(end)} IST` };
 };
 
 // A calendar invite (RFC 5545): UTC times, escaped text, CRLF lines folded at 75 octets.

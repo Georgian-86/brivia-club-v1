@@ -1387,3 +1387,12 @@ Verify: `select count(*) from pg_proc where proname = 'hiring_people';` (1) and
 refuses a reply to a message from another conversation. No grant change (members still cannot update messages).
 Verify: `select count(*) from information_schema.columns where table_name = 'brivia_messages' and column_name = 'reply_to_id';` (1).
 
+## 0056
+
+**Multi-day events (D-197).** Apply after `0022`, then deploy the client (an older client keeps working: without
+`end_date` an event ends on its start date, as before). Redefines `save_member_event` only: `p_fields.end_date`
+(YYYY-MM-DD, optional) may be the start date or up to 30 days after it ('invalid end_date' otherwise), and the end
+(date + time, IST) must come after the start ('invalid end_time'). Grants as 0022. Redeploy the `event-ticket`,
+`razorpay-verify` and `razorpay-webhook` functions so the ticket email names both days (`_shared/ticket-email.js`).
+Verify: `select prosrc like '%end_date%' from pg_proc where proname = 'save_member_event';` (true).
+

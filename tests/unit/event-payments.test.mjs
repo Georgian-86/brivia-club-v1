@@ -67,6 +67,9 @@ test('ticket codes are BRV- and six unambiguous characters', () => {
 test('times are shown in Indian time', () => {
   assert.deepEqual(whenLines(event.starts_at, event.ends_at), { date: 'Sunday, 8 November 2026', time: '7:00 PM – 10:00 PM IST' });
   assert.equal(whenLines('nope').date, 'Date to be announced');
+  assert.deepEqual(whenLines('2026-11-08T13:30:00Z', '2026-11-10T16:30:00Z'),
+    { date: 'Sunday, 8 November – Tuesday, 10 November 2026', time: '7:00 PM, 8 Nov – 10:00 PM, 10 Nov IST' }, 'D-197: several days');
+  assert.equal(whenLines('2026-12-31T13:30:00Z', '2027-01-02T16:30:00Z').date, 'Thursday, 31 December 2026 – Saturday, 2 January 2027');
 });
 
 test('the invitation: the event, the guest, the code, paid or free, links, and every value escaped', () => {

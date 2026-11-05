@@ -108,6 +108,15 @@ try {
     await page.fill('#ec-endTime', '17:00');
     check(`${w}: an end before the start is caught inline`, /after the start/.test(await page.locator('#ec-endTime-error').innerText()));
     await page.fill('#ec-endTime', '21:00');
+    // D-197: the end date follows the start date; set to a later day, the event runs over several days.
+    check(`${w}: the end date follows the start date`, await page.inputValue('#ec-endDate') === ymd(5) && await page.getAttribute('#ec-endDate', 'min') === ymd(5));
+    await page.fill('#ec-endDate', ymd(4));
+    check(`${w}: an end date before the start is caught inline`, /before the start/.test(await page.locator('#ec-endDate-error').innerText()));
+    await page.fill('#ec-endDate', ymd(7));
+    await page.fill('#ec-endTime', '17:00');
+    check(`${w}: a multi-day event may end earlier in the day`, (await page.locator('#ec-endTime-error').innerText()).trim() === '' && (await page.locator('#ec-endDate-error').innerText()).trim() === '');
+    check(`${w}: the preview names the day it ends`, / – \w{3} \d{1,2} \w{3}, 5:00 PM/.test(await page.locator('[data-ec-preview-card] .event-card-line').first().innerText()));
+    await shot(page, `multi-day-${w}.png`);
     await page.fill('#ec-venueName', 'Battle Chess Skool');
     await page.locator('#ec-city').click();
     await page.locator('#ec-city').pressSequentially('Beng');
@@ -193,7 +202,7 @@ try {
     // Live preview card.
     const card = await page.locator('[data-ec-preview-card] .event-card').innerText();
     check(`${w}: the live card shows title, category, time, venue, fee and spots (${JSON.stringify(card)})`,
-      /Bangalore Chess Meetup/.test(card) && /GAMES/.test(card) && /6:00 PM – 9:00 PM/.test(card) && /Battle Chess Skool, Bengaluru/.test(card) && /₹499 · 30 spots left/.test(card));
+      /Bangalore Chess Meetup/.test(card) && /GAMES/.test(card) && /6:00 PM – \w{3} \d{1,2} \w{3}, 5:00 PM/.test(card) && /Battle Chess Skool, Bengaluru/.test(card) && /₹499 · 30 spots left/.test(card));
     check(`${w}: the live card uses the poster`, await page.evaluate(() => /^blob:|event-posters/.test(document.querySelector('[data-ec-preview-card] .event-card-media img')?.src || '')));
     await page.locator('[data-ec-preview-card]').scrollIntoViewIfNeeded();
     await shot(page, `create-filled-${w}.png`);
@@ -215,7 +224,7 @@ try {
     const sent = body('save_member_event');
     const f = sent.p_fields || {};
     check(`${w}: Publish sends one save with every field (${JSON.stringify(f).slice(0, 160)}…)`, posted('save_member_event').length === 1 && sent.p_publish === true && sent.p_id === null
-      && f.title === 'Bangalore Chess Meetup' && f.category === 'games' && f.date === ymd(5) && f.start_time === '18:00' && f.end_time === '21:00'
+      && f.title === 'Bangalore Chess Meetup' && f.category === 'games' && f.date === ymd(5) && f.start_time === '18:00' && f.end_time === '17:00' && f.end_date === ymd(7)
       && f.place_id === 'in-bengaluru' && f.capacity === '30' && f.fee_inr === '499' && /event-posters/.test(f.image_url) && !('pin' in f));
     const br = body('set_event_brochure');
     check(`${w}: the brochure is set on the new event (${JSON.stringify(br)})`, br?.p_id === 'm-1' && /event-brochures\/.+\.pdf$/.test(br?.p_url || ''));

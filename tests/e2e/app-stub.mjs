@@ -400,12 +400,12 @@ export const startAppStub = async ({ port, state = {}, deckRows = defaultDeckRow
         if (st.saveError) { const err = st.saveError; st.saveError = null; return json(400, err); }
         const f = args.p_fields || {};
         const id = args.p_id || `m-${st.saved.length}`;
-        const at = (t) => (f.date && t ? new Date(`${f.date}T${t}:00+05:30`).toISOString() : null);
+        const at = (t, d = f.date) => (d && t ? new Date(`${d}T${t}:00+05:30`).toISOString() : null);
         const place = (st.places || []).find((p) => p.id === f.place_id);
         const old = st.events.find((x) => x.id === id) || {};
         const row = {
           ...old, id, title: f.title, description: f.description, category: f.category || 'other', custom_category: f.custom_category || null, tags: [], venue_name: f.venue_name || null,
-          venue_area: place?.name || null, venue_address: f.venue_address || '', place_id: f.place_id || '', starts_at: at(f.start_time), ends_at: at(f.end_time),
+          venue_area: place?.name || null, venue_address: f.venue_address || '', place_id: f.place_id || '', starts_at: at(f.start_time), ends_at: at(f.end_time, f.end_date || f.date),
           image_key: '', image_url: f.image_url || '', gallery_urls: f.gallery_urls || [], map_url: f.map_url || '', distance_km: place ? 3 : null,
           going_count: old.going_count || 0, companion_count: old.companion_count || 0, going: Boolean(old.going), wants_companion: Boolean(old.wants_companion),
           friends: [], status: args.p_publish ? 'published' : 'draft', is_mine: true, organizer: { id: (st.own || ownRow).id, name: (st.own || ownRow).name, photo_url: null },

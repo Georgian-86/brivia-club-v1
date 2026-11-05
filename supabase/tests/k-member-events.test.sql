@@ -109,6 +109,21 @@ begin
   if c not like '22023:invalid date%' then raise exception 'FAIL M2: past date gave %', c; end if;
   c := pg_temp.code_of(format('select public.save_member_event(null, %L::jsonb, true)', pg_temp.fields('{"end_time": "17:00"}')));
   if c not like '22023:invalid end_time%' then raise exception 'FAIL M2: end before start gave %', c; end if;
+  -- D-197 (0056): an event may end on a later day, up to 30 days after its start date, never before it starts.
+  d := public.save_member_event(null, pg_temp.fields(jsonb_build_object('end_date', to_char((now() at time zone 'Asia/Kolkata')::date + 7, 'YYYY-MM-DD'), 'end_time', '17:00')), true);
+  if (select ends_at - starts_at from public.list_events(null) where id = d) is distinct from interval '1 day 23 hours' then raise exception 'FAIL M2: a multi-day event keeps its end date'; end if;
+  perform public.cancel_member_event(d); perform public.delete_member_event(d);
+  c := pg_temp.code_of(format('select public.save_member_event(null, %L::jsonb, true)',
+         pg_temp.fields(jsonb_build_object('end_date', to_char((now() at time zone 'Asia/Kolkata')::date + 4, 'YYYY-MM-DD')))));
+  if c not like '22023:invalid end_date%' then raise exception 'FAIL M2: an end date before the start gave %', c; end if;
+  c := pg_temp.code_of(format('select public.save_member_event(null, %L::jsonb, true)',
+         pg_temp.fields(jsonb_build_object('end_date', to_char((now() at time zone 'Asia/Kolkata')::date + 36, 'YYYY-MM-DD')))));
+  if c not like '22023:invalid end_date%' then raise exception 'FAIL M2: an end date over 30 days gave %', c; end if;
+  c := pg_temp.code_of(format('select public.save_member_event(null, %L::jsonb, true)', pg_temp.fields('{"end_date": "2026-13-40"}')));
+  if c not like '22023:invalid end_date%' then raise exception 'FAIL M2: a malformed end date gave %', c; end if;
+  c := pg_temp.code_of(format('select public.save_member_event(null, %L::jsonb, true)',
+         pg_temp.fields(jsonb_build_object('end_date', to_char((now() at time zone 'Asia/Kolkata')::date + 5, 'YYYY-MM-DD'), 'end_time', '17:00'))));
+  if c not like '22023:invalid end_time%' then raise exception 'FAIL M2: same end date, earlier time gave %', c; end if;
   c := pg_temp.code_of(format('select public.save_member_event(null, %L::jsonb, true)', pg_temp.fields('{"date": "31-31-2026"}')));
   if c not like '22023:invalid date%' then raise exception 'FAIL M2: a malformed date gave %', c; end if;
   c := pg_temp.code_of(format('select public.save_member_event(null, %L::jsonb, true)', pg_temp.fields('{"venue_address": ""}')));

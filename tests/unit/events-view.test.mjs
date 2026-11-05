@@ -2,7 +2,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  EVENT_CATEGORIES, isEventCategory, eventDateBadge, eventTimeRange, distanceLabel, goingLabel, companionLabel,
+  EVENT_CATEGORIES, isEventCategory, eventDateBadge, eventTimeRange, eventDayCount, distanceLabel, goingLabel, companionLabel,
   otherCompanions, normalizeEvent, withRsvp, nearbyEvents, filterEvents, eventCardMarkup, eventDetailMarkup,
   companionRowMarkup, companionNote,
 } from '../../site/scripts/events-view.js';
@@ -303,4 +303,11 @@ test('drawer: the brochure link only for a checked URL; the map link has its ico
   assert.match(html, /Event brochure/);
   assert.match(html, /class="event-map-link"[^>]*><svg[^>]*>.*<span>Open in Google Maps<\/span>/s);
   assert.ok(!eventDetailMarkup(e, { brochureSrc: 'javascript:alert(1)' }).includes('event-brochure'));
+});
+
+test('D-197: a multi-day event names the day it ends', () => {
+  assert.equal(eventTimeRange('2026-11-06T12:30:00Z', '2026-11-08T15:30:00Z'), '6:00 PM – Sun 8 Nov, 9:00 PM');
+  assert.equal(eventDayCount('2026-11-06T12:30:00Z', '2026-11-08T15:30:00Z'), 3);
+  assert.equal(eventDayCount('2026-11-06T12:30:00Z', '2026-11-06T15:30:00Z'), 1);
+  assert.equal(eventDayCount('2026-11-06T12:30:00Z', null), 1);
 });

@@ -3777,3 +3777,20 @@ solitaire shuffle; D-179's intro deal and D-185's pile-and-flip deal are not use
   opening half-second; the rest are borderline (about 12 ms at full speed). Waiting for idle before starting was tried
   and measured worse, so it was not kept.
 
+## D-197 (2026-11-05): events can run over several days
+
+Founder: "the event can take more days as well". The New Event form had one date with a start and end time, so a
+festival, a hackathon or a weekend retreat could not be listed honestly.
+- The form now has Start date, Starts, End date, Ends (two by two, also on a phone). The end date follows the start
+  date until the organiser moves it to a later day, so a one-day event is filled exactly as before; it cannot be set
+  before the start date or more than 30 days after it (`MAX_EVENT_DAYS`), and the end must come after the start, so a
+  multi-day event may end earlier in the day than it started (6 PM Friday to 5 PM Sunday).
+- 0056 redefines `save_member_event` with the same rules (`end_date`, 'invalid end_date'); blank means the start date,
+  so the deployed client keeps working before and after the migration. `club_event.ends_at` was already a full
+  timestamp, and the listing/registration rules (`brivia_event_open`) already use it, so a multi-day event stays open
+  until it ends.
+- Display: a card or the detail reads "6:00 PM – Sun 8 Nov, 9:00 PM" when the end falls on another day (IST); the
+  ticket email reads "Sunday, 8 November – Tuesday, 10 November 2026" and "7:00 PM, 8 Nov – 10:00 PM, 10 Nov IST";
+  the calendar invite already used the real start and end.
+- 30 days is a guard against typos (a year in the wrong field), not a product limit; longer runs can be raised later.
+

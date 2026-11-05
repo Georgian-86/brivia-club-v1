@@ -7,7 +7,7 @@
 // removed or the dialog discarded) are removed again. The venue pin is sent once and only its ~2 km cell is kept.
 import {
   EVENT_FORM_CATEGORIES, CATEGORY_ROW, LIMITS, PHOTO_ACCEPT, emptyDraft, draftFromEvent, validateEventDraft, firstErrorField,
-  toServerFields, serverErrorField, serverErrorMessage, imageFileProblem, previewEvent, todayIst,
+  toServerFields, serverErrorField, serverErrorMessage, imageFileProblem, previewEvent, todayIst, addDays, MAX_EVENT_DAYS,
   BROCHURE_ACCEPT, brochureFileProblem, brochureDisplayName, COVER_ZOOM, coverCrop, coverOutputSize,
 } from './event-form.js';
 import { eventCardMarkup, eventDetailMarkup } from './events-view.js';
@@ -73,11 +73,13 @@ const shellMarkup = () => `<div class="ec-shell">
 
       <section class="ec-section" aria-labelledby="ec-s2">
         <h3 id="ec-s2"><span aria-hidden="true">02</span>Date, time &amp; venue</h3>
-        <div class="ec-row ec-row-3">
-          ${field('date', 'Date', `<input id="ec-date" name="date" type="date" required ${describedBy('date')} />`)}
+        <div class="ec-row ec-row-when">
+          ${field('date', 'Start date', `<input id="ec-date" name="date" type="date" required ${describedBy('date')} />`)}
           ${field('startTime', 'Starts', `<input id="ec-startTime" name="startTime" type="time" step="900" required ${describedBy('startTime')} />`)}
+          ${field('endDate', 'End date', `<input id="ec-endDate" name="endDate" type="date" ${describedBy('endDate')} />`)}
           ${field('endTime', 'Ends', `<input id="ec-endTime" name="endTime" type="time" step="900" required ${describedBy('endTime')} />`)}
         </div>
+        <p class="ec-hint ec-when-hint">Running over several days? Set the end date (up to ${MAX_EVENT_DAYS} days after it starts).</p>
         <div class="ec-row">
           ${field('venueName', 'Venue name', `<input id="ec-venueName" name="venueName" type="text" maxlength="${LIMITS.venueName}" autocomplete="off" placeholder="Battle Chess Skool" required ${describedBy('venueName')} />`)}
           ${field('city', 'City', `<div class="ec-combo"><input id="ec-city" name="city" type="text" role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="ec-city-list" autocomplete="off" spellcheck="false" placeholder="Start typing your city" required ${describedBy('city', true)} /><ul class="ec-combo-list" id="ec-city-list" role="listbox" aria-label="Cities" hidden></ul></div>`, { hint: 'Choose from the list, so people nearby can find it.' })}
@@ -239,7 +241,7 @@ export const createEventComposer = ({ dialog, api, memberId, organizer, safeImag
   const dirty = () => snapshot() !== saved;
 
   // Form <-> draft ---------------------------------------------------------------------------------------------------
-  const TEXT = ['title', 'customCategory', 'description', 'date', 'startTime', 'endTime', 'venueName', 'venueAddress', 'mapUrl', 'capacity', 'fee', 'contactEmail', 'contactPhone', 'contactLink'];
+  const TEXT = ['title', 'customCategory', 'description', 'date', 'endDate', 'startTime', 'endTime', 'venueName', 'venueAddress', 'mapUrl', 'capacity', 'fee', 'contactEmail', 'contactPhone', 'contactLink'];
   const fill = () => {
     TEXT.forEach((n) => { const el = form.elements[n]; if (el) el.value = draft[n] ?? ''; });
     cityInput.value = draft.city || '';
@@ -248,6 +250,8 @@ export const createEventComposer = ({ dialog, api, memberId, organizer, safeImag
     form.elements.contactPublic.checked = Boolean(draft.contactPublic);
     $('[data-ec-contact]').open = Boolean(draft.contactEmail || draft.contactPhone || draft.contactLink);
     form.elements.date.min = todayIst();
+    if (!draft.endDate || draft.endDate === draft.date) form.elements.endDate.dataset.follows = '1'; else delete form.elements.endDate.dataset.follows;
+    syncEndDate();
     const feeLocked = draft.registeredCount > 0;
     form.querySelectorAll('input[name="paid"]').forEach((r) => { r.disabled = feeLocked; });
     form.elements.fee.disabled = feeLocked;
@@ -324,16 +328,28 @@ export const createEventComposer = ({ dialog, api, memberId, organizer, safeImag
     target?.focus({ preventScroll: true });
   };
 
-  const update = () => {
-    read(); renderFee(); renderCounts(); renderPreview();
+  // D-197: the end date follows the start date until it is set to a later day; it can never sit before it.
+  const syncEndDate = () => {
+    const end = form.elements.endDate;
+    end.min = draft.date || todayIst();
+    end.max = draft.date ? addDays(draft.date, MAX_EVENT_DAYS) : '';
+  };
+  const update = (e) => {
+    if (e?.target === form.elements.date) {
+      const start = form.elements.date.value;
+      const end = form.elements.endDate;
+      if (start && (!end.value || end.value < start || end.dataset.follows === '1')) { end.value = start; end.dataset.follows = '1'; }
+    }
+    if (e?.target === form.elements.endDate) delete form.elements.endDate.dataset.follows;
+    read(); syncEndDate(); renderFee(); renderCounts(); renderPreview();
     if (tried) showErrors(validateEventDraft(draft, { publish: true }));
     status.textContent = '';
   };
   form.addEventListener('input', (e) => {
     if (e.target === cityInput) return;
-    update();
+    update(e);
   });
-  form.addEventListener('change', (e) => { if (e.target.type === 'file') return; update(); });
+  form.addEventListener('change', (e) => { if (e.target.type === 'file') return; update(e); });
   // Enter in a field must never publish by accident: only the footer buttons save.
   form.addEventListener('submit', (e) => e.preventDefault());
 

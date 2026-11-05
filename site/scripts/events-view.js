@@ -51,11 +51,22 @@ const clock = (date) => {
   const p = parts(date, { hour: 'numeric', minute: '2-digit', hour12: true });
   return `${p.hour}:${p.minute} ${String(p.dayPeriod).toUpperCase()}`;
 };
-// '6:00 PM – 9:00 PM'; an open-ended event ends 'Late'.
+const istDay = (date) => new Intl.DateTimeFormat('en-CA', { timeZone: EVENT_TIME_ZONE, year: 'numeric', month: '2-digit', day: '2-digit' }).format(date);
+const shortDay = (date) => new Intl.DateTimeFormat('en-GB', { timeZone: EVENT_TIME_ZONE, weekday: 'short', day: 'numeric', month: 'short' }).format(date).replace(',', '');
+// The number of calendar days (IST) an event runs over: 1 for a same-day event, 3 for Thu to Sat (D-197).
+export const eventDayCount = (startsAt, endsAt) => {
+  const start = toDate(startsAt);
+  const end = endsAt ? toDate(endsAt) : null;
+  if (!start || !end) return 1;
+  return Math.max(1, Math.round((Date.parse(istDay(end)) - Date.parse(istDay(start))) / 86400000) + 1);
+};
+// '6:00 PM – 9:00 PM'; an open-ended event ends 'Late'; one that ends on a later day names that day,
+// '6:00 PM – Sat 8 Nov, 9:00 PM' (D-197).
 export const eventTimeRange = (startsAt, endsAt) => {
   const start = toDate(startsAt);
   if (!start) return '';
   const end = endsAt ? toDate(endsAt) : null;
+  if (end && istDay(end) !== istDay(start)) return `${clock(start)} – ${shortDay(end)}, ${clock(end)}`;
   return `${clock(start)} – ${end ? clock(end) : 'Late'}`;
 };
 

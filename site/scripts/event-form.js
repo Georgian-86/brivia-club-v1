@@ -48,7 +48,7 @@ export const isContactPhone = (value) => /^\+?[0-9][0-9 ()-]{6,19}$/.test(String
 export const isContactLink = (value) => { const v = String(value || '').trim(); return v.length <= 300 && /^https:\/\/[^\s"'<>\\]+$/.test(v); };
 
 export const emptyDraft = () => ({
-  id: null, status: 'new', title: '', category: '', customCategory: '', description: '', date: '', startTime: '', endTime: '',
+  id: null, status: 'new', title: '', category: '', customCategory: '', description: '', date: '', endDate: '', startTime: '', endTime: '',
   venueName: '', venueAddress: '', placeId: '', city: '', pin: null, mapUrl: '', capacity: '', paid: false, fee: '',
   contactEmail: '', contactPhone: '', contactLink: '', contactPublic: false, imageUrl: '', gallery: [],
   registeredCount: 0, brochureUrl: '', brochureName: '',
@@ -72,6 +72,7 @@ export const draftFromEvent = (event) => {
     id: event.id, status: event.status || 'draft', title: event.title || '', category: FORM_KEYS.has(event.category) ? event.category : '',
     customCategory: event.category === 'other' ? event.customCategory || '' : '',
     description: event.description || '', date: start?.date || '', startTime: start?.time || '', endTime: end?.time || '',
+    endDate: end?.date || '',
     venueName: event.venueName || '', venueAddress: event.venueAddress || '', placeId: event.placeId || '', city: event.placeId ? event.venueArea || '' : '',
     mapUrl: event.mapUrl || '', capacity: event.capacity ? String(event.capacity) : '', paid: event.feeInr > 0, fee: event.feeInr > 0 ? String(event.feeInr) : '',
     contactEmail: contact.email || '', contactPhone: contact.phone || '', contactLink: contact.link || '', contactPublic: Boolean(contact.public),
@@ -79,6 +80,16 @@ export const draftFromEvent = (event) => {
     brochureUrl: event.brochureUrl || '', brochureName: event.brochureUrl ? 'Event brochure.pdf' : '',
     originalStart: event.startsAt || null,
   };
+};
+
+// D-197: the longest an event may run, in days after its start date (the server checks the same).
+export const MAX_EVENT_DAYS = 30;
+// YYYY-MM-DD plus n days (calendar arithmetic in UTC, so no time zone shifts the date).
+export const addDays = (date, n) => {
+  const d = new Date(`${date}T00:00:00Z`);
+  if (Number.isNaN(d.getTime())) return '';
+  d.setUTCDate(d.getUTCDate() + n);
+  return d.toISOString().slice(0, 10);
 };
 
 // Today in IST as YYYY-MM-DD (the date input's min).
@@ -123,7 +134,19 @@ export const validateEventDraft = (draft, { publish = false, now = new Date() } 
     if (!String(draft.fee ?? '').trim()) { if (publish) errors.fee = 'Set the entry fee, or choose Free.'; }
     else if (!Number.isInteger(fee) || fee < 1 || fee > LIMITS.feeMax) errors.fee = `A whole amount from ₹1 to ₹${LIMITS.feeMax.toLocaleString('en-IN')}.`;
   }
-  if (draft.date && draft.startTime && draft.endTime && draft.endTime <= draft.startTime) errors.endTime = 'The end time must be after the start time.';
+  // D-197: an event can run over several days. The end date is optional (the start date when blank), on or after the
+  // start date and at most MAX_EVENT_DAYS days after it; the end instant must come after the start instant.
+  const endDate = draft.endDate || draft.date;
+  if (draft.endDate) {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(draft.endDate)) errors.endDate = 'Choose an end date.';
+    else if (draft.date && draft.endDate < draft.date) errors.endDate = 'The end date cannot be before the start date.';
+    else if (draft.date && draft.endDate > addDays(draft.date, MAX_EVENT_DAYS)) errors.endDate = `An event can run for at most ${MAX_EVENT_DAYS} days.`;
+  }
+  if (!errors.endDate && draft.date && draft.startTime && draft.endTime) {
+    const s0 = istInstant(draft.date, draft.startTime);
+    const e0 = istInstant(endDate, draft.endTime);
+    if (s0 && e0 && e0 <= s0) errors.endTime = endDate === draft.date ? 'The end time must be after the start time.' : 'The event must end after it starts.';
+  }
   if (!publish) return errors;
 
   if (!FORM_KEYS.has(draft.category)) errors.category = 'Choose a category.';
@@ -146,7 +169,7 @@ export const validateEventDraft = (draft, { publish = false, now = new Date() } 
 };
 
 // The order fields appear in, for "focus the first error".
-export const FIELD_ORDER = Object.freeze(['title', 'category', 'customCategory', 'description', 'date', 'startTime', 'endTime', 'venueName',
+export const FIELD_ORDER = Object.freeze(['title', 'category', 'customCategory', 'description', 'date', 'startTime', 'endDate', 'endTime', 'venueName',
   'venueAddress', 'city', 'mapUrl', 'capacity', 'fee', 'contactEmail', 'contactPhone', 'contactLink', 'contactPublic', 'image']);
 export const firstErrorField = (errors) => FIELD_ORDER.find((f) => errors[f]) || Object.keys(errors)[0] || null;
 
@@ -159,6 +182,7 @@ export const toServerFields = (draft) => ({
   date: draft.date || '',
   start_time: draft.startTime || '',
   end_time: draft.endTime || '',
+  end_date: draft.endDate || '',
   venue_name: String(draft.venueName || '').trim(),
   venue_address: String(draft.venueAddress || '').trim(),
   place_id: draft.placeId || '',
@@ -176,7 +200,7 @@ export const toServerFields = (draft) => ({
 
 // save_member_event errors: 22023 'invalid <server field>' names the field; P0001 'event_limit' is the daily cap.
 const SERVER_FIELD = Object.freeze({
-  title: 'title', category: 'category', custom_category: 'customCategory', description: 'description', date: 'date', start_time: 'startTime', end_time: 'endTime',
+  title: 'title', category: 'category', custom_category: 'customCategory', description: 'description', date: 'date', start_time: 'startTime', end_time: 'endTime', end_date: 'endDate',
   venue_name: 'venueName', venue_address: 'venueAddress', place_id: 'city', pin: 'city', map_url: 'mapUrl', capacity: 'capacity',
   fee_inr: 'fee', contact_email: 'contactEmail', contact_phone: 'contactPhone', contact_link: 'contactLink',
   contact_public: 'contactPublic', image_url: 'image', gallery_urls: 'image',
@@ -243,7 +267,7 @@ export const coverOutputSize = (sw) => { const w = Math.max(1, Math.round(Math.m
 // The live preview: the draft as a listed event (normalizeEvent's shape), so the real card renders it.
 export const previewEvent = (draft, { organizer = null, imageSrc = '' } = {}) => {
   const start = istInstant(draft.date, draft.startTime || '00:00');
-  const end = draft.endTime ? istInstant(draft.date, draft.endTime) : null;
+  const end = draft.endTime ? istInstant(draft.endDate || draft.date, draft.endTime) : null;
   const capacity = wholeNumber(draft.capacity);
   const fee = draft.paid ? wholeNumber(draft.fee) : 0;
   return {

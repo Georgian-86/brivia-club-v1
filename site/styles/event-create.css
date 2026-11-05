@@ -53,6 +53,9 @@ body.app-body .event-create-dialog .ec-section h3 { display: flex; align-items: 
 .ec-section h3 span { color: var(--ec-wine); font-family: var(--font-heading); font-size: var(--text-20); font-style: italic; font-weight: 500; letter-spacing: 0; }
 .ec-row { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-4); }
 .ec-row-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+/* D-197: start date + time, then end date + time, two by two (also on a phone). */
+.ec-row-when { grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); row-gap: var(--space-3); }
+.ec-when-hint { margin: calc(var(--space-2) * -1) 0 0; }
 
 /* Fields */
 .ec-field { display: grid; align-content: start; gap: 6px; min-width: 0; margin: 0; padding: 0; border: 0; }
@@ -275,6 +278,7 @@ body.app-body .event-ask-dialog textarea:focus-visible { outline: none; border-c
   .ec-body, .ec-detail-preview { padding: var(--space-4) var(--space-4) var(--space-6); }
   .ec-discard { padding: var(--space-3) var(--space-4); }
   .ec-row { grid-template-columns: minmax(0, 1fr); }
+  .ec-row-when { grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr); }
   .ec-row-3 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .ec-row-3 > [data-field="date"], .ec-row-3 > [data-field="capacity"], .ec-row-3 > .ec-fee-toggle, .ec-row-3 > .ec-fee-amount { grid-column: 1 / -1; }
   .ec-contact .ec-row-3 { grid-template-columns: minmax(0, 1fr); }
