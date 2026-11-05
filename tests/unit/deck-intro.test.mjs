@@ -1,7 +1,7 @@
 // D-164 / D-174: the deck's arrival (a shuffle, then the deal) (deck-intro.js) and its "deal" cue (notify-sound.js INTRO_CUE). Run: npm run test:unit
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { INTRO, introLength, introAllowed, riffleOrder, riffleLandings } from '../../site/scripts/deck-intro.js';
+import { handScaleFor, HAND, INTRO, introLength, introAllowed, riffleOrder, riffleLandings } from '../../site/scripts/deck-intro.js';
 import { INTRO_CUE, renderIntroCue, createSoundKit } from '../../site/scripts/notify-sound.js';
 
 const param = () => ({ value: 0, setValueAtTime() {}, exponentialRampToValueAtTime() {}, linearRampToValueAtTime() {}, cancelScheduledValues() {} });
@@ -108,4 +108,12 @@ test('autoplay rules: silent on a fresh load; plays after a tap or when the page
   const silent = createSoundKit({ win: fakeAudio(log), doc: fakeDoc(), nav: {}, interactions: () => true, volume: () => 0 });
   silent.unlock();
   assert.equal(silent.intro(), false, 'volume 0');
+});
+
+test('the shuffling hand is smaller than the card, then grows into place before the deal (D-192)', () => {
+  assert.equal(handScaleFor({ narrow: true, width: 360 }), HAND.narrow);
+  assert.ok(Math.abs(handScaleFor({ width: 520 }) * 520 - 330) < 1, 'a big card: the hand is about 330 px wide');
+  assert.equal(handScaleFor({ width: 380 }), HAND.max, 'never quite full size while it shuffles');
+  assert.equal(handScaleFor({ width: 900 }), HAND.min, 'never tiny');
+  assert.ok(INTRO.square.at + INTRO.square.dur <= INTRO.layers[0].at + 0.01, 'full size by the deal');
 });

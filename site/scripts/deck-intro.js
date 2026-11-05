@@ -26,7 +26,7 @@ export const INTRO = Object.freeze({
   pack: Object.freeze({ count: 8, at: 0, dur: 0.46, from: Object.freeze({ y: 150, scale: 0.86, rotation: -5 }) }),
   // D-187: the pack rises fanned (two cards each side, like a hand of cards) under a front card that reads
   // "Shuffling Your Matches", holds a moment so it can be read, then gathers into a squared pack for the split.
-  fan: Object.freeze({ angles: Object.freeze([-10, 10, -5, 5]), xPercent: Object.freeze([-4, 4, -2, 2]), yPercent: Object.freeze([9, 9, 4.5, 4.5]), scale: 0.93, origin: '50% 100%', narrowScale: 0.74 }),
+  fan: Object.freeze({ angles: Object.freeze([-10, 10, -5, 5]), xPercent: Object.freeze([-4, 4, -2, 2]), yPercent: Object.freeze([9, 9, 4.5, 4.5]), scale: 0.93, origin: '50% 100%' }),
   gather: Object.freeze({ at: 0.86, dur: 0.2 }),
   split: Object.freeze({ at: 1.1, dur: 0.26, x: 36, narrowX: 22, rotation: 7, lift: -12 }),
   riffle: Object.freeze({ at: 1.4, gap: 0.056, drop: 0.17 }),
@@ -59,6 +59,14 @@ export const riffleOrder = (intro = INTRO) => {
   return order.map((card, k) => ({ card, side: card < half ? 0 : 1, at: +(intro.riffle.at + k * intro.riffle.gap).toFixed(3) }));
 };
 export const riffleLandings = (intro = INTRO) => riffleOrder(intro).map((r) => +(r.at + intro.riffle.drop).toFixed(3));
+
+// D-192: how much smaller the shuffling hand is than the card (the founder: the cards looked too big).
+export const HAND = Object.freeze({ narrow: 0.74, targetWidth: 330, max: 0.86, min: 0.62 });
+export const handScaleFor = ({ narrow = false, width = 0 } = {}, hand = HAND) => {
+  if (narrow) return hand.narrow;
+  if (!width) return hand.max;
+  return Math.min(hand.max, Math.max(hand.min, hand.targetWidth / width));
+};
 
 // When the whole intro is over (the last tween's end).
 export const introLength = (intro = INTRO) => Math.max(
@@ -157,9 +165,12 @@ export const playDeckIntro = ({ stack, card, next, back, controls = [], reduced 
       const F = INTRO.fan;
       cards.forEach((c, i) => gsap.set(c, { y: -i * 1.4, zIndex: i }));
       // On a phone the card nearly fills the screen, so the fanned hand is shown smaller until it gathers.
-      if (room < 120) {
-        gsap.set(pack.hand, { scale: F.narrowScale, transformOrigin: '50% 38%' });
-        tl.to(pack.hand, { scale: 1, duration: INTRO.gather.dur, ease: 'power2.inOut' }, INTRO.gather.at);
+      // D-192: the hand is shown smaller than the card while it reads and riffles (a phone: 74%; elsewhere a card about
+      // 330 px wide, at most 86%), and grows into the card's place as the pack is squared, just before the deal.
+      const handScale = handScaleFor({ narrow: room < 120, width: stack.offsetWidth || 0 });
+      if (handScale < 1) {
+        gsap.set(pack.hand, { scale: handScale, transformOrigin: '50% 42%' });
+        tl.to(pack.hand, { scale: 1, duration: INTRO.square.dur, ease: 'power2.inOut' }, INTRO.square.at);
       }
       F.angles.forEach((angle, i) => gsap.set(cards[i], { rotation: angle, xPercent: F.xPercent[i], yPercent: F.yPercent[i], scale: F.scale, transformOrigin: F.origin }));
       tl.from(wrap, { ...INTRO.pack.from, duration: INTRO.pack.dur, ease: 'power3.out', transformOrigin: '50% 100%', force3D: true, immediateRender: true }, INTRO.pack.at)

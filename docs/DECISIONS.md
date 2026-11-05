@@ -3726,3 +3726,9 @@ solitaire shuffle; D-179's intro deal and D-185's pile-and-flip deal are not use
   e2e `message-replies.spec.mjs` MR1-MR4 (20 checks), message-actions, chat-inbox, read-receipts, chat-extras 150,
   chat-search.
 
+## D-192 (2026-11-05): the shuffling hand is smaller than the card
+- **Asked:** a desktop screenshot of the shuffle: "these cards look so big, pls fix the size so it looks aesthetic".
+- **Done:** while the hand reads "Shuffling Your Matches" and riffles, it is drawn at about 330 px wide (86% of the
+  card at most, 62% at least; 74% on phones, as before) and grows into the card's place as the pack is squared, just
+  before the deal (`handScaleFor`, unit-tested). Timing, motion and sound are unchanged.
+
