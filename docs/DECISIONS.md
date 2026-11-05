@@ -3498,3 +3498,10 @@ controls (a tester or a seeded test member), never a real member, so no new expo
 - **Not done:** an AI image generator was tried for these and returned a generic page mock-up with faces, so
   none of its output was used.
 
+
+## D-178 (2026-11-05): plain wine shuffle card backs
+- **Asked:** "remove the grid pattern from the back of the cards and make the cards color wine color as used elsewhere
+  in the website. rest keep the same".
+- **Done:** the gold lattice is gone from `.deck-shuffle-card` (`site/styles/deck.css`) and the back is
+  `--color-wine` (#5e0b28), the site's main wine, instead of `--color-wine-deep`. The gold wordmark, the soft gold glow
+  behind it, the hairline gold frame and the dark edge are unchanged, as is the shuffle motion and sound (D-174).
