@@ -3810,3 +3810,10 @@ so allow that; also max registrations can be unlimited as well and time of event
 - Capacity is optional: empty means unlimited (placeholder "Unlimited"); registration already treated a null
   capacity as no limit, so only the publish check and the `club_event_member_capacity` constraint changed (0056).
 
+## D-199 (2026-11-05): an event can run up to a year
+
+Founder, on the end-date picker stopping at 20 November: "why cant i see next year calender". D-197's 30-day guard was
+too tight for long hackathons, exhibitions and seasons. The end date may now be up to 365 days after the start date
+(0057, `MAX_EVENT_DAYS`), and the start-date picker goes back up to a year for an event already under way (the rule
+that it must not have ended is unchanged).
+

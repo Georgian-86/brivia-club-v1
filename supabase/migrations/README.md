@@ -1399,3 +1399,9 @@ and 23:59 IST when blank); capacity may be empty (unlimited), so the `club_event
 Verify: `select prosrc like '%end_date%' from pg_proc where proname = 'save_member_event';` (true).
 and `select count(*) from pg_constraint where conname = 'club_event_member_capacity';` (0).
 
+## 0057
+
+**Events up to a year long (D-199).** Apply after `0056`, with or before the client deploy. Redefines
+`save_member_event` as 0056 with the end date allowed up to 365 days after the start date (was 30). Grants as 0022.
+Verify: `select prosrc like '%v_date + 365%' from pg_proc where proname = 'save_member_event';` (true).
+

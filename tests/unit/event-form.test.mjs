@@ -134,12 +134,12 @@ test('preview event: placeholders until filled, spots from capacity, fee', () =>
   assert.equal(q.organizer.name, 'Me');
 });
 
-test('D-197: an event can run over several days, ending after it starts and at most 30 days on', () => {
+test('D-197: an event can run over several days, ending after it starts and at most a year on', () => {
   assert.equal(addDays('2026-11-28', 5), '2026-12-03');
   assert.deepEqual(validateEventDraft({ ...good(), endDate: '2026-11-07' }, { publish: true, now: NOW }), {}, 'the same day is fine');
   assert.deepEqual(validateEventDraft({ ...good(), endDate: '2026-11-09', endTime: '17:00' }, { publish: true, now: NOW }), {}, 'ends earlier in the day, two days on');
   assert.match(validateEventDraft({ ...good(), endDate: '2026-11-06' }, { publish: true, now: NOW }).endDate, /before the start/);
-  assert.match(validateEventDraft({ ...good(), endDate: addDays('2026-11-07', MAX_EVENT_DAYS + 1) }, { now: NOW }).endDate, /at most 30 days/);
+  assert.match(validateEventDraft({ ...good(), endDate: addDays('2026-11-07', MAX_EVENT_DAYS + 1) }, { now: NOW }).endDate, /at most a year/);
   assert.deepEqual(validateEventDraft({ ...good(), endDate: addDays('2026-11-07', MAX_EVENT_DAYS) }, { publish: true, now: NOW }), {});
   assert.match(validateEventDraft({ ...good(), endDate: '2026-11-07', endTime: '17:00' }, { publish: true, now: NOW }).endTime, /after the start/);
   assert.equal(toServerFields({ ...good(), endDate: '2026-11-09' }).end_date, '2026-11-09');

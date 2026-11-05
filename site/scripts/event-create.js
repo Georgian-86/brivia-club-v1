@@ -79,7 +79,7 @@ const shellMarkup = () => `<div class="ec-shell">
           ${field('endDate', 'End date', `<input id="ec-endDate" name="endDate" type="date" ${describedBy('endDate')} />`)}
           ${field('endTime', 'Ends', `<input id="ec-endTime" name="endTime" type="time" step="900" ${describedBy('endTime')} />`, { optional: true })}
         </div>
-        <p class="ec-hint ec-when-hint">Running over several days? Set the end date (up to ${MAX_EVENT_DAYS} days). Already under way? Pick the day it started. No times means all day.</p>
+        <p class="ec-hint ec-when-hint">Running over several days? Set the end date (up to a year). Already under way? Pick the day it started. No times means all day.</p>
         <div class="ec-row">
           ${field('venueName', 'Venue name', `<input id="ec-venueName" name="venueName" type="text" maxlength="${LIMITS.venueName}" autocomplete="off" placeholder="Battle Chess Skool" required ${describedBy('venueName')} />`)}
           ${field('city', 'City', `<div class="ec-combo"><input id="ec-city" name="city" type="text" role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="ec-city-list" autocomplete="off" spellcheck="false" placeholder="Start typing your city" required ${describedBy('city', true)} /><ul class="ec-combo-list" id="ec-city-list" role="listbox" aria-label="Cities" hidden></ul></div>`, { hint: 'Choose from the list, so people nearby can find it.' })}

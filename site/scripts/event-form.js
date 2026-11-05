@@ -84,7 +84,7 @@ export const draftFromEvent = (event) => {
 };
 
 // D-197: the longest an event may run, in days after its start date (the server checks the same).
-export const MAX_EVENT_DAYS = 30;
+export const MAX_EVENT_DAYS = 365; // D-199: a year (was 30, D-197)
 // YYYY-MM-DD plus n days (calendar arithmetic in UTC, so no time zone shifts the date).
 export const addDays = (date, n) => {
   const d = new Date(`${date}T00:00:00Z`);
@@ -157,7 +157,7 @@ export const validateEventDraft = (draft, { publish = false, now = new Date() } 
   if (draft.endDate) {
     if (!/^\d{4}-\d{2}-\d{2}$/.test(draft.endDate)) errors.endDate = 'Choose an end date.';
     else if (draft.date && draft.endDate < draft.date) errors.endDate = 'The end date cannot be before the start date.';
-    else if (draft.date && draft.endDate > addDays(draft.date, MAX_EVENT_DAYS)) errors.endDate = `An event can run for at most ${MAX_EVENT_DAYS} days.`;
+    else if (draft.date && draft.endDate > addDays(draft.date, MAX_EVENT_DAYS)) errors.endDate = `An event can run for at most a year (${MAX_EVENT_DAYS} days).`;
   }
   const span = eventSpan(draft);
   if (!errors.endDate && span.starts && span.ends && span.ends <= span.starts) {
