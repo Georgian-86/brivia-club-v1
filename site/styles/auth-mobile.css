@@ -138,3 +138,79 @@ body.auth-page .auth-input-shell:has(input[name="password"], input[name="confirm
     text-wrap: balance;
   }
 }
+
+/* D-208 (founder, iPhone screenshot: "FIX THIS, MAKE IT LOOK REFINED AND SHARP"): the phone login, rebuilt to be exact.
+   1. The handset is in the page flow, directly above JOIN THE CLUB (a block before the login view), instead of an
+      absolute picture with the form pushed down by a separate margin. The two were sized from the screen height in two
+      places; on an iPhone (in-app browser) they disagreed and a tall empty band opened between the handset and the
+      heading. In flow, the heading always starts where the handset ends.
+   2. Sharp surfaces: solid fields and buttons with hairline borders, so the background no longer shows through them,
+      and a calm background (one soft wash at the top, clean paper behind the form) instead of large blurred blobs. */
+@media (max-width: 700px) {
+  body.auth-page:has(.auth-login.is-active)::before {
+    background:
+      radial-gradient(120% 55% at 50% 0%, color-mix(in srgb, var(--aura-rose) 55%, transparent), transparent 70%),
+      var(--aura-base) !important;
+  }
+  body.auth-page .auth-shell:has(.auth-login.is-active) .auth-phone { display: none !important; }
+  body.auth-page .auth-shell:has(.auth-login.is-active) .auth-login { margin-top: 0 !important; }
+  body.auth-page .auth-shell:has(.auth-login.is-active) .auth-login::before {
+    content: "";
+    display: block;
+    width: calc(var(--login-phone-h) * .667);
+    height: var(--login-phone-h);
+    /* the panel's 14 px top padding is taken back so the cord still hangs from the very top; the cut-out's handset
+       sits in its left half (centre at 25% of its width), so that point goes on the midline; its last ~7% is empty,
+       which is the breathing room above the heading */
+    margin: -14px 0 0 calc(50% - var(--login-phone-h) * .167);
+    background: url('../media/assets/vintage-phone-cutout.webp') 0 0 / 100% 100% no-repeat;
+    filter: drop-shadow(0 14px 14px color-mix(in srgb, var(--color-oxblood-deep) 20%, transparent));
+    pointer-events: none;
+  }
+  /* "Create account" sits in the top corner beside the cord, out of the flow, so the handset hangs from the top. */
+  body.auth-page .auth-shell:has(.auth-login.is-active) .auth-panel-top {
+    position: absolute !important;
+    top: 14px;
+    right: 20px;
+    z-index: 2;
+    margin: 0 !important;
+  }
+  body.auth-page .auth-shell:has(.auth-login.is-active) .auth-login h1 {
+    position: relative;
+    -webkit-text-stroke: .35px currentColor;
+  }
+  body.auth-page .auth-shell:has(.auth-login.is-active) .auth-login .auth-intro {
+    color: color-mix(in srgb, var(--color-wine) 70%, transparent) !important;
+  }
+  body.auth-page .auth-shell:has(.auth-login.is-active) .auth-login .auth-form label {
+    font-size: 11px !important;
+    color: var(--color-wine) !important;
+  }
+  body.auth-page .auth-shell:has(.auth-login.is-active) .auth-login .auth-form input {
+    height: 50px !important;
+    border: 1px solid color-mix(in srgb, var(--color-wine) 24%, transparent) !important;
+    border-radius: 12px !important;
+    background: #fffdfa !important;
+    box-shadow: 0 1px 2px color-mix(in srgb, var(--color-oxblood-deep) 6%, transparent) !important;
+    color: var(--color-oxblood-deep) !important;
+  }
+  body.auth-page .auth-shell:has(.auth-login.is-active) .auth-login .auth-form input::placeholder {
+    color: color-mix(in srgb, var(--color-wine) 42%, transparent) !important;
+  }
+  body.auth-page .auth-shell:has(.auth-login.is-active) .auth-login .auth-form input:focus {
+    border-color: var(--color-wine) !important;
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-wine) 14%, transparent) !important;
+    outline: none !important;
+  }
+  body.auth-page .auth-shell:has(.auth-login.is-active) .auth-login :is(.auth-submit, .auth-google-trigger) {
+    height: 50px !important;
+    min-height: 50px !important;
+  }
+  body.auth-page .auth-shell:has(.auth-login.is-active) .auth-login .auth-submit {
+    box-shadow: 0 6px 14px -6px color-mix(in srgb, var(--color-oxblood-deep) 55%, transparent) !important;
+  }
+  body.auth-page .auth-shell:has(.auth-login.is-active) .auth-login .auth-google-trigger {
+    border: 1px solid color-mix(in srgb, var(--color-wine) 32%, transparent) !important;
+    background: #fffdfa !important;
+  }
+}

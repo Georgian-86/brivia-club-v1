@@ -36,14 +36,18 @@ try {
     await page.waitForTimeout(500);
     const m = await page.evaluate(() => {
       const r = (s) => document.querySelector(s).getBoundingClientRect();
-      const phone = r('.auth-phone'); const title = r('#auth-title'); const g = r('.auth-login .auth-google-trigger');
+      // D-208: the handset is the login view's ::before (in the flow, right above the title), not .auth-phone.
+      const login = document.querySelector('.auth-login'); const lr = login.getBoundingClientRect(); const pb = getComputedStyle(login, '::before');
+      const pw = parseFloat(pb.width); const ph = parseFloat(pb.height); const pt = lr.top; /* its negative top margin collapses into the view's own */ const pl = lr.left + parseFloat(pb.marginLeft);
+      const phone = { height: ph, width: pw, left: pl, top: pt, bottom: pt + ph };
+      const title = r('#auth-title'); const g = r('.auth-login .auth-google-trigger');
       const titleLines = Math.round(title.height / parseFloat(getComputedStyle(document.querySelector('#auth-title')).lineHeight || title.height));
       const icons = [...document.querySelectorAll('#login-form .auth-field-icon')].map((i) => ({ font: getComputedStyle(i).fontSize, mask: getComputedStyle(i).maskImage || getComputedStyle(i).webkitMaskImage }));
-      return { phoneH: Math.round(phone.height), phoneMid: Math.round(phone.left + phone.width * .25), mid: Math.round(innerWidth / 2), titleLines, titleBelowPhone: title.top >= phone.bottom - 24, googleBottom: Math.round(g.bottom), h: innerHeight, icons, overflow: document.documentElement.scrollWidth - innerWidth };
+      return { phoneH: Math.round(phone.height), phoneMid: Math.round(phone.left + phone.width * .25), mid: Math.round(innerWidth / 2), titleLines, titleBelowPhone: title.top >= phone.bottom - 24 && title.top - phone.bottom <= 4, phoneTop: Math.round(phone.top), googleBottom: Math.round(g.bottom), h: innerHeight, icons, overflow: document.documentElement.scrollWidth - innerWidth };
     });
     const tag = `${viewport.width}x${viewport.height}`;
     await check(`${tag} login: the telephone shows at the top, centred, above the title (${JSON.stringify(m)})`, () => {
-      assert.ok(m.phoneH >= 150); assert.ok(Math.abs(m.phoneMid - m.mid) <= 6); assert.ok(m.titleBelowPhone);
+      assert.ok(m.phoneH >= 150); assert.ok(Math.abs(m.phoneMid - m.mid) <= 6); assert.ok(m.titleBelowPhone); assert.ok(m.phoneTop <= 0, 'the cord hangs from the top');
     });
     await check(`${tag} login: JOIN THE CLUB is one line, Google is on screen, nothing scrolls sideways`, () => {
       assert.equal(m.titleLines, 1); assert.ok(m.googleBottom <= m.h, `${m.googleBottom} > ${m.h}`); assert.ok(m.overflow <= 0);

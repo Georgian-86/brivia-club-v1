@@ -3910,3 +3910,18 @@ closing the drawer, a click elsewhere closes it. Every published event has it.
 Also: a contact pasted from WhatsApp or a phone book can carry invisible direction marks or no-break spaces, which made
 a valid number ("91 78377 14469") fail the form's check. Those characters are now stripped before checking and saving.
 
+## D-208 (2026-11-05): the phone login is exact and sharp
+
+Founder (iPhone screenshot of auth.html from WhatsApp): "FIX THIS, MAKE IT LOOK REFINED AND SHARP". A tall empty band
+sat between the red telephone and JOIN THE CLUB, the background's blurred pink blobs showed through the fields, and
+the page read soft.
+- **Layout:** the handset was an absolutely placed picture, and the form was pushed down by a separate margin, both
+  sized from the screen height. On the iPhone's in-app browser the two disagreed (the handset drew smaller than the room
+  kept for it). The handset is now the login view's own first block (`.auth-login::before`), in the flow, so the title
+  always starts where it ends; "Create account" is pinned in the top corner beside the cord. Same sizes as before
+  (`--login-phone-h`), so the whole login still fits one screen on any phone.
+- **Sharp:** solid fields (50 px, 12 px corners, a hairline wine border, a clear focus ring) and solid buttons instead
+  of 12%-opaque fields; one soft wash at the top of the page instead of the large blurred blobs on this screen; a
+  lighter stroke on the title.
+- mobile-polish.spec measures the handset where it now lives and checks the title is within 4 px of it.
+
