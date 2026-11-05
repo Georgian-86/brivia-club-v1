@@ -3871,3 +3871,16 @@ so are list_events' 80-row cap and its 60-day window (events starting more than 
 others), so Explore always lists every open event, however far ahead. Spam is left to reporting and moderation
 (docs/MODERATION.md); a cap can come back later if abuse appears.
 
+## D-205 (2026-11-05): the first card turns over smoothly after the shuffle
+
+Founder (screen recording on an iPhone): "the card after shuffling gets stuck, pls fix it make the turn very smooth".
+Frame by frame, the member's card appeared tilted mid-turn, held there for about 0.6 s, then snapped flat. Two causes:
+- The card waited at opacity 0 until the instant it turned. A fully transparent layer is not painted ahead (Safari), so
+  its photos were decoded and the whole card painted in 3D on the first frames of the turn: the turn stalled. It now
+  waits at 1% opacity (edge-on, under the pack, never seen), so it is painted during the shuffle, and its photos are
+  decoded (img.decode, off the main thread) as soon as the shuffle starts.
+- The turn used an overshoot ease (back.out): the card swung past flat and hung a degree or two off for about 0.3 s
+  before the end of the timeline snapped it straight. It now eases out (power3.out) with no overshoot.
+Measured on a phone-sized page with the CPU slowed 4x: before, the angle sat at 1-2 degrees for up to 20 frames and then
+jumped to flat; after, it eases 88 -> 0 continuously. Timings are unchanged (the deal still ends by 3.1 s).
+

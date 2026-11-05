@@ -145,6 +145,11 @@ export const playDeckIntro = ({ stack, card, next, back, controls = [], reduced 
   const onDown = (e) => { if (!e.target?.closest?.(INTERACTIVE)) skip(); };
   const listeners = [['pointerdown', onDown], ['pointerup', skip], ['keydown', skip]];
   stack.classList.add('is-intro');
+  // D-205: decode the dealt cards' photos now, off the main thread, so none is decoded on the frame it turns up.
+  [card, next, back].forEach((el) => el?.querySelectorAll?.('img').forEach((img) => {
+    if (img.loading === 'lazy') img.loading = 'eager';
+    img.decode?.().catch(() => {});
+  }));
   // The cards carry CSS transitions on transform (app.css, deck.css); they would fight the timeline.
   gsap.set(layers.map((l) => l.el), { transition: 'none' });
 
@@ -206,7 +211,8 @@ export const playDeckIntro = ({ stack, card, next, back, controls = [], reduced 
       tl.from(el, {
         ...spec.from,
         duration: spec.dur,
-        ease: top ? 'back.out(1.25)' : 'power3.out',
+        // D-205: the top card turns with no overshoot (back.out swung it past flat and back, a lurch at the end).
+        ease: 'power3.out',
         transformOrigin: top ? '50% 50%' : '50% 100%',
         transformPerspective: top ? 1200 : 0,
         force3D: true,
@@ -214,7 +220,10 @@ export const playDeckIntro = ({ stack, card, next, back, controls = [], reduced 
       }, spec.at);
       // Hidden until dealt (set now, so the first painted frame never shows a card early); the top card shows the
       // moment it turns up, when it is edge-on.
-      gsap.set(el, { opacity: 0 });
+      // D-205: the top card waits at 1% opacity, not 0: a fully transparent layer is not painted ahead (Safari), so its
+      // photo was decoded and the whole card rasterised in 3D on the first frames of the turn, which stalled it
+      // mid-turn on a phone. At 1%, edge-on and under the pack, it is painted during the shuffle and never seen.
+      gsap.set(el, { opacity: top ? 0.01 : 0 });
       tl.to(el, { opacity: 1, duration: top ? 0.01 : 0.2, ease: 'power1.out' }, spec.at);
     });
     // The landing: the stack gives a little under the top card, then recovers (weight, not bounce).
