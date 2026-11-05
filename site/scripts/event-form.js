@@ -208,7 +208,8 @@ export const toServerFields = (draft) => ({
   gallery_urls: (draft.gallery || []).slice(0, LIMITS.gallery),
 });
 
-// save_member_event errors: 22023 'invalid <server field>' names the field; P0001 'event_limit' is the daily cap.
+// save_member_event errors: 22023 'invalid <server field>' names the field; P0001 'event_limit' was the daily cap (gone
+// since 0061, D-204; kept for a server not yet migrated).
 const SERVER_FIELD = Object.freeze({
   title: 'title', category: 'category', custom_category: 'customCategory', description: 'description', date: 'date', start_time: 'startTime', end_time: 'endTime', end_date: 'endDate',
   venue_name: 'venueName', venue_address: 'venueAddress', place_id: 'city', pin: 'city', map_url: 'mapUrl', capacity: 'capacity',

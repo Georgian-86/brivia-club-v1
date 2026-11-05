@@ -15,7 +15,7 @@
 --    (service side) confirms it; an expired hold frees the seat.
 -- M7 cancel and delete: a cancelled event leaves others' lists but stays (marked cancelled) for the organiser and the
 --    members registered; a published event cannot be deleted; a draft or cancelled one can, with its registrations.
--- M8 at most 10 new events per member per 24 hours (P0001 'event_limit').
+-- M8 D-204 (0061): no daily cap: an 11th and 12th event in 24 hours save (0022's 10-a-day 'event_limit' is gone).
 set brivia.harness_autocomplete = 'off';
 
 create or replace function pg_temp.mv(n int) returns uuid language sql immutable as $$
@@ -329,7 +329,9 @@ begin
   perform pg_temp.as_member(pg_temp.mv(6));
   for i in 1..10 loop perform public.save_member_event(null, jsonb_build_object('title', 'Draft ' || i), false); end loop;
   c := pg_temp.code_of(format('select public.save_member_event(null, %L::jsonb, false)', '{"title": "One more"}'));
-  if c not like 'P0001:event_limit%' then raise exception 'FAIL M8: an 11th event in 24 h: %', c; end if;
+  if c <> 'none' then raise exception 'FAIL M8: an 11th event in 24 h: %', c; end if;
+  c := pg_temp.code_of(format('select public.save_member_event(null, %L::jsonb, false)', '{"title": "And another"}'));
+  if c <> 'none' then raise exception 'FAIL M8: a 12th event in 24 h: %', c; end if;
   reset role;
 end $$;
 

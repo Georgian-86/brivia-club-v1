@@ -3863,3 +3863,10 @@ user may get a notification".
   Buildathon"); tapping opens Explore on that event and marks them read. The organiser's devices get a web push
   (`push-notify`, sent when the registrant's app confirms the seat) and an open tab shows a toast.
 
+## D-204 (2026-11-05): no cap on how many events a member creates or Explore lists
+
+Founder: "remove the 10 events listing limit". The founder had created 10 events in a day and the 11th was refused:
+save_member_event allowed 10 new events per member per 24 hours (D-121, 'event_limit'). That cap is gone (0061), and
+so is list_events' 80-row cap, so Explore always lists every open event. Spam is left to reporting and moderation
+(docs/MODERATION.md); a cap can come back later if abuse appears.
+
