@@ -1,7 +1,7 @@
 // D-164: the deck's arrival (deck-intro.js) and its "deal" cue (notify-sound.js INTRO_CUE). Run: npm run test:unit
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { INTRO, introLength, introAllowed } from '../../site/scripts/deck-intro.js';
+import { INTRO, introLength, introAllowed, flipMidpoint } from '../../site/scripts/deck-intro.js';
 import { INTRO_CUE, renderIntroCue, createSoundKit } from '../../site/scripts/notify-sound.js';
 
 const param = () => ({ value: 0, setValueAtTime() {}, exponentialRampToValueAtTime() {}, linearRampToValueAtTime() {}, cancelScheduledValues() {} });
@@ -22,32 +22,38 @@ const fakeAudio = (log) => {
 };
 const fakeDoc = () => { const l = {}; return { addEventListener: (t, fn) => { (l[t] ||= []).push(fn); }, fire: (t, e = {}) => (l[t] || []).forEach((fn) => fn({ type: t, ...e })) }; };
 
-test('the intro is brief: about a second, the motion itself under 0.9 s', () => {
+test('the intro is brief: under two seconds, the deal itself under 0.9 s (D-179)', () => {
   const total = introLength();
-  assert.ok(total > 0.8 && total <= 1.3, `total ${total}`);
-  const motion = Math.max(...INTRO.layers.map((l) => l.at + l.dur));
-  assert.ok(motion <= 0.9, `motion ${motion}`);
+  assert.ok(total > 1.2 && total <= 1.9, `total ${total}`);
+  const deal = Math.max(...INTRO.layers.map((l) => l.at + l.dur));
+  assert.ok(deal <= 0.9, `deal ${deal}`);
 });
 
-test('the stack is dealt back to front, each card from further down, the top card last', () => {
+test('the stack is dealt from one pile, back to front, the top card last, then flipped face-up (D-179)', () => {
   assert.equal(INTRO.layers.length, 3);
   INTRO.layers.forEach((l, i, a) => {
+    assert.ok(l.from.y > 60 && l.from.scale < 1, 'from the pile, below and smaller');
     if (!i) return;
     assert.ok(l.at > a[i - 1].at, 'staggered');
-    assert.ok(l.from.y > a[i - 1].from.y, 'from further down');
+    assert.ok(Math.abs(l.from.x - a[i - 1].from.x) < 10 && Math.abs(l.from.y - a[i - 1].from.y) < 10, 'one pile, slightly fanned');
   });
-  assert.ok(INTRO.land > INTRO.layers.at(-1).at, 'the stack lands after the top card is dealt');
+  assert.ok(INTRO.layers[0].at >= INTRO.pile.dur - 0.01, 'the pile is on screen before the first card leaves it');
+  const dealt = Math.max(...INTRO.layers.map((l) => l.at + l.dur));
+  assert.ok(INTRO.flip.at >= dealt - 0.02, 'the top card flips once it has landed');
+  assert.ok(INTRO.reveal.at >= flipMidpoint() - 0.1, 'the cards behind turn over with the top card');
+  assert.ok(INTRO.land >= flipMidpoint(), 'the stack settles after the flip');
 });
 
-test('the sound follows the motion: one tap per card, in order, then the bell as the stack settles', () => {
+test('the sound follows the motion: one tap per card as it lands, in order, then the bell on the flip', () => {
   assert.equal(INTRO_CUE.taps.length, INTRO.layers.length);
   INTRO_CUE.taps.forEach((t, i) => {
-    const deal = INTRO.layers[i].at;
-    assert.ok(t > deal && t < deal + 0.2, `tap ${i} lands within 0.2 s of its card`);
+    const { at, dur } = INTRO.layers[i];
+    assert.ok(t > at && t < at + dur, `tap ${i} lands during its card's flight`);
+    if (i) assert.ok(t > INTRO_CUE.taps[i - 1], 'in order');
   });
-  assert.ok(INTRO_CUE.bells[0].at >= INTRO.land - 0.05 && INTRO_CUE.bells[0].at <= INTRO.land + 0.1, 'bell on the landing');
+  assert.ok(Math.abs(INTRO_CUE.bells[0].at - flipMidpoint()) <= 0.08, 'bell as the face turns up');
   const end = Math.max(...INTRO_CUE.bells.map((b) => b.at + b.dur));
-  assert.ok(end < INTRO_CUE.length && INTRO_CUE.length <= 1.5, 'short');
+  assert.ok(end < INTRO_CUE.length && INTRO_CUE.length <= 2.1, 'short');
   assert.ok(INTRO_CUE.level < 0.7, 'quieter than the swipe cues');
 });
 

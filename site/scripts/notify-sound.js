@@ -262,15 +262,16 @@ export const renderCue = (ctx, dest, cue, t0 = 0) => {
   if (cue.sparkle) sine(ctx, bus, cue.sparkle, t0);
 };
 
-// D-164: the deck's arrival cue, "the deal". Not the horn: three soft card taps as the stack is dealt (a felt-tipped
-// click of filtered noise over a small low thump), then a warm two-note bell, B-flat up to F (the kit's key), that
-// rings out under the gloss. Quieter than the swipe cues and about 1.1 s long. Times match deck-intro.js INTRO.
+// D-164 (retimed D-179): the deck's arrival cue, "the deal". Not the horn: three soft card taps as each card lands from
+// the pile (a felt-tipped click of filtered noise over a small low thump), then a warm two-note bell, B-flat up to F
+// (the kit's key), as the top card turns face-up, ringing out under the gloss. Quieter than the swipe cues, about 1.9 s.
+// Times match deck-intro.js INTRO (unit-tested).
 export const INTRO_CUE = Object.freeze({
-  length: 1.45, level: 0.58,
-  taps: Object.freeze([0.11, 0.2, 0.31]),
+  length: 2, level: 0.58,
+  taps: Object.freeze([0.33, 0.45, 0.58]),
   bells: Object.freeze([
-    Object.freeze({ midi: 82, at: 0.4, dur: 0.9, gain: 0.2 }),
-    Object.freeze({ midi: 89, at: 0.5, dur: 0.8, gain: 0.14 }),
+    Object.freeze({ midi: 82, at: 1.04, dur: 0.85, gain: 0.2 }),
+    Object.freeze({ midi: 89, at: 1.14, dur: 0.75, gain: 0.14 }),
   ]),
 });
 export const renderIntroCue = (ctx, dest, t0 = 0, cue = INTRO_CUE) => {

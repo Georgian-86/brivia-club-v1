@@ -247,6 +247,7 @@ export const shimmerShared = (container) => {
 
 // N7. Adds a sliding pill to a Curated / Nearby group (once) and moves it under the active option. fromIndex: the
 // option the member left (the pill starts there and slides); without it the pill just sits under the active one.
+const slides = new WeakMap(); // pill -> its running slide (slideModePill)
 export const slideModePill = (group, { fromIndex = null, reduced = prefersReduced() } = {}) => {
   if (!group) return;
   const buttons = [...group.querySelectorAll('[data-connect-mode]')];
@@ -262,11 +263,15 @@ export const slideModePill = (group, { fromIndex = null, reduced = prefersReduce
   }
   const place = (b) => ({ x: b.offsetLeft, width: b.offsetWidth });
   const to = place(buttons[active]);
-  // A plain re-place (resize, a view change a frame later) leaves a running slide alone; it already ends there.
-  if (fromIndex === null && gsap.isTweening(pill)) return;
+  // A plain re-place (resize, a view change a frame later) leaves a running slide alone; it already ends there. The
+  // slide is remembered on the pill: gsap.isTweening() is false for a tween that has not rendered its first frame yet,
+  // so a re-place in the same frame as the click used to snap the pill to the end (found with D-179).
+  const slide = slides.get(pill);
+  if (fromIndex === null && slide && slide.progress() < 1 && !slide.paused()) return;
   gsap.killTweensOf(pill);
+  slides.delete(pill);
   if (reduced || fromIndex === null || fromIndex === active || !buttons[fromIndex]) { gsap.set(pill, to); return; }
-  gsap.fromTo(pill, place(buttons[fromIndex]), { ...to, duration: 0.42, ease: 'power3.inOut' });
+  slides.set(pill, gsap.fromTo(pill, place(buttons[fromIndex]), { ...to, duration: 0.42, ease: 'power3.inOut' }));
 };
 
 // N9. Tags bubbles that were not on screen in the last render of this chat; CSS lifts them in.

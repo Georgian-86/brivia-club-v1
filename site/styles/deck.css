@@ -580,3 +580,42 @@ body.app-body .app-view[data-view="home"] .deck-empty-action { min-height: 44px;
   pointer-events: none;
   will-change: transform;
 }
+
+/* The face-down card back for the opening deal (D-179, deck-intro.js): a wine back with a hairline inner frame, a soft
+   diagonal sheen and the club's mark. Laid over each card only while it is dealt; removed when the deal ends. */
+.app-view[data-view="home"] .swipe-stack .deck-intro-back {
+  position: absolute;
+  z-index: 6;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  border-radius: inherit;
+  background:
+    radial-gradient(120% 80% at 30% 18%, color-mix(in srgb, var(--color-cream) 16%, transparent), transparent 60%),
+    repeating-linear-gradient(135deg, color-mix(in srgb, var(--color-cream) 5%, transparent) 0 2px, transparent 2px 11px),
+    linear-gradient(160deg, var(--color-wine) 0%, var(--color-wine-deep) 100%);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--color-cream) 22%, transparent);
+  pointer-events: none;
+  backface-visibility: hidden;
+}
+.app-view[data-view="home"] .swipe-stack .deck-intro-back::before {
+  position: absolute;
+  inset: 12px;
+  border: 1px solid color-mix(in srgb, var(--color-cream) 38%, transparent);
+  border-radius: calc(18px - 6px);
+  content: '';
+}
+.app-view[data-view="home"] .swipe-stack .deck-intro-back-mark {
+  display: grid;
+  place-items: center;
+  width: 84px;
+  height: 84px;
+  border: 1px solid color-mix(in srgb, var(--color-cream) 45%, transparent);
+  border-radius: 50%;
+  color: var(--color-cream);
+  font-family: var(--font-heading);
+  font-size: 38px;
+  line-height: 1;
+  letter-spacing: .02em;
+}
+.app-view[data-view="home"] .swipe-stack .deck-intro-back-mark i { margin-right: 3px; font-size: 15px; font-style: italic; opacity: .85; }

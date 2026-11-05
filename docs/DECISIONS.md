@@ -3521,3 +3521,25 @@ D-164 deal (`deck-intro.js`); D-173's own intro deal is not used, only its daily
   unit 535; e2e hiring (all pass), deck 201, deck-ritual, explore-cards 74. `nearby.spec` (D-138 settings row) and
   `consent.spec` (cancelKeepsCard timeout) fail the same way without this change.
 
+## D-179 (2026-11-05): the deck's opening deal becomes a Solitaire deal with a card flip
+- **Asked (founder, 2026-11-05):** "i need a very good animation, pls fix it" — the deck opening deal (chosen in the
+  follow-up question). D-164's deal faded the three layers in half-transparent, so one person's name showed through
+  another's while they flew in.
+- **Decision:** `deck-intro.js` keeps D-164's contract (one GSAP timeline, transforms and opacity only, skips on any
+  touch, click or key, clears every property it set, plays once per window) and replaces the choreography: a small
+  face-down pile (wine card backs with an inner hairline frame and the club's "the B" mark, `.deck-intro-back`) fades in
+  beside the stack; the three layers are dealt from it back to front on short arcs (x and y on different curves) with a
+  little spin and overshoot; the top card lifts and flips face-up (rotateY with perspective, back swapped at the edge-on
+  midpoint); the cards behind turn over under it; the stack settles, the gloss crosses, Pass / Pitch rise. Cards stay
+  opaque throughout: only the stack fades, for 0.16 s. About 1.7 s. The cards behind keep their CSS fan origin so they
+  land exactly where the stack holds them. Reduced motion is unchanged (a 150 ms fade, no backs, no sound).
+- **Sound:** INTRO_CUE retimed: a tap as each card lands, the two-note bell on the flip (length 2.0 s).
+- **Found on the way:** (1) `slideModePill` (motion-moments.js N7) snapped the Curated/Nearby pill to its end when a
+  re-place came before the slide's first frame (`gsap.isTweening` is false until then); it now remembers its slide.
+  (2) The public profile dialog moved focus in only after a timeout, so an Escape right after opening was lost; it now
+  focuses at once (the timeout stays as a fallback).
+- **Proof:** unit 535 (deck-intro: one pile, back-to-front, flip after landing, taps during each flight, bell on the
+  flip, under 1.9 s); e2e deck 201, deck-ritual, deck-tutorial, motion, sounds, mobile-polish, work-identity, fit 324,
+  hiring, explore-cards 74; no sideways scroll at 360/390 px during the deal; the card backs are removed afterwards.
+  `launch-polish` (city search timeout) and `nearby` (D-138 settings row) fail the same way without this change.
+

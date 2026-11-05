@@ -2421,7 +2421,11 @@ const openPublicProfile = (person, options = {}) => {
     else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus(); }
   });
   modal.tabIndex = -1;
-  window.setTimeout(() => modal.querySelector('.public-profile-close')?.focus(), 0);
+  // Focus moves in at once, so Escape and Tab work from the first keystroke; again after this task, in case the click that
+  // opened the dialog hands focus back to its button.
+  const focusClose = () => { if (modal.isConnected && !modal.contains(document.activeElement)) modal.querySelector('.public-profile-close')?.focus(); };
+  focusClose();
+  window.setTimeout(focusClose, 0);
   // D-141: a hirer's banner first (roles, Ask about this role); a hirer sees a seeker's "Open to roles".
   if (hiring?.available()) void hiring.decorateProfile(modal, findPersonById(profile.id) || profile);
   // Founder (2026-11-03): interests take at most three lines; the rest wait behind "+N more".

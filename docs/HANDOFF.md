@@ -7,6 +7,9 @@ Update this file at the end of every session. CLAUDE.md holds the aim; this file
 
 ## 1. What is done
 
+**2026-11-05, D-179:** the deck's opening deal is now a Solitaire deal: a face-down wine pile, cards dealt on arcs, the
+top card flips face-up with a bell (`deck-intro.js`, `.deck-intro-back` in deck.css). Client only, no migration.
+
 **2026-11-04, D-178:** Global Hiring Discovery: the Connect Hiring switch shows everyone, anywhere, who is hiring or
 open to roles, ranked by fit + shared interests + skills (not distance), paged, refreshed live, with a "Global hiring
 discovery" label (migration 0052). Fixes the once-per-session hiring load and unstored passes on hiring cards.
