@@ -22,7 +22,7 @@ const check = async (name, fn) => { try { await fn(); console.log('PASS ', name)
 const signedOut = async (viewport) => {
   const ctx = await browser.newContext({ viewport, isMobile: viewport.width < 800, hasTouch: viewport.width < 800 });
   await ctx.route('https://stub.supabase.local/**', (route) => route.fulfill({ status: 200, contentType: 'application/json', body: '[]', headers: { 'access-control-allow-origin': '*', 'access-control-allow-headers': '*' } }));
-  await ctx.addInitScript(() => { try { localStorage.setItem('brivia-intro-seen', 'true'); } catch { /* none */ } });
+  await ctx.addInitScript(() => { try { sessionStorage.setItem('brivia-intro-seen', 'true'); } catch { /* none */ } });
   return ctx;
 };
 

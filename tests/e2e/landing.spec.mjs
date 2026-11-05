@@ -76,7 +76,7 @@ const newContext = async (browser, viewport, options = {}) => {
     return route.continue();
   });
   await context.addInitScript(INIT_SCRIPT);
-  if (options.seen) await context.addInitScript(() => { try { localStorage.setItem('brivia-intro-seen', 'true'); } catch { /* ignore */ } });
+  if (options.seen) await context.addInitScript(() => { try { sessionStorage.setItem('brivia-intro-seen', 'true'); } catch { /* ignore */ } });
   if (options.saveData) await context.addInitScript(() => { Object.defineProperty(navigator, 'connection', { get: () => ({ saveData: true, effectiveType: '4g' }) }); });
   return context;
 };
@@ -146,7 +146,8 @@ try {
       await context.close();
     }
 
-    // 2. Intro: first visit is gone within 5100 ms (D-190); second visit in a new tab never shows it.
+    // 2. Intro (D-196): opening the site plays it; it holds about 5.6 s and is gone within 6600 ms; a reload in the same
+    //    tab never replays it (a new tab would).
     {
       const context = await newContext(browser, viewport);
       const page = await context.newPage();
@@ -155,19 +156,19 @@ try {
       await page.waitForFunction(() => window.__introGoneAt !== null, null, { timeout: 8000 }).catch(() => {});
       const goneAt = await page.evaluate(() => window.__introGoneAt);
       const bodyLocked = await page.evaluate(() => document.body.classList.contains('intro-active'));
-      const stored = await page.evaluate(() => { try { return localStorage.getItem('brivia-intro-seen'); } catch { return null; } });
+      const stored = await page.evaluate(() => { try { return sessionStorage.getItem('brivia-intro-seen'); } catch { return null; } });
       console.log(`INFO ${label}: first-visit intro present at DOMContentLoaded=${introSeenAtStart}, gone at ${goneAt} ms`);
-      await check(`${label}: intro gone within 5100 ms on first visit`, () => {
+      await check(`${label}: intro holds at least 5 s and is gone within 6600 ms`, () => {
         assert.equal(introSeenAtStart, true, 'a first visit should start with the intro');
-        assert.ok(goneAt !== null && goneAt <= 5100, `intro gone at ${goneAt} ms`);
+        assert.ok(goneAt !== null && goneAt >= 5000 && goneAt <= 6600, `intro gone at ${goneAt} ms`);
         assert.equal(bodyLocked, false, 'body.intro-active still set');
-        assert.equal(stored, 'true', 'brivia-intro-seen not stored in localStorage');
+        assert.equal(stored, 'true', 'brivia-intro-seen not stored for this tab');
       });
-      const second = await context.newPage();
-      await second.goto(`${BASE}/index.html`, { waitUntil: 'load' });
+      const second = page; // the same tab, reloaded
+      await second.reload({ waitUntil: 'load' });
       await second.waitForTimeout(300);
       const secondState = await second.evaluate(() => ({ everVisible: window.__introEverVisible, present: Boolean(document.querySelector('#intro-burst')), locked: document.body.classList.contains('intro-active') }));
-      await check(`${label}: no intro on second visit (localStorage)`, () => {
+      await check(`${label}: no intro again on a reload in the same tab`, () => {
         assert.equal(secondState.everVisible, false, 'intro flashed on the second visit');
         assert.equal(secondState.locked, false);
       });
@@ -186,8 +187,8 @@ try {
       await page.waitForFunction(() => window.__introGoneAt !== null, null, { timeout: 8000 }).catch(() => {});
       const goneAt = await page.evaluate(() => window.__introGoneAt);
       console.log(`INFO ${label}: playing-video intro gone at ${goneAt} ms`);
-      await check(`${label}: the intro plays at least 4 s and is cut at the 5000 ms cap (gone by 5100 ms, not before 4000 ms)`, () => {
-        assert.ok(goneAt !== null && goneAt >= 4000 && goneAt <= 5100, `gone at ${goneAt} ms`);
+      await check(`${label}: a playing intro holds at least 5 s and is gone by the 6500 ms cap (6600 ms)`, () => {
+        assert.ok(goneAt !== null && goneAt >= 5000 && goneAt <= 6600, `gone at ${goneAt} ms`);
       });
       await context.close();
     }

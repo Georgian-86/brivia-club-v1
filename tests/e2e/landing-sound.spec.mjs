@@ -27,7 +27,7 @@ for (let i = 0; i < 80; i += 1) { try { if ((await fetch(`${BASE}/`)).ok) break;
 // The browser's autoplay rule, made explicit: an AudioContext may only run after a real gesture. A time shift lets a
 // test jump the page's clock forward (the 5-minute limit) without waiting 5 minutes.
 const INIT = () => {
-  try { localStorage.setItem('brivia-intro-seen', 'true'); } catch { /* none */ }
+  try { sessionStorage.setItem('brivia-intro-seen', 'true'); } catch { /* none */ }
   window.__timeShift = 0;
   const realNow = performance.now.bind(performance);
   performance.now = () => realNow() + window.__timeShift;

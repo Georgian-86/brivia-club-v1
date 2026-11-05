@@ -17,7 +17,7 @@ import { initGuidedSignup } from './signup-screens.js';
 import { signupFlowMode, resumeScreen } from './signup-flow.js';
 import { defaultCoverUrl, normalizeCoverUrl } from './cover-assets.js';
 import { DEFAULT_COVER_KEY, presetCoverPath, presetCoverStoredPath } from './preset-cover.js';
-import { motionAllowed, introPlan, pickHeroSource, markLoaded, INTRO_CAP_MS } from './landing-motion.js';
+import { motionAllowed, introPlan, pickHeroSource, markLoaded, INTRO_CAP_MS, INTRO_HOLD_MS } from './landing-motion.js';
 import { SOUND_LIMIT_MS, SOUND_STORAGE_KEY, soundPreference, soundPlan, isUnlockEvent, barsToSchedule } from './landing-sound.js';
 import { IGNITION, IGNITION_CUE, createIgnitionSound } from './brivia-ignition.js';
 import heroSoundtrackUrl from '../media/audio/hero-soundtrack.m4a?url';
@@ -66,16 +66,17 @@ let plan = 'play';
 try {
   const fromAuth = window.sessionStorage.getItem('brivia-skip-intro-once') === 'true';
   window.sessionStorage.removeItem('brivia-skip-intro-once');
-  const seenBefore = window.localStorage.getItem('brivia-intro-seen') === 'true';
+  // D-196: the intro plays each time the site is opened in a new tab (sessionStorage), not once ever.
+  const seenBefore = window.sessionStorage.getItem('brivia-intro-seen') === 'true';
   plan = introPlan({ seenBefore, fromAuth });
-  if (plan === 'skip' || fromAuth) window.localStorage.setItem('brivia-intro-seen', 'true');
+  if (plan === 'skip' || fromAuth) window.sessionStorage.setItem('brivia-intro-seen', 'true');
 } catch {}
 if (!landingMotion) plan = 'skip';
 if (introBurst && plan === 'skip') {
   introBurst.remove();
 }
 if (introBurst && plan === 'play') {
-  try { window.localStorage.setItem('brivia-intro-seen', 'true'); } catch {}
+  try { window.sessionStorage.setItem('brivia-intro-seen', 'true'); } catch {}
   document.body.classList.add('intro-active');
   let introDone = false;
   const finishIntro = (fast = false) => {
@@ -90,7 +91,8 @@ if (introBurst && plan === 'play') {
   introClock.start = performance.now();
   introClock.active = true;
   // The title is drawn by CSS from the first frame; it holds for a moment on the name, then fades.
-  window.setTimeout(() => finishIntro(), Math.round(IGNITION.total * 1000 - 50));
+  // D-196: the name holds on screen until INTRO_HOLD_MS (about 5.6 s), then the landing fades in.
+  window.setTimeout(() => finishIntro(), INTRO_HOLD_MS);
   introSkip?.addEventListener('click', () => finishIntro());
   // The cap counts from navigation start (not from when this script ran) and leaves room for the 120 ms fade.
   window.setTimeout(() => finishIntro(true), Math.max(0, INTRO_CAP_MS - 150 - Math.round(window.performance?.now?.() || 0)));
@@ -1702,7 +1704,9 @@ const startGoogleAuth = async () => {
       provider: 'google',
       options: { redirectTo: `${window.location.origin}/auth.html`, queryParams: { prompt: 'select_account' } },
     });
-    if (!error) { startHandoff('Opening Google'); return { ok: true }; }
+    // D-196: no loading screen on the way out to Google (it flashed the dark intro title for a moment before Google's
+    // account picker, and played its music). The button already says "Connecting to Google...".
+    if (!error) return { ok: true };
     throw error;
   } catch (error) {
     endHandoff();

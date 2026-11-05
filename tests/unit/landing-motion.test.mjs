@@ -1,7 +1,7 @@
 // Landing motion helpers (Phase B landing speed). Run: node --test tests/unit
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { motionAllowed, introPlan, pickHeroSource, INTRO_CAP_MS, INTRO_START_GRACE_MS } from '../../site/scripts/landing-motion.js';
+import { motionAllowed, introPlan, pickHeroSource, INTRO_CAP_MS, INTRO_HOLD_MS, INTRO_START_GRACE_MS } from '../../site/scripts/landing-motion.js';
 
 test('motionAllowed is false for reduced motion', () => {
   assert.equal(motionAllowed({ reducedMotion: true, saveData: false }), false);
@@ -30,7 +30,8 @@ test('introPlan plays on a first visit', () => {
 });
 
 test('intro timing constants', () => {
-  assert.equal(INTRO_CAP_MS, 5000); // D-190
+  assert.equal(INTRO_CAP_MS, 6500); // D-196
+  assert.ok(INTRO_HOLD_MS >= 5000 && INTRO_HOLD_MS + 450 <= INTRO_CAP_MS, 'holds 5-6 s, inside the cap');
   assert.equal(INTRO_START_GRACE_MS, 800);
 });
 

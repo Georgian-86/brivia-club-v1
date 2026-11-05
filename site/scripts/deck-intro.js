@@ -218,8 +218,10 @@ export const playDeckIntro = ({ stack, card, next, back, controls = [], reduced 
       tl.to(el, { opacity: 1, duration: top ? 0.01 : 0.2, ease: 'power1.out' }, spec.at);
     });
     // The landing: the stack gives a little under the top card, then recovers (weight, not bounce).
-    tl.to(stack, { y: 4, scaleY: 0.988, transformOrigin: '50% 100%', duration: INTRO.settle * 0.35, ease: 'power2.out' }, INTRO.land)
-      .to(stack, { y: 0, scaleY: 1, duration: INTRO.settle * 0.65, ease: 'power3.out' }, INTRO.land + INTRO.settle * 0.35);
+    // D-196: a 4 px dip only (translate, no scale): scaling the whole stack re-rasterised the card and its photo on every
+    // frame of the landing, which is where the shuffle hitched at the very end.
+    tl.to(stack, { y: 4, duration: INTRO.settle * 0.35, ease: 'power2.out', force3D: true }, INTRO.land)
+      .to(stack, { y: 0, duration: INTRO.settle * 0.65, ease: 'power3.out', force3D: true }, INTRO.land + INTRO.settle * 0.35);
     // One gloss across the top card: a soft light band, like a fresh card catching the light.
     gloss = doc?.createElement?.('span') || null;
     if (gloss) {

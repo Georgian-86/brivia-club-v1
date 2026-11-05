@@ -3756,3 +3756,24 @@ solitaire shuffle; D-179's intro deal and D-185's pile-and-flip deal are not use
   screen fades up 8 px in 0.24 s (opacity and transform only; none under reduced motion; not between Curated and
   Explore, which share a screen). The numbering note: D-194 is the scheduled photo swap.
 
+## D-196 (2026-11-05): no intro flash on Google sign-in; the intro on every open, 5.6 s; a smooth end to the shuffle
+- **Asked:** a screen recording: "when i tried to log in, the intro video came for a second, pls fix that, also this
+  intro video must come when the user opens the link of the website, the intro video must stay at least for 5-6 sec
+  until The Brivia Club comes on screen then the landing page should come; also the cards while shuffling get stuck at
+  last last second pls fix this and make the shuffling smooth".
+- **The flash:** "Continue with Google" showed the D-088 loading screen ("Opening Google") for the moment before the
+  browser left for Google; since D-186 that screen is the dark ignition, so it read as the intro flashing (and played
+  its cue). The Google button no longer shows it; it already says "Connecting to Google...". Back from Google, the
+  "Signing you in" screen is unchanged.
+- **The intro:** plays each time the site is opened in a tab (sessionStorage, was localStorage: once ever); a reload in
+  the same tab, or arriving back from an auth page, does not replay it. It holds until INTRO_HOLD_MS = 5.6 s (the
+  ignition draws for 4.2 s, then THE BRIVIA CLUB holds), then the landing fades in; cap 6.5 s from navigation start.
+  Reduced motion, Save-Data and 2G still skip it.
+- **The shuffle's end:** measured with long-animation-frame timing under a 4x CPU slowdown: the last second (deal, flip,
+  landing, gloss) was a run of 50-100 ms frames spent in paint, not script. Causes and fixes: the landing scaled the
+  whole stack (the card and its photo re-rasterised each frame) -> a 4 px dip only; the gloss used mix-blend-mode
+  soft-light (the card re-blended each frame) -> a plain translucent band; and the moving layers now get their own
+  compositor layer while the deck arrives (`.is-intro`, removed after). Desktop then showed no slow frame after the
+  opening half-second; the rest are borderline (about 12 ms at full speed). Waiting for idle before starting was tried
+  and measured worse, so it was not kept.
+

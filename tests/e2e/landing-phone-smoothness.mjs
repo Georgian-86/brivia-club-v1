@@ -20,7 +20,7 @@ let worst = 0;
 try {
   const context = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 3, isMobile: true, hasTouch: true });
   await context.addInitScript(() => {
-    try { localStorage.setItem('brivia-intro-seen', 'true'); } catch { /* none */ }
+    try { sessionStorage.setItem('brivia-intro-seen', 'true'); } catch { /* none */ }
     window.__frames = []; window.__long = []; window.__cls = 0; window.__shifts = [];
     let last = performance.now();
     const tick = (t) => { window.__frames.push([t - last, scrollY]); last = t; requestAnimationFrame(tick); };

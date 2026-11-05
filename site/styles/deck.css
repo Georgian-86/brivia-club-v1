@@ -575,11 +575,19 @@ body.app-body .app-view[data-view="home"] .deck-empty-action { min-height: 44px;
   position: absolute;
   z-index: 5;
   inset: -10% -20%;
-  background: linear-gradient(105deg, transparent 32%, rgb(255 255 255 / 0) 38%, rgb(255 246 240 / .34) 50%, rgb(255 255 255 / 0) 62%, transparent 68%);
-  mix-blend-mode: soft-light;
+  /* D-196: a plain translucent light band (no blend mode: soft-light made the browser re-blend the whole card on every
+     frame of the sweep, at the end of the shuffle). */
+  background: linear-gradient(105deg, transparent 34%, rgb(255 250 246 / 0) 40%, rgb(255 250 246 / .2) 50%, rgb(255 250 246 / 0) 60%, transparent 66%);
   pointer-events: none;
   will-change: transform;
 }
+/* D-196: while the deck arrives, each moving layer has its own compositor layer, so the deal, the flip and the dip move
+   pixels instead of repainting them. Dropped as soon as the intro ends (is-intro goes). */
+.app-view[data-view="home"] .swipe-stack.is-intro,
+.app-view[data-view="home"] .swipe-stack.is-intro .swipe-card,
+.app-view[data-view="home"] .swipe-stack.is-intro .swipe-card-next,
+.app-view[data-view="home"] .swipe-stack.is-intro .swipe-card-back,
+.app-view[data-view="home"] .swipe-stack.is-intro .deck-shuffle-card { will-change: transform, opacity; }
 
 /* D-174 / D-187: the shuffle's pack (deck-intro.js), in the founder's design: pale blush paper cards with soft edges,
    fanned two each side behind a front card framed in a wine hairline that reads "Shuffling Your Matches" over a

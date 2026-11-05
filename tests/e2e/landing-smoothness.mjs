@@ -19,7 +19,7 @@ try {
   for (const viewport of [{ width: 1440, height: 900 }, { width: 390, height: 844 }]) {
     const context = await browser.newContext({ viewport });
     await context.addInitScript(() => {
-      try { localStorage.setItem('brivia-intro-seen', 'true'); } catch { /* none */ }
+      try { sessionStorage.setItem('brivia-intro-seen', 'true'); } catch { /* none */ }
       window.__frames = []; window.__long = []; window.__cls = 0;
       let last = performance.now();
       const tick = (t) => { window.__frames.push(t - last); last = t; requestAnimationFrame(tick); };

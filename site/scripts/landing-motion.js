@@ -1,8 +1,11 @@
 // Pure helpers for the landing page's intro and video start (Phase B landing speed).
 // Keep this file free of DOM access so it can be unit-tested with node --test.
 
-// D-190: the founder asked for an intro of at least 4 s (the drawn Brivia ignition, 4.2 s plus its fade).
-export const INTRO_CAP_MS = 5000;
+// D-190 / D-196: the founder asked for the intro to stay 5-6 s, until The Brivia Club is fully on screen and has held:
+// the drawn ignition runs 4.2 s, the name holds, and the landing fades in from INTRO_HOLD_MS. The cap counts from
+// navigation start and only cuts in if the page itself was slow to start.
+export const INTRO_HOLD_MS = 5600;
+export const INTRO_CAP_MS = 6500;
 export const INTRO_START_GRACE_MS = 800;
 
 // Posters only (no video requests) for reduced-motion and save-data visitors, and on a 2g link where the 4K hero (D-062)
@@ -26,7 +29,7 @@ export function pickHeroSource(infos) {
   return smooth >= 0 ? smooth : first(() => true);
 }
 
-// The intro plays on a first visit only; arriving back from an auth page also skips it.
+// The intro plays once per tab (D-196: each time the site is opened); arriving back from an auth page skips it.
 export function introPlan({ seenBefore = false, fromAuth = false } = {}) {
   return seenBefore || fromAuth ? 'skip' : 'play';
 }

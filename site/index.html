@@ -77,7 +77,7 @@
       (function () {
         try {
           var seen = false, fromAuth = false;
-          try { seen = localStorage.getItem('brivia-intro-seen') === 'true'; } catch (e) {}
+          try { seen = sessionStorage.getItem('brivia-intro-seen') === 'true'; } catch (e) {}
           try { fromAuth = sessionStorage.getItem('brivia-skip-intro-once') === 'true'; } catch (e) {}
           var reduced = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
           var saveData = !!(navigator.connection && navigator.connection.saveData);
