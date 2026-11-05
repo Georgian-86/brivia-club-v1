@@ -3956,3 +3956,17 @@ new for now").
   the same button.
 - Mutual consent is unchanged: only existing connections are marked, and nothing is sent or matched by viewing.
 
+## D-212 (2026-11-05): seeded members' photos are skies, desks, laptops and faceless mirror selfies
+
+Founder: "set pfps of sky, office desk, laptop aur mirror selfies of people but must not look ai" (for every seeded
+member). Supersedes the D-177 / D-188 photos (which matched each member's interests; t59-t68 were temporary crops).
+- All 68 seeded members now show a real Unsplash photograph (free license only, no Unsplash+): 35 skies and clouds, 15
+  office desks and workspaces, 14 laptops, 4 mirror selfies, mixed evenly across t01-t68. Same file names in
+  `site/public/test-avatars/`, so no database change.
+- Not AI: Unsplash results credited to "Microsoft Copilot" (AI images) and 3D-rendered offices were left out.
+- No faces: every crop was checked by eye. Mirror selfies where the face shows even partly were rejected; only four of
+  the free ones hide the face completely behind the phone or camera, so the other kinds take the remaining places.
+- How: the container cannot reach Unsplash, so Unsplash search pages filtered to the free license were captured with
+  Firecrawl (7 captures instead of one per photo) and each photo cut from the page; sources in supabase/seed/README.md.
+  (Planned as D-194 while Firecrawl's credits were exhausted; done once they reset.)
+
