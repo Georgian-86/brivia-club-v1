@@ -1460,3 +1460,11 @@ Verify: `select count(*) from pg_proc where proname = 'companion_deck_v2';` (1).
 Opening a chat, or the Chats tab, on one device clears the bell's message rows on the others. The client works as before
 until this is applied.
 Verify: `select count(*) from pg_proc where proname in ('mark_chat_seen', 'my_chat_seen');` (2).
+
+## 0065
+
+**Title and organisation at signup (D-214).** Apply after `0064`, with the client deploy and the `directory` Edge
+Function. `search_companies` may be called without a session, and anon reads only the directory's own companies
+(`source <> 'member'`); members' own organisations stay signed-in only. The Edge Function's logo pass also tries the
+logo Wikidata lists for the company's name.
+Verify: `select has_function_privilege('anon', 'public.search_companies(text,int)', 'execute');` (true).

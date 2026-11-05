@@ -13,15 +13,15 @@
 // still creates the account; setup is those three, and About you's Finish saves all of them.
 export const SETUP = ['interests', 'area', 'about'];
 export const SCREENS = {
-  email: ['welcome', 'account', 'adult', 'name', 'details', 'photo', ...SETUP, 'reveal'],
-  google: ['welcome', 'adult', 'name', 'details', 'photo', ...SETUP, 'reveal'],
+  email: ['welcome', 'account', 'work', 'name', 'details', 'photo', ...SETUP, 'reveal'],
+  google: ['welcome', 'work', 'name', 'details', 'photo', ...SETUP, 'reveal'],
 };
 // The last signup screen: its primary button creates the account and saves the profile.
 export const SIGNUP_LAST = 'photo';
 export const isSetupScreen = (screen) => SETUP.includes(screen);
 
 // The icon each question shows in its bubble (signup-screens.js draws them as inline SVG).
-export const STEP_ICONS = { account: 'mail', adult: 'shield', name: 'person', details: 'phone', photo: 'camera', about: 'note', area: 'pin', interests: 'spark' };
+export const STEP_ICONS = { account: 'mail', work: 'briefcase', name: 'person', details: 'phone', photo: 'camera', about: 'note', area: 'pin', interests: 'spark' };
 const TERMINAL = ['reveal', 'verify'];
 // The questions of the phase `screen` belongs to (signup questions for welcome / verify, setup for reveal).
 const questions = (path, screen) => {
@@ -50,7 +50,7 @@ export const stepStates = (path, screen) => {
 export const resumeScreen = ({ session, status = {} }) => {
   if (!session) return 'welcome';
   if (status.completed) return 'done';
-  if (!status.adult_declared) return 'adult';
+  if (!status.adult_declared) return 'work';  // D-214: the work screen replaced the 18+ one (continuing confirms it)
   if (!status.has_name) return 'name';
   if (!status.has_phone || !status.has_gender) return 'details';
   if (status.has_photo === false) return 'photo';

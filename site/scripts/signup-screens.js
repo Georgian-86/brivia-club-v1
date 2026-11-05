@@ -6,7 +6,8 @@
 // you's Finish calls `submitSetup(answers)`.
 // No email code, no points screen: the interests are saved with an even split. Coordinates live only in
 // `answers.area` (memory) and are dropped once saved.
-import { searchPlaces, fetchInterestNodes, addMemberInterest, isMissingFunction } from './supabase.js';
+import { searchPlaces, fetchInterestNodes, addMemberInterest, isMissingFunction, searchCompanies, searchCompanyDirectory, companyLogoUrl } from './supabase.js';
+import { TITLE_MAX, cleanTitle, cleanCompanyName, monogramMarkup } from './work-identity.js';
 import { SCREENS, STEP_ICONS, SETUP, stepLabel, stepStates, backTarget, groupInterests, isOffered, hasCatalog, catalogGroups, normalizeInterestLabel } from './signup-flow.js';
 import { ImageProcessingError, PHOTO_ERROR_MESSAGE, PHOTO_FRAMER_ERROR } from './image-compress.js';
 import { MAX_INTERESTS } from './passion-budget.js';
@@ -48,6 +49,7 @@ const ICONS = {
   back: '<path d="M19 12H5M11 6l-6 6 6 6"/>',
   chevron: '<path d="M6 9l6 6 6-6"/>',
   note: '<path d="M5 4.5h10.5L19 8v11.5H5z"/><path d="M8.5 10h7M8.5 13.5h7M8.5 17h4.5"/>',
+  briefcase: '<rect x="3.5" y="7.5" width="17" height="12" rx="2.5"/><path d="M9 7.5V6a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v1.5M3.5 12.5h17"/>',
   camera: '<path d="M4 8.5A2.5 2.5 0 0 1 6.5 6h1.8l1.4-2h4.6l1.4 2h1.8A2.5 2.5 0 0 1 20 8.5v8a2.5 2.5 0 0 1-2.5 2.5h-11A2.5 2.5 0 0 1 4 16.5z"/><circle cx="12" cy="12.5" r="3.6"/>',
 };
 const svg = (name, cls = '') => `<svg class="${cls}" viewBox="0 0 24 24" aria-hidden="true" focusable="false">${ICONS[name]}</svg>`;
@@ -90,7 +92,7 @@ export const initGuidedSignup = ({
   const back = root.querySelector('[data-guided-back]');
   const next = root.querySelector('[data-guided-next]');
   // photo: the framed File picked on the photo screen (D-102); photoUrl: the member's stored photo when resuming.
-  const emptyAnswers = () => ({ email: '', password: '', passwordConfirm: '', adult: false, name: '', phoneCountryCode: '+91', phoneNumber: '', gender: '', photo: null, photoUrl: '', lookingFor: [], bio: '', area: null, interests: [] });
+  const emptyAnswers = () => ({ email: '', password: '', passwordConfirm: '', adult: false, title: '', companyId: '', companyName: '', companyLogo: '', name: '', phoneCountryCode: '+91', phoneNumber: '', gender: '', photo: null, photoUrl: '', lookingFor: [], bio: '', area: null, interests: [] });
   const state = { path, hasSession, resumeAt, screen: 'welcome', busy: false, nodes: null, current: null, email: '', answers: { ...emptyAnswers(), ...prefill } };
   const geo = { seq: 0, pending: false, guard: 0 };
 
@@ -256,29 +258,133 @@ export const initGuidedSignup = ({
       },
     }),
 
-    adult: () => ({
-      autofocus: 'input[name="guided-adult"]',
-      html: `${heading('Are you 18 or older?', 'Brivia Club is for adults. We never ask for your date of birth.')}
-        <label class="guided-check"><input type="checkbox" name="guided-adult" ${a.adult ? 'checked' : ''} /><span>I'm 18 or older</span></label>
-        <p class="guided-fine"><a href="/privacy.html" target="_blank" rel="noopener">How we use your data</a> (privacy notice)</p>
-        <button class="guided-link" type="button" data-guided-under18>I'm under 18</button>`,
-      mount: (el) => {
-        const box = el.querySelector('input[name="guided-adult"]');
-        box.addEventListener('change', () => { a.adult = box.checked; refreshNext(); });
-        el.querySelector('[data-guided-under18]').addEventListener('click', () => {
-          cancelGeo();
-          Object.assign(a, emptyAnswers());
-          if (state.hasSession) onSignOut({ quiet: true });
-          state.screen = 'stop';
-          host.innerHTML = `<div class="guided-screen guided-screen--stop">${heading('Thanks for being honest.', COPY.under18)}</div>`;
-          root.dataset.screen = 'stop';
-          steps.hidden = true; label.hidden = true; actions.hidden = true;
-          root.querySelector('#signup-screen-title')?.focus();
-        });
-      },
-      ready: () => a.adult === true,
-      submit: async () => nextAfter('adult'),
-    }),
+    // D-214 (founder, 2026-11-06): the second screen asks for the member's title and organisation (it replaced "Are
+    // you 18 or older?"; continuing confirms it, and declare_adult is still recorded when the account is created).
+    // Both optional. The organisation comes from the company directory, every option with its logo (or its initials on
+    // a tile); a name the directory does not have is kept as typed and added once the account exists (setup's Finish).
+    work: () => {
+      let rows = [];
+      let query = '';
+      let active = -1;
+      let seq = 0;
+      let timer = 0;
+      const logoOf = (c) => (c.logo_path ? companyLogoUrl(c.logo_path) : '');
+      const mark = (name, url) => (url ? `<img class="work-logo" src="${escapeHtml(url)}" alt="" width="28" height="28" loading="lazy" />` : monogramMarkup(name, escapeHtml));
+      return {
+        autofocus: 'input[name="guided-title"]',
+        html: `${heading('What do you do?', 'Your title and organisation show small on your card, like “Designer at Zomato”. Add them now or later.')}
+          <label class="guided-field"><span class="guided-field-label">Title</span>
+            <input type="text" name="guided-title" autocomplete="organization-title" maxlength="${TITLE_MAX}" placeholder="e.g. Product Designer, Student, Founder" value="${escapeHtml(a.title)}" /></label>
+          <p class="guided-field-label" id="guided-company-label">Company or organisation</p>
+          <div class="guided-company-picked" data-guided-company-picked hidden></div>
+          <div class="guided-combo" data-guided-combo>
+            <label class="guided-field guided-field--search guided-field--combo"><span class="sr-only">Company or organisation</span>${svg('search', 'guided-search-icon')}
+              <input type="text" role="combobox" name="guided-company" autocomplete="off" maxlength="80" placeholder="Search, e.g. Infosys, IIT Delhi" aria-autocomplete="list" aria-expanded="false" aria-controls="guided-company-options" aria-labelledby="guided-company-label" /></label>
+            <div class="guided-menu guided-menu--company" id="guided-company-options" role="listbox" aria-label="Companies" hidden></div>
+          </div>
+          <p class="guided-fine">By continuing you confirm you're 18 or older. <a href="/privacy.html" target="_blank" rel="noopener">How we use your data</a></p>`,
+        mount: (el) => {
+          const title = el.querySelector('input[name="guided-title"]');
+          const combo = el.querySelector('[data-guided-combo]');
+          const input = el.querySelector('input[name="guided-company"]');
+          const menu = el.querySelector('#guided-company-options');
+          const picked = el.querySelector('[data-guided-company-picked]');
+          title.addEventListener('input', () => { a.title = title.value; });
+          const optionId = (i) => `guided-company-${i}`;
+          const options = () => [...menu.querySelectorAll('.guided-menu-option')];
+          const setActive = (i) => {
+            const list = options();
+            active = list.length ? Math.max(0, Math.min(i, list.length - 1)) : -1;
+            list.forEach((o, j) => o.classList.toggle('is-active', j === active));
+            if (active < 0) input.removeAttribute('aria-activedescendant');
+            else { input.setAttribute('aria-activedescendant', optionId(active)); list[active].scrollIntoView({ block: 'nearest' }); }
+          };
+          const close = () => { menu.hidden = true; combo.classList.remove('is-open'); input.setAttribute('aria-expanded', 'false'); input.removeAttribute('aria-activedescendant'); active = -1; };
+          const render = (note = '') => {
+            const own = cleanCompanyName(query);
+            const exact = rows.some((c) => c.name.toLowerCase() === own.toLowerCase());
+            const items = rows.map((c, i) => `<div class="guided-menu-option guided-company-option" id="${optionId(i)}" role="option" aria-selected="false" data-company="${i}">${mark(c.name, logoOf(c))}<span>${escapeHtml(c.name)}</span></div>`);
+            if (own.length >= 2 && !exact) items.push(`<div class="guided-menu-option guided-company-option is-add" id="${optionId(rows.length)}" role="option" aria-selected="false" data-company-own>${monogramMarkup(own, escapeHtml)}<span>Use “${escapeHtml(own)}”</span></div>`);
+            menu.innerHTML = items.join('') + (note ? `<div class="guided-menu-note" role="option" aria-disabled="true" aria-selected="false">${escapeHtml(note)}</div>` : '');
+            fallBack(menu);
+            menu.hidden = !menu.innerHTML || !query;
+            combo.classList.toggle('is-open', !menu.hidden);
+            input.setAttribute('aria-expanded', String(!menu.hidden));
+            setActive(query ? 0 : -1);
+          };
+          // A logo that does not load gives way to the company's initials on a tile.
+          const fallBack = (root) => root.querySelectorAll('img.work-logo').forEach((img) => img.addEventListener('error', () => {
+            const name = img.closest('[data-company], [data-guided-company-picked]')?.querySelector('span:last-of-type')?.textContent || '';
+            img.outerHTML = monogramMarkup(name, escapeHtml);
+          }, { once: true }));
+          const showPicked = () => {
+            const on = Boolean(a.companyName);
+            picked.hidden = !on;
+            combo.hidden = on;
+            picked.innerHTML = on ? `${mark(a.companyName, a.companyLogo)}<span class="guided-company-name">${escapeHtml(a.companyName)}</span><button type="button" class="guided-link" data-guided-company-change>Change</button>` : '';
+            fallBack(picked);
+            picked.querySelector('[data-guided-company-change]')?.addEventListener('click', () => {
+              Object.assign(a, { companyId: '', companyName: '', companyLogo: '' });
+              showPicked();
+              input.value = ''; query = ''; rows = []; close();
+              input.focus();
+            });
+          };
+          const choose = (opt, { keyboard = false } = {}) => {
+            if (!opt) return;
+            if (opt.hasAttribute('data-company-own')) Object.assign(a, { companyId: '', companyName: cleanCompanyName(query), companyLogo: '' });
+            else {
+              const c = rows[Number(opt.dataset.company)];
+              if (!c) return;
+              Object.assign(a, { companyId: String(c.id), companyName: c.name, companyLogo: logoOf(c) });
+            }
+            close();
+            showPicked();
+            if (keyboard) picked.querySelector('[data-guided-company-change]')?.focus();
+            else next.focus({ preventScroll: true });
+          };
+          input.addEventListener('input', () => {
+            window.clearTimeout(timer);
+            query = input.value.trim();
+            if (!query) { rows = []; close(); return; }
+            const ticket = ++seq;
+            timer = window.setTimeout(async () => {
+              const local = await searchCompanies(query).catch(() => ({ data: [] }));
+              if (ticket !== seq) return;
+              rows = (local.data || []).slice(0, 8);
+              // The directory (Wikidata, with logos) answers signed-in members only; signed out, the database's list.
+              const ask = state.hasSession && local.needsDirectory;
+              render(ask ? 'Searching the directory…' : '');
+              if (!ask) return;
+              const remote = await searchCompanyDirectory(query).catch(() => ({ data: [] }));
+              if (ticket !== seq) return;
+              const seen = new Set(rows.map((r) => String(r.id)));
+              rows = [...rows, ...(remote.data || []).filter((r) => r?.id && !seen.has(String(r.id)))].slice(0, 8);
+              render();
+            }, 200);
+          });
+          input.addEventListener('keydown', (event) => {
+            if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+              if (menu.hidden) return;
+              event.preventDefault();
+              setActive(active + (event.key === 'ArrowDown' ? 1 : -1));
+            } else if (event.key === 'Enter' && !menu.hidden && active >= 0) { event.preventDefault(); choose(options()[active], { keyboard: true }); }
+            else if (event.key === 'Escape' && !menu.hidden) { event.preventDefault(); event.stopPropagation(); close(); }
+            else if (event.key === 'Tab') close();
+          });
+          menu.addEventListener('mousedown', (event) => event.preventDefault());
+          menu.addEventListener('click', (event) => choose(event.target.closest('.guided-menu-option:not([aria-disabled="true"])')));
+          input.addEventListener('blur', () => window.setTimeout(close, 120));
+          showPicked();
+        },
+        ready: () => true,
+        submit: async () => {
+          a.title = cleanTitle(a.title);
+          a.adult = true;
+          return nextAfter('work');
+        },
+      };
+    },
 
     name: () => ({
       autofocus: 'input[name="guided-name"]',
@@ -392,6 +498,8 @@ export const initGuidedSignup = ({
         ready: () => Boolean(a.photo || a.photoUrl),
         notReady: () => COPY.photoMissing,
         submit: async () => {
+          // D-214: the title and organisation are saved with setup's Finish; kept here so a confirm-email detour keeps them.
+          try { window.localStorage.setItem('brivia-pending-work', JSON.stringify({ title: cleanTitle(a.title), companyId: a.companyId, companyName: a.companyName })); } catch { /* answers stay in memory */ }
           const result = await submit({ ...a, adult: true });
           if (!result?.ok) return { screen: result?.screen || 'photo', message: result?.message || COPY.saveFailed };
           a.password = ''; a.passwordConfirm = '';
@@ -560,7 +668,7 @@ export const initGuidedSignup = ({
           a.bio = cleanBio(a.bio);
           let result;
           try {
-            result = await submitSetup({ area: a.area, interests: a.interests.map(({ id, label, mode }) => ({ id, label, mode })), lookingFor: [...a.lookingFor], bio: a.bio });
+            result = await submitSetup({ area: a.area, interests: a.interests.map(({ id, label, mode }) => ({ id, label, mode })), lookingFor: [...a.lookingFor], bio: a.bio, work: { title: cleanTitle(a.title), companyId: a.companyId, companyName: a.companyName } });
           } catch (error) { submitted = false; throw error; }
           if (!result?.ok) { submitted = false; return { screen: result?.screen || 'about', message: result?.message || COPY.saveFailed }; }
           // Saved: the coordinates leave memory.

@@ -58,7 +58,22 @@ const commonsLogoFor = async (site: string) => {
     return file ? `${file.replace(/^http:/, 'https:')}?width=128` : '';
   } catch { return ''; }
 };
-const storeIcon = async (admin: any, site: string, base: string) => {
+// D-214: a company whose site gives no icon at all: the logo Wikidata lists for the organisation of that name (the
+// first search result described as an organisation), as a Commons PNG.
+const commonsLogoByName = async (name: string) => {
+  try {
+    const clean = String(name || '').replace(/\([^)]*\)/g, ' ').replace(/\s+/g, ' ').trim();
+    if (clean.length < 2) return '';
+    const s = await timed(`https://www.wikidata.org/w/api.php?action=wbsearchentities&format=json&type=item&language=en&uselang=en&limit=6&search=${encodeURIComponent(clean)}`);
+    const found = s.ok ? (await s.json()).search || [] : [];
+    const hit = found.find((r: any) => /^Q\d+$/.test(r.id) && isOrg(String(r.description || '')));
+    if (!hit) return '';
+    const e = await timed(`https://www.wikidata.org/w/api.php?action=wbgetclaims&format=json&property=P154&entity=${hit.id}`);
+    const file = e.ok ? (await e.json())?.claims?.P154?.[0]?.mainsnak?.datavalue?.value || '' : '';
+    return file ? `https://commons.wikimedia.org/wiki/Special:FilePath/${encodeURIComponent(file)}?width=128` : '';
+  } catch { return ''; }
+};
+const storeIcon = async (admin: any, site: string, base: string, name = '') => {
   const www = site.startsWith('www.') ? site : `www.${site}`;
   const sources = [
     `https://www.google.com/s2/favicons?domain=${encodeURIComponent(site)}&sz=128`,
@@ -69,9 +84,11 @@ const storeIcon = async (admin: any, site: string, base: string) => {
     `https://${www}/favicon.ico`,
     `https://${site}/favicon.ico`,
     'commons',
+    'commons-name',
   ];
   for (let source of sources) {
     if (source === 'commons') { source = await commonsLogoFor(site); if (!source) continue; }
+    if (source === 'commons-name') { source = await commonsLogoByName(name); if (!source) continue; }
     try {
       const img = await timed(source, {}, 5000);
       let type = (img.headers.get('content-type') || '').split(';')[0].trim();
@@ -107,14 +124,14 @@ Deno.serve(async (req) => {
   if (body.kind === 'logos') {
     const ids = (Array.isArray(body.ids) ? body.ids : []).filter((x) => /^[0-9a-f-]{36}$/.test(String(x))).slice(0, 40);
     if (!ids.length) return json(200, { done: 0 });
-    const { data: rows } = await admin.from('company').select('id,icon_domain,domain,logo_path,source').in('id', ids);
+    const { data: rows } = await admin.from('company').select('id,name,icon_domain,domain,logo_path,source').in('id', ids);
     const byDomain = new Map<string, string>();
     let done = 0;
     for (const r of rows || []) {
       const site = r.icon_domain || r.domain;
       if (r.logo_path || r.source === 'member' || !site) continue;
       let path = byDomain.get(site);
-      if (path === undefined) { path = await storeIcon(admin, site, `directory/c-${r.id}-icon`); byDomain.set(site, path); }
+      if (path === undefined) { path = await storeIcon(admin, site, `directory/c-${r.id}-icon`, r.name); byDomain.set(site, path); }
       if (path) { await admin.rpc('brivia_set_company_icon', { p_id: r.id, p_path: path }); done += 1; }
     }
     return json(200, { done, seen: (rows || []).length });

@@ -3984,3 +3984,22 @@ member). Supersedes the D-177 / D-188 photos (which matched each member's intere
   the member replied after it, which clears the stale rows already in the bell. Before 0064 the client works as before.
 - Hiring: `smooth.css` forced a cream background (`!important`) on `#hiring-toggle`, so when on, its cream label and
   knob sat on cream: a blank white pill. The on state now keeps the deep-wine background. Checked in hiring.spec.
+
+## D-214 (2026-11-06): signup's second screen asks for title and organisation, not "Are you 18 or older?"
+
+- Founder (with a screenshot of Step 2 of 5): "remove this 18 year or older and instead put those title and company
+  organisation box make sure logo for every company is there".
+- Done: Step 2 is "What do you do?": a Title field and a Company or organisation search over the company directory,
+  every option led by its logo on a white tile (or the company's initials when it has none, also when a logo fails to
+  load), plus "Use “<typed name>”" for an organisation not in the directory. Both optional. They are saved with setup's
+  Finish (`set_my_work`; a typed name is added with `add_company` first), and kept in localStorage across a
+  confirm-email detour. Edit profile still changes them.
+- The 18+ rule is unchanged in substance: the checkbox and "I'm under 18" link are gone, the screen says "By continuing
+  you confirm you're 18 or older" with the privacy notice link, and `declare_adult` is still recorded when the account
+  is created (the server still refuses location and interests without it). A member resuming without the declaration
+  resumes at this screen.
+- 0065: the email path has no session at Step 2, so `search_companies` becomes callable signed out and anon reads only
+  the directory's own companies (`source <> 'member'`); members' own organisations stay signed-in only.
+- Logos: 878 of 932 directory companies have one; the other 54 (mostly Indian banks and PSUs whose sites block icon
+  fetches) never got one from the site-icon sources. The directory Edge Function's logo pass now also tries the logo
+  Wikidata lists for the company's name; it runs when the function is deployed.

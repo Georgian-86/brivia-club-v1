@@ -333,3 +333,26 @@ body.auth-page .auth-shell .guided .guided-bio-count { display: block; margin-to
 }
 /* D-137: the bio word limit, a quiet wine note when the bio runs past 20 words. */
 body.auth-page .auth-shell .guided .guided-bio-count.is-over { color: var(--k-wine); font-weight: 600; }
+
+/* D-214: the organisation picker on signup's second screen. Every option leads with its logo on a white tile (or the
+   company's initials when it has none), like LinkedIn (D-144). */
+body.auth-page .auth-shell .guided .guided-company-option { display: flex; align-items: center; justify-content: flex-start; gap: 12px; text-align: left; }
+body.auth-page .auth-shell .guided :is(.guided-company-option, .guided-company-picked) .work-logo {
+  flex: 0 0 28px; width: 28px; height: 28px; box-sizing: border-box; border-radius: 6px; padding: 3px; object-fit: contain;
+  background: #fff; box-shadow: 0 0 0 1px color-mix(in srgb, var(--color-chat-wine) 14%, transparent);
+}
+body.auth-page .auth-shell .guided :is(.guided-company-option, .guided-company-picked) .work-logo--mono {
+  display: inline-grid; place-items: center; padding: 0; background: var(--k-box); color: var(--k-wine);
+  font-size: 11px; font-weight: 800; letter-spacing: .02em;
+}
+body.auth-page .auth-shell .guided :is(.guided-company-option, .guided-company-picked) svg.work-logo { padding: 5px; fill: none; stroke: currentColor; stroke-width: 1.3; color: var(--k-muted); }
+body.auth-page .auth-shell .guided .guided-company-option span:last-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+body.auth-page .auth-shell .guided .guided-company-picked {
+  display: flex; align-items: center; gap: 12px; min-height: 52px; margin-bottom: var(--space-3); padding: 10px 14px;
+  border: 1px solid var(--k-wine); border-radius: 12px; background: var(--k-box);
+}
+body.auth-page .auth-shell .guided .guided-company-picked[hidden] { display: none; }
+body.auth-page .auth-shell .guided .guided-company-picked .work-logo { flex-basis: 32px; width: 32px; height: 32px; }
+body.auth-page .auth-shell .guided .guided-company-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--k-wine); font-weight: 700; }
+body.auth-page .auth-shell .guided .guided-company-picked .guided-link { margin: 0; padding: 6px 4px; }
+body.auth-page .auth-shell .guided [data-guided-combo][hidden] { display: none; }

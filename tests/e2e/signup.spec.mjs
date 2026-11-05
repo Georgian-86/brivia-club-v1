@@ -136,6 +136,15 @@ const setup = async (context, opts = {}) => {
       const q = ((url.searchParams.get('or') || '').match(/name\.ilike\.\*([^*]*)\*/) || [])[1] || '';
       return json(200, places.filter((pl) => !q || pl.name.toLowerCase().includes(q.toLowerCase())));
     }
+    // D-214: the organisation search on the work screen (0065: no session needed), and the save at setup's Finish.
+    if (p.startsWith('/storage/v1/object/public/company-logos/')) return route.fulfill({ status: 200, contentType: 'image/png', body: PHOTO_PNG, headers });
+    if (rpc === 'search_companies') {
+      const q = String(JSON.parse(body || '{}').p_q || '').toLowerCase();
+      const all = [{ id: 'c0000000-0000-4000-8000-000000000001', name: 'Infosys', logo_path: 'directory/infosys-icon.png', source: 'admin' },
+        { id: 'c0000000-0000-4000-8000-000000000002', name: 'Indian Bank', logo_path: null, source: 'admin' }];
+      return json(200, all.filter((c) => c.name.toLowerCase().includes(q)));
+    }
+    if (rpc === 'set_my_work') { state.work = JSON.parse(body || '{}'); return route.fulfill({ status: 204, body: '', headers }); }
     if (rpc === 'set_home_location' || rpc === 'set_home_city') { state.hasCell = true; return json(200, 'Pune'); }
     if (rpc === 'set_member_interests') { state.interests = JSON.parse(body || '{}').p_items || []; return route.fulfill({ status: 204, body: '', headers }); }
     if (rpc === 'my_interests') return json(200, state.interests);
@@ -329,7 +338,7 @@ try {
     u = await ui(page);
     check(`${w} account: one question, "Step 1 of 5", first bubble current, Back shown, Continue disabled (${u.bubbles.join(' ')})`, () => {
       assert.equal(u.questions, 1); assert.equal(u.h1, 1); assert.equal(u.primaries, 1); assert.equal(u.label, 'Step 1 of 5');
-      assert.deepEqual(u.bubbles, ['account:current', 'adult:pending', 'name:pending', 'details:pending', 'photo:pending']);
+      assert.deepEqual(u.bubbles, ['account:current', 'work:pending', 'name:pending', 'details:pending', 'photo:pending']);
       assert.equal(u.back, true); assert.equal(u.nextDisabled, true);
     });
     let f = await focusInfo(page);
@@ -355,30 +364,42 @@ try {
     await shot(page, `${w}-02-account`);
     await auditScreen(page, `${w} account`);
     await page.locator('input[name="guided-password-confirm"]').press('Enter');
-    const toAdult = await waitScreen(page, 'adult');
+    const toWork = await waitScreen(page, 'work');
     u = await ui(page);
-    check(`${w} Enter = Continue: account -> 18+ ("Step 2 of 5"), nothing sent to Supabase Auth yet`, () => {
-      assert.equal(toAdult, true); assert.equal(u.label, 'Step 2 of 5'); assert.equal(u.questions, 1);
-      assert.deepEqual(u.bubbles.slice(0, 2), ['account:done', 'adult:current']);
+    check(`${w} Enter = Continue: account -> work ("Step 2 of 5"), nothing sent to Supabase Auth yet`, () => {
+      assert.equal(toWork, true); assert.equal(u.label, 'Step 2 of 5'); assert.equal(u.questions, 1);
+      assert.deepEqual(u.bubbles.slice(0, 2), ['account:done', 'work:current']);
       assert.equal(calls.filter((c) => c.path.startsWith('/auth/v1/signup')).length, 0);
     });
-    check(`${w} 18+: one checkbox "I'm 18 or older", the notice link, Continue disabled until ticked`, () => {
-      assert.match(u.text, /I'm 18 or older/i); assert.match(u.text, /privacy|How we use your data/i); assert.equal(u.nextDisabled, true);
+    check(`${w} work: title and organisation, no 18+ checkbox, the 18+ line and the notice link, Continue enabled (optional)`, () => {
+      assert.match(u.text, /What do you do\?/); assert.doesNotMatch(u.text, /I'm under 18/i); assert.match(u.text, /confirm you're 18 or older/i);
+      assert.match(u.text, /How we use your data/i); assert.equal(u.nextDisabled, false);
     });
-    await page.keyboard.press('Enter');
-    await page.waitForTimeout(150);
-    const stillAdult = await screenOf(page);
-    check(`${w} 18+ is required (still ${stillAdult})`, () => assert.equal(stillAdult, 'adult'));
-    await shot(page, `${w}-03-adult`);
-    await auditScreen(page, `${w} adult`);
+    await page.locator('input[name="guided-title"]').fill('Product Designer');
+    await page.locator('input[name="guided-company"]').fill('in');
+    await page.waitForSelector('#guided-company-options .guided-company-option', { timeout: 4000 });
+    const opts = await page.$$eval('#guided-company-options .guided-company-option', (els) => els.map((el) => ({ text: el.querySelector('span:last-child')?.textContent.trim() || '', img: el.querySelector('img.work-logo')?.getAttribute('src') || '', mono: el.querySelector('.work-logo--mono')?.textContent || '' })));
+    check(`${w} work: every organisation shows its logo, or its initials when it has none (${JSON.stringify(opts)})`, () => {
+      const infosys = opts.find((o) => o.text === 'Infosys'); const bank = opts.find((o) => o.text === 'Indian Bank');
+      assert.ok(infosys && /company-logos\/directory\/infosys-icon\.png$/.test(infosys.img)); assert.ok(bank && bank.mono === 'IB');
+    });
+    await shot(page, `${w}-03-work-search`);
+    await page.locator('#guided-company-options .guided-company-option', { hasText: 'Infosys' }).click();
+    const pickedText = await page.locator('[data-guided-company-picked]').innerText();
+    check(`${w} work: the picked organisation shows with its logo and Change (${pickedText})`, async () => {
+      assert.match(pickedText, /Infosys/); assert.match(pickedText, /Change/i);
+    });
+    await shot(page, `${w}-03-work`);
+    await auditScreen(page, `${w} work`);
     await page.locator('[data-guided-back]').click();
     await waitScreen(page, 'account');
     const kept = await page.locator('input[name="guided-email"]').inputValue();
-    check(`${w} Back from 18+ (no session yet) returns to account with the email kept`, () => assert.equal(kept, EMAIL));
+    check(`${w} Back from work (no session yet) returns to account with the email kept`, () => assert.equal(kept, EMAIL));
     await page.locator('[data-guided-next]').click();
-    await waitScreen(page, 'adult');
-    await page.locator('input[name="guided-adult"]').check();
-    await page.locator('input[name="guided-adult"]').press('Enter');
+    await waitScreen(page, 'work');
+    const keptTitle = await page.locator('input[name="guided-title"]').inputValue();
+    check(`${w} work: the title and organisation are kept after Back (${keptTitle})`, async () => { assert.equal(keptTitle, 'Product Designer'); assert.match(await page.locator('[data-guided-company-picked]').innerText(), /Infosys/); });
+    await page.locator('[data-guided-next]').click();
     await waitScreen(page, 'name');
     u = await ui(page);
     check(`${w} name: "Step 3 of 5", one question, Back shown, Continue disabled when empty`, () => {
@@ -557,8 +578,7 @@ try {
     await page.locator('input[name="guided-email"]').fill(EMAIL);
     await page.locator('input[name="guided-password"]').fill(PASSWORD);
     await page.locator('input[name="guided-password-confirm"]').fill(PASSWORD);
-    await page.locator('[data-guided-next]').click(); await waitScreen(page, 'adult'); await note('adult');
-    await page.locator('input[name="guided-adult"]').check();
+    await page.locator('[data-guided-next]').click(); await waitScreen(page, 'work'); await note('work');
     await page.locator('[data-guided-next]').click(); await waitScreen(page, 'name'); await note('name');
     await page.locator('input[name="guided-name"]').fill('Gia Guided');
     await page.locator('[data-guided-next]').click(); await waitScreen(page, 'details'); await note('details');
@@ -591,8 +611,8 @@ try {
     await page.locator('input[name="guided-email"]').fill(EMAIL);
     await page.locator('input[name="guided-password"]').fill(PASSWORD);
     await page.locator('input[name="guided-password-confirm"]').fill(PASSWORD);
-    await page.keyboard.press('Enter'); await waitScreen(page, 'adult');
-    await page.locator('input[name="guided-adult"]').check(); await page.keyboard.press('Enter'); await waitScreen(page, 'name');
+    await page.keyboard.press('Enter'); await waitScreen(page, 'work');
+    await page.keyboard.press('Enter'); await waitScreen(page, 'name');
     await page.locator('input[name="guided-name"]').fill('Dee Denied'); await page.keyboard.press('Enter'); await waitScreen(page, 'details');
     await page.locator('input[name="guided-phone"]').fill('9876543210');
     await page.locator('.guided-segment[data-gender="Male"]').click();
@@ -639,8 +659,8 @@ try {
     await page.locator('input[name="guided-email"]').fill(EMAIL);
     await page.locator('input[name="guided-password"]').fill(PASSWORD);
     await page.locator('input[name="guided-password-confirm"]').fill(PASSWORD);
-    await page.locator('[data-guided-next]').click(); await waitScreen(page, 'adult');
-    await page.locator('input[name="guided-adult"]').check(); await page.locator('[data-guided-next]').click(); await waitScreen(page, 'name');
+    await page.locator('[data-guided-next]').click(); await waitScreen(page, 'work');
+    await page.locator('[data-guided-next]').click(); await waitScreen(page, 'name');
     await page.locator('input[name="guided-name"]').fill('Rae Reduced'); await page.locator('[data-guided-next]').click(); await waitScreen(page, 'details');
     await page.locator('input[name="guided-phone"]').fill('9876543210');
     await page.locator('.guided-segment[data-gender="Female"]').click();
@@ -660,7 +680,7 @@ try {
   // screen's button, which creates the account; with { until: 'interests' }, to the interests' Continue).
   // opts: { area: 'geo' | 'city', picks }.
   const answerRest = async (page, from, { area = 'city', picks = ['Chess', 'Guitar', 'Hackathons'], name = 'Gia Guided', until = 'about' } = {}) => {
-    const order = ['account', 'adult', 'name', 'details', 'photo', 'interests', 'area', 'about'];
+    const order = ['account', 'work', 'name', 'details', 'photo', 'interests', 'area', 'about'];
     for (const screen of order.slice(order.indexOf(from))) {
       await waitScreen(page, screen, 8000);
       if (screen === 'photo') {
@@ -678,8 +698,8 @@ try {
         await page.locator('input[name="guided-email"]').fill(EMAIL);
         await page.locator('input[name="guided-password"]').fill(PASSWORD);
         await page.locator('input[name="guided-password-confirm"]').fill(PASSWORD);
-      } else if (screen === 'adult') {
-        await page.locator('input[name="guided-adult"]').check();
+      } else if (screen === 'work') {
+        await page.locator('input[name="guided-title"]').fill('Analyst');
       } else if (screen === 'name') {
         await page.locator('input[name="guided-name"]').fill(name);
       } else if (screen === 'details') {
@@ -733,6 +753,9 @@ try {
     const leaked = calls.filter((c) => (COORD_RE.test(c.url) || COORD_RE.test(c.body)) && !c.path.endsWith('/set_home_location'));
     const stored = await page.evaluate(() => JSON.stringify({ ...localStorage, ...sessionStorage }));
     const upload = calls.findIndex((c) => c.path.startsWith('/storage/v1/object/profile-photos/'));
+    check(`${w} D-214: Finish saves the title from the work screen (set_my_work ${JSON.stringify(state.work)})`, () => {
+      assert.equal(state.work?.p_title, 'Analyst'); assert.equal(stored.includes('brivia-pending-work'), false);
+    });
     check(`${w} submit: the framed photo is uploaded before the profile row is written, and the row stores it (${upload})`, () => {
       assert.ok(upload >= 0 && upload < at[1]); assert.match(String(state.profile?.photo_url || ''), new RegExp(`/profile-photos/${ME}/`));
     });
@@ -828,20 +851,19 @@ try {
     const { state, calls } = await setup(context, { signedIn: true, provider: 'google', meta: { full_name: 'Gabe Google' } });
     const page = await context.newPage();
     await page.goto(`${BASE}/auth.html?complete-profile=1`, { waitUntil: 'load' });
-    const landed = await waitScreen(page, 'adult', 8000);
+    const landed = await waitScreen(page, 'work', 8000);
     let u = await ui(page);
-    check(`${w} Google: lands on 18+ at "Step 1 of 4", bubbles without Account`, () => {
+    check(`${w} Google: lands on work at "Step 1 of 4", bubbles without Account`, () => {
       assert.equal(landed, true); assert.equal(u.label, 'Step 1 of 4');
-      assert.deepEqual(u.bubbles, ['adult:current', 'name:pending', 'details:pending', 'photo:pending']);
+      assert.deepEqual(u.bubbles, ['work:current', 'name:pending', 'details:pending', 'photo:pending']);
     });
     await page.locator('[data-guided-back]').click();
     await waitScreen(page, 'welcome');
     u = await ui(page);
     if (u.title) seenTitles.add(u.title);
-    check(`${w} Google: Back from 18+ goes to Welcome (signed in), never to an account screen`, () => { assert.match(u.text, /Welcome back/i); assert.match(u.text, /Sign out/i); });
+    check(`${w} Google: Back from work goes to Welcome (signed in), never to an account screen`, () => { assert.match(u.text, /Welcome back/i); assert.match(u.text, /Sign out/i); });
     await page.locator('[data-guided-continue]').click();
-    await waitScreen(page, 'adult');
-    await page.locator('input[name="guided-adult"]').check();
+    await waitScreen(page, 'work');
     await page.locator('[data-guided-next]').click();
     await waitScreen(page, 'name');
     const prefilled = await page.locator('input[name="guided-name"]').inputValue();
@@ -1198,7 +1220,7 @@ try {
     await page.locator('input[name="guided-password"]').fill(PASSWORD);
     await page.locator('input[name="guided-password-confirm"]').fill(PASSWORD);
     await page.locator('[data-guided-next]').click();
-    const onAdult = await waitScreen(page, 'adult');
+    const onAdult = await waitScreen(page, 'work');
     await settleAnimations(page);
     const adult = onAdult ? await boxOf(page, '#guided-signup') : null;
     const adultTitle = onAdult ? await linesOf(page, '#guided-signup h1') : null;
@@ -1207,7 +1229,7 @@ try {
       assert.ok(adult);
       for (const b of [account, adult]) { assert.ok(Math.abs(under(b)) <= 2); assert.ok(Math.abs(b.w - welcome.w) <= 1); }
     });
-    if (vw >= 1440) check(`${tag} "Are you 18 or older?" is one line at ${adultTitle?.size} px (${Math.round(adultTitle?.h)} px, line ${Math.round(adultTitle?.lh)} px)`, () => { assert.ok(adultTitle.size <= 40); assert.ok(adultTitle.h <= adultTitle.lh * 1.4); });
+    if (vw >= 1440) check(`${tag} "What do you do?" is one line at ${adultTitle?.size} px (${Math.round(adultTitle?.h)} px, line ${Math.round(adultTitle?.lh)} px)`, () => { assert.ok(adultTitle.size <= 40); assert.ok(adultTitle.h <= adultTitle.lh * 1.4); });
     // The stepper: one thin bar per question, done / current / pending, no icon circles and no step names.
     const bars = await page.evaluate(() => {
       const steps = document.querySelector('[data-guided-steps]');

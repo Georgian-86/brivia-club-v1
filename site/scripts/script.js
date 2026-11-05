@@ -1,7 +1,7 @@
 // Shared landing + auth behaviour. Styles come from the page entries (landing-entry.js, auth-entry.js), never from here.
 import {
   supabase, supabaseReady, saveProfile, compressImageOnly, fileToDataUrl, PHOTO_ERROR_MESSAGE, PHOTO_FRAMER_ERROR, ImageProcessingError, withoutCredentials, rowToProfile,
-  declareAdult, setHomeLocation, setHomeCity, setMemberInterests, setSensitiveConsent, fetchSensitiveConsentAt, fetchMyInterests, fetchInterestNodes, searchPlaces, onboardingStatus,
+  declareAdult, setMyWork, addCompany, setHomeLocation, setHomeCity, setMemberInterests, setSensitiveConsent, fetchSensitiveConsentAt, fetchMyInterests, fetchInterestNodes, searchPlaces, onboardingStatus,
 } from './supabase.js';
 import { buildPendingOnboarding, isPendingExpired, dataUrlToFile } from './pending-profile.js';
 import { isUnderReview, shouldWithdrawConsent } from './onboarding-guard.js';
@@ -1728,7 +1728,7 @@ const startGoogleAuth = async () => {
 let guidedRow = null;  // the signed-in member's own profile row when the flow resumed (kept fields are not cleared)
 let guidedSaved = null;  // their saved budget (my_interests) when the flow resumed: unchanged picks keep its points
 const GUIDED_DEFAULT_COVER = '/Images/Cover%20images/2257522A-04B9-4E3E-AB1A-A73D7BB8CCBF.PNG';
-const guidedStepFor = (message) => (message === ADULT_SAVE_ERROR ? 'adult'
+const guidedStepFor = (message) => (message === ADULT_SAVE_ERROR ? 'photo'
   : message === AREA_SAVE_ERROR || message === 'Try again later.' ? 'area' : message === ABOUT_SAVE_ERROR ? 'about' : 'interests');
 const submitGuidedSignup = async (answers) => {
   if (!supabaseReady || !supabase) return { ok: false, screen: 'photo', message: 'Supabase is not configured.' };
@@ -1813,7 +1813,24 @@ const saveGuidedAbout = async (userId, lookingFor, bio) => {
   if (error) throw new OnboardingStepError(ABOUT_SAVE_ERROR);
   if (guidedRow) guidedRow = { ...guidedRow, looking_for: looking, bio: String(bio || '').trim() };
 };
-const submitGuidedSetup = async ({ area, interests, lookingFor = [], bio = '' }) => {
+// D-214: the title and organisation from signup's second screen. Optional: a failure never blocks Finish (they can be
+// set in Edit profile). A name the directory did not have is added as the member's own organisation first.
+const saveGuidedWork = async (userId, work) => {
+  let pending = null;
+  try { pending = JSON.parse(window.localStorage.getItem('brivia-pending-work') || 'null'); } catch { pending = null; }
+  const w = (work && (work.title || work.companyName)) ? work : pending;
+  if (!w || !(w.title || w.companyName)) return;
+  try {
+    let companyId = w.companyId || null;
+    if (!companyId && w.companyName) {
+      const { data } = await addCompany(userId, { name: w.companyName });
+      companyId = data || null;
+    }
+    const { error } = await setMyWork(String(w.title || '').trim() || null, companyId);
+    if (!error) window.localStorage.removeItem('brivia-pending-work');
+  } catch { /* kept for Edit profile */ }
+};
+const submitGuidedSetup = async ({ area, interests, lookingFor = [], bio = '', work = null }) => {
   if (!supabaseReady || !supabase) return { ok: false, screen: 'about', message: 'Supabase is not configured.' };
   areaChoice = area && ['geo', 'city', 'keep'].includes(area.kind) ? { ...area } : null;
   // Unchanged picks over a complete saved budget keep the member's own points and modes and are not saved again (M3).
@@ -1826,6 +1843,7 @@ const submitGuidedSetup = async ({ area, interests, lookingFor = [], bio = '' })
     adultAlreadyDeclared = adultAlreadyDeclared || Boolean(guidedRow?.adult_declared_at);
     await saveGuidedAbout(user.id, lookingFor, bio);
     await finishOnboarding(user.id, { skipInterests: planned.unchanged });
+    await saveGuidedWork(user.id, work);
     areaChoice = null;
     return { ok: true };
   } catch (error) {

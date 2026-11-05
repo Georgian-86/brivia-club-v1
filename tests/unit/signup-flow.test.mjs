@@ -9,9 +9,9 @@ import { evenSplit } from '../../site/scripts/passion-budget.js';
 const ids = (n) => Array.from({ length: n }, (_, i) => ({ id: `i${i}`, label: `L${i}` }));
 
 test('screen lists: signup ends with the photo (email 5 questions, Google 4), then setup (interests, area, About you)', () => {
-  assert.deepEqual(SCREENS.email, ['welcome', 'account', 'adult', 'name', 'details', 'photo', 'interests', 'area', 'about', 'reveal']);
-  assert.deepEqual(SCREENS.google, ['welcome', 'adult', 'name', 'details', 'photo', 'interests', 'area', 'about', 'reveal']);
-  assert.deepEqual(STEP_ICONS, { account: 'mail', adult: 'shield', name: 'person', details: 'phone', photo: 'camera', about: 'note', area: 'pin', interests: 'spark' });
+  assert.deepEqual(SCREENS.email, ['welcome', 'account', 'work', 'name', 'details', 'photo', 'interests', 'area', 'about', 'reveal']);
+  assert.deepEqual(SCREENS.google, ['welcome', 'work', 'name', 'details', 'photo', 'interests', 'area', 'about', 'reveal']);
+  assert.deepEqual(STEP_ICONS, { account: 'mail', work: 'briefcase', name: 'person', details: 'phone', photo: 'camera', about: 'note', area: 'pin', interests: 'spark' });
   for (const s of [...SCREENS.email, ...SCREENS.google].filter((n) => n !== 'welcome' && n !== 'reveal')) assert.ok(STEP_ICONS[s], `${s} has an icon`);
   assert.equal(SCREENS.email.includes('points'), false);
   assert.equal(SCREENS.email.includes('verify'), false, 'verify is terminal, not a step');
@@ -19,9 +19,9 @@ test('screen lists: signup ends with the photo (email 5 questions, Google 4), th
 
 test('stepLabel counts the questions of each phase: signup (ending with the photo), then setup', () => {
   assert.equal(stepLabel('email', 'account'), 'Step 1 of 5');
-  assert.equal(stepLabel('email', 'adult'), 'Step 2 of 5');
+  assert.equal(stepLabel('email', 'work'), 'Step 2 of 5');
   assert.equal(stepLabel('email', 'photo'), 'Step 5 of 5');
-  assert.equal(stepLabel('google', 'adult'), 'Step 1 of 4');
+  assert.equal(stepLabel('google', 'work'), 'Step 1 of 4');
   assert.equal(stepLabel('google', 'details'), 'Step 3 of 4');
   assert.equal(stepLabel('google', 'photo'), 'Step 4 of 4');
   assert.equal(stepLabel('email', 'interests'), 'Set up 1 of 3');
@@ -35,7 +35,7 @@ test('stepLabel counts the questions of each phase: signup (ending with the phot
 
 test('stepStates: done before the current step, current, pending after', () => {
   assert.deepEqual(stepStates('google', 'name'), [
-    { screen: 'adult', state: 'done' }, { screen: 'name', state: 'current' }, { screen: 'details', state: 'pending' },
+    { screen: 'work', state: 'done' }, { screen: 'name', state: 'current' }, { screen: 'details', state: 'pending' },
     { screen: 'photo', state: 'pending' },
   ]);
   assert.deepEqual(stepStates('email', 'area'), [{ screen: 'interests', state: 'done' }, { screen: 'area', state: 'current' }, { screen: 'about', state: 'pending' }]);
@@ -49,8 +49,8 @@ test('resumeScreen: adult, name, details, photo, then interests, area and About 
   const session = { user: { id: 'u' } };
   const all = { adult_declared: true, has_name: true, has_phone: true, has_gender: true, has_cell: true, interests: 2, points: 20 };
   assert.equal(resumeScreen({ session: {}, status: { adult_declared: true, has_name: false } }), 'name');
-  assert.equal(resumeScreen({ session, status: {} }), 'adult');
-  assert.equal(resumeScreen({ session, status: { ...all, adult_declared: false } }), 'adult');
+  assert.equal(resumeScreen({ session, status: {} }), 'work');
+  assert.equal(resumeScreen({ session, status: { ...all, adult_declared: false } }), 'work');
   assert.equal(resumeScreen({ session, status: { ...all, has_name: false } }), 'name');
   assert.equal(resumeScreen({ session, status: { ...all, has_phone: false } }), 'details');
   assert.equal(resumeScreen({ session, status: { ...all, has_gender: false } }), 'details');
@@ -70,17 +70,17 @@ test('resumeScreen: adult, name, details, photo, then interests, area and About 
 });
 
 test('backTarget: never back to account once signed in', () => {
-  assert.equal(backTarget('email', 'adult', true), 'welcome');
-  assert.equal(backTarget('email', 'adult', false), 'account');
+  assert.equal(backTarget('email', 'work', true), 'welcome');
+  assert.equal(backTarget('email', 'work', false), 'account');
   assert.equal(backTarget('email', 'account', false), 'welcome');
-  assert.equal(backTarget('email', 'name', true), 'adult');
+  assert.equal(backTarget('email', 'name', true), 'work');
   assert.equal(backTarget('email', 'about', false), 'area');
   assert.equal(backTarget('email', 'area', true), 'interests');
   assert.equal(backTarget('email', 'photo', true), 'details');
 
   assert.equal(backTarget('email', 'interests', true), null, 'setup never goes back into signup');
   assert.equal(backTarget('google', 'interests', true), null);
-  assert.equal(backTarget('google', 'adult', true), 'welcome');
+  assert.equal(backTarget('google', 'work', true), 'welcome');
   assert.equal(backTarget('google', 'welcome', false), null);
   assert.equal(backTarget('email', 'nope', false), null);
 });
