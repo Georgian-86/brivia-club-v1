@@ -174,13 +174,13 @@ export const createEventsPage = ({ root, api, safeImage, toast, isMissing, sendH
     if (data) replaceEvent(withRsvp(before, data.going, data.wants_companion, data.status || null));
     const after = byId(event.id);
     if (!after.going) toast(before.going ? 'Registration cancelled. Your spot is free for someone else.' : 'Saved.');
-    else if (!before.going && after.myStatus === 'pending_payment') { void pay(after); return true; }   // D-177: straight to payment
+    else if (!before.going && after.myStatus === 'pending_payment') { void pay(after); return true; }   // D-183: straight to payment
     else if (!before.going && after.myStatus === 'confirmed') { void celebrate(after, { paid: false }); return true; }
     else if (!quiet) toast(after.wantsCompanion && !before.wantsCompanion ? "You'll be shown to others going who want company too." : !after.wantsCompanion && before.wantsCompanion ? 'Companion matching is off for this event.' : 'Saved.');
     return true;
   };
 
-  // D-177: a confirmed seat. The sound plays; a free seat asks the server for its ticket (a paid seat's ticket was sent
+  // D-183: a confirmed seat. The sound plays; a free seat asks the server for its ticket (a paid seat's ticket was sent
   // when the payment was confirmed). The toast only promises an email the server says it sent.
   const celebrate = async (event, { paid = false, emailed = null } = {}) => {
     api.playTicket?.();
@@ -193,7 +193,7 @@ export const createEventsPage = ({ root, api, safeImage, toast, isMissing, sendH
     toast(sent ? `${lead} Your ticket is on its way to your inbox.` : `${lead} See you there.`);
   };
 
-  // D-177: pay for a held seat with Razorpay. The server creates the order (its amount), Checkout takes the payment, the
+  // D-183: pay for a held seat with Razorpay. The server creates the order (its amount), Checkout takes the payment, the
   // server verifies it and confirms the seat (and emails the ticket). If this page closes mid-payment, Razorpay's
   // webhook confirms it instead. Nothing here can confirm a seat by itself.
   const pay = async (event) => {

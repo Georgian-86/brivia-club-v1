@@ -1,4 +1,4 @@
-// The Brivia ignition (D-180): the club's opening title, drawn live instead of played from a video. A point of crimson
+// The Brivia ignition (D-186): the club's opening title, drawn live instead of played from a video. A point of crimson
 // light breathes in on black, ignites, stretches into a hairline streak, and THE BRIVIA CLUB opens out of it from the
 // centre, letter by letter. It replaces the landing's 58 kbps intro video (soft and banded, and scaled 1.55x on
 // phones) and is also the "Opening your club" loading screen (handoff.css). Vector text and CSS gradients, so it is

@@ -1,4 +1,4 @@
-// D-180: the Brivia ignition (brivia-ignition.js + ignition.css): the landing intro and the loading screen.
+// D-186: the Brivia ignition (brivia-ignition.js + ignition.css): the landing intro and the loading screen.
 // Run: npm run test:unit
 import test from 'node:test';
 import assert from 'node:assert/strict';

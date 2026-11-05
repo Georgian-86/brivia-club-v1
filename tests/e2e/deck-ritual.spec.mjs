@@ -1,4 +1,4 @@
-// The deck ritual's daily-limit shuffle (D-173, D-174), against stubbed Supabase. Connect opens with the D-164 deal
+// The deck ritual's daily-limit shuffle (D-179, D-180), against stubbed Supabase. Connect opens with the D-164 deal
 // (deck-intro.js); this spec covers what happens when the day's free swipes run out.
 // PLAYWRIGHT_MODULE=/path/to/playwright/index.mjs node tests/e2e/deck-ritual.spec.mjs   (Vite on :5186)
 // DR1 the deck opens with the D-164 deal, and swiping works after it.

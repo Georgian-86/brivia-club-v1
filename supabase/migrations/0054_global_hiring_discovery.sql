@@ -1,8 +1,8 @@
 set lock_timeout = '5s';
--- 0052_global_hiring_discovery.sql: Global Hiring Discovery (founder request 2026-11-05, D-178: "Toggle Hiring ON ->
+-- 0052_global_hiring_discovery.sql: Global Hiring Discovery (founder request 2026-11-05, D-184: "Toggle Hiring ON ->
 -- instantly discover professionals who are open to hiring opportunities anywhere ... rank by skills, interests,
--- experience and compatibility rather than geographical proximity"). Applied after 0051 (README "## 0052").
--- 0001-0051 are frozen. Idempotent.
+-- experience and compatibility rather than geographical proximity"). Applied after 0053 (README "## 0054").
+-- 0001-0053 are frozen. Idempotent.
 --
 -- hiring_people (D-169 0048, D-170 0049) is replaced in place, under the same name, so the Hiring switch keeps calling
 -- one query. What changes:

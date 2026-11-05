@@ -204,7 +204,7 @@ body.app-body .hiring-toggle:focus-visible { outline: 2px solid var(--color-wine
 /* Phones (founder, 2026-11-04): the filter button stays left, the Hiring switch sits at the right end of the row. */
 @media (max-width: 849px) { body.app-body .home-tools .hiring-toggle { margin-left: auto; } }
 
-/* D-178: the subtle "Global hiring discovery" label under the Connect tools, only while the Hiring lens is on. */
+/* D-184: the subtle "Global hiring discovery" label under the Connect tools, only while the Hiring lens is on. */
 .hiring-global-label {
   display: inline-flex; align-items: center; gap: var(--space-2); margin: var(--space-2) 0 0; padding: 4px 10px;
   border: 1px solid color-mix(in srgb, var(--color-wine) 18%, transparent); border-radius: 999px;

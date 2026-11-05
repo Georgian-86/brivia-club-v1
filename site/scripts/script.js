@@ -29,7 +29,7 @@ document.querySelectorAll('.skeleton img').forEach(markLoaded);
 
 const introBurst = document.querySelector('#intro-burst');
 const introSkip = introBurst?.querySelector('.intro-skip');
-// D-180: the intro is the drawn Brivia ignition (no video). introClock lets the music code below join it: the cue
+// D-186: the intro is the drawn Brivia ignition (no video). introClock lets the music code below join it: the cue
 // plays if the page may make sound now, or from a tap during the intro (part-way, so the chord still lands on the name).
 const introClock = { start: 0, active: false, cued: false, musicFrom: 0 };
 const landingMotion = motionAllowed({
@@ -236,7 +236,7 @@ const scheduleMusic = () => {
   if (!musicContext || musicState !== 'play') return;
   if (musicElapsedMs() >= SOUND_LIMIT_MS) { stopMusic('ended'); return; }
   if (!musicBuffer) { loadMusic(); return; }
-  // After the intro's cue (D-180), the soundtrack comes in under its tail instead of over the chord.
+  // After the intro's cue (D-186), the soundtrack comes in under its tail instead of over the chord.
   if (musicNextBarAt === 0) musicNextBarAt = Math.max(musicContext.currentTime + 0.05, introClock.musicFrom || 0);
   for (const start of barsToSchedule({ now: musicContext.currentTime, nextBarAt: musicNextBarAt, barLength: musicBuffer.duration - MUSIC_CROSSFADE, lookahead: 1 })) {
     playMusicBar(start);
@@ -255,7 +255,7 @@ const ensureMusicContext = () => {
   ignitionSound.prime(musicContext);
   return musicContext;
 };
-// D-180: the ignition's cue, once, while the intro is on screen and the page may make sound.
+// D-186: the ignition's cue, once, while the intro is on screen and the page may make sound.
 const ignitionSound = createIgnitionSound();
 function playIntroCue() {
   if (!introClock.active || introClock.cued || musicPreference === 'off' || musicContext?.state !== 'running') return;
@@ -632,7 +632,7 @@ const authModal = document.querySelector('#auth-modal');
 // startHandoff shows it with a short note; endHandoff hides it again unless the page is already leaving for the app.
 let leavingForApp = false;
 const handoffNote = document.querySelector('[data-handoff-note]');
-// D-180: the loading screen is the Brivia ignition; shown after a sign-in (a gesture on this page), it plays its cue.
+// D-186: the loading screen is the Brivia ignition; shown after a sign-in (a gesture on this page), it plays its cue.
 // Its own audio context, so the landing soundtrack never starts here. Silent when the visitor turned the sound off.
 let handoffAudio = null;
 const handoffSound = createIgnitionSound();
@@ -2133,7 +2133,7 @@ const updateAuthScrollbar = () => {
 const redirectToApp = () => {
   leavingForApp = true;
   startHandoff();
-  // D-180: app.html shows the same loading title already drawn, so the page change is a still cut, not a restart.
+  // D-186: app.html shows the same loading title already drawn, so the page change is a still cut, not a restart.
   try { window.sessionStorage.setItem('brivia-ignition-settled', String(Date.now())); } catch {}
   window.location.replace('/app.html');
 };

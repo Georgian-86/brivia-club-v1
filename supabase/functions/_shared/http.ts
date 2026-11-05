@@ -1,4 +1,4 @@
-// Shared plumbing for the event payment and ticket functions (D-177): CORS, JSON replies, clients, and the caller.
+// Shared plumbing for the event payment and ticket functions (D-183): CORS, JSON replies, clients, and the caller.
 import { createClient } from 'npm:@supabase/supabase-js@2.45.4';
 
 export const CORS = {

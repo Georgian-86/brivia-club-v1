@@ -21,7 +21,7 @@ import '../styles/mobile-app.css';
 import '../styles/skeleton.css';
 import '../styles/aura-theme.css';
 import '../styles/handoff.css';
-import '../styles/ignition.css'; // D-180: the loading screen's title
+import '../styles/ignition.css'; // D-186: the loading screen's title
 import { supabase, compressImageOnly, rowToProfile, saveProfile, isPresetCoverUrl, onboardingStatus, sendSignal, fetchSignalQuota, isRateLimited, isStorageImageUrl, withoutCredentials, uploadMessageAttachment, removeMessageAttachment, uploadCommunityPostImage, removeCommunityPostImage, ImageProcessingError, PHOTO_ERROR_MESSAGE, PHOTO_FRAMER_ERROR, compressAttachmentFiles, attachmentKind, reportMember, setSensitiveConsent, fetchSensitiveConsentAt, fetchMyInterests, fetchInterestNodes, addMemberInterest, isMissingFunction, touchPresence, connectionPresence, setPresenceVisible, myPresenceVisible, setMemberInterests, uploadResume, removeResume, resumeSignedUrl, resumeInfo, clearResumePath, searchPlaces, setHomeCity, setHomeLocation, listEvents, setEventRsvp, setCompanionDefault, myEventPrefs, eventCompanions, saveMemberEvent, cancelMemberEvent, deleteMemberEvent, uploadEventImage, removeEventImages, setEventInterest, setEventBrochure, uploadEventBrochure, removeEventBrochures, companionEvents, companionDeck, companionSwipe, companionQuota, createPaymentOrder, verifyPayment, sendEventTicket, editMessage, unsendMessage, deleteMessageForMe, myCompanionMatches, markCompanionMatchSeen, sendConnectRequest, setNearbyEnabled, myNearbySetting, nearbyPulse, nearbyClear, myNearbyAlerts, setNearbyMuted, nearbyDiscover, nearbyPass, nearbyConnect, myNearbyMatches, myNotifications, markNotificationsRead, dismissNotification, setNearbyRadius, savePushSubscription, deletePushSubscription, sendPendingPush, searchCompanies, searchCompanyDirectory, companyLogoUrl, addCompany, setMyWork, memberWork, uploadCompanyLogo, markMessagesDelivered, markConversationRead, setReadReceipts, myReadReceipts, chatPeopleSearch } from './supabase.js';
 import { locateOnce, fallbackCopy } from './geo-locate.js';
 import { areaChangeMessage, AREA_HELPER, AREA_NO_MATCH } from './area-change.js';
@@ -112,7 +112,7 @@ import '../styles/work-identity.css';  // D-140: company line and picker
 import '../styles/profile-hero.css';  // D-172: the profile hero's text column fits beside the photo card
 import '../styles/hiring.css';  // D-141: the hiring bar, banner, sheets and profile cards
 import '../styles/message-actions.css';  // D-157: the long-press message menu and the editing bar
-import '../styles/deck-ritual.css';  // D-173: the deck ritual's card backs (the daily-limit shuffle)
+import '../styles/deck-ritual.css';  // D-179: the deck ritual's card backs (the daily-limit shuffle)
 import '../styles/components.css';  // D-105: the shared field, select, listbox and chip components, last so they win
 import { createHiring } from './hiring-ui.js';  // D-141
 import { interleaveLift } from './hiring.js';
@@ -166,7 +166,7 @@ const EDIT_COLUMNS = ',edited_at,unsent_at';
 const isEditColumnError = (error) => /edited_at|unsent_at/.test(error?.message || '');
 // The message being edited in the composer: { personId, id } or null.
 let editingMessage = null;
-// D-173: the deck ritual's daily-limit shuffle (deck-ritual.js) and whether this page has seen swipes left (only then
+// D-179: the deck ritual's daily-limit shuffle (deck-ritual.js) and whether this page has seen swipes left (only then
 // does the cap animate). The opening deal is deck-intro.js (D-164).
 let deckRitual = null;
 let sawSwipesLeft = false;
@@ -788,7 +788,7 @@ const renderSignalQuota = () => {
   const copy = quotaNotice(signalQuota);
   const limitCopy = document.querySelector('#swipe-limit-copy');
   if (limitCopy) limitCopy.textContent = copy;
-  // D-173: at the daily cap the finished deck says it; the notice stays for the live cap only.
+  // D-179: at the daily cap the finished deck says it; the notice stays for the live cap only.
   limitState?.toggleAttribute('hidden', !copy || !currentPerson || quotaBlocked(signalQuota) === 'daily');
   // At a cap, Pitch says so to assistive tech and looks muted, but stays focusable: a tap explains why (F2).
   const like = document.querySelector('[data-action="like"]');
@@ -807,7 +807,7 @@ const renderSignalQuota = () => {
   }
   syncDeckRitual();
 };
-// D-173: the deck ritual follows the real state. The opening deal is deck-intro.js (D-164); the
+// D-179: the deck ritual follows the real state. The opening deal is deck-intro.js (D-164); the
 // completion follows the server's daily quota (never a timer) and only animates when this page saw the cap arrive.
 // When the quota frees up again (the next window), the finished deck clears and a fresh deck is dealt.
 function syncDeckRitual() {
@@ -1327,7 +1327,7 @@ const eventsPage = createEventsPage({
   memberId: () => memberProfile.id,
   openCompanions,
   api: { listEvents, setEventRsvp, setEventInterest, setCompanionDefault, myEventPrefs, eventCompanions, cancelMemberEvent, deleteMemberEvent, removeEventImages, removeEventBrochures,
-    createPaymentOrder, verifyPayment, sendEventTicket, playTicket: () => chime.ticket() },   // D-177
+    createPaymentOrder, verifyPayment, sendEventTicket, playTicket: () => chime.ticket() },   // D-183
   safeImage: eventSafeImage,
   toast: (message) => showToast(message),
   isMissing: isMissingFunction,
@@ -1640,7 +1640,7 @@ const renderHome = (queue = getExplorePeople()) => {
     actions?.setAttribute('hidden', '');
     hint?.setAttribute('hidden', '');
     limitState?.setAttribute('hidden', '');
-    // D-173: the day's swipes are used: the finished deck, not "You're caught up".
+    // D-179: the day's swipes are used: the finished deck, not "You're caught up".
     if (quotaBlocked(signalQuota) === 'daily') { hint?.removeAttribute('hidden'); emptyState?.setAttribute('hidden', ''); syncDeckRitual(); return; }
     if (emptyState) renderDeckEmpty(emptyState);
     // D-165 (N3): the last card was just swiped away: the reason turns in like the back of that card.
@@ -1687,14 +1687,14 @@ const renderHome = (queue = getExplorePeople()) => {
   if (bandNoteEl) {
     const note = bandNote(currentPerson.distanceBand);
     bandNoteEl.textContent = note;
-    // D-178: Global hiring discovery ignores distance, so the "distances appear as your area fills up" note is noise there.
+    // D-184: Global hiring discovery ignores distance, so the "distances appear as your area fills up" note is noise there.
     bandNoteEl.hidden = !note || exploreFilters.hiring;
   }
   const tags = document.querySelector('#swipe-tags'); if (tags) { renderCardChips(tags, currentPerson); if (newCardShown) shimmerShared(tags); }
   // D-141: a hirer's bar says HIRING; the role strip shows when the role fits what this member is open to.
   if (hiring?.available()) {
     hiring.decorateCard(currentPerson, { label: cardLabel, strip: document.querySelector('#swipe-hiring'), tags });
-    // D-178: a member who is open to a role (not hiring) reads OPEN TO · <title> while the hiring lens is on.
+    // D-184: a member who is open to a role (not hiring) reads OPEN TO · <title> while the hiring lens is on.
     const poolId = String(currentPerson.id || '');
     if (cardLabel && exploreFilters.hiring && hiringPool.kinds.get(poolId) === 'open_to' && !cardLabel.classList.contains('is-hiring')) {
       const title = hiringPool.titles.get(poolId);
@@ -1764,7 +1764,7 @@ function offerDeckTutorial() {
     if (deckIntro.running) { offerDeckTutorial(); return; }
     const card = document.querySelector('#swipe-card');
     if (!currentPerson || !card || card.hidden || card.closest('[hidden]') || document.body.classList.contains('app-auth-pending')) return;
-    if (deckRitual?.busy() || deckRitual?.isComplete()) return;   // D-173: not over the finished deck
+    if (deckRitual?.busy() || deckRitual?.isComplete()) return;   // D-179: not over the finished deck
     if (!['home', 'explore'].includes(document.body.dataset.appView)) return;
     if (overlayIds.some((id) => !document.querySelector(`#${id}`)?.hidden) || document.querySelector('#public-profile-modal') || cardOverflowOpen()) return;
     maybeShowDeckTutorial({ returnFocus: document.activeElement === document.body ? null : document.activeElement });
@@ -2110,11 +2110,11 @@ const renderPendingRequestTags = () => {
 };
 // D-141: the deck lift. Up to one hiring suggestion in every five cards, never the card already on screen.
 let hiringLifted = false;
-// D-169 / D-178: Global Hiring Discovery. With the Hiring switch on, the deck is everyone hiring or open to roles,
-// anywhere (hiring_people, 0052: best fit first, never by distance), paged 30 at a time as the queue runs low. The
+// D-169 / D-184: Global Hiring Discovery. With the Hiring switch on, the deck is everyone hiring or open to roles,
+// anywhere (hiring_people, 0054: best fit first, never by distance), paged 30 at a time as the queue runs low. The
 // pool remembers each member's kind ('hiring' | 'open_to') and role title for the card's bar. While the switch is on
 // it refreshes every minute and when the tab returns: new people join the end of the queue, and anyone who closed
-// their role (or is no longer open) leaves it. Nearby is separate and untouched. Before 0052: one page of hirers.
+// their role (or is no longer open) leaves it. Nearby is separate and untouched. Before 0054: one page of hirers.
 const hiringPool = { kinds: new Map(), titles: new Map(), after: null, end: false, loading: null, timer: 0 };
 const addHiringRows = async (rows, { front = false } = {}) => {
   rows.forEach((r) => { hiringPool.kinds.set(String(r.id), r.hiring_kind || 'hiring'); hiringPool.titles.set(String(r.id), r.role_title || ''); });
@@ -2585,7 +2585,7 @@ const swipe = (type, { vx = 0 } = {}) => {
     openPitch(person);
     return true;
   }
-  // The card starts leaving first (D-173: so a pass that uses the last free swipe lets it fly out before the deck
+  // The card starts leaving first (D-179: so a pass that uses the last free swipe lets it fly out before the deck
   // reshuffles), then the count goes down at once; the server is the judge (a refused pass puts the card back).
   advanceCard(person, 'pass', { vx });
   if (Number.isFinite(Number(signalQuota?.remaining))) {
@@ -2770,7 +2770,7 @@ const renderFilterOptions = () => {
     toggle.setAttribute('aria-checked', String(Boolean(exploreFilters.hiring)));
     if (hiring?.available()) toggle.title = hiring.lensLabel();
   }
-  // D-178: while the switch is on, a quiet label says the deck is global, not local.
+  // D-184: while the switch is on, a quiet label says the deck is global, not local.
   const tools = document.querySelector('.app-view[data-view="home"] .home-tools');
   let globalLabel = document.querySelector('#hiring-global-label');
   if (!globalLabel && tools) {
@@ -2800,7 +2800,7 @@ const renderExplore = () => {
   renderFilterOptions();
   updateDiscoveryFilterResult(queue.length);
   renderHome(queue);
-  // D-178: Global Hiring Discovery pages on as the queue runs low.
+  // D-184: Global Hiring Discovery pages on as the queue runs low.
   if (exploreFilters.hiring && queue.length < 5 && !hiringPool.end && !hiringPool.loading) void pullHiringPeople();
   // The queue ran out (not just filtered away): load once more, then deck_status() decides the empty state.
   if (!queue.length && deck.ready && !deckPeople().length && !deck.end && !deck.loading) refillDeck();
@@ -5816,7 +5816,7 @@ deckSwipe = createDeckSwipe({
     && !document.querySelector('#swipe-card')?.classList.contains('is-loading'),
   onCommit: (direction, { vx }) => swipe(direction === 'pitch' ? 'like' : 'pass', { vx }),
 });
-// D-173: the deck ritual's daily-limit shuffle (the opening deal is deck-intro.js, D-164).
+// D-179: the deck ritual's daily-limit shuffle (the opening deal is deck-intro.js, D-164).
 deckRitual = createDeckRitual({ stack: document.querySelector('#swipe-stack'), cue: (name) => chime.ritual(name) });
 // D-165 (N5): on desktop the top card leans towards the cursor (never while dragging or during the intro).
 attachCardTilt({ card: document.querySelector('#swipe-card'), stack: document.querySelector('#swipe-stack'), enabled: () => Boolean(currentPerson) && !deckIntro.running });

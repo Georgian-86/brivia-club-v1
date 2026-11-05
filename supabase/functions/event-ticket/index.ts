@@ -1,4 +1,4 @@
-// event-ticket (D-177): the signed-in member asks for their own ticket after a free registration is confirmed (paid
+// event-ticket (D-183): the signed-in member asks for their own ticket after a free registration is confirmed (paid
 // seats get theirs from razorpay-verify / razorpay-webhook). Body { event_id }. Sends once (send-ticket.ts claims it).
 import { CORS, json, adminClient, callerId, UUID } from '../_shared/http.ts';
 import { sendTicket } from '../_shared/send-ticket.ts';

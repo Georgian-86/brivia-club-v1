@@ -581,7 +581,7 @@ body.app-body .app-view[data-view="home"] .deck-empty-action { min-height: 44px;
   will-change: transform;
 }
 
-/* The face-down card back for the opening deal (D-179, deck-intro.js): a wine back with a hairline inner frame, a soft
+/* The face-down card back for the opening deal (D-185, deck-intro.js): a wine back with a hairline inner frame, a soft
    diagonal sheen and the club's mark. Laid over each card only while it is dealt; removed when the deal ends. */
 .app-view[data-view="home"] .swipe-stack .deck-intro-back {
   position: absolute;

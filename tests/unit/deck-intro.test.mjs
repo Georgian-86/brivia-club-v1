@@ -22,14 +22,14 @@ const fakeAudio = (log) => {
 };
 const fakeDoc = () => { const l = {}; return { addEventListener: (t, fn) => { (l[t] ||= []).push(fn); }, fire: (t, e = {}) => (l[t] || []).forEach((fn) => fn({ type: t, ...e })) }; };
 
-test('the intro is brief: under two seconds, the deal itself under 0.9 s (D-179)', () => {
+test('the intro is brief: under two seconds, the deal itself under 0.9 s (D-185)', () => {
   const total = introLength();
   assert.ok(total > 1.2 && total <= 1.9, `total ${total}`);
   const deal = Math.max(...INTRO.layers.map((l) => l.at + l.dur));
   assert.ok(deal <= 0.9, `deal ${deal}`);
 });
 
-test('the stack is dealt from one pile, back to front, the top card last, then flipped face-up (D-179)', () => {
+test('the stack is dealt from one pile, back to front, the top card last, then flipped face-up (D-185)', () => {
   assert.equal(INTRO.layers.length, 3);
   INTRO.layers.forEach((l, i, a) => {
     assert.ok(l.from.y > 60 && l.from.scale < 1, 'from the pile, below and smaller');

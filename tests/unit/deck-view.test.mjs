@@ -42,7 +42,7 @@ test('deckFields: keeps only the band and up to 2 shared labels; never city, sta
   assert.deepEqual(deckFields({ distance_band: '  ', shared_interests: null }), { distanceBand: '', shared: [] });
 });
 
-test('deckEmptyState: the Hiring switch alone says no one is hiring, anywhere (D-169, D-178)', () => {
+test('deckEmptyState: the Hiring switch alone says no one is hiring, anywhere (D-169, D-184)', () => {
   assert.deepEqual(deckEmptyState('hiring'), { title: 'No one is hiring yet.', copy: "When members anywhere open a role or say they're open to one, they show up here. Turn Hiring off to see everyone in your deck again.", action: 'Show everyone', kind: 'clear-filters' });
   assert.doesNotMatch(deckEmptyState('hiring').title, /near you/, 'global discovery: no location in the empty state');
 });

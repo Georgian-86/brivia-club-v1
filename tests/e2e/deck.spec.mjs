@@ -445,7 +445,7 @@ try {
   await small.locator('.swipe-hint').scrollIntoViewIfNeeded();
   await shot(small, 'deck-375-quota-counter.png');
 
-  // Zero quota at both widths (D-173, replaces D-026's "the card stays with a notice"): no profile is offered; the
+  // Zero quota at both widths (D-179, replaces D-026's "the card stays with a notice"): no profile is offered; the
   // finished deck shows "That's your deck for today." with the refresh time, and nothing scrolls sideways.
   resetStub({ remaining: 0, resetsAt: '2026-10-04T15:00:00+00:00' });
   await small.reload({ waitUntil: 'domcontentloaded' });

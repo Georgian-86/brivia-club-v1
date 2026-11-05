@@ -1,30 +1,30 @@
 # Session handoff (read after CLAUDE.md)
 
-Last updated: 2026-11-05 (D-173 to D-177 merged from a parallel branch: the daily-limit shuffle, blush card, landing button, Razorpay and tickets; D-168 four motion moments fixed on live; D-167 "It's mutual" for every new match; D-164 the deck deal-in with a sound; D-165 motion moments; D-162 one-tap Hiring toggle on Connect, seeded hirers for testing, visible only to testers (0047); D-157 edit, unsend and delete for me from a long press on a message; D-156 city suggestions from the first letter, all 1,131 interests reach the pickers, 10 swipes a day on the deck and on companions; D-154 one opener in the pitch box, typing bubble and inbox typing; D-153 sharper hero video, subject-following phone crop; D-152 Chat search finds people, mobile chat polish; D-151 Read receipts switch, like and comment notifications, Posts tab renamed Notes; D-150 Delivered, Read and last active in chat; D-141 Hiring, built, 0037 not applied; D-140 worldwide city directory and company on profiles; D-138 one aura on every sheet, crossings say where and when, hidden-tab pulses, sound switches; D-137 bio 1 to 20 words, the sound kit; D-136 Gospel Music and NLP offered; D-135 interest list in the founder's wording, A–Z; D-134 Nearby notifications and web push; D-133 phone location; D-131 Nearby discovery; D-129 pitch shown once; D-128 cover order, names, OPEN MINDS retired; D-126 interest on all events; D-125 Show interest, brochure, poster area). Before that: 2026-11-02 (D-121 Create Event). Before that: 2026-11-01 (D-119 Crossing paths). Before that: 2026-11-01 (D-118 calmer Explore; D-117 Explore events, Posts tab). Before that: 2026-11-01 (D-116 cover set). Before that: 2026-10-28 (D-100 chat inbox, D-101 post activity and 0015, D-102 photo and setup). Before that: 2026-10-20 (live-database correction D-070; "Send without a note" D-071). Before that: 2026-10-16 (design references, D-062). Before that: 2026-10-13, after Phase D of the experience iteration (the test world), on branch
+Last updated: 2026-11-05 (D-179 to D-183 merged from a parallel branch: the daily-limit shuffle, blush card, landing button, Razorpay and tickets; D-168 four motion moments fixed on live; D-167 "It's mutual" for every new match; D-164 the deck deal-in with a sound; D-165 motion moments; D-162 one-tap Hiring toggle on Connect, seeded hirers for testing, visible only to testers (0047); D-157 edit, unsend and delete for me from a long press on a message; D-156 city suggestions from the first letter, all 1,131 interests reach the pickers, 10 swipes a day on the deck and on companions; D-154 one opener in the pitch box, typing bubble and inbox typing; D-153 sharper hero video, subject-following phone crop; D-152 Chat search finds people, mobile chat polish; D-151 Read receipts switch, like and comment notifications, Posts tab renamed Notes; D-150 Delivered, Read and last active in chat; D-141 Hiring, built, 0037 not applied; D-140 worldwide city directory and company on profiles; D-138 one aura on every sheet, crossings say where and when, hidden-tab pulses, sound switches; D-137 bio 1 to 20 words, the sound kit; D-136 Gospel Music and NLP offered; D-135 interest list in the founder's wording, A–Z; D-134 Nearby notifications and web push; D-133 phone location; D-131 Nearby discovery; D-129 pitch shown once; D-128 cover order, names, OPEN MINDS retired; D-126 interest on all events; D-125 Show interest, brochure, poster area). Before that: 2026-11-02 (D-121 Create Event). Before that: 2026-11-01 (D-119 Crossing paths). Before that: 2026-11-01 (D-118 calmer Explore; D-117 Explore events, Posts tab). Before that: 2026-11-01 (D-116 cover set). Before that: 2026-10-28 (D-100 chat inbox, D-101 post activity and 0015, D-102 photo and setup). Before that: 2026-10-20 (live-database correction D-070; "Send without a note" D-071). Before that: 2026-10-16 (design references, D-062). Before that: 2026-10-13, after Phase D of the experience iteration (the test world), on branch
 `claude/jolly-edison-49xvza` (repo `Georgian-86/brivia-club-v1`). Phases C and D are not on `main` yet, and Phase D's SQL
 is not applied: the founder applies it in the SQL editor (section 3, item 0).
 Update this file at the end of every session. CLAUDE.md holds the aim; this file holds **where we are**.
 
 ## 1. What is done
 
-**2026-11-05, D-180:** the landing intro and the "Opening your club" loading screen are the Brivia ignition, drawn
+**2026-11-05, D-186:** the landing intro and the "Opening your club" loading screen are the Brivia ignition, drawn
 live (`brivia-ignition.js`, `ignition.css`) with its own music cue; the blurry 58 kbps intro video is gone.
 
-**2026-11-05, D-179:** the deck's opening deal is now a Solitaire deal: a face-down wine pile, cards dealt on arcs, the
+**2026-11-05, D-185:** the deck's opening deal is now a Solitaire deal: a face-down wine pile, cards dealt on arcs, the
 top card flips face-up with a bell (`deck-intro.js`, `.deck-intro-back` in deck.css). Client only, no migration.
 
-**2026-11-04, D-178:** Global Hiring Discovery: the Connect Hiring switch shows everyone, anywhere, who is hiring or
+**2026-11-04, D-184:** Global Hiring Discovery: the Connect Hiring switch shows everyone, anywhere, who is hiring or
 open to roles, ranked by fit + shared interests + skills (not distance), paged, refreshed live, with a "Global hiring
-discovery" label (migration 0052). Fixes the once-per-session hiring load and unstored passes on hiring cards.
-**Owed: apply 0052 with the client deploy** (README "0052").
+discovery" label (migration 0054). Fixes the once-per-session hiring load and unstored passes on hiring cards.
+**Owed: apply 0054 with the client deploy** (README "0054").
 
-**2026-11-04, D-177:** paid events take payment with Razorpay (order, verify, webhook; refunds a lost seat) and every
+**2026-11-04, D-183:** paid events take payment with Razorpay (order, verify, webhook; refunds a lost seat) and every
 confirmed seat gets an emailed invitation ticket via Resend (with a calendar invite) and a ticket sound. **Owed: the
-founder's Resend domain + key and Razorpay keys + webhook (migrations README "0051"), then apply 0051 and deploy the four
+founder's Resend domain + key and Razorpay keys + webhook (migrations README "0053"), then apply 0053 and deploy the four
 functions (razorpay-webhook with JWT verification off), and a test-mode payment.** Until then Reserve holds the seat
 and says payment opens soon.
 
-**2026-11-04, D-173:** the deck ritual's daily-limit shuffle (Connect opens with the D-164 deal; founder 2026-11-05): at the daily swipe cap the deck fans, riffles, reforms and reads "That's your deck for
+**2026-11-04, D-179:** the deck ritual's daily-limit shuffle (Connect opens with the D-164 deal; founder 2026-11-05): at the daily swipe cap the deck fans, riffles, reforms and reads "That's your deck for
 today." with the refresh time; two new deck cues. Files `site/scripts/deck-ritual.js`, `site/styles/deck-ritual.css`;
 tests `tests/unit/deck-ritual.test.mjs`, `tests/e2e/deck-ritual.spec.mjs`. Client only (no migration).
 **2026-11-04, D-172:** the own profile hero's text never runs under the photo card: the work line and bio wrap or

@@ -390,7 +390,7 @@ export const cancelMemberEvent = (id) => rpcCall('cancel_member_event', { p_id: 
 export const companionEvents = () => rpcCall('companion_events', {});
 export const companionDeck = (eventId, limit = 20) => rpcCall('companion_deck', { p_event: eventId, p_limit: limit });
 export const companionSwipe = (eventId, targetId, like) => rpcCall('companion_swipe', { p_event: eventId, p_target: targetId, p_like: Boolean(like) });
-// D-177 (0051): Razorpay payments for a held seat, and the emailed ticket. Each answers { data, error }; a function that
+// D-183 (0053): Razorpay payments for a held seat, and the emailed ticket. Each answers { data, error }; a function that
 // is not deployed yet answers an error the caller treats as "payments open soon".
 const invoke = async (name, body) => {
   if (!supabase) return notConfigured();

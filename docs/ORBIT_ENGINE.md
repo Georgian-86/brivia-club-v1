@@ -1192,7 +1192,7 @@ Hiring is a lane beside the deck, not a change to it: `deck_candidates` and the 
 - **Location first, never a cut (D-170, 0049).** `hiring_suggestions` shows every vacancy at any distance, nearest
   first (own ~3 / ~10 km rings, then the nearest place; fit breaks ties), and answers only the distance band, never a
   cell, a city or km. This is the hiring lane only: the deck's Escape-Velocity gate is unchanged. (`hiring_people`, the
-  Hiring switch, no longer orders by distance: see "The toggle", D-178.)
+  Hiring switch, no longer orders by distance: see "The toggle", D-184.)
 - **The lift.** The client puts at most one suggestion in every five deck cards (`interleaveLift`), never in place of
   the card on screen. Suggestions are mutual-consent like everything else: "Ask about this role" sends a signal
   (`send_connect_request`, the daily quota and the waiting cap apply) with the role tag; a connection exists only when
@@ -1207,7 +1207,7 @@ Hiring is a lane beside the deck, not a change to it: `deck_candidates` and the 
   `open_test_world` is on, the same rule as the deck; switching it off leaves only testers) (`brivia_hiring_seen_by`, applied in
   `brivia_role_shown`, `member_open_to` and both sides of `hiring_suggestions`). Seeded members skip the photo and
   14-day parts of the bar (they never carry a photo, D-156); completed, confirmed email and no open flag still apply.
-- **The toggle: Global Hiring Discovery (D-178, migration 0052; was D-169/D-170).** Connect carries a one-tap Hiring
+- **The toggle: Global Hiring Discovery (D-184, migration 0054; was D-169/D-170).** Connect carries a one-tap Hiring
   switch beside the discovery-filter button (`#hiring-toggle`, `role="switch"`, D-166). Turning it on calls
   `hiring_people(p_limit, p_after_score, p_after_id)`: every member, anywhere, who has a shown role (kind `hiring`) or
   is open to roles under `member_open_to`'s rule (kind `open_to`: they chose Everyone, or the caller has an open role

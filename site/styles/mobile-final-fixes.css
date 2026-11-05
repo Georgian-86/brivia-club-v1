@@ -829,7 +829,7 @@
 
 /* The profile hero's phone layout lives in profile-layout.css (D-092). */
 
-/* The intro (D-180) is drawn live and sized by ignition.css; the old video's 1.55x phone zoom is gone. */
+/* The intro (D-186) is drawn live and sized by ignition.css; the old video's 1.55x phone zoom is gone. */
 
 /* Final mobile footer email size override. */
 @media(max-width:700px){
@@ -839,7 +839,7 @@
   }
 }
 
-/* D-176 (founder, 2026-11-04): on phones the hero's START SWIPING sits a little lower, clear of the top edge. */
+/* D-182 (founder, 2026-11-04): on phones the hero's START SWIPING sits a little lower, clear of the top edge. */
 @media (max-width: 700px) {
   body:not(.auth-page):not(.app-body):not(.careers-page) .hero-nav>.cta-button { transform: translateY(12px); }
 }

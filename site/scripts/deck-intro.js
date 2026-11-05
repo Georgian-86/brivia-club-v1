@@ -1,4 +1,4 @@
-// The deck's arrival (D-164, reworked D-179): a Solitaire deal. A small face-down pile (wine card backs with the club's
+// The deck's arrival (D-164, reworked D-185): a Solitaire deal. A small face-down pile (wine card backs with the club's
 // mark) rises in beside the stack; the three layers are dealt from it one after another, each on a short arc with a
 // little spin, landing face-down in their places; then the top card lifts and flips over to show the person, the stack
 // takes its weight, a gloss crosses the fresh card and Pass / Pitch rise in. About 1.7 s, never blocking: a touch, a

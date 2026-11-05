@@ -1,4 +1,4 @@
-// Razorpay Checkout for a held event seat (D-177). The order comes from the razorpay-order Edge Function (the server sets
+// Razorpay Checkout for a held event seat (D-183). The order comes from the razorpay-order Edge Function (the server sets
 // the amount); this only opens Checkout and reports what happened. The seat is confirmed on the server
 // (razorpay-verify, or razorpay-webhook if the tab closes), never here.
 //

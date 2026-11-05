@@ -1,4 +1,4 @@
-// D-173: the deck ritual's choreography (pure). Run: npm run test:unit
+// D-179: the deck ritual's choreography (pure). Run: npm run test:unit
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
@@ -17,7 +17,7 @@ test('the intro lands deepest first, one back every 120 ms, then the top card ri
   assert.ok(introTotal() >= 1400 && introTotal() <= 2000, `intro ${introTotal()} ms`);
 });
 
-test('the completion shuffle is fast, like Solitaire (D-174): two riffles; the cards are squared by about 1.1 s, the message shows by 1.7 s', () => {
+test('the completion shuffle is fast, like Solitaire (D-180): two riffles; the cards are squared by about 1.1 s, the message shows by 1.7 s', () => {
   const total = completeTotal();
   assert.ok(total >= 1000 && total <= 1700, `shuffle ${total} ms`);
   assert.ok(completeSquareAt() <= 1200, `squared at ${completeSquareAt()} ms`);

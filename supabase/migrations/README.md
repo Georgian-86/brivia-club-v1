@@ -1331,9 +1331,9 @@ change. Verify: `select pg_get_functiondef('public.hiring_suggestions(int)'::reg
 roles and seeded "Open to roles" (nearest first, like real ones); with it off, only testers do. No grant change.
 Verify: `select pg_get_functiondef('public.brivia_hiring_seen_by(uuid,uuid)'::regprocedure) like '%brivia_in_test_world%';` (t).
 
-## 0051
+## 0053
 
-**Razorpay payments and emailed tickets (D-177).** Not applied yet. Apply after `0050`.
+**Razorpay payments and emailed tickets (D-183).** Not applied yet. Apply after `0050`.
 Adds `event_rsvp.payment_order_id`, `ticket_code` (BRV-XXXXXX) and `ticket_sent_at`, with a unique index on each of the
 first two. Members still have no direct access to `event_rsvp` (RLS on, no policy); four Edge Functions do the work with
 the service role. Apply with the client deploy; until the functions and secrets are in, Reserve keeps the 30-minute
@@ -1347,7 +1347,7 @@ Setup, in this order (only the founder can do 1-3: they are accounts, keys and D
    `payment.captured` and `order.paid`, and a webhook secret of your choice. Payment capture: automatic (the default).
 3. **Supabase > Edge Functions > Secrets**: `RAZORPAY_KEY_ID`, `RAZORPAY_KEY_SECRET`, `RAZORPAY_WEBHOOK_SECRET`,
    `RESEND_API_KEY`, and optionally `TICKET_FROM` (default `The Brivia Club <tickets@thebriviaclub.live>`).
-4. Apply `0051`, then deploy the functions `event-ticket`, `razorpay-order`, `razorpay-verify` (JWT verification on) and
+4. Apply `0053`, then deploy the functions `event-ticket`, `razorpay-order`, `razorpay-verify` (JWT verification on) and
    `razorpay-webhook` (**JWT verification off**: Razorpay sends no Supabase token; the function checks Razorpay's
    signature on every request). Each imports `../_shared/`.
 5. Test with Razorpay's test cards/UPI on a paid event: the seat turns Registered, the ticket email arrives with the
@@ -1355,9 +1355,9 @@ Setup, in this order (only the founder can do 1-3: they are accounts, keys and D
    keys in the secrets; the webhook re-added for live).
 Verify: `select column_name from information_schema.columns where table_name = 'event_rsvp' and column_name in ('payment_order_id','ticket_code','ticket_sent_at');` (3 rows).
 
-## 0052
+## 0054
 
-**Global Hiring Discovery (D-178).** Not applied yet. Apply after `0050` (independent of `0051`), with the client
+**Global Hiring Discovery (D-184).** Not applied yet. Apply after `0050` (independent of `0053`), with the client
 deploy (the new client falls back to the old call until it is in; the old client still reads the new answer).
 Replaces `hiring_people` with `hiring_people(int, numeric, uuid)`: members with a shown role and members open to roles,
 anywhere, ranked by fit, shared interests and skills, paged; logs an impression per row (surface `hiring`). Grant:

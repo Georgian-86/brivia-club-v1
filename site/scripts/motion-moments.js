@@ -265,7 +265,7 @@ export const slideModePill = (group, { fromIndex = null, reduced = prefersReduce
   const to = place(buttons[active]);
   // A plain re-place (resize, a view change a frame later) leaves a running slide alone; it already ends there. The
   // slide is remembered on the pill: gsap.isTweening() is false for a tween that has not rendered its first frame yet,
-  // so a re-place in the same frame as the click used to snap the pill to the end (found with D-179).
+  // so a re-place in the same frame as the click used to snap the pill to the end (found with D-185).
   const slide = slides.get(pill);
   if (fromIndex === null && slide && slide.progress() < 1 && !slide.paused()) return;
   gsap.killTweensOf(pill);

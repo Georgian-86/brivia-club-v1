@@ -281,7 +281,7 @@ export const startAppStub = async ({ port, state = {}, deckRows = defaultDeckRow
       if (pathName === '/rest/v1/rpc/set_nearby_radius') { st.radiusSaved = args.p_km; return json(200, args.p_km); }
       if (pathName === '/rest/v1/rpc/save_push_subscription') { (st.pushSubs ||= []).push(args); return json(200, true); }
       if (pathName === '/rest/v1/rpc/delete_push_subscription') { st.pushSubs = (st.pushSubs || []).filter((x) => x.p_endpoint !== args.p_endpoint); return json(200, true); }
-      // D-177: payments and tickets. st.pay: { order: 'ok' | 'not_configured' | 'hold_expired', verify: 'confirmed' | 'full' |
+      // D-183: payments and tickets. st.pay: { order: 'ok' | 'not_configured' | 'hold_expired', verify: 'confirmed' | 'full' |
       // 'error', ticketSent: true | false }; every call is recorded in st.payCalls.
       if (['/functions/v1/razorpay-order', '/functions/v1/razorpay-verify', '/functions/v1/event-ticket'].includes(pathName)) {
         const fn = pathName.slice(14);

@@ -1,7 +1,7 @@
 /* Sign-in hand-off (2026-10-24, D-088). One branded "opening your club" screen covers every wait between a sign-in
    and the app: auth.html shows it the moment a session exists (inline head script adds html.brivia-handing-off) and right
    after a successful sign-in; app.html shows it while body.app-auth-pending. Before this, members saw the login card
-   for a second, then a blank page, then the app. Since D-180 it is the Brivia ignition on black (the same title as the landing's first-visit intro). Both pages show the identical splash, so the page change itself is a
+   for a second, then a blank page, then the app. Since D-186 it is the Brivia ignition on black (the same title as the landing's first-visit intro). Both pages show the identical splash, so the page change itself is a
    seamless cut (a cross-document view transition was tried and dropped: its mid-frame flashed white). */
 
 .brivia-handoff {
@@ -10,7 +10,7 @@
   z-index: 400;
   display: none;
   place-items: center;
-  /* D-180: the loading screen is the Brivia ignition on black (brivia-ignition.js, ignition.css). */
+  /* D-186: the loading screen is the Brivia ignition on black (brivia-ignition.js, ignition.css). */
   background: radial-gradient(60% 45% at 50% 50%, rgb(90 6 31 / .22), transparent 70%), #030204;
   color: #f4ebe6;
   font-family: var(--font-heading);
@@ -24,7 +24,7 @@ body.app-auth-pending:has(.under-review) .brivia-handoff { display: none; }
 .brivia-handoff-stage { display: grid; justify-items: center; }
 /* The name for screen readers (the drawn title is aria-hidden). */
 .brivia-handoff-label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
-/* Arriving from the sign-in hand-off (D-180): the title is already drawn on the page before; app.html shows its last
+/* Arriving from the sign-in hand-off (D-186): the title is already drawn on the page before; app.html shows its last
    frame, so the change of page is a still cut. Only the waiting glint moves. */
 html.ignition-settled .brivia-handoff .ignition *, html.ignition-settled .brivia-handoff, html.ignition-settled .brivia-handoff-note { animation: none; }
 html.ignition-settled .brivia-handoff .ignition-streak::after { animation: brivia-handoff-glint 1.7s cubic-bezier(.45, 0, .2, 1) infinite; }

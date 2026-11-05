@@ -6,9 +6,9 @@
 --   HS3 (0050, D-171) with open_test_world on, R sees the seeded banners and the seeded "Open to roles", like T; with it
 --       off, R sees no seeded banner, no seeded "Open to roles" and cannot ask about a seeded role, while T still does
 --   HS4 a real hirer's banner is unchanged for R (only seeded members are gated)
---   HS5 hiring_people (0048, D-169; 0052, D-178): with the world open R and T both find all 12 seeded hirers plus H,
+--   HS5 hiring_people (0048, D-169; 0054, D-184): with the world open R and T both find all 12 seeded hirers plus H,
 --       and the seeded seekers who chose Everyone; with it closed R finds only H. Order by score, never by distance
---       (D-178 supersedes D-170's nearest first); the band is a place name or 'Abroad', never km.
+--       (D-184 supersedes D-170's nearest first); the band is a place name or 'Abroad', never km.
 begin;
 create or replace function pg_temp.t(n int) returns uuid language sql immutable as $$
   select ('a7e57000-0000-4000-8000-' || lpad(n::text, 12, '0'))::uuid $$;
@@ -98,7 +98,7 @@ begin
   perform pg_temp.as_member(t);
   select count(*) into n from public.hiring_people(50) where hiring_kind = 'hiring';
   if n <> 13 then raise exception 'FAIL HS5: the tester finds % hiring people, expected 13', n; end if;
-  -- D-178: ranked by score, never by distance; one page after another repeats no one
+  -- D-184: ranked by score, never by distance; one page after another repeats no one
   if exists (select 1 from (select score, lag(score) over (order by k) prev from (select row_number() over () k, score from public.hiring_people(50)) z) q
               where q.prev < q.score) then raise exception 'FAIL HS5: not in score order'; end if;
   if exists (select 1 from public.hiring_people(50) where distance_band ~ '[0-9]') then raise exception 'FAIL HS5: a distance leaked'; end if;

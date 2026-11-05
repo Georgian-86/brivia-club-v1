@@ -3417,9 +3417,9 @@ controls (a tester or a seeded test member), never a real member, so no new expo
 
 Two sessions logged decisions in parallel on 2026-11-04. The entries below were written as D-162 to D-166 on branch
 `claude/eloquent-ramanujan-w942g9` while `main` used those numbers for other decisions; they are kept here as
-D-173 to D-177 (same order and wording), and their migration 0047 is 0051. Founder, 2026-11-05: Connect opens with the
-D-164 deal (`deck-intro.js`); D-173's own intro deal is not used, only its daily-limit shuffle.
-## D-173 (2026-11-04): the signature deck ritual (intro deal, daily-cap shuffle, deck sounds)
+D-179 to D-183 (same order and wording), and their migration 0047 is 0053. Founder, 2026-11-05: Connect opens with the
+D-164 deal (`deck-intro.js`); D-179's own intro deal is not used, only its daily-limit shuffle.
+## D-179 (2026-11-04): the signature deck ritual (intro deal, daily-cap shuffle, deck sounds)
 
 - **Asked:** a Solitaire-inspired, cinematic deck on Connect: the deck assembles on arrival and the top card rises into
   the live profile; Pass sinks left, Pitch lifts right; when the daily free swipes are used the deck spreads, gathers,
@@ -3451,16 +3451,16 @@ D-164 deal (`deck-intro.js`); D-173's own intro deal is not used, only its daily
   onboarding 269. The app-stub counts passes as swipes with `passesUseSwipes` and marks the intro played unless a spec
   sets `deckRitual`.
 
-## D-174 (2026-11-04): the daily-cap shuffle is fast, like Solitaire
+## D-180 (2026-11-04): the daily-cap shuffle is fast, like Solitaire
 
 - **Asked:** "make the cards shuffle too fast just like they do in the solitaire game".
 - **Done:** the completion is now a quick fan (0.2 s), a fast riffle (cards drop 30 ms apart, 0.26 s each, a crisp
   ease with no overshoot), a cut (top half right, bottom half left, 0.15 s), a second riffle, then a snap square-up.
   The cards are squared by 1.1 s and the message shows by 1.6 s (was about 2.3 s). The `complete` cue follows: a quicker
   falling arpeggio and light riffle ticks, one per card across both riffles, then the same closing horn line. The
-  intro deal is unchanged. Supersedes D-173's 1.5-2.5 s target for the shuffle.
+  intro deal is unchanged. Supersedes D-179's 1.5-2.5 s target for the shuffle.
 
-## D-175 (2026-11-04): the Connect profile card on the warm pink blush
+## D-181 (2026-11-04): the Connect profile card on the warm pink blush
 
 - **Asked:** "change the color of these profile cards acc to our gradient".
 - **Done:** new token `--aura-blush-card` (deepest blush low left under the name and chips, a softer blush right, a
@@ -3468,12 +3468,12 @@ D-164 deal (`deck-intro.js`); D-173's own intro deal is not used, only its daily
   under it; the avatar ring matches; the chips are frosted cream with a hairline. The wine title bar, cover, layout and
   View profile are unchanged. Dark ink on the blush stays well above WCAG AA.
 
-## D-176 (2026-11-04): the landing's START SWIPING sits lower on phones
+## D-182 (2026-11-04): the landing's START SWIPING sits lower on phones
 
 - **Asked:** "move the start swiping button little down". On phones it sat 9 px from the top edge; it is now 12 px
   lower (a transform, so the header's layout is unchanged). Desktop is unchanged.
 
-## D-177 (2026-11-04): Razorpay payments for paid events; an emailed invitation ticket; a ticket sound
+## D-183 (2026-11-04): Razorpay payments for paid events; an emailed invitation ticket; a ticket sound
 
 - **Asked:** "when a user registers for an event after making payment, a music effect should come and the user should
   get his ticket of the event on his mail with some aesthetic theme colored invitation". There was no payment gateway
@@ -3493,23 +3493,23 @@ D-164 deal (`deck-intro.js`); D-173's own intro deal is not used, only its daily
   played on confirmation; same Settings switch as the swipe and deck sounds.
 - **Code:** `supabase/functions/{razorpay-order,razorpay-verify,razorpay-webhook,event-ticket}`, shared
   `_shared/{razorpay.js,ticket-email.js,send-ticket.ts,http.ts}` (the .js files are unit-tested in Node);
-  `site/scripts/payment-checkout.js`; migration 0051. Setup steps: migrations README "0051".
+  `site/scripts/payment-checkout.js`; migration 0053. Setup steps: migrations README "0053".
 - **Proof:** unit 525 (signatures against Node's HMAC, tampering, amounts, hold window, email content and escaping,
   https-only links, the .ics, Checkout options, the cue); SQL harness (zb-event-tickets); e2e `event-payment.spec.mjs`
   EP1-EP6 (17 checks), events 75, create-event 151, companions 65. The Deno functions were not run here (no Deno in
   this environment): their logic lives in the tested shared files, and they need a test-mode run once deployed.
 
-## D-178 (2026-11-04): Global Hiring Discovery: the Hiring switch reaches everyone, ranked by fit, not distance
+## D-184 (2026-11-04): Global Hiring Discovery: the Hiring switch reaches everyone, ranked by fit, not distance
 - **Asked (founder, 2026-11-05):** "Toggle Hiring ON → instantly discover professionals who are open to hiring
   opportunities anywhere in the world. No geographical restrictions whatsoever." Rank by skills, interests, experience
   and compatibility; page; live updates; respect privacy, blocks and deleted accounts; a subtle "GLOBAL HIRING
   DISCOVERY" label; Curated, Nearby and Hiring stay independent. Founder chose "Extend the live one": one query.
-- **Decision:** migration 0052 replaces `hiring_people` under the same name. It adds members open to roles
+- **Decision:** migration 0054 replaces `hiring_people` under the same name. It adds members open to roles
   (`member_open_to`'s rule, so a seeker who chose "open roles only" is shown only to a hirer with an open role) to
   members with a shown role; drops distance from the order (supersedes D-170's nearest first for this query only;
   `hiring_suggestions` keeps it); scores 0.5 fit + 0.35 shared interests + 0.15 shared skills; pages by keyset; logs an
   impression per row served. The client keeps a paging pool (`hiringPool`), refreshes every 60 s and on tab return
-  while the switch is on, and falls back to the old single call if 0052 is not applied yet.
+  while the switch is on, and falls back to the old single call if 0054 is not applied yet.
 - **Found on the way:** (1) the old client loaded the hiring cards once per session (`hiringPeopleLoaded` never reset),
   so turning the switch off and on again, or a new role elsewhere, showed nothing new: the likely cause of the founder's
   empty hiring deck. (2) Those cards came from `get_candidates`, which logs no impression, so a Pass on a far hiring
@@ -3521,7 +3521,7 @@ D-164 deal (`deck-intro.js`); D-173's own intro deal is not used, only its daily
   unit 535; e2e hiring (all pass), deck 201, deck-ritual, explore-cards 74. `nearby.spec` (D-138 settings row) and
   `consent.spec` (cancelKeepsCard timeout) fail the same way without this change.
 
-## D-179 (2026-11-05): the deck's opening deal becomes a Solitaire deal with a card flip
+## D-185 (2026-11-05): the deck's opening deal becomes a Solitaire deal with a card flip
 - **Asked (founder, 2026-11-05):** "i need a very good animation, pls fix it" — the deck opening deal (chosen in the
   follow-up question). D-164's deal faded the three layers in half-transparent, so one person's name showed through
   another's while they flew in.
@@ -3543,7 +3543,7 @@ D-164 deal (`deck-intro.js`); D-173's own intro deal is not used, only its daily
   hiring, explore-cards 74; no sideways scroll at 360/390 px during the deal; the card backs are removed afterwards.
   `launch-polish` (city search timeout) and `nearby` (D-138 settings row) fail the same way without this change.
 
-## D-180 (2026-11-05): the Brivia ignition: the opening title drawn live, with music; also the loading screen
+## D-186 (2026-11-05): the Brivia ignition: the opening title drawn live, with music; also the loading screen
 - **Asked (founder, 2026-11-05):** with a phone recording of the landing's intro video: "the loading video of brivia must
   be like this, w a very good music effect, make this video clean and non blur".
 - **Found:** the intro shipped as `intro-video-1080.mp4` at about 58 kbps (soft, banded on the gradients), and phones
