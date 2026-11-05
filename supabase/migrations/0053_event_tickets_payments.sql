@@ -1,5 +1,5 @@
 set lock_timeout = '5s';
--- 0051_event_tickets_payments.sql: Razorpay payments for paid events and an emailed invitation ticket for every
+-- 0053_event_tickets_payments.sql: Razorpay payments for paid events and an emailed invitation ticket for every
 -- confirmed registration (founder request 2026-11-04, D-183: "when a user registers for an event after making payment,
 -- a music effect should come and the user should get his ticket of the event on his mail with some aesthetic theme
 -- colored invitation"; gateway: Razorpay; email: Resend). Applied after 0050 (README "## 0053"). 0001-0050 are frozen.
