@@ -42,7 +42,7 @@ import { collabSummary, openCollabReview } from './collab-requests.js';
 import { createPresence, presenceDot } from './presence.js';
 import { cleanQuery, matchesQuery, STATUS as PERSON_STATUS, peopleResults, localPeople } from './chat-search.js';
 import { receiptState, receiptMarkup, lastOwnMessageId, applyReceipt, needsReadReceipt, needsDeliveredReceipt, lastActiveLabel } from './receipts.js';
-import { createMessageMenu, applyMessageUpdate, unsentLabel, previewForUnsent, canEditMessage } from './message-actions.js';
+import { createMessageMenu, applyMessageUpdate, unsentLabel, previewForUnsent, canEditMessage, replyQuote } from './message-actions.js';
 import { createCrossingPaths, isQuietHour, alertHeadline, alertDetail, alertToast, pausedCopy } from './crossing-paths.js';
 import '../styles/crossing-paths.css';
 import { createNearbyPage } from './nearby-page.js';
@@ -167,6 +167,11 @@ const isReceiptColumnError = (error) => /delivered_at|read_at/.test(error?.messa
 let editColumns = true;
 const EDIT_COLUMNS = ',edited_at,unsent_at';
 const isEditColumnError = (error) => /edited_at|unsent_at/.test(error?.message || '');
+// D-191 (0055): replies. Before 0055 the column is missing: threads load without it and Reply sends a plain message.
+let replyColumns = true;
+const REPLY_COLUMNS = ',reply_to_id';
+const isReplyColumnError = (error) => /reply_to_id/.test(error?.message || '');
+let replyingTo = null; // { personId, id }
 // The message being edited in the composer: { personId, id } or null.
 let editingMessage = null;
 // D-179: the deck ritual's daily-limit shuffle (deck-ritual.js) and whether this page has seen swipes left (only then
@@ -3049,8 +3054,12 @@ const loadChatMessages = async (person) => {
   // more reliable than the compound PostgREST OR/AND filter for older rows.
   const fullColumns = 'id,sender_id,recipient_id,body,created_at,message_type,attachment_url,attachment_path,attachment_name,attachment_mime,attachment_size';
   const mine = `sender_id.eq.${memberProfile.id},recipient_id.eq.${memberProfile.id}`;
-  const select = () => supabase.from('brivia_messages').select(fullColumns + (receiptColumns ? RECEIPT_COLUMNS : '') + (editColumns ? EDIT_COLUMNS : '')).or(mine);
+  const select = () => supabase.from('brivia_messages').select(fullColumns + (receiptColumns ? RECEIPT_COLUMNS : '') + (editColumns ? EDIT_COLUMNS : '') + (replyColumns ? REPLY_COLUMNS : '')).or(mine);
   let { data, error } = await select();
+  if (error && replyColumns && isReplyColumnError(error)) {
+    replyColumns = false;
+    ({ data, error } = await select());
+  }
   if (error && editColumns && isEditColumnError(error)) {
     editColumns = false;
     ({ data, error } = await select());
@@ -3079,6 +3088,7 @@ const loadChatMessages = async (person) => {
       readAt: message.read_at || '',
       editedAt: message.edited_at || '',
       unsentAt: message.unsent_at || '',
+      replyTo: message.reply_to_id || '',
     }));
     const previousMessages = chatMessages[person.id] || [];
     // D-157: a message deleted for me (on any device) is no longer returned: drop it, unless it is newer than this
@@ -3104,7 +3114,8 @@ const loadChatMessages = async (person) => {
       const previous = previousMessages[index];
       return !previous || previous.id !== message.id || previous.text !== message.text || previous.createdAt !== message.createdAt || previous.attachment?.url !== message.attachment?.url || previous.attachment?.path !== message.attachment?.path
         || (previous.deliveredAt || '') !== message.deliveredAt || (previous.readAt || '') !== message.readAt
-        || (previous.editedAt || '') !== (message.editedAt || '') || (previous.unsentAt || '') !== (message.unsentAt || '');
+        || (previous.editedAt || '') !== (message.editedAt || '') || (previous.unsentAt || '') !== (message.unsentAt || '')
+        || (previous.replyTo || '') !== (message.replyTo || '');
     });
     chatMessages[person.id] = mergedMessages;
     if (selectedChat?.id === person.id) markChatRead(person.id);
@@ -3139,6 +3150,7 @@ const appendRemoteMessage = (message) => {
     readAt: message.read_at || '',
     editedAt: message.edited_at || '',
     unsentAt: message.unsent_at || '',
+    replyTo: message.reply_to_id || '',
   });
   if (isIncoming) sendDeliveredReceipt();
   messages.sort((a, b) => new Date(a.createdAt || 0).getTime() - new Date(b.createdAt || 0).getTime());
@@ -3284,6 +3296,7 @@ const openChat = (person, markAsRead = true) => {
   ensureChatMoreMenu();
   ensureChatWallpaper();
   if (editingMessage && String(editingMessage.personId) !== String(person.id)) cancelMessageEdit({ keepInput: false });
+  if (replyingTo && String(replyingTo.personId) !== String(person.id)) cancelMessageReply({ render: false });
   messageMenu?.close();
   selectedChat = person;
   joinTyping(person);
@@ -3470,7 +3483,9 @@ const renderMessages = () => {
     const word = receipt && receipt !== 'sent' && String(message.id) === newestOwnId ? `<span class="message-receipt-word">${receipt === 'read' ? 'Read' : 'Delivered'}</span>` : '';
     const edited = message.editedAt ? '<span class="message-edited">Edited</span>' : '';
     const editing = editingMessage && String(editingMessage.id) === String(message.id) ? ' is-editing' : '';
-    return `<div class="message ${mineClass}${kind}${editing}" data-message-id="${idAttr}" tabindex="0" aria-haspopup="menu">${content}<small${receipt ? ' class="message-meta"' : ''}>${edited}${escapeHtml(formatChatTime(message.createdAt))}${word}${receiptMarkup(receipt)}</small></div>`;
+    const replying = replyingTo && String(replyingTo.id) === String(message.id) ? ' is-replying-to' : '';
+    const quote = message.replyTo && !message.unsentAt ? replyQuoteMarkup(replyQuote(thread, message.replyTo, { themName: selectedChat?.name, kindLabel: messageKindLabel })) : '';
+    return `<div class="message ${mineClass}${kind}${editing}${replying}${quote ? ' has-reply' : ''}" data-message-id="${idAttr}" tabindex="0" aria-haspopup="menu">${quote}${content}<small${receipt ? ' class="message-meta"' : ''}>${edited}${escapeHtml(formatChatTime(message.createdAt))}${word}${receiptMarkup(receipt)}</small></div>`;
   };
   const newestOwnId = lastOwnMessageId(thread);
   messages.innerHTML = thread.length ? thread.map(renderBubble).join('') : '<div class="chat-start-note"><strong>Start with context.</strong><span>A thoughtful first message makes a better introduction.</span></div>';
@@ -3507,7 +3522,7 @@ const renderMessages = () => {
 
 const CHAT_CLOSE_ICON = '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true" focusable="false"><path d="M6 6l12 12M18 6 6 18"/></svg>';
 // Something layered over the open thread (a menu, a picker, a dialog) takes Escape first.
-const CHAT_LAYERS = '#chat-more-menu:not([hidden]), #chat-emoji-picker:not([hidden]), #chat-attachment-menu:not([hidden]), #chat-gif-picker:not([hidden]), #chat-share-menu:not([hidden]), #chat-camera-modal:not([hidden]), #public-profile-modal, #profile-edit-modal, #app-notification-panel:not([hidden]), [popover]:popover-open, dialog[open], .app-overlay:not([hidden]), .message-menu, #chat-edit-bar:not([hidden])'; // D-157: the message menu and the editing bar take Escape first
+const CHAT_LAYERS = '#chat-more-menu:not([hidden]), #chat-emoji-picker:not([hidden]), #chat-attachment-menu:not([hidden]), #chat-gif-picker:not([hidden]), #chat-share-menu:not([hidden]), #chat-camera-modal:not([hidden]), #public-profile-modal, #profile-edit-modal, #app-notification-panel:not([hidden]), [popover]:popover-open, dialog[open], .app-overlay:not([hidden]), .message-menu, #chat-edit-bar:not([hidden]), #chat-reply-bar:not([hidden])'; // D-157, D-191: the message menu and the editing bar take Escape first
 const closeChatToInbox = () => {
   if (!selectedChat) return;
   const id = selectedChat.id;
@@ -3517,6 +3532,8 @@ const closeChatToInbox = () => {
 };
 window.addEventListener('keydown', (event) => {
   if (event.key !== 'Escape' || !selectedChat || document.body.dataset.appView !== 'chat') return;
+  // D-191: with focus outside the composer, Escape first lets go of the message being replied to.
+  if (replyingTo && event.target?.id !== 'chat-input' && !document.querySelector('.message-menu')) { event.preventDefault(); cancelMessageReply(); return; }
   if (document.querySelector('#chat-window')?.hidden || document.querySelector(CHAT_LAYERS)) return;
   event.preventDefault();
   closeChatToInbox();
@@ -3524,6 +3541,7 @@ window.addEventListener('keydown', (event) => {
 const closeSelectedChat = () => {
   closeShareMenu();
   cancelMessageEdit({ keepInput: false });
+  cancelMessageReply({ render: false });
   messageMenu?.close();
   leaveTyping();
   selectedChat = null;
@@ -6429,6 +6447,77 @@ const patchThreadMessage = (personId, id, patch) => {
   if (!thread) return;
   chatMessages[personId] = thread.map((m) => (String(m.id) === String(id) ? { ...m, ...patch } : m));
 };
+// D-191 (0055): Reply. The quote above a reply, the "Replying to" bar above the composer, and the jump to the original.
+const messageKindLabel = (message) => {
+  const kind = message?.attachment?.kind;
+  if (kind === 'image') return 'Photo';
+  if (kind === 'gif') return 'GIF';
+  if (kind === 'video') return 'Video';
+  if (kind === 'resume') return 'Resume';
+  if (kind) return 'File';
+  if (parseAreaBody(message?.text)) return 'Shared area';
+  if (parseSharedPost(message?.text)) return 'Shared post';
+  return '';
+};
+const isCardText = (message) => Boolean(parseAreaBody(message?.text) || parseSharedPost(message?.text));
+function replyQuoteMarkup(quote) {
+  if (!quote) return '';
+  const state = quote.missing ? ' is-missing' : quote.unsent ? ' is-unsent' : '';
+  const who = quote.who ? `<strong>${escapeHtml(quote.who)}</strong>` : '';
+  return `<button type="button" class="message-reply-quote${state}" data-reply-jump="${escapeHtml(quote.id)}"${quote.missing ? ' disabled' : ''} aria-label="${escapeHtml(`Replying to ${quote.who || 'a message'}: ${quote.text}`)}">${who}<span>${escapeHtml(quote.text)}</span></button>`;
+}
+const replyBar = () => {
+  let bar = document.querySelector('#chat-reply-bar');
+  const form = document.querySelector('#chat-form');
+  if (!bar && form) {
+    bar = document.createElement('div');
+    bar.id = 'chat-reply-bar';
+    bar.className = 'chat-edit-bar chat-reply-bar';
+    bar.hidden = true;
+    bar.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 15 4 10l5-5"/><path d="M4 10h9a7 7 0 0 1 7 7v2"/></svg><span class="chat-edit-copy"><strong id="chat-reply-who">Replying</strong><span id="chat-reply-preview"></span></span><button type="button" class="chat-edit-cancel" aria-label="Cancel reply">×</button>';
+    form.before(bar);
+    bar.querySelector('.chat-edit-cancel').addEventListener('click', () => { cancelMessageReply(); document.querySelector('#chat-input')?.focus(); });
+  }
+  return bar;
+};
+function cancelMessageReply({ render = true } = {}) {
+  if (!replyingTo) return;
+  replyingTo = null;
+  const bar = document.querySelector('#chat-reply-bar');
+  if (bar) bar.hidden = true;
+  document.querySelector('#chat-form')?.classList.remove('is-replying');
+  if (render && selectedChat) renderMessages();
+}
+function startMessageReply(message) {
+  if (!selectedChat || !message || message.unsentAt) return;
+  if (editingMessage) cancelMessageEdit({ keepInput: false });
+  replyingTo = { personId: selectedChat.id, id: message.id };
+  const quote = replyQuote(chatMessages[selectedChat.id] || [], message.id, { themName: selectedChat.name, kindLabel: messageKindLabel });
+  const bar = replyBar();
+  if (bar) {
+    bar.hidden = false;
+    bar.querySelector('#chat-reply-who').textContent = quote.who === 'You' ? 'Replying to yourself' : `Replying to ${quote.who}`;
+    bar.querySelector('#chat-reply-preview').textContent = isCardText(message) && !message.attachment ? messageKindLabel(message) : quote.text;
+  }
+  document.querySelector('#chat-form')?.classList.add('is-replying');
+  const input = document.querySelector('#chat-input');
+  input?.focus();
+  renderMessages();
+}
+// Tap a quote: the original scrolls into view and glows for a moment.
+document.querySelector('#chat-messages')?.addEventListener('click', (event) => {
+  const jump = event.target.closest?.('[data-reply-jump]');
+  if (!jump) return;
+  event.preventDefault();
+  event.stopPropagation();
+  const target = [...document.querySelectorAll('#chat-messages .message[data-message-id]')].find((el) => el.dataset.messageId === jump.dataset.replyJump);
+  if (!target) return;
+  target.scrollIntoView({ block: 'center', behavior: reducedMotion() ? 'auto' : 'smooth' });
+  target.classList.remove('is-reply-target');
+  void target.offsetWidth;
+  target.classList.add('is-reply-target');
+  window.setTimeout(() => target.classList.remove('is-reply-target'), 1600);
+});
 const editBar = () => {
   let bar = document.querySelector('#chat-edit-bar');
   const form = document.querySelector('#chat-form');
@@ -6455,6 +6544,7 @@ function cancelMessageEdit({ keepInput = true } = {}) {
 }
 const startMessageEdit = (message) => {
   if (!selectedChat || !canEditMessage(message, { special: isSpecialMessage(message) })) { showToast('Messages can be edited for 15 minutes after sending.'); return; }
+  cancelMessageReply({ render: false });
   editingMessage = { personId: selectedChat.id, id: message.id, original: message.text };
   const bar = editBar();
   if (bar) { bar.hidden = false; bar.querySelector('#chat-edit-preview').textContent = message.text; }
@@ -6497,6 +6587,7 @@ const deleteThreadMessageForMe = async (message) => {
   if (error) { showToast(actionErrorCopy(error, 'That message could not be deleted. Try again.')); return; }
   chatMessages[personId] = (chatMessages[personId] || []).filter((m) => String(m.id) !== String(message.id));
   if (editingMessage && String(editingMessage.id) === String(message.id)) cancelMessageEdit({ keepInput: false });
+  if (replyingTo && String(replyingTo.id) === String(message.id)) cancelMessageReply({ render: false });
   renderChats();
   if (String(selectedChat?.id) === String(personId)) renderMessages();
   showToast('Deleted for you.');
@@ -6510,13 +6601,15 @@ messageMenu = createMessageMenu({
   onAction: async (action, message) => {
     if (action === 'copy') {
       try { await navigator.clipboard.writeText(message.text); showToast('Copied.'); } catch { showToast('Copy is not available here.'); }
-    } else if (action === 'edit') startMessageEdit(message);
+    } else if (action === 'reply') startMessageReply(message);
+    else if (action === 'edit') startMessageEdit(message);
     else if (action === 'unsend') await unsendThreadMessage(message);
     else if (action === 'delete') await deleteThreadMessageForMe(message);
   },
 });
 document.querySelector('#chat-input')?.addEventListener('keydown', (event) => {
   if (event.key === 'Escape' && editingMessage) { event.preventDefault(); event.stopPropagation(); cancelMessageEdit({ keepInput: false }); }
+  else if (event.key === 'Escape' && replyingTo) { event.preventDefault(); event.stopPropagation(); cancelMessageReply(); }
 });
 document.querySelector('#chat-form')?.addEventListener('submit', async (event) => {
   event.preventDefault();
@@ -6531,14 +6624,26 @@ document.querySelector('#chat-form')?.addEventListener('submit', async (event) =
     // Re-encode every image BEFORE anything is sent: one failure aborts the whole send (no text, no files) and the
     // composer keeps its state so the member can remove the bad file. Compressed files are not re-encoded on upload.
     const files = await compressAttachmentFiles(pendingChatFiles.map((entry) => entry.file));
-    if (!files.length && !pendingChatGif) await insertChatMessage(body);
+    // D-191: the first message of this send carries the reply (the rest are its attachments, sent in the same breath).
+    let reply = replyingTo && String(replyingTo.personId) === String(selectedChat.id) && replyColumns ? { reply_to_id: replyingTo.id } : null;
+    const send = async (text, attachment) => {
+      const extra = reply;
+      reply = null;
+      try { await insertChatMessage(text, attachment, extra); } catch (error) {
+        if (!extra || !isReplyColumnError(error)) throw error;
+        replyColumns = false; // before 0055: send it as a plain message
+        await insertChatMessage(text, attachment);
+      }
+    };
+    if (!files.length && !pendingChatGif) await send(body);
     for (let index = 0; index < files.length; index += 1) {
       const file = files[index];
       const attachment = await uploadMessageAttachment(memberProfile.id, file);
-      await insertChatMessage(index === 0 ? body : '', attachment);
+      await send(index === 0 ? body : '', attachment);
     }
-    if (pendingChatGif) await insertChatMessage(files.length ? '' : body, { kind: 'gif', url: pendingChatGif.url, path: '', name: `${pendingChatGif.label} GIF`, mime: 'image/gif', size: 0 });
+    if (pendingChatGif) await send(files.length ? '' : body, { kind: 'gif', url: pendingChatGif.url, path: '', name: `${pendingChatGif.label} GIF`, mime: 'image/gif', size: 0 });
     input.value = '';
+    cancelMessageReply({ render: false });
     resetPendingChatFiles();
     await loadChatMessages(selectedChat);
   } catch (error) {
@@ -6733,6 +6838,7 @@ const loadSupabaseCommunity = async () => {
         attachment: message.unsent_at ? null : attachmentFromRow(message),
         editedAt: message.edited_at || '',
         unsentAt: message.unsent_at || '',
+        replyTo: message.reply_to_id || '',
       });
     });
     remoteMatchIds = [...inboxIds];

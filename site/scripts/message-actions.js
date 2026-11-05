@@ -1,5 +1,6 @@
-// Edit, unsend and delete for me (D-157, migration 0046). A long press on a chat bubble (or right-click, or the
-// context-menu key / Shift+F10 on a focused bubble) opens a small menu next to it:
+// Reply (D-191, migration 0055), edit, unsend and delete for me (D-157, migration 0046). A long press on a chat bubble
+// (or right-click, or the context-menu key / Shift+F10 on a focused bubble) opens a small menu next to it:
+//   Reply                any message that is still there: the next message I send quotes it
 //   Copy                 any message with text
 //   Edit                 my own plain text message, within 15 minutes, not unsent (the server checks the same)
 //   Unsend               my own message, any time: it goes for both of us ("This message was unsent")
@@ -25,6 +26,7 @@ export const canEditMessage = (message, { now = Date.now(), special = false } = 
 export const messageActions = (message, { now = Date.now(), special = false } = {}) => {
   if (!message || !isServerId(message.id)) return [];
   const actions = [];
+  if (!message.unsentAt) actions.push('reply');
   if (!message.unsentAt && !special && String(message.text || '').trim()) actions.push('copy');
   if (canEditMessage(message, { now, special })) actions.push('edit');
   if (message.from === 'me' && !message.unsentAt) actions.push('unsend');
@@ -49,15 +51,31 @@ export const applyMessageUpdate = (messages, row) => {
   return next;
 };
 
+// D-191: what a reply's quote shows, from the thread I already hold (never a server read: a message I cannot see, or
+// deleted for me, quotes as unavailable). kindLabel(message) names a card or a file ("Photo", "Shared area").
+export const QUOTE_MAX = 90;
+export const replyQuote = (thread, replyToId, { themName = 'Them', kindLabel = () => '' } = {}) => {
+  if (!replyToId) return null;
+  const target = (Array.isArray(thread) ? thread : []).find((m) => String(m.id) === String(replyToId));
+  if (!target) return { id: String(replyToId), who: '', text: 'Original message unavailable', missing: true };
+  const who = target.from === 'me' ? 'You' : String(themName || 'Them').split(/\s+/)[0];
+  if (target.unsentAt) return { id: String(target.id), who, text: unsentLabel(target.from), unsent: true };
+  const words = String(target.text || '').replace(/\s+/g, ' ').trim();
+  const label = kindLabel(target);
+  const body = label && !words ? label : label && words && label !== words ? `${label} · ${words}` : words || label || 'Message';
+  return { id: String(target.id), who, text: body.length > QUOTE_MAX ? `${body.slice(0, QUOTE_MAX - 1).trimEnd()}…` : body };
+};
+
 // The inbox row's last line for an unsent message.
 export const previewForUnsent = (message) => (message?.unsentAt ? unsentLabel(message.from) : null);
 
-const LABELS = { copy: 'Copy', edit: 'Edit', unsend: 'Unsend', delete: 'Delete for me' };
+const LABELS = { reply: 'Reply', copy: 'Copy', edit: 'Edit', unsend: 'Unsend', delete: 'Delete for me' };
 const CONFIRM = {
   unsend: { title: 'Unsend for everyone?', copy: 'It will be removed for both of you.', action: 'Unsend' },
   delete: { title: 'Delete for you?', copy: 'It stays in their chat.', action: 'Delete' },
 };
 const ICONS = {
+  reply: '<path d="M9 15 4 10l5-5"/><path d="M4 10h9a7 7 0 0 1 7 7v2"/>',
   copy: '<path d="M8 8h9v11H8z"/><path d="M5 15V5h9"/>',
   edit: '<path d="M4 20h4L19 9l-4-4L4 16v4Z"/><path d="m13.5 6.5 4 4"/>',
   unsend: '<path d="M9 14 4 9l5-5"/><path d="M4 9h10a6 6 0 0 1 0 12h-3"/>',
@@ -147,7 +165,7 @@ export const createMessageMenu = ({ container, getMessage, onAction, now = () =>
       if (!action) return;
       if (!button.dataset.messageConfirm && CONFIRM[action]) { renderConfirm(action); return; }
       const message = found.message;
-      close({ refocus: action !== 'edit' && action !== 'delete' && action !== 'unsend' });
+      close({ refocus: action !== 'edit' && action !== 'reply' && action !== 'delete' && action !== 'unsend' });
       void onAction(action, message);
     });
     menu.addEventListener('keydown', (event) => {

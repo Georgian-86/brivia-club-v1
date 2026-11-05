@@ -111,9 +111,11 @@ begin
   perform pg_temp.as_owner();
   -- 0042 added delivered_at and read_at; both stay null on a withheld message (w-read-receipts R2/R3), so they reveal no block.
   -- 0046 added edited_at and unsent_at: only the sender sets them, and a withheld row stays invisible to the recipient.
+  -- 0055 added reply_to_id: set on insert only, within the same pair; a reply that quotes a withheld message carries just
+  -- its id (the client quotes from its own thread, where a withheld row never arrives), so it reveals no block.
   select string_agg(column_name, ',' order by ordinal_position) into cols
     from information_schema.columns where table_schema = 'public' and table_name = 'brivia_messages';
-  if cols <> 'id,sender_id,recipient_id,body,message_type,attachment_url,attachment_path,attachment_name,attachment_mime,attachment_size,created_at,delivered_at,read_at,edited_at,unsent_at' then
+  if cols <> 'id,sender_id,recipient_id,body,message_type,attachment_url,attachment_path,attachment_name,attachment_mime,attachment_size,created_at,delivered_at,read_at,edited_at,unsent_at,reply_to_id' then
     raise exception 'FAIL S2: brivia_messages columns changed: %', cols; end if;
 end $$;
 

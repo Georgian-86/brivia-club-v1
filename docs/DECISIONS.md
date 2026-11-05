@@ -3710,3 +3710,19 @@ solitaire shuffle; D-179's intro deal and D-185's pile-and-flip deal are not use
   goes from 2.5 s to 5 s (supersedes Phase B's 2.5 s for the intro only; it still plays on a first visit only and any
   tap skips nothing else on the page, which stays usable under it). The loading screen uses the same title.
 
+## D-191 (2026-11-05): reply to any message in a chat
+- **Asked:** a chat screenshot: "i need a feature where i can reply on any message in continuation".
+- **Done (0055):** the long-press menu (right-click on desktop) now starts with **Reply** on any message that is still
+  there (mine or theirs, text, photo, video, GIF, file or shared card). A "Replying to Asha" bar with the line appears
+  above the composer and the bubble is marked; Escape or × lets go. The next message carries `reply_to_id` (the first
+  of a send with attachments) and shows a small quote at its top: who said it ("You" or their first name) and up to two
+  lines, wine on light bubbles, cream on mine. Tapping the quote scrolls to the original and makes it glow. A quote of
+  a message I no longer hold (deleted for me) reads "Original message unavailable"; of an unsent one, as unsent.
+- **Server:** `brivia_messages.reply_to_id` (on delete set null), set on insert only; a trigger refuses a target from
+  any other conversation, so a reply can never quote a stranger's message. Quotes are drawn from the thread the member
+  already holds, never read from the server, so a withheld (blocked) message never leaks through a reply.
+- **Before 0055:** threads load without the column and Reply sends a plain message.
+- **Proof:** SQL `zd-message-replies` R1-R3, `a5-blocked-send` column snapshot updated; unit 548 (replyQuote, menu);
+  e2e `message-replies.spec.mjs` MR1-MR4 (20 checks), message-actions, chat-inbox, read-receipts, chat-extras 150,
+  chat-search.
+

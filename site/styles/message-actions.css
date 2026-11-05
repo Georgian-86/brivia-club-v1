@@ -98,3 +98,42 @@ body.app-body .app-view[data-view="chat"] .chat-messages .message.me.is-unsent s
   cursor: pointer;
 }
 .chat-edit-cancel:hover, .chat-edit-cancel:focus-visible { background: var(--color-card-paper); color: var(--color-ink); }
+
+/* D-191 (0055): replies. The quote at the top of a reply (who and a short line; tap to jump to the original), the
+   "Replying to" bar above the composer (the editing bar's look, a reply arrow), and the glow on the original. */
+.chat-messages .message .message-reply-quote {
+  display: grid;
+  gap: 1px;
+  width: 100%;
+  min-width: 0;
+  margin: 0 0 var(--space-2);
+  padding: 6px 10px 7px 11px;
+  border: 0;
+  border-left: 3px solid var(--color-wine);
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--color-wine) 8%, var(--color-card-paper));
+  color: var(--color-ink);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.chat-messages .message .message-reply-quote strong { color: var(--color-wine); font-size: var(--text-12); font-weight: 700; letter-spacing: .02em; }
+.chat-messages .message .message-reply-quote span {
+  display: -webkit-box;
+  overflow: hidden;
+  color: var(--color-ink-soft);
+  font-size: var(--text-12);
+  line-height: 1.35;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+/* My bubbles are wine: the quote sits on a lighter wash with a cream rule. */
+.chat-messages .message.me .message-reply-quote { border-left-color: color-mix(in srgb, var(--color-cream) 85%, transparent); background: color-mix(in srgb, var(--color-cream) 16%, transparent); }
+.chat-messages .message.me .message-reply-quote strong { color: var(--color-cream); }
+.chat-messages .message.me .message-reply-quote span { color: color-mix(in srgb, var(--color-cream) 82%, transparent); }
+.chat-messages .message .message-reply-quote.is-missing, .chat-messages .message .message-reply-quote.is-unsent { cursor: default; font-style: italic; }
+.chat-messages .message .message-reply-quote:focus-visible { outline: 2px solid var(--color-wine-soft); outline-offset: 2px; }
+.chat-messages .message.is-replying-to { box-shadow: 0 0 0 2px var(--color-wine-soft); }
+.chat-messages .message.is-reply-target { animation: message-reply-glow 1.5s ease-out; }
+@keyframes message-reply-glow { 0%, 30% { box-shadow: 0 0 0 3px var(--color-wine-soft), 0 0 22px color-mix(in srgb, var(--color-wine) 35%, transparent); } 100% { box-shadow: 0 0 0 0 transparent; } }
+@media (prefers-reduced-motion: reduce) { .chat-messages .message.is-reply-target { animation: none; box-shadow: 0 0 0 2px var(--color-wine-soft); } }

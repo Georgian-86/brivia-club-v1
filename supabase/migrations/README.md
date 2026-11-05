@@ -1380,3 +1380,10 @@ anywhere, ranked by fit, shared interests and skills, paged; logs an impression 
 Verify: `select count(*) from pg_proc where proname = 'hiring_people';` (1) and
 `select pg_get_function_identity_arguments('public.hiring_people'::regproc);` (`p_limit integer, p_after_score numeric, p_after_id uuid`).
 
+## 0055
+
+**Replies (D-191).** Apply after `0046`, with the client deploy (the client works with or without it). Adds
+`brivia_messages.reply_to_id` (uuid, references brivia_messages, on delete set null) and a before-insert trigger that
+refuses a reply to a message from another conversation. No grant change (members still cannot update messages).
+Verify: `select count(*) from information_schema.columns where table_name = 'brivia_messages' and column_name = 'reply_to_id';` (1).
+

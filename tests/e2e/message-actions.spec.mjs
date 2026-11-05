@@ -1,7 +1,7 @@
 // Edit, unsend and delete for me (D-157, 0046), against stubbed Supabase.
 // PLAYWRIGHT_MODULE=/path/to/playwright/index.mjs node tests/e2e/message-actions.spec.mjs   (Vite on :5175)
-// MA1 a long press (touch, 390 px) on my fresh message opens the menu: Copy, Edit, Unsend, Delete for me; on theirs:
-//     Copy and Delete for me; on my 20-minute-old message no Edit. Escape closes it and focus returns to the bubble.
+// MA1 a long press (touch, 390 px) on my fresh message opens the menu: Reply (D-191), Copy, Edit, Unsend, Delete for me;
+//     on theirs: Reply, Copy and Delete for me; on my 20-minute-old message no Edit. Escape closes it and focus returns to the bubble.
 // MA2 Edit puts the text in the composer with the "Editing message" bar; Send calls edit_message, the bubble shows
 //     the new text and "Edited"; no new message is inserted.
 // MA3 Unsend asks once, then the bubble reads "You unsent a message" and the inbox row says so too.
@@ -61,7 +61,7 @@ try {
   {
     const { ctx, page, errors } = await openThread({ width: 390, height: 844 }, { hasTouch: true, isMobile: true });
     await longPress(page, 3);
-    check('MA1 long press on my fresh message lists Copy, Edit, Unsend, Delete for me', JSON.stringify(await menuItems(page)) === '["Copy","Edit","Unsend","Delete for me"]', JSON.stringify(await menuItems(page)));
+    check('MA1 long press on my fresh message lists Reply, Copy, Edit, Unsend, Delete for me', JSON.stringify(await menuItems(page)) === '["Reply","Copy","Edit","Unsend","Delete for me"]', JSON.stringify(await menuItems(page)));
     const inView = await page.$eval('.message-menu', (el) => { const r = el.getBoundingClientRect(); return r.left >= 0 && r.right <= innerWidth && r.top >= 0 && r.bottom <= innerHeight; });
     check('MA1 the menu stays inside the 390 px screen', inView);
     if (shots) await page.screenshot({ path: `${shots}/menu-390.png` });
@@ -69,10 +69,10 @@ try {
     check('MA1 Escape closes the menu', await page.locator('.message-menu').count() === 0);
     check('MA1 focus returns to the bubble', await page.evaluate(() => document.activeElement?.dataset?.messageId) === id(3));
     await longPress(page, 2);
-    check('MA1 their message: Copy and Delete for me', JSON.stringify(await menuItems(page)) === '["Copy","Delete for me"]', JSON.stringify(await menuItems(page)));
+    check('MA1 their message: Reply, Copy and Delete for me', JSON.stringify(await menuItems(page)) === '["Reply","Copy","Delete for me"]', JSON.stringify(await menuItems(page)));
     await page.keyboard.press('Escape');
     await longPress(page, 1);
-    check('MA1 my 20-minute-old message has no Edit', JSON.stringify(await menuItems(page)) === '["Copy","Unsend","Delete for me"]', JSON.stringify(await menuItems(page)));
+    check('MA1 my 20-minute-old message has no Edit', JSON.stringify(await menuItems(page)) === '["Reply","Copy","Unsend","Delete for me"]', JSON.stringify(await menuItems(page)));
     await page.keyboard.press('Escape');
 
     // MA2
@@ -126,7 +126,7 @@ try {
     const first = await page.evaluate(() => document.activeElement?.textContent?.trim());
     await page.keyboard.press('ArrowDown');
     const second = await page.evaluate(() => document.activeElement?.textContent?.trim());
-    check('MA5 arrows move through the items', first === 'Copy' && second === 'Unsend', `${first} -> ${second}`);
+    check('MA5 arrows move through the items', first === 'Reply' && second === 'Copy', `${first} -> ${second}`);
     await page.waitForTimeout(250); // past the 0.14 s opening animation (it starts at 98% scale)
     const heights = await page.$$eval('.message-menu [role="menuitem"]', (els) => els.map((el) => el.getBoundingClientRect().height));
     check('MA5 every item is at least 44 px tall', heights.every((h) => h >= 44), JSON.stringify(heights));
