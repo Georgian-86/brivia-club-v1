@@ -7,6 +7,9 @@ Update this file at the end of every session. CLAUDE.md holds the aim; this file
 
 ## 1. What is done
 
+**2026-11-05, D-187:** the deck's shuffle wears the founder's mock-up: blush paper cards, a fanned hand behind a framed
+front card reading "Shuffling Your Matches" with pulsing dots, a short hold, then the D-174 riffle and deal.
+
 **2026-11-05, D-186:** the landing intro and the "Opening your club" loading screen are the Brivia ignition, drawn
 live (`brivia-ignition.js`, `ignition.css`) with its own music cue; the blurry 58 kbps intro video is gone.
 

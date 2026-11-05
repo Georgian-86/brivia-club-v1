@@ -22,16 +22,19 @@ const fakeAudio = (log) => {
 };
 const fakeDoc = () => { const l = {}; return { addEventListener: (t, fn) => { (l[t] ||= []).push(fn); }, fire: (t, e = {}) => (l[t] || []).forEach((fn) => fn({ type: t, ...e })) }; };
 
-test('the shuffle is a moment, not a wait: about 3 s in all, the cards dealt by 2.5 s', () => {
+test('the shuffle is a moment, not a wait: under 3.7 s in all, the cards dealt by 3.1 s (D-187 adds a 0.6 s hold)', () => {
   const total = introLength();
-  assert.ok(total > 2.4 && total <= 3.2, `total ${total}`);
+  assert.ok(total > 3 && total <= 3.7, `total ${total}`);
   const dealt = Math.max(...INTRO.layers.map((l) => l.at + l.dur));
-  assert.ok(dealt <= 2.5, `dealt ${dealt}`);
+  assert.ok(dealt <= 3.1, `dealt ${dealt}`);
 });
 
 test('the beats run in order: pack, split, riffle, square, deal', () => {
   const p = INTRO.pack, sp = INTRO.split, r = INTRO.riffle, sq = INTRO.square;
   assert.ok(sp.at >= p.at + p.dur, 'split after the pack has risen');
+  assert.ok(INTRO.gather.at >= p.at + p.dur + 0.3, 'the fanned pack holds long enough to read');
+  assert.ok(sp.at >= INTRO.gather.at + INTRO.gather.dur, 'the fan gathers before the split');
+  assert.equal(INTRO.fan.angles.length, 4, 'two cards fanned each side');
   assert.ok(r.at >= sp.at + sp.dur, 'riffle after the split');
   assert.ok(sq.at >= Math.max(...riffleLandings()) - 0.01, 'square after the last card lands');
   assert.ok(INTRO.layers[0].at >= sq.at + sq.dur, 'deal after the pack is square');
@@ -64,7 +67,7 @@ test('the sound follows the motion: a tick per riffled card, a tap per dealt car
   });
   assert.ok(INTRO_CUE.bells[0].at >= INTRO.land - 0.05 && INTRO_CUE.bells[0].at <= INTRO.land + 0.1, 'bell on the landing');
   const end = Math.max(...INTRO_CUE.bells.map((b) => b.at + b.dur));
-  assert.ok(end < INTRO_CUE.length && INTRO_CUE.length <= 3.6, 'ends with the motion');
+  assert.ok(end < INTRO_CUE.length && INTRO_CUE.length <= 4.2, 'ends with the motion');
   assert.ok(INTRO_CUE.level < 0.7, 'quieter than the swipe cues');
 });
 

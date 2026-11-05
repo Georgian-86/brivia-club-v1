@@ -268,14 +268,14 @@ export const renderCue = (ctx, dest, cue, t0 = 0) => {
 // two-note bell, B-flat up to F (the kit's key), on the landing. Quieter than the swipe cues. Times match
 // deck-intro.js INTRO (unit-tested).
 export const INTRO_CUE = Object.freeze({
-  length: 3.4, level: 0.58,
-  swish: Object.freeze({ at: 0.5, dur: 0.24 }),
-  ticks: Object.freeze([0.97, 1.026, 1.082, 1.138, 1.194, 1.25, 1.306, 1.362]),
-  square: 1.4,
-  taps: Object.freeze([1.72, 1.82, 1.98]),
+  length: 4, level: 0.58,      // D-187: every beat 0.6 s later, after the "Shuffling Your Matches" hold
+  swish: Object.freeze({ at: 1.1, dur: 0.24 }),
+  ticks: Object.freeze([1.57, 1.626, 1.682, 1.738, 1.794, 1.85, 1.906, 1.962]),
+  square: 2.0,
+  taps: Object.freeze([2.32, 2.42, 2.58]),
   bells: Object.freeze([
-    Object.freeze({ midi: 82, at: 2.2, dur: 0.9, gain: 0.2 }),
-    Object.freeze({ midi: 89, at: 2.3, dur: 0.8, gain: 0.14 }),
+    Object.freeze({ midi: 82, at: 2.8, dur: 0.9, gain: 0.2 }),
+    Object.freeze({ midi: 89, at: 2.9, dur: 0.8, gain: 0.14 }),
   ]),
 });
 const noiseBuffer = (ctx, seconds, seed0) => {

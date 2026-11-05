@@ -581,34 +581,70 @@ body.app-body .app-view[data-view="home"] .deck-empty-action { min-height: 44px;
   will-change: transform;
 }
 
-/* D-174: the shuffle's pack (deck-intro.js). Card backs in the top card's place, above the stack, removed when the deal
-   ends: warm paper with a faint wine lattice, a hairline wine frame and the club's wordmark (the founder's logo,
-   source-media/assets/brivia-wordmark-original.png) in the middle. */
+/* D-174 / D-187: the shuffle's pack (deck-intro.js), in the founder's design: pale blush paper cards with soft edges,
+   fanned two each side behind a front card framed in a wine hairline that reads "Shuffling Your Matches" over a
+   two-card icon and three pulsing dots. In the top card's place, above the stack, removed when the deal ends. */
 .app-view[data-view="home"] .swipe-stack .deck-shuffle { position: absolute; z-index: 3; inset: 0; pointer-events: none; }
+.app-view[data-view="home"] .deck-shuffle-hand { position: absolute; inset: 0; }
 .app-view[data-view="home"] .deck-shuffle-card {
   position: absolute;
   inset: 0;
   overflow: hidden;
-  border: 2px solid var(--dk-ink);
-  border-radius: 18px;
-  background:
-    radial-gradient(circle at 50% 46%, color-mix(in srgb, var(--color-gold) 14%, transparent), transparent 48%),
-    var(--color-oxblood);
-  box-shadow: 0 10px 24px var(--dk-line);
+  border: 1px solid color-mix(in srgb, var(--color-wine) 16%, transparent);
+  border-radius: 26px;
+  background: linear-gradient(170deg, #fbf3f1 0%, #f6e9e6 55%, #f1e1de 100%);
+  box-shadow: 0 1px 0 rgb(255 255 255 / .7) inset, 0 18px 40px rgb(94 11 40 / .12), 0 4px 12px rgb(94 11 40 / .08);
   backface-visibility: hidden;
 }
-.app-view[data-view="home"] .deck-shuffle-card::after {
+/* The front card: a wine hairline frame and the words. */
+.app-view[data-view="home"] .deck-shuffle-card.is-face::after {
   position: absolute;
   inset: 12px;
-  border: 1px solid color-mix(in srgb, var(--color-gold) 48%, transparent);
-  border-radius: 12px;
+  border: 1.5px solid color-mix(in srgb, var(--color-wine) 78%, transparent);
+  border-radius: 18px;
   content: '';
 }
-/* D-174: the club wordmark in gold on the wine back (the gold is baked into the image). */
-.app-view[data-view="home"] .deck-shuffle-card::before {
+.app-view[data-view="home"] .deck-shuffle-face {
   position: absolute;
   inset: 0;
-  background: url('../media/assets/brivia-wordmark-gold.webp') center 47% / 62% auto no-repeat;
-  content: '';
+  display: grid;
+  align-content: center;
+  justify-items: center;
+  gap: 18px;
+  padding: 0 28px;
+  text-align: center;
 }
-@media (max-width: 760px) { .app-view[data-view="home"] .deck-shuffle-card { border-radius: 17px; } }
+.app-view[data-view="home"] .deck-shuffle-icon {
+  width: clamp(76px, 7vw, 96px);
+  height: clamp(76px, 7vw, 96px);
+  fill: none;
+  stroke: var(--color-wine);
+  stroke-width: 1.1;
+  stroke-linejoin: round;
+}
+.app-view[data-view="home"] .deck-shuffle-icon .deck-shuffle-icon-front { fill: #f8eeec; }
+.app-view[data-view="home"] .deck-shuffle-title {
+  color: var(--color-name-ink, #241515);
+  font-family: var(--font-heading);
+  font-size: clamp(34px, 3.4vw, 46px);
+  font-weight: 400;
+  line-height: 1.12;
+  letter-spacing: -.01em;
+}
+.app-view[data-view="home"] .deck-shuffle-title em { color: var(--color-wine); font-style: italic; }
+.app-view[data-view="home"] .deck-shuffle-dots { display: flex; gap: 14px; margin-top: 26px; }
+.app-view[data-view="home"] .deck-shuffle-dots i {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--color-wine) 18%, #e9dcda);
+  animation: deck-shuffle-dot .9s ease-in-out infinite;
+}
+.app-view[data-view="home"] .deck-shuffle-dots i:nth-child(2) { animation-delay: .3s; }
+.app-view[data-view="home"] .deck-shuffle-dots i:nth-child(3) { animation-delay: .6s; }
+@keyframes deck-shuffle-dot { 0%, 100% { background: color-mix(in srgb, var(--color-wine) 18%, #e9dcda); } 30% { background: var(--color-wine); } }
+@media (max-width: 760px) {
+  .app-view[data-view="home"] .deck-shuffle-card { border-radius: 22px; }
+  .app-view[data-view="home"] .deck-shuffle-card.is-face::after { inset: 10px; border-radius: 15px; }
+  .app-view[data-view="home"] .deck-shuffle-title { font-size: 34px; }
+}

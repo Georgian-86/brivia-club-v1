@@ -3665,3 +3665,17 @@ solitaire shuffle; D-179's intro deal and D-185's pile-and-flip deal are not use
   sound, sounds, app-shell 214, password-reset, onboarding 269, signup 368 (its one failure, the denied-location city
   list, fails the same without this change). Clean 1080p and phone renders with the music were sent to the founder.
 
+## D-187 (2026-11-05): the shuffle's cards in the founder's design: blush paper, a fanned hand, "Shuffling Your Matches"
+- **Asked:** two mock-ups (phone and desktop): "make the ui of the shuffling cards like this".
+- **Done:** D-174's pack keeps its motion but takes the mock-up's look. The cards are pale blush paper with soft edges
+  and a soft shadow (no wine backs, no wordmark; supersedes D-178's plain wine backs). The pack now rises fanned, two
+  cards each side tucked behind the front card (rotated about their bottom edge), and the front card carries a wine
+  hairline frame, a two-card-and-heart line icon, "Shuffling / Your *Matches*" (Bodoni, Matches in wine italic) and
+  three dots that pulse in turn. It holds 0.4 s so it can be read, the fan gathers and the words fade, then the split,
+  riffle, square and deal run as before, each 0.6 s later; the shuffle sound moves with them (INTRO_CUE). On a phone the
+  hand is shown at 74% while it reads, so the fan stays on screen, and grows back as it gathers. About 3.6 s in all;
+  any tap or key still skips it.
+- **Proof:** unit 546 (deck-intro: the hold is long enough to read, the fan gathers before the split, two cards each
+  side, the cue still on every beat); e2e deck 201, deck-ritual, motion, mobile-polish, deck-tutorial; screenshots at
+  1554x1012 and 390x844 match the mock-ups.
+

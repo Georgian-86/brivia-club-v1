@@ -14,8 +14,9 @@ gsap.ticker.lagSmoothing(100, 33);
 
 // The choreography, in seconds. Unit-tested (tests/unit/deck-intro.test.mjs) so the sound and the motion stay in step.
 // D-174: a solitaire-style shuffle before the deal (founder: "more lengthy and better, kinda like shuffle in
-// solitaire"). Five beats, about 3 s in all, any tap or key skips to the resting stack:
-//   1. pack     a squared pack of card backs rises into the card's place
+// solitaire"). Five beats, about 3.6 s in all, any tap or key skips to the resting stack:
+//   1. pack     the pack rises into the card's place, fanned, the front card reading "Shuffling Your Matches"
+//               (D-187, the founder's design), holds a moment, then gathers square
 //   2. split    it splits into two halves that lean apart
 //   3. riffle   the halves riffle back together, one card at a time, alternating sides (a tick per card)
 //   4. square   the pack is squared up with a small tap
@@ -23,21 +24,25 @@ gsap.ticker.lagSmoothing(100, 33);
 //               member's card flips face up in its place; the stack takes the weight, the gloss crosses, Pass / Pitch rise
 export const INTRO = Object.freeze({
   pack: Object.freeze({ count: 8, at: 0, dur: 0.46, from: Object.freeze({ y: 150, scale: 0.86, rotation: -5 }) }),
-  split: Object.freeze({ at: 0.5, dur: 0.26, x: 36, narrowX: 22, rotation: 7, lift: -12 }),
-  riffle: Object.freeze({ at: 0.8, gap: 0.056, drop: 0.17 }),
-  square: Object.freeze({ at: 1.37, dur: 0.22 }),
+  // D-187: the pack rises fanned (two cards each side, like a hand of cards) under a front card that reads
+  // "Shuffling Your Matches", holds a moment so it can be read, then gathers into a squared pack for the split.
+  fan: Object.freeze({ angles: Object.freeze([-10, 10, -5, 5]), xPercent: Object.freeze([-4, 4, -2, 2]), yPercent: Object.freeze([9, 9, 4.5, 4.5]), scale: 0.93, origin: '50% 100%', narrowScale: 0.74 }),
+  gather: Object.freeze({ at: 0.86, dur: 0.2 }),
+  split: Object.freeze({ at: 1.1, dur: 0.26, x: 36, narrowX: 22, rotation: 7, lift: -12 }),
+  riffle: Object.freeze({ at: 1.4, gap: 0.056, drop: 0.17 }),
+  square: Object.freeze({ at: 1.97, dur: 0.22 }),
   // back, next, top: when each is dealt, where it comes from, how long. The top card flips (rotationY) instead.
   layers: Object.freeze([
-    Object.freeze({ at: 1.62, from: Object.freeze({ x: -26, y: 30, rotation: -5, scale: 0.95 }), dur: 0.52 }),
-    Object.freeze({ at: 1.72, from: Object.freeze({ x: 24, y: 34, rotation: 4, scale: 0.95 }), dur: 0.52 }),
-    Object.freeze({ at: 1.86, from: Object.freeze({ rotationY: -88, scale: 0.97 }), dur: 0.6 }),
+    Object.freeze({ at: 2.22, from: Object.freeze({ x: -26, y: 30, rotation: -5, scale: 0.95 }), dur: 0.52 }),
+    Object.freeze({ at: 2.32, from: Object.freeze({ x: 24, y: 34, rotation: 4, scale: 0.95 }), dur: 0.52 }),
+    Object.freeze({ at: 2.46, from: Object.freeze({ rotationY: -88, scale: 0.97 }), dur: 0.6 }),
   ]),
-  flip: Object.freeze({ at: 1.74, dur: 0.12 }),   // the pack's top card turns edge-on just before the real one turns up
-  packOut: Object.freeze({ at: 1.76, dur: 0.12 }),
-  land: 2.2,         // the top card has visually arrived: the stack takes the weight
+  flip: Object.freeze({ at: 2.34, dur: 0.12 }),   // the pack's top card turns edge-on just before the real one turns up
+  packOut: Object.freeze({ at: 2.36, dur: 0.12 }),
+  land: 2.8,         // the top card has visually arrived: the stack takes the weight
   settle: 0.3,       // the landing's squash and recovery
-  gloss: Object.freeze({ at: 2.26, dur: 0.72 }),
-  controls: Object.freeze({ at: 2.18, dur: 0.44, stagger: 0.06 }),
+  gloss: Object.freeze({ at: 2.86, dur: 0.72 }),
+  controls: Object.freeze({ at: 2.78, dur: 0.44, stagger: 0.06 }),
   reducedFade: 0.15,
 });
 
@@ -78,14 +83,27 @@ const buildPack = (doc, stack, count) => {
   const wrap = doc.createElement('div');
   wrap.className = 'deck-shuffle';
   wrap.setAttribute('aria-hidden', 'true');
+  // The hand: holds the cards, so a phone can show the fanned pack smaller while it reads "Shuffling" (D-187).
+  const hand = doc.createElement('div');
+  hand.className = 'deck-shuffle-hand';
+  wrap.appendChild(hand);
   const cards = Array.from({ length: count }, () => {
     const c = doc.createElement('span');
     c.className = 'deck-shuffle-card';
-    wrap.appendChild(c);
+    hand.appendChild(c);
     return c;
   });
+  // D-187: the front card's face: two cards with a heart, "Shuffling / Your Matches", three dots that pulse in turn.
+  const front = cards[count - 1];
+  front.classList.add('is-face');
+  front.innerHTML = `<span class="deck-shuffle-face"><svg class="deck-shuffle-icon" viewBox="0 0 48 48" aria-hidden="true">`
+    + `<rect x="7" y="9" width="17" height="25" rx="2.5" transform="rotate(-16 15.5 21.5)"/>`
+    + `<rect x="21" y="12" width="17" height="25" rx="2.5" transform="rotate(12 29.5 24.5)" class="deck-shuffle-icon-front"/>`
+    + `<path d="M29.6 28.2c-2.6-1.7-4.2-3.2-4.2-5a2.2 2.2 0 0 1 4.1-1.1 2.2 2.2 0 0 1 4.1 1.1c0 1.8-1.6 3.3-4 5Z" transform="rotate(12 29.5 24.5)"/>`
+    + `</svg><span class="deck-shuffle-title">Shuffling<br />Your <em>Matches</em></span>`
+    + `<span class="deck-shuffle-dots"><i></i><i></i><i></i></span></span>`;
   stack.appendChild(wrap);
-  return { wrap, cards };
+  return { wrap, hand, cards, front };
 };
 
 // playDeckIntro({ stack, card, next, back, controls, reduced, onStart }): runs the timeline; returns { finish }.
@@ -134,10 +152,22 @@ export const playDeckIntro = ({ stack, card, next, back, controls = [], reduced 
       // On a phone the card nearly fills the screen: the halves part less, so they stay on screen.
       const room = (doc.documentElement?.clientWidth || 1000) - (stack.offsetWidth || 0);
       const splitX = room < 120 ? INTRO.split.narrowX : INTRO.split.x;
-      // 1. The pack rises into the card's place (each card a hair above the one under it: a thick, squared pack).
+      // 1. The pack rises into the card's place (each card a hair above the one under it: a thick, squared pack),
+      // the bottom four fanned out behind the front card (D-187).
+      const F = INTRO.fan;
       cards.forEach((c, i) => gsap.set(c, { y: -i * 1.4, zIndex: i }));
+      // On a phone the card nearly fills the screen, so the fanned hand is shown smaller until it gathers.
+      if (room < 120) {
+        gsap.set(pack.hand, { scale: F.narrowScale, transformOrigin: '50% 38%' });
+        tl.to(pack.hand, { scale: 1, duration: INTRO.gather.dur, ease: 'power2.inOut' }, INTRO.gather.at);
+      }
+      F.angles.forEach((angle, i) => gsap.set(cards[i], { rotation: angle, xPercent: F.xPercent[i], yPercent: F.yPercent[i], scale: F.scale, transformOrigin: F.origin }));
       tl.from(wrap, { ...INTRO.pack.from, duration: INTRO.pack.dur, ease: 'power3.out', transformOrigin: '50% 100%', force3D: true, immediateRender: true }, INTRO.pack.at)
         .from(wrap, { opacity: 0, duration: 0.18, ease: 'power1.out', immediateRender: true }, INTRO.pack.at);
+      // 1b. The fan gathers into a squared pack and the face's words fade, ready for the split.
+      tl.to(cards.slice(0, F.angles.length), { rotation: 0, xPercent: 0, yPercent: 0, scale: 1, duration: INTRO.gather.dur, ease: 'power2.inOut' }, INTRO.gather.at)
+        .to(pack.front.querySelector('.deck-shuffle-face'), { opacity: 0, duration: INTRO.gather.dur * 0.8, ease: 'power1.in' }, INTRO.gather.at)
+        .set(cards, { transformOrigin: '50% 50%' }, INTRO.gather.at + INTRO.gather.dur);
       // 2. Split: the two halves lean apart (left half to the left, right half to the right).
       cards.forEach((c, i) => {
         const side = i < half ? -1 : 1;
