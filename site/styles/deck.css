@@ -593,9 +593,7 @@ body.app-body .app-view[data-view="home"] .deck-empty-action { min-height: 44px;
   border-radius: 18px;
   background:
     radial-gradient(circle at 50% 46%, color-mix(in srgb, var(--color-gold) 14%, transparent), transparent 48%),
-    repeating-linear-gradient(45deg, color-mix(in srgb, var(--color-gold) 8%, transparent) 0 1px, transparent 1px 14px),
-    repeating-linear-gradient(-45deg, color-mix(in srgb, var(--color-gold) 8%, transparent) 0 1px, transparent 1px 14px),
-    var(--color-wine-deep);
+    var(--color-oxblood);
   box-shadow: 0 10px 24px var(--dk-line);
   backface-visibility: hidden;
 }
