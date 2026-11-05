@@ -1824,6 +1824,8 @@ const renderHome = (queue = getExplorePeople()) => {
     // D-184: Global hiring discovery ignores distance, so the "distances appear as your area fills up" note is noise there.
     bandNoteEl.hidden = !note || exploreFilters.hiring;
   }
+  const pendingEl = document.querySelector('#swipe-request-pending');
+  if (pendingEl) pendingEl.hidden = !requestPendingFor(currentPerson);
   const tags = document.querySelector('#swipe-tags'); if (tags) { renderCardChips(tags, currentPerson); if (newCardShown) shimmerShared(tags); }
   // D-141: a hirer's bar says HIRING; the role strip shows when the role fits what this member is open to.
   if (hiring?.available()) {
@@ -2251,9 +2253,16 @@ let hiringLifted = false;
 // pool remembers each member's kind ('hiring' | 'open_to') and role title for the card's bar. While the switch is on
 // it refreshes every minute and when the tab returns: new people join the end of the queue, and anyone who closed
 // their role (or is no longer open) leaves it. Nearby is separate and untouched. Before 0054: one page of hirers.
-const hiringPool = { kinds: new Map(), titles: new Map(), after: null, end: false, loading: null, timer: 0 };
+const hiringPool = { kinds: new Map(), titles: new Map(), pending: new Set(), after: null, end: false, loading: null, timer: 0 };
+// D-219: someone the member already sent a request to (hiring_people_v2's request_pending) stays in the hiring deck; a
+// Like on them sends nothing and says the request is pending.
+const requestPendingFor = (person) => Boolean(person?.id) && exploreFilters.hiring && hiringPool.pending.has(String(person.id));
+const REQUEST_PENDING_TEXT = 'Request already pending. They’ll see it in their notifications.';
 const addHiringRows = async (rows, { front = false } = {}) => {
-  rows.forEach((r) => { hiringPool.kinds.set(String(r.id), r.hiring_kind || 'hiring'); hiringPool.titles.set(String(r.id), r.role_title || ''); });
+  rows.forEach((r) => {
+    hiringPool.kinds.set(String(r.id), r.hiring_kind || 'hiring'); hiringPool.titles.set(String(r.id), r.role_title || '');
+    if (r.request_pending === true) hiringPool.pending.add(String(r.id)); else hiringPool.pending.delete(String(r.id));
+  });
   const ids = rows.map((r) => String(r.id)).filter((id) => id !== String(memberProfile.id || '') && !deck.seen.has(id));
   if (!ids.length) return 0;
   const missing = ids.filter((id) => !findPersonById(id));
@@ -2715,6 +2724,8 @@ const swipe = (type, { vx = 0 } = {}) => {
     return false;
   }
   const person = currentPerson;
+  // D-219: a request is already waiting with them: nothing is sent, the card springs back, and the toast says why.
+  if (type === 'like' && requestPendingFor(person)) { showToast(REQUEST_PENDING_TEXT); return false; }
   // A pitch keeps its card on screen (parked right) until the sheet resolves: sent -> it leaves; a failed send ->
   // it springs back. The request is sent when the sheet resolves (submit with a note, or dismiss without one).
   if (type === 'like') {

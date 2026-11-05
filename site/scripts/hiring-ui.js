@@ -548,13 +548,23 @@ export const createHiring = (deps) => {
   // hiring_people: D-184 (0054) pages through everyone hiring or open to roles, anywhere, best fit first
   // ({ rows, end }; after = { score, id } of the last row seen). Before 0054 the D-169 call (200 hirers, one page).
   // null when the RPC is not there yet.
+  // D-219 (0067): hiring_people_v2 also serves members the caller already has a live request to (request_pending);
+  // before 0067 the 0054 call, which leaves them out.
   const PAGE = 30;
   let paged = true;
+  let v2 = true;
   const findPeople = async (after = null) => {
     await boot();
     if (!state.available) return null;
+    const args = { p_limit: PAGE, p_after_score: after?.score ?? null, p_after_id: after?.id ?? null };
+    if (paged && v2) {
+      const { data, error } = await rpc('hiring_people_v2', args);
+      if (!error) return { rows: data || [], end: (data || []).length < PAGE };
+      if (!['PGRST202', '42883'].includes(error.code)) return null;
+      v2 = false;
+    }
     if (paged) {
-      const { data, error } = await rpc('hiring_people', { p_limit: PAGE, p_after_score: after?.score ?? null, p_after_id: after?.id ?? null });
+      const { data, error } = await rpc('hiring_people', args);
       if (!error) return { rows: data || [], end: (data || []).length < PAGE };
       if (!['PGRST202', '42883'].includes(error.code)) return null;
       paged = false;                                   // before 0054: the single-page call

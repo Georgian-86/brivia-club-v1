@@ -35,6 +35,8 @@ const seekerRoutes = () => ({
   'rpc/member_hiring': { body: [...ashaHiring, bilalHiring] },
   'rpc/hiring_suggestions': { body: [{ id: ASHA, fit: 0.86, role_title: 'Frontend Developer', distance_band: '~3 km' }] },
   'rpc/hiring_people': { body: [{ id: ASHA, fit: 0.86, role_title: 'Frontend Developer', distance_band: '~3 km' }, { id: BILAL, fit: 0, role_title: 'Data Analyst', distance_band: '~10 km' }] },
+  // D-219 (0067): v2 also serves Asha, whom this member already sent a request to (request_pending).
+  'rpc/hiring_people_v2': { body: [{ id: ASHA, fit: 0.86, role_title: 'Frontend Developer', distance_band: '~3 km', hiring_kind: 'hiring', score: 0.6, request_pending: true }, { id: BILAL, fit: 0, role_title: 'Data Analyst', distance_band: '~10 km', hiring_kind: 'hiring', score: 0.2, request_pending: false }] },
   'rpc/my_sent_role_asks': { body: [] },
   'rpc/member_open_to': { body: [] },
   'rpc/ask_about_role': { body: [{ status: 'sent', remaining: 29, resets_at: null, asks_left: 2 }] },
@@ -123,7 +125,16 @@ try {
     check(`${w}: on, the switch is wine with a readable label (${JSON.stringify(onLook)})`, onLook.bg !== onLook.color && /^rgb\((\d+), (\d+), (\d+)\)$/.test(onLook.bg) && Number(onLook.bg.match(/\d+/)[0]) < 140 && onLook.label > 20);
     check(`${w}: the toggle turns the drawer's lens on too`, await page.evaluate(() => document.querySelector('#filter-hiring')?.checked === true));
     await page.waitForFunction(() => /^2 people match/.test(document.querySelector('#discovery-filter-result')?.textContent || ''));
-    check(`${w}: the switch searches everyone hiring (hiring_people), fitting roles first, a non-fitting hirer too (${await page.locator('#discovery-filter-result').textContent()})`, callsTo('hiring_people').length === 1 && /Asha/.test(await page.locator('#swipe-name').innerText()));
+    check(`${w}: the switch searches everyone hiring (hiring_people), fitting roles first, a non-fitting hirer too (${await page.locator('#discovery-filter-result').textContent()})`, callsTo('hiring_people_v2').length === 1 && /Asha/.test(await page.locator('#swipe-name').innerText()));
+    // D-219: Asha already has this member's request: her card says so, and a Like sends nothing and says it is pending.
+    check(`${w}: a member with a pending request is in the hiring deck, marked Request pending`, await page.locator('#swipe-request-pending').isVisible());
+    const signalsBefore = callsTo('send_signal').length + callsTo('send_connect_request').length;
+    await page.evaluate(() => document.querySelector('.swipe-like[data-action="like"]')?.click());
+    await page.waitForTimeout(400);
+    const toastText = await page.locator('#app-toast').innerText().catch(() => '');
+    check(`${w}: a Like on them says the request is already pending and sends nothing (${toastText})`, /Request already pending/.test(toastText)
+      && callsTo('send_signal').length + callsTo('send_connect_request').length === signalsBefore
+      && /Asha/.test(await page.locator('#swipe-name').innerText()) && await page.locator('#pitch-modal').isHidden());
     check(`${w}: the deck still never scrolls sideways with the toggle on`, await noSideScroll(page));
     const axeToggle = await axeViolations(page, { include: '[data-view="home"] .home-tools' });
     check(`${w}: the filter button and Hiring switch are axe clean`, axeToggle.length === 0, axeToggle.join(' | '));

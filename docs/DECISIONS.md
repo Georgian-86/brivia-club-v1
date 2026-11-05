@@ -4039,3 +4039,15 @@ new for now").
 - Done: the row wraps instead. The picker and the pill are one group (`.companions-tools`) that stays on the right of
   the first row when it fits and moves together to a second row when it does not. companions-head.spec checks 1080 to
   1920 px for overlaps (it failed at 1080-1366 before the fix).
+
+## D-219 (2026-11-06): members you already sent a request to stay in the hiring deck, marked "Request pending"
+
+- Founder (screenshot, Hiring on, "No one is hiring yet"): people they had already sent requests to are now hiring but
+  did not show; show them anyway, and a re-swipe should say the request is already pending.
+- Found: `hiring_people` (0054) leaves out anyone with a live request from the caller, and anyone they signalled in the
+  last 30 days.
+- Done: 0067 adds `hiring_people_v2`: the same people, order and pages, plus members with a live request from the caller,
+  flagged `request_pending`. A declined or expired request's 30-day pause, connections, passes and blocks are unchanged.
+  The card shows a "Request pending" chip; a Like (button or swipe) sends nothing, the card springs back, and a toast says
+  "Request already pending. They'll see it in their notifications." Pass works as usual. The client falls back to
+  `hiring_people` before 0067.

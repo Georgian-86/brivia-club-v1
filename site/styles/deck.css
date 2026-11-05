@@ -656,3 +656,15 @@ body.app-body .app-view[data-view="home"] .deck-empty-action { min-height: 44px;
   .app-view[data-view="home"] .deck-shuffle-card.is-face::after { inset: 10px; border-radius: 15px; }
   .app-view[data-view="home"] .deck-shuffle-title { font-size: 34px; }
 }
+
+/* D-219: a hiring card for someone the member already sent a request to. */
+body.app-body .app-view[data-view="home"] .swipe-card #swipe-request-pending[hidden] { display: none; }
+body.app-body .app-view[data-view="home"] .swipe-card #swipe-request-pending {
+  display: inline-flex; align-items: center; gap: 6px; width: fit-content; margin: 8px 0 0; padding: 5px 11px;
+  border: 1px solid color-mix(in srgb, var(--color-wine) 28%, transparent); border-radius: var(--radius-pill);
+  background: color-mix(in srgb, var(--color-wine) 8%, var(--color-cream)); color: var(--color-wine);
+  font-family: var(--font-body); font-size: var(--text-12); font-weight: 700; letter-spacing: .02em; line-height: 1.2;
+}
+body.app-body .app-view[data-view="home"] .swipe-card #swipe-request-pending svg {
+  flex: 0 0 13px; width: 13px; height: 13px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round;
+}

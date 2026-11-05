@@ -139,6 +139,25 @@ begin
   reset role;
 end $$;
 
+-- G7 (0067, D-219): a member the caller has a live request to leaves hiring_people (0054) but stays in
+-- hiring_people_v2, flagged request_pending; everyone else is served by v2 with request_pending = false.
+insert into public.connection_requests (from_id, to_id, note) values (pg_temp.gh(1), pg_temp.gh(2), 'hello about your role');
+do $$
+begin
+  if has_function_privilege('anon', 'public.hiring_people_v2(integer, numeric, uuid)', 'execute')
+     or not has_function_privilege('authenticated', 'public.hiring_people_v2(integer, numeric, uuid)', 'execute') then
+    raise exception 'FAIL G7: grants'; end if;
+  set local role authenticated;
+  perform pg_temp.as_member(1);
+  if exists (select 1 from public.hiring_people(30) where id = pg_temp.gh(2)) then raise exception 'FAIL G7: v1 kept a requested member'; end if;
+  if not exists (select 1 from public.hiring_people_v2(30) where id = pg_temp.gh(2) and request_pending) then
+    raise exception 'FAIL G7: v2 does not show the requested member as pending'; end if;
+  if exists (select 1 from public.hiring_people_v2(30) where id <> pg_temp.gh(2) and request_pending) then
+    raise exception 'FAIL G7: someone not requested is marked pending'; end if;
+  reset role;
+end $$;
+select 'zc-global-hiring G7 OK';
+
 -- G6
 update public.brivia_feature set enabled = false where name = 'hiring';
 do $$

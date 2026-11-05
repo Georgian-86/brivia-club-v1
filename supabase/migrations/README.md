@@ -1474,3 +1474,10 @@ Verify: `select has_function_privilege('anon', 'public.search_companies(text,int
 **Unlimited roles, 1000-word descriptions (D-217).** Apply after `0065`, with the client deploy. `hiring_role.about`
 holds up to 8000 characters; `save_hiring_role` accepts up to 1000 words there and no longer caps open roles at 3.
 Verify: `select prosrc not like '%role_cap%' from pg_proc where proname = 'save_hiring_role';` (true).
+
+## 0067
+
+**Pending requests stay in the hiring deck (D-219).** Apply after `0066`, with the client deploy. Adds
+`hiring_people_v2(limit, after_score, after_id)`: 0054's `hiring_people` plus a `request_pending` column; members the
+caller has a live request to are served (flagged) instead of left out. `hiring_people` is unchanged for the older client.
+Verify: `select count(*) from pg_proc where proname = 'hiring_people_v2';` (1).
