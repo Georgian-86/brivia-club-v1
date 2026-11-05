@@ -10,7 +10,6 @@
   backdrop-filter: none !important;
   background-color: color-mix(in srgb, var(--color-cream) 92%, transparent) !important;
 }
-.app-view[data-view="home"] .swipe-hint,
 .app-view[data-view="profile"] .profile-card,
 .community-post-empty {
   -webkit-backdrop-filter: none !important;
@@ -30,3 +29,15 @@
   .app-view.is-entering { animation: app-view-in .24s cubic-bezier(.2, .7, .2, 1) both; }
 }
 @keyframes app-view-in { from { opacity: 0; transform: translate3d(0, 8px, 0); } to { opacity: 1; transform: none; } }
+
+/* The deck's hint: on a phone it sits over the room photo, so a cream fill keeps it readable. */
+.app-view[data-view="home"] .swipe-hint {
+  -webkit-backdrop-filter: none !important;
+  backdrop-filter: none !important;
+  background-color: color-mix(in srgb, var(--color-cream) 88%, transparent) !important;
+}
+/* D-209 (founder: "remove this white highlighted tape below Pass and Pitch"): from 850 px the hint is a caption in the
+   headline column on the page itself, like the headline above it, so it has no fill (it read as a pale strip). */
+@media (min-width: 850px) {
+  .app-view[data-view="home"] .swipe-hint { background-color: transparent !important; }
+}

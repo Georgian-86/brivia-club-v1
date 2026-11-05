@@ -324,7 +324,7 @@ end $$;
 
 -- M8
 do $$
-declare i int; c text;
+declare i int; c text; d uuid;
 begin
   set local role authenticated;
   perform pg_temp.as_member(pg_temp.mv(6));
@@ -336,6 +336,9 @@ begin
   perform public.save_member_event(null, pg_temp.fields(jsonb_build_object('title', 'Far ahead', 'date', to_char((now() at time zone 'Asia/Kolkata')::date + 90, 'YYYY-MM-DD'))), true);
   perform pg_temp.as_member(pg_temp.mv(2));
   if not exists (select 1 from public.list_events(null) where title = 'Far ahead') then raise exception 'FAIL M8: an event 90 days ahead is not listed'; end if;
+  -- D-209 (0062): College Fest is a category, and its tab lists it.
+  d := public.save_member_event(null, pg_temp.fields('{"title": "Yugaantar 26", "category": "college"}'), true);
+  if not exists (select 1 from public.list_events('college') where id = d) then raise exception 'FAIL M8: a College Fest event'; end if;
   reset role;
 end $$;
 

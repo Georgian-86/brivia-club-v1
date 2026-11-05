@@ -3925,3 +3925,14 @@ the page read soft.
   lighter stroke on the title.
 - mobile-polish.spec measures the handset where it now lives and checks the title is within 4 px of it.
 
+## D-209 (2026-11-05): College Fest replaces Chess & Games in the form; no strip behind the deck's hint
+
+Founder: "add an option of College Fest instead of Chess & Games" and "remove this white highlighted tape below this
+Pass and Pitch".
+- **College Fest:** a new category `college` (0062), shown in the create form where Chess & Games was, in Explore's
+  fixed tab row in place of Games, and with the festive cover by default. `games` stays valid: older chess and games
+  events keep their category (an edit keeps it), and the Games tab still appears while such an event is listed.
+- **The hint:** D-195 replaced the hint's blur with a cream fill. On the desktop the hint is a caption on the page in
+  the headline column, where that fill read as a pale strip; from 850 px it has none. On a phone the hint sits over
+  the room photo, where the fill keeps it readable (the deck spec's contrast check), so it stays there.
+

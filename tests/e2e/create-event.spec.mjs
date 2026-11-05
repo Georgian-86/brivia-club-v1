@@ -61,7 +61,9 @@ try {
       const note = document.querySelector('.events-head-note').getBoundingClientRect();
       return Boolean(b.closest('.events-head')) && !b.closest('.events-toolbar') && b.getBoundingClientRect().top >= note.bottom;
     }));
-    check(`${w}: the tabs are the reference nine`, (await page.locator('#event-chips [data-event-category]').count()) === 9);
+    // D-209: the nine fixed tabs now include College Fest; Games is added while games events are listed (these are).
+    check(`${w}: the tabs are the nine fixed ones (with College Fest) plus Games for the listed games events`, (await page.locator('#event-chips [data-event-category]').count()) === 10
+      && await page.locator('#event-chips [data-event-category="college"]').count() === 1 && await page.locator('#event-chips [data-event-category="games"]').count() === 1);
     check(`${w}: the toolbar does not scroll sideways`, await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth));
     await shot(page, `explore-${w}.png`);
 
@@ -93,7 +95,7 @@ try {
     check(`${w}: Other reveals "Your category"`, await page.locator('#ec-customCategory').isVisible());
     await page.fill('#ec-customCategory', 'Book club');
     check(`${w}: the live card shows your own category`, /BOOK CLUB/.test(await page.locator('[data-ec-preview-card] .event-kicker').innerText()));
-    await page.locator('#event-create-dialog .ec-chip:has-text("Chess & Games")').click();
+    await page.locator('#event-create-dialog .ec-chip:has-text("College Fest")').click();   // D-209
     check(`${w}: another category hides it again`, await page.locator('#ec-customCategory').isHidden());
     await page.fill('#ec-description', 'Rapid games, a friendly ladder and good conversation. All levels welcome.');
     await page.locator('#ec-description').press('End');
@@ -202,7 +204,7 @@ try {
     // Live preview card.
     const card = await page.locator('[data-ec-preview-card] .event-card').innerText();
     check(`${w}: the live card shows title, category, time, venue, fee and spots (${JSON.stringify(card)})`,
-      /Bangalore Chess Meetup/.test(card) && /GAMES/.test(card) && /6:00 PM – \w{3} \d{1,2} \w{3}, 5:00 PM/.test(card) && /Battle Chess Skool, Bengaluru/.test(card) && /₹499 · 30 spots left/.test(card));
+      /Bangalore Chess Meetup/.test(card) && /COLLEGE FEST/.test(card) && /6:00 PM – \w{3} \d{1,2} \w{3}, 5:00 PM/.test(card) && /Battle Chess Skool, Bengaluru/.test(card) && /₹499 · 30 spots left/.test(card));
     check(`${w}: the live card uses the poster`, await page.evaluate(() => /^blob:|event-posters/.test(document.querySelector('[data-ec-preview-card] .event-card-media img')?.src || '')));
     await page.locator('[data-ec-preview-card]').scrollIntoViewIfNeeded();
     await shot(page, `create-filled-${w}.png`);
@@ -224,7 +226,7 @@ try {
     const sent = body('save_member_event');
     const f = sent.p_fields || {};
     check(`${w}: Publish sends one save with every field (${JSON.stringify(f).slice(0, 160)}…)`, posted('save_member_event').length === 1 && sent.p_publish === true && sent.p_id === null
-      && f.title === 'Bangalore Chess Meetup' && f.category === 'games' && f.date === ymd(5) && f.start_time === '18:00' && f.end_time === '17:00' && f.end_date === ymd(7)
+      && f.title === 'Bangalore Chess Meetup' && f.category === 'college' && f.date === ymd(5) && f.start_time === '18:00' && f.end_time === '17:00' && f.end_date === ymd(7)
       && f.place_id === 'in-bengaluru' && f.capacity === '30' && f.fee_inr === '499' && /event-posters/.test(f.image_url) && !('pin' in f));
     const br = body('set_event_brochure');
     check(`${w}: the brochure is set on the new event (${JSON.stringify(br)})`, br?.p_id === 'm-1' && /event-brochures\/.+\.pdf$/.test(br?.p_url || ''));

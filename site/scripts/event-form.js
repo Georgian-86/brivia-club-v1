@@ -13,7 +13,7 @@ export const EVENT_FORM_CATEGORIES = Object.freeze([
   { key: 'networking', label: 'Networking' },
   { key: 'music', label: 'Music' },
   { key: 'sports', label: 'Sports' },
-  { key: 'games', label: 'Chess & Games' },
+  { key: 'college', label: 'College Fest' },   // D-209: in place of Chess & Games (games stays valid for older events)
   { key: 'food', label: 'Food & Drinks' },
   { key: 'art', label: 'Art & Culture' },
   { key: 'wellness', label: 'Wellness' },
@@ -27,7 +27,8 @@ export const CATEGORY_ROW = 7;
 // "Other": the organiser's own category name (2 to 24 letters, digits, spaces and & ' / + -).
 export const CUSTOM_CATEGORY = /^[\p{L}\p{N}][\p{L}\p{N} &'/+-]*$/u;
 export const tidyCustomCategory = (value) => String(value || '').trim().replace(/\s+/g, ' ');
-const FORM_KEYS = new Set(EVENT_FORM_CATEGORIES.map((c) => c.key));
+// D-209: 'games' is no longer offered, but an older Chess & Games event keeps its category when it is edited.
+const FORM_KEYS = new Set([...EVENT_FORM_CATEGORIES.map((c) => c.key), 'games']);
 
 export const LIMITS = Object.freeze({
   title: 80, description: 2000, descriptionMin: 20, venueName: 120, venueAddress: 240, capacityMax: 5000, feeMax: 100000,

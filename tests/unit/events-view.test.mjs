@@ -16,7 +16,7 @@ const row = {
 };
 
 test('categories: All first, then the mockup order, plus Culture, then the create form\'s others (D-121)', () => {
-  assert.deepEqual(EVENT_CATEGORIES.map((c) => c.label), ['All', 'Tech', 'Music', 'Sports', 'Food', 'Art', 'Games', 'Networking', 'Culture',
+  assert.deepEqual(EVENT_CATEGORIES.map((c) => c.label), ['All', 'Tech', 'Music', 'Sports', 'Food', 'Art', 'College Fest', 'Games', 'Networking', 'Culture',
     'Startups', 'Wellness', 'Outdoors', 'Learning', 'Workshops', 'Community', 'Other']);
   assert.ok(isEventCategory('music'));
   assert.ok(!isEventCategory('<script>'));
@@ -218,7 +218,7 @@ test('companion row mentions shared goals when interests do not overlap; the que
 
 test('tabs: the reference nine always; a new category only while an event uses it', async () => {
   const { visibleCategories } = await import('../../site/scripts/events-view.js');
-  assert.deepEqual(visibleCategories([]).map((c) => c.key), ['all', 'tech', 'music', 'sports', 'food', 'art', 'games', 'networking', 'culture']);
+  assert.deepEqual(visibleCategories([]).map((c) => c.key), ['all', 'tech', 'music', 'sports', 'food', 'art', 'college', 'networking', 'culture']);
   assert.deepEqual(visibleCategories([{ category: 'workshops' }]).map((c) => c.key).slice(-1), ['workshops']);
   assert.ok(visibleCategories([], 'education').some((c) => c.key === 'education'), 'the selected tab never vanishes');
 });

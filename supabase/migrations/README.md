@@ -1437,3 +1437,9 @@ Verify: `select count(*) from pg_trigger where tgname = 'event_rsvp_notify';` (1
 (`event_limit`), and `list_events` without its 80-row cap and its 60-day window. Grants unchanged.
 Verify: `select prosrc not like '%event_limit%' from pg_proc where proname = 'save_member_event';` (true).
 
+## 0062
+
+**College Fest (D-209).** Apply after `0061`, with the client deploy. Adds the event category `college` to
+`club_event_category_check` and to `save_member_event`'s list (otherwise 0061's). `games` stays valid.
+Verify: `select pg_get_constraintdef(oid) like '%college%' from pg_constraint where conname = 'club_event_category_check';` (true).
+

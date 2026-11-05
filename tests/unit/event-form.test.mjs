@@ -14,7 +14,7 @@ const good = () => ({
 });
 
 test('fourteen categories, two rows of seven, Other last', () => {
-  assert.deepEqual(EVENT_FORM_CATEGORIES.map((c) => c.label), ['Tech', 'Startups', 'Networking', 'Music', 'Sports', 'Chess & Games', 'Food & Drinks',
+  assert.deepEqual(EVENT_FORM_CATEGORIES.map((c) => c.label), ['Tech', 'Startups', 'Networking', 'Music', 'Sports', 'College Fest', 'Food & Drinks',
     'Art & Culture', 'Wellness', 'Outdoors', 'Learning', 'Workshops', 'Community', 'Other']);
 });
 

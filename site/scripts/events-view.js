@@ -12,6 +12,7 @@ export const EVENT_CATEGORIES = Object.freeze([
   { key: 'sports', label: 'Sports' },
   { key: 'food', label: 'Food' },
   { key: 'art', label: 'Art' },
+  { key: 'college', label: 'College Fest' },   // D-209
   { key: 'games', label: 'Games' },
   { key: 'networking', label: 'Networking' },
   { key: 'culture', label: 'Culture' },
@@ -28,7 +29,8 @@ const CATEGORY_KEYS = new Set(EVENT_CATEGORIES.map((c) => c.key));
 export const isEventCategory = (key) => CATEGORY_KEYS.has(String(key || ''));
 // The tabs Explore always shows (the founder's reference); the create form's other categories get a tab only while an
 // event in them is listed (D-121), so the row stays as designed.
-export const BASE_CATEGORY_KEYS = Object.freeze(['all', 'tech', 'music', 'sports', 'food', 'art', 'games', 'networking', 'culture']);
+// D-209: College Fest takes Games' place in the fixed row; Games still shows while a games event is listed.
+export const BASE_CATEGORY_KEYS = Object.freeze(['all', 'tech', 'music', 'sports', 'food', 'art', 'college', 'networking', 'culture']);
 export const visibleCategories = (events = [], current = 'all') => {
   const used = new Set(events.map((e) => e.category));
   return EVENT_CATEGORIES.filter((c) => BASE_CATEGORY_KEYS.includes(c.key) || used.has(c.key) || c.key === current);
