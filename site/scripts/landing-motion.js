@@ -4,10 +4,11 @@
 // D-190 / D-196: the founder asked for the intro to stay 5-6 s, until The Brivia Club is fully on screen and has held:
 // the drawn ignition runs 4.2 s, the name holds, and the landing fades in from INTRO_HOLD_MS. The cap counts from
 // navigation start and only cuts in if the page itself was slow to start.
-// D-201 (founder: "must be of 5 secs only"): the name is complete at 2.67 s and holds; the landing starts fading in at
-// 4.5 s and the intro is gone at 5.0 s (the 500 ms fade). The cap is also 5.0 s.
-export const INTRO_HOLD_MS = 4500;
-export const INTRO_CAP_MS = 5000;
+// D-201 (founder: "must be of 5 secs only"), then D-210 ("reduce the intro a little"): the name is complete at 2.67 s
+// and holds for about a second; the landing starts fading in at 3.5 s and the intro is gone at 4.0 s (the 500 ms fade).
+// The cap is also 4.0 s.
+export const INTRO_HOLD_MS = 3500;
+export const INTRO_CAP_MS = 4000;
 export const INTRO_START_GRACE_MS = 800;
 
 // Posters only (no video requests) for reduced-motion and save-data visitors, and on a 2g link where the 4K hero (D-062)

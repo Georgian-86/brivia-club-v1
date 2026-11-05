@@ -3936,3 +3936,9 @@ Pass and Pitch".
   the headline column, where that fill read as a pale strip; from 850 px it has none. On a phone the hint sits over
   the room photo, where the fill keeps it readable (the deck spec's contrast check), so it stays there.
 
+## D-210 (2026-11-05): the intro lasts 4 seconds
+
+Founder: "reduce the intro video before landing page a little". Supersedes D-201's 5 s. THE BRIVIA CLUB is complete at
+2.67 s and now holds for about a second; the landing starts fading in at 3.5 s (`INTRO_HOLD_MS`) and the intro is gone
+at 4.0 s, also the cap (`INTRO_CAP_MS`). Measured: gone at 3.96-3.98 s at 375 and 1440 px.
+
