@@ -39,7 +39,7 @@ test('the markup: one letter span per character, centre first, aria-hidden, no v
   const landing = readFileSync(new URL('../../site/index.html', import.meta.url), 'utf8');
   assert.ok(landing.includes(html), 'the landing carries the title');
   assert.doesNotMatch(landing, /intro-video/, 'the landing has no intro video');
-  // D-211: the sign-in loading screen is the D-088 "Opening your club" splash again, not the ignition.
+  // D-212: the sign-in loading screen is the D-088 "Opening your club" splash again, not the ignition.
   ['site/app.html', 'site/auth.html'].forEach((page) => {
     const text = readFileSync(new URL(`../../${page}`, import.meta.url), 'utf8');
     assert.ok(!text.includes('class="ignition"'), `${page} has no ignition`);

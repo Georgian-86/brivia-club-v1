@@ -152,68 +152,70 @@ an invented profile (D-156). Men's and women's profiles get photos that match; t
 photos; "Prefer not to say" and t61-t68 get neutral ones. Each is cropped to 480 px WebP in `site/public/test-avatars/`
 and was checked by eye for faces. File names are unchanged, so a deploy is all it takes (no SQL).
 
-Source URL: `https://images.unsplash.com/<photo>`. The purge script clears them with the profiles.
+D-211 turned 25 of them into pets (dogs, cats) and instruments (guitar, piano, violin, tabla), matched to the member's
+interests where one fits. Source URL: `https://images.unsplash.com/<photo>`; a `page <slug>` entry is
+`https://unsplash.com/photos/<slug>`. The purge script clears them with the profiles.
 
 | File | Unsplash photo | Shows |
 |---|---|---|
 | t01 | photo-1785663292283-04a0e6a3bb19 | Mirror selfie, camera over the face |
-| t02 | photo-1781165804627-9eb1486c40ce | Seen from behind over the city at dusk |
+| t02 | photo-1647975647816-5d3ff813e404 | Hand forming a chord on a guitar |
 | t03 | photo-1789981552903-504c5a33169c | White hoodie above the hills |
 | t04 | photo-1747374373804-df8fa149716e | Mirror selfie, camera over the face |
 | t05 | photo-1569291364147-60a038bda755 | Seen from behind over the city |
 | t06 | photo-1768295984707-64ab37e539dd | Latte beside a keyboard on a white desk |
 | t07 | photo-1743109811511-dbd694fb3457 | City skyline at night |
 | t08 | photo-1785474445369-409f6acec42b | Laptop and coffee on a monochrome desk |
-| t09 | photo-1757835777871-99894b28b001 | Red hoodie walking into mist |
-| t10 | photo-1782061817103-f8468fe4bdd6 | Seen from behind by a radio tower |
+| t09 | photo-1530281700549-e82e7bf110d6 | Dog running out of the sea |
+| t10 | photo-1761472082698-3d51618aeb45 | Hand on an acoustic guitar's frets |
 | t11 | photo-1689467909244-631e55404336 | Seen from behind, working at two screens |
-| t12 | photo-1660421716577-c3ef88a85431 | Seen from behind at a pink sunset |
+| t12 | photo-1774979517562-9b47c3761c71 | Cat sitting on a wooden counter |
 | t13 | photo-1673442981926-fefc73d04878 | Laptop, tablet and coffee on a marble desk |
-| t14 | photo-1637175541493-6a6506fc08c0 | Round car mirror reflection |
+| t14 | photo-1704122873190-e92f977f78aa | Fluffy cat curled on a cushion |
 | t15 | photo-1657256794209-0daf23db892b | Silhouette against a violet sunset |
 | t16 | photo-1786152532472-caec53399382 | Seen from behind on a rooftop |
 | t17 | photo-1783244725627-6a2ce2815451 | Camera held over the face |
 | t18 | photo-1497032628192-86f99bcd76bc | Desk from above: laptop, coffee, notebook |
 | t19 | photo-1606055413678-7561ef89bbbc | Walking a road, seen from behind |
-| t20 | photo-1765953288011-8d405b2c611d | Silhouette at a sunset lake |
+| t20 | photo-1582456891925-a53965520520 | Pomeranian on the steps |
 | t21 | photo-1600753575717-9e38cce25f3c | Red top on a forest path |
-| t22 | photo-1764476751150-652d9bd827bd | Taking a photo of a city skyline |
-| t23 | photo-1763568258257-1e70fcf7b629 | Laptop, notebook and plant on a wooden desk |
-| t24 | photo-1500934550294-7f7f731ca2df | Seen from behind by a city skyline |
+| t22 | photo-1778585041100-507f3eafe63f | Hands on piano keys |
+| t23 | photo-1741229395001-6d8d2a97f05e | Fingers on a guitar neck in low light |
+| t24 | photo-1768198566500-9ec0160d88ec | Fluffy cat on a sofa by a window |
 | t25 | photo-1750322769212-fb7750247387 | Latte art beside a laptop |
 | t26 | photo-1630532852017-9b14723a72c5 | Laptop and iced coffee by a window |
-| t27 | photo-1522051654488-d1452aaa0ae8 | Hair in the wind above the city |
+| t27 | photo-1510771463146-e89e6e86560e | Golden retriever holding a flower |
 | t28 | photo-1780545311196-f8b507b08b94 | Silhouette in golden light |
-| t29 | photo-1637946377734-196461199419 | Silhouette in the mountains at dusk |
+| t29 | page hand-holding-violin-bow-and-strings-YqSVAieps84 | Hand on a violin and bow |
 | t30 | photo-1711419398242-d8ca79c6e9c1 | Silhouette at sunset by the water |
 | t31 | photo-1479502806991-251c94be6b15 | Seen from behind on a city rooftop |
 | t32 | photo-1722934181894-eb1323604b84 | Walking a park path, seen from behind |
 | t33 | photo-1783746893555-9367486518ec | Sun hat, overlooking the city |
 | t34 | photo-1688158307264-c949b2d68ffe | Coffee and a leather wallet on a desk |
-| t35 | photo-1774325301564-736a5196e467 | White cap, overlooking a city road |
+| t35 | photo-1772982822877-4cd058eea507 | Brown cat by a window |
 | t36 | photo-1773561213080-cf7b71cda100 | Silhouette with the sun at hand height |
-| t37 | photo-1776792089618-d1509d0fb38f | Seen from behind by a tower at dusk |
+| t37 | page a-close-up-of-a-person-playing-a-violin-KGGsJI6r-0U | Violin and bow, close |
 | t38 | photo-1634826833404-b51e7ddcc3b0 | Mirror selfie in a dark doorway |
-| t39 | photo-1640350410217-caf204697bb7 | Hands photographing city lights |
+| t39 | photo-1568219656418-15c329312bf1 | Hand on a tabla |
 | t40 | photo-1519639715757-0c88449f9048 | Laptop at a window desk |
 | t41 | photo-1753272363249-d9bd81d80f89 | Silhouette at a sunset balcony |
-| t42 | photo-1519445319698-eed4e883433f | Laptop, red mug and earbuds on a dark desk |
-| t43 | photo-1557938187-af371ef22476 | Silhouette at a misty window |
-| t44 | photo-1769373087942-9a9d383ac76a | Silhouette at sunset, face in shadow |
-| t45 | photo-1757883904576-9f2ff8f6a829 | Seen from behind over city lights |
+| t42 | photo-1633411988188-6e63354a9019 | Hands on a tabla |
+| t43 | photo-1772714037381-cf6a20be3152 | Tabby cat beside a potted plant |
+| t44 | photo-1570797803365-c6eb43b1f040 | Hands playing a tabla pair |
+| t45 | page a-person-holding-a-violin-ya6PWTtPlkw | Fingers on violin strings |
 | t46 | photo-1761934798152-bf0c739808f7 | Back of the head at night |
 | t47 | photo-1586149663840-3d4dc1b6c681 | Seen from behind in black and white |
 | t48 | photo-1779081764094-150614ee6371 | Silhouette on the shore at sunset |
-| t49 | photo-1748674600938-c1f5938037d9 | Silhouette at a city window |
+| t49 | photo-1760146933340-d7697ffb0fd6 | Hands at a grand piano |
 | t50 | photo-1654686474914-bb98f6280d10 | Hands on a laptop by a window |
-| t51 | photo-1672412201014-d669c3461d1f | Plaid shirt walking a misty road |
+| t51 | photo-1589666629225-750e2f7875f5 | Fingers on piano keys, close |
 | t52 | photo-1638029351298-6f5966e8754c | Orange hoodie in a garden |
-| t53 | photo-1725668321489-6235729263ba | Silhouette on a beach at sunset |
+| t53 | photo-1758748930304-4f2735578156 | Black and white cat on a windowsill |
 | t54 | photo-1751554827598-c96cb294c0e6 | Car mirror selfie with a camera |
-| t55 | photo-1752414284741-fe0883899553 | Small figure on a golden shore |
-| t56 | photo-1699259161877-9baf909bf1b7 | Hooded, seen from behind in the rain |
-| t57 | photo-1663079068226-6c303a769e0c | Silhouette at sunset over a lake |
-| t58 | photo-1671735551338-91362fb79a28 | Car mirror selfie at golden hour |
+| t55 | photo-1776729870224-36f0bf5c2cda | Tabby cat at a window |
+| t56 | photo-1518020382113-a7e8fc38eac9 | Pug in a denim jacket |
+| t57 | photo-1743506444917-38047eabb60a | Black and white dog |
+| t58 | photo-1516366434321-728a48e6b7bf | Golden dog resting its chin |
 | t59 | photo-1778945469600-bef900cec017 | Small figure under a dramatic sky |
 | t60 | photo-1642789009978-209023f28a5d | Phone held up at night |
 | t61 | photo-1724390409130-20e9b8ddf921 | Phone held up, taking a photo |
