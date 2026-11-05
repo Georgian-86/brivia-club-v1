@@ -7,6 +7,10 @@ Update this file at the end of every session. CLAUDE.md holds the aim; this file
 
 ## 1. What is done
 
+**2026-11-06, D-218 and D-219 (live):** the Companions header wraps instead of overlapping in narrower windows (D-218);
+0067 applied: members you already sent a request to stay in the hiring deck with "Request pending", and a Like on them
+sends nothing and says so (D-219, hiring_people_v2).
+
 **2026-11-06, D-213 to D-217 (live):** migrations 0063-0066 applied, `directory` Edge Function v6, client deployed
 (main 76bd215). The intro is 4 s (D-213); connections who want company show first in Companions with "Text them · Make
 a plan" (D-214, 0063); opening a chat or the Chats tab clears message notifications on every device, and the Hiring
