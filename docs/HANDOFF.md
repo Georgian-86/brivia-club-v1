@@ -13,11 +13,11 @@ live (`brivia-ignition.js`, `ignition.css`) with its own music cue; the blurry 5
 **2026-11-04, D-184:** Global Hiring Discovery: the Connect Hiring switch shows everyone, anywhere, who is hiring or
 open to roles, ranked by fit + shared interests + skills (not distance), paged, refreshed live, with a "Global hiring
 discovery" label (migration 0054). Fixes the once-per-session hiring load and unstored passes on hiring cards.
-**Owed: apply 0054 with the client deploy** (README "0054").
+Live 2026-11-05: client deployed, 0054 applied and checked (the founder's account gets 5 hirers by score, no distances).
 
 **2026-11-04, D-183:** paid events take payment with Razorpay (order, verify, webhook; refunds a lost seat) and every
 confirmed seat gets an emailed invitation ticket via Resend (with a calendar invite) and a ticket sound. **Owed: the
-founder's Resend domain + key and Razorpay keys + webhook (migrations README "0053"), then apply 0053 and deploy the four
+founder's Resend domain + key and Razorpay keys + webhook (migrations README "0053"), then deploy the four
 functions (razorpay-webhook with JWT verification off), and a test-mode payment.** Until then Reserve holds the seat
 and says payment opens soon.
 

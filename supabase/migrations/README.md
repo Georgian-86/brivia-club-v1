@@ -1348,7 +1348,7 @@ their own folder. Then re-run `supabase/seed/hiring-test-members.sql`, which set
 
 ## 0053
 
-**Razorpay payments and emailed tickets (D-183).** Not applied yet. Apply after `0050`.
+**Razorpay payments and emailed tickets (D-183).** Applied 2026-11-05 (the functions and secrets are still owed). Apply after `0050`.
 Adds `event_rsvp.payment_order_id`, `ticket_code` (BRV-XXXXXX) and `ticket_sent_at`, with a unique index on each of the
 first two. Members still have no direct access to `event_rsvp` (RLS on, no policy); four Edge Functions do the work with
 the service role. Apply with the client deploy; until the functions and secrets are in, Reserve keeps the 30-minute
@@ -1372,7 +1372,7 @@ Verify: `select column_name from information_schema.columns where table_name = '
 
 ## 0054
 
-**Global Hiring Discovery (D-184).** Not applied yet. Apply after `0050` (independent of `0053`), with the client
+**Global Hiring Discovery (D-184).** Applied 2026-11-05. Apply after `0050` (independent of `0053`), with the client
 deploy (the new client falls back to the old call until it is in; the old client still reads the new answer).
 Replaces `hiring_people` with `hiring_people(int, numeric, uuid)`: members with a shown role and members open to roles,
 anywhere, ranked by fit, shared interests and skills, paged; logs an impression per row (surface `hiring`). Grant:
