@@ -22,6 +22,7 @@ gsap.ticker.lagSmoothing(100, 33);
 //   4. square   the pack is squared up with a small tap
 //   5. deal     the back two cards slide out behind it to their places, the pack's top card turns edge-on and the
 //               member's card flips face up in its place; the stack takes the weight, the gloss crosses, Pass / Pitch rise
+export const INTRO_PERSPECTIVE = 1200;   // px; the 3D depth of the turning cards (set once, never tweened)
 export const INTRO = Object.freeze({
   pack: Object.freeze({ count: 8, at: 0, dur: 0.46, from: Object.freeze({ y: 150, scale: 0.86, rotation: -5 }) }),
   // D-187: the pack rises fanned (two cards each side, like a hand of cards) under a front card that reads
@@ -202,19 +203,24 @@ export const playDeckIntro = ({ stack, card, next, back, controls = [], reduced 
         .to(wrap, { scaleX: 1, scaleY: 1, duration: INTRO.square.dur * 0.65, ease: 'power3.out' }, INTRO.square.at + INTRO.square.dur * 0.35);
       // 5. The pack's top card turns edge-on (the member's card finishes the turn), and the rest of the pack goes.
       const last = cards[riffleOrder().at(-1).card];
-      tl.to(last, { rotationY: 88, transformPerspective: 1200, duration: INTRO.flip.dur, ease: 'power1.in' }, INTRO.flip.at)
+      // D-205: the perspective is set, not tweened (tweened, it grew from nothing and warped the start of the turn).
+      gsap.set(last, { transformPerspective: INTRO_PERSPECTIVE });
+      tl.to(last, { rotationY: 88, duration: INTRO.flip.dur, ease: 'power1.in' }, INTRO.flip.at)
         .to(cards.filter((c) => c !== last), { opacity: 0, duration: INTRO.packOut.dur, ease: 'power1.in' }, INTRO.packOut.at)
         .set(wrap, { autoAlpha: 0 }, INTRO.flip.at + INTRO.flip.dur);
     }
     layers.forEach(({ el, spec }, i) => {
       const top = i === layers.length - 1;
+      // D-205: the top card's perspective is fixed for the whole turn. Inside the from() it was tweened with the angle,
+      // from 1200 px down to none: near the end the perspective was a few pixels, which blew a 3-degree angle up into a
+      // steep tilt that held, then snapped flat when both reached zero. That was the card "getting stuck".
+      if (top) gsap.set(el, { transformPerspective: INTRO_PERSPECTIVE });
       tl.from(el, {
         ...spec.from,
         duration: spec.dur,
         // D-205: the top card turns with no overshoot (back.out swung it past flat and back, a lurch at the end).
         ease: 'power3.out',
         transformOrigin: top ? '50% 50%' : '50% 100%',
-        transformPerspective: top ? 1200 : 0,
         force3D: true,
         immediateRender: true,
       }, spec.at);

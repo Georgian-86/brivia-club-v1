@@ -117,3 +117,13 @@ test('the shuffling hand is smaller than the card, then grows into place before 
   assert.equal(handScaleFor({ width: 900 }), HAND.min, 'never tiny');
   assert.ok(INTRO.square.at + INTRO.square.dur <= INTRO.layers[0].at + 0.01, 'full size by the deal');
 });
+
+test('D-205: no turn tweens its perspective (tweened, it warped a small angle into a steep, held tilt)', async () => {
+  const { readFileSync } = await import('node:fs');
+  for (const file of ['deck-intro.js', 'motion-moments.js']) {
+    const src = readFileSync(new URL(`../../site/scripts/${file}`, import.meta.url), 'utf8');
+    const tweens = [...src.matchAll(/\b(?:tl|gsap)\.(?:to|from|fromTo)\(([\s\S]*?)\)(?:[,;\n]|\s*\.)/g)].map((m) => m[1]);
+    assert.ok(tweens.length > 0, `${file} has tweens`);
+    assert.ok(tweens.every((t) => !/transformPerspective/.test(t)), `${file}: transformPerspective only in gsap.set`);
+  }
+});

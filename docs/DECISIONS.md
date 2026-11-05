@@ -3883,6 +3883,13 @@ Frame by frame, the member's card appeared tilted mid-turn, held there for about
   before the end of the timeline snapped it straight. It now eases out (power3.out) with no overshoot.
 Measured on a phone-sized page with the CPU slowed 4x: before, the angle sat at 1-2 degrees for up to 20 frames and then
 jumped to flat; after, it eases 88 -> 0 continuously. Timings are unchanged (the deal still ends by 3.1 s).
+- **The real cause (found by rendering the turn frame by frame at 60 fps):** `transformPerspective: 1200` sat inside the
+  same `from()` as the rotation, so GSAP tweened the perspective from 1200 px down to none along with the angle. Near the
+  end the perspective was 42 px, then 6 px: a 3-degree angle drawn with a 6 px perspective is a steep tilt. So the card
+  looked held at a steep angle for about a quarter of a second, then snapped flat when both reached zero, on every
+  device. The perspective is now set once (`INTRO_PERSPECTIVE`) and only the angle moves. The pack card's turn and the
+  caught-up box (motion-moments.js flipIn) had the same mistake and are fixed the same way; a unit test keeps
+  transformPerspective out of every tween.
 
 ## D-206 (2026-11-05): Share on an event offers Copy link
 

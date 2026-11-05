@@ -189,7 +189,10 @@ export const pitchSentFlight = ({ from, to, doc = globalThis.document, reduced =
 export const flipIn = (el, { reduced = prefersReduced() } = {}) => {
   if (!el) return null;
   if (reduced) return gsap.from(el, { opacity: 0, duration: 0.15, clearProps: 'opacity' });
-  return gsap.from(el, { rotationY: -78, transformPerspective: 1000, transformOrigin: '50% 50%', opacity: 0, scale: 0.96, duration: MOMENTS.flip, ease: 'power3.out', clearProps: 'transform,opacity' });
+  // D-205: the perspective is set once, not tweened (tweened inside from() it fell to a few pixels near the end and
+  // warped a small angle into a steep tilt, then snapped flat).
+  gsap.set(el, { transformPerspective: 1000 });
+  return gsap.from(el, { rotationY: -78, transformOrigin: '50% 50%', opacity: 0, scale: 0.96, duration: MOMENTS.flip, ease: 'power3.out', clearProps: 'transform,opacity' });
 };
 
 // N5. Desktop only (a fine pointer that can hover). Never while dragging, during the intro, or under reduced motion.
