@@ -4030,3 +4030,12 @@ new for now").
 - Done: 0066 drops the 3-open-roles cap from `save_hiring_role` and lets "A line about it" hold up to 1000 words (at
   most 8000 characters, so one "word" cannot be a wall of text); still no links or contact details. The sheet says
   "Hiring · Role N", counts "N / 1000 words", and the profile card always offers "Add a role" ("N roles").
+
+## D-218 (2026-11-06): the Companions header never overlaps
+
+- Founder (screenshot, a narrower window): the header's text overlapped. From 1080 px the title, the note, the event
+  picker and the "N looking for a companion" pill sat in one grid row that needs about 1,600 px; narrower, the note's
+  column shrank under the picker.
+- Done: the row wraps instead. The picker and the pill are one group (`.companions-tools`) that stays on the right of
+  the first row when it fits and moves together to a second row when it does not. companions-head.spec checks 1080 to
+  1920 px for overlaps (it failed at 1080-1366 before the fix).

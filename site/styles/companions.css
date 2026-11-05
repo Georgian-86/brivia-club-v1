@@ -42,6 +42,8 @@ body.app-body .companion-picker select:focus-visible { outline: none; }
 .companion-picker-chevron { position: absolute; right: var(--space-4); pointer-events: none; }
 .companions-count { display: inline-flex; align-items: center; gap: var(--space-3); min-height: 48px; margin: 0; padding: 6px var(--space-5) 6px 8px; border-radius: var(--radius-pill); background: color-mix(in srgb, var(--cp-paper) 78%, transparent); color: var(--cp-wine); font-size: var(--text-14); font-weight: 600; box-shadow: 0 6px 16px -12px color-mix(in srgb, var(--cp-wine-deep) 50%, transparent); }
 .companions-count[hidden] { display: none; }
+/* D-218: the event picker and the count stay together, and wrap together. */
+.companions-tools { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-3); min-width: 0; }
 .companion-faces { display: inline-flex; }
 .companion-face { display: grid; place-items: center; width: 30px; height: 30px; margin-left: -10px; overflow: hidden; border: 2px solid var(--cp-paper); border-radius: 50%; background: color-mix(in srgb, var(--cp-wine) 20%, var(--cp-paper)); color: var(--cp-wine-deep); font-size: var(--text-12); font-weight: 700; }
 .companion-face:first-child { margin-left: 0; }
@@ -129,10 +131,12 @@ body.app-body .companion-match-dialog .event-btn-primary { background: var(--cp-
 .notification-companion { display: flex; align-items: center; gap: var(--space-3); padding: var(--space-3) var(--space-4); border-bottom: 1px solid var(--color-line); background: color-mix(in srgb, var(--color-wine) 6%, transparent); }
 
 @media (min-width: 1080px) {
-  .companions-head { grid-template-columns: auto minmax(0, auto) 1fr auto; column-gap: var(--space-5); }
-  .companions-note { width: 230px; padding-left: var(--space-5); border-left: 1px solid var(--cp-line); }
-  .companion-picker { justify-self: end; }
-  .companions-count { justify-self: end; }
+  /* D-218: one row when everything fits; otherwise the event picker and the count wrap to a second row (they overlapped
+     the note in a narrower window). Nothing shrinks under anything else. */
+  .companions-head { display: flex; flex-wrap: wrap; align-items: center; column-gap: var(--space-5); row-gap: var(--space-4); }
+  .companions-head > div:first-child { flex: 0 0 auto; }
+  .companions-note { flex: 0 0 230px; width: 230px; padding-left: var(--space-5); border-left: 1px solid var(--cp-line); }
+  .companions-tools { flex: 0 1 auto; margin-left: auto; justify-content: flex-end; }
 }
 @media (max-width: 1079px) {
   .companion-row { grid-template-columns: minmax(0, 380px); }
