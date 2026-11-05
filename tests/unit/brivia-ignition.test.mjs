@@ -36,10 +36,14 @@ test('the markup: one letter span per character, centre first, aria-hidden, no v
   assert.equal(Math.min(...letters.map((l) => l.d)), 0, 'a centre letter');
   assert.ok(letters.filter((l) => l.d === 0).every((l) => l.s === 0));
   assert.doesNotMatch(html, /<video|<img/);
-  ['site/index.html', 'site/app.html', 'site/auth.html'].forEach((page) => {
+  const landing = readFileSync(new URL('../../site/index.html', import.meta.url), 'utf8');
+  assert.ok(landing.includes(html), 'the landing carries the title');
+  assert.doesNotMatch(landing, /intro-video/, 'the landing has no intro video');
+  // D-211: the sign-in loading screen is the D-088 "Opening your club" splash again, not the ignition.
+  ['site/app.html', 'site/auth.html'].forEach((page) => {
     const text = readFileSync(new URL(`../../${page}`, import.meta.url), 'utf8');
-    assert.ok(text.includes(html), `${page} carries the same title`);
-    assert.doesNotMatch(text, /intro-video/, `${page} has no intro video`);
+    assert.ok(!text.includes('class="ignition"'), `${page} has no ignition`);
+    assert.ok(text.includes('brivia-handoff-mark') && text.includes('brivia-handoff-line'), `${page} has the classic loader`);
   });
 });
 
