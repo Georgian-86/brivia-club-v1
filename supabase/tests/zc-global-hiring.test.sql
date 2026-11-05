@@ -1,7 +1,7 @@
 -- 0054 (D-184): Global Hiring Discovery (hiring_people, replaced in place). Ids 0e480000-0000-4000-8000-0000000000NN. One transaction, rolled back.
 --   01 V viewer, Bengaluru, open to Frontend Developer (mid, hybrid/remote), skills React
 --   02 Delhi hirer: Frontend Developer, mid, hybrid (a strong fit), skills React     03 Mumbai hirer: Data Analyst
---   04 Bengaluru member, neither                          05 Delhi hirer with a 2-day-old account (under the bar)
+--   04 Bengaluru member, neither                          05 Delhi hirer whose email is unconfirmed (under the bar; D-173 dropped the age wait)
 --   06 Pune seeker who chose Everyone                     07 Chennai seeker visible to hirers only
 --   08 hirer V blocked                                    09 hirer already connected to V     10 hirer V passed today
 -- G1 grants. G2 every eligible member anywhere, no one else, ranked by fit not distance, a coarse band only.
@@ -24,14 +24,14 @@ begin
   for g in 1..10 loop
     mid := pg_temp.gh(g);
     cell := public.brivia_grid_cell(cities[g][1], cities[g][2], 7);
-    insert into auth.users(id, email_confirmed_at) values (mid, now()) on conflict do nothing;
+    insert into auth.users(id, email_confirmed_at) values (mid, case when g = 5 then null else now() end) on conflict do nothing;
     insert into public.profiles (id, name, full_name, email, experience, looking_for, photo_url, skills)
     values (mid, 'Glob ' || g, 'Glob ' || g, 'glob' || g || '@example.com', 'Some years', array['Friends'],
             'https://x.supabase.co/storage/v1/object/public/profile-photos/' || mid || '/p.jpg',
             case when g in (1, 2) then array['React'] else array['Chess'] end)
     on conflict (id) do nothing;
     update public.profiles set adult_declared_at = now(),
-           created_at = case when g = 5 then now() - interval '2 days' else now() - interval '30 days' end where profiles.id = mid;
+           created_at = now() - interval '30 days' where profiles.id = mid;
     insert into public.member_orbit (member_id, home_cell, home_cell_g6, home_cell_g5, place_id, precision)
     values (mid, cell, public.brivia_grid_parent(cell, 6), public.brivia_grid_parent(cell, 5), public.brivia_nearest_place(cell), 'cell')
     on conflict (member_id) do nothing;

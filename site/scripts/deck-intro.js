@@ -1,15 +1,10 @@
-// The deck's arrival (D-164, reworked D-185): a Solitaire deal. A small face-down pile (wine card backs with the club's
-// mark) rises in beside the stack; the three layers are dealt from it one after another, each on a short arc with a
-// little spin, landing face-down in their places; then the top card lifts and flips over to show the person, the stack
-// takes its weight, a gloss crosses the fresh card and Pass / Pitch rise in. About 1.7 s, never blocking: a touch, a
-// click or a key on the deck finishes it at once. Paired with the "deal" sound (notify-sound.js INTRO_CUE): a tap as
-// each card lands and a bell on the flip.
+// The deck's arrival (D-164, reworked as a shuffle in D-174): when the Connect deck first shows real people, a pack of
+// card backs is shuffled in the card's place and the member's cards are dealt from it (see INTRO below). Never
+// blocking: a touch, a click or a key finishes it at once. Paired with the "shuffle" sound (notify-sound.js INTRO_CUE).
 //
-// GSAP drives it (one timeline, transforms and opacity only, so it stays on the compositor). The cards stay opaque the
-// whole time (D-164's fade let one person's name show through another's); only the stack fades in, for 0.16 s. Every
-// property it sets is cleared at the end and the card backs are removed, so deck-swipe.js and the stack's CSS (D-082)
-// own the cards again exactly as before.
-// prefers-reduced-motion: no travel, no flip, no gloss and no sound; the cards fade in over 150 ms instead.
+// GSAP drives it (one timeline, transforms and opacity only, so it stays on the compositor). Every property it sets is
+// cleared at the end, so deck-swipe.js and the stack's CSS (D-082) own the cards again exactly as before.
+// prefers-reduced-motion: no travel, no rotation, no gloss and no sound; the cards fade in over 150 ms instead.
 
 import { gsap } from 'gsap';
 
@@ -18,31 +13,54 @@ import { gsap } from 'gsap';
 gsap.ticker.lagSmoothing(100, 33);
 
 // The choreography, in seconds. Unit-tested (tests/unit/deck-intro.test.mjs) so the sound and the motion stay in step.
+// D-174: a solitaire-style shuffle before the deal (founder: "more lengthy and better, kinda like shuffle in
+// solitaire"). Five beats, about 3 s in all, any tap or key skips to the resting stack:
+//   1. pack     a squared pack of card backs rises into the card's place
+//   2. split    it splits into two halves that lean apart
+//   3. riffle   the halves riffle back together, one card at a time, alternating sides (a tick per card)
+//   4. square   the pack is squared up with a small tap
+//   5. deal     the back two cards slide out behind it to their places, the pack's top card turns edge-on and the
+//               member's card flips face up in its place; the stack takes the weight, the gloss crosses, Pass / Pitch rise
 export const INTRO = Object.freeze({
-  pile: Object.freeze({ dur: 0.16 }),   // the stack (the face-down pile) fades in
-  // back, next, top: when each layer leaves the pile, where the pile sits for it (a fanned edge), how long it flies.
+  pack: Object.freeze({ count: 8, at: 0, dur: 0.46, from: Object.freeze({ y: 150, scale: 0.86, rotation: -5 }) }),
+  split: Object.freeze({ at: 0.5, dur: 0.26, x: 36, narrowX: 22, rotation: 7, lift: -12 }),
+  riffle: Object.freeze({ at: 0.8, gap: 0.056, drop: 0.17 }),
+  square: Object.freeze({ at: 1.37, dur: 0.22 }),
+  // back, next, top: when each is dealt, where it comes from, how long. The top card flips (rotationY) instead.
   layers: Object.freeze([
-    Object.freeze({ at: 0.16, from: Object.freeze({ x: -46, y: 118, rotation: -9, scale: 0.84 }), dur: 0.38 }),
-    Object.freeze({ at: 0.28, from: Object.freeze({ x: -42, y: 114, rotation: -6.5, scale: 0.84 }), dur: 0.38 }),
-    Object.freeze({ at: 0.4, from: Object.freeze({ x: -38, y: 110, rotation: -4, scale: 0.84 }), dur: 0.42 }),
+    Object.freeze({ at: 1.62, from: Object.freeze({ x: -26, y: 30, rotation: -5, scale: 0.95 }), dur: 0.52 }),
+    Object.freeze({ at: 1.72, from: Object.freeze({ x: 24, y: 34, rotation: 4, scale: 0.95 }), dur: 0.52 }),
+    Object.freeze({ at: 1.86, from: Object.freeze({ rotationY: -88, scale: 0.97 }), dur: 0.6 }),
   ]),
-  flip: Object.freeze({ at: 0.86, up: 0.17, down: 0.3, lift: 12, scale: 1.045 }),  // the top card turns face-up
-  reveal: Object.freeze({ at: 0.98, dur: 0.22 }),   // the cards behind turn face-up (their edges, under the top card)
-  land: 1.3,         // the flipped card settles: the stack takes the weight
-  settle: 0.26,      // the landing's squash and recovery
-  gloss: Object.freeze({ at: 1.1, dur: 0.62 }),
-  controls: Object.freeze({ at: 1.16, dur: 0.4, stagger: 0.06 }),
+  flip: Object.freeze({ at: 1.74, dur: 0.12 }),   // the pack's top card turns edge-on just before the real one turns up
+  packOut: Object.freeze({ at: 1.76, dur: 0.12 }),
+  land: 2.2,         // the top card has visually arrived: the stack takes the weight
+  settle: 0.3,       // the landing's squash and recovery
+  gloss: Object.freeze({ at: 2.26, dur: 0.72 }),
+  controls: Object.freeze({ at: 2.18, dur: 0.44, stagger: 0.06 }),
   reducedFade: 0.15,
 });
 
-// The moment the top card is edge-on and swaps its back for its face.
-export const flipMidpoint = (intro = INTRO) => intro.flip.at + intro.flip.up;
+// Riffle order: as in a real riffle, the bottom cards of the two halves fall first, alternating right, left, right...
+// Returns, for the k-th card to land, which pack card it is (0 = bottom of the left half), its half, and when it drops.
+export const riffleOrder = (intro = INTRO) => {
+  const n = intro.pack.count;
+  const half = Math.ceil(n / 2);
+  const order = [];
+  for (let i = 0; i < half; i += 1) {
+    if (half + i < n) order.push(half + i);
+    order.push(i);
+  }
+  return order.map((card, k) => ({ card, side: card < half ? 0 : 1, at: +(intro.riffle.at + k * intro.riffle.gap).toFixed(3) }));
+};
+export const riffleLandings = (intro = INTRO) => riffleOrder(intro).map((r) => +(r.at + intro.riffle.drop).toFixed(3));
 
 // When the whole intro is over (the last tween's end).
 export const introLength = (intro = INTRO) => Math.max(
+  intro.pack.at + intro.pack.dur,
+  ...riffleLandings(intro),
+  intro.square.at + intro.square.dur,
   ...intro.layers.map((l) => l.at + l.dur),
-  intro.flip.at + intro.flip.up + intro.flip.down,
-  intro.reveal.at + intro.reveal.dur,
   intro.land + intro.settle,
   intro.gloss.at + intro.gloss.dur,
   intro.controls.at + intro.controls.dur + intro.controls.stagger * 2,
@@ -54,6 +72,22 @@ export const introAllowed = ({ played = false, cardShown = false, viewShown = fa
 
 const CLEARED = 'transform,opacity,visibility,transition,willChange';
 
+// The shuffle's pack: card backs laid in the card's place, above the stack, gone when the deal ends.
+const buildPack = (doc, stack, count) => {
+  if (!doc?.createElement || !stack?.appendChild) return null;
+  const wrap = doc.createElement('div');
+  wrap.className = 'deck-shuffle';
+  wrap.setAttribute('aria-hidden', 'true');
+  const cards = Array.from({ length: count }, () => {
+    const c = doc.createElement('span');
+    c.className = 'deck-shuffle-card';
+    wrap.appendChild(c);
+    return c;
+  });
+  stack.appendChild(wrap);
+  return { wrap, cards };
+};
+
 // playDeckIntro({ stack, card, next, back, controls, reduced, onStart }): runs the timeline; returns { finish }.
 // controls: the Pass / Pitch row and the hint (any that are shown). onStart() is called on the first frame (the sound).
 export const playDeckIntro = ({ stack, card, next, back, controls = [], reduced = false, onStart, onDone, doc = globalThis.document } = {}) => {
@@ -62,14 +96,14 @@ export const playDeckIntro = ({ stack, card, next, back, controls = [], reduced 
   const layers = [back, next, card].map((el, i) => (shown(el) ? { el, spec: INTRO.layers[i] } : null)).filter(Boolean);
   const rows = controls.filter(shown);
   let gloss = null;
-  let backs = [];
+  let shuffle = null;
   let ended = false;
   const cleanup = () => {
     if (ended) return;
     ended = true;
     gloss?.remove();
-    backs.forEach((b) => b.remove());
-    gsap.set([stack, ...layers.map((l) => l.el), ...rows], { clearProps: `${CLEARED},transformOrigin,transformPerspective` });
+    shuffle?.remove();
+    gsap.set([stack, ...layers.map((l) => l.el), ...rows], { clearProps: CLEARED });
     stack.classList.remove('is-intro');
     listeners.forEach(([type, fn]) => doc?.removeEventListener?.(type, fn, true));
     onDone?.();
@@ -92,41 +126,56 @@ export const playDeckIntro = ({ stack, card, next, back, controls = [], reduced 
     tl.from([...layers.map((l) => l.el), ...rows], { opacity: 0, duration: INTRO.reducedFade, ease: 'none' });
   } else {
     if (onStart) tl.call(onStart, [], 0);
-    // Every card starts face-down: a wine back with the club's mark, laid over the face for the deal only.
-    backs = doc?.createElement ? layers.map(({ el }) => {
-      const back = doc.createElement('span');
-      back.className = 'deck-intro-back';
-      back.setAttribute('aria-hidden', 'true');
-      back.innerHTML = '<span class="deck-intro-back-mark"><span><i>the</i>B</span></span>';
-      el.appendChild(back);
-      return back;
-    }) : [];
-    // The pile appears: only the stack fades, so no card is ever see-through over another.
-    tl.from(stack, { opacity: 0, duration: INTRO.pile.dur, ease: 'power1.out', immediateRender: true }, 0);
+    const pack = buildPack(doc, stack, INTRO.pack.count);
+    if (pack) {
+      shuffle = pack.wrap;
+      const { wrap, cards } = pack;
+      const half = Math.ceil(cards.length / 2);
+      // On a phone the card nearly fills the screen: the halves part less, so they stay on screen.
+      const room = (doc.documentElement?.clientWidth || 1000) - (stack.offsetWidth || 0);
+      const splitX = room < 120 ? INTRO.split.narrowX : INTRO.split.x;
+      // 1. The pack rises into the card's place (each card a hair above the one under it: a thick, squared pack).
+      cards.forEach((c, i) => gsap.set(c, { y: -i * 1.4, zIndex: i }));
+      tl.from(wrap, { ...INTRO.pack.from, duration: INTRO.pack.dur, ease: 'power3.out', transformOrigin: '50% 100%', force3D: true, immediateRender: true }, INTRO.pack.at)
+        .from(wrap, { opacity: 0, duration: 0.18, ease: 'power1.out', immediateRender: true }, INTRO.pack.at);
+      // 2. Split: the two halves lean apart (left half to the left, right half to the right).
+      cards.forEach((c, i) => {
+        const side = i < half ? -1 : 1;
+        tl.to(c, { xPercent: side * splitX, y: INTRO.split.lift - (i % half) * 1.4, rotation: side * INTRO.split.rotation,
+          duration: INTRO.split.dur, ease: 'power2.inOut' }, INTRO.split.at + (i % half) * 0.012);
+      });
+      // 3. Riffle: one card at a time, alternating halves, drops into the middle and onto the pile.
+      riffleOrder().forEach(({ card, at }, k) => {
+        const c = cards[card];
+        tl.set(c, { zIndex: 20 + k }, at)
+          .to(c, { xPercent: 0, y: -k * 1.4, rotation: (k % 2 ? 1 : -1) * 1.6, duration: INTRO.riffle.drop, ease: 'power2.in' }, at);
+      });
+      // 4. Square up: the pile is tapped square (rotations out) and gives a little.
+      tl.to(cards, { rotation: 0, duration: INTRO.square.dur, ease: 'power3.out' }, INTRO.square.at)
+        .to(wrap, { scaleX: 0.975, scaleY: 0.985, duration: INTRO.square.dur * 0.35, ease: 'power2.out', transformOrigin: '50% 100%' }, INTRO.square.at)
+        .to(wrap, { scaleX: 1, scaleY: 1, duration: INTRO.square.dur * 0.65, ease: 'power3.out' }, INTRO.square.at + INTRO.square.dur * 0.35);
+      // 5. The pack's top card turns edge-on (the member's card finishes the turn), and the rest of the pack goes.
+      const last = cards[riffleOrder().at(-1).card];
+      tl.to(last, { rotationY: 88, transformPerspective: 1200, duration: INTRO.flip.dur, ease: 'power1.in' }, INTRO.flip.at)
+        .to(cards.filter((c) => c !== last), { opacity: 0, duration: INTRO.packOut.dur, ease: 'power1.in' }, INTRO.packOut.at)
+        .set(wrap, { autoAlpha: 0 }, INTRO.flip.at + INTRO.flip.dur);
+    }
     layers.forEach(({ el, spec }, i) => {
       const top = i === layers.length - 1;
-      // Where the card rests in the stack (the CSS fan of the cards behind, D-082), read before the pile pose is set.
-      const rest = { x: gsap.getProperty(el, 'x'), y: gsap.getProperty(el, 'y'), rotation: gsap.getProperty(el, 'rotation'), scale: gsap.getProperty(el, 'scaleX') };
-      // The pile pose, at once: every card waits there until it is dealt. The cards behind keep their CSS origin (the
-      // bottom edge), so they land exactly where the stack holds them; the top card turns about its middle for the flip.
-      tl.set(el, { ...spec.from, ...(top ? { transformOrigin: '50% 60%' } : {}), force3D: true, immediateRender: true }, 0);
-      // The deal: x and y on different curves, so the card travels on an arc (out first, then up and in), turning as it
-      // goes and landing with a small overshoot.
-      tl.to(el, { x: rest.x, duration: spec.dur, ease: 'power2.out' }, spec.at)
-        .to(el, { y: rest.y, duration: spec.dur, ease: 'power3.out' }, spec.at)
-        .to(el, { rotation: rest.rotation, scale: rest.scale, duration: spec.dur + 0.06, ease: top ? 'back.out(1.7)' : 'back.out(1.4)' }, spec.at);
+      tl.from(el, {
+        ...spec.from,
+        duration: spec.dur,
+        ease: top ? 'back.out(1.25)' : 'power3.out',
+        transformOrigin: top ? '50% 50%' : '50% 100%',
+        transformPerspective: top ? 1200 : 0,
+        force3D: true,
+        immediateRender: true,
+      }, spec.at);
+      // Hidden until dealt (set now, so the first painted frame never shows a card early); the top card shows the
+      // moment it turns up, when it is edge-on.
+      gsap.set(el, { opacity: 0 });
+      tl.to(el, { opacity: 1, duration: top ? 0.01 : 0.2, ease: 'power1.out' }, spec.at);
     });
-    // The flip: the top card lifts and turns edge-on, its back goes, and it turns the rest of the way face-up.
-    const top = layers.at(-1);
-    const topBack = backs.at(-1);
-    const F = INTRO.flip;
-    tl.set(top.el, { transformPerspective: 1100 }, F.at)
-      .to(top.el, { rotationY: 90, y: -F.lift, scale: F.scale, duration: F.up, ease: 'power2.in' }, F.at)
-      .set(topBack, { opacity: 0 }, flipMidpoint())
-      .fromTo(top.el, { rotationY: -90 }, { rotationY: 0, duration: F.down, ease: 'back.out(1.5)', immediateRender: false }, flipMidpoint())
-      .to(top.el, { y: 0, scale: 1, duration: F.down + 0.08, ease: 'power3.out' }, flipMidpoint());
-    // The cards behind turn face-up under it (only their edges show).
-    if (backs.length > 1) tl.to(backs.slice(0, -1), { opacity: 0, duration: INTRO.reveal.dur, ease: 'power1.inOut', stagger: 0.05 }, INTRO.reveal.at);
     // The landing: the stack gives a little under the top card, then recovers (weight, not bounce).
     tl.to(stack, { y: 4, scaleY: 0.988, transformOrigin: '50% 100%', duration: INTRO.settle * 0.35, ease: 'power2.out' }, INTRO.land)
       .to(stack, { y: 0, scaleY: 1, duration: INTRO.settle * 0.65, ease: 'power3.out' }, INTRO.land + INTRO.settle * 0.35);
@@ -139,7 +188,8 @@ export const playDeckIntro = ({ stack, card, next, back, controls = [], reduced 
       tl.fromTo(gloss, { xPercent: -130, opacity: 1 }, { xPercent: 130, duration: INTRO.gloss.dur, ease: 'power2.inOut' }, INTRO.gloss.at);
     }
     if (rows.length) {
-      tl.from(rows, { y: 14, opacity: 0, duration: INTRO.controls.dur, ease: 'power3.out', stagger: INTRO.controls.stagger, immediateRender: true }, INTRO.controls.at);
+      gsap.set(rows, { y: 14, opacity: 0 });
+      tl.to(rows, { y: 0, opacity: 1, duration: INTRO.controls.dur, ease: 'power3.out', stagger: INTRO.controls.stagger }, INTRO.controls.at);
     }
   }
   listeners.forEach(([type, fn]) => doc?.addEventListener?.(type, fn, true));

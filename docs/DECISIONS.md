@@ -3413,12 +3413,107 @@ controls (a tester or a seeded test member), never a real member, so no new expo
   or better everywhere (was as low as 2.2:1 on the lightest covers).
 - **Check:** `tests/e2e/profile-hero.spec.mjs`.
 
+## D-173 (2026-11-04): no account-age wait before a hirer's role shows
+
+- **Asked:** a real hirer (a new account) was missing from Hiring. The check showed no open role yet and an account
+  0 days old; the founder chose "Remove the wait" over 1 day or keeping 14 days.
+- **Done (0051):** `brivia_hiring_bar` drops the 14-day account age; a completed profile, a photo (seeded members
+  exempt), a confirmed email, no open flag and the hiring switch still apply. `brivia_hiring_live_from` is the
+  account's first day, and the client no longer promises a go-live date: an under-bar role says it shows once the
+  profile has a photo and a confirmed email.
+- **Trade-off:** supersedes the 14-day part of D-141's bar. A scam account can post on its first day; reports
+  (`report_fake_job`, which pause the role) are the remaining guard. Revisit before a real launch.
+
+
+## D-174 (2026-11-04): the deck arrives with a solitaire-style shuffle
+
+- **Asked:** "Make the stacking animation more lenghty and better kinda like shuffle in solitaire. Use the
+  professionally designing skills". Supersedes D-164's 0.9 s deal-in.
+- **Motion (`site/scripts/deck-intro.js`, about 3 s, five beats):** a squared pack of eight card backs (deep
+  wine, a fine gold lattice, a hairline gold frame, the club wordmark "the Brivia CLUB" in gold) rises into the card's place; it splits into two halves
+  that lean apart; the halves riffle back together one card at a time, alternating, bottom cards first; the pack is
+  squared with a small tap; then the back two cards slide out behind it, the pack's top card turns edge-on and the
+  member's card flips face up in its place. The stack takes the weight, the gloss crosses, Pass / Pitch rise in. On a
+  phone the halves part less (22% instead of 36%) so they stay on screen. Transforms and opacity only; the pack is
+  removed and every inline style cleared at the end. Any tap or key still skips to the resting stack.
+- **Sound (`INTRO_CUE`):** a swish on the split, a light tick as each riffled card lands, a muffled tap on the
+  square-up, three soft taps on the deal, then the same B-flat to F bell on the landing. Same switch and autoplay rules.
+- **Design rules followed (ui-ux-pro-max / frontend-design):** one orchestrated load moment, deceleration on arrival,
+  acceleration on the riffle drops, interruptible, never blocks input, reduced motion keeps the 150 ms fade.
+- **Fix found while capturing:** later-positioned from-tweens painted the first frame before their start (an edge-on
+  card showed for one frame); the dealt cards and controls are now hidden with a set and revealed with a to-tween.
+- **Proof:** unit 516 (`deck-intro.test.mjs`: beat order, a real riffle, sound in sync); deck 201/201, app-shell
+  214/214, deck-tutorial, motion (10/10), sounds, work-identity; frame captures at 390 and 1440.
+- **Card backs (follow-up, same PR):** Arovas asked for their logo on the backs instead of the B, then for the wine
+  backs to stay with the logo in gold. The PNG was cut to a transparent, trimmed wordmark and filled with a metallic
+  gold gradient: `site/media/assets/brivia-wordmark-gold.webp` (560 px, ~24 KB; original kept in `source-media/`).
+  New token `--color-gold` tints the lattice and frame; `app.js` preloads the image so the first shuffle frame has it.
+  A black "the" and a full-width tagline were tried and reverted on Arovas's call: the final back is the all-gold
+  wordmark with no "Swipe. Match. Build" line (560 px, ~42 KB), rebuilt from the original by
+  `scripts/build-wordmark-gold.py`.
+
+## D-175 (2026-11-04): Search Console verification and the first SEO pass
+
+- **Asked:** "add the file for search console and do SEO" (Arovas).
+- **Verification:** the HTML file Google issued lives at `site/public/google4d360d183cb779a9.html` and is served at the
+  site root (shipped first, PR #53). It must stay, or the property loses verification.
+- **Index only the public pages:** `/`, `/auth.html`, `/careers.html`, `/privacy.html` are in `sitemap.xml` with a
+  canonical URL, a description, Open Graph and Twitter card tags (shared `og-image.jpg`, 1200×630).
+- **Keep the member app out:** `app.html`, `chat.html`, `explore.html`, `profile.html` send `noindex, nofollow` as a
+  meta tag and as an `X-Robots-Tag` header. They are deliberately **not** `Disallow`ed in `robots.txt`: a crawler that
+  cannot fetch a page cannot see its noindex, and a blocked URL can still be indexed from links. `robots.txt` blocks
+  only `/data/` (static lookup JSON). No member data is in any static page; profiles render client-side after sign-in.
+- **Structured data:** one Organization + WebSite JSON-LD graph on the landing page (name, logo, contact email, the
+  Instagram and LinkedIn profiles). No JobPosting on careers yet: Google requires a posting date, full description and
+  location rules per role, which the page does not carry.
+- **Performance basics:** already in place (hashed `/assets/*` cached immutable, hero poster preloaded, below-fold
+  images lazy with sizes). Added a one-day cache with a week of stale-while-revalidate for the icons and OG image.
+
+## D-176 (2026-11-04): Vercel Web Analytics and Speed Insights
+
+- **Asked:** "now add analytics" (Arovas).
+- **Choice:** Vercel Web Analytics (page views, referrers, countries, devices) and Speed Insights (Core Web Vitals),
+  through `@vercel/analytics` and `@vercel/speed-insights`, loaded by `site/scripts/analytics.js` on the five real
+  pages (landing, auth, app, careers, privacy). Picked over Google Analytics because the site is already on Vercel and
+  both are cookieless with a daily-reset visitor hash, so no cookie banner is needed and no third-party ad tracker sees
+  members. GA4 or a product-analytics tool can be added later if per-feature funnels are needed.
+- **Privacy:** `analytics-url.js` drops every query parameter except `view` and the whole hash before an event leaves
+  the page, because sign-in hand-offs carry one-time codes and tokens there (unit `analytics-url.test.mjs`). No custom
+  events, no user ids, nothing from Supabase is sent. The privacy notice names the analytics and Vercel as host; the
+  notice version is unchanged (no new personal data and no new consent).
+- **Needs the dashboard:** both products must be switched on (Speed Insights already was on 2026-11-04; Web Analytics was not) for the project in Vercel (Analytics and Speed Insights
+  tabs), otherwise `/_vercel/insights/*` returns 404 and nothing is counted.
+
+## D-177 (2026-11-04): faceless real-looking photos for the test hirers
+
+- **Asked:** "i need to add picture in the profile for test hireres", then "i need real looking picture in which faces
+  are not visible".
+- **Done (0052):** the 12 seeded hirers get Unsplash License photos with no face in them (hands at a laptop, a
+  handshake, a suit with the face out of frame, a person seen from behind), cropped to 480 px WebP and shipped in
+  `site/public/test-avatars`. `profiles_photo_url_storage` accepts `/test-avatars/tNN.(webp|jpg|svg)` on a seeded row
+  only; `hiring-test-members.sql` sets them once 0052 is in. Sources are listed in `supabase/seed/README.md`.
+- **Why faceless:** D-156 refused strangers' faces on invented profiles. Photos without a face carry no one's
+  likeness, and many real members use a picture like this. The seeded profiles are still invented, so the open test
+  world should close before a real launch.
+- **Not done:** an AI image generator was tried for these and returned a generic page mock-up with faces, so
+  none of its output was used.
+
+
+## D-178 (2026-11-05): plain wine shuffle card backs
+- **Asked:** "remove the grid pattern from the back of the cards and make the cards color wine color as used elsewhere
+  in the website. rest keep the same".
+- **Done:** the gold lattice is gone from `.deck-shuffle-card` (`site/styles/deck.css`) and the back is
+  `--color-oxblood` (#4c1315), the wine of the member card's own photo frame, instead of `--color-wine-deep`
+  (a first pass used `--color-wine`; Arovas asked for the card's wine instead). The gold wordmark, the soft gold glow
+  behind it, the hairline gold frame and the dark edge are unchanged, as is the shuffle motion and sound (D-174).
 ## Renumbering note (2026-11-05)
 
-Two sessions logged decisions in parallel on 2026-11-04. The entries below were written as D-162 to D-166 on branch
-`claude/eloquent-ramanujan-w942g9` while `main` used those numbers for other decisions; they are kept here as
-D-179 to D-183 (same order and wording), and their migration 0047 is 0053. Founder, 2026-11-05: Connect opens with the
-D-164 deal (`deck-intro.js`); D-179's own intro deal is not used, only its daily-limit shuffle.
+Two sessions logged decisions in parallel on 2026-11-04 and 2026-11-05. The entries below were written on branch
+`claude/eloquent-ramanujan-w942g9` while `main` used the same numbers for other decisions (D-172 to D-178 above). They
+are kept as D-179 to D-186 (same order and wording), and the branch's migrations are 0053 (event tickets and payments)
+and 0054 (global hiring discovery); `main` has 0051 and 0052. Founder, 2026-11-05: Connect opens with D-174's
+solitaire shuffle; D-179's intro deal and D-185's pile-and-flip deal are not used. D-179's daily-limit shuffle is.
+
 ## D-179 (2026-11-04): the signature deck ritual (intro deal, daily-cap shuffle, deck sounds)
 
 - **Asked:** a Solitaire-inspired, cinematic deck on Connect: the deck assembles on arrival and the top card rises into
@@ -3521,7 +3616,9 @@ D-164 deal (`deck-intro.js`); D-179's own intro deal is not used, only its daily
   unit 535; e2e hiring (all pass), deck 201, deck-ritual, explore-cards 74. `nearby.spec` (D-138 settings row) and
   `consent.spec` (cancelKeepsCard timeout) fail the same way without this change.
 
-## D-185 (2026-11-05): the deck's opening deal becomes a Solitaire deal with a card flip
+## D-185 (2026-11-05): the deck's opening deal becomes a Solitaire deal with a card flip (not shipped)
+- **Outcome (founder, 2026-11-05):** at merge time, `main` already had D-174's solitaire shuffle; the founder kept it.
+  This deal is not used. Its two fixes below (the Curated/Nearby pill and the profile dialog's focus) did ship.
 - **Asked (founder, 2026-11-05):** "i need a very good animation, pls fix it" — the deck opening deal (chosen in the
   follow-up question). D-164's deal faded the three layers in half-transparent, so one person's name showed through
   another's while they flew in.

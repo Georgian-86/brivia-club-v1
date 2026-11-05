@@ -25,7 +25,7 @@ const ashaHiring = [{
     { id: ROLE_B, title: 'Design Intern', family: 'design', level: 'intern', work_mode: 'onsite', help: 'refer', company: null, about: null, opened_days: 3, fit: 0.2, accepting: true, asked: false },
   ],
 }];
-// D-169: Bilal is hiring too, for a role that does not fit; the Hiring switch shows him after Asha.
+// D-174: Bilal is hiring too, for a role that does not fit; the Hiring switch shows him after Asha.
 const bilalHiring = { member_id: BILAL, best_title: 'Data Analyst', fits: false, roles: [
   { id: 'a0a00000-0000-4000-8000-000000000003', title: 'Data Analyst', family: 'data', level: 'entry', work_mode: 'onsite', help: 'hiring', company: null, about: null, opened_days: 1, fit: 0, accepting: true, asked: false }] };
 const seekerIntent = [{ titles: ['Frontend Developer', 'React Developer'], families: ['software'], level: 'mid', work_modes: ['hybrid', 'remote'], visibility: 'hirers', findable: false, private_company: null, consented_at: new Date().toISOString(), updated_at: new Date().toISOString() }];
@@ -102,6 +102,9 @@ try {
     check(`${w}: the bar reads HIRING and is never clipped (${JSON.stringify(bar)})`, /^HIRING/.test(bar.text) && !bar.clipped);
     const strip = await page.locator('#swipe-hiring').innerText().catch(() => '');
     check(`${w}: the strip names the fitting role (${JSON.stringify(strip)})`, /Frontend Developer · Hybrid/.test(strip) && /Fits what you're open to/.test(strip) && /Can refer/.test(strip));
+    await page.waitForTimeout(1200);   // the deal-in settles; the strip arrived after the card was drawn
+    const inside = await page.evaluate(() => { const c = document.querySelector('#swipe-card').getBoundingClientRect(); const b = document.querySelector('#swipe-card .view-info-button').getBoundingClientRect(); const t = document.querySelector('#swipe-tags'); const half = [...t.children].filter((x) => !x.hidden && x.offsetTop + x.offsetHeight > t.clientHeight + 1).length; return { ok: b.bottom <= c.bottom + 1 && b.height >= 44, half }; });
+    check(`${w}: View profile stays inside the card with the hiring strip, and no chip is cut in half (${JSON.stringify(inside)})`, inside.ok && inside.half === 0);
     check(`${w}: no duplicate "Hiring" chip on the card`, !(await page.locator('#swipe-tags').innerText()).match(/^Hiring$/m));
     check(`${w}: the deck never scrolls sideways`, await noSideScroll(page));
     await shot(page, `deck-seeker-${w}.png`);

@@ -581,41 +581,34 @@ body.app-body .app-view[data-view="home"] .deck-empty-action { min-height: 44px;
   will-change: transform;
 }
 
-/* The face-down card back for the opening deal (D-185, deck-intro.js): a wine back with a hairline inner frame, a soft
-   diagonal sheen and the club's mark. Laid over each card only while it is dealt; removed when the deal ends. */
-.app-view[data-view="home"] .swipe-stack .deck-intro-back {
+/* D-174: the shuffle's pack (deck-intro.js). Card backs in the top card's place, above the stack, removed when the deal
+   ends: warm paper with a faint wine lattice, a hairline wine frame and the club's wordmark (the founder's logo,
+   source-media/assets/brivia-wordmark-original.png) in the middle. */
+.app-view[data-view="home"] .swipe-stack .deck-shuffle { position: absolute; z-index: 3; inset: 0; pointer-events: none; }
+.app-view[data-view="home"] .deck-shuffle-card {
   position: absolute;
-  z-index: 6;
   inset: 0;
-  display: grid;
-  place-items: center;
-  border-radius: inherit;
+  overflow: hidden;
+  border: 2px solid var(--dk-ink);
+  border-radius: 18px;
   background:
-    radial-gradient(120% 80% at 30% 18%, color-mix(in srgb, var(--color-cream) 16%, transparent), transparent 60%),
-    repeating-linear-gradient(135deg, color-mix(in srgb, var(--color-cream) 5%, transparent) 0 2px, transparent 2px 11px),
-    linear-gradient(160deg, var(--color-wine) 0%, var(--color-wine-deep) 100%);
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--color-cream) 22%, transparent);
-  pointer-events: none;
+    radial-gradient(circle at 50% 46%, color-mix(in srgb, var(--color-gold) 14%, transparent), transparent 48%),
+    var(--color-oxblood);
+  box-shadow: 0 10px 24px var(--dk-line);
   backface-visibility: hidden;
 }
-.app-view[data-view="home"] .swipe-stack .deck-intro-back::before {
+.app-view[data-view="home"] .deck-shuffle-card::after {
   position: absolute;
   inset: 12px;
-  border: 1px solid color-mix(in srgb, var(--color-cream) 38%, transparent);
-  border-radius: calc(18px - 6px);
+  border: 1px solid color-mix(in srgb, var(--color-gold) 48%, transparent);
+  border-radius: 12px;
   content: '';
 }
-.app-view[data-view="home"] .swipe-stack .deck-intro-back-mark {
-  display: grid;
-  place-items: center;
-  width: 84px;
-  height: 84px;
-  border: 1px solid color-mix(in srgb, var(--color-cream) 45%, transparent);
-  border-radius: 50%;
-  color: var(--color-cream);
-  font-family: var(--font-heading);
-  font-size: 38px;
-  line-height: 1;
-  letter-spacing: .02em;
+/* D-174: the club wordmark in gold on the wine back (the gold is baked into the image). */
+.app-view[data-view="home"] .deck-shuffle-card::before {
+  position: absolute;
+  inset: 0;
+  background: url('../media/assets/brivia-wordmark-gold.webp') center 47% / 62% auto no-repeat;
+  content: '';
 }
-.app-view[data-view="home"] .swipe-stack .deck-intro-back-mark i { margin-right: 3px; font-size: 15px; font-style: italic; opacity: .85; }
+@media (max-width: 760px) { .app-view[data-view="home"] .deck-shuffle-card { border-radius: 17px; } }

@@ -10,9 +10,6 @@ Update this file at the end of every session. CLAUDE.md holds the aim; this file
 **2026-11-05, D-186:** the landing intro and the "Opening your club" loading screen are the Brivia ignition, drawn
 live (`brivia-ignition.js`, `ignition.css`) with its own music cue; the blurry 58 kbps intro video is gone.
 
-**2026-11-05, D-185:** the deck's opening deal is now a Solitaire deal: a face-down wine pile, cards dealt on arcs, the
-top card flips face-up with a bell (`deck-intro.js`, `.deck-intro-back` in deck.css). Client only, no migration.
-
 **2026-11-04, D-184:** Global Hiring Discovery: the Connect Hiring switch shows everyone, anywhere, who is hiring or
 open to roles, ranked by fit + shared interests + skills (not distance), paged, refreshed live, with a "Global hiring
 discovery" label (migration 0054). Fixes the once-per-session hiring load and unstored passes on hiring cards.
@@ -24,9 +21,24 @@ founder's Resend domain + key and Razorpay keys + webhook (migrations README "00
 functions (razorpay-webhook with JWT verification off), and a test-mode payment.** Until then Reserve holds the seat
 and says payment opens soon.
 
-**2026-11-04, D-179:** the deck ritual's daily-limit shuffle (Connect opens with the D-164 deal; founder 2026-11-05): at the daily swipe cap the deck fans, riffles, reforms and reads "That's your deck for
+**2026-11-04, D-179:** the deck ritual's daily-limit shuffle (Connect opens with the D-174 shuffle): at the daily swipe cap the deck fans, riffles, reforms and reads "That's your deck for
 today." with the refresh time; two new deck cues. Files `site/scripts/deck-ritual.js`, `site/styles/deck-ritual.css`;
 tests `tests/unit/deck-ritual.test.mjs`, `tests/e2e/deck-ritual.spec.mjs`. Client only (no migration).
+**2026-11-04, D-176:** Vercel Web Analytics + Speed Insights on every real page (`site/scripts/analytics.js`, URLs
+scrubbed by `analytics-url.js`). Both must be enabled in the Vercel project's Analytics and Speed Insights tabs.
+
+**2026-11-04, D-175:** Google Search Console verified by file (`site/public/google4d360d183cb779a9.html`, keep it:
+removing it unverifies the property) and a first SEO pass: `robots.txt`, `sitemap.xml` (public pages only),
+canonical + Open Graph + Twitter tags on `/`, `/auth.html`, `/careers.html`, `/privacy.html`, Organization/WebSite
+JSON-LD on `/`, and `noindex` (meta + `X-Robots-Tag` in `vercel.json`) on app, chat, explore and profile. Add any new
+public page to `sitemap.xml`.
+
+**2026-11-05, D-178:** the shuffle card backs are plain `--color-oxblood` (the member card's frame wine) with no lattice; logo, frame and motion unchanged.
+
+**2026-11-04, D-174:** the deck now arrives with a ~3 s solitaire-style shuffle (pack, split, riffle, square, deal and
+flip) and a matching shuffle sound. Files `site/scripts/deck-intro.js`, `INTRO_CUE` in `site/scripts/notify-sound.js`,
+`.deck-shuffle` in `site/styles/deck.css`.
+
 **2026-11-04, D-172:** the own profile hero's text never runs under the photo card: the work line and bio wrap or
 clamp inside their column, the name wraps to two lines instead of an early ellipsis, one type scale per breakpoint
 (`site/styles/profile-hero.css`). Test `tests/e2e/profile-hero.spec.mjs` (long, real and short profiles at 390 and 1440).
@@ -91,7 +103,7 @@ You're hiring → Add a role); their deck card's bar reads "HIRING · ROLE" and 
 member whose Looking for is Job Referral, Internship Referral or Job Opportunities says which roles they're open to
 (private to hirers by default) and gets the role strip, a deck lift (1 in 5), a once-a-day notification and the
 Hiring lens; "Ask about this role" is a signal with a note and the role tag, answered in the request sheet. **Owed:
-apply `0037_hiring.sql`** (README "0037"), **then `0047_hiring_test_world.sql`, then `0048_hiring_people.sql`, then `0049_hiring_anywhere.sql`, then `0050_hiring_open_world.sql` (D-171: seeded roles for everyone while the open test world is on), then
+apply `0037_hiring.sql`** (README "0037"), **then `0047_hiring_test_world.sql`, then `0048_hiring_people.sql`, then `0049_hiring_anywhere.sql`, then `0050_hiring_open_world.sql` (D-171: seeded roles for everyone while the open test world is on), then `0051_hiring_no_wait.sql` (D-173: no 14-day wait), then `0052_test_avatars.sql` (D-177: faceless photos for the test hirers), then
 `supabase/seed/hiring-test-members.sql`** and the `brivia_tester` insert for the founder (seed README, D-162); until 0037 the
 client hides all of it, including the Hiring toggle beside Curated / Nearby. Spec
 `docs/superpowers/specs/2026-11-02-hiring-design.md`, engine lane ORBIT_ENGINE.md §12, moderation MODERATION.md.

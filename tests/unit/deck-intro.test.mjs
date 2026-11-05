@@ -1,7 +1,7 @@
-// D-164: the deck's arrival (deck-intro.js) and its "deal" cue (notify-sound.js INTRO_CUE). Run: npm run test:unit
+// D-164 / D-174: the deck's arrival (a shuffle, then the deal) (deck-intro.js) and its "deal" cue (notify-sound.js INTRO_CUE). Run: npm run test:unit
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { INTRO, introLength, introAllowed, flipMidpoint } from '../../site/scripts/deck-intro.js';
+import { INTRO, introLength, introAllowed, riffleOrder, riffleLandings } from '../../site/scripts/deck-intro.js';
 import { INTRO_CUE, renderIntroCue, createSoundKit } from '../../site/scripts/notify-sound.js';
 
 const param = () => ({ value: 0, setValueAtTime() {}, exponentialRampToValueAtTime() {}, linearRampToValueAtTime() {}, cancelScheduledValues() {} });
@@ -22,38 +22,49 @@ const fakeAudio = (log) => {
 };
 const fakeDoc = () => { const l = {}; return { addEventListener: (t, fn) => { (l[t] ||= []).push(fn); }, fire: (t, e = {}) => (l[t] || []).forEach((fn) => fn({ type: t, ...e })) }; };
 
-test('the intro is brief: under two seconds, the deal itself under 0.9 s (D-185)', () => {
+test('the shuffle is a moment, not a wait: about 3 s in all, the cards dealt by 2.5 s', () => {
   const total = introLength();
-  assert.ok(total > 1.2 && total <= 1.9, `total ${total}`);
-  const deal = Math.max(...INTRO.layers.map((l) => l.at + l.dur));
-  assert.ok(deal <= 0.9, `deal ${deal}`);
-});
-
-test('the stack is dealt from one pile, back to front, the top card last, then flipped face-up (D-185)', () => {
-  assert.equal(INTRO.layers.length, 3);
-  INTRO.layers.forEach((l, i, a) => {
-    assert.ok(l.from.y > 60 && l.from.scale < 1, 'from the pile, below and smaller');
-    if (!i) return;
-    assert.ok(l.at > a[i - 1].at, 'staggered');
-    assert.ok(Math.abs(l.from.x - a[i - 1].from.x) < 10 && Math.abs(l.from.y - a[i - 1].from.y) < 10, 'one pile, slightly fanned');
-  });
-  assert.ok(INTRO.layers[0].at >= INTRO.pile.dur - 0.01, 'the pile is on screen before the first card leaves it');
+  assert.ok(total > 2.4 && total <= 3.2, `total ${total}`);
   const dealt = Math.max(...INTRO.layers.map((l) => l.at + l.dur));
-  assert.ok(INTRO.flip.at >= dealt - 0.02, 'the top card flips once it has landed');
-  assert.ok(INTRO.reveal.at >= flipMidpoint() - 0.1, 'the cards behind turn over with the top card');
-  assert.ok(INTRO.land >= flipMidpoint(), 'the stack settles after the flip');
+  assert.ok(dealt <= 2.5, `dealt ${dealt}`);
 });
 
-test('the sound follows the motion: one tap per card as it lands, in order, then the bell on the flip', () => {
+test('the beats run in order: pack, split, riffle, square, deal', () => {
+  const p = INTRO.pack, sp = INTRO.split, r = INTRO.riffle, sq = INTRO.square;
+  assert.ok(sp.at >= p.at + p.dur, 'split after the pack has risen');
+  assert.ok(r.at >= sp.at + sp.dur, 'riffle after the split');
+  assert.ok(sq.at >= Math.max(...riffleLandings()) - 0.01, 'square after the last card lands');
+  assert.ok(INTRO.layers[0].at >= sq.at + sq.dur, 'deal after the pack is square');
+  assert.ok(INTRO.flip.at + INTRO.flip.dur <= INTRO.layers[2].at + 0.01, 'the pack card is edge-on when the top card turns up');
+  assert.ok(INTRO.land > INTRO.layers[2].at, 'the stack lands after the top card turns up');
+});
+
+test('a real riffle: every pack card once, bottom cards first, alternating halves', () => {
+  const order = riffleOrder();
+  assert.equal(order.length, INTRO.pack.count);
+  assert.deepEqual([...new Set(order.map((o) => o.card))].sort((a, b) => a - b), [...Array(INTRO.pack.count).keys()]);
+  order.forEach((o, k) => { if (k) { assert.notEqual(o.side, order[k - 1].side, 'alternating'); assert.ok(o.at > order[k - 1].at); } });
+  assert.equal(order[0].card, Math.ceil(INTRO.pack.count / 2), 'the right half bottom card falls first');
+});
+
+test('the back cards are dealt back to front, the top card flips face up last', () => {
+  assert.equal(INTRO.layers.length, 3);
+  assert.ok(INTRO.layers[1].at > INTRO.layers[0].at && INTRO.layers[2].at > INTRO.layers[1].at, 'staggered');
+  assert.ok(Math.abs(INTRO.layers[2].from.rotationY) >= 80, 'the top card turns from edge-on');
+});
+
+test('the sound follows the motion: a tick per riffled card, a tap per dealt card, the bell on the landing', () => {
+  assert.deepEqual([...INTRO_CUE.ticks], riffleLandings(), 'one tick as each card lands');
+  assert.ok(Math.abs(INTRO_CUE.swish.at - INTRO.split.at) < 0.05, 'the swish on the split');
+  assert.ok(INTRO_CUE.square >= INTRO.square.at && INTRO_CUE.square <= INTRO.square.at + 0.08, 'the square-up tap');
   assert.equal(INTRO_CUE.taps.length, INTRO.layers.length);
   INTRO_CUE.taps.forEach((t, i) => {
-    const { at, dur } = INTRO.layers[i];
-    assert.ok(t > at && t < at + dur, `tap ${i} lands during its card's flight`);
-    if (i) assert.ok(t > INTRO_CUE.taps[i - 1], 'in order');
+    const deal = INTRO.layers[i].at;
+    assert.ok(t > deal && t < deal + 0.2, `tap ${i} lands within 0.2 s of its card`);
   });
-  assert.ok(Math.abs(INTRO_CUE.bells[0].at - flipMidpoint()) <= 0.08, 'bell as the face turns up');
+  assert.ok(INTRO_CUE.bells[0].at >= INTRO.land - 0.05 && INTRO_CUE.bells[0].at <= INTRO.land + 0.1, 'bell on the landing');
   const end = Math.max(...INTRO_CUE.bells.map((b) => b.at + b.dur));
-  assert.ok(end < INTRO_CUE.length && INTRO_CUE.length <= 2.1, 'short');
+  assert.ok(end < INTRO_CUE.length && INTRO_CUE.length <= 3.6, 'ends with the motion');
   assert.ok(INTRO_CUE.level < 0.7, 'quieter than the swipe cues');
 });
 
@@ -65,11 +76,11 @@ test('the intro plays once, only for a visible deck with a card', () => {
   assert.equal(introAllowed({ cardShown: true, viewShown: true, pageVisible: false }), false, 'background tab');
 });
 
-test('the deal cue renders without throwing and uses taps (noise + thump) and bells (sine)', () => {
+test('the shuffle cue renders without throwing: noise for the swish, ticks and taps; sine thumps and bells', () => {
   const log = { osc: [], buffers: [] };
   const ctx = new (fakeAudio(log).AudioContext)();
   assert.doesNotThrow(() => renderIntroCue(ctx, ctx.destination, 0));
-  assert.equal(log.buffers.length, 3, 'one noise tap per card');
+  assert.equal(log.buffers.length, 1 + INTRO_CUE.ticks.length + 1 + 3, 'swish, a tick per riffled card, the square-up, a tap per dealt card');
   assert.ok(log.osc.length >= 3 + 4 && log.osc.every((t) => t === 'sine'));
 });
 
