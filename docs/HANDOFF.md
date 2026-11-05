@@ -16,7 +16,7 @@ canonical + Open Graph + Twitter tags on `/`, `/auth.html`, `/careers.html`, `/p
 JSON-LD on `/`, and `noindex` (meta + `X-Robots-Tag` in `vercel.json`) on app, chat, explore and profile. Add any new
 public page to `sitemap.xml`.
 
-**2026-11-05, D-178:** the shuffle card backs are plain `--color-wine` with no lattice; logo, frame and motion unchanged.
+**2026-11-05, D-178:** the shuffle card backs are plain `--color-oxblood` (the member card's frame wine) with no lattice; logo, frame and motion unchanged.
 
 **2026-11-04, D-174:** the deck now arrives with a ~3 s solitaire-style shuffle (pack, split, riffle, square, deal and
 flip) and a matching shuffle sound. Files `site/scripts/deck-intro.js`, `INTRO_CUE` in `site/scripts/notify-sound.js`,
