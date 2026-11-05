@@ -94,3 +94,10 @@ test('renewal and copy helpers', () => {
   assert.match(askErrorText({ message: 'role_ask_cap' }), /3 roles a day/);
   assert.match(askErrorText({ code: '23505', message: 'x' }), /already asked/);
 });
+
+test('D-215: wordCount counts words for the 1000-word role description', async () => {
+  const { wordCount, ABOUT_WORDS_MAX } = await import('../../site/scripts/hiring.js');
+  assert.equal(ABOUT_WORDS_MAX, 1000);
+  assert.equal(wordCount(''), 0); assert.equal(wordCount('  '), 0);
+  assert.equal(wordCount(' React and  TypeScript\nteam '), 4);
+});

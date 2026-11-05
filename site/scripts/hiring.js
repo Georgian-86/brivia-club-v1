@@ -205,7 +205,10 @@ export const askFootLine = (signalsLeft, asksLeft) => {
 };
 export const ASK_MIN = 20;
 export const ASK_MAX = 500;
-export const ROLES_MAX = 3;
+// D-215 (0066): no cap on roles; a role's "A line about it" holds up to 1000 words (8000 characters).
+export const ABOUT_WORDS_MAX = 1000;
+export const ABOUT_CHARS_MAX = 8000;
+export const wordCount = (text) => (String(text ?? '').trim() ? String(text).trim().split(/\s+/).length : 0);
 
 // The answer to a failed ask, by the server's code / message.
 export const askErrorText = (error) => {

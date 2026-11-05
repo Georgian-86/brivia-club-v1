@@ -68,6 +68,7 @@ dialog.hiring-sheet::backdrop { background: color-mix(in srgb, var(--color-oxblo
 .hiring-label { display: flex; align-items: baseline; gap: var(--space-2); margin: 0; padding: 0; color: var(--color-ink-soft); font-size: var(--text-12); font-weight: 700; letter-spacing: .1em; text-transform: uppercase; }
 .hiring-optional { color: var(--color-ink-soft); font-weight: 500; letter-spacing: 0; text-transform: none; opacity: .85; }
 .hiring-count { margin-left: auto; color: var(--color-ink-soft); font-weight: 600; letter-spacing: 0; text-transform: none; font-variant-numeric: tabular-nums; }
+.hiring-count.is-over { color: var(--color-wine); }
 .hiring-help, .hiring-note { margin: 6px 0 0; color: var(--color-ink-soft); font-size: var(--text-12); line-height: 1.45; }
 .hiring-note { text-align: center; margin-top: var(--space-3); }
 .hiring-family { color: var(--color-wine); font-weight: 600; }

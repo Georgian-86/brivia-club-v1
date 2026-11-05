@@ -7,7 +7,7 @@
 import {
   FAMILIES, ROLE_TITLES, roleFor, LEVELS, LEVEL_HINT, MODES, HELP, levelLabel, modeLabel, helpBadge, roleMeta,
   roleTextIssue, lookingForRoles, defaultHelp, cardBarLabels, pickBarLabel, stripModel, hiringRowModel, daysLeft,
-  needsRenewal, askFootLine, askErrorText, ASK_MIN, ASK_MAX, ROLES_MAX, familyLabel,
+  needsRenewal, askFootLine, askErrorText, ASK_MIN, ASK_MAX, ABOUT_WORDS_MAX, ABOUT_CHARS_MAX, wordCount, familyLabel,
 } from './hiring.js';
 
 export const BAG_ICON = '<svg class="hiring-bag" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><rect x="3.5" y="7.5" width="17" height="12" rx="2"/><path d="M9 7.5V6a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v1.5M3.5 12.5h17"/></svg>';
@@ -211,9 +211,8 @@ export const createHiring = (deps) => {
   // Add a role / Edit a role.
   const openRoleSheet = (role = null, opener) => {
     const index = role ? state.roles.findIndex((r) => r.id === role.id) + 1 : state.roles.length + 1;
-    if (!role && state.roles.length >= ROLES_MAX) { showToast('You can have 3 roles at a time. Close one to add another.'); return; }
     const help = role?.help || defaultHelp(me()?.lookingFor);
-    const html = `<p class="hiring-eyebrow">Hiring · Role ${Math.min(index, ROLES_MAX)} of ${ROLES_MAX}</p><h2 id="hiring-role-title">${role ? 'Edit your <em>role.</em>' : 'Who are you <em>looking for?</em>'}</h2>`
+    const html = `<p class="hiring-eyebrow">Hiring · Role ${index}</p><h2 id="hiring-role-title">${role ? 'Edit your <em>role.</em>' : 'Who are you <em>looking for?</em>'}</h2>`
       + '<p class="hiring-lede">Members open to this kind of role see it on your card first. It stays up for 30 days.</p>'
       + '<form class="hiring-form" novalidate>'
       + chipPickerMarkup({ id: 'hiring-role-pick', label: 'ROLE TITLE', listLabel: 'Role title', placeholder: 'Pick a role or type your own', helper: 'Pick from the list or type the title you use.' })
@@ -223,7 +222,7 @@ export const createHiring = (deps) => {
       + segment('work_mode', MODES, role?.work_mode || 'hybrid', 'Where')
       + '<p class="hiring-help">On-site and hybrid roles show to members near your area, nearest first. Never a street or a city name.</p>'
       + segment('help', HELP, help, 'How you can help')
-      + `<div class="hiring-field"><label class="hiring-label" for="hiring-about">A line about it <span class="hiring-optional">optional</span><span class="hiring-count" data-count>0 / 200</span></label><textarea class="b-field" id="hiring-about" name="about" maxlength="200" rows="3" placeholder="The team, the stack, what you'd look for.">${esc(role?.about || '')}</textarea><p class="hiring-error" data-error="about" hidden></p></div>`
+      + `<div class="hiring-field"><label class="hiring-label" for="hiring-about">A line about it <span class="hiring-optional">optional</span><span class="hiring-count" data-count>0 / ${ABOUT_WORDS_MAX} words</span></label><textarea class="b-field" id="hiring-about" name="about" maxlength="${ABOUT_CHARS_MAX}" rows="5" placeholder="The team, the stack, what you'd look for.">${esc(role?.about || '')}</textarea><p class="hiring-error" data-error="about" hidden></p></div>`
       + `<button type="submit" class="hiring-primary"><span data-label>${role ? 'Save role' : 'Post role'}</span></button>`
       + '<p class="hiring-note">No links or fees. Members ask through Brivia, and you choose who to connect with.</p></form>';
     openSheet({
@@ -243,7 +242,7 @@ export const createHiring = (deps) => {
         dialog.querySelector('[data-picker="hiring-role-pick"]').addEventListener('keydown', () => window.setTimeout(showFamily, 0));
         const about = form.querySelector('#hiring-about');
         const count = form.querySelector('[data-count]');
-        const recount = () => { count.textContent = `${about.value.length} / 200`; };
+        const recount = () => { const n = wordCount(about.value); count.textContent = `${n} / ${ABOUT_WORDS_MAX} words`; count.classList.toggle('is-over', n > ABOUT_WORDS_MAX); };
         about.addEventListener('input', recount); recount();
         form.addEventListener('submit', async (event) => {
           event.preventDefault();
@@ -253,7 +252,7 @@ export const createHiring = (deps) => {
           const ok = [
             fieldError(form, 'title', !pick ? 'Pick or type the role you are hiring for.' : pick.title.length < 3 || pick.title.length > 60 ? 'Use 3 to 60 characters.' : roleTextIssue(pick.title)),
             fieldError(form, 'company', company && (company.length < 2) ? 'Use at least 2 characters.' : roleTextIssue(company)),
-            fieldError(form, 'about', roleTextIssue(text)),
+            fieldError(form, 'about', wordCount(text) > ABOUT_WORDS_MAX ? `Keep it to ${ABOUT_WORDS_MAX} words.` : roleTextIssue(text)),
           ].every(Boolean);
           if (!ok) { form.querySelector('.hiring-error:not([hidden])')?.closest('.hiring-field, .profile-edit-picker')?.querySelector('input, textarea')?.focus(); return; }
           const submit = form.querySelector('[type="submit"]');
@@ -266,7 +265,7 @@ export const createHiring = (deps) => {
           if (error) {
             const msg = String(error.message || '');
             if (msg.includes('no links')) fieldError(form, 'about', 'Links and contact details go in chat, after you connect.');
-            else if (msg.includes('role_cap')) showToast('You can have 3 roles at a time. Close one to add another.');
+            else if (msg.includes('about too long')) fieldError(form, 'about', `Keep it to ${ABOUT_WORDS_MAX} words.`);
             else showToast('Your role could not be saved. Please try again.');
             return;
           }
@@ -447,12 +446,12 @@ export const createHiring = (deps) => {
         return `<li><button type="button" class="hiring-card-row" data-hiring-manage="${esc(r.id)}" aria-label="Manage ${esc(r.title)}"><span class="hiring-card-row-copy"><strong>${esc(r.title)}</strong><span>${esc(line)}</span></span><span class="hiring-row-end">${pill}<span class="hiring-chev" aria-hidden="true">›</span></span></button></li>`;
       }).join('');
       const renewal = state.roles.find((r) => r.status === 'open' && needsRenewal(r));
-      html += `<div class="profile-card-head"><h2 class="profile-card-title" id="profile-hiring-title">You're hiring</h2><span class="profile-checklist-count">${state.roles.length} of ${ROLES_MAX} roles</span></div>`
+      html += `<div class="profile-card-head"><h2 class="profile-card-title" id="profile-hiring-title">You're hiring</h2><span class="profile-checklist-count">${state.roles.length} role${state.roles.length === 1 ? '' : 's'}</span></div>`
         + (rows ? `<ul class="hiring-card-roles">${rows}</ul>` : '<p class="profile-card-empty">Add the role you\'re hiring for, so members open to it can find you.</p>')
         + (renewal ? `<p class="hiring-card-alert">Still hiring a ${esc(renewal.title)}? It closes in ${daysLeft(renewal.expires_at)} day${daysLeft(renewal.expires_at) === 1 ? '' : 's'}.</p>` : '')
         + '<div class="hiring-card-actions">'
         + (waiting ? `<button class="profile-card-action" type="button" data-hiring-review>Review ${waiting} ask${waiting === 1 ? '' : 's'}</button>` : '')
-        + (state.roles.length < ROLES_MAX ? '<button class="profile-card-action" type="button" data-hiring-add>Add a role</button>' : '')
+        + '<button class="profile-card-action" type="button" data-hiring-add>Add a role</button>'
         + '</div>'
         + (state.roles.length ? `<p class="hiring-card-note">${live ? 'Your card shows "HIRING" to everyone. Members open to this kind of role see it first.' : 'Your banner goes live once your profile has a photo and a confirmed email.'}</p>` : '');
     }

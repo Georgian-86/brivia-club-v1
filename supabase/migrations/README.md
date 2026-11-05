@@ -1468,3 +1468,9 @@ Function. `search_companies` may be called without a session, and anon reads onl
 (`source <> 'member'`); members' own organisations stay signed-in only. The Edge Function's logo pass also tries the
 logo Wikidata lists for the company's name.
 Verify: `select has_function_privilege('anon', 'public.search_companies(text,int)', 'execute');` (true).
+
+## 0066
+
+**Unlimited roles, 1000-word descriptions (D-215).** Apply after `0065`, with the client deploy. `hiring_role.about`
+holds up to 8000 characters; `save_hiring_role` accepts up to 1000 words there and no longer caps open roles at 3.
+Verify: `select prosrc not like '%role_cap%' from pg_proc where proname = 'save_hiring_role';` (true).

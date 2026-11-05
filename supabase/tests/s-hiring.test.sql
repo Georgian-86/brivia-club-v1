@@ -5,7 +5,7 @@
 --   05 F far hirer (Delhi)            06 P seeker, findable, private company "Lumen Labs" (H's company)
 --   07 Q seeker, findable             08, 09, 10 more hirers over the bar (for the 3-a-day cap)
 --   11 B blocked by S                 30..54 waiting askers for the 25-per-role cap
--- H1 grants and shapes; H2 role validation and the 3-role cap; H3 the hiring bar; H4 the fit maths;
+-- H1 grants and shapes; H2 role validation, no role cap (0066) and the 1000-word about; H3 the hiring bar; H4 the fit maths;
 -- H5 member_hiring visibility; H6 hiring_suggestions both ways; H7 member_open_to; H8 asking and its caps;
 -- H9 25 waiting asks per role; H10 pause / open / renew / close; H11 report_fake_job; H12 the kill switch;
 -- H13 withdrawing intent and deleting a profile.
@@ -75,7 +75,7 @@ select 's-hiring.test H1 OK';
 
 -- H2 ---------------------------------------------------------------------------------------------------------------
 do $$
-declare v uuid;
+declare v uuid; v4 uuid;
 begin
   set local role authenticated;
   perform pg_temp.as_member(1);
@@ -91,8 +91,15 @@ begin
                                'React and TypeScript, a small product team.');
   perform public.save_hiring_role(null, 'Backend Developer', 'software', 'senior', 'onsite', 'refer', 'Lumen Labs', null);
   perform public.save_hiring_role(null, 'Design Intern', 'design', 'intern', 'remote', 'hiring', 'Lumen Labs', null);
-  if pg_temp.err($q$select public.save_hiring_role(null, 'Data Analyst', 'data', 'mid', 'remote', 'hiring', null, null)$q$) <> 'PT429' then
-    raise exception 'FAIL H2: a fourth role was accepted'; end if;
+  -- D-215 (0066): no cap on roles; the about holds 1000 words, not 1001.
+  if pg_temp.err($q$select public.save_hiring_role(null, 'Data Analyst', 'data', 'mid', 'remote', 'hiring', null, repeat('word ', 1001))$q$) <> '22001' then
+    raise exception 'FAIL H2: a 1001-word about was accepted'; end if;
+  v4 := public.save_hiring_role(null, 'Data Analyst', 'data', 'mid', 'remote', 'hiring', null, btrim(repeat('word ', 1000)));
+  if v4 is null then raise exception 'FAIL H2: a fourth role was refused'; end if;
+  reset role;
+  delete from public.hiring_role where id = v4;   -- the rest of this file expects three roles here
+  set local role authenticated;
+  perform pg_temp.as_member(1);
   if (select title from public.my_hiring_roles() where id = v) <> 'Frontend Developer' then raise exception 'FAIL H2: title not tidied'; end if;
   perform pg_temp.as_member(3);
   if pg_temp.err(format('select public.save_hiring_role(%L, %L, %L, %L, %L, %L)', v, 'Mine now', 'software', 'mid', 'hybrid', 'refer')) <> 'P0002' then

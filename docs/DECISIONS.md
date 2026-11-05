@@ -4003,3 +4003,11 @@ member). Supersedes the D-177 / D-188 photos (which matched each member's intere
 - Logos: 878 of 932 directory companies have one; the other 54 (mostly Indian banks and PSUs whose sites block icon
   fetches) never got one from the site-icon sources. The directory Edge Function's logo pass now also tries the logo
   Wikidata lists for the company's name; it runs when the function is deployed.
+
+## D-215 (2026-11-06): unlimited hiring roles; a role's description up to 1000 words
+
+- Founder (screenshots of the role sheet, "Role 2 of 3", "0 / 200"): "make the limit to 1000 words for this, also
+  hirings can be unlimited".
+- Done: 0066 drops the 3-open-roles cap from `save_hiring_role` and lets "A line about it" hold up to 1000 words (at
+  most 8000 characters, so one "word" cannot be a wall of text); still no links or contact details. The sheet says
+  "Hiring · Role N", counts "N / 1000 words", and the profile card always offers "Add a role" ("N roles").
