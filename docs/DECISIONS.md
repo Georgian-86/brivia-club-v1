@@ -3970,3 +3970,17 @@ member). Supersedes the D-177 / D-188 photos (which matched each member's intere
   Firecrawl (7 captures instead of one per photo) and each photo cut from the page; sources in supabase/seed/README.md.
   (Planned as D-194 while Firecrawl's credits were exhausted; done once they reset.)
 
+
+## D-213 (2026-11-05): a chat read on one device is read on all; the Hiring switch stays visible when on
+
+- Founder: "pls do clear old notifications once the user opens the chats on either phone or laptop, also the hiring
+  button once we turn on gets disappeared, how will user turn it off".
+- Notifications: the bell's "N messages from X" rows and the inbox's unread counts were kept per browser, so a chat
+  read on the phone stayed unread on the laptop. Read receipts (0042) cannot carry it (only set while both members have
+  them on). 0064 adds a private, own-rows-only marker `brivia_private.chat_seen` with `mark_chat_seen(other, at)` and
+  `my_chat_seen()`. Opening a conversation stores how far it was read; opening the Chats tab stores the time and clears
+  the bell's message rows (the inbox keeps its own unread counts). Every device pulls the marker every ~10 s and when
+  it comes back to the foreground. Locally, a message row is also cleared once its conversation was read up to it or
+  the member replied after it, which clears the stale rows already in the bell. Before 0064 the client works as before.
+- Hiring: `smooth.css` forced a cream background (`!important`) on `#hiring-toggle`, so when on, its cream label and
+  knob sat on cream: a blank white pill. The on state now keeps the deep-wine background. Checked in hiring.spec.

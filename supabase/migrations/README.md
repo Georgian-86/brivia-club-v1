@@ -1451,3 +1451,12 @@ first in the order; shown even if swiped before). `companion_deck` is unchanged 
 falls back to it until this is applied. `companion_events.to_see` counts the same way.
 Verify: `select count(*) from pg_proc where proname = 'companion_deck_v2';` (1).
 
+
+## 0064
+
+**Chats read on any device (D-213).** Apply after `0063`, with the client deploy. A private per-member marker,
+`brivia_private.chat_seen`: the newest message seen in each conversation, and when the Chats tab was last opened.
+`mark_chat_seen(other, at)` (other null for the tab) never moves it backwards; `my_chat_seen()` returns the caller's rows.
+Opening a chat, or the Chats tab, on one device clears the bell's message rows on the others. The client works as before
+until this is applied.
+Verify: `select count(*) from pg_proc where proname in ('mark_chat_seen', 'my_chat_seen');` (2).

@@ -366,6 +366,10 @@ export const setReadReceipts = (on) => rpcCall('set_read_receipts', { p_on: Bool
 export const myReadReceipts = () => rpcCall('my_read_receipts', {});
 export const markMessagesDelivered = () => rpcCall('mark_messages_delivered', {});
 export const markConversationRead = (otherId) => rpcCall('mark_conversation_read', { p_other: otherId });
+// D-213 (0064): the member's own "seen up to" per conversation, kept on the server so every device agrees. otherId null
+// is the Chats tab. Before 0064 both answer PGRST202 / 404 (isMissingFunction).
+export const markChatSeen = (otherId, at = null) => rpcCall('mark_chat_seen', { p_other: otherId || null, p_at: at });
+export const myChatSeen = () => rpcCall('my_chat_seen', {});
 export const setPresenceVisible = async (visible) => (supabase ? supabase.rpc('set_presence_visible', { p_visible: Boolean(visible) }) : notConfigured());
 export const myPresenceVisible = async () => (supabase ? supabase.rpc('my_presence_visible') : notConfigured());
 // Club events (0020, D-117). Before 0020 is applied each answers PGRST202 / 404 (isMissingFunction).

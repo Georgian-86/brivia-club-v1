@@ -21,6 +21,8 @@
   backdrop-filter: none !important;
   background-color: color-mix(in srgb, var(--color-cream) 93%, transparent) !important;
 }
+/* D-213: the Hiring switch when on stays deep wine with cream text (the cream above made it a blank white pill). */
+#hiring-toggle[aria-checked="true"] { background-color: var(--color-wine-deep) !important; }
 /* Already opaque: the blur behind it never showed. */
 .profile-photo-editor { -webkit-backdrop-filter: none !important; backdrop-filter: none !important; }
 

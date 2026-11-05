@@ -22,7 +22,7 @@ import '../styles/skeleton.css';
 import '../styles/aura-theme.css';
 import '../styles/handoff.css';
 import '../styles/ignition.css'; // D-186: the loading screen's title
-import { supabase, compressImageOnly, rowToProfile, saveProfile, isPresetCoverUrl, onboardingStatus, sendSignal, fetchSignalQuota, isRateLimited, isStorageImageUrl, withoutCredentials, uploadMessageAttachment, removeMessageAttachment, uploadCommunityPostImage, removeCommunityPostImage, ImageProcessingError, PHOTO_ERROR_MESSAGE, PHOTO_FRAMER_ERROR, compressAttachmentFiles, attachmentKind, reportMember, setSensitiveConsent, fetchSensitiveConsentAt, fetchMyInterests, fetchInterestNodes, addMemberInterest, isMissingFunction, touchPresence, connectionPresence, setPresenceVisible, myPresenceVisible, setMemberInterests, uploadResume, removeResume, resumeSignedUrl, resumeInfo, clearResumePath, searchPlaces, setHomeCity, setHomeLocation, listEvents, setEventRsvp, setCompanionDefault, myEventPrefs, eventCompanions, saveMemberEvent, cancelMemberEvent, deleteMemberEvent, uploadEventImage, removeEventImages, setEventInterest, setEventBrochure, uploadEventBrochure, removeEventBrochures, companionEvents, companionDeck, companionSwipe, companionQuota, createPaymentOrder, verifyPayment, sendEventTicket, editMessage, unsendMessage, deleteMessageForMe, myCompanionMatches, markCompanionMatchSeen, sendConnectRequest, setNearbyEnabled, myNearbySetting, nearbyPulse, nearbyClear, myNearbyAlerts, setNearbyMuted, nearbyDiscover, nearbyPass, nearbyConnect, myNearbyMatches, myNotifications, markNotificationsRead, dismissNotification, setNearbyRadius, savePushSubscription, deletePushSubscription, sendPendingPush, searchCompanies, searchCompanyDirectory, companyLogoUrl, addCompany, setMyWork, memberWork, uploadCompanyLogo, markMessagesDelivered, markConversationRead, setReadReceipts, myReadReceipts, chatPeopleSearch } from './supabase.js';
+import { supabase, compressImageOnly, rowToProfile, saveProfile, isPresetCoverUrl, onboardingStatus, sendSignal, fetchSignalQuota, isRateLimited, isStorageImageUrl, withoutCredentials, uploadMessageAttachment, removeMessageAttachment, uploadCommunityPostImage, removeCommunityPostImage, ImageProcessingError, PHOTO_ERROR_MESSAGE, PHOTO_FRAMER_ERROR, compressAttachmentFiles, attachmentKind, reportMember, setSensitiveConsent, fetchSensitiveConsentAt, fetchMyInterests, fetchInterestNodes, addMemberInterest, isMissingFunction, touchPresence, connectionPresence, setPresenceVisible, myPresenceVisible, setMemberInterests, uploadResume, removeResume, resumeSignedUrl, resumeInfo, clearResumePath, searchPlaces, setHomeCity, setHomeLocation, listEvents, setEventRsvp, setCompanionDefault, myEventPrefs, eventCompanions, saveMemberEvent, cancelMemberEvent, deleteMemberEvent, uploadEventImage, removeEventImages, setEventInterest, setEventBrochure, uploadEventBrochure, removeEventBrochures, companionEvents, companionDeck, companionSwipe, companionQuota, createPaymentOrder, verifyPayment, sendEventTicket, editMessage, unsendMessage, deleteMessageForMe, myCompanionMatches, markCompanionMatchSeen, sendConnectRequest, setNearbyEnabled, myNearbySetting, nearbyPulse, nearbyClear, myNearbyAlerts, setNearbyMuted, nearbyDiscover, nearbyPass, nearbyConnect, myNearbyMatches, myNotifications, markNotificationsRead, dismissNotification, setNearbyRadius, savePushSubscription, deletePushSubscription, sendPendingPush, searchCompanies, searchCompanyDirectory, companyLogoUrl, addCompany, setMyWork, memberWork, uploadCompanyLogo, markMessagesDelivered, markConversationRead, markChatSeen, myChatSeen, setReadReceipts, myReadReceipts, chatPeopleSearch } from './supabase.js';
 import { locateOnce, fallbackCopy } from './geo-locate.js';
 import { areaChangeMessage, AREA_HELPER, AREA_NO_MATCH } from './area-change.js';
 import { areaShareBody, parseAreaBody, resumeShareAttachment, resumeMessageFields, RESUME_SHARE_BODY, NO_RESUME_HINT, RESUME_GONE_COPY, RESUME_SHARE_NOTE, AREA_SHARE_NOTE } from './quick-share.js';
@@ -229,9 +229,78 @@ const chatUnreadCount = (personId) => unreadCount(chatMessages[personId], lastRe
 const markChatRead = (personId) => {
   sendReadReceipt(personId);
   const next = markRead(getChatReadState(), personId, chatMessages[personId]);
-  if (next === chatReadState) return;
-  chatReadState = next;
-  saveChatReadState();
+  if (next !== chatReadState) { chatReadState = next; saveChatReadState(); }
+  const at = chatReadState.read[String(personId)];
+  if (at) pushChatSeen(personId, at);
+};
+// D-213 (0064): what the member has seen is also kept on the server, so a chat read (or the Chats tab opened) on the
+// phone clears the laptop's bell and unread counts, and the other way round. Only the member's own rows; before 0064
+// both calls are missing and everything stays per device as before.
+let chatSeenMissing = false;
+let chatSeenInFlight = false;
+const chatSeenSent = {}; // personId ('' for the Chats tab) -> newest time already on the server
+const pushChatSeen = (personId, at) => {
+  if (chatSeenMissing || !supabase || !memberProfile.id || !Number.isFinite(Date.parse(at))) return;
+  const key = personId ? String(personId) : '';
+  if (chatSeenSent[key] && Date.parse(chatSeenSent[key]) >= Date.parse(at)) return;
+  const before = chatSeenSent[key];
+  chatSeenSent[key] = at;
+  const undo = () => { if (chatSeenSent[key] === at) { if (before) chatSeenSent[key] = before; else delete chatSeenSent[key]; } };
+  markChatSeen(personId || null, at).then(({ error }) => {
+    if (isMissingFunction(error)) chatSeenMissing = true;
+    else if (error) undo();
+  }).catch(undo);
+};
+// A message notification is read once its conversation was read up to it (here or on another device), once the member
+// replied after it, or once the Chats tab was opened after it. Returns whether anything changed.
+const reconcileMessageNotifications = (inboxSeenAt = 0) => {
+  const state = getChatReadState();
+  let changed = false;
+  notifications = notifications.map((notification) => {
+    if (notification.read || notification.type !== 'message') return notification;
+    const at = Date.parse(notification.createdAt);
+    if (!Number.isFinite(at)) return notification;
+    const readUpTo = Date.parse(lastReadAt(state, notification.personId));
+    const replied = (chatMessages[notification.personId] || []).some((m) => m.from === 'me' && Date.parse(m.createdAt) > at);
+    if (at > readUpTo && at > inboxSeenAt && !replied) return notification;
+    changed = true;
+    return { ...notification, read: true };
+  });
+  if (changed) saveNotifications();
+  return changed;
+};
+const applyChatSeen = (rows) => {
+  let state = getChatReadState();
+  let readChanged = false;
+  let inboxAt = 0;
+  rows.forEach((row) => {
+    const at = Date.parse(row?.seen_at);
+    if (!Number.isFinite(at)) return;
+    const key = row.other_id ? String(row.other_id) : '';
+    const iso = new Date(at).toISOString();
+    if (!chatSeenSent[key] || Date.parse(chatSeenSent[key]) < at) chatSeenSent[key] = iso;
+    if (!key) { inboxAt = Math.max(inboxAt, at); return; }
+    if (at > Date.parse(lastReadAt(state, key))) { state = { ...state, read: { ...state.read, [key]: iso } }; readChanged = true; }
+  });
+  if (readChanged) { chatReadState = state; saveChatReadState(); }
+  const notesChanged = reconcileMessageNotifications(inboxAt);
+  if (readChanged) renderChats();
+  if (readChanged || notesChanged) renderNotifications();
+};
+const pullChatSeen = async () => {
+  if (chatSeenMissing || chatSeenInFlight || !supabase || !memberProfile.id) return;
+  chatSeenInFlight = true;
+  try {
+    const { data, error } = await myChatSeen();
+    if (isMissingFunction(error)) { chatSeenMissing = true; return; }
+    if (!error && Array.isArray(data)) applyChatSeen(data);
+  } catch { /* next sync tries again */ } finally { chatSeenInFlight = false; }
+};
+// Opening the Chats tab clears the bell's message rows (the inbox keeps its own unread counts), on every device.
+const clearMessageNotificationsForInbox = () => {
+  const now = new Date().toISOString();
+  if (reconcileMessageNotifications(Date.parse(now))) renderNotifications();
+  pushChatSeen(null, now);
 };
 // D-150: tell the sender their messages were read, only while this conversation is on screen in a visible tab.
 const readReceiptInFlight = new Set();
@@ -257,7 +326,10 @@ const sendDeliveredReceipt = () => {
   markMessagesDelivered().then(({ error }) => { if (isMissingFunction(error)) receiptsMissing = true; })
     .catch(() => {}).finally(() => { deliveredInFlight = false; });
 };
-document.addEventListener('visibilitychange', () => { if (selectedChat) sendReadReceipt(selectedChat.id); });
+document.addEventListener('visibilitychange', () => {
+  if (selectedChat) sendReadReceipt(selectedChat.id);
+  if (document.visibilityState === 'visible') pullChatSeen();
+});
 const unreadMessageTotal = (conversations) => unreadTotal(conversations.map((p) => p.id), (id) => chatMessages[id], (id) => lastReadAt(getChatReadState(), id));
 // Desktop: the inbox rows scroll inside .chat-inbox-scroll; a wheel over the search box or the heading above them
 // scrolls the rows too (founder, 2026-10-28: the list only moved from its own scrollbar area).
@@ -760,10 +832,11 @@ const syncIncomingNotifications = async (rows = []) => {
   if (!notifications.length) notifications = readNotifications();
   let changed = false;
   rows.filter((message) => String(message.recipient_id) === String(memberProfile.id)).forEach((message) => { if (addMessageNotification(message)) changed = true; });
-  if (changed) renderNotifications();
+  if (changed) { reconcileMessageNotifications(Date.parse(chatSeenSent[''] || '') || 0); renderNotifications(); }
 };
 const ensureNotificationControls = () => {
   notifications = readNotifications();
+  reconcileMessageNotifications();
   renderNotifications();
   const button = document.querySelector('#app-notification-button');
   const panel = document.querySelector('#app-notification-panel');
@@ -1409,6 +1482,7 @@ const setView = (view) => {
   if (previousView === 'chat' || view === 'chat') { try { scheduleRowTyping(); } catch { /* best-effort */ } }
   // D-164: Nearby back to Curated deals the deck again (the member's tap also lets the sound play).
   if (view === 'explore' && previousView === 'nearby') deckIntro.played = false;
+  if (view === 'chat' && previousView !== 'chat' && memberProfile.id) clearMessageNotificationsForInbox();
   if (view === 'explore') renderExplore();
   if (view === 'home' || view === 'explore') { offerDeckTutorial(); window.setTimeout(syncDeckRitual, 0); }
   if (view === 'posts') {
@@ -3292,6 +3366,7 @@ const startMessageSync = () => {
   const sync = () => {
     if (selectedChat) { loadChatMessages(selectedChat); paintChatStatus(); }
     syncIncomingNotificationsFromServer().catch((error) => console.warn('Notification sync could not complete:', error.message));
+    if (connectionSyncTick % 2 === 0 && document.visibilityState === 'visible') pullChatSeen();
     // Every ~30 s: pick up new requests, and matches completed by the other member accepting.
     if (++connectionSyncTick % 6 === 1) {
       loadConnectionRequests().catch((error) => console.warn('Request sync could not complete:', error.message));
