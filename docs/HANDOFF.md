@@ -7,6 +7,10 @@ Update this file at the end of every session. CLAUDE.md holds the aim; this file
 
 ## 1. What is done
 
+**2026-11-05, D-210:** all 68 seeded members have new faceless profile photos (mirror selfies with the phone over the
+face, sky and city views from behind, sunset silhouettes, desks with laptops); same file names, so live with the deploy
+(no SQL). Delivers D-194.
+
 **2026-11-05, D-193:** seeded hiring roles and intents deleted live (hiring shows real members only); `hiring-test-members.sql` retired. D-194 (sky / desk / laptop / mirror-selfie photos for the seeded members) is scheduled for 21:00 UTC when the image-search credits refresh.
 
 **2026-11-05, D-191:** reply to any chat message (long-press > Reply; quote on the reply, tap to jump), migration 0055.

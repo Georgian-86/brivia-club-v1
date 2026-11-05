@@ -143,86 +143,85 @@ dashboard first (or accept orphaned test files; the orphan report in `docs/BREAC
 **Retired (D-193, 2026-11-05):** `hiring-test-members.sql` is no longer run: the founder removed every seeded hiring role
 and "Open to roles" entry from the live data. Running it again would bring them back.
 
-### Test hirer photos (D-177)
+### Seeded member photos (D-210; replaces the D-177 and D-188 sets)
 
-The 12 seeded hirers carry real-looking photos in which no face is visible, so no stranger's likeness sits on an
-invented profile (D-156). They are free photos under the Unsplash License, cropped to 480 px WebP, in
-`site/public/test-avatars/` (served at `/test-avatars/tNN.webp`):
-
-| File | Unsplash photo | Shows |
-|---|---|---|
-| t06 | photo-1515378791036-0648a3ef77b2 | Person in a mustard sweater on a laptop |
-| t08 | photo-1484480974693-6ca0a78fb36b | Hand writing a checklist |
-| t11 | photo-1507679799987-c73779587ccf | Suit, face out of frame |
-| t13 | photo-1517048676732-d65bc937f952 | Hands with notebooks at a meeting |
-| t18 | photo-1553877522-43269d4ea984 | Person seen from behind at a laptop |
-| t23 | photo-1521791136064-7986c2920216 | Handshake |
-| t25 | photo-1717496331312-3e8aacfa27a7 | Hands holding a tablet |
-| t26 | photo-1577100078279-b3445eae827c | Hands on a laptop, phone beside it |
-| t34 | photo-1516321318423-f06f85e504b3 | Hands pointing at a laptop |
-| t40 | photo-1486312338219-ce68d2c6f44d | Hands typing |
-| t42 | photo-1564697259644-03cd5e7363fa | Over-the-shoulder, tablet |
-| t50 | photo-1434030216411-0b793f4b4173 | Hand writing beside a coffee cup |
+Every seeded member (tNN = seed number NN, t61-t68 for any extra test rows) has a real photo, under the Unsplash
+License, in which no face can be seen: a mirror selfie with the phone or camera over the face, someone seen from behind
+against the sky or a city, a silhouette at sunset, or a desk with a laptop and coffee. That keeps any stranger's face off
+an invented profile (D-156). Men's and women's profiles get photos that match; the seeded hirers get desk and laptop
+photos; "Prefer not to say" and t61-t68 get neutral ones. Each is cropped to 480 px WebP in `site/public/test-avatars/`
+and was checked by eye for faces. File names are unchanged, so a deploy is all it takes (no SQL).
 
 Source URL: `https://images.unsplash.com/<photo>`. The purge script clears them with the profiles.
 
-### Faceless photos for every seeded member (D-188)
-
-Every other seeded member (tNN = seed number NN) has a faceless Unsplash License photo that fits their top interest:
-hands at work, an instrument, a camera, food, a book, a figure seen from behind. Found with Firecrawl image search,
-captured from the Unsplash photo page (the container cannot reach Unsplash directly), cropped to 480 px WebP, and
-checked by eye for faces. Page: `https://unsplash.com/photos/<slug>`.
-
-| File | Unsplash page slug | Shows |
+| File | Unsplash photo | Shows |
 |---|---|---|
-| t01 | close-up-of-a-hand-typing-on-a-computer-keyboard-Qh1degtlisQ | Hand typing on a keyboard |
-| t02 | a-worn-out-badminton-shuttlecock-held-by-a-hand-mtQqHRnqXaY | Shuttlecock held in a hand |
-| t03 | hiker-with-backpack-admiring-a-majestic-snow-capped-mountain-mxIj46EEvic | Hiker in silhouette below a snow peak |
-| t04 | hands-holding-a-vintage-camera-taking-a-picture-2Mi8hbjRXHM | Hands holding a vintage camera |
-| t05 | hand-writing-notes-in-a-notebook-at-a-desk-1rm4_SojyNM | Hand writing notes at a desk |
-| t07 | hands-typing-code-on-a-laptop-keyboard-xORqjEMmsRM | Hands typing code on a laptop |
-| t09 | hiker-enjoys-the-scenic-view-of-mountains-3U3-UZP8WjI | Hiker seen from behind, mountains |
-| t10 | hands-typing-code-on-a-laptop-computer-8pMT3J_gxJA | Hands typing code, dark desk |
-| t12 | hands-grinding-spices-in-a-bowl-with-bracelets-Vu7lfKQMwRo | Hands grinding spices |
-| t14 | white-badminton-shuttlecock-hVeOZslMjGA | Hand tossing a shuttlecock |
-| t15 | a-man-hiking-up-a-mountain-with-a-backpack-QTrSmMrmeAs | Hiker from behind on a ridge |
-| t16 | person-holding-camera-lens-7KLa-xLbSXA | Hand holding a lens to a lake |
-| t17 | a-close-up-of-a-persons-hand-on-a-laptop-ZN4MUOwkuA8 | Hand on a laptop touchpad |
-| t19 | a-close-up-of-a-person-typing-on-a-laptop-ThjsNSWZVx8 | Hands typing on a laptop |
-| t20 | hand-writing-in-a-notebook-on-a-white-desk-7MbJh7ge6y8 | Journal on a white desk |
-| t21 | a-man-riding-a-motorcycle-down-a-road-next-to-a-forest-pOqkzMljrVg | Motorcycle rider from behind |
-| t22 | a-close-up-of-a-person-typing-on-a-laptop-tj6sV9Z40f0 | Hands typing, laptop on knees |
-| t24 | a-person-holding-a-piece-of-bread-in-their-hands-uXzMtJ9etIU | Sourdough loaf broken open |
-| t27 | hands-holding-a-freshly-baked-loaf-of-sourdough-bread-smHpLKXZJA8 | Hands holding a sourdough loaf |
-| t28 | an-indoor-rock-climbing-wall-with-many-handholds-and-ropes-riMO975bfIc | Bouldering wall |
-| t29 | hand-holding-violin-bow-and-strings-YqSVAieps84 | Hand on a violin and bow |
-| t30 | hands-holding-a-loaf-of-freshly-baked-bread-JVY7VSBEhEo | Bread in a tin |
-| t31 | a-person-chopping-green-vegetables-on-a-cutting-board-WzrojlIzgyQ | Chopping greens |
-| t32 | a-person-climbing-up-the-side-of-a-mountain-pwFvjm4hcik | Hand on a rock face |
-| t33 | hands-typing-on-a-vintage-typewriter-with-paper-L8KoP71_hPY | Hands on a typewriter |
-| t35 | hands-type-on-an-old-black-typewriter-E1BQ3jb0blc | Hands on an old typewriter |
-| t36 | a-person-writing-on-a-notebook-next-to-a-typewriter-mR2VH9NMtdU | Notebook beside a typewriter |
-| t37 | a-close-up-of-a-person-playing-a-violin-KGGsJI6r-0U | Violin and bow, close |
-| t38 | hand-writing-in-a-notebook-with-pens-and-glasses-TIaRRl8wEWA | Hand writing, pens |
-| t39 | hand-holding-a-vintage-nikon-point-and-shoot-camera-QNf5-vAFAGU | Hand holding a film camera |
-| t41 | hands-holding-a-vintage-canon-camera-dHxSFSc5fX0 | Hands holding a Canon |
-| t43 | a-hand-holding-a-potted-plant-on-a-white-background-aRFyZYwfBro | Pot plant balanced on an arm |
-| t44 | hands-holding-a-game-controller-playing-a-video-game-DngE_t_zuTE | Hands with a game controller |
-| t45 | a-person-holding-a-violin-ya6PWTtPlkw | Fingers on violin strings |
-| t46 | hand-holding-a-black-nikon-point-and-shoot-camera-LQ6WtX0C0GQ | Hand holding a compact camera |
-| t47 | hands-slicing-red-onion-on-a-wooden-cutting-board-NzRZ0vzvgJs | Slicing a red onion |
-| t48 | hand-holding-a-vintage-film-camera-with-patterned-background-sZsdcnBsZqs | Hand holding a film camera |
-| t49 | a-hand-paints-watercolor-art-with-a-fine-brush-1UH_1YIZNYk | Hand painting watercolour |
-| t51 | person-looking-through-a-telescope-at-night-with-city-lights-OmR8BHt-q4E | Telescope silhouette at night |
-| t52 | a-close-up-of-paint-and-a-brush-on-a-piece-of-paper-oURTHj8kT-4 | Paint and brush on paper |
-| t53 | a-persons-hands-holding-a-book-and-a-cup-of-tea-EgYcr_N-UyE | Book and tea |
-| t54 | hands-holding-a-book-and-a-cup-of-coffee-0-qCTnUdRU8 | Hands with a book and coffee |
-| t55 | a-person-is-holding-a-cup-of-tea-and-reading-a-book-qLJ-M7EyoaY | Tea over an open book |
-| t56 | a-person-reading-a-book-by-a-window-shfeJo9uJ1I | Reading by a window, face out of frame |
-| t57 | a-man-riding-on-the-back-of-a-motorcycle-dZTBczLXC7k | Helmeted rider on a motorcycle |
-| t58 | a-person-reading-a-book-mVudmq8W_PU | Silhouette from behind at a window |
-
-Temporary: t59 to t68 are a second, tighter (and mostly mirrored) crop of another member's photo, because the Firecrawl
-credits ran out before ten more could be fetched: t59 from t55, t60 from t31, t61 from t39, t62 from t44, t63 from t20, t64 from t41, t65 from t09, t66 from t12, t67 from t37, t68 from t10.
-Replace them with their own photos when convenient (same file names; nothing else changes).
+| t01 | photo-1785663292283-04a0e6a3bb19 | Mirror selfie, camera over the face |
+| t02 | photo-1781165804627-9eb1486c40ce | Seen from behind over the city at dusk |
+| t03 | photo-1789981552903-504c5a33169c | White hoodie above the hills |
+| t04 | photo-1747374373804-df8fa149716e | Mirror selfie, camera over the face |
+| t05 | photo-1569291364147-60a038bda755 | Seen from behind over the city |
+| t06 | photo-1768295984707-64ab37e539dd | Latte beside a keyboard on a white desk |
+| t07 | photo-1743109811511-dbd694fb3457 | City skyline at night |
+| t08 | photo-1785474445369-409f6acec42b | Laptop and coffee on a monochrome desk |
+| t09 | photo-1757835777871-99894b28b001 | Red hoodie walking into mist |
+| t10 | photo-1782061817103-f8468fe4bdd6 | Seen from behind by a radio tower |
+| t11 | photo-1689467909244-631e55404336 | Seen from behind, working at two screens |
+| t12 | photo-1660421716577-c3ef88a85431 | Seen from behind at a pink sunset |
+| t13 | photo-1673442981926-fefc73d04878 | Laptop, tablet and coffee on a marble desk |
+| t14 | photo-1637175541493-6a6506fc08c0 | Round car mirror reflection |
+| t15 | photo-1657256794209-0daf23db892b | Silhouette against a violet sunset |
+| t16 | photo-1786152532472-caec53399382 | Seen from behind on a rooftop |
+| t17 | photo-1783244725627-6a2ce2815451 | Camera held over the face |
+| t18 | photo-1497032628192-86f99bcd76bc | Desk from above: laptop, coffee, notebook |
+| t19 | photo-1606055413678-7561ef89bbbc | Walking a road, seen from behind |
+| t20 | photo-1765953288011-8d405b2c611d | Silhouette at a sunset lake |
+| t21 | photo-1600753575717-9e38cce25f3c | Red top on a forest path |
+| t22 | photo-1764476751150-652d9bd827bd | Taking a photo of a city skyline |
+| t23 | photo-1763568258257-1e70fcf7b629 | Laptop, notebook and plant on a wooden desk |
+| t24 | photo-1500934550294-7f7f731ca2df | Seen from behind by a city skyline |
+| t25 | photo-1750322769212-fb7750247387 | Latte art beside a laptop |
+| t26 | photo-1630532852017-9b14723a72c5 | Laptop and iced coffee by a window |
+| t27 | photo-1522051654488-d1452aaa0ae8 | Hair in the wind above the city |
+| t28 | photo-1780545311196-f8b507b08b94 | Silhouette in golden light |
+| t29 | photo-1637946377734-196461199419 | Silhouette in the mountains at dusk |
+| t30 | photo-1711419398242-d8ca79c6e9c1 | Silhouette at sunset by the water |
+| t31 | photo-1479502806991-251c94be6b15 | Seen from behind on a city rooftop |
+| t32 | photo-1722934181894-eb1323604b84 | Walking a park path, seen from behind |
+| t33 | photo-1783746893555-9367486518ec | Sun hat, overlooking the city |
+| t34 | photo-1688158307264-c949b2d68ffe | Coffee and a leather wallet on a desk |
+| t35 | photo-1774325301564-736a5196e467 | White cap, overlooking a city road |
+| t36 | photo-1773561213080-cf7b71cda100 | Silhouette with the sun at hand height |
+| t37 | photo-1776792089618-d1509d0fb38f | Seen from behind by a tower at dusk |
+| t38 | photo-1634826833404-b51e7ddcc3b0 | Mirror selfie in a dark doorway |
+| t39 | photo-1640350410217-caf204697bb7 | Hands photographing city lights |
+| t40 | photo-1519639715757-0c88449f9048 | Laptop at a window desk |
+| t41 | photo-1753272363249-d9bd81d80f89 | Silhouette at a sunset balcony |
+| t42 | photo-1519445319698-eed4e883433f | Laptop, red mug and earbuds on a dark desk |
+| t43 | photo-1557938187-af371ef22476 | Silhouette at a misty window |
+| t44 | photo-1769373087942-9a9d383ac76a | Silhouette at sunset, face in shadow |
+| t45 | photo-1757883904576-9f2ff8f6a829 | Seen from behind over city lights |
+| t46 | photo-1761934798152-bf0c739808f7 | Back of the head at night |
+| t47 | photo-1586149663840-3d4dc1b6c681 | Seen from behind in black and white |
+| t48 | photo-1779081764094-150614ee6371 | Silhouette on the shore at sunset |
+| t49 | photo-1748674600938-c1f5938037d9 | Silhouette at a city window |
+| t50 | photo-1654686474914-bb98f6280d10 | Hands on a laptop by a window |
+| t51 | photo-1672412201014-d669c3461d1f | Plaid shirt walking a misty road |
+| t52 | photo-1638029351298-6f5966e8754c | Orange hoodie in a garden |
+| t53 | photo-1725668321489-6235729263ba | Silhouette on a beach at sunset |
+| t54 | photo-1751554827598-c96cb294c0e6 | Car mirror selfie with a camera |
+| t55 | photo-1752414284741-fe0883899553 | Small figure on a golden shore |
+| t56 | photo-1699259161877-9baf909bf1b7 | Hooded, seen from behind in the rain |
+| t57 | photo-1663079068226-6c303a769e0c | Silhouette at sunset over a lake |
+| t58 | photo-1671735551338-91362fb79a28 | Car mirror selfie at golden hour |
+| t59 | photo-1778945469600-bef900cec017 | Small figure under a dramatic sky |
+| t60 | photo-1642789009978-209023f28a5d | Phone held up at night |
+| t61 | photo-1724390409130-20e9b8ddf921 | Phone held up, taking a photo |
+| t62 | photo-1774269792790-bfa70fecb79a | Silhouette against a sunset sky |
+| t63 | photo-1765161794532-4dd677d321d2 | Silhouette on a hill at dusk |
+| t64 | photo-1777132769515-ea5d119ec102 | Seen from behind at sunset |
+| t65 | photo-1772234153865-71128db6ad87 | Grey hoodie, seen from behind |
+| t66 | photo-1724441400168-b46f8b0ff41e | Navy hoodie, seen from behind |
+| t67 | photo-1742522197047-0fbf649b17bc | Hood up, seen from behind |
+| t68 | photo-1610901190603-a334521b81b5 | Orange jacket on a snowy street |
 
