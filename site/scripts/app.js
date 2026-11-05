@@ -1194,7 +1194,9 @@ const companionsPage = createCompanionsPage({
   me: () => ({ name: memberProfile.name || 'You', photoUrl: memberProfile.photoUrl || memberProfile.photo_url || '' }),
   toast: (message) => showToast(message),
   isMissing: isMissingFunction,
-  openProfile: (person) => openPublicProfile({ id: person.id, name: person.name, image: person.photoUrl, photoUrl: person.photoUrl, role: person.headline || 'Brivia member', tags: person.interests }),
+  // D-211: a connected companion's profile says so and offers to text them to make a plan.
+  openProfile: (person) => openPublicProfile({ id: person.id, name: person.name, image: person.photoUrl, photoUrl: person.photoUrl, role: person.headline || 'Brivia member', tags: person.interests },
+    person.connected ? { status: 'connected', makePlan: true, onMessage: () => { void openCompanionConversation(person); } } : {}),
   openConversation: async (person) => { markCompanionSeenLocally(String(companionMatches.find((m) => m.otherId === String(person.id))?.id || '')); await openCompanionConversation(person); },
   goExplore: () => document.querySelector('[data-nav-host] [data-nav="events"]')?.click(),
   composer: connectComposer,
@@ -2452,7 +2454,8 @@ const openPublicProfile = (person, options = {}) => {
     + `<div class="public-profile-body">${bio ? `<p class="public-profile-bio">${escapeHtml(bio)}</p>` : ''}`
     + (groups || `<p class="public-profile-empty">${escapeHtml(firstName)} hasn't added interests yet.</p>`)
     + `</div>`
-    + (matched ? `<footer class="public-profile-actions"><button class="public-profile-message" type="button" data-public-profile-message>Message ${escapeHtml(firstName)}</button></footer>`
+    + (matched && options.makePlan ? `<footer class="public-profile-actions"><p class="public-profile-status public-profile-connected" role="status">You're already connected.</p><button class="public-profile-message" type="button" data-public-profile-message>Text ${escapeHtml(firstName)} · Make a plan</button></footer>`
+      : matched ? `<footer class="public-profile-actions"><button class="public-profile-message" type="button" data-public-profile-message>Message ${escapeHtml(firstName)}</button></footer>`
       : statusAction ? `<footer class="public-profile-actions">${statusAction}</footer>` : '')
     + `</section>`;
   document.body.append(modal);

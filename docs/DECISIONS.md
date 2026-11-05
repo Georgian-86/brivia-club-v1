@@ -3942,3 +3942,17 @@ Founder: "reduce the intro video before landing page a little". Supersedes D-201
 2.67 s and now holds for about a second; the landing starts fading in at 3.5 s (`INTRO_HOLD_MS`) and the intro is gone
 at 4.0 s, also the cap (`INTRO_CAP_MS`). Measured: gone at 3.96-3.98 s at 375 and 1440 px.
 
+## D-211 (2026-11-05): connections who want company show in Companions, with "Text them · Make a plan"
+
+Founder: "no matter if the person is added or not, if they turn on companion button i want their profile to be shown in
+that section, and when i view it, it must show you are already connected, and then a button of Text Them and make a
+plan". The deck (0023/0025) left out existing connections, so a friend going to the same event never appeared ("No one
+new for now").
+- 0063 `companion_deck_v2` includes them, flagged connected, first in the deck, even if swiped before (a new function
+  because the answer gains a column; the harness re-applies 0023, which cannot replace a function whose columns changed).
+- Their card reads "✓ You're already connected" and "Going too · text them to make a plan". Pass / Connect and swiping
+  give way to **Text <name> · Make a plan** (opens the chat) and **Next** (moves the card to the back; records nothing,
+  uses no swipe). Arrow keys do the same. Their profile, opened from the card, says "You're already connected." above
+  the same button.
+- Mutual consent is unchanged: only existing connections are marked, and nothing is sent or matched by viewing.
+

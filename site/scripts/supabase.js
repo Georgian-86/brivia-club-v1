@@ -389,7 +389,16 @@ export const saveMemberEvent = async (id, fields, publish) => {
 export const cancelMemberEvent = (id) => rpcCall('cancel_member_event', { p_id: id });
 // Find a Companion (0023, D-123). Before 0023 each answers PGRST202 (isMissingFunction).
 export const companionEvents = () => rpcCall('companion_events', {});
-export const companionDeck = (eventId, limit = 20) => rpcCall('companion_deck', { p_event: eventId, p_limit: limit });
+// D-211 (0063): v2 also lists connections who want company at the event (connected: true); v1 before 0063.
+let companionDeckV2Missing = false;
+export const companionDeck = async (eventId, limit = 20) => {
+  if (!companionDeckV2Missing) {
+    const v2 = await rpcCall('companion_deck_v2', { p_event: eventId, p_limit: limit });
+    if (!v2.error || !isMissingFunction(v2.error)) return v2;
+    companionDeckV2Missing = true;
+  }
+  return rpcCall('companion_deck', { p_event: eventId, p_limit: limit });
+};
 export const companionSwipe = (eventId, targetId, like) => rpcCall('companion_swipe', { p_event: eventId, p_target: targetId, p_like: Boolean(like) });
 // D-183 (0053): Razorpay payments for a held seat, and the emailed ticket. Each answers { data, error }; a function that
 // is not deployed yet answers an error the caller treats as "payments open soon".

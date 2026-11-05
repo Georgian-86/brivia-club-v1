@@ -48,6 +48,7 @@ export const normalizeCompanion = (row = {}) => ({
   shared: (Array.isArray(row.shared_interests) ? row.shared_interests : []).map(String).filter(Boolean).slice(0, 4),
   band: String(row.distance_band || '').trim(),
   sharedCount: Math.max(0, Number(row.shared_count) || 0),
+  connected: row.connected === true,   // D-211 (0063): already a connection; shown first, no swipe
 });
 
 // The professional line: 'Founder · Looking for Friends, Co-founder', or the shared interests when there is no headline.
@@ -69,8 +70,9 @@ export const companionCardMarkup = (person, { coverSrc = '', photoSrc = '', even
   const chips = person.interests.map((label) => `<li class="${shared.has(label.toLowerCase()) ? 'is-shared' : ''}">${escapeHtml(label)}${shared.has(label.toLowerCase()) ? '<span class="sr-only"> (you share this)</span>' : ''}</li>`).join('');
   const when = [shortEventDate(event.startsAt), event.venueName].filter(Boolean).join(' · ');
   const band = bandLine(person.band);
-  return `<article class="companion-card${current ? ' is-current' : ''}" data-companion-id="${escapeHtml(person.id)}" data-index="${index}" aria-label="${escapeHtml(`${person.name}, looking for a companion for ${event.title || 'this event'}`)}">
-  <div class="companion-card-bar"><span>Looking for a companion</span><button type="button" class="companion-card-more" data-companion-profile="${escapeHtml(person.id)}" aria-label="More about ${escapeHtml(person.name)}"><span aria-hidden="true">•••</span></button></div>
+  const label = person.connected ? `${person.name}, already connected, also looking for company at ${event.title || 'this event'}` : `${person.name}, looking for a companion for ${event.title || 'this event'}`;
+  return `<article class="companion-card${current ? ' is-current' : ''}${person.connected ? ' is-connected' : ''}" data-companion-id="${escapeHtml(person.id)}" data-index="${index}" aria-label="${escapeHtml(label)}">
+  <div class="companion-card-bar"><span>${person.connected ? "You're already connected" : 'Looking for a companion'}</span><button type="button" class="companion-card-more" data-companion-profile="${escapeHtml(person.id)}" aria-label="More about ${escapeHtml(person.name)}"><span aria-hidden="true">•••</span></button></div>
   <div class="companion-card-cover"${coverSrc ? '' : ' data-fallback'}>${coverSrc ? `<img src="${escapeHtml(coverSrc)}" alt="" loading="lazy" decoding="async" draggable="false" />` : ''}</div>
   <button type="button" class="companion-card-profile" data-companion-profile="${escapeHtml(person.id)}" aria-label="Open ${escapeHtml(person.name)}'s profile">
     <span class="companion-avatar">${photoSrc ? `<img src="${escapeHtml(photoSrc)}" alt="" draggable="false" />` : `<span aria-hidden="true">${escapeHtml(initials(person.name))}</span>`}</span>
@@ -82,7 +84,7 @@ export const companionCardMarkup = (person, { coverSrc = '', photoSrc = '', even
     ${chips ? `<ul class="companion-chips" aria-label="Interests">${chips}</ul>` : ''}
   </div>
   <p class="companion-event"${when ? ` title="${escapeHtml(when)}"` : ''}><span>Going to</span> ${escapeHtml(event.title || 'this event')}${when ? `<span class="sr-only">, ${escapeHtml(when)}</span>` : ''}</p>
-  <p class="companion-hint" aria-hidden="true">Swipe right to connect · left to pass</p>
+  <p class="companion-hint" aria-hidden="true">${person.connected ? 'Going too · text them to make a plan' : 'Swipe right to connect · left to pass'}</p>
   <span class="companion-stamp companion-stamp-pass" aria-hidden="true">Pass</span>
   <span class="companion-stamp companion-stamp-like" aria-hidden="true">Connect</span>
 </article>`;

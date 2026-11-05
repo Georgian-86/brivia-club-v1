@@ -146,3 +146,11 @@ body.app-body .companion-match-dialog .event-btn-primary { background: var(--cp-
   .companion-actions { gap: var(--space-6); }
 }
 @media (prefers-reduced-motion: reduce) { .companion-card, body.app-body .companion-action { transition: none; } .companion-card.is-skeleton { animation: none; } }
+
+/* D-211: a card of someone already connected: the bar says so in wine, and a text-them row stands in for Pass / Connect. */
+.companion-card.is-connected .companion-card-bar > span:first-child { font-weight: 700; }
+.companion-card.is-connected .companion-card-bar > span:first-child::before { content: "\2713\00a0"; }
+.companion-connected-actions { display: flex; flex-wrap: wrap; justify-content: center; gap: var(--space-3); margin-top: var(--space-6); }
+.companion-connected-actions[hidden] { display: none; }
+.companion-connected-actions [hidden] { display: none; }
+@media (max-width: 719px) { .companion-connected-actions { margin-top: var(--space-5); } }

@@ -41,6 +41,17 @@ export const createCompanionsPage = ({ root, api, safeImage, coverFor, me, toast
     quotaLine.setAttribute('aria-live', 'polite');
     actions.after(quotaLine);
   }
+  // D-211: for a card of someone already connected, a text-them row stands in for Pass / Connect (no swipe is used).
+  let connectedRow = root.querySelector('[data-companion-connected]');
+  if (!connectedRow && actions) {
+    connectedRow = document.createElement('div');
+    connectedRow.className = 'companion-connected-actions';
+    connectedRow.dataset.companionConnected = '';
+    connectedRow.hidden = true;
+    connectedRow.innerHTML = '<button type="button" class="event-btn event-btn-primary" data-companion-text>Text them · Make a plan</button>'
+      + '<button type="button" class="event-btn event-btn-ghost" data-companion-next>Next</button>';
+    actions.after(connectedRow);
+  }
   const renderQuota = () => {
     if (!quotaLine) return;
     const text = actions?.hidden ? '' : companionQuotaLabel(state.quota);
@@ -77,6 +88,7 @@ export const createCompanionsPage = ({ root, api, safeImage, coverFor, me, toast
   const empty = (title, copy, action = '') => {
     deckEl.innerHTML = `<div class="companion-empty" role="status"><h2>${title}</h2><p>${copy}</p>${action}</div>`;
     actions.hidden = true;
+    if (connectedRow) connectedRow.hidden = true;
     renderQuota();
   };
 
@@ -99,8 +111,22 @@ export const createCompanionsPage = ({ root, api, safeImage, coverFor, me, toast
     deckEl.innerHTML = `<div class="companion-row">${state.people.slice(0, VISIBLE).map((p, i) => companionCardMarkup(p, {
       coverSrc: coverFor(p.coverUrl), photoSrc: safeImage(p.photoUrl), event: ev, current: i === 0, index: i,
     })).join('')}</div>`;
-    actions.hidden = false;
     const current = deckEl.querySelector('.companion-card.is-current');
+    const first = state.people[0];
+    if (first.connected) {
+      actions.hidden = true;
+      if (connectedRow) {
+        connectedRow.hidden = false;
+        const text = connectedRow.querySelector('[data-companion-text]');
+        text.textContent = `Text ${first.name.split(/\s+/)[0]} · Make a plan`;
+        connectedRow.querySelector('[data-companion-next]').hidden = state.people.length < 2;
+      }
+      renderQuota();
+      status.textContent = `${first.name}. You're already connected. ${state.people.length} ${state.people.length === 1 ? 'person' : 'people'} to see.`;
+      return;
+    }
+    if (connectedRow) connectedRow.hidden = true;
+    actions.hidden = false;
     state.swipe = createDeckSwipe({
       card: current,
       stack: deckEl.querySelector('.companion-row'),
@@ -142,6 +168,14 @@ export const createCompanionsPage = ({ root, api, safeImage, coverFor, me, toast
     renderPicker();
     if (state.error || state.unavailable) { renderDeck(); return; }
     await loadDeck();
+  };
+
+  // D-211: Next on a connected card moves it to the back of the deck (nothing is recorded; it stays in the deck).
+  const nextConnected = () => {
+    if (state.people.length < 2) return;
+    state.people.push(state.people.shift());
+    renderDeck();
+    root.querySelector(state.people[0].connected ? '[data-companion-text]' : '#companion-like')?.focus({ preventScroll: true });
   };
 
   // D-124 "Make the first move.": Connect opens the composer. Send = the request with the message (it opens their chat
@@ -235,6 +269,9 @@ export const createCompanionsPage = ({ root, api, safeImage, coverFor, me, toast
   });
 
   root.addEventListener('click', (e) => {
+    if (e.target.closest('[data-companion-text]') && state.people[0]?.connected) { openConversation(state.people[0]); return; }
+    if (e.target.closest('[data-companion-next]')) { nextConnected(); return; }
+    if (state.people[0]?.connected && e.target.closest('#companion-pass, #companion-like')) return;
     if (e.target.closest('#companion-pass')) { decide(false); return; }
     if (e.target.closest('#companion-like')) { connect(); return; }
     if (e.target.closest('[data-companion-explore]')) { goExplore(); return; }
@@ -250,6 +287,11 @@ export const createCompanionsPage = ({ root, api, safeImage, coverFor, me, toast
   picker.addEventListener('change', () => { state.eventId = picker.value; loadDeck(); });
   root.addEventListener('keydown', (e) => {
     if (!state.people.length || e.target.closest('select, input, textarea') || e.altKey || e.metaKey || e.ctrlKey) return;
+    if (state.people[0].connected) {
+      if (e.key === 'ArrowLeft') { e.preventDefault(); nextConnected(); }
+      if (e.key === 'ArrowRight') { e.preventDefault(); openConversation(state.people[0]); }
+      return;
+    }
     if (e.key === 'ArrowLeft') { e.preventDefault(); decide(false); }
     if (e.key === 'ArrowRight') { e.preventDefault(); connect(); }
   });

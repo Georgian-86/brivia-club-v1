@@ -424,11 +424,11 @@ export const startAppStub = async ({ port, state = {}, deckRows = defaultDeckRow
       // D-123 Find a Companion (0023): st.companionEvents (companion_events rows; null answers PGRST202), st.companionDecks
       // ({ [event id]: companion_deck rows }), st.likedMe (ids who already liked me: a like on them matches), st.companionMatches
       // (my_companion_matches rows). A swipe removes the card; a match also adds a connection (matchIds).
-      if (['/rest/v1/rpc/companion_events', '/rest/v1/rpc/companion_deck', '/rest/v1/rpc/companion_swipe', '/rest/v1/rpc/my_companion_matches', '/rest/v1/rpc/mark_companion_match_seen'].includes(pathName) && !st.companionEvents) {
+      if (['/rest/v1/rpc/companion_events', '/rest/v1/rpc/companion_deck', '/rest/v1/rpc/companion_deck_v2', '/rest/v1/rpc/companion_swipe', '/rest/v1/rpc/my_companion_matches', '/rest/v1/rpc/mark_companion_match_seen'].includes(pathName) && !st.companionEvents) {
         return json(404, { code: 'PGRST202', message: 'Could not find the function' });
       }
       if (pathName === '/rest/v1/rpc/companion_events') return json(200, st.companionEvents.map((e) => ({ ...e, to_see: (st.companionDecks?.[e.event_id] || []).length })));
-      if (pathName === '/rest/v1/rpc/companion_deck') return json(200, st.companionDecks?.[args.p_event] || []);
+      if (pathName === '/rest/v1/rpc/companion_deck' || pathName === '/rest/v1/rpc/companion_deck_v2') return json(200, st.companionDecks?.[args.p_event] || []);
       if (pathName === '/rest/v1/rpc/companion_swipe') {
         (st.swipes ||= []).push(args);
         const deckRows = st.companionDecks?.[args.p_event] || [];

@@ -1443,3 +1443,11 @@ Verify: `select prosrc not like '%event_limit%' from pg_proc where proname = 'sa
 `club_event_category_check` and to `save_member_event`'s list (otherwise 0061's). `games` stays valid.
 Verify: `select pg_get_constraintdef(oid) like '%college%' from pg_constraint where conname = 'club_event_category_check';` (true).
 
+## 0063
+
+**Connections in Companions (D-211).** Apply after `0062`, with the client deploy. Adds `companion_deck_v2(event, limit)`:
+0025's deck plus members the caller is already connected with who want company at that event (a `connected` column;
+first in the order; shown even if swiped before). `companion_deck` is unchanged for the older client; the new client
+falls back to it until this is applied. `companion_events.to_see` counts the same way.
+Verify: `select count(*) from pg_proc where proname = 'companion_deck_v2';` (1).
+
