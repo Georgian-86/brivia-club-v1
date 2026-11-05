@@ -3884,3 +3884,14 @@ Frame by frame, the member's card appeared tilted mid-turn, held there for about
 Measured on a phone-sized page with the CPU slowed 4x: before, the angle sat at 1-2 degrees for up to 20 frames and then
 jumped to flat; after, it eases 88 -> 0 continuously. Timings are unchanged (the deal still ends by 3.1 s).
 
+## D-206 (2026-11-05): Share on an event offers Copy link
+
+Founder: "there must be a copy link option in the share button for every event". The drawer's Share button went
+straight to the device's share sheet (or, without one, copied silently), so on a laptop there was no visible way to copy
+the link. It now opens a small menu: **Copy link** (clipboard, with a fallback for in-app browsers; "Event link
+copied."), **WhatsApp** (wa.me with the title and link) and **More options** (the device's own share sheet, shown only
+where the browser has one). A real menu: arrow keys move through it, Escape closes it back to the button without
+closing the drawer, a click elsewhere closes it. Every published event has it.
+Also: a contact pasted from WhatsApp or a phone book can carry invisible direction marks or no-break spaces, which made
+a valid number ("91 78377 14469") fail the form's check. Those characters are now stripped before checking and saving.
+

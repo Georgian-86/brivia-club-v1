@@ -410,6 +410,20 @@ const ownerToolsMarkup = (event, confirm = null) => {
   return `<section class="event-owner" aria-label="Your event"><p class="app-eyebrow">YOUR EVENT</p>${counts}<div class="event-owner-tools">${tools}</div></section>`;
 };
 
+// D-206: the share menu under the drawer's share button: Copy link, WhatsApp, and the device's own share sheet (shown
+// only where the browser has one).
+const LINK_ICON = '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1"/><path d="M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/></svg>';
+const CHAT_ICON = '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M4 20l1.3-3.9A8 8 0 1 1 8 19.1Z"/></svg>';
+const MORE_ICON = '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 15V4M8 8l4-4 4 4M6 11v8h12v-8"/></svg>';
+const SHARE_MENU = `<div class="event-share-menu" id="event-share-menu" data-event-share-menu role="menu" aria-label="Share event" hidden>
+    <button type="button" role="menuitem" data-event-share-copy>${LINK_ICON}<span>Copy link</span></button>
+    <button type="button" role="menuitem" data-event-share-whatsapp>${CHAT_ICON}<span>WhatsApp</span></button>
+    <button type="button" role="menuitem" data-event-share-more>${MORE_ICON}<span>More options</span></button>
+  </div>`;
+// The link to an event (it opens Explore on that event) and a WhatsApp share of it.
+export const eventShareUrl = (id, origin = globalThis.location?.origin || 'https://thebriviaclub.live') => new URL(`/app.html?view=events&event=${encodeURIComponent(id)}`, origin).href;
+export const whatsappShareUrl = (title, url) => `https://wa.me/?text=${encodeURIComponent(`${String(title || '').trim()} ${url}`.trim())}`;
+
 // The drawer. opts: imageSrc (checked), friends, organizerSrc (checked), gallery ([checked URL]), preview (no actions),
 // confirm ('cancel' | 'delete': the organiser's inline confirmation), brochureSrc (a checked brochure PDF URL, D-125).
 export const eventDetailMarkup = (event, { imageSrc = '', friends = [], organizerSrc = '', gallery = [], preview = false, confirm = null, brochureSrc = '' } = {}) => {
@@ -427,7 +441,8 @@ export const eventDetailMarkup = (event, { imageSrc = '', friends = [], organize
       : others ? `${others} ${others === 1 ? 'person is' : 'people are'} looking for company.` : 'Be the first to look for company.';
   return `<div class="event-detail-media"${imageSrc ? '' : ' data-fallback'}>${imageSrc ? `<img src="${escapeHtml(imageSrc)}" alt="" />` : ''}${dateBadgeMarkup(event.startsAt)}
   ${preview ? '' : `<button type="button" class="event-detail-icon event-detail-back" data-event-close aria-label="Close event"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M19 12H5M11 6l-6 6 6 6"/></svg></button>
-  ${live ? '<button type="button" class="event-detail-icon event-detail-share" data-event-share aria-label="Share event"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 15V4M8 8l4-4 4 4M6 11v8h12v-8"/></svg></button>' : ''}`}
+  ${live ? `<button type="button" class="event-detail-icon event-detail-share" data-event-share aria-label="Share event" aria-haspopup="menu" aria-expanded="false" aria-controls="event-share-menu"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 15V4M8 8l4-4 4 4M6 11v8h12v-8"/></svg></button>
+  ${SHARE_MENU}` : ''}`}
 </div>
 <div class="event-detail-body">
   ${statusBadge(event) ? `<p class="event-detail-status${event.status === 'cancelled' ? ' is-cancelled' : ''}">${event.status === 'cancelled' ? 'Cancelled by the organiser' : 'Draft · only you can see this'}</p>` : ''}

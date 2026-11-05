@@ -402,3 +402,11 @@ body.app-body .event-companion-pill[aria-checked="true"] .event-switch-mini span
 
 /* D-198: an event already under way. */
 .event-now { color: var(--ev-wine, var(--color-wine)); font-weight: 700; }
+
+/* D-206: the share menu under the drawer's share button. */
+.event-share-menu { position: absolute; top: calc(var(--space-4) + 52px); right: var(--space-4); z-index: 3; display: grid; min-width: 200px; padding: 6px; border: 1px solid color-mix(in srgb, var(--ev-ink) 10%, transparent); border-radius: 14px; background: var(--ev-paper); box-shadow: 0 18px 40px -18px color-mix(in srgb, var(--ev-wine-deep) 55%, transparent); }
+.event-share-menu[hidden] { display: none; }
+body.app-body .event-share-menu button { display: flex; align-items: center; gap: 10px; min-height: 44px; padding: 0 12px; border: 0; border-radius: 10px; background: none; color: var(--ev-ink); font: inherit; font-size: var(--text-14); font-weight: 600; text-align: left; cursor: pointer; }
+body.app-body .event-share-menu button[hidden] { display: none; }
+body.app-body .event-share-menu button:hover, body.app-body .event-share-menu button:focus-visible { background: color-mix(in srgb, var(--ev-wine) 8%, transparent); outline: none; }
+.event-share-menu svg { width: 18px; height: 18px; flex: 0 0 18px; fill: none; stroke: var(--ev-wine); stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }

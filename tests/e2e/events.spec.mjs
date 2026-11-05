@@ -104,6 +104,30 @@ try {
     const axeDetail = await axeViolations(page, { include: '#event-detail' });
     check(`${w}: axe on the panel`, axeDetail.length === 0, JSON.stringify(axeDetail));
 
+    // D-206: Share opens a menu (Copy link, WhatsApp, More where the device has a share sheet); Copy link copies the
+    // event's link; Escape closes the menu and returns to the button, and the drawer stays open.
+    await page.evaluate(() => { window.__copied = null; try { Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText: async (t) => { window.__copied = t; } } }); } catch {} });
+    await page.locator('#event-detail [data-event-share]').click();
+    check(`${w}: Share opens the menu, focus on Copy link`, await page.locator('[data-event-share-menu]').isVisible()
+      && await page.locator('[data-event-share]').getAttribute('aria-expanded') === 'true'
+      && await page.evaluate(() => document.activeElement?.matches('[data-event-share-copy]')));
+    const items = await page.$$eval('[data-event-share-menu] [role="menuitem"]:not([hidden])', (els) => els.map((el) => el.textContent.trim()));
+    check(`${w}: the menu offers Copy link and WhatsApp (${items.join(', ')})`, items[0] === 'Copy link' && items.includes('WhatsApp'));
+    const axeShare = await axeViolations(page, { include: '[data-event-share-menu]' });
+    check(`${w}: axe on the share menu`, axeShare.length === 0, JSON.stringify(axeShare));
+    await shot(page, `share-menu-${w}.png`);
+    await page.keyboard.press('ArrowDown');
+    check(`${w}: arrow keys move through the menu`, await page.evaluate(() => document.activeElement?.matches('[data-event-share-whatsapp]')));
+    await page.keyboard.press('Escape');
+    check(`${w}: Escape closes the menu, not the drawer, and focus returns to Share`, await page.locator('[data-event-share-menu]').isHidden()
+      && await page.locator('#event-detail').isVisible() && await page.evaluate(() => document.activeElement?.matches('[data-event-share]')));
+    await page.locator('#event-detail [data-event-share]').click();
+    await page.locator('[data-event-share-copy]').click();
+    await page.waitForTimeout(200);
+    const copied = await page.evaluate(() => window.__copied);
+    check(`${w}: Copy link copies the event's link (${copied})`, /\/app\.html\?view=events&event=e-jam$/.test(copied || '') && await page.locator('[data-event-share-menu]').isHidden());
+    check(`${w}: and says so`, /Event link copied/.test(await page.locator('body').innerText()));
+
     // Register, then the companion switch (one RPC each, counts move once). D-121: the switch waits for a registration.
     check(`${w}: the companion switch is off-limits until registered`, await page.locator('[data-event-wants]').isDisabled());
     await page.locator('[data-event-going]').click();

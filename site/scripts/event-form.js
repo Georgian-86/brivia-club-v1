@@ -43,9 +43,11 @@ const PHOTO_EXTENSION = /\.(jpe?g|png|webp|heic|heif|avif|gif|bmp)$/i;
 const MAP_URL = /^https:\/\/((www\.)?google\.[a-z.]{2,8}\/maps|maps\.google\.[a-z.]{2,8}\/|maps\.app\.goo\.gl\/|goo\.gl\/maps\/|maps\.apple\.com\/|(www\.)?openstreetmap\.org\/)/;
 const UNSAFE = /["'<>\s\\]/;
 export const isMapUrl = (value) => { const v = String(value || '').trim(); return v.length <= 300 && !UNSAFE.test(v) && MAP_URL.test(v); };
-export const isContactEmail = (value) => /^[^@\s<>"']+@[^@\s<>"']+\.[^@\s<>"']+$/.test(String(value || '').trim()) && String(value).trim().length <= 254;
-export const isContactPhone = (value) => /^\+?[0-9][0-9 ()-]{6,19}$/.test(String(value || '').trim());
-export const isContactLink = (value) => { const v = String(value || '').trim(); return v.length <= 300 && /^https:\/\/[^\s"'<>\\]+$/.test(v); };
+export const isContactEmail = (value) => /^[^@\s<>"']+@[^@\s<>"']+\.[^@\s<>"']+$/.test(cleanContact(value)) && cleanContact(value).length <= 254;
+// D-206: a contact pasted from WhatsApp or a phone book can carry invisible direction marks and no-break spaces.
+export const cleanContact = (value) => String(value ?? '').replace(/[\u200B-\u200F\u202A-\u202E\u2060-\u2069\uFEFF]/g, '').replace(/[\u00A0\u2007\u202F]/g, ' ').trim();
+export const isContactPhone = (value) => /^\+?[0-9][0-9 ()-]{6,19}$/.test(cleanContact(value));
+export const isContactLink = (value) => { const v = cleanContact(value); return v.length <= 300 && /^https:\/\/[^\s"'<>\\]+$/.test(v); };
 
 export const emptyDraft = () => ({
   id: null, status: 'new', title: '', category: '', customCategory: '', description: '', date: '', endDate: '', startTime: '', endTime: '',
@@ -200,9 +202,9 @@ export const toServerFields = (draft) => ({
   map_url: String(draft.mapUrl || '').trim(),
   capacity: String(draft.capacity ?? '').trim(),
   fee_inr: draft.paid ? String(draft.fee ?? '').trim() : '0',
-  contact_email: String(draft.contactEmail || '').trim(),
-  contact_phone: String(draft.contactPhone || '').trim(),
-  contact_link: String(draft.contactLink || '').trim(),
+  contact_email: cleanContact(draft.contactEmail),
+  contact_phone: cleanContact(draft.contactPhone),
+  contact_link: cleanContact(draft.contactLink),
   contact_public: Boolean(draft.contactPublic),
   image_url: draft.imageUrl || '',
   gallery_urls: (draft.gallery || []).slice(0, LIMITS.gallery),

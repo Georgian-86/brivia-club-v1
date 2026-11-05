@@ -11,6 +11,7 @@
 import {
   visibleCategories, EVENTS_EMPTY, isEventCategory, normalizeEvent, withRsvp, filterEvents, nearbyEvents,
   eventCardMarkup, eventDetailMarkup, questionNote, companionStep, withInterest,
+  eventShareUrl, whatsappShareUrl,
 } from './events-view.js';
 import { eventImageSrc } from './event-assets.js';
 import { openCheckout } from './payment-checkout.js';
@@ -183,6 +184,38 @@ export const createEventsPage = ({ root, api, safeImage, toast, isMissing, sendH
 
   // D-183: a confirmed seat. The sound plays; a free seat asks the server for its ticket (a paid seat's ticket was sent
   // when the payment was confirmed). The toast only promises an email the server says it sent.
+  // D-206: the share menu.
+  const shareParts = () => ({ button: panel.querySelector('[data-event-share]'), menu: panel.querySelector('[data-event-share-menu]') });
+  const closeShareMenu = (focusButton) => {
+    const { button, menu } = shareParts();
+    if (!menu || menu.hidden) return;
+    menu.hidden = true;
+    button?.setAttribute('aria-expanded', 'false');
+    if (focusButton) button?.focus();
+  };
+  const toggleShareMenu = () => {
+    const { button, menu } = shareParts();
+    if (!menu) return;
+    if (!menu.hidden) { closeShareMenu(true); return; }
+    const more = menu.querySelector('[data-event-share-more]');
+    if (more) more.hidden = typeof navigator.share !== 'function';
+    menu.hidden = false;
+    button?.setAttribute('aria-expanded', 'true');
+    menu.querySelector('[role="menuitem"]')?.focus();
+  };
+  // Clipboard API first; the old textarea copy where it is not allowed (some in-app browsers).
+  const copyText = async (text) => {
+    try { await navigator.clipboard.writeText(text); return true; } catch { /* fall through */ }
+    try {
+      const area = document.createElement('textarea');
+      area.value = text; area.setAttribute('readonly', ''); area.style.cssText = 'position:fixed;top:0;left:0;opacity:0';
+      document.body.append(area); area.select();
+      const ok = document.execCommand('copy');
+      area.remove();
+      return ok;
+    } catch { return false; }
+  };
+
   const celebrate = async (event, { paid = false, emailed = null } = {}) => {
     api.playTicket?.();
     api.sendPendingPush?.();   // D-203: the organiser hears about the registration on their devices (0060's trigger)
@@ -380,14 +413,22 @@ export const createEventsPage = ({ root, api, safeImage, toast, isMissing, sendH
     if (t.closest('[data-event-confirm-no]')) { state.confirm = null; renderPanel(); panel.querySelector('[data-event-edit], [data-event-delete]')?.focus(); return; }
     const yes = t.closest('[data-event-confirm-yes]');
     if (yes) { yes.disabled = true; ownerAction(event, yes.dataset.eventConfirmYes); return; }
-    if (t.closest('[data-event-share]')) {
-      const url = new URL(`/app.html?view=events&event=${encodeURIComponent(event.id)}`, window.location.origin).href;
-      const done = () => toast('Event link copied.');
-      if (navigator.share) navigator.share({ title: event.title, url }).catch(() => {});
-      else navigator.clipboard?.writeText(url).then(done, () => toast(url));
+    // D-206: the share button opens a small menu: Copy link, WhatsApp, More options (the device's share sheet).
+    if (t.closest('[data-event-share]')) { toggleShareMenu(); return; }
+    const url = eventShareUrl(event.id);
+    if (t.closest('[data-event-share-copy]')) {
+      closeShareMenu(true);
+      copyText(url).then((ok) => toast(ok ? 'Event link copied.' : url));
+      return;
     }
+    if (t.closest('[data-event-share-whatsapp]')) { closeShareMenu(true); window.open(whatsappShareUrl(event.title, url), '_blank', 'noopener'); return; }
+    if (t.closest('[data-event-share-more]')) { closeShareMenu(true); navigator.share?.({ title: event.title, url }).catch(() => {}); return; }
   };
   [root, panel, backdrop].forEach((el) => el?.addEventListener('click', onClick));
+  // A click anywhere else in the drawer closes the share menu.
+  panel?.addEventListener('click', (e) => {
+    if (!e.target.closest?.('[data-event-share], [data-event-share-menu]')) closeShareMenu(false);
+  }, true);
 
   createButton?.addEventListener('click', () => {
     if (!composer) return;
@@ -425,6 +466,14 @@ export const createEventsPage = ({ root, api, safeImage, toast, isMissing, sendH
   });
 
   panel.addEventListener('keydown', (e) => {
+    const menu = panel.querySelector('[data-event-share-menu]');
+    if (menu && !menu.hidden) {
+      const items = [...menu.querySelectorAll('[role="menuitem"]:not([hidden])')];
+      const i = items.indexOf(document.activeElement);
+      if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); closeShareMenu(true); return; }
+      if (e.key === 'ArrowDown') { e.preventDefault(); items[(i + 1) % items.length]?.focus(); return; }
+      if (e.key === 'ArrowUp') { e.preventDefault(); items[(i - 1 + items.length) % items.length]?.focus(); return; }
+    }
     if (e.key === 'Escape' && panel.classList.contains('is-sheet')) { e.preventDefault(); e.stopPropagation(); closeSheet(); }
     if (e.key === 'Tab' && panel.classList.contains('is-sheet')) {
       const items = [...panel.querySelectorAll('button:not([disabled]), a[href], [tabindex="0"]')];
