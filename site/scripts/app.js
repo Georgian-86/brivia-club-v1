@@ -117,6 +117,7 @@ import '../styles/hiring.css';  // D-141: the hiring bar, banner, sheets and pro
 import '../styles/message-actions.css';  // D-157: the long-press message menu and the editing bar
 import '../styles/deck-ritual.css';  // D-179: the deck ritual's card backs (the daily-limit shuffle)
 import '../styles/components.css';  // D-105: the shared field, select, listbox and chip components, last so they win
+import '../styles/smooth.css';  // D-194: no backdrop blur on moving surfaces; a calm tab change (after everything)
 import { createHiring } from './hiring-ui.js';  // D-141
 import { interleaveLift } from './hiring.js';
 import { navMarkup, markCurrentNav, setChatBadges } from './app-nav.js';
@@ -1361,10 +1362,18 @@ const setView = (view) => {
   const renderedView = view === 'explore' ? 'home' : view;
   document.body.dataset.appView = view;
   document.body.classList.toggle('app-subview', view !== 'home');
+  const previousRendered = previousView === 'explore' ? 'home' : previousView;
   document.querySelectorAll('[data-view]').forEach((section) => {
     const isActive = section.dataset.view === renderedView;
     section.hidden = !isActive;
     section.classList.toggle('is-active', isActive);
+    // D-194: a different screen fades up instead of popping in (not on first load, not Curated <-> Explore).
+    if (isActive && previousRendered && previousRendered !== renderedView && section.classList.contains('app-view')) {
+      section.classList.remove('is-entering');
+      void section.offsetWidth;
+      section.classList.add('is-entering');
+      section.addEventListener('animationend', () => section.classList.remove('is-entering'), { once: true });
+    }
   });
   document.querySelectorAll('[data-nav]').forEach((button) => button.classList.toggle('is-active', button.dataset.nav === view));
   markCurrentNav(document, view);
@@ -1391,8 +1400,9 @@ const setView = (view) => {
     renderProfile();
     if (previousView !== 'profile' || !['ready', 'loading'].includes(profileInterests.status)) loadProfileInterests();
   }
-  // Reduced motion: jump, never glide ('instant' also beats html{scroll-behavior:smooth}).
-  window.scrollTo({ top: 0, behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'instant' : 'smooth' });
+  // D-194: a new screen starts at the top at once (a long glide from the old screen's position read as a jolt); the
+  // fade above carries the change. The same screen re-tapped still glides back up.
+  window.scrollTo({ top: 0, behavior: previousRendered !== renderedView || window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'instant' : 'smooth' });
 };
 
 const validViews = ['home', 'explore', 'events', 'posts', 'chat', 'profile', 'companions', 'nearby'];

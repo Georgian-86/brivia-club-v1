@@ -3743,3 +3743,16 @@ solitaire shuffle; D-179's intro deal and D-185's pile-and-flip deal are not use
 - **Pending (D-194):** the founder asked for sky, office-desk, laptop and mirror-selfie photos (real, not AI). The image
   search's credits ran out; the swap is scheduled for when they refresh (21:00 UTC).
 
+## D-195 (2026-11-05): smoother: no backdrop blur on moving surfaces, a calm tab change
+- **Asked:** "make the website more smooth".
+- **Measured** (Playwright, 4x CPU slowdown, phone and desktop): the app's screens already hold about 60 fps when
+  scrolled and switched; the landing's one long task (472 ms) is the 4K hero video starting. Headless Chrome has no GPU,
+  so the real cost was found by inventory: 28 surfaces used `backdrop-filter`, including the interest chips on the
+  swipe card (re-blurred on every frame of a swipe), the profile cards, the hint, the Curated/Nearby switch, the Hiring
+  switch and the inbox tabs, all of which scroll with the page. Safari re-blurs these on every scroll frame.
+- **Done** (`site/styles/smooth.css`, loaded last): those surfaces drop the blur and keep their look with a slightly more
+  opaque cream fill (they were already 66-82% opaque, so the blur barely showed); only the fixed top bar and tab bar
+  keep their glass. A tab change now jumps to the top at once (no long smooth scroll from the old position) and the new
+  screen fades up 8 px in 0.24 s (opacity and transform only; none under reduced motion; not between Curated and
+  Explore, which share a screen). The numbering note: D-194 is the scheduled photo swap.
+

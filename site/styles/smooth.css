@@ -1,0 +1,32 @@
+/* D-194 "make the website more smooth": GPU-light surfaces and a calm tab change.
+   A backdrop blur is recomputed by the browser every frame its content or the page behind it moves. On things that
+   scroll with the page, or ride on the swipe card, that cost lands on every scroll and swipe frame (worst in Safari).
+   They were already 66-82% opaque, so the blur barely showed: here they keep their look with a slightly more opaque
+   fill and no blur. The fixed top bar and tab bar keep theirs (they sit still; the blur reads as glass there).
+   Loaded last so it wins over the earlier theme files. Tokens only. */
+.app-view[data-view="home"] #swipe-tags > *,
+.app-view[data-view="home"] .member-tags span {
+  -webkit-backdrop-filter: none !important;
+  backdrop-filter: none !important;
+  background-color: color-mix(in srgb, var(--color-cream) 92%, transparent) !important;
+}
+.app-view[data-view="home"] .swipe-hint,
+.app-view[data-view="profile"] .profile-card,
+.community-post-empty {
+  -webkit-backdrop-filter: none !important;
+  backdrop-filter: none !important;
+  background-color: color-mix(in srgb, var(--color-cream) 88%, transparent) !important;
+}
+.connect-mode, #hiring-toggle, .inbox-tabs {
+  -webkit-backdrop-filter: none !important;
+  backdrop-filter: none !important;
+  background-color: color-mix(in srgb, var(--color-cream) 93%, transparent) !important;
+}
+/* Already opaque: the blur behind it never showed. */
+.profile-photo-editor { -webkit-backdrop-filter: none !important; backdrop-filter: none !important; }
+
+/* A tab change: the new screen fades up a few pixels (opacity and transform only, on the compositor). */
+@media (prefers-reduced-motion: no-preference) {
+  .app-view.is-entering { animation: app-view-in .24s cubic-bezier(.2, .7, .2, 1) both; }
+}
+@keyframes app-view-in { from { opacity: 0; transform: translate3d(0, 8px, 0); } to { opacity: 1; transform: none; } }
