@@ -7,6 +7,13 @@ Update this file at the end of every session. CLAUDE.md holds the aim; this file
 
 ## 1. What is done
 
+**2026-11-06, D-213 to D-217 (live):** migrations 0063-0066 applied, `directory` Edge Function v6, client deployed
+(main 76bd215). The intro is 4 s (D-213); connections who want company show first in Companions with "Text them · Make
+a plan" (D-214, 0063); opening a chat or the Chats tab clears message notifications on every device, and the Hiring
+switch stays visible when on (D-215, 0064); signup's Step 2 asks for title and organisation, with logos (D-216, 0065;
+continuing confirms 18+); unlimited hiring roles with 1000-word descriptions (D-217, 0066). Company logos: about 41
+directory companies (mostly Indian banks and PSUs) have no logo any source gives; they show their initials on a tile.
+
 **2026-11-05, D-211:** 25 seeded members' photos are now pets or instruments (matched to interests); no SQL.
 
 **2026-11-05, D-210:** all 68 seeded members have new faceless profile photos (mirror selfies with the phone over the
