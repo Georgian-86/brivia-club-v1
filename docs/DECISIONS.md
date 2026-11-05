@@ -3543,3 +3543,28 @@ D-164 deal (`deck-intro.js`); D-173's own intro deal is not used, only its daily
   hiring, explore-cards 74; no sideways scroll at 360/390 px during the deal; the card backs are removed afterwards.
   `launch-polish` (city search timeout) and `nearby` (D-138 settings row) fail the same way without this change.
 
+## D-180 (2026-11-05): the Brivia ignition: the opening title drawn live, with music; also the loading screen
+- **Asked (founder, 2026-11-05):** with a phone recording of the landing's intro video: "the loading video of brivia must
+  be like this, w a very good music effect, make this video clean and non blur".
+- **Found:** the intro shipped as `intro-video-1080.mp4` at about 58 kbps (soft, banded on the gradients), and phones
+  scaled it a further 1.55x (mobile-final-fixes.css), so it was blurry everywhere and worst on phones.
+- **Decision:** the title is no longer a video. `brivia-ignition.js` + `ignition.css` draw the same idea live: a
+  crimson point breathes in on black, ignites, stretches into a 1 px hairline streak with a soft flare, and THE BRIVIA
+  CLUB (Bodoni Moda 500, wide tracking) opens out of it from the centre letter; the point settles into a faint glow
+  behind the name. Vector text and CSS gradients, transforms and opacity only: sharp at any size and pixel density,
+  nothing to download but one preloaded font file (`font-display: block`, so it never flashes in a fallback face).
+  1.8 s, inside the landing's 2.5 s intro cap (Phase B). The video and its poster are deleted.
+- **Where:** the landing's first-visit intro (`#intro-burst`), and the "Opening your club" loading screen
+  (`.brivia-handoff` on auth.html and app.html, now on black) with a glint that runs along the streak while it waits.
+  Arriving on app.html from the sign-in hand-off shows the finished title (a still cut, not a restart).
+- **Music:** "the ignition", synthesised with Web Audio in the sound kit's key (B-flat): a low swell and a rising air
+  that draw in, a spark on the ignition, a soft low hit and a warm B-flat add 9 chord with a four-bell arpeggio on the
+  reveal, in a generated hall reverb; about 4.6 s with its tail. The loading screen after Log in / sign up plays it (a
+  gesture on that page lets it); the landing plays it when the browser allows sound, or from a tap during the intro
+  (part-way, so the chord still lands on the name), then brings the soundtrack in under its tail. Silent when the
+  visitor turned the landing sound off, and under reduced motion.
+- **Proof:** unit `brivia-ignition.test.mjs` (CSS and JS on one clock, order, cap, markup on all three pages with no
+  video, cue lands on the picture, plays part-way, never after the reveal); e2e landing (intro gone by 2.6 s), landing
+  sound, sounds, app-shell 214, password-reset, onboarding 269, signup 368 (its one failure, the denied-location city
+  list, fails the same without this change). Clean 1080p and phone renders with the music were sent to the founder.
+

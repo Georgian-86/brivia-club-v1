@@ -829,16 +829,7 @@
 
 /* The profile hero's phone layout lives in profile-layout.css (D-092). */
 
-/* Keep the original intro framing and only enlarge the intro slightly on
-   phones so its central message is easier to read. */
-@media (max-width:700px){
-  body:not(.app-body) .intro-burst .intro-video{
-    object-fit:contain!important;
-    object-position:center center!important;
-    transform:scale(1.55)!important;
-    transform-origin:center center!important;
-  }
-}
+/* The intro (D-180) is drawn live and sized by ignition.css; the old video's 1.55x phone zoom is gone. */
 
 /* Final mobile footer email size override. */
 @media(max-width:700px){

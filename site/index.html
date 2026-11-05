@@ -24,6 +24,7 @@
     <link rel="preload" as="image" href="./media/posters/hero-section-video.webp" media="(min-aspect-ratio: 10/16)" fetchpriority="high" />
     <link rel="preload" as="image" href="./media/posters/hero-portrait.webp" media="(max-aspect-ratio: 10/16)" fetchpriority="high" />
     <link rel="preload" as="font" type="font/woff2" fetchpriority="low" href="../node_modules/@fontsource/instrument-sans/files/instrument-sans-latin-700-normal.woff2" crossorigin />
+    <link rel="preload" as="font" type="font/woff2" href="../node_modules/@fontsource/bodoni-moda/files/bodoni-moda-latin-500-normal.woff2" crossorigin />
     <script>
       /* D-088: a sign-in that Supabase returns to the Site URL (this page) instead of auth.html goes straight on to the
          app, as auth.html does, rather than leaving the member on the landing holding a session. */
@@ -59,9 +60,8 @@
   </head>
   <body>
     <div class="intro-burst" id="intro-burst" role="status" aria-label="Introducing Brivia Club">
-      <video class="intro-video" muted playsinline preload="none" poster="./media/posters/intro-video.webp" aria-hidden="true">
-        <source src="./media/video/intro-video-1080.mp4" type="video/mp4" />
-      </video>
+      <!-- D-180: the opening title is drawn live (brivia-ignition.js, ignition.css), sharp at any size. -->
+      <div class="ignition" aria-hidden="true"><span class="ignition-flare"></span><span class="ignition-streak"></span><span class="ignition-core"></span><p class="ignition-word"><span class="ignition-letter" style="--d:7;--s:-1">T</span><span class="ignition-letter" style="--d:6;--s:-1">H</span><span class="ignition-letter" style="--d:5;--s:-1">E</span><span class="ignition-gap"></span><span class="ignition-letter" style="--d:3;--s:-1">B</span><span class="ignition-letter" style="--d:2;--s:-1">R</span><span class="ignition-letter" style="--d:1;--s:-1">I</span><span class="ignition-letter" style="--d:0;--s:0">V</span><span class="ignition-letter" style="--d:1;--s:1">I</span><span class="ignition-letter" style="--d:2;--s:1">A</span><span class="ignition-gap"></span><span class="ignition-letter" style="--d:4;--s:1">C</span><span class="ignition-letter" style="--d:5;--s:1">L</span><span class="ignition-letter" style="--d:6;--s:1">U</span><span class="ignition-letter" style="--d:7;--s:1">B</span></p></div>
     </div>
     <div class="cursor" aria-hidden="true"></div>
     <!-- D-063: one sound control for the whole landing (the music). -->

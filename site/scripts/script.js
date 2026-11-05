@@ -17,8 +17,9 @@ import { initGuidedSignup } from './signup-screens.js';
 import { signupFlowMode, resumeScreen } from './signup-flow.js';
 import { defaultCoverUrl, normalizeCoverUrl } from './cover-assets.js';
 import { DEFAULT_COVER_KEY, presetCoverPath, presetCoverStoredPath } from './preset-cover.js';
-import { motionAllowed, introPlan, pickHeroSource, markLoaded, INTRO_CAP_MS, INTRO_START_GRACE_MS } from './landing-motion.js';
+import { motionAllowed, introPlan, pickHeroSource, markLoaded, INTRO_CAP_MS } from './landing-motion.js';
 import { SOUND_LIMIT_MS, SOUND_STORAGE_KEY, soundPreference, soundPlan, isUnlockEvent, barsToSchedule } from './landing-sound.js';
+import { IGNITION, IGNITION_CUE, createIgnitionSound } from './brivia-ignition.js';
 import heroSoundtrackUrl from '../media/audio/hero-soundtrack.m4a?url';
 import { watchPasswordFields } from './password-reveal.js';
 import Lenis from 'lenis';
@@ -28,7 +29,9 @@ document.querySelectorAll('.skeleton img').forEach(markLoaded);
 
 const introBurst = document.querySelector('#intro-burst');
 const introSkip = introBurst?.querySelector('.intro-skip');
-const introVideo = introBurst?.querySelector('.intro-video');
+// D-180: the intro is the drawn Brivia ignition (no video). introClock lets the music code below join it: the cue
+// plays if the page may make sound now, or from a tap during the intro (part-way, so the chord still lands on the name).
+const introClock = { start: 0, active: false, cued: false, musicFrom: 0 };
 const landingMotion = motionAllowed({
   reducedMotion: Boolean(window.matchMedia?.('(prefers-reduced-motion: reduce)').matches),
   saveData: Boolean(navigator.connection?.saveData),
@@ -78,20 +81,17 @@ if (introBurst && plan === 'play') {
   const finishIntro = (fast = false) => {
     if (introDone) return;
     introDone = true;
+    introClock.active = false;
     document.body.classList.remove('intro-active');
     if (fast === true) introBurst.style.animationDuration = '.12s';
     introBurst.classList.add('is-skipped');
     window.setTimeout(() => introBurst.remove(), fast === true ? 160 : 500);
   };
-  introVideo?.addEventListener('ended', () => window.setTimeout(finishIntro, 400), { once: true });
-  if (introVideo) {
-    introVideo.muted = true;
-    introVideo.preload = 'auto';
-    introVideo.play().catch(() => {});
-  }
+  introClock.start = performance.now();
+  introClock.active = true;
+  // The title is drawn by CSS from the first frame; it holds for a moment on the name, then fades.
+  window.setTimeout(() => finishIntro(), Math.round(IGNITION.total * 1000 - 50));
   introSkip?.addEventListener('click', () => finishIntro());
-  // Never look stuck: if the video has not started within the grace period, fade out; hard cap either way.
-  window.setTimeout(() => { if (!introVideo || introVideo.currentTime === 0) finishIntro(); }, INTRO_START_GRACE_MS);
   // The cap counts from navigation start (not from when this script ran) and leaves room for the 120 ms fade.
   window.setTimeout(() => finishIntro(true), Math.max(0, INTRO_CAP_MS - 150 - Math.round(window.performance?.now?.() || 0)));
 }
@@ -236,7 +236,8 @@ const scheduleMusic = () => {
   if (!musicContext || musicState !== 'play') return;
   if (musicElapsedMs() >= SOUND_LIMIT_MS) { stopMusic('ended'); return; }
   if (!musicBuffer) { loadMusic(); return; }
-  if (musicNextBarAt === 0) musicNextBarAt = musicContext.currentTime + 0.05;
+  // After the intro's cue (D-180), the soundtrack comes in under its tail instead of over the chord.
+  if (musicNextBarAt === 0) musicNextBarAt = Math.max(musicContext.currentTime + 0.05, introClock.musicFrom || 0);
   for (const start of barsToSchedule({ now: musicContext.currentTime, nextBarAt: musicNextBarAt, barLength: musicBuffer.duration - MUSIC_CROSSFADE, lookahead: 1 })) {
     playMusicBar(start);
     musicNextBarAt = start + musicBuffer.duration - MUSIC_CROSSFADE;
@@ -250,9 +251,19 @@ const ensureMusicContext = () => {
   musicBus = musicContext.createGain();
   musicBus.gain.value = 0.0001;
   musicBus.connect(musicContext.destination);
-  musicContext.addEventListener?.('statechange', () => { if (musicContext.state === 'running' && musicState === 'wait') beginMusic(); });
+  musicContext.addEventListener?.('statechange', () => { if (musicContext.state === 'running') playIntroCue(); if (musicContext.state === 'running' && musicState === 'wait') beginMusic(); });
+  ignitionSound.prime(musicContext);
   return musicContext;
 };
+// D-180: the ignition's cue, once, while the intro is on screen and the page may make sound.
+const ignitionSound = createIgnitionSound();
+function playIntroCue() {
+  if (!introClock.active || introClock.cued || musicPreference === 'off' || musicContext?.state !== 'running') return;
+  const offset = (performance.now() - introClock.start) / 1000;
+  if (!ignitionSound.play(musicContext, musicContext.destination, { offset, volume: 0.9 })) return;
+  introClock.cued = true;
+  introClock.musicFrom = musicContext.currentTime + Math.max(0, IGNITION_CUE.length - offset - 1.6);
+}
 const beginMusic = () => {
   if (soundPlan({ preference: musicPreference, unlocked: musicContext?.state === 'running', playedMs: musicPlayedMs }) !== 'play') return;
   if (musicState === 'play') return;
@@ -291,8 +302,8 @@ const tryStartMusic = () => {
   if (musicPreference === 'off' || musicState === 'play' || musicState === 'ended') return;
   const context = ensureMusicContext();
   if (!context) return;
-  if (context.state === 'running') { beginMusic(); return; }
-  context.resume().then(() => { if (context.state === 'running') beginMusic(); }).catch(() => {});
+  if (context.state === 'running') { playIntroCue(); beginMusic(); return; }
+  context.resume().then(() => { if (context.state === 'running') { playIntroCue(); beginMusic(); } }).catch(() => {});
 };
 // Every gesture a browser accepts for audio, until the sound has really started (not once: a touchstart or a
 // scroll used to spend the one-shot listener without starting anything).
@@ -621,9 +632,33 @@ const authModal = document.querySelector('#auth-modal');
 // startHandoff shows it with a short note; endHandoff hides it again unless the page is already leaving for the app.
 let leavingForApp = false;
 const handoffNote = document.querySelector('[data-handoff-note]');
+// D-180: the loading screen is the Brivia ignition; shown after a sign-in (a gesture on this page), it plays its cue.
+// Its own audio context, so the landing soundtrack never starts here. Silent when the visitor turned the sound off.
+let handoffAudio = null;
+const handoffSound = createIgnitionSound();
+const wakeHandoffAudio = () => {
+  if (musicPreference === 'off') return null;
+  try {
+    const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+    if (!handoffAudio && AudioContextClass) { handoffAudio = new AudioContextClass(); handoffSound.prime(handoffAudio); }
+    if (handoffAudio?.state === 'suspended') handoffAudio.resume().catch(() => {});
+  } catch { handoffAudio = null; }
+  return handoffAudio;
+};
+if (document.querySelector('.brivia-handoff') && !isLandingPage) {
+  // Wake the context inside the sign-in's own gesture (a click or Enter), so it may play when the screen shows.
+  ['pointerdown', 'keydown'].forEach((name) => window.addEventListener(name, (event) => { if (isUnlockEvent(event) || event.type === 'pointerdown') wakeHandoffAudio(); }, { capture: true, passive: true }));
+}
 const startHandoff = (note = 'Opening your club') => {
   if (handoffNote) handoffNote.textContent = note;
-  document.documentElement.classList.add('brivia-handing-off');
+  const root = document.documentElement;
+  const showing = root.classList.contains('brivia-handing-off');
+  root.classList.add('brivia-handing-off');
+  if (showing || prefersReducedMotion) return;
+  const ctx = wakeHandoffAudio();
+  if (!ctx) return;
+  const go = () => { if (root.classList.contains('brivia-handing-off')) handoffSound.play(ctx, ctx.destination, { volume: 0.85 }); };
+  if (ctx.state === 'running') go(); else ctx.resume().then(go, () => {});
 };
 const endHandoff = () => {
   if (!leavingForApp) document.documentElement.classList.remove('brivia-handing-off');
@@ -2098,6 +2133,8 @@ const updateAuthScrollbar = () => {
 const redirectToApp = () => {
   leavingForApp = true;
   startHandoff();
+  // D-180: app.html shows the same loading title already drawn, so the page change is a still cut, not a restart.
+  try { window.sessionStorage.setItem('brivia-ignition-settled', String(Date.now())); } catch {}
   window.location.replace('/app.html');
 };
 // Back from Google (or the app) restores this page from the back/forward cache with the hand-off still up: undo it.

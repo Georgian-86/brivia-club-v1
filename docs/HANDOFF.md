@@ -7,6 +7,9 @@ Update this file at the end of every session. CLAUDE.md holds the aim; this file
 
 ## 1. What is done
 
+**2026-11-05, D-180:** the landing intro and the "Opening your club" loading screen are the Brivia ignition, drawn
+live (`brivia-ignition.js`, `ignition.css`) with its own music cue; the blurry 58 kbps intro video is gone.
+
 **2026-11-05, D-179:** the deck's opening deal is now a Solitaire deal: a face-down wine pile, cards dealt on arcs, the
 top card flips face-up with a bell (`deck-intro.js`, `.deck-intro-back` in deck.css). Client only, no migration.
 

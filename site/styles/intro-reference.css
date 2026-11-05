@@ -8,13 +8,8 @@
   background: #020304;
 }
 
-.intro-video {
-  display: block;
-  width: 100%;
-  height: 100%;
-  object-fit: contain;
-  background: #020304;
-}
+/* D-180: the intro is the drawn Brivia ignition (ignition.css), centred on black, with a faint wine bloom. */
+.intro-burst { background: radial-gradient(60% 45% at 50% 50%, rgb(90 6 31 / .2), transparent 70%), #020304; }
 
 .intro-burst.is-skipped {
   animation: intro-video-exit .45s cubic-bezier(.76, 0, .24, 1) forwards;

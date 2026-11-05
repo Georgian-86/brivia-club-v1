@@ -3,6 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, interactive-widget=resizes-content" />
+    <link rel="preload" as="font" type="font/woff2" href="../node_modules/@fontsource/bodoni-moda/files/bodoni-moda-latin-500-normal.woff2" crossorigin />
     <link rel="icon" href="/favicon.ico" sizes="48x48" />
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
@@ -11,9 +12,11 @@
     <meta name="theme-color" content="#101016" />
     <title>Brivia Club · Discover your kind</title>
     <style>.app-nav-button{text-decoration:none}.app-view[hidden]{display:none!important}</style>
+    <!-- D-180: arriving from the sign-in hand-off, the loading title is already drawn; it stays still instead of starting over. -->
+    <script>try{var t=Number(sessionStorage.getItem('brivia-ignition-settled'));sessionStorage.removeItem('brivia-ignition-settled');if(t&&Date.now()-t<20000)document.documentElement.classList.add('ignition-settled')}catch(e){}</script>
   </head>
   <body class="app-body app-auth-pending">
-    <div class="brivia-handoff" role="status" aria-live="polite"><div><p class="brivia-handoff-mark"><em>the</em>Brivia Club</p><div class="brivia-handoff-line" aria-hidden="true"></div><p class="brivia-handoff-note" data-handoff-note>Opening your club</p></div></div>
+    <div class="brivia-handoff" role="status" aria-live="polite"><div class="brivia-handoff-stage"><p class="brivia-handoff-label">The Brivia Club</p><div class="ignition" aria-hidden="true"><span class="ignition-flare"></span><span class="ignition-streak"></span><span class="ignition-core"></span><p class="ignition-word"><span class="ignition-letter" style="--d:7;--s:-1">T</span><span class="ignition-letter" style="--d:6;--s:-1">H</span><span class="ignition-letter" style="--d:5;--s:-1">E</span><span class="ignition-gap"></span><span class="ignition-letter" style="--d:3;--s:-1">B</span><span class="ignition-letter" style="--d:2;--s:-1">R</span><span class="ignition-letter" style="--d:1;--s:-1">I</span><span class="ignition-letter" style="--d:0;--s:0">V</span><span class="ignition-letter" style="--d:1;--s:1">I</span><span class="ignition-letter" style="--d:2;--s:1">A</span><span class="ignition-gap"></span><span class="ignition-letter" style="--d:4;--s:1">C</span><span class="ignition-letter" style="--d:5;--s:1">L</span><span class="ignition-letter" style="--d:6;--s:1">U</span><span class="ignition-letter" style="--d:7;--s:1">B</span></p></div><p class="brivia-handoff-note" data-handoff-note>Opening your club</p></div></div>
     <div class="app-wrap">
       <header class="app-topbar"><a class="app-brand" href="/"><span class="app-brand-prefix">the</span><strong>Brivia Club</strong></a><nav class="app-header-nav" data-nav-host="header" aria-label="Member navigation"></nav><button class="app-notification-button" id="app-notification-button" type="button" aria-label="Notifications" aria-controls="app-notification-panel" aria-expanded="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6.8 10.4a5.2 5.2 0 0 1 10.4 0c0 5 2 5.7 2 7.1H4.8c0-1.4 2-2.1 2-7.1ZM9.8 20h4.4"/></svg><i id="notification-badge" hidden>0</i></button><button class="app-avatar-button" id="app-avatar-button" data-nav="profile" aria-label="Open profile"></button><div class="notification-panel" id="app-notification-panel" hidden role="dialog" aria-label="Notifications"><div class="notification-panel-head"><strong>NOTIFICATIONS</strong><button type="button" id="notification-mark-all">MARK ALL READ</button></div><div class="notification-list" id="notification-list"></div></div></header>
       <main class="app-main">

@@ -17,6 +17,7 @@ import '../styles/signup-classic.css';
 import '../styles/emoji-field.css';  // D-113: the emoji panel under the signup bio
 import '../styles/aura-theme.css';
 import '../styles/handoff.css';
+import '../styles/ignition.css'; // D-180
 import '../styles/password-reveal.css';
 // Login on phones: the telephone back on top, one-line title (D-096). Loads last.
 import '../styles/auth-mobile.css';

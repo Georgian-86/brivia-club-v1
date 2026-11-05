@@ -1,0 +1,117 @@
+/* The Brivia ignition (D-180, brivia-ignition.js): the club's opening title on black. A crimson point breathes in,
+   ignites, stretches into a hairline streak, and THE BRIVIA CLUB opens out of it from the centre. Used by the landing's
+   first-visit intro and by the "Opening your club" loading screen (handoff.css). Vector text and gradients only, so it
+   is sharp at any size; transforms and opacity only, so it stays on the compositor. The resting styles are the final
+   frame: prefers-reduced-motion simply drops the animations. Times below are unit-tested against IGNITION. */
+
+/* block, not swap: the title must never flash in a fallback face mid-reveal; the pages preload this file. */
+@font-face { font-family: 'Brivia Title'; font-style: normal; font-weight: 500; font-display: block;
+  src: url('../../node_modules/@fontsource/bodoni-moda/files/bodoni-moda-latin-500-normal.woff2') format('woff2'); }
+
+.ignition {
+  --ign-total: 1.8s;
+  --ign-ignite: .4s;
+  --ign-reveal: .8s;
+  --ign-letter-at: .68s;
+  --ign-letter-step: .035s;
+  --ign-letter-dur: .5s;
+  --ign-crimson: #d4204f;
+  --ign-ember: #7a0a2c;
+  --ign-hot: #ffe1e8;
+  --ign-cream: #f4ebe6;
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: min(88vw, 820px);
+  height: 160px;
+  pointer-events: none;
+  user-select: none;
+}
+.ignition > * { grid-area: 1 / 1; }
+
+/* The point of light: a hot centre in a crimson glow. */
+.ignition-core {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: radial-gradient(circle, #fff 0 28%, var(--ign-hot) 42%, var(--ign-crimson) 70%, transparent 72%);
+  box-shadow: 0 0 8px 2px rgb(212 32 79 / .8), 0 0 28px 10px rgb(122 10 44 / .5), 0 0 70px 26px rgb(122 10 44 / .22);
+  opacity: .28;
+  transform: scale(.75);
+  animation: ign-core var(--ign-total) linear both;
+}
+/* The streak: a 1 px hairline, hot in the middle, crimson towards the ends, gone at the edges. */
+.ignition-streak {
+  position: relative;
+  width: 100%;
+  height: 1px;
+  background: linear-gradient(90deg, transparent 4%, rgb(122 10 44 / .35) 14%, rgb(212 32 79 / .7) 32%, var(--ign-hot) 50%, rgb(212 32 79 / .7) 68%, rgb(122 10 44 / .35) 86%, transparent 96%);
+  opacity: .42;
+  animation: ign-streak var(--ign-total) linear both;
+}
+/* The flare: a soft horizontal bloom around the streak (light, not text: the letters themselves stay crisp). */
+.ignition-flare {
+  width: 74%;
+  height: 46px;
+  background: radial-gradient(50% 50% at 50% 50%, rgb(212 32 79 / .34), rgb(122 10 44 / .12) 55%, transparent 72%);
+  opacity: .5;
+  animation: ign-flare var(--ign-total) linear both;
+}
+.ignition-word {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  justify-content: center;
+  margin: 0;
+  margin-right: -.62em; /* the tracking after the last letter, so the word is optically centred */
+  color: var(--ign-cream);
+  font-family: 'Brivia Title', 'Bodoni Moda', Didot, 'Bodoni 72', 'Times New Roman', serif;
+  font-size: clamp(13px, 1.45vw, 21px);
+  font-weight: 500;
+  line-height: 1;
+  letter-spacing: .62em;
+  white-space: nowrap;
+  text-rendering: geometricPrecision;
+  -webkit-font-smoothing: antialiased;
+}
+.ignition-letter {
+  display: inline-block;
+  animation: ign-letter var(--ign-letter-dur) cubic-bezier(.2, .7, .2, 1) calc(var(--ign-letter-at) + var(--d) * var(--ign-letter-step)) both;
+}
+.ignition-gap { display: inline-block; width: .5em; }
+
+@keyframes ign-core {
+  0%, 2.5% { opacity: 0; transform: scale(.2); }
+  19% { opacity: 1; transform: scale(1); }
+  22.2% { opacity: 1; transform: scale(1.75); animation-timing-function: cubic-bezier(.2, .7, .2, 1); }
+  34% { opacity: 1; transform: scale(1); }
+  44.4% { opacity: 1; transform: scale(1); }
+  70% { opacity: .28; transform: scale(.75); }
+  100% { opacity: .28; transform: scale(.75); }
+}
+@keyframes ign-streak {
+  0%, 22.2% { opacity: 0; transform: scaleX(.002); }
+  22.7% { opacity: 1; transform: scaleX(.01); animation-timing-function: cubic-bezier(.16, 1, .3, 1); }
+  44.4% { opacity: 1; transform: scaleX(1); }
+  70% { opacity: .42; transform: scaleX(1); }
+  100% { opacity: .42; transform: scaleX(1); }
+}
+@keyframes ign-flare {
+  0%, 20% { opacity: 0; transform: scale(.08, .5); }
+  28% { opacity: .95; transform: scale(.45, 1); animation-timing-function: cubic-bezier(.16, 1, .3, 1); }
+  44.4% { opacity: .8; transform: scale(1, 1); }
+  100% { opacity: .5; transform: scale(1, 1); }
+}
+@keyframes ign-letter {
+  from { opacity: 0; transform: translateX(calc(var(--s) * -.55em)); color: var(--ign-hot); }
+  55% { opacity: 1; }
+  to { opacity: 1; transform: none; color: var(--ign-cream); }
+}
+
+@media (max-width: 520px) {
+  .ignition { height: 130px; }
+  .ignition-word { font-size: 13px; letter-spacing: .5em; margin-right: -.5em; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .ignition, .ignition * { animation: none !important; }
+}
