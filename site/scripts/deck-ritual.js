@@ -121,6 +121,10 @@ export const markIntroPlayed = (storage = globalThis.sessionStorage) => { try { 
 // stack: #swipe-stack (holds #swipe-card and the peek layers). cue(name): the sound kit's ritual cue ('deal' |
 // 'complete'); it is never awaited. Returns { intro, complete, clear, busy, isComplete }.
 const escapeHtml = (value) => String(value ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const COMPLETE_ICON = '<svg class="deck-complete-icon" viewBox="0 0 48 48" aria-hidden="true" focusable="false">'
+  + '<rect x="7" y="9" width="17" height="25" rx="2.5" transform="rotate(-16 15.5 21.5)"/>'
+  + '<rect x="21" y="12" width="17" height="25" rx="2.5" transform="rotate(12 29.5 24.5)" class="deck-complete-icon-front"/>'
+  + '<path d="M29.6 28.2c-2.6-1.7-4.2-3.2-4.2-5a2.2 2.2 0 0 1 4.1-1.1 2.2 2.2 0 0 1 4.1 1.1c0 1.8-1.6 3.3-4 5Z" transform="rotate(12 29.5 24.5)"/></svg>';
 const BACK_FACE = '<span class="deck-back-frame" aria-hidden="true"></span><span class="deck-back-mark" aria-hidden="true"><i>the</i> Brivia Club</span>';
 
 export const createDeckRitual = ({ stack, cue = () => {}, win = globalThis.window, doc = globalThis.document } = {}) => {
@@ -236,8 +240,10 @@ export const createDeckRitual = ({ stack, cue = () => {}, win = globalThis.windo
 
   const message = (quota) => {
     const words = completionCopy(quota);
-    return `<div class="deck-complete-face" role="status" aria-live="polite"><span class="deck-complete-eyebrow">The Brivia Club</span>`
-      + `<h2 class="deck-complete-title">${escapeHtml(words.title)}</h2><p class="deck-complete-copy">${escapeHtml(words.copy)}</p>`
+    // D-189: the two-card icon of the shuffle's front card; the title's last word in wine italic ("today.").
+    const title = escapeHtml(words.title).replace(/(\S+)$/, '<em>$1</em>');
+    return `<div class="deck-complete-face" role="status" aria-live="polite">${COMPLETE_ICON}<span class="deck-complete-eyebrow">The Brivia Club</span>`
+      + `<h2 class="deck-complete-title">${title}</h2><p class="deck-complete-copy">${escapeHtml(words.copy)}</p>`
       + `<p class="deck-complete-refresh">${escapeHtml(words.refresh)}</p></div>`;
   };
   const showMessage = (backs, quota) => {

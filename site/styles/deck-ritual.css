@@ -1,5 +1,5 @@
 /* The deck ritual (D-179): the card backs that assemble on arrival and reshuffle when the day's swipes are used.
-   Tokens only (tokens.css): no raw colours, no font stacks. The profile card is never restyled here; the stack only
+   Tokens only (tokens.css): no raw colours, no font stacks. D-189: the backs are blush paper, like the D-187 shuffle. The profile card is never restyled here; the stack only
    hides it (opacity / visibility, so it keeps its size) while the backs move, and shows it again. */
 
 /* The layer: over the stack, the same size as the card, with depth. */
@@ -13,39 +13,30 @@
 }
 .app-view[data-view="home"] .swipe-stack .deck-ritual.is-complete { pointer-events: auto; }
 
-/* A card back: deep wine, a fine champagne frame, the wordmark, a faint woven lattice. */
+/* A card back (D-189, the founder's mock-up, as the D-187 shuffle): blush paper with soft edges and a soft shadow, the
+   club's wordmark small in wine. The top card of the finished deck adds a wine hairline frame and the words. */
 .deck-back {
   position: absolute;
   inset: 0;
   overflow: hidden;
-  border: 1.5px solid color-mix(in srgb, var(--color-oxblood-deep) 85%, transparent);
-  border-radius: 22px;
-  background:
-    repeating-linear-gradient(45deg, color-mix(in srgb, var(--color-cream) 5%, transparent) 0 1px, transparent 1px 14px),
-    repeating-linear-gradient(-45deg, color-mix(in srgb, var(--color-cream) 5%, transparent) 0 1px, transparent 1px 14px),
-    radial-gradient(ellipse 90% 70% at 30% 18%, color-mix(in srgb, var(--color-wine-soft) 70%, transparent), transparent 70%),
-    linear-gradient(160deg, var(--color-wine), var(--color-oxblood-deep));
+  border: 1px solid color-mix(in srgb, var(--color-wine) 16%, transparent);
+  border-radius: 26px;
+  background: var(--aura-blush-card);
   box-shadow:
-    0 30px 50px -28px color-mix(in srgb, var(--color-oxblood-deep) 70%, transparent),
-    0 8px 18px -10px color-mix(in srgb, var(--color-oxblood) 45%, transparent),
-    inset 0 1px 0 color-mix(in srgb, var(--color-cream) 22%, transparent);
+    0 22px 44px -26px color-mix(in srgb, var(--color-oxblood-deep) 38%, transparent),
+    0 6px 16px -10px color-mix(in srgb, var(--color-oxblood) 22%, transparent),
+    inset 0 1px 0 color-mix(in srgb, var(--color-cream) 70%, transparent);
   backface-visibility: hidden;
   will-change: transform, opacity;
 }
-.deck-back-frame {
-  position: absolute;
-  inset: 12px;
-  border: 1px solid color-mix(in srgb, var(--color-receipt-read) 42%, transparent);
-  border-radius: 14px;
-  box-shadow: inset 0 0 0 4px color-mix(in srgb, var(--color-wine-deep) 55%, transparent), inset 0 0 0 5px color-mix(in srgb, var(--color-receipt-read) 18%, transparent);
-}
+.deck-back-frame { display: none; }
 .deck-back-mark {
   position: absolute;
   top: 50%;
   left: 50%;
-  color: color-mix(in srgb, var(--color-cream) 88%, transparent);
+  color: color-mix(in srgb, var(--color-wine) 70%, transparent);
   font-family: var(--font-heading);
-  font-size: clamp(22px, 7cqw, 30px);
+  font-size: clamp(20px, 6cqw, 26px);
   letter-spacing: .01em;
   white-space: nowrap;
   transform: translate(-50%, -50%);
@@ -54,8 +45,15 @@
 .deck-back-mark i { margin-right: .12em; font-size: .62em; font-style: italic; opacity: .85; }
 .app-view[data-view="home"] .swipe-stack { container-type: inline-size; }
 
-/* The finished deck: the words take the top card's face. */
+/* The finished deck: the words take the top card's face, inside a wine hairline frame. */
 .deck-back.is-message .deck-back-mark { display: none; }
+.deck-back.is-message .deck-back-frame {
+  position: absolute;
+  inset: 12px;
+  display: block;
+  border: 1.5px solid color-mix(in srgb, var(--color-wine) 78%, transparent);
+  border-radius: 18px;
+}
 .deck-complete-face {
   position: absolute;
   inset: 12px;
@@ -65,11 +63,21 @@
   justify-content: center;
   gap: var(--space-3);
   padding: var(--space-6) var(--space-5);
-  color: var(--color-cream);
+  color: var(--color-name-ink);
   text-align: center;
 }
+.deck-complete-icon {
+  width: clamp(60px, 16cqw, 84px);
+  height: clamp(60px, 16cqw, 84px);
+  margin-bottom: var(--space-2);
+  fill: none;
+  stroke: var(--color-wine);
+  stroke-width: 1.1;
+  stroke-linejoin: round;
+}
+.deck-complete-icon .deck-complete-icon-front { fill: var(--color-cream); }
 .deck-complete-eyebrow {
-  color: color-mix(in srgb, var(--color-receipt-read) 80%, var(--color-cream));
+  color: var(--color-wine);
   font-family: var(--font-body);
   font-size: var(--text-12);
   font-weight: 700;
@@ -78,28 +86,30 @@
 }
 .deck-complete-title {
   margin: 0;
-  color: var(--color-cream);
+  color: var(--color-name-ink);
   font-family: var(--font-heading);
-  font-size: clamp(28px, 9.5cqw, 40px);
+  font-size: clamp(30px, 9.5cqw, 42px);
   font-weight: 400;
   letter-spacing: -.015em;
   line-height: 1.08;
   text-wrap: balance;
 }
+.deck-complete-title em { color: var(--color-wine); font-style: italic; }
 .deck-complete-copy {
   max-width: 28ch;
   margin: 0;
-  color: color-mix(in srgb, var(--color-cream) 82%, transparent);
+  color: var(--color-ink-soft);
   font-family: var(--font-body);
   font-size: var(--text-14);
   line-height: 1.55;
 }
 .deck-complete-refresh {
   margin: var(--space-2) 0 0;
-  padding: 8px 16px;
-  border: 1px solid color-mix(in srgb, var(--color-receipt-read) 45%, transparent);
+  padding: 9px 18px;
+  border: 1px solid color-mix(in srgb, var(--color-wine) 55%, transparent);
   border-radius: var(--radius-pill);
-  color: color-mix(in srgb, var(--color-receipt-read) 85%, var(--color-cream));
+  background: color-mix(in srgb, var(--color-cream) 55%, transparent);
+  color: var(--color-wine);
   font-family: var(--font-body);
   font-size: var(--text-12);
   font-weight: 700;

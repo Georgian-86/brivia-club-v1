@@ -825,6 +825,8 @@ function syncDeckRitual() {
     document.querySelector('#home-empty-state')?.setAttribute('hidden', '');
     document.querySelector('#swipe-limit-state')?.setAttribute('hidden', '');
     document.querySelector('#swipe-card')?.setAttribute('inert', '');
+    // D-189: the opening shuffle may have started before the quota arrived; the finished deck replaces it at once.
+    deckIntro.running?.finish?.();
     void deckRitual.complete({ quota: signalQuota, animate: onConnect && sawSwipesLeft && !deckRitual.isComplete() });
     return;
   }
@@ -1733,7 +1735,9 @@ function maybePlayDeckIntro() {
   const card = document.querySelector('#swipe-card');
   if (!introAllowed({
     played: deckIntro.played,
-    cardShown: Boolean(currentPerson && card && !card.hidden && !card.classList.contains('is-loading')),
+    // D-189: with the day's swipes used, the finished deck (D-179) stands in for the card, so there is nothing to deal.
+    cardShown: Boolean(currentPerson && card && !card.hidden && !card.classList.contains('is-loading'))
+      && quotaBlocked(signalQuota) !== 'daily' && !stack?.classList.contains('is-deck-complete'),
     viewShown: Boolean(stack && !stack.closest('[hidden]')),
     pageVisible: document.visibilityState !== 'hidden',
   })) return;

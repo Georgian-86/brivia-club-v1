@@ -12,10 +12,10 @@
 // the intro); the loading screen after "Log in" always may.
 
 export const IGNITION = Object.freeze({
-  total: 1.8,        // s: one pass of the title (ignition.css --ign-total); the landing's 2.5 s cap leaves room for it
-  ignite: 0.4,       // the point flares and the streak starts
-  reveal: 0.8,       // the streak is full width; the hit and the chord
-  letters: Object.freeze({ at: 0.68, step: 0.035, dur: 0.5 }), // centre letter first, then outwards
+  total: 4.2,        // s: one pass of the title (ignition.css --ign-total); D-190: at least 4 s, as the founder asked
+  ignite: 0.9,       // the point has breathed in; it flares and the streak starts
+  reveal: 1.7,       // the streak is full width; the hit and the chord
+  letters: Object.freeze({ at: 1.45, step: 0.06, dur: 0.8 }), // centre letter first, then outwards
 });
 
 export const IGNITION_WORD = 'THE BRIVIA CLUB';
@@ -42,20 +42,20 @@ export const lettersDone = (word = IGNITION_WORD, l = IGNITION.letters) => {
 
 // The cue, in seconds from its start. Unit-tested so the hit lands on the reveal.
 export const IGNITION_CUE = Object.freeze({
-  length: 4.6,
+  length: 6,
   level: 0.62,
-  swell: Object.freeze({ notes: Object.freeze([34, 41, 46]), peak: 0.76, gain: 0.15 }),
-  riser: Object.freeze({ from: 0.08, to: 0.78, gain: 0.2 }),
-  spark: Object.freeze({ at: 0.4, midi: 98, gain: 0.05 }),
-  hit: Object.freeze({ at: 0.8, gain: 0.42 }),
-  chord: Object.freeze({ at: 0.8, notes: Object.freeze([58, 62, 65, 72, 77]), gain: 0.065, decay: 3.2 }),
+  swell: Object.freeze({ notes: Object.freeze([34, 41, 46]), peak: 1.6, gain: 0.15 }),
+  riser: Object.freeze({ from: 0.5, to: 1.66, gain: 0.2 }),
+  spark: Object.freeze({ at: 0.9, midi: 98, gain: 0.05 }),
+  hit: Object.freeze({ at: 1.7, gain: 0.42 }),
+  chord: Object.freeze({ at: 1.7, notes: Object.freeze([58, 62, 65, 72, 77]), gain: 0.065, decay: 3.2 }),
   bells: Object.freeze([
-    Object.freeze({ midi: 82, at: 0.88 }),
-    Object.freeze({ midi: 89, at: 0.96 }),
-    Object.freeze({ midi: 94, at: 1.04 }),
-    Object.freeze({ midi: 98, at: 1.14 }),
+    Object.freeze({ midi: 82, at: 1.8 }),
+    Object.freeze({ midi: 89, at: 1.92 }),
+    Object.freeze({ midi: 94, at: 2.04 }),
+    Object.freeze({ midi: 98, at: 2.18 }),
   ]),
-  reverb: Object.freeze({ seconds: 2.8, wet: 0.38 }),
+  reverb: Object.freeze({ seconds: 3.2, wet: 0.4 }),
 });
 
 const hz = (midi) => 440 * 2 ** ((midi - 69) / 12);

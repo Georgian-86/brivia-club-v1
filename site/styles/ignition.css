@@ -9,12 +9,12 @@
   src: url('../../node_modules/@fontsource/bodoni-moda/files/bodoni-moda-latin-500-normal.woff2') format('woff2'); }
 
 .ignition {
-  --ign-total: 1.8s;
-  --ign-ignite: .4s;
-  --ign-reveal: .8s;
-  --ign-letter-at: .68s;
-  --ign-letter-step: .035s;
-  --ign-letter-dur: .5s;
+  --ign-total: 4.2s;
+  --ign-ignite: .9s;
+  --ign-reveal: 1.7s;
+  --ign-letter-at: 1.45s;
+  --ign-letter-step: .06s;
+  --ign-letter-dur: .8s;
   --ign-crimson: #d4204f;
   --ign-ember: #7a0a2c;
   --ign-hot: #ffe1e8;
@@ -80,26 +80,29 @@
 }
 .ignition-gap { display: inline-block; width: .5em; }
 
+/* Percentages of the 4.2 s pass: 0.9 s = 21.4% (ignite), 1.7 s = 40.5% (reveal). */
 @keyframes ign-core {
-  0%, 2.5% { opacity: 0; transform: scale(.2); }
+  0%, 2.4% { opacity: 0; transform: scale(.2); }
+  10% { opacity: .55; transform: scale(.7); }
+  14% { opacity: .4; transform: scale(.62); }
   19% { opacity: 1; transform: scale(1); }
-  22.2% { opacity: 1; transform: scale(1.75); animation-timing-function: cubic-bezier(.2, .7, .2, 1); }
-  34% { opacity: 1; transform: scale(1); }
-  44.4% { opacity: 1; transform: scale(1); }
-  70% { opacity: .28; transform: scale(.75); }
+  21.4% { opacity: 1; transform: scale(1.75); animation-timing-function: cubic-bezier(.2, .7, .2, 1); }
+  29.8% { opacity: 1; transform: scale(1); }
+  40.5% { opacity: 1; transform: scale(1); }
+  61.9% { opacity: .28; transform: scale(.75); }
   100% { opacity: .28; transform: scale(.75); }
 }
 @keyframes ign-streak {
-  0%, 22.2% { opacity: 0; transform: scaleX(.002); }
-  22.7% { opacity: 1; transform: scaleX(.01); animation-timing-function: cubic-bezier(.16, 1, .3, 1); }
-  44.4% { opacity: 1; transform: scaleX(1); }
-  70% { opacity: .42; transform: scaleX(1); }
+  0%, 21.4% { opacity: 0; transform: scaleX(.002); }
+  21.6% { opacity: 1; transform: scaleX(.01); animation-timing-function: cubic-bezier(.16, 1, .3, 1); }
+  40.5% { opacity: 1; transform: scaleX(1); }
+  64.3% { opacity: .42; transform: scaleX(1); }
   100% { opacity: .42; transform: scaleX(1); }
 }
 @keyframes ign-flare {
   0%, 20% { opacity: 0; transform: scale(.08, .5); }
-  28% { opacity: .95; transform: scale(.45, 1); animation-timing-function: cubic-bezier(.16, 1, .3, 1); }
-  44.4% { opacity: .8; transform: scale(1, 1); }
+  26.2% { opacity: .95; transform: scale(.45, 1); animation-timing-function: cubic-bezier(.16, 1, .3, 1); }
+  40.5% { opacity: .8; transform: scale(1, 1); }
   100% { opacity: .5; transform: scale(1, 1); }
 }
 @keyframes ign-letter {

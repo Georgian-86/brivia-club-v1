@@ -163,3 +163,63 @@ invented profile (D-156). They are free photos under the Unsplash License, cropp
 
 Source URL: `https://images.unsplash.com/<photo>`. The purge script clears them with the profiles.
 
+### Faceless photos for every seeded member (D-188)
+
+Every other seeded member (tNN = seed number NN) has a faceless Unsplash License photo that fits their top interest:
+hands at work, an instrument, a camera, food, a book, a figure seen from behind. Found with Firecrawl image search,
+captured from the Unsplash photo page (the container cannot reach Unsplash directly), cropped to 480 px WebP, and
+checked by eye for faces. Page: `https://unsplash.com/photos/<slug>`.
+
+| File | Unsplash page slug | Shows |
+|---|---|---|
+| t01 | close-up-of-a-hand-typing-on-a-computer-keyboard-Qh1degtlisQ | Hand typing on a keyboard |
+| t02 | a-worn-out-badminton-shuttlecock-held-by-a-hand-mtQqHRnqXaY | Shuttlecock held in a hand |
+| t03 | hiker-with-backpack-admiring-a-majestic-snow-capped-mountain-mxIj46EEvic | Hiker in silhouette below a snow peak |
+| t04 | hands-holding-a-vintage-camera-taking-a-picture-2Mi8hbjRXHM | Hands holding a vintage camera |
+| t05 | hand-writing-notes-in-a-notebook-at-a-desk-1rm4_SojyNM | Hand writing notes at a desk |
+| t07 | hands-typing-code-on-a-laptop-keyboard-xORqjEMmsRM | Hands typing code on a laptop |
+| t09 | hiker-enjoys-the-scenic-view-of-mountains-3U3-UZP8WjI | Hiker seen from behind, mountains |
+| t10 | hands-typing-code-on-a-laptop-computer-8pMT3J_gxJA | Hands typing code, dark desk |
+| t12 | hands-grinding-spices-in-a-bowl-with-bracelets-Vu7lfKQMwRo | Hands grinding spices |
+| t14 | white-badminton-shuttlecock-hVeOZslMjGA | Hand tossing a shuttlecock |
+| t15 | a-man-hiking-up-a-mountain-with-a-backpack-QTrSmMrmeAs | Hiker from behind on a ridge |
+| t16 | person-holding-camera-lens-7KLa-xLbSXA | Hand holding a lens to a lake |
+| t17 | a-close-up-of-a-persons-hand-on-a-laptop-ZN4MUOwkuA8 | Hand on a laptop touchpad |
+| t19 | a-close-up-of-a-person-typing-on-a-laptop-ThjsNSWZVx8 | Hands typing on a laptop |
+| t20 | hand-writing-in-a-notebook-on-a-white-desk-7MbJh7ge6y8 | Journal on a white desk |
+| t21 | a-man-riding-a-motorcycle-down-a-road-next-to-a-forest-pOqkzMljrVg | Motorcycle rider from behind |
+| t22 | a-close-up-of-a-person-typing-on-a-laptop-tj6sV9Z40f0 | Hands typing, laptop on knees |
+| t24 | a-person-holding-a-piece-of-bread-in-their-hands-uXzMtJ9etIU | Sourdough loaf broken open |
+| t27 | hands-holding-a-freshly-baked-loaf-of-sourdough-bread-smHpLKXZJA8 | Hands holding a sourdough loaf |
+| t28 | an-indoor-rock-climbing-wall-with-many-handholds-and-ropes-riMO975bfIc | Bouldering wall |
+| t29 | hand-holding-violin-bow-and-strings-YqSVAieps84 | Hand on a violin and bow |
+| t30 | hands-holding-a-loaf-of-freshly-baked-bread-JVY7VSBEhEo | Bread in a tin |
+| t31 | a-person-chopping-green-vegetables-on-a-cutting-board-WzrojlIzgyQ | Chopping greens |
+| t32 | a-person-climbing-up-the-side-of-a-mountain-pwFvjm4hcik | Hand on a rock face |
+| t33 | hands-typing-on-a-vintage-typewriter-with-paper-L8KoP71_hPY | Hands on a typewriter |
+| t35 | hands-type-on-an-old-black-typewriter-E1BQ3jb0blc | Hands on an old typewriter |
+| t36 | a-person-writing-on-a-notebook-next-to-a-typewriter-mR2VH9NMtdU | Notebook beside a typewriter |
+| t37 | a-close-up-of-a-person-playing-a-violin-KGGsJI6r-0U | Violin and bow, close |
+| t38 | hand-writing-in-a-notebook-with-pens-and-glasses-TIaRRl8wEWA | Hand writing, pens |
+| t39 | hand-holding-a-vintage-nikon-point-and-shoot-camera-QNf5-vAFAGU | Hand holding a film camera |
+| t41 | hands-holding-a-vintage-canon-camera-dHxSFSc5fX0 | Hands holding a Canon |
+| t43 | a-hand-holding-a-potted-plant-on-a-white-background-aRFyZYwfBro | Pot plant balanced on an arm |
+| t44 | hands-holding-a-game-controller-playing-a-video-game-DngE_t_zuTE | Hands with a game controller |
+| t45 | a-person-holding-a-violin-ya6PWTtPlkw | Fingers on violin strings |
+| t46 | hand-holding-a-black-nikon-point-and-shoot-camera-LQ6WtX0C0GQ | Hand holding a compact camera |
+| t47 | hands-slicing-red-onion-on-a-wooden-cutting-board-NzRZ0vzvgJs | Slicing a red onion |
+| t48 | hand-holding-a-vintage-film-camera-with-patterned-background-sZsdcnBsZqs | Hand holding a film camera |
+| t49 | a-hand-paints-watercolor-art-with-a-fine-brush-1UH_1YIZNYk | Hand painting watercolour |
+| t51 | person-looking-through-a-telescope-at-night-with-city-lights-OmR8BHt-q4E | Telescope silhouette at night |
+| t52 | a-close-up-of-paint-and-a-brush-on-a-piece-of-paper-oURTHj8kT-4 | Paint and brush on paper |
+| t53 | a-persons-hands-holding-a-book-and-a-cup-of-tea-EgYcr_N-UyE | Book and tea |
+| t54 | hands-holding-a-book-and-a-cup-of-coffee-0-qCTnUdRU8 | Hands with a book and coffee |
+| t55 | a-person-is-holding-a-cup-of-tea-and-reading-a-book-qLJ-M7EyoaY | Tea over an open book |
+| t56 | a-person-reading-a-book-by-a-window-shfeJo9uJ1I | Reading by a window, face out of frame |
+| t57 | a-man-riding-on-the-back-of-a-motorcycle-dZTBczLXC7k | Helmeted rider on a motorcycle |
+| t58 | a-person-reading-a-book-mVudmq8W_PU | Silhouette from behind at a window |
+
+Temporary: t59 to t68 are a second, tighter (and mostly mirrored) crop of another member's photo, because the Firecrawl
+credits ran out before ten more could be fetched: t59 from t55, t60 from t31, t61 from t39, t62 from t44, t63 from t20, t64 from t41, t65 from t09, t66 from t12, t67 from t37, t68 from t10.
+Replace them with their own photos when convenient (same file names; nothing else changes).
+

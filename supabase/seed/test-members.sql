@@ -327,6 +327,18 @@ begin
   on conflict (id) do nothing;
 end $$;
 
+-- D-188 (0052): every seeded member gets a faceless profile photo that fits their interests (site/public/test-avatars,
+-- tNN = seed number NN; sources in supabase/seed/README.md). Never a face (D-156). Skipped quietly before 0052, whose
+-- constraint is what allows the path; a member who already has a photo keeps it.
+do $$
+begin
+  if pg_get_constraintdef((select oid from pg_constraint where conname = 'profiles_photo_url_storage')) like '%test-avatars%' then
+    update public.profiles p set photo_url = '/test-avatars/t' || lpad(right(p.id::text, 12)::int::text, 2, '0') || '.webp'
+     where p.is_test and p.photo_url is null
+       and p.id::text like 'a7e57000-0000-4000-8000-%' and right(p.id::text, 12)::int between 1 and 68;
+  end if;
+end $$;
+
 commit;
 
 select (select count(*) from public.profiles where is_test) as test_members,

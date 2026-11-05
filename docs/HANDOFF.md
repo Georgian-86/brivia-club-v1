@@ -7,6 +7,10 @@ Update this file at the end of every session. CLAUDE.md holds the aim; this file
 
 ## 1. What is done
 
+**2026-11-05, D-188-D-190:** every seeded member has a faceless photo (`site/public/test-avatars`, applied with 0052 and
+`test-members.sql` at deploy; t59-t68 are temporary second crops); the finished "That's your deck for today." deck is
+blush like the shuffle, and the shuffle no longer plays under it; the Brivia intro runs 4.2 s (landing cap 5 s).
+
 **2026-11-05, D-187:** the deck's shuffle wears the founder's mock-up: blush paper cards, a fanned hand behind a framed
 front card reading "Shuffling Your Matches" with pulsing dots, a short hold, then the D-174 riffle and deal.
 

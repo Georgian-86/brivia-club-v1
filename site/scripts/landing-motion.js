@@ -1,7 +1,8 @@
 // Pure helpers for the landing page's intro and video start (Phase B landing speed).
 // Keep this file free of DOM access so it can be unit-tested with node --test.
 
-export const INTRO_CAP_MS = 2500;
+// D-190: the founder asked for an intro of at least 4 s (the drawn Brivia ignition, 4.2 s plus its fade).
+export const INTRO_CAP_MS = 5000;
 export const INTRO_START_GRACE_MS = 800;
 
 // Posters only (no video requests) for reduced-motion and save-data visitors, and on a 2g link where the 4K hero (D-062)

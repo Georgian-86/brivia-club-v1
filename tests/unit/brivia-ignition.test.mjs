@@ -49,7 +49,7 @@ test('the music lands on the picture: spark on the ignition, hit and chord on th
   assert.ok(IGNITION_CUE.riser.to <= IGNITION.reveal && IGNITION_CUE.riser.to > IGNITION.reveal - 0.1, 'the riser cuts just before the hit');
   IGNITION_CUE.bells.forEach((b, i, a) => { assert.ok(b.at > IGNITION.reveal); if (i) assert.ok(b.at > a[i - 1].at); });
   assert.deepEqual(IGNITION_CUE.chord.notes.map((m) => m % 12), [10, 2, 5, 0, 5], 'B-flat add 9: the sound kit\'s key');
-  assert.ok(IGNITION_CUE.length < 5);
+  assert.ok(IGNITION_CUE.length <= 6.5, 'the cue rings out under the 4 s title, not long after (D-190)');
 });
 
 const param = () => ({ value: 0, setValueAtTime() {}, exponentialRampToValueAtTime() {}, linearRampToValueAtTime() {} });

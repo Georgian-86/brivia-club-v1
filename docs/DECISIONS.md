@@ -3679,3 +3679,34 @@ solitaire shuffle; D-179's intro deal and D-185's pile-and-flip deal are not use
   side, the cue still on every beat); e2e deck 201, deck-ritual, motion, mobile-polish, deck-tutorial; screenshots at
   1554x1012 and 390x844 match the mock-ups.
 
+## D-188 (2026-11-05): faceless profile photos for every seeded member
+- **Asked:** "pls give profile pictures to all the fake accounts we have created".
+- **Done:** extends D-177 (12 hirers) to all 68 seeded members. Each gets a faceless Unsplash License photo that fits
+  their top interest (hands on a keyboard, a shuttlecock, a hiker seen from behind, a violin, a film camera, sourdough,
+  a typewriter, a book and tea, a telescope in silhouette...), cropped to 480 px WebP in `site/public/test-avatars/`
+  (`tNN.webp`, NN = seed number) and checked by eye for faces. `test-members.sql` sets them once 0052 is in (a member
+  with a photo keeps it); sources in `supabase/seed/README.md`. Same reason as D-177/D-156: no stranger's face on an
+  invented profile, and the seeded profiles stay `is_test` and come out with the purge script.
+- **How:** the container cannot reach Unsplash, so the photos were found with Firecrawl image search and captured from
+  each Unsplash photo page. The Firecrawl credits ran out after 46: t59-t68 are, for now, a second tighter (mostly
+  mirrored) crop of another member's photo, listed in the seed README to replace later.
+- **Live:** with the deploy, apply 0052 (main's) and run the photo step of `test-members.sql`.
+
+## D-189 (2026-11-05): the finished deck in the blush design; the shuffle never plays under it
+- **Asked:** a screenshot of the wine "That's your deck for today." card: "fix the ui for this as well".
+- **Done:** D-179's daily-limit deck takes the D-187 look: blush paper backs (`--aura-blush-card`) with soft edges and
+  a small wine wordmark; the top card adds the wine hairline frame, the two-card-and-heart icon, THE BRIVIA CLUB in
+  wine, "That's your deck for *today.*" in Bodoni (the last word in wine italic), the copy in soft ink and a wine
+  outline pill for the refresh time. Motion and copy unchanged.
+- **Fixed on the way:** opening Connect with the day's swipes already used played the D-174 shuffle underneath the
+  finished deck (the quota arrives after the first render). The intro now skips when the deck is capped, and the
+  finished deck stops a shuffle that already started.
+
+## D-190 (2026-11-05): the Brivia ignition runs at least 4 s
+- **Asked:** "make this intro video little longer like for 4 sec at least".
+- **Done:** D-186's title now runs 4.2 s: the point breathes in for 0.9 s before it ignites, the streak opens until
+  1.7 s, the letters arrive more slowly (1.45 s, 0.06 s apart, 0.8 s each, done by 2.7 s) and the name holds. The cue
+  moves with it (spark 0.9 s, hit and chord 1.7 s, bells to 2.2 s, about 6 s with its hall). The landing's intro cap
+  goes from 2.5 s to 5 s (supersedes Phase B's 2.5 s for the intro only; it still plays on a first visit only and any
+  tap skips nothing else on the page, which stays usable under it). The loading screen uses the same title.
+
