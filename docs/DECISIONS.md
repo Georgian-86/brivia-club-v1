@@ -3936,3 +3936,16 @@ Pass and Pitch".
   the headline column, where that fill read as a pale strip; from 850 px it has none. On a phone the hint sits over
   the room photo, where the fill keeps it readable (the deck spec's contrast check), so it stays there.
 
+
+## D-210 (2026-11-05): new profile photos for every seeded member: mirror selfies, sky, city and desks
+- **Asked:** "for all the test profiles add some good profile pictures for all those whose profile picture was updated
+  today". This also delivers D-194 (the founder's earlier ask for sky, office-desk, laptop and mirror-selfie photos).
+- **Done:** all 68 `site/public/test-avatars/tNN.webp` files replaced. The D-188 set was mostly close-ups of hands and
+  objects, and t59-t68 were second crops of other members' photos; the new set looks like photos people actually use
+  on a profile: mirror selfies with the phone or camera over the face, people seen from behind against the sky or a
+  city, sunset silhouettes, hoodies on a street, and desk-and-laptop shots. All 68 are distinct, free under the Unsplash
+  License, cropped to 480 px WebP (2.4 MB in total) and checked by eye: no face is visible in any of them (D-156 still
+  holds). Men's and women's profiles get matching photos, the seeded hirers get desk photos, and "Prefer not to say"
+  and t61-t68 get neutral ones. The sources are listed in `supabase/seed/README.md`; the D-177 and D-188 tables are
+  superseded.
+- **Live:** the file names did not change, so the deploy is all it takes. There is no SQL to run.
