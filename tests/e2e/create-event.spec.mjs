@@ -80,7 +80,7 @@ try {
     // Publish empty: inline errors, first field focused, nothing sent.
     await page.locator('[data-ec-publish]').click();
     const errs = await page.evaluate(() => [...document.querySelectorAll('#event-create-dialog .event-field-error')].filter((e) => e.textContent).map((e) => e.id));
-    check(`${w}: publishing an empty form shows inline errors (${errs.length})`, errs.includes('ec-title-error') && errs.includes('ec-category-error') && errs.includes('ec-city-error') && errs.includes('ec-capacity-error'));
+    check(`${w}: publishing an empty form shows inline errors, none for the optional times or capacity (${errs.length})`, errs.includes('ec-title-error') && errs.includes('ec-category-error') && errs.includes('ec-city-error') && !errs.includes('ec-capacity-error') && !errs.includes('ec-startTime-error'));
     check(`${w}: focus moves to the first problem and it is marked invalid`, await page.evaluate(() => document.activeElement?.id === 'ec-title' && document.activeElement.getAttribute('aria-invalid') === 'true'));
     check(`${w}: nothing is sent while invalid`, posted('save_member_event').length === 0);
     const axeErr = await axeViolations(page, { include: '#event-create-dialog' });

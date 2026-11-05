@@ -3794,3 +3794,19 @@ festival, a hackathon or a weekend retreat could not be listed honestly.
   the calendar invite already used the real start and end.
 - 30 days is a guard against typos (a year in the wrong field), not a product limit; longer runs can be raised later.
 
+## D-198 (2026-11-05): events already under way, optional times, unlimited registrations
+
+Founder: "past dates can also be selected because it wanna show that it was started that day and is still going on
+so allow that; also max registrations can be unlimited as well and time of event must be optional".
+- Dates: the start date may be in the past (the picker allows up to 30 days back); what must hold on publishing is
+  that the event has not ended (its end, or six hours after an open-ended start: `brivia_event_open`). An ended event
+  names the end date ('This event has already ended'). The old "an already published event keeps its passed start"
+  exception is no longer needed. Cards and the detail show "Happening now" while an event is under way.
+- Times are optional. No column was added: a blank start is stored at 00:00 IST and a blank end at 23:59 IST on the
+  end day (a timed one-day event with no end stays open-ended, as before), and the display reads those back as
+  untimed: "All day", "From 6:00 PM", "Until 7:00 PM", "Until Sat 7 Nov", "6:00 PM – Mon 2 Nov". An event really set
+  to start at midnight therefore reads as all day, which means the same thing to a guest. Considered: an `all_day`
+  column, rejected for now because list_events (0025) would have to be dropped and recreated for one flag.
+- Capacity is optional: empty means unlimited (placeholder "Unlimited"); registration already treated a null
+  capacity as no limit, so only the publish check and the `club_event_member_capacity` constraint changed (0056).
+

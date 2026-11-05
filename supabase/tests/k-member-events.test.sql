@@ -2,7 +2,7 @@
 -- (O blocked K), 05 I (incomplete), 06 C.
 -- M1 structure: no coordinate columns on club_event; the new functions are authenticated-only (anon cannot run
 --    them); confirm_event_payment is not executable by any client role; the event-posters bucket is public with limits.
--- M2 save_member_event: a draft needs only a title and is seen only by its creator; publishing names the missing or
+-- M2 save_member_event: a draft needs only a title and is seen only by its creator; publishing names the missing or (D-198: times and capacity optional)
 --    bad field (22023 'invalid <field>'): category, Other without its own name (and the name is kept), description, a past date, an end before the start, venue, city,
 --    capacity, a map link off the allow-list, a poster outside the creator's folder; a pin becomes a g7 cell only.
 -- M3 visibility: a published event is listed to members who can see the creator (not K, whom O blocked); the
@@ -124,14 +124,25 @@ begin
   c := pg_temp.code_of(format('select public.save_member_event(null, %L::jsonb, true)',
          pg_temp.fields(jsonb_build_object('end_date', to_char((now() at time zone 'Asia/Kolkata')::date + 5, 'YYYY-MM-DD'), 'end_time', '17:00'))));
   if c not like '22023:invalid end_time%' then raise exception 'FAIL M2: same end date, earlier time gave %', c; end if;
+  -- D-198: times and capacity optional (00:00 to 23:59 IST, unlimited); an event under way may start in the past, not end there.
+  d := public.save_member_event(null, pg_temp.fields('{"start_time": "", "end_time": "", "capacity": ""}'), true);
+  if (select (starts_at at time zone 'Asia/Kolkata')::time = '00:00' and (ends_at at time zone 'Asia/Kolkata')::time = '23:59' and capacity is null
+        from public.list_events(null) where id = d) is distinct from true then raise exception 'FAIL M2: an untimed, unlimited event'; end if;
+  perform public.cancel_member_event(d); perform public.delete_member_event(d);
+  d := public.save_member_event(null, pg_temp.fields(jsonb_build_object('date', to_char((now() at time zone 'Asia/Kolkata')::date - 3, 'YYYY-MM-DD'),
+         'end_date', to_char((now() at time zone 'Asia/Kolkata')::date + 2, 'YYYY-MM-DD'))), true);
+  if not exists (select 1 from public.list_events(null) where id = d) then raise exception 'FAIL M2: an event under way is listed'; end if;
+  perform public.cancel_member_event(d); perform public.delete_member_event(d);
+  c := pg_temp.code_of(format('select public.save_member_event(null, %L::jsonb, true)',
+         pg_temp.fields(jsonb_build_object('date', to_char((now() at time zone 'Asia/Kolkata')::date - 3, 'YYYY-MM-DD'),
+           'end_date', to_char((now() at time zone 'Asia/Kolkata')::date - 1, 'YYYY-MM-DD')))));
+  if c not like '22023:invalid end_date%' then raise exception 'FAIL M2: an event that has ended gave %', c; end if;
   c := pg_temp.code_of(format('select public.save_member_event(null, %L::jsonb, true)', pg_temp.fields('{"date": "31-31-2026"}')));
   if c not like '22023:invalid date%' then raise exception 'FAIL M2: a malformed date gave %', c; end if;
   c := pg_temp.code_of(format('select public.save_member_event(null, %L::jsonb, true)', pg_temp.fields('{"venue_address": ""}')));
   if c not like '22023:invalid venue_address%' then raise exception 'FAIL M2: no address gave %', c; end if;
   c := pg_temp.code_of(format('select public.save_member_event(null, %L::jsonb, true)', pg_temp.fields('{"place_id": "nowhere"}')));
   if c not like '22023:invalid place_id%' then raise exception 'FAIL M2: unknown city gave %', c; end if;
-  c := pg_temp.code_of(format('select public.save_member_event(null, %L::jsonb, true)', pg_temp.fields('{"capacity": null}')));
-  if c not like '22023:invalid capacity%' then raise exception 'FAIL M2: no capacity gave %', c; end if;
   c := pg_temp.code_of(format('select public.save_member_event(null, %L::jsonb, true)', pg_temp.fields('{"capacity": 0}')));
   if c not like '22023:invalid capacity%' then raise exception 'FAIL M2: zero capacity gave %', c; end if;
   c := pg_temp.code_of(format('select public.save_member_event(null, %L::jsonb, true)', pg_temp.fields('{"map_url": "https://evil.example/maps"}')));

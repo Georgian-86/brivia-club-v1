@@ -2,7 +2,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  EVENT_CATEGORIES, isEventCategory, eventDateBadge, eventTimeRange, eventDayCount, distanceLabel, goingLabel, companionLabel,
+  EVENT_CATEGORIES, isEventCategory, eventDateBadge, eventTimeRange, eventDayCount, eventUnderWay, distanceLabel, goingLabel, companionLabel,
   otherCompanions, normalizeEvent, withRsvp, nearbyEvents, filterEvents, eventCardMarkup, eventDetailMarkup,
   companionRowMarkup, companionNote,
 } from '../../site/scripts/events-view.js';
@@ -310,4 +310,17 @@ test('D-197: a multi-day event names the day it ends', () => {
   assert.equal(eventDayCount('2026-11-06T12:30:00Z', '2026-11-08T15:30:00Z'), 3);
   assert.equal(eventDayCount('2026-11-06T12:30:00Z', '2026-11-06T15:30:00Z'), 1);
   assert.equal(eventDayCount('2026-11-06T12:30:00Z', null), 1);
+});
+
+test('D-198: untimed events read as all day, and one under way says so', () => {
+  assert.equal(eventTimeRange('2026-10-30T18:30:00Z', '2026-10-31T18:29:00Z'), 'All day');
+  assert.equal(eventTimeRange('2026-10-30T18:30:00Z', '2026-11-07T13:30:00Z'), 'Until Sat 7 Nov, 7:00 PM');
+  assert.equal(eventTimeRange('2026-10-30T18:30:00Z', '2026-11-07T18:29:00Z'), 'Until Sat 7 Nov');
+  assert.equal(eventTimeRange('2026-10-31T12:30:00Z', '2026-11-02T18:29:00Z'), '6:00 PM – Mon 2 Nov');
+  assert.equal(eventTimeRange('2026-10-31T12:30:00Z', '2026-10-31T18:29:00Z'), 'From 6:00 PM');
+  assert.equal(eventTimeRange('2026-10-30T18:30:00Z', '2026-10-31T13:30:00Z'), 'Until 7:00 PM');
+  const now = new Date('2026-11-05T10:00:00Z');
+  assert.equal(eventUnderWay('2026-10-30T18:30:00Z', '2026-11-07T13:30:00Z', now), true);
+  assert.equal(eventUnderWay('2026-11-06T18:30:00Z', '2026-11-07T13:30:00Z', now), false);
+  assert.equal(eventUnderWay('2026-10-30T18:30:00Z', '2026-11-01T13:30:00Z', now), false);
 });

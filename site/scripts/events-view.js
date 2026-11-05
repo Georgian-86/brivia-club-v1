@@ -60,14 +60,32 @@ export const eventDayCount = (startsAt, endsAt) => {
   if (!start || !end) return 1;
   return Math.max(1, Math.round((Date.parse(istDay(end)) - Date.parse(istDay(start))) / 86400000) + 1);
 };
+// D-198: times are optional. An untimed start is stored at 00:00 IST and an untimed end at 23:59 IST.
+const hhmm = (date) => { const p = parts(date, { hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }); return `${p.hour}:${p.minute}`; };
 // '6:00 PM – 9:00 PM'; an open-ended event ends 'Late'; one that ends on a later day names that day,
-// '6:00 PM – Sat 8 Nov, 9:00 PM' (D-197).
+// '6:00 PM – Sat 8 Nov, 9:00 PM' (D-197); without times, 'All day', 'From 6:00 PM', 'Until 7:00 PM', 'Until Sun 8 Nov'.
 export const eventTimeRange = (startsAt, endsAt) => {
   const start = toDate(startsAt);
   if (!start) return '';
   const end = endsAt ? toDate(endsAt) : null;
-  if (end && istDay(end) !== istDay(start)) return `${clock(start)} – ${shortDay(end)}, ${clock(end)}`;
-  return `${clock(start)} – ${end ? clock(end) : 'Late'}`;
+  const startTimed = hhmm(start) !== '00:00';
+  const endTimed = end && hhmm(end) !== '23:59';
+  if (end && istDay(end) !== istDay(start)) {
+    const until = endTimed ? `${shortDay(end)}, ${clock(end)}` : shortDay(end);
+    return startTimed ? `${clock(start)} – ${until}` : `Until ${until}`;
+  }
+  if (!end) return startTimed ? `${clock(start)} – Late` : 'All day';
+  if (startTimed && endTimed) return `${clock(start)} – ${clock(end)}`;
+  if (startTimed) return `From ${clock(start)}`;
+  if (endTimed) return `Until ${clock(end)}`;
+  return 'All day';
+};
+// D-198: an event that has started and not yet ended ('Happening now' on its card).
+export const eventUnderWay = (startsAt, endsAt, now = new Date()) => {
+  const start = toDate(startsAt);
+  if (!start || start > now) return false;
+  const end = endsAt ? toDate(endsAt) : new Date(start.getTime() + 6 * 3600e3);
+  return end > now;
 };
 
 // '~3 km' (the server already rounds to whole km); '' without a distance.
@@ -275,7 +293,7 @@ export const eventCardMarkup = (event, { imageSrc = '', friends = [] } = {}) => 
   <div class="event-card-body">
     ${kicker(event)}
     <h2 class="event-card-title"><button type="button" class="event-open" data-event-open="${escapeHtml(event.id)}" aria-label="${escapeHtml(label)}">${escapeHtml(event.title)}</button></h2>
-    <p class="event-card-line">${escapeHtml(eventTimeRange(event.startsAt, event.endsAt) || 'Date and time to be set')}</p>
+    <p class="event-card-line">${eventUnderWay(event.startsAt, event.endsAt) && event.status !== 'cancelled' ? '<span class="event-now">Happening now</span> · ' : ''}${escapeHtml(eventTimeRange(event.startsAt, event.endsAt) || 'Date and time to be set')}</p>
     <p class="event-card-line">${escapeHtml(place || 'Venue to be set')}</p>
     <p class="event-card-seats${spotsLeft(event) === 0 && live ? ' is-full' : ''}">${escapeHtml(seatsLine(event))}</p>
     <div class="event-card-foot">
@@ -415,7 +433,7 @@ export const eventDetailMarkup = (event, { imageSrc = '', friends = [], organize
   ${statusBadge(event) ? `<p class="event-detail-status${event.status === 'cancelled' ? ' is-cancelled' : ''}">${event.status === 'cancelled' ? 'Cancelled by the organiser' : 'Draft · only you can see this'}</p>` : ''}
   ${kicker(event)}
   <h2 class="event-detail-title" id="${preview ? 'event-preview-title' : 'event-detail-title'}" tabindex="-1">${escapeHtml(event.title)}</h2>
-  <p class="event-meta">${CLOCK}<span>${escapeHtml(event.startsAt ? `${fullDate(event.startsAt, 'short')} · ${eventTimeRange(event.startsAt, event.endsAt)}` : 'Date and time to be set')}</span></p>
+  <p class="event-meta">${CLOCK}<span>${eventUnderWay(event.startsAt, event.endsAt) && event.status !== 'cancelled' ? '<span class="event-now">Happening now</span> · ' : ''}${escapeHtml(event.startsAt ? `${fullDate(event.startsAt, 'short')} · ${eventTimeRange(event.startsAt, event.endsAt)}` : 'Date and time to be set')}</span></p>
   <p class="event-meta">${PIN}<span>${escapeHtml(where || 'Venue to be set')}</span></p>
   ${map ? `<p class="event-map-row">${map}</p>` : ''}
   ${organizerMarkup(event, organizerSrc)}

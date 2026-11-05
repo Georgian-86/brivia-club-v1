@@ -3,7 +3,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   EVENT_FORM_CATEGORIES, emptyDraft, draftFromEvent, validateEventDraft, firstErrorField, toServerFields, serverErrorField,
-  serverErrorMessage, imageFileProblem, previewEvent, isMapUrl, istInstant, todayIst, addDays, MAX_EVENT_DAYS,
+  serverErrorMessage, imageFileProblem, previewEvent, isMapUrl, istInstant, todayIst, addDays, MAX_EVENT_DAYS, eventSpan,
 } from '../../site/scripts/event-form.js';
 
 const NOW = new Date('2026-11-02T06:30:00Z'); // 12:00 IST
@@ -33,26 +33,35 @@ test('a complete draft publishes; a draft needs only a name', () => {
   assert.ok(validateEventDraft(emptyDraft(), { now: NOW }).title);
 });
 
-test('publishing names every missing field, first in form order', () => {
+test('publishing names every missing field, first in form order; times and capacity are optional (D-198)', () => {
   const errors = validateEventDraft({ ...emptyDraft(), title: 'x' }, { publish: true, now: NOW });
-  for (const f of ['category', 'description', 'date', 'startTime', 'endTime', 'venueName', 'venueAddress', 'city', 'capacity']) assert.ok(errors[f], f);
+  for (const f of ['category', 'description', 'date', 'venueName', 'venueAddress', 'city']) assert.ok(errors[f], f);
+  for (const f of ['startTime', 'endTime', 'capacity']) assert.equal(errors[f], undefined, f);
   assert.equal(firstErrorField(errors), 'category');
+  assert.deepEqual(validateEventDraft({ ...good(), startTime: '', endTime: '', capacity: '' }, { publish: true, now: NOW }), {});
+  assert.equal(toServerFields({ ...good(), capacity: '' }).capacity, '', 'empty: unlimited');
 });
 
-test('dates and times: future only (IST), end after start', () => {
-  assert.match(validateEventDraft({ ...good(), date: '2026-11-01' }, { publish: true, now: NOW }).date, /today or a later date/);
-  assert.match(validateEventDraft({ ...good(), date: '2026-11-02', startTime: '11:00', endTime: '13:00' }, { publish: true, now: NOW }).startTime, /not passed/);
-  assert.deepEqual(validateEventDraft({ ...good(), date: '2026-11-02', startTime: '12:30', endTime: '13:00' }, { publish: true, now: NOW }), {});
+test('dates and times (IST): an event may have started, never ended; end after start', () => {
+  assert.deepEqual(validateEventDraft({ ...good(), date: '2026-10-31', endDate: '2026-11-07' }, { publish: true, now: NOW }), {}, 'under way since 31 Oct');
+  assert.match(validateEventDraft({ ...good(), date: '2026-11-01' }, { publish: true, now: NOW }).date, /already ended/);
+  assert.match(validateEventDraft({ ...good(), date: '2026-10-30', endDate: '2026-11-01' }, { publish: true, now: NOW }).endDate, /already ended/);
+  assert.deepEqual(validateEventDraft({ ...good(), date: '2026-11-02', startTime: '11:00', endTime: '13:00' }, { publish: true, now: NOW }), {}, 'started an hour ago');
+  assert.match(validateEventDraft({ ...good(), date: '2026-11-02', startTime: '09:00', endTime: '11:00' }, { publish: true, now: NOW }).date, /already ended/);
+  assert.deepEqual(validateEventDraft({ ...good(), date: '2026-11-02', startTime: '', endTime: '' }, { publish: true, now: NOW }), {}, 'all day today');
   assert.match(validateEventDraft({ ...good(), endTime: '17:00' }, { publish: true, now: NOW }).endTime, /after the start/);
   assert.match(validateEventDraft({ ...good(), endTime: '18:00' }, { now: NOW }).endTime, /after the start/, 'also for drafts');
   assert.equal(istInstant('2026-11-07', '18:00').toISOString(), '2026-11-07T12:30:00.000Z');
   assert.equal(todayIst(new Date('2026-11-01T19:00:00Z')), '2026-11-02', 'after 18:30 UTC it is already tomorrow in IST');
 });
 
-test('an already published event may keep a start that has passed', () => {
-  const d = { ...good(), date: '2026-11-02', startTime: '11:00', endTime: '15:00', status: 'published', originalStart: '2026-11-02T05:30:00.000Z' };
-  assert.deepEqual(validateEventDraft(d, { publish: true, now: NOW }), {});
-  assert.ok(validateEventDraft({ ...d, startTime: '11:30' }, { publish: true, now: NOW }).startTime);
+test('D-198: untimed events are stored 00:00 to 23:59 IST and read back untimed', () => {
+  const span = eventSpan({ date: '2026-11-07', endDate: '2026-11-09', startTime: '', endTime: '' });
+  assert.equal(span.starts.toISOString(), '2026-11-06T18:30:00.000Z');
+  assert.equal(span.ends.toISOString(), '2026-11-09T18:29:00.000Z');
+  assert.equal(eventSpan({ date: '2026-11-07', startTime: '18:00', endTime: '' }).ends, null, 'a timed one-day event stays open-ended');
+  const d = draftFromEvent({ id: 'e', title: 'T', startsAt: span.starts.toISOString(), endsAt: span.ends.toISOString() });
+  assert.deepEqual([d.date, d.startTime, d.endDate, d.endTime], ['2026-11-07', '', '2026-11-09', '']);
 });
 
 test('capacity, fee, contact and map link rules', () => {

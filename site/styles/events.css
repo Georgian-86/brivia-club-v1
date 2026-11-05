@@ -378,3 +378,6 @@ body.app-body .event-companion-pill:focus-visible { outline: 2px solid var(--ev-
 body.app-body .event-companion-pill[aria-checked="true"] .event-switch-mini { background: var(--ev-wine); }
 body.app-body .event-companion-pill[aria-checked="true"] .event-switch-mini span { transform: translateX(14px); }
 @media (prefers-reduced-motion: reduce) { body.app-body .event-companion-pill, .event-switch-mini, .event-switch-mini span { transition: none; } }
+
+/* D-198: an event already under way. */
+.event-now { color: var(--ev-wine, var(--color-wine)); font-weight: 700; }

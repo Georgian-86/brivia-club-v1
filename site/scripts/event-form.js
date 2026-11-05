@@ -71,7 +71,8 @@ export const draftFromEvent = (event) => {
     ...emptyDraft(),
     id: event.id, status: event.status || 'draft', title: event.title || '', category: FORM_KEYS.has(event.category) ? event.category : '',
     customCategory: event.category === 'other' ? event.customCategory || '' : '',
-    description: event.description || '', date: start?.date || '', startTime: start?.time || '', endTime: end?.time || '',
+    description: event.description || '', date: start?.date || '',
+    startTime: start?.time && start.time !== ALL_DAY_START ? start.time : '', endTime: end?.time && end.time !== ALL_DAY_END ? end.time : '',
     endDate: end?.date || '',
     venueName: event.venueName || '', venueAddress: event.venueAddress || '', placeId: event.placeId || '', city: event.placeId ? event.venueArea || '' : '',
     mapUrl: event.mapUrl || '', capacity: event.capacity ? String(event.capacity) : '', paid: event.feeInr > 0, fee: event.feeInr > 0 ? String(event.feeInr) : '',
@@ -91,6 +92,22 @@ export const addDays = (date, n) => {
   d.setUTCDate(d.getUTCDate() + n);
   return d.toISOString().slice(0, 10);
 };
+
+// D-198: the instants an event runs between, as the server stores them. No start time starts it at 00:00 IST; no end
+// time ends it at 23:59 IST on its end day, except a timed one-day event, which stays open-ended (ends null).
+export const ALL_DAY_START = '00:00';
+export const ALL_DAY_END = '23:59';
+export const eventSpan = (draft) => {
+  const starts = istInstant(draft.date, draft.startTime || ALL_DAY_START);
+  if (!starts) return { starts: null, ends: null };
+  const endDate = draft.endDate || draft.date;
+  let ends = null;
+  if (draft.endTime) ends = istInstant(endDate, draft.endTime);
+  else if (!draft.startTime || endDate > draft.date) ends = istInstant(endDate, ALL_DAY_END);
+  return { starts, ends };
+};
+// When the event stops being open (brivia_event_open, 0020): its end, or six hours after an open-ended start.
+const eventOpenUntil = ({ starts, ends }) => ends || new Date(starts.getTime() + 6 * 3600e3);
 
 // Today in IST as YYYY-MM-DD (the date input's min).
 export const todayIst = (now = new Date()) => istParts(now.toISOString()).date;
@@ -142,10 +159,9 @@ export const validateEventDraft = (draft, { publish = false, now = new Date() } 
     else if (draft.date && draft.endDate < draft.date) errors.endDate = 'The end date cannot be before the start date.';
     else if (draft.date && draft.endDate > addDays(draft.date, MAX_EVENT_DAYS)) errors.endDate = `An event can run for at most ${MAX_EVENT_DAYS} days.`;
   }
-  if (!errors.endDate && draft.date && draft.startTime && draft.endTime) {
-    const s0 = istInstant(draft.date, draft.startTime);
-    const e0 = istInstant(endDate, draft.endTime);
-    if (s0 && e0 && e0 <= s0) errors.endTime = endDate === draft.date ? 'The end time must be after the start time.' : 'The event must end after it starts.';
+  const span = eventSpan(draft);
+  if (!errors.endDate && span.starts && span.ends && span.ends <= span.starts) {
+    errors.endTime = endDate === draft.date ? 'The end time must be after the start time.' : 'The event must end after it starts.';
   }
   if (!publish) return errors;
 
@@ -153,17 +169,14 @@ export const validateEventDraft = (draft, { publish = false, now = new Date() } 
   else if (draft.category === 'other' && !custom) errors.customCategory = 'Name your category, like "Book club" or "Pottery".';
   if (!errors.description && description.length < LIMITS.descriptionMin) errors.description = 'Tell people a little more (at least 20 characters).';
   if (!draft.date) errors.date = 'Choose a date.';
-  if (!draft.startTime) errors.startTime = 'Choose a start time.';
-  if (!draft.endTime) errors.endTime = errors.endTime || 'Choose an end time.';
-  const start = istInstant(draft.date, draft.startTime);
-  // An already published event keeps its start (it may be under way); a new or draft one must start in the future.
-  const keepsStart = draft.status === 'published' && draft.originalStart && start && start.getTime() === new Date(draft.originalStart).getTime();
-  if (draft.date && !errors.date && draft.date < todayIst(now)) errors.date = 'Choose today or a later date.';
-  else if (start && start <= now && !keepsStart && !errors.startTime) errors.startTime = 'Choose a time that has not passed.';
+  // D-198: the start may have passed (the event is already under way); it must not have ended.
+  else if (span.starts && !errors.endDate && !errors.endTime && eventOpenUntil(span) <= now) {
+    if (draft.endDate && draft.endDate > draft.date) errors.endDate = 'This event has already ended. Choose a later end date.';
+    else errors.date = 'This event has already ended. Choose a later date, or set an end date.';
+  }
   if (!String(draft.venueName || '').trim()) errors.venueName = 'Name the venue.';
   if (!String(draft.venueAddress || '').trim()) errors.venueAddress = 'Add the address so people can find it.';
   if (!draft.placeId) errors.city = 'Choose the city from the list.';
-  if (!String(draft.capacity ?? '').trim()) errors.capacity = 'How many people can come?';
   if (draft.contactPublic && !draft.contactEmail && !draft.contactPhone && !draft.contactLink) errors.contactPublic = 'Add a contact to show, or untick this.';
   return errors;
 };
@@ -266,15 +279,14 @@ export const coverOutputSize = (sw) => { const w = Math.max(1, Math.round(Math.m
 
 // The live preview: the draft as a listed event (normalizeEvent's shape), so the real card renders it.
 export const previewEvent = (draft, { organizer = null, imageSrc = '' } = {}) => {
-  const start = istInstant(draft.date, draft.startTime || '00:00');
-  const end = draft.endTime ? istInstant(draft.endDate || draft.date, draft.endTime) : null;
+  const { starts: start, ends: end } = eventSpan(draft);
   const capacity = wholeNumber(draft.capacity);
   const fee = draft.paid ? wholeNumber(draft.fee) : 0;
   return {
     id: 'preview', title: String(draft.title || '').trim() || 'Your event name', description: String(draft.description || '').trim(),
     category: FORM_KEYS.has(draft.category) ? draft.category : 'other', customCategory: draft.category === 'other' ? tidyCustomCategory(draft.customCategory) : '', tags: [], venueName: String(draft.venueName || '').trim() || 'Venue',
     venueArea: draft.city || '', venueAddress: String(draft.venueAddress || '').trim(), startsAt: draft.date && start ? start.toISOString() : null,
-    endsAt: end && draft.startTime ? end.toISOString() : null, imageKey: '', imageUrl: imageSrc, gallery: [], distanceKm: null,
+    endsAt: end ? end.toISOString() : null, imageKey: '', imageUrl: imageSrc, gallery: [], distanceKm: null,
     goingCount: draft.registeredCount || 0, companionCount: 0, going: false, wantsCompanion: false, friends: [],
     status: 'published', isMine: false, organizer, capacity: Number.isInteger(capacity) && capacity > 0 ? capacity : null,
     registeredCount: draft.registeredCount || 0, feeInr: Number.isInteger(fee) && fee > 0 ? fee : 0, myStatus: null,

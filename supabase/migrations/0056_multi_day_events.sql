@@ -2,11 +2,19 @@ set lock_timeout = '5s';
 -- 0056_multi_day_events.sql: an event may run over several days (founder request 2026-11-05, D-197: "the event can take
 -- more days as well"). Apply after 0022 (README "## 0056"). 0001-0055 are frozen. Idempotent.
 --
--- save_member_event (0022) is redefined with one change: p_fields may carry end_date (YYYY-MM-DD). Absent or empty, the
--- event ends on its start date, exactly as before (an older client keeps working). The end date may not be before the
--- start date or more than 30 days after it, and the end (date + time, IST) must come after the start ('invalid
--- end_time'). club_event already stores ends_at as a full timestamp and its open/listing rules use it, so nothing else
--- changes. Grants as 0022.
+-- save_member_event (0022) is redefined:
+--   * D-197: p_fields may carry end_date (YYYY-MM-DD). Absent or empty, the event ends on its start date, as before (an
+--     older client keeps working). It may not be before the start date or more than 30 days after it, and the end must
+--     come after the start ('invalid end_time').
+--   * D-198 (founder, same day): a published event may have started already, as long as it has not ended (it is
+--     "still going on"); start and end times are optional (no start time = 00:00 IST, no end time = 23:59 IST on the
+--     end day; a timed one-day event with no end stays open-ended as before); capacity may be empty, meaning unlimited
+--     registrations (the club_event_member_capacity check is dropped; registration already treats null as no limit).
+-- club_event already stores starts_at/ends_at as full timestamps and every open/listing rule uses brivia_event_open.
+-- Grants as 0022.
+
+-- D-198: a published member event may leave capacity empty (unlimited registrations).
+alter table public.club_event drop constraint if exists club_event_member_capacity;
 
 create or replace function public.save_member_event(p_id uuid, p_fields jsonb, p_publish boolean default false)
 returns uuid
@@ -89,15 +97,19 @@ begin
   if v_fee < 0 or v_fee > 100000 then raise exception 'invalid fee_inr' using errcode = '22023'; end if;
   if v_venue is not null and char_length(v_venue) > 120 then raise exception 'invalid venue_name' using errcode = '22023'; end if;
   if v_address is not null and char_length(v_address) > 240 then raise exception 'invalid venue_address' using errcode = '22023'; end if;
-  if v_date is not null and v_start is not null then
-    v_starts := (v_date + v_start) at time zone 'Asia/Kolkata';
+  if v_date is not null then
+    -- D-197: an event may run over several days (end_date, default the start date), at most 30 days after it starts.
+    -- D-198: the times are optional. No start time starts it at 00:00 IST; no end time ends it at 23:59 IST on its end
+    -- day, except a timed one-day event, which stays open-ended (ends_at null, as before).
+    v_end_date := coalesce(v_end_date, v_date);
+    if v_end_date < v_date or v_end_date > v_date + 30 then raise exception 'invalid end_date' using errcode = '22023'; end if;
+    v_starts := (v_date + coalesce(v_start, time '00:00')) at time zone 'Asia/Kolkata';
     if v_end is not null then
-      -- D-197: an event may run over several days (end_date, default the start date), at most 30 days after it starts.
-      v_end_date := coalesce(v_end_date, v_date);
-      if v_end_date < v_date or v_end_date > v_date + 30 then raise exception 'invalid end_date' using errcode = '22023'; end if;
       v_ends := (v_end_date + v_end) at time zone 'Asia/Kolkata';
-      if v_ends <= v_starts then raise exception 'invalid end_time' using errcode = '22023'; end if;
+    elsif v_start is null or v_end_date > v_date then
+      v_ends := (v_end_date + time '23:59') at time zone 'Asia/Kolkata';
     end if;
+    if v_ends is not null and v_ends <= v_starts then raise exception 'invalid end_time' using errcode = '22023'; end if;
   end if;
   if v_place is not null then
     select p.name into v_area from public.place p where p.id = v_place;
@@ -144,16 +156,13 @@ begin
     if v_category = 'other' and v_custom is null then raise exception 'invalid custom_category' using errcode = '22023'; end if;
     if char_length(v_description) < 20 then raise exception 'invalid description' using errcode = '22023'; end if;
     if v_date is null then raise exception 'invalid date' using errcode = '22023'; end if;
-    if v_start is null then raise exception 'invalid start_time' using errcode = '22023'; end if;
-    if v_end is null then raise exception 'invalid end_time' using errcode = '22023'; end if;
-    -- A new start must be in the future; an edit of a published event may keep its (already passed) start time.
-    if v_starts <= now() and (p_id is null or not v_old.is_published or v_starts is distinct from v_old.starts_at) then
-      raise exception 'invalid date' using errcode = '22023';
+    -- D-198: the start may have passed (an event already under way); the event must not have ended.
+    if not public.brivia_event_open(v_starts, v_ends) then
+      raise exception '%', case when v_end_date > v_date then 'invalid end_date' else 'invalid date' end using errcode = '22023';
     end if;
     if v_venue is null then raise exception 'invalid venue_name' using errcode = '22023'; end if;
     if v_address is null then raise exception 'invalid venue_address' using errcode = '22023'; end if;
     if v_place is null then raise exception 'invalid place_id' using errcode = '22023'; end if;
-    if v_capacity is null then raise exception 'invalid capacity' using errcode = '22023'; end if;
     if v_contact_public and v_email is null and v_phone is null and v_link is null then
       raise exception 'invalid contact_public' using errcode = '22023';
     end if;

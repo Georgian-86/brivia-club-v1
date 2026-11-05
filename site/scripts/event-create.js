@@ -75,11 +75,11 @@ const shellMarkup = () => `<div class="ec-shell">
         <h3 id="ec-s2"><span aria-hidden="true">02</span>Date, time &amp; venue</h3>
         <div class="ec-row ec-row-when">
           ${field('date', 'Start date', `<input id="ec-date" name="date" type="date" required ${describedBy('date')} />`)}
-          ${field('startTime', 'Starts', `<input id="ec-startTime" name="startTime" type="time" step="900" required ${describedBy('startTime')} />`)}
+          ${field('startTime', 'Starts', `<input id="ec-startTime" name="startTime" type="time" step="900" ${describedBy('startTime')} />`, { optional: true })}
           ${field('endDate', 'End date', `<input id="ec-endDate" name="endDate" type="date" ${describedBy('endDate')} />`)}
-          ${field('endTime', 'Ends', `<input id="ec-endTime" name="endTime" type="time" step="900" required ${describedBy('endTime')} />`)}
+          ${field('endTime', 'Ends', `<input id="ec-endTime" name="endTime" type="time" step="900" ${describedBy('endTime')} />`, { optional: true })}
         </div>
-        <p class="ec-hint ec-when-hint">Running over several days? Set the end date (up to ${MAX_EVENT_DAYS} days after it starts).</p>
+        <p class="ec-hint ec-when-hint">Running over several days? Set the end date (up to ${MAX_EVENT_DAYS} days). Already under way? Pick the day it started. No times means all day.</p>
         <div class="ec-row">
           ${field('venueName', 'Venue name', `<input id="ec-venueName" name="venueName" type="text" maxlength="${LIMITS.venueName}" autocomplete="off" placeholder="Battle Chess Skool" required ${describedBy('venueName')} />`)}
           ${field('city', 'City', `<div class="ec-combo"><input id="ec-city" name="city" type="text" role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="ec-city-list" autocomplete="off" spellcheck="false" placeholder="Start typing your city" required ${describedBy('city', true)} /><ul class="ec-combo-list" id="ec-city-list" role="listbox" aria-label="Cities" hidden></ul></div>`, { hint: 'Choose from the list, so people nearby can find it.' })}
@@ -98,7 +98,7 @@ const shellMarkup = () => `<div class="ec-shell">
       <section class="ec-section" aria-labelledby="ec-s3">
         <h3 id="ec-s3"><span aria-hidden="true">03</span>Registration</h3>
         <div class="ec-row ec-row-3">
-          ${field('capacity', 'Maximum registrations', `<input id="ec-capacity" name="capacity" type="number" inputmode="numeric" min="1" max="${LIMITS.capacityMax}" step="1" placeholder="30" required ${describedBy('capacity', true)} />`, { hint: 'Registrations close when it is full.' })}
+          ${field('capacity', 'Maximum registrations', `<input id="ec-capacity" name="capacity" type="number" inputmode="numeric" min="1" max="${LIMITS.capacityMax}" step="1" placeholder="Unlimited" ${describedBy('capacity', true)} />`, { hint: 'Leave empty for unlimited. Registrations close when it is full.', optional: true })}
           <fieldset class="ec-field ec-fee-toggle" data-field="paid">
             <legend>Entry fee</legend>
             <div class="ec-segment"><label><input type="radio" name="paid" value="free" checked /><span>Free</span></label><label><input type="radio" name="paid" value="paid" /><span>Paid</span></label></div>
@@ -249,7 +249,7 @@ export const createEventComposer = ({ dialog, api, memberId, organizer, safeImag
     form.querySelectorAll('input[name="paid"]').forEach((r) => { r.checked = (r.value === 'paid') === Boolean(draft.paid); });
     form.elements.contactPublic.checked = Boolean(draft.contactPublic);
     $('[data-ec-contact]').open = Boolean(draft.contactEmail || draft.contactPhone || draft.contactLink);
-    form.elements.date.min = todayIst();
+    form.elements.date.min = addDays(todayIst(), -MAX_EVENT_DAYS);
     if (!draft.endDate || draft.endDate === draft.date) form.elements.endDate.dataset.follows = '1'; else delete form.elements.endDate.dataset.follows;
     syncEndDate();
     const feeLocked = draft.registeredCount > 0;

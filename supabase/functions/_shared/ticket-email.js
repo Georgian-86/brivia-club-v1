@@ -24,17 +24,26 @@ export const whenLines = (startsAt, endsAt) => {
   if (Number.isNaN(start.getTime())) return { date: 'Date to be announced', time: '' };
   const date = start.toLocaleDateString('en-GB', { timeZone: IST, weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
   const t = (d) => d.toLocaleTimeString('en-US', { timeZone: IST, hour: 'numeric', minute: '2-digit' });
+  // D-198: times are optional; an untimed start is stored at 00:00 IST and an untimed end at 23:59 IST.
+  const hhmm = (d) => d.toLocaleTimeString('en-GB', { timeZone: IST, hour: '2-digit', minute: '2-digit', hourCycle: 'h23' });
+  const startTimed = hhmm(start) !== '00:00';
   const end = endsAt ? new Date(endsAt) : null;
-  if (!end || Number.isNaN(end.getTime())) return { date, time: `${t(start)} IST` };
+  if (!end || Number.isNaN(end.getTime())) return { date, time: startTimed ? `${t(start)} IST` : 'All day' };
+  const endTimed = hhmm(end) !== '23:59';
   const day = (d) => d.toLocaleDateString('en-CA', { timeZone: IST });
   if (day(end) !== day(start)) {
     // D-197: a multi-day event, "Saturday, 8 November – Monday, 10 November 2026" and "7:00 PM, 8 Nov – 10:00 PM, 10 Nov IST".
     const long = (d, year) => `${d.toLocaleDateString('en-GB', { timeZone: IST, weekday: 'long' })}, ${d.toLocaleDateString('en-GB', { timeZone: IST, day: 'numeric', month: 'long', ...(year ? { year: 'numeric' } : {}) })}`;
     const short = (d) => d.toLocaleDateString('en-GB', { timeZone: IST, day: 'numeric', month: 'short' });
     const sameYear = start.toLocaleDateString('en-GB', { timeZone: IST, year: 'numeric' }) === end.toLocaleDateString('en-GB', { timeZone: IST, year: 'numeric' });
-    return { date: `${long(start, !sameYear)} – ${long(end, true)}`, time: `${t(start)}, ${short(start)} – ${t(end)}, ${short(end)} IST` };
+    const from = startTimed ? `${t(start)}, ${short(start)}` : short(start);
+    const to = endTimed ? `${t(end)}, ${short(end)}` : short(end);
+    return { date: `${long(start, !sameYear)} – ${long(end, true)}`, time: startTimed || endTimed ? `${from} – ${to} IST` : 'All day' };
   }
-  return { date, time: `${t(start)} – ${t(end)} IST` };
+  if (startTimed && endTimed) return { date, time: `${t(start)} – ${t(end)} IST` };
+  if (startTimed) return { date, time: `From ${t(start)} IST` };
+  if (endTimed) return { date, time: `Until ${t(end)} IST` };
+  return { date, time: 'All day' };
 };
 
 // A calendar invite (RFC 5545): UTC times, escaped text, CRLF lines folded at 75 octets.
