@@ -635,33 +635,9 @@ const authModal = document.querySelector('#auth-modal');
 // startHandoff shows it with a short note; endHandoff hides it again unless the page is already leaving for the app.
 let leavingForApp = false;
 const handoffNote = document.querySelector('[data-handoff-note]');
-// D-186: the loading screen is the Brivia ignition; shown after a sign-in (a gesture on this page), it plays its cue.
-// Its own audio context, so the landing soundtrack never starts here. Silent when the visitor turned the sound off.
-let handoffAudio = null;
-const handoffSound = createIgnitionSound();
-const wakeHandoffAudio = () => {
-  if (musicPreference === 'off') return null;
-  try {
-    const AudioContextClass = window.AudioContext || window.webkitAudioContext;
-    if (!handoffAudio && AudioContextClass) { handoffAudio = new AudioContextClass(); handoffSound.prime(handoffAudio); }
-    if (handoffAudio?.state === 'suspended') handoffAudio.resume().catch(() => {});
-  } catch { handoffAudio = null; }
-  return handoffAudio;
-};
-if (document.querySelector('.brivia-handoff') && !isLandingPage) {
-  // Wake the context inside the sign-in's own gesture (a click or Enter), so it may play when the screen shows.
-  ['pointerdown', 'keydown'].forEach((name) => window.addEventListener(name, (event) => { if (isUnlockEvent(event) || event.type === 'pointerdown') wakeHandoffAudio(); }, { capture: true, passive: true }));
-}
 const startHandoff = (note = 'Opening your club') => {
   if (handoffNote) handoffNote.textContent = note;
-  const root = document.documentElement;
-  const showing = root.classList.contains('brivia-handing-off');
-  root.classList.add('brivia-handing-off');
-  if (showing || prefersReducedMotion) return;
-  const ctx = wakeHandoffAudio();
-  if (!ctx) return;
-  const go = () => { if (root.classList.contains('brivia-handing-off')) handoffSound.play(ctx, ctx.destination, { volume: 0.85 }); };
-  if (ctx.state === 'running') go(); else ctx.resume().then(go, () => {});
+  document.documentElement.classList.add('brivia-handing-off');
 };
 const endHandoff = () => {
   if (!leavingForApp) document.documentElement.classList.remove('brivia-handing-off');
@@ -2138,8 +2114,6 @@ const updateAuthScrollbar = () => {
 const redirectToApp = () => {
   leavingForApp = true;
   startHandoff();
-  // D-186: app.html shows the same loading title already drawn, so the page change is a still cut, not a restart.
-  try { window.sessionStorage.setItem('brivia-ignition-settled', String(Date.now())); } catch {}
   window.location.replace('/app.html');
 };
 // Back from Google (or the app) restores this page from the back/forward cache with the hand-off still up: undo it.

@@ -3957,3 +3957,14 @@ Pass and Pitch".
   violin (t29, t37, t45, the D-188 photos brought back) and tabla (t39, t42, t44). Thirteen others get a dog or a cat
   (t09, t12, t14, t20, t24, t27, t35, t43 with her houseplants, t53, t55, t56, t57, t58). No human face in any of them;
   sources in `supabase/seed/README.md`. Same file names, so live with the deploy and no SQL.
+
+## D-212 (2026-11-05): the sign-in loading screen is the classic "Opening your club" splash again
+- **Asked (founder, 2026-11-05):** "before today i had a loader for signup and register; now the animation I added
+  before the landing page took over the loaders also. Let the black Brivia Club animation be there on the landing page
+  but bring back the loader screens as they were."
+- **Decision:** D-186 (was D-180) put the ignition on black into `.brivia-handoff` on auth.html and app.html. That part
+  is reverted to the D-088 splash exactly as it was before (aura background, "the Brivia Club" mark, sliding wine line,
+  OPENING YOUR CLUB): markup, `handoff.css`, no ignition.css or Bodoni preload on those pages, no cue on sign-in, and
+  no `brivia-ignition-settled` still-cut hand-over. The landing's intro (`#intro-burst`) keeps the ignition and its music.
+- **Proof:** unit `brivia-ignition.test.mjs` now checks the title is on the landing and the classic loader (not the
+  ignition) is on auth and app; screenshots of the landing intro and the auth loader at 390 and 1440 px.
