@@ -87,6 +87,7 @@ const sound = (page) => page.evaluate(() => {
 });
 const isPlaying = () => document.querySelector('[data-landing-sound]')?.dataset.state === 'playing';
 const isStopped = () => document.querySelector('[data-landing-sound]')?.dataset.state === 'stopped';
+const isArmed = () => document.querySelector('[data-landing-sound]')?.dataset.state === 'armed';
 const waitFor = async (page, fn, arg, timeout = 5000) => page.waitForFunction(fn, arg, { timeout }).then(() => true).catch(() => false);
 const watchConsole = (page) => {
   const problems = [];
@@ -115,8 +116,8 @@ try {
     await page.reload({ waitUntil: 'load' });
     await page.waitForTimeout(700);
     let s = await sound(page);
-    await check('1440: before any gesture the button says "Play music", 44 px tall, inside the screen', async () => {
-      assert.equal(s.ready, true); assert.equal(s.state, 'stopped'); assert.equal(s.label, 'Play music'); assert.equal(s.text, 'Play music');
+    await check('1440: before any gesture the button shows music ON ("Music on", waiting for a tap), 44 px tall, inside the screen', async () => {
+      assert.equal(s.ready, true); assert.equal(s.state, 'armed'); assert.equal(s.text, 'Music on'); assert.equal(s.playing, false);
       const box = await page.locator('[data-landing-sound]').boundingBox();
       assert.ok(box && box.width >= 44 && box.height >= 44 && box.x + box.width <= 1440 && box.y + box.height <= 900, JSON.stringify(box));
     });
@@ -126,7 +127,7 @@ try {
     for (let i = 0; i < 12; i += 1) { await page.mouse.wheel(0, 120); await page.waitForTimeout(30); }
     await page.waitForTimeout(500);
     s = await sound(page);
-    await check('1440: scrolling alone does not start the music (no browser allows it)', () => assert.equal(s.state, 'stopped'));
+    await check('1440: scrolling alone does not start the music (no browser allows it); the button stays "Music on"', () => assert.equal(s.state, 'armed'));
     await check('1440: Lenis smooth scroll is on (desktop pointer) and the page moved', async () => {
       const r = await page.evaluate(() => ({ lenis: document.documentElement.classList.contains('lenis'), smooth: document.documentElement.classList.contains('has-smooth-scroll'), y: scrollY }));
       assert.equal(r.lenis, true); assert.equal(r.smooth, true); assert.ok(r.y > 500, `scrollY ${r.y}`);
@@ -179,10 +180,10 @@ try {
     await check(`1440: a hidden tab suspends the music (${hiddenCtx}) and it resumes on return`, () => { assert.equal(hiddenCtx, 'suspended'); assert.equal(back, true); });
     // An interruption (iOS: a call, Siri) the page did not ask for: the label follows, the next gesture resumes.
     await page.evaluate(() => window.__interrupt());
-    const honest = await waitFor(page, isStopped);
+    const honest = await waitFor(page, isArmed);
     await page.mouse.click(700, 300);
     const recovered = await waitFor(page, isPlaying);
-    await check('1440: an outside interruption shows "Play music" and the next click brings the music back', () => { assert.equal(honest, true); assert.equal(recovered, true); });
+    await check('1440: an outside interruption shows "Music on" (waiting for a tap) and the next click brings the music back', () => { assert.equal(honest, true); assert.equal(recovered, true); });
     const live = (await sound(page)).passes.live;
     await check(`1440: never more than one pass (plus a crossfade) at a time (live ${live})`, () => assert.ok(live <= 2, String(live)));
     await page.evaluate(() => { window.__timeShift = 5 * 60 * 1000 + 1000; });
@@ -268,6 +269,8 @@ try {
     await page.waitForTimeout(600);
     const lenis = await page.evaluate(() => document.documentElement.classList.contains('lenis'));
     await check('iPhone: no Lenis on a phone (native momentum scrolling)', () => assert.equal(lenis, false));
+    const shown = await sound(page);
+    await check('iPhone: on opening, the button shows music ON ("Music on"), not "Play music"', () => { assert.equal(shown.state, 'armed'); assert.equal(shown.text, 'Music on'); });
     await page.touchscreen.tap(195, 500);
     const started = await waitFor(page, isPlaying);
     const keeper = await page.evaluate(() => window.__mediaPlays.filter((src) => src.startsWith('data:audio/wav')).length);
@@ -281,6 +284,19 @@ try {
     const on = await waitFor(page, isPlaying);
     await check('iPhone: tapping the button stops and plays the music', () => { assert.equal(off, true); assert.equal(on, true); });
     await check('iPhone: no console errors or warnings', () => assert.deepEqual(problems, []));
+    await context.close();
+  }
+  // iPhone, first touch on the button itself while it says "Music on": the music starts (it never turns it off).
+  {
+    const context = await browser.newContext({ ...devices['iPhone 13'] });
+    await context.addInitScript(INIT, {});
+    const page = await context.newPage();
+    await page.goto(`${BASE}/index.html`, { waitUntil: 'load' });
+    await page.waitForTimeout(600);
+    await page.locator('[data-landing-sound]').tap();
+    const started = await waitFor(page, isPlaying);
+    const s = await sound(page);
+    await check('iPhone: tapping "Music on" first starts the music and the button becomes "Stop music"', () => { assert.equal(started, true); assert.equal(s.text, 'Stop music'); });
     await context.close();
   }
   // Reduced motion: no Lenis.
@@ -329,7 +345,7 @@ try {
   const problems = watchConsole(page);
   await page.goto(`${BASE}/index.html`, { waitUntil: 'load' });
   await page.waitForTimeout(1500);
-  const before = await page.evaluate(isStopped);
+  const before = await page.evaluate(isArmed);
   await page.mouse.click(700, 450);
   const started = await waitFor(page, isPlaying);
   await page.waitForTimeout(1500);
@@ -337,7 +353,7 @@ try {
   const off = await waitFor(page, isStopped);
   await page.locator('[data-landing-sound]').click();
   const on = await waitFor(page, isPlaying);
-  await check('real autoplay policy: silent and "Play music" at load, a click plays, the button stops and plays it', () => { assert.equal(before, true); assert.equal(started, true); assert.equal(off, true); assert.equal(on, true); });
+  await check('real autoplay policy: silent at load with the button showing "Music on",  a click plays, the button stops and plays it', () => { assert.equal(before, true); assert.equal(started, true); assert.equal(off, true); assert.equal(on, true); });
   await check('real autoplay policy: no console errors or warnings (no refused AudioContext)', () => assert.deepEqual(problems, []));
   await context.close();
 } finally { await real.close(); stop(); }

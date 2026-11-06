@@ -53,9 +53,14 @@ export const initialPreference = ({ stored = null, navigationType = 'navigate' }
 
 // What the button says. `playing` is the real state: the music is wanted AND the audio clock is running.
 // The label names the action a press will take, so it is never a "pressed" toggle with a changing name.
-export const soundButtonView = (playing) => (playing
-  ? { state: 'playing', label: 'Stop music' }
-  : { state: 'stopped', label: 'Play music' });
+// D-221: music is ON by default. While it is wanted but the browser still waits for a first touch (iPhone and most
+// phones never allow sound before one), the button shows ON ("Music on", lit, inviting a tap), not "Play music",
+// which read as off. Any tap on the page, or on the button, then starts it.
+export const soundButtonView = ({ audible = false, waiting = false } = {}) => {
+  if (audible) return { state: 'playing', label: 'Stop music', text: 'Stop music' };
+  if (waiting) return { state: 'armed', label: 'Music on: tap anywhere to hear it', text: 'Music on' };
+  return { state: 'stopped', label: 'Play music', text: 'Play music' };
+};
 
 // How far into the soundtrack the current pass is (s), to carry the position across an internal page change.
 export const trackOffset = ({ now, passStart, duration }) => {

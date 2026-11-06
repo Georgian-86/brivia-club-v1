@@ -212,12 +212,14 @@ let musicState = 'wait'; // 'wait' (wanted, not yet allowed) | 'play' | 'off' (t
 const musicAudible = () => musicState === 'play' && musicContext?.state === 'running';
 const renderSoundButton = () => {
   if (!soundButton) return;
-  const view = soundButtonView(musicAudible());
+  // Waiting: the music is on (the visitor's choice or the default) and only the browser's first-touch rule holds it.
+  const waiting = musicPreference === 'on' && (musicState === 'wait' || musicState === 'play');
+  const view = soundButtonView({ audible: musicAudible(), waiting });
   soundButton.classList.toggle('is-playing', view.state === 'playing');
   soundButton.dataset.state = view.state;
   soundButton.setAttribute('aria-label', view.label);
   soundButton.title = view.label;
-  if (soundButtonText) soundButtonText.textContent = view.label;
+  if (soundButtonText) soundButtonText.textContent = view.text;
 };
 
 // iPhone: Web Audio follows the ring switch unless the page is in the "playback" audio session. iOS 17+ has

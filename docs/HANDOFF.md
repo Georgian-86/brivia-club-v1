@@ -7,13 +7,14 @@ Update this file at the end of every session. CLAUDE.md holds the aim; this file
 
 ## 1. What is done
 
-**2026-11-06, D-220 (branch `claude/website-audio-system-cyqfa3`, not merged):** the landing music control is
+**2026-11-06, D-220 and D-221 (branch `claude/website-audio-system-cyqfa3`, not merged):** the landing music control is
 rebuilt so it tells the truth: "Stop music" / "Play music" (visible label), stops the soundtrack and the intro cue,
 resumes from the same point, music on by default (a mute lasts for the tab only; a reload starts with music on), the
 iPhone silent switch no longer hides it, a missing file is retried 3 times, no console warnings. Files
 `site/scripts/script.js` (landing music block), `site/scripts/landing-sound.js`; checks
 `tests/unit/landing-sound.test.mjs` and `tests/e2e/landing-sound.spec.mjs` (34). Owed: a check on a real iPhone (silent
-switch on), Safari, Firefox and Edge once deployed.
+switch on), Safari, Firefox and Edge once deployed. D-221: before the first touch the button shows ON ("Music on", lit)
+rather than "Play music".
 
 **2026-11-06, D-213 to D-217 (live):** migrations 0063-0066 applied, `directory` Edge Function v6, client deployed
 (main 76bd215). The intro is 4 s (D-213); connections who want company show first in Companions with "Text them · Make

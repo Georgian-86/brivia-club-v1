@@ -4099,3 +4099,19 @@ new for now").
   Honest limit: no browser lets a page start sound before a gesture unless it already allows it (Chrome's engagement
   score, Firefox/Safari settings); the first tap, click or key then starts it. Real-device Safari/Firefox/Edge and an
   iPhone's silent switch were not available in this container: check them on the live site.
+
+## D-221 (2026-11-06): the music button shows ON by default ("Music on") until the first touch
+
+- Founder (iPhone screenshot from the live site): "by default the music button is not on when I opened the website".
+  The live site was still on the pre-D-220 build (round button, flat bars). D-220 would have shown "Play music" there
+  too: iPhone Safari (and most phones) never allow sound before the visitor's first touch, so the page is silent at that
+  moment, and "Play music" read as off.
+- **Done.** A third button state, `armed`: the music is on (the default, or the visitor's choice) and only the browser's
+  first-touch rule holds it. The button is lit (wine, cream text), bars raised, with a soft pulse ring inviting the tap,
+  and says "Music on" (accessible name "Music on: tap anywhere to hear it"). Any tap on the page, or on the button,
+  starts the music, and it becomes "Stop music"; stopping shows "Play music". An interruption (a call, Siri) also returns
+  to "Music on" until the next tap. The pulse is off under reduced motion. `soundButtonView({ audible, waiting })` in
+  `landing-sound.js`, unit-tested; e2e checks updated (pre-gesture, scroll, interruption, real autoplay policy) and two
+  iPhone checks added.
+- Honest limit, unchanged: no website can start sound on an iPhone before a touch. The button now says ON, and the first
+  touch anywhere makes it audible.

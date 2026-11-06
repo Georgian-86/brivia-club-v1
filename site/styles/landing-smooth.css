@@ -88,6 +88,16 @@ html.has-smooth-scroll { scroll-behavior: auto !important; }
 .sound-toggle.is-playing .sound-toggle-bars i:nth-child(3) { animation-duration: 1.3s; animation-delay: -.6s; }
 .sound-toggle.is-playing .sound-toggle-bars i:nth-child(4) { animation-duration: .95s; animation-delay: -.15s; }
 @keyframes sound-bar { from { transform: scaleY(.25); } to { transform: scaleY(1); } }
+/* D-221: "Music on", waiting for the first touch: lit (wine), bars raised, and a soft ring that invites the tap. */
+.sound-toggle[data-state="armed"] { background: var(--color-wine); color: var(--color-cream); border-color: var(--color-wine); }
+.sound-toggle[data-state="armed"]:hover { background: var(--color-wine); }
+.sound-toggle[data-state="armed"] .sound-toggle-bars i { transform: scaleY(.55); }
+.sound-toggle[data-state="armed"] .sound-toggle-bars i:nth-child(2n) { transform: scaleY(.9); }
+.sound-toggle.is-ready[data-state="armed"] { animation: sound-armed 2.2s ease-out infinite; }
+@keyframes sound-armed {
+  0% { box-shadow: 0 8px 22px color-mix(in srgb, var(--color-wine) 16%, transparent), 0 0 0 0 color-mix(in srgb, var(--color-wine) 45%, transparent); }
+  70%, 100% { box-shadow: 0 8px 22px color-mix(in srgb, var(--color-wine) 16%, transparent), 0 0 0 12px color-mix(in srgb, var(--color-wine) 0%, transparent); }
+}
 /* The menu and the auth modal cover it; it never sits on top of them. */
 body.auth-open .sound-toggle,
 body:has(.menu-overlay.open) .sound-toggle { opacity: 0; pointer-events: none; }
@@ -97,6 +107,7 @@ body:has(.menu-overlay.open) .sound-toggle { opacity: 0; pointer-events: none; }
   .sound-toggle { right: max(14px, env(safe-area-inset-right)); bottom: max(14px, env(safe-area-inset-bottom)); gap: 8px; padding: 0 14px 0 12px; font-size: 10.5px; }
 }
 @media (prefers-reduced-motion: reduce) {
+  .sound-toggle.is-ready[data-state="armed"] { animation: none; }
   .sound-toggle.is-playing .sound-toggle-bars i { animation: none; transform: scaleY(.7); }
   .sound-toggle.is-playing .sound-toggle-bars i:nth-child(2n) { transform: scaleY(1); }
 }

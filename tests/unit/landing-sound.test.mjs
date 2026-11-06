@@ -63,8 +63,11 @@ test('initialPreference: a mute holds while navigating, a reload starts with mus
 });
 
 test('soundButtonView: the label always names the action the button will take', () => {
-  assert.deepEqual(soundButtonView(true), { state: 'playing', label: 'Stop music' });
-  assert.deepEqual(soundButtonView(false), { state: 'stopped', label: 'Play music' });
+  assert.deepEqual(soundButtonView({ audible: true }), { state: 'playing', label: 'Stop music', text: 'Stop music' });
+  assert.deepEqual(soundButtonView({ audible: true, waiting: true }).state, 'playing');
+  // D-221: on by default; before the first touch the button shows ON, never "Play music".
+  assert.deepEqual(soundButtonView({ waiting: true }), { state: 'armed', label: 'Music on: tap anywhere to hear it', text: 'Music on' });
+  assert.deepEqual(soundButtonView({}), { state: 'stopped', label: 'Play music', text: 'Play music' });
 });
 
 test('trackOffset: the position inside the current pass, 0 when unknown or at the very end', () => {
