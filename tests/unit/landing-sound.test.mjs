@@ -49,3 +49,46 @@ test('barsToSchedule: queues bars on the audio clock ahead of time, never in the
   // After a stall (tab throttled), late bars are dropped rather than played in a burst: start from now.
   assert.deepEqual(barsToSchedule({ now: 20, nextBarAt: 6.45, barLength: 3.2, lookahead: 1 }), [20.05]);
 });
+
+// D-220
+import { initialPreference, soundButtonView, trackOffset, MAX_LOAD_ATTEMPTS, loadRetryDelayMs, silentWavDataUri } from '../../site/scripts/landing-sound.js';
+
+test('initialPreference: a mute holds while navigating, a reload starts with music on again', () => {
+  assert.equal(initialPreference({ stored: 'off', navigationType: 'navigate' }), 'off');
+  assert.equal(initialPreference({ stored: 'off', navigationType: 'back_forward' }), 'off');
+  assert.equal(initialPreference({ stored: 'off', navigationType: 'reload' }), 'on');
+  assert.equal(initialPreference({ stored: null, navigationType: 'navigate' }), 'on');
+  assert.equal(initialPreference({ stored: 'on', navigationType: 'reload' }), 'on');
+  assert.equal(initialPreference(), 'on');
+});
+
+test('soundButtonView: the label always names the action the button will take', () => {
+  assert.deepEqual(soundButtonView(true), { state: 'playing', label: 'Stop music' });
+  assert.deepEqual(soundButtonView(false), { state: 'stopped', label: 'Play music' });
+});
+
+test('trackOffset: the position inside the current pass, 0 when unknown or at the very end', () => {
+  assert.equal(trackOffset({ now: 12.345, passStart: 10, duration: 17.6 }), 2.35);
+  assert.equal(trackOffset({ now: 9, passStart: 10, duration: 17.6 }), 0);
+  assert.equal(trackOffset({ now: 27.4, passStart: 10, duration: 17.6 }), 0);
+  assert.equal(trackOffset({ now: 5, passStart: 0, duration: 0 }), 0);
+});
+
+test('loadRetryDelayMs: a growing pause, capped, and a bounded number of attempts', () => {
+  assert.equal(MAX_LOAD_ATTEMPTS, 3);
+  assert.equal(loadRetryDelayMs(1), 1000);
+  assert.equal(loadRetryDelayMs(2), 2000);
+  assert.equal(loadRetryDelayMs(3), 4000);
+  assert.equal(loadRetryDelayMs(10), 8000);
+});
+
+test('silentWavDataUri: a valid, silent PCM WAV', () => {
+  const uri = silentWavDataUri();
+  assert.ok(uri.startsWith('data:audio/wav;base64,'));
+  const bytes = Buffer.from(uri.split(',')[1], 'base64');
+  assert.equal(bytes.toString('ascii', 0, 4), 'RIFF');
+  assert.equal(bytes.toString('ascii', 8, 12), 'WAVE');
+  assert.equal(bytes.readUInt32LE(4), bytes.length - 8);
+  assert.equal(bytes.readUInt32LE(40), bytes.length - 44);
+  assert.ok([...bytes.subarray(44)].every((b) => b === 128));
+});

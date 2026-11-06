@@ -79,11 +79,19 @@ test('the cue renders (with or without a reverb) and voices every part', () => {
   assert.doesNotThrow(() => renderIgnitionCue(fakeCtx({ osc: 0, sources: [] }, { convolver: false }), node(), 0));
 });
 
-test('played part-way from a tap during the intro, never after the reveal; silent when audio is not running', () => {
+test('played part-way from a tap during the intro, never after the reveal; silent when audio is not running', async () => {
   const log = { osc: 0, sources: [] };
-  const sound = createIgnitionSound({ win: {} });
+  // D-220: part-way in, only the pre-rendered cue can start (a live render would schedule in the past, which a real
+  // AudioParam refuses with an exception); from the very start it may render live.
+  class FakeOffline { constructor() { Object.assign(this, fakeCtx({ osc: 0, sources: [] })); } startRendering() { return Promise.resolve({ duration: IGNITION_CUE.length }); } }
+  const sound = createIgnitionSound({ win: { OfflineAudioContext: FakeOffline } });
   const ctx = fakeCtx(log);
+  assert.equal(sound.play(ctx, ctx.destination, { offset: 0.3 }), false, 'not before the pre-render');
+  assert.equal(sound.play(ctx, ctx.destination, { offset: 0 }), true, 'from the start it renders live');
+  await sound.prime(ctx);
+  assert.equal(sound.ready(), true);
   assert.equal(sound.play(ctx, ctx.destination, { offset: 0.3 }), true);
+  assert.equal(log.sources.at(-1).offset, 0.3, 'the pre-rendered cue starts part-way');
   assert.equal(sound.play(ctx, ctx.destination, { offset: IGNITION.reveal + 0.1 }), false, 'too late for the hit');
   assert.equal(sound.play({ ...ctx, state: 'suspended' }, ctx.destination), false);
 });

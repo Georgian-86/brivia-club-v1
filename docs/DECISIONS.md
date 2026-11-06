@@ -4051,3 +4051,51 @@ new for now").
   The card shows a "Request pending" chip; a Like (button or swipe) sends nothing, the card springs back, and a toast says
   "Request already pending. They'll see it in their notifications." Pass works as usual. The client falls back to
   `hiring_people` before 0067.
+
+## D-220 (2026-11-06): one landing music control that always tells the truth (Stop music / Play music)
+
+- Founder: music on by default whenever the browser permits it, on phones and desktops; a landing button that really
+  stops and resumes every intended layer, labelled "Stop music" / "Play music"; the choice holds while navigating; a
+  reload starts with music on again; test the real audio, not the look. No agent-arena round: the founder specified the
+  behaviour (as D-063); the button keeps its place and family, only gaining its label.
+- **Audit.** The landing has two sound layers, both Web Audio on one context: the soundtrack loop (D-092) and the
+  ignition cue under the intro (D-186). The hero video has no audio track. The app's notification, swipe and deal cues
+  (D-137, own per-device switches in Settings) are not landing music and are unchanged.
+- **Root causes found.** (1) A mute was saved in `localStorage` forever, so a visitor who once pressed it never heard
+  music again, on any visit. (2) iPhone: Web Audio follows the ring/silent switch, so with it on silent the music was
+  inaudible. (3) Stop faded only the soundtrack bus; the intro cue was wired straight to the speakers and played on.
+  (4) Play restarted the track from the top. (5) The button followed an intention flag, not the audio clock: after an
+  iOS interruption (call, Siri) or a refused resume it still showed "playing" in silence. (6) A missing or blocked
+  soundtrack was re-requested every 250 ms forever. (7) The track was fetched only after the first tap, so the first
+  tap waited for the download. (8) An AudioContext was created at load even when sound was not allowed, which Chrome
+  reports as a console warning. (9) Vestigial code unmuted the (silent) hero video on the first gesture.
+- **Done** (`landing-sound.js` helpers, unit-tested; `script.js`; `index.html`; `landing-smooth.css`):
+  - The mute lives in `sessionStorage` for the tab: landing ↔ auth/careers keeps it; a reload (navigation type
+    `reload`) or a new tab starts with music on. The old `localStorage` key is removed on load.
+  - Sound before a gesture is asked first (`navigator.getAutoplayPolicy` where it exists, else a silent unmuted clip);
+    only then is an AudioContext created. Otherwise every activation gesture retries until the clock really runs.
+  - "Stop music" fades both buses (soundtrack and cue) in 0.35 s, then suspends the context, so "Play music" resumes
+    from the exact point and can never layer a second copy (seven fast presses checked). The cue is cut for good.
+  - The label is derived from the real state (wanted and `context.state === 'running'`); an interruption shows "Play
+    music" and re-arms the gesture listeners. A press does what the label says. Visible text plus `data-state`; no
+    `aria-pressed` with a changing name.
+  - iPhone: `navigator.audioSession.type = 'playback'` while playing (iOS 17+), else a looping silent clip held in
+    the gesture, so the music plays with the switch on silent; released on stop and while hidden. Trade-off: like any
+    playback audio it pauses other apps' audio while it plays.
+  - Prefetch of the soundtrack when idle (not under save-data); a failed load is retried 3 times (1 s, 2 s, 4 s) and
+    then the button offers "Play music", which tries again.
+  - Hidden tab: suspended (and not counted towards the 5 minutes); on return it resumes, or waits for a tap if the
+    browser refuses. `pageshow` (back/forward cache) does the same. On `pagehide` the track position is kept in
+    `sessionStorage`, so returning to the landing picks the soundtrack up where it was.
+  - The hero video always plays muted; nothing but the music makes sound on the landing.
+  - Found while testing: a first start part-way through the intro, before the ignition cue's pre-render was ready,
+    fell back to a live render scheduled in the past, which threw and also kept the soundtrack from starting.
+    `brivia-ignition.js` now only starts part-way from the pre-render; the landing waits for it once (the soundtrack
+    waits with it, so it still enters under the cue's tail), and a cue failure can never stop the music.
+  - Kept from D-063: the 5-minute limit (then a fade; "Play music" gives a fresh 5 minutes).
+- **Checks.** `tests/unit/landing-sound.test.mjs` (10), `tests/unit/brivia-ignition.test.mjs` (part-way contract). `tests/e2e/landing-sound.spec.mjs` (34): desktop, iPhone
+  emulation, page-to-page navigation, reload, hidden tab, interruption, missing file, a browser that allows sound at
+  load, and Chromium's real gesture-required policy with nothing mocked; no console errors or warnings in any.
+  Honest limit: no browser lets a page start sound before a gesture unless it already allows it (Chrome's engagement
+  score, Firefox/Safari settings); the first tap, click or key then starts it. Real-device Safari/Firefox/Edge and an
+  iPhone's silent switch were not available in this container: check them on the live site.

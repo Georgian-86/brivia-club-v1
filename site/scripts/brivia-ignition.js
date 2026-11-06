@@ -231,6 +231,8 @@ export const createIgnitionSound = ({ win = globalThis.window } = {}) => {
   // offset: how far into the title the page already is (s). Past the reveal, nothing plays (a late hit sounds wrong).
   const play = (ctx, dest, { offset = 0, volume = 1 } = {}) => {
     if (!ctx || ctx.state !== 'running' || offset > IGNITION.reveal - 0.12) return false;
+    // Part-way in, only the pre-rendered cue can start (a live render would schedule in the past and throw, D-220).
+    if (!buffer && offset > 0.02) return false;
     const gain = ctx.createGain();
     gain.gain.value = volume;
     gain.connect(dest || ctx.destination);

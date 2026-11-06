@@ -7,6 +7,14 @@ Update this file at the end of every session. CLAUDE.md holds the aim; this file
 
 ## 1. What is done
 
+**2026-11-06, D-220 (branch `claude/website-audio-system-cyqfa3`, not merged):** the landing music control is
+rebuilt so it tells the truth: "Stop music" / "Play music" (visible label), stops the soundtrack and the intro cue,
+resumes from the same point, music on by default (a mute lasts for the tab only; a reload starts with music on), the
+iPhone silent switch no longer hides it, a missing file is retried 3 times, no console warnings. Files
+`site/scripts/script.js` (landing music block), `site/scripts/landing-sound.js`; checks
+`tests/unit/landing-sound.test.mjs` and `tests/e2e/landing-sound.spec.mjs` (34). Owed: a check on a real iPhone (silent
+switch on), Safari, Firefox and Edge once deployed.
+
 **2026-11-06, D-213 to D-217 (live):** migrations 0063-0066 applied, `directory` Edge Function v6, client deployed
 (main 76bd215). The intro is 4 s (D-213); connections who want company show first in Companions with "Text them · Make
 a plan" (D-214, 0063); opening a chat or the Chats tab clears message notifications on every device, and the Hiring
@@ -323,7 +331,7 @@ room photo is softly blurred again (baked into `media/assets/chat-room-soft.webp
 
 **Landing smoothness and sound (2026-10-16), same branch.** See D-063. Lenis smooth scroll (desktop pointer only),
 cheaper matching-scene layers, sound that starts on the first real gesture and stops after 5 minutes, and a sound
-button. Checks: `node tests/e2e/landing-sound.spec.mjs` (15 checks, after a stub build) and the frame-time probe
+button (rebuilt in D-220). Checks: `node tests/e2e/landing-sound.spec.mjs` (34 checks since D-220, after a stub build) and the frame-time probe
 `node tests/e2e/landing-smoothness.mjs` (`SMOOTH_ASSERT=1` fails on a p95 frame over 34 ms; this container has no GPU,
 so judge desktop smoothness on a real laptop). Open: the original `source-media/Images/Videos/HEROSECTIONVI.MOV` carries a real
 soundtrack (the 4K master has none); the landing still plays its synthesized chord. Ask the founder before swapping.

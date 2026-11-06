@@ -47,13 +47,18 @@ html.has-smooth-scroll { scroll-behavior: auto !important; }
   z-index: 40;
   right: max(20px, env(safe-area-inset-right));
   bottom: max(20px, env(safe-area-inset-bottom));
-  display: grid;
-  width: 44px;
+  display: inline-flex;
+  min-width: 44px;
   height: 44px;
-  place-items: center;
-  padding: 0;
+  align-items: center;
+  gap: 9px;
+  padding: 0 16px 0 14px;
   border: 1px solid color-mix(in srgb, var(--color-wine) 30%, transparent);
-  border-radius: 50%;
+  border-radius: 999px;
+  font: 600 11px/1 var(--font-body);
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  white-space: nowrap;
   background: color-mix(in srgb, var(--color-cream) 92%, transparent);
   color: var(--color-wine);
   box-shadow: 0 8px 22px color-mix(in srgb, var(--color-wine) 16%, transparent);
@@ -66,7 +71,9 @@ html.has-smooth-scroll { scroll-behavior: auto !important; }
 .sound-toggle.is-ready { opacity: 1; pointer-events: auto; transform: none; }
 .sound-toggle:hover { background: var(--color-cream); transform: translateY(-2px); }
 .sound-toggle:focus-visible { outline: 2px solid var(--color-wine); outline-offset: 3px; }
-.sound-toggle-bars { display: flex; align-items: center; gap: 3px; height: 16px; }
+.sound-toggle-bars { display: flex; flex: none; align-items: center; gap: 3px; height: 16px; }
+/* D-220: the label names what a press does ("Stop music" / "Play music"); script.js keeps it in step with the sound. */
+.sound-toggle-text { display: block; }
 .sound-toggle-bars i {
   display: block;
   width: 2px;
@@ -87,7 +94,7 @@ body:has(.menu-overlay.open) .sound-toggle { opacity: 0; pointer-events: none; }
 /* The playground stage has its own sound button, which scrolls through this corner on a phone: step aside (D-066). */
 .sound-toggle.is-ready.is-yielding { opacity: 0; pointer-events: none; transform: translateY(8px); }
 @media (max-width: 700px) {
-  .sound-toggle { right: max(14px, env(safe-area-inset-right)); bottom: max(14px, env(safe-area-inset-bottom)); }
+  .sound-toggle { right: max(14px, env(safe-area-inset-right)); bottom: max(14px, env(safe-area-inset-bottom)); gap: 8px; padding: 0 14px 0 12px; font-size: 10.5px; }
 }
 @media (prefers-reduced-motion: reduce) {
   .sound-toggle.is-playing .sound-toggle-bars i { animation: none; transform: scaleY(.7); }

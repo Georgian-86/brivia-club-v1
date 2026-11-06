@@ -18,8 +18,11 @@ import { signupFlowMode, resumeScreen } from './signup-flow.js';
 import { defaultCoverUrl, normalizeCoverUrl } from './cover-assets.js';
 import { DEFAULT_COVER_KEY, presetCoverPath, presetCoverStoredPath } from './preset-cover.js';
 import { motionAllowed, introPlan, pickHeroSource, markLoaded, INTRO_CAP_MS, INTRO_HOLD_MS } from './landing-motion.js';
-import { SOUND_LIMIT_MS, SOUND_STORAGE_KEY, soundPreference, soundPlan, isUnlockEvent, barsToSchedule } from './landing-sound.js';
-import { IGNITION, IGNITION_CUE, createIgnitionSound } from './brivia-ignition.js';
+import {
+  SOUND_LIMIT_MS, SOUND_STORAGE_KEY, isUnlockEvent, barsToSchedule, initialPreference, soundButtonView, trackOffset,
+  MAX_LOAD_ATTEMPTS, loadRetryDelayMs, silentWavDataUri,
+} from './landing-sound.js';
+import { IGNITION_CUE, createIgnitionSound } from './brivia-ignition.js';
 import heroSoundtrackUrl from '../media/audio/hero-soundtrack.m4a?url';
 import { watchPasswordFields } from './password-reveal.js';
 import Lenis from 'lenis';
@@ -31,7 +34,7 @@ const introBurst = document.querySelector('#intro-burst');
 const introSkip = introBurst?.querySelector('.intro-skip');
 // D-186: the intro is the drawn Brivia ignition (no video). introClock lets the music code below join it: the cue
 // plays if the page may make sound now, or from a tap during the intro (part-way, so the chord still lands on the name).
-const introClock = { start: 0, active: false, cued: false, musicFrom: 0 };
+const introClock = { start: 0, active: false, cued: false, musicFrom: 0, pending: false, primed: false };
 const landingMotion = motionAllowed({
   reducedMotion: Boolean(window.matchMedia?.('(prefers-reduced-motion: reduce)').matches),
   saveData: Boolean(navigator.connection?.saveData),
@@ -99,36 +102,17 @@ if (introBurst && plan === 'play') {
   window.setTimeout(() => finishIntro(true), Math.max(0, INTRO_CAP_MS - 150 - Math.round(window.performance?.now?.() || 0)));
 }
 
-/* Keep the landing-page music enabled on desktop and mobile. Browsers may
-   reject autoplay with sound, so retry immediately on the first real gesture. */
+/* The landing's videos are decorative and silent (the hero has no audio track, D-092), so they always play muted:
+   only the music below makes sound, and on iPhone a video never takes the audio session from it (D-220). */
 const landingVideos = [...document.querySelectorAll('.hero-video')];
 // The hero video starts late (when idle) and never under reduced-motion or save-data.
-// Until a video has started, the gesture handler leaves it alone, so nothing is force-loaded. Every video keeps
-// `muted` + `playsinline` in the HTML (iOS autoplay); the first user gesture unmutes them as before.
 const startedLandingVideos = new Set();
-// Set by the first user gesture; a video that starts later (the idle hero) is unmuted on start.
-let landingAudioUnlocked = false;
-const playLandingVideo = (video) => {
-  video.muted = false;
-  video.defaultMuted = false;
-  video.volume = 1;
-  video.play().catch(() => {
-    video.muted = true;
-    video.play().catch(() => {});
-  });
-};
 const startLandingVideo = (video) => {
   if (!landingMotion || startedLandingVideos.has(video)) return;
   startedLandingVideos.add(video);
+  video.muted = true;
   video.preload = 'auto';
-  // After a gesture, start unmuted (the gesture handler has already run, so it cannot do this later); before one, start
-  // muted from the HTML attribute without an unmuted attempt the browser would reject.
-  if (landingAudioUnlocked) playLandingVideo(video);
-  else video.play().catch(() => {});
-};
-const enableLandingVideoAudio = () => {
-  landingAudioUnlocked = true;
-  startedLandingVideos.forEach(playLandingVideo);
+  video.play().catch(() => {});
 };
 const heroLandingVideo = document.querySelector('.hero-video');
 // The 4K hero (D-062) lists AV1, HEVC and H.264 for each frame (portrait crop / full frame). The browser takes the
@@ -179,59 +163,132 @@ if (landingMotion && belowFoldVideos.length) {
     belowFoldVideos.forEach((video) => videoObserver.observe(video));
   } else belowFoldVideos.forEach(startLandingVideo);
 }
-// ---- Landing sound (D-063; the hero video's own soundtrack since D-092) ----
-// The music (the original hero video's soundtrack, looped with a 2 s crossfade) starts as early as the browser allows:
-// at load when the browser permits it, otherwise on the visitor's first real gesture (any of them, retried until it
-// works: scrolling alone can never start audio in a browser). It fades in, plays for at most 5 minutes of visible
-// time, then fades out. The sound button (bottom right) turns everything off or on, and the choice is remembered.
+// ---- Landing music (D-063, D-092, D-186; one control for every layer since D-220) ----
+// Two layers make sound on the landing, both on one AudioContext: the ignition cue under the intro (cueBus) and the
+// soundtrack, looped with a 2 s crossfade (musicBus). Nothing else on the landing has audio. The music starts as early
+// as the browser allows: at load when sound is already permitted (asked with a silent clip first, so a refusal is
+// quiet), otherwise on the first real gesture, retried on every gesture until it truly runs. The button turns both
+// layers off and on. Off fades for 0.35 s and then suspends the audio clock, so on resumes from the same point and
+// can never layer a second copy. The choice lasts for the tab (a reload starts with music on again), and the position
+// carries across a visit to another page of the site and back. After 5 minutes of visible play it fades out (D-063).
 const soundButton = document.querySelector('[data-landing-sound]');
+const soundButtonText = soundButton?.querySelector('[data-landing-sound-text]');
 const MUSIC_VOLUME = 0.32;
 const MUSIC_CROSSFADE = 2;
+const SOUND_POSITION_KEY = 'brivia-landing-sound-at';
+const SILENT_WAV = silentWavDataUri();
+const navigationType = (() => {
+  try { return window.performance?.getEntriesByType?.('navigation')?.[0]?.type || 'navigate'; } catch { return 'navigate'; }
+})();
 let musicPreference = 'on';
-try { musicPreference = soundPreference(window.localStorage.getItem(SOUND_STORAGE_KEY)); } catch { /* private mode */ }
+let resumeOffset = 0; // where the soundtrack was when the visitor left for another page of this tab (s)
+// Read on the landing only: auth.html runs this file too, and must leave the tab's choice and position alone.
+if (isLandingPage) try {
+  window.localStorage.removeItem(SOUND_STORAGE_KEY); // the pre-D-220 mute that lasted forever
+  musicPreference = initialPreference({ stored: window.sessionStorage.getItem(SOUND_STORAGE_KEY), navigationType });
+  if (navigationType === 'reload') window.sessionStorage.removeItem(SOUND_STORAGE_KEY);
+  else resumeOffset = Number(window.sessionStorage.getItem(SOUND_POSITION_KEY)) || 0;
+  window.sessionStorage.removeItem(SOUND_POSITION_KEY);
+} catch { /* private mode: on, from the start */ }
+const saveMusicPreference = () => { try { window.sessionStorage.setItem(SOUND_STORAGE_KEY, musicPreference); } catch { /* private mode */ } };
 let musicContext;
 let musicBus;
+let cueBus;
+let musicData = null;
+let musicFetch = null;
 let musicBuffer = null;
-let musicLoading = null;
+let musicDecoding = null;
+let musicLoadFailures = 0;
+let musicRetryAt = 0;
 const musicSources = new Set();
-let musicScheduler;
+const passStarts = []; // where each queued pass's track time 0 falls on the audio clock
+let musicScheduler = 0;
+let suspendTimer = 0;
 let musicNextBarAt = 0;
 let musicPlayedMs = 0;
 let musicPlayingSince = 0;
-let musicState = 'wait'; // 'wait' | 'play' | 'off' | 'ended'
-let gestureSeen = false;
+let musicState = 'wait'; // 'wait' (wanted, not yet allowed) | 'play' | 'off' (the visitor) | 'ended' (5 min) | 'error'
+// What the visitor hears right now: wanted, and the audio clock really running (not suspended or interrupted).
+const musicAudible = () => musicState === 'play' && musicContext?.state === 'running';
 const renderSoundButton = () => {
   if (!soundButton) return;
-  const playing = musicState === 'play';
-  soundButton.classList.toggle('is-playing', playing);
-  soundButton.setAttribute('aria-pressed', String(playing));
-  soundButton.setAttribute('aria-label', playing ? 'Mute sound' : 'Play sound');
-  soundButton.title = playing ? 'Mute sound' : 'Play sound';
+  const view = soundButtonView(musicAudible());
+  soundButton.classList.toggle('is-playing', view.state === 'playing');
+  soundButton.dataset.state = view.state;
+  soundButton.setAttribute('aria-label', view.label);
+  soundButton.title = view.label;
+  if (soundButtonText) soundButtonText.textContent = view.label;
 };
-// Fetched and decoded once, after the first start (never on load: a visitor who never hears it never downloads it).
-const loadMusic = () => {
-  musicLoading ||= fetch(heroSoundtrackUrl)
+
+// iPhone: Web Audio follows the ring switch unless the page is in the "playback" audio session. iOS 17+ has
+// navigator.audioSession; older iOS gets there while a (silent) media element plays. Called inside the gesture.
+const isAppleTouch = /iP(hone|ad|od)/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+let silentKeeper = null;
+const holdPlaybackSession = () => {
+  try { if (navigator.audioSession) { navigator.audioSession.type = 'playback'; return; } } catch { /* read-only */ }
+  if (!isAppleTouch) return;
+  if (!silentKeeper) {
+    silentKeeper = new Audio(SILENT_WAV);
+    silentKeeper.loop = true;
+    silentKeeper.setAttribute('playsinline', '');
+    silentKeeper.setAttribute('x-webkit-airplay', 'deny');
+  }
+  silentKeeper.play().catch(() => {});
+};
+const releasePlaybackSession = () => {
+  try { if (navigator.audioSession) navigator.audioSession.type = 'auto'; } catch { /* read-only */ }
+  silentKeeper?.pause();
+};
+
+// The soundtrack's bytes are fetched when the page is idle (so the first tap plays at once) and decoded once.
+const fetchMusic = () => {
+  musicFetch ||= fetch(heroSoundtrackUrl)
     .then((response) => { if (!response.ok) throw new Error(`soundtrack ${response.status}`); return response.arrayBuffer(); })
-    .then((data) => new Promise((resolve, reject) => musicContext.decodeAudioData(data, resolve, reject)))
-    .then((buffer) => { musicBuffer = buffer; scheduleMusic(); })
-    .catch(() => { musicLoading = null; }); // offline or blocked: the next start tries again
-  return musicLoading;
+    .then((data) => { musicData = data; return data; })
+    .catch((error) => { musicFetch = null; throw error; });
+  return musicFetch;
 };
-// One pass of the soundtrack: it fades in over the previous pass's last 2 s and fades out over its own.
-const playMusicBar = (start) => {
+const loadMusic = () => {
+  if (musicBuffer || musicDecoding || !musicContext) return;
+  if (musicLoadFailures >= MAX_LOAD_ATTEMPTS || performance.now() < musicRetryAt) return;
+  musicDecoding = (musicData ? Promise.resolve(musicData) : fetchMusic())
+    .then((data) => {
+      musicData = null; // decoding detaches the bytes
+      musicFetch = null;
+      return new Promise((resolve, reject) => musicContext.decodeAudioData(data, resolve, reject));
+    })
+    .then((buffer) => { musicBuffer = buffer; musicDecoding = null; scheduleMusic(); })
+    .catch(() => {
+      // Offline, missing or undecodable: a few spaced retries, then the button honestly offers "Play music" again.
+      musicDecoding = null;
+      musicLoadFailures += 1;
+      musicRetryAt = performance.now() + loadRetryDelayMs(musicLoadFailures);
+      if (musicLoadFailures >= MAX_LOAD_ATTEMPTS && musicState === 'play') stopMusic('error');
+    });
+};
+// One pass of the soundtrack from `offset` s: it fades in over the previous pass's last 2 s (a pass resumed mid-track
+// comes in under the bus fade instead) and fades out over its own. Returns when the next pass should start.
+const playMusicPass = (start, offset = 0) => {
+  const from = offset > 0 && offset < musicBuffer.duration - MUSIC_CROSSFADE * 2 ? offset : 0;
   const source = musicContext.createBufferSource();
   const gain = musicContext.createGain();
-  const end = start + musicBuffer.duration;
+  const end = start + musicBuffer.duration - from;
   source.buffer = musicBuffer;
-  gain.gain.setValueAtTime(0.0001, start);
-  gain.gain.exponentialRampToValueAtTime(1, start + MUSIC_CROSSFADE);
+  if (from > 0) gain.gain.setValueAtTime(1, start);
+  else {
+    gain.gain.setValueAtTime(0.0001, start);
+    gain.gain.exponentialRampToValueAtTime(1, start + MUSIC_CROSSFADE);
+  }
   gain.gain.setValueAtTime(1, end - MUSIC_CROSSFADE);
   gain.gain.exponentialRampToValueAtTime(0.0001, end);
   source.connect(gain).connect(musicBus);
-  source.addEventListener('ended', () => musicSources.delete(source));
+  source.addEventListener('ended', () => { musicSources.delete(source); source.disconnect(); gain.disconnect(); });
   musicSources.add(source);
-  source.start(start);
+  source.start(start, from);
   source.stop(end);
+  passStarts.push(start - from);
+  if (passStarts.length > 3) passStarts.shift();
+  return end - MUSIC_CROSSFADE;
 };
 const musicElapsedMs = () => musicPlayedMs + (musicState === 'play' && !document.hidden ? performance.now() - musicPlayingSince : 0);
 // Queues the next pass on the audio clock a second ahead (a busy main thread never leaves a gap), and ends at 5 minutes.
@@ -239,117 +296,211 @@ const scheduleMusic = () => {
   if (!musicContext || musicState !== 'play') return;
   if (musicElapsedMs() >= SOUND_LIMIT_MS) { stopMusic('ended'); return; }
   if (!musicBuffer) { loadMusic(); return; }
+  if (musicContext.state !== 'running') return;
   // After the intro's cue (D-186), the soundtrack comes in under its tail instead of over the chord.
+  if (musicNextBarAt === 0 && introClock.pending) return;
   if (musicNextBarAt === 0) musicNextBarAt = Math.max(musicContext.currentTime + 0.05, introClock.musicFrom || 0);
-  for (const start of barsToSchedule({ now: musicContext.currentTime, nextBarAt: musicNextBarAt, barLength: musicBuffer.duration - MUSIC_CROSSFADE, lookahead: 1 })) {
-    playMusicBar(start);
-    musicNextBarAt = start + musicBuffer.duration - MUSIC_CROSSFADE;
+  for (let guard = 0; guard < 4; guard += 1) {
+    const [start] = barsToSchedule({ now: musicContext.currentTime, nextBarAt: musicNextBarAt, barLength: musicBuffer.duration, lookahead: 1 });
+    if (start === undefined) break;
+    musicNextBarAt = playMusicPass(start, resumeOffset);
+    resumeOffset = 0;
   }
+};
+const startScheduler = () => {
+  if (musicScheduler) return;
+  musicScheduler = window.setInterval(scheduleMusic, 250);
+};
+const onMusicContextState = () => {
+  const running = musicContext.state === 'running';
+  if (running && (musicState === 'wait' || musicState === 'play')) { playIntroCue(); beginMusic(); }
+  // Suspended or "interrupted" while wanted and on screen (iOS: a call, Siri, another app's audio): the next gesture
+  // brings it back, and until then the button says "Play music".
+  if (!running && musicState === 'play' && !document.hidden) armUnlock();
+  renderSoundButton();
 };
 const ensureMusicContext = () => {
   if (musicContext) return musicContext;
   const AudioContextClass = window.AudioContext || window.webkitAudioContext;
   if (!AudioContextClass) return null;
-  musicContext = new AudioContextClass();
+  try { musicContext = new AudioContextClass({ latencyHint: 'playback' }); } catch {
+    try { musicContext = new AudioContextClass(); } catch { return null; }
+  }
   musicBus = musicContext.createGain();
   musicBus.gain.value = 0.0001;
   musicBus.connect(musicContext.destination);
-  musicContext.addEventListener?.('statechange', () => { if (musicContext.state === 'running') playIntroCue(); if (musicContext.state === 'running' && musicState === 'wait') beginMusic(); });
+  cueBus = musicContext.createGain();
+  cueBus.gain.value = 1;
+  cueBus.connect(musicContext.destination);
+  musicContext.addEventListener?.('statechange', onMusicContextState);
   ignitionSound.prime(musicContext);
   return musicContext;
 };
 // D-186: the ignition's cue, once, while the intro is on screen and the page may make sound.
 const ignitionSound = createIgnitionSound();
+// Started part-way (the usual case: the first tap comes during the intro), the cue needs its pre-render, which takes a
+// moment on a fresh context: it waits for it once, and the soundtrack waits with it so it still comes in under the tail.
 function playIntroCue() {
   if (!introClock.active || introClock.cued || musicPreference === 'off' || musicContext?.state !== 'running') return;
+  if (!ignitionSound.ready() && !introClock.primed) {
+    if (introClock.pending) return;
+    introClock.pending = true;
+    Promise.resolve(ignitionSound.prime(musicContext)).then(() => {
+      introClock.pending = false;
+      introClock.primed = true;
+      playIntroCue();
+      scheduleMusic();
+    });
+    return;
+  }
   const offset = (performance.now() - introClock.start) / 1000;
-  if (!ignitionSound.play(musicContext, musicContext.destination, { offset, volume: 0.9 })) return;
+  try {
+    if (!ignitionSound.play(musicContext, cueBus, { offset, volume: 0.9 })) return;
+  } catch { introClock.cued = true; return; } // the cue is a flourish: never let it stop the music
   introClock.cued = true;
   introClock.musicFrom = musicContext.currentTime + Math.max(0, IGNITION_CUE.length - offset - 1.6);
 }
-const beginMusic = () => {
-  if (soundPlan({ preference: musicPreference, unlocked: musicContext?.state === 'running', playedMs: musicPlayedMs }) !== 'play') return;
-  if (musicState === 'play') return;
+function beginMusic() {
+  if (musicPreference === 'off' || musicContext?.state !== 'running') return;
+  if (musicState !== 'wait' && musicState !== 'play') return;
+  window.clearTimeout(suspendTimer);
+  disarmUnlock();
+  if (musicState === 'play') { startScheduler(); scheduleMusic(); renderSoundButton(); return; } // back after an interruption
   musicState = 'play';
   musicPlayingSince = performance.now();
   const now = musicContext.currentTime;
   musicBus.gain.cancelScheduledValues(now);
   musicBus.gain.setValueAtTime(Math.max(musicBus.gain.value, 0.0001), now);
   musicBus.gain.exponentialRampToValueAtTime(MUSIC_VOLUME, now + 1.2); // a soft fade-in, never a jolt
-  musicNextBarAt = 0; // the first pass starts as soon as the soundtrack is decoded
   scheduleMusic();
-  window.clearInterval(musicScheduler);
-  musicScheduler = window.setInterval(scheduleMusic, 250);
-  window.__briviaLandingAudioEnabled = true;
+  startScheduler();
   renderSoundButton();
-};
+}
 function stopMusic(next) {
   if (musicState === 'play') musicPlayedMs = musicElapsedMs();
   musicState = next;
   window.clearInterval(musicScheduler);
+  musicScheduler = 0;
+  disarmUnlock();
   if (musicContext && musicBus) {
-    const now = musicContext.currentTime;
-    const fade = next === 'ended' ? 2.5 : 0.6;
+    const context = musicContext;
+    const now = context.currentTime;
+    const fade = next === 'ended' ? 2.5 : 0.35;
     musicBus.gain.cancelScheduledValues(now);
     musicBus.gain.setValueAtTime(Math.max(musicBus.gain.value, 0.0001), now);
     musicBus.gain.exponentialRampToValueAtTime(0.0001, now + fade);
-    // Queued passes end with the fade, so turning the sound on again never layers a second copy over the first.
-    musicSources.forEach((source) => { try { source.stop(now + fade); } catch { /* already stopped */ } });
-    musicSources.clear();
+    // The intro's cue stops too, and for good: a chord that lands after the name has gone sounds wrong.
+    introClock.cued = true;
+    cueBus.gain.cancelScheduledValues(now);
+    cueBus.gain.setValueAtTime(Math.max(cueBus.gain.value, 0.0001), now);
+    cueBus.gain.exponentialRampToValueAtTime(0.0001, now + Math.min(fade, 0.35));
+    // Then the audio clock stops: every queued pass freezes where it is, and on resumes it from there.
+    window.clearTimeout(suspendTimer);
+    suspendTimer = window.setTimeout(() => { if (musicState !== 'play') context.suspend().catch(() => {}); }, fade * 1000 + 80);
   }
+  releasePlaybackSession();
   renderSoundButton();
 }
-// Tries to start the sound. Inside a gesture the browser lets the context run; outside one it stays suspended and
-// the statechange listener starts the music the moment it is allowed.
+// Tries to start (or resume) the sound. Inside a gesture the browser lets the context run; outside one it may stay
+// suspended, and the gesture listeners try again.
 const tryStartMusic = () => {
-  if (musicPreference === 'off' || musicState === 'play' || musicState === 'ended') return;
+  if (musicPreference === 'off' || (musicState !== 'wait' && musicState !== 'play')) return;
   const context = ensureMusicContext();
   if (!context) return;
+  holdPlaybackSession();
+  window.clearTimeout(suspendTimer);
   if (context.state === 'running') { playIntroCue(); beginMusic(); return; }
-  context.resume().then(() => { if (context.state === 'running') { playIntroCue(); beginMusic(); } }).catch(() => {});
+  try {
+    context.resume().then(() => { if (context.state === 'running') { playIntroCue(); beginMusic(); } }, () => {});
+  } catch { /* an old Safari without a promise: statechange starts it */ }
 };
 // Every gesture a browser accepts for audio, until the sound has really started (not once: a touchstart or a
-// scroll used to spend the one-shot listener without starting anything).
+// scroll used to spend a one-shot listener without starting anything).
 const UNLOCK_EVENTS = ['pointerdown', 'pointerup', 'mousedown', 'touchend', 'click', 'keydown'];
+let unlockArmed = false;
 const onUnlockGesture = (event) => {
   if (!isUnlockEvent(event) || soundButton?.contains(event.target)) return;
-  if (!gestureSeen) {
-    gestureSeen = true;
-    if (musicPreference === 'on') enableLandingVideoAudio();
-  }
   tryStartMusic();
-  if (musicState !== 'wait' || musicPreference === 'off') UNLOCK_EVENTS.forEach((name) => window.removeEventListener(name, onUnlockGesture, true));
+};
+function armUnlock() {
+  if (unlockArmed || !isLandingPage) return;
+  unlockArmed = true;
+  UNLOCK_EVENTS.forEach((name) => window.addEventListener(name, onUnlockGesture, { capture: true, passive: true }));
+}
+function disarmUnlock() {
+  if (!unlockArmed) return;
+  unlockArmed = false;
+  UNLOCK_EVENTS.forEach((name) => window.removeEventListener(name, onUnlockGesture, true));
+}
+// Whether this browser lets the page make sound before a gesture. Firefox can say so directly; elsewhere a silent,
+// unmuted clip is asked to play (a refusal there is silent, unlike an AudioContext the browser will not start).
+const soundAllowedNow = async () => {
+  try {
+    if (typeof navigator.getAutoplayPolicy === 'function') return navigator.getAutoplayPolicy('audiocontext') === 'allowed';
+  } catch { /* fall through to the probe */ }
+  try {
+    const probe = new Audio(SILENT_WAV);
+    await probe.play();
+    probe.pause();
+    return true;
+  } catch { return false; }
 };
 if (isLandingPage) {
-  UNLOCK_EVENTS.forEach((name) => window.addEventListener(name, onUnlockGesture, { capture: true, passive: true }));
-  if (musicPreference === 'on') tryStartMusic(); // some browsers (a returning visitor, a site with sound allowed) allow it at once
+  renderSoundButton();
+  if (musicPreference === 'on') {
+    armUnlock();
+    soundAllowedNow().then((allowed) => { if (allowed) tryStartMusic(); });
+    if (!navigator.connection?.saveData) {
+      const prefetch = () => { fetchMusic().catch(() => {}); };
+      if (typeof window.requestIdleCallback === 'function') window.requestIdleCallback(prefetch, { timeout: 2500 });
+      else window.setTimeout(prefetch, 1200);
+    }
+  }
+  // A hidden tab is silent (and its time does not count towards the 5 minutes); back on screen, it carries on.
   document.addEventListener('visibilitychange', () => {
     if (!musicContext) return;
     if (document.hidden) {
       if (musicState === 'play') musicPlayedMs += performance.now() - musicPlayingSince;
       musicContext.suspend().catch(() => {});
+      silentKeeper?.pause();
     } else if (musicState === 'play') {
       musicPlayingSince = performance.now();
-      musicContext.resume().catch(() => {});
+      holdPlaybackSession();
+      musicContext.resume().then(() => {
+        if (musicContext.state !== 'running') armUnlock(); // iOS may refuse outside a gesture: the next tap resumes
+        renderSoundButton();
+      }, () => armUnlock());
     }
   });
+  // Back from another page of the site through the back/forward cache: carry on (or wait for a tap) as on screen.
+  window.addEventListener('pageshow', (event) => {
+    if (!event.persisted || !musicContext || musicState !== 'play') return;
+    musicContext.resume().then(() => { if (musicContext.state !== 'running') armUnlock(); renderSoundButton(); }, () => armUnlock());
+  });
+  // Leaving for another page of this tab: remember where the soundtrack was, so the landing picks it up there.
+  window.addEventListener('pagehide', () => {
+    try {
+      if (!musicAudible() || !musicBuffer) { window.sessionStorage.removeItem(SOUND_POSITION_KEY); return; }
+      const now = musicContext.currentTime;
+      const passStart = [...passStarts].reverse().find((at) => at <= now) ?? now;
+      window.sessionStorage.setItem(SOUND_POSITION_KEY, String(trackOffset({ now, passStart, duration: musicBuffer.duration })));
+    } catch { /* private mode */ }
+  });
   soundButton?.addEventListener('click', () => {
-    if (musicState === 'play') {
+    // The button does what its label says: "Stop music" while the music is heard, "Play music" otherwise.
+    if (musicAudible()) {
       musicPreference = 'off';
       stopMusic('off');
-      landingAudioUnlocked = false; // a video that starts later stays muted too
-      landingVideos.forEach((video) => { video.muted = true; });
     } else {
       musicPreference = 'on';
       if (musicState === 'ended') musicPlayedMs = 0; // a deliberate replay gets a fresh 5 minutes
-      musicState = 'wait';
-      gestureSeen = true;
-      enableLandingVideoAudio();
+      if (musicState === 'error') { musicLoadFailures = 0; musicRetryAt = 0; }
+      if (musicState !== 'play') musicState = 'wait';
       tryStartMusic();
+      armUnlock(); // if this press could not start it (rare), the next gesture will
     }
-    try { window.localStorage.setItem(SOUND_STORAGE_KEY, musicPreference); } catch { /* private mode */ }
+    saveMusicPreference();
   });
-  renderSoundButton();
   // The button fades in once the intro has gone, so it never sits on top of it.
   const revealSoundButton = () => soundButton?.classList.add('is-ready');
   if (document.getElementById('intro-burst')) {

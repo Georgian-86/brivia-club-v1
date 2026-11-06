@@ -1,9 +1,13 @@
-// Landing sound and smooth scroll (D-063), against `vite preview` of a fresh build:
-// * scrolling alone never starts the music (no browser allows it), the first real gesture does, on desktop (click)
-//   and on a phone (a tap: touchend / pointerup, the old one-shot touchstart never could);
-// * the music is the hero video's own soundtrack (D-092), looped with a crossfade, never layered;
-// * the sound button turns it off and on, the choice survives a reload, and the music stops itself after 5 minutes;
-// * Lenis smooth scroll runs on a desktop pointer, not on a phone, not with reduced motion; the menu stops it.
+// Landing music and smooth scroll (D-063, D-220), against `vite preview` of a fresh build:
+// * the music starts at load when the browser allows sound, otherwise on the first real gesture (scrolling never can);
+// * "Stop music" silences every layer that reaches the speakers (the soundtrack and the intro's cue) and "Play music"
+//   resumes from the same point, never layering a second copy, however fast the button is pressed;
+// * the label always matches what is heard (an interrupted or hidden page says "Play music");
+// * a mute holds while moving between pages of the tab, a reload starts with music on again, and the position
+//   carries across a visit to another page and back;
+// * a missing soundtrack is retried a few times, not in a loop, and the button says so honestly;
+// * an iPhone keeps the page in the playback audio session (silent switch); no console errors or warnings, including
+//   under Chromium's real autoplay policy with no mocks; Lenis on a desktop pointer only, the 5-minute limit.
 //   VITE_SUPABASE_URL=https://stub.supabase.local VITE_SUPABASE_ANON_KEY=stub npm run build
 //   PLAYWRIGHT_MODULE=/tmp/pw/node_modules/playwright/index.mjs node tests/e2e/landing-sound.spec.mjs
 import assert from 'node:assert/strict';
@@ -11,7 +15,7 @@ import { spawn } from 'node:child_process';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-const { chromium } = await import(process.env.PLAYWRIGHT_MODULE || 'playwright');
+const { chromium, devices } = await import(process.env.PLAYWRIGHT_MODULE || 'playwright');
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const PORT = Number(process.env.E2E_PORT || 5179);
 const BASE = `http://127.0.0.1:${PORT}`;
@@ -24,136 +28,318 @@ const preview = spawn('npx', ['vite', 'preview', '--port', String(PORT), '--stri
 const stop = () => { try { process.kill(-preview.pid, 'SIGTERM'); } catch { /* gone */ } };
 for (let i = 0; i < 80; i += 1) { try { if ((await fetch(`${BASE}/`)).ok) break; } catch { /* starting */ } await new Promise((r) => setTimeout(r, 250)); }
 
-// The browser's autoplay rule, made explicit: an AudioContext may only run after a real gesture. A time shift lets a
-// test jump the page's clock forward (the 5-minute limit) without waiting 5 minutes.
-const INIT = () => {
-  try { sessionStorage.setItem('brivia-intro-seen', 'true'); } catch { /* none */ }
+// The browser's autoplay rule, made explicit: without a real gesture an AudioContext stays suspended and an unmuted
+// media element refuses to play, unless the test says sound is allowed (allowSound; a real allow-policy browser is used for that further down).
+// A time shift lets a test jump the page's clock (the 5-minute limit).
+const INIT = ({ allowSound = false, skipIntro = true } = {}) => {
+  try { if (skipIntro) sessionStorage.setItem('brivia-intro-seen', 'true'); } catch { /* none */ }
   window.__timeShift = 0;
   const realNow = performance.now.bind(performance);
   performance.now = () => realNow() + window.__timeShift;
-  window.__gesture = false;
+  window.__gesture = allowSound;
   ['mousedown', 'keydown', 'touchend', 'click'].forEach((type) => window.addEventListener(type, (e) => { if (e.isTrusted && (type !== 'keydown' || e.key !== 'Escape')) window.__gesture = true; }, true));
   window.addEventListener('pointerup', (e) => { if (e.isTrusted && e.pointerType !== 'mouse') window.__gesture = true; }, true);
+  const realPlay = HTMLMediaElement.prototype.play;
+  window.__mediaPlays = [];
+  HTMLMediaElement.prototype.play = function play() {
+    if (!this.muted && !window.__gesture) return Promise.reject(new DOMException('blocked', 'NotAllowedError'));
+    window.__mediaPlays.push(this.currentSrc || this.src || 'video');
+    return realPlay.call(this);
+  };
   const Real = window.AudioContext;
+  window.__contexts = 0;
   window.AudioContext = class extends Real {
-    constructor(...args) { super(...args); window.__ctx = this; this.__suspend(); }
-    __suspend() { Real.prototype.suspend.call(this).catch(() => {}); }
+    constructor(...args) { super(...args); window.__contexts += 1; window.__ctx = this; if (!window.__gesture) Real.prototype.suspend.call(this).catch(() => {}); }
     resume() { return window.__gesture ? Real.prototype.resume.call(this) : Promise.resolve(); }
   };
-  // D-092: count the soundtrack passes that are queued and still live (started, not yet ended or stopped early).
-  window.__passes = { started: 0, live: 0, duration: 0 };
+  window.__interrupt = () => Real.prototype.suspend.call(window.__ctx); // what iOS does on a call or Siri
+  // Every gain node wired straight to the speakers: the page's layers. After "Stop music" all must be silent.
+  window.__outputs = [];
+  const realConnect = AudioNode.prototype.connect;
+  AudioNode.prototype.connect = function connect(target, ...rest) {
+    if (target instanceof AudioDestinationNode && this instanceof GainNode) window.__outputs.push(this);
+    return realConnect.call(this, target, ...rest);
+  };
+  // Soundtrack passes: started, still live, and the offset each one started from.
+  window.__passes = { started: 0, live: 0, duration: 0, offsets: [] };
   const realSource = Real.prototype.createBufferSource;
   Real.prototype.createBufferSource = function createBufferSource() {
     const node = realSource.call(this);
     const realStart = node.start.bind(node);
-    node.start = (...a) => { window.__passes.started += 1; window.__passes.live += 1; window.__passes.duration = node.buffer?.duration || 0; node.addEventListener('ended', () => { window.__passes.live -= 1; }); return realStart(...a); };
+    node.start = (...a) => {
+      if (node.buffer && node.buffer.duration > 10) {
+        window.__passes.started += 1; window.__passes.live += 1; window.__passes.duration = node.buffer.duration; window.__passes.offsets.push(a[1] || 0);
+        node.addEventListener('ended', () => { window.__passes.live -= 1; });
+      }
+      return realStart(...a);
+    };
     return node;
   };
 };
 const sound = (page) => page.evaluate(() => {
   const b = document.querySelector('[data-landing-sound]');
-  return { pressed: b?.getAttribute('aria-pressed'), label: b?.getAttribute('aria-label'), ready: b?.classList.contains('is-ready'), ctx: window.__ctx?.state || 'none', stored: localStorage.getItem('brivia-landing-sound') };
+  return {
+    state: b?.dataset.state, label: b?.getAttribute('aria-label'), text: b?.textContent.trim(), playing: b?.classList.contains('is-playing'),
+    ready: b?.classList.contains('is-ready'), ctx: window.__ctx?.state || 'none', time: window.__ctx?.currentTime || 0,
+    stored: sessionStorage.getItem('brivia-landing-sound'), legacy: localStorage.getItem('brivia-landing-sound'),
+    passes: { ...window.__passes }, outputs: window.__outputs.map((g) => g.gain.value),
+  };
 });
-const waitFor = async (page, fn, arg, timeout = 4000) => page.waitForFunction(fn, arg, { timeout }).then(() => true).catch(() => false);
+const isPlaying = () => document.querySelector('[data-landing-sound]')?.dataset.state === 'playing';
+const isStopped = () => document.querySelector('[data-landing-sound]')?.dataset.state === 'stopped';
+const waitFor = async (page, fn, arg, timeout = 5000) => page.waitForFunction(fn, arg, { timeout }).then(() => true).catch(() => false);
+const watchConsole = (page) => {
+  const problems = [];
+  page.on('pageerror', (e) => problems.push(`pageerror: ${e.message}`));
+  page.on('console', (m) => {
+    if (m.type() !== 'error' && m.type() !== 'warning') return;
+    const text = m.text();
+    if (/was preloaded using link preload/.test(text)) return; // font preloads, unrelated to sound
+    if (/supabase|stub\.supabase|Failed to load resource|ERR_NAME_NOT_RESOLVED|net::/i.test(text) && !/m4a|soundtrack/i.test(text)) return; // the stub backend
+    problems.push(`${m.type()}: ${text}`);
+  });
+  return problems;
+};
 
 const browser = await chromium.launch({ headless: true, executablePath: process.env.CHROMIUM_PATH || '/opt/pw-browsers/chromium' });
 try {
-  // Desktop: scroll does nothing, a click starts it, the button mutes it and the choice survives a reload.
+  // Desktop, autoplay blocked: scroll does nothing, a click starts it, Stop / Play control every layer.
   {
     const context = await browser.newContext({ viewport: { width: 1440, height: 900 } });
-    await context.addInitScript(INIT);
+    await context.addInitScript(INIT, {});
     const page = await context.newPage();
-    const errors = [];
-    page.on('pageerror', (e) => errors.push(e.message));
+    const problems = watchConsole(page);
+    await page.evaluate(() => localStorage.setItem('brivia-landing-sound', 'off')).catch(() => {});
     await page.goto(`${BASE}/index.html`, { waitUntil: 'load' });
-    await page.waitForTimeout(600);
+    await page.evaluate(() => localStorage.setItem('brivia-landing-sound', 'off')); // a visitor muted under the old rule
+    await page.reload({ waitUntil: 'load' });
+    await page.waitForTimeout(700);
     let s = await sound(page);
-    await check('1440: the sound button is on screen, 44 px, labelled, and not playing before any gesture', async () => {
-      assert.equal(s.ready, true);
-      assert.equal(s.pressed, 'false');
-      assert.equal(s.label, 'Play sound');
+    await check('1440: before any gesture the button says "Play music", 44 px tall, inside the screen', async () => {
+      assert.equal(s.ready, true); assert.equal(s.state, 'stopped'); assert.equal(s.label, 'Play music'); assert.equal(s.text, 'Play music');
       const box = await page.locator('[data-landing-sound]').boundingBox();
-      assert.ok(box && box.width >= 44 && box.height >= 44, JSON.stringify(box));
-      assert.ok(box.x + box.width <= 1440 && box.y + box.height <= 900, 'inside the viewport');
+      assert.ok(box && box.width >= 44 && box.height >= 44 && box.x + box.width <= 1440 && box.y + box.height <= 900, JSON.stringify(box));
     });
+    await check('1440: the old forever-mute in localStorage is cleared (music is on by default)', () => assert.equal(s.legacy, null));
+    await check('1440: no AudioContext is created before the browser allows sound (no console warning)', async () => assert.equal(await page.evaluate(() => window.__contexts), 0));
     await page.mouse.move(700, 450);
     for (let i = 0; i < 12; i += 1) { await page.mouse.wheel(0, 120); await page.waitForTimeout(30); }
     await page.waitForTimeout(500);
     s = await sound(page);
-    await check('1440: scrolling alone does not start the music (no browser allows it)', () => assert.equal(s.pressed, 'false'));
+    await check('1440: scrolling alone does not start the music (no browser allows it)', () => assert.equal(s.state, 'stopped'));
     await check('1440: Lenis smooth scroll is on (desktop pointer) and the page moved', async () => {
       const r = await page.evaluate(() => ({ lenis: document.documentElement.classList.contains('lenis'), smooth: document.documentElement.classList.contains('has-smooth-scroll'), y: scrollY }));
       assert.equal(r.lenis, true); assert.equal(r.smooth, true); assert.ok(r.y > 500, `scrollY ${r.y}`);
     });
     await page.mouse.click(700, 450);
-    const started = await waitFor(page, () => document.querySelector('[data-landing-sound]')?.getAttribute('aria-pressed') === 'true');
+    const started = await waitFor(page, isPlaying);
+    const passed = await waitFor(page, () => window.__passes.started > 0);
     s = await sound(page);
-    await check(`1440: the first click starts the music at once (pressed ${s.pressed}, context ${s.ctx})`, () => { assert.equal(started, true); assert.equal(s.ctx, 'running'); });
-    const playing = await waitFor(page, () => window.__passes?.started > 0);
-    const passes = await page.evaluate(() => window.__passes);
-    await check(`1440: it plays the hero video's own soundtrack (${passes.duration.toFixed(1)} s), not a synthesized chord`, () => {
-      assert.equal(playing, true);
-      assert.ok(passes.duration > 17 && passes.duration < 18.5, String(passes.duration));
+    await check(`1440: the first click starts the soundtrack (${s.passes.duration.toFixed(1)} s) and the button says "Stop music"`, () => {
+      assert.equal(started, true); assert.equal(passed, true); assert.equal(s.ctx, 'running');
+      assert.equal(s.label, 'Stop music'); assert.equal(s.text, 'Stop music'); assert.equal(s.playing, true);
+      assert.ok(s.passes.duration > 17 && s.passes.duration < 18.5, String(s.passes.duration));
+    });
+    await page.waitForTimeout(1500);
+    await page.locator('[data-landing-sound]').click();
+    await page.waitForTimeout(700);
+    s = await sound(page);
+    const stoppedAt = s.time;
+    await check('1440: "Stop music" silences every layer, suspends the audio clock and says "Play music"', () => {
+      assert.equal(s.state, 'stopped'); assert.equal(s.label, 'Play music'); assert.equal(s.ctx, 'suspended'); assert.equal(s.stored, 'off');
+      assert.ok(s.outputs.length >= 2, `outputs ${s.outputs}`);
+      assert.ok(s.outputs.every((v) => v < 0.01), `gains ${s.outputs}`);
+    });
+    const startedBefore = s.passes.started;
+    await page.waitForTimeout(800);
+    await page.locator('[data-landing-sound]').click();
+    const resumed = await waitFor(page, isPlaying);
+    await page.waitForTimeout(300);
+    s = await sound(page);
+    await check('1440: "Play music" resumes from the same point (no new pass, the clock picks up where it stopped)', () => {
+      assert.equal(resumed, true); assert.equal(s.stored, 'on');
+      assert.equal(s.passes.started, startedBefore);
+      assert.ok(s.time - stoppedAt < 0.6, `stopped at ${stoppedAt}, now ${s.time}`);
+    });
+    for (let i = 0; i < 7; i += 1) { await page.locator('[data-landing-sound]').click(); await page.waitForTimeout(90); }
+    await page.waitForTimeout(1300);
+    s = await sound(page);
+    await check(`1440: seven quick presses end on the right state with no layering (live passes ${s.passes.live})`, () => {
+      assert.equal(s.state, 'stopped'); assert.equal(s.label, 'Play music'); assert.ok(s.passes.live <= 2, String(s.passes.live));
+      assert.ok(s.outputs.every((v) => v < 0.01), `gains ${s.outputs}`);
     });
     await page.locator('[data-landing-sound]').click();
-    await page.waitForTimeout(200);
-    s = await sound(page);
-    await check('1440: the button mutes it and remembers', () => { assert.equal(s.pressed, 'false'); assert.equal(s.label, 'Play sound'); assert.equal(s.stored, 'off'); });
-    await page.reload({ waitUntil: 'load' });
-    await page.waitForTimeout(400);
-    await page.mouse.click(700, 450);
-    await page.waitForTimeout(500);
-    s = await sound(page);
-    await check('1440: after a reload a muted visitor stays muted, even after a click', () => assert.equal(s.pressed, 'false'));
-    await page.locator('[data-landing-sound]').click();
-    const back = await waitFor(page, () => document.querySelector('[data-landing-sound]')?.getAttribute('aria-pressed') === 'true');
-    s = await sound(page);
-    await check('1440: the button turns it back on', () => { assert.equal(back, true); assert.equal(s.stored, 'on'); });
-    await page.locator('[data-landing-sound]').click(); await page.waitForTimeout(150);
-    await page.locator('[data-landing-sound]').click(); await page.waitForTimeout(1200);
-    const layered = await page.evaluate(() => window.__passes.live);
-    await check(`1440: off and on again never layers a second copy (live passes ${layered})`, () => assert.ok(layered <= 1, String(layered)));
+    await waitFor(page, isPlaying);
+    // A hidden tab is silent; back on screen, it carries on.
+    await page.evaluate(() => { Object.defineProperty(document, 'hidden', { configurable: true, get: () => true }); document.dispatchEvent(new Event('visibilitychange')); });
+    await page.waitForTimeout(300);
+    const hiddenCtx = (await sound(page)).ctx;
+    await page.evaluate(() => { Object.defineProperty(document, 'hidden', { configurable: true, get: () => false }); document.dispatchEvent(new Event('visibilitychange')); });
+    const back = await waitFor(page, () => window.__ctx.state === 'running');
+    await check(`1440: a hidden tab suspends the music (${hiddenCtx}) and it resumes on return`, () => { assert.equal(hiddenCtx, 'suspended'); assert.equal(back, true); });
+    // An interruption (iOS: a call, Siri) the page did not ask for: the label follows, the next gesture resumes.
+    await page.evaluate(() => window.__interrupt());
+    const honest = await waitFor(page, isStopped);
+    await page.mouse.click(700, 300);
+    const recovered = await waitFor(page, isPlaying);
+    await check('1440: an outside interruption shows "Play music" and the next click brings the music back', () => { assert.equal(honest, true); assert.equal(recovered, true); });
+    const live = (await sound(page)).passes.live;
+    await check(`1440: never more than one pass (plus a crossfade) at a time (live ${live})`, () => assert.ok(live <= 2, String(live)));
     await page.evaluate(() => { window.__timeShift = 5 * 60 * 1000 + 1000; });
-    const ended = await waitFor(page, () => document.querySelector('[data-landing-sound]')?.getAttribute('aria-pressed') === 'false');
-    await check('1440: the music stops itself after 5 minutes', () => assert.equal(ended, true));
+    const ended = await waitFor(page, isStopped);
+    await check('1440: the music fades itself out after 5 minutes (D-063)', () => assert.equal(ended, true));
     await page.locator('[data-landing-sound]').click();
-    const replay = await waitFor(page, () => document.querySelector('[data-landing-sound]')?.getAttribute('aria-pressed') === 'true');
-    await check('1440: after the 5 minutes, the button plays it again', () => assert.equal(replay, true));
+    const replay = await waitFor(page, isPlaying);
+    await check('1440: after the 5 minutes, "Play music" plays it again', () => assert.equal(replay, true));
     await page.locator('.menu-trigger').click();
-    await page.waitForTimeout(800); // the button's 0.5 s fade-out
-    const stopped = await page.evaluate(() => document.documentElement.classList.contains('lenis-stopped'));
-    const hidden = await page.evaluate(() => { const s = getComputedStyle(document.querySelector('[data-landing-sound]')); return { opacity: Number(s.opacity), events: s.pointerEvents }; });
-    await check('1440: the open menu stops smooth scroll and hides the sound button', () => { assert.equal(stopped, true); assert.ok(hidden.opacity < 0.01, JSON.stringify(hidden)); assert.equal(hidden.events, 'none'); });
-    await check('1440: no page errors', () => assert.deepEqual(errors, []));
+    await page.waitForTimeout(800);
+    const menu = await page.evaluate(() => { const st = getComputedStyle(document.querySelector('[data-landing-sound]')); return { lenis: document.documentElement.classList.contains('lenis-stopped'), opacity: Number(st.opacity), events: st.pointerEvents }; });
+    await check('1440: the open menu stops smooth scroll and hides the sound button', () => { assert.equal(menu.lenis, true); assert.ok(menu.opacity < 0.01); assert.equal(menu.events, 'none'); });
+    await check('1440: no console errors or warnings', () => assert.deepEqual(problems, []));
     await context.close();
   }
-  // Phone: native scrolling (no Lenis), and a tap starts the music (the old touchstart one-shot never could).
+  // Moving between pages: a mute holds, a reload restores the default, and the position carries over.
   {
-    const context = await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
-    await context.addInitScript(INIT);
+    const context = await browser.newContext({ viewport: { width: 1280, height: 800 } });
+    await context.addInitScript(INIT, {});
     const page = await context.newPage();
+    const problems = watchConsole(page);
+    await page.goto(`${BASE}/index.html`, { waitUntil: 'load' });
+    await page.waitForTimeout(400);
+    await page.mouse.click(640, 400);
+    await waitFor(page, () => window.__passes.started > 0);
+    await page.waitForTimeout(3000);
+    await page.goto(`${BASE}/auth.html`, { waitUntil: 'load' }); // runs script.js too: must leave the position alone
+    await page.reload({ waitUntil: 'load' });
+    await page.goto(`${BASE}/careers.html`, { waitUntil: 'load' });
+    await page.goto(`${BASE}/index.html`, { waitUntil: 'load' });
+    await page.waitForTimeout(400);
+    await page.mouse.click(640, 400);
+    await waitFor(page, () => window.__passes.started > 0);
+    let s = await sound(page);
+    await check(`navigation: back on the landing the soundtrack picks up where it was (offset ${s.passes.offsets[0]} s), one copy`, () => {
+      assert.ok(s.passes.offsets[0] > 2 && s.passes.offsets[0] < 8, String(s.passes.offsets));
+      assert.equal(s.passes.started, 1); assert.equal(s.state, 'playing');
+    });
+    await page.locator('[data-landing-sound]').click();
+    await page.waitForTimeout(300);
+    await page.goto(`${BASE}/auth.html`, { waitUntil: 'load' });
+    await page.reload({ waitUntil: 'load' }); // reloading another page is not a reload of the landing
+    await page.goto(`${BASE}/index.html`, { waitUntil: 'load' });
+    await page.waitForTimeout(400);
+    await page.mouse.click(640, 400);
+    await page.waitForTimeout(700);
+    s = await sound(page);
+    await check('navigation: a visitor who stopped the music is not surprised by it on the next page', () => { assert.equal(s.state, 'stopped'); assert.equal(s.ctx, 'none'); });
+    await page.reload({ waitUntil: 'load' });
+    await page.waitForTimeout(400);
+    await page.mouse.click(640, 400);
+    const on = await waitFor(page, isPlaying);
+    s = await sound(page);
+    await check('reload: the music is on again by default (first gesture starts it, from the top)', () => { assert.equal(on, true); assert.equal(s.stored, null); });
+    await waitFor(page, () => window.__passes.started > 0);
+    await check('reload: from the top of the track', async () => assert.equal((await sound(page)).passes.offsets[0], 0));
+    await check('navigation: no console errors or warnings', () => assert.deepEqual(problems, []));
+    await context.close();
+  }
+  // A missing soundtrack: a few spaced retries, never a request loop, and the button stays honest.
+  {
+    const context = await browser.newContext({ viewport: { width: 1280, height: 800 } });
+    await context.addInitScript(INIT, {});
+    let requests = 0;
+    await context.route(/\.m4a(\?|$)/, (route) => { requests += 1; return route.fulfill({ status: 404, body: '' }); });
+    const page = await context.newPage();
+    page.on('pageerror', (e) => { failures += 1; console.log(`FAIL missing file: page error ${e.message}`); });
+    await page.goto(`${BASE}/index.html`, { waitUntil: 'load' });
+    await page.waitForTimeout(400);
+    await page.mouse.click(640, 400);
+    await page.waitForTimeout(9000);
+    const s = await sound(page);
+    await check(`missing soundtrack: at most a few requests (${requests}) and the button offers "Play music" again`, () => { assert.ok(requests >= 1 && requests <= 4, String(requests)); assert.equal(s.label, 'Play music'); });
+    await context.close();
+  }
+  // Phone (iPhone): native scrolling, a tap starts it, and the playback audio session is held while it plays.
+  {
+    const context = await browser.newContext({ ...devices['iPhone 13'] });
+    await context.addInitScript(INIT, {});
+    const page = await context.newPage();
+    const problems = watchConsole(page);
     await page.goto(`${BASE}/index.html`, { waitUntil: 'load' });
     await page.waitForTimeout(600);
     const lenis = await page.evaluate(() => document.documentElement.classList.contains('lenis'));
-    await check('390 touch: no Lenis on a phone (native momentum scrolling)', () => assert.equal(lenis, false));
+    await check('iPhone: no Lenis on a phone (native momentum scrolling)', () => assert.equal(lenis, false));
     await page.touchscreen.tap(195, 500);
-    const started = await waitFor(page, () => document.querySelector('[data-landing-sound]')?.getAttribute('aria-pressed') === 'true');
-    const s = await sound(page);
-    await check(`390 touch: a tap starts the music (pressed ${s.pressed}, context ${s.ctx})`, () => assert.equal(started, true));
+    const started = await waitFor(page, isPlaying);
+    const keeper = await page.evaluate(() => window.__mediaPlays.filter((src) => src.startsWith('data:audio/wav')).length);
+    await check(`iPhone: a tap starts the music and holds the playback session for the silent switch (${keeper} keeper plays)`, () => { assert.equal(started, true); assert.ok(keeper >= 1); });
     const box = await page.locator('[data-landing-sound]').boundingBox();
-    await check('390 touch: the button is a 44 px target inside the screen', () => assert.ok(box && box.width >= 44 && box.x + box.width <= 390 && box.y + box.height <= 844, JSON.stringify(box)));
+    const vp = page.viewportSize();
+    await check('iPhone: the button is a 44 px target inside the screen', () => assert.ok(box && box.width >= 44 && box.height >= 44 && box.x >= 0 && box.x + box.width <= vp.width && box.y + box.height <= vp.height, JSON.stringify(box)));
+    await page.locator('[data-landing-sound]').tap();
+    const off = await waitFor(page, isStopped);
+    await page.locator('[data-landing-sound]').tap();
+    const on = await waitFor(page, isPlaying);
+    await check('iPhone: tapping the button stops and plays the music', () => { assert.equal(off, true); assert.equal(on, true); });
+    await check('iPhone: no console errors or warnings', () => assert.deepEqual(problems, []));
     await context.close();
   }
   // Reduced motion: no Lenis.
   {
     const context = await browser.newContext({ viewport: { width: 1440, height: 900 }, reducedMotion: 'reduce' });
-    await context.addInitScript(INIT);
+    await context.addInitScript(INIT, {});
     const page = await context.newPage();
     await page.goto(`${BASE}/index.html`, { waitUntil: 'load' });
     const lenis = await page.evaluate(() => document.documentElement.classList.contains('lenis'));
     await check('reduced motion: plain scrolling (no Lenis)', () => assert.equal(lenis, false));
     await context.close();
   }
-} finally { await browser.close(); stop(); }
+} finally { await browser.close(); }
+
+// A browser that allows sound (Chromium's no-gesture policy, as for a site the visitor lets play): it plays at load
+// with no gesture, and the intro's cue joins the same control.
+const allowed = await chromium.launch({ headless: true, executablePath: process.env.CHROMIUM_PATH || '/opt/pw-browsers/chromium', args: ['--autoplay-policy=no-user-gesture-required'] });
+try {
+  {
+    const context = await allowed.newContext({ viewport: { width: 1440, height: 900 } });
+    await context.addInitScript(INIT, { allowSound: true, skipIntro: false });
+    const page = await context.newPage();
+    const problems = watchConsole(page);
+    await page.goto(`${BASE}/index.html`, { waitUntil: 'load' });
+    const running = await waitFor(page, () => window.__ctx?.state === 'running');
+    const cue = await page.evaluate(() => window.__outputs.length);
+    await check('autoplay allowed: the music and the intro cue start at load, with no gesture', () => { assert.equal(running, true); assert.ok(cue >= 2); });
+    await waitFor(page, () => document.querySelector('[data-landing-sound]')?.classList.contains('is-ready'), null, 8000);
+    await waitFor(page, isPlaying);
+    await check('autoplay allowed: the button says "Stop music" once the intro has gone', async () => assert.equal((await sound(page)).label, 'Stop music'));
+    await page.locator('[data-landing-sound]').click();
+    await page.waitForTimeout(600);
+    const s = await sound(page);
+    await check('autoplay allowed: "Stop music" silences the soundtrack and the cue', () => { assert.equal(s.state, 'stopped'); assert.ok(s.outputs.every((v) => v < 0.01), String(s.outputs)); });
+    await check('autoplay allowed: no console errors or warnings', () => assert.deepEqual(problems, []));
+    await context.close();
+  }
+} finally { await allowed.close(); }
+
+// Chromium's own autoplay policy, nothing mocked: blocked at load without a console warning, a click starts it.
+const real = await chromium.launch({ headless: true, executablePath: process.env.CHROMIUM_PATH || '/opt/pw-browsers/chromium', args: ['--autoplay-policy=user-gesture-required'] });
+try {
+  const context = await real.newContext({ viewport: { width: 1440, height: 900 } });
+  await context.addInitScript(() => { try { sessionStorage.setItem('brivia-intro-seen', 'true'); } catch { /* none */ } });
+  const page = await context.newPage();
+  const problems = watchConsole(page);
+  await page.goto(`${BASE}/index.html`, { waitUntil: 'load' });
+  await page.waitForTimeout(1500);
+  const before = await page.evaluate(isStopped);
+  await page.mouse.click(700, 450);
+  const started = await waitFor(page, isPlaying);
+  await page.waitForTimeout(1500);
+  await page.locator('[data-landing-sound]').click();
+  const off = await waitFor(page, isStopped);
+  await page.locator('[data-landing-sound]').click();
+  const on = await waitFor(page, isPlaying);
+  await check('real autoplay policy: silent and "Play music" at load, a click plays, the button stops and plays it', () => { assert.equal(before, true); assert.equal(started, true); assert.equal(off, true); assert.equal(on, true); });
+  await check('real autoplay policy: no console errors or warnings (no refused AudioContext)', () => assert.deepEqual(problems, []));
+  await context.close();
+} finally { await real.close(); stop(); }
 console.log(failures ? `${failures} landing sound check(s) failed` : 'All landing sound checks passed');
 process.exit(failures ? 1 : 0);
