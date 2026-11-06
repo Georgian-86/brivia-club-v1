@@ -7,7 +7,7 @@ Update this file at the end of every session. CLAUDE.md holds the aim; this file
 
 ## 1. What is done
 
-**2026-11-06, D-220 and D-221 (branch `claude/website-audio-system-cyqfa3`, not merged):** the landing music control is
+**2026-11-06, D-220 and D-221 (live: main 95e4126, deployed to thebriviaclub.live):** the landing music control is
 rebuilt so it tells the truth: "Stop music" / "Play music" (visible label), stops the soundtrack and the intro cue,
 resumes from the same point, music on by default (a mute lasts for the tab only; a reload starts with music on), the
 iPhone silent switch no longer hides it, a missing file is retried 3 times, no console warnings. Files
