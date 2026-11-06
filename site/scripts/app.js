@@ -2710,6 +2710,13 @@ const swipe = (type, { vx = 0 } = {}) => {
     dismissPendingPitch();
     return true;
   }
+  // D-219: a request is already waiting with them: nothing is sent and no swipe is used; the toast says why and the
+  // card leaves to the right so the next one comes (founder: "after this the next card should come").
+  if (type === 'like' && requestPendingFor(currentPerson)) {
+    showToast(REQUEST_PENDING_TEXT);
+    advanceCard(currentPerson, 'pitch', { vx });
+    return true;
+  }
   // At a cached cap, read the quota again first: the cap may have cleared (F4). Still capped: a Like sends nothing,
   // opens no pitch and keeps the card (D-026). D-156: a Pass uses one of the daily swipes too, so at the daily cap it
   // is held the same way (the live cap of unanswered signals still lets a Pass through).
@@ -2724,8 +2731,6 @@ const swipe = (type, { vx = 0 } = {}) => {
     return false;
   }
   const person = currentPerson;
-  // D-219: a request is already waiting with them: nothing is sent, the card springs back, and the toast says why.
-  if (type === 'like' && requestPendingFor(person)) { showToast(REQUEST_PENDING_TEXT); return false; }
   // A pitch keeps its card on screen (parked right) until the sheet resolves: sent -> it leaves; a failed send ->
   // it springs back. The request is sent when the sheet resolves (submit with a note, or dismiss without one).
   if (type === 'like') {

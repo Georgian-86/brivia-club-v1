@@ -4051,3 +4051,6 @@ new for now").
   The card shows a "Request pending" chip; a Like (button or swipe) sends nothing, the card springs back, and a toast says
   "Request already pending. They'll see it in their notifications." Pass works as usual. The client falls back to
   `hiring_people` before 0067.
+- Follow-up (founder, same day: "after this the next card should come"): the Like on a pending card now shows the toast
+  and moves the card off to the right, so the next card comes. Still nothing is sent and no daily swipe is used; the
+  card comes back on a later load (it is only skipped for this session).

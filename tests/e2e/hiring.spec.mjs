@@ -128,13 +128,6 @@ try {
     check(`${w}: the switch searches everyone hiring (hiring_people), fitting roles first, a non-fitting hirer too (${await page.locator('#discovery-filter-result').textContent()})`, callsTo('hiring_people_v2').length === 1 && /Asha/.test(await page.locator('#swipe-name').innerText()));
     // D-219: Asha already has this member's request: her card says so, and a Like sends nothing and says it is pending.
     check(`${w}: a member with a pending request is in the hiring deck, marked Request pending`, await page.locator('#swipe-request-pending').isVisible());
-    const signalsBefore = callsTo('send_signal').length + callsTo('send_connect_request').length;
-    await page.evaluate(() => document.querySelector('.swipe-like[data-action="like"]')?.click());
-    await page.waitForTimeout(400);
-    const toastText = await page.locator('#app-toast').innerText().catch(() => '');
-    check(`${w}: a Like on them says the request is already pending and sends nothing (${toastText})`, /Request already pending/.test(toastText)
-      && callsTo('send_signal').length + callsTo('send_connect_request').length === signalsBefore
-      && /Asha/.test(await page.locator('#swipe-name').innerText()) && await page.locator('#pitch-modal').isHidden());
     check(`${w}: the deck still never scrolls sideways with the toggle on`, await noSideScroll(page));
     const axeToggle = await axeViolations(page, { include: '[data-view="home"] .home-tools' });
     check(`${w}: the filter button and Hiring switch are axe clean`, axeToggle.length === 0, axeToggle.join(' | '));
@@ -258,6 +251,27 @@ try {
     await page.locator('[data-card-action="report"]').click();
     await page.waitForSelector('dialog.report-dialog[open]');
     check(`${w}: reporting a hirer offers "Fake job or recruitment scam" first`, /Fake job or recruitment scam/.test(await page.locator('.report-reasons .report-reason').first().innerText()));
+    await ctx.close();
+
+    // D-219: a Like on someone with a pending request sends nothing, says so, and the next card comes.
+    st.routes = seekerRoutes();
+    st.own = { ...ownRow, looking_for: ['Job Referral', 'Friends'] };
+    ctx = await stub.newContext(browser, { width: w, height: h }, mobile);
+    page = await stub.open(ctx, { errors });
+    page.setDefaultTimeout(8000);
+    await page.waitForFunction(() => /HIRING/.test(document.querySelector('#swipe-card-label')?.textContent || ''));
+    await page.locator('#hiring-toggle').click();
+    await page.waitForFunction(() => /^2 people match/.test(document.querySelector('#discovery-filter-result')?.textContent || ''));
+    await page.waitForFunction(() => /Asha/.test(document.querySelector('#swipe-name')?.textContent || ''));
+    const signalsBefore = callsTo('send_signal').length + callsTo('send_connect_request').length;
+    await page.evaluate(() => document.querySelector('.swipe-like[data-action="like"]')?.click());
+    await page.waitForTimeout(400);
+    const toastText = await page.locator('#app-toast').innerText().catch(() => '');
+    check(`${w}: a Like on them says the request is already pending and sends nothing (${toastText})`, /Request already pending/.test(toastText)
+      && callsTo('send_signal').length + callsTo('send_connect_request').length === signalsBefore
+      && await page.locator('#pitch-modal').isHidden());
+    await page.waitForTimeout(700);
+    check(`${w}: then the next card comes (${await page.locator('#swipe-name').innerText()})`, /Bilal/.test(await page.locator('#swipe-name').innerText()));
     await ctx.close();
   }
   check('no page errors', errors.length === 0, errors.slice(0, 5).join(' | '));
