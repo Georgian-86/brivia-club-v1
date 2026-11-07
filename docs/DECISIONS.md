@@ -4151,7 +4151,7 @@ new for now").
   every phone measured (iPhone SE, 13, Pixel 7).
 - **Login, also.** The login form had `autocomplete="off"` on the form, the email and the password (since D-160, with
   no recorded reason), which blocks iCloud Keychain, Google Password Manager, Windows and Android autofill. Now
-  `username email` / `current-password`, the email keyboard (`inputmode`), no auto-capitals or autocorrect, and
+  `username` / `current-password`, the email keyboard (`inputmode`), no auto-capitals or autocorrect, and
   Next/Go on the keyboard. Raw API errors ("Invalid login credentials", "Failed to fetch", Safari's "Load failed")
   are plain sentences (`loginErrorCopy`, unit-tested): wrong password, unconfirmed email, no connection, too many tries.
 - Step 1 of signup: "Your title and organisation show small on your card. Add them now or later." (no example).
