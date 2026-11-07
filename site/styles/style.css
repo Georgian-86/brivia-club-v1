@@ -556,10 +556,17 @@ footer.site-footer{display:block!important;background:#1d1d1f;color:#fff;padding
 .menu-drawer nav a:hover{color:#5a061f!important}
 
 /* About: what the app is, in plain words, for visitors and Google's OAuth review. */
-.about-section{background:#f8f6ef;color:#1d1d1f;padding:clamp(70px,10vw,140px) clamp(24px,4vw,60px);border-top:1px solid rgba(0,0,0,.08)}
-.about-section h2{margin:20px 0 34px;font-size:clamp(40px,5.5vw,80px);line-height:.9;letter-spacing:-3px}
-.about-body{max-width:640px}
-.about-body p{margin:0 0 18px;font-size:17px;line-height:1.55;color:#3b3633}
-.about-body h3{margin:34px 0 12px;font-size:15px;letter-spacing:.06em;text-transform:uppercase}
-.about-body a{color:#8d301b;text-decoration:underline}
-@media(max-width:700px){.about-section h2{letter-spacing:-1.5px}.about-body p{font-size:16px}}
+/* About block inside the dark footer: sentence case, readable measure, light text that keeps 4.5:1 on #1d1d1f. */
+.site-footer-about{display:grid;grid-template-columns:minmax(200px,1fr) minmax(0,1.35fr) minmax(0,1.35fr);gap:clamp(28px,4vw,64px);padding:clamp(48px,7vw,96px) 0;border-bottom:1px solid rgba(255,255,255,.25);text-transform:none;scroll-margin-top:96px}
+.site-footer-about-eyebrow{margin:0 0 14px;color:rgba(255,255,255,.6);font-size:11px;font-weight:600;letter-spacing:.08em;text-transform:uppercase}
+.site-footer-about h2{margin:0;font-size:clamp(28px,2.6vw,40px);line-height:1;letter-spacing:-1.2px;font-weight:700;color:#fff;max-width:9ch}
+.site-footer-about h3{margin:0 0 14px;color:rgba(255,255,255,.6);font-size:11px;font-weight:600;letter-spacing:.08em;text-transform:uppercase}
+.site-footer-about-col{max-width:62ch}
+.site-footer-about-col p{margin:0 0 16px;font-size:15px;line-height:1.6;color:rgba(255,255,255,.78)}
+.site-footer-about-col p:last-child{margin-bottom:0}
+.site-footer-about-col h3+p{margin-top:0}
+.site-footer .site-footer-about-link{display:inline-flex;align-items:center;gap:8px;min-height:44px;color:#fff;font-weight:600;text-decoration:underline;text-underline-offset:4px;text-decoration-color:rgba(255,255,255,.45)}
+.site-footer .site-footer-about-link:hover{text-decoration-color:#fff}
+.site-footer .site-footer-about-link:focus-visible{outline:2px solid #fff;outline-offset:3px}
+@media(max-width:1000px){.site-footer-about{grid-template-columns:1fr 1fr}.site-footer-about-head{grid-column:1/-1}.site-footer-about h2{max-width:none}}
+@media(max-width:700px){.site-footer-about{grid-template-columns:1fr;gap:32px;padding:56px 0}.site-footer-about h2{font-size:28px;letter-spacing:-.8px}}

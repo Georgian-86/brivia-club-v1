@@ -4115,3 +4115,10 @@ new for now").
   iPhone checks added.
 - Honest limit, unchanged: no website can start sound on an iPhone before a touch. The button now says ON, and the first
   touch anywhere makes it audible.
+
+## D-222
+**About moves from the landing body into the footer (2026-11-07).** The founder asked to remove the "What Brivia Club is."
+section from the landing page and carry the same text in the footer. It now sits as a three-column About block in the
+dark footer (heading, what the app does, signing in with Google), stacking to one column under 700 px. The copy is
+unchanged, it is visible without any tap (Google OAuth branding review reads it on the homepage), it keeps
+`id="about"` and the link to `/privacy.html#google`, and the footer nav gains an ABOUT link.
