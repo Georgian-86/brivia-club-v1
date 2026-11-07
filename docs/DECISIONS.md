@@ -4117,8 +4117,10 @@ new for now").
   touch anywhere makes it audible.
 
 ## D-222
-**About moves from the landing body into the footer (2026-11-07).** The founder asked to remove the "What Brivia Club is."
-section from the landing page and carry the same text in the footer. It now sits as a three-column About block in the
-dark footer (heading, what the app does, signing in with Google), stacking to one column under 700 px. The copy is
-unchanged, it is visible without any tap (Google OAuth branding review reads it on the homepage), it keeps
-`id="about"` and the link to `/privacy.html#google`, and the footer nav gains an ABOUT link.
+**About moves off the landing page to its own page (2026-11-07).** The founder asked to remove the "What Brivia Club is."
+section from the landing body and to make ABOUT a footer link to a separate page, not the full text in the footer. The
+copy is unchanged and now lives at `/about.html` (privacy page styles, same deep-wine brand), with the Google sign-in
+explanation and the link to `/privacy.html#google`. The landing footer nav gains ABOUT next to PRIVACY; the page is in
+the Vite inputs and the sitemap. Note for the Google OAuth branding review: the homepage now explains the app only
+through that footer link, so if Google asks for the description on the homepage itself, point them to `/about.html` or
+bring a short line back.

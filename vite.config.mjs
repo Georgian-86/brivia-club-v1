@@ -17,6 +17,7 @@ export default defineConfig({
         profile: 'site/profile.html',
         careers: 'site/careers.html',
         privacy: 'site/privacy.html',
+        about: 'site/about.html',
       },
     },
   },
