@@ -2,6 +2,7 @@ import '../styles/tokens.css';
 import '../styles/fonts.css';
 import '../styles/fonts-careers.css';
 import '../styles/aura-theme.css';
+import './site-chrome.js'; // the shared site footer and menu (D-223)
 import { supabase } from './supabase.js';
 
 const roles = {

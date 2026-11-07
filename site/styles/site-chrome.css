@@ -1,0 +1,15 @@
+/* D-223: the landing nav and footer on the other public pages (about, privacy, careers). The landing's own styles do
+   the work; these rules only fit the fixed nav over a plain document page. */
+body.doc-page .hero-nav{top:0;height:84px;background:rgba(255,250,241,.92);-webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px);border-bottom:1px solid rgba(67,4,22,.08)}
+body.doc-page .hero-nav .menu-trigger{top:50%;transform:translateY(-50%)}
+body.doc-page .hero-nav.is-over-dark{background:transparent;border-bottom-color:transparent;-webkit-backdrop-filter:none;backdrop-filter:none}
+body.doc-page .deleted-banner:not(:empty){margin-top:84px}
+body.doc-page main.page{padding-top:132px}
+body.doc-page .deleted-banner:not(:empty)+main.page{padding-top:40px}
+body.menu-open{overflow:hidden}
+.site-footer :focus-visible,.hero-nav :focus-visible,.menu-drawer :focus-visible{outline:2px solid currentColor;outline-offset:3px}
+@media(max-width:700px){
+  body.doc-page .hero-nav .menu-trigger{transform:none}
+  body.doc-page main.page{padding-top:84px}
+  body.doc-page .deleted-banner:not(:empty){margin-top:56px}
+}

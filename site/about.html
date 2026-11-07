@@ -23,14 +23,14 @@
     <meta name="twitter:title" content="About · Brivia Club" />
     <meta name="twitter:description" content="What Brivia Club is: a networking app that introduces you to people who care about the same things you do, starting with the people near you." />
     <meta name="twitter:image" content="https://thebriviaclub.live/og-image.jpg" />
-    <link rel="stylesheet" href="/styles/privacy.css" />
     <script type="module" src="/scripts/analytics.js"></script>
   </head>
-  <body>
+  <body class="doc-page">
     <a class="skip-link" href="#main">Skip to the page</a>
-    <header class="site-header">
-      <a class="brand" href="/">the <strong>Brivia Club</strong></a>
-      <a class="header-link" href="/">Back to home</a>
+    <header class="hero-nav" id="top">
+      <button class="menu-trigger" type="button" aria-label="Open menu" aria-expanded="false"><span></span><span></span><span></span></button>
+      <div class="nav-spacer" aria-hidden="true"></div>
+      <a href="/auth.html#signup" class="cta-button"><span class="button-label">START SWIPING</span><span class="button-arrows">→</span></a>
     </header>
 
     <!-- What the app is and what it does with Google sign-in, in plain words (Google OAuth branding review, D-222). -->
@@ -52,9 +52,13 @@
       </section>
     </main>
 
-    <footer class="site-footer">
-      <p><a href="/privacy.html">Privacy notice</a></p>
-      <p><a href="mailto:hello@thebriviaclub.live">hello@thebriviaclub.live</a></p>
+    <footer class="site-footer" id="site-footer">
+      <div class="site-footer-cta"><a href="mailto:hello@thebriviaclub.live">hello@thebriviaclub.live <b>↗</b></a></div>
+      <div class="site-footer-middle"><span class="site-footer-brand">BRIVIA CLUB</span><nav><a href="/">HOME</a><a href="/#projects">HOW IT WORKS</a><a href="/about.html">ABOUT</a><a href="/careers.html">CAREERS</a><a href="#site-footer">CONTACT</a><a href="/privacy.html">PRIVACY</a></nav></div>
+      <div class="site-footer-bottom"><span>©2026 BRIVIA CLUB</span><div><a href="https://www.instagram.com/thebriviaclub?stkn=MWZpcWszZzhwOW8xbg==" target="_blank" rel="noreferrer">INSTAGRAM</a><a href="https://www.linkedin.com/company/the-brivia-club/" target="_blank" rel="noreferrer">LINKEDIN</a></div><a href="#top">BACK TO TOP ↑</a></div>
     </footer>
+
+    <div class="menu-overlay" aria-hidden="true" inert><div class="menu-drawer" role="dialog" aria-label="Brivia Club menu"><div class="menu-drawer-head"><a class="menu-drawer-brand" href="/"><span>the</span> <strong>Brivia Club</strong></a><button class="menu-close" type="button" aria-label="Close menu">×</button></div><nav><a href="/"><span>01</span>HOME <b>↗</b></a><a href="/#projects"><span>02</span>HOW IT WORKS <b>↗</b></a><a href="/about.html"><span>03</span>ABOUT <b>↗</b></a><a href="/careers.html"><span>04</span>CAREERS <b>↗</b></a><a href="#site-footer"><span>05</span>CONTACT <b>↗</b></a></nav><div class="menu-drawer-bottom"><p>MEMBERSHIP</p><div><button type="button" data-menu-auth="login">LOGIN <b>↗</b></button><button type="button" data-menu-auth="signup">SIGN UP <b>↗</b></button><button type="button" data-menu-logout hidden>LOG OUT <b>↗</b></button></div></div></div></div>
+    <script type="module" src="/scripts/about.js"></script>
   </body>
 </html>

@@ -531,6 +531,7 @@ const overlay = document.querySelector('.menu-overlay');
 const setMenuOpen = (isOpen) => {
   overlay?.classList.toggle('open', isOpen);
   overlay?.setAttribute('aria-hidden', String(!isOpen));
+  if (overlay) overlay.inert = !isOpen; // closed: off-screen links leave the tab order (D-223)
   if (isOpen) smoothScroll?.stop(); else smoothScroll?.start();
 };
 document.querySelector('.menu-trigger')?.addEventListener('click', () => setMenuOpen(true));

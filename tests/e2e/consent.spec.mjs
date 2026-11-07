@@ -1652,8 +1652,9 @@ try {
   check(`privacy.html?deleted=1: axe finds no violations (${deletedAxe.join(' | ')})`, () => assert.deepEqual(deletedAxe, []));
   await priv.setViewportSize({ width: 1440, height: 900 });
   const wideTable = await priv.evaluate(() => ({ overflow: document.documentElement.scrollWidth - window.innerWidth, display: getComputedStyle(document.querySelector('table tbody tr')).display }));
-  const backLink = await priv.evaluate(() => { const a = document.querySelector('.header-link'); return a.hidden || a.getClientRects().length === 0; });
-  check('privacy.html?deleted=1 hides the "Back to the app" link', () => assert.equal(backLink, true));
+  // D-223: the page wears the shared site nav and footer, which hold no link into the app (a deleted member is signed out).
+  const appLink = await priv.evaluate(() => [...document.querySelectorAll('a[href]')].some((a) => a.getAttribute('href').startsWith('/app.html') && a.getClientRects().length));
+  check('privacy.html?deleted=1 shows no link into the app', () => assert.equal(appLink, false));
   check(`privacy.html at 1440 px: a real table, no horizontal scroll (${JSON.stringify(wideTable)})`, () => { assert.equal(wideTable.display, 'table-row'); assert.ok(wideTable.overflow <= 0); });
   if (SHOTS) await priv.screenshot({ path: path.join(SHOTS, 'privacy-1440-deleted.png') });
   check('privacy.html: no uncaught page errors', () => assert.deepEqual(privErrors, []));

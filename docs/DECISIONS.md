@@ -4124,3 +4124,14 @@ explanation and the link to `/privacy.html#google`. The landing footer nav gains
 the Vite inputs and the sitemap. Note for the Google OAuth branding review: the homepage now explains the app only
 through that footer link, so if Google asks for the description on the homepage itself, point them to `/about.html` or
 bring a short line back.
+
+## D-223
+**One footer across the public site; About and Privacy wear the landing nav too (2026-11-07).** The founder saw that
+About and Privacy had their own wine header ("Back to home") and a two-line footer, and asked for the footer to be the
+same throughout the website. About and Privacy now carry the landing's nav (menu button, START SWIPING, which goes to
+`/auth.html#signup`), its side menu and its dark footer; Careers swaps its one-line footer for the same footer and keeps
+its own hero header. The markup sits in each page's HTML (crawlers and Google's branding review see the footer links);
+`site-chrome.js` loads the landing styles and wires the menu (Escape closes it, focus moves in and back, the closed menu
+is `inert`, also on the landing). `privacy.css` is scoped to `.page` so it no longer styles the shared chrome. The menu
+gains ABOUT on every page. `tests/unit/site-chrome.test.mjs` fails if the footers drift apart. The signed-in app pages
+keep their own navigation.
