@@ -182,7 +182,7 @@ const navigationType = (() => {
   try { return window.performance?.getEntriesByType?.('navigation')?.[0]?.type || 'navigate'; } catch { return 'navigate'; }
 })();
 let musicPreference = 'on';
-// D-222: Safari on a Mac and every iPhone/iPad browser play the landing's sound through <audio> elements (see
+// D-223: Safari on a Mac and every iPhone/iPad browser play the landing's sound through <audio> elements (see
 // prefersMediaElementAudio): WebKit can leave Web Audio "running" with nothing reaching the speakers.
 const mediaMusic = isLandingPage && prefersMediaElementAudio({
   userAgent: navigator.userAgent, platform: navigator.platform, maxTouchPoints: navigator.maxTouchPoints || 0,
@@ -239,7 +239,7 @@ const isAppleTouch = /iP(hone|ad|od)/.test(navigator.userAgent) || (navigator.pl
 let silentKeeper = null;
 const holdPlaybackSession = () => {
   try { if (navigator.audioSession) { navigator.audioSession.type = 'playback'; return; } } catch { /* read-only */ }
-  if (!isAppleTouch || mediaMusic) return; // D-222: an <audio> playing is already in the playback session
+  if (!isAppleTouch || mediaMusic) return; // D-223: an <audio> playing is already in the playback session
   if (!silentKeeper) {
     silentKeeper = new Audio(SILENT_WAV);
     silentKeeper.loop = true;
@@ -417,7 +417,7 @@ function stopMusic(next) {
   releasePlaybackSession();
   renderSoundButton();
 }
-// ---- D-222: the media-element path ----
+// ---- D-223: the media-element path ----
 // The soundtrack is one looping <audio> of hero-soundtrack-loop.m4a (the passes' 2 s crossfade baked in, so the loop
 // is seamless) and the intro's cue a pre-rendered WAV in a second <audio>. Fades are volume steps where the browser
 // allows them. The page's own pauses (stop, hidden tab, the wait under the cue) are told apart from a pause the

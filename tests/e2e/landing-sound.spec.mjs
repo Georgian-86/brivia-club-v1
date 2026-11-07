@@ -276,7 +276,7 @@ try {
     await page.touchscreen.tap(195, 500);
     const started = await waitFor(page, isPlaying);
     const media = await page.evaluate(() => ({ contexts: window.__contexts, loop: window.__mediaPlays.filter((src) => /hero-soundtrack-loop/.test(src)).length }));
-    // D-222: every iPhone browser is WebKit, so the soundtrack is an <audio> (which is in the playback session by itself:
+    // D-223: every iPhone browser is WebKit, so the soundtrack is an <audio> (which is in the playback session by itself:
     // the silent switch does not mute it) and no AudioContext is made for the landing's music.
     await check(`iPhone: a tap starts the music as an <audio> loop, no Web Audio (${media.loop} plays, ${media.contexts} contexts)`, () => { assert.equal(started, true); assert.ok(media.loop >= 1); assert.equal(media.contexts, 0); });
     const box = await page.locator('[data-landing-sound]').boundingBox();
@@ -303,7 +303,7 @@ try {
     await check('iPhone: tapping "Music on" first starts the music and the button becomes "Stop music"', () => { assert.equal(started, true); assert.equal(s.text, 'Stop music'); });
     await context.close();
   }
-  // D-222: Safari on a Mac. The soundtrack and the intro's cue play through <audio> elements; no AudioContext at all.
+  // D-223: Safari on a Mac. The soundtrack and the intro's cue play through <audio> elements; no AudioContext at all.
   const SAFARI_UA = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.1 Safari/605.1.15';
   const media = (page) => page.evaluate(() => {
     const loop = window.__mediaEls.find((el) => /hero-soundtrack-loop/.test(el.currentSrc || el.src));

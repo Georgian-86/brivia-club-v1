@@ -164,7 +164,7 @@ test('D-138: notification sound and swipe sounds are separate choices; the push 
   assert.match(sw, /silent,/);
 });
 
-// D-222: Safari on a Mac plays each pre-rendered cue from an <audio> (a WAV of the buffer); Chrome and iPhone keep Web Audio.
+// D-223: Safari on a Mac plays each pre-rendered cue from an <audio> (a WAV of the buffer); Chrome and iPhone keep Web Audio.
 test('Safari on a Mac: cues play from <audio> elements; Chrome and iPhone keep Web Audio', async () => {
   const withMedia = (log) => {
     const win = fakeAudio(log);

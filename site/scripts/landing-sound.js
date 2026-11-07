@@ -92,7 +92,7 @@ export const silentWavDataUri = () => {
   return `data:audio/wav;base64,${btoa(binary)}`;
 };
 
-// ---- D-222: Safari plays the landing's sound through media elements, not Web Audio ----
+// ---- D-223: Safari plays the landing's sound through media elements, not Web Audio ----
 
 // Safari (Mac) and every iPhone/iPad browser (all WebKit) can leave a Web Audio context "running" while nothing
 // reaches the speakers (WebKit bugs 276687, 231105: another tab's audio closing, a route change, an interruption), so

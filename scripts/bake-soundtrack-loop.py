@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# Bakes the landing soundtrack into one seamless loop for the media-element path (D-222, Safari).
+# Bakes the landing soundtrack into one seamless loop for the media-element path (D-223, Safari).
 # Usage: ffmpeg -i site/media/audio/hero-soundtrack.m4a -ar 44100 -ac 2 track.wav
 #        python3 scripts/bake-soundtrack-loop.py track.wav loop.wav 0.6
 #        ffmpeg -i loop.wav -c:a aac -b:a 160k -movflags +faststart site/media/audio/hero-soundtrack-loop.m4a

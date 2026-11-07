@@ -96,7 +96,7 @@ test('silentWavDataUri: a valid, silent PCM WAV', () => {
   assert.ok([...bytes.subarray(44)].every((b) => b === 128));
 });
 
-// D-222: Safari and every iPhone browser get the media-element path; Chrome, Edge and Firefox keep Web Audio.
+// D-223: Safari and every iPhone browser get the media-element path; Chrome, Edge and Firefox keep Web Audio.
 test('prefersMediaElementAudio: WebKit only', async () => {
   const { prefersMediaElementAudio: pick } = await import('../../site/scripts/landing-sound.js');
   const mac = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko)';

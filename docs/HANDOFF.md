@@ -7,13 +7,13 @@ Update this file at the end of every session. CLAUDE.md holds the aim; this file
 
 ## 1. What is done
 
-**2026-11-07, D-222 (branch `claude/admiring-johnson-aes5se`, not deployed yet; client only, no SQL):** Safari (Mac) and
+**2026-11-07, D-223 (on main, deployed to thebriviaclub.live; client only, no SQL):** Safari (Mac) and
 every iPhone browser play the landing soundtrack and intro cue through `<audio>` elements instead of Web Audio (WebKit
 could show "Stop music" in silence); Safari on Mac plays the app's swipe/notification cues the same way. The phone login
 is one screen again (a production-only CSS order bug pushed Log in and Google below the fold), password managers can
 fill it, and log-in errors are plain sentences. Step 1's "Designer at Zomato" example removed. Checks:
 `tests/e2e/landing-sound.spec.mjs` (48), `tests/e2e/login-smooth.spec.mjs` (17). Owed: a check on a real Mac in Safari
-and a real iPhone after deploy. Already failing on main before D-222 (same result on the untouched base): `signup.spec.mjs`
+and a real iPhone after deploy. Already failing on main before D-223 (same result on the untouched base): `signup.spec.mjs`
 "area denied" and the interests listbox "on screen" (1920x886, 375x812; flaky); `landing.spec.mjs` 7 (hero-unmute
 checks from before D-220, and a same-origin 404 after a full scroll).
 

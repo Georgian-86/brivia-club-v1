@@ -11,7 +11,7 @@ export const signupErrorCopy = (error) => {
   return message || 'Could not create your account. Please try again.';
 };
 
-// D-222: plain copy for log-in errors (Supabase's "Invalid login credentials" or a browser's "Failed to fetch" were
+// D-223: plain copy for log-in errors (Supabase's "Invalid login credentials" or a browser's "Failed to fetch" were
 // shown raw). `online` is navigator.onLine.
 export const LOGIN_FAILED = 'That email and password do not match. Try again, or reset your password below.';
 export const loginErrorCopy = (error, { online = true } = {}) => {

@@ -368,7 +368,7 @@ export const createSoundKit = ({
   let rendering = null;
   const playedIds = new Set();
   const lastCue = {};
-  // D-222: Safari on a Mac can keep a Web Audio context "running" in silence, so there each pre-rendered cue plays
+  // D-223: Safari on a Mac can keep a Web Audio context "running" in silence, so there each pre-rendered cue plays
   // from an <audio> element (a WAV of the same buffer). Not on iPhone: an <audio> would pause the member's own music,
   // where these UI sounds are meant to mix with it (the 'ambient' session below).
   const appleTouch = /iP(hone|ad|od)/.test(nav?.userAgent || '') || (nav?.platform === 'MacIntel' && nav?.maxTouchPoints > 1);

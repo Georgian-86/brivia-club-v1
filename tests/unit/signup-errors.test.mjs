@@ -18,7 +18,7 @@ test('other errors keep their message, with a fallback', () => {
   assert.equal(signupErrorCopy(null), 'Could not create your account. Please try again.');
 });
 
-test('loginErrorCopy: plain words for each log-in failure (D-222)', async () => {
+test('loginErrorCopy: plain words for each log-in failure (D-223)', async () => {
   const { loginErrorCopy, LOGIN_FAILED } = await import('../../site/scripts/signup-errors.js');
   assert.equal(loginErrorCopy({ code: 'invalid_credentials', message: 'Invalid login credentials', status: 400 }), LOGIN_FAILED);
   assert.equal(loginErrorCopy({ message: 'Invalid login credentials' }), LOGIN_FAILED);
