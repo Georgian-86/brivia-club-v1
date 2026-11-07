@@ -13,7 +13,9 @@ could show "Stop music" in silence); Safari on Mac plays the app's swipe/notific
 is one screen again (a production-only CSS order bug pushed Log in and Google below the fold), password managers can
 fill it, and log-in errors are plain sentences. Step 1's "Designer at Zomato" example removed. Checks:
 `tests/e2e/landing-sound.spec.mjs` (48), `tests/e2e/login-smooth.spec.mjs` (17). Owed: a check on a real Mac in Safari
-and a real iPhone after deploy.
+and a real iPhone after deploy. Already failing on main before D-222 (same result on the untouched base): `signup.spec.mjs`
+"area denied" and the interests listbox "on screen" (1920x886, 375x812; flaky); `landing.spec.mjs` 7 (hero-unmute
+checks from before D-220, and a same-origin 404 after a full scroll).
 
 **2026-11-06, D-220 and D-221 (live: main 95e4126, deployed to thebriviaclub.live):** the landing music control is
 rebuilt so it tells the truth: "Stop music" / "Play music" (visible label), stops the soundtrack and the intro cue,
