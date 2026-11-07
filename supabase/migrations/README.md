@@ -1481,3 +1481,11 @@ Verify: `select prosrc not like '%role_cap%' from pg_proc where proname = 'save_
 `hiring_people_v2(limit, after_score, after_id)`: 0054's `hiring_people` plus a `request_pending` column; members the
 caller has a live request to are served (flagged) instead of left out. `hiring_people` is unchanged for the older client.
 Verify: `select count(*) from pg_proc where proname = 'hiring_people_v2';` (1).
+
+## 0068
+
+**Message yourself (D-224).** Apply after `0067`, then deploy the client (the client before the SQL only means a note
+to yourself is refused with an error, as today). `brivia_private.brivia_can_send` also allows the caller as the
+recipient, so a member can keep a private thread with themselves. Nothing else changes: messaging anyone else still
+needs a match, and no match is created.
+Verify: `select prosrc like '%p_recipient = auth.uid()%' from pg_proc where proname = 'brivia_can_send';` (true).

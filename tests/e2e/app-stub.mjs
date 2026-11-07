@@ -521,7 +521,12 @@ export const startAppStub = async ({ port, state = {}, deckRows = defaultDeckRow
         st.messages = st.messages.filter((m) => m.id !== args.p_id);
         return json(200, true);
       }
-      if (pathName === '/rest/v1/brivia_messages' && method === 'POST') { (st.sent ||= []).push(args); return route.fulfill({ status: 201, body: '', headers: { 'access-control-allow-origin': '*' } }); }
+      if (pathName === '/rest/v1/brivia_messages' && method === 'POST') {
+        (st.sent ||= []).push(args);
+        // echoSends: the stored row comes back on the next read, as the server would return it.
+        if (st.echoSends) [].concat(args).forEach((row, i) => (st.messages ||= []).push({ id: `sent-${st.sent.length}-${i}`, created_at: new Date().toISOString(), message_type: 'text', ...row }));
+        return route.fulfill({ status: 201, body: '', headers: { 'access-control-allow-origin': '*' } });
+      }
       if (pathName === '/rest/v1/brivia_messages' && method === 'GET') return json(200, st.messages || []);
       if (pathName.startsWith('/rest/v1/')) return json(200, []);
       return json(200, {});

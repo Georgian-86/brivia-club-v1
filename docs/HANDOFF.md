@@ -7,6 +7,10 @@ Update this file at the end of every session. CLAUDE.md holds the aim; this file
 
 ## 1. What is done
 
+**2026-11-07, D-224 (branch `claude/admiring-johnson-aes5se`):** "You · Message yourself" pinned first in Chats
+(notes, links, files to yourself; search your own name finds it). Needs migration **0068** (README "0068") applied
+before or with the client deploy. Checks: `tests/e2e/chat-self.spec.mjs`, `supabase/tests/s-message-yourself.test.sql`.
+
 **2026-11-07, D-223 (on main, deployed to thebriviaclub.live; client only, no SQL):** Safari (Mac) and
 every iPhone browser play the landing soundtrack and intro cue through `<audio>` elements instead of Web Audio (WebKit
 could show "Stop music" in silence); Safari on Mac plays the app's swipe/notification cues the same way. The phone login

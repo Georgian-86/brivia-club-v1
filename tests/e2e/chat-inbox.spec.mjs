@@ -28,7 +28,7 @@ try {
     await ctx.addInitScript(([k]) => { if (!localStorage.getItem(k)) localStorage.setItem(k, JSON.stringify({ baseline: '2020-01-01T00:00:00.000Z', read: {} })); }, [`brivia-chat-read:${ME}`]);
     const page = await stub.open(ctx, { path: '/app.html?view=chat' });
     await page.waitForSelector('.chat-row .chat-row-copy strong', { timeout: 8000 });
-    const order = await page.$$eval('.chat-row .chat-row-copy strong', (n) => n.map((x) => x.textContent));
+    const order = await page.$$eval('.chat-row:not(.is-self) .chat-row-copy strong', (n) => n.map((x) => x.textContent)); // D-224: "You" is pinned first
     check(`${w}: newest contact first`, JSON.stringify(order) === JSON.stringify(expectedOrder), JSON.stringify(order));
     const badge = () => page.$$eval('[data-chat-badge]', (b) => b.filter((x) => !x.hidden).map((x) => x.textContent));
     check(`${w}: badge counts unread messages (10: two from one person, none from the one I answered), not conversations`, (await badge()).every((t) => t === '10') && (await badge()).length > 0, JSON.stringify(await badge()));

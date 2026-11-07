@@ -4169,3 +4169,27 @@ bring a short line back.
   new `login-smooth.spec.mjs` (17: one screen and no sideways scroll at five sizes, password-manager attributes, 16 px
   fields on phones, the error copy). Honest limit: the container has Chromium only; the WebKit path is exercised with a
   Safari user agent, not real Safari. Check on a real Mac (Safari) and iPhone after deploy.
+
+## D-224 (2026-11-07): "You · Message yourself" in Chats
+
+- Founder (Mac Safari screenshot: searching their own name in Chats found no one): "make it possible to text ourselves
+  as well". No agent-arena round: a small, self-contained feature with an obvious precedent (WhatsApp's "Message
+  yourself", Telegram's "Saved Messages"), and nothing about matching, ranking or consent changes.
+- **Done.**
+  - A thread with yourself, pinned first in Chats: your photo, "Your name (You)", the last note as its preview
+    ("Notes, links and files just for you" when empty). Not counted in "NN CONVERSATIONS"; left out by the Unread
+    filter (nothing in it is ever unread). Search finds it by your own name (any word, from its start), "you", "me",
+    "myself", "self", "notes" or "message yourself" (two letters or more): `selfChatMatches` in `self-chat.js`.
+  - Inside: your name with "(You)", "Only you can see this", "Notes, links and files to yourself". Everything the
+    composer does works (text, photos, files, GIFs, edit, unsend, reply). No typing signal, active status, ticks,
+    sharing check, or Remove connection / Block / Report menu. The avatar and name open your own Profile.
+  - Server, migration 0068: `brivia_can_send` also allows the caller as the recipient. Rows are sender = recipient =
+    the member; the select policy already lets only them read it; never withheld (no one blocks themselves);
+    `mark_conversation_read` already returns 0 for yourself. The client never calls `mark_chat_seen` for your own id,
+    because there it means "the Chats tab was opened" (0064) and would clear unread chats on your other devices.
+  - Mutual consent is unchanged: messaging anyone else still needs a match, and the self-thread creates none.
+- **Checks.** `supabase/tests/s-message-yourself.test.sql` (send, read back, edit, reply, unsend, never withheld;
+  another member can neither read it nor message you unmatched; an incomplete profile cannot; no forged sender; no
+  match row). `tests/unit/self-chat.test.mjs` (3). `tests/e2e/chat-self.spec.mjs` (22: pinned first, search, the
+  header, no menu or ticks, a note is sent to yourself and shows, other chats keep their menu, desktop and phone).
+  `chat-inbox.spec.mjs` now orders the conversations below the pinned row.

@@ -160,3 +160,8 @@ body.app-body .app-view[data-view="chat"] .chat-row.is-unread::before {
   background: var(--color-chat-wine) !important;
   transform: translateY(-50%);
 }
+
+/* D-224: your own thread ("Message yourself") has no Remove / Block / Report menu: the hidden "•••" stays hidden
+   (several .chat-more rules set display and would otherwise show it). */
+body.app-body .app-view[data-view="chat"] .chat-window-head .chat-more[hidden] { display: none !important; }
+body.app-body .app-view[data-view="chat"] .chat-window-head:has(.chat-more[hidden]) .chat-close { margin-left: auto !important; }
