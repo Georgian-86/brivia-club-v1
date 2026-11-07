@@ -4115,3 +4115,12 @@ new for now").
   iPhone checks added.
 - Honest limit, unchanged: no website can start sound on an iPhone before a touch. The button now says ON, and the first
   touch anywhere makes it audible.
+
+## D-222
+**About moves off the landing page to its own page (2026-11-07).** The founder asked to remove the "What Brivia Club is."
+section from the landing body and to make ABOUT a footer link to a separate page, not the full text in the footer. The
+copy is unchanged and now lives at `/about.html` (privacy page styles, same deep-wine brand), with the Google sign-in
+explanation and the link to `/privacy.html#google`. The landing footer nav gains ABOUT next to PRIVACY; the page is in
+the Vite inputs and the sitemap. Note for the Google OAuth branding review: the homepage now explains the app only
+through that footer link, so if Google asks for the description on the homepage itself, point them to `/about.html` or
+bring a short line back.
