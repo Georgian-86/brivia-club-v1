@@ -91,7 +91,7 @@ try {
         assert.equal(inbox.scrollsInside, false); assert.equal(inbox.heading, 'Messages'); assert.equal(inbox.topline, false); assert.equal(inbox.threadsHead, false);
       });
     }
-    await page.locator('#chat-list [data-chat-id]').first().click();
+    await page.locator('#chat-list .chat-row:not(.is-self) [data-chat-id]').first().click();
     await page.waitForFunction(() => !document.querySelector('#chat-window')?.hidden, null, { timeout: 5000 });
     const close = await page.evaluate(() => { const c = document.querySelector('#chat-close'); const m = document.querySelector('#chat-more'); const box = (e) => { const r = e.getBoundingClientRect(); return [Math.round(r.width), Math.round(r.height)]; }; return { shown: Boolean(c && getComputedStyle(c).display !== 'none'), label: c?.getAttribute('aria-label'), close: c && box(c), more: m && box(m) }; });
     if (!phone) {
@@ -105,7 +105,7 @@ try {
         assert.equal(await page.evaluate(() => document.activeElement?.classList.contains('chat-row-open')), true);
       });
       // The notification panel over an open thread takes Escape first (the thread stays open).
-      await page.locator('#chat-list [data-chat-id]').first().click();
+      await page.locator('#chat-list .chat-row:not(.is-self) [data-chat-id]').first().click();
       await page.click('#app-notification-button');
       await page.waitForSelector('#app-notification-panel:not([hidden])', { timeout: 3000 });
       await page.keyboard.press('Escape');

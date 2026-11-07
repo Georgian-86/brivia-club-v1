@@ -48,9 +48,9 @@ try {
     await page.waitForTimeout(600);
     const head = await page.evaluate(() => ({
       name: document.querySelector('#chat-name')?.textContent, status: document.querySelector('#chat-status')?.textContent,
-      more: document.querySelector('#chat-more')?.hidden && getComputedStyle(document.querySelector('#chat-more')).display === 'none', ticks: document.querySelectorAll('#chat-messages .message-receipt, #chat-messages .message-receipt-word, #chat-messages [class*="receipt"]').length,
+      more: document.querySelector('#chat-more')?.hidden && getComputedStyle(document.querySelector('#chat-more')).display === 'none', share: !document.querySelector('#chat-share-toggle') || document.querySelector('#chat-share-toggle').hidden, ticks: document.querySelectorAll('#chat-messages .message-receipt, #chat-messages .message-receipt-word, #chat-messages [class*="receipt"]').length,
     }));
-    check(`${w}: the thread opens as yours ("Only you can see this"), with no menu and no ticks`, head.name === 'Alex Me (You)' && head.status === 'Only you can see this' && head.more === true && head.ticks === 0, JSON.stringify(head));
+    check(`${w}: the thread opens as yours ("Only you can see this"), with no menu, no share "+" and no ticks`, head.name === 'Alex Me (You)' && head.status === 'Only you can see this' && head.more === true && head.share === true && head.ticks === 0, JSON.stringify(head));
 
     const sentBefore = (st.sent || []).length;
     await page.fill('#chat-input', `note from ${w}`);

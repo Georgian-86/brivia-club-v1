@@ -479,7 +479,7 @@ try {
       const page = await stub.open(context, { path: '/app.html?view=chat', errors: pageErrors });
       page.setDefaultTimeout(6000);
       await page.waitForSelector('#chat-list [data-chat-id]', { timeout: 8000 });
-      await page.locator('#chat-list [data-chat-id]').first().click();
+      await page.locator('#chat-list .chat-row:not(.is-self) [data-chat-id]').first().click();
       await page.waitForSelector('#chat-window:not([hidden]) #chat-form', { timeout: 6000 });
       await page.waitForTimeout(500);
       return { context, page };
@@ -821,7 +821,7 @@ try {
       page.on('console', (m) => consoleLines.push(`${m.type()}: ${m.text()}`));
       page.setDefaultTimeout(6000);
       await page.waitForSelector('#chat-list [data-chat-id]', { timeout: 8000 });
-      await page.locator('#chat-list [data-chat-id]').first().click();
+      await page.locator('#chat-list .chat-row:not(.is-self) [data-chat-id]').first().click();
       await page.waitForSelector('#chat-window:not([hidden]) #chat-form', { timeout: 6000 });
       await page.waitForTimeout(700);
       return { context, page, rt, consoleLines };
@@ -1024,7 +1024,7 @@ try {
           assert.ok(rt.leaves.includes(TOPIC));
           assert.equal(s.visible, false);
         });
-        await page.locator('#chat-list [data-chat-id]').first().click();
+        await page.locator('#chat-list .chat-row:not(.is-self) [data-chat-id]').first().click();
         await page.waitForTimeout(600);
         const rejoined = rt.typingJoins().length;
         await page.locator('#chat-input').pressSequentially('hi', { delay: 40 });
@@ -1124,7 +1124,7 @@ try {
       await scenario('T7 quick reopen', async () => {
         const { context, page, rt } = await openTyping(375, { leaveDelayMs: 500 });
         await page.locator('#chat-back').click();
-        await page.locator('#chat-list [data-chat-id]').first().click();
+        await page.locator('#chat-list .chat-row:not(.is-self) [data-chat-id]').first().click();
         await page.waitForTimeout(1200);
         rt.push(true);
         await waitTyping(page, true);

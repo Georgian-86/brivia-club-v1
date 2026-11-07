@@ -31,7 +31,7 @@ try {
     await page.close();
     page = await stub.open(ctx, { path: '/app.html?view=chat' });
     await page.waitForTimeout(1500);
-    await page.locator('#chat-list [data-chat-id]').first().click({ timeout: 5000 }).catch((e) => console.log('chat open', e.message));
+    await page.locator('#chat-list .chat-row:not(.is-self) [data-chat-id]').first().click({ timeout: 5000 }).catch((e) => console.log('chat open', e.message));
     await page.waitForTimeout(800);
     await page.screenshot({ path: path.join(SHOTS, `chat-${tag}.png`) });
     await ctx.close();

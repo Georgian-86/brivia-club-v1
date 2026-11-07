@@ -154,7 +154,7 @@ try {
     {
       const { context, page } = await openShot(NARROW, '/app.html?view=chat');
       await page.waitForTimeout(1500);
-      await page.locator('#chat-list [data-chat-id]').first().click({ timeout: 5000 });
+      await page.locator('#chat-list .chat-row:not(.is-self) [data-chat-id]').first().click({ timeout: 5000 });
       await page.waitForTimeout(600);
       await page.screenshot({ path: path.join(SHOTS, 'app-chat-thread-375.png') });
       await context.close();
@@ -331,7 +331,7 @@ try {
       await page.waitForFunction(() => document.querySelector('#chat-list [data-chat-id]'), null, { timeout: 8000 }).catch(() => {});
       await settle(page);
       const listBar = await tabbarShown(page);
-      await page.locator('#chat-list [data-chat-id]').first().click({ timeout: 5000 }).catch((error) => console.log(`chat open failed: ${error.message.split('\n')[0]}`));
+      await page.locator('#chat-list .chat-row:not(.is-self) [data-chat-id]').first().click({ timeout: 5000 }).catch((error) => console.log(`chat open failed: ${error.message.split('\n')[0]}`));
       await settle(page);
       const threadBar = await tabbarShown(page);
       const compose = await page.evaluate(() => ['#chat-input', '#chat-form button[type="submit"]'].map((sel) => {
@@ -795,7 +795,7 @@ try {
       await audit('Explore posts');
       await go('chat');
       await audit('Chat list');
-      await page.locator('#chat-list [data-chat-id]').first().click({ timeout: 5000 }).catch((error) => console.log(`chat open failed: ${error.message.split('\n')[0]}`));
+      await page.locator('#chat-list .chat-row:not(.is-self) [data-chat-id]').first().click({ timeout: 5000 }).catch((error) => console.log(`chat open failed: ${error.message.split('\n')[0]}`));
       await settle(page);
       await audit('Chat conversation');
       await go('profile');
@@ -869,7 +869,7 @@ try {
       });
       check(`${tag}: the deck card's VIEW PROFILE is not cut off by the card (${JSON.stringify(card)})`, () => { assert.ok(card.buttonBottom <= card.cardBottom, 'button below the card edge'); assert.ok(card.buttonRight <= card.cardRight); });
       await go('chat');
-      await page.locator('#chat-list [data-chat-id]').first().click({ timeout: 5000 }).catch(() => {});
+      await page.locator('#chat-list .chat-row:not(.is-self) [data-chat-id]').first().click({ timeout: 5000 }).catch(() => {});
       await settle(page);
       const ph = await page.evaluate(() => {
         const i = document.querySelector('.chat-compose input'); const s = getComputedStyle(i); const ps = getComputedStyle(i, '::placeholder');

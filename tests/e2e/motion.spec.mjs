@@ -98,7 +98,7 @@ try {
     const ctx = await stub.newContext(browser, { width: 390, height: 844 }, { isMobile: true, hasTouch: true });
     await ctx.addInitScript(recorder);
     const page = await stub.open(ctx, { path: '/app.html?view=chat' });
-    await page.waitForSelector('#chat-list [data-chat-id]'); await page.locator('#chat-list [data-chat-id]').first().click();
+    await page.waitForSelector('#chat-list [data-chat-id]'); await page.locator('#chat-list .chat-row:not(.is-self) [data-chat-id]').first().click();
     await page.waitForTimeout(1200);
     const before = (await seen(page)).bubble;
     st.messages.push({ id: 'm2', sender_id: ASHA, recipient_id: ME, body: 'See you at 7?', created_at: new Date().toISOString() });

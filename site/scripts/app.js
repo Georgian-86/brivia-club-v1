@@ -6278,7 +6278,8 @@ const refreshShareMatch = async (personId) => {
 };
 const syncShareToggle = () => {
   const toggle = document.querySelector('#chat-share-toggle');
-  if (toggle) toggle.hidden = !selectedChat || (!areaShareBody(memberPlaceLabel) && shareResumeState() === null);
+  // D-224: nothing to share with yourself (your resume and area are already yours).
+  if (toggle) toggle.hidden = !selectedChat || Boolean(selectedChat.isSelf) || (!areaShareBody(memberPlaceLabel) && shareResumeState() === null);
 };
 const shareItem = (share, icon, title, hint, extra = '') => `<button type="button" class="chat-share-item" data-share="${share}"${extra}><span class="chat-share-icon">${icon}</span><span class="chat-share-copy"><span class="chat-share-title">${title}</span><span class="chat-share-hint">${escapeHtml(hint)}</span></span></button>`;
 const renderShareMenu = () => {
