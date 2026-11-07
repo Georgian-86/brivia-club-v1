@@ -7,6 +7,14 @@ Update this file at the end of every session. CLAUDE.md holds the aim; this file
 
 ## 1. What is done
 
+**2026-11-07, D-222 (branch `claude/admiring-johnson-aes5se`, not deployed yet; client only, no SQL):** Safari (Mac) and
+every iPhone browser play the landing soundtrack and intro cue through `<audio>` elements instead of Web Audio (WebKit
+could show "Stop music" in silence); Safari on Mac plays the app's swipe/notification cues the same way. The phone login
+is one screen again (a production-only CSS order bug pushed Log in and Google below the fold), password managers can
+fill it, and log-in errors are plain sentences. Step 1's "Designer at Zomato" example removed. Checks:
+`tests/e2e/landing-sound.spec.mjs` (48), `tests/e2e/login-smooth.spec.mjs` (17). Owed: a check on a real Mac in Safari
+and a real iPhone after deploy.
+
 **2026-11-06, D-220 and D-221 (live: main 95e4126, deployed to thebriviaclub.live):** the landing music control is
 rebuilt so it tells the truth: "Stop music" / "Play music" (visible label), stops the soundtrack and the intro cue,
 resumes from the same point, music on by default (a mute lasts for the tab only; a reload starts with music on), the

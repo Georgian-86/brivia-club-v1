@@ -272,7 +272,7 @@ export const initGuidedSignup = ({
       const mark = (name, url) => (url ? `<img class="work-logo" src="${escapeHtml(url)}" alt="" width="28" height="28" loading="lazy" />` : monogramMarkup(name, escapeHtml));
       return {
         autofocus: 'input[name="guided-title"]',
-        html: `${heading('What do you do?', 'Your title and organisation show small on your card, like “Designer at Zomato”. Add them now or later.')}
+        html: `${heading('What do you do?', 'Your title and organisation show small on your card. Add them now or later.')}
           <label class="guided-field"><span class="guided-field-label">Title</span>
             <input type="text" name="guided-title" autocomplete="organization-title" maxlength="${TITLE_MAX}" placeholder="e.g. Product Designer, Student, Founder" value="${escapeHtml(a.title)}" /></label>
           <p class="guided-field-label" id="guided-company-label">Company or organisation</p>

@@ -41,9 +41,11 @@ const INIT = ({ allowSound = false, skipIntro = true } = {}) => {
   window.addEventListener('pointerup', (e) => { if (e.isTrusted && e.pointerType !== 'mouse') window.__gesture = true; }, true);
   const realPlay = HTMLMediaElement.prototype.play;
   window.__mediaPlays = [];
+  window.__mediaEls = [];
   HTMLMediaElement.prototype.play = function play() {
     if (!this.muted && !window.__gesture) return Promise.reject(new DOMException('blocked', 'NotAllowedError'));
     window.__mediaPlays.push(this.currentSrc || this.src || 'video');
+    if (!window.__mediaEls.includes(this)) window.__mediaEls.push(this);
     return realPlay.call(this);
   };
   const Real = window.AudioContext;
@@ -273,8 +275,10 @@ try {
     await check('iPhone: on opening, the button shows music ON ("Music on"), not "Play music"', () => { assert.equal(shown.state, 'armed'); assert.equal(shown.text, 'Music on'); });
     await page.touchscreen.tap(195, 500);
     const started = await waitFor(page, isPlaying);
-    const keeper = await page.evaluate(() => window.__mediaPlays.filter((src) => src.startsWith('data:audio/wav')).length);
-    await check(`iPhone: a tap starts the music and holds the playback session for the silent switch (${keeper} keeper plays)`, () => { assert.equal(started, true); assert.ok(keeper >= 1); });
+    const media = await page.evaluate(() => ({ contexts: window.__contexts, loop: window.__mediaPlays.filter((src) => /hero-soundtrack-loop/.test(src)).length }));
+    // D-222: every iPhone browser is WebKit, so the soundtrack is an <audio> (which is in the playback session by itself:
+    // the silent switch does not mute it) and no AudioContext is made for the landing's music.
+    await check(`iPhone: a tap starts the music as an <audio> loop, no Web Audio (${media.loop} plays, ${media.contexts} contexts)`, () => { assert.equal(started, true); assert.ok(media.loop >= 1); assert.equal(media.contexts, 0); });
     const box = await page.locator('[data-landing-sound]').boundingBox();
     const vp = page.viewportSize();
     await check('iPhone: the button is a 44 px target inside the screen', () => assert.ok(box && box.width >= 44 && box.height >= 44 && box.x >= 0 && box.x + box.width <= vp.width && box.y + box.height <= vp.height, JSON.stringify(box)));
@@ -297,6 +301,93 @@ try {
     const started = await waitFor(page, isPlaying);
     const s = await sound(page);
     await check('iPhone: tapping "Music on" first starts the music and the button becomes "Stop music"', () => { assert.equal(started, true); assert.equal(s.text, 'Stop music'); });
+    await context.close();
+  }
+  // D-222: Safari on a Mac. The soundtrack and the intro's cue play through <audio> elements; no AudioContext at all.
+  const SAFARI_UA = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.1 Safari/605.1.15';
+  const media = (page) => page.evaluate(() => {
+    const loop = window.__mediaEls.find((el) => /hero-soundtrack-loop/.test(el.currentSrc || el.src));
+    const cue = window.__mediaEls.find((el) => /^blob:/.test(el.currentSrc || el.src));
+    return {
+      contexts: window.__contexts, loopPaused: loop ? loop.paused : null, loopTime: loop ? loop.currentTime : 0, loopVolume: loop ? loop.volume : null,
+      loopLoops: loop ? loop.loop : null, cuePlayed: Boolean(cue), cuePaused: cue ? cue.paused : null,
+    };
+  });
+  {
+    const context = await browser.newContext({ viewport: { width: 1440, height: 900 }, userAgent: SAFARI_UA });
+    await context.addInitScript(INIT, {});
+    const page = await context.newPage();
+    const problems = watchConsole(page);
+    await page.goto(`${BASE}/index.html`, { waitUntil: 'load' });
+    await page.waitForTimeout(700);
+    let s = await sound(page);
+    await check('Safari: before any gesture the button shows "Music on"', () => assert.equal(s.state, 'armed'));
+    await page.mouse.click(700, 450);
+    const started = await waitFor(page, isPlaying);
+    await page.waitForTimeout(1600);
+    let m = await media(page);
+    await check(`Safari: a click plays the soundtrack as a looping <audio>, faded in (volume ${m.loopVolume?.toFixed(2)}), and no AudioContext is ever made`, () => {
+      assert.equal(started, true); assert.equal(m.loopPaused, false); assert.equal(m.loopLoops, true); assert.equal(m.contexts, 0);
+      assert.ok(m.loopVolume > 0.4 && m.loopVolume <= 1, String(m.loopVolume));
+    });
+    await page.locator('[data-landing-sound]').click();
+    await page.waitForTimeout(700);
+    s = await sound(page); m = await media(page);
+    const stoppedAt = m.loopTime;
+    await check('Safari: "Stop music" fades the soundtrack out and pauses it; the button says "Play music"', () => { assert.equal(s.state, 'stopped'); assert.equal(m.loopPaused, true); assert.equal(s.stored, 'off'); });
+    await page.waitForTimeout(800);
+    await page.locator('[data-landing-sound]').click();
+    const resumed = await waitFor(page, isPlaying);
+    m = await media(page);
+    await check('Safari: "Play music" resumes from the same point, one element (no second copy)', async () => {
+      assert.equal(resumed, true); assert.equal(m.loopPaused, false); assert.ok(m.loopTime - stoppedAt < 0.6, `${stoppedAt} -> ${m.loopTime}`);
+      assert.equal(await page.evaluate(() => window.__mediaEls.filter((el) => /hero-soundtrack-loop/.test(el.currentSrc || el.src)).length), 1);
+    });
+    for (let i = 0; i < 7; i += 1) { await page.locator('[data-landing-sound]').click(); await page.waitForTimeout(90); }
+    await page.waitForTimeout(900);
+    s = await sound(page); m = await media(page);
+    await check('Safari: seven quick presses end stopped and paused', () => { assert.equal(s.state, 'stopped'); assert.equal(m.loopPaused, true); });
+    await page.locator('[data-landing-sound]').click();
+    await waitFor(page, isPlaying);
+    await page.evaluate(() => { Object.defineProperty(document, 'hidden', { configurable: true, get: () => true }); document.dispatchEvent(new Event('visibilitychange')); });
+    await page.waitForTimeout(300);
+    const hiddenPaused = (await media(page)).loopPaused;
+    await page.evaluate(() => { Object.defineProperty(document, 'hidden', { configurable: true, get: () => false }); document.dispatchEvent(new Event('visibilitychange')); });
+    await page.waitForTimeout(300);
+    m = await media(page); s = await sound(page);
+    await check('Safari: a hidden tab pauses the music and it plays again on return', () => { assert.equal(hiddenPaused, true); assert.equal(m.loopPaused, false); assert.equal(s.state, 'playing'); });
+    // The system pausing it (a call, another app taking the audio): the label follows, the next click resumes.
+    await page.evaluate(() => window.__mediaEls.find((el) => /hero-soundtrack-loop/.test(el.currentSrc || el.src)).pause());
+    const honest = await waitFor(page, isArmed);
+    await page.mouse.click(700, 300);
+    const recovered = await waitFor(page, isPlaying);
+    await check('Safari: an outside pause shows "Music on" and the next click brings the music back', () => { assert.equal(honest, true); assert.equal(recovered, true); });
+    await page.evaluate(() => { window.__timeShift = 5 * 60 * 1000 + 1000; });
+    const ended = await waitFor(page, isStopped);
+    await page.waitForTimeout(3000);
+    await check('Safari: the music fades itself out after 5 minutes', async () => { assert.equal(ended, true); assert.equal((await media(page)).loopPaused, true); });
+    await check('Safari: no console errors or warnings', () => assert.deepEqual(problems, []));
+    await context.close();
+  }
+  // Safari, a click during the intro: the cue plays (a pre-rendered WAV) and the soundtrack comes in under its tail.
+  {
+    const context = await browser.newContext({ viewport: { width: 1440, height: 900 }, userAgent: SAFARI_UA });
+    await context.addInitScript(INIT, { skipIntro: false });
+    const page = await context.newPage();
+    const problems = watchConsole(page);
+    await page.goto(`${BASE}/index.html`, { waitUntil: 'load' });
+    await page.waitForTimeout(500);
+    await page.mouse.click(700, 450);
+    const cue = await waitFor(page, () => window.__mediaEls.some((el) => /^blob:/.test(el.currentSrc || el.src) && !el.paused), null, 3000);
+    const early = await media(page);
+    const later = await waitFor(page, () => window.__mediaEls.some((el) => /hero-soundtrack-loop/.test(el.currentSrc || el.src) && !el.paused), null, 8000);
+    await check(`Safari intro: a click plays the cue, the soundtrack follows (loop paused at first: ${early.loopPaused})`, () => { assert.equal(cue, true); assert.equal(later, true); assert.equal((early.loopPaused ?? true), true); });
+    await waitFor(page, () => document.querySelector('[data-landing-sound]')?.classList.contains('is-ready'), null, 8000);
+    await page.locator('[data-landing-sound]').click();
+    await page.waitForTimeout(700);
+    const m = await media(page);
+    await check('Safari intro: "Stop music" silences the soundtrack and the cue', () => { assert.equal(m.loopPaused, true); assert.ok(m.cuePaused !== false); });
+    await check('Safari intro: no console errors or warnings', () => assert.deepEqual(problems, []));
     await context.close();
   }
   // Reduced motion: no Lenis.

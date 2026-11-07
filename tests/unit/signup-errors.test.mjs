@@ -17,3 +17,17 @@ test('other errors keep their message, with a fallback', () => {
   assert.equal(signupErrorCopy({ message: 'Password should be at least 8 characters.' }), 'Password should be at least 8 characters.');
   assert.equal(signupErrorCopy(null), 'Could not create your account. Please try again.');
 });
+
+test('loginErrorCopy: plain words for each log-in failure (D-222)', async () => {
+  const { loginErrorCopy, LOGIN_FAILED } = await import('../../site/scripts/signup-errors.js');
+  assert.equal(loginErrorCopy({ code: 'invalid_credentials', message: 'Invalid login credentials', status: 400 }), LOGIN_FAILED);
+  assert.equal(loginErrorCopy({ message: 'Invalid login credentials' }), LOGIN_FAILED);
+  assert.match(loginErrorCopy({ code: 'email_not_confirmed', message: 'Email not confirmed' }), /Confirm your email/);
+  assert.match(loginErrorCopy(new TypeError('Failed to fetch')), /No connection/);
+  assert.match(loginErrorCopy(new TypeError('Load failed')), /No connection/); // Safari's wording
+  assert.match(loginErrorCopy({ message: 'anything' }, { online: false }), /No connection/);
+  assert.match(loginErrorCopy({ status: 429, message: 'Request rate limit reached' }), /Too many tries/);
+  assert.match(loginErrorCopy(new Error('Supabase is not configured.')), /unavailable/);
+  assert.equal(loginErrorCopy({ message: 'Something else' }), 'Something else');
+  assert.match(loginErrorCopy(null), /Could not sign you in/);
+});

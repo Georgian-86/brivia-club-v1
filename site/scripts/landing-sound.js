@@ -91,3 +91,45 @@ export const silentWavDataUri = () => {
   bytes.forEach((b) => { binary += String.fromCharCode(b); });
   return `data:audio/wav;base64,${btoa(binary)}`;
 };
+
+// ---- D-222: Safari plays the landing's sound through media elements, not Web Audio ----
+
+// Safari (Mac) and every iPhone/iPad browser (all WebKit) can leave a Web Audio context "running" while nothing
+// reaches the speakers (WebKit bugs 276687, 231105: another tab's audio closing, a route change, an interruption), so
+// the button said "Stop music" in silence. An <audio> element is WebKit's most reliable path, so there the soundtrack
+// is a looping <audio> (the crossfade baked into the file) and the intro's cue a pre-rendered WAV. Chrome, Edge and
+// Firefox keep Web Audio.
+export const prefersMediaElementAudio = ({ userAgent = '', platform = '', maxTouchPoints = 0 } = {}) => {
+  if (/iP(hone|ad|od)/.test(userAgent) || (platform === 'MacIntel' && maxTouchPoints > 1)) return true;
+  return /Macintosh/.test(userAgent) && /Version\/[\d.]+.*Safari\//.test(userAgent)
+    && !/Chrome|Chromium|CriOS|Edg|OPR|Firefox|FxiOS/.test(userAgent);
+};
+
+// 16-bit PCM WAV bytes from Float32 channel data (-1..1), for a rendered cue an <audio> element can play.
+export const wavBytes = (channels, rate) => {
+  const count = channels.length;
+  const frames = count ? channels[0].length : 0;
+  const bytes = new Uint8Array(44 + frames * count * 2);
+  const view = new DataView(bytes.buffer);
+  const ascii = (at, text) => { for (let i = 0; i < text.length; i += 1) bytes[at + i] = text.charCodeAt(i); };
+  ascii(0, 'RIFF'); view.setUint32(4, 36 + frames * count * 2, true); ascii(8, 'WAVE');
+  ascii(12, 'fmt '); view.setUint32(16, 16, true); view.setUint16(20, 1, true); view.setUint16(22, count, true);
+  view.setUint32(24, rate, true); view.setUint32(28, rate * count * 2, true); view.setUint16(32, count * 2, true);
+  view.setUint16(34, 16, true); ascii(36, 'data'); view.setUint32(40, frames * count * 2, true);
+  let at = 44;
+  for (let i = 0; i < frames; i += 1) {
+    for (let c = 0; c < count; c += 1) {
+      const s = Math.max(-1, Math.min(1, channels[c][i] || 0));
+      view.setInt16(at, s < 0 ? s * 0x8000 : s * 0x7fff, true);
+      at += 2;
+    }
+  }
+  return bytes;
+};
+
+// One step of a volume fade on an element (the media path's equivalent of a gain ramp), clamped to 0..1.
+export const fadeVolume = ({ from, to, elapsed, duration }) => {
+  if (!(duration > 0) || elapsed >= duration) return Math.max(0, Math.min(1, to));
+  const t = Math.max(0, elapsed) / duration;
+  return Math.max(0, Math.min(1, from + (to - from) * t));
+};

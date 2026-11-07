@@ -95,3 +95,41 @@ test('silentWavDataUri: a valid, silent PCM WAV', () => {
   assert.equal(bytes.readUInt32LE(40), bytes.length - 44);
   assert.ok([...bytes.subarray(44)].every((b) => b === 128));
 });
+
+// D-222: Safari and every iPhone browser get the media-element path; Chrome, Edge and Firefox keep Web Audio.
+test('prefersMediaElementAudio: WebKit only', async () => {
+  const { prefersMediaElementAudio: pick } = await import('../../site/scripts/landing-sound.js');
+  const mac = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko)';
+  assert.equal(pick({ userAgent: `${mac} Version/18.1 Safari/605.1.15`, platform: 'MacIntel' }), true);
+  assert.equal(pick({ userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1' }), true);
+  assert.equal(pick({ userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) CriOS/130.0 Mobile/15E148 Safari/604.1' }), true);
+  assert.equal(pick({ userAgent: `${mac} Version/18.0 Safari/605.1.15`, platform: 'MacIntel', maxTouchPoints: 5 }), true); // iPad
+  assert.equal(pick({ userAgent: `${mac.replace('605.1.15 (KHTML, like Gecko)', '537.36 (KHTML, like Gecko)')} Chrome/130.0.0.0 Safari/537.36`, platform: 'MacIntel' }), false);
+  assert.equal(pick({ userAgent: `${mac} Chrome/130.0.0.0 Safari/537.36 Edg/130.0`, platform: 'MacIntel' }), false);
+  assert.equal(pick({ userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 14.5; rv:131.0) Gecko/20100101 Firefox/131.0', platform: 'MacIntel' }), false);
+  assert.equal(pick({ userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36', platform: 'Win32' }), false);
+  assert.equal(pick({ userAgent: 'Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Mobile Safari/537.36', platform: 'Linux armv8l' }), false);
+  assert.equal(pick({}), false);
+});
+
+test('wavBytes: a valid 16-bit PCM WAV, interleaved and clamped', async () => {
+  const { wavBytes } = await import('../../site/scripts/landing-sound.js');
+  const bytes = wavBytes([Float32Array.from([0, 1, -1]), Float32Array.from([0.5, 2, -2])], 44100);
+  const view = new DataView(bytes.buffer);
+  const text = (at, n) => String.fromCharCode(...bytes.slice(at, at + n));
+  assert.equal(text(0, 4), 'RIFF');
+  assert.equal(text(8, 4), 'WAVE');
+  assert.equal(view.getUint16(22, true), 2);
+  assert.equal(view.getUint32(24, true), 44100);
+  assert.equal(view.getUint32(40, true), 3 * 2 * 2);
+  assert.equal(bytes.length, 44 + 12);
+  assert.deepEqual([0, 1, 2, 3, 4, 5].map((i) => view.getInt16(44 + i * 2, true)), [0, 16383, 32767, 32767, -32768, -32768]);
+});
+
+test('fadeVolume: linear, clamped, done at the end', async () => {
+  const { fadeVolume } = await import('../../site/scripts/landing-sound.js');
+  assert.equal(fadeVolume({ from: 0, to: 0.5, elapsed: 0, duration: 1 }), 0);
+  assert.equal(fadeVolume({ from: 0, to: 0.5, elapsed: 0.5, duration: 1 }), 0.25);
+  assert.equal(fadeVolume({ from: 0.5, to: 0, elapsed: 2, duration: 1 }), 0);
+  assert.equal(fadeVolume({ from: 0, to: 3, elapsed: 0, duration: 0 }), 1);
+});

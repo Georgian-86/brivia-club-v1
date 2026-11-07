@@ -163,3 +163,43 @@ test('D-138: notification sound and swipe sounds are separate choices; the push 
   assert.match(sw, /'\/__brivia-prefs'/);
   assert.match(sw, /silent,/);
 });
+
+// D-222: Safari on a Mac plays each pre-rendered cue from an <audio> (a WAV of the buffer); Chrome and iPhone keep Web Audio.
+test('Safari on a Mac: cues play from <audio> elements; Chrome and iPhone keep Web Audio', async () => {
+  const withMedia = (log) => {
+    const win = fakeAudio(log);
+    const r = win.OfflineAudioContext;
+    win.OfflineAudioContext = function OfflineAudioContext(ch, len, rate) {
+      const c = r(ch, len, rate);
+      c.startRendering = () => Promise.resolve({ numberOfChannels: 1, sampleRate: rate, getChannelData: () => new Float32Array(8) });
+      return c;
+    };
+    win.Audio = function Audio(src) { const el = { src, volume: 1, currentTime: 5, play() { log.media.push({ src, volume: el.volume, at: el.currentTime }); return Promise.resolve(); }, pause() { log.paused += 1; } }; return el; };
+    win.Blob = function Blob(parts, opts) { return { parts, type: opts.type }; };
+    win.URL = { createObjectURL: (b) => `blob:${b.type}` };
+    return win;
+  };
+  const SAFARI = { userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.1 Safari/605.1.15', platform: 'MacIntel', maxTouchPoints: 0 };
+  const CHROME = { userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36', platform: 'MacIntel', maxTouchPoints: 0 };
+  const IPHONE = { userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1', platform: 'iPhone', maxTouchPoints: 5 };
+  for (const [nav, media] of [[SAFARI, true], [CHROME, false], [IPHONE, false]]) {
+    const log = { osc: [], buffers: [], media: [], paused: 0 };
+    const doc = fakeDoc();
+    const kit = createSoundKit({ win: withMedia(log), doc, nav, enabled: () => true, interactions: () => true, volume: () => 80 });
+    doc.fire('click');
+    await kit.ready();
+    const rendered = log.buffers.length; // the offline renders start buffers too
+    assert.equal(kit.notify('x'), true);
+    assert.equal(kit.swipe('pass'), true);
+    if (media) {
+      assert.equal(log.media.length, 2, nav.userAgent);
+      assert.deepEqual(log.media.map((m) => m.src), ['blob:audio/wav', 'blob:audio/wav']);
+      assert.ok(log.media.every((m) => m.at === 0 && Math.abs(m.volume - volumeGain(80)) < 1e-9));
+      assert.equal(log.paused, 1, 'a new cue stops the last');
+      assert.equal(log.buffers.length, rendered, 'nothing through Web Audio');
+    } else {
+      assert.equal(log.media.length, 0, nav.userAgent);
+      assert.equal(log.buffers.length, rendered + 2);
+    }
+  }
+});

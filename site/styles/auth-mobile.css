@@ -153,7 +153,10 @@ body.auth-page .auth-input-shell:has(input[name="password"], input[name="confirm
       var(--aura-base) !important;
   }
   body.auth-page .auth-shell:has(.auth-login.is-active) .auth-phone { display: none !important; }
-  body.auth-page .auth-shell:has(.auth-login.is-active) .auth-login { margin-top: 0 !important; }
+  /* D-222: top 0 here too. auth-polish.css lowers the desktop login group with top: 140px !important; the phone reset
+     for it (mobile-final-fixes.css) is shared with the landing and the app, so the production build moves it into a
+     shared chunk that loads BEFORE the auth CSS, and on phones the 140 px won: Log in and Google fell below the fold. */
+  body.auth-page .auth-shell:has(.auth-login.is-active) .auth-login { margin-top: 0 !important; top: 0 !important; }
   body.auth-page .auth-shell:has(.auth-login.is-active) .auth-login::before {
     content: "";
     display: block;

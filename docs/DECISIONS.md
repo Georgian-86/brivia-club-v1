@@ -4115,3 +4115,49 @@ new for now").
   iPhone checks added.
 - Honest limit, unchanged: no website can start sound on an iPhone before a touch. The button now says ON, and the first
   touch anywhere makes it audible.
+
+## D-222 (2026-11-07): Safari plays the landing's sound through <audio>; a one-screen phone login; password managers allowed
+
+- Founder (Mac Safari screenshot of the live landing showing "STOP MUSIC" while silent; signup screenshot): "can't
+  hear music and music effects on laptop, specially in Safari"; "make onboarding very smooth, specially the login page,
+  for laptop and phone, Mac, Windows, iOS, Android"; and drop the "like 'Designer at Zomato'" example from step 1. No
+  agent-arena round: these are bug fixes against behaviour the founder already specified (D-063, D-220), not a new
+  product or architecture choice; the one design choice (media elements on WebKit only) is recorded here.
+- **Sound, root cause.** The button follows `AudioContext.state`, and WebKit can keep a context "running" (and its
+  clock moving) while nothing reaches the speakers: WebKit bugs 276687 (another tab with audio closes), 231105 and
+  217606 (route changes, interruptions). So Safari showed "Stop music" in silence, and the app's swipe and notification
+  cues (also Web Audio) could be silent the same way. Chrome, Edge and Firefox were not affected.
+- **Done.**
+  - `prefersMediaElementAudio()` (landing-sound.js, unit-tested): Safari on a Mac and every iPhone/iPad browser (all
+    WebKit). There the landing's soundtrack is one looping `<audio>` of `media/audio/hero-soundtrack-loop.m4a`, the
+    2 s crossfade between passes baked into the file (equal-power, so the loop is seamless;
+    `scripts/bake-soundtrack-loop.py`, 337 KB), and the intro's cue is rendered offline (OfflineAudioContext, no
+    speakers involved) and played from an `<audio>` as a WAV (`wavBytes`). No AudioContext is created for the landing
+    on WebKit. Everything D-220 promised holds on this path: stop fades and pauses, play resumes from the same point
+    (one element, so never a second copy), a hidden tab pauses, a pause the system makes (call, Siri, another app)
+    shows "Music on" and the next tap resumes, the 5-minute limit, the position carried across pages. A tap during the
+    intro starts the cue part-way and the soundtrack comes in under its tail (started and paused inside the gesture so
+    iOS lets it start later). iPhone: element volume is fixed by the hardware buttons, so there fades are cuts; an
+    `<audio>` is in the playback session by itself, so the silent switch does not mute it.
+  - The app's sound kit (`notify-sound.js`) plays its pre-rendered cues from `<audio>` elements on Safari for Mac only.
+    Not on iPhone: an `<audio>` there would pause the member's own music, and the kit's UI sounds are meant to mix with
+    it (the 'ambient' session).
+  - Chrome, Edge and Firefox keep the Web Audio path unchanged.
+- **Login, root cause.** On phones, Log in and Continue with Google sat below the fold (iPhone 13: Google ended at
+  779 px of 664; iPhone SE: 708 of 568). `auth-polish.css` lowers the desktop login group with `top: 140px !important`;
+  its phone reset lives in `mobile-final-fixes.css`, which the landing and the app import too, so the production build
+  moves it into a shared chunk that loads before the auth CSS and the 140 px won on phones (the dev server keeps import
+  order, so it never showed there). Fixed in `auth-mobile.css` (loads last): the phone login is one screen again on
+  every phone measured (iPhone SE, 13, Pixel 7).
+- **Login, also.** The login form had `autocomplete="off"` on the form, the email and the password (since D-160, with
+  no recorded reason), which blocks iCloud Keychain, Google Password Manager, Windows and Android autofill. Now
+  `username email` / `current-password`, the email keyboard (`inputmode`), no auto-capitals or autocorrect, and
+  Next/Go on the keyboard. Raw API errors ("Invalid login credentials", "Failed to fetch", Safari's "Load failed")
+  are plain sentences (`loginErrorCopy`, unit-tested): wrong password, unconfirmed email, no connection, too many tries.
+- Step 1 of signup: "Your title and organisation show small on your card. Add them now or later." (no example).
+- **Checks.** Unit: `landing-sound.test.mjs` (+3), `sound-kit.test.mjs` (+1), `signup-errors.test.mjs` (+1).
+  E2E: `landing-sound.spec.mjs` 48 (Safari-on-Mac block: no AudioContext, stop/play/position, hidden tab, outside
+  pause, 5 minutes, the intro cue then the soundtrack; the iPhone checks now expect the `<audio>` path);
+  new `login-smooth.spec.mjs` (17: one screen and no sideways scroll at five sizes, password-manager attributes, 16 px
+  fields on phones, the error copy). Honest limit: the container has Chromium only; the WebKit path is exercised with a
+  Safari user agent, not real Safari. Check on a real Mac (Safari) and iPhone after deploy.

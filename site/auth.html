@@ -96,14 +96,14 @@
             <p class="auth-eyebrow">RETURNING MEMBER</p>
             <h1 id="auth-title">JOIN THE CLUB</h1>
             <p class="auth-intro">THOUGHTFUL PEOPLE. REAL MOMENTUM.</p>
-            <form class="auth-form" id="login-form" autocomplete="off">
-              <label>Email address<span class="auth-input-shell"><span class="auth-field-icon" aria-hidden="true">✉</span><input type="email" name="email" autocomplete="off" placeholder="you@yourdomain.com" required /></span></label>
-              <label>Password<span class="auth-input-shell"><span class="auth-field-icon" aria-hidden="true">♙</span><input type="password" name="password" autocomplete="off" placeholder="Enter your password" required /></span></label>
+            <form class="auth-form" id="login-form">
+              <label>Email address<span class="auth-input-shell"><span class="auth-field-icon" aria-hidden="true">✉</span><input type="email" name="email" autocomplete="username email" inputmode="email" autocapitalize="off" autocorrect="off" spellcheck="false" enterkeyhint="next" placeholder="you@yourdomain.com" required /></span></label>
+              <label>Password<span class="auth-input-shell"><span class="auth-field-icon" aria-hidden="true">♙</span><input type="password" name="password" autocomplete="current-password" enterkeyhint="go" placeholder="Enter your password" required /></span></label>
               <button class="auth-submit" type="submit">LOG IN <span>→</span></button>
               <button class="auth-forgot" type="button">Forgot password?</button>
             </form>
             <form class="auth-form auth-reset-form" id="reset-request-form" novalidate hidden>
-              <label>Email address<span class="auth-input-shell"><span class="auth-field-icon" aria-hidden="true">✉</span><input type="email" name="email" autocomplete="email" placeholder="you@yourdomain.com" required /></span></label>
+              <label>Email address<span class="auth-input-shell"><span class="auth-field-icon" aria-hidden="true">✉</span><input type="email" name="email" autocomplete="email" inputmode="email" autocapitalize="off" autocorrect="off" spellcheck="false" enterkeyhint="send" placeholder="you@yourdomain.com" required /></span></label>
               <button class="auth-submit" type="submit">SEND RESET LINK <span>→</span></button>
               <button class="auth-forgot auth-reset-back" type="button">Back to log in</button>
             </form>

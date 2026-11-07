@@ -12,7 +12,7 @@
 // starts its sound instantly and never waits for it; one cue at a time (a new one fades the last out); a notification
 // id plays once; the same swipe cue within 180 ms plays once. One on/off switch and one volume for this device.
 
-import { isUnlockEvent } from './landing-sound.js';
+import { isUnlockEvent, prefersMediaElementAudio, wavBytes } from './landing-sound.js';
 import { completeLandings, completeSquareAt } from './deck-ritual.js';
 
 export const SOUND_KEY = 'brivia-notify-sound';
@@ -368,6 +368,24 @@ export const createSoundKit = ({
   let rendering = null;
   const playedIds = new Set();
   const lastCue = {};
+  // D-222: Safari on a Mac can keep a Web Audio context "running" in silence, so there each pre-rendered cue plays
+  // from an <audio> element (a WAV of the same buffer). Not on iPhone: an <audio> would pause the member's own music,
+  // where these UI sounds are meant to mix with it (the 'ambient' session below).
+  const appleTouch = /iP(hone|ad|od)/.test(nav?.userAgent || '') || (nav?.platform === 'MacIntel' && nav?.maxTouchPoints > 1);
+  const mediaMode = Boolean(win?.Audio && win?.URL?.createObjectURL && win?.Blob) && !appleTouch
+    && prefersMediaElementAudio({ userAgent: nav?.userAgent || '', platform: nav?.platform || '', maxTouchPoints: nav?.maxTouchPoints || 0 });
+  const elements = {};
+  const elementFor = (name) => {
+    if (!mediaMode || !buffers[name]) return null;
+    if (!elements[name]) {
+      const b = buffers[name];
+      const channels = Array.from({ length: b.numberOfChannels }, (_, c) => b.getChannelData(c));
+      const el = new win.Audio(win.URL.createObjectURL(new win.Blob([wavBytes(channels, b.sampleRate)], { type: 'audio/wav' })));
+      el.preload = 'auto';
+      elements[name] = el;
+    }
+    return elements[name];
+  };
 
   // Pre-render each cue once into a buffer, so playback is one buffer start (no synthesis at swipe time).
   const prerender = () => {
@@ -406,8 +424,9 @@ export const createSoundKit = ({
 
   const stopCurrent = () => {
     if (!current) return;
-    const { src, gain } = current;
+    const { src, gain, el } = current;
     current = null;
+    if (el) { try { el.pause(); } catch { /* fine */ } return; }
     try {
       const t = ctx.currentTime;
       gain.gain.cancelScheduledValues?.(t);
@@ -424,6 +443,18 @@ export const createSoundKit = ({
     if (level <= 0) return false;
     if (ctx.state !== 'running') ctx.resume?.().catch?.(() => {});
     stopCurrent();
+    const el = elementFor(name);
+    if (el) {
+      try {
+        el.currentTime = 0;
+        el.volume = Math.min(1, level);
+        const entry = { el };
+        current = entry;
+        el.onended = () => { if (current === entry) current = null; };
+        Promise.resolve(el.play()).catch(() => { if (current === entry) current = null; });
+        return true;
+      } catch { /* Web Audio below */ }
+    }
     const gain = ctx.createGain();
     gain.gain.value = level;
     // A soft limiter: loud enough on laptop and phone speakers, never distorted at 100%.
