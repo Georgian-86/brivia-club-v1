@@ -4361,3 +4361,20 @@ bring a short line back.
   own `community-posts/<your id>/` file (storage policy from 0001). The card disappears, an open post closes, and a
   toast says "Post deleted."; a refused delete keeps everything and says it could not be deleted. No migration.
 - **Checks.** e2e `post-delete.spec.mjs` PD1-PD5 at 1440 and 390 (axe clean); post-activity and post-frame pass.
+
+## D-234 (2026-11-10): edit your caption; connections hear about a new note
+
+- **Request (founder, 2026-11-10):** "also let me edit the caption of my post, also when our connection posts
+  something, we may get a notification".
+- **Edit caption.** Your open post has "Edit caption" beside "Delete post": the caption becomes a box (240
+  characters), Save writes the trimmed caption by id and author, Cancel or Escape restores it, an empty caption is
+  refused ("Write a caption, or delete the post instead."). The live rules already allowed it: the update policy
+  lets only the author update, and `brivia_posts_keep_immutable` (0003) keeps the image, author and date fixed, so only
+  the caption can change. No migration for this part.
+- **New-note notification (0071).** When you post, each of your connections (mutual consent: a `matches` row) gets
+  "<Name> shared a new note" with the start of the caption and the note's picture, in the bell and as a push (the
+  poster's app calls `push-notify` after posting, as likes and comments do). Never for blocked members or the other
+  world; deleting the note removes them; an edited caption updates unread ones. One per connection and note.
+- **Checks.** SQL `zk-new-post-notes.test.sql` (harness all passed); unit `member-notifications.test.mjs` (+1, 595);
+  e2e `post-edit.spec.mjs` PE1-PE4 and PN6 at 1440 and 390 (axe clean); post-notifications, post-delete, post-frame,
+  post-activity pass. 0071 applied live; push-notify v6 deployed (verified identical to the repo).

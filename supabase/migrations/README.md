@@ -1504,3 +1504,11 @@ in `brivia_private.cover_switch_d227` (members cannot read it), then sets AT WOR
 Runs once: a re-run, or a member who picks SMASH THEORY later, changes nothing. The undo statement is in the file.
 Verify: `select count(*) from brivia_private.cover_switch_d227;` (the number switched) and
 `select count(*) from profiles where cover_url like '%2257522A%';` (0 right after).
+
+## 0071
+
+**Connections hear about a new note (D-234).** Apply after `0070`, then deploy `push-notify` and the client. Adds the
+notification type `post_new`: a trigger on `community_posts` writes one for each of the author's connections (a
+`matches` row) when a note is posted, never for blocked members or other worlds; deleting the note removes them, and a
+caption edit refreshes the snippet of unread ones. No new read function: `my_notifications_v4` already returns them.
+Verify: `select count(*) from pg_trigger where tgname = 'community_posts_notify_new';` (1). Applied live 2026-11-10.

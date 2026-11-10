@@ -107,14 +107,15 @@ export const createMemberNotifications = ({ api, subscribe, onNew = () => {}, on
 
 // D-151 (0043): likes and comments on my notes, grouped per note and kind, newest first.
 // [{ key, type, postId, postImage, people: [{ id, name, photoUrl }], snippet, createdAt, unread, ids }]
-export const POST_TYPES = new Set(['post_like', 'post_comment']);
+// D-234 (0071): post_new, a connection shared a new note (one row per note).
+export const POST_TYPES = new Set(['post_like', 'post_comment', 'post_new']);
 export const groupPostNotifications = (list = [], now = Date.now(), days = 7) => {
   const groups = new Map();
   for (const n of list) {
     if (!POST_TYPES.has(n?.type) || !n.postId || n.dismissedAt) continue;
     if (n.createdAt && now - new Date(n.createdAt).getTime() > days * 86400000) continue;
     // Each comment is its own row (it has words); likes on one note are one row.
-    const key = n.type === 'post_comment' ? `c:${n.id}` : `l:${n.postId}`;
+    const key = n.type === 'post_comment' ? `c:${n.id}` : n.type === 'post_new' ? `n:${n.postId}` : `l:${n.postId}`;
     const g = groups.get(key) || { key, type: n.type, postId: n.postId, postImage: n.postImage, people: [], snippet: n.snippet, createdAt: n.createdAt, unread: false, ids: [] };
     if (!g.people.some((p) => p.id === n.sourceId)) g.people.push({ id: n.sourceId, name: n.name, photoUrl: n.photoUrl });
     if (String(n.createdAt) > String(g.createdAt)) g.createdAt = n.createdAt;
@@ -132,6 +133,7 @@ export const postNotificationCopy = (g) => {
   const people = g?.people || [];
   const lead = firstName(people[0]?.name);
   if (g?.type === 'post_comment') return { title: `${lead} commented on your note`, line: g.snippet ? `“${g.snippet}”` : '' };
+  if (g?.type === 'post_new') return { title: `${lead} shared a new note`, line: g.snippet ? `“${g.snippet}”` : 'Tap to see it.' };
   const who = people.length === 1 ? lead : people.length === 2 ? `${lead} and ${firstName(people[1]?.name)}` : `${lead} and ${people.length - 1} others`;
   return { title: `${who} liked your note`, line: '' };
 };
