@@ -244,7 +244,7 @@ There are no City or State inputs (D-036). **Cover (D-080):** there is no cover 
 ("Choose one of the Brivia covers. Your own pictures can't be used as a cover.") holds the 25 provided covers, in the founder's order
 (D-128), as a radio group of 16:9 thumbnails with their uppercase titles (the signup picker's), 2 columns on phones and
 5 on desktop whenever the dialog is wide enough; the current cover is checked (wine ring, a check badge, bold deep-wine
-title; a legacy value marks its preset, none marks the default cover, SMASH THEORY). Arrow keys move the choice; focus shows a deep-wine ring. SAVE CHANGES stores the
+title; a legacy value marks its preset, none marks the default cover, AT WORK, the first; SMASH THEORY until D-227). Arrow keys move the choice; focus shows a deep-wine ring. SAVE CHANGES stores the
 picked preset path; saving without a change sends the stored value back. The server (0014) accepts only these paths
 and no longer accepts uploads into `profile-covers`. The member's area (`my_onboarding_status().place_label`) is shown
 read-only as "YOUR AREA" with "Change your area: coming soon." The profile page's details card (email, phone) is
@@ -319,6 +319,11 @@ labelled "PRIVATE · ONLY YOU SEE THESE", and the hero and the area stat show th
 
   This replaces the earlier draft ("Widen nothing. We already did.") and the old "Come tomorrow." daily-limit state:
   the only limit left is the signal quota, which keeps the card (below).
+- **D-225 (the limit in the request dialog):** when a request is refused at a cap, or the member is already at one,
+  the request dialog (deck pitch sheet, profile Connect, Find a Companion, Nearby) shows the limit in place of the
+  writing parts: "You're out of free swipes" / "You've used all 10 of today's free swipes, so this request wasn't sent.
+  Fresh swipes tomorrow at 3 PM." (the day from `resets_at`: later today, tomorrow, a weekday) and one "Got it" (48 px,
+  wine pill; `role="alert"`). Never only a toast: a toast sits under a modal. `#pitch-modal` is on layer 190.
 - **D-156 (supersedes the counter copy below):** the counter counts **swipes** (Pass and Pitch): "N of 10 swipes left
   today"; at 0 "Your next swipe frees up at 3 PM", the notice "You've used your 10 free swipes for today. More at 3 PM."
   and **both** Pass and Pitch are muted (aria-disabled, still focusable; a tap explains). The live cap still lets Pass

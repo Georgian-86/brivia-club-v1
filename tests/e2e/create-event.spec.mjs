@@ -187,11 +187,14 @@ try {
     const galleryUploads = st.calls.filter((c) => c.method === 'POST' && c.path.startsWith('/storage/v1/object/event-posters/')).length;
     check(`${w}: two gallery photos upload as JPEGs and show as thumbnails (${galleryUploads} uploads in all)`, galleryUploads >= 3);
 
-    // D-125: the brochure, a PDF up to 5 MB.
+    // D-125: the brochure, a PDF. D-227: no size limit of ours (a 12 MB PDF uploads), and the copy names none.
+    check(`${w}: the brochure label names no size limit`, !/MB/.test(await page.locator('#ec-brochure-label').innerText()));
     await page.setInputFiles('#ec-brochure', { name: 'menu.txt', mimeType: 'text/plain', buffer: Buffer.from('menu') });
     check(`${w}: a brochure that is not a PDF is refused inline`, /must be a PDF/.test(await page.locator('#ec-brochure-error').innerText()));
-    await page.setInputFiles('#ec-brochure', { name: 'huge.pdf', mimeType: 'application/pdf', buffer: Buffer.alloc(5 * 1024 * 1024 + 1, 32) });
-    check(`${w}: a brochure over 5 MB is refused inline`, /under 5 MB/.test(await page.locator('#ec-brochure-error').innerText()));
+    await page.setInputFiles('#ec-brochure', { name: 'Big menu.pdf', mimeType: 'application/pdf', buffer: Buffer.alloc(12 * 1024 * 1024, 32) });
+    await page.waitForFunction(() => !document.querySelector('[data-ec-brochure-filled]').hidden && document.querySelector('[data-ec-brochure-busy]').hidden, null, { timeout: 15000 }).catch(() => {});
+    check(`${w}: a 12 MB brochure is accepted and uploads`, (await page.locator('#ec-brochure-error').innerText()) === ''
+      && st.calls.some((c) => c.method === 'POST' && c.path.startsWith(`/storage/v1/object/event-brochures/${ownRow.id}/`)));
     await page.setInputFiles('#ec-brochure', { name: 'Chess night menu.pdf', mimeType: 'application/pdf', buffer: Buffer.from('%PDF-1.4\n%%EOF') });
     await page.waitForFunction(() => !document.querySelector('[data-ec-brochure-filled]').hidden && document.querySelector('[data-ec-brochure-busy]').hidden);
     check(`${w}: the brochure uploads to the member's own event-brochures folder and shows its name`,

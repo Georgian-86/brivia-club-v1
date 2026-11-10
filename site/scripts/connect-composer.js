@@ -4,6 +4,12 @@
 // never reaches chat. Pure helpers are unit-tested in tests/unit/connect-composer.test.mjs.
 
 export const NOTE_MAX = 500;
+// D-225: the in-dialog limit block. closeAttr closes the dialog without sending (the composer's cancel, the pitch's
+// data-close-overlay).
+export const LIMIT_MARKUP = (closeAttr) => `<div class="composer-limit" role="alert" hidden>`
+  + '<span class="composer-limit-mark" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7.5V12l3 2"/></svg></span>'
+  + '<p class="composer-limit-title"></p><p class="composer-limit-body"></p>'
+  + `<button type="button" class="composer-limit-ok" ${closeAttr}>Got it</button></div>`;
 const clean = (v) => String(v || '').trim();
 const firstName = (name) => clean(name).split(/\s+/)[0] || 'there';
 
@@ -47,6 +53,7 @@ export const createConnectComposer = (dialog) => {
     <textarea id="composer-message" rows="4" maxlength="${NOTE_MAX}" aria-describedby="composer-copy composer-count composer-error" required></textarea>
     <div class="composer-meta"><p class="event-field-error" id="composer-error" role="alert"></p><button type="button" class="composer-another" data-composer-another>${ANOTHER_IDEA_ICON}<span>Another idea</span></button><p class="composer-count" id="composer-count" aria-live="polite">0 / ${NOTE_MAX}</p></div>
     <div class="composer-actions"><button type="button" class="composer-cancel" data-composer-cancel>Cancel</button><button type="submit" class="composer-send">Send request <span aria-hidden="true">→</span></button></div>
+    ${LIMIT_MARKUP('data-composer-limit-ok')}
   </form>`;
   dialog.setAttribute('aria-labelledby', 'composer-title');
   const form = dialog.querySelector('form');
@@ -56,12 +63,23 @@ export const createConnectComposer = (dialog) => {
   const submit = dialog.querySelector(".composer-send");
   let current = null;
   let suggestions = [];
+  const limit = dialog.querySelector('.composer-limit');
+  // D-225: the limit takes the dialog's place, with its own Got it (it never sends anything).
+  const showLimit = (copy) => {
+    if (!copy || !limit) return;
+    limit.querySelector('.composer-limit-title').textContent = copy.title;
+    limit.querySelector('.composer-limit-body').textContent = copy.body;
+    form.classList.add('is-limit');  // form is the .composer-panel
+    limit.hidden = false;
+    limit.querySelector('.composer-limit-ok')?.focus();
+  };
+  const clearLimit = () => { form.classList.remove('is-limit'); if (limit) limit.hidden = true; };
   const renderCount = () => { const c = composerCount(text.value.length); count.textContent = c.text; count.classList.toggle('is-near', c.nearLimit); };
   const cancel = () => { if (!current) return; const { onCancel } = current; current = null; dialog.close(); onCancel?.(); };
   text.addEventListener('input', () => { error.textContent = ''; renderCount(); });
   dialog.addEventListener('cancel', (e) => { e.preventDefault(); cancel(); });
   dialog.addEventListener('click', (e) => {
-    if (e.target === dialog || e.target.closest('[data-composer-cancel]')) { cancel(); return; }
+    if (e.target === dialog || e.target.closest('[data-composer-cancel], [data-composer-limit-ok]')) { cancel(); return; }
     if (e.target.closest('[data-composer-another]')) { text.value = nextSuggestion(suggestions, text.value); error.textContent = ''; renderCount(); text.focus(); text.setSelectionRange(text.value.length, text.value.length); }
   });
   form.addEventListener('submit', async (e) => {
@@ -72,10 +90,12 @@ export const createConnectComposer = (dialog) => {
     submit.disabled = true;
     const ok = await current.onSend(note);
     submit.disabled = false;
+    if (ok && typeof ok === 'object' && ok.limit) { showLimit(ok.limit); return; }   // D-225: said here, not in a toast
     if (ok && current) { current = null; dialog.close(); }
   });
   return {
-    open({ person = {}, suggestions: list = [], prefill = '', onSend, onCancel } = {}) {
+    // limit (D-225): open straight on the limit when the member is known to be at a cap: nothing to write, nothing sent.
+    open({ person = {}, suggestions: list = [], prefill = '', onSend, onCancel, limit: atLimit = null } = {}) {
       current = { onSend, onCancel };
       suggestions = list;
       dialog.querySelector('[data-composer-name]').textContent = person.name || 'them';
@@ -83,8 +103,9 @@ export const createConnectComposer = (dialog) => {
       text.value = prefill || list[0] || '';
       error.textContent = '';
       renderCount();
+      clearLimit();
       dialog.showModal();
-      text.focus();
+      if (atLimit) showLimit(atLimit); else text.focus();
     },
   };
 };

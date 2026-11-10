@@ -1481,3 +1481,26 @@ Verify: `select prosrc not like '%role_cap%' from pg_proc where proname = 'save_
 `hiring_people_v2(limit, after_score, after_id)`: 0054's `hiring_people` plus a `request_pending` column; members the
 caller has a live request to are served (flagged) instead of left out. `hiring_people` is unchanged for the older client.
 Verify: `select count(*) from pg_proc where proname = 'hiring_people_v2';` (1).
+
+## 0068
+
+**Message yourself (D-224).** Apply after `0067`, with the client deploy (either order is safe: the old client never
+offers a self thread). Replaces `brivia_private.brivia_can_send(uuid)` so a completed member may also send a message to
+themselves; everything else in the send rule is unchanged. No data, table, column or grant changes.
+Verify, signed in as a completed member in the app: Chat, search your own name, Message, send "test". Or in SQL:
+`select prosrc like '%p_recipient = auth.uid()%' from pg_proc where proname = 'brivia_can_send';` (true).
+
+## 0069
+
+**No brochure size limit (D-227).** Apply after `0068`, with the client deploy. Sets the `event-brochures` bucket's
+`file_size_limit` to null (it was 5 MB since 0025); still PDF only and public. A brochure is then limited only by the
+project-wide upload limit in the Supabase dashboard (Project Settings > Storage, "Upload file size limit"; raise it
+there if large brochures are expected). Verify: `select file_size_limit from storage.buckets where id = 'event-brochures';` (null).
+
+## 0070
+
+**SMASH THEORY members move to AT WORK (D-227, one-off).** Apply after `0069`. Keeps each switched member's old cover
+in `brivia_private.cover_switch_d227` (members cannot read it), then sets AT WORK for every profile with SMASH THEORY.
+Runs once: a re-run, or a member who picks SMASH THEORY later, changes nothing. The undo statement is in the file.
+Verify: `select count(*) from brivia_private.cover_switch_d227;` (the number switched) and
+`select count(*) from profiles where cover_url like '%2257522A%';` (0 right after).

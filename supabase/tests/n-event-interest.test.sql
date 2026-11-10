@@ -54,7 +54,7 @@ begin
     if has_function_privilege('anon', f, 'execute') then raise exception 'FAIL N1: anon can run %', f; end if;
     if not has_function_privilege('authenticated', f, 'execute') then raise exception 'FAIL N1: members cannot run %', f; end if;
   end loop;
-  if not exists (select 1 from storage.buckets where id = 'event-brochures' and public and file_size_limit = 5242880
+  if not exists (select 1 from storage.buckets where id = 'event-brochures' and public and file_size_limit is null   -- 5 MB until 0069 (D-227)
                   and allowed_mime_types = array['application/pdf']) then
     raise exception 'FAIL N1: event-brochures bucket'; end if;
   if has_function_privilege('authenticated', 'public.brivia_companion_status(text)', 'execute') then

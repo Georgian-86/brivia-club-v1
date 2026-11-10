@@ -1,7 +1,7 @@
 // The honest signal quota copy (UX_SPEC §B "Signal counter", D-026, D-032). Run: npm run test:unit
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { quotaLabel, quotaErrorText, quotaBlocked, resetTimeLabel, quotaNotice } from '../../site/scripts/signal-quota.js';
+import { quotaLabel, quotaErrorText, quotaBlocked, resetTimeLabel, quotaNotice, freshSwipesLine, swipeLimitCopy } from '../../site/scripts/signal-quota.js';
 
 const RESETS = '2026-10-03T15:00:00Z';
 // R7 (iteration 3): the reset time is local, "3 PM" on the hour and "8:30 PM" otherwise. The server rounds to the UTC hour, so
@@ -97,4 +97,43 @@ test('resetTimeLabel: local hour ("3 PM"), minutes only when not on the hour, em
   for (const iso of ['2026-10-03T15:30:00Z', '2026-10-03T15:45:00Z', '2026-10-03T00:00:00Z']) assert.equal(resetTimeLabel(iso), localFormat(iso));
   assert.equal(resetTimeLabel(null), '');
   assert.equal(resetTimeLabel('not a date'), '');
+});
+
+// D-225: the limit, said inside the request dialog (founder 2026-11-10: "display the message that free swipes over,
+// fresh swipes tomm clearly on screen when the user tries to send requests").
+const local = (y, m, d, h, min = 0) => new Date(y, m - 1, d, h, min);
+test('freshSwipesLine: later today, tomorrow, a weekday, or plain tomorrow without a time', () => {
+  const now = local(2026, 11, 10, 12, 22);
+  assert.equal(freshSwipesLine(local(2026, 11, 10, 15).toISOString(), now), `Fresh swipes later today at ${resetTimeLabel(local(2026, 11, 10, 15).toISOString())}.`);
+  assert.equal(freshSwipesLine(local(2026, 11, 11, 15).toISOString(), now), `Fresh swipes tomorrow at ${resetTimeLabel(local(2026, 11, 11, 15).toISOString())}.`);
+  assert.match(freshSwipesLine(local(2026, 11, 13, 9).toISOString(), now), /^Fresh swipes on Friday at /);
+  assert.equal(freshSwipesLine(null, now), 'Fresh swipes tomorrow.');
+  assert.equal(freshSwipesLine('not a date', now), 'Fresh swipes tomorrow.');
+  // a reset time already past (a stale quota) never says "today" for the past
+  assert.equal(freshSwipesLine(local(2026, 11, 10, 9).toISOString(), now), 'Fresh swipes soon. Try again in a moment.');
+});
+test('swipeLimitCopy: the daily cap names the count and when fresh swipes come', () => {
+  const now = local(2026, 11, 10, 12, 22);
+  const resets = local(2026, 11, 11, 15).toISOString();
+  const c = swipeLimitCopy({ remaining: 0, daily_limit: 10, resets_at: resets }, now);
+  assert.equal(c.kind, 'daily');
+  assert.equal(c.title, "You're out of free swipes");
+  assert.equal(c.body, `You've used all 10 of today's free swipes, so this request wasn't sent. Fresh swipes tomorrow at ${resetTimeLabel(resets)}.`);
+});
+test('swipeLimitCopy: from a refused send even when the cached quota still shows swipes left', () => {
+  const c = swipeLimitCopy({ remaining: 3 }, local(2026, 11, 10, 12), { code: 'PT429', message: 'signal_quota_exhausted' });
+  assert.equal(c.kind, 'daily');
+  assert.match(c.body, /Fresh swipes tomorrow\.$/);
+});
+test('swipeLimitCopy: the live cap of unanswered requests', () => {
+  const c = swipeLimitCopy({ remaining: 4, live_unanswered: 100, live_limit: 100 }, new Date());
+  assert.equal(c.kind, 'live');
+  assert.equal(c.title, 'Too many requests waiting');
+  assert.equal(c.body, 'You have 100 requests waiting for an answer, so this request wasn\'t sent. Passing is always free.');
+  assert.equal(swipeLimitCopy({ remaining: 4 }, new Date(), { status: 429, message: 'signal_live_cap' }).kind, 'live');
+});
+test('swipeLimitCopy: null when nothing blocks, or for an unrelated error', () => {
+  assert.equal(swipeLimitCopy({ remaining: 4 }, new Date()), null);
+  assert.equal(swipeLimitCopy(null, new Date()), null);
+  assert.equal(swipeLimitCopy({ remaining: 4 }, new Date(), { code: '23505', message: 'signal_quota_exhausted' }), null);
 });

@@ -9,7 +9,7 @@ export const isPresetCoverUrl = (value) => {
 
 // The covers Brivia provides (D-080): members choose from these only, never their own picture. The order and titles are
 // the founder's (D-128) and the signup picker's (auth.html). The default cover (cover-assets.js defaultCoverUrl,
-// DEFAULT_COVER_KEY) is SMASH THEORY, not the first: it is the cover members without a choice have always seen. The same
+// DEFAULT_COVER_KEY) is AT WORK, the first (D-227, founder 2026-11-10; it was SMASH THEORY before). The same
 // 25 names are brivia_private.brivia_offered_cover_keys() (0014, redefined by 0019 and 0027) and the keys of
 // cover-assets.js; tests/unit/preset-cover.test.mjs pins all four equal.
 export const PRESET_COVERS = [
@@ -40,7 +40,7 @@ export const PRESET_COVERS = [
   { key: 'DEB7869C-E852-450F-A371-65E2BF6167A2.PNG', title: 'FIND YOUR PACE' },
 ];
 export const PRESET_COVER_KEYS = PRESET_COVERS.map((cover) => cover.key);
-export const DEFAULT_COVER_KEY = '2257522A-04B9-4E3E-AB1A-A73D7BB8CCBF.PNG';
+export const DEFAULT_COVER_KEY = 'AE983BB0-AF28-41D3-AA72-B03B4C7F7D8C.PNG';
 const PREFIX = '/Images/Cover%20images/';
 export const presetCoverStoredPath = (key) => `${PREFIX}${key}`;
 

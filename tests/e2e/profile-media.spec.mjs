@@ -306,7 +306,7 @@ try {
     const pickedValue = await page.evaluate(() => document.querySelector('.cover-value')?.value);
     check(`covers signup: only the photo file input (${JSON.stringify(signup.files)})`, () => assert.deepEqual(signup.files, ['photo-input']));
     check(`covers signup: the picker stores preset paths, never a build URL (${signup.value} -> ${pickedValue})`, () => {
-      assert.equal(signup.value, P('2257522A-04B9-4E3E-AB1A-A73D7BB8CCBF.PNG')); assert.equal(pickedValue, P('DEB7869C-E852-450F-A371-65E2BF6167A2.PNG'));
+      assert.equal(signup.value, P('AE983BB0-AF28-41D3-AA72-B03B4C7F7D8C.PNG'));   // AT WORK (D-227) assert.equal(pickedValue, P('DEB7869C-E852-450F-A371-65E2BF6167A2.PNG'));
     });
     await context.close();
   }

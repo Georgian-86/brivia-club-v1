@@ -150,7 +150,7 @@ export const createNearbyPage = ({
         setBusy(true);
         const sent = await sendRequest(person, note);
         setBusy(false);
-        if (sent.error) return false;
+        if (sent.error) return sent.limit ? { limit: sent.limit } : false;   // D-225: the limit, said in the dialog
         await advance('pitch');
         if (sent.status === 'matched') showMatch(person);
         else toast(`Request sent. If ${person.name} connects too, it's mutual.`);

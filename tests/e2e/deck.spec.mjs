@@ -916,7 +916,7 @@ try {
   // default preset cover on the card and the next card, never their own photo.
   const noCover = await sp.evaluate(() => ({ card: document.querySelector('#swipe-image')?.getAttribute('src') || '', next: document.querySelector('#swipe-next-image')?.getAttribute('src') || '' }));
   check(`no cover: the default preset cover shows, not the member's photo (${JSON.stringify(noCover)})`, () => {
-    for (const src of [noCover.card, noCover.next]) { assert.match(src, /Cover%20images\/2257522A-/); assert.ok(!src.includes('photo'), src); }
+    for (const src of [noCover.card, noCover.next]) { assert.match(src, /Cover%20images\/AE983BB0-/); assert.ok(!src.includes('photo'), src); }
   });
 
   // A short drag springs back: nothing sent, same card, no stamp left.
@@ -1047,7 +1047,7 @@ try {
   }
   // Dana has no cover and no photo: the default preset cover (D-120), never the alt text.
   const dana = await sp.evaluate(() => { const img = document.querySelector('#swipe-image'); return { name: document.querySelector('#swipe-name').textContent.trim(), placeholder: img.parentElement.classList.contains('is-placeholder'), imgShown: img.getClientRects().length > 0, src: img.getAttribute('src') }; });
-  check(`no cover and no photo: the default preset cover shows, no placeholder or alt text (${JSON.stringify(dana)})`, () => { assert.equal(dana.name, 'Dana Blank'); assert.equal(dana.placeholder, false); assert.equal(dana.imgShown, true); assert.match(dana.src, /Cover%20images\/2257522A-/); });
+  check(`no cover and no photo: the default preset cover shows, no placeholder or alt text (${JSON.stringify(dana)})`, () => { assert.equal(dana.name, 'Dana Blank'); assert.equal(dana.placeholder, false); assert.equal(dana.imgShown, true); assert.match(dana.src, /Cover%20images\/AE983BB0-/); });
   await sw.close();
 
   // Buttons and arrow keys use the same motion; Pitch keeps the card until the sheet resolves.

@@ -77,3 +77,44 @@ export const quotaErrorText = (error, quota, status = 0) => {
   if (message.includes('signal_live_cap')) return `You have ${liveLimit(quota)} signals waiting for an answer.`;
   return null;
 };
+
+// D-225 (founder 2026-11-10: "display the message that free swipes over, fresh swipes tomm clearly on screen when the
+// user tries to send requests"): the limit is said inside the request dialog, not in a toast that a modal can cover.
+// When fresh swipes come, in the member's own day: "later today at 3 PM", "tomorrow at 3 PM", "on Friday at 9 AM".
+// Without a reset time it says "tomorrow" (the window is a rolling 24 h); a reset time already past never claims a time.
+const dayStart = (d) => new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+export const freshSwipesLine = (resetsAt, now = new Date()) => {
+  const time = resetTimeLabel(resetsAt);
+  if (!time) return 'Fresh swipes tomorrow.';
+  const at = new Date(resetsAt);
+  if (at.getTime() <= now.getTime()) return 'Fresh swipes soon. Try again in a moment.';
+  const days = Math.round((dayStart(at) - dayStart(now)) / 86400000);
+  if (days <= 0) return `Fresh swipes later today at ${time}.`;
+  if (days === 1) return `Fresh swipes tomorrow at ${time}.`;
+  return `Fresh swipes on ${at.toLocaleDateString([], { weekday: 'long' })} at ${time}.`;
+};
+
+// The in-dialog limit: { kind: 'daily' | 'live', title, body } or null. From the cached quota, or from a refused send
+// (PT429 / HTTP 429 with the cap's name), since the cache can be behind the server.
+export const swipeLimitCopy = (quota, now = new Date(), error = null) => {
+  const capped = Boolean(error) && (error.code === 'PT429' || error.status === 429);
+  const message = capped ? String(error.message || '') : '';
+  const kind = message.includes('signal_live_cap') ? 'live'
+    : message.includes('signal_quota_exhausted') || message.includes('swipe_quota_exhausted') ? 'daily'
+      : quotaBlocked(quota);
+  if (kind === 'daily') {
+    return {
+      kind,
+      title: "You're out of free swipes",
+      body: `You've used all ${dailyLimit(quota)} of today's free swipes, so this request wasn't sent. ${freshSwipesLine(quota?.resets_at, now)}`,
+    };
+  }
+  if (kind === 'live') {
+    return {
+      kind,
+      title: 'Too many requests waiting',
+      body: `You have ${liveLimit(quota)} requests waiting for an answer, so this request wasn't sent. Passing is always free.`,
+    };
+  }
+  return null;
+};

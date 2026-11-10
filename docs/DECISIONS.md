@@ -4169,3 +4169,94 @@ bring a short line back.
   new `login-smooth.spec.mjs` (17: one screen and no sideways scroll at five sizes, password-manager attributes, 16 px
   fields on phones, the error copy). Honest limit: the container has Chromium only; the WebKit path is exercised with a
   Safari user agent, not real Safari. Check on a real Mac (Safari) and iPhone after deploy.
+
+## D-224 (2026-11-10): message yourself, found from Chat search
+
+- **Ask (founder, 2026-11-10):** "user should be able to search their profile in chats section and should be able to
+  text themselves."
+- **Decision.** A private note-to-self thread, like "Message yourself" in other messengers. Searching your own name
+  (or "you", "me", "myself", "self") in Chat lists "Your name (You) · Message yourself" first under People, with
+  Message. The thread joins the inbox once it has a note (or while open), sorted like any other.
+- **Storage.** A self note is an ordinary `brivia_messages` row with sender = recipient = the member. Migration 0068
+  lets `brivia_can_send` (0013) accept `recipient = auth.uid()`; the insert policy still needs a completed profile and
+  `sender_id = auth.uid()`, and to anyone else the old match + same-world rule applies verbatim. Reading is unchanged
+  (sender or recipient), so no one else can ever see a note. Not a connection: no match row, nothing in the deck.
+- **In the thread.** Header "Your name (You)" / "Message yourself"; the avatar and name open your own Profile tab; no
+  typing channel, presence, read ticks or unread count; the ••• menu keeps only Delete chat (hides it on this device;
+  Message from search brings it back). A note is never a notification. Replies, edit, unsend and attachments work as in
+  any thread. "Notes" stays the name of the posts tab; the self thread is not called notes, to avoid two meanings.
+- **Consent rule.** Unaffected: the mutual-consent rule governs contact between two members; a note to self involves
+  no one else.
+- **Checks.** Unit `chat-self.test.mjs` (7); SQL `zh-message-yourself.test.sql` (S1-S5: send and read back, nobody
+  else reads it, still no message to a non-match, an incomplete profile is refused, replies stay in-thread, no forging);
+  it fails without 0068 (row-level security) and passes with it. E2E `chat-self.spec.mjs` (49 at 1440 and 390);
+  chat-search, chat-inbox, chat-extras (150) and chat-seen unchanged and passing.
+
+## D-225 (2026-11-10): the swipe limit is said inside the request dialog; the pitch sheet opens above Chat
+
+- **Ask (founder, 2026-11-10, with a screenshot of "Make the first move." on Find a Companion):** "i am not able to
+  send request since my free swipes got over, but pls display the message that free swipes over, fresh swipes tomm
+  clearly on screen when the user tries to send requests".
+- **Root cause.** At the cap, SEND REQUEST was refused correctly, but the reason only went to a toast. The companions
+  and nearby composer is a modal `<dialog>` (the top layer), so the toast sat under it and was never seen; on the
+  Connect deck the sheet closed and the note was dropped. Separately, the pitch sheet (`#pitch-modal`, z-index 50)
+  opened UNDER the Chat view (a fixed layer at 100) when Connect was pressed on a profile from Chat search: invisible.
+- **Decision.** Every request dialog (Connect deck pitch sheet, a profile's Connect, Find a Companion, Nearby) says the
+  limit itself, in place of the writing parts: a clock mark, "You're out of free swipes", "You've used all 10 of
+  today's free swipes, so this request wasn't sent. Fresh swipes tomorrow at 3 PM.", and one "Got it" that closes it
+  and sends nothing. The day is named from the server's `resets_at` in the member's time: "later today at", "tomorrow
+  at", "on Friday at"; without a reset time "Fresh swipes tomorrow."; a reset time already past says "Fresh swipes
+  soon. Try again in a moment." (never a time in the past). The live cap reads "Too many requests waiting". At a cap the
+  app already knows, the dialog opens straight on the limit (nothing to write first). On the deck the note is kept and
+  comes back on the next try. A deck pass at the cap keeps its toast; the deck itself already shows "That's your deck
+  for today" (D-179). `#pitch-modal` takes the public profile modal's layer (190).
+- **Files.** `signal-quota.js` (`freshSwipesLine`, `swipeLimitCopy`), `connect-composer.js` (limit block, `onSend` may
+  return `{ limit }`, `open({ limit })`), `companions-page.js`, `nearby-page.js`, `app.js` (`requestLimitResult`, the
+  guarded composer, `showPitchLimit`), `app.html`, `connect-composer.css`.
+- **Checks.** Unit `signal-quota.test.mjs` (+5); e2e `swipe-limit.spec.mjs` (22 at 1440, 390 and 375); deck (201),
+  companions (65), chat-search and chat-self pass. Already failing before this change, unchanged: `consent.spec.mjs`
+  (times out in `cancelKeepsCard` at line 234) and one `nearby.spec.mjs` Settings sound check (D-138).
+
+## D-226 (2026-11-10): confirming the email never asks for the signup details again
+
+- **Report (founder, 2026-11-10, after a live signup):** "once we enter all details we will get confirmation mail
+  again it is going to same page to enter details".
+- **Root causes.** With email confirmation on, no session exists at signup, so the photo, the 18+ confirmation and the
+  work answers waited in this browser only (`brivia-pending-profile`, `brivia-pending-work`). (1) The confirmation
+  link often opens elsewhere: a phone's mail app opens its own browser, and the site lives on two domains
+  (thebriviaclub.com and thebriviaclub.live) whose storage is separate. There the member had no 18+ record, so
+  `resumeScreen` started again at the work screen. (2) Even in the same browser, the link's return path
+  (`restoreAuthPageSession`) skipped the pending signup whenever a profile row already existed.
+- **Decision.** signUp keeps, with the account (auth metadata), `adultDeclared: true` (continuing the work screen
+  confirms 18+, D-216) and the work answers (`workTitle`, `workCompanyId`, `workCompanyName`; shown on cards anyway, so
+  not private). Back from the link, or logging in, in any browser: a pending signup here is applied first (as the login
+  form already did); otherwise `applySignupMetadata` records the 18+ confirmation, and setup's Finish saves the work
+  answers from the account. Name, phone and gender already travelled this way. So another browser asks only for the
+  photo (it cannot be uploaded before a session exists, and auth metadata is no place for an image); the same browser
+  goes straight to setup. Accounts from before D-226 (no flag) are unchanged: they confirm 18+ on the work screen.
+  Interests, location and the photo are still never put in auth metadata.
+- **Config (founder).** In Supabase, Authentication > URL Configuration, list both domains' `/auth.html` under
+  Redirect URLs, so the link returns to the domain the member signed up on.
+- **Checks.** `signup.spec.mjs` R1-R3 (failed before the fix: R1 and R2 landed on the work screen; pass after), and
+  the confirmation-on case now checks the flag is sent. Onboarding (269), password-reset, password-reveal pass.
+  Already failing before D-226, unchanged: `signup.spec.mjs` "area denied", and `login-smooth.spec.mjs` 3 error-copy
+  checks (they read "Log in is unavailable right now" in the stub on the untouched code too).
+
+## D-227 (2026-11-10): AT WORK is the default cover; brochures have no size limit of ours
+
+- **Ask (founder, 2026-11-10, with screenshots of the cover picker and Create Event):** "by default cover should be
+  at work that is the first one, ALSO THERE SHOULD BE NO FILE SIZE CRITERIA FOR BROCHURE".
+- **Default cover.** `DEFAULT_COVER_KEY` / `defaultCoverUrl` / signup's `GUIDED_DEFAULT_COVER` / the classic picker's
+  preselection are AT WORK (`AE983BB0-...PNG`), the first cover, instead of SMASH THEORY (D-128). It is what a new
+  signup gets and what any member without a stored cover shows (deck, profile, the editor's checked tile). Members who
+  had SMASH THEORY stored were switched too, at the founder's word ("do it"): the database cannot tell a chosen
+  SMASH THEORY from the old default, so 0070 switches all of them once, keeping each old cover in
+  `brivia_private.cover_switch_d227` for an undo; a member who picks SMASH THEORY afterwards keeps it.
+- **Brochure.** The client no longer checks a size ("Optional · PDF"), and 0069 removes the bucket's 5 MB limit. It is
+  still PDF only. The one remaining ceiling is Supabase's project-wide upload limit (dashboard, Project Settings >
+  Storage); a PDF over it gets "This PDF is too large for the server to accept. Try a compressed copy."
+- **Checks.** Unit `preset-cover.test.mjs` (default = AT WORK, the first, in all four places); SQL
+  `zi-brochure-no-size-limit.test.sql` and `n-event-interest.test.sql` N1 updated; e2e `create-event.spec.mjs` (a 12 MB
+  PDF uploads; the label names no limit), `deck.spec.mjs` (201, the no-cover cards show AT WORK),
+  `profile-media.spec.mjs` signup default. Already failing before D-227, unchanged: `profile-media.spec.mjs` 7
+  "no cover file input anywhere" checks (they see Create Event's poster inputs).

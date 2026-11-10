@@ -32,7 +32,7 @@ const FORM_KEYS = new Set([...EVENT_FORM_CATEGORIES.map((c) => c.key), 'games'])
 
 export const LIMITS = Object.freeze({
   title: 80, description: 2000, descriptionMin: 20, venueName: 120, venueAddress: 240, capacityMax: 5000, feeMax: 100000,
-  gallery: 6, imageBytes: 25 * 1024 * 1024, brochureBytes: 5 * 1024 * 1024,
+  gallery: 6, imageBytes: 25 * 1024 * 1024,
 });
 export const POSTER_TYPES = Object.freeze(['image/jpeg', 'image/png', 'image/webp']);
 // The photo pickers open the device's whole gallery (iPhones keep photos as HEIC). Every photo is re-encoded to a
@@ -243,14 +243,13 @@ export const imageFileProblem = (file) => {
   return '';
 };
 
-// The brochure (D-125, 0025): one PDF, at most 5 MB. '' or the problem.
+// The brochure (D-125, 0025): one PDF, any size (D-227 removed the 5 MB limit). '' or the problem.
 export const BROCHURE_ACCEPT = 'application/pdf,.pdf';
 export const brochureFileProblem = (file) => {
   if (!file) return 'Choose a PDF.';
   const type = String(file.type || '').toLowerCase();
   const pdf = type === 'application/pdf' || ((!type || type === 'application/octet-stream') && /\.pdf$/i.test(String(file.name || '')));
   if (!pdf) return 'The brochure must be a PDF.';
-  if (file.size > LIMITS.brochureBytes) return 'Keep the brochure under 5 MB.';
   if (!file.size) return 'This PDF is empty.';
   return '';
 };
