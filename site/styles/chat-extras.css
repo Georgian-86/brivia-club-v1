@@ -949,3 +949,9 @@ a.message-place.is-link { color: var(--color-ink); text-decoration: none; cursor
 @media (hover: hover) { a.message-place.is-link:hover { border-color: color-mix(in srgb, var(--color-wine) 34%, transparent); background: color-mix(in srgb, var(--color-wine) 4%, var(--color-cream)); } }
 a.message-place.is-link:focus-visible { outline: 2px solid var(--color-wine); outline-offset: 2px; }
 .message-place-open { display: block; margin-top: 4px; color: var(--color-wine); font-size: var(--text-12); font-weight: 700; letter-spacing: .08em; text-transform: uppercase; }
+
+/* D-231: share a place (a name or a Google Maps link). */
+.share-place .share-place-label { display: block; margin: var(--space-3) 0 6px; color: var(--color-wine-deep); font-family: var(--font-body); font-size: var(--text-12); font-weight: 700; letter-spacing: .1em; text-transform: uppercase; text-align: left; }
+.share-place .share-place-input { width: 100%; min-height: 48px; }
+.share-place .share-place-error { min-height: 1.2em; margin: 6px 0 0; color: var(--color-wine); font-family: var(--font-body); font-size: var(--text-12); font-weight: 600; text-align: left; }
+.share-place .share-place-error:empty { min-height: 0; margin: 0; }

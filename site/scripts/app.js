@@ -24,7 +24,7 @@ import '../styles/handoff.css';
 import { supabase, compressImageOnly, rowToProfile, saveProfile, isPresetCoverUrl, onboardingStatus, sendSignal, fetchSignalQuota, isRateLimited, isStorageImageUrl, withoutCredentials, uploadMessageAttachment, removeMessageAttachment, uploadCommunityPostImage, removeCommunityPostImage, ImageProcessingError, PHOTO_ERROR_MESSAGE, PHOTO_FRAMER_ERROR, compressAttachmentFiles, attachmentKind, reportMember, setSensitiveConsent, fetchSensitiveConsentAt, fetchMyInterests, fetchInterestNodes, addMemberInterest, isMissingFunction, touchPresence, connectionPresence, setPresenceVisible, myPresenceVisible, setMemberInterests, uploadResume, removeResume, resumeSignedUrl, resumeInfo, clearResumePath, searchPlaces, setHomeCity, setHomeLocation, listEvents, setEventRsvp, setCompanionDefault, myEventPrefs, eventCompanions, saveMemberEvent, cancelMemberEvent, deleteMemberEvent, uploadEventImage, removeEventImages, setEventInterest, setEventBrochure, uploadEventBrochure, removeEventBrochures, companionEvents, companionDeck, companionSwipe, companionQuota, createPaymentOrder, verifyPayment, sendEventTicket, editMessage, unsendMessage, deleteMessageForMe, myCompanionMatches, markCompanionMatchSeen, sendConnectRequest, setNearbyEnabled, myNearbySetting, nearbyPulse, nearbyClear, myNearbyAlerts, setNearbyMuted, nearbyDiscover, nearbyPass, nearbyConnect, myNearbyMatches, myNotifications, markNotificationsRead, dismissNotification, setNearbyRadius, savePushSubscription, deletePushSubscription, sendPendingPush, searchCompanies, searchCompanyDirectory, companyLogoUrl, addCompany, setMyWork, memberWork, uploadCompanyLogo, markMessagesDelivered, markConversationRead, markChatSeen, myChatSeen, setReadReceipts, myReadReceipts, chatPeopleSearch } from './supabase.js';
 import { locateOnce, fallbackCopy } from './geo-locate.js';
 import { areaChangeMessage, AREA_HELPER, AREA_NO_MATCH } from './area-change.js';
-import { areaShareBody, parseAreaBody, areaMapUrl, resumeShareAttachment, resumeMessageFields, RESUME_SHARE_BODY, NO_RESUME_HINT, RESUME_GONE_COPY, RESUME_SHARE_NOTE, AREA_SHARE_NOTE } from './quick-share.js';
+import { areaShareBody, parseAreaBody, areaMapUrl, placeShareBody, parsePlaceBody, placeShareProblem, resumeShareAttachment, resumeMessageFields, RESUME_SHARE_BODY, NO_RESUME_HINT, RESUME_GONE_COPY, RESUME_SHARE_NOTE, AREA_SHARE_NOTE } from './quick-share.js';
 import { validateResume, readResumeHead, resumeMetaLine, formatResumeSize, resumeUploadErrorMessage, isMissingResumeStore, RESUME_FILE_NAME, REMOVE_RESUME_CONFIRM, REMOVE_FAILED_COPY, REPLACED_NOT_SAVED_COPY, OPEN_FAILED_COPY, COMING_SOON_COPY } from './resume-file.js';
 import { POPULAR_INTERESTS, INTEREST_CATALOG, LOOKING_FOR_CATALOG, taxonomyLabels, catalogValues, matchOptions, dropdownOptions } from './discovery-catalog.js';
 import { deleteAccount, clearBriviaKeys, DELETE_BUCKETS, reauthMarker, reauthMarkerMatches } from './account-deletion.js';
@@ -3190,7 +3190,7 @@ const renderChats = () => {
     const last = chatMessages[person.id]?.at(-1);
     const unreadMessages = chatUnreadCount(person.id);
     const unread = unreadMessages > 0;
-    const lastPreview = previewForUnsent(last) || (last?.attachment?.kind === 'resume' ? 'Resume (PDF)' : last?.attachment ? `📎 ${last.attachment.name || 'Attachment'}` : parseSharedPost(last?.text) ? 'Shared a post' : (last?.text || (person.isSelf ? SELF_STATUS : 'Start a conversation')));
+    const lastPreview = previewForUnsent(last) || (last?.attachment?.kind === 'resume' ? 'Resume (PDF)' : last?.attachment ? `📎 ${last.attachment.name || 'Attachment'}` : parseSharedPost(last?.text) ? 'Shared a post' : parsePlaceBody(last?.text) ? `📍 ${parsePlaceBody(last.text).name}` : (last?.text || (person.isSelf ? SELF_STATUS : 'Start a conversation')));
     return `<div class="chat-row${unread ? ' is-unread' : ''}${person.isSelf ? ' is-self' : ''}${selectedChat?.id === person.id ? ' is-selected' : ''}"><button class="chat-row-open" type="button" data-chat-id="${escapeHtml(person.id)}"><span class="member-profile-trigger" data-public-profile-id="${escapeHtml(person.id)}" role="button" tabindex="0" aria-label="${person.isSelf ? 'Open your profile' : `Open ${escapeHtml(person.name)} profile`}">${renderAvatar({ ...person, name: person.avatarName || person.name })}${presenceDot(!person.isSelf && isActiveNow(person.id))}</span><span class="chat-row-copy"><strong data-public-profile-id="${escapeHtml(person.id)}">${escapeHtml(person.name)}${isActiveNow(person.id) ? '<span class="sr-only">, active now</span>' : ''}</strong><span>${escapeHtml(lastPreview)}</span></span><span class="chat-row-meta"><time>${escapeHtml(formatInboxTime(last?.createdAt))}</time>${unread ? `<b aria-label="${unreadMessages} unread">${unreadMessages > 99 ? '99+' : unreadMessages}</b>` : ''}</span></button><button class="chat-delete" type="button" data-delete-chat-id="${escapeHtml(person.id)}" aria-label="Delete chat with ${escapeHtml(person.name)}" title="Delete chat"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M4.5 6h11M8 3.5h4M6.5 6l.6 10h5.8l-.6-10M8.5 8.5v5M11.5 8.5v5"/></svg></button></div>`;
   };
   // D-152: while searching, conversations with messages first, then people (connections even without a message, then
@@ -3704,6 +3704,8 @@ const renderMessages = () => {
     const open = valid ? `<button type="button" class="message-resume-open" data-resume-open="${escapeHtml(message.attachment.path)}" data-message-id="${id}" aria-label="Open resume"${gone ? ` aria-describedby="resume-gone-${id}"` : ''}>Open</button>` : '';
     return `<span class="message-resume"><span class="message-resume-icon">${RESUME_DOC_ICON}</span><span class="message-resume-copy"><span class="message-resume-title">Resume (PDF)</span><span class="message-resume-sub">${message.from === 'me' ? 'Your latest version' : 'Their latest version'}</span>${goneLine}</span>${open}</span>`;
   };
+  // D-231: a place the member chose, by name (opens a Maps search) or as a Google Maps link (opens it).
+  const renderSharedPlace = (place) => `<a class="message-place is-link" href="${escapeHtml(place.url)}" target="_blank" rel="noopener noreferrer"><span class="message-place-icon">${SHARE_PIN_ICON}</span><span class="message-place-copy"><span class="message-place-eyebrow">Shared place</span><span class="message-place-name">${escapeHtml(place.name)}</span><span class="message-place-open">Open in Maps <span aria-hidden="true">↗</span></span></span></a>`;
   // D-230: the card opens the area in Google Maps (a search for the place name only, never a point).
   const renderSharedArea = (area) => {
     const inner = `<span class="message-place-icon">${SHARE_PIN_ICON}</span><span class="message-place-copy"><span class="message-place-eyebrow">Shared area</span><span class="message-place-name">${escapeHtml(area.place)}</span><span class="message-place-scope">${escapeHtml(area.scope)}</span>`;
@@ -3720,12 +3722,14 @@ const renderMessages = () => {
     }
     const isResume = message.attachment?.kind === 'resume' && Boolean(message.attachment.path);
     const area = !message.attachment ? parseAreaBody(message.text) : null;
-    const sharedPostId = !message.attachment && !area ? parseSharedPost(message.text) : null;
+    const place = !message.attachment && !area ? parsePlaceBody(message.text) : null;   // D-231
+    const sharedPostId = !message.attachment && !area && !place ? parseSharedPost(message.text) : null;
     const content = isResume ? renderSharedResume(message)
       : area ? renderSharedArea(area)
+        : place ? renderSharedPlace(place)
         : sharedPostId ? renderSharedPost(sharedPostId)
           : `${renderAttachment(message.attachment)}${message.text ? `<span class="message-copy">${escapeHtml(message.text)}</span>` : ''}`;
-    const kind = isResume || area || sharedPostId ? ' has-attachment has-share' : message.attachment ? ' has-attachment' : '';
+    const kind = isResume || area || place || sharedPostId ? ' has-attachment has-share' : message.attachment ? ' has-attachment' : '';
     const receipt = selectedChat?.isSelf ? '' : receiptState(message);   // D-224: no ticks on notes to self
     const word = receipt && receipt !== 'sent' && String(message.id) === newestOwnId ? `<span class="message-receipt-word">${receipt === 'read' ? 'Read' : 'Delivered'}</span>` : '';
     const edited = message.editedAt ? '<span class="message-edited">Edited</span>' : '';
@@ -6382,7 +6386,7 @@ const refreshShareMatch = async (personId) => {
 };
 const syncShareToggle = () => {
   const toggle = document.querySelector('#chat-share-toggle');
-  if (toggle) toggle.hidden = !selectedChat || (!areaShareBody(memberPlaceLabel) && shareResumeState() === null);
+  if (toggle) toggle.hidden = !selectedChat;   // D-231: a place can always be shared
 };
 const shareItem = (share, icon, title, hint, extra = '') => `<button type="button" class="chat-share-item" data-share="${share}"${extra}><span class="chat-share-icon">${icon}</span><span class="chat-share-copy"><span class="chat-share-title">${title}</span><span class="chat-share-hint">${escapeHtml(hint)}</span></span></button>`;
 const renderShareMenu = () => {
@@ -6398,6 +6402,7 @@ const renderShareMenu = () => {
   }
   const area = parseAreaBody(areaShareBody(memberPlaceLabel));
   if (area) rows.push(shareItem('area', SHARE_PIN_ICON, 'Share my area', `${area.place}, ${area.scope.toLowerCase()}`));
+  rows.push(shareItem('place', SHARE_PIN_ICON, 'Share a place', 'A café, restaurant or address'));   // D-231
   menu.innerHTML = rows.join('');
 };
 const closeShareMenu = ({ focusToggle = false } = {}) => {
@@ -6496,6 +6501,40 @@ const confirmAreaShare = async () => {
   if (!ok) { document.querySelector('#chat-share-toggle')?.focus(); return; }
   await sendShare(person, () => insertChatMessage(body, null, { message_type: 'text' }));
 };
+// D-231: share any place: type its name or paste a Google Maps link; the card opens it in Maps for both of you.
+const promptPlaceShare = () => {
+  const person = selectedChat;
+  if (!person || shareBusy) return;
+  document.querySelector('dialog.share-confirm')?.remove();
+  const dialog = document.createElement('dialog');
+  dialog.className = 'share-confirm share-place';
+  dialog.setAttribute('aria-labelledby', 'share-place-title');
+  dialog.innerHTML = `<form class="share-confirm-panel" method="dialog" novalidate><span class="share-confirm-icon">${SHARE_PIN_ICON}</span>`
+    + `<h2 class="share-confirm-title" id="share-place-title">Share a place with ${escapeHtml(person.name || 'this member')}</h2>`
+    + '<label class="share-place-label" for="share-place-input">Place name or Google Maps link</label>'
+    + '<input class="b-field share-place-input" id="share-place-input" type="text" maxlength="400" autocomplete="off" enterkeyhint="send" placeholder="e.g. Rameshwaram Cafe, Indiranagar" aria-describedby="share-place-note share-place-error" />'
+    + '<p class="share-place-error" id="share-place-error" role="alert"></p>'
+    + '<p class="share-confirm-note" id="share-place-note">They\'ll get a card that opens it in Google Maps. Only what you type is sent.</p>'
+    + '<div class="share-confirm-actions"><button type="button" class="share-confirm-button" data-share-cancel>Cancel</button><button type="submit" class="share-confirm-button is-primary">Send place</button></div></form>';
+  const input = dialog.querySelector('#share-place-input');
+  const error = dialog.querySelector('#share-place-error');
+  const close = () => { if (dialog.open) dialog.close(); dialog.remove(); document.querySelector('#chat-share-toggle')?.focus(); };
+  dialog.addEventListener('cancel', (event) => { event.preventDefault(); close(); });
+  dialog.addEventListener('click', (event) => { if (event.target === dialog || event.target.closest('[data-share-cancel]')) close(); });
+  input.addEventListener('input', () => { error.textContent = ''; });
+  dialog.querySelector('form').addEventListener('submit', async (event) => {
+    event.preventDefault();
+    const problem = placeShareProblem(input.value);
+    if (problem) { error.textContent = problem; input.focus(); return; }
+    const body = placeShareBody(input.value);
+    if (dialog.open) dialog.close();
+    dialog.remove();
+    await sendShare(person, () => insertChatMessage(body, null, { message_type: 'text' }));
+  });
+  document.body.append(dialog);
+  dialog.showModal();
+  input.focus();
+};
 const bindChatShare = (form, closeMenus) => {
   const toggle = form.querySelector('#chat-share-toggle');
   const menu = form.querySelector('#chat-share-menu');
@@ -6514,6 +6553,7 @@ const bindChatShare = (form, closeMenus) => {
     closeShareMenu();
     if (item.dataset.share === 'resume') confirmResumeShare();
     else if (item.dataset.share === 'area') confirmAreaShare();
+    else if (item.dataset.share === 'place') promptPlaceShare();
   });
   document.addEventListener('keydown', (event) => {
     if (menu.hidden) return;
@@ -6688,7 +6728,7 @@ const insertChatMessage = async (body, attachment = null, extra = null) => {
 };
 // D-157 (0046): long-press a bubble for Copy, Edit, Unsend or Delete for me.
 const findThreadMessage = (id) => (selectedChat ? (chatMessages[selectedChat.id] || []).find((m) => String(m.id) === String(id)) : null);
-const isSpecialMessage = (message) => Boolean(message?.attachment || parseAreaBody(message?.text) || parseSharedPost(message?.text));
+const isSpecialMessage = (message) => Boolean(message?.attachment || parseAreaBody(message?.text) || parsePlaceBody(message?.text) || parseSharedPost(message?.text));
 const actionErrorCopy = (error, fallback) => {
   if (isMissingFunction(error)) return 'Editing and unsending open soon.';
   const text = String(error?.message || '');
@@ -6711,10 +6751,11 @@ const messageKindLabel = (message) => {
   if (kind === 'resume') return 'Resume';
   if (kind) return 'File';
   if (parseAreaBody(message?.text)) return 'Shared area';
+  if (parsePlaceBody(message?.text)) return 'Shared place';
   if (parseSharedPost(message?.text)) return 'Shared post';
   return '';
 };
-const isCardText = (message) => Boolean(parseAreaBody(message?.text) || parseSharedPost(message?.text));
+const isCardText = (message) => Boolean(parseAreaBody(message?.text) || parsePlaceBody(message?.text) || parseSharedPost(message?.text));
 function replyQuoteMarkup(quote) {
   if (!quote) return '';
   const state = quote.missing ? ' is-missing' : quote.unsent ? ' is-unsent' : '';
