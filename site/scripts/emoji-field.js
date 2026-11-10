@@ -3,6 +3,7 @@
 // in six tabs (styles: emoji-field.css, imported by the page entries). A press inserts the emoji at the cursor, never
 // past the field's maxlength, and fires `input` so counts and Continue update. Escape or a press outside closes it; focus returns to the field.
 import { chatEmojiCategories } from './chat-emoji-data.js';
+import { TONES, getTone, setTone, withTone, onToneChange } from './emoji-tone.js';
 
 const TABS = [['smileys', 'Smileys'], ['people', 'People'], ['animals', 'Animals'], ['food', 'Food'], ['activities', 'Activities'], ['symbols', 'Symbols']];
 const FACE = '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="8.5"/><path d="M8.5 14.2c.9 1.3 2.1 2 3.5 2s2.6-.7 3.5-2"/><circle cx="9.2" cy="10" r=".9"/><circle cx="14.8" cy="10" r=".9"/></svg>';
@@ -30,6 +31,7 @@ export const attachEmojiPicker = (field, { label = 'Add an emoji', after = field
   box.innerHTML = `<button type="button" class="emoji-field-toggle" aria-label="${label}" aria-expanded="false" aria-controls="${id}">${FACE}<span class="emoji-field-text">Emoji</span></button>
     <div class="emoji-field-panel" id="${id}" role="group" aria-label="Emoji" hidden>
       <div class="emoji-field-tabs" role="tablist" aria-label="Emoji categories">${TABS.map(([key, name], i) => `<button type="button" role="tab" data-emoji-tab="${key}" aria-selected="${i === 0}">${name}</button>`).join('')}</div>
+      <div class="emoji-field-tones" role="radiogroup" aria-label="Skin tone"><span class="emoji-field-tones-label" aria-hidden="true">Skin tone</span>${TONES.map((t) => `<button type="button" role="radio" class="emoji-field-tone" data-emoji-tone="${t.key}" aria-label="${t.label} skin tone" aria-checked="false">${withTone('✋', t.key)}</button>`).join('')}</div>
       <div class="emoji-field-grid" role="tabpanel"></div>
     </div>`;
   if (insert) insert(box); else after.insertAdjacentElement('afterend', box);
@@ -37,8 +39,13 @@ export const attachEmojiPicker = (field, { label = 'Add an emoji', after = field
   const panel = box.querySelector('.emoji-field-panel');
   const grid = box.querySelector('.emoji-field-grid');
   const max = field.maxLength > 0 ? field.maxLength : Infinity;
+  let tab = 'smileys';
+  const paintTones = () => box.querySelectorAll('[data-emoji-tone]').forEach((b) => b.setAttribute('aria-checked', String(b.dataset.emojiTone === getTone())));
   const render = (key) => {
-    grid.innerHTML = (chatEmojiCategories[key] || chatEmojiCategories.smileys).map((e) => `<button type="button" class="emoji-field-emoji" data-emoji="${e}">${e}</button>`).join('');
+    tab = key;
+    const tone = getTone();
+    paintTones();
+    grid.innerHTML = [...new Set((chatEmojiCategories[key] || chatEmojiCategories.smileys).map((raw) => withTone(raw, tone)))].map((e) => `<button type="button" class="emoji-field-emoji" data-emoji="${e}">${e}</button>`).join('');
     grid.querySelectorAll('.emoji-field-emoji').forEach((b) => b.setAttribute('aria-label', b.dataset.emoji));
     box.querySelectorAll('[data-emoji-tab]').forEach((t) => t.setAttribute('aria-selected', String(t.dataset.emojiTab === key)));
   };
@@ -59,6 +66,11 @@ export const attachEmojiPicker = (field, { label = 'Add an emoji', after = field
   }
   toggle.addEventListener('click', () => (panel.hidden ? open() : close()));
   box.querySelector('.emoji-field-tabs').addEventListener('click', (event) => { const t = event.target.closest('[data-emoji-tab]'); if (t) render(t.dataset.emojiTab); });
+  // D-236: the skin tone row. A choice re-draws this panel (and any other panel or quick row on the page).
+  const tones = box.querySelector('.emoji-field-tones');
+  tones.addEventListener('mousedown', (event) => event.preventDefault());
+  tones.addEventListener('click', (event) => { const t = event.target.closest('[data-emoji-tone]'); if (t) setTone(t.dataset.emojiTone); });
+  const stopTone = onToneChange(() => { if (!box.isConnected) { stopTone(); return; } if (grid.childElementCount) render(tab); else paintTones(); });
   // The field keeps its selection while the panel is used: a press on an emoji does not take the focus.
   grid.addEventListener('mousedown', (event) => event.preventDefault());
   grid.addEventListener('click', (event) => {

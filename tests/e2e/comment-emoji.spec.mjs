@@ -5,6 +5,8 @@
 // CE3 the emoji button opens the full panel above the box, inside the screen; a tab changes the set; an emoji goes in
 //     at the cursor; Escape closes the panel (the post stays open).
 // CE4 posting sends the emoji in the comment and closes the panel. Axe clean (panel open) at 390; no sideways scroll.
+// CE5 (D-236) hands are light-skinned by default (🙌🏻 👏🏻); the panel's Skin tone row has Light chosen; choosing Dark
+//     re-draws the quick row and the panel (People) in dark, and the choice is kept when the note is opened again.
 import { startAppStub, ME } from './app-stub.mjs';
 import { axeViolations } from './a11y.mjs';
 const { chromium } = await import(process.env.PLAYWRIGHT_MODULE || 'playwright');
@@ -66,6 +68,26 @@ try {
     await page.waitForTimeout(600);
     check(`${w} CE4 the comment is sent with its emoji`, posted.length === 1 && posted[0]?.body === `Great game 🔥${first}`, JSON.stringify(posted));
     check(`${w} CE4 posting closes the panel`, await panel.isHidden());
+    // CE5
+    const quickHands = await page.$$eval('#post-detail [data-comment-emoji]', (els) => els.map((e) => e.dataset.commentEmoji));
+    check(`${w} CE5 hands are light by default`, quickHands.includes('🙌🏻') && quickHands.includes('👏🏻') && quickHands.includes('❤️'), JSON.stringify(quickHands));
+    await page.locator('#post-detail .emoji-field-toggle').click();
+    const checked = await page.$$eval('#post-detail [data-emoji-tone][aria-checked="true"]', (els) => els.map((e) => e.dataset.emojiTone));
+    const toneSizes = await page.$$eval('#post-detail [data-emoji-tone]', (els) => els.map((e) => e.getBoundingClientRect().height));
+    check(`${w} CE5 six tones, Light chosen, >= 44 px`, JSON.stringify(checked) === '["light"]' && toneSizes.length === 6 && toneSizes.every((x) => x >= 44), JSON.stringify({ checked, toneSizes }));
+    await page.locator('#post-detail [data-emoji-tone="dark"]').click();
+    await page.locator('#post-detail [data-emoji-tab="people"]').click();
+    const people = await page.$$eval('#post-detail .emoji-field-emoji', (els) => els.map((e) => e.dataset.emoji));
+    const quickDark = await page.$$eval('#post-detail [data-comment-emoji]', (els) => els.map((e) => e.dataset.commentEmoji));
+    check(`${w} CE5 Dark re-draws the quick row and the panel`, quickDark.includes('🙌🏿') && quickDark.includes('👏🏿') && people.some((e) => e.includes('\u{1F3FF}')) && !people.some((e) => e.includes('\u{1F3FB}')), JSON.stringify({ quickDark, sample: people.slice(0, 12) }));
+    await page.keyboard.press('Escape');
+    await page.locator('[data-post-detail-close]').click();
+    await page.waitForSelector('#post-detail', { state: 'detached' });
+    await page.locator('.post-card[data-post-id="p1"] [data-post-action="comment"]').first().click();
+    await page.waitForSelector('#post-detail[open] .post-comment-quick');
+    const kept = await page.$$eval('#post-detail [data-comment-emoji]', (els) => els.map((e) => e.dataset.commentEmoji));
+    check(`${w} CE5 the choice is kept`, kept.includes('🙌🏿'), JSON.stringify(kept));
+    if (shots) { await page.locator('#post-detail .emoji-field-toggle').click(); await page.locator('#post-detail [data-emoji-tab="people"]').click(); await page.screenshot({ path: `${shots}/comment-tone-${w}.png` }); }
     check(`${w} no page errors`, errors.length === 0, errors.join('; '));
     await ctx.close();
   }

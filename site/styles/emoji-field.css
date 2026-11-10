@@ -35,3 +35,11 @@
 .emoji-field.is-compact .emoji-field-toggle svg { width: 24px; height: 24px; }
 .emoji-field.is-compact .emoji-field-text { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 .emoji-field.is-compact .emoji-field-panel { position: absolute; left: 0; right: 0; bottom: calc(100% + 6px); margin: 0; }
+
+/* D-236: the skin tone row, between the tabs and the grid. */
+.emoji-field-tones { display: flex; align-items: center; gap: 2px; padding: 4px 0; border-bottom: 1px solid color-mix(in srgb, var(--color-chat-wine) 14%, transparent); overflow-x: auto; scrollbar-width: none; }
+.emoji-field-tones-label { flex: 0 0 auto; margin-right: 6px; color: var(--color-chat-wine); font-size: var(--text-12); font-weight: 700; letter-spacing: .06em; text-transform: uppercase; }
+.emoji-field-tone { flex: 0 0 auto; width: 44px; height: 44px; padding: 0; border: 2px solid transparent; border-radius: 50%; background: transparent; font-size: 22px; line-height: 1; cursor: pointer; }
+.emoji-field-tone[aria-checked="true"] { border-color: var(--color-chat-wine); background: color-mix(in srgb, var(--color-chat-wine) 10%, transparent); }
+.emoji-field-tone:focus-visible { outline: 2px solid var(--color-chat-wine); outline-offset: 1px; }
+@media (max-width: 420px) { .emoji-field-tones-label { display: none; } .emoji-field-tones { justify-content: space-between; } }

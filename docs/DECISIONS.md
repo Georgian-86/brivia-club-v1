@@ -4389,3 +4389,16 @@ bring a short line back.
   The form's grid column is `minmax(0, 1fr)` so the scrolling quick row never widens it past the screen.
 - **Checks.** e2e `comment-emoji.spec.mjs` CE1-CE4 at 1440 and 390 (axe clean, no overflow); post-activity, post-edit,
   post-notifications, profile-edit and create-event (the other emoji pickers) pass; unit 595.
+
+## D-236 (2026-11-11): skin tone for emoji, light by default
+
+- **Request (founder, 2026-11-11, screenshot of the Notes comment box):** "make it white handed by default and then
+  this option that we can choose custom emoji".
+- **Decision.** Hands and people emoji (Unicode `Emoji_Modifier_Base`: 🙌 👏 👍 🧑‍💻 …) take a skin tone, light by
+  default. The emoji panel (`emoji-field.js`: Notes comments, bio, event description) gains a "Skin tone" row of six
+  ✋ (Default yellow, Light, Medium-light, Medium, Medium-dark, Dark); a choice re-draws the panel and the comment
+  quick row at once and is kept in this browser (`localStorage`, a convenience; it never leaves the device). Hearts,
+  fire and faces never change. `emoji-tone.js` holds the pure `withTone` (decodes the lists' HTML entities, replaces
+  any tone already there; duplicates the lists then had are dropped). The chat composer's own picker is unchanged.
+- **Checks.** Unit `emoji-tone.test.mjs` (6, 601 total); e2e `comment-emoji.spec.mjs` CE5 (light by default, six
+  tones >= 44 px, Dark re-draws quick row and panel, kept on reopen) at 1440 and 390; profile-edit and create-event pass.
