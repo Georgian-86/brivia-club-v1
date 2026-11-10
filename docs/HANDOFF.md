@@ -7,30 +7,35 @@ Update this file at the end of every session. CLAUDE.md holds the aim; this file
 
 ## 1. What is done
 
-**2026-11-10, D-227 (branch `claude/funny-cori-ew167m`, not deployed):** AT WORK (the first cover) is the default
-cover for new signups and members without one; brochures have no size limit of ours. **Owed: apply 0069 and 0070** (README
+**2026-11-10, D-228 (faster start-up and onboarding):** start-up reads run in parallel, the login page prefetches
+the app's files, Create Event's code loads on demand, the envelope opens in 0.7 s. First card on a throttled phone
+1.15-1.38 s (was 1.45-1.63 s). Measure with `tests/e2e/perf-boot.mjs` (see its header). Live database checked
+2026-11-10: every object from 0001-0070 present. Edge Functions live: push-notify, directory; the four payment/ticket
+functions (D-183) wait for the founder's Razorpay and Resend keys (README "## 0053").
+
+**2026-11-10, D-227 (LIVE: main 326e57c, PR #67, deployed to thebriviaclub.live/.com; 0069 and 0070 applied, 120 covers switched):** AT WORK (the first cover) is the default
+cover for new signups and members without one; brochures have no size limit of ours. **Done: 0069 and 0070 applied** (README
 "## 0069", "## 0070": 0070 switches SMASH THEORY members to AT WORK once, reversibly); check Supabase's project-wide upload limit (Project Settings > Storage) is as high as wanted. Also already
 failing before D-227: `profile-media.spec.mjs` 7 "no cover file input anywhere" checks.
 
-**2026-11-10, D-226 (branch `claude/funny-cori-ew167m`, not deployed; client only, no SQL):** confirming the email
+**2026-11-10, D-226 (LIVE: main 326e57c; client only):** confirming the email
 no longer sends a new member back to enter their details. signUp keeps the 18+ confirmation and the work answers with
 the account, and the link's return path applies this browser's pending signup first even when a profile row exists.
 Another browser asks only for the photo. **Owed (founder): Supabase Auth > URL Configuration, add both
 `https://thebriviaclub.com/auth.html` and `https://thebriviaclub.live/auth.html` to Redirect URLs** (and www variants
 if used). Also already failing before D-226: `login-smooth.spec.mjs` 3 error-copy checks.
 
-**2026-11-10, D-225 (branch `claude/funny-cori-ew167m`, not deployed; client only, no SQL):** at the swipe limit
+**2026-11-10, D-225 (LIVE: main 326e57c; client only):** at the swipe limit
 every request dialog says "You're out of free swipes ... Fresh swipes tomorrow at 3 PM." itself (the toast sat under
 the modal and was never seen), and the pitch sheet now opens above Chat (it was invisible from Chat search's profile
 Connect). Check `tests/e2e/swipe-limit.spec.mjs`. Already failing before D-225 and unchanged: `consent.spec.mjs`
 (`cancelKeepsCard`, line 234) and one `nearby.spec.mjs` Settings sound check.
 
-**2026-11-10, D-224 (branch `claude/funny-cori-ew167m`, not deployed; migration 0068 not applied):** message
+**2026-11-10, D-224 (LIVE: main 326e57c; 0068 applied and verified):** message
 yourself. Chat search finds your own profile ("Your name (You) · Message yourself") and opens a private thread with
 yourself; it joins the inbox once it has a note. 0068 lets `brivia_can_send` accept a message to yourself (nothing
 else changes). Files `site/scripts/chat-self.js`, `site/scripts/app.js`; checks `tests/unit/chat-self.test.mjs`,
-`supabase/tests/zh-message-yourself.test.sql`, `tests/e2e/chat-self.spec.mjs`. **Owed: apply 0068 (README "## 0068")
-and deploy the client.**
+`supabase/tests/zh-message-yourself.test.sql`, `tests/e2e/chat-self.spec.mjs`. **Done: 0068 applied, client deployed.**
 
 **2026-11-07, D-223 (on main, deployed to thebriviaclub.live; client only, no SQL):** Safari (Mac) and
 every iPhone browser play the landing soundtrack and intro cue through `<audio>` elements instead of Web Audio (WebKit

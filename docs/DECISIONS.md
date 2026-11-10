@@ -4260,3 +4260,25 @@ bring a short line back.
   PDF uploads; the label names no limit), `deck.spec.mjs` (201, the no-cover cards show AT WORK),
   `profile-media.spec.mjs` signup default. Already failing before D-227, unchanged: `profile-media.spec.mjs` 7
   "no cover file input anywhere" checks (they see Create Event's poster inputs).
+
+## D-228 (2026-11-10): faster start-up and onboarding
+
+- **Ask (founder, 2026-11-10):** "deploy everything, also make the onboarding and app very smooth and fast".
+- **Measured first** (`tests/e2e/perf-boot.mjs`: production build, a mid phone on 4G (CPU x4, 9 Mbps, 40 ms), 150 ms
+  added to every Supabase request): the first deck card took 1.45-1.55 s. Two parts: ~0.8 s to download and run the code,
+  then three rounds of requests one after another (profile and status, then blocks / matches / inbox, then the deck).
+- **Changes.**
+  - Start-up reads (`app.js loadSupabaseCommunity`): blocks, matches, the inbox and the first deck page are asked for
+    at the same moment as the profile check, since all they need is the session; each answer is used at the same
+    point as before. The chat partners' cards load beside the deck instead of after it.
+  - The sign-up / login page fetches the app's files in the background when idle (`prefetch-app.js`; low priority,
+    skipped on Data Saver and 2G; plain fetch so Safari benefits too), so entering the app opens from cache.
+  - Create Event's code (50 KB) loads on first use or when the browser is idle, not with the app.
+  - The welcome card's envelope opens in ~0.7 s instead of holding the form for 1.42 s.
+- **Result (same set-up, 2 runs each):** first card 1.22-1.38 s cold (was 1.45-1.55 s); after six seconds on the login
+  page 1.15-1.20 s (was 1.51-1.63 s). On the real network each round trip saved is longer than the test's 150 ms.
+- **Not changed (founder's call):** the deck's 3.6 s solitaire shuffle on every app open (D-174, asked to be lengthy;
+  any tap skips it). gsap (230 KB source) stays in the main bundle: the deal, card tilt and moments use it synchronously.
+- **Checks.** Unit 584 (new `prefetch-app.test.mjs`); e2e deck 201, app-shell 214, onboarding 269, create-event,
+  chat-search, chat-self, swipe-limit pass; signup, login-smooth and profile-media fail only their known pre-existing
+  checks (same names as before).
