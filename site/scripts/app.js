@@ -24,7 +24,7 @@ import '../styles/handoff.css';
 import { supabase, compressImageOnly, rowToProfile, saveProfile, isPresetCoverUrl, onboardingStatus, sendSignal, fetchSignalQuota, isRateLimited, isStorageImageUrl, withoutCredentials, uploadMessageAttachment, removeMessageAttachment, uploadCommunityPostImage, removeCommunityPostImage, ImageProcessingError, PHOTO_ERROR_MESSAGE, PHOTO_FRAMER_ERROR, compressAttachmentFiles, attachmentKind, reportMember, setSensitiveConsent, fetchSensitiveConsentAt, fetchMyInterests, fetchInterestNodes, addMemberInterest, isMissingFunction, touchPresence, connectionPresence, setPresenceVisible, myPresenceVisible, setMemberInterests, uploadResume, removeResume, resumeSignedUrl, resumeInfo, clearResumePath, searchPlaces, setHomeCity, setHomeLocation, listEvents, setEventRsvp, setCompanionDefault, myEventPrefs, eventCompanions, saveMemberEvent, cancelMemberEvent, deleteMemberEvent, uploadEventImage, removeEventImages, setEventInterest, setEventBrochure, uploadEventBrochure, removeEventBrochures, companionEvents, companionDeck, companionSwipe, companionQuota, createPaymentOrder, verifyPayment, sendEventTicket, editMessage, unsendMessage, deleteMessageForMe, myCompanionMatches, markCompanionMatchSeen, sendConnectRequest, setNearbyEnabled, myNearbySetting, nearbyPulse, nearbyClear, myNearbyAlerts, setNearbyMuted, nearbyDiscover, nearbyPass, nearbyConnect, myNearbyMatches, myNotifications, markNotificationsRead, dismissNotification, setNearbyRadius, savePushSubscription, deletePushSubscription, sendPendingPush, searchCompanies, searchCompanyDirectory, companyLogoUrl, addCompany, setMyWork, memberWork, uploadCompanyLogo, markMessagesDelivered, markConversationRead, markChatSeen, myChatSeen, setReadReceipts, myReadReceipts, chatPeopleSearch } from './supabase.js';
 import { locateOnce, fallbackCopy } from './geo-locate.js';
 import { areaChangeMessage, AREA_HELPER, AREA_NO_MATCH } from './area-change.js';
-import { areaShareBody, parseAreaBody, resumeShareAttachment, resumeMessageFields, RESUME_SHARE_BODY, NO_RESUME_HINT, RESUME_GONE_COPY, RESUME_SHARE_NOTE, AREA_SHARE_NOTE } from './quick-share.js';
+import { areaShareBody, parseAreaBody, areaMapUrl, resumeShareAttachment, resumeMessageFields, RESUME_SHARE_BODY, NO_RESUME_HINT, RESUME_GONE_COPY, RESUME_SHARE_NOTE, AREA_SHARE_NOTE } from './quick-share.js';
 import { validateResume, readResumeHead, resumeMetaLine, formatResumeSize, resumeUploadErrorMessage, isMissingResumeStore, RESUME_FILE_NAME, REMOVE_RESUME_CONFIRM, REMOVE_FAILED_COPY, REPLACED_NOT_SAVED_COPY, OPEN_FAILED_COPY, COMING_SOON_COPY } from './resume-file.js';
 import { POPULAR_INTERESTS, INTEREST_CATALOG, LOOKING_FOR_CATALOG, taxonomyLabels, catalogValues, matchOptions, dropdownOptions } from './discovery-catalog.js';
 import { deleteAccount, clearBriviaKeys, DELETE_BUCKETS, reauthMarker, reauthMarkerMatches } from './account-deletion.js';
@@ -561,13 +561,21 @@ const unseenNearbyAlerts = () => {
 };
 const findPersonById = (personId) => people.find((person) => String(person.id) === String(personId));
 const notificationPreview = (message) => (parseSharedPost(message?.body) ? 'Shared a post with you.' : message?.body) || ((message?.attachment_url || message?.attachment_path) ? 'Sent an attachment.' : 'Sent you a message.');
-const addMessageNotification = (message) => {
+// D-229: save = false lets a sync add many and save once. A message older than everything in a full list is not added:
+// it would be trimmed again at once, and with 80+ received messages that re-add / trim churned (and saved and redrew)
+// on every 5-second sync, which froze phones for 100-250 ms each time.
+const NOTIFICATIONS_KEPT = 80;
+const notificationTime = (item) => Date.parse(item?.createdAt || '') || 0;
+const addMessageNotification = (message, { save = true } = {}) => {
   if (!areNotificationsEnabled() || !message?.id || !memberProfile.id || String(message.sender_id) === String(memberProfile.id)) return false;
   const id = String(message.id);
   if (notifications.some((item) => String(item.id) === id)) return false;
-  notifications.unshift({ id, type: 'message', personId: String(message.sender_id), body: notificationPreview(message), createdAt: message.created_at || new Date().toISOString(), read: false });
-  notifications = notifications.slice(0, 80);
-  saveNotifications();
+  const createdAt = message.created_at || new Date().toISOString();
+  const at = Date.parse(createdAt) || 0;
+  if (notifications.length >= NOTIFICATIONS_KEPT && notifications.every((item) => notificationTime(item) >= at)) return false;
+  notifications.push({ id, type: 'message', personId: String(message.sender_id), body: notificationPreview(message), createdAt, read: false });
+  notifications = notifications.sort((a, b) => notificationTime(b) - notificationTime(a)).slice(0, NOTIFICATIONS_KEPT);
+  if (save) saveNotifications();
   return true;
 };
 const markNotificationsReadForPerson = (personId) => {
@@ -832,8 +840,8 @@ const syncIncomingNotifications = async (rows = []) => {
   if (!notifications.length) notifications = readNotifications();
   let changed = false;
   // D-224: a note to self is never a notification.
-  rows.filter((message) => String(message.recipient_id) === String(memberProfile.id) && String(message.sender_id) !== String(memberProfile.id)).forEach((message) => { if (addMessageNotification(message)) changed = true; });
-  if (changed) { reconcileMessageNotifications(Date.parse(chatSeenSent[''] || '') || 0); renderNotifications(); }
+  rows.filter((message) => String(message.recipient_id) === String(memberProfile.id) && String(message.sender_id) !== String(memberProfile.id)).forEach((message) => { if (addMessageNotification(message, { save: false })) changed = true; });
+  if (changed) { saveNotifications(); reconcileMessageNotifications(Date.parse(chatSeenSent[''] || '') || 0); renderNotifications(); }   // D-229: one save per sync
 };
 const ensureNotificationControls = () => {
   notifications = readNotifications();
@@ -1490,12 +1498,13 @@ const setView = (view) => {
     section.hidden = !isActive;
     section.classList.toggle('is-active', isActive);
     // D-194: a different screen fades up instead of popping in (not on first load, not Curated <-> Explore).
+    // D-229: restarted on the next frame, not by reading offsetWidth (that forced a full layout in the middle of every
+    // switch), and one handler per section (an addEventListener per switch piled up when a fade was cut short).
     if (isActive && previousRendered && previousRendered !== renderedView && section.classList.contains('app-view')) {
       section.classList.remove('is-entering');
-      void section.offsetWidth;
-      section.classList.add('is-entering');
-      section.addEventListener('animationend', () => section.classList.remove('is-entering'), { once: true });
-    }
+      section.onanimationend = () => section.classList.remove('is-entering');
+      requestAnimationFrame(() => { if (!section.hidden) section.classList.add('is-entering'); });
+    } else if (!isActive) section.classList.remove('is-entering');
   });
   document.querySelectorAll('[data-nav]').forEach((button) => button.classList.toggle('is-active', button.dataset.nav === view));
   markCurrentNav(document, view);
@@ -1525,7 +1534,7 @@ const setView = (view) => {
   }
   // D-194: a new screen starts at the top at once (a long glide from the old screen's position read as a jolt); the
   // fade above carries the change. The same screen re-tapped still glides back up.
-  window.scrollTo({ top: 0, behavior: previousRendered !== renderedView || window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'instant' : 'smooth' });
+  if (window.scrollY > 0) window.scrollTo({ top: 0, behavior: previousRendered !== renderedView || window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'instant' : 'smooth' });
 };
 
 const validViews = ['home', 'explore', 'events', 'posts', 'chat', 'profile', 'companions', 'nearby'];
@@ -1639,6 +1648,9 @@ const fitCardChips = () => {
   const limit = container.clientHeight + 1;
   chips.forEach((chip) => { if (chip.offsetTop + chip.offsetHeight > limit) chip.hidden = true; });
 };
+// D-229: one fit per frame, however many renders ask for it.
+let chipFitFrame = 0;
+const scheduleChipFit = () => { cancelAnimationFrame(chipFitFrame); chipFitFrame = requestAnimationFrame(fitCardChips); };
 let chipFitObserver = null;
 const watchCardChips = () => {
   if (chipFitObserver || typeof ResizeObserver !== 'function') return;
@@ -1859,7 +1871,7 @@ const renderHome = (queue = getExplorePeople()) => {
     }
     void hiring.ensure(queue.slice(0, 12).map((p) => p.id));
   } else { const strip = document.querySelector('#swipe-hiring'); if (strip) strip.hidden = true; }
-  fitCardChips();
+  scheduleChipFit();   // D-229: measured once, just before the next paint, not in the middle of this render
   watchCardChips();
   const count = document.querySelector('#queue-count');
   if (count) count.textContent = `${String(currentIndex + 1).padStart(2, '0')} / ${String(queue.length).padStart(2, '0')}`;
@@ -2889,13 +2901,21 @@ const loadFilterTaxonomy = async () => {
     renderFilterOptions();
   } catch { filterTaxonomyRequested = false; }
 };
+// D-229: the merged, sorted lists are rebuilt only when what goes into them changes (a new card, the taxonomy loading).
+const catalogCache = { skillsKey: null, skills: [], lookingKey: null, lookingFor: [] };
 const filterCatalog = () => {
   const { names, skills, lookingFor } = getFilterValues();
-  return {
-    names,
-    skills: catalogValues({ members: skills, standard: INTEREST_CATALOG, taxonomy: filterTaxonomy }),
-    lookingFor: catalogValues({ members: lookingFor, standard: LOOKING_FOR_CATALOG }),
-  };
+  const skillsKey = `${filterTaxonomy.length}\u0001${skills.join('\u0001')}`;
+  if (catalogCache.skillsKey !== skillsKey) {
+    catalogCache.skillsKey = skillsKey;
+    catalogCache.skills = catalogValues({ members: skills, standard: INTEREST_CATALOG, taxonomy: filterTaxonomy });
+  }
+  const lookingKey = lookingFor.join('\u0001');
+  if (catalogCache.lookingKey !== lookingKey) {
+    catalogCache.lookingKey = lookingKey;
+    catalogCache.lookingFor = catalogValues({ members: lookingFor, standard: LOOKING_FOR_CATALOG });
+  }
+  return { names, skills: catalogCache.skills, lookingFor: catalogCache.lookingFor };
 };
 const renderSuggestionList = (container, values, query, kind, selected = new Set(), showAll = false) => {
   if (!container) return;
@@ -2938,6 +2958,9 @@ const renderSelectedFilters = (container, values, selected, kind) => {
   container.innerHTML = selectedLabels.map((value) => `<button class="discovery-filter-selected-chip" type="button" data-remove-filter="${kind}" data-filter-value="${escapeHtml(value)}"><span>${escapeHtml(value)}</span><b aria-hidden="true">×</b><span class="sr-only">Remove ${escapeHtml(value)}</span></button>`).join('');
 };
 const renderFilterOptions = () => {
+  // D-229: the drawer's options are drawn when it opens (openDiscoveryFilters), never while it is closed: rebuilding
+  // ~1,100 interest options on every Explore render was the slowest part of a tab switch.
+  if (document.querySelector('#discovery-filter-drawer')?.hidden) return;
   const search = document.querySelector('#drawer-filter-search');
   const skillsInput = document.querySelector('#filter-skills-input');
   const lookingInput = document.querySelector('#filter-looking-for-input');
@@ -3681,7 +3704,14 @@ const renderMessages = () => {
     const open = valid ? `<button type="button" class="message-resume-open" data-resume-open="${escapeHtml(message.attachment.path)}" data-message-id="${id}" aria-label="Open resume"${gone ? ` aria-describedby="resume-gone-${id}"` : ''}>Open</button>` : '';
     return `<span class="message-resume"><span class="message-resume-icon">${RESUME_DOC_ICON}</span><span class="message-resume-copy"><span class="message-resume-title">Resume (PDF)</span><span class="message-resume-sub">${message.from === 'me' ? 'Your latest version' : 'Their latest version'}</span>${goneLine}</span>${open}</span>`;
   };
-  const renderSharedArea = (area) => `<span class="message-place"><span class="message-place-icon">${SHARE_PIN_ICON}</span><span class="message-place-copy"><span class="message-place-eyebrow">Shared area</span><span class="message-place-name">${escapeHtml(area.place)}</span><span class="message-place-scope">${escapeHtml(area.scope)}</span></span></span>`;
+  // D-230: the card opens the area in Google Maps (a search for the place name only, never a point).
+  const renderSharedArea = (area) => {
+    const inner = `<span class="message-place-icon">${SHARE_PIN_ICON}</span><span class="message-place-copy"><span class="message-place-eyebrow">Shared area</span><span class="message-place-name">${escapeHtml(area.place)}</span><span class="message-place-scope">${escapeHtml(area.scope)}</span>`;
+    const url = areaMapUrl(area.place);
+    return url
+      ? `<a class="message-place is-link" href="${escapeHtml(url)}" target="_blank" rel="noopener noreferrer">${inner}<span class="message-place-open">Open in Maps <span aria-hidden="true">↗</span></span></span></a>`
+      : `<span class="message-place">${inner}</span></span>`;
+  };
   const renderBubble = (message) => {
     const idAttr = escapeHtml(String(message.id));
     const mineClass = message.from === 'me' ? 'me' : 'them';

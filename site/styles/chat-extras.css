@@ -943,3 +943,9 @@ body.app-body .app-view[data-view="chat"] .chat-layout .message.chat-typing-bubb
   .chat-typing-bubble i{animation:none;opacity:.6}
   body.app-body .app-view[data-view="chat"] .chat-layout .message.chat-typing-bubble{animation:none}
 }
+
+/* D-230: the shared area opens in Google Maps (a search for the place name only). */
+a.message-place.is-link { color: var(--color-ink); text-decoration: none; cursor: pointer; transition: border-color .15s ease, background-color .15s ease; }
+@media (hover: hover) { a.message-place.is-link:hover { border-color: color-mix(in srgb, var(--color-wine) 34%, transparent); background: color-mix(in srgb, var(--color-wine) 4%, var(--color-cream)); } }
+a.message-place.is-link:focus-visible { outline: 2px solid var(--color-wine); outline-offset: 2px; }
+.message-place-open { display: block; margin-top: 4px; color: var(--color-wine); font-size: var(--text-12); font-weight: 700; letter-spacing: .08em; text-transform: uppercase; }

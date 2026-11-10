@@ -5,8 +5,20 @@
 // A message from the other member newer than that is unread. `baseline` is set on the first run of this build, so
 // messages from before it count as read (the old build forgot its read state on every reload).
 
-const validTime = (value) => typeof value === 'string' && Number.isFinite(Date.parse(value));
-const time = (value) => (validTime(value) ? Date.parse(value) : NaN);
+// D-229: parsed once per distinct string (the inbox re-reads every message's time on each redraw; parsing them twice
+// per pass was a visible part of switching to Chats with many conversations). Bounded so it never grows without end.
+const parsed = new Map();
+const parse = (value) => {
+  let at = parsed.get(value);
+  if (at === undefined) {
+    if (parsed.size > 20000) parsed.clear();
+    at = Date.parse(value);
+    parsed.set(value, at);
+  }
+  return at;
+};
+const validTime = (value) => typeof value === 'string' && Number.isFinite(parse(value));
+const time = (value) => (validTime(value) ? parse(value) : NaN);
 
 export const parseReadState = (raw, now = new Date().toISOString()) => {
   let saved = null;

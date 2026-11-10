@@ -680,6 +680,13 @@ try {
           assert.match(bubbles.place, /Kochi/);
           assert.match(bubbles.place, /about a 2 km area/i);
         });
+        // D-230: the area card opens Google Maps searching the place name only, in a new tab; >= 44 px tall.
+        const areaLink = await page.evaluate(() => { const a = document.querySelector('#chat-messages a.message-place'); const r = a?.getBoundingClientRect(); return a ? { href: a.getAttribute('href'), target: a.target, rel: a.rel, h: Math.round(r.height), open: a.querySelector('.message-place-open')?.textContent.trim() } : null; });
+        check(`Q4 ${width}: the area card opens the place in Google Maps, name only (${JSON.stringify(areaLink)})`, () => {
+          assert.equal(areaLink?.href, 'https://www.google.com/maps/search/?api=1&query=Kochi');
+          assert.equal(areaLink.target, '_blank'); assert.match(areaLink.rel, /noopener/); assert.ok(areaLink.h >= 44);
+          assert.match(areaLink.open, /Open in Maps/); assert.ok(!/\d+\.\d{2,}/.test(areaLink.href));
+        });
         check(`Q4 ${width}: nothing is signed before Open (${JSON.stringify(signCalls(mark0).map((c) => c.path))})`, () => assert.deepEqual(signCalls(mark0).filter((c) => c.path.includes('resume')), []));
         const axe = await axeViolations(page, { include: '#chat-messages .message-resume, #chat-messages .message-place' });
         check(`Q4 ${width}: axe clean on the bubbles (${axe.join(' | ')})`, () => assert.deepEqual(axe, []));

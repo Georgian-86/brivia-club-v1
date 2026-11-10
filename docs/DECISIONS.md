@@ -4282,3 +4282,41 @@ bring a short line back.
 - **Checks.** Unit 584 (new `prefetch-app.test.mjs`); e2e deck 201, app-shell 214, onboarding 269, create-event,
   chat-search, chat-self, swipe-limit pass; signup, login-smooth and profile-media fail only their known pre-existing
   checks (same names as before).
+
+## D-229 (2026-11-10): the app stops freezing every 5 seconds; lighter tab switches and phone scrolling
+
+- **Report (founder, 2026-11-10):** "the app is lagging too much, pls fix both on phones and laptop".
+- **Measured first.** With the stub's few rows the main thread was idle, so lag was measured with realistic volume (40
+  conversations, 1,200 messages, 40 cards; `tests/e2e/perf-runtime.mjs` and profiling scripts), on a laptop and a
+  phone (CPU x4). On the phone the app froze for 120-250 ms about every 5 seconds, idle or in a chat.
+- **Causes and fixes.**
+  - The 5-second sync re-read the newest 80 received messages and ran each through `addMessageNotification`, which
+    rewrote the whole notification list to localStorage on every call. With 80+ received messages the list also
+    churned for ever: an old message trimmed off the end was "new" again on the next sync, re-added, another trimmed.
+    Now a message older than everything in a full list is skipped, items are kept in date order, and a sync saves
+    once, only when something changed.
+  - Tab switch: `setView` restarted the screen's fade by reading `offsetWidth` (a forced layout mid-switch) and added
+    an `animationend` listener per switch, never removed when a fade was cut short (listeners grew 380 -> 650 over a
+    session). Now the fade restarts on the next frame, with one handler per section; listeners stay flat.
+  - Every Explore render rebuilt the filter drawer's ~1,100 interest options even while it was closed. Now the drawer
+    draws when opened, and the merged catalogue is cached until its inputs change.
+  - The deck card's chips were measured synchronously in the middle of each render; now once per frame.
+  - The inbox parsed every message's time twice per pass; parsed times are now cached (`chat-unread.js`).
+  - Phones: the top bar and tab bar dropped their backdrop blur for a near-solid cream. D-194 kept it on the grounds
+    that they do not move, but the page scrolls under them, so the blur was recomputed every scroll frame.
+- **Result (same machine, realistic data):** phone idle inbox 0.92 s CPU and 4 freezes per 20 s -> 0.28 s and one of
+  63 ms; phone open chat 1.04 s and 6 freezes -> 0.49 s and 3; laptop idle inbox 0.24 s -> 0.06 s; 8 phone tab
+  switches 11 long tasks -> 6.
+- **Left as is:** a tab switch still restyles against 3,168 CSS rules (~60-160 ms on a slow phone); shrinking that
+  means consolidating the app's 58 stylesheets, a separate piece of work.
+
+## D-230 (2026-11-10): a shared area opens in Google Maps
+
+- **Report (founder, 2026-11-10, screenshot of a "Shared area · Bangalore East · About a 2 km area" card in chat):**
+  "i am not able to open the location, pls fix it".
+- **Decision.** The card is a link to a Google Maps search for the place name (`areaMapUrl` in `quick-share.js`), in a
+  new tab, with an "Open in Maps ↗" line. Only the place name goes into the link, the same words already in the
+  message; never coordinates (a label shaped like one gives no link, as `areaShareBody` already refuses to send one).
+  So it shows the area, as the card says, never the sender's position (CLAUDE.md location privacy).
+- **Checks.** Unit `quick-share.test.mjs` (+2); e2e `chat-extras.spec.mjs` Q4: the card links to the Kochi search in a
+  new tab with noopener, is >= 44 px, and is axe clean (152/152).
