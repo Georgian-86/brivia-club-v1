@@ -46,3 +46,19 @@ body.photo-crop-open{overflow:hidden}
   .photo-crop-actions{margin-top:auto}
   .photo-crop-cancel,.photo-crop-use{flex:1;min-width:0}
 }
+
+/* D-232: a rectangular frame (a post photo) and the shape chips. The frame's inset is set from the chosen shape. */
+.photo-crop-dialog.is-rect .photo-crop-mask{border-radius:var(--radius-s,6px)}
+.photo-crop-dialog.is-rect .photo-crop-preview{width:auto;height:88px;border-radius:var(--radius-s,6px)}
+.photo-crop-aspects{display:flex;flex-wrap:wrap;gap:var(--space-2)}
+.photo-crop-aspect{display:inline-flex;align-items:center;gap:var(--space-2);min-height:44px;padding:0 var(--space-4);border:1px solid var(--color-line);border-radius:var(--radius-pill);background:var(--color-cream);color:var(--color-wine);font:700 var(--text-14) var(--font-body);cursor:pointer}
+.photo-crop-aspect small{font-weight:500;color:var(--color-ink-soft)}
+.photo-crop-aspect[aria-pressed="true"]{border-color:var(--color-wine);background:var(--color-wine);color:var(--color-cream)}
+.photo-crop-aspect[aria-pressed="true"] small{color:var(--color-cream)}
+.photo-crop-aspect-icon{display:block;height:16px;border:2px solid currentColor;border-radius:3px}
+@media (max-width:600px){
+  .photo-crop-aspects{flex-wrap:nowrap}
+  .photo-crop-aspect{flex:1;justify-content:center;padding:0 var(--space-2);font-size:var(--text-12)}
+  .photo-crop-aspect small{display:none}
+  .photo-crop-dialog.is-rect .photo-crop-preview{height:56px}
+}

@@ -90,3 +90,35 @@ test('decodeSize caps the long side at 2048 px and keeps the aspect ratio', () =
   assert.deepEqual(decodeSize(20000, 10), { width: 2048, height: 1, scaled: true });
   assert.deepEqual(decodeSize(1000, 500, 400), { width: 400, height: 200, scaled: true });
 });
+
+// D-232: a rectangular frame for a post photo.
+import { frameScale, frameSize, frameRect } from '../../site/scripts/photo-crop-math.js';
+
+test('frameSize fits an aspect inside the stage, long side 86 %', () => {
+  assert.deepEqual(frameSize(100, 1), { frameWidth: 86, frameHeight: 86 });
+  const p = frameSize(100, 4 / 5); near(p.frameWidth, 68.8); near(p.frameHeight, 86);
+  const l = frameSize(100, 5 / 4); near(l.frameWidth, 86); near(l.frameHeight, 68.8);
+  assert.deepEqual(frameSize(100, 0), { frameWidth: 86, frameHeight: 86 });
+});
+
+test('a rectangular frame is covered at 1x and the offset is clamped per axis', () => {
+  // 2000 x 1000 photo, 240 x 300 portrait frame: scale = max(0.12, 0.3) = 0.3 -> 600 x 300 shown.
+  const d = { width: 2000, height: 1000, frameWidth: 240, frameHeight: 300 };
+  near(frameScale(2000, 1000, 240, 300), 0.3);
+  assert.deepEqual(clampOffset({ x: 999, y: 50, zoom: 1 }, d), { x: 180, y: 0, zoom: 1 });
+});
+
+test('frameRect is the region under the frame, in photo pixels, inside the photo', () => {
+  const d = { width: 2000, height: 1000, frameWidth: 240, frameHeight: 300 };
+  assert.deepEqual(frameRect({ x: 0, y: 0, zoom: 1 }, d), { sx: 600, sy: 0, sw: 800, sh: 1000 });
+  assert.deepEqual(frameRect({ x: 180, y: 0, zoom: 1 }, d), { sx: 0, sy: 0, sw: 800, sh: 1000 });
+  assert.deepEqual(frameRect({ x: -999, y: 0, zoom: 1 }, d), { sx: 1200, sy: 0, sw: 800, sh: 1000 });
+  const z = frameRect({ x: 0, y: 0, zoom: 2 }, d);
+  assert.deepEqual(z, { sx: 800, sy: 250, sw: 400, sh: 500 });
+});
+
+test('without frame sizes, frameRect matches the circle square', () => {
+  const r = frameRect({ x: 40, y: 0, zoom: 1.5 }, dims);
+  const c = cropRect({ x: 40, y: 0, zoom: 1.5 }, dims);
+  assert.deepEqual([r.sx, r.sy, r.sw, r.sh], [c.sx, c.sy, c.size, c.size]);
+});

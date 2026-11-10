@@ -5436,6 +5436,10 @@ let communityPostSort = 'newest';
 let communityPostsLoaded = false;
 let communityPostsLoading = false;
 let communityPostPreviewUrl = '';
+// D-232: the photo as picked, and the part the member framed (a JPEG File), which is what gets uploaded.
+let communityPostPicked = null;
+let communityPostFramed = null;
+let communityPostAspect = 4 / 5;
 // Likes and saves (polish wave C3; tables from 0012): the member's own sets, and whether the tables exist yet.
 const communityReactions = { liked: new Set(), saved: new Set(), available: true };
 const communityReactionGuard = createReactionGuard();
@@ -6007,6 +6011,9 @@ const closeCommunityPostComposer = () => {
   preview?.setAttribute('hidden', '');
   if (communityPostPreviewUrl) URL.revokeObjectURL(communityPostPreviewUrl);
   communityPostPreviewUrl = '';
+  communityPostPicked = null;
+  communityPostFramed = null;
+  communityPostAspect = 4 / 5;
   const feedback = document.querySelector('#community-post-feedback');
   if (feedback) feedback.textContent = '';
 };
@@ -6023,20 +6030,62 @@ document.querySelector('#community-post-list')?.addEventListener('click', (event
 });
 bindCommunityPostActions();
 document.querySelector('#close-community-post')?.addEventListener('click', closeCommunityPostComposer);
-document.querySelector('#community-post-image')?.addEventListener('change', (event) => {
-  const file = event.target.files?.[0];
+// D-232: a picked post photo opens "Frame your post" (photo-crop.js, rectangular frame): the member drags, zooms and
+// picks Portrait 4:5, Square or Landscape 5:4. "Adjust photo" reopens it on the original. If the framer cannot load or
+// read the photo, the photo is used as picked (the old behaviour), so posting never breaks.
+const showCommunityPostPreview = (file) => {
   const preview = document.querySelector('#community-post-preview');
   const image = document.querySelector('#community-post-preview-image');
   if (!file || !preview || !image) return;
   if (communityPostPreviewUrl) URL.revokeObjectURL(communityPostPreviewUrl);
   communityPostPreviewUrl = URL.createObjectURL(file);
   image.src = communityPostPreviewUrl;
+  preview.style.aspectRatio = communityPostFramed ? String(communityPostAspect) : '';
+  preview.classList.toggle('is-framed', Boolean(communityPostFramed));
   preview.removeAttribute('hidden');
+};
+const frameCommunityPostPhoto = async () => {
+  const input = document.querySelector('#community-post-image');
+  const feedback = document.querySelector('#community-post-feedback');
+  if (!communityPostPicked) return;
+  let openPhotoCrop;
+  let POST_ASPECTS;
+  try { ({ openPhotoCrop, POST_ASPECTS } = await import('./photo-crop.js')); } catch { showCommunityPostPreview(communityPostPicked); return; }
+  try {
+    let chosen = communityPostAspect;
+    const framed = await openPhotoCrop(communityPostPicked, {
+      returnFocus: document.querySelector('[data-post-adjust]') || input,
+      frame: {
+        aspects: POST_ASPECTS,
+        aspect: communityPostAspect,
+        kicker: 'YOUR POST',
+        title: 'Frame your post',
+        help: 'Pick a shape, then drag to choose what shows in the frame. Zoom with the slider, a pinch or the mouse wheel.',
+        useLabel: 'Use this frame',
+        onAspect: (value) => { chosen = value; },
+      },
+    });
+    if (!framed) { if (!communityPostFramed) showCommunityPostPreview(communityPostPicked); return; }
+    communityPostAspect = chosen;
+    communityPostFramed = framed;
+    if (feedback) feedback.textContent = '';
+    showCommunityPostPreview(framed);
+  } catch {
+    showCommunityPostPreview(communityPostPicked);
+  }
+};
+document.querySelector('#community-post-image')?.addEventListener('change', (event) => {
+  const file = event.target.files?.[0];
+  if (!file) return;
+  communityPostPicked = file;
+  communityPostFramed = null;
+  void frameCommunityPostPhoto();
 });
+document.querySelector('[data-post-adjust]')?.addEventListener('click', () => { void frameCommunityPostPhoto(); });
 document.querySelector('#community-post-form')?.addEventListener('submit', async (event) => {
   event.preventDefault();
   const form = event.currentTarget;
-  const file = form.querySelector('[name="image"]')?.files?.[0];
+  const file = communityPostFramed || form.querySelector('[name="image"]')?.files?.[0];
   const caption = form.querySelector('[name="caption"]')?.value.trim() || '';
   const feedback = form.querySelector('#community-post-feedback');
   const submit = form.querySelector('[type="submit"]');

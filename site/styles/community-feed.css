@@ -78,3 +78,11 @@
   .community-post-form-footer{align-items:stretch;flex-direction:column}
   .community-post-submit{width:100%}
 }
+
+/* D-232: the framed post photo is shown whole, at the shape the member chose, with "Adjust photo" to reframe it. */
+.community-post-preview{position:relative}
+.community-post-preview.is-framed{max-height:none;width:min(100%,420px);margin-inline:auto}
+.community-post-preview.is-framed img{max-height:none;object-fit:contain}
+.community-post-adjust{position:absolute;right:10px;bottom:10px;min-height:44px;padding:0 16px;border:1px solid rgba(255,255,255,.7);border-radius:999px;background:rgba(52,31,28,.72);color:#fffdf9;font-family:inherit;font-size:var(--text-12);font-weight:700;letter-spacing:.08em;text-transform:uppercase;cursor:pointer}
+.community-post-adjust:hover{background:rgba(116,31,57,.9)}
+.community-post-adjust:focus-visible{outline:2px solid #741f39;outline-offset:3px}

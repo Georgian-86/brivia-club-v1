@@ -22,10 +22,18 @@ const clampAxis = (value, displayed, diameter) => {
   return Math.min(slack, Math.max(-slack, v)) || 0; // || 0: never -0
 };
 
-export const clampOffset = (state, { width, height, diameter }) => {
+// D-232: the frame may be a rectangle (frameWidth x frameHeight stage px, for a post photo). Without them it is the
+// circle's bounding square (diameter x diameter), so the profile photo maths is unchanged.
+const frameOf = (dims) => ({ fw: dims.frameWidth ?? dims.diameter, fh: dims.frameHeight ?? dims.diameter });
+// At 1x the photo just covers the frame (the larger of the two axis fits).
+export const frameScale = (width, height, fw, fh) => Math.max(fw / Math.max(1e-9, width), fh / Math.max(1e-9, height));
+
+export const clampOffset = (state, dims) => {
+  const { width, height } = dims;
+  const { fw, fh } = frameOf(dims);
   const zoom = clampZoom(state.zoom);
-  const scale = baseScale(width, height, diameter) * zoom;
-  return { x: clampAxis(state.x, width * scale, diameter), y: clampAxis(state.y, height * scale, diameter), zoom };
+  const scale = frameScale(width, height, fw, fh) * zoom;
+  return { x: clampAxis(state.x, width * scale, fw), y: clampAxis(state.y, height * scale, fh), zoom };
 };
 
 export const panBy = (state, dx, dy, dims) => clampOffset({ ...state, x: state.x + dx, y: state.y + dy }, dims);
@@ -57,6 +65,26 @@ export const cropRect = (state, dims) => {
     sy: fit(height / 2 + (-diameter / 2 - s.y) / scale, height),
     size,
   };
+};
+
+// D-232: the frame (stage px) for an aspect ratio (width / height) inside a square stage of `side`, its long side
+// `share` of the stage.
+export const frameSize = (side, aspect, share = 0.86) => {
+  const a = Number(aspect) > 0 ? Number(aspect) : 1;
+  const long = side * share;
+  return a >= 1 ? { frameWidth: long, frameHeight: long / a } : { frameWidth: long * a, frameHeight: long };
+};
+
+// D-232: the rectangle under a rectangular frame, in natural pixels of the photo, always inside the photo.
+export const frameRect = (state, dims) => {
+  const { width, height } = dims;
+  const { fw, fh } = frameOf(dims);
+  const s = clampOffset(state, dims);
+  const scale = frameScale(width, height, fw, fh) * s.zoom;
+  const sw = Math.max(1, Math.min(Math.round(fw / scale), Math.floor(width) || 1));
+  const sh = Math.max(1, Math.min(Math.round(fh / scale), Math.floor(height) || 1));
+  const fit = (value, extent, size) => Math.min(Math.max(0, Math.round(value)), Math.max(0, Math.floor(extent) - size));
+  return { sx: fit(width / 2 + (-fw / 2 - s.x) / scale, width, sw), sy: fit(height / 2 + (-fh / 2 - s.y) / scale, height, sh), sw, sh };
 };
 
 // Fix round 1 (I3): the decoded photo is at most MAX_DECODE px on its long side (aspect kept, never upscaled), so a

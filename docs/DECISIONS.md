@@ -4334,3 +4334,19 @@ bring a short line back.
   in every open chat. Helpers: `placeShareProblem`, `placeShareBody`, `parsePlaceBody` in `quick-share.js`.
 - **Checks.** Unit `quick-share.test.mjs` (590 total); e2e `share-place.spec.mjs` SP1-SP4 at 1440 and 390 (18/18);
   `chat-extras.spec.mjs` menu lists updated (152/152).
+
+## D-232 (2026-11-10): frame a post photo before sharing
+
+- **Report (founder, 2026-11-10, screenshot of the Notes "Put it out there." composer):** "there is no option to adjust
+  the area pls fix it".
+- **Decision.** Picking a post photo opens "Frame your post", the profile photo framer (`photo-crop.js`, D-080) in a
+  new rectangular mode: shape chips Portrait 4:5 (default, the shape the post opens at), Square and Landscape 5:4;
+  drag, pinch, wheel, slider and keys as before. "Use this frame" shows the framed photo whole at its shape in the
+  composer with an "Adjust photo" button that reopens the framer on the original (Cancel keeps the earlier framing).
+  The framed JPEG (long side <= 1600 px, then the usual 1280 px compression) is what is uploaded. If the framer cannot
+  load or read the photo, the photo is used as picked, so posting never breaks. The post's full view now shows the
+  whole photo (`object-fit: contain`) so the chosen frame is not cropped again; the feed thumbnail stays 5:4 cover.
+- **Maths.** `frameSize`, `frameScale`, `frameRect` in `photo-crop-math.js`; the circle's maths is unchanged (the
+  frame defaults to the circle's square).
+- **Checks.** Unit `photo-crop.test.mjs` (+4, 594 total); e2e `post-frame.spec.mjs` PF1-PF4 at 1440 and 390 (26/26,
+  axe clean); profile-media unchanged (its 7 known cover-input failures predate this).
