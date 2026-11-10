@@ -7,6 +7,8 @@ Update this file at the end of every session. CLAUDE.md holds the aim; this file
 
 ## 1. What is done
 
+**2026-11-10, D-235:** emoji in Notes comments: a quick row of eight reactions and the full emoji panel beside the box.
+
 **2026-11-10, D-234:** "Edit caption" in your open post; connections get "<Name> shared a new note" (bell and
 push) when you post (0071 live, push-notify v6).
 

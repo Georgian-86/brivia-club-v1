@@ -28,3 +28,10 @@
 .emoji-field-emoji:focus-visible { background: color-mix(in srgb, var(--color-chat-wine) 10%, transparent); outline: none; }
 /* Form label rules (`label > span` in Edit profile) must not grey the button's word. */
 .emoji-field button.emoji-field-toggle > span.emoji-field-text { color: var(--color-chat-wine); }
+
+/* D-235: the compact form beside a one-line composer (Notes comments): the face only, the panel opening upward. */
+.emoji-field.is-compact { position: static; flex: 0 0 auto; margin-top: 0; }
+.emoji-field.is-compact .emoji-field-toggle { width: 44px; height: 44px; justify-content: center; padding: 0; }
+.emoji-field.is-compact .emoji-field-toggle svg { width: 24px; height: 24px; }
+.emoji-field.is-compact .emoji-field-text { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+.emoji-field.is-compact .emoji-field-panel { position: absolute; left: 0; right: 0; bottom: calc(100% + 6px); margin: 0; }

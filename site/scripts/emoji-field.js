@@ -18,19 +18,21 @@ export const insertAt = (value, start, end, emoji, max = Infinity) => {
 };
 
 // field: a textarea or input. Adds the button and panel right after `after` (default: the field); returns { close }.
-export const attachEmojiPicker = (field, { label = 'Add an emoji', after = field } = {}) => {
+// D-235: `compact` shows the face only (no word) and opens the panel upward, for a one-line composer (Notes comments);
+// `insert(box)` places the button somewhere else than after `after`.
+export const attachEmojiPicker = (field, { label = 'Add an emoji', after = field, compact = false, insert = null } = {}) => {
   if (!field || field.dataset.emojiField) return null;
   field.dataset.emojiField = '1';
   seq += 1;
   const id = `emoji-panel-${seq}`;
   const box = document.createElement('div');
-  box.className = 'emoji-field';
+  box.className = compact ? 'emoji-field is-compact' : 'emoji-field';
   box.innerHTML = `<button type="button" class="emoji-field-toggle" aria-label="${label}" aria-expanded="false" aria-controls="${id}">${FACE}<span class="emoji-field-text">Emoji</span></button>
     <div class="emoji-field-panel" id="${id}" role="group" aria-label="Emoji" hidden>
       <div class="emoji-field-tabs" role="tablist" aria-label="Emoji categories">${TABS.map(([key, name], i) => `<button type="button" role="tab" data-emoji-tab="${key}" aria-selected="${i === 0}">${name}</button>`).join('')}</div>
       <div class="emoji-field-grid" role="tabpanel"></div>
     </div>`;
-  after.insertAdjacentElement('afterend', box);
+  if (insert) insert(box); else after.insertAdjacentElement('afterend', box);
   const toggle = box.querySelector('.emoji-field-toggle');
   const panel = box.querySelector('.emoji-field-panel');
   const grid = box.querySelector('.emoji-field-grid');
