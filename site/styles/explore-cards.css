@@ -312,3 +312,12 @@ body.app-body .post-card-delete[aria-busy="true"]{opacity:.5;cursor:progress}
 .post-caption-edit-cancel{border:1px solid var(--brivia-wine);background:transparent;color:var(--brivia-wine)}
 .post-caption-edit-save{border:1px solid var(--brivia-wine);background:var(--brivia-wine);color:var(--color-cream)}
 .post-caption-edit-save[aria-busy="true"]{opacity:.7;cursor:progress}
+
+/* D-235: emoji in Notes comments. The form is the anchor of the upward emoji panel; a quick row of reactions above. */
+.post-comment-form{position:relative;grid-template-columns:minmax(0,1fr)}
+.post-comment-quick{display:flex;gap:2px;overflow-x:auto;margin:0 calc(-1 * var(--space-1));scrollbar-width:none}
+.post-comment-quick::-webkit-scrollbar{display:none}
+.post-comment-quick button{flex:0 0 auto;width:44px;height:44px;padding:0;border:0;border-radius:50%;background:transparent;font-size:22px;line-height:1;cursor:pointer}
+.post-comment-quick button:hover{background:color-mix(in srgb, var(--brivia-wine) 8%, transparent)}
+.post-comment-quick button:focus-visible{outline:2px solid var(--brivia-wine);outline-offset:-2px}
+.post-comment-row{align-items:flex-end}

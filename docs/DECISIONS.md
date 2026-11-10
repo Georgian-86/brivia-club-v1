@@ -4378,3 +4378,14 @@ bring a short line back.
 - **Checks.** SQL `zk-new-post-notes.test.sql` (harness all passed); unit `member-notifications.test.mjs` (+1, 595);
   e2e `post-edit.spec.mjs` PE1-PE4 and PN6 at 1440 and 390 (axe clean); post-notifications, post-delete, post-frame,
   post-activity pass. 0071 applied live; push-notify v6 deployed (verified identical to the repo).
+
+## D-235 (2026-11-10): emoji in Notes comments
+
+- **Request (founder, 2026-11-10):** "i need option of emojis for comments section in notes".
+- **Decision.** The comment box in an open note gets (1) a quick row of eight common reactions (❤️ 🙌 🔥 👏 😍 😂 😮 😢)
+  above it and (2) a smiley button beside it that opens the full emoji panel (the bio's picker, `emoji-field.js` D-113,
+  in a new `compact` mode: icon only, panel opening upward over the thread). Both insert at the cursor within the
+  comment's length limit and enable Post; Escape closes the panel before the note; posting closes it. All targets 44 px.
+  The form's grid column is `minmax(0, 1fr)` so the scrolling quick row never widens it past the screen.
+- **Checks.** e2e `comment-emoji.spec.mjs` CE1-CE4 at 1440 and 390 (axe clean, no overflow); post-activity, post-edit,
+  post-notifications, profile-edit and create-event (the other emoji pickers) pass; unit 595.

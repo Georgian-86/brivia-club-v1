@@ -77,7 +77,7 @@ try { const img = new Image(); img.decoding = 'async'; img.src = shuffleWordmark
 import { mutualMoment, pitchSentFlight, flipIn, attachCardTilt, shimmerShared, slideModePill, markArrivals, revealOnScroll } from './motion-moments.js';
 import { whyPanelMarkup, whyRow } from './why-panel.js';
 import { chatEmojiCategories } from './chat-emoji-data.js';
-import { attachEmojiPicker } from './emoji-field.js';
+import { attachEmojiPicker, insertAt } from './emoji-field.js';
 import { chatGifCatalog } from './chat-gif-data.js';
 import { typingTopic, createTypingSender, createTypingReceiver, TYPING_EVENT } from './chat-typing.js';
 import '../styles/chat-attachments.css';
@@ -5764,6 +5764,9 @@ const commentMarkup = (comment, post, depth = 0, parentName = '') => {
     + `<p class="post-comment-actions"><button type="button" data-comment-reply="${escapeHtml(comment.id)}" data-comment-name="${escapeHtml(own ? 'yourself' : who.name)}">Reply</button>${canDelete ? `<button type="button" data-comment-delete="${escapeHtml(comment.id)}">Delete</button>` : ''}</p>`
     + `</div></div>${replies}</li>`;
 };
+// D-235: emoji in Notes comments: a quick row of common reactions and the full emoji panel (emoji-field.js) beside the
+// box. Both insert at the cursor, within the comment's length limit, and enable Post.
+const COMMENT_QUICK_EMOJI = ['❤️', '🙌', '🔥', '👏', '😍', '😂', '😮', '😢'];
 const mountPostComments = async (dialog, post, author) => {
   const listBox = dialog.querySelector('[data-post-comments]');
   const form = dialog.querySelector('[data-post-comment-form]');
@@ -5797,6 +5800,20 @@ const mountPostComments = async (dialog, post, author) => {
     if (event.key === 'Escape' && replyTo) { event.preventDefault(); event.stopPropagation(); setReply(null); }
   });
   replying.querySelector('[data-reply-cancel]').addEventListener('click', () => { setReply(null); input.focus(); });
+  const emoji = attachEmojiPicker(input, { label: 'Add an emoji to your comment', compact: true, insert: (box) => input.before(box) });
+  const quick = form.querySelector('.post-comment-quick');
+  quick?.addEventListener('mousedown', (event) => event.preventDefault());   // keep the cursor in the box
+  quick?.addEventListener('click', (event) => {
+    const b = event.target.closest('[data-comment-emoji]');
+    if (!b) return;
+    const max = input.maxLength > 0 ? input.maxLength : Infinity;
+    const result = insertAt(input.value, input.selectionStart, input.selectionEnd, b.dataset.commentEmoji, max);
+    if (!result) return;
+    input.value = result.value;
+    input.focus({ preventScroll: true });
+    input.setSelectionRange(result.caret, result.caret);
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+  });
   form.addEventListener('submit', async (event) => {
     event.preventDefault();
     const body = cleanCommentBody(input.value);
@@ -5810,6 +5827,7 @@ const mountPostComments = async (dialog, post, author) => {
     if (!dialog.isConnected) return;
     if (error) { send.disabled = false; showToast(COMMENT_FAILED); return; }
     sendPendingPush();   // D-151: the note's author is notified (server trigger); push it to their devices
+    emoji?.close();
     rows.push({ ...row, author_id: row.author_id || memberProfile.id });
     input.value = '';
     fit();
@@ -5885,6 +5903,7 @@ const openCommunityPostDetail = async (postId, opener = document.activeElement) 
     + (String(post.author_id) === String(memberProfile.id) ? '<div class="post-detail-own"><button type="button" class="post-detail-edit" data-post-edit>Edit caption</button><button type="button" class="post-detail-delete" data-post-delete>Delete post</button></div>' : '')
     + '<section class="post-comments" aria-labelledby="post-comments-title"><h3 class="post-comments-title" id="post-comments-title">Comments</h3><div class="post-comments-list" data-post-comments aria-live="polite"><p class="post-comments-note">Loading comments…</p></div></section></div>'
     + `<form class="post-detail-footer post-comment-form" data-post-comment-form novalidate><p class="post-comment-replying" data-replying hidden><span></span><button type="button" data-reply-cancel aria-label="Cancel reply">×</button></p>`
+    + `<div class="post-comment-quick" role="group" aria-label="Quick emoji">${COMMENT_QUICK_EMOJI.map((e) => `<button type="button" data-comment-emoji="${e}" aria-label="Add ${e}">${e}</button>`).join('')}</div>`
     + `<div class="post-comment-row"><label class="sr-only" for="post-comment-input">Write a comment</label><textarea id="post-comment-input" name="comment" rows="1" maxlength="${COMMENT_MAX}" placeholder="Add a comment…" autocomplete="off"></textarea>`
     + '<button type="submit" class="post-comment-send" disabled>Post</button></div></form></div>';
   dialog.__returnFocus = opener;
