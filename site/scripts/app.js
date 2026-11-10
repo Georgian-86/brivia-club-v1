@@ -5548,6 +5548,7 @@ const renderCommunityPosts = () => {
       dateLabel: formatCommunityPostDate(post.created_at),
       activity: activityFor(post.id),
       summary: activitySummaryFor(post.id),
+      own: Boolean(memberProfile.id) && String(post.author_id) === String(memberProfile.id),
     }, { escapeHtml, renderAvatar });
   }).join('');
   syncReactionAvailability();
@@ -5879,6 +5880,7 @@ const openCommunityPostDetail = async (postId, opener = document.activeElement) 
     + `<div class="post-detail-body"><p class="post-detail-caption">${escapeHtml(post.caption || '')}</p>`
     + `<div class="post-detail-stats" data-post-detail-stats></div>`
     + '<button type="button" class="post-detail-action post-detail-action--quiet" data-post-detail-action aria-busy="true" disabled>View profile</button>'
+    + (String(post.author_id) === String(memberProfile.id) ? '<button type="button" class="post-detail-delete" data-post-delete>Delete post</button>' : '')
     + '<section class="post-comments" aria-labelledby="post-comments-title"><h3 class="post-comments-title" id="post-comments-title">Comments</h3><div class="post-comments-list" data-post-comments aria-live="polite"><p class="post-comments-note">Loading comments…</p></div></section></div>'
     + `<form class="post-detail-footer post-comment-form" data-post-comment-form novalidate><p class="post-comment-replying" data-replying hidden><span></span><button type="button" data-reply-cancel aria-label="Cancel reply">×</button></p>`
     + `<div class="post-comment-row"><label class="sr-only" for="post-comment-input">Write a comment</label><textarea id="post-comment-input" name="comment" rows="1" maxlength="${COMMENT_MAX}" placeholder="Add a comment…" autocomplete="off"></textarea>`
@@ -5888,6 +5890,7 @@ const openCommunityPostDetail = async (postId, opener = document.activeElement) 
   dialog.addEventListener('cancel', (event) => { event.preventDefault(); closeCommunityPostDetail(); });
   dialog.addEventListener('click', (event) => {
     if (event.target === dialog || event.target.closest('[data-post-detail-close]')) closeCommunityPostDetail();
+    else if (event.target.closest('[data-post-delete]')) void deleteCommunityPost(post.id);
   });
   dialog.showModal();
   dialog.querySelector('[data-post-detail-close]')?.focus();
@@ -5907,6 +5910,30 @@ const openCommunityPostDetail = async (postId, opener = document.activeElement) 
     openPublicProfile(isOwn ? memberProfile : (communityPostAuthors[author.id] || findPersonById(author.id) || author), { forcePublic: !isOwn });
   });
 };
+// D-233: a member deletes their own post (RLS allows only the author; likes, comments, shares and its notifications
+// cascade). Confirmed first. Its image is removed only when it is the member's own community-posts file.
+const deleteCommunityPost = async (postId) => {
+  const post = communityPosts.find((item) => String(item.id) === String(postId));
+  if (!post || !supabase || !memberProfile.id || String(post.author_id) !== String(memberProfile.id)) return;
+  if (!window.confirm('Delete this post? It is removed for everyone, with its likes and comments.')) return;
+  const buttons = document.querySelectorAll(`.post-card[data-post-id="${CSS.escape(String(post.id))}"] [data-post-action="delete"], #post-detail [data-post-delete]`);
+  buttons.forEach((button) => setBusy(button, true));
+  try {
+    const { data, error } = await supabase.from('community_posts').delete().eq('id', post.id).eq('author_id', memberProfile.id).select('id');
+    if (error) throw error;
+    if (!data?.length) throw new Error('not deleted');
+  } catch {
+    buttons.forEach((button) => { if (button.isConnected) setBusy(button, false); });
+    showToast('Your post could not be deleted. Please try again.');
+    return;
+  }
+  const own = typeof post.image_path === 'string' && post.image_path.startsWith(`${memberProfile.id}/`);
+  if (own) void removeCommunityPostImage(post.image_path).catch(() => {});
+  communityPosts = communityPosts.filter((item) => String(item.id) !== String(post.id));
+  if (document.querySelector('#post-detail')?.dataset.postId === String(post.id)) closeCommunityPostDetail();
+  renderCommunityPosts();
+  showToast('Post deleted.');
+};
 // One delegated listener for every card's actions (the cards are re-rendered on sort and reload). A tap on the image
 // opens the post too (pointer convenience; keyboard and screen-reader users have Comment).
 const bindCommunityPostActions = () => {
@@ -5922,6 +5949,7 @@ const bindCommunityPostActions = () => {
     // Safari does not focus a clicked button: pass it, so closing the detail returns focus to Comment.
     else if (action === 'comment') openCommunityPostDetail(postId, event.target.closest('[data-post-action]'));
     else if (action === 'share') shareCommunityPost(postId, event.target.closest('[data-post-action]'));
+    else if (action === 'delete') void deleteCommunityPost(postId);
     else if (!action && event.target.closest('.post-card-media')) openCommunityPostDetail(postId, card.querySelector('[data-post-action="comment"]'));
   });
 };

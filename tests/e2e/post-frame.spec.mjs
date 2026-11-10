@@ -46,7 +46,7 @@ try {
         return { overflow: document.documentElement.scrollWidth - window.innerWidth, small: r.filter((x) => x.height < 44 || x.right > window.innerWidth + 0.5).length };
       });
       check('390 PF4 dialog fits, targets >= 44 px', m.overflow <= 0 && m.small === 0, JSON.stringify(m));
-      const v = await axeViolations(page, '.photo-crop');
+      const v = await axeViolations(page, { include: '.photo-crop' });
       check('390 PF4 frame dialog axe clean', v.length === 0, JSON.stringify(v));
     }
     if (shots) await page.screenshot({ path: `${shots}/post-frame-${w}.png` });

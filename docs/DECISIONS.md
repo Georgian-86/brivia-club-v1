@@ -4350,3 +4350,14 @@ bring a short line back.
   frame defaults to the circle's square).
 - **Checks.** Unit `photo-crop.test.mjs` (+4, 594 total); e2e `post-frame.spec.mjs` PF1-PF4 at 1440 and 390 (26/26,
   axe clean); profile-media unchanged (its 7 known cover-input failures predate this).
+
+## D-233 (2026-11-10): delete your own post
+
+- **Request (founder, 2026-11-10):** "pls give an option to delete the post, i mistakenly posted something".
+- **Decision.** Your own post card has a bin button in its header bar ("Delete your post", 44 px), and your open post
+  has "Delete post". Both ask first ("Delete this post? It is removed for everyone, with its likes and comments."),
+  then delete by id and author. The live RLS policy from 0001 already allows only the author to delete; likes,
+  comments, shares and post notifications cascade (0012, 0015, 0043). Your image file is then removed when it is your
+  own `community-posts/<your id>/` file (storage policy from 0001). The card disappears, an open post closes, and a
+  toast says "Post deleted."; a refused delete keeps everything and says it could not be deleted. No migration.
+- **Checks.** e2e `post-delete.spec.mjs` PD1-PD5 at 1440 and 390 (axe clean); post-activity and post-frame pass.
