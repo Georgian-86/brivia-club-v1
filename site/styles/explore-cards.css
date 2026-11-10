@@ -161,7 +161,7 @@ dialog.post-detail[open]{animation:post-detail-in var(--motion-slow) var(--ease)
   box-shadow:0 40px 90px -30px color-mix(in srgb, var(--brivia-deep-wine) 80%, transparent);
 }
 .post-detail-media{grid-area:media;position:relative;aspect-ratio:4/5;max-height:calc(100dvh - 48px);overflow:hidden;background:color-mix(in srgb, var(--brivia-wine) 8%, var(--color-cream))}
-.post-detail-media img{display:block;width:100%;height:100%;object-fit:cover}
+.post-detail-media img{display:block;width:100%;height:100%;object-fit:contain} /* D-232: the whole framed photo, never re-cropped */
 .post-detail-head{grid-area:head;display:flex;align-items:center;gap:var(--space-3);min-height:72px;padding:var(--space-3) var(--space-3) var(--space-3) var(--space-5);background:var(--brivia-wine);color:var(--color-cream)}
 .post-detail-head .post-card-avatar{flex-basis:40px;width:40px;height:40px}
 .post-detail-byline{flex:1 1 auto;min-width:0}

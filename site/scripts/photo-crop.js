@@ -6,9 +6,17 @@
 // (zoom). Escape or Cancel resolves null. Focus is trapped while open and returns to `returnFocus` on close.
 import '../styles/photo-crop.css';
 import { ImageProcessingError } from './image-compress.js';
-import { MIN_ZOOM, MAX_ZOOM, clampZoom, clampOffset, panBy, zoomAbout, wheelZoom, pinchZoom, cropRect, initialCrop, baseScale, decodeSize } from './photo-crop-math.js';
+import { MIN_ZOOM, MAX_ZOOM, clampZoom, clampOffset, panBy, zoomAbout, wheelZoom, pinchZoom, cropRect, initialCrop, baseScale, decodeSize, frameSize, frameRect, frameScale } from './photo-crop-math.js';
 
 export const OUTPUT_SIZE = 800;
+// D-232: a post photo framed in a rectangle is exported with its long side at most this (the upload compresses to 1280).
+export const FRAME_OUTPUT_LONG = 1600;
+// D-232: the shapes offered when a post photo is framed (width / height).
+export const POST_ASPECTS = [
+  { value: 4 / 5, label: 'Portrait', ratio: '4:5' },
+  { value: 1, label: 'Square', ratio: '1:1' },
+  { value: 5 / 4, label: 'Landscape', ratio: '5:4' },
+];
 const MASK = 0.86; // the circle's share of the stage side
 const KEY_STEP = 12;
 
@@ -62,14 +70,19 @@ const decode = async (file) => {
 const toBlob = (canvas, type, quality) => new Promise((resolve) => canvas.toBlob(resolve, type, quality));
 
 // The framed square as a JPEG File (OUTPUT_SIZE x OUTPUT_SIZE).
+// D-232: a rect with sw / sh (a rectangular frame) is exported at its own shape, long side <= FRAME_OUTPUT_LONG.
 export const renderCrop = async (decoded, rect, name = 'photo') => {
+  const sw = rect.sw ?? rect.size;
+  const sh = rect.sh ?? rect.size;
+  const rectangular = rect.sw != null;
+  const fit = rectangular ? Math.min(FRAME_OUTPUT_LONG / Math.max(sw, sh), 1) : 0;
   const canvas = document.createElement('canvas');
-  canvas.width = OUTPUT_SIZE;
-  canvas.height = OUTPUT_SIZE;
+  canvas.width = rectangular ? Math.max(1, Math.round(sw * fit)) : OUTPUT_SIZE;
+  canvas.height = rectangular ? Math.max(1, Math.round(sh * fit)) : OUTPUT_SIZE;
   const context = canvas.getContext('2d');
   if (!context) throw new ImageProcessingError();
   context.imageSmoothingQuality = 'high';
-  context.drawImage(decoded.source, rect.sx, rect.sy, rect.size, rect.size, 0, 0, OUTPUT_SIZE, OUTPUT_SIZE);
+  context.drawImage(decoded.source, rect.sx, rect.sy, sw, sh, 0, 0, canvas.width, canvas.height);
   const blob = await toBlob(canvas, 'image/jpeg', 0.9);
   if (!blob) throw new ImageProcessingError();
   return new File([blob], `${String(name || 'photo').replace(/\.[^.]+$/, '')}.jpg`, { type: 'image/jpeg', lastModified: Date.now() });
@@ -78,10 +91,13 @@ export const renderCrop = async (decoded, rect, name = 'photo') => {
 const ICON_MINUS = '<svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" focusable="false"><path d="M5 12h14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>';
 const ICON_PLUS = '<svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" focusable="false"><path d="M5 12h14M12 5v14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>';
 
-const markup = () => `<div class="photo-crop-dialog" role="dialog" aria-modal="true" aria-labelledby="photo-crop-title" aria-describedby="photo-crop-help" tabindex="-1">
-  <p class="photo-crop-kicker">PROFILE PHOTO</p>
-  <h2 class="photo-crop-title" id="photo-crop-title">Frame your photo</h2>
-  <p class="photo-crop-help" id="photo-crop-help">Drag to choose what shows in the circle. Zoom with the slider, a pinch or the mouse wheel. Arrow keys move it; + and − zoom.</p>
+const escapeText = (value) => String(value ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const aspectChips = (aspects, current) => (aspects?.length > 1 ? `<div class="photo-crop-aspects" role="group" aria-label="Shape">${aspects.map((a, i) => `<button type="button" class="photo-crop-aspect" data-photo-crop-aspect="${i}" aria-pressed="${a.value === current}"><span class="photo-crop-aspect-icon" style="aspect-ratio:${a.value}" aria-hidden="true"></span>${escapeText(a.label)} <small>${escapeText(a.ratio || '')}</small></button>`).join('')}</div>` : '');
+const markup = (o = {}) => `<div class="photo-crop-dialog${o.rect ? ' is-rect' : ''}" role="dialog" aria-modal="true" aria-labelledby="photo-crop-title" aria-describedby="photo-crop-help" tabindex="-1">
+  <p class="photo-crop-kicker">${escapeText(o.kicker || 'PROFILE PHOTO')}</p>
+  <h2 class="photo-crop-title" id="photo-crop-title">${escapeText(o.title || 'Frame your photo')}</h2>
+  <p class="photo-crop-help" id="photo-crop-help">${escapeText(o.help || 'Drag to choose what shows in the circle. Zoom with the slider, a pinch or the mouse wheel. Arrow keys move it; + and − zoom.')}</p>
+  ${o.rect ? aspectChips(o.aspects, o.aspect) : ''}
   <div class="photo-crop-body">
     <div class="photo-crop-stage" tabindex="0" role="group" aria-label="Photo framing. Arrow keys move the photo, plus and minus zoom." data-photo-crop-stage>
       <canvas class="photo-crop-canvas" aria-hidden="true"></canvas>
@@ -99,7 +115,7 @@ const markup = () => `<div class="photo-crop-dialog" role="dialog" aria-modal="t
   </div>
   <div class="photo-crop-actions">
     <button type="button" class="photo-crop-cancel" data-photo-crop-cancel>Cancel</button>
-    <button type="button" class="photo-crop-use" data-photo-crop-use>Use photo</button>
+    <button type="button" class="photo-crop-use" data-photo-crop-use>${escapeText(o.useLabel || 'Use photo')}</button>
   </div>
 </div>`;
 
@@ -107,14 +123,19 @@ const FOCUSABLE = 'button:not([disabled]), input:not([disabled]), [tabindex]:not
 
 // Resolves with the framed File, or null on Cancel / Escape. Throws ImageProcessingError when the file cannot be
 // decoded (nothing is shown then; the caller keeps its existing inline error path).
-export async function openPhotoCrop(file, { returnFocus = null } = {}) {
+// D-232: pass `frame` ({ aspects, aspect, kicker, title, help, useLabel }) for a rectangular frame (a post photo):
+// the member picks a shape from `aspects` and the result keeps that shape. Without it: the round profile photo frame.
+export async function openPhotoCrop(file, { returnFocus = null, frame = null } = {}) {
   let decoded;
   try { decoded = await decode(file); } catch { throw new ImageProcessingError(); }
   if (!(decoded.width > 0) || !(decoded.height > 0)) { decoded.release(); throw new ImageProcessingError(); }
 
   const root = document.createElement('div');
   root.className = 'photo-crop';
-  root.innerHTML = markup();
+  const rectMode = Boolean(frame);
+  const aspects = rectMode ? (frame.aspects?.length ? frame.aspects : POST_ASPECTS) : [];
+  let aspect = rectMode ? (Number(frame.aspect) > 0 ? Number(frame.aspect) : aspects[0].value) : 1;
+  root.innerHTML = markup(rectMode ? { ...frame, rect: true, aspects, aspect } : {});
   document.body.append(root);
   document.body.classList.add('photo-crop-open');
   // Fix round 1 (I1): everything behind the dialog is inert while it is open (the profile editor included), so a click
@@ -130,7 +151,20 @@ export async function openPhotoCrop(file, { returnFocus = null } = {}) {
 
   let side = 0; // stage side in CSS px
   let state = initialCrop();
-  const dims = () => ({ width: decoded.width, height: decoded.height, diameter: side * MASK });
+  const mask = root.querySelector('.photo-crop-mask');
+  const dims = () => (rectMode
+    ? { width: decoded.width, height: decoded.height, ...frameSize(side, aspect, MASK) }
+    : { width: decoded.width, height: decoded.height, diameter: side * MASK });
+  const shapeFrame = () => {
+    if (!rectMode) return;
+    const f = frameSize(100, aspect, MASK);
+    mask.style.inset = `${(100 - f.frameHeight) / 2}% ${(100 - f.frameWidth) / 2}%`;
+    const long = 160;
+    preview.width = Math.round(aspect >= 1 ? long : long * aspect);
+    preview.height = Math.round(aspect >= 1 ? long / aspect : long);
+    preview.style.aspectRatio = String(aspect);
+  };
+  shapeFrame();
 
   const draw = () => {
     if (!side) return;
@@ -139,16 +173,17 @@ export async function openPhotoCrop(file, { returnFocus = null } = {}) {
     if (canvas.width !== px) { canvas.width = px; canvas.height = px; }
     const context = canvas.getContext('2d');
     if (!context) return;
-    const scale = baseScale(decoded.width, decoded.height, side * MASK) * state.zoom;
+    const d = dims();
+    const scale = (rectMode ? frameScale(decoded.width, decoded.height, d.frameWidth, d.frameHeight) : baseScale(decoded.width, decoded.height, side * MASK)) * state.zoom;
     const w = decoded.width * scale;
     const h = decoded.height * scale;
     context.setTransform(ratio, 0, 0, ratio, 0, 0);
     context.clearRect(0, 0, side, side);
     context.drawImage(decoded.source, side / 2 + state.x - w / 2, side / 2 + state.y - h / 2, w, h);
-    const rect = cropRect(state, dims());
+    const rect = rectMode ? frameRect(state, d) : cropRect(state, d);
     const p = preview.getContext('2d');
-    if (p) { p.clearRect(0, 0, preview.width, preview.height); p.drawImage(decoded.source, rect.sx, rect.sy, rect.size, rect.size, 0, 0, preview.width, preview.height); }
-    stage.dataset.cropRect = `${rect.sx},${rect.sy},${rect.size}`;
+    if (p) { p.clearRect(0, 0, preview.width, preview.height); p.drawImage(decoded.source, rect.sx, rect.sy, rect.sw ?? rect.size, rect.sh ?? rect.size, 0, 0, preview.width, preview.height); }
+    stage.dataset.cropRect = rectMode ? `${rect.sx},${rect.sy},${rect.sw},${rect.sh}` : `${rect.sx},${rect.sy},${rect.size}`;
     stage.dataset.sourceSize = `${decoded.width},${decoded.height}`;
     range.value = String(state.zoom);
     range.setAttribute('aria-valuetext', `${state.zoom.toFixed(1)} times`);
@@ -215,6 +250,15 @@ export async function openPhotoCrop(file, { returnFocus = null } = {}) {
 
   range.addEventListener('input', () => { state = zoomAbout(state, Number(range.value), { x: 0, y: 0 }, dims()); draw(); });
   const zoomStep = (direction) => { state = zoomAbout(state, clampZoom(state.zoom + direction * 0.25), { x: 0, y: 0 }, dims()); draw(); };
+  root.querySelectorAll('[data-photo-crop-aspect]').forEach((button) => button.addEventListener('click', () => {
+    const next = aspects[Number(button.dataset.photoCropAspect)];
+    if (!next || next.value === aspect) return;
+    aspect = next.value;
+    frame.onAspect?.(aspect);
+    root.querySelectorAll('[data-photo-crop-aspect]').forEach((b) => b.setAttribute('aria-pressed', String(b === button)));
+    shapeFrame();
+    set(initialCrop());
+  }));
   root.querySelectorAll('[data-photo-crop-zoom]').forEach((button) => button.addEventListener('click', () => zoomStep(Number(button.dataset.photoCropZoom))));
 
   return new Promise((resolve) => {
@@ -237,7 +281,7 @@ export async function openPhotoCrop(file, { returnFocus = null } = {}) {
       useButton.disabled = true;
       useButton.setAttribute('aria-busy', 'true');
       try {
-        finish(await renderCrop(decoded, cropRect(state, dims()), file?.name));
+        finish(await renderCrop(decoded, rectMode ? frameRect(state, dims()) : cropRect(state, dims()), file?.name));
       } catch {
         useButton.disabled = false;
         useButton.removeAttribute('aria-busy');

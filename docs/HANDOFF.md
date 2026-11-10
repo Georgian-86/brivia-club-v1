@@ -7,6 +7,9 @@ Update this file at the end of every session. CLAUDE.md holds the aim; this file
 
 ## 1. What is done
 
+**2026-11-10, D-232:** posting a photo opens "Frame your post" (Portrait 4:5 / Square / Landscape 5:4, drag and
+zoom); "Adjust photo" reframes it. The post's full view shows the whole framed photo.
+
 **2026-11-10, D-231:** chat **+** → "Share a place": send any place by name or Google Maps link; it shows as a
 "Shared place" card that opens in Maps. Coordinates and non-Maps links are refused.
 
