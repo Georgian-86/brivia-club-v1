@@ -79,3 +79,5 @@
 .notification-post-thumb img{display:block;width:100%;height:100%;object-fit:cover}
 /* D-203: a registration for my event. */
 .notification-post-kind.is-event svg{stroke-linecap:round}
+/* D-234: a connection shared a new note. */
+.notification-post-kind.is-new svg{stroke-linecap:round;stroke-width:2}

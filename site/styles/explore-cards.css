@@ -295,3 +295,20 @@ body.app-body .post-card-delete[aria-busy="true"]{opacity:.5;cursor:progress}
 .post-detail-delete{display:block;min-height:44px;margin:calc(-1 * var(--space-2)) var(--space-6) var(--space-4);padding:0;border:0;background:transparent;color:var(--color-danger, #9b2335);font-family:var(--font-body);font-size:var(--text-12);font-weight:700;letter-spacing:.12em;text-transform:uppercase;text-decoration:underline;text-underline-offset:3px;cursor:pointer}
 .post-detail-delete:focus-visible{outline:2px solid var(--brivia-wine);outline-offset:3px}
 .post-detail-delete[aria-busy="true"]{opacity:.6;cursor:progress}
+
+/* D-234: edit your caption in the open post. "Edit caption" and "Delete post" share one row. */
+.post-detail-own{display:flex;flex-wrap:wrap;gap:var(--space-5);margin:calc(-1 * var(--space-2)) var(--space-6) var(--space-4)}
+.post-detail-own[hidden]{display:none}
+.post-detail-own .post-detail-delete{margin:0}
+.post-detail-edit{display:block;min-height:44px;margin:0;padding:0;border:0;background:transparent;color:var(--brivia-wine);font-family:var(--font-body);font-size:var(--text-12);font-weight:700;letter-spacing:.12em;text-transform:uppercase;text-decoration:underline;text-underline-offset:3px;cursor:pointer}
+.post-detail-edit:focus-visible{outline:2px solid var(--brivia-wine);outline-offset:3px}
+.post-caption-edit{display:grid;gap:var(--space-2);margin:0 var(--space-6) var(--space-4)}
+.post-caption-edit textarea{box-sizing:border-box;width:100%;min-height:88px;padding:var(--space-3);border:1px solid color-mix(in srgb, var(--brivia-wine) 30%, transparent);border-radius:12px;background:var(--color-cream);color:var(--color-ink);font:400 var(--text-16)/1.4 var(--font-body);resize:vertical}
+.post-caption-edit textarea:focus-visible{outline:2px solid var(--brivia-wine);outline-offset:2px}
+.post-caption-edit-error{margin:0;color:#9b2335;font-size:var(--text-14)}
+.post-caption-edit-error[hidden]{display:none}
+.post-caption-edit-actions{display:flex;justify-content:flex-end;gap:var(--space-3)}
+.post-caption-edit-cancel,.post-caption-edit-save{min-height:44px;min-width:96px;padding:0 var(--space-5);border-radius:var(--radius-pill);font:700 var(--text-12) var(--font-body);letter-spacing:.1em;text-transform:uppercase;cursor:pointer}
+.post-caption-edit-cancel{border:1px solid var(--brivia-wine);background:transparent;color:var(--brivia-wine)}
+.post-caption-edit-save{border:1px solid var(--brivia-wine);background:var(--brivia-wine);color:var(--color-cream)}
+.post-caption-edit-save[aria-busy="true"]{opacity:.7;cursor:progress}

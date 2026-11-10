@@ -7,6 +7,9 @@ Update this file at the end of every session. CLAUDE.md holds the aim; this file
 
 ## 1. What is done
 
+**2026-11-10, D-234:** "Edit caption" in your open post; connections get "<Name> shared a new note" (bell and
+push) when you post (0071 live, push-notify v6).
+
 **2026-11-10, D-233:** delete your own post: the bin on your post card, or "Delete post" in the open post (asks
 first; likes and comments go with it).
 

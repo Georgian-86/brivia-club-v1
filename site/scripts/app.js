@@ -737,13 +737,15 @@ const renderNotifications = () => {
   }).join('');
   const heartIcon = '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 13.6S2.2 10.2 2.2 6.1A2.9 2.9 0 0 1 8 4.6a2.9 2.9 0 0 1 5.8 1.5c0 4.1-5.8 7.5-5.8 7.5Z"/></svg>';
   const commentIcon = '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3 12.8V4.5A1.5 1.5 0 0 1 4.5 3h7A1.5 1.5 0 0 1 13 4.5v5A1.5 1.5 0 0 1 11.5 11H5.5Z"/></svg>';
+  const newNoteIcon = '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 2.5v11M2.5 8h11"/></svg>';
+  const postKind = (type) => (type === 'post_like' ? ['like', heartIcon] : type === 'post_new' ? ['new', newNoteIcon] : ['comment', commentIcon]);
   const postHtml = postGroups.map((g) => {
     const copy = postNotificationCopy(g);
     const lead = g.people[0] || {};
     const person = findPersonById(lead.id) || { name: lead.name, image: lead.photoUrl };
     const thumb = g.postImage && isStorageImageUrl(g.postImage) ? `<img src="${escapeHtml(g.postImage)}" alt="" loading="lazy" decoding="async" />` : '';
     return `<button type="button" class="notification-post${g.unread ? ' is-unread' : ''}" data-post-note="${escapeHtml(g.key)}" aria-label="${escapeHtml(`${copy.title}. ${copy.line}`.trim())}">`
-      + `<span class="notification-nearby-face">${renderAvatar(person, 'notification-avatar')}<i class="notification-post-kind is-${g.type === 'post_like' ? 'like' : 'comment'}">${g.type === 'post_like' ? heartIcon : commentIcon}</i></span>`
+      + `<span class="notification-nearby-face">${renderAvatar(person, 'notification-avatar')}<i class="notification-post-kind is-${postKind(g.type)[0]}">${postKind(g.type)[1]}</i></span>`
       + `<span class="notification-nearby-copy"><strong>${escapeHtml(copy.title)}</strong>${copy.line ? `<span>${escapeHtml(copy.line)}</span>` : ''}<small>${escapeHtml(formatNotificationTime(g.createdAt))}</small></span>`
       + `${thumb ? `<span class="notification-post-thumb">${thumb}</span>` : ''}</button>`;
   }).join('');
@@ -5880,7 +5882,7 @@ const openCommunityPostDetail = async (postId, opener = document.activeElement) 
     + `<div class="post-detail-body"><p class="post-detail-caption">${escapeHtml(post.caption || '')}</p>`
     + `<div class="post-detail-stats" data-post-detail-stats></div>`
     + '<button type="button" class="post-detail-action post-detail-action--quiet" data-post-detail-action aria-busy="true" disabled>View profile</button>'
-    + (String(post.author_id) === String(memberProfile.id) ? '<button type="button" class="post-detail-delete" data-post-delete>Delete post</button>' : '')
+    + (String(post.author_id) === String(memberProfile.id) ? '<div class="post-detail-own"><button type="button" class="post-detail-edit" data-post-edit>Edit caption</button><button type="button" class="post-detail-delete" data-post-delete>Delete post</button></div>' : '')
     + '<section class="post-comments" aria-labelledby="post-comments-title"><h3 class="post-comments-title" id="post-comments-title">Comments</h3><div class="post-comments-list" data-post-comments aria-live="polite"><p class="post-comments-note">Loading comments…</p></div></section></div>'
     + `<form class="post-detail-footer post-comment-form" data-post-comment-form novalidate><p class="post-comment-replying" data-replying hidden><span></span><button type="button" data-reply-cancel aria-label="Cancel reply">×</button></p>`
     + `<div class="post-comment-row"><label class="sr-only" for="post-comment-input">Write a comment</label><textarea id="post-comment-input" name="comment" rows="1" maxlength="${COMMENT_MAX}" placeholder="Add a comment…" autocomplete="off"></textarea>`
@@ -5891,6 +5893,7 @@ const openCommunityPostDetail = async (postId, opener = document.activeElement) 
   dialog.addEventListener('click', (event) => {
     if (event.target === dialog || event.target.closest('[data-post-detail-close]')) closeCommunityPostDetail();
     else if (event.target.closest('[data-post-delete]')) void deleteCommunityPost(post.id);
+    else if (event.target.closest('[data-post-edit]')) startCaptionEdit(dialog, post);
   });
   dialog.showModal();
   dialog.querySelector('[data-post-detail-close]')?.focus();
@@ -5908,6 +5911,56 @@ const openCommunityPostDetail = async (postId, opener = document.activeElement) 
     dialog.__returnFocus = null;
     closeCommunityPostDetail();
     openPublicProfile(isOwn ? memberProfile : (communityPostAuthors[author.id] || findPersonById(author.id) || author), { forcePublic: !isOwn });
+  });
+};
+// D-234: the author edits their caption in the open post (RLS lets only the author update; the server keeps the image,
+// author and date fixed, 0003). Save writes the trimmed caption (1-240 characters); Cancel or Escape restores it.
+const CAPTION_MAX = 240;
+const startCaptionEdit = (dialog, post) => {
+  if (!dialog?.isConnected || dialog.querySelector('[data-caption-form]')) return;
+  const caption = dialog.querySelector('.post-detail-caption');
+  const own = dialog.querySelector('.post-detail-own');
+  if (!caption) return;
+  const form = document.createElement('form');
+  form.className = 'post-caption-edit';
+  form.dataset.captionForm = '';
+  form.noValidate = true;
+  form.innerHTML = `<label class="sr-only" for="post-caption-edit-input">Caption</label><textarea id="post-caption-edit-input" rows="3" maxlength="${CAPTION_MAX}"></textarea>`
+    + '<p class="post-caption-edit-error" role="alert" hidden></p>'
+    + '<div class="post-caption-edit-actions"><button type="button" class="post-caption-edit-cancel" data-caption-cancel>Cancel</button><button type="submit" class="post-caption-edit-save">Save</button></div>';
+  const input = form.querySelector('textarea');
+  input.value = post.caption || '';
+  caption.hidden = true;
+  if (own) own.hidden = true;
+  caption.after(form);
+  input.focus();
+  input.setSelectionRange(input.value.length, input.value.length);
+  const close = () => { form.remove(); caption.hidden = false; if (own) own.hidden = false; dialog.querySelector('[data-post-edit]')?.focus(); };
+  form.querySelector('[data-caption-cancel]').addEventListener('click', close);
+  input.addEventListener('keydown', (event) => { if (event.key === 'Escape') { event.preventDefault(); event.stopPropagation(); close(); } });
+  form.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    const error = form.querySelector('.post-caption-edit-error');
+    const next = input.value.trim();
+    if (!next) { error.textContent = 'Write a caption, or delete the post instead.'; error.hidden = false; input.focus(); return; }
+    if (next === (post.caption || '')) { close(); return; }
+    const save = form.querySelector('[type="submit"]');
+    setBusy(save, true);
+    try {
+      const { data, error: failure } = await supabase.from('community_posts').update({ caption: next }).eq('id', post.id).eq('author_id', memberProfile.id).select('id, caption');
+      if (failure) throw failure;
+      if (!data?.length) throw new Error('not updated');
+      post.caption = data[0].caption ?? next;
+    } catch {
+      setBusy(save, false);
+      error.textContent = 'Your caption could not be saved. Please try again.';
+      error.hidden = false;
+      return;
+    }
+    caption.textContent = post.caption;
+    close();
+    renderCommunityPosts();
+    showToast('Caption updated.');
   });
 };
 // D-233: a member deletes their own post (RLS allows only the author; likes, comments, shares and its notifications
@@ -6133,6 +6186,7 @@ document.querySelector('#community-post-form')?.addEventListener('submit', async
     });
     if (error) throw error;
     closeCommunityPostComposer();
+    sendPendingPush();   // D-234: your connections were notified (server trigger); push it to their devices
     await loadCommunityPosts();
     showToast('Your post is live in Explore.');
   } catch (error) {

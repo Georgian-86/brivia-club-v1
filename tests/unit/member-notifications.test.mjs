@@ -102,3 +102,17 @@ test('postNotificationCopy: one, two, many likers; a comment quotes its words', 
   assert.deepEqual(postNotificationCopy({ type: 'post_comment', people: [{ name: 'Ravi' }], snippet: 'Where?' }), { title: 'Ravi commented on your note', line: '“Where?”' });
   assert.equal(postNotificationCopy({ type: 'post_like', people: [{ name: '' }] }).title, 'A member liked your note');
 });
+
+// D-234 (0071): a connection shared a new note.
+test('post_new: one row per note, titled "<name> shared a new note" with the caption', () => {
+  const now = Date.parse('2026-11-10T12:00:00Z');
+  const list = [
+    { id: 'p1', type: 'post_new', sourceId: 'a', name: 'Asha Rao', postId: 'n1', snippet: 'Evening at the club', createdAt: '2026-11-10T11:00:00Z' },
+    { id: 'p2', type: 'post_new', sourceId: 'b', name: 'Ravi Kumar', postId: 'n2', snippet: null, createdAt: '2026-11-10T11:30:00Z', readAt: '2026-11-10T11:31:00Z' },
+    { id: 'l1', type: 'post_like', sourceId: 'b', name: 'Ravi Kumar', postId: 'n1', createdAt: '2026-11-10T10:00:00Z' },
+  ];
+  const groups = groupPostNotifications(list, now);
+  assert.deepEqual(groups.map((g) => [g.key, g.type, g.unread]), [['n:n2', 'post_new', false], ['n:n1', 'post_new', true], ['l:n1', 'post_like', true]]);
+  assert.deepEqual(postNotificationCopy(groups[1]), { title: 'Asha shared a new note', line: '“Evening at the club”' });
+  assert.deepEqual(postNotificationCopy(groups[0]), { title: 'Ravi shared a new note', line: 'Tap to see it.' });
+});
