@@ -4320,3 +4320,17 @@ bring a short line back.
   So it shows the area, as the card says, never the sender's position (CLAUDE.md location privacy).
 - **Checks.** Unit `quick-share.test.mjs` (+2); e2e `chat-extras.spec.mjs` Q4: the card links to the Kochi search in a
   new tab with noopener, is >= 44 px, and is axe clean (152/152).
+
+## D-231 (2026-11-10): share any place in chat
+
+- **Request (founder, 2026-11-10, screenshot of a pasted maps.app.goo.gl link):** "add option of sending some random
+  location as well".
+- **Decision.** The chat **+** menu gains "Share a place": type a place name (a café, restaurant or address) or paste
+  a Google Maps link. It is sent as a `Place: …` text message and drawn as a "Shared place" card that opens in Google
+  Maps in a new tab (a name opens a Maps search; a link opens as is, shown as "Pinned on Google Maps"). Only https
+  Google Maps hosts (google.*/maps, maps.google.*, maps.app.goo.gl, goo.gl/maps) are accepted; other links and raw
+  coordinates are refused with a plain message, so the app never carries or derives a member's own position
+  (CLAUDE.md location privacy: the member chooses a place to name, nothing is read from the device). **+** now shows
+  in every open chat. Helpers: `placeShareProblem`, `placeShareBody`, `parsePlaceBody` in `quick-share.js`.
+- **Checks.** Unit `quick-share.test.mjs` (590 total); e2e `share-place.spec.mjs` SP1-SP4 at 1440 and 390 (18/18);
+  `chat-extras.spec.mjs` menu lists updated (152/152).

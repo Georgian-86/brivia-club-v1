@@ -62,3 +62,36 @@ test('areaMapUrl never links coordinates or nothing', () => {
   assert.equal(areaMapUrl(''), '');
   assert.equal(areaMapUrl(null), '');
 });
+
+// D-231 (founder 2026-11-10: "add option of sending some random location as well"): share any place by name or link.
+import { placeShareBody, parsePlaceBody, placeShareProblem, PLACE_PREFIX } from '../../site/scripts/quick-share.js';
+test('placeShareBody: a place name, or a Google Maps link, as one tidy message', () => {
+  assert.equal(PLACE_PREFIX, 'Place: ');
+  assert.equal(placeShareBody('  Rameshwaram Cafe,   Indiranagar '), 'Place: Rameshwaram Cafe, Indiranagar');
+  assert.equal(placeShareBody('https://maps.app.goo.gl/S1kkeNLURQM4qEeN9?g_st=ic'), 'Place: https://maps.app.goo.gl/S1kkeNLURQM4qEeN9?g_st=ic');
+  assert.equal(placeShareBody('https://www.google.com/maps/place/Toit/@12.97,77.64,17z'), 'Place: https://www.google.com/maps/place/Toit/@12.97,77.64,17z');
+  assert.equal(placeShareBody('https://maps.google.co.in/?q=MTR'), 'Place: https://maps.google.co.in/?q=MTR');
+  assert.equal(placeShareBody('x'.repeat(300)).length, PLACE_PREFIX.length + 160);
+});
+test('placeShareBody refuses nothing, raw coordinates and other links', () => {
+  assert.equal(placeShareBody('   '), '');
+  assert.equal(placeShareBody('12.9716, 77.5946'), '');
+  assert.equal(placeShareBody('https://evil.example/maps'), '');
+  assert.equal(placeShareBody('http://maps.app.goo.gl/abc'), '');
+  assert.equal(placeShareBody('javascript:alert(1)'), '');
+  assert.equal(placeShareBody('https://maps.app.goo.gl.evil.com/x'), '');
+});
+test('placeShareProblem says why in plain words', () => {
+  assert.equal(placeShareProblem('MTR, Lalbagh'), '');
+  assert.equal(placeShareProblem(''), 'Type a place name or paste a Google Maps link.');
+  assert.equal(placeShareProblem('12.9716, 77.5946'), 'Type the place name, or paste a Google Maps link, instead of coordinates.');
+  assert.equal(placeShareProblem('https://evil.example/x'), 'Only Google Maps links can be shared here.');
+});
+test('parsePlaceBody: the card for a name (opens a Maps search) or a link (opens the link)', () => {
+  assert.deepEqual(parsePlaceBody('Place: MTR, Lalbagh'), { name: 'MTR, Lalbagh', url: 'https://www.google.com/maps/search/?api=1&query=MTR%2C%20Lalbagh', pinned: false });
+  assert.deepEqual(parsePlaceBody('Place: https://maps.app.goo.gl/S1kke'), { name: 'Pinned on Google Maps', url: 'https://maps.app.goo.gl/S1kke', pinned: true });
+  assert.equal(parsePlaceBody('Place: https://evil.example/x'), null);
+  assert.equal(parsePlaceBody('Place: 12.97, 77.59'), null);
+  assert.equal(parsePlaceBody('My area: Kochi (about a 2 km area)'), null);
+  assert.equal(parsePlaceBody('hello'), null);
+});

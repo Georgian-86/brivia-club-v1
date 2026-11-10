@@ -47,6 +47,45 @@ export const areaMapUrl = (place) => {
   return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(name)}`;
 };
 
+// D-231 (founder 2026-11-10: "add option of sending some random location as well"): any place the member chooses (a
+// café, a restaurant, an address) by name, or a Google Maps link they paste. Plain text 'Place: <name or link>', so an
+// older app still shows it readably. Never raw coordinates (type the name or paste a link instead); links only from
+// Google Maps hosts, https only (the host is checked whole, so maps.app.goo.gl.evil.com is refused).
+export const PLACE_PREFIX = 'Place: ';
+const PLACE_MAX = 160;
+const MAPS_HOST = /^(?:(?:www\.)?google\.[a-z]{2,3}(?:\.[a-z]{2})?|maps\.google\.[a-z]{2,3}(?:\.[a-z]{2})?|maps\.app\.goo\.gl|goo\.gl)$/i;
+const mapsLink = (text) => {
+  let url;
+  try { url = new URL(text); } catch { return ''; }
+  if (url.protocol !== 'https:' || !MAPS_HOST.test(url.hostname)) return '';
+  if (/^(?:www\.)?google\./i.test(url.hostname) && !url.pathname.startsWith('/maps')) return '';
+  if (url.hostname.toLowerCase() === 'goo.gl' && !url.pathname.startsWith('/maps')) return '';
+  return url.href;
+};
+const cleanPlace = (input) => String(input ?? '').replace(/\s+/g, ' ').trim().slice(0, PLACE_MAX);
+const looksLikeLink = (text) => /^[a-z][a-z0-9+.-]*:/i.test(text);
+export const placeShareProblem = (input) => {
+  const text = cleanPlace(input);
+  if (!text) return 'Type a place name or paste a Google Maps link.';
+  if (looksLikeLink(text)) return mapsLink(text) ? '' : 'Only Google Maps links can be shared here.';
+  if (COORDINATE_LIKE.test(text)) return 'Type the place name, or paste a Google Maps link, instead of coordinates.';
+  return '';
+};
+export const placeShareBody = (input) => {
+  const text = cleanPlace(input);
+  if (placeShareProblem(text)) return '';
+  return `${PLACE_PREFIX}${looksLikeLink(text) ? mapsLink(text) : text}`;
+};
+// A place message read back for its card: { name, url, pinned } or null for any other text.
+export const parsePlaceBody = (body) => {
+  const text = String(body ?? '');
+  if (!text.startsWith(PLACE_PREFIX)) return null;
+  const rest = text.slice(PLACE_PREFIX.length).trim();
+  if (!rest || placeShareProblem(rest)) return null;
+  if (looksLikeLink(rest)) return { name: 'Pinned on Google Maps', url: mapsLink(rest), pinned: true };
+  return { name: rest, url: areaMapUrl(rest), pinned: false };
+};
+
 // The attachment the composer sends for a resume share, and the columns it becomes (no attachment_url at all).
 export const resumeShareAttachment = (senderId, size) => ({
   kind: 'resume',

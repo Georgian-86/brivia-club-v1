@@ -7,6 +7,9 @@ Update this file at the end of every session. CLAUDE.md holds the aim; this file
 
 ## 1. What is done
 
+**2026-11-10, D-231:** chat **+** → "Share a place": send any place by name or Google Maps link; it shows as a
+"Shared place" card that opens in Maps. Coordinates and non-Maps links are refused.
+
 **2026-11-10, D-229 and D-230:** the app no longer freezes every 5 seconds (the notification sync rewrote and
 churned its list; phones froze 120-250 ms each time), lighter tab switches (no forced layout, no listener leak, the
 filter drawer draws only when open), no backdrop blur on the phone top bar and tab bar. A shared area in chat opens a

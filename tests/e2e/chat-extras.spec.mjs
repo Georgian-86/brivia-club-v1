@@ -510,10 +510,10 @@ try {
           assert.equal(closed.open, false);
         });
         const s = await openMenu(page);
-        check(`Q1 ${width}: the menu shows exactly "Share my resume" and "Share my area", each >= 44 px (${JSON.stringify(s)})`, () => {
+        check(`Q1 ${width}: the menu shows exactly "Share my resume", "Share my area" and "Share a place", each >= 44 px (${JSON.stringify(s)})`, () => {
           assert.equal(s.open, true);
           assert.equal(s.toggle.expanded, 'true');
-          assert.deepEqual(s.items.map((i) => i.title), ['Share my resume', 'Share my area']);
+          assert.deepEqual(s.items.map((i) => i.title), ['Share my resume', 'Share my area', 'Share a place']);   // D-231 adds a place
           assert.ok(s.items.every((i) => i.h >= 44 && i.w >= 44 && !i.disabled));
         });
         // Scoped to the new controls: the legacy #chat-input (title-only label) and the thread's time stamps (3.5:1)
@@ -734,7 +734,7 @@ try {
         const { context, page } = await openThread(375, { own: { ...ownRow, resume_path: null } });
         const s = await openMenu(page);
         check(`Q5 without a resume the item is disabled with "Add a resume in your profile first." and a way to Profile (${JSON.stringify(s)})`, () => {
-          assert.deepEqual(s.items.map((i) => i.title), ['Share my resume', 'Share my area']);
+          assert.deepEqual(s.items.map((i) => i.title), ['Share my resume', 'Share my area', 'Share a place']);   // D-231 adds a place
           assert.equal(s.items[0].disabled, true);
           assert.equal(s.items[0].hint, 'Add a resume in your profile first.');
           assert.equal(s.items[1].disabled, false);
@@ -758,13 +758,13 @@ try {
       {
         const { context, page } = await openThread(375, { matchIds: [] });
         const s = await openMenu(page);
-        check(`Q5 without a match "Share my resume" is absent (${JSON.stringify(s.items.map((i) => i.title))})`, () => assert.deepEqual(s.items.map((i) => i.title), ['Share my area']));
+        check(`Q5 without a match "Share my resume" is absent (${JSON.stringify(s.items.map((i) => i.title))})`, () => assert.deepEqual(s.items.map((i) => i.title), ['Share my area', 'Share a place']));
         await context.close();
       }
       {
         const { context, page } = await openThread(375, { own: { ...ownRow } });
         const s = await openMenu(page);
-        check(`Q5 without 0012 (no resume_path column) "Share my resume" is absent (${JSON.stringify(s.items.map((i) => i.title))})`, () => assert.deepEqual(s.items.map((i) => i.title), ['Share my area']));
+        check(`Q5 without 0012 (no resume_path column) "Share my resume" is absent (${JSON.stringify(s.items.map((i) => i.title))})`, () => assert.deepEqual(s.items.map((i) => i.title), ['Share my area', 'Share a place']));
         await context.close();
       }
     });
