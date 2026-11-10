@@ -7,6 +7,11 @@ Update this file at the end of every session. CLAUDE.md holds the aim; this file
 
 ## 1. What is done
 
+**2026-11-10, D-229 and D-230:** the app no longer freezes every 5 seconds (the notification sync rewrote and
+churned its list; phones froze 120-250 ms each time), lighter tab switches (no forced layout, no listener leak, the
+filter drawer draws only when open), no backdrop blur on the phone top bar and tab bar. A shared area in chat opens a
+Google Maps search for the place name (never coordinates). Measure with `tests/e2e/perf-runtime.mjs`.
+
 **2026-11-10, D-228 (faster start-up and onboarding):** start-up reads run in parallel, the login page prefetches
 the app's files, Create Event's code loads on demand, the envelope opens in 0.7 s. First card on a throttled phone
 1.15-1.38 s (was 1.45-1.63 s). Measure with `tests/e2e/perf-boot.mjs` (see its header). Live database checked

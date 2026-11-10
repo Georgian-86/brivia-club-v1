@@ -43,3 +43,17 @@
 @media (min-width: 850px) {
   .app-view[data-view="home"] .swipe-hint { background-color: transparent !important; }
 }
+
+/* D-229 (founder: "the app is lagging too much, on phones and laptop"): the top bar and the tab bar sit still, but on a
+   phone the page scrolls under them, and a backdrop blur is recomputed every frame the content behind it moves, the
+   same cost as above (D-194 kept theirs on the reasoning that they do not move; what moves is behind them). On touch
+   screens and narrow windows they keep their look with a near-solid cream and no blur. Wide desktop windows keep the
+   glass: there the top bar does not stick, so nothing scrolls under it. */
+@media (max-width: 780px), (pointer: coarse) {
+  body.app-body .app-topbar,
+  body.app-body .app-tabbar {
+    -webkit-backdrop-filter: none !important;
+    backdrop-filter: none !important;
+    background-color: color-mix(in srgb, var(--color-cream) 96%, transparent) !important;
+  }
+}

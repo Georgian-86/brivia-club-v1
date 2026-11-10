@@ -39,6 +39,14 @@ export const parseAreaBody = (body) => {
   return { place, scope };
 };
 
+// D-230: where the area card opens: a Google Maps search for the place name, the same words already in the message.
+// Never a coordinate (a label shaped like one gives no link).
+export const areaMapUrl = (place) => {
+  const name = String(place ?? '').trim();
+  if (!name || COORDINATE_LIKE.test(name)) return '';
+  return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(name)}`;
+};
+
 // The attachment the composer sends for a resume share, and the columns it becomes (no attachment_url at all).
 export const resumeShareAttachment = (senderId, size) => ({
   kind: 'resume',

@@ -48,3 +48,17 @@ test('D4: copy', () => {
   assert.equal(RESUME_GONE_COPY, 'This resume is no longer shared.');
   assert.match(RESUME_SHARE_NOTE, /They'll always see your latest resume\./);
 });
+
+// D-230 (founder 2026-11-10: "i am not able to open the location"): the area card opens a map search for the place name
+// only, the same words already in the message; never coordinates.
+import { areaMapUrl } from '../../site/scripts/quick-share.js';
+test('areaMapUrl searches Google Maps for the place name only', () => {
+  assert.equal(areaMapUrl('Bangalore East'), 'https://www.google.com/maps/search/?api=1&query=Bangalore%20East');
+  assert.equal(areaMapUrl('  Koramangala, Bengaluru '), 'https://www.google.com/maps/search/?api=1&query=Koramangala%2C%20Bengaluru');
+  assert.equal(areaMapUrl('Pune & Co'), 'https://www.google.com/maps/search/?api=1&query=Pune%20%26%20Co');
+});
+test('areaMapUrl never links coordinates or nothing', () => {
+  assert.equal(areaMapUrl('12.9716, 77.5946'), '');
+  assert.equal(areaMapUrl(''), '');
+  assert.equal(areaMapUrl(null), '');
+});
