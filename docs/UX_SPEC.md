@@ -319,6 +319,11 @@ labelled "PRIVATE · ONLY YOU SEE THESE", and the hero and the area stat show th
 
   This replaces the earlier draft ("Widen nothing. We already did.") and the old "Come tomorrow." daily-limit state:
   the only limit left is the signal quota, which keeps the card (below).
+- **D-225 (the limit in the request dialog):** when a request is refused at a cap, or the member is already at one,
+  the request dialog (deck pitch sheet, profile Connect, Find a Companion, Nearby) shows the limit in place of the
+  writing parts: "You're out of free swipes" / "You've used all 10 of today's free swipes, so this request wasn't sent.
+  Fresh swipes tomorrow at 3 PM." (the day from `resets_at`: later today, tomorrow, a weekday) and one "Got it" (48 px,
+  wine pill; `role="alert"`). Never only a toast: a toast sits under a modal. `#pitch-modal` is on layer 190.
 - **D-156 (supersedes the counter copy below):** the counter counts **swipes** (Pass and Pitch): "N of 10 swipes left
   today"; at 0 "Your next swipe frees up at 3 PM", the notice "You've used your 10 free swipes for today. More at 3 PM."
   and **both** Pass and Pitch are muted (aria-disabled, still focusable; a tap explains). The live cap still lets Pass

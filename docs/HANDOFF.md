@@ -7,6 +7,12 @@ Update this file at the end of every session. CLAUDE.md holds the aim; this file
 
 ## 1. What is done
 
+**2026-11-10, D-225 (branch `claude/funny-cori-ew167m`, not deployed; client only, no SQL):** at the swipe limit
+every request dialog says "You're out of free swipes ... Fresh swipes tomorrow at 3 PM." itself (the toast sat under
+the modal and was never seen), and the pitch sheet now opens above Chat (it was invisible from Chat search's profile
+Connect). Check `tests/e2e/swipe-limit.spec.mjs`. Already failing before D-225 and unchanged: `consent.spec.mjs`
+(`cancelKeepsCard`, line 234) and one `nearby.spec.mjs` Settings sound check.
+
 **2026-11-10, D-224 (branch `claude/funny-cori-ew167m`, not deployed; migration 0068 not applied):** message
 yourself. Chat search finds your own profile ("Your name (You) · Message yourself") and opens a private thread with
 yourself; it joins the inbox once it has a note. 0068 lets `brivia_can_send` accept a message to yourself (nothing

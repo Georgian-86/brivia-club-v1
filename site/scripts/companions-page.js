@@ -193,7 +193,7 @@ export const createCompanionsPage = ({ root, api, safeImage, coverFor, me, toast
       onCancel: () => { state.swipe?.settle(); likeBtn.focus({ preventScroll: true }); },
       onSend: async (note) => {
         const sent = await sendRequest(person, note);
-        if (sent.error) return false;
+        if (sent.error) return sent.limit ? { limit: sent.limit } : false;   // D-225: the limit, said in the dialog
         decide(true, { requested: true });
         return true;
       },

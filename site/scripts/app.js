@@ -66,7 +66,7 @@ import { toastSide } from './toast-place.js';
 import { loadReactions, setReaction, createReactionGuard } from './post-reactions.js';
 import { loadActivity, withLike, likeSummary, threadComments, cleanCommentBody, loadComments, addComment, deleteComment, recordShare, sharedPostMessage, parseSharedPost, emptyActivity, COMMENT_MAX } from './post-activity.js';
 import { profileChecklist } from './profile-checklist.js';
-import { quotaLabel, quotaErrorText, quotaBlocked, quotaNotice } from './signal-quota.js';
+import { quotaLabel, quotaErrorText, quotaBlocked, quotaNotice, swipeLimitCopy } from './signal-quota.js';
 import { pitchLine, deckChips, deckEmptyState, deckFields, bandNote, deckCoverSrc } from './deck-view.js';
 import { createDeckSwipe, SWIPE, setSwipeCue } from './deck-swipe.js';
 import { createDeckRitual } from './deck-ritual.js';
@@ -1259,7 +1259,17 @@ document.addEventListener('click', (event) => {
   if (button && !button.classList.contains('is-active')) openConnectMode(button.dataset.connectMode);
 });
 // One composer for the whole app (companions and Nearby): building it twice would rebuild the same <dialog>.
-const connectComposer = createConnectComposer(document.querySelector('#connect-composer-dialog'));
+// D-225: a request refused at a cap says so inside the dialog (a toast sits under a modal <dialog>, so it was never
+// seen). The quota is read again first, so the reset time is the server's.
+const requestLimitResult = async (error, status) => {
+  await refreshSignalQuota();
+  const limit = swipeLimitCopy(signalQuota, new Date(), { code: error?.code, message: error?.message, status });
+  if (!limit) showToast(quotaErrorText(error, signalQuota, status) || 'Your request could not be sent. Please try again.');
+  return { error, limit };
+};
+// At a cap this app already knows about, the composer opens straight on the limit: nothing to write, nothing sent.
+const baseConnectComposer = createConnectComposer(document.querySelector('#connect-composer-dialog'));
+const connectComposer = { open: (options = {}) => baseConnectComposer.open({ ...options, limit: options.limit || swipeLimitCopy(signalQuota) }) };
 const companionsPage = createCompanionsPage({
   root: document.querySelector('[data-view="companions"]'),
   api: { companionEvents, companionDeck, companionSwipe, companionQuota, markCompanionMatchSeen },
@@ -1278,7 +1288,7 @@ const companionsPage = createCompanionsPage({
     const { data, error, status } = await sendConnectRequest(person.id, note);
     const row = Array.isArray(data) ? data[0] : data;
     if (error) {
-      if (isRateLimited(error, status)) { showToast(quotaErrorText(error, signalQuota)); return { error }; }
+      if (isRateLimited(error, status)) return requestLimitResult(error, status);   // D-225
       showToast('Your request could not be sent. Please try again.');
       return { error };
     }
@@ -1321,7 +1331,7 @@ nearbyPage = createNearbyPage({
     const { data, error, status } = await nearbyConnect(person.id, note);
     const row = Array.isArray(data) ? data[0] : data;
     if (error) {
-      if (isRateLimited(error, status)) { showToast(quotaErrorText(error, signalQuota)); return { error }; }
+      if (isRateLimited(error, status)) return requestLimitResult(error, status);   // D-225
       showToast('Your request could not be sent. Please try again.');
       return { error };
     }
@@ -2633,8 +2643,25 @@ const renderPitchCount = () => {
   out.classList.toggle('is-near', c.nearLimit);
 };
 let pitchSuggestions = [];
+// D-225: the swipe limit, said in the pitch sheet itself (the writing parts step aside; "Got it" closes, sending nothing).
+const showPitchLimit = (copy) => {
+  const panel = document.querySelector('#pitch-modal .pitch-panel');
+  const box = document.querySelector('#pitch-limit');
+  if (!copy || !panel || !box) return false;
+  box.querySelector('.composer-limit-title').textContent = copy.title;
+  box.querySelector('.composer-limit-body').textContent = copy.body;
+  panel.classList.add('is-limit');
+  box.hidden = false;
+  window.setTimeout(() => box.querySelector('.composer-limit-ok')?.focus(), 80);
+  return true;
+};
+const clearPitchLimit = () => {
+  document.querySelector('#pitch-modal .pitch-panel')?.classList.remove('is-limit');
+  document.querySelector('#pitch-limit')?.setAttribute('hidden', '');
+};
 const openPitch = (person) => {
   dismissPendingPitch();
+  clearPitchLimit();
   pendingPitch = { person, resolved: false };
   pitchOpenedAt = performance.now();
   pitchPerson = person;
@@ -2649,6 +2676,8 @@ const openPitch = (person) => {
   const pitchMessage = document.querySelector('#pitch-message'); if (pitchMessage) pitchMessage.value = savedNote || pitchSuggestions[0] || pitchLine(person);
   renderPitchCount();
   openOverlay('pitch-modal');
+  // D-225: already at a cap this app knows about: the sheet opens on the limit (closing it sends nothing).
+  if (showPitchLimit(swipeLimitCopy(signalQuota))) { if (savedNote) unsentNotes.set(String(person.id), savedNote); return; }
   window.setTimeout(() => pitchMessage?.focus(), 80);
 };
 
@@ -2720,7 +2749,13 @@ const swipe = (type, { vx = 0 } = {}) => {
     capCheckInFlight = true;
     refreshSignalQuota().finally(() => {
       capCheckInFlight = false;
-      if (blocks(type)) { renderSignalQuota(); showToast(type === 'like' ? quotaBlockedToast() : quotaErrorText({ code: 'PT429', message: 'swipe_quota_exhausted' }, signalQuota)); return; }
+      if (blocks(type)) {
+        renderSignalQuota();
+        // D-225: a request at the cap opens the sheet on the limit, clearly on screen; a pass keeps its toast.
+        if (type === 'like' && currentPerson) openPitch(currentPerson);
+        else showToast(type === 'like' ? quotaBlockedToast() : quotaErrorText({ code: 'PT429', message: 'swipe_quota_exhausted' }, signalQuota));
+        return;
+      }
       swipe(type);
     });
     return false;
@@ -6854,11 +6889,13 @@ document.querySelector('#pitch-form')?.addEventListener('submit', async (event) 
     // The pitch travels as the note of the like's single request; no message is sent until the pair is matched.
     const result = await sendConnectionSignal(pending.person, body);
     if (result.quotaText) {
-      // Over a cap: nothing was sent or charged. The sheet closes, and the card comes back to the front.
-      document.querySelector('#pitch-modal')?.setAttribute('hidden', '');
+      // Over a cap: nothing was sent or charged. D-225: the sheet stays and says so (the limit and when fresh swipes
+      // come); the note is kept for the next try and the card comes back to the front.
+      unsentNotes.set(String(pending.person.id), body);
       if (!pendingPitch) pitchPerson = null;
       requeuePerson(pending.person);
-      showToast(result.quotaText);
+      const limit = swipeLimitCopy(signalQuota, new Date(), { code: result.error?.code, message: result.error?.message, status: 429 });
+      if (!showPitchLimit(limit)) { document.querySelector('#pitch-modal')?.setAttribute('hidden', ''); showToast(result.quotaText); }
       return;
     }
     if (result.error) {

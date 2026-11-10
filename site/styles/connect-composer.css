@@ -68,3 +68,19 @@ body.app-body :is(#pitch-modal .pitch-panel, .connect-composer-dialog) textarea{
   body.app-body :is(#pitch-modal, .connect-composer-dialog) .pitch-copy{margin-bottom:var(--space-3)}
   body.app-body :is(#pitch-modal .pitch-panel, .connect-composer-dialog) textarea{font-size:16px}
 }
+
+/* D-225: at a swipe limit the dialog says so itself, in place of the writing parts (a toast sat under the modal and was
+   never seen). Big serif title, the reason and when fresh swipes come in full ink, one wine "Got it". */
+body.app-body :is(#pitch-modal .pitch-panel, .connect-composer-dialog .composer-panel).is-limit
+  > :is(h2, .pitch-copy, #pitch-form, textarea, label, .composer-meta, .composer-actions) { display: none; }
+body.app-body .composer-limit { display: grid; justify-items: start; gap: var(--space-3); margin-top: var(--space-4); }
+body.app-body .composer-limit[hidden] { display: none; }
+body.app-body .composer-limit-mark svg { display: block; width: 40px; height: 40px; fill: none; stroke: var(--cc-wine); stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; }
+body.app-body .composer-limit-title { margin: 0; color: var(--cc-ink); font-family: var(--font-heading); font-size: clamp(30px, 4.6vw, 40px); font-weight: 400; line-height: 1.05; letter-spacing: -.02em; }
+body.app-body .composer-limit-body { margin: 0; color: var(--cc-ink); font-size: var(--text-16); line-height: 1.55; }
+body.app-body .composer-limit-ok { width: 100%; min-height: 48px; margin-top: var(--space-2); padding: 0 var(--space-5); border: 0; border-radius: var(--radius-pill); background: var(--cc-wine); color: var(--cc-paper); font-family: var(--font-body); font-size: var(--text-12); font-weight: 700; letter-spacing: .12em; text-transform: uppercase; cursor: pointer; }
+@media (hover: hover) { body.app-body .composer-limit-ok:hover { background: var(--cc-wine-deep); } }
+/* D-225: the sheet opens over every view. The Chat view is a fixed layer at z-index 100 (app-navigation.css), so the
+   sheet at the base overlay's 50 opened UNDER it when Connect was pressed on a profile from Chat search (it was
+   invisible). It takes the public profile modal's layer (190, profile-theme.css), which it opens from. */
+body.app-body #pitch-modal { z-index: 190; }

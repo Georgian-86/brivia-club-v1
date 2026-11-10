@@ -4191,3 +4191,28 @@ bring a short line back.
   else reads it, still no message to a non-match, an incomplete profile is refused, replies stay in-thread, no forging);
   it fails without 0068 (row-level security) and passes with it. E2E `chat-self.spec.mjs` (49 at 1440 and 390);
   chat-search, chat-inbox, chat-extras (150) and chat-seen unchanged and passing.
+
+## D-225 (2026-11-10): the swipe limit is said inside the request dialog; the pitch sheet opens above Chat
+
+- **Ask (founder, 2026-11-10, with a screenshot of "Make the first move." on Find a Companion):** "i am not able to
+  send request since my free swipes got over, but pls display the message that free swipes over, fresh swipes tomm
+  clearly on screen when the user tries to send requests".
+- **Root cause.** At the cap, SEND REQUEST was refused correctly, but the reason only went to a toast. The companions
+  and nearby composer is a modal `<dialog>` (the top layer), so the toast sat under it and was never seen; on the
+  Connect deck the sheet closed and the note was dropped. Separately, the pitch sheet (`#pitch-modal`, z-index 50)
+  opened UNDER the Chat view (a fixed layer at 100) when Connect was pressed on a profile from Chat search: invisible.
+- **Decision.** Every request dialog (Connect deck pitch sheet, a profile's Connect, Find a Companion, Nearby) says the
+  limit itself, in place of the writing parts: a clock mark, "You're out of free swipes", "You've used all 10 of
+  today's free swipes, so this request wasn't sent. Fresh swipes tomorrow at 3 PM.", and one "Got it" that closes it
+  and sends nothing. The day is named from the server's `resets_at` in the member's time: "later today at", "tomorrow
+  at", "on Friday at"; without a reset time "Fresh swipes tomorrow."; a reset time already past says "Fresh swipes
+  soon. Try again in a moment." (never a time in the past). The live cap reads "Too many requests waiting". At a cap the
+  app already knows, the dialog opens straight on the limit (nothing to write first). On the deck the note is kept and
+  comes back on the next try. A deck pass at the cap keeps its toast; the deck itself already shows "That's your deck
+  for today" (D-179). `#pitch-modal` takes the public profile modal's layer (190).
+- **Files.** `signal-quota.js` (`freshSwipesLine`, `swipeLimitCopy`), `connect-composer.js` (limit block, `onSend` may
+  return `{ limit }`, `open({ limit })`), `companions-page.js`, `nearby-page.js`, `app.js` (`requestLimitResult`, the
+  guarded composer, `showPitchLimit`), `app.html`, `connect-composer.css`.
+- **Checks.** Unit `signal-quota.test.mjs` (+5); e2e `swipe-limit.spec.mjs` (22 at 1440, 390 and 375); deck (201),
+  companions (65), chat-search and chat-self pass. Already failing before this change, unchanged: `consent.spec.mjs`
+  (times out in `cancelKeepsCard` at line 234) and one `nearby.spec.mjs` Settings sound check (D-138).
