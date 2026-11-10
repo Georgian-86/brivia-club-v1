@@ -4169,3 +4169,25 @@ bring a short line back.
   new `login-smooth.spec.mjs` (17: one screen and no sideways scroll at five sizes, password-manager attributes, 16 px
   fields on phones, the error copy). Honest limit: the container has Chromium only; the WebKit path is exercised with a
   Safari user agent, not real Safari. Check on a real Mac (Safari) and iPhone after deploy.
+
+## D-224 (2026-11-10): message yourself, found from Chat search
+
+- **Ask (founder, 2026-11-10):** "user should be able to search their profile in chats section and should be able to
+  text themselves."
+- **Decision.** A private note-to-self thread, like "Message yourself" in other messengers. Searching your own name
+  (or "you", "me", "myself", "self") in Chat lists "Your name (You) · Message yourself" first under People, with
+  Message. The thread joins the inbox once it has a note (or while open), sorted like any other.
+- **Storage.** A self note is an ordinary `brivia_messages` row with sender = recipient = the member. Migration 0068
+  lets `brivia_can_send` (0013) accept `recipient = auth.uid()`; the insert policy still needs a completed profile and
+  `sender_id = auth.uid()`, and to anyone else the old match + same-world rule applies verbatim. Reading is unchanged
+  (sender or recipient), so no one else can ever see a note. Not a connection: no match row, nothing in the deck.
+- **In the thread.** Header "Your name (You)" / "Message yourself"; the avatar and name open your own Profile tab; no
+  typing channel, presence, read ticks or unread count; the ••• menu keeps only Delete chat (hides it on this device;
+  Message from search brings it back). A note is never a notification. Replies, edit, unsend and attachments work as in
+  any thread. "Notes" stays the name of the posts tab; the self thread is not called notes, to avoid two meanings.
+- **Consent rule.** Unaffected: the mutual-consent rule governs contact between two members; a note to self involves
+  no one else.
+- **Checks.** Unit `chat-self.test.mjs` (7); SQL `zh-message-yourself.test.sql` (S1-S5: send and read back, nobody
+  else reads it, still no message to a non-match, an incomplete profile is refused, replies stay in-thread, no forging);
+  it fails without 0068 (row-level security) and passes with it. E2E `chat-self.spec.mjs` (49 at 1440 and 390);
+  chat-search, chat-inbox, chat-extras (150) and chat-seen unchanged and passing.

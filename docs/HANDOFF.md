@@ -7,6 +7,13 @@ Update this file at the end of every session. CLAUDE.md holds the aim; this file
 
 ## 1. What is done
 
+**2026-11-10, D-224 (branch `claude/funny-cori-ew167m`, not deployed; migration 0068 not applied):** message
+yourself. Chat search finds your own profile ("Your name (You) · Message yourself") and opens a private thread with
+yourself; it joins the inbox once it has a note. 0068 lets `brivia_can_send` accept a message to yourself (nothing
+else changes). Files `site/scripts/chat-self.js`, `site/scripts/app.js`; checks `tests/unit/chat-self.test.mjs`,
+`supabase/tests/zh-message-yourself.test.sql`, `tests/e2e/chat-self.spec.mjs`. **Owed: apply 0068 (README "## 0068")
+and deploy the client.**
+
 **2026-11-07, D-223 (on main, deployed to thebriviaclub.live; client only, no SQL):** Safari (Mac) and
 every iPhone browser play the landing soundtrack and intro cue through `<audio>` elements instead of Web Audio (WebKit
 could show "Stop music" in silence); Safari on Mac plays the app's swipe/notification cues the same way. The phone login

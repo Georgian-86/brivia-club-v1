@@ -40,6 +40,7 @@ import { MAX_INTERESTS } from './passion-budget.js';
 import { collabSummary, openCollabReview } from './collab-requests.js';
 import { createPresence, presenceDot } from './presence.js';
 import { cleanQuery, matchesQuery, STATUS as PERSON_STATUS, peopleResults, localPeople } from './chat-search.js';
+import { isSelfId, selfChatPerson, selfMatchesQuery, SELF_STATUS, SELF_ROLE } from './chat-self.js';
 import { receiptState, receiptMarkup, lastOwnMessageId, applyReceipt, needsReadReceipt, needsDeliveredReceipt, lastActiveLabel } from './receipts.js';
 import { createMessageMenu, applyMessageUpdate, unsentLabel, previewForUnsent, canEditMessage, replyQuote } from './message-actions.js';
 import { createCrossingPaths, isQuietHour, alertHeadline, alertDetail, alertToast, pausedCopy } from './crossing-paths.js';
@@ -830,7 +831,8 @@ const renderNotifications = () => {
 const syncIncomingNotifications = async (rows = []) => {
   if (!notifications.length) notifications = readNotifications();
   let changed = false;
-  rows.filter((message) => String(message.recipient_id) === String(memberProfile.id)).forEach((message) => { if (addMessageNotification(message)) changed = true; });
+  // D-224: a note to self is never a notification.
+  rows.filter((message) => String(message.recipient_id) === String(memberProfile.id) && String(message.sender_id) !== String(memberProfile.id)).forEach((message) => { if (addMessageNotification(message)) changed = true; });
   if (changed) { reconcileMessageNotifications(Date.parse(chatSeenSent[''] || '') || 0); renderNotifications(); }
 };
 const ensureNotificationControls = () => {
@@ -3053,6 +3055,23 @@ const messagePerson = async (row) => {
   setView('chat');
   openChat(person);
 };
+// D-224: message yourself. The thread opens at once; it is never added to connections or the deck.
+const messageSelf = () => {
+  if (!memberProfile.id) return;
+  const self = selfChatPerson(memberProfile);
+  restoreChatForMe(self.id);
+  clearChatSearch();
+  setView('chat');
+  openChat(self);
+};
+const selfRowMarkup = () => {
+  const self = selfChatPerson(memberProfile);
+  return `<div class="chat-person-row is-self" data-person-id="${escapeHtml(self.id)}">`
+    + `<button type="button" class="chat-person-open" data-self-open aria-label="View your profile">`
+    + `${renderAvatar({ name: self.avatarName, image: self.image })}<span class="chat-row-copy"><strong>${escapeHtml(self.name)}</strong>`
+    + `<span>${escapeHtml(SELF_STATUS)}</span></span></button>`
+    + '<button type="button" class="chat-person-message" data-self-message aria-label="Message yourself">Message</button></div>';
+};
 const openSearchProfile = async (row) => {
   const person = await personFromSearch(row);
   openPublicProfile(person, { status: row.status, onMessage: () => messagePerson(row) });
@@ -3074,13 +3093,21 @@ const renderChats = () => {
   ensureChatMoreMenu();
   const hiddenChatIds = readHiddenChatIds();
   // Newest contact first (founder, 2026-10-28): the conversation with the latest message, either way, is on top.
-  const conversations = sortByLastContact(people.filter((person) => remoteMatchIds.includes(person.id) && !hiddenChatIds.has(String(person.id))), (id) => chatMessages[id]);
+  // D-224: the member's own thread ("Message yourself") is listed once it has a message, or while it is open.
+  const ownId = String(memberProfile.id || '');
+  const selfConversation = ownId && !hiddenChatIds.has(ownId) && ((chatMessages[ownId] || []).length || isSelfId(selectedChat?.id, ownId))
+    ? selfChatPerson(memberProfile) : null;
+  const conversations = sortByLastContact([
+    ...people.filter((person) => remoteMatchIds.includes(person.id) && !isSelfId(person.id, ownId) && !hiddenChatIds.has(String(person.id))),
+    ...(selfConversation ? [selfConversation] : []),
+  ], (id) => chatMessages[id]);
   const query = chatSearchQuery.trim().toLowerCase();
   const matches = conversations.filter((person) => {
     const last = chatMessages[person.id]?.at(-1);
     const unread = chatUnreadCount(person.id) > 0;
     const haystack = `${person.name} ${person.city} ${person.state || ''} ${person.role} ${person.experience || ''} ${person.skills || ''} ${person.lookingFor || ''} ${last?.text || ''} ${last?.attachment?.name || ''}`.toLowerCase();
-    return (!query || haystack.includes(query) || matchesQuery({ name: person.name, text: haystack }, query)) && (activeChatFilter !== 'unread' || unread);
+    const found = !query || haystack.includes(query) || matchesQuery({ name: person.name, text: haystack }, query) || (person.isSelf && selfMatchesQuery(memberProfile, query));
+    return found && (activeChatFilter !== 'unread' || unread);
   });
   const list = document.querySelector('#chat-list');
   const inboxToolbar = list?.querySelector('#inbox-toolbar');
@@ -3093,8 +3120,8 @@ const renderChats = () => {
     const last = chatMessages[person.id]?.at(-1);
     const unreadMessages = chatUnreadCount(person.id);
     const unread = unreadMessages > 0;
-    const lastPreview = previewForUnsent(last) || (last?.attachment?.kind === 'resume' ? 'Resume (PDF)' : last?.attachment ? `📎 ${last.attachment.name || 'Attachment'}` : parseSharedPost(last?.text) ? 'Shared a post' : (last?.text || 'Start a conversation'));
-    return `<div class="chat-row${unread ? ' is-unread' : ''}${selectedChat?.id === person.id ? ' is-selected' : ''}"><button class="chat-row-open" type="button" data-chat-id="${escapeHtml(person.id)}"><span class="member-profile-trigger" data-public-profile-id="${escapeHtml(person.id)}" role="button" tabindex="0" aria-label="Open ${escapeHtml(person.name)} profile">${renderAvatar(person)}${presenceDot(isActiveNow(person.id))}</span><span class="chat-row-copy"><strong data-public-profile-id="${escapeHtml(person.id)}">${escapeHtml(person.name)}${isActiveNow(person.id) ? '<span class="sr-only">, active now</span>' : ''}</strong><span>${escapeHtml(lastPreview)}</span></span><span class="chat-row-meta"><time>${escapeHtml(formatInboxTime(last?.createdAt))}</time>${unread ? `<b aria-label="${unreadMessages} unread">${unreadMessages > 99 ? '99+' : unreadMessages}</b>` : ''}</span></button><button class="chat-delete" type="button" data-delete-chat-id="${escapeHtml(person.id)}" aria-label="Delete chat with ${escapeHtml(person.name)}" title="Delete chat"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M4.5 6h11M8 3.5h4M6.5 6l.6 10h5.8l-.6-10M8.5 8.5v5M11.5 8.5v5"/></svg></button></div>`;
+    const lastPreview = previewForUnsent(last) || (last?.attachment?.kind === 'resume' ? 'Resume (PDF)' : last?.attachment ? `📎 ${last.attachment.name || 'Attachment'}` : parseSharedPost(last?.text) ? 'Shared a post' : (last?.text || (person.isSelf ? SELF_STATUS : 'Start a conversation')));
+    return `<div class="chat-row${unread ? ' is-unread' : ''}${person.isSelf ? ' is-self' : ''}${selectedChat?.id === person.id ? ' is-selected' : ''}"><button class="chat-row-open" type="button" data-chat-id="${escapeHtml(person.id)}"><span class="member-profile-trigger" data-public-profile-id="${escapeHtml(person.id)}" role="button" tabindex="0" aria-label="${person.isSelf ? 'Open your profile' : `Open ${escapeHtml(person.name)} profile`}">${renderAvatar({ ...person, name: person.avatarName || person.name })}${presenceDot(!person.isSelf && isActiveNow(person.id))}</span><span class="chat-row-copy"><strong data-public-profile-id="${escapeHtml(person.id)}">${escapeHtml(person.name)}${isActiveNow(person.id) ? '<span class="sr-only">, active now</span>' : ''}</strong><span>${escapeHtml(lastPreview)}</span></span><span class="chat-row-meta"><time>${escapeHtml(formatInboxTime(last?.createdAt))}</time>${unread ? `<b aria-label="${unreadMessages} unread">${unreadMessages > 99 ? '99+' : unreadMessages}</b>` : ''}</span></button><button class="chat-delete" type="button" data-delete-chat-id="${escapeHtml(person.id)}" aria-label="Delete chat with ${escapeHtml(person.name)}" title="Delete chat"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M4.5 6h11M8 3.5h4M6.5 6l.6 10h5.8l-.6-10M8.5 8.5v5M11.5 8.5v5"/></svg></button></div>`;
   };
   // D-152: while searching, conversations with messages first, then people (connections even without a message, then
   // members with a request either way, then anyone else), from the server. The empty state only when both are empty.
@@ -3105,15 +3132,19 @@ const renderChats = () => {
     const withMessages = matches.filter((person) => (chatMessages[person.id] || []).length);
     const knownConnections = matches.filter((person) => !(chatMessages[person.id] || []).length)
       .map((person) => ({ member_id: person.id, name: person.name, photo_url: person.image || '', status: 'connected', has_conversation: false }));
-    searchPeople = peopleResults([...chatPeople.rows, ...knownConnections], withMessages.map((person) => person.id));
-    const loadingPeople = chatPeople.status === 'loading' && !searchPeople.length;
+    searchPeople = peopleResults([...chatPeople.rows, ...knownConnections], withMessages.map((person) => person.id))
+      .filter((p) => !isSelfId(p.id, ownId));
+    // D-224: the member finds themselves (own name, or "you", "me", "myself", "self") first among People, unless their
+    // own thread is already listed under Conversations.
+    const selfRow = selfMatchesQuery(memberProfile, chatSearchQuery) && !withMessages.some((person) => person.isSelf) ? selfRowMarkup() : '';
+    const loadingPeople = chatPeople.status === 'loading' && !searchPeople.length && !selfRow;
     const section = (title, count, body) => `<section class="chat-search-section" aria-label="${title}"><h3 class="chat-search-title">${title}${count ? ` <span>${count}</span>` : ''}</h3>${body}</section>`;
     const convoSection = withMessages.length ? section('Conversations', withMessages.length, withMessages.map(conversationRow).join('')) : '';
     const peopleBody = loadingPeople ? `<div class="chat-search-loading" aria-busy="true">${skeletonMarkup('list', 2)}</div>`
-      : searchPeople.length ? searchPeople.map(personRowMarkup).join('')
+      : searchPeople.length || selfRow ? selfRow + searchPeople.map(personRowMarkup).join('')
         : chatPeople.status === 'error' ? '<div class="chat-search-error"><span>Search is unavailable right now.</span><button type="button" data-chat-search-retry>Try again</button></div>' : '';
-    const peopleSection = peopleBody ? section('People', searchPeople.length, peopleBody) : '';
-    const nothing = !withMessages.length && !searchPeople.length && chatPeople.status === 'done';
+    const peopleSection = peopleBody ? section('People', searchPeople.length + (selfRow ? 1 : 0), peopleBody) : '';
+    const nothing = !withMessages.length && !searchPeople.length && !selfRow && chatPeople.status === 'done';
     searchMarkup = `<div class="chat-search-results" aria-live="polite">${convoSection}${peopleSection}${nothing ? `<div class="inbox-empty"><strong>No one found for “${escapeHtml(cleanQuery(chatSearchQuery))}”</strong><span>Try a first name, a surname or a company. Search finds your connections and other members.</span></div>` : ''}</div>`;
   }
   const head = searching
@@ -3139,7 +3170,7 @@ const renderChats = () => {
     if (profileTrigger && person) {
       event.preventDefault();
       event.stopPropagation();
-      openPublicProfile(person);
+      if (person.isSelf) setView('profile'); else openPublicProfile(person);
       return;
     }
     openChat(person);
@@ -3170,6 +3201,9 @@ const renderChats = () => {
     if (row) messagePerson(row);
   }));
   list?.querySelector('[data-chat-search-retry]')?.addEventListener('click', () => { chatPeople = { query: '', status: 'idle', rows: [] }; schedulePeopleSearch(); renderChats(); });
+  // D-224: the self row.
+  list?.querySelector('[data-self-message]')?.addEventListener('click', messageSelf);
+  list?.querySelector('[data-self-open]')?.addEventListener('click', () => { clearChatSearch(); setView('profile'); });
 };
 
 const loadChatMessages = async (person) => {
@@ -3405,6 +3439,12 @@ let chatStatusContext = '';
 function paintChatStatus() {
   const chatStatus = document.querySelector('#chat-status');
   if (!chatStatus || !selectedChat) return;
+  // D-224: the self thread has no presence or typing; its line says what it is.
+  if (selectedChat.isSelf) {
+    if (chatStatus.textContent !== SELF_STATUS) chatStatus.textContent = SELF_STATUS;
+    chatStatus.classList.remove('is-typing', 'is-active-now', 'has-last-active');
+    return;
+  }
   const active = isActiveNow(selectedChat.id);
   const activity = lastActiveLabel(active, presence?.lastSeen(selectedChat.id) || '');
   // D-154: while they type, the line says so (the bubble in the thread says it too).
@@ -3424,21 +3464,26 @@ const openChat = (person, markAsRead = true) => {
   if (replyingTo && String(replyingTo.personId) !== String(person.id)) cancelMessageReply({ render: false });
   messageMenu?.close();
   selectedChat = person;
-  joinTyping(person);
+  // D-224: nobody types back in the self thread.
+  if (person.isSelf) leaveTyping(); else joinTyping(person);
+  syncChatMenuForSelf();
   if (markAsRead) markChatRead(person.id);
   const list = document.querySelector('#chat-list'); const windowPanel = document.querySelector('#chat-window');
   const isSmallScreen = window.matchMedia('(max-width: 700px)').matches;
   if (list) list.hidden = isSmallScreen;
   windowPanel?.removeAttribute('hidden');
+  // D-224: in the self thread the avatar and name open the member's own Profile tab.
+  const openPersonProfile = () => (person.isSelf ? setView('profile') : openPublicProfile(person));
+  const profileLabel = person.isSelf ? 'Open your profile' : `Open ${person.name} profile`;
   const avatar = document.querySelector('#chat-avatar');
   if (avatar) {
-    avatar.innerHTML = avatarImage(person.image, person.name) || escapeHtml(initials(person.name));
+    avatar.innerHTML = avatarImage(person.image, person.avatarName || person.name) || escapeHtml(initials(person.avatarName || person.name));
     avatar.dataset.publicProfileId = person.id;
     avatar.setAttribute('role', 'button');
     avatar.setAttribute('tabindex', '0');
-    avatar.setAttribute('aria-label', `Open ${person.name} profile`);
-    avatar.onclick = () => openPublicProfile(person);
-    avatar.onkeydown = (event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); openPublicProfile(person); } };
+    avatar.setAttribute('aria-label', profileLabel);
+    avatar.onclick = openPersonProfile;
+    avatar.onkeydown = (event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); openPersonProfile(); } };
   }
   const chatName = document.querySelector('#chat-name');
   if (chatName) {
@@ -3446,13 +3491,13 @@ const openChat = (person, markAsRead = true) => {
     chatName.dataset.publicProfileId = person.id;
     chatName.setAttribute('role', 'button');
     chatName.setAttribute('tabindex', '0');
-    chatName.setAttribute('aria-label', `Open ${person.name} profile`);
-    chatName.onclick = () => openPublicProfile(person);
-    chatName.onkeydown = (event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); openPublicProfile(person); } };
+    chatName.setAttribute('aria-label', profileLabel);
+    chatName.onclick = openPersonProfile;
+    chatName.onkeydown = (event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); openPersonProfile(); } };
   }
-  const chatRole = document.querySelector('#chat-role'); if (chatRole) chatRole.textContent = `${person.role || 'Brivia member'}${person.city ? `, ${person.city}` : ''}`;
+  const chatRole = document.querySelector('#chat-role'); if (chatRole) chatRole.textContent = person.isSelf ? SELF_ROLE : `${person.role || 'Brivia member'}${person.city ? `, ${person.city}` : ''}`;
   // D-123: a pair who met through Find a Companion sees the event that brought them together.
-  const companionContext = companionMatches.find((match) => match.otherId === String(person.id));
+  const companionContext = person.isSelf ? null : companionMatches.find((match) => match.otherId === String(person.id));
   chatStatusContext = companionContext ? chatContextLine(companionContext) : '';
   paintChatStatus();
   renderChats();
@@ -3604,7 +3649,7 @@ const renderMessages = () => {
         : sharedPostId ? renderSharedPost(sharedPostId)
           : `${renderAttachment(message.attachment)}${message.text ? `<span class="message-copy">${escapeHtml(message.text)}</span>` : ''}`;
     const kind = isResume || area || sharedPostId ? ' has-attachment has-share' : message.attachment ? ' has-attachment' : '';
-    const receipt = receiptState(message);
+    const receipt = selectedChat?.isSelf ? '' : receiptState(message);   // D-224: no ticks on notes to self
     const word = receipt && receipt !== 'sent' && String(message.id) === newestOwnId ? `<span class="message-receipt-word">${receipt === 'read' ? 'Read' : 'Delivered'}</span>` : '';
     const edited = message.editedAt ? '<span class="message-edited">Edited</span>' : '';
     const editing = editingMessage && String(editingMessage.id) === String(message.id) ? ' is-editing' : '';
@@ -3875,6 +3920,7 @@ const hideReportedMember = (person) => {
 const completeChatAction = async (action) => {
   const person = selectedChat;
   if (!person) return;
+  if (person.isSelf && action !== 'delete') return;   // D-224
   if (action === 'report') {
     const reported = await openReportDialog({ name: person.name, trigger: document.querySelector('#chat-more'), ...hiringReport(person) });
     if (!reported) return;
@@ -3927,6 +3973,13 @@ const completeChatAction = async (action) => {
   if (!saveHiddenChatIds(hiddenIds)) { showToast('Could not update this chat. Please try again.'); return; }
   closeSelectedChat();
   showToast('Chat deleted from your inbox.');
+};
+// D-224: the self thread keeps only "Delete chat" (hide it on this device); there is no one to remove, block or report.
+const syncChatMenuForSelf = () => {
+  const isSelf = Boolean(selectedChat?.isSelf);
+  document.querySelectorAll('#chat-more-menu [data-chat-action]').forEach((button) => {
+    button.hidden = isSelf && button.dataset.chatAction !== 'delete';
+  });
 };
 const ensureChatMoreMenu = () => {
   const header = document.querySelector('.chat-window-head');
@@ -6951,7 +7004,8 @@ const loadSupabaseCommunity = async () => {
     const inboxIds = new Set(remoteMatchIds);
     (inboxRows || []).sort((a, b) => new Date(a.created_at || 0).getTime() - new Date(b.created_at || 0).getTime()).forEach((message) => {
       const otherId = message.sender_id === session.user.id ? message.recipient_id : message.sender_id;
-      inboxIds.add(otherId);
+      // D-224: the member's own notes live in chatMessages[own id]; they are not a connection or a card to load.
+      if (!isSelfId(otherId, session.user.id)) inboxIds.add(otherId);
       // One entry per message id (D-129): a realtime insert that arrived while the inbox loaded is not drawn twice.
       const thread = (chatMessages[otherId] ||= []);
       if (thread.some((item) => String(item.id) === String(message.id))) return;

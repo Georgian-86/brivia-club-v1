@@ -1481,3 +1481,11 @@ Verify: `select prosrc not like '%role_cap%' from pg_proc where proname = 'save_
 `hiring_people_v2(limit, after_score, after_id)`: 0054's `hiring_people` plus a `request_pending` column; members the
 caller has a live request to are served (flagged) instead of left out. `hiring_people` is unchanged for the older client.
 Verify: `select count(*) from pg_proc where proname = 'hiring_people_v2';` (1).
+
+## 0068
+
+**Message yourself (D-224).** Apply after `0067`, with the client deploy (either order is safe: the old client never
+offers a self thread). Replaces `brivia_private.brivia_can_send(uuid)` so a completed member may also send a message to
+themselves; everything else in the send rule is unchanged. No data, table, column or grant changes.
+Verify, signed in as a completed member in the app: Chat, search your own name, Message, send "test". Or in SQL:
+`select prosrc like '%p_recipient = auth.uid()%' from pg_proc where proname = 'brivia_can_send';` (true).
