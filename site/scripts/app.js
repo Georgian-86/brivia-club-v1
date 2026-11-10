@@ -53,7 +53,6 @@ import { createSoundKit, soundEnabled, setSoundEnabled, soundVolume, setSoundVol
 import { createWebPush, pushSupport, PUSH_COPY } from './web-push.js';
 import '../styles/nearby.css';
 import { createEventsPage } from './events-page.js';
-import { createEventComposer } from './event-create.js';
 import { createCompanionsPage } from './companions-page.js';
 import { openerSuggestions, composerCount, nextSuggestion, ANOTHER_IDEA_ICON, createConnectComposer } from './connect-composer.js';
 import '../styles/connect-composer.css';
@@ -378,12 +377,13 @@ const saveBlockedUserIds = (ids) => {
   try { syncTypingForSelectedChat(); } catch { /* typing is best-effort */ }
   return true;
 };
-const syncBlockedUserIds = async () => {
-  if (!supabase || !memberProfile.id) return;
-  const { data, error } = await supabase
+// prefetched: the same read already started at sign-in (D-228), applied here once the member is known.
+const syncBlockedUserIds = async (prefetched = null) => {
+  if (!supabase || (!memberProfile.id && !prefetched)) return;
+  const { data, error } = await (prefetched || supabase
     .from('brivia_blocks')
     .select('blocked_id')
-    .eq('blocker_id', memberProfile.id);
+    .eq('blocker_id', memberProfile.id));
   if (error) {
     if (!/relation|table|schema cache|brivia_blocks/i.test(error.message || '')) console.warn('Blocked users could not load:', error.message);
     return;
@@ -1124,7 +1124,9 @@ let pendingEventId = null;
 let pendingEventRead = false;
 const eventSafeImage = (url) => (isStorageImageUrl(url) ? safeImageUrl(url) : '');
 // Create Event (D-121, 0022): the composer dialog; a save refreshes Explore, "View event" opens the new event.
-const eventComposer = createEventComposer({
+// D-228: the composer (and its 50 KB of code) loads on first use, or in idle time after start-up, not with the app.
+let eventComposerLoad = null;
+const loadEventComposer = () => (eventComposerLoad ||= import('./event-create.js').then(({ createEventComposer }) => createEventComposer({
   dialog: document.querySelector('#event-create-dialog'),
   api: { saveMemberEvent, uploadEventImage, removeEventImages, searchPlaces, prepareImage: compressImageOnly, setEventBrochure, uploadEventBrochure, removeEventBrochures },
   memberId: () => memberProfile.id,
@@ -1136,7 +1138,14 @@ const eventComposer = createEventComposer({
   onView: (id) => eventsPage.openEvent(id),
   geo: navigator.geolocation,
   secure: window.isSecureContext,
-});
+})));
+const eventComposer = {
+  open: (event = null) => loadEventComposer().then((composer) => composer.open(event))
+    .catch(() => showToast('Creating events could not open. Check your connection and try again.')),
+};
+// Warm it once the first screen is up, so the first Create Event opens at once.
+const warmLater = (load) => (window.requestIdleCallback ? window.requestIdleCallback(() => load(), { timeout: 4000 }) : window.setTimeout(load, 2500));
+warmLater(() => loadEventComposer().catch(() => { eventComposerLoad = null; }));
 // Find a Companion (D-123, 0023): the companions view, opening a conversation after a match, and match notifications
 // for the member who swiped first (the second sees the moment at once).
 const companionSeenKey = () => `brivia-companion-seen:${memberProfile.id || 'anonymous'}`;
@@ -1558,7 +1567,7 @@ const filtersActive = () => Boolean(exploreFilters.query || exploreFilters.skill
 // wrap-around: when the queue runs out the deck loads once more, and if nothing new comes back deck_status() says why.
 // `people` stays the registry of every member card known to this page (deck, search, chats, request senders).
 const DECK_PAGE_SIZE = 12;
-const deck = { ready: false, ids: [], seen: new Set(), loading: null, end: null, refilling: false };
+const deck = { ready: false, ids: [], seen: new Set(), loading: null, prefetch: null, end: null, refilling: false };
 const deckPeople = () => deck.ids.map((id) => findPersonById(id)).filter(Boolean);
 const getExplorePeople = () => deckPeople().filter(explorePersonMatches);
 // The current card is always the first card of the (filtered) queue, so clearing a filter returns to the server order.
@@ -1982,7 +1991,10 @@ const fetchCandidates = async (ids) => {
 const loadDeck = () => {
   if (!supabase) return Promise.resolve({ added: 0, error: null });
   if (deck.loading) return deck.loading;
-  deck.loading = supabase.rpc('deck_candidates', { p_limit: DECK_PAGE_SIZE }).then(({ data, error }) => {
+  // D-228: the first page was asked for at sign-in, beside the profile check; later pages are asked for here.
+  const request = deck.prefetch || supabase.rpc('deck_candidates', { p_limit: DECK_PAGE_SIZE });
+  deck.prefetch = null;
+  deck.loading = request.then(({ data, error }) => {
     if (error) return { added: 0, error };
     const added = enqueueDeckIds(mergePeople(data));
     if (added) deck.end = null;
@@ -6960,6 +6972,27 @@ const loadSupabaseCommunity = async () => {
     window.location.href = '/auth.html';
     return;
   }
+  // D-228 (founder 2026-11-10: "make the onboarding and app very smooth and fast"): everything the first screen needs
+  // depends only on the session, so it is all asked for now, beside the profile check, instead of in three rounds one
+  // after another (profile -> blocks/matches/inbox -> deck). Each answer is used at the same point as before; for a
+  // member who is sent to onboarding instead, the extra reads are simply dropped. A query builder only sends when it
+  // is awaited or then-ed, so each one is started with .then.
+  const uid = session.user.id;
+  const inboxFilter = `sender_id.eq.${uid},recipient_id.eq.${uid}`;
+  const loadInbox = async () => {
+    // Sort in the browser so an older Supabase schema cache cannot block inbox loading.
+    const base = 'id,sender_id,recipient_id,body,created_at,message_type,attachment_url,attachment_path,attachment_name,attachment_mime,attachment_size';
+    let full = await supabase.from('brivia_messages').select(base + (editColumns ? EDIT_COLUMNS : '')).or(inboxFilter);
+    if (full.error && editColumns && isEditColumnError(full.error)) { editColumns = false; full = await supabase.from('brivia_messages').select(base).or(inboxFilter); }
+    return full.error ? supabase.from('brivia_messages').select('id,sender_id,recipient_id,body').or(inboxFilter) : full;
+  };
+  const sent = (query) => query.then((answer) => answer);
+  const early = {
+    blocks: sent(supabase.from('brivia_blocks').select('blocked_id').eq('blocker_id', uid)),
+    matches: sent(supabase.from('matches').select('user1_id,user2_id').or(`user1_id.eq.${uid},user2_id.eq.${uid}`)),
+    inbox: loadInbox(),
+  };
+  deck.prefetch = sent(supabase.rpc('deck_candidates', { p_limit: DECK_PAGE_SIZE }));
   // The member's row and onboarding status are independent reads: ask for both at once (D-088).
   const [{ data: ownRow, error: ownError }, { data: onboarding, error: onboardingError }] = await Promise.all([
     supabase.from('profiles').select('*').eq('id', session.user.id).maybeSingle(),
@@ -7014,19 +7047,11 @@ const loadSupabaseCommunity = async () => {
   renderProfile();
   initResume(ownRow);
   if (document.body.dataset.appView === 'profile' && profileInterests.status === 'idle') loadProfileInterests();
-  // Blocks, matches and the inbox are independent reads: load them together (D-088), then use them in the old order.
-  const inboxFilter = `sender_id.eq.${session.user.id},recipient_id.eq.${session.user.id}`;
-  const loadInbox = async () => {
-    // Sort in the browser so an older Supabase schema cache cannot block inbox loading.
-    const base = 'id,sender_id,recipient_id,body,created_at,message_type,attachment_url,attachment_path,attachment_name,attachment_mime,attachment_size';
-    let full = await supabase.from('brivia_messages').select(base + (editColumns ? EDIT_COLUMNS : '')).or(inboxFilter);
-    if (full.error && editColumns && isEditColumnError(full.error)) { editColumns = false; full = await supabase.from('brivia_messages').select(base).or(inboxFilter); }
-    return full.error ? supabase.from('brivia_messages').select('id,sender_id,recipient_id,body').or(inboxFilter) : full;
-  };
+  // Blocks, matches and the inbox (started at sign-in, D-228) are used in the old order.
   const [, { data: matchRows, error: matchError }, { data: inboxRows, error: inboxError }] = await Promise.all([
-    syncBlockedUserIds(),
-    supabase.from('matches').select('user1_id,user2_id').or(`user1_id.eq.${session.user.id},user2_id.eq.${session.user.id}`),
-    loadInbox(),
+    syncBlockedUserIds(early.blocks),
+    early.matches,
+    early.inbox,
   ]);
   if (!matchError) {
     remoteConnectionIds = (matchRows || []).map((match) => match.user1_id === session.user.id ? match.user2_id : match.user1_id);
@@ -7060,14 +7085,14 @@ const loadSupabaseCommunity = async () => {
     remoteMatchIds = [...inboxIds];
   } else console.warn('Inbox could not load:', inboxError.message);
   // The deck: the first deck_candidates cards (location-first, server order); more load when the queue runs out.
-  const { error } = await loadDeck();
-  if (error) { console.warn('The deck could not load:', error.message); deck.end = 'error'; }
-  // Connections and conversations may be with members beyond the first page: load their cards by id.
+  // Connections and conversations may be with members beyond the first page: their cards load by id at the same time
+  // (D-228; the deck never holds a connection, so the two never wait on each other).
   const missingChatIds = remoteMatchIds.filter((id) => !findPersonById(id));
-  if (missingChatIds.length) {
-    const { data: chatRows, error: chatError } = await fetchCandidates(missingChatIds);
-    if (chatError) console.warn('Connections could not load:', chatError.message);
-    mergePeople(chatRows);
+  const [{ error }, chatCards] = await Promise.all([loadDeck(), missingChatIds.length ? fetchCandidates(missingChatIds) : null]);
+  if (error) { console.warn('The deck could not load:', error.message); deck.end = 'error'; }
+  if (chatCards) {
+    if (chatCards.error) console.warn('Connections could not load:', chatCards.error.message);
+    mergePeople(chatCards.data);
   }
   currentPerson = deckPeople()[0] || null;
   deck.ready = true;

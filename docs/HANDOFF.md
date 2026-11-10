@@ -7,6 +7,12 @@ Update this file at the end of every session. CLAUDE.md holds the aim; this file
 
 ## 1. What is done
 
+**2026-11-10, D-228 (faster start-up and onboarding):** start-up reads run in parallel, the login page prefetches
+the app's files, Create Event's code loads on demand, the envelope opens in 0.7 s. First card on a throttled phone
+1.15-1.38 s (was 1.45-1.63 s). Measure with `tests/e2e/perf-boot.mjs` (see its header). Live database checked
+2026-11-10: every object from 0001-0070 present. Edge Functions live: push-notify, directory; the four payment/ticket
+functions (D-183) wait for the founder's Razorpay and Resend keys (README "## 0053").
+
 **2026-11-10, D-227 (LIVE: main 326e57c, PR #67, deployed to thebriviaclub.live/.com; 0069 and 0070 applied, 120 covers switched):** AT WORK (the first cover) is the default
 cover for new signups and members without one; brochures have no size limit of ours. **Done: 0069 and 0070 applied** (README
 "## 0069", "## 0070": 0070 switches SMASH THEORY members to AT WORK once, reversibly); check Supabase's project-wide upload limit (Project Settings > Storage) is as high as wanted. Also already

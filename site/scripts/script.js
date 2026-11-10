@@ -15,6 +15,7 @@ import { locateOnce, fallbackCopy, isTryAgainLater, STILL_WAITING_TEXT } from '.
 import { signupErrorCopy, loginErrorCopy } from './signup-errors.js';
 import { initGuidedSignup } from './signup-screens.js';
 import { signupFlowMode, resumeScreen } from './signup-flow.js';
+import { prefetchApp } from './prefetch-app.js';
 import { defaultCoverUrl, normalizeCoverUrl } from './cover-assets.js';
 import { DEFAULT_COVER_KEY, presetCoverPath, presetCoverStoredPath } from './preset-cover.js';
 import { motionAllowed, introPlan, pickHeroSource, markLoaded, INTRO_CAP_MS, INTRO_HOLD_MS } from './landing-motion.js';
@@ -2598,6 +2599,8 @@ const closeAuth = () => {
   authCta?.focus();
 };
 
+// D-228: while the member signs up or logs in, the app's files are fetched in the background (prefetch-app.js).
+if (document.body.classList.contains('auth-page')) prefetchApp();
 if (document.body.classList.contains('auth-page')) {
   window.addEventListener('pagehide', () => {
     try { window.sessionStorage.setItem('brivia-skip-intro-once', 'true'); } catch {}
@@ -2611,7 +2614,7 @@ const openAuthEnvelope = (view) => {
   authEnvelopeTimer = window.setTimeout(() => {
     setAuthView(view);
     authShell.classList.remove('is-envelope-opening');
-  }, 1420);
+  }, 700);   // D-228: was 1420 ms; the envelope's own animation is now ~0.7 s (auth-polish.css)
 };
 
 authModal?.querySelector('.auth-close')?.addEventListener('click', closeAuth);

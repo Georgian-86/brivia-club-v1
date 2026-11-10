@@ -56,13 +56,16 @@ export const session = { access_token: accessToken, refresh_token: 'stub-refresh
 
 export const freshState = () => ({ status: 'caught_up', emptyDeck: false, deckFail: false, matchAll: false, onboarding: [true], onboardingCalls: 0, passed: new Set(), signalled: new Set(), remaining: 30, resetsAt: null, matchIds: [], search: [], report: 'ok', rows: null, why: null, whyStatuses: null });
 
-export const startAppStub = async ({ port, state = {}, deckRows = defaultDeckRows } = {}) => {
+// previewDir: serve a production build (vite build with VITE_SUPABASE_URL = ORIGIN) with `vite preview` instead of the
+// dev server, for timing checks (tests/e2e/perf-boot.mjs).
+export const startAppStub = async ({ port, state = {}, deckRows = defaultDeckRows, previewDir = '' } = {}) => {
   const st = state;
   for (const [key, value] of Object.entries(freshState())) if (!(key in st)) st[key] = value;
   st.calls ||= [];
   st.bodies ||= [];
   const url = `http://127.0.0.1:${port}`;
-  const vite = spawn('npx', ['vite', '--port', String(port), '--strictPort', '--host', '127.0.0.1'], {
+  const viteArgs = previewDir ? ['vite', 'preview', '--outDir', previewDir] : ['vite'];
+  const vite = spawn('npx', [...viteArgs, '--port', String(port), '--strictPort', '--host', '127.0.0.1'], {
     cwd: repoRoot,
     env: { ...process.env, VITE_SUPABASE_URL: ORIGIN, VITE_SUPABASE_ANON_KEY: 'stub-anon-key' },
     stdio: ['ignore', 'pipe', 'pipe'],
