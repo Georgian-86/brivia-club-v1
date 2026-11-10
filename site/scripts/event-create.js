@@ -156,7 +156,7 @@ const shellMarkup = () => `<div class="ec-shell">
           </div>
         </div>
         <div class="ec-field ec-brochure" data-field="brochure">
-          <span class="ec-label-like" id="ec-brochure-label">Brochure <span class="ec-optional">Optional · PDF up to 5 MB</span></span>
+          <span class="ec-label-like" id="ec-brochure-label">Brochure <span class="ec-optional">Optional · PDF</span></span>
           <input class="sr-only" id="ec-brochure" type="file" accept="${BROCHURE_ACCEPT}" tabindex="-1" aria-hidden="true" />
           <div data-ec-brochure-empty><button type="button" class="ec-brochure-add" data-ec-pick="brochure" aria-describedby="ec-brochure-hint ec-brochure-error">${DOC}<span>Add a brochure</span></button></div>
           <div class="ec-brochure-file" data-ec-brochure-filled hidden>
@@ -562,7 +562,7 @@ export const createEventComposer = ({ dialog, api, memberId, organizer, safeImag
   $('[data-ec-crop-open]').addEventListener('click', () => { const src = posterSource || posterSrc(); if (src) openCrop(src); });
   window.addEventListener('resize', () => { if (crop) drawCrop(); });
 
-  // The brochure (D-125): one PDF up to 5 MB, uploaded at once; set on the event after it saves --------------------------
+  // The brochure (D-125): one PDF of any size (D-227), uploaded at once; set on the event after it saves --------------------------
   const brochureError = (message) => { $('#ec-brochure-error').textContent = message; $('.ec-brochure').classList.toggle('has-error', Boolean(message)); };
   const dropBrochure = (url) => {
     if (url && brochureUploads.has(url) && url !== draft.brochureUrl) { brochureUploads.delete(url); api.removeEventBrochures?.(memberId(), [url]); }
@@ -583,7 +583,7 @@ export const createEventComposer = ({ dialog, api, memberId, organizer, safeImag
       dropBrochure(before);
     } catch (error) {
       brochureError(/bucket not found/i.test(`${error?.message || ''} ${error?.error || ''}`) ? 'Brochures open soon. You can publish without one.'
-        : /size|large|413/i.test(`${error?.message || ''} ${error?.statusCode || ''}`) ? 'Keep the brochure under 5 MB.' : 'That PDF did not upload. Try again.');
+        : /size|large|413/i.test(`${error?.message || ''} ${error?.statusCode || ''}`) ? "This PDF is too large for the server to accept. Try a compressed copy." : 'That PDF did not upload. Try again.');
     } finally { brochureBusy = false; busy -= 1; renderBrochure(); renderPreview(); }
   });
   $('[data-ec-brochure-remove]').addEventListener('click', () => {

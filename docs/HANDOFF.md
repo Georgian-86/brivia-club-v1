@@ -7,6 +7,11 @@ Update this file at the end of every session. CLAUDE.md holds the aim; this file
 
 ## 1. What is done
 
+**2026-11-10, D-227 (branch `claude/funny-cori-ew167m`, not deployed):** AT WORK (the first cover) is the default
+cover for new signups and members without one; brochures have no size limit of ours. **Owed: apply 0069** (README
+"## 0069"); check Supabase's project-wide upload limit (Project Settings > Storage) is as high as wanted. Also already
+failing before D-227: `profile-media.spec.mjs` 7 "no cover file input anywhere" checks.
+
 **2026-11-10, D-226 (branch `claude/funny-cori-ew167m`, not deployed; client only, no SQL):** confirming the email
 no longer sends a new member back to enter their details. signUp keeps the 18+ confirmation and the work answers with
 the account, and the link's return path applies this browser's pending signup first even when a profile row exists.

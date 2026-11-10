@@ -244,7 +244,7 @@ There are no City or State inputs (D-036). **Cover (D-080):** there is no cover 
 ("Choose one of the Brivia covers. Your own pictures can't be used as a cover.") holds the 25 provided covers, in the founder's order
 (D-128), as a radio group of 16:9 thumbnails with their uppercase titles (the signup picker's), 2 columns on phones and
 5 on desktop whenever the dialog is wide enough; the current cover is checked (wine ring, a check badge, bold deep-wine
-title; a legacy value marks its preset, none marks the default cover, SMASH THEORY). Arrow keys move the choice; focus shows a deep-wine ring. SAVE CHANGES stores the
+title; a legacy value marks its preset, none marks the default cover, AT WORK, the first; SMASH THEORY until D-227). Arrow keys move the choice; focus shows a deep-wine ring. SAVE CHANGES stores the
 picked preset path; saving without a change sends the stored value back. The server (0014) accepts only these paths
 and no longer accepts uploads into `profile-covers`. The member's area (`my_onboarding_status().place_label`) is shown
 read-only as "YOUR AREA" with "Change your area: coming soon." The profile page's details card (email, phone) is

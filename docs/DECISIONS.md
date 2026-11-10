@@ -4241,3 +4241,21 @@ bring a short line back.
   the confirmation-on case now checks the flag is sent. Onboarding (269), password-reset, password-reveal pass.
   Already failing before D-226, unchanged: `signup.spec.mjs` "area denied", and `login-smooth.spec.mjs` 3 error-copy
   checks (they read "Log in is unavailable right now" in the stub on the untouched code too).
+
+## D-227 (2026-11-10): AT WORK is the default cover; brochures have no size limit of ours
+
+- **Ask (founder, 2026-11-10, with screenshots of the cover picker and Create Event):** "by default cover should be
+  at work that is the first one, ALSO THERE SHOULD BE NO FILE SIZE CRITERIA FOR BROCHURE".
+- **Default cover.** `DEFAULT_COVER_KEY` / `defaultCoverUrl` / signup's `GUIDED_DEFAULT_COVER` / the classic picker's
+  preselection are AT WORK (`AE983BB0-...PNG`), the first cover, instead of SMASH THEORY (D-128). It is what a new
+  signup gets and what any member without a stored cover shows (deck, profile, the editor's checked tile). Members who
+  already have SMASH THEORY stored keep it: the database cannot tell a chosen SMASH THEORY from the old default, so no
+  rows were changed (a follow-up can, if the founder wants it).
+- **Brochure.** The client no longer checks a size ("Optional · PDF"), and 0069 removes the bucket's 5 MB limit. It is
+  still PDF only. The one remaining ceiling is Supabase's project-wide upload limit (dashboard, Project Settings >
+  Storage); a PDF over it gets "This PDF is too large for the server to accept. Try a compressed copy."
+- **Checks.** Unit `preset-cover.test.mjs` (default = AT WORK, the first, in all four places); SQL
+  `zi-brochure-no-size-limit.test.sql` and `n-event-interest.test.sql` N1 updated; e2e `create-event.spec.mjs` (a 12 MB
+  PDF uploads; the label names no limit), `deck.spec.mjs` (201, the no-cover cards show AT WORK),
+  `profile-media.spec.mjs` signup default. Already failing before D-227, unchanged: `profile-media.spec.mjs` 7
+  "no cover file input anywhere" checks (they see Create Event's poster inputs).

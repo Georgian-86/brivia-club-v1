@@ -1999,7 +1999,7 @@ const startGoogleAuth = async () => {
 // Each resolves { ok: true, ... } or { ok: false, screen, message } (the screen to show the line on).
 let guidedRow = null;  // the signed-in member's own profile row when the flow resumed (kept fields are not cleared)
 let guidedSaved = null;  // their saved budget (my_interests) when the flow resumed: unchanged picks keep its points
-const GUIDED_DEFAULT_COVER = '/Images/Cover%20images/2257522A-04B9-4E3E-AB1A-A73D7BB8CCBF.PNG';
+const GUIDED_DEFAULT_COVER = '/Images/Cover%20images/AE983BB0-AF28-41D3-AA72-B03B4C7F7D8C.PNG';   // AT WORK (D-227)
 const guidedStepFor = (message) => (message === ADULT_SAVE_ERROR ? 'photo'
   : message === AREA_SAVE_ERROR || message === 'Try again later.' ? 'area' : message === ABOUT_SAVE_ERROR ? 'about' : 'interests');
 const submitGuidedSignup = async (answers) => {

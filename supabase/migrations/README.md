@@ -1489,3 +1489,10 @@ offers a self thread). Replaces `brivia_private.brivia_can_send(uuid)` so a comp
 themselves; everything else in the send rule is unchanged. No data, table, column or grant changes.
 Verify, signed in as a completed member in the app: Chat, search your own name, Message, send "test". Or in SQL:
 `select prosrc like '%p_recipient = auth.uid()%' from pg_proc where proname = 'brivia_can_send';` (true).
+
+## 0069
+
+**No brochure size limit (D-227).** Apply after `0068`, with the client deploy. Sets the `event-brochures` bucket's
+`file_size_limit` to null (it was 5 MB since 0025); still PDF only and public. A brochure is then limited only by the
+project-wide upload limit in the Supabase dashboard (Project Settings > Storage, "Upload file size limit"; raise it
+there if large brochures are expected). Verify: `select file_size_limit from storage.buckets where id = 'event-brochures';` (null).

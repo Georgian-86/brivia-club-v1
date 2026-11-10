@@ -53,9 +53,9 @@ const coverAssets = {
   'DEB7869C-E852-450F-A371-65E2BF6167A2.PNG': coverSixteen,
 };
 
-// The default cover (preset-cover.js DEFAULT_COVER_KEY, SMASH THEORY): the signup picker's preselected one and what a
-// member with no cover sees. D-128 moved it from first to 20th in the order; the picture did not change.
-export const defaultCoverUrl = coverTwo;
+// The default cover (preset-cover.js DEFAULT_COVER_KEY, AT WORK, the first in the picker; D-227): the signup picker's
+// preselected one and what a member with no cover sees (SMASH THEORY until D-227).
+export const defaultCoverUrl = coverThirteen;
 
 const coverKeys = Object.keys(coverAssets);
 

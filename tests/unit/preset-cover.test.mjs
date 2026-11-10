@@ -90,15 +90,16 @@ test('presetCoverPath: anything else is not a cover', () => {
   }
 });
 
-test('the default cover is SMASH THEORY (unchanged picture, D-128), preselected at signup, not a retired one', () => {
-  assert.equal(DEFAULT_COVER_KEY, '2257522A-04B9-4E3E-AB1A-A73D7BB8CCBF.PNG');
-  assert.ok(PRESET_COVER_KEYS.includes(DEFAULT_COVER_KEY));
-  assert.match(read('site/scripts/script.js'), /GUIDED_DEFAULT_COVER = '\/Images\/Cover%20images\/2257522A-04B9-4E3E-AB1A-A73D7BB8CCBF\.PNG'/);
-  assert.match(read('site/auth.html'), /name="coverUrl" value="\/Images\/Cover%20images\/2257522A-04B9-4E3E-AB1A-A73D7BB8CCBF\.PNG"/);
-  assert.match(read('site/auth.html'), /class="cover-choice is-selected" type="button" data-cover-option="\/Images\/Cover%20images\/2257522A-04B9-4E3E-AB1A-A73D7BB8CCBF\.PNG"/);
+test('the default cover is AT WORK, the first one (D-227, founder 2026-11-10), preselected at signup', () => {
+  assert.equal(DEFAULT_COVER_KEY, 'AE983BB0-AF28-41D3-AA72-B03B4C7F7D8C.PNG');
+  assert.equal(DEFAULT_COVER_KEY, PRESET_COVER_KEYS[0]);
+  assert.equal(PRESET_COVERS[0].title, 'AT WORK');
+  assert.match(read('site/scripts/script.js'), /GUIDED_DEFAULT_COVER = '\/Images\/Cover%20images\/AE983BB0-AF28-41D3-AA72-B03B4C7F7D8C\.PNG'/);
+  assert.match(read('site/auth.html'), /name="coverUrl" value="\/Images\/Cover%20images\/AE983BB0-AF28-41D3-AA72-B03B4C7F7D8C\.PNG"/);
+  assert.match(read('site/auth.html'), /class="cover-choice is-selected" type="button" data-cover-option="\/Images\/Cover%20images\/AE983BB0-AF28-41D3-AA72-B03B4C7F7D8C\.PNG"/);
   assert.equal((read('site/auth.html').match(/cover-choice is-selected/g) || []).length, 1);
-  assert.match(read('site/scripts/cover-assets.js'), /defaultCoverUrl = coverTwo;/);
-  assert.match(read('site/scripts/cover-assets.js'), /import coverTwo from '\.\.\/media\/Images\/Cover images\/2257522A-04B9-4E3E-AB1A-A73D7BB8CCBF\.webp';/);
+  assert.match(read('site/scripts/cover-assets.js'), /defaultCoverUrl = coverThirteen;/);
+  assert.match(read('site/scripts/cover-assets.js'), /import coverThirteen from '\.\.\/media\/Images\/Cover images\/AE983BB0-AF28-41D3-AA72-B03B4C7F7D8C\.webp';/);
   for (const file of ['site/auth.html', 'site/scripts/cover-assets.js', 'site/scripts/preset-cover.js', 'site/scripts/script.js']) {
     assert.ok(!read(file).includes('163BDB0C'), file);
   }
