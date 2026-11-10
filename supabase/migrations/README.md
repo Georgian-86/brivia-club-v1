@@ -1496,3 +1496,11 @@ Verify, signed in as a completed member in the app: Chat, search your own name, 
 `file_size_limit` to null (it was 5 MB since 0025); still PDF only and public. A brochure is then limited only by the
 project-wide upload limit in the Supabase dashboard (Project Settings > Storage, "Upload file size limit"; raise it
 there if large brochures are expected). Verify: `select file_size_limit from storage.buckets where id = 'event-brochures';` (null).
+
+## 0070
+
+**SMASH THEORY members move to AT WORK (D-227, one-off).** Apply after `0069`. Keeps each switched member's old cover
+in `brivia_private.cover_switch_d227` (members cannot read it), then sets AT WORK for every profile with SMASH THEORY.
+Runs once: a re-run, or a member who picks SMASH THEORY later, changes nothing. The undo statement is in the file.
+Verify: `select count(*) from brivia_private.cover_switch_d227;` (the number switched) and
+`select count(*) from profiles where cover_url like '%2257522A%';` (0 right after).

@@ -4249,8 +4249,9 @@ bring a short line back.
 - **Default cover.** `DEFAULT_COVER_KEY` / `defaultCoverUrl` / signup's `GUIDED_DEFAULT_COVER` / the classic picker's
   preselection are AT WORK (`AE983BB0-...PNG`), the first cover, instead of SMASH THEORY (D-128). It is what a new
   signup gets and what any member without a stored cover shows (deck, profile, the editor's checked tile). Members who
-  already have SMASH THEORY stored keep it: the database cannot tell a chosen SMASH THEORY from the old default, so no
-  rows were changed (a follow-up can, if the founder wants it).
+  had SMASH THEORY stored were switched too, at the founder's word ("do it"): the database cannot tell a chosen
+  SMASH THEORY from the old default, so 0070 switches all of them once, keeping each old cover in
+  `brivia_private.cover_switch_d227` for an undo; a member who picks SMASH THEORY afterwards keeps it.
 - **Brochure.** The client no longer checks a size ("Optional · PDF"), and 0069 removes the bucket's 5 MB limit. It is
   still PDF only. The one remaining ceiling is Supabase's project-wide upload limit (dashboard, Project Settings >
   Storage); a PDF over it gets "This PDF is too large for the server to accept. Try a compressed copy."

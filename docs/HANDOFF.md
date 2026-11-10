@@ -8,8 +8,8 @@ Update this file at the end of every session. CLAUDE.md holds the aim; this file
 ## 1. What is done
 
 **2026-11-10, D-227 (branch `claude/funny-cori-ew167m`, not deployed):** AT WORK (the first cover) is the default
-cover for new signups and members without one; brochures have no size limit of ours. **Owed: apply 0069** (README
-"## 0069"); check Supabase's project-wide upload limit (Project Settings > Storage) is as high as wanted. Also already
+cover for new signups and members without one; brochures have no size limit of ours. **Owed: apply 0069 and 0070** (README
+"## 0069", "## 0070": 0070 switches SMASH THEORY members to AT WORK once, reversibly); check Supabase's project-wide upload limit (Project Settings > Storage) is as high as wanted. Also already
 failing before D-227: `profile-media.spec.mjs` 7 "no cover file input anywhere" checks.
 
 **2026-11-10, D-226 (branch `claude/funny-cori-ew167m`, not deployed; client only, no SQL):** confirming the email
