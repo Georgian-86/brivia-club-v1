@@ -7,6 +7,13 @@ Update this file at the end of every session. CLAUDE.md holds the aim; this file
 
 ## 1. What is done
 
+**2026-11-10, D-226 (branch `claude/funny-cori-ew167m`, not deployed; client only, no SQL):** confirming the email
+no longer sends a new member back to enter their details. signUp keeps the 18+ confirmation and the work answers with
+the account, and the link's return path applies this browser's pending signup first even when a profile row exists.
+Another browser asks only for the photo. **Owed (founder): Supabase Auth > URL Configuration, add both
+`https://thebriviaclub.com/auth.html` and `https://thebriviaclub.live/auth.html` to Redirect URLs** (and www variants
+if used). Also already failing before D-226: `login-smooth.spec.mjs` 3 error-copy checks.
+
 **2026-11-10, D-225 (branch `claude/funny-cori-ew167m`, not deployed; client only, no SQL):** at the swipe limit
 every request dialog says "You're out of free swipes ... Fresh swipes tomorrow at 3 PM." itself (the toast sat under
 the modal and was never seen), and the pitch sheet now opens above Chat (it was invisible from Chat search's profile

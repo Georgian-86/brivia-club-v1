@@ -4216,3 +4216,28 @@ bring a short line back.
 - **Checks.** Unit `signal-quota.test.mjs` (+5); e2e `swipe-limit.spec.mjs` (22 at 1440, 390 and 375); deck (201),
   companions (65), chat-search and chat-self pass. Already failing before this change, unchanged: `consent.spec.mjs`
   (times out in `cancelKeepsCard` at line 234) and one `nearby.spec.mjs` Settings sound check (D-138).
+
+## D-226 (2026-11-10): confirming the email never asks for the signup details again
+
+- **Report (founder, 2026-11-10, after a live signup):** "once we enter all details we will get confirmation mail
+  again it is going to same page to enter details".
+- **Root causes.** With email confirmation on, no session exists at signup, so the photo, the 18+ confirmation and the
+  work answers waited in this browser only (`brivia-pending-profile`, `brivia-pending-work`). (1) The confirmation
+  link often opens elsewhere: a phone's mail app opens its own browser, and the site lives on two domains
+  (thebriviaclub.com and thebriviaclub.live) whose storage is separate. There the member had no 18+ record, so
+  `resumeScreen` started again at the work screen. (2) Even in the same browser, the link's return path
+  (`restoreAuthPageSession`) skipped the pending signup whenever a profile row already existed.
+- **Decision.** signUp keeps, with the account (auth metadata), `adultDeclared: true` (continuing the work screen
+  confirms 18+, D-216) and the work answers (`workTitle`, `workCompanyId`, `workCompanyName`; shown on cards anyway, so
+  not private). Back from the link, or logging in, in any browser: a pending signup here is applied first (as the login
+  form already did); otherwise `applySignupMetadata` records the 18+ confirmation, and setup's Finish saves the work
+  answers from the account. Name, phone and gender already travelled this way. So another browser asks only for the
+  photo (it cannot be uploaded before a session exists, and auth metadata is no place for an image); the same browser
+  goes straight to setup. Accounts from before D-226 (no flag) are unchanged: they confirm 18+ on the work screen.
+  Interests, location and the photo are still never put in auth metadata.
+- **Config (founder).** In Supabase, Authentication > URL Configuration, list both domains' `/auth.html` under
+  Redirect URLs, so the link returns to the domain the member signed up on.
+- **Checks.** `signup.spec.mjs` R1-R3 (failed before the fix: R1 and R2 landed on the work screen; pass after), and
+  the confirmation-on case now checks the flag is sent. Onboarding (269), password-reset, password-reveal pass.
+  Already failing before D-226, unchanged: `signup.spec.mjs` "area denied", and `login-smooth.spec.mjs` 3 error-copy
+  checks (they read "Log in is unavailable right now" in the stub on the untouched code too).

@@ -819,6 +819,8 @@ try {
       assert.equal(p.adultDeclared, true); assert.deepEqual(p.interests, []); assert.match(String(p.photoUrl || ''), /^data:image\/(jpeg|webp|png);base64,/);
       assert.match(u.text, /pick your area and interests next/);
       assert.equal(p.phoneNumber, '9876543210'); assert.equal(p.gender, 'Female');
+      const sent = JSON.parse(calls.find((c) => c.path === '/auth/v1/signup')?.body || '{}').data || {};
+      assert.equal(sent.adultDeclared, true); assert.equal(sent.workTitle, 'Analyst');   // D-226: travels with the account
       assert.ok(!COORD_RE.test(stored)); assert.ok(!/correct horse/.test(stored));
       assert.equal(calls.filter((c) => c.path.startsWith('/rest/v1/rpc/')).length, 0);
     });
@@ -1099,6 +1101,68 @@ try {
       assert.equal(calls.filter(rpcAt('set_member_interests')).length, 0);
       assert.deepEqual(state.interests, saved);
     });
+    await context.close();
+  }
+
+  // ---- D-226: back from the confirmation email, the details are not asked again ----
+  // (founder 2026-11-10: "once we enter all details we will get confirmation mail again it is going to same page to
+  // enter details"). The link often opens in another browser (a phone's mail app) or on the other domain, where this
+  // browser's pending profile does not exist; and with a profile row already there the pending profile was ignored.
+  {
+    // R1: another browser. signUp now keeps the 18+ confirmation and the work answers with the account (auth metadata),
+    // so the member resumes at the photo (the one thing that cannot travel), and Finish still saves the title.
+    const meta = { name: 'Gia Guided', full_name: 'Gia Guided', phone: '+91 9876543210', phoneCountryCode: '+91', phoneNumber: '9876543210', gender: 'Female', coverUrl: '/Images/Cover%20images/x.PNG', adultDeclared: true, workTitle: 'Analyst', workCompanyId: '', workCompanyName: '' };
+    let context = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+    await scriptGeo(context, 'ok');
+    let { state, calls } = await setup(context, { signedIn: true, meta });
+    let page = await context.newPage();
+    const errors = [];
+    page.on('pageerror', (e) => errors.push(e.message));
+    await page.goto(`${BASE}/auth.html`, { waitUntil: 'load' });
+    const atPhoto = await waitScreen(page, 'photo', 10000);
+    check(`R1 another browser: resumes at the photo, not the work screen (${await page.evaluate(() => document.querySelector('#guided-signup')?.dataset.screen)})`, () => assert.equal(atPhoto, true));
+    check('R1 another browser: the 18+ confirmation given at signup is applied (declare_adult, once)', () => assert.equal(calls.filter(rpcAt('declare_adult')).length, 1));
+    check('R1 another browser: name, phone and gender were saved from the account', () => {
+      assert.equal(state.profile?.name, 'Gia Guided'); assert.equal(String(state.profile?.phone_number || '').replace(/\D/g, ''), '9876543210'); assert.equal(state.profile?.gender, 'Female');
+    });
+    let revealed = false;
+    if (atPhoto) {   // before the fix the member is on the work screen: nothing below would apply
+      await answerRest(page, 'photo', { area: 'city' });
+      await page.locator('[data-guided-next]').click();
+      revealed = await waitScreen(page, 'reveal', 10000);
+    }
+    check(`R1 another browser: Finish reaches the reveal and saves the title from the account (${JSON.stringify(state.work)})`, () => {
+      assert.equal(revealed, true); assert.equal(state.work?.p_title, 'Analyst');
+    });
+    check(`R1 no page errors (${errors.join(' | ')})`, () => assert.deepEqual(errors, []));
+    await context.close();
+
+    // R2: the same browser, a profile row already there: the pending profile (photo, 18+) is applied first.
+    context = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+    await scriptGeo(context, 'ok');
+    ({ state, calls } = await setup(context, { signedIn: true, meta: { name: 'Gia Guided', full_name: 'Gia Guided' }, profile: { id: ME, name: 'Gia Guided', email: EMAIL } }));
+    const photo = `data:image/png;base64,${PHOTO_PNG.toString('base64')}`;
+    await context.addInitScript(([email, img]) => {
+      if (sessionStorage.getItem('pending-seeded')) return;
+      sessionStorage.setItem('pending-seeded', '1');
+      localStorage.setItem('brivia-pending-profile', JSON.stringify({ name: 'Gia Guided', email, phoneCountryCode: '+91', phoneNumber: '9876543210', phone: '+91 9876543210', gender: 'Female', coverUrl: '/Images/Cover%20images/x.PNG', photoUrl: img, photoName: 'profile-photo.jpg', interests: [], privateOmitted: false, orbit: { kind: 'geo' }, savedAt: Date.now(), adultDeclared: true }));
+    }, [EMAIL, photo]);
+    page = await context.newPage();
+    await page.goto(`${BASE}/auth.html`, { waitUntil: 'load' });
+    const atSetup = await waitScreen(page, 'interests', 10000);
+    check(`R2 same browser with a row: lands on setup, not the details (${await page.evaluate(() => document.querySelector('#guided-signup')?.dataset.screen)})`, () => assert.equal(atSetup, true));
+    check('R2 same browser with a row: the photo is uploaded and declare_adult sent', () => {
+      assert.ok(calls.some((c) => c.path.startsWith('/storage/v1/object/profile-photos/'))); assert.equal(calls.filter(rpcAt('declare_adult')).length, 1);
+    });
+    await context.close();
+
+    // R3: an account from before D-226 (no adultDeclared in its metadata) still starts at the work screen.
+    context = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+    ({ calls } = await setup(context, { signedIn: true, meta: { name: 'Old Signup', full_name: 'Old Signup', phone: '+91 9876543210', phoneNumber: '9876543210', phoneCountryCode: '+91', gender: 'Male' } }));
+    page = await context.newPage();
+    await page.goto(`${BASE}/auth.html`, { waitUntil: 'load' });
+    const atWork = await waitScreen(page, 'work', 10000);
+    check('R3 an older account without the flag still confirms 18+ on the work screen', () => { assert.equal(atWork, true); assert.equal(calls.filter(rpcAt('declare_adult')).length, 0); });
     await context.close();
   }
 

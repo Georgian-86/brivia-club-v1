@@ -2039,7 +2039,15 @@ const submitGuidedSignup = async (answers) => {
         options: {
           emailRedirectTo: `${window.location.origin}/auth.html`,
           // Auth metadata holds contact basics only: never interests (some are private), any location or the photo.
-          data: { name: profile.name, full_name: profile.name, phone: profile.phone, phoneCountryCode, phoneNumber, gender: profile.gender, coverUrl: profile.coverUrl },
+          // D-226: plus the 18+ confirmation (continuing the work screen confirms it, D-216) and the work answers, so
+          // the confirmation link can be opened in any browser or on either domain without asking them again.
+          data: {
+            name: profile.name, full_name: profile.name, phone: profile.phone, phoneCountryCode, phoneNumber, gender: profile.gender, coverUrl: profile.coverUrl,
+            adultDeclared: true,
+            workTitle: String(answers.title || '').trim().slice(0, 80),
+            workCompanyId: String(answers.companyId || ''),
+            workCompanyName: String(answers.companyName || '').trim().slice(0, 120),
+          },
         },
       });
       if (error) return { ok: false, screen: 'account', message: signupErrorCopy(error) };
@@ -2090,7 +2098,13 @@ const saveGuidedAbout = async (userId, lookingFor, bio) => {
 const saveGuidedWork = async (userId, work) => {
   let pending = null;
   try { pending = JSON.parse(window.localStorage.getItem('brivia-pending-work') || 'null'); } catch { pending = null; }
-  const w = (work && (work.title || work.companyName)) ? work : pending;
+  let w = (work && (work.title || work.companyName)) ? work : pending;
+  if (!w || !(w.title || w.companyName)) {
+    // D-226: the answers given at signup travel with the account (another browser has no pending work).
+    const { data } = await supabase.auth.getSession();
+    const meta = data?.session?.user?.user_metadata || {};
+    w = { title: meta.workTitle || '', companyId: meta.workCompanyId || null, companyName: meta.workCompanyName || '' };
+  }
   if (!w || !(w.title || w.companyName)) return;
   try {
     let companyId = w.companyId || null;
@@ -2391,8 +2405,18 @@ const restoreAuthPageSession = async () => {
     setAuthView(requestedAuthView, 'none');
     return;
   }
+  // D-226 (founder 2026-11-10: confirming the email sent members back to enter their details again). Back from the
+  // confirmation link, this browser's pending signup is applied first, as the login form does, whether or not a
+  // profile row exists yet (before, a row meant the pending photo and 18+ answer were ignored).
+  const pending = readPendingProfile();
+  const pendingMatches = pending?.email?.toLowerCase() === session.user.email?.toLowerCase();
+  if (pendingMatches && await restoreCachedMemberProfile(session.user, pending)) {
+    const pendingResult = await applyPendingOnboarding(pending);
+    await routeAfterProfile(session.user, null, pendingResult);
+    return;
+  }
   // As on the login form: with no pending signup, read the onboarding status beside the profile (D-088).
-  const statusRequest = readPendingProfile() ? null : onboardingStatus();
+  const statusRequest = pending ? null : onboardingStatus();
   const { data: profile, error } = await supabase.from('profiles').select('*').eq('id', session.user.id).maybeSingle();
   if (error) {
     setAuthView('login');
@@ -2400,14 +2424,14 @@ const restoreAuthPageSession = async () => {
     return;
   }
   if (profile) {
+    // D-226: another browser (or the other domain) has no pending signup; what signup kept with the account applies.
+    if (await applySignupMetadata(session.user, profile)) { await routeAfterProfile(session.user, null); return; }
     await routeAfterProfile(session.user, profile, null, statusRequest);
     return;
   }
-  const pending = readPendingProfile();
-  const pendingMatches = pending?.email?.toLowerCase() === session.user.email?.toLowerCase();
-  if (await restoreCachedMemberProfile(session.user, pendingMatches ? pending : null)) {
-    const pendingResult = pendingMatches ? await applyPendingOnboarding(pending) : null;
-    await routeAfterProfile(session.user, null, pendingResult);
+  if (await restoreCachedMemberProfile(session.user, null)) {
+    await applySignupMetadata(session.user, null);
+    await routeAfterProfile(session.user, null, null);
     return;
   }
   if (guidedSignup) { await openGuidedFor(session.user, null, null, null); return; }
@@ -2481,6 +2505,15 @@ const savePendingProfile = async (userId, profile, source) => {
   return { ...result, cached };
 };
 
+// D-226: the 18+ confirmation a signup kept with the account (auth metadata adultDeclared, set at signUp) is recorded
+// once the profile row exists, when this browser has no pending signup to do it. True when it was recorded now (the
+// caller then re-reads the row). Never for an account without the flag (older signups confirm on the work screen).
+const applySignupMetadata = async (user, row = null) => {
+  if (user?.user_metadata?.adultDeclared !== true || row?.adult_declared_at) return false;
+  const { error } = await declareAdult();
+  if (error) { console.warn('The 18+ confirmation could not be recorded:', error.message); return false; }
+  return true;
+};
 const restoreCachedMemberProfile = async (user, preferredProfile = null) => {
   if (!user?.id || !supabase) return false;
   const userEmail = String(user.email || '').trim().toLowerCase();
@@ -2641,6 +2674,7 @@ loginForm?.addEventListener('submit', async (event) => {
     if (ownProfileError) throw ownProfileError;
     if (!ownProfile) {
       if (await restoreCachedMemberProfile(data.user)) {
+        if (!pendingBelongsToUser) await applySignupMetadata(data.user, null);   // D-226
         await routeAfterProfile(data.user);
         return;
       }
@@ -2652,6 +2686,8 @@ loginForm?.addEventListener('submit', async (event) => {
     if (pendingBelongsToUser && pending?.coverUrl) {
       await supabase.auth.updateUser({ data: { coverUrl: pending.coverUrl } }).catch(() => {});
     }
+    // D-226: logging in from another browser than the signup one: what signup kept with the account applies.
+    if (!pendingBelongsToUser && await applySignupMetadata(data.user, ownProfile)) { await routeAfterProfile(data.user, null); return; }
     await routeAfterProfile(data.user, ownProfile, loginPendingResult, statusRequest);
   } catch (error) {
     if (loginNote) loginNote.textContent = loginErrorCopy(error, { online: navigator.onLine !== false });
