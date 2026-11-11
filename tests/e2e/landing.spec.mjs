@@ -212,11 +212,10 @@ try {
       await page.goto(`${BASE}/index.html`, { waitUntil: 'domcontentloaded' });
       if (tapFirst) await page.mouse.click(Math.round(viewport.width / 2), Math.round(viewport.height / 2));
       await page.waitForTimeout(1900);
-      const hero = await page.evaluate(() => ({ muted: document.querySelector('.hero-video').muted, attempts: window.__unmutedAttempts }));
-      await check(`${label}: ${tapFirst ? 'a tap before the hero starts leaves it unmuted once it starts' : 'with no gesture the hero starts muted without an unmuted attempt'}`, () => {
-        if (tapFirst) assert.equal(hero.muted, false, 'hero is muted after an early tap');
-        else { assert.equal(hero.muted, true); assert.equal(hero.attempts, 0, 'unmuted play() attempted before any gesture'); }
-      });
+      // D-092 / D-220: the hero video is decorative and always plays muted, tap or no tap; the landing's sound is its
+      // own <audio> / Web Audio music (D-221 / D-222, landing-sound.spec), so an unmuted play() here is that music's.
+      const hero = await page.evaluate(() => ({ muted: document.querySelector('.hero-video').muted }));
+      await check(`${label}: ${tapFirst ? 'after an early tap' : 'with no gesture'} the hero video plays muted (the music is separate)`, () => assert.equal(hero.muted, true));
       await context.close();
     }
 
@@ -264,7 +263,7 @@ try {
       page.on('pageerror', (error) => errors.push(error.message));
       const tracked = await track(context, page);
       const bad = [];
-      page.on('response', (response) => { if (response.url().startsWith(BASE) && response.status() >= 400) bad.push(`${response.status()} ${response.url().replace(BASE, '')}`); });
+      page.on('response', (response) => { if (response.url().startsWith(BASE) && !response.url().includes('/_vercel/') /* Vercel analytics: only on Vercel */ && response.status() >= 400) bad.push(`${response.status()} ${response.url().replace(BASE, '')}`); });
       await page.goto(`${BASE}/index.html`, { waitUntil: 'load' });
       await page.waitForTimeout(2000);
       const modelledBytes = nonHeroBytes(tracked.entries());
@@ -365,7 +364,7 @@ try {
     const context = await newContext(browser, VIEWPORTS[0], { seen: true });
     const page = await context.newPage();
     const bad = [];
-    page.on('response', (response) => { if (response.url().startsWith(BASE) && response.status() >= 400) bad.push(`${response.status()} ${response.url().replace(BASE, '')}`); });
+    page.on('response', (response) => { if (response.url().startsWith(BASE) && !response.url().includes('/_vercel/') /* Vercel analytics: only on Vercel */ && response.status() >= 400) bad.push(`${response.status()} ${response.url().replace(BASE, '')}`); });
     await page.goto(`${BASE}/auth.html`, { waitUntil: 'load' });
     await page.evaluate(async () => { for (let y = 0; y <= document.body.scrollHeight; y += 500) { window.scrollTo(0, y); await new Promise((r) => setTimeout(r, 60)); } });
     await page.waitForTimeout(800);

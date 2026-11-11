@@ -6,7 +6,7 @@
 // you's Finish calls `submitSetup(answers)`.
 // No email code, no points screen: the interests are saved with an even split. Coordinates live only in
 // `answers.area` (memory) and are dropped once saved.
-import { searchPlaces, fetchInterestNodes, addMemberInterest, isMissingFunction, searchCompanies, searchCompanyDirectory, companyLogoUrl } from './supabase.js';
+import { supabase, searchPlaces, fetchInterestNodes, addMemberInterest, isMissingFunction, searchCompanies, searchCompanyDirectory, companyLogoUrl } from './supabase.js';
 import { TITLE_MAX, cleanTitle, cleanCompanyName, monogramMarkup } from './work-identity.js';
 import { SCREENS, STEP_ICONS, SETUP, stepLabel, stepStates, backTarget, groupInterests, isOffered, hasCatalog, catalogGroups, normalizeInterestLabel } from './signup-flow.js';
 import { ImageProcessingError, PHOTO_ERROR_MESSAGE, PHOTO_FRAMER_ERROR } from './image-compress.js';
@@ -725,7 +725,8 @@ export const initGuidedSignup = ({
             if (!input.value.trim()) { options = []; list.innerHTML = ''; list.hidden = true; return; }
             const { data, error } = await searchPlaces(input.value, 8);
             if (seq !== searchSeq || !el.isConnected) return;
-            options = error ? [] : data;
+            // D-240: the directory can hold the same city twice ("Delhi, Delhi, India"): show it once.
+            options = error ? [] : (data || []).filter((p, i, all) => all.findIndex((q) => [q.name, q.region, q.country].join('|').toLowerCase() === [p.name, p.region, p.country].join('|').toLowerCase()) === i);
             list.hidden = false;
             list.innerHTML = options.length
               ? options.map((place) => `<li><button type="button" data-place="${escapeHtml(place.id)}" aria-pressed="false"><span>${escapeHtml(place.name)}</span><small>${escapeHtml([place.region, place.country].filter(Boolean).join(', '))}</small></button></li>`).join('')
@@ -735,6 +736,13 @@ export const initGuidedSignup = ({
           const chooseCity = (place) => {
             if (!place) return false;
             cancelGeo();
+            // D-240: the pick closes the list and the field shows the city (founder: "after choosing our location it
+            // must hide the options below"). Focusing the field again (or typing) opens it again.
+            searchSeq += 1;
+            window.clearTimeout(searchTimer);
+            input.value = place.name;
+            list.hidden = true;
+            list.innerHTML = '';
             geoButton.removeAttribute('aria-busy');
             setFallback('');
             choose({ kind: 'city', placeId: place.id, label: `${place.name}, ${place.region}` }, `Your area: ${place.name}, ${place.region}. We use the city's centre, never your address.`);
@@ -776,7 +784,8 @@ export const initGuidedSignup = ({
           else if (a.area?.kind === 'geo') choose(a.area, GOT_IT);
           else if (a.area?.kind === 'keep') choose(a.area, a.area.label ? `Your area: ${a.area.label}. Choose again to change it.` : 'Your area is set. Choose again to change it.');
           geoButton.addEventListener('click', () => { void useLocation(); });
-          input.addEventListener('focus', () => { if (list.hidden) void render(); });
+          // D-240: not right after a pick (the field still shows the chosen city): only once it is changed.
+          input.addEventListener('focus', () => { if (list.hidden && !(a.area?.kind === 'city' && input.value.trim() === a.area.label.split(',')[0])) void render(); });
           input.addEventListener('input', () => {
             searchSeq += 1; options = []; list.innerHTML = '';
             window.clearTimeout(searchTimer);
@@ -1017,8 +1026,32 @@ export const initGuidedSignup = ({
       noActions: true,
       html: `<div class="guided-reveal-mark" aria-hidden="true">${svg('mail')}</div>
         ${heading('Check your email.', `We sent a link to <b>${escapeHtml(a.email)}</b>. Open it to activate your Brivia profile; it signs you in, and you pick your area and interests next. It can take a few minutes, so check spam or promotions too.`)}
+        <p class="guided-verify-wait" role="status"><span class="guided-verify-dot" aria-hidden="true"></span>Waiting for you to open the link. This page carries on by itself once you do.</p>
         <div class="guided-choices"><button class="guided-link guided-link--center" type="button" data-guided-login>Back to log in</button></div>`,
-      mount: (el) => { el.querySelector('[data-guided-login]').addEventListener('click', () => onLogin()); },
+      mount: (el) => {
+        el.querySelector('[data-guided-login]').addEventListener('click', () => onLogin());
+        // D-240 (a tester: "it prompted the account creation again after I clicked on the email verification link"):
+        // the link opens in a new tab, which signs in and finishes the account; this tab used to stay here with every
+        // answer filled in, and carrying on in it walked through signup again. Now, as soon as this browser holds the
+        // session for this email (the other tab, a focus, a 4 s check), this tab reloads the login page, which sends
+        // the member to setup or the app like the link did.
+        if (!supabase) return;
+        const email = String(a.email || '').trim().toLowerCase();
+        let done = false;
+        const go = () => { if (done || !el.isConnected) return; done = true; window.location.assign('/auth.html'); };
+        const check = async () => {
+          if (done || !el.isConnected) return;
+          try {
+            const { data } = await supabase.auth.getSession();
+            if (data?.session?.user && String(data.session.user.email || '').toLowerCase() === email) go();
+          } catch { /* offline: the next check */ }
+        };
+        const { data: sub } = supabase.auth.onAuthStateChange((_event, session) => { if (session?.user && String(session.user.email || '').toLowerCase() === email) go(); });
+        const timer = window.setInterval(() => { if (!el.isConnected) { window.clearInterval(timer); sub?.subscription?.unsubscribe(); return; } void check(); }, 4000);
+        const onShow = () => { if (document.visibilityState === 'visible') void check(); };
+        window.addEventListener('focus', onShow);
+        document.addEventListener('visibilitychange', onShow);
+      },
     }),
   };
 

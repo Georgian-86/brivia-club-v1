@@ -356,3 +356,11 @@ body.auth-page .auth-shell .guided .guided-company-picked .work-logo { flex-basi
 body.auth-page .auth-shell .guided .guided-company-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--k-wine); font-weight: 700; }
 body.auth-page .auth-shell .guided .guided-company-picked .guided-link { margin: 0; padding: 6px 4px; }
 body.auth-page .auth-shell .guided [data-guided-combo][hidden] { display: none; }
+
+/* D-240: "Check your email" says the page carries on by itself; a soft pulsing dot (still under reduced motion). */
+body.auth-page .guided-verify-wait { display: flex; align-items: center; justify-content: center; gap: 10px; margin: var(--space-4) 0 0; color: var(--color-ink-soft, #6b5a56); font-size: var(--text-14); line-height: 1.45; text-align: center; }
+body.auth-page .guided-verify-dot { flex: none; width: 8px; height: 8px; border-radius: 50%; background: var(--color-wine, #741f39); }
+@media (prefers-reduced-motion: no-preference) {
+  body.auth-page .guided-verify-dot { animation: guided-verify-pulse 1.6s ease-in-out infinite; }
+  @keyframes guided-verify-pulse { 0%, 100% { opacity: .35; transform: scale(.85); } 50% { opacity: 1; transform: scale(1.1); } }
+}

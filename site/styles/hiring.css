@@ -207,7 +207,7 @@ body.app-body .hiring-toggle:focus-visible { outline: 2px solid var(--color-wine
 
 /* D-184: the subtle "Global hiring discovery" label under the Connect tools, only while the Hiring lens is on. */
 .hiring-global-label {
-  display: inline-flex; align-items: center; gap: var(--space-2); margin: var(--space-2) 0 0; padding: 4px 10px;
+  display: inline-flex; align-items: center; gap: var(--space-2); margin: var(--space-2) 0 var(--space-3); padding: 4px 10px; /* D-240: room below, never touching the kicker */
   border: 1px solid color-mix(in srgb, var(--color-wine) 18%, transparent); border-radius: 999px;
   background: color-mix(in srgb, var(--color-wine) 5%, transparent); color: var(--color-wine-deep);
   font-family: var(--font-body); font-size: var(--text-12); font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase;
@@ -219,3 +219,10 @@ body.app-body .hiring-toggle:focus-visible { outline: 2px solid var(--color-wine
   .hiring-global-label:not([hidden]) { animation: hiring-global-in 240ms ease-out; }
   @keyframes hiring-global-in { from { opacity: 0; transform: translateY(-2px); } to { opacity: 1; transform: none; } }
 }
+
+/* D-240: the notice pills ("Global hiring discovery", the search lane's line) sit on their own row with room under them,
+   so they never touch or overlap the kicker and heading below; two of them stack. */
+body.app-body .app-view[data-view="home"] .home-heading .hiring-global-label:not([hidden]) { display: flex; width: fit-content; max-width: 100%; position: relative; z-index: 1; }
+body.app-body .app-view[data-view="home"] .home-heading .hiring-global-label + .hiring-global-label { margin-top: 0; }
+body.app-body .app-view[data-view="home"] .home-heading .hiring-global-label + .home-kicker,
+body.app-body .app-view[data-view="home"] .home-heading .hiring-global-label[hidden] + .hiring-global-label + .home-kicker { margin-top: 0; }

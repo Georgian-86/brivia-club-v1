@@ -4452,3 +4452,35 @@ bring a short line back.
 - **Checks.** SQL `zl-discover-people.test.sql` (radius, custom city, interests, looking-for, exclusions, the band,
   anon) and the hygiene allowlist; unit `discovery-location.test.mjs` (5, 606 total); e2e
   `discovery-location.spec.mjs` LP1-LP5, FB1-FB2 at 1440 and 390 (axe clean, 44 px).
+
+## D-240 (2026-11-12): a bug sweep, quick swipes, the city list, the verification tab, and auth polish
+
+- **Asks (founder, 2026-11-12):** "fix all the bugs in the app", "make everything very aesthetic and smooth, especially
+  the onboarding and login page", "after choosing our location it must hide the options below", "this showing people
+  from anywhere button is overlapping … also global hiring discovery", "looking for gets hidden if there are multiple
+  options", a tester's "it prompted the account creation again after I clicked on the email verification link", and
+  "why am I not able to swipe in one go".
+- **Quick swipes (`deck-swipe.js`).** While a card flew out, a second swipe landed on the next card (a picture in the
+  stack, not the card element) and was lost, so fast swiping needed two tries. The stack now listens; a touch during a
+  fly-out finishes it at once and the new top card takes the drag; the stack is `touch-action: pan-y` like the card.
+  Measured: four left swipes 250 ms apart moved 2 cards before, 4 after (touch and mouse). New `swipe-quick.spec.mjs`.
+- **City list.** Onboarding's area step and Edit profile → Your area close the list on a pick (the field shows the
+  city); a city the directory holds twice shows once.
+- **The verification tab.** The live data showed the account was created by the link within seconds; the tester then
+  carried on in the original tab, still on "Check your email" with every answer filled in, and walked through signup
+  again. That screen now watches for the session (another tab's sign-in, focus, every 4 s) and carries on by itself;
+  it says so ("This page carries on by itself once you do").
+- **Swipe limit (D-225 follow-up).** The limit sheet no longer leaves a pending request behind (it could go out later
+  as a plain request); on the finished deck a tap re-reads the quota, and when swipes are back the swipe goes through
+  once the new deck is dealt (it was ignored until a reload).
+- **Connect.** The notice pills sit on their own row with room under them (and a hidden one stays hidden); the card's
+  Looking for bar shows up to four choices on two lines, "+N" beyond (was one line with "…"; D-113).
+- **Escape.** A leftover "It's mutual" key listener steps aside once its moment is gone.
+- **Auth polish.** The step bar glides, buttons press in 2 %, fields ease into a soft focus ring, the phone action bar
+  rests on a soft shadow; all off under reduced motion.
+- **The sweep.** Every e2e spec was run. Outdated tests were brought up to the product (each change named in the test):
+  consent (now 189/0: the mutual moment, D-132 card answers, D-156 "swipes", D-179 finished deck, the avatar photo,
+  the privacy sections), signup (383/0), profile-media (193/0: company logos and event posters are not profile covers),
+  landing (the muted hero, Vercel-only analytics), launch-polish (search_cities, axe after the dialog's fade), nearby
+  (SWIPE & DECK SOUNDS), deck-tutorial (the aria-hidden demo cards). login-smooth passes when built with the stub env
+  its header names. Every spec run passes.

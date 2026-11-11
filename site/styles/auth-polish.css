@@ -2937,3 +2937,28 @@
 .auth-signup-form .private-btn { flex: 1 1 0; min-height: 44px; }
 .auth-signup-form .private-btn:disabled { opacity: .5; cursor: not-allowed; }
 @media (prefers-reduced-motion: reduce) { .auth-signup-form .private-consent { transition: none; animation: none; } }
+
+/* D-240 (founder: "make everything very aesthetic and smooth, especially the onboarding and login page"): a light
+   polish layer on top of the existing auth styles. Motion is short and soft, and none of it runs under reduced motion.
+   - the step bar fills with a glide instead of jumping;
+   - buttons answer a press (a 2 % press-in), fields ease into their focus ring;
+   - on phones the Back / Continue bar rests on a soft shadow instead of a hard line. */
+body.auth-page .guided .guided-bar-fill { transition: width .5s cubic-bezier(.2, .7, .2, 1), background-color .3s ease; }
+body.auth-page :is(.guided-next, .guided-back, .auth-submit, .google-button, .guided-choice, .guided-link, button[type="submit"]) {
+  transition: transform .14s ease, box-shadow .2s ease, background-color .2s ease, border-color .2s ease, color .2s ease;
+  -webkit-tap-highlight-color: transparent;
+}
+body.auth-page :is(.guided-next, .guided-back, .auth-submit, .google-button, button[type="submit"]):active:not(:disabled) { transform: scale(.98); }
+body.auth-page :is(input, textarea, select) { transition: border-color .2s ease, box-shadow .25s ease, background-color .2s ease; }
+body.auth-page :is(input, textarea, select):focus-visible { box-shadow: 0 0 0 4px color-mix(in srgb, var(--color-wine, #741f39) 12%, transparent); }
+@media (max-width: 700px) {
+  body.auth-page .auth-shell .guided .guided-actions {
+    border-top-color: transparent;
+    box-shadow: 0 -10px 24px -14px color-mix(in srgb, var(--color-ink, #2f211f) 28%, transparent);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  body.auth-page .guided .guided-bar-fill,
+  body.auth-page :is(.guided-next, .guided-back, .auth-submit, .google-button, .guided-choice, .guided-link, button[type="submit"], input, textarea, select) { transition: none; }
+  body.auth-page :is(.guided-next, .guided-back, .auth-submit, .google-button, button[type="submit"]):active:not(:disabled) { transform: none; }
+}

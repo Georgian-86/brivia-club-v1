@@ -1985,9 +1985,13 @@ const CANDIDATE_ID_CAP = 50;
 // Another member's card. Location is only the deck's distance band: a City/State on any row is dropped here, so no
 // surface (card, info sheet, public profile, chat header, lists) can show it.
 // D-113: the deck card's bar: "LOOKING FOR · CO-FOUNDER, MENTOR" (the first two), or the plain club line without any.
+// D-240 (founder: "looking for gets hidden if there are multiple options"): up to four, then "+N"; the bar wraps to
+// two lines instead of cutting the words off.
 const deckCardLabel = (lookingFor) => {
-  const items = splitProfileValues(lookingFor).slice(0, 2);
-  return items.length ? `LOOKING FOR · ${items.join(', ').toUpperCase()}` : 'BRIVIA MEMBER';
+  const all = splitProfileValues(lookingFor);
+  const items = all.slice(0, 4);
+  const more = all.length > items.length ? ` +${all.length - items.length}` : '';
+  return items.length ? `LOOKING FOR · ${items.join(', ').toUpperCase()}${more}` : 'BRIVIA MEMBER';
 };
 const toMemberPerson = (row) => {
   const { city, state, email, phone, phone_country_code: phoneCountryCode, phone_number: phoneNumber, ...safeRow } = row || {};
@@ -2732,7 +2736,15 @@ const openPitch = (person) => {
   renderPitchCount();
   openOverlay('pitch-modal');
   // D-225: already at a cap this app knows about: the sheet opens on the limit (closing it sends nothing).
-  if (showPitchLimit(swipeLimitCopy(signalQuota))) { if (savedNote) unsentNotes.set(String(person.id), savedNote); return; }
+  if (showPitchLimit(swipeLimitCopy(signalQuota))) {
+    if (savedNote) unsentNotes.set(String(person.id), savedNote);
+    // D-240: the limit message is not a pending request: nothing can be sent, so nothing waits to be resolved (a
+    // leftover pending pitch could later go out as a plain request from a swipe). The card springs back at once.
+    pendingPitch = null;
+    pitchPerson = null;
+    deckSwipe?.settle();
+    return;
+  }
   window.setTimeout(() => pitchMessage?.focus(), 80);
 };
 
@@ -2785,6 +2797,19 @@ const advanceCard = (person, direction, { vx = 0, duration, silent = false } = {
 
 // type: 'pass' | 'like'. Returns false when nothing happened (the dragged card springs back).
 const swipe = (type, { vx = 0 } = {}) => {
+  // D-240: on the finished deck (the day's swipes used, D-179) a tap reads the quota again first: when the server says
+  // swipes are back, the finished deck clears and this swipe goes through once the new deck is dealt (it used to be
+  // ignored until a reload or the reset timer).
+  if (deckRitual?.isComplete() && !capCheckInFlight && quotaBlocked(signalQuota) === 'daily') {
+    capCheckInFlight = true;
+    refreshSignalQuota().finally(() => {
+      capCheckInFlight = false;
+      if (quotaBlocked(signalQuota) === 'daily') return;
+      const attempt = (tries = 0) => { if (swipe(type) || tries >= 80) return; window.setTimeout(() => attempt(tries + 1), 100); };
+      attempt();
+    });
+    return false;
+  }
   if (!currentPerson || deckAdvancing || capCheckInFlight || deckRitual?.busy() || deckRitual?.isComplete()) return false;
   // A Like while the pitch sheet is opening or open is ignored: a repeated click/keypress must not resolve
   // the pending like as a plain like and drop the note (Task 3b).
@@ -2811,7 +2836,10 @@ const swipe = (type, { vx = 0 } = {}) => {
         else showToast(type === 'like' ? quotaBlockedToast() : quotaErrorText({ code: 'PT429', message: 'swipe_quota_exhausted' }, signalQuota));
         return;
       }
-      swipe(type);
+      // D-240: the cap cleared, so the finished deck is being swept away and the new deck dealt; swipes are held while
+      // that plays. The member's Like (or Pass) waits for it (up to 8 s: the deal runs about 3.6 s) instead of being dropped.
+      const attempt = (tries = 0) => { if (swipe(type) || tries >= 80) return; window.setTimeout(() => attempt(tries + 1), 100); };
+      attempt();
     });
     return false;
   }
@@ -4325,7 +4353,11 @@ const wireAreaChanger = (modal) => {
   });
   results.addEventListener('click', (event) => {
     const option = event.target.closest('[data-place-id]');
-    if (option) apply(() => setHomeCity(option.dataset.placeId));
+    if (!option) return;
+    // D-240: the pick closes the list at once (it used to stay open until the save came back).
+    search.value = option.dataset.placeName || search.value;
+    showResults([]);
+    apply(() => setHomeCity(option.dataset.placeId));
   });
   geo.addEventListener('click', async () => {
     if (busy) return;
