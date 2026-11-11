@@ -125,6 +125,9 @@ export const mutualMoment = ({ me = {}, person = {}, shared = [], doc = globalTh
     else gsap.to(root, { opacity: 0, duration: 0.18, ease: 'power1.in', onComplete: finish });
   };
   function onKey(e) {
+    // D-240: the moment was taken off the page some other way (a view change): this listener must not keep eating the
+    // next Escape (it used to stop the one meant for the pitch sheet, which then stayed open).
+    if (!root.isConnected) { (doc.defaultView || doc).removeEventListener('keydown', onKey, true); if (!done) { done = true; resolve('close'); } return; }
     if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); close('close'); return; }
     if (e.key === 'Tab') {   // keep focus inside the two buttons
       const items = [hi, later];

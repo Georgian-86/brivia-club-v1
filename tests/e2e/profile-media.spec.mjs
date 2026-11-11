@@ -226,8 +226,10 @@ try {
       const tiles = [...modal.querySelectorAll('.profile-cover-option')].map((el) => { const r = el.getBoundingClientRect(); return [Math.round(r.width), Math.round(r.height)]; });
       return {
         // every file input on the page: none is about covers (the post image and the resume are fine); in the editor only the photo
-        files: [...document.querySelectorAll('input[type="file"]')].filter((el) => /cover/i.test(`${el.name} ${el.id} ${el.className} ${el.closest('label, section, div')?.textContent || ''}`)).map((el) => el.name || el.id),
-        editorFiles: [...modal.querySelectorAll('input[type="file"]')].map((el) => el.name),
+        // The event composer's poster upload (ec-poster*, an event's cover) and the company-logo uploads in Your work are
+        // other features; only a profile cover upload is ruled out here.
+        files: [...document.querySelectorAll('input[type="file"]')].filter((el) => !/^ec-poster/.test(el.id) && !el.matches('[data-work-logo-file], [data-work-new-logo]')).filter((el) => /cover/i.test(`${el.name} ${el.id} ${el.className} ${el.closest('label, section, div')?.textContent || ''}`)).map((el) => el.name || el.id),
+        editorFiles: [...modal.querySelectorAll('input[type="file"]:not([data-work-logo-file]):not([data-work-new-logo])')].map((el) => el.name),
         coverFile: document.querySelectorAll('[name="coverFile"], .cover-input').length,
         radios: radios.length, types: [...new Set(radios.map((r) => r.type))], checked: radios.filter((r) => r.checked).map((r) => r.value),
         legend: modal.querySelector('.profile-cover-picker legend')?.textContent.trim(), tiles,

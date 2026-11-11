@@ -631,16 +631,17 @@ try {
       next: document.querySelector('[data-guided-next]').disabled,
     }));
     await shot(page, '1440-06b-area-denied');
-    check(`area denied: fallbackCopy('denied'), the city list shown, focus in the city search, Continue disabled (${JSON.stringify(denied.cities)})`, () => {
-      assert.ok(denied.text.includes(DENIED)); assert.ok(denied.cities.length >= 1); assert.equal(denied.focus, 'guided-city'); assert.equal(denied.next, true);
+    check(`area denied: fallbackCopy('denied'), focus in the city search (no city suggested before typing, D-156), Continue disabled (${JSON.stringify(denied.cities)})`, () => {
+      assert.ok(denied.text.includes(DENIED)); assert.equal(denied.cities.length, 0); /* D-156: none suggested before a letter is typed */ assert.equal(denied.focus, 'guided-city'); assert.equal(denied.next, true);
     });
     await page.locator('input[name="guided-city"]').fill('Pune');
     await page.waitForSelector('.guided-cities button[data-place="in-pune"]', { timeout: 4000 }).catch(() => {});
     await page.waitForTimeout(250);
     await page.locator('input[name="guided-city"]').press('Enter');
     await page.waitForTimeout(150);
-    const chose = await page.evaluate(() => ({ pressed: document.querySelector('.guided-cities button[aria-pressed="true"]')?.dataset.place, next: document.querySelector('[data-guided-next]').disabled, status: document.querySelector('[data-guided-area-status]')?.textContent }));
-    check(`area: a typed city + Enter picks it (${JSON.stringify(chose)})`, () => { assert.equal(chose.pressed, 'in-pune'); assert.equal(chose.next, false); assert.match(chose.status, /Pune/); });
+    const chose = await page.evaluate(() => ({ listHidden: document.querySelector('.guided-cities')?.hidden, field: document.querySelector('input[name="guided-city"]').value, next: document.querySelector('[data-guided-next]').disabled, status: document.querySelector('[data-guided-area-status]')?.textContent }));
+    // D-240: the pick closes the city list and the field shows the city.
+    check(`area: a typed city + Enter picks it and closes the list (${JSON.stringify(chose)})`, () => { assert.equal(chose.listHidden, true); assert.equal(chose.field, 'Pune'); assert.equal(chose.next, false); assert.match(chose.status, /Pune/); });
     await page.locator('input[name="guided-city"]').press('Enter');
     const moved = await waitScreen(page, 'about');
     check('area: Enter again = Continue (to About you)', () => assert.equal(moved, true));

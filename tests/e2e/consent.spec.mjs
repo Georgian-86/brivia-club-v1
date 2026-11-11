@@ -253,6 +253,9 @@ try {
   await resetToast();
   await sendWithoutNote();
   await waitForToast(/It's mutual/);
+  // The "It's mutual" moment (motion-moments.js) opens over the deck: dismiss it like a member would before the next like.
+  await page.locator('.mutual-later').click({ timeout: 3000 }).catch(() => {});
+  await page.waitForSelector('.mutual-moment', { state: 'detached', timeout: 3000 }).catch(() => {});
   await page.waitForTimeout(300);
   let resolved = requestPosts().slice(before);
   check(`"Send without a note" = one POST with note null (got ${resolved.length})`, () => { assert.equal(resolved.length, 1); assert.deepEqual(signalBody(resolved[0]), { to: cara.id, note: null }); });
@@ -323,24 +326,18 @@ try {
   const noteHasTag = await devCard.locator('.collab-note-text b').count();
   check(`request sender name is Dev Rao (got "${senderName}")`, () => assert.equal(senderName, 'Dev Rao'));
   check('request note escaped (rendered as text, no <b> element)', () => { assert.equal(noteText, '<b>climb</b> with me?'); assert.equal(noteHasTag, 0); });
-  const connect = page.locator('dialog.collab-review [data-collab-decide="connect"]');
-  const later = page.locator('dialog.collab-review [data-collab-decide="later"]');
-  const [connectBox, laterBox] = [await connect.boundingBox(), await later.boundingBox()];
-  check(`Connect / Not now >=44px and equal size (${connectBox.width}x${connectBox.height}, ${laterBox.width}x${laterBox.height})`, () => {
-    assert.ok(connectBox.height >= 44 && laterBox.height >= 44);
-    assert.equal(Math.round(connectBox.width), Math.round(laterBox.width));
-  });
+  // D-132: no Connect / Not now buttons; the focused card answers (→ accept, ← decline; collab-requests.spec covers the
+  // drag). A second → while the answer is in flight sends nothing more.
+  await devCard.focus();
   let releaseRpc;
   state.holdRpc = new Promise((resolve) => { releaseRpc = resolve; });
-  await connect.click();
+  await page.keyboard.press('ArrowRight');
   await page.waitForTimeout(150);
-  const bothDisabled = (await connect.isDisabled()) && (await later.isDisabled());
-  await connect.click({ force: true, timeout: 500 }).catch(() => {});
+  await page.keyboard.press('ArrowRight');
   releaseRpc(); state.holdRpc = null;
   await page.waitForSelector('dialog.collab-review .collab-state h3');
   const connectedText = await page.locator('dialog.collab-review .collab-state').innerText();
-  check('Connect / Not now disabled while the RPC is in flight', () => assert.equal(bothDisabled, true));
-  check('Connect calls /rest/v1/rpc/respond_connection_request once with p_accept=true', () => {
+  check('→ (accept) calls /rest/v1/rpc/respond_connection_request once with p_accept=true, even pressed twice', () => {
     const rpc = posts('/rest/v1/rpc/respond_connection_request');
     assert.equal(rpc.length, 1);
     assert.deepEqual(JSON.parse(rpc[0].body), { p_from: DEV, p_accept: true });
@@ -348,6 +345,8 @@ try {
   check(`a real connection shows "You're connected." with Reply (their message opens the chat, D-124) (got ${JSON.stringify(connectedText)})`, () => { assert.match(connectedText, /You're connected\./); assert.match(connectedText, /Reply Dev/); assert.match(connectedText, /first one in your chat/); });
   check('accept checks matches in both orders', () => assert.ok(calls.some((c) => c.path === '/rest/v1/matches' && /and\(user1_id\.eq\.[^,]+,user2_id\.eq\.[^)]+\),and\(/.test(c.search))));
   check('accept refreshed connections from matches', () => assert.ok(calls.filter((c) => c.path === '/rest/v1/matches' && c.method === 'GET' && !c.search.includes('and(')).length >= 2));
+  await page.locator('.mutual-later').click({ timeout: 3000 }).catch(() => {});   // the "It's mutual" moment over the review
+  await page.waitForSelector('.mutual-moment', { state: 'detached', timeout: 3000 }).catch(() => {});
   await page.locator('dialog.collab-review [data-collab-next]').click();
 
   // 4b. A stranger's request: sender loaded via rpc/get_candidates; a crafted photo_url cannot inject markup.
@@ -710,8 +709,9 @@ try {
   // 8c. Escape while a pitch submit is in flight, and the submit then fails: the like is NOT restored behind
   // the hidden sheet, so moving to the next card sends nothing more.
   await hardPage.waitForFunction(() => document.querySelector('#swipe-card:not([hidden]) #swipe-name')?.textContent?.trim() === 'Ivan Next');
-  const ivanImage = await hardPage.evaluate(() => document.querySelector('#swipe-image')?.getAttribute('src') || '');
-  check(`a Supabase storage photo_url renders (got ${ivanImage.slice(0, 90)})`, () => assert.equal(ivanImage, IVAN_PHOTO));
+  // The photo is the card's avatar (--card-avatar-image); #swipe-image is the cover (D-227: AT WORK when none is set).
+  const ivanImage = await hardPage.evaluate(() => getComputedStyle(document.querySelector('#swipe-card')).getPropertyValue('--card-avatar-image').trim());
+  check(`a Supabase storage photo_url renders (got ${ivanImage.slice(0, 120)})`, () => assert.ok(ivanImage.includes(IVAN_PHOTO), ivanImage));
   hardBefore = hardPosts().length;
   await hardPage.locator('[data-action="like"]').dispatchEvent('click');
   await hardPage.waitForSelector('#pitch-modal:not([hidden])');
@@ -896,7 +896,7 @@ try {
     await hardPage.waitForSelector('.photo-crop', { state: 'detached' });
   };
   // 8f1. Covers come only from the provided set (D-080): the editor has no cover upload (profile-media.spec covers the picker).
-  const coverFields = await hardPage.locator('#profile-edit-form [name="coverFile"], #profile-edit-form input[type="file"]:not([name="photoFile"])').count();
+  const coverFields = await hardPage.locator('#profile-edit-form [name="coverFile"], #profile-edit-form input[type="file"]:not([name="photoFile"]):not([data-work-logo-file]):not([data-work-new-logo])').count();   // company logos are Your work, not covers
   check(`profile editor has no cover upload (${coverFields})`, () => assert.equal(coverFields, 0));
   await framePhoto('me.png');
   await hardPage.locator('#profile-edit-form [type="submit"]').click();
@@ -1085,7 +1085,7 @@ try {
   await quotaPage.waitForTimeout(500);
   const advancedTo = await qCard();
   await quotaPage.locator('#pitch-modal .pitch-no-note').click(); // D-124: the explicit plain like (Escape now cancels)
-  await qWaitToast(/today's signals/);
+  await qWaitToast(/today's swipes/);   // D-156: swipes, not signals
   await quotaPage.waitForFunction((n) => document.querySelector('#swipe-card:not([hidden]) #swipe-name')?.textContent?.trim() === n, raceCard, { timeout: 4000 }).catch(() => {});
   await quotaPage.waitForTimeout(400);
   const raceState = { card: await qCard(), toast: await quotaPage.locator('#app-toast').textContent(), counter: await qCounter() };
@@ -1094,7 +1094,7 @@ try {
     assert.equal(raceState.card, raceCard);
   });
   check(`PT429 shows the honest toast and refreshes the counter (${JSON.stringify(raceState)})`, () => {
-    assert.equal(raceState.toast, `You've used today's signals. More at ${resetLabel}.`);
+    assert.equal(raceState.toast, `You've used today's swipes. More at ${resetLabel}.`);
     assert.equal(raceState.counter, `Your next swipe frees up at ${resetLabel}`);
   });
   q.race = false;
@@ -1107,23 +1107,20 @@ try {
   const zeroState = await quotaPage.evaluate(() => ({
     card: document.querySelector('#swipe-card:not([hidden]) #swipe-name')?.textContent?.trim() || '',
     pitchOpen: !document.querySelector('#pitch-modal')?.hidden,
-    limitVisible: !document.querySelector('#swipe-limit-state')?.hidden,
-    limitText: document.querySelector('#swipe-limit-state')?.textContent?.replace(/\s+/g, ' ').trim() || '',
-    toast: document.querySelector('#app-toast')?.textContent || '',
+    limitShown: !document.querySelector('#pitch-limit')?.hidden,
+    limitTitle: document.querySelector('#pitch-limit .composer-limit-title')?.textContent || '',
+    limitBody: document.querySelector('#pitch-limit .composer-limit-body')?.textContent || '',
     ariaDisabled: document.querySelector('[data-action="like"]')?.getAttribute('aria-disabled'),
   }));
   if (SHOTS) await quotaPage.screenshot({ path: path.join(SHOTS, 'quota-1280-zero.png') });
+  // At 0 the deck shows its finished state (D-179: the day's swipes are used, said there, not in a toast): a Like opens
+  // nothing, sends nothing and keeps the same card.
   check(`at 0 a Like keeps the same card and opens no pitch (${JSON.stringify(zeroState)})`, () => {
     assert.equal(zeroState.card, raceCard);
     assert.equal(zeroState.pitchOpen, false);
   });
   check('at 0 a Like makes no send_signal call', () => assert.equal(qSignals().length, zeroBefore));
-  check(`at 0 the notice reads "You've used your N free swipes for today. More at HH:MM." and Pitch is aria-disabled (${JSON.stringify(zeroState)})`, () => {
-    assert.equal(zeroState.limitVisible, true);
-    assert.match(zeroState.limitText, new RegExp(`You've used your \\d+ free swipes for today\\. More at ${resetLabel}\\.`));
-    assert.match(zeroState.toast, /More at/);
-    assert.equal(zeroState.ariaDisabled, 'true');
-  });
+  check(`at 0 Pitch is aria-disabled (${JSON.stringify(zeroState)})`, () => assert.equal(zeroState.ariaDisabled, 'true'));
   // D-156: a Pass uses a swipe too, so at 0 it keeps the card, records no pass and sends nothing; nothing in localStorage.
   const passBefore = qSignals().length;
   const passPostsBefore = q.calls.filter((c) => c.method === 'POST' && c.path === '/rest/v1/interaction').length;
@@ -1158,10 +1155,11 @@ try {
   // F4: the quota is read again when the tab becomes visible.
   q.remaining = 0; q.resetsAt = RESETS_AT;
   await quotaPage.evaluate(() => document.dispatchEvent(new Event('visibilitychange')));
-  const capShown = await quotaPage.waitForFunction(() => !document.querySelector('#swipe-limit-state')?.hidden, null, { timeout: 4000 }).then(() => true, () => false);
+  // D-179: at the daily cap the deck says so (the finished deck) and Pitch is held; the notice is for the live cap only.
+  const capShown = await quotaPage.waitForFunction(() => document.querySelector('[data-action="like"]')?.getAttribute('aria-disabled') === 'true', null, { timeout: 4000 }).then(() => true, () => false);
   q.remaining = 30; q.resetsAt = null;
   await quotaPage.evaluate(() => document.dispatchEvent(new Event('visibilitychange')));
-  const capCleared = await quotaPage.waitForFunction(() => document.querySelector('#swipe-limit-state')?.hidden, null, { timeout: 4000 }).then(() => true, () => false);
+  const capCleared = await quotaPage.waitForFunction(() => document.querySelector('[data-action="like"]')?.getAttribute('aria-disabled') === null, null, { timeout: 4000 }).then(() => true, () => false);
   check(`visibilitychange re-reads the quota: the cap shows, then clears (${capShown}, ${capCleared})`, () => { assert.equal(capShown, true); assert.equal(capCleared, true); });
   // F5: Pass then Like within 100 ms: exactly one pass and no signal for that person.
   await quotaPage.waitForTimeout(400);
@@ -1625,7 +1623,7 @@ try {
     text: document.body.innerText,
   }));
   check(`privacy.html at 375 px: no horizontal scroll (${page375.overflow})`, () => assert.ok(page375.overflow <= 0));
-  check(`privacy.html sections in order (${page375.h2.join(' | ')})`, () => assert.deepEqual(page375.h2, ['The short version', 'What we collect', 'Your area', 'Private interests', 'Who sees what', 'Adults only (18+)', 'How long we keep things', 'Deleting your account', 'Where your data lives', 'Reports and safety', 'Your rights', 'Grievance officer']));
+  check(`privacy.html sections in order (${page375.h2.join(' | ')})`, () => assert.deepEqual(page375.h2, ['The short version', 'What we collect', 'Signing in with Google', 'Your area', 'Private interests', 'Who sees what', 'Adults only (18+)', 'How long we keep things', 'Deleting your account', 'Where your data lives', 'Reports and safety', 'Your rights', 'Grievance officer', 'Data sources']));
   check(`privacy.html: the retention table has a caption and stacks under 480 px (${page375.caption}, ${page375.rows} rows, td ${page375.stacked})`, () => { assert.ok(page375.caption); assert.ok(page375.rows >= 14); assert.equal(page375.stacked, 'block'); });
   check(`privacy.html: body text is 16 px or more (${page375.bodySize})`, () => assert.ok(page375.bodySize >= 16));
   check('privacy.html without ?deleted=1 shows an empty status region', () => assert.equal(page375.banner, ''));

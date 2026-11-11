@@ -248,3 +248,10 @@ body.app-body .app-view[data-view="home"] .swipe-card #swipe-bio {
   line-height: 1.4;
 }
 body.app-body .app-view[data-view="home"] .swipe-card #swipe-bio[hidden] { display: none; }
+
+/* D-240: the bar's "Looking for" line wraps (two lines at most) so several choices all show; the bar grows down over
+   the cover's top edge instead of cutting the words. Supersedes D-113's one-line "…". */
+body.app-body .app-view[data-view="home"] .swipe-card .swipe-card-topline { height: auto; min-height: 42px; padding-top: 8px; padding-bottom: 8px; align-items: center; gap: 10px; }
+body.app-body .app-view[data-view="home"] .swipe-card .swipe-card-topline #swipe-card-label {
+  display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; white-space: normal; line-height: 1.45; letter-spacing: .12em; overflow-wrap: anywhere;
+}
