@@ -79,6 +79,7 @@ import { whyPanelMarkup, whyRow } from './why-panel.js';
 import { chatEmojiCategories } from './chat-emoji-data.js';
 import { attachEmojiPicker, insertAt } from './emoji-field.js';
 import { getTone, withTone, onToneChange } from './emoji-tone.js';
+import { RADIUS, normalizeLocation, isDefaultLocation, locationParams, radiusLabel, locationSummary, fallbackSummary } from './discovery-location.js';
 import { chatGifCatalog } from './chat-gif-data.js';
 import { typingTopic, createTypingSender, createTypingReceiver, TYPING_EVENT } from './chat-typing.js';
 import '../styles/chat-attachments.css';
@@ -146,6 +147,19 @@ let currentIndex = 0;
 let currentPerson = people[0];
 let activeFilter = 'all';
 const exploreFilters = { query: '', skills: new Set(), lookingFor: new Set(), hiring: false };
+// D-239: the drawer's Location settings (kept on this device) and the search lane they open (discover_people, 0072).
+// widePool.fallback: interest filters found no one in the location-first deck, so the lane searches everywhere.
+const LOCATION_KEY = 'brivia-discovery-location';
+let locationPrefs = (() => { try { return normalizeLocation(JSON.parse(window.localStorage.getItem(LOCATION_KEY) || 'null')); } catch { return normalizeLocation(null); } })();
+const saveLocationPrefs = (next) => {
+  locationPrefs = normalizeLocation(next);
+  try { window.localStorage.setItem(LOCATION_KEY, JSON.stringify(locationPrefs)); } catch { /* this page only */ }
+};
+const widePool = { key: '', ids: [], end: false, loading: null, fallback: false, labels: new Map() };
+const locationActive = () => !isDefaultLocation(locationPrefs);
+const interestFilterOn = () => exploreFilters.skills.size > 0 || exploreFilters.lookingFor.size > 0;
+const wideLaneOn = () => !exploreFilters.hiring && (locationActive() || widePool.fallback);
+const wideKey = () => JSON.stringify([locationActive() ? locationParams(locationPrefs) : 'anywhere', [...exploreFilters.skills].sort(), [...exploreFilters.lookingFor].sort()]);
 const filterDrafts = { skills: '', lookingFor: '' };
 let activeChatFilter = 'all';
 let chatSearchQuery = '';
@@ -1571,7 +1585,15 @@ const explorePersonMatches = (person) => {
   const hasHiring = !exploreFilters.hiring || hiringPool.kinds.has(String(person.id)) || Boolean(hiring?.matchesLens(person));
   return hasName && hasSkill && hasLookingFor && hasSkillSearch && hasLookingSearch && hasHiring;
 };
-const filtersActive = () => Boolean(exploreFilters.query || exploreFilters.skills.size || exploreFilters.lookingFor.size || exploreFilters.hiring || filterDrafts.skills || filterDrafts.lookingFor);
+// D-239: does a deck card have one of the picked interests and looking-fors? Only what was picked counts, never text
+// still being typed (that would flip the lane on and off mid-word).
+const matchesPickedInterests = (person) => {
+  const skills = splitProfileValues(person.skills).map(normalizedValue);
+  const lookingFor = splitProfileValues(person.lookingFor).map(normalizedValue);
+  return (!exploreFilters.skills.size || [...exploreFilters.skills].some((v) => skills.includes(v)))
+    && (!exploreFilters.lookingFor.size || [...exploreFilters.lookingFor].some((v) => lookingFor.includes(v)));
+};
+const filtersActive = () => Boolean(exploreFilters.query || exploreFilters.skills.size || exploreFilters.lookingFor.size || exploreFilters.hiring || filterDrafts.skills || filterDrafts.lookingFor || locationActive());
 
 // The deck (UX_SPEC §B, Iteration 3 Task 10). deck_candidates returns the next cards in the server's order (k-safe
 // display ring, then shared interests); the client keeps that order. A card is consumed when it is passed or liked:
@@ -1581,7 +1603,10 @@ const filtersActive = () => Boolean(exploreFilters.query || exploreFilters.skill
 const DECK_PAGE_SIZE = 12;
 const deck = { ready: false, ids: [], seen: new Set(), loading: null, prefetch: null, end: null, refilling: false };
 const deckPeople = () => deck.ids.map((id) => findPersonById(id)).filter(Boolean);
-const getExplorePeople = () => deckPeople().filter(explorePersonMatches);
+// D-239: while the search lane is on, Connect shows its people (the server already applied distance and interests).
+const getExplorePeople = () => (wideLaneOn()
+  ? widePool.ids.filter((id) => !deck.seen.has(id)).map((id) => findPersonById(id)).filter(Boolean).filter(explorePersonMatches)
+  : deckPeople().filter(explorePersonMatches));
 // The current card is always the first card of the (filtered) queue, so clearing a filter returns to the server order.
 const syncExploreQueue = () => {
   const queue = getExplorePeople();
@@ -1592,7 +1617,10 @@ const syncExploreQueue = () => {
 
 // Why the deck is empty: the filters (when the loaded deck has cards they hide), else the server's deck_status().
 const onlyHiringLens = () => exploreFilters.hiring && !exploreFilters.query && !exploreFilters.skills.size && !exploreFilters.lookingFor.size;
-const deckEmptyCause = () => (filtersActive() && (deckPeople().length || exploreFilters.hiring) ? (onlyHiringLens() ? 'hiring' : 'filters') : deck.end);
+const deckEmptyCause = () => {
+  if (wideLaneOn() && (widePool.loading || widePool.key !== wideKey())) return null;   // D-239: still searching
+  return filtersActive() && (deckPeople().length || exploreFilters.hiring || wideLaneOn()) ? (onlyHiringLens() ? 'hiring' : 'filters') : deck.end;
+};
 const renderDeckEmpty = (emptyState) => {
   const cause = deckEmptyCause();
   if (!cause) { emptyState.hidden = true; return; }
@@ -2962,6 +2990,7 @@ const renderSelectedFilters = (container, values, selected, kind) => {
 };
 const renderFilterOptions = () => {
   syncHiringControls();
+  syncLocationControls();
   // D-229: the drawer's options are drawn when it opens (openDiscoveryFilters), never while it is closed: rebuilding
   // ~1,100 interest options on every Explore render was the slowest part of a tab switch.
   if (document.querySelector('#discovery-filter-drawer')?.hidden) return;
@@ -3015,7 +3044,7 @@ const syncHiringControls = () => {
 const updateDiscoveryFilterResult = (count) => {
   const result = document.querySelector('#discovery-filter-result');
   if (!result) return;
-  const activeCount = exploreFilters.skills.size + exploreFilters.lookingFor.size + (exploreFilters.query ? 1 : 0) + (exploreFilters.hiring ? 1 : 0) + (filterDrafts.skills ? 1 : 0) + (filterDrafts.lookingFor ? 1 : 0);
+  const activeCount = exploreFilters.skills.size + exploreFilters.lookingFor.size + (exploreFilters.query ? 1 : 0) + (exploreFilters.hiring ? 1 : 0) + (filterDrafts.skills ? 1 : 0) + (filterDrafts.lookingFor ? 1 : 0) + (locationActive() ? 1 : 0);
   result.textContent = activeCount ? (count + ' ' + (count === 1 ? 'person' : 'people') + ' match') : 'All people';
   const resetButton = document.querySelector('#clear-discovery-filters');
   if (resetButton) {
@@ -3024,13 +3053,71 @@ const updateDiscoveryFilterResult = (count) => {
     resetButton.removeAttribute('aria-label'); // the visible words are its name (WCAG 2.5.3)
   }
 };
+// D-239: the search lane. Location settings (anything but the default) or interest filters that find no one in the
+// deck turn it on; it pages discover_people (20 at a time, nearest first within the filters) into its own queue.
+const updateWideLane = () => {
+  widePool.fallback = !exploreFilters.hiring && !locationActive() && interestFilterOn() && deck.ready
+    && !deckPeople().some(matchesPickedInterests);
+  if (wideLaneOn() && widePool.key !== wideKey()) void pullWidePeople({ restart: true });
+};
+async function pullWidePeople({ restart = false } = {}) {
+  if (!supabase || !memberProfile.id || !wideLaneOn()) return;
+  const key = wideKey();
+  if (restart || widePool.key !== key) { widePool.key = key; widePool.ids = []; widePool.end = false; widePool.loading = null; }
+  if (widePool.loading) return widePool.loading;
+  if (widePool.end) return;
+  const where = locationActive() ? locationParams(locationPrefs) : { p_radius_km: null, p_place_id: null };
+  const run = (async () => {
+    const { data, error } = await supabase.rpc('discover_people', {
+      p_skills: [...exploreFilters.skills], p_looking_for: [...exploreFilters.lookingFor], ...where,
+      p_exclude: widePool.ids.slice(-300), p_limit: 20,
+    });
+    if (widePool.key !== key) return;
+    if (error) { widePool.end = true; return; }
+    const rows = data || [];
+    if (rows.length < 20) widePool.end = true;
+    const byId = new Map(rows.map((r) => [String(r.id), r]));
+    const missing = [...byId.keys()].filter((id) => !findPersonById(id));
+    if (missing.length) {
+      const { data: cards } = await fetchCandidates(missing);
+      mergePeople((cards || []).map((c) => ({ ...c, distance_band: byId.get(String(c.id))?.distance_band || null, shared_interests: byId.get(String(c.id))?.shared_interests || [] })));
+    }
+    if (widePool.key !== key) return;
+    widePool.ids.push(...[...byId.keys()].filter((id) => findPersonById(id) && !widePool.ids.includes(id)));
+  })();
+  widePool.loading = run;
+  try { await run; } finally { if (widePool.loading === run) widePool.loading = null; }
+  if (widePool.key === key) renderExplore();
+}
+// The quiet line under the Connect tools: where the lane is searching, or why it searches everywhere.
+const syncWideLabel = () => {
+  const tools = document.querySelector('.app-view[data-view="home"] .home-tools');
+  let label = document.querySelector('#wide-search-label');
+  if (!label && tools) {
+    label = document.createElement('p');
+    label.id = 'wide-search-label';
+    label.className = 'hiring-global-label wide-search-label';
+    label.setAttribute('role', 'status');
+    label.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 21s-6.5-6.2-6.5-11a6.5 6.5 0 0 1 13 0c0 4.8-6.5 11-6.5 11Z"/><circle cx="12" cy="10" r="2.3"/></svg><span></span>';
+    (document.querySelector('#hiring-global-label') || tools).after(label);
+  }
+  if (!label) return;
+  const on = wideLaneOn();
+  label.hidden = !on;
+  if (!on) return;
+  const picked = [...exploreFilters.skills, ...exploreFilters.lookingFor].map((v) => widePool.labels.get(v) || v);
+  label.querySelector('span').textContent = widePool.fallback ? fallbackSummary(picked) : locationSummary(locationPrefs, areaInputValue(memberPlaceLabel).split(',')[0]);
+};
 const renderExplore = () => {
+  updateWideLane();
+  syncWideLabel();
   const queue = syncExploreQueue();
   renderFilterOptions();
   updateDiscoveryFilterResult(queue.length);
   renderHome(queue);
   // D-184: Global Hiring Discovery pages on as the queue runs low.
   if (exploreFilters.hiring && queue.length < 5 && !hiringPool.end && !hiringPool.loading) void pullHiringPeople();
+  if (wideLaneOn() && widePool.key === wideKey() && queue.length < 5 && !widePool.end && !widePool.loading) void pullWidePeople();
   // The queue ran out (not just filtered away): load once more, then deck_status() decides the empty state.
   if (!queue.length && deck.ready && !deckPeople().length && !deck.end && !deck.loading) refillDeck();
 };
@@ -6375,6 +6462,7 @@ discoveryFilterDrawer?.addEventListener('click', (event) => {
   } else {
     const targetSet = kind === 'skills' ? exploreFilters.skills : exploreFilters.lookingFor;
     targetSet.add(normalizedValue(value));
+    widePool.labels.set(normalizedValue(value), value);   // D-239: the words the member picked, for the notice
     filterDrafts[kind === 'skills' ? 'skills' : 'lookingFor'] = '';
     const input = document.querySelector(FILTER_INPUTS[kind]);
     if (input) input.value = '';
@@ -6437,10 +6525,92 @@ const clearDiscoveryFilters = () => {
   exploreFilters.hiring = false;
   filterDrafts.skills = '';
   filterDrafts.lookingFor = '';
+  saveLocationPrefs(null);   // D-239: Location back to near me, 50 km
   renderExplore();
 };
 document.querySelector('#clear-discovery-filters')?.addEventListener('click', clearDiscoveryFilters);
 document.querySelector('#hiring-toggle')?.addEventListener('click', () => setHiringLens(!exploreFilters.hiring));
+// D-239: Location. Every change applies at once (like the other filters) and is kept on this device.
+function syncLocationControls() {
+  const group = document.querySelector('#filter-location-group');
+  if (!group) return;
+  const p = locationPrefs;
+  const anywhere = group.querySelector('#filter-anywhere');
+  if (anywhere) anywhere.checked = p.anywhere;
+  group.querySelectorAll('[data-location-mode]').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.locationMode === p.mode)));
+  const custom = group.querySelector('#filter-location-custom');
+  const showCustom = p.mode === 'custom' || group.dataset.pickingCity === '1';
+  if (custom) custom.hidden = !showCustom;
+  const name = group.querySelector('#filter-location-name');
+  if (name) name.textContent = p.mode === 'custom' ? p.place.name : (areaInputValue(memberPlaceLabel) || 'Your area');
+  const range = group.querySelector('#filter-radius');
+  const out = group.querySelector('#filter-radius-value');
+  if (range && document.activeElement !== range) range.value = String(p.radiusKm);
+  if (out) out.textContent = p.anywhere ? 'Anywhere' : radiusLabel(range ? range.value : p.radiusKm);
+  range?.setAttribute('aria-valuetext', radiusLabel(range.value));
+  group.classList.toggle('is-anywhere', p.anywhere);
+  group.querySelectorAll('#filter-location-body button, #filter-location-body input').forEach((el) => { el.disabled = p.anywhere; });
+}
+const applyLocation = (next) => { saveLocationPrefs({ ...locationPrefs, ...next }); renderExplore(); };
+document.querySelector('#filter-anywhere')?.addEventListener('change', (event) => applyLocation({ anywhere: event.currentTarget.checked }));
+document.querySelectorAll('[data-location-mode]').forEach((button) => button.addEventListener('click', () => {
+  const group = document.querySelector('#filter-location-group');
+  if (button.dataset.locationMode === 'near') { delete group.dataset.pickingCity; applyLocation({ mode: 'near', place: null }); return; }
+  group.dataset.pickingCity = '1';   // shows the city search; Custom applies once a city is picked
+  syncLocationControls();
+  document.querySelector('#filter-place-input')?.focus();
+}));
+document.querySelector('#filter-radius')?.addEventListener('input', (event) => {
+  const out = document.querySelector('#filter-radius-value');
+  if (out) out.textContent = radiusLabel(event.currentTarget.value);
+  event.currentTarget.setAttribute('aria-valuetext', radiusLabel(event.currentTarget.value));
+});
+document.querySelector('#filter-radius')?.addEventListener('change', (event) => applyLocation({ radiusKm: Number(event.currentTarget.value) }));
+(() => {
+  const input = document.querySelector('#filter-place-input');
+  const list = document.querySelector('#filter-place-results');
+  if (!input || !list) return;
+  let timer = 0;
+  let seq = 0;
+  const show = (rows, note = '') => {
+    list.innerHTML = rows.length
+      ? rows.map((row) => `<li><button type="button" role="option" aria-selected="false" class="location-result" data-place-id="${escapeHtml(row.id)}" data-place-name="${escapeHtml(row.name)}">${escapeHtml(row.name)}${row.region || row.country ? `<small>${escapeHtml([row.region, row.country].filter(Boolean).join(', '))}</small>` : ''}</button></li>`).join('')
+      : (note ? `<li class="location-results-note">${escapeHtml(note)}</li>` : '');
+    list.hidden = !list.innerHTML;
+    input.setAttribute('aria-expanded', String(!list.hidden));
+  };
+  input.addEventListener('input', () => {
+    window.clearTimeout(timer);
+    const term = input.value.trim();
+    if (!term) { show([]); return; }
+    const ticket = ++seq;
+    timer = window.setTimeout(async () => {
+      const { data, error } = await searchPlaces(term);
+      if (ticket !== seq) return;
+      show(error ? [] : (data || []), error ? "Cities couldn't be loaded. Please try again." : 'No city found. Try another spelling.');
+    }, 200);
+  });
+  input.addEventListener('keydown', (event) => {
+    if (event.key === 'ArrowDown') { event.preventDefault(); list.querySelector('button')?.focus(); }
+    else if (event.key === 'Escape' && !list.hidden) { event.preventDefault(); event.stopPropagation(); show([]); }
+  });
+  list.addEventListener('keydown', (event) => {
+    const buttons = [...list.querySelectorAll('button')];
+    const at = buttons.indexOf(document.activeElement);
+    if (event.key === 'ArrowDown') { event.preventDefault(); buttons[Math.min(at + 1, buttons.length - 1)]?.focus(); }
+    else if (event.key === 'ArrowUp') { event.preventDefault(); if (at <= 0) input.focus(); else buttons[at - 1].focus(); }
+    else if (event.key === 'Escape') { event.preventDefault(); event.stopPropagation(); show([]); input.focus(); }
+  });
+  list.addEventListener('click', (event) => {
+    const option = event.target.closest('[data-place-id]');
+    if (!option) return;
+    input.value = '';
+    show([]);
+    delete document.querySelector('#filter-location-group').dataset.pickingCity;
+    applyLocation({ mode: 'custom', place: { id: option.dataset.placeId, name: option.dataset.placeName } });
+    document.querySelector('#filter-radius')?.focus();
+  });
+})();
 document.querySelector('#filter-hiring')?.addEventListener('change', (event) => setHiringLens(event.currentTarget.checked));
 // The empty deck's one next action (UX_SPEC §B): its kind comes from deckEmptyState().
 document.querySelector('#deck-empty-action')?.addEventListener('click', async (event) => {

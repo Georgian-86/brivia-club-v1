@@ -93,7 +93,7 @@ begin
      and has_function_privilege('authenticated', p.oid, 'execute');
   want := 'add_company,add_member_interest,ask_about_role,brivia_can_see_author,brivia_has_completed_profile,'
        || 'cancel_member_event,chat_people_search,companion_deck,companion_deck_v2,companion_events,companion_swipe,connection_last_seen,connection_presence,deck_candidates,'
-       || 'deck_status,deck_why,declare_adult,delete_member_event,delete_message_for_me,delete_my_account,delete_push_subscription,'
+       || 'deck_status,deck_why,declare_adult,delete_member_event,delete_message_for_me,delete_my_account,delete_push_subscription,discover_people,'
        || 'dismiss_notification,edit_message,ensure_place,event_companions,get_candidates,hiring_people,hiring_people_v2,hiring_suggestions,list_events,'
        || 'mark_chat_seen,mark_companion_match_seen,mark_conversation_read,mark_messages_delivered,mark_notifications_read,member_bio,member_hiring,member_open_to,member_work,'
        || 'my_chat_seen,my_companion_matches,my_companion_quota,my_event_prefs,my_hiring_roles,my_interests,my_nearby_alerts,my_nearby_matches,'
