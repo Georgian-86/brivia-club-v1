@@ -4430,3 +4430,25 @@ bring a short line back.
 - **Read more.** A small pill in the card's wine: 12 px small caps, a chevron that turns over when open, a soft wine
   tint (solid wine on hover), over a cream fade at the end of the caption's second line; still a 44 px target.
 - **Checks.** hiring (93), explore-cards (74), post-more pass; unit 601.
+
+## D-239 (2026-11-11): Location in the filters (anywhere / near me / custom city / radius), and "everywhere" when no one nearby has the interest
+
+- **Request (founder, 2026-11-11, screenshots of the drawer and of another app's "Filter by location"):** "add a
+  feature like this, also when we search with some particular interests, show all the available people from any
+  location when there is no person with those skills nearby".
+- **Decision.** The filter drawer gains LOCATION: "Search anywhere" (a switch), "Near me / Custom city" (a city from
+  the place directory), "Current location" and a 25-500 km "Search radius" (50 by default). The default changes
+  nothing: Connect stays the location-first deck. Any other setting, or picked interests that no deck card has,
+  switches Connect to a search lane (`discover_people`, migration 0072) with a quiet line under the tools ("Within 200
+  km of Kochi", "Showing people from anywhere", or "No one nearby with Chess. Showing people from everywhere, nearest
+  first."). Reset filters puts Location back. Settings are kept on the device.
+- **Why it fits ORBIT.** It is search (§7: not gated, not ring-restricted), opened only by the member, so the deck and
+  the Escape-Velocity gate are untouched; the spec says so in §7. Location privacy holds: distance is city to city
+  (place centroids), answers name a city or 'Abroad', never km, a cell or coordinates; the radius only ever compares
+  cities. Mutual consent is unchanged (a Like still sends a request).
+- **Not agent-arena'd:** a direct founder request on an existing search rule; recorded here instead.
+- **Fixes found on the way:** Reset filters stayed greyed out when only Location was set; text still being typed in
+  the interests box could flip the fallback on mid-word (the fallback now looks only at picked values).
+- **Checks.** SQL `zl-discover-people.test.sql` (radius, custom city, interests, looking-for, exclusions, the band,
+  anon) and the hygiene allowlist; unit `discovery-location.test.mjs` (5, 606 total); e2e
+  `discovery-location.spec.mjs` LP1-LP5, FB1-FB2 at 1440 and 390 (axe clean, 44 px).

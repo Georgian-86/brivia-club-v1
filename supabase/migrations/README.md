@@ -1512,3 +1512,12 @@ notification type `post_new`: a trigger on `community_posts` writes one for each
 `matches` row) when a note is posted, never for blocked members or other worlds; deleting the note removes them, and a
 caption edit refreshes the snippet of unread ones. No new read function: `my_notifications_v4` already returns them.
 Verify: `select count(*) from pg_trigger where tgname = 'community_posts_notify_new';` (1). Applied live 2026-11-10.
+
+## 0072
+
+**The filter drawer's search lane (D-239).** Apply after `0071`, then deploy the client. Adds `discover_people`
+(SECURITY DEFINER, `authenticated` only): members by interest / looking-for within a radius of the caller's city or a
+chosen city, or anywhere; city-to-city distance only; the deck's exclusions; answers ids, the city (or 'Abroad'),
+hits and shared labels, never km. The deck (`deck_candidates`) is unchanged. Verify:
+`select has_function_privilege('anon', 'public.discover_people(text[], text[], int, text, uuid[], int)', 'execute');`
+(false). Applied live 2026-11-11.

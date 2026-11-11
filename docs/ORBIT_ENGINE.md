@@ -460,6 +460,16 @@ saturated, the outer rings relax first, instead of the deck repeating saturated 
 
 ## 7. Search and Long-Range Requests
 
+- **The filter drawer's search lane (D-239, migration 0072, interim).** `discover_people(p_skills, p_looking_for,
+  p_radius_km, p_place_id, p_exclude, p_limit)` is search, so it is not gated and not ring-restricted; the deck and
+  the Escape-Velocity gate are unchanged. Connect switches to it only when the member asks: a Location setting other
+  than the default (Search anywhere; a Custom city as the centre; a radius of 25-500 km other than 50), or picked
+  interests / looking-fors that no card in the loaded deck has (then it searches everywhere, nearest first, and says
+  so). Distance is measured between place centroids (the caller's place or the custom city, and each member's place):
+  city level, never a cell or a position; the answer is the member's city, or 'Abroad' for another country, never km.
+  Order: interest hits, shared interests, distance, id. It keeps every exclusion of the deck (`brivia_visible_to`,
+  connected, a signal in 30 days, a live request, a pass in 7 days), pages by `p_exclude` (at most 300 ids, 20 a
+  page, 30 at most) and logs no impressions. Location settings stay on the member's device.
 - **Search** ranks by `0.6 · query_relevance + 0.4 · R`. It is not gated and not ring-restricted, and it shows the
   distance band. Query relevance mixes name/handle hits, interest-taxonomy hits (including descendants) and
   semantic similarity of the `about` text (reuses engine v1 `semanticSearch`).

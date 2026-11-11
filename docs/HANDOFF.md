@@ -7,6 +7,9 @@ Update this file at the end of every session. CLAUDE.md holds the aim; this file
 
 ## 1. What is done
 
+**2026-11-11, D-239:** filters have LOCATION (search anywhere, near me / custom city, 25-500 km radius); picked
+interests no one nearby has search everywhere, nearest first (0072 `discover_people`, applied live).
+
 **2026-11-11, D-238:** the Hiring switch on Connect turns on again (a D-229 regression); Read more / Show less is a
 wine pill.
 

@@ -66,3 +66,37 @@ body.app-body[data-app-view="explore"] .app-menu-button{display:grid!important}
   .discovery-filter-clear{grid-column:1}
   .discovery-filter-apply{grid-column:2}
 }
+
+/* D-239: Location in the filter drawer: Search anywhere, Near me / Custom city, Search radius. Wine on cream, the
+   drawer's own fields; 44 px targets. While "Search anywhere" is on, the rest is dimmed and off. */
+.discovery-location .location-anywhere{margin-top:var(--space-2);padding-top:0;border-top:0}
+.discovery-location .location-body{display:grid;gap:var(--space-3);margin-top:var(--space-3);transition:opacity .18s ease}
+.discovery-location.is-anywhere .location-body{opacity:.45}
+.location-sub{margin:0;color:var(--color-ink-soft);font-size:var(--text-12);font-weight:600;letter-spacing:.06em;text-transform:uppercase}
+.location-mode{display:grid;grid-template-columns:1fr 1fr;gap:4px;padding:4px;border:1px solid color-mix(in srgb, var(--color-wine) 16%, transparent);border-radius:999px;background:color-mix(in srgb, var(--color-wine) 4%, #fffdf8)}
+.location-mode-btn{min-height:44px;border:0;border-radius:999px;background:transparent;color:var(--color-wine-deep);font-family:var(--font-body);font-size:var(--text-14);font-weight:600;cursor:pointer;transition:background-color .18s ease,color .18s ease}
+.location-mode-btn[aria-pressed="true"]{background:var(--color-wine);color:var(--color-cream);box-shadow:0 6px 14px color-mix(in srgb, var(--color-wine) 24%, transparent)}
+.location-mode-btn:focus-visible{outline:2px solid var(--color-wine);outline-offset:2px}
+.location-mode-btn:disabled{cursor:default}
+.location-current{display:flex;align-items:baseline;justify-content:space-between;gap:var(--space-3);padding:12px 14px;border-radius:12px;background:color-mix(in srgb, var(--color-wine) 5%, #fffdf8)}
+.location-current span{color:var(--color-ink-soft);font-size:var(--text-12);letter-spacing:.04em}
+.location-current strong{min-width:0;overflow:hidden;color:var(--color-wine-deep);font-size:var(--text-14);text-overflow:ellipsis;white-space:nowrap}
+.location-custom{position:relative}
+.location-custom[hidden]{display:none}
+.location-custom .discovery-filter-input{height:46px;font-size:var(--text-14)}
+.location-results{position:absolute;z-index:5;left:0;right:0;top:calc(100% + 4px);max-height:240px;margin:0;padding:4px;overflow-y:auto;list-style:none;border:1px solid color-mix(in srgb, var(--color-wine) 20%, transparent);border-radius:12px;background:#fffdf8;box-shadow:0 14px 30px color-mix(in srgb, var(--color-ink) 14%, transparent)}
+.location-results[hidden]{display:none}
+.location-result{display:flex;flex-direction:column;align-items:flex-start;width:100%;min-height:44px;padding:8px 12px;border:0;border-radius:8px;background:transparent;color:var(--color-ink);font-family:var(--font-body);font-size:var(--text-14);text-align:left;cursor:pointer}
+.location-result small{color:var(--color-ink-soft);font-size:var(--text-12)}
+.location-result:hover,.location-result:focus-visible{background:color-mix(in srgb, var(--color-wine) 9%, transparent);outline:none}
+.location-results-note{padding:10px 12px;color:var(--color-ink-soft);font-size:var(--text-12)}
+.location-radius{display:grid;gap:6px}
+.location-radius-head{display:flex;align-items:baseline;justify-content:space-between}
+.location-radius-head label{color:var(--color-ink);font-size:var(--text-14);font-weight:600}
+.location-radius-head output{color:var(--color-wine-deep);font-family:var(--font-heading, serif);font-size:var(--text-20, 20px)}
+.location-radius input[type="range"]{width:100%;min-height:44px;margin:0;accent-color:var(--color-wine);cursor:pointer}
+.location-radius input[type="range"]:disabled{cursor:default}
+.location-radius-scale{display:flex;justify-content:space-between;color:var(--color-ink-soft);font-size:var(--text-12)}
+/* The notice under the Connect tools (same pill as "Global hiring discovery"); words can run long, so it wraps. */
+.wide-search-label{text-transform:none;letter-spacing:.02em;white-space:normal}
+.wide-search-label span{min-width:0}
