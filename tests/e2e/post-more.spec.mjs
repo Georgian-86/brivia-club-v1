@@ -37,6 +37,7 @@ try {
       const v = await axeViolations(page, { include: '#community-post-list' });
       check('390 RM3 axe clean', v.length === 0, JSON.stringify(v));
     }
+    if (shots) { await page.mouse.move(1, 1); await page.locator('.post-card[data-post-id="long"]').screenshot({ path: `${shots}/post-more-closed-${w}.png` }); }
     await longMore.click();
     await page.waitForTimeout(200);
     const open = await page.evaluate(() => {
@@ -45,7 +46,7 @@ try {
       return { full: c.scrollHeight <= c.clientHeight + 1, lines: Math.round(c.clientHeight / parseFloat(getComputedStyle(c).lineHeight)), label: m.textContent.trim(), expanded: m.getAttribute('aria-expanded'), detail: !!document.querySelector('#post-detail') };
     });
     check(`${w} RM2 Read more shows the whole caption in place`, open.full && open.lines > 2 && open.label === 'Show less' && open.expanded === 'true' && !open.detail, JSON.stringify(open));
-    if (shots) await page.screenshot({ path: `${shots}/post-more-${w}.png` });
+    if (shots) { await page.mouse.move(1, 1); await page.waitForTimeout(400); await page.locator('.post-card[data-post-id="long"]').screenshot({ path: `${shots}/post-more-${w}.png` }); }
     await longMore.click();
     await page.waitForTimeout(200);
     const closed = await page.evaluate(() => {

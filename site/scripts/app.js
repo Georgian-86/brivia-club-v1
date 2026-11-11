@@ -2961,6 +2961,7 @@ const renderSelectedFilters = (container, values, selected, kind) => {
   container.innerHTML = selectedLabels.map((value) => `<button class="discovery-filter-selected-chip" type="button" data-remove-filter="${kind}" data-filter-value="${escapeHtml(value)}"><span>${escapeHtml(value)}</span><b aria-hidden="true">×</b><span class="sr-only">Remove ${escapeHtml(value)}</span></button>`).join('');
 };
 const renderFilterOptions = () => {
+  syncHiringControls();
   // D-229: the drawer's options are drawn when it opens (openDiscoveryFilters), never while it is closed: rebuilding
   // ~1,100 interest options on every Explore render was the slowest part of a tab switch.
   if (document.querySelector('#discovery-filter-drawer')?.hidden) return;
@@ -2977,6 +2978,11 @@ const renderFilterOptions = () => {
   renderFilterDropdown(document.querySelector('#filter-skills-suggestions'), skills, filterDrafts.skills, 'skills', exploreFilters.skills, POPULAR_INTERESTS);
   renderSelectedFilters(document.querySelector('#filter-looking-for-selected'), lookingFor, exploreFilters.lookingFor, 'looking-for');
   renderFilterDropdown(document.querySelector('#filter-looking-for-suggestions'), lookingFor, filterDrafts.lookingFor, 'looking-for', exploreFilters.lookingFor);
+};
+// D-238: the Hiring switch, the lens and the "Global hiring discovery" line are drawn on every Explore render, drawer
+// open or not. (D-229 skipped all of renderFilterOptions while the drawer was closed, and these lived inside it, so a tap
+// on the Hiring switch turned the lens on but the switch never showed it; a second tap turned it off again.)
+const syncHiringControls = () => {
   // D-141: the Hiring lens, only once hiring is live for this member.
   const lens = document.querySelector('#filter-hiring-group');
   if (lens) {
@@ -6006,7 +6012,7 @@ const toggleCaptionMore = (card) => {
   const open = !card.classList.contains('is-caption-open');
   card.classList.toggle('is-caption-open', open);
   more.setAttribute('aria-expanded', String(open));
-  more.querySelector('span').textContent = open ? 'Show less' : 'Read more';
+  more.querySelector('.post-card-more-text').textContent = open ? 'Show less' : 'Read more';
   if (!open) markCaptionMore();
 };
 // D-233: a member deletes their own post (RLS allows only the author; likes, comments, shares and its notifications

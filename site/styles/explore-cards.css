@@ -325,11 +325,16 @@ body.app-body .post-card-delete[aria-busy="true"]{opacity:.5;cursor:progress}
 /* D-237: "Read more" sits over the end of the caption's second line (cream fade), so a cut caption keeps the card's
    height; open, the whole caption shows and "Show less" follows it. 44 px target. */
 body.app-body .post-card-caption-wrap{position:relative;flex:0 0 auto}
-body.app-body .post-card-more{position:absolute;right:var(--space-3);bottom:10px;display:flex;align-items:flex-end;min-width:44px;height:44px;margin:0;padding:0;border:0;background:none;color:var(--brivia-wine);font-family:var(--font-body);font-size:var(--text-14);font-weight:700;line-height:1.35;cursor:pointer}
+body.app-body .post-card-more{position:absolute;right:calc(var(--space-3) - 4px);bottom:6px;display:flex;align-items:flex-end;min-width:44px;height:44px;margin:0;padding:0 0 0 2.4em;border:0;background:linear-gradient(90deg, transparent, var(--color-cream) 2em) bottom/100% 1.6em no-repeat;color:var(--brivia-wine);font-family:var(--font-body);cursor:pointer;-webkit-tap-highlight-color:transparent}
 body.app-body .post-card-more[hidden]{display:none}
-body.app-body .post-card-more span{padding-left:2.2em;background:linear-gradient(90deg, transparent, var(--color-cream) 1.8em);text-decoration:underline;text-underline-offset:3px}
-body.app-body .post-card-more:focus-visible{outline:2px solid var(--brivia-wine);outline-offset:2px;border-radius:6px}
+/* D-238: a quiet wine pill, small caps and a chevron, in the card's own bar colours. */
+body.app-body .post-card-more-pill{display:inline-flex;align-items:center;gap:5px;height:24px;padding:0 10px 0 11px;border:1px solid color-mix(in srgb, var(--brivia-wine) 22%, transparent);border-radius:999px;background:color-mix(in srgb, var(--brivia-wine) 7%, var(--color-cream));color:var(--brivia-wine);font-size:var(--text-12);font-weight:700;letter-spacing:.1em;line-height:1;text-transform:uppercase;transition:background-color var(--motion-base, .2s) ease, color var(--motion-base, .2s) ease, border-color var(--motion-base, .2s) ease}
+body.app-body .post-card-more-pill svg{width:11px;height:11px;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round;transition:transform var(--motion-base, .2s) ease}
+@media (hover:hover){body.app-body .post-card-more:hover .post-card-more-pill{border-color:var(--brivia-wine);background:var(--brivia-wine);color:var(--color-cream)}}
+body.app-body .post-card-more:focus-visible{outline:none}
+body.app-body .post-card-more:focus-visible .post-card-more-pill{outline:2px solid var(--brivia-wine);outline-offset:2px}
 body.app-body .post-card.is-caption-open .post-card-caption{display:block;height:auto;-webkit-line-clamp:unset;margin-bottom:0}
-body.app-body .post-card.is-caption-open .post-card-more{position:static;height:44px;margin:0 var(--space-3) 0 auto}
-body.app-body .post-card.is-caption-open .post-card-more span{padding-left:0;background:none}
+body.app-body .post-card.is-caption-open .post-card-more{position:static;align-items:center;margin:0 calc(var(--space-3) - 4px) 0 auto;padding:0;background:none}
+body.app-body .post-card.is-caption-open .post-card-more-pill svg{transform:rotate(180deg)}
 body.app-body .post-card.is-caption-open .post-card-caption-wrap{display:flex;flex-direction:column}
+@media (prefers-reduced-motion:reduce){body.app-body .post-card-more-pill,body.app-body .post-card-more-pill svg{transition:none}}
