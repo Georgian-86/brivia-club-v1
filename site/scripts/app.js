@@ -5556,6 +5556,7 @@ const renderCommunityPosts = () => {
   }).join('');
   syncReactionAvailability();
   bindCommunityProfileTriggers();
+  scheduleCaptionMore();
 };
 
 // Like and Save follow the member's own rows. Until 0012 is applied the tables do not exist: both buttons are hidden.
@@ -5986,6 +5987,28 @@ const startCaptionEdit = (dialog, post) => {
     showToast('Caption updated.');
   });
 };
+// D-237: "Read more" on a card whose caption is cut off (two lines). It expands the caption in place; "Show less"
+// folds it back. Measured after each draw and on resize (a wider card may fit the whole caption).
+const markCaptionMore = () => {
+  document.querySelectorAll('#community-post-list .post-card').forEach((card) => {
+    const caption = card.querySelector('.post-card-caption');
+    const more = card.querySelector('.post-card-more');
+    if (!caption || !more || card.classList.contains('is-caption-open')) return;
+    more.hidden = !(caption.scrollHeight > caption.clientHeight + 1);
+  });
+};
+let captionMoreFrame = 0;
+const scheduleCaptionMore = () => { cancelAnimationFrame(captionMoreFrame); captionMoreFrame = requestAnimationFrame(markCaptionMore); };
+window.addEventListener('resize', scheduleCaptionMore, { passive: true });
+const toggleCaptionMore = (card) => {
+  const more = card?.querySelector('.post-card-more');
+  if (!more) return;
+  const open = !card.classList.contains('is-caption-open');
+  card.classList.toggle('is-caption-open', open);
+  more.setAttribute('aria-expanded', String(open));
+  more.querySelector('span').textContent = open ? 'Show less' : 'Read more';
+  if (!open) markCaptionMore();
+};
 // D-233: a member deletes their own post (RLS allows only the author; likes, comments, shares and its notifications
 // cascade). Confirmed first. Its image is removed only when it is the member's own community-posts file.
 const deleteCommunityPost = async (postId) => {
@@ -6020,6 +6043,7 @@ const bindCommunityPostActions = () => {
     const card = event.target.closest('.post-card');
     if (!card) return;
     const postId = card.dataset.postId;
+    if (event.target.closest('[data-post-more]')) { toggleCaptionMore(card); return; }
     const action = event.target.closest('[data-post-action]')?.dataset.postAction;
     if (action === 'like' || action === 'save') toggleCommunityReaction(postId, action);
     // Safari does not focus a clicked button: pass it, so closing the detail returns focus to Comment.
@@ -6118,6 +6142,8 @@ const closeCommunityPostComposer = () => {
   communityPostPicked = null;
   communityPostFramed = null;
   communityPostAspect = 4 / 5;
+  document.querySelector('.community-post-upload')?.classList.remove('has-photo');
+  communityCaptionEmoji?.close();
   const feedback = document.querySelector('#community-post-feedback');
   if (feedback) feedback.textContent = '';
 };
@@ -6147,6 +6173,7 @@ const showCommunityPostPreview = (file) => {
   preview.style.aspectRatio = communityPostFramed ? String(communityPostAspect) : '';
   preview.classList.toggle('is-framed', Boolean(communityPostFramed));
   preview.removeAttribute('hidden');
+  document.querySelector('.community-post-upload')?.classList.add('has-photo');   // D-237: Replace takes over
 };
 const frameCommunityPostPhoto = async () => {
   const input = document.querySelector('#community-post-image');
@@ -6186,6 +6213,25 @@ document.querySelector('#community-post-image')?.addEventListener('change', (eve
   void frameCommunityPostPhoto();
 });
 document.querySelector('[data-post-adjust]')?.addEventListener('click', () => { void frameCommunityPostPhoto(); });
+// D-237: Replace picks another photo (then frames it); Remove drops the photo, so "Add an image" shows again.
+document.querySelector('[data-post-replace]')?.addEventListener('click', () => document.querySelector('#community-post-image')?.click());
+document.querySelector('[data-post-remove]')?.addEventListener('click', () => {
+  const input = document.querySelector('#community-post-image');
+  const preview = document.querySelector('#community-post-preview');
+  if (input) input.value = '';
+  if (communityPostPreviewUrl) URL.revokeObjectURL(communityPostPreviewUrl);
+  communityPostPreviewUrl = '';
+  communityPostPicked = null;
+  communityPostFramed = null;
+  communityPostAspect = 4 / 5;
+  preview?.setAttribute('hidden', '');
+  preview?.querySelector('img')?.removeAttribute('src');
+  document.querySelector('.community-post-upload')?.classList.remove('has-photo');
+  input?.focus();
+});
+// D-237: emoji for the caption (the same panel as comments and the bio, with skin tones).
+const communityCaption = document.querySelector('#community-post-caption');
+const communityCaptionEmoji = communityCaption ? attachEmojiPicker(communityCaption, { label: 'Add an emoji to your caption' }) : null;
 document.querySelector('#community-post-form')?.addEventListener('submit', async (event) => {
   event.preventDefault();
   const form = event.currentTarget;
