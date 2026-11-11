@@ -4417,3 +4417,16 @@ bring a short line back.
   four buttons are unchanged.
 - **Checks.** e2e `post-frame.spec.mjs` PF5-PF6 (Replace, Remove, caption emoji) and new `post-more.spec.mjs` RM1-RM3
   at 1440 and 390 (axe clean); post-delete, post-activity, comment-emoji, post-edit pass; unit 601.
+
+## D-238 (2026-11-11): the Hiring switch works again; Read more / Show less as a wine pill
+
+- **Report (founder, 2026-11-11, phone screenshot of Connect):** "am not able to turn on the hiring button from
+  screen", and "make these read more and show less buttons aesthetic".
+- **Hiring switch (a D-229 regression).** D-229 made `renderFilterOptions` return at once while the filter drawer is
+  closed, but the Hiring switch (`#hiring-toggle`: shown or hidden, on or off), the lens in the drawer and the "Global
+  hiring discovery" line were drawn inside it. A tap turned the lens on, the switch kept showing off, and the next tap
+  turned it off again. They now live in `syncHiringControls()`, run on every Explore render before the early return.
+  `hiring.spec.mjs` failed on main ("the Hiring switch shows, off") and passes with the fix (93 checks).
+- **Read more.** A small pill in the card's wine: 12 px small caps, a chevron that turns over when open, a soft wine
+  tint (solid wine on hover), over a cream fade at the end of the caption's second line; still a 44 px target.
+- **Checks.** hiring (93), explore-cards (74), post-more pass; unit 601.
