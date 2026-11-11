@@ -18,6 +18,8 @@ const A = defaultDeckRows[0].id;
 const messages = [{ id: 'm1', sender_id: A, recipient_id: ME, content: 'Hi there', created_at: new Date(Date.now() - 6e5).toISOString() }];
 const state = {
   matchIds: [A], messages,
+  // D-140: the city search is rpc/search_cities (the stub answers it from `places`); the place route stays for the fallback.
+  places: [{ id: 'in-pune', name: 'Pune', region: 'Maharashtra', country: 'IN' }, { id: 'in-puducherry', name: 'Puducherry', region: 'Puducherry', country: 'IN' }],
   routes: {
     place: { body: [{ id: 'in-pune', name: 'Pune', region: 'Maharashtra', country: 'IN' }, { id: 'in-puducherry', name: 'Puducherry', region: 'Puducherry', country: 'IN' }] },
     'rpc/set_home_city': { body: 'Pune' },
@@ -67,6 +69,8 @@ try {
       assert.doesNotMatch(dialog.text, /open to meaningful connections/i);
       assert.equal(dialog.focus, 'public-profile-close');
     });
+    // The dialog fades and rises in (public-profile-rise): axe runs once that is over, or it measures half-faded text.
+    await page.waitForFunction(() => document.getAnimations().every((an) => an.playState !== 'running' || !document.querySelector('#public-profile-modal')?.contains(an.effect?.target)), null, { timeout: 3000 }).catch(() => {});
     await check(`${tag} profile dialog: axe clean`, async () => assert.deepEqual(await axeViolations(page, { include: '#public-profile-modal' }), []));
     await check(`${tag} profile dialog: Message for a match opens that chat`, async () => {
       assert.equal(dialog.message, 'Message Asha');

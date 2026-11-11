@@ -7,6 +7,9 @@ Update this file at the end of every session. CLAUDE.md holds the aim; this file
 
 ## 1. What is done
 
+**2026-11-12, D-240:** quick swipes go through one after another; city lists close on a pick; "Check your email" carries
+on by itself; swipe-limit fixes; pills and Looking for fixed; auth polish; every e2e spec passes (outdated tests updated).
+
 **2026-11-11, D-239:** filters have LOCATION (search anywhere, near me / custom city, 25-500 km radius); picked
 interests no one nearby has search everywhere, nearest first (0072 `discover_people`, applied live).
 

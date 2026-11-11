@@ -255,3 +255,7 @@ body.app-body .app-view[data-view="home"] .swipe-card .swipe-card-topline { heig
 body.app-body .app-view[data-view="home"] .swipe-card .swipe-card-topline #swipe-card-label {
   display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; white-space: normal; line-height: 1.45; letter-spacing: .12em; overflow-wrap: anywhere;
 }
+
+/* D-240: the whole stack hands sideways moves to the app (as the card does), so a quick second swipe that lands on the
+   next card while one flies out is a swipe, not a browser pan. Vertical scrolling is untouched. */
+body.app-body .app-view[data-view="home"] #swipe-stack { touch-action: pan-y; }

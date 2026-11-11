@@ -92,7 +92,6 @@ export const flyDistance = (direction, { left, right, viewport }) => (direction 
 // (the card springs back). Returns { flyOut, park, settle, reset, enter }.
 const SPRING = 'cubic-bezier(.34, 1.56, .64, 1)';   // overshoot, then settle
 const GLIDE = 'cubic-bezier(.2, .7, .2, 1)';        // the --ease token's curve
-const wait = (ms) => new Promise((resolve) => { window.setTimeout(resolve, ms); });
 
 // D-137: the swipe sound. The app sets it once (app.js: the sound kit); every deck (Explore, Nearby, Event companions,
 // requests) shares it. It is called after the motion starts and never awaited, so audio can never delay a swipe.
@@ -106,6 +105,23 @@ export const createDeckSwipe = ({ card, stack, canDrag = () => true, onCommit = 
   const host = stack || card;
   let drag = null;
   let suppressClickUntil = 0;
+  // D-240 (founder: "why am I not able to swipe in one go"): while a card flies out, the finger lands on the next card
+  // (a picture in the stack, not this element), so the second swipe of a quick pair was lost. The stack now listens;
+  // a touch during a flight finishes it at once (`hurry`), and the new top card takes the drag from that touch.
+  let flight = null;      // { timer, resolve } while a fly-out runs
+  let pendingDown = null; // a pointerdown that came while the deck was still moving on
+  const flightWait = (ms) => new Promise((resolve) => {
+    const timer = window.setTimeout(() => { flight = null; resolve(); }, ms);
+    flight = { timer, resolve };
+  });
+  const hurry = () => {
+    if (!flight) return false;
+    const { timer, resolve } = flight;
+    flight = null;
+    window.clearTimeout(timer);
+    resolve();
+    return true;
+  };
   let pose = { x: 0, y: 0, r: 0 };
 
   const setVars = ({ pass = 0, pitch = 0, rise = 0 } = {}) => {
@@ -149,7 +165,7 @@ export const createDeckSwipe = ({ card, stack, canDrag = () => true, onCommit = 
       place(0, 0, 0, 'opacity 140ms linear');
       card.style.opacity = '0';
       sound();
-      return wait(150);
+      return flightWait(150);
     }
     const rect = card.getBoundingClientRect();
     const distance = flyDistance(direction, { left: rect.left, right: rect.right, viewport: window.innerWidth });
@@ -160,7 +176,7 @@ export const createDeckSwipe = ({ card, stack, canDrag = () => true, onCommit = 
     // D-162: a pass sinks a little as it leaves; a pitch lifts, as if handed on.
     place(pose.x + distance, pose.y + (direction === 'pitch' ? -64 : 24), turn, `transform ${ms}ms ${GLIDE}`);
     sound();
-    return wait(ms + 20);
+    return flightWait(ms + 20);
   };
 
   // A pitch keeps its card on screen, parked a little to the right with the PITCH stamp, until the sheet resolves.
@@ -198,13 +214,28 @@ export const createDeckSwipe = ({ card, stack, canDrag = () => true, onCommit = 
     }, 260);
   };
 
+  const startDrag = (id, x0, y0, t) => {
+    drag = { id, x0, y0, axis: null, samples: [{ x: x0, t }], width: card.offsetWidth || 1 };
+  };
   const onPointerDown = (event) => {
     if (drag || (event.pointerType === 'mouse' && event.button !== 0)) return;
-    if (event.target.closest?.('input, textarea, select, [data-no-swipe], .card-more-menu')) return;
+    if (event.target.closest?.('input, textarea, select, button, a, [data-no-swipe], .card-more-menu')) {
+      // Buttons on the card itself keep their tap; elsewhere in the stack only the card area starts a drag.
+      if (!card.contains(event.target)) return;
+      if (event.target.closest?.('input, textarea, select, [data-no-swipe], .card-more-menu')) return;
+    }
+    pendingDown = null;
+    if (hurry()) { pendingDown = { id: event.pointerId, x0: event.clientX, y0: event.clientY, t: event.timeStamp }; return; }
+    if (!card.contains(event.target)) return;   // not mid-flight: only the top card itself is dragged
     if (!canDrag()) return;
-    drag = { id: event.pointerId, x0: event.clientX, y0: event.clientY, axis: null, samples: [{ x: event.clientX, t: event.timeStamp }], width: card.offsetWidth || 1 };
+    startDrag(event.pointerId, event.clientX, event.clientY, event.timeStamp);
   };
   const onPointerMove = (event) => {
+    // The deck finished moving on since the touch began (hurry): the new top card takes this drag.
+    if (!drag && pendingDown && event.pointerId === pendingDown.id && canDrag()) {
+      startDrag(pendingDown.id, pendingDown.x0, pendingDown.y0, pendingDown.t);
+      pendingDown = null;
+    }
     if (!drag || event.pointerId !== drag.id) return;
     const dx = event.clientX - drag.x0;
     const dy = event.clientY - drag.y0;
@@ -224,6 +255,7 @@ export const createDeckSwipe = ({ card, stack, canDrag = () => true, onCommit = 
     setVars(stampsFor(dx, drag.width));
   };
   const finish = (event, cancelled) => {
+    if (pendingDown && event.pointerId === pendingDown.id) pendingDown = null;
     if (!drag || event.pointerId !== drag.id) return;
     const { axis, width } = drag;
     const dx = event.clientX - drag.x0;
@@ -246,10 +278,11 @@ export const createDeckSwipe = ({ card, stack, canDrag = () => true, onCommit = 
     }
   };
 
-  card.addEventListener('pointerdown', onPointerDown);
-  card.addEventListener('pointermove', onPointerMove);
-  card.addEventListener('pointerup', (event) => finish(event, false));
-  card.addEventListener('pointercancel', (event) => finish(event, true));
+  // On the stack (the card is inside it), so a touch on the next card while one flies out is heard too.
+  host.addEventListener('pointerdown', onPointerDown);
+  host.addEventListener('pointermove', onPointerMove);
+  host.addEventListener('pointerup', (event) => finish(event, false));
+  host.addEventListener('pointercancel', (event) => finish(event, true));
   // Touch pointers start captured by the touched child; moving the capture to the card fires lostpointercapture on
   // that child first (it bubbles here), which is not the end of the drag.
   card.addEventListener('lostpointercapture', (event) => { if (event.target === card && drag && event.pointerId === drag.id && drag.axis === 'x') finish(event, true); });

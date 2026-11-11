@@ -52,7 +52,7 @@ try {
       assert.equal(look.skip, "Don't show this again"); assert.equal(look.checked, false);
       assert.equal(look.focused, 'deck-tutorial-done'); assert.equal(look.inView, true); assert.equal(look.small, 0);
     });
-    const ax = await axeViolations(page, { include: 'dialog.deck-tutorial' });
+    const ax = await axeViolations(page, { include: 'dialog.deck-tutorial', decorative: ['.deck-tutorial-demo'] })   // the animated demo cards are aria-hidden pictures;
     await check(`${tag}: axe on the tutorial (${ax.join(' | ')})`, () => assert.deepEqual(ax, []));
     const before = stub.calls.length;
     await page.keyboard.press('ArrowLeft'); await page.keyboard.press('ArrowRight'); await page.waitForTimeout(500);
