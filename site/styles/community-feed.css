@@ -86,3 +86,11 @@
 .community-post-adjust{position:absolute;right:10px;bottom:10px;min-height:44px;padding:0 16px;border:1px solid rgba(255,255,255,.7);border-radius:999px;background:rgba(52,31,28,.72);color:#fffdf9;font-family:inherit;font-size:var(--text-12);font-weight:700;letter-spacing:.08em;text-transform:uppercase;cursor:pointer}
 .community-post-adjust:hover{background:rgba(116,31,57,.9)}
 .community-post-adjust:focus-visible{outline:2px solid #741f39;outline-offset:3px}
+
+/* D-237: the photo's Adjust / Replace / Remove, and the upload box hidden (not removed: Replace uses its input) once a
+   photo is in. */
+.community-post-photo-actions{position:absolute;right:10px;bottom:10px;left:10px;display:flex;flex-wrap:wrap;justify-content:flex-end;gap:8px}
+.community-post-photo-actions .community-post-adjust{position:static}
+.community-post-adjust.is-remove{background:rgba(116,31,57,.88)}
+.community-post-upload.has-photo{position:absolute;width:1px;height:1px;min-height:0;margin:-1px;padding:0;overflow:hidden;clip:rect(0 0 0 0);border:0;white-space:nowrap}
+@media (max-width:480px){.community-post-photo-actions{gap:6px}.community-post-photo-actions .community-post-adjust{padding:0 12px;letter-spacing:.05em}}

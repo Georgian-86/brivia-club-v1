@@ -4402,3 +4402,18 @@ bring a short line back.
   any tone already there; duplicates the lists then had are dropped). The chat composer's own picker is unchanged.
 - **Checks.** Unit `emoji-tone.test.mjs` (6, 601 total); e2e `comment-emoji.spec.mjs` CE5 (light by default, six
   tones >= 44 px, Dark re-draws quick row and panel, kept on reopen) at 1440 and 390; profile-edit and create-event pass.
+
+## D-237 (2026-11-11): post composer emoji, replace or remove the photo; "Read more" on long captions
+
+- **Requests (founder, 2026-11-11, screenshots of the composer and the Notes feed):** "add an option for emoji as
+  well, also to delete and replace photo while posting" and "also read more type something to read full caption".
+- **Composer.** The caption gets the emoji panel (`emoji-field.js`, with the D-236 skin tones). The framed photo has
+  Adjust, Replace and Remove (44 px, one row on phones): Replace opens the file picker and frames the new photo; Remove
+  drops it and brings back "Add an image". While a photo is in, the "Add an image" box is visually hidden (not removed:
+  Replace uses its file input).
+- **Read more.** A card whose caption is cut at two lines shows "Read more" over the end of the second line (a cream
+  fade), so cards keep one height. It expands the caption in place ("Show less" folds it back) without opening the
+  post. Measured after each draw and on resize. It is `data-post-more`, not a `data-post-action`, so the action bar's
+  four buttons are unchanged.
+- **Checks.** e2e `post-frame.spec.mjs` PF5-PF6 (Replace, Remove, caption emoji) and new `post-more.spec.mjs` RM1-RM3
+  at 1440 and 390 (axe clean); post-delete, post-activity, comment-emoji, post-edit pass; unit 601.

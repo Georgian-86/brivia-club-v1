@@ -49,7 +49,9 @@ export const postCardMarkup = (post, author, { liked = false, saved = false, ima
     + (own ? `<button type="button" class="post-card-delete" data-post-action="delete" aria-label="Delete your post" title="Delete post">${DELETE_ICON}</button>` : '')
     + '</header>'
     + `<div class="post-card-media">${media}</div>`
-    + `<p class="post-card-caption">${escapeHtml(post.caption || '')}</p>`
+    // D-237: "Read more" shows only when the caption is cut off (app.js measures it after drawing).
+    + `<div class="post-card-caption-wrap"><p class="post-card-caption" id="post-caption-${escapeHtml(post.id)}">${escapeHtml(post.caption || '')}</p>`
+    + `<button type="button" class="post-card-more" data-post-more aria-expanded="false" aria-controls="post-caption-${escapeHtml(post.id)}" hidden><span>Read more</span></button></div>`
     + `<div class="post-card-actions">${actionButton('like', liked ? 'Liked' : 'Like', Boolean(liked), activity?.likeCount)}${actionButton('comment', 'Comment', undefined, activity?.commentCount)}${actionButton('share', 'Share', undefined, activity?.shareCount)}${actionButton('save', saved ? 'Saved' : 'Save', Boolean(saved))}</div>`
     + postFooterMarkup(activity, summary, escapeHtml)
     + '</article>';

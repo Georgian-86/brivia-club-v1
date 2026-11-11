@@ -7,6 +7,9 @@ Update this file at the end of every session. CLAUDE.md holds the aim; this file
 
 ## 1. What is done
 
+**2026-11-11, D-237:** post composer: emoji for the caption, Replace / Remove for the photo; long captions on cards
+have "Read more" / "Show less".
+
 **2026-11-11, D-236:** emoji hands are light-skinned by default; the emoji panel has a Skin tone row (six tones, kept
 per browser).
 
