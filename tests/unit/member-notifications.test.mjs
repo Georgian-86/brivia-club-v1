@@ -2,7 +2,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createMemberNotifications, normalizeNotification, isFresh } from '../../site/scripts/member-notifications.js';
-import { pushSupport, urlBase64ToUint8Array, VAPID_PUBLIC_KEY, PUSH_COPY } from '../../site/scripts/web-push.js';
+import { pushSupport, urlBase64ToUint8Array, VAPID_PUBLIC_KEY, PUSH_COPY, iosBrowser, installSteps } from '../../site/scripts/web-push.js';
 
 const row = (id, extra = {}) => ({ id, notification_type: 'nearby_appeared', source_user_id: `s-${id}`, name: `Person ${id}`, band: '1', created_at: new Date().toISOString(), read_at: null, dismissed_at: null, ...extra });
 const harness = (rows) => {
@@ -70,7 +70,7 @@ test('web push: iPhone in a Safari tab must add to Home Screen; denied and unsup
   const desktop = { userAgent: 'Mozilla/5.0 (Macintosh) Chrome/130', serviceWorker: {} };
   assert.equal(pushSupport({ win: { ...winTab, Notification: { permission: 'denied' } }, nav: desktop }), 'denied');
   assert.equal(pushSupport({ win: { isSecureContext: true }, nav: { userAgent: 'x' } }), 'unsupported');
-  assert.match(PUSH_COPY['ios-install'], /Add to Home Screen/);
+  assert.match(PUSH_COPY['ios-install'], /Home Screen/);
   const key = urlBase64ToUint8Array(VAPID_PUBLIC_KEY);
   assert.equal(key.length, 65);
   assert.equal(key[0], 4);
@@ -115,4 +115,18 @@ test('post_new: one row per note, titled "<name> shared a new note" with the cap
   assert.deepEqual(groups.map((g) => [g.key, g.type, g.unread]), [['n:n2', 'post_new', false], ['n:n1', 'post_new', true], ['l:n1', 'post_like', true]]);
   assert.deepEqual(postNotificationCopy(groups[1]), { title: 'Asha shared a new note', line: '“Evening at the club”' });
   assert.deepEqual(postNotificationCopy(groups[0]), { title: 'Ravi shared a new note', line: 'Tap to see it.' });
+});
+
+// D-245: the iPhone steps follow the browser the member is in.
+test('web push: iPhone install steps for Safari, Chrome, and inside another app', () => {
+  const ua = (tail) => ({ userAgent: `Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 Mobile/15E148 ${tail}` });
+  assert.equal(iosBrowser(ua('Version/18.0 Safari/604.1')), 'safari');
+  assert.equal(iosBrowser(ua('CriOS/130.0 Safari/604.1')), 'chrome');
+  assert.equal(iosBrowser(ua('GSA/350.0 Safari/604.1')), 'inapp');
+  assert.equal(iosBrowser(ua('Instagram 350.0')), 'inapp');
+  assert.equal(iosBrowser(ua('FxiOS/130.0')), 'other');
+  assert.match(installSteps('safari')[1], /Add to Home Screen/);
+  assert.match(installSteps('chrome')[0], /top right of Chrome/);
+  assert.match(installSteps('inapp')[0], /Open in Safari/);
+  assert.equal(installSteps('safari').length, 4);
 });

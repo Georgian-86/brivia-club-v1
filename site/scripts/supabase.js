@@ -518,6 +518,11 @@ export const sendPendingPush = async () => {
   if (!supabase?.functions) return { error: null };
   try { return await supabase.functions.invoke('push-notify', { body: {} }); } catch (error) { return { error }; }
 };
+// D-245: right after chat messages are sent: push-notify pushes my newest unread messages to `to`'s devices.
+export const sendMessagePush = async (to) => {
+  if (!supabase?.functions || !to) return { error: null };
+  try { return await supabase.functions.invoke('push-notify', { body: { to } }); } catch (error) { return { error }; }
+};
 // D-140 (0036): company / organisation. Database search first; when it has few answers, the directory Edge Function
 // looks the name up on Wikidata, caches the companies (with their logos) and returns them.
 export const searchCompanies = async (query, limit = 8) => {

@@ -4556,3 +4556,24 @@ bring a short line back.
   refused, unsent and deleted-for-me refused) and the hygiene allowlist; unit 612 (emoji search, reactions);
   e2e `message-reactions.spec.mjs` RX1-RX6 at 390 (axe clean), post-more updated; message-actions, message-replies,
   chat-extras, chat-inbox, comment-emoji, post-likers pass.
+
+## D-245 (2026-11-12): phone notifications: the iPhone switch works, and chat messages are pushed
+
+- **Ask (founder, 2026-11-12, screenshot from an iPhone browser tab):** "i am not able to turn the notifications on for
+  phone, pls fix".
+- **Cause.** On an iPhone, Apple allows website notifications only for a site opened from its Home Screen icon (iOS
+  16.4+). In a browser tab the Web notifications switch was greyed out, so a tap did nothing, and the one-line hint named
+  Safari's menu even inside the Google app or Instagram, where it does not exist.
+- **Decision.** The switch is never greyed out on an iPhone tab. A tap opens the steps for the browser the member is in
+  (Safari: Share › Add to Home Screen; Chrome: Share at the top right; inside another app: open in Safari first, with
+  "Copy the Brivia link"), then "open Brivia from its icon and turn this on". The blocked state says where to allow it on
+  iPhone and Android. Android and desktop were already working and are unchanged.
+- **Chat messages are pushed too.** Until now only crossings, likes, comments, new notes and event registrations were
+  pushed; a message reached a closed app only in the inbox. The sender's app now calls `push-notify` with `{ to }` 1.5 s
+  after its last send; the function pushes the sender's newest unread messages of the last 2 minutes ("Name" / the
+  message, or "Name · 3 new messages"), one notification per sender that the next one replaces, never across a block.
+  A tap opens that chat. A notification tapped while Brivia is open now goes where it points (chat, note, event), not
+  always to Nearby.
+- **Checks.** Unit 613 (iPhone browsers and steps); e2e `push-install.spec.mjs` PI1-PI3 (switch tappable, Safari and
+  Google app steps, axe clean, three quick sends make one push call); nearby, chat-extras, chat-inbox, message-actions,
+  message-reactions pass. push-notify v7 deployed (the live v6 matched the repo before the change).

@@ -1,4 +1,5 @@
-// push-notify (D-134): sends Web Push for new Nearby notifications, and (D-151, 0043) likes and comments on a note,
+// push-notify (D-134): sends Web Push for new chat messages (D-245, body { to }: the sender's app right after a send),
+// and for new Nearby notifications, and (D-151, 0043) likes and comments on a note,
 // called by the liker's or commenter's app right after it saves. Called by the signed-in app right after its location
 // pulse (nearby_pulse writes member_notification rows, 0030). Each notification is claimed once (push_sent_at set in the
 // same UPDATE that selects it), never one already read, so no device gets a push for something viewed elsewhere and no
@@ -39,6 +40,57 @@ Deno.serve(async (req) => {
   const uid = who.user.id;
 
   const admin = createClient(url, service, { auth: { persistSession: false } });
+  webpush.setVapidDetails(subject, pub, priv);
+  const gone: string[] = [];
+  const pushTo = async (memberId: string, payload: string, topic: string) => {
+    const { data: subs } = await admin.from('push_subscription').select('endpoint,member_id,p256dh,auth').eq('member_id', memberId);
+    let n = 0;
+    for (const s of subs || []) {
+      try {
+        await webpush.sendNotification({ endpoint: s.endpoint, keys: { p256dh: s.p256dh, auth: s.auth } }, payload, { TTL: 60 * 60, urgency: 'high', topic });
+        n += 1;
+      } catch (e) {
+        const code = (e as { statusCode?: number })?.statusCode;
+        if (code === 404 || code === 410) gone.push(s.endpoint);
+      }
+    }
+    return n;
+  };
+
+  // D-245: { to }: the caller just sent chat messages to `to`. Push the caller's newest messages to them (sent in the
+  // last 2 minutes, not read, not unsent), unless either has blocked the other. One notification per sender (the tag),
+  // replaced by the next, so a burst of messages is one notification, not ten.
+  let body: { to?: string } = {};
+  try { body = await req.json(); } catch { body = {}; }
+  if (body?.to) {
+    const to = String(body.to);
+    if (!/^[0-9a-f-]{36}$/i.test(to) || to === uid) return json(200, { sent: 0 });
+    const recent = new Date(Date.now() - 2 * 60 * 1000).toISOString();
+    const [{ data: msgs }, { data: blocks }, { data: me }] = await Promise.all([
+      admin.from('brivia_messages').select('id,body,message_type,created_at')
+        .eq('sender_id', uid).eq('recipient_id', to).gte('created_at', recent).is('read_at', null).is('unsent_at', null)
+        .order('created_at', { ascending: false }).limit(10),
+      admin.from('brivia_blocks').select('blocker_id')
+        .or(`and(blocker_id.eq.${uid},blocked_id.eq.${to}),and(blocker_id.eq.${to},blocked_id.eq.${uid})`).limit(1),
+      admin.from('profiles').select('name').eq('id', uid).maybeSingle(),
+    ]);
+    if (!msgs?.length || blocks?.length) return json(200, { sent: 0 });
+    const latest = msgs[0];
+    const kind: Record<string, string> = { image: 'Sent a photo', gif: 'Sent a GIF', video: 'Sent a video', resume: 'Shared their resume', file: 'Sent a file' };
+    const text = String(latest.body || '').replace(/\s+/g, ' ').trim();
+    const line = text ? (text.length > 140 ? `${text.slice(0, 139)}…` : text) : (kind[latest.message_type] || 'Sent you a message');
+    const first = String(me?.name || '').trim().split(/\s+/)[0] || 'A Brivia member';
+    const payload = JSON.stringify({
+      id: null, tag: `msg-${uid}`, type: 'message',
+      title: msgs.length > 1 ? `${first} · ${msgs.length} new messages` : first,
+      body: line,
+      url: `/app.html?view=chat&chat=${uid}`,
+    });
+    const sent = await pushTo(to, payload, `m${uid.replace(/-/g, '').slice(0, 31)}`);
+    if (gone.length) await admin.from('push_subscription').delete().in('endpoint', gone);
+    return json(200, { sent });
+  }
+
   // Claim: this member's fresh notifications either way (they were told, or others were told about them), unread, not
   // yet pushed. The UPDATE ... RETURNING makes the claim atomic, so two concurrent calls never push the same one.
   const since = new Date(Date.now() - 10 * 60 * 1000).toISOString();
@@ -50,7 +102,6 @@ Deno.serve(async (req) => {
   if (claimError) return json(500, { error: 'claim' });
   if (!claimed?.length) return json(200, { sent: 0 });
 
-  webpush.setVapidDetails(subject, pub, priv);
   const recipients = [...new Set(claimed.map((n) => n.user_id))];
   const sources = [...new Set(claimed.map((n) => n.source_user_id).filter(Boolean))];
   const [{ data: subs }, { data: people }] = await Promise.all([
@@ -59,7 +110,6 @@ Deno.serve(async (req) => {
   ]);
   const nameOf = new Map((people || []).map((p) => [p.id, p]));
   let sent = 0;
-  const gone: string[] = [];
   for (const n of claimed) {
     const who = nameOf.get(n.source_user_id) || { name: 'A Brivia member', photo_url: null };
     const first = String(who.name || '').trim().split(/\s+/)[0] || 'A Brivia member';

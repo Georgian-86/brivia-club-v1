@@ -27,10 +27,26 @@ export const pushSupport = ({ win = globalThis.window, nav = globalThis.navigato
   return 'ready';
 };
 
+// D-245: which iPhone browser this is, for the install steps. Only Safari and Chrome can add Brivia to the Home Screen
+// in a way that gets notifications; inside another app (Instagram, WhatsApp, the Google app) Brivia opens in Safari first.
+export const iosBrowser = (nav = globalThis.navigator) => {
+  const ua = String(nav?.userAgent || '');
+  if (/Instagram|FBAN|FBAV|FB_IAB|WhatsApp|Line\/|LinkedInApp|Snapchat|Twitter|GSA\//.test(ua)) return 'inapp';
+  if (/CriOS/.test(ua)) return 'chrome';
+  if (/FxiOS|EdgiOS|OPiOS|DuckDuckGo|Brave/.test(ua)) return 'other';
+  return 'safari';
+};
+const SHARE = 'the Share button (a square with an arrow)';
+export const installSteps = (browser) => {
+  if (browser === 'safari') return [`Tap ${SHARE} at the bottom of Safari.`, 'Scroll down and tap “Add to Home Screen”, then “Add”.', 'Open Brivia from its new icon on your Home Screen.', 'Go to Settings and turn on Web notifications, then tap “Allow”.'];
+  if (browser === 'chrome') return [`Tap ${SHARE} at the top right of Chrome.`, 'Tap “Add to Home Screen”, then “Add”.', 'Open Brivia from its new icon on your Home Screen.', 'Go to Settings and turn on Web notifications, then tap “Allow”.'];
+  return ['Open thebriviaclub.live in Safari: tap ••• or the compass icon and choose “Open in Safari” (or copy the link below and paste it in Safari).', `In Safari, tap ${SHARE}, then “Add to Home Screen”.`, 'Open Brivia from its new icon on your Home Screen.', 'Go to Settings and turn on Web notifications, then tap “Allow”.'];
+};
+
 export const PUSH_COPY = Object.freeze({
-  'ios-install': 'On iPhone, add Brivia to your Home Screen first (Share › Add to Home Screen), then turn this on there.',
+  'ios-install': 'On iPhone, notifications work once Brivia is on your Home Screen. Tap the switch to see how (it takes 20 seconds).',
   unsupported: "This browser can't show Brivia notifications.",
-  denied: 'Notifications are blocked for Brivia. Allow them in your browser’s site settings, then try again.',
+  denied: 'Notifications are blocked for Brivia on this device. iPhone: Settings app › Notifications › Brivia › Allow. Android: tap the lock by the address, then Permissions › Notifications › Allow. Then try again.',
 });
 
 export const createWebPush = ({ save, remove, win = globalThis.window, nav = globalThis.navigator, key = VAPID_PUBLIC_KEY } = {}) => {
