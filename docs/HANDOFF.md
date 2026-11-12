@@ -7,6 +7,8 @@ Update this file at the end of every session. CLAUDE.md holds the aim; this file
 
 ## 1. What is done
 
+**2026-11-12, D-242:** "Liked by" on notes (the author sees every liker; 0074 live). Fonts audited clean.
+
 **2026-11-12, D-241:** newcomers (name + photo + 18+, setup unfinished) show in decks as "New to Brivia", one in
 five; requests to them wait until they finish (0073 live). 36 accounts with no profile cannot be shown: a reminder
 email is the next lever.

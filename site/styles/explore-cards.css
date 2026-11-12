@@ -338,3 +338,23 @@ body.app-body .post-card.is-caption-open .post-card-more{position:static;align-i
 body.app-body .post-card.is-caption-open .post-card-more-pill svg{transform:rotate(180deg)}
 body.app-body .post-card.is-caption-open .post-card-caption-wrap{display:flex;flex-direction:column}
 @media (prefers-reduced-motion:reduce){body.app-body .post-card-more-pill,body.app-body .post-card-more-pill svg{transition:none}}
+
+/* D-242: "Liked by". The likes line reads as a link; the sheet is a small cream dialog with 44 px rows. */
+body.app-body .post-card-likes.is-link{min-width:0;margin:0;padding:0;border:0;background:none;color:inherit;font:inherit;text-align:left;cursor:pointer;text-decoration:underline;text-decoration-color:color-mix(in srgb, currentColor 35%, transparent);text-underline-offset:3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+body.app-body .post-card-likes.is-link:hover{text-decoration-color:currentColor}
+body.app-body .post-card-likes.is-link:focus-visible,.post-detail-likers:focus-visible{outline:2px solid var(--brivia-wine);outline-offset:2px;border-radius:4px}
+.post-detail-likers{min-height:44px;margin:0;padding:0;border:0;background:none;color:inherit;font:inherit;font-weight:600;cursor:pointer;text-decoration:underline;text-underline-offset:3px}
+dialog.likers-sheet{width:min(380px,calc(100vw - 32px));max-height:min(560px,80vh);padding:0;border:1px solid var(--color-line);border-radius:18px;background:var(--color-cream);color:var(--color-ink);box-shadow:0 24px 60px color-mix(in srgb, var(--color-ink) 28%, transparent);overflow:hidden}
+dialog.likers-sheet::backdrop{background:color-mix(in srgb, var(--color-oxblood-deep, #3a0814) 55%, transparent)}
+.likers-head{display:flex;align-items:center;justify-content:space-between;padding:14px 12px 10px 20px;border-bottom:1px solid var(--color-line)}
+.likers-head h2{margin:0;color:var(--brivia-wine);font:400 var(--text-24, 24px)/1.1 var(--font-heading)}
+.likers-close{width:44px;height:44px;border:0;border-radius:50%;background:transparent;color:var(--brivia-wine);font-size:24px;cursor:pointer}
+.likers-close:focus-visible{outline:2px solid var(--brivia-wine);outline-offset:-2px}
+.likers-list{max-height:calc(min(560px,80vh) - 70px);margin:0;padding:6px;overflow-y:auto;list-style:none}
+.likers-row{display:flex;align-items:center;gap:12px;width:100%;min-height:52px;padding:6px 12px;border:0;border-radius:12px;background:transparent;color:var(--color-ink);font-family:var(--font-body);font-size:var(--text-16, 16px);text-align:left;cursor:pointer}
+.likers-row:hover,.likers-row:focus-visible{background:color-mix(in srgb, var(--brivia-wine) 8%, transparent);outline:none}
+.likers-row small{margin-left:auto;color:var(--color-ink-soft);font-size:var(--text-12)}
+.likers-avatar{display:grid;flex:0 0 40px;width:40px;height:40px;place-items:center;overflow:hidden;border-radius:50%;background:color-mix(in srgb, var(--brivia-wine) 14%, var(--color-cream));color:var(--brivia-wine);font-size:var(--text-12);font-weight:700}
+.likers-avatar img{width:100%;height:100%;object-fit:cover}
+.likers-name{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:600}
+.likers-note{padding:14px 12px;color:var(--color-ink-soft);font-size:var(--text-14);text-align:center}
