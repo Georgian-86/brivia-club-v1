@@ -91,3 +91,12 @@ test('deckCoverSrc: the chosen cover, else the default preset cover, never the p
   assert.equal(deckCoverSrc({ coverUrl: null, image: null }, safe, ''), '');
   assert.equal(deckCoverSrc(null, safe), '');
 });
+
+// D-241
+import { interleaveNewcomers } from '../../site/scripts/deck-view.js';
+test('interleaveNewcomers: one newcomer after every four deck cards, the rest at the end, no repeats', () => {
+  assert.deepEqual(interleaveNewcomers(['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i'], ['n1', 'n2', 'n3']), ['a', 'b', 'c', 'd', 'n1', 'e', 'f', 'g', 'h', 'n2', 'i', 'n3']);
+  assert.deepEqual(interleaveNewcomers([], ['n1', 'n2']), ['n1', 'n2']);
+  assert.deepEqual(interleaveNewcomers(['a', 'n1'], ['n1', 'n1', 'n2']), ['a', 'n1', 'n2']);
+  assert.deepEqual(interleaveNewcomers(['a', 'b'], []), ['a', 'b']);
+});

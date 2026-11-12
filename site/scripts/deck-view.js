@@ -74,3 +74,16 @@ export const deckCoverSrc = (person, safe, fallback = '') => {
   }
   return '';
 };
+
+// D-241: newcomer cards (members who started but have not finished setup) go in among the deck's own cards: one after
+// every `every - 1` regular cards, the rest at the end, so the location-first deck still leads. Ids only, order kept.
+export const interleaveNewcomers = (queue = [], newcomers = [], every = 5) => {
+  const add = [...new Set(newcomers.map(String))].filter((id) => !queue.map(String).includes(id));
+  const out = [];
+  let n = 0;
+  queue.map(String).forEach((id, i) => {
+    out.push(id);
+    if ((i + 1) % (every - 1) === 0 && n < add.length) out.push(add[n++]);
+  });
+  return [...out, ...add.slice(n)];
+};

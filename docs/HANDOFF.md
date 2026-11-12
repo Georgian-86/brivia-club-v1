@@ -7,6 +7,10 @@ Update this file at the end of every session. CLAUDE.md holds the aim; this file
 
 ## 1. What is done
 
+**2026-11-12, D-241:** newcomers (name + photo + 18+, setup unfinished) show in decks as "New to Brivia", one in
+five; requests to them wait until they finish (0073 live). 36 accounts with no profile cannot be shown: a reminder
+email is the next lever.
+
 **2026-11-12, D-240:** quick swipes go through one after another; city lists close on a pick; "Check your email" carries
 on by itself; swipe-limit fixes; pills and Looking for fixed; auth polish; every e2e spec passes (outdated tests updated).
 

@@ -66,7 +66,7 @@ import { loadReactions, setReaction, createReactionGuard } from './post-reaction
 import { loadActivity, withLike, likeSummary, threadComments, cleanCommentBody, loadComments, addComment, deleteComment, recordShare, sharedPostMessage, parseSharedPost, emptyActivity, COMMENT_MAX } from './post-activity.js';
 import { profileChecklist } from './profile-checklist.js';
 import { quotaLabel, quotaErrorText, quotaBlocked, quotaNotice, swipeLimitCopy } from './signal-quota.js';
-import { pitchLine, deckChips, deckEmptyState, deckFields, bandNote, deckCoverSrc } from './deck-view.js';
+import { pitchLine, deckChips, deckEmptyState, deckFields, bandNote, deckCoverSrc, interleaveNewcomers } from './deck-view.js';
 import { createDeckSwipe, SWIPE, setSwipeCue } from './deck-swipe.js';
 import { createDeckRitual } from './deck-ritual.js';
 import { maybeShowDeckTutorial } from './deck-tutorial.js';
@@ -2089,6 +2089,34 @@ const routeIncompleteMember = async (onboarding, ownRow = null) => {
   window.location.replace('/auth.html?complete-profile=1');
 };
 // When the queue runs out: load once more; if nothing new comes back, ask deck_status() why (never a count).
+// D-241 (founder: "show the profiles of the people who started but didn't finish … we desperately need users"):
+// newcomer_cards (0073) brings members with a name, a photo and the 18+ declaration whose setup is not finished. They
+// go in among the deck's cards, one after every four ("New to Brivia" on the card). A request to them waits until
+// they finish setup; a connection still needs them to accept.
+const newcomerLane = { loading: false, lastAt: 0 };
+async function liftNewcomerCards() {
+  if (!supabase || !memberProfile.id || !deck.ready || newcomerLane.loading) return;
+  if (Date.now() - newcomerLane.lastAt < 60000) return;
+  newcomerLane.loading = true;
+  newcomerLane.lastAt = Date.now();
+  try {
+    const exclude = [...new Set([...deck.seen, ...deck.ids].map(String))].slice(-500);
+    const { data, error } = await supabase.rpc('newcomer_cards', { p_exclude: exclude, p_limit: 6 });
+    if (error) { if (!isMissingFunction(error)) console.warn('Newcomer cards could not load:', error.message); return; }
+    if (!data?.length) return;
+    mergePeople(data);
+    const ids = data.map((row) => String(row.id)).filter((id) => findPersonById(id) && !deck.ids.includes(id) && !deck.seen.has(id));
+    if (!ids.length) return;
+    // The card on screen stays first (it is deck.ids[0]) and counts as one of the four before a newcomer.
+    deck.ids = interleaveNewcomers(deck.ids, ids);
+    if (deck.end && deckPeople().length) deck.end = null;
+    renderExplore();
+  } catch (error) {
+    console.warn('Newcomer cards could not load:', error?.message || error);
+  } finally {
+    newcomerLane.loading = false;
+  }
+}
 const refillDeck = async () => {
   if (!deck.ready || deckPeople().length || deck.refilling) return;
   deck.refilling = true;
@@ -2106,6 +2134,7 @@ const refillDeck = async () => {
   }
   // Not settled: the member is being routed to onboarding or the review notice, so the deck must not load again.
   if (settled) renderExplore();
+  if (settled && !deckPeople().length) void liftNewcomerCards();   // D-241: the deck ran dry: newcomers may still be there
 };
 // One refill. Resolves true when the deck has cards or deck.end says why not.
 const refillDeckOnce = async () => {
@@ -7575,6 +7604,7 @@ const loadSupabaseCommunity = async () => {
   }
   currentPerson = deckPeople()[0] || null;
   deck.ready = true;
+  void liftNewcomerCards();   // D-241
   startHiring();
   renderHome();
   renderExplore();
