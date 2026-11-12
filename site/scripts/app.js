@@ -5886,9 +5886,56 @@ const paintDetailStats = (postId) => {
   if (!box || String(dialog.dataset.postId) !== String(postId)) return;
   const a = activityFor(postId);
   if (!a) { box.hidden = true; return; }
-  const parts = [activitySummaryFor(postId), a.shareCount ? `${a.shareCount} ${a.shareCount === 1 ? 'share' : 'shares'}` : ''].filter(Boolean);
-  box.hidden = !parts.length;
-  box.innerHTML = parts.map((part) => `<span>${escapeHtml(part)}</span>`).join('');
+  const likes = activitySummaryFor(postId);
+  const shares = a.shareCount ? `${a.shareCount} ${a.shareCount === 1 ? 'share' : 'shares'}` : '';
+  box.hidden = !likes && !shares;
+  // D-242: the likes line opens "Liked by".
+  box.innerHTML = (likes ? (a.likeCount > 0 ? `<button type="button" class="post-detail-likers" data-post-likers>${escapeHtml(likes)}</button>` : `<span>${escapeHtml(likes)}</span>`) : '')
+    + (shares ? `<span>${escapeHtml(shares)}</span>` : '');
+};
+// D-242 (a member: "I'm unable to see who liked my note"): "Liked by", from post_likers (0074). The note's author
+// sees everyone who liked it; anyone else sees their own connections among the likers (as the "Liked by" line).
+const openPostLikers = async (postId, opener = document.activeElement) => {
+  const post = communityPosts.find((item) => String(item.id) === String(postId));
+  if (!post || !supabase) return;
+  document.querySelector('dialog.likers-sheet')?.remove();
+  const own = String(post.author_id) === String(memberProfile.id);
+  const dialog = document.createElement('dialog');
+  dialog.className = 'likers-sheet';
+  dialog.setAttribute('aria-labelledby', 'likers-title');
+  dialog.innerHTML = '<div class="likers-head"><h2 id="likers-title">Liked by</h2><button type="button" class="likers-close" data-likers-close aria-label="Close">×</button></div>'
+    + '<ul class="likers-list" aria-busy="true"><li class="likers-note">Loading…</li></ul>';
+  document.body.append(dialog);
+  const close = () => { dialog.close(); dialog.remove(); opener?.focus?.({ preventScroll: true }); };
+  dialog.addEventListener('cancel', (event) => { event.preventDefault(); close(); });
+  dialog.addEventListener('click', (event) => {
+    if (event.target === dialog || event.target.closest('[data-likers-close]')) { close(); return; }
+    const row = event.target.closest('[data-liker-id]');
+    if (!row) return;
+    const id = row.dataset.likerId;
+    close();
+    closeCommunityPostDetail?.();
+    if (String(id) === String(memberProfile.id)) setView('profile'); else openMemberProfileById(id);
+  });
+  dialog.showModal();
+  dialog.querySelector('[data-likers-close]')?.focus();
+  const { data, error } = await supabase.rpc('post_likers', { p_post_id: post.id });
+  if (!dialog.isConnected) return;
+  const list = dialog.querySelector('.likers-list');
+  list.removeAttribute('aria-busy');
+  if (error) { list.innerHTML = `<li class="likers-note">${isMissingFunction(error) ? 'Coming soon.' : "Couldn't load the likes. Please try again."}</li>`; return; }
+  const rows = data || [];
+  const total = activityFor(post.id)?.likeCount || rows.length;
+  const hidden = Math.max(0, total - rows.length);
+  list.innerHTML = rows.map((r) => {
+    const me = String(r.member_id) === String(memberProfile.id);
+    const name = me ? 'You' : (r.name || 'Brivia member');
+    // The name is right beside the photo: the photo is decorative here (alt="").
+    const avatar = renderAvatar({ name: me ? (memberProfile.name || 'You') : name, image: me ? (memberProfile.photoUrl || '') : (r.photo_url || '') }, 'likers-avatar').replace(/<img([^>]*?)\salt="[^"]*"/, '<img$1 alt=""');
+    return `<li><button type="button" class="likers-row" data-liker-id="${escapeHtml(String(r.member_id))}">${avatar}<span class="likers-name">${escapeHtml(name)}</span>${r.is_connection ? '<small>Connection</small>' : ''}</button></li>`;
+  }).join('')
+    + (hidden && !own ? `<li class="likers-note">${hidden} more ${hidden === 1 ? 'person' : 'people'} you're not connected with.</li>` : '')
+    + (!rows.length && !hidden ? '<li class="likers-note">No likes yet.</li>' : '');
 };
 const COMMENT_FAILED = "Your comment didn't post. Please try again.";
 const commentAuthor = (id) => {
@@ -6072,6 +6119,7 @@ const openCommunityPostDetail = async (postId, opener = document.activeElement) 
     if (event.target === dialog || event.target.closest('[data-post-detail-close]')) closeCommunityPostDetail();
     else if (event.target.closest('[data-post-delete]')) void deleteCommunityPost(post.id);
     else if (event.target.closest('[data-post-edit]')) startCaptionEdit(dialog, post);
+    else if (event.target.closest('[data-post-likers]')) void openPostLikers(post.id, event.target.closest('[data-post-likers]'));
   });
   dialog.showModal();
   dialog.querySelector('[data-post-detail-close]')?.focus();
@@ -6198,6 +6246,7 @@ const bindCommunityPostActions = () => {
     if (!card) return;
     const postId = card.dataset.postId;
     if (event.target.closest('[data-post-more]')) { toggleCaptionMore(card); return; }
+    if (event.target.closest('[data-post-likers]')) { void openPostLikers(postId, event.target.closest('[data-post-likers]')); return; }
     const action = event.target.closest('[data-post-action]')?.dataset.postAction;
     if (action === 'like' || action === 'save') toggleCommunityReaction(postId, action);
     // Safari does not focus a clicked button: pass it, so closing the detail returns focus to Comment.

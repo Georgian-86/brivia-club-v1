@@ -27,8 +27,11 @@ export const isSafePostImageSrc = (src) => typeof src === 'string' && (src.start
 // in-place repaint (app.js paintPostActivity), so both produce the same structure.
 export const postFooterMarkup = (activity, summary, escapeHtml) => {
   const comments = activity?.commentCount || 0;
+  // D-242: with likes, the line is a button that opens "Liked by" (who liked it).
   const likes = summary
-    ? `<p class="post-card-likes" data-post-likes>${escapeHtml(summary)}</p>`
+    ? (activity?.likeCount > 0
+      ? `<button type="button" class="post-card-likes is-link" data-post-likes data-post-likers>${escapeHtml(summary)}</button>`
+      : `<p class="post-card-likes" data-post-likes>${escapeHtml(summary)}</p>`)
     : '<p class="post-card-likes is-empty" data-post-likes>Be the first to like this</p>';
   const link = comments ? `<button type="button" class="post-card-comments-link" data-post-action="comment">View ${comments} comment${comments === 1 ? '' : 's'}</button>` : '';
   return `<div class="post-card-footer">${likes}${link}</div>`;

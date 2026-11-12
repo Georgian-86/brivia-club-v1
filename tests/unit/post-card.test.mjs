@@ -98,6 +98,8 @@ test('footer: likes left, comments right; one comment reads singular (D-107)', (
   assert.ok(html.indexOf('Liked by Asha and 2 others') < html.indexOf('View 3 comments'));
   assert.match(html, /<button type="button" class="post-card-comments-link" data-post-action="comment">View 3 comments<\/button>/);
   assert.match(postFooterMarkup({ likeCount: 0, commentCount: 1 }, '', escapeHtml), /View 1 comment<.*|Be the first to like this/s);
+  // D-242: with likes the line opens "Liked by"
+  assert.match(html, /<button type="button" class="post-card-likes is-link" data-post-likes data-post-likers>Liked by Asha and 2 others<\/button>/);
   const one = postFooterMarkup({ likeCount: 0, commentCount: 1 }, '', escapeHtml);
   assert.match(one, /Be the first to like this/);
   assert.match(one, />View 1 comment</);

@@ -4505,3 +4505,19 @@ bring a short line back.
 - **Checks.** SQL `zm-newcomer-cards.test.sql` (who is shown, a request recorded, none to an undeclared member, no
   match, visible only after setup) and the hygiene / world guards; unit `interleaveNewcomers` (607); e2e
   `newcomers.spec.mjs` NC1-NC4 at 1440 and 390; deck (201), swipe-quick, consent (189), deck-ritual pass.
+
+## D-242 (2026-11-12): "Liked by": who liked a note
+
+- **Feedback (a member, Vinit, via the founder, 2026-11-12):** "I'm unable to see who liked my note"; "some minor
+  inconsistencies with font and text alignment"; "some minor UI bugs too".
+- **Decision.** A liked note's "Liked by …" line (on the card and in the open note) is a button that opens "Liked by":
+  each liker's photo and name, "Connection" where it applies, a tap opens their profile (`post_likers`, 0074). The
+  note's author sees everyone who liked it (except members they cannot see: blocked, other world); anyone else sees
+  only their own connections among the likers, the rule the "Liked by" line already followed (0015), plus a line
+  saying how many others liked it.
+- **Fonts.** An audit of every main view (Connect, Explore, Notes, Chat, Profile, Events) at 390 and 1440 found no text
+  outside the two families (Bodoni Moda, Instrument Sans). The alignment remark and "minor UI bugs" name no screen:
+  screenshots from the member are needed to act on them.
+- **Checks.** SQL `zn-post-likers.test.sql` (author sees all, others their connections, a blocked member nothing, anon
+  cannot call) and the hygiene allowlist; unit post-card (607); e2e `post-likers.spec.mjs` LK1-LK3 at 1440 and 390
+  (axe clean); post-activity, explore-cards, post-notifications pass.

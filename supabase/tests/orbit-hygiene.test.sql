@@ -99,7 +99,7 @@ begin
        || 'my_chat_seen,my_companion_matches,my_companion_quota,my_event_prefs,my_hiring_roles,my_interests,my_nearby_alerts,my_nearby_matches,'
        || 'my_nearby_setting,my_notifications,my_notifications_v2,my_notifications_v3,my_notifications_v4,my_onboarding_status,my_outgoing_requests,'
        || 'my_presence_visible,my_read_receipts,my_role_asks,my_role_intent,my_sent_role_asks,my_signal_quota,nearby_clear,nearby_connect,'
-       || 'nearby_discover,nearby_pass,nearby_pulse,newcomer_cards,post_activity,report_fake_job,report_member,'
+       || 'nearby_discover,nearby_pass,nearby_pulse,newcomer_cards,post_activity,post_likers,report_fake_job,report_member,'
        || 'respond_connection_request,save_hiring_role,save_member_event,save_push_subscription,save_role_intent,'
        || 'search_members,send_connect_request,send_signal,set_companion_default,set_company_logo,set_event_brochure,set_event_interest,'
        || 'set_event_rsvp,set_hiring_role_status,set_home_city,set_home_location,set_member_interests,set_my_work,'

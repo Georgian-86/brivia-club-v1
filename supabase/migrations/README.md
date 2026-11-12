@@ -1531,3 +1531,10 @@ installed body, one condition), not re-created from a copy, because the live fun
 3-argument `brivia_request_is_live`, D-129). Verify:
 `select position('brivia_newcomer_visible' in prosrc) > 0 from pg_proc where oid = 'public.send_signal(uuid, text)'::regprocedure;`
 (true) and `select count(*) from public.newcomer_cards();` as a member. Applied live 2026-11-12.
+
+## 0074
+
+**Who liked a note (D-242).** Apply after `0073`, then deploy the client. Adds `post_likers(p_post_id)`: the note's
+author sees every liker they can see; anyone else sees their own connections among the likers (as post_activity's
+"Liked by" line). Verify: `select has_function_privilege('anon', 'public.post_likers(uuid)', 'execute');` (false).
+Applied live 2026-11-12.
