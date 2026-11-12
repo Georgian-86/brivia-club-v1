@@ -4484,3 +4484,24 @@ bring a short line back.
   landing (the muted hero, Vercel-only analytics), launch-polish (search_cities, axe after the dialog's fade), nearby
   (SWIPE & DECK SOUNDS), deck-tutorial (the aria-hidden demo cards). login-smooth passes when built with the stub env
   its header names. Every spec run passes.
+
+## D-241 (2026-11-12): newcomers (started, not finished) are shown in the deck
+
+- **Ask (founder, 2026-11-12):** "do show the profiles of the people who started but didn't finish on swipes in the
+  connect section, don't discard those profiles, we desperately need users".
+- **What the data allowed.** Of 343 real accounts, 289 are completed. Of the other 54, 36 have no profile at all (no
+  name, no photo: nothing to show) and 18 have one, all missing interests and an area. 17 of the 18 have a name, a
+  photo and the 18+ declaration; one has no 18+ declaration and is not shown (an unconfirmed age is never put in front
+  of strangers).
+- **Decision.** Those newcomers appear in other members' decks, one after every four deck cards (all of them when the
+  deck runs dry), labelled "New to Brivia" instead of a distance (`newcomer_cards`, 0073). A request to them is
+  recorded (`send_signal` step 5 now also accepts `brivia_newcomer_visible`); they see it, and can accept, only after
+  finishing setup, so mutual consent holds and the request is a reason to come back. They are never scored or ranked
+  (no interests, no area), and completed members' visibility (`brivia_visible_to`) is unchanged. ORBIT §6.2 step 7.
+- **Live drift respected.** `send_signal` live carries a live-only edit (3-argument `brivia_request_is_live`, D-129), so
+  0073 patches the installed body's one condition instead of re-creating it from the 0008 copy (which would undo it).
+- **Not agent-arena'd:** a direct, time-critical founder request; the safety lines (18+, review flag, world, blocks,
+  mutual consent) are kept and recorded here.
+- **Checks.** SQL `zm-newcomer-cards.test.sql` (who is shown, a request recorded, none to an undeclared member, no
+  match, visible only after setup) and the hygiene / world guards; unit `interleaveNewcomers` (607); e2e
+  `newcomers.spec.mjs` NC1-NC4 at 1440 and 390; deck (201), swipe-quick, consent (189), deck-ritual pass.

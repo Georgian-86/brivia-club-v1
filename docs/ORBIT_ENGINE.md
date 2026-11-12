@@ -311,6 +311,14 @@ you see, never *how good* we claim the fit is.
 4. Apply MMR diversity over interest vectors (λ = 0.8), reused from engine v1 `diversify()`, so a deck isn't twelve badminton players.
 5. Add one exploration card from the eligible set outside the top ranks (ε = 0.15), as in engine v1 `withExploration()`.
 6. Log every served card with its full feature vector to the interaction log (`log_impressions`, §9.1.6).
+7. **Newcomers (D-241, migration 0073, interim).** Members who started but have not finished setup are not completed,
+   so the deck never scores them (no interests, no area). While the club is small they are still shown: `newcomer_cards`
+   returns members with a real name, a photo and the 18+ declaration (never without it), not under review, same world,
+   no block, newest first, minus the deck's own-history exclusions; the client puts one after every four deck cards
+   (more at the end when the deck runs dry), labelled "New to Brivia" instead of a distance. They carry no score and
+   take no part in steps 1–5. A request to them is recorded by `send_signal` (`brivia_newcomer_visible`); they see it,
+   and can accept, only once setup is finished, so a connection still needs both to agree. Completed members are
+   unaffected (`brivia_visible_to` is unchanged).
 
 ### 6.3 Explanations (evidence only)
 

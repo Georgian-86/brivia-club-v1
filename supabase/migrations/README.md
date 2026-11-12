@@ -1521,3 +1521,13 @@ chosen city, or anywhere; city-to-city distance only; the deck's exclusions; ans
 hits and shared labels, never km. The deck (`deck_candidates`) is unchanged. Verify:
 `select has_function_privilege('anon', 'public.discover_people(text[], text[], int, text, uuid[], int)', 'execute');`
 (false). Applied live 2026-11-11.
+
+## 0073
+
+**Newcomers in the deck (D-241).** Apply after `0072`, then deploy the client. Adds
+`brivia_private.brivia_newcomer_visible` and `newcomer_cards` (members with a name, a photo and the 18+ declaration
+whose setup is not finished), and lets `send_signal` record a request to them. `send_signal` is patched in place (the
+installed body, one condition), not re-created from a copy, because the live function carries a live-only edit (the
+3-argument `brivia_request_is_live`, D-129). Verify:
+`select position('brivia_newcomer_visible' in prosrc) > 0 from pg_proc where oid = 'public.send_signal(uuid, text)'::regprocedure;`
+(true) and `select count(*) from public.newcomer_cards();` as a member. Applied live 2026-11-12.
