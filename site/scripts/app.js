@@ -21,7 +21,7 @@ import '../styles/mobile-app.css';
 import '../styles/skeleton.css';
 import '../styles/aura-theme.css';
 import '../styles/handoff.css';
-import { supabase, compressImageOnly, rowToProfile, saveProfile, isPresetCoverUrl, onboardingStatus, sendSignal, fetchSignalQuota, isRateLimited, isStorageImageUrl, withoutCredentials, uploadMessageAttachment, removeMessageAttachment, uploadCommunityPostImage, removeCommunityPostImage, ImageProcessingError, PHOTO_ERROR_MESSAGE, PHOTO_FRAMER_ERROR, compressAttachmentFiles, attachmentKind, reportMember, setSensitiveConsent, fetchSensitiveConsentAt, fetchMyInterests, fetchInterestNodes, addMemberInterest, isMissingFunction, touchPresence, connectionPresence, setPresenceVisible, myPresenceVisible, setMemberInterests, uploadResume, removeResume, resumeSignedUrl, resumeInfo, clearResumePath, searchPlaces, setHomeCity, setHomeLocation, listEvents, setEventRsvp, setCompanionDefault, myEventPrefs, eventCompanions, saveMemberEvent, cancelMemberEvent, deleteMemberEvent, uploadEventImage, removeEventImages, setEventInterest, setEventBrochure, uploadEventBrochure, removeEventBrochures, companionEvents, companionDeck, companionSwipe, companionQuota, createPaymentOrder, verifyPayment, sendEventTicket, editMessage, unsendMessage, deleteMessageForMe, myCompanionMatches, markCompanionMatchSeen, sendConnectRequest, setNearbyEnabled, myNearbySetting, nearbyPulse, nearbyClear, myNearbyAlerts, setNearbyMuted, nearbyDiscover, nearbyPass, nearbyConnect, myNearbyMatches, myNotifications, markNotificationsRead, dismissNotification, setNearbyRadius, savePushSubscription, deletePushSubscription, sendPendingPush, searchCompanies, searchCompanyDirectory, companyLogoUrl, addCompany, setMyWork, memberWork, uploadCompanyLogo, markMessagesDelivered, markConversationRead, markChatSeen, myChatSeen, setReadReceipts, myReadReceipts, chatPeopleSearch } from './supabase.js';
+import { supabase, compressImageOnly, rowToProfile, saveProfile, isPresetCoverUrl, onboardingStatus, sendSignal, fetchSignalQuota, isRateLimited, isStorageImageUrl, withoutCredentials, uploadMessageAttachment, removeMessageAttachment, uploadCommunityPostImage, removeCommunityPostImage, ImageProcessingError, PHOTO_ERROR_MESSAGE, PHOTO_FRAMER_ERROR, compressAttachmentFiles, attachmentKind, reportMember, setSensitiveConsent, fetchSensitiveConsentAt, fetchMyInterests, fetchInterestNodes, addMemberInterest, isMissingFunction, touchPresence, connectionPresence, setPresenceVisible, myPresenceVisible, setMemberInterests, uploadResume, removeResume, resumeSignedUrl, resumeInfo, clearResumePath, searchPlaces, setHomeCity, setHomeLocation, listEvents, setEventRsvp, setCompanionDefault, myEventPrefs, eventCompanions, saveMemberEvent, cancelMemberEvent, deleteMemberEvent, uploadEventImage, removeEventImages, setEventInterest, setEventBrochure, uploadEventBrochure, removeEventBrochures, companionEvents, companionDeck, companionSwipe, companionQuota, createPaymentOrder, verifyPayment, sendEventTicket, editMessage, unsendMessage, deleteMessageForMe, reactToMessage, messageReactionsFor, myCompanionMatches, markCompanionMatchSeen, sendConnectRequest, setNearbyEnabled, myNearbySetting, nearbyPulse, nearbyClear, myNearbyAlerts, setNearbyMuted, nearbyDiscover, nearbyPass, nearbyConnect, myNearbyMatches, myNotifications, markNotificationsRead, dismissNotification, setNearbyRadius, savePushSubscription, deletePushSubscription, sendPendingPush, searchCompanies, searchCompanyDirectory, companyLogoUrl, addCompany, setMyWork, memberWork, uploadCompanyLogo, markMessagesDelivered, markConversationRead, markChatSeen, myChatSeen, setReadReceipts, myReadReceipts, chatPeopleSearch } from './supabase.js';
 import { locateOnce, fallbackCopy } from './geo-locate.js';
 import { areaChangeMessage, AREA_HELPER, AREA_NO_MATCH } from './area-change.js';
 import { areaShareBody, parseAreaBody, areaMapUrl, placeShareBody, parsePlaceBody, placeShareProblem, resumeShareAttachment, resumeMessageFields, RESUME_SHARE_BODY, NO_RESUME_HINT, RESUME_GONE_COPY, RESUME_SHARE_NOTE, AREA_SHARE_NOTE } from './quick-share.js';
@@ -76,9 +76,12 @@ import shuffleWordmark from '../media/assets/brivia-wordmark-gold.webp';
 try { const img = new Image(); img.decoding = 'async'; img.src = shuffleWordmark; } catch { /* no Image: no preload */ }
 import { mutualMoment, pitchSentFlight, flipIn, attachCardTilt, shimmerShared, slideModePill, markArrivals, revealOnScroll } from './motion-moments.js';
 import { whyPanelMarkup, whyRow } from './why-panel.js';
-import { chatEmojiCategories } from './chat-emoji-data.js';
+import { chatEmojiCategories, EMOJI_TABS } from './chat-emoji-data.js';
+import { searchEmoji } from './emoji-search.js';
 import { attachEmojiPicker, insertAt } from './emoji-field.js';
 import { getTone, withTone, onToneChange } from './emoji-tone.js';
+import { QUICK_REACTIONS, canReact, reactionsByMessage, groupReactions, withMyReaction, chipLabel, sameReactions } from './message-reactions.js';
+import { openReactionPicker, closeReactionPicker } from './reaction-picker.js';
 import { RADIUS, normalizeLocation, isDefaultLocation, locationParams, radiusLabel, locationSummary, fallbackSummary } from './discovery-location.js';
 import { chatGifCatalog } from './chat-gif-data.js';
 import { typingTopic, createTypingSender, createTypingReceiver, TYPING_EVENT } from './chat-typing.js';
@@ -193,7 +196,11 @@ let editingMessage = null;
 // does the cap animate). The opening deal is deck-intro.js (D-164).
 let deckRitual = null;
 let sawSwipesLeft = false;
-let messageMenu = null; // createMessageMenu, set once the chat composer exists
+let messageMenu = null;
+const messageReactions = new Map();   // D-244: messageId -> [{ memberId, emoji, at }]
+let reactionsAvailable = true;
+const reactionsReadAt = new Map();
+const reactionTouched = new Map();   // messageId -> when I last changed my reaction (a read begun before it is stale) // createMessageMenu, set once the chat composer exists
 // Crossing paths (D-119, 0021): the loop (crossing-paths.js), its alerts (from my_nearby_alerts) and its status.
 let crossingPaths = null;
 let nearbyAlerts = [];
@@ -3506,6 +3513,7 @@ const loadChatMessages = async (person) => {
     chatMessages[person.id] = mergedMessages;
     if (selectedChat?.id === person.id) markChatRead(person.id);
     if (messagesChanged) { renderMessages(); renderChats(); }
+    void loadMessageReactions(person.id, { force: messagesChanged });
   } else console.warn('Messages could not load:', error.message);
 };
 
@@ -3894,7 +3902,8 @@ const renderMessages = () => {
     const editing = editingMessage && String(editingMessage.id) === String(message.id) ? ' is-editing' : '';
     const replying = replyingTo && String(replyingTo.id) === String(message.id) ? ' is-replying-to' : '';
     const quote = message.replyTo && !message.unsentAt ? replyQuoteMarkup(replyQuote(thread, message.replyTo, { themName: selectedChat?.name, kindLabel: messageKindLabel })) : '';
-    return `<div class="message ${mineClass}${kind}${editing}${replying}${quote ? ' has-reply' : ''}" data-message-id="${idAttr}" tabindex="0" aria-haspopup="menu">${quote}${content}<small${receipt ? ' class="message-meta"' : ''}>${edited}${escapeHtml(formatChatTime(message.createdAt))}${word}${receiptMarkup(receipt)}</small></div>`;
+    const chips = reactionChipsMarkup(message);
+    return `<div class="message ${mineClass}${kind}${editing}${replying}${quote ? ' has-reply' : ''}${chips ? ' has-reactions' : ''}" data-message-id="${idAttr}" tabindex="0" aria-haspopup="menu">${quote}${content}<small${receipt ? ' class="message-meta"' : ''}>${edited}${escapeHtml(formatChatTime(message.createdAt))}${word}${receiptMarkup(receipt)}</small>${chips}</div>`;
   };
   const newestOwnId = lastOwnMessageId(thread);
   messages.innerHTML = thread.length ? thread.map(renderBubble).join('') : '<div class="chat-start-note"><strong>Start with context.</strong><span>A thoughtful first message makes a better introduction.</span></div>';
@@ -3931,7 +3940,7 @@ const renderMessages = () => {
 
 const CHAT_CLOSE_ICON = '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true" focusable="false"><path d="M6 6l12 12M18 6 6 18"/></svg>';
 // Something layered over the open thread (a menu, a picker, a dialog) takes Escape first.
-const CHAT_LAYERS = '#chat-more-menu:not([hidden]), #chat-emoji-picker:not([hidden]), #chat-attachment-menu:not([hidden]), #chat-gif-picker:not([hidden]), #chat-share-menu:not([hidden]), #chat-camera-modal:not([hidden]), #public-profile-modal, #profile-edit-modal, #app-notification-panel:not([hidden]), [popover]:popover-open, dialog[open], .app-overlay:not([hidden]), .message-menu, #chat-edit-bar:not([hidden]), #chat-reply-bar:not([hidden])'; // D-157, D-191: the message menu and the editing bar take Escape first
+const CHAT_LAYERS = '#chat-more-menu:not([hidden]), #chat-emoji-picker:not([hidden]), #chat-attachment-menu:not([hidden]), #chat-gif-picker:not([hidden]), #chat-share-menu:not([hidden]), #chat-camera-modal:not([hidden]), #public-profile-modal, #profile-edit-modal, #app-notification-panel:not([hidden]), [popover]:popover-open, dialog[open], .app-overlay:not([hidden]), .message-menu, #chat-edit-bar:not([hidden]), #chat-reply-bar:not([hidden]), .reaction-picker'; // D-157, D-191: the message menu and the editing bar take Escape first
 const closeChatToInbox = () => {
   if (!selectedChat) return;
   const id = selectedChat.id;
@@ -3952,6 +3961,7 @@ const closeSelectedChat = () => {
   cancelMessageEdit({ keepInput: false });
   cancelMessageReply({ render: false });
   messageMenu?.close();
+  closeReactionPicker();
   leaveTyping();
   selectedChat = null;
   document.querySelector('#chat-window')?.setAttribute('hidden', '');
@@ -6230,7 +6240,8 @@ const toggleCaptionMore = (card) => {
   const open = !card.classList.contains('is-caption-open');
   card.classList.toggle('is-caption-open', open);
   more.setAttribute('aria-expanded', String(open));
-  more.querySelector('.post-card-more-text').textContent = open ? 'Show less' : 'Read more';
+  more.querySelector('.post-card-more-text').textContent = open ? 'less' : '… more';
+  more.setAttribute('aria-label', open ? 'Show less of the caption' : 'Read more of the caption');
   if (!open) markCaptionMore();
 };
 // D-233: a member deletes their own post (RLS allows only the author; likes, comments, shares and its notifications
@@ -7128,7 +7139,9 @@ const ensureChatComposer = () => {
   const attachmentMenuMarkup = document.querySelector('#chat-attachment-menu');
   if (attachmentMenuMarkup) attachmentMenuMarkup.innerHTML = '<button type="button" data-chat-picker="document"><span class="chat-attachment-option-icon chat-attachment-option-document">▤</span><span>Document</span></button><button type="button" data-chat-picker="photo"><span class="chat-attachment-option-icon chat-attachment-option-photo">▣</span><span>Photos &amp; videos</span></button><button type="button" data-chat-picker="gif"><span class="chat-attachment-option-icon chat-attachment-option-gif">GIF</span><span>GIF</span></button><button type="button" data-chat-picker="camera"><span class="chat-attachment-option-icon chat-attachment-option-camera">●</span><span>Camera</span></button>';
   const emojiPickerMarkup = document.querySelector('#chat-emoji-picker');
-  if (emojiPickerMarkup) emojiPickerMarkup.innerHTML = '<div class="chat-emoji-tabs"><button type="button" class="is-active" data-emoji-category="smileys">☺</button><button type="button" data-emoji-category="people">♙</button><button type="button" data-emoji-category="animals">♣</button><button type="button" data-emoji-category="food">◆</button><button type="button" data-emoji-category="activities">★</button><button type="button" data-emoji-category="symbols">♥</button></div><div class="chat-emoji-grid" id="chat-emoji-grid"></div>';
+  // D-244: every emoji (nine groups, a search by name), hands and people in the member's skin tone (D-236).
+  const TAB_ICON = { smileys: '😀', people: '👋', animals: '🐶', food: '🍕', travel: '✈️', activities: '⚽', objects: '💡', symbols: '❤️', flags: '🏳️' };
+  if (emojiPickerMarkup) emojiPickerMarkup.innerHTML = `<label class="chat-emoji-search"><span class="sr-only">Search emoji</span><input type="search" id="chat-emoji-search" placeholder="Search emoji (chess, cry…)" autocomplete="off" spellcheck="false" /></label><div class="chat-emoji-tabs" role="tablist" aria-label="Emoji categories">${EMOJI_TABS.map(([key, label], i) => `<button type="button" role="tab" class="${i === 0 ? 'is-active' : ''}" data-emoji-category="${key}" aria-label="${label}" title="${label}">${withTone(TAB_ICON[key] || '🙂', getTone())}</button>`).join('')}</div><div class="chat-emoji-grid" id="chat-emoji-grid"></div>`;
   form.querySelector('button[type="submit"]')?.classList.add('chat-send-button');
   const input = document.querySelector('#chat-input');
   const emojiToggle = document.querySelector('#chat-emoji-toggle');
@@ -7137,22 +7150,38 @@ const ensureChatComposer = () => {
   const attachmentMenu = document.querySelector('#chat-attachment-menu');
   const gifPicker = document.querySelector('#chat-gif-picker');
   if (gifPicker) gifPicker.innerHTML = `<div class="chat-gif-picker-head"><strong>GIFs</strong><span>Choose a reaction</span></div><div class="chat-gif-grid">${chatGifCatalog.map((gif, index) => `<button type="button" data-chat-gif="${index}" aria-label="${escapeHtml(gif.label)} GIF"><img src="${escapeHtml(gif.url)}" alt="" loading="lazy" referrerpolicy="no-referrer" /><span>${escapeHtml(gif.label)}</span></button>`).join('')}</div>`;
-  const renderEmojiCategory = (category = 'smileys') => {
+  let chatEmojiTab = 'smileys';
+  const renderEmojiCategory = (category = chatEmojiTab) => {
     const grid = emojiPicker?.querySelector('#chat-emoji-grid');
     if (!grid) return;
-    const emojis = chatEmojiCategories[category] || chatEmojiCategories.smileys;
-    grid.innerHTML = emojis.map((emoji) => `<button type="button" data-chat-emoji="${emoji}" aria-label="Emoji">${emoji}</button>`).join('');
-    emojiPicker.querySelectorAll('[data-emoji-category]').forEach((button) => button.classList.toggle('is-active', button.dataset.emojiCategory === category));
-    grid.querySelectorAll('[data-chat-emoji]').forEach((button) => button.addEventListener('click', () => {
-      if (!input) return;
-      const start = input.selectionStart ?? input.value.length;
-      const end = input.selectionEnd ?? start;
-      input.value = `${input.value.slice(0, start)}${button.dataset.chatEmoji}${input.value.slice(end)}`;
-      input.focus();
-      input.setSelectionRange(start + button.dataset.chatEmoji.length, start + button.dataset.chatEmoji.length);
-    }));
+    const query = emojiPicker.querySelector('#chat-emoji-search')?.value.trim() || '';
+    if (!query) chatEmojiTab = category;
+    const tone = getTone();
+    const emojis = [...new Set((query ? searchEmoji(query) : (chatEmojiCategories[category] || chatEmojiCategories.smileys)).map((e) => withTone(e, tone)))];
+    grid.innerHTML = emojis.length
+      ? emojis.map((emoji) => `<button type="button" data-chat-emoji="${emoji}" aria-label="${escapeHtml(emoji)}">${emoji}</button>`).join('')
+      : '<p class="chat-emoji-none">No emoji found.</p>';
+    emojiPicker.querySelectorAll('[data-emoji-category]').forEach((button) => { const on = !query && button.dataset.emojiCategory === category; button.classList.toggle('is-active', on); button.setAttribute('aria-selected', String(on)); });
   };
-  emojiPicker?.querySelectorAll('[data-emoji-category]').forEach((button) => button.addEventListener('click', () => renderEmojiCategory(button.dataset.emojiCategory)));
+  // One delegated listener: a press puts the emoji at the cursor and keeps the field's focus.
+  emojiPicker?.querySelector('#chat-emoji-grid')?.addEventListener('mousedown', (event) => { if (event.target.closest('[data-chat-emoji]')) event.preventDefault(); });
+  emojiPicker?.querySelector('#chat-emoji-grid')?.addEventListener('click', (event) => {
+    const button = event.target.closest('[data-chat-emoji]');
+    if (!button || !input) return;
+    const start = input.selectionStart ?? input.value.length;
+    const end = input.selectionEnd ?? start;
+    input.value = `${input.value.slice(0, start)}${button.dataset.chatEmoji}${input.value.slice(end)}`;
+    input.focus();
+    input.setSelectionRange(start + button.dataset.chatEmoji.length, start + button.dataset.chatEmoji.length);
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+  });
+  emojiPicker?.querySelectorAll('[data-emoji-category]').forEach((button) => button.addEventListener('click', () => {
+    const search = emojiPicker.querySelector('#chat-emoji-search');
+    if (search) search.value = '';
+    renderEmojiCategory(button.dataset.emojiCategory);
+  }));
+  emojiPicker?.querySelector('#chat-emoji-search')?.addEventListener('input', () => renderEmojiCategory());
+  onToneChange(() => renderEmojiCategory());
   renderEmojiCategory();
   gifPicker?.querySelectorAll('[data-chat-gif]').forEach((button) => button.addEventListener('click', () => {
     queueChatGif(chatGifCatalog[Number(button.dataset.chatGif)]);
@@ -7396,14 +7425,76 @@ const deleteThreadMessageForMe = async (message) => {
   if (String(selectedChat?.id) === String(personId)) renderMessages();
   showToast('Deleted for you.');
 };
+// D-244 (0075): reactions. messageReactions: messageId -> [{ memberId, emoji, at }], read with the thread (at most every
+// 8 s, or at once when the thread changed) and painted as chips under the bubble. A press on a chip toggles that emoji.
+async function loadMessageReactions(personId, { force = false } = {}) {
+  if (!reactionsAvailable || !supabase || !memberProfile.id) return;
+  const key = String(personId);
+  const last = reactionsReadAt.get(key) || 0;
+  if (!force && Date.now() - last < 8000) return;
+  const started = Date.now();
+  reactionsReadAt.set(key, started);
+  const ids = (chatMessages[personId] || []).filter(canReact).slice(-200).map((m) => String(m.id));
+  if (!ids.length) return;
+  const { data, error } = await messageReactionsFor(ids);
+  if (error) { if (isMissingFunction(error)) reactionsAvailable = false; return; }
+  const next = reactionsByMessage(data);
+  let changed = false;
+  ids.forEach((id) => {
+    const fresh = next.get(id) || [];
+    if ((reactionTouched.get(id) || 0) >= started) return;   // my change came after this read began: keep it
+    if (!sameReactions(messageReactions.get(id) || [], fresh)) { changed = true; if (fresh.length) messageReactions.set(id, fresh); else messageReactions.delete(id); }
+  });
+  if (changed && String(selectedChat?.id) === key) renderMessages();
+}
+function reactionChipsMarkup(message) {
+  if (message.unsentAt) return '';
+  const groups = groupReactions(messageReactions.get(String(message.id)), memberProfile.id);
+  if (!groups.length) return '';
+  return `<span class="message-reactions">${groups.map((g) => `<button type="button" class="message-reaction${g.mine ? ' is-mine' : ''}" data-reaction="${escapeHtml(g.emoji)}" aria-pressed="${g.mine}" aria-label="${escapeHtml(chipLabel(g))}"><span aria-hidden="true">${escapeHtml(g.emoji)}</span>${g.count > 1 ? `<span class="message-reaction-count" aria-hidden="true">${g.count}</span>` : ''}</button>`).join('')}</span>`;
+}
+async function reactToThreadMessage(message, emoji) {
+  if (!message || !emoji || !canReact(message) || !memberProfile.id) return;
+  const id = String(message.id);
+  const before = messageReactions.get(id) || [];
+  const mine = before.find((r) => String(r.memberId) === String(memberProfile.id));
+  const next = withMyReaction(before, memberProfile.id, mine?.emoji === emoji ? null : emoji);
+  if (next.length) messageReactions.set(id, next); else messageReactions.delete(id);
+  reactionTouched.set(id, Date.now());
+  renderMessages();
+  navigator.vibrate?.(8);
+  const { data, error } = await reactToMessage(id, emoji);
+  reactionTouched.set(id, Date.now());
+  if (error) {
+    if (before.length) messageReactions.set(id, before); else messageReactions.delete(id);
+    renderMessages();
+    showToast(isMissingFunction(error) ? 'Reactions open soon.' : /not found/.test(String(error.message || '')) ? 'This message is no longer available.' : 'That reaction could not be saved. Try again.');
+    if (isMissingFunction(error)) reactionsAvailable = false;
+    return;
+  }
+  const saved = reactionsByMessage(data).get(id) || [];
+  if (saved.length) messageReactions.set(id, saved); else messageReactions.delete(id);
+  renderMessages();
+}
+document.querySelector('#chat-messages')?.addEventListener('click', (event) => {
+  const chip = event.target.closest?.('[data-reaction]');
+  if (!chip) return;
+  event.preventDefault();
+  event.stopPropagation();
+  const message = findThreadMessage(chip.closest('[data-message-id]')?.dataset.messageId);
+  if (message) void reactToThreadMessage(message, chip.dataset.reaction);
+});
 messageMenu = createMessageMenu({
   container: document.querySelector('#chat-messages'),
   getMessage: (id) => {
     const message = findThreadMessage(id);
     return message ? { message, special: isSpecialMessage(message) } : null;
   },
-  onAction: async (action, message) => {
-    if (action === 'copy') {
+  reactions: { quick: () => QUICK_REACTIONS.map((e) => withTone(e, getTone())), canReact: (message) => reactionsAvailable && canReact(message) },
+  onAction: async (action, message, extra) => {
+    if (action === 'react') await reactToThreadMessage(message, extra);
+    else if (action === 'react-more') openReactionPicker({ anchor: extra, onPick: (emoji) => { void reactToThreadMessage(message, emoji); } });
+    else if (action === 'copy') {
       try { await navigator.clipboard.writeText(message.text); showToast('Copied.'); } catch { showToast('Copy is not available here.'); }
     } else if (action === 'reply') startMessageReply(message);
     else if (action === 'edit') startMessageEdit(message);
