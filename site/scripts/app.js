@@ -21,7 +21,7 @@ import '../styles/mobile-app.css';
 import '../styles/skeleton.css';
 import '../styles/aura-theme.css';
 import '../styles/handoff.css';
-import { supabase, compressImageOnly, rowToProfile, saveProfile, isPresetCoverUrl, onboardingStatus, sendSignal, fetchSignalQuota, isRateLimited, isStorageImageUrl, withoutCredentials, uploadMessageAttachment, removeMessageAttachment, uploadCommunityPostImage, removeCommunityPostImage, ImageProcessingError, PHOTO_ERROR_MESSAGE, PHOTO_FRAMER_ERROR, compressAttachmentFiles, attachmentKind, reportMember, setSensitiveConsent, fetchSensitiveConsentAt, fetchMyInterests, fetchInterestNodes, addMemberInterest, isMissingFunction, touchPresence, connectionPresence, setPresenceVisible, myPresenceVisible, setMemberInterests, uploadResume, removeResume, resumeSignedUrl, resumeInfo, clearResumePath, searchPlaces, setHomeCity, setHomeLocation, listEvents, setEventRsvp, setCompanionDefault, myEventPrefs, eventCompanions, saveMemberEvent, cancelMemberEvent, deleteMemberEvent, uploadEventImage, removeEventImages, setEventInterest, setEventBrochure, uploadEventBrochure, removeEventBrochures, companionEvents, companionDeck, companionSwipe, companionQuota, createPaymentOrder, verifyPayment, sendEventTicket, editMessage, unsendMessage, deleteMessageForMe, reactToMessage, messageReactionsFor, myCompanionMatches, markCompanionMatchSeen, sendConnectRequest, setNearbyEnabled, myNearbySetting, nearbyPulse, nearbyClear, myNearbyAlerts, setNearbyMuted, nearbyDiscover, nearbyPass, nearbyConnect, myNearbyMatches, myNotifications, markNotificationsRead, dismissNotification, setNearbyRadius, savePushSubscription, deletePushSubscription, sendPendingPush, searchCompanies, searchCompanyDirectory, companyLogoUrl, addCompany, setMyWork, memberWork, uploadCompanyLogo, markMessagesDelivered, markConversationRead, markChatSeen, myChatSeen, setReadReceipts, myReadReceipts, chatPeopleSearch } from './supabase.js';
+import { supabase, compressImageOnly, rowToProfile, saveProfile, isPresetCoverUrl, onboardingStatus, sendSignal, fetchSignalQuota, isRateLimited, isStorageImageUrl, withoutCredentials, uploadMessageAttachment, removeMessageAttachment, uploadCommunityPostImage, removeCommunityPostImage, ImageProcessingError, PHOTO_ERROR_MESSAGE, PHOTO_FRAMER_ERROR, compressAttachmentFiles, attachmentKind, reportMember, setSensitiveConsent, fetchSensitiveConsentAt, fetchMyInterests, fetchInterestNodes, addMemberInterest, isMissingFunction, touchPresence, connectionPresence, setPresenceVisible, myPresenceVisible, setMemberInterests, uploadResume, removeResume, resumeSignedUrl, resumeInfo, clearResumePath, searchPlaces, setHomeCity, setHomeLocation, listEvents, setEventRsvp, setCompanionDefault, myEventPrefs, eventCompanions, saveMemberEvent, cancelMemberEvent, deleteMemberEvent, uploadEventImage, removeEventImages, setEventInterest, setEventBrochure, uploadEventBrochure, removeEventBrochures, companionEvents, companionDeck, companionSwipe, companionQuota, createPaymentOrder, verifyPayment, sendEventTicket, editMessage, unsendMessage, deleteMessageForMe, reactToMessage, messageReactionsFor, myCompanionMatches, markCompanionMatchSeen, sendConnectRequest, setNearbyEnabled, myNearbySetting, nearbyPulse, nearbyClear, myNearbyAlerts, setNearbyMuted, nearbyDiscover, nearbyPass, nearbyConnect, myNearbyMatches, myNotifications, markNotificationsRead, dismissNotification, setNearbyRadius, savePushSubscription, deletePushSubscription, sendPendingPush, sendMessagePush, searchCompanies, searchCompanyDirectory, companyLogoUrl, addCompany, setMyWork, memberWork, uploadCompanyLogo, markMessagesDelivered, markConversationRead, markChatSeen, myChatSeen, setReadReceipts, myReadReceipts, chatPeopleSearch } from './supabase.js';
 import { locateOnce, fallbackCopy } from './geo-locate.js';
 import { areaChangeMessage, AREA_HELPER, AREA_NO_MATCH } from './area-change.js';
 import { areaShareBody, parseAreaBody, areaMapUrl, placeShareBody, parsePlaceBody, placeShareProblem, resumeShareAttachment, resumeMessageFields, RESUME_SHARE_BODY, NO_RESUME_HINT, RESUME_GONE_COPY, RESUME_SHARE_NOTE, AREA_SHARE_NOTE } from './quick-share.js';
@@ -50,7 +50,7 @@ import { COPY as NEARBY_COPY, crossingCopy } from './nearby-view.js';
 import { createMemberNotifications, groupPostNotifications, postNotificationCopy, POST_TYPES, groupEventNotifications, eventNotificationCopy, EVENT_TYPES } from './member-notifications.js';
 import { workMarkup, workLine, normalizeWork, mergeCompanies, cleanTitle, cleanCompanyName, INDUSTRIES, logoFileToWebp, ORG_ICON, monogramMarkup } from './work-identity.js';
 import { createSoundKit, soundEnabled, setSoundEnabled, soundVolume, setSoundVolume, interactionSoundEnabled, setInteractionSoundEnabled, pushSoundEnabled, setPushSoundEnabled } from './notify-sound.js';
-import { createWebPush, pushSupport, PUSH_COPY } from './web-push.js';
+import { createWebPush, pushSupport, PUSH_COPY, iosBrowser, installSteps } from './web-push.js';
 import '../styles/nearby.css';
 import { createEventsPage } from './events-page.js';
 import { createCompanionsPage } from './companions-page.js';
@@ -1487,7 +1487,16 @@ const startMemberNotes = () => {
   navigator.serviceWorker?.addEventListener?.('message', (event) => {
     const msg = event.data || {};
     if (msg.type === 'brivia-push') memberNotes.load();
-    if (msg.type === 'brivia-open') { if (msg.id) memberNotes.markRead([msg.id]); openConnectMode('nearby'); }
+    if (msg.type === 'brivia-open') {
+      if (msg.id) memberNotes.markRead([msg.id]);
+      // D-245: go where the notification points (a chat, a note, an event), not always to Nearby.
+      let target = null;
+      try { target = new URL(msg.url, window.location.origin); } catch { target = null; }
+      const view = target?.searchParams.get('view');
+      if (!target || !view || view === 'nearby') { openConnectMode('nearby'); return; }
+      if (view === 'chat' && target.searchParams.get('chat')) { openChatById(target.searchParams.get('chat')); return; }
+      window.location.assign(`${target.pathname}${target.search}`);
+    }
   });
   if (pushSupport() === 'ready' && window.Notification?.permission === 'granted') webPush.register().catch(() => {});
 };
@@ -3690,6 +3699,26 @@ function paintChatStatus() {
   chatStatus.classList.toggle('is-active-now', !typingBubbleShown && activity === 'Active now');
   chatStatus.classList.toggle('has-last-active', Boolean(activity));
 }
+// D-245: open a chat by the other member's id (a message notification); the card loads by id when it is not held yet.
+const openChatById = async (personId) => {
+  if (!personId) return;
+  let person = findPersonById(personId);
+  if (!person) {
+    const { data } = await fetchCandidates([personId]).catch(() => ({ data: null }));
+    if (data) mergePeople(data);
+    person = findPersonById(personId);
+  }
+  if (!person) return;
+  setView('chat');
+  openChat(person);
+};
+let chatUrlRead = false;
+function openChatFromUrl() {
+  if (chatUrlRead) return;
+  chatUrlRead = true;
+  const params = new URLSearchParams(window.location.search);
+  if (params.get('view') === 'chat' && params.get('chat')) void openChatById(params.get('chat'));
+}
 const openChat = (person, markAsRead = true) => {
   if (!person) return;
   markNotificationsReadForPerson(person.id);
@@ -5003,7 +5032,7 @@ const openNotificationSettings = () => {
     <label class="settings-toggle-row"><span><strong>MESSAGE NOTIFICATIONS</strong><small>Get an alert when someone sends you a message.</small></span><input id="profile-notifications-toggle" type="checkbox" /><i aria-hidden="true"></i></label>
     <label class="settings-toggle-row" data-presence-setting hidden><span><strong>SHOW WHEN I'M ACTIVE</strong><small>Your connections see a dot when you're here. Turn it off and you won't see theirs either.</small></span><input id="profile-presence-toggle" type="checkbox" /><i aria-hidden="true"></i></label>
     <label class="settings-toggle-row" data-receipts-setting hidden><span><strong>READ RECEIPTS</strong><small>Others see when you've read their messages. Turn it off and you won't see when they've read yours either.</small></span><input id="profile-receipts-toggle" type="checkbox" /><i aria-hidden="true"></i></label>
-    <label class="settings-toggle-row" data-push-setting><span><strong>WEB NOTIFICATIONS</strong><small>Get a notification on this device when someone crosses your path, or likes or comments on your note, even when Brivia is closed. Separate from location.</small><small class="settings-nearby-status" data-push-status role="status"></small></span><input id="profile-push-toggle" type="checkbox" /><i aria-hidden="true"></i></label>
+    <label class="settings-toggle-row" data-push-setting><span><strong>WEB NOTIFICATIONS</strong><small>Get a notification on this device when someone messages you, crosses your path, or likes or comments on your note, even when Brivia is closed. Separate from location.</small><small class="settings-nearby-status" data-push-status role="status"></small></span><input id="profile-push-toggle" type="checkbox" /><i aria-hidden="true"></i></label>
     <label class="settings-toggle-row"><span><strong>NOTIFICATION SOUND</strong><small>A soft sax chime when a notification arrives while Brivia is open. On this device.</small></span><input id="profile-sound-toggle" type="checkbox" /><i aria-hidden="true"></i></label>
     <label class="settings-toggle-row"><span><strong>SWIPE &amp; DECK SOUNDS</strong><small>A short note when you pass or pitch, and when your deck is dealt. On this device.</small></span><input id="profile-swipe-sound-toggle" type="checkbox" /><i aria-hidden="true"></i></label>
     <label class="settings-toggle-row" data-push-sound-setting><span><strong>PUSH NOTIFICATION SOUND</strong><small>Your device's own sound for Brivia notifications when Brivia is closed. Off: they arrive silently. On iPhone, set this in Settings, Notifications.</small></span><input id="profile-push-sound-toggle" type="checkbox" /><i aria-hidden="true"></i></label>
@@ -5095,9 +5124,33 @@ const openNotificationSettings = () => {
   volumeInput.addEventListener('input', () => { setSoundVolume(volumeInput.value); showVolume(); });
   volumeInput.addEventListener('change', () => { chime.unlock(); if (!chime.preview()) chime.swipe('pitch'); });
   const support = pushSupport();
-  if (support !== 'ready') { pushToggle.disabled = support !== 'denied'; pushStatus.textContent = PUSH_COPY[support] || ''; }
+  if (support !== 'ready') { pushToggle.disabled = support === 'unsupported'; pushStatus.textContent = PUSH_COPY[support] || ''; }
   webPush.isOn().then((on) => { if (modal.isConnected) pushToggle.checked = on; }).catch(() => {});
+  // D-245: on an iPhone browser tab the switch used to be greyed out and did nothing. A tap now opens the steps for this
+  // browser (Safari, Chrome, or inside another app), right under the row.
+  const showInstallSteps = () => {
+    const row = modal.querySelector('[data-push-setting]');
+    let guide = modal.querySelector('[data-push-install]');
+    if (!guide) {
+      const browser = iosBrowser();
+      guide = document.createElement('div');
+      guide.className = 'push-install';
+      guide.dataset.pushInstall = '';
+      guide.setAttribute('role', 'region');
+      guide.setAttribute('aria-label', 'Turn on notifications on iPhone');
+      guide.innerHTML = `<p class="push-install-title">Get Brivia notifications on your iPhone</p><ol>${installSteps(browser).map((step) => `<li>${escapeHtml(step)}</li>`).join('')}</ol>`
+        + (browser === 'safari' || browser === 'chrome' ? '' : '<button type="button" class="push-install-copy" data-push-copy>Copy the Brivia link</button>')
+        + '<p class="push-install-note">Apple allows website notifications only from the Home Screen icon (iOS 16.4 or later).</p>';
+      row.insertAdjacentElement('afterend', guide);
+      guide.querySelector('[data-push-copy]')?.addEventListener('click', async (event) => {
+        try { await navigator.clipboard.writeText('https://thebriviaclub.live/app.html'); event.currentTarget.textContent = 'Link copied. Paste it in Safari'; } catch { event.currentTarget.textContent = 'thebriviaclub.live'; }
+      });
+    }
+    guide.hidden = false;
+    guide.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+  };
   pushToggle.addEventListener('change', async () => {
+    if (pushSupport() === 'ios-install') { pushToggle.checked = false; showInstallSteps(); return; }
     const want = pushToggle.checked;
     pushToggle.disabled = true;
     const result = want ? await webPush.enable() : await webPush.disable();
@@ -5861,6 +5914,7 @@ const shareCommunityPost = async (postId, opener = document.activeElement) => {
     send.disabled = true;
     send.setAttribute('aria-busy', 'true');
     const { error } = await supabase.from('brivia_messages').insert({ sender_id: memberProfile.id, recipient_id: person.id, body: sharedPostMessage(data.url), message_type: 'text' });
+    if (!error) queueMessagePush(person.id);
     send.removeAttribute('aria-busy');
     if (error) { send.disabled = false; showToast(chatSendErrorCopy(error)); return; }
     send.textContent = 'Sent';
@@ -7262,7 +7316,15 @@ const insertChatMessage = async (body, attachment = null, extra = null) => {
     }
     throw error;
   }
+  queueMessagePush(payload.recipient_id);
 };
+// D-245: the other member's phone hears about it. Sends within 1.5 s of each other make one push (one notification).
+const messagePushTimers = new Map();
+function queueMessagePush(to) {
+  if (!to || String(to) === String(memberProfile.id)) return;
+  window.clearTimeout(messagePushTimers.get(String(to)));
+  messagePushTimers.set(String(to), window.setTimeout(() => { messagePushTimers.delete(String(to)); void sendMessagePush(to); }, 1500));
+}
 // D-157 (0046): long-press a bubble for Copy, Edit, Unsend or Delete for me.
 const findThreadMessage = (id) => (selectedChat ? (chatMessages[selectedChat.id] || []).find((m) => String(m.id) === String(id)) : null);
 const isSpecialMessage = (message) => Boolean(message?.attachment || parseAreaBody(message?.text) || parsePlaceBody(message?.text) || parseSharedPost(message?.text));
@@ -7771,6 +7833,7 @@ const loadSupabaseCommunity = async () => {
   renderHome();
   renderExplore();
   renderChats();
+  openChatFromUrl();   // D-245: a message notification opens that chat (?view=chat&chat=<id>)
   renderProfile();
   if (document.body.dataset.appView === 'profile' && profileInterests.status === 'idle') loadProfileInterests();
   try { ensureNotificationControls(); renderNotifications(); } catch (error) { console.warn('Notification controls could not load:', error.message); }

@@ -95,3 +95,14 @@
 .notification-post.has-stack{grid-template-columns:auto minmax(0,1fr) auto}
 .notification-post.has-stack .notification-nearby-face .notification-post-kind{z-index:3}
 .notification-post.has-stack .notification-avatar--stack{margin-left:-8px}
+
+/* D-245: the iPhone steps under the Web notifications row (a tap on its switch in a browser tab). */
+.push-install { margin: 0 0 var(--space-3, 12px); padding: 14px 16px; border: 1px solid color-mix(in srgb, var(--color-wine) 22%, transparent); border-radius: 12px; background: color-mix(in srgb, var(--color-wine) 5%, var(--color-cream)); color: var(--color-ink); font-family: var(--font-body); animation: push-install-in .2s ease-out; }
+.push-install[hidden] { display: none; }
+.push-install-title { margin: 0 0 8px; color: var(--color-wine); font-size: var(--text-14); font-weight: 700; }
+.push-install ol { margin: 0; padding-left: 20px; display: grid; gap: 6px; font-size: var(--text-14); line-height: 1.45; }
+.push-install-note { margin: 10px 0 0; color: var(--color-ink-soft); font-size: var(--text-12); }
+.push-install-copy { margin-top: 10px; min-height: 44px; padding: 0 16px; border: 1px solid var(--color-wine); border-radius: 999px; background: transparent; color: var(--color-wine); font: inherit; font-size: var(--text-14); font-weight: 700; cursor: pointer; }
+.push-install-copy:focus-visible { outline: 2px solid var(--color-wine-soft); outline-offset: 2px; }
+@keyframes push-install-in { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) { .push-install { animation: none; } }
