@@ -340,7 +340,7 @@ body.app-body .post-card.is-caption-open .post-card-caption-wrap{display:flex;fl
 @media (prefers-reduced-motion:reduce){body.app-body .post-card-more-pill,body.app-body .post-card-more-pill svg{transition:none}}
 
 /* D-242: "Liked by". The likes line reads as a link; the sheet is a small cream dialog with 44 px rows. */
-body.app-body .post-card-likes.is-link{min-width:0;margin:0;padding:0;border:0;background:none;color:inherit;font:inherit;text-align:left;cursor:pointer;text-decoration:underline;text-decoration-color:color-mix(in srgb, currentColor 35%, transparent);text-underline-offset:3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+body.app-body .post-card-likes.is-link{min-width:0;margin:0;padding:0;border:0;background:none;color:var(--color-ink);font-family:var(--font-body);font-size:var(--text-12);font-weight:600;letter-spacing:.02em;line-height:inherit;text-align:left;cursor:pointer;text-decoration:underline;text-decoration-color:color-mix(in srgb, currentColor 35%, transparent);text-underline-offset:3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 body.app-body .post-card-likes.is-link:hover{text-decoration-color:currentColor}
 body.app-body .post-card-likes.is-link:focus-visible,.post-detail-likers:focus-visible{outline:2px solid var(--brivia-wine);outline-offset:2px;border-radius:4px}
 .post-detail-likers{min-height:44px;margin:0;padding:0;border:0;background:none;color:inherit;font:inherit;font-weight:600;cursor:pointer;text-decoration:underline;text-underline-offset:3px}
@@ -362,3 +362,11 @@ dialog.likers-sheet::backdrop{background:color-mix(in srgb, var(--color-oxblood-
 .likers-foot{padding:8px 12px 12px;border-top:1px solid var(--color-line)}
 .likers-view-note{width:100%;min-height:44px;border:1px solid var(--brivia-wine);border-radius:999px;background:var(--brivia-wine);color:var(--color-cream);font-family:var(--font-body);font-size:var(--text-12);font-weight:700;letter-spacing:.12em;text-transform:uppercase;cursor:pointer}
 .likers-view-note:focus-visible{outline:2px solid var(--brivia-wine);outline-offset:3px}
+
+/* D-244 (founder: "fix the UI of this read more button"): no pill. A quiet wine "… more" at the end of the caption's
+   second line, the words fading out before it; open, "less" under the caption. Same type as the caption. */
+body.app-body .post-card-more{right:var(--space-3);bottom:10px;align-items:flex-end;padding:0 0 0 2.6em;background:linear-gradient(90deg, transparent, var(--color-cream) 2.2em) bottom/100% 1.4em no-repeat}
+body.app-body .post-card-more-pill{height:auto;padding:0;border:0;border-radius:0;background:none;color:var(--brivia-wine);font-size:var(--text-14);font-weight:700;letter-spacing:0;line-height:1.35;text-transform:none;gap:3px}
+body.app-body .post-card-more-pill svg{width:12px;height:12px}
+@media (hover:hover){body.app-body .post-card-more:hover .post-card-more-pill{background:none;color:var(--brivia-wine);text-decoration:underline;text-underline-offset:3px}}
+body.app-body .post-card.is-caption-open .post-card-more{padding:0;background:none}

@@ -54,7 +54,7 @@ export const postCardMarkup = (post, author, { liked = false, saved = false, ima
     + `<div class="post-card-media">${media}</div>`
     // D-237: "Read more" shows only when the caption is cut off (app.js measures it after drawing).
     + `<div class="post-card-caption-wrap"><p class="post-card-caption" id="post-caption-${escapeHtml(post.id)}">${escapeHtml(post.caption || '')}</p>`
-    + `<button type="button" class="post-card-more" data-post-more aria-expanded="false" aria-controls="post-caption-${escapeHtml(post.id)}" hidden><span class="post-card-more-pill"><span class="post-card-more-text">Read more</span><svg viewBox="0 0 12 12" aria-hidden="true" focusable="false"><path d="M3 4.5 6 7.5 9 4.5"/></svg></span></button></div>`
+    + `<button type="button" class="post-card-more" data-post-more aria-label="Read more of the caption" aria-expanded="false" aria-controls="post-caption-${escapeHtml(post.id)}" hidden><span class="post-card-more-pill"><span class="post-card-more-text">… more</span><svg viewBox="0 0 12 12" aria-hidden="true" focusable="false"><path d="M3 4.5 6 7.5 9 4.5"/></svg></span></button></div>`
     + `<div class="post-card-actions">${actionButton('like', liked ? 'Liked' : 'Like', Boolean(liked), activity?.likeCount)}${actionButton('comment', 'Comment', undefined, activity?.commentCount)}${actionButton('share', 'Share', undefined, activity?.shareCount)}${actionButton('save', saved ? 'Saved' : 'Save', Boolean(saved))}</div>`
     + postFooterMarkup(activity, summary, escapeHtml)
     + '</article>';

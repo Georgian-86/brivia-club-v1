@@ -7,6 +7,8 @@ Update this file at the end of every session. CLAUDE.md holds the aim; this file
 
 ## 1. What is done
 
+**2026-11-12, D-244:** every emoji (1,870, with search) in all pickers; reactions on chat messages (0075 live); "… more" is a text link on notes.
+
 **2026-11-12, D-243:** like notifications show the likers' faces and open "Liked by" (then View note).
 
 **2026-11-12, D-242:** "Liked by" on notes (the author sees every liker; 0074 live). Fonts audited clean.

@@ -448,7 +448,7 @@ body.app-body .app-view[data-view="chat"] .chat-layout .message small {
   opacity: .78;
 }
 body.app-body .app-view[data-view="chat"] .chat-layout .message.me small { color: var(--color-cream); }
-body.app-body .app-view[data-view="chat"] .chat-layout .message.them small { color: color-mix(in srgb, var(--color-name-ink) 70%, transparent); }
+body.app-body .app-view[data-view="chat"] .chat-layout .message.them small { color: color-mix(in srgb, var(--color-name-ink) 86%, transparent); } /* D-244: 4.5:1 on the cream bubble (was 3.5:1) */
 
 /* Thread header: cream bar, serif name, serif small-caps status. */
 body.app-body .app-view[data-view="chat"] .chat-window-head {

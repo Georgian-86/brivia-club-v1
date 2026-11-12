@@ -428,6 +428,10 @@ export const sendEventTicket = (eventId) => invoke('event-ticket', { event_id: e
 export const editMessage = (id, body) => rpcCall('edit_message', { p_id: id, p_body: body });
 export const unsendMessage = (id) => rpcCall('unsend_message', { p_id: id });
 export const deleteMessageForMe = (id) => rpcCall('delete_message_for_me', { p_id: id });
+// D-244 (0075): one emoji per member per message; the same emoji again (or null) removes it. Both answer the message's
+// rows { message_id, member_id, emoji, created_at }; before 0075 the error is isMissingFunction.
+export const reactToMessage = (id, emoji) => rpcCall('react_to_message', { p_message: id, p_emoji: emoji || null });
+export const messageReactionsFor = (ids) => rpcCall('message_reactions_for', { p_ids: ids });
 // D-156 (0045): { daily_limit, remaining, resets_at } for the 10 companion swipes a day; before 0045 an error (never blocks).
 export const companionQuota = () => rpcCall('my_companion_quota', {});
 export const myCompanionMatches = () => rpcCall('my_companion_matches', {});

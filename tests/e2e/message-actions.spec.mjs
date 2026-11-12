@@ -54,7 +54,7 @@ const longPress = async (page, n) => {
   await page.waitForTimeout(600);
   await page.evaluate(({ sel, x, y }) => document.querySelector(sel).dispatchEvent(new PointerEvent('pointerup', { bubbles: true, pointerType: 'touch', clientX: x, clientY: y })), { sel: `#chat-messages .message[data-message-id="${id(n)}"]`, x, y });
 };
-const menuItems = (page) => page.$$eval('.message-menu [role="menuitem"]', (els) => els.map((el) => el.textContent.trim()));
+const menuItems = (page) => page.$$eval('.message-menu .message-menu-item[role="menuitem"]', (els) => els.map((el) => el.textContent.trim()));
 
 try {
   // Phone: MA1-MA3.

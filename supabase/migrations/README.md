@@ -1538,3 +1538,13 @@ installed body, one condition), not re-created from a copy, because the live fun
 author sees every liker they can see; anyone else sees their own connections among the likers (as post_activity's
 "Liked by" line). Verify: `select has_function_privilege('anon', 'public.post_likers(uuid)', 'execute');` (false).
 Applied live 2026-11-12.
+
+## 0075
+
+**Message reactions (D-244).** Apply after `0074`, then deploy the client. Adds the private table
+`brivia_private.message_reaction` (one emoji per member per message, no member grants) and two RPCs:
+`react_to_message(p_message, p_emoji)` (the same emoji again, or null, removes it) and `message_reactions_for(p_ids)`.
+Both serve only the two members of the pair, under `brivia_pair_world_ok`, never an unsent or deleted-for-me message.
+Before 0075 the client hides the reaction row. Verify:
+`select has_function_privilege('anon', 'public.react_to_message(uuid, text)', 'execute');` (false).
+Applied live 2026-11-12.

@@ -211,3 +211,10 @@ body.app-body[data-app-view="chat"] .chat-layout>.chat-window{
 .chat-attachment-note p[hidden]{display:none}
 .media-inline-error{display:block;margin:6px 0 0;font:600 var(--text-12)/1.4 var(--font-body);color:#a3203a}
 .media-inline-error[hidden]{display:none}
+/* D-244: every emoji, with a search on top; tab icons are emoji (nine groups). */
+.chat-emoji-search{display:block;padding:8px 8px 0}
+.chat-emoji-search input{box-sizing:border-box;width:100%;height:38px;padding:0 12px;border:1px solid rgba(90,6,31,.18);border-radius:999px;background:#fffdf8;color:#2f211f;font:inherit;font-size:var(--text-14)}
+.chat-emoji-search input:focus-visible{outline:2px solid #5a061f;outline-offset:1px}
+.chat-emoji-tabs button{font-size:18px!important;line-height:1}
+.chat-emoji-grid button{font-size:22px!important;line-height:1}
+.chat-emoji-none{grid-column:1/-1;margin:16px 0;color:rgba(52,31,28,.6);font-size:var(--text-14);text-align:center}

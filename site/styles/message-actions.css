@@ -137,3 +137,76 @@ body.app-body .app-view[data-view="chat"] .chat-messages .message.me.is-unsent s
 .chat-messages .message.is-reply-target { animation: message-reply-glow 1.5s ease-out; }
 @keyframes message-reply-glow { 0%, 30% { box-shadow: 0 0 0 3px var(--color-wine-soft), 0 0 22px color-mix(in srgb, var(--color-wine) 35%, transparent); } 100% { box-shadow: 0 0 0 0 transparent; } }
 @media (prefers-reduced-motion: reduce) { .chat-messages .message.is-reply-target { animation: none; box-shadow: 0 0 0 2px var(--color-wine-soft); } }
+
+/* D-244 (0075): reactions. The quick row at the top of the menu, and the chips under a bubble. */
+.message-menu-reacts {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 2px;
+  margin-bottom: var(--space-1);
+  padding: 0 0 var(--space-1);
+  border-bottom: 1px solid var(--color-line);
+}
+.message-react {
+  display: inline-grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  font-size: 24px;
+  line-height: 1;
+  cursor: pointer;
+  transition: transform .12s ease, background-color .12s ease;
+}
+.message-react:hover, .message-react:focus-visible { background: var(--color-card-paper); outline: none; transform: scale(1.12); }
+.message-react:active { transform: scale(.94); }
+.message-react.is-more { color: var(--color-wine); border: 1px solid var(--color-line); }
+.message-react.is-more svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; }
+.message-menu:has(.message-menu-reacts) { min-width: min(316px, calc(100vw - 24px)); }
+@media (max-width: 360px) { .message-react { width: 40px; height: 40px; font-size: 22px; } }
+
+.chat-messages .message.has-reactions { margin-bottom: 20px; }
+.message-reactions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin: 4px 0 -22px;
+  position: relative;
+  z-index: 1;
+}
+.chat-messages .message.me .message-reactions { justify-content: flex-end; }
+.message-reaction {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  min-width: 32px;
+  min-height: 28px;
+  padding: 0 8px;
+  border: 1px solid var(--color-line);
+  border-radius: 999px;
+  background: var(--color-cream);
+  box-shadow: 0 2px 6px color-mix(in srgb, var(--color-ink) 12%, transparent);
+  color: var(--color-ink);
+  font-family: var(--font-body);
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+  animation: message-reaction-in .18s ease-out;
+}
+/* A 44px touch target around the small chip. */
+.message-reaction { position: relative; }
+.message-reaction::after { content: ''; position: absolute; inset: -8px -2px; }
+.message-reaction.is-mine { border-color: var(--color-wine); background: color-mix(in srgb, var(--color-wine) 10%, var(--color-cream)); }
+.message-reaction-count { font-size: var(--text-12); font-weight: 700; color: var(--color-ink-soft); }
+.message-reaction.is-mine .message-reaction-count { color: var(--color-wine); }
+.message-reaction:focus-visible { outline: 2px solid var(--color-wine-soft); outline-offset: 2px; }
+@keyframes message-reaction-in { from { opacity: 0; transform: scale(.6); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) { .message-reaction, .message-react { animation: none; transition: none; } }
+
+/* The "+" card: the emoji-field panel, fixed beside the bubble. */
+.reaction-picker { position: fixed; z-index: 1210; margin: 0; max-height: min(440px, calc(100vh - 24px)); overflow: hidden; display: flex; flex-direction: column; }
+.reaction-picker .emoji-field-grid { max-height: 220px; }

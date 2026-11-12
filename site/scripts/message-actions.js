@@ -84,7 +84,9 @@ const ICONS = {
 
 // container: the #chat-messages element. getMessage(id) -> { message, special } | null. onAction(action, message)
 // returns a promise; the menu closes before it runs.
-export const createMessageMenu = ({ container, getMessage, onAction, now = () => Date.now() }) => {
+// D-244: `reactions` { quick: () => [emoji], canReact(message) } puts a row of quick reactions and a "+" (every emoji)
+// above the actions; a press calls onAction('react', message, emoji) or onAction('react-more', message, bubble).
+export const createMessageMenu = ({ container, getMessage, onAction, reactions = null, now = () => Date.now() }) => {
   if (!container) return { close() {} };
   let menu = null;
   let anchor = null;
@@ -123,8 +125,13 @@ export const createMessageMenu = ({ container, getMessage, onAction, now = () =>
     menu.style.left = `${Math.round(left)}px`;
   };
 
-  const renderList = (actions) => {
-    menu.innerHTML = actions.map((a) => `<button type="button" role="menuitem" class="message-menu-item${a === 'delete' || a === 'unsend' ? ' is-danger' : ''}" data-message-action="${a}"><svg viewBox="0 0 24 24" aria-hidden="true">${ICONS[a]}</svg><span>${LABELS[a]}</span></button>`).join('');
+  const reactRow = (message) => {
+    if (!reactions || !reactions.canReact(message)) return '';
+    const quick = reactions.quick().map((e) => `<button type="button" role="menuitem" class="message-react" data-message-react="${e}" aria-label="React ${e}">${e}</button>`).join('');
+    return `<div class="message-menu-reacts" role="group" aria-label="React">${quick}<button type="button" role="menuitem" class="message-react is-more" data-message-react-more aria-label="More reactions"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 6v12M6 12h12"/></svg></button></div>`;
+  };
+  const renderList = (actions, message) => {
+    menu.innerHTML = reactRow(message) + actions.map((a) => `<button type="button" role="menuitem" class="message-menu-item${a === 'delete' || a === 'unsend' ? ' is-danger' : ''}" data-message-action="${a}"><svg viewBox="0 0 24 24" aria-hidden="true">${ICONS[a]}</svg><span>${LABELS[a]}</span></button>`).join('');
   };
   const renderConfirm = (action) => {
     const c = CONFIRM[action];
@@ -149,10 +156,10 @@ export const createMessageMenu = ({ container, getMessage, onAction, now = () =>
     menu.className = 'message-menu';
     menu.setAttribute('role', 'menu');
     menu.setAttribute('aria-label', 'Message options');
-    renderList(actions);
+    renderList(actions, found.message);
     document.body.append(menu);
     place();
-    items()[0]?.focus({ preventScroll: true });
+    (menu.querySelector('.message-menu-item') || items()[0])?.focus({ preventScroll: true });   // D-244: the first action, not the first reaction
     document.addEventListener('pointerdown', outside, true);
     window.addEventListener('resize', onResize);
     container.addEventListener('scroll', onResize, { passive: true });
@@ -161,6 +168,8 @@ export const createMessageMenu = ({ container, getMessage, onAction, now = () =>
       const button = event.target.closest('button');
       if (!button) return;
       if (button.hasAttribute('data-message-cancel')) { close({ refocus: true }); return; }
+      if (button.dataset.messageReact) { close({ refocus: true }); void onAction('react', found.message, button.dataset.messageReact); return; }
+      if (button.hasAttribute('data-message-react-more')) { const at = anchor; close(); void onAction('react-more', found.message, at); return; }
       const action = button.dataset.messageConfirm || button.dataset.messageAction;
       if (!action) return;
       if (!button.dataset.messageConfirm && CONFIRM[action]) { renderConfirm(action); return; }
@@ -184,6 +193,7 @@ export const createMessageMenu = ({ container, getMessage, onAction, now = () =>
   const cancelPress = () => { if (press) { window.clearTimeout(press.timer); press = null; } };
 
   container.addEventListener('pointerdown', (event) => {
+    suppressClick = false;   // a long press that ended without a click (common on touch) must not eat the next tap
     if (event.pointerType === 'mouse' && event.button !== 0) return;
     const bubble = bubbleFrom(event.target);
     if (!bubble) return;

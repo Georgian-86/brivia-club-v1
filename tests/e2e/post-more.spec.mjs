@@ -1,6 +1,6 @@
 // "Read more" for long captions on post cards (D-237, founder 2026-11-11), stubbed Supabase.
 // PLAYWRIGHT_MODULE=/opt/node-tools/node_modules/playwright/index.mjs node tests/e2e/post-more.spec.mjs   (Vite on :5215)
-// RM1 a caption cut at two lines shows "Read more" (>= 44 px); a short one does not; cards keep the same height.
+// RM1 a caption cut at two lines shows "… more" (D-244: a text link, no pill) (>= 44 px); a short one does not; cards keep the same height.
 // RM2 Read more shows the whole caption in place (aria-expanded), "Show less" folds it back; the post does not open.
 // RM3 axe clean at 390.
 import { startAppStub } from './app-stub.mjs';
@@ -45,7 +45,7 @@ try {
       const m = document.querySelector('.post-card[data-post-id="long"] .post-card-more');
       return { full: c.scrollHeight <= c.clientHeight + 1, lines: Math.round(c.clientHeight / parseFloat(getComputedStyle(c).lineHeight)), label: m.textContent.trim(), expanded: m.getAttribute('aria-expanded'), detail: !!document.querySelector('#post-detail') };
     });
-    check(`${w} RM2 Read more shows the whole caption in place`, open.full && open.lines > 2 && open.label === 'Show less' && open.expanded === 'true' && !open.detail, JSON.stringify(open));
+    check(`${w} RM2 Read more shows the whole caption in place`, open.full && open.lines > 2 && open.label === 'less' && open.expanded === 'true' && !open.detail, JSON.stringify(open));
     if (shots) { await page.mouse.move(1, 1); await page.waitForTimeout(400); await page.locator('.post-card[data-post-id="long"]').screenshot({ path: `${shots}/post-more-${w}.png` }); }
     await longMore.click();
     await page.waitForTimeout(200);
@@ -53,7 +53,7 @@ try {
       const m = document.querySelector('.post-card[data-post-id="long"] .post-card-more');
       return { label: m.textContent.trim(), expanded: m.getAttribute('aria-expanded'), visible: !m.hidden };
     });
-    check(`${w} RM2 Show less folds it back`, closed.label === 'Read more' && closed.expanded === 'false' && closed.visible, JSON.stringify(closed));
+    check(`${w} RM2 Show less folds it back`, closed.label === '… more' && closed.expanded === 'false' && closed.visible, JSON.stringify(closed));
     check(`${w} no page errors`, errors.length === 0, errors.join('; '));
     await ctx.close();
   }
