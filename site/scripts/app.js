@@ -759,9 +759,13 @@ const renderNotifications = () => {
     const lead = g.people[0] || {};
     const person = findPersonById(lead.id) || { name: lead.name, image: lead.photoUrl };
     const thumb = g.postImage && isStorageImageUrl(g.postImage) ? `<img src="${escapeHtml(g.postImage)}" alt="" loading="lazy" decoding="async" />` : '';
-    return `<button type="button" class="notification-post${g.unread ? ' is-unread' : ''}" data-post-note="${escapeHtml(g.key)}" aria-label="${escapeHtml(`${copy.title}. ${copy.line}`.trim())}">`
-      + `<span class="notification-nearby-face">${renderAvatar(person, 'notification-avatar')}<i class="notification-post-kind is-${postKind(g.type)[0]}">${postKind(g.type)[1]}</i></span>`
-      + `<span class="notification-nearby-copy"><strong>${escapeHtml(copy.title)}</strong>${copy.line ? `<span>${escapeHtml(copy.line)}</span>` : ''}<small>${escapeHtml(formatNotificationTime(g.createdAt))}</small></span>`
+    // D-243: likes show who (up to three faces) and open "Liked by".
+    const isLike = g.type === 'post_like';
+    const extra = isLike ? g.people.slice(1, 3).map((p) => renderAvatar(findPersonById(p.id) || { name: p.name, image: p.photoUrl }, 'notification-avatar notification-avatar--stack')).join('') : '';
+    const line = isLike ? (g.people.length > 1 ? `See all ${g.people.length}` : 'See who') : copy.line;
+    return `<button type="button" class="notification-post${g.unread ? ' is-unread' : ''}${extra ? ' has-stack' : ''}" data-post-note="${escapeHtml(g.key)}" aria-label="${escapeHtml(`${copy.title}. ${line}`.trim())}">`
+      + `<span class="notification-nearby-face">${renderAvatar(person, 'notification-avatar')}${extra}<i class="notification-post-kind is-${postKind(g.type)[0]}">${postKind(g.type)[1]}</i></span>`
+      + `<span class="notification-nearby-copy"><strong>${escapeHtml(copy.title)}</strong>${line ? `<span${isLike ? ' class="notification-see-likers"' : ''}>${escapeHtml(line)}</span>` : ''}<small>${escapeHtml(formatNotificationTime(g.createdAt))}</small></span>`
       + `${thumb ? `<span class="notification-post-thumb">${thumb}</span>` : ''}</button>`;
   }).join('');
   const ticketIcon = '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2.5 5.5V4h11v1.5a1.5 1.5 0 0 0 0 3V10h-11V8.5a1.5 1.5 0 0 0 0-3Z"/><path d="M9.5 4v6" stroke-dasharray="1.2 1.2"/></svg>';
@@ -782,6 +786,7 @@ const renderNotifications = () => {
     closeNotificationPanel();
     if (!g) return;
     memberNotes.markRead(g.ids);
+    if (g.type === 'post_like') { openNotificationLikers(g, document.querySelector('#app-notification-button')); return; }   // D-243
     openSharedPost(g.postId);
   }));
   list.querySelectorAll('[data-event-note]').forEach((item) => item.addEventListener('click', (event) => {
@@ -5895,30 +5900,53 @@ const paintDetailStats = (postId) => {
 };
 // D-242 (a member: "I'm unable to see who liked my note"): "Liked by", from post_likers (0074). The note's author
 // sees everyone who liked it; anyone else sees their own connections among the likers (as the "Liked by" line).
-const openPostLikers = async (postId, opener = document.activeElement) => {
-  const post = communityPosts.find((item) => String(item.id) === String(postId));
-  if (!post || !supabase) return;
+// The sheet itself (shared by a note and a like notification). onViewNote adds a "View note" button at the bottom.
+const buildLikersSheet = ({ opener = document.activeElement, onViewNote = null } = {}) => {
   document.querySelector('dialog.likers-sheet')?.remove();
-  const own = String(post.author_id) === String(memberProfile.id);
   const dialog = document.createElement('dialog');
   dialog.className = 'likers-sheet';
   dialog.setAttribute('aria-labelledby', 'likers-title');
   dialog.innerHTML = '<div class="likers-head"><h2 id="likers-title">Liked by</h2><button type="button" class="likers-close" data-likers-close aria-label="Close">×</button></div>'
-    + '<ul class="likers-list" aria-busy="true"><li class="likers-note">Loading…</li></ul>';
+    + '<ul class="likers-list" aria-busy="true"><li class="likers-note">Loading…</li></ul>'
+    + (onViewNote ? '<div class="likers-foot"><button type="button" class="likers-view-note" data-likers-note>View note</button></div>' : '');
   document.body.append(dialog);
-  const close = () => { dialog.close(); dialog.remove(); opener?.focus?.({ preventScroll: true }); };
+  const close = ({ refocus = true } = {}) => { dialog.close(); dialog.remove(); if (refocus) opener?.focus?.({ preventScroll: true }); };
   dialog.addEventListener('cancel', (event) => { event.preventDefault(); close(); });
   dialog.addEventListener('click', (event) => {
     if (event.target === dialog || event.target.closest('[data-likers-close]')) { close(); return; }
+    if (event.target.closest('[data-likers-note]')) { close({ refocus: false }); onViewNote?.(); return; }
     const row = event.target.closest('[data-liker-id]');
     if (!row) return;
     const id = row.dataset.likerId;
-    close();
+    close({ refocus: false });
     closeCommunityPostDetail?.();
     if (String(id) === String(memberProfile.id)) setView('profile'); else openMemberProfileById(id);
   });
   dialog.showModal();
   dialog.querySelector('[data-likers-close]')?.focus();
+  return { dialog, list: dialog.querySelector('.likers-list') };
+};
+// rows: [{ id, name, photoUrl, isConnection }]. The photo is decorative (the name is beside it).
+const likerRowsMarkup = (rows) => rows.map((r) => {
+  const me = String(r.id) === String(memberProfile.id);
+  const name = me ? 'You' : (r.name || 'Brivia member');
+  const avatar = renderAvatar({ name: me ? (memberProfile.name || 'You') : name, image: me ? (memberProfile.photoUrl || '') : (r.photoUrl || '') }, 'likers-avatar').replace(/<img([^>]*?)\salt="[^"]*"/, '<img$1 alt=""');
+  return `<li><button type="button" class="likers-row" data-liker-id="${escapeHtml(String(r.id))}">${avatar}<span class="likers-name">${escapeHtml(name)}</span>${r.isConnection ? '<small>Connection</small>' : ''}</button></li>`;
+}).join('');
+// D-243 (founder: "also show who liked on notifications"): a like notification opens "Liked by" with the people in it
+// (the notification already names them: one row per liker), then "View note".
+const openNotificationLikers = (g, opener) => {
+  const { list } = buildLikersSheet({ opener, onViewNote: () => openSharedPost(g.postId) });
+  list.removeAttribute('aria-busy');
+  const connected = new Set(remoteConnectionIds.map(String));
+  const rows = (g.people || []).map((p) => ({ id: p.id, name: findPersonById(p.id)?.name || p.name, photoUrl: p.photoUrl || findPersonById(p.id)?.image || '', isConnection: connected.has(String(p.id)) }));
+  list.innerHTML = rows.length ? likerRowsMarkup(rows) : '<li class="likers-note">No likes to show.</li>';
+};
+const openPostLikers = async (postId, opener = document.activeElement) => {
+  const post = communityPosts.find((item) => String(item.id) === String(postId));
+  if (!post || !supabase) return;
+  const own = String(post.author_id) === String(memberProfile.id);
+  const { dialog } = buildLikersSheet({ opener });
   const { data, error } = await supabase.rpc('post_likers', { p_post_id: post.id });
   if (!dialog.isConnected) return;
   const list = dialog.querySelector('.likers-list');
@@ -5927,13 +5955,7 @@ const openPostLikers = async (postId, opener = document.activeElement) => {
   const rows = data || [];
   const total = activityFor(post.id)?.likeCount || rows.length;
   const hidden = Math.max(0, total - rows.length);
-  list.innerHTML = rows.map((r) => {
-    const me = String(r.member_id) === String(memberProfile.id);
-    const name = me ? 'You' : (r.name || 'Brivia member');
-    // The name is right beside the photo: the photo is decorative here (alt="").
-    const avatar = renderAvatar({ name: me ? (memberProfile.name || 'You') : name, image: me ? (memberProfile.photoUrl || '') : (r.photo_url || '') }, 'likers-avatar').replace(/<img([^>]*?)\salt="[^"]*"/, '<img$1 alt=""');
-    return `<li><button type="button" class="likers-row" data-liker-id="${escapeHtml(String(r.member_id))}">${avatar}<span class="likers-name">${escapeHtml(name)}</span>${r.is_connection ? '<small>Connection</small>' : ''}</button></li>`;
-  }).join('')
+  list.innerHTML = likerRowsMarkup(rows.map((r) => ({ id: r.member_id, name: r.name, photoUrl: r.photo_url, isConnection: r.is_connection })))
     + (hidden && !own ? `<li class="likers-note">${hidden} more ${hidden === 1 ? 'person' : 'people'} you're not connected with.</li>` : '')
     + (!rows.length && !hidden ? '<li class="likers-note">No likes yet.</li>' : '');
 };

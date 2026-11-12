@@ -3,6 +3,8 @@
 // PN1 two likes on one note are one row ("Ravi and Asha liked your note", newest first) with the note's thumbnail; a comment is its own
 //     row quoting its words; the bell counts the unread rows.
 // PN2 opening the panel marks them read on the server (as every notification, D-134); a row opens the Notes view.
+// PN6 (D-243) a like row shows who (two faces, "See all 2") and opens "Liked by" with both people; "View note"
+//     then opens Notes. A comment row still opens the note at once.
 // PN3 Settings shows READ RECEIPTS (on); turning it off saves set_read_receipts(false).
 // PN4 the nav says Notes.  PN5 before 0043 (v2 only, no receipts functions): no post rows, the switch stays hidden.
 // PN_SHOTS=<dir> saves the open panel at 390 and 1440.
@@ -51,7 +53,14 @@ try {
     check(`${w} PN1 rows: the comment, then the likes`, rows.length === 2 && rows[0].title === 'Ravi commented on your note' && rows[0].line === '“Where is this café?”' && rows[1].title === 'Ravi and Asha liked your note', JSON.stringify(rows));
     check(`${w} PN1 each row shows the note`, rows.every((r) => r.thumb), JSON.stringify(rows));
     if (shots) await page.screenshot({ path: `${shots}/post-notes-${w}.png` });
+    const likeRow = await page.$eval('.notification-post.has-stack', (el) => ({ faces: el.querySelectorAll('.notification-avatar').length, see: el.querySelector('.notification-see-likers')?.textContent })).catch(() => null);
+    check(`${w} PN6 the like row shows who`, likeRow?.faces === 2 && likeRow?.see === 'See all 2', JSON.stringify(likeRow));
     await page.locator('.notification-post', { hasText: 'liked your note' }).click();
+    await page.waitForSelector('dialog.likers-sheet[open] .likers-row', { timeout: 4000 }).catch(() => {});
+    const likers = await page.$$eval('dialog.likers-sheet .likers-name', (els) => els.map((e) => e.textContent));
+    check(`${w} PN6 it opens "Liked by" with both`, JSON.stringify(likers) === '["Ravi Kumar","Asha Rao"]', JSON.stringify(likers));
+    if (shots) await page.screenshot({ path: `${shots}/post-likers-${w}.png` });
+    await page.locator('dialog.likers-sheet [data-likers-note]').click();
     await page.waitForTimeout(600);
     const marked = st.calls.filter((c) => c.path === '/rest/v1/rpc/mark_notifications_read').map((c) => JSON.parse(c.body || '{}').p_ids || []).flat();
     check(`${w} PN2 they are marked read on the server`, marked.includes('00000000-0000-4000-8000-0000000000n2'), JSON.stringify(marked));

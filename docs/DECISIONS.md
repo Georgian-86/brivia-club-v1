@@ -4521,3 +4521,13 @@ bring a short line back.
 - **Checks.** SQL `zn-post-likers.test.sql` (author sees all, others their connections, a blocked member nothing, anon
   cannot call) and the hygiene allowlist; unit post-card (607); e2e `post-likers.spec.mjs` LK1-LK3 at 1440 and 390
   (axe clean); post-activity, explore-cards, post-notifications pass.
+
+## D-243 (2026-11-12): like notifications show who liked
+
+- **Ask (founder, 2026-11-12):** "also show who liked on notifications".
+- **Decision.** A "… liked your note" notification shows up to three of the likers' faces, overlapping, and "See who" /
+  "See all N". A tap opens the same "Liked by" sheet as the note (D-242) with the people in that notification
+  (connections marked), and a "View note" button that opens the note. Comment notifications still open the note
+  directly. No server change: a like notification already holds one row per liker (0043).
+- **Checks.** e2e `post-notifications.spec.mjs` PN6 (two faces, "See all 2", "Liked by" with both, View note opens
+  Notes) at 1440 and 390; post-likers, event-notifications, crossing-paths, collab-requests pass; unit 607.

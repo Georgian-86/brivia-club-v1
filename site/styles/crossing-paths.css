@@ -81,3 +81,17 @@
 .notification-post-kind.is-event svg{stroke-linecap:round}
 /* D-234: a connection shared a new note. */
 .notification-post-kind.is-new svg{stroke-linecap:round;stroke-width:2}
+/* D-243: a like notification shows who: up to three faces, overlapping, the newest first. */
+.notification-post.has-stack .notification-nearby-face{display:flex;align-items:center;width:auto;min-width:34px}
+.notification-post.has-stack .notification-avatar{flex:none;border:2px solid var(--color-cream)}
+.notification-avatar--stack{width:28px;height:28px;margin-left:-12px;font-size:var(--text-12)}
+.notification-post.has-stack .notification-avatar:first-child{position:relative;z-index:2}
+.notification-avatar--stack:nth-of-type(2){position:relative;z-index:1}
+.notification-see-likers{color:var(--brivia-wine, #741f39);font-weight:600}
+/* D-243 polish: the heart stays on the first face; the stack has room; "See all" reads as an action. */
+.notification-post.has-stack .notification-nearby-face .notification-post-kind{left:20px;right:auto}
+.notification-post.has-stack .notification-nearby-face{gap:0;padding-right:2px}
+.notification-post .notification-nearby-copy span.notification-see-likers{color:var(--brivia-wine, #741f39);font-style:normal;font-weight:700}
+.notification-post.has-stack{grid-template-columns:auto minmax(0,1fr) auto}
+.notification-post.has-stack .notification-nearby-face .notification-post-kind{z-index:3}
+.notification-post.has-stack .notification-avatar--stack{margin-left:-8px}
