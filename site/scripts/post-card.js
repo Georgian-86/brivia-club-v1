@@ -39,7 +39,7 @@ export const postFooterMarkup = (activity, summary, escapeHtml) => {
 
 // D-233: `own` (the member's own post) adds a Delete button to the header.
 const DELETE_ICON = '<svg viewBox="0 0 20 20" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M4.5 6h11M8 3.5h4M6.5 6l.6 10h5.8l-.6-10M8.5 8.5v5M11.5 8.5v5"/></svg>';
-export const postCardMarkup = (post, author, { liked = false, saved = false, imageSrc = '', dateLabel = '', activity = null, summary = '', own = false } = {}, { escapeHtml, renderAvatar }) => {
+export const postCardMarkup = (post, author, { liked = false, saved = false, imageSrc = '', dateLabel = '', activity = null, summary = '', own = false, badge = '' } = {}, { escapeHtml, renderAvatar }) => {
   const authorId = author?.id || post.author_id || '';
   const name = author?.name || 'Brivia member';
   const media = isSafePostImageSrc(imageSrc)
@@ -47,7 +47,7 @@ export const postCardMarkup = (post, author, { liked = false, saved = false, ima
     : '<span class="community-post-image-missing" role="img" aria-label="Image unavailable"></span>';
   return `<article class="post-card" data-post-id="${escapeHtml(post.id)}">`
     + `<header class="post-card-head">${renderAvatar({ name, image: author?.image || '' }, 'post-card-avatar')}`
-    + `<button type="button" class="post-card-author" data-public-profile-id="${escapeHtml(authorId)}" aria-label="Open ${escapeHtml(name)} profile">${escapeHtml(name)}</button>`
+    + `<button type="button" class="post-card-author" data-public-profile-id="${escapeHtml(authorId)}" aria-label="Open ${escapeHtml(name)} profile">${escapeHtml(name)}</button>${badge}`
     + `<time class="post-card-date">${escapeHtml(dateLabel)}</time>`
     + (own ? `<button type="button" class="post-card-delete" data-post-action="delete" aria-label="Delete your post" title="Delete post">${DELETE_ICON}</button>` : '')
     + '</header>'

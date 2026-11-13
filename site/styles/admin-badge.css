@@ -1,0 +1,36 @@
+/* D-246 (0076): the Admin badge beside a name (profile hero, public profile, deck card, chat, notes). A small cream pill
+   with a wine seal and tick; on wine headers (notes cards, the profile hero) it keeps its own cream fill. Tokens only. */
+.admin-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: 8px;
+  padding: 2px 8px 2px 4px;
+  border: 1px solid color-mix(in srgb, var(--color-wine) 35%, transparent);
+  border-radius: 999px;
+  background: var(--color-cream);
+  color: var(--color-wine);
+  font-family: var(--font-body);
+  font-size: 11px;
+  font-style: normal;
+  font-weight: 700;
+  letter-spacing: .08em;
+  line-height: 1.4;
+  text-transform: uppercase;
+  vertical-align: middle;
+  white-space: nowrap;
+}
+.admin-badge svg { width: 14px; height: 14px; flex: 0 0 14px; }
+.admin-badge .admin-badge-seal { fill: var(--color-wine); }
+.admin-badge .admin-badge-tick { fill: none; stroke: var(--color-cream); stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+/* The big serif profile name: a slightly larger pill, set on the baseline. */
+#profile-name .admin-badge, .public-profile-id h2 .admin-badge { font-size: 12px; padding: 3px 10px 3px 5px; margin-left: 12px; }
+#profile-name .admin-badge svg, .public-profile-id h2 .admin-badge svg { width: 16px; height: 16px; flex-basis: 16px; }
+body.app-body .post-card-head:has(.admin-badge) .post-card-author { flex: 0 1 auto; }
+.post-card-head .admin-badge { flex: 0 0 auto; margin-left: 0; margin-right: auto; }
+.chat-row .admin-badge { margin-left: 6px; padding: 1px 6px 1px 3px; font-size: 10px; }
+.chat-row .admin-badge svg { width: 12px; height: 12px; flex-basis: 12px; }
+/* The thread header: the name shortens, the badge stays whole. */
+body.app-body .app-view[data-view="chat"] .chat-window-head #chat-name:has(.admin-badge) { display: flex !important; align-items: center; gap: 6px; overflow: visible; }
+body.app-body .app-view[data-view="chat"] #chat-name .chat-name-text { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+body.app-body .app-view[data-view="chat"] #chat-name .admin-badge { flex: 0 0 auto; margin-left: 0; }
