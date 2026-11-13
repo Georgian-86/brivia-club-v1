@@ -4599,3 +4599,17 @@ bring a short line back.
   lines and "… more" when the breaks run past them; open, it reads exactly as written.
 - **Checks.** e2e `post-more.spec.mjs` RM4 (a three-paragraph caption shows "… more" and opens on five lines) at 1440 and
   390; `admin-badge.spec.mjs` now also checks the badge on a Notes card.
+
+## D-248 (2026-11-13): Notes is a masonry ("Pinterest") wall
+
+- **Ask (founder, 2026-11-13, two screenshots):** "if captions are small, dont leave so much space, pls fix it in some
+  pinteresty aesthetic way"; "when i click on the read more of one post, only that post must get expanded not all the
+  posts pls". Opening one caption stretched every card in its row, and a one-line caption kept an empty second line.
+- **Decision.** From two columns up, the Notes grid is a masonry wall: every card is as tall as its own content and the
+  next card tucks in under it (CSS grid on 2 px rows; app.js spans each card from its height, a ResizeObserver re-spans
+  it when its photo loads or its caption opens). A short caption takes one line; "… more" opens only that card, and only
+  the cards under it move. A photo shows in its own shape, between 4:5 portrait and 16:9 landscape (it was always
+  cropped to 5:4). Phones stay one column. This replaces D-107's "cards in a row share a height" and 5:4-only media.
+- **Checks.** e2e `notes-masonry.spec.mjs` NM1-NM3 (own heights, no overlap, even gaps, only the opened card grows) at
+  1440, 1024 and 390; explore-cards E2 and E7 updated to the new rule (74 pass); post-more, post-activity, post-likers,
+  post-delete, post-edit, post-frame, post-notifications, admin-badge pass; unit 613.

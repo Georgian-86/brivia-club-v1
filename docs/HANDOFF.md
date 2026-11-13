@@ -7,6 +7,8 @@ Update this file at the end of every session. CLAUDE.md holds the aim; this file
 
 ## 1. What is done
 
+**2026-11-13, D-248:** Notes is a masonry wall (own heights, "… more" opens one card, photos in their own shape).
+
 **2026-11-13, D-247:** Notes card captions keep their line breaks.
 
 **2026-11-13, D-246:** the Admin badge (0076 live); THE BRIVIA CLUB has it.
