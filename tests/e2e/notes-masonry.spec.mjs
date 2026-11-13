@@ -1,7 +1,7 @@
 // The Notes masonry wall (D-248), against stubbed Supabase.
 // PLAYWRIGHT_MODULE=/path/to/playwright/index.mjs node tests/e2e/notes-masonry.spec.mjs   (Vite on :5179)
-// NM1 at 1440 (4 columns) and 1024 (3): cards take their own height; no two cards overlap; the space under a card is
-//     the column gap (± 6 px), never a stretched row.
+// NM1 at 1440 (4 columns) and 1024 (3): D-249 every card has the original size (one height); no two cards overlap; the
+//     space under a card is the column gap (± 6 px).
 // NM2 opening a long caption grows only that card and pushes only the cards under it down; still no overlap.
 // NM3 at 390: one column, no spans, no page errors.
 import { startAppStub } from './app-stub.mjs';
@@ -35,7 +35,7 @@ try {
     const gap = await page.$eval('#community-post-list', (el) => parseFloat(getComputedStyle(el).columnGap));
     let b = await boxes(page);
     check(`${w} NM1 masonry is on`, await page.locator('#community-post-list.is-masonry').count() === 1);
-    check(`${w} NM1 cards take their own height`, new Set(b.map((x) => x.h)).size > 1, JSON.stringify(b.map((x) => x.h)));
+    check(`${w} NM1 every card has the original size (one height)`, Math.max(...b.map((x) => x.h)) - Math.min(...b.map((x) => x.h)) <= 1, JSON.stringify(b.map((x) => x.h)));
     check(`${w} NM1 no two cards overlap`, !overlaps(b), JSON.stringify(b));
     check(`${w} NM1 the space under each card is the gap (${gap} px)`, gapsOk(b, gap), JSON.stringify(b));
     if (shots) await page.screenshot({ path: `${shots}/masonry-${w}.png`, fullPage: true });

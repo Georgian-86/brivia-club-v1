@@ -4613,3 +4613,13 @@ bring a short line back.
 - **Checks.** e2e `notes-masonry.spec.mjs` NM1-NM3 (own heights, no overlap, even gaps, only the opened card grows) at
   1440, 1024 and 390; explore-cards E2 and E7 updated to the new rule (74 pass); post-more, post-activity, post-likers,
   post-delete, post-edit, post-frame, post-notifications, admin-badge pass; unit 613.
+
+## D-249 (2026-11-13): the original card size, with only the opened card growing
+
+- **Ask (founder, 2026-11-13, after D-248):** "bring back the previous original card size, it would just get expanded
+  after clicking read more otherwise keep the card size to that original size".
+- **Decision.** Every Notes card is the original size again: the 5:4 photo and two caption lines (D-107), so all cards
+  match. The masonry layout from D-248 stays underneath: "… more" grows only that card, and only the cards under it
+  move down; no card in its row stretches. D-248's own-height cards and own-shape photos are withdrawn.
+- **Checks.** explore-cards (74) and post-more back to their pre-D-248 form; notes-masonry NM1 now checks one card size;
+  NM2 (only the opened card grows, no overlap, even gaps) unchanged.

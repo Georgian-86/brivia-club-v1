@@ -6307,8 +6307,9 @@ const markCaptionMore = () => {
     more.hidden = !(caption.scrollHeight > caption.clientHeight + 1);
   });
 };
-// D-248: the Notes grid is a masonry ("Pinterest") wall. Each card keeps its own height (a short caption, a portrait
-// photo) and the next card tucks in underneath, instead of every card in a row stretching to the tallest. The grid
+// D-248/D-249: the Notes grid lays cards out as a masonry wall. Every card has the original size (5:4 photo, two caption
+// lines); a card whose caption is opened grows alone and the cards under it move down, instead of every card in its row
+// stretching to its height. The grid
 // runs on 2 px rows; each card spans as many as its height plus the column gap. A ResizeObserver re-spans a card when
 // its photo loads or its caption opens. One column: no spans (the natural flow is the same).
 const MASONRY_ROW = 2;
@@ -6331,18 +6332,8 @@ const layoutMasonry = () => {
     cards.forEach((card) => masonryObserver.observe(card));
   }
 };
-// A post photo shows in its own shape (as framed when posted), between 4:5 portrait and 16:9 landscape.
-const fitPostMedia = (img) => {
-  const box = img?.closest('.post-card-media');
-  if (!box || !img.naturalWidth || !img.naturalHeight) return;
-  const ratio = Math.min(16 / 9, Math.max(4 / 5, img.naturalWidth / img.naturalHeight));
-  box.style.aspectRatio = String(Math.round(ratio * 1000) / 1000);
-};
-const fitAllPostMedia = () => document.querySelectorAll('#community-post-list .post-card-media img').forEach((img) => {
-  if (img.complete) fitPostMedia(img); else img.addEventListener('load', () => fitPostMedia(img), { once: true });
-});
 let captionMoreFrame = 0;
-const scheduleCaptionMore = () => { cancelAnimationFrame(captionMoreFrame); captionMoreFrame = requestAnimationFrame(() => { fitAllPostMedia(); markCaptionMore(); layoutMasonry(); }); };
+const scheduleCaptionMore = () => { cancelAnimationFrame(captionMoreFrame); captionMoreFrame = requestAnimationFrame(() => { markCaptionMore(); layoutMasonry(); }); };
 window.addEventListener('resize', scheduleCaptionMore, { passive: true });
 const toggleCaptionMore = (card) => {
   const more = card?.querySelector('.post-card-more');

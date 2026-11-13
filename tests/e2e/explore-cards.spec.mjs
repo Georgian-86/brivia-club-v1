@@ -7,8 +7,8 @@
 // Asserts:
 // E1 columns: 1 at 375 and 390, 2 at 768, 4 at 1280, 1440 and 1920 (distinct card offsetLeft values); smaller cards
 //    since D-092: at most 340 px wide on a phone and 300 px from 1280.
-// E2 (D-248) every card's media box keeps the photo's shape between 4:5 and 16:9, and each card keeps its own height (the
-//    masonry wall; until D-248 every box was 5:4 and cards in a row shared a height).
+// E2 every card's media box is 5:4 (width / height 1.25 ± 0.01; founder 2026-10-22 "a bit too long"), the whole card is
+//    close to square (height / width 1.1 to 1.35) from 768 px, and every card in a row has the same height.
 // E3 the header and action bars are --brivia-wine; their text is >= 4.5:1 against it (computed, not axe); every action
 //    is >= 44 x 44 px.
 // E4 a double tap on Like sends one POST and leaves aria-pressed="true"; a 403 rolls back with the toast "That didn't
@@ -195,15 +195,13 @@ try {
       const expected = width <= 390 ? 1 : width === 768 ? 2 : width < 1360 ? 3 : 4; // D-096: more air, 4 columns from 1360 px
       check(`E1 ${width}: ${expected} column(s) (${m.columns}; ${m.count} cards)`, () => { assert.equal(m.count, POSTS.length); assert.equal(m.columns, Math.min(expected, m.count)); });
       check(`E1 ${width}: smaller cards (${m.cardWidth} px wide)`, () => assert.ok(m.cardWidth <= (width <= 390 ? 350 : 310), String(m.cardWidth)));
-      // D-248 (founder 2026-11-13, "pinteresty"): a photo keeps its own shape between 4:5 and 16:9, and each card keeps its
-      // own height (the masonry wall), so cards in a row no longer share one.
-      check(`E2 ${width}: every media box is between 4:5 and 16:9 (${JSON.stringify({ ratios: m.ratios })})`, () => {
-        m.ratios.forEach((r) => assert.ok(r >= 0.79 && r <= 1.79, String(r)));
+      check(`E2 ${width}: every media box is 5:4 and cards in a row share a height (${JSON.stringify({ ratios: m.ratios, rows: m.rows })})`, () => {
+        m.ratios.forEach((r) => assert.ok(Math.abs(r - 1.25) <= 0.01, String(r)));
+        m.rows.forEach((row) => assert.ok(Math.max(...row) - Math.min(...row) <= 1, JSON.stringify(row)));
       });
       check(`E2 ${width}: the whole card reads close to square (height / width ${JSON.stringify([...new Set(m.shapes)])}, ${m.cardWidth} px wide)`, () => {
         // D-107: every card now ends in a 40 px footer, so the bound moved from 1.35 to 1.5 (wide) and 1.4 to 1.5 (phone).
-        // D-248: a short caption no longer reserves two lines and a portrait photo may be 4:5, so 0.9 to 2.0.
-        m.shapes.forEach((r) => assert.ok(r >= 0.9 && r <= 2.0, String(r)));
+        m.shapes.forEach((r) => assert.ok(width >= 768 ? r >= 1.1 && r <= 1.5 : r <= 1.5, String(r)));
         assert.ok(m.cardWidth <= 440, `card ${m.cardWidth} px wide`);
       });
       check(`E3 ${width}: header and action bars are --brivia-wine, text >= 4.5:1, targets >= 44 px (${JSON.stringify({ wine: m.wine, heads: m.heads, bars: m.bars, min: m.minContrast, small: m.small })})`, () => {
@@ -532,15 +530,14 @@ try {
         const after = await page.evaluate(() => {
           const list = document.querySelector('#community-post-list');
           const card = list.querySelector('.post-card').getBoundingClientRect();
-          return { busy: list.getAttribute('aria-busy'), skeletons: list.querySelectorAll('.skeleton').length, width: Math.round(card.width), shortest: Math.min(...[...list.querySelectorAll('.post-card')].map((c) => Math.round(c.getBoundingClientRect().height))), tallest: Math.max(...[...list.querySelectorAll('.post-card')].map((c) => Math.round(c.getBoundingClientRect().height))) };
+          return { busy: list.getAttribute('aria-busy'), skeletons: list.querySelectorAll('.skeleton').length, width: Math.round(card.width), shortest: Math.min(...[...list.querySelectorAll('.post-card')].map((c) => Math.round(c.getBoundingClientRect().height))) };
         });
         check(`E7 ${width}: card-shaped skeletons while loading, aria-busy cleared after (${JSON.stringify({ during, after })})`, () => {
           assert.ok(during, 'skeletons with aria-busy within 900 ms');
           assert.equal(during.head && during.actions, true);
           assert.ok(Math.abs(during.ratio - 1.25) <= 0.01, String(during.ratio));
           assert.ok(Math.abs(during.width - after.width) <= 1, `${during.width} vs ${after.width}`);
-          // D-248: cards now have their own heights; a skeleton sits within the range of the real ones.
-          assert.ok(during.height >= after.shortest - 24 && during.height <= after.tallest + 24, `${during.height} vs ${after.shortest}-${after.tallest}`);
+          assert.ok(Math.abs(during.height - after.shortest) <= 24, `${during.height} vs ${after.shortest}`);
           assert.equal(after.busy, null); assert.equal(after.skeletons, 0);
         });
         await context.close();

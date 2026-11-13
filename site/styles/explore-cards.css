@@ -373,10 +373,6 @@ body.app-body .post-card-more-pill svg{width:12px;height:12px}
 body.app-body .post-card.is-caption-open .post-card-more{padding:0;background:none}
 
 /* D-248: the masonry ("Pinterest") wall. app.js sets each card's row span from its height on 2 px rows; the vertical
-   gap is part of the span, so the grid's own row gap is 0. A short caption no longer reserves a second line. */
+   gap is part of the span, so the grid's own row gap is 0. D-249: cards keep the original size (5:4 photo, two caption lines); only an opened card grows. */
 body.app-body .community-feed-view .community-post-list.is-masonry{grid-auto-rows:2px;grid-auto-flow:row dense;row-gap:0 !important;align-items:start}
 body.app-body .community-post-list.is-masonry>.post-card{align-self:start}
-body.app-body .post-card-caption{height:auto;max-height:2.7em}
-body.app-body .post-card.is-caption-open .post-card-caption{max-height:none}
-body.app-body .post-card-caption:empty{display:none}
-body.app-body .post-card-media{transition:aspect-ratio var(--motion-base, .2s) ease}

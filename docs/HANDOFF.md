@@ -7,6 +7,8 @@ Update this file at the end of every session. CLAUDE.md holds the aim; this file
 
 ## 1. What is done
 
+**2026-11-13, D-249:** Notes cards back to the original size; "… more" grows only that card (D-248 layout kept).
+
 **2026-11-13, D-248:** Notes is a masonry wall (own heights, "… more" opens one card, photos in their own shape).
 
 **2026-11-13, D-247:** Notes card captions keep their line breaks.
