@@ -78,7 +78,7 @@ test('web push: iPhone in a Safari tab must add to Home Screen; denied and unsup
 
 // D-151 (0043): likes and comments on my notes.
 import { groupPostNotifications, postNotificationCopy } from '../../site/scripts/member-notifications.js';
-test('groupPostNotifications: likes per note in one row, each comment its own row, newest first', () => {
+test('groupPostNotifications: likes per note in one row, comments per note in one row (D-253), newest first', () => {
   const now = Date.parse('2026-11-04T12:00:00Z');
   const n = (id, type, postId, sourceId, name, at, extra = {}) => ({ id, type, postId, sourceId, name, createdAt: at, readAt: null, dismissedAt: null, snippet: '', ...extra });
   const list = [
@@ -90,7 +90,7 @@ test('groupPostNotifications: likes per note in one row, each comment its own ro
     n('6', 'post_like', 'p3', 'e', 'E', '2026-11-04T09:00:00Z', { dismissedAt: 'x' }),
   ];
   const groups = groupPostNotifications(list, now);
-  assert.deepEqual(groups.map((g) => g.key), ['c:3', 'l:p1']);
+  assert.deepEqual(groups.map((g) => g.key), ['c:p1', 'l:p1']);
   assert.deepEqual(groups[1].ids, ['1', '2']);
   assert.equal(groups[1].unread, true);
   assert.equal(groups[1].people.length, 2);
@@ -129,4 +129,21 @@ test('web push: iPhone install steps for Safari, Chrome, and inside another app'
   assert.match(installSteps('chrome')[0], /top right of Chrome/);
   assert.match(installSteps('inapp')[0], /Open in Safari/);
   assert.equal(installSteps('safari').length, 4);
+});
+
+// D-253: comments on one note are one row: the newest comment, its writer first, then "and N others".
+test('groupPostNotifications + postNotificationCopy: comments on a note in one row with the newest comment', () => {
+  const now = Date.parse('2026-11-13T12:00:00Z');
+  const c = (id, src, name, at, snippet) => ({ id, type: 'post_comment', postId: 'p9', sourceId: src, name, createdAt: at, readAt: null, dismissedAt: null, snippet, commentId: `k${id}` });
+  const groups = groupPostNotifications([
+    c('1', 'a', 'Amar Singh', '2026-11-13T09:00:00Z', 'First!'),
+    c('2', 'b', 'Diya Shah', '2026-11-13T11:00:00Z', 'Beautiful'),
+    c('3', 'a', 'Amar Singh', '2026-11-13T10:00:00Z', 'Again'),
+    c('4', 'g', 'Golu', '2026-11-13T08:00:00Z', 'Hi'),
+  ], now);
+  assert.equal(groups.length, 1);
+  assert.deepEqual(groups[0].people.map((p) => p.id), ['b', 'a', 'g']);
+  assert.equal(groups[0].snippet, 'Beautiful');
+  assert.deepEqual(postNotificationCopy(groups[0]), { title: 'Diya and 2 others commented on your note', line: 'Beautiful' });
+  assert.equal(postNotificationCopy({ ...groups[0], people: groups[0].people.slice(0, 2) }).title, 'Diya and Amar commented on your note');
 });

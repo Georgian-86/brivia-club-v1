@@ -4672,3 +4672,23 @@ bring a short line back.
   wine dot for unread instead of a tinted band.
 - **Checks.** comment-at-limit CL1 at 1440 and 390; post-notifications (quotes removed from PN1), crossing-paths,
   event-notifications, post-likers, collab-requests, nearby pass; unit 613 (copy without quotes).
+
+## D-253 (2026-11-13): a calmer notification panel, comments grouped, and Hiring off gives the deck back
+
+- **Ask (founder, 2026-11-13):** "still notifications section is not looking that aesthetic"; "just show recent comment
+  and say xyz and pqr others commented"; "once I click on hiring, then I am not able to go back to normal".
+- **Panel (notification-panel.css, loaded last).** A cream card with a soft wine shadow and 22 px corners; a serif
+  "Notifications" title and a quiet "Mark all read"; every row on one grid (44 px face, the words, a 48 px photo tile);
+  names in bold wine; comments and captions plain in a cream bubble cut cleanly at two lines; times as "6h ago"; unread
+  rows marked by a dot; the collaboration row in the same body type with a smaller Review pill. The "is nearby" row
+  keeps its compact layout (D-119). An Admin is named in full ("The Brivia Club shared a new note", not "THE shared").
+- **Comments grouped.** Comments on one note are one row, like likes: the newest comment in the bubble, its writer
+  first, "Diya and Amar commented" / "Diya and 2 others commented on your note", two faces. Likes now lead with the
+  newest liker too.
+- **Hiring off.** Turning the lens on moved the hiring people to the front of the deck; turning it off left them there,
+  so the deck still looked like Hiring. The deck is now saved when the lens goes on, and off (or "Clear filters") gives
+  it back: the people the lens brought in leave and the rest return to their order.
+- **Checks.** hiring-off HO1 (fails on the previous build, passes now) at 1440 and 390; unit 614 (comment grouping and
+  copy); post-notifications, crossing-paths, collab-requests, event-notifications, hiring, deck (201),
+  discovery-location, newcomers, comment-at-limit pass. app-shell already times out on main (the new-post composer
+  step), unrelated to this change.
