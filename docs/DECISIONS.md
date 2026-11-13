@@ -4647,3 +4647,12 @@ bring a short line back.
   selection, View profile still clicks), landing (gated intro, 4 s after the tap; no gate when sound is allowed),
   landing-sound (the Safari intro cue and soundtrack after the tap), launch-polish, sounds, deck (201), consent (189),
   newcomers, deck-tutorial pass; unit 613.
+
+## D-251 (2026-11-13): no "Tap to enter"; music stays on by default
+
+- **Ask (founder, 2026-11-13):** "no remove this tap to enter w sound button and keep the sound effects by default".
+- **Decision.** The D-250 gate is removed: the intro plays at once, as before D-250. The music and the intro's cue stay
+  ON by default (D-220/D-221): they play at load wherever the browser allows sound, and otherwise start with the
+  visitor's first tap, click or key anywhere on the page (a tap during the intro still brings the cue in on the title).
+  Browsers do not allow sound before a first gesture, so on a fresh visit without one the intro itself is silent.
+- **Checks.** landing, landing-sound, launch-polish and sounds pass with the pre-D-250 files.
