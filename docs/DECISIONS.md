@@ -4656,3 +4656,19 @@ bring a short line back.
   visitor's first tap, click or key anywhere on the page (a tap during the intro still brings the cue in on the title).
   Browsers do not allow sound before a first gesture, so on a fresh visit without one the intro itself is silent.
 - **Checks.** landing, landing-sound, launch-polish and sounds pass with the pre-D-250 files.
+
+## D-252 (2026-11-13): comments at the swipe limit; a prettier notification panel; no quote marks
+
+- **Ask (founder, 2026-11-13):** "if the free swipes get over, pls dont restrict comments, the user must still be able
+  to comment on posts"; "make this notification section little aesthetic and pretty and dont show double quotes on
+  comments".
+- **Comments.** Nothing in the client or in the repo's SQL ties comments to the swipe quota (the insert policy needs only
+  a completed profile and a visible note). A member at 0 swipes posts a comment normally in the stubbed app; a new spec
+  (`comment-at-limit`) now guards it. The live database could not be inspected in this session (the Supabase connector
+  was down), so a live-only rule is not ruled out; the founder was asked what they saw.
+- **Panel.** Note rows are soft cards inset from the panel's edges, all titles on one line start (faces in one 52 px
+  column; a like shows the newest face in front and the next behind it), the name in bold, a comment or caption in a
+  cream bubble (no quote marks, not italic), the time small and uppercase, the note's photo a rounded 48 px tile, and a
+  wine dot for unread instead of a tinted band.
+- **Checks.** comment-at-limit CL1 at 1440 and 390; post-notifications (quotes removed from PN1), crossing-paths,
+  event-notifications, post-likers, collab-requests, nearby pass; unit 613 (copy without quotes).

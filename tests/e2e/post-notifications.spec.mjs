@@ -50,7 +50,7 @@ try {
     const badge = await openPanel(page);
     check(`${w} PN1 the bell counts two unread rows`, badge === '2', badge);
     const rows = await page.$$eval('.notification-post', (els) => els.map((el) => ({ title: el.querySelector('strong')?.textContent, line: el.querySelector('.notification-nearby-copy span')?.textContent || '', thumb: Boolean(el.querySelector('.notification-post-thumb img')) })));
-    check(`${w} PN1 rows: the comment, then the likes`, rows.length === 2 && rows[0].title === 'Ravi commented on your note' && rows[0].line === '“Where is this café?”' && rows[1].title === 'Ravi and Asha liked your note', JSON.stringify(rows));
+    check(`${w} PN1 rows: the comment, then the likes`, rows.length === 2 && rows[0].title === 'Ravi commented on your note' && rows[0].line === 'Where is this café?' && rows[1].title === 'Ravi and Asha liked your note', JSON.stringify(rows));
     check(`${w} PN1 each row shows the note`, rows.every((r) => r.thumb), JSON.stringify(rows));
     if (shots) await page.screenshot({ path: `${shots}/post-notes-${w}.png` });
     const likeRow = await page.$eval('.notification-post.has-stack', (el) => ({ faces: el.querySelectorAll('.notification-avatar').length, see: el.querySelector('.notification-see-likers')?.textContent })).catch(() => null);

@@ -99,7 +99,7 @@ test('postNotificationCopy: one, two, many likers; a comment quotes its words', 
   assert.equal(postNotificationCopy({ type: 'post_like', people: [{ name: 'Asha Rao' }] }).title, 'Asha liked your note');
   assert.equal(postNotificationCopy({ type: 'post_like', people: [{ name: 'Asha' }, { name: 'Ravi K' }] }).title, 'Asha and Ravi liked your note');
   assert.equal(postNotificationCopy({ type: 'post_like', people: [{ name: 'Asha' }, { name: 'B' }, { name: 'C' }, { name: 'D' }] }).title, 'Asha and 3 others liked your note');
-  assert.deepEqual(postNotificationCopy({ type: 'post_comment', people: [{ name: 'Ravi' }], snippet: 'Where?' }), { title: 'Ravi commented on your note', line: '“Where?”' });
+  assert.deepEqual(postNotificationCopy({ type: 'post_comment', people: [{ name: 'Ravi' }], snippet: 'Where?' }), { title: 'Ravi commented on your note', line: 'Where?' });
   assert.equal(postNotificationCopy({ type: 'post_like', people: [{ name: '' }] }).title, 'A member liked your note');
 });
 
@@ -113,7 +113,7 @@ test('post_new: one row per note, titled "<name> shared a new note" with the cap
   ];
   const groups = groupPostNotifications(list, now);
   assert.deepEqual(groups.map((g) => [g.key, g.type, g.unread]), [['n:n2', 'post_new', false], ['n:n1', 'post_new', true], ['l:n1', 'post_like', true]]);
-  assert.deepEqual(postNotificationCopy(groups[1]), { title: 'Asha shared a new note', line: '“Evening at the club”' });
+  assert.deepEqual(postNotificationCopy(groups[1]), { title: 'Asha shared a new note', line: 'Evening at the club' });
   assert.deepEqual(postNotificationCopy(groups[0]), { title: 'Ravi shared a new note', line: 'Tap to see it.' });
 });
 

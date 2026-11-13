@@ -106,3 +106,45 @@
 .push-install-copy:focus-visible { outline: 2px solid var(--color-wine-soft); outline-offset: 2px; }
 @keyframes push-install-in { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: none; } }
 @media (prefers-reduced-motion: reduce) { .push-install { animation: none; } }
+
+/* ---------- D-252: a prettier panel (founder: "make this notification section little aesthetic and pretty") ----------
+   Each note row is a soft card inset from the panel's edges: one column for faces (a like's stack fits in it, so every
+   title starts on the same line), the name in bold, a comment or caption in a cream bubble (no quote marks, not italic),
+   the time small and quiet, the note's photo a rounded 48 px tile. Unread rows carry a wine dot instead of a fill. */
+#notification-list .notification-post{
+  position:relative;grid-template-columns:52px minmax(0,1fr) auto;gap:12px;
+  width:calc(100% - 16px);margin:6px 8px;padding:12px 12px 12px 14px;border:0;border-radius:16px;
+  background:transparent;transition:background var(--motion-fast) var(--ease), transform var(--motion-fast) var(--ease);
+}
+#notification-list .notification-post + .notification-post{margin-top:2px}
+#notification-list .notification-post.is-unread{background:color-mix(in srgb, var(--brivia-wine) 5%, var(--color-cream))}
+#notification-list .notification-post.is-unread::before{
+  content:'';position:absolute;left:4px;top:50%;width:6px;height:6px;margin-top:-3px;border-radius:50%;background:var(--brivia-wine);
+}
+@media (hover:hover){#notification-list .notification-post:hover{background:color-mix(in srgb, var(--brivia-wine) 8%, var(--color-cream))}}
+#notification-list .notification-post .notification-nearby-face{width:52px;height:44px;display:flex;align-items:center}
+#notification-list .notification-post .notification-nearby-face > .notification-avatar:first-child{width:44px;height:44px;flex:none}
+#notification-list .notification-post.has-stack .notification-nearby-face{width:52px;min-width:52px;padding:0}
+/* A like's faces: the newest 36 px in front, the next 28 px tucked behind it to the right (a third stays in "See all"). */
+#notification-list .notification-post.has-stack .notification-nearby-face{position:relative}
+#notification-list .notification-post.has-stack .notification-avatar:first-child{position:relative;z-index:2;width:36px;height:36px;border:2px solid var(--color-cream)}
+#notification-list .notification-post.has-stack .notification-avatar--stack{position:absolute;z-index:1;top:2px;left:22px;width:28px;height:28px;margin:0;border:2px solid var(--color-cream)}
+#notification-list .notification-post.has-stack .notification-avatar--stack + .notification-avatar--stack{display:none}
+#notification-list .notification-post .notification-post-kind{z-index:3;right:4px;bottom:0;left:auto;width:18px;height:18px}
+#notification-list .notification-post.has-stack .notification-post-kind{left:22px;right:auto;bottom:2px}
+#notification-list .notification-post .notification-nearby-copy{gap:5px}
+#notification-list .notification-post .notification-nearby-copy strong{
+  color:var(--color-ink);font-size:var(--text-14);font-weight:400;line-height:1.35;white-space:normal;
+}
+#notification-list .notification-post .notification-nearby-copy strong b{color:var(--color-wine-deep);font-weight:700}
+#notification-list .notification-post .notification-nearby-copy span.notification-snippet{
+  justify-self:start;max-width:100%;padding:5px 11px;border-radius:4px 14px 14px 14px;
+  background:color-mix(in srgb, var(--brivia-wine) 7%, var(--color-cream));color:var(--color-ink);
+  font-size:var(--text-12);font-style:normal;line-height:1.4;-webkit-line-clamp:2;
+}
+#notification-list .notification-post .notification-nearby-copy span.notification-line{font-style:normal}
+#notification-list .notification-post .notification-nearby-copy small{color:var(--color-ink-soft);font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase}
+#notification-list .notification-post .notification-post-thumb{
+  width:48px;height:48px;border-radius:12px;box-shadow:0 4px 12px color-mix(in srgb, var(--brivia-wine) 18%, transparent);
+}
+@media (prefers-reduced-motion:reduce){#notification-list .notification-post{transition:none}}
