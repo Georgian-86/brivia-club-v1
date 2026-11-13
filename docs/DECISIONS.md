@@ -4590,3 +4590,12 @@ bring a short line back.
 - **Granted.** THE BRIVIA CLUB (created 2026-11-13 04:49 UTC, the account in the founder's screenshot).
 - **Checks.** SQL `zp-member-badges.test.sql` (members read, cannot write; only 'admin'); e2e `admin-badge.spec.mjs`
   AB1-AB3 at 1440 and 390 (axe clean); chat-extras, chat-inbox, deck, post-activity, explore-cards, hiring pass; unit 613.
+
+## D-247 (2026-11-13): captions keep their line breaks on the Notes cards
+
+- **Ask (founder, 2026-11-13, screenshot of the club's notifications note):** "the latest post has two three lines but
+  i can see everything got merged in one line, pls fix it".
+- **Decision.** A card's caption keeps the author's line breaks, as the open note already did. Closed, it still shows two
+  lines and "… more" when the breaks run past them; open, it reads exactly as written.
+- **Checks.** e2e `post-more.spec.mjs` RM4 (a three-paragraph caption shows "… more" and opens on five lines) at 1440 and
+  390; `admin-badge.spec.mjs` now also checks the badge on a Notes card.

@@ -3,6 +3,7 @@
 // RM1 a caption cut at two lines shows "… more" (D-244: a text link, no pill) (>= 44 px); a short one does not; cards keep the same height.
 // RM2 Read more shows the whole caption in place (aria-expanded), "Show less" folds it back; the post does not open.
 // RM3 axe clean at 390.
+// RM4 (D-247) a caption with line breaks keeps them: "… more" shows, and open it reads on separate lines.
 import { startAppStub } from './app-stub.mjs';
 import { axeViolations } from './a11y.mjs';
 const { chromium } = await import(process.env.PLAYWRIGHT_MODULE || 'playwright');
@@ -15,6 +16,7 @@ const at = (h) => new Date(Date.now() - h * 36e5).toISOString();
 const st = { posts: [
   { id: 'long', author_id: OTHER, image_url: IMG, image_path: '', caption: LONG, created_at: at(1) },
   { id: 'short', author_id: OTHER, image_url: IMG, image_path: '', caption: 'Deepavali 🪔', created_at: at(2) },
+  { id: 'lines', author_id: OTHER, image_url: IMG, image_path: '', caption: 'BRIVIA HAS NOTIFICATIONS 🔔\n\nAnd its own icon too!\n\nGo to Settings', created_at: at(3) },
 ], rows: [{ id: OTHER, name: 'Meera Iyer', photo_url: null, cover_url: null, experience: 'Member', skills: ['Chess'], looking_for: ['Friends'] }] };
 const stub = await startAppStub({ port: 5215, state: st });
 const browser = await chromium.launch();
@@ -31,6 +33,12 @@ try {
     const box = await longMore.boundingBox();
     check(`${w} RM1 a cut caption shows Read more, >= 44 px`, (await longMore.isVisible()) && box.height >= 44 && box.width >= 44, JSON.stringify(box));
     check(`${w} RM1 a short caption has none`, await page.locator('.post-card[data-post-id="short"] .post-card-more').isHidden());
+    check(`${w} RM4 a caption with line breaks shows … more`, await page.locator('.post-card[data-post-id="lines"] .post-card-more').isVisible());
+    await page.locator('.post-card[data-post-id="lines"] .post-card-more').click();
+    const linesOpen = await page.$eval('.post-card[data-post-id="lines"] .post-card-caption', (el) => Math.round(el.getBoundingClientRect().height / parseFloat(getComputedStyle(el).lineHeight)));
+    check(`${w} RM4 open, the breaks stay (5 lines)`, linesOpen >= 5, String(linesOpen));
+    if (shots) await page.locator('.post-card[data-post-id="lines"]').screenshot({ path: `${shots}/post-lines-${w}.png` });
+    await page.locator('.post-card[data-post-id="lines"] .post-card-more').click();
     const heights = await page.$$eval('.post-card', (els) => els.map((e) => Math.round(e.getBoundingClientRect().height)));
     check(`${w} RM1 cards keep the same height`, new Set(heights).size === 1, JSON.stringify(heights));
     if (w === 390) {
