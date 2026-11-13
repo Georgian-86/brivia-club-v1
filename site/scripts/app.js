@@ -6307,8 +6307,42 @@ const markCaptionMore = () => {
     more.hidden = !(caption.scrollHeight > caption.clientHeight + 1);
   });
 };
+// D-248: the Notes grid is a masonry ("Pinterest") wall. Each card keeps its own height (a short caption, a portrait
+// photo) and the next card tucks in underneath, instead of every card in a row stretching to the tallest. The grid
+// runs on 2 px rows; each card spans as many as its height plus the column gap. A ResizeObserver re-spans a card when
+// its photo loads or its caption opens. One column: no spans (the natural flow is the same).
+const MASONRY_ROW = 2;
+let masonryObserver = null;
+const spanCard = (card, gap) => { card.style.gridRowEnd = `span ${Math.max(1, Math.ceil((card.offsetHeight + gap) / MASONRY_ROW))}`; };
+const layoutMasonry = () => {
+  const list = document.querySelector('#community-post-list');
+  if (!list) return;
+  const cards = [...list.querySelectorAll(':scope > .post-card')];
+  const columns = getComputedStyle(list).gridTemplateColumns.split(' ').filter(Boolean).length;
+  const on = columns > 1 && cards.length > 1;
+  list.classList.toggle('is-masonry', on);
+  masonryObserver?.disconnect();
+  if (!on) { cards.forEach((card) => { card.style.gridRowEnd = ''; }); return; }
+  const gap = parseFloat(getComputedStyle(list).columnGap) || 20;
+  list.style.setProperty('--masonry-gap', `${gap}px`);
+  cards.forEach((card) => spanCard(card, gap));
+  if (typeof ResizeObserver === 'function') {
+    masonryObserver = new ResizeObserver((entries) => entries.forEach((entry) => spanCard(entry.target, gap)));
+    cards.forEach((card) => masonryObserver.observe(card));
+  }
+};
+// A post photo shows in its own shape (as framed when posted), between 4:5 portrait and 16:9 landscape.
+const fitPostMedia = (img) => {
+  const box = img?.closest('.post-card-media');
+  if (!box || !img.naturalWidth || !img.naturalHeight) return;
+  const ratio = Math.min(16 / 9, Math.max(4 / 5, img.naturalWidth / img.naturalHeight));
+  box.style.aspectRatio = String(Math.round(ratio * 1000) / 1000);
+};
+const fitAllPostMedia = () => document.querySelectorAll('#community-post-list .post-card-media img').forEach((img) => {
+  if (img.complete) fitPostMedia(img); else img.addEventListener('load', () => fitPostMedia(img), { once: true });
+});
 let captionMoreFrame = 0;
-const scheduleCaptionMore = () => { cancelAnimationFrame(captionMoreFrame); captionMoreFrame = requestAnimationFrame(markCaptionMore); };
+const scheduleCaptionMore = () => { cancelAnimationFrame(captionMoreFrame); captionMoreFrame = requestAnimationFrame(() => { fitAllPostMedia(); markCaptionMore(); layoutMasonry(); }); };
 window.addEventListener('resize', scheduleCaptionMore, { passive: true });
 const toggleCaptionMore = (card) => {
   const more = card?.querySelector('.post-card-more');

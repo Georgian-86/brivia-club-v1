@@ -1,6 +1,6 @@
 // "Read more" for long captions on post cards (D-237, founder 2026-11-11), stubbed Supabase.
 // PLAYWRIGHT_MODULE=/opt/node-tools/node_modules/playwright/index.mjs node tests/e2e/post-more.spec.mjs   (Vite on :5215)
-// RM1 a caption cut at two lines shows "… more" (D-244: a text link, no pill) (>= 44 px); a short one does not; cards keep the same height.
+// RM1 a caption cut at two lines shows "… more" (D-244: a text link, no pill) (>= 44 px); a short one does not; cards take their own height (D-248 masonry).
 // RM2 Read more shows the whole caption in place (aria-expanded), "Show less" folds it back; the post does not open.
 // RM3 axe clean at 390.
 // RM4 (D-247) a caption with line breaks keeps them: "… more" shows, and open it reads on separate lines.
@@ -40,7 +40,8 @@ try {
     if (shots) await page.locator('.post-card[data-post-id="lines"]').screenshot({ path: `${shots}/post-lines-${w}.png` });
     await page.locator('.post-card[data-post-id="lines"] .post-card-more').click();
     const heights = await page.$$eval('.post-card', (els) => els.map((e) => Math.round(e.getBoundingClientRect().height)));
-    check(`${w} RM1 cards keep the same height`, new Set(heights).size === 1, JSON.stringify(heights));
+    // D-248: the masonry wall: a short caption makes a shorter card (no reserved second line).
+    check(`${w} RM1 a short caption makes a shorter card`, heights.length >= 2 && Math.min(...heights) < Math.max(...heights), JSON.stringify(heights));
     if (w === 390) {
       const v = await axeViolations(page, { include: '#community-post-list' });
       check('390 RM3 axe clean', v.length === 0, JSON.stringify(v));
