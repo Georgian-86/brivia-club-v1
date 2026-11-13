@@ -4623,3 +4623,27 @@ bring a short line back.
   move down; no card in its row stretches. D-248's own-height cards and own-shape photos are withdrawn.
 - **Checks.** explore-cards (74) and post-more back to their pre-D-248 form; notes-masonry NM1 now checks one card size;
   NM2 (only the opened card grows, no overlap, even gaps) unchanged.
+
+## D-250 (2026-11-13): Admin notes reach everyone; a steadier laptop swipe; the intro starts with its music
+
+- **Ask (founder, 2026-11-13):** "the admin post notifications must go to everyone on the app whether they use it or
+  not"; "the swipe is not working well on laptop pls fix it its not smooth and is getting stuck"; "the intro video before
+  landing page is not producing music, pls fix that".
+- **Admin notes (0077).** A note by a member with the Admin badge notifies every real account (not anonymous, not the
+  author), active or not, set up or not, in the author's world, with no block either way: in the app and, on devices
+  that turned web notifications on, by push. Other members' notes still notify only their connections (0071).
+  push-notify reads the devices 100 members at a time so a note to everyone stays one call. The club's note of
+  2026-11-13 was sent to everyone once, in the app (its push window had passed).
+- **Laptop swipe.** A mouse drag is now captured from the press (moving off the card or out of the window keeps it), the
+  press never starts a text selection or a photo drag (Safari did), the card is painted once per frame with the newest
+  position, and a release outside the page or the window losing focus always lets the card go (it springs back). Tap
+  targets on the card still click. No Safari engine here: verified in Chromium (swipe-quick SQ1-SQ3, deck, consent).
+- **Intro music.** Browsers allow sound only after a tap, and the 4 s intro ran before any, so it was always silent. The
+  intro now waits on black behind "Tap to enter · with sound" (animations paused at their first frame, set in the page
+  head); the tap starts the intro and its music together (cue on the title, soundtrack under its tail). A browser that
+  already allows sound skips the gate; nobody tapping for 8 s, the intro plays on silently; a tab that turned the music
+  off never sees the gate. Reloads in the same tab still skip the intro (D-196).
+- **Checks.** SQL `zq-admin-post-broadcast.test.sql`; e2e swipe-quick SQ3 (drag to the window's edge, focus loss, no
+  selection, View profile still clicks), landing (gated intro, 4 s after the tap; no gate when sound is allowed),
+  landing-sound (the Safari intro cue and soundtrack after the tap), launch-polish, sounds, deck (201), consent (189),
+  newcomers, deck-tutorial pass; unit 613.

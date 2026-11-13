@@ -3,6 +3,8 @@
 // SQ1 four left swipes 250 ms apart (each starting on the stack while the last card may still be flying out) pass four
 //     cards, by touch on a phone and by mouse on a laptop, with normal and reduced motion.
 // SQ2 a tap on the stack mid-flight (no drag) passes nothing more.
+// SQ3 (D-250, laptop) a mouse drag that leaves the card (to the window's edge) still passes; a drag held when the window
+//     loses focus springs back (never stuck held); a press-and-drag selects no text; a click on "View profile" still opens it.
 import { startAppStub } from './app-stub.mjs';
 const { chromium } = await import(process.env.PLAYWRIGHT_MODULE || 'playwright');
 let failed = 0;
@@ -50,6 +52,26 @@ try {
     await page.waitForTimeout(1200);
     const tapped = num(await page.textContent('#swipe-name'));
     check(`${tag} SQ2 a tap mid-flight passes nothing more`, tapped - after === 1, `${after} -> ${tapped}`);
+    if (!touch && motion === 'no-preference') {
+      const before = num(await page.textContent('#swipe-name'));
+      await page.mouse.move(box.cx, box.y); await page.mouse.down();
+      for (let i = 1; i <= 10; i += 1) { await page.mouse.move(box.cx - ((box.cx - 4) * i) / 10, box.y + i * 6); await page.waitForTimeout(16); }
+      await page.mouse.up();
+      await page.waitForTimeout(900);
+      check(`${tag} SQ3 a drag out to the window's edge passes`, num(await page.textContent('#swipe-name')) - before === 1);
+      await page.mouse.move(box.cx, box.y); await page.mouse.down();
+      for (let i = 1; i <= 6; i += 1) { await page.mouse.move(box.cx + i * 15, box.y); await page.waitForTimeout(16); }
+      await page.evaluate(() => window.dispatchEvent(new Event('blur')));
+      await page.waitForTimeout(700);
+      const held = await page.evaluate(() => ({ t: document.querySelector('#swipe-card').style.transform, held: document.querySelector('#swipe-card').classList.contains('is-held'), drag: document.querySelector('#swipe-stack').classList.contains('is-dragging') }));
+      await page.mouse.up();
+      check(`${tag} SQ3 losing focus mid-drag springs the card back`, !held.held && !held.drag && !held.t, JSON.stringify(held));
+      check(`${tag} SQ3 a drag selects no text`, (await page.evaluate(() => String(getSelection()))) === '');
+      await page.waitForTimeout(300);
+      await page.locator('#swipe-card .view-info-button').click();
+      await page.waitForTimeout(500);
+      check(`${tag} SQ3 a click on View profile still opens it`, await page.evaluate(() => Boolean(document.querySelector('#public-profile-modal, .app-overlay:not([hidden])'))));
+    }
     check(`${tag} no page errors`, errors.length === 0, errors.join('; '));
     await ctx.close();
   }

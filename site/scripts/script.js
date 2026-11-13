@@ -36,7 +36,7 @@ const introBurst = document.querySelector('#intro-burst');
 const introSkip = introBurst?.querySelector('.intro-skip');
 // D-186: the intro is the drawn Brivia ignition (no video). introClock lets the music code below join it: the cue
 // plays if the page may make sound now, or from a tap during the intro (part-way, so the chord still lands on the name).
-const introClock = { start: 0, active: false, cued: false, musicFrom: 0, pending: false, primed: false };
+const introClock = { start: 0, active: false, cued: false, musicFrom: 0, pending: false, primed: false, waiting: false, begin: null };
 const landingMotion = motionAllowed({
   reducedMotion: Boolean(window.matchMedia?.('(prefers-reduced-motion: reduce)').matches),
   saveData: Boolean(navigator.connection?.saveData),
@@ -93,16 +93,48 @@ if (introBurst && plan === 'play') {
     introBurst.classList.add('is-skipped');
     window.setTimeout(() => introBurst.remove(), fast === true ? 160 : 500);
   };
-  introClock.start = performance.now();
-  introClock.active = true;
-  // The title is drawn by CSS from the first frame; it holds for a moment on the name, then fades.
-  // D-196: the name holds on screen until INTRO_HOLD_MS (3.5 s + a 0.5 s fade = 4 s, D-213), then the landing fades in.
-  // D-201: timed from navigation start, so the whole intro (hold + fade) is 5 s from the moment the page opens.
-  window.setTimeout(() => finishIntro(), Math.max(0, INTRO_HOLD_MS - Math.round(window.performance?.now?.() || 0)));
+  // D-250 (founder: "the intro ... is not producing music"): browsers allow sound only after a tap, and the intro used
+  // to run before any, so it was always silent. It now waits behind "Tap to enter" (html.intro-gated, set in the page
+  // head before the first frame, with the CSS animations paused); the tap starts the intro and, being a gesture, the
+  // music with it. Nobody tapping for 8 s: the intro plays on, silent, as before. Timers then count from the start.
+  const gate = introBurst.querySelector('[data-intro-enter]');
+  const root = document.documentElement;
+  // fromLoad: the browser already allows sound, so the gate is lifted at once and the 4 s count from the page opening.
+  const beginIntro = ({ fromLoad = false } = {}) => {
+    if (introClock.start) return;
+    const from = root.classList.contains('intro-gated') && fromLoad !== true ? performance.now() : 0;
+    root.classList.remove('intro-gated');
+    introClock.waiting = false;
+    gate?.remove();
+    introClock.start = performance.now();
+    introClock.active = true;
+    // The title is drawn by CSS; it holds for a moment on the name, then fades.
+    // D-196: the name holds on screen until INTRO_HOLD_MS (3.5 s + a 0.5 s fade = 4 s, D-213), then the landing fades in.
+    // D-201: timed from navigation start (or, behind the gate, from the tap), so the whole intro is 5 s.
+    const elapsed = () => Math.round(performance.now() - from);
+    window.setTimeout(() => finishIntro(), Math.max(0, INTRO_HOLD_MS - elapsed()));
+    // The cap leaves room for the 120 ms fade.
+    window.setTimeout(() => finishIntro(true), Math.max(0, INTRO_CAP_MS - 150 - elapsed()));
+  };
   introSkip?.addEventListener('click', () => finishIntro());
-  // The cap counts from navigation start (not from when this script ran) and leaves room for the 120 ms fade.
-  window.setTimeout(() => finishIntro(true), Math.max(0, INTRO_CAP_MS - 150 - Math.round(window.performance?.now?.() || 0)));
+  introClock.begin = beginIntro;
+  if (root.classList.contains('intro-gated') && gate) {
+    introClock.waiting = true;   // the cue is prepared while the gate waits, so the tap can play it at once
+    // The gate is the whole black screen: a click, a tap or a key anywhere enters. These listeners are on window in the
+    // capture phase and added before the music's, so the intro is running when the music hears the same gesture (the
+    // cue then lands on the title and the soundtrack waits for its tail, as for a tap during the intro).
+    const enter = (event) => {
+      if (introClock.start) return;
+      if (event.type === 'keydown' && (event.key === 'Tab' || event.key === 'Shift')) return;
+      beginIntro();
+    };
+    ['pointerdown', 'touchend', 'click', 'keydown'].forEach((type) => window.addEventListener(type, enter, { capture: true }));
+    window.setTimeout(() => beginIntro(), 8000);
+    try { gate.focus({ preventScroll: true }); } catch { /* not focusable yet */ }
+  } else beginIntro();
 }
+// A gate left over (the intro was skipped by script.js before it ran) never blocks the page.
+if (!introBurst || plan !== 'play') document.documentElement.classList.remove('intro-gated');
 
 /* The landing's videos are decorative and silent (the hero has no audio track, D-092), so they always play muted:
    only the music below makes sound, and on iPhone a video never takes the audio session from it (D-220). */
@@ -460,7 +492,7 @@ const ensureMusicElement = () => {
 };
 // The cue is rendered offline (no speakers involved) and handed to an <audio> as a WAV, while the title plays.
 const prepareMediaCue = () => {
-  if (cueEl || !introClock.active) return;
+  if (cueEl || !(introClock.active || introClock.waiting)) return;
   Promise.resolve(ignitionSound.prime({ sampleRate: 44100 })).then((buffer) => {
     if (!buffer || cueEl) return;
     const channels = Array.from({ length: buffer.numberOfChannels }, (_, c) => buffer.getChannelData(c));
@@ -575,7 +607,8 @@ if (isLandingPage) {
   renderSoundButton();
   if (musicPreference === 'on') {
     armUnlock();
-    soundAllowedNow().then((allowed) => { if (allowed) tryStartMusic(); });
+    // D-250: a browser that already allows sound needs no "Tap to enter": the intro starts now, with its music.
+    soundAllowedNow().then((allowed) => { if (allowed) { introClock.begin?.({ fromLoad: true }); tryStartMusic(); } });
     if (mediaMusic) { ensureMusicElement(); prepareMediaCue(); } else if (!navigator.connection?.saveData) {
       const prefetch = () => { fetchMusic().catch(() => {}); };
       if (typeof window.requestIdleCallback === 'function') window.requestIdleCallback(prefetch, { timeout: 2500 });

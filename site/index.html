@@ -83,6 +83,13 @@
           var saveData = !!(navigator.connection && navigator.connection.saveData);
           var slow = !!(navigator.connection && /^(slow-2g|2g)$/.test(navigator.connection.effectiveType || ''));
           if (seen || fromAuth || reduced || saveData || slow) document.documentElement.classList.add('no-intro');
+          /* D-250: the intro waits for a tap so it can start with its music (browsers allow sound only after one).
+             Not when the visitor turned the music off in this tab. script.js lifts it (or after 8 s, silently). */
+          else {
+            var mutedTab = false;
+            try { mutedTab = sessionStorage.getItem('brivia-landing-sound') === 'off'; } catch (e) {}
+            if (!mutedTab) document.documentElement.classList.add('intro-gated');
+          }
         } catch (e) {}
       })();
     </script>
@@ -90,6 +97,7 @@
   </head>
   <body>
     <div class="intro-burst" id="intro-burst" role="status" aria-label="Introducing Brivia Club">
+      <button class="intro-enter" type="button" data-intro-enter><span class="intro-enter-word">Tap to enter</span><span class="intro-enter-sub">with sound</span></button>
       <!-- D-186: the opening title is drawn live (brivia-ignition.js, ignition.css), sharp at any size. -->
       <div class="ignition" aria-hidden="true"><span class="ignition-flare"></span><span class="ignition-streak"></span><span class="ignition-core"></span><p class="ignition-word"><span class="ignition-letter" style="--d:7;--s:-1">T</span><span class="ignition-letter" style="--d:6;--s:-1">H</span><span class="ignition-letter" style="--d:5;--s:-1">E</span><span class="ignition-gap"></span><span class="ignition-letter" style="--d:3;--s:-1">B</span><span class="ignition-letter" style="--d:2;--s:-1">R</span><span class="ignition-letter" style="--d:1;--s:-1">I</span><span class="ignition-letter" style="--d:0;--s:0">V</span><span class="ignition-letter" style="--d:1;--s:1">I</span><span class="ignition-letter" style="--d:2;--s:1">A</span><span class="ignition-gap"></span><span class="ignition-letter" style="--d:4;--s:1">C</span><span class="ignition-letter" style="--d:5;--s:1">L</span><span class="ignition-letter" style="--d:6;--s:1">U</span><span class="ignition-letter" style="--d:7;--s:1">B</span></p></div>
     </div>

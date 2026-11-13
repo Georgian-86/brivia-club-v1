@@ -1561,3 +1561,11 @@ delete from public.member_badge where member_id = '<member uuid>';
 
 Verify: `select has_table_privilege('authenticated', 'public.member_badge', 'insert');` (false). Applied live
 2026-11-13; THE BRIVIA CLUB granted 'admin'.
+
+## 0077
+
+**Admin notes reach everyone (D-250).** Apply after `0076`, then deploy `push-notify`. Re-creates
+`brivia_private.brivia_notify_post_new()`: a note by a member with the Admin badge notifies every real account in the
+author's world (no block either way); anyone else's note still notifies only their connections. Verify: post a note as
+an admin and `select count(*) from public.member_notification where post_id = '<id>';` (every other account). Applied
+live 2026-11-13.

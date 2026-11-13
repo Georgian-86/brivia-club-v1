@@ -104,10 +104,14 @@ Deno.serve(async (req) => {
 
   const recipients = [...new Set(claimed.map((n) => n.user_id))];
   const sources = [...new Set(claimed.map((n) => n.source_user_id).filter(Boolean))];
-  const [{ data: subs }, { data: people }] = await Promise.all([
-    admin.from('push_subscription').select('endpoint,member_id,p256dh,auth').in('member_id', recipients),
+  // D-250: an Admin's note reaches every member, so the devices are read 100 members at a time (a short URL each).
+  const chunks: string[][] = [];
+  for (let i = 0; i < recipients.length; i += 100) chunks.push(recipients.slice(i, i + 100));
+  const [subParts, { data: people }] = await Promise.all([
+    Promise.all(chunks.map((ids) => admin.from('push_subscription').select('endpoint,member_id,p256dh,auth').in('member_id', ids))),
     admin.from('profiles').select('id,name,photo_url').in('id', sources),
   ]);
+  const subs = subParts.flatMap((part) => part.data || []);
   const nameOf = new Map((people || []).map((p) => [p.id, p]));
   let sent = 0;
   for (const n of claimed) {
@@ -133,7 +137,7 @@ Deno.serve(async (req) => {
       body: `You and ${first === 'A Brivia member' ? 'a Brivia member' : first} were ${APART[n.band] || 'close by'}${n.place_name ? `, near ${n.place_name}` : ''}. Discover who you crossed paths with.`,
       url: `/app.html?view=nearby&notification=${n.id}`,
     });
-    for (const s of (subs || []).filter((x) => x.member_id === n.user_id)) {
+    for (const s of subs.filter((x) => x.member_id === n.user_id)) {
       try {
         await webpush.sendNotification({ endpoint: s.endpoint, keys: { p256dh: s.p256dh, auth: s.auth } }, payload, { TTL: 60 * 60, urgency: 'normal', topic: String(n.id).replace(/-/g, '').slice(0, 32) });
         sent += 1;

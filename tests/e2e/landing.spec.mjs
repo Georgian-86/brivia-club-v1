@@ -146,19 +146,25 @@ try {
       await context.close();
     }
 
-    // 2. Intro (D-196): opening the site plays it; it lasts 4 s: gone between 3500 and 4150 ms (D-213); a reload in the same
-    //    tab never replays it (a new tab would).
+    // 2. Intro (D-196): opening the site plays it; it lasts 4 s: gone between 3500 and 4150 ms (D-213) after the tap on
+    //    "Tap to enter" (D-250); a reload in the same tab never replays it (a new tab would).
     {
       const context = await newContext(browser, viewport);
       const page = await context.newPage();
       await page.goto(`${BASE}/index.html`, { waitUntil: 'domcontentloaded' });
       const introSeenAtStart = await page.evaluate(() => Boolean(document.querySelector('#intro-burst')));
+      // D-250: the intro waits behind "Tap to enter" (sound needs a tap); it lasts 4 s from the tap.
+      await page.waitForTimeout(600);
+      const gated = await page.evaluate(() => document.documentElement.classList.contains('intro-gated') && Boolean(document.querySelector('[data-intro-enter]')));
+      const tapAt = await page.evaluate(() => Math.round(performance.now()));
+      await page.mouse.click(viewport.width / 2, viewport.height / 2);
       await page.waitForFunction(() => window.__introGoneAt !== null, null, { timeout: 8000 }).catch(() => {});
-      const goneAt = await page.evaluate(() => window.__introGoneAt);
+      const goneAt = await page.evaluate((t) => (window.__introGoneAt === null ? null : window.__introGoneAt - t), tapAt);
       const bodyLocked = await page.evaluate(() => document.body.classList.contains('intro-active'));
       const stored = await page.evaluate(() => { try { return sessionStorage.getItem('brivia-intro-seen'); } catch { return null; } });
       console.log(`INFO ${label}: first-visit intro present at DOMContentLoaded=${introSeenAtStart}, gone at ${goneAt} ms`);
-      await check(`${label}: intro is gone between 3.5 and 4.15 s (4 s plus measuring)`, () => {
+      await check(`${label}: D-250 the intro waits behind "Tap to enter"`, () => assert.equal(gated, true));
+      await check(`${label}: intro is gone between 3.5 and 4.15 s after the tap (4 s plus measuring)`, () => {
         assert.equal(introSeenAtStart, true, 'a first visit should start with the intro');
         assert.ok(goneAt !== null && goneAt >= 3500 && goneAt <= 4150, `intro gone at ${goneAt} ms`);
         assert.equal(bodyLocked, false, 'body.intro-active still set');
@@ -187,6 +193,7 @@ try {
       await page.waitForFunction(() => window.__introGoneAt !== null, null, { timeout: 8000 }).catch(() => {});
       const goneAt = await page.evaluate(() => window.__introGoneAt);
       console.log(`INFO ${label}: playing-video intro gone at ${goneAt} ms`);
+      // D-250: a page that may already play sound (play() resolves here) skips "Tap to enter" and starts at once.
       await check(`${label}: a playing intro is gone by the 4000 ms cap (4150 ms)`, () => {
         assert.ok(goneAt !== null && goneAt >= 3500 && goneAt <= 4150, `gone at ${goneAt} ms`);
       });
