@@ -7,6 +7,8 @@ Update this file at the end of every session. CLAUDE.md holds the aim; this file
 
 ## 1. What is done
 
+**2026-11-13, D-252:** prettier notification panel, no quote marks on comments; commenting at 0 swipes guarded by a spec (live DB not checked: connector down).
+
 **2026-11-13, D-251:** "Tap to enter" removed; landing music on by default (first gesture where the browser requires one).
 
 **2026-11-13, D-250:** Admin notes notify every member (0077 live, push-notify v8); laptop swipe captured and frame-paced; intro waits for "Tap to enter" so it starts with music.

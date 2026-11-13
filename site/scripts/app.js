@@ -765,6 +765,8 @@ const renderNotifications = () => {
   const heartIcon = '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 13.6S2.2 10.2 2.2 6.1A2.9 2.9 0 0 1 8 4.6a2.9 2.9 0 0 1 5.8 1.5c0 4.1-5.8 7.5-5.8 7.5Z"/></svg>';
   const commentIcon = '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3 12.8V4.5A1.5 1.5 0 0 1 4.5 3h7A1.5 1.5 0 0 1 13 4.5v5A1.5 1.5 0 0 1 11.5 11H5.5Z"/></svg>';
   const newNoteIcon = '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 2.5v11M2.5 8h11"/></svg>';
+  const firstNameOf = (name) => String(name || '').trim().split(/\s+/)[0] || '';
+  const boldLead = (title, first) => (first && title.startsWith(first) ? `<b>${escapeHtml(first)}</b>${escapeHtml(title.slice(first.length))}` : escapeHtml(title));
   const postKind = (type) => (type === 'post_like' ? ['like', heartIcon] : type === 'post_new' ? ['new', newNoteIcon] : ['comment', commentIcon]);
   const postHtml = postGroups.map((g) => {
     const copy = postNotificationCopy(g);
@@ -777,7 +779,8 @@ const renderNotifications = () => {
     const line = isLike ? (g.people.length > 1 ? `See all ${g.people.length}` : 'See who') : copy.line;
     return `<button type="button" class="notification-post${g.unread ? ' is-unread' : ''}${extra ? ' has-stack' : ''}" data-post-note="${escapeHtml(g.key)}" aria-label="${escapeHtml(`${copy.title}. ${line}`.trim())}">`
       + `<span class="notification-nearby-face">${renderAvatar(person, 'notification-avatar')}${extra}<i class="notification-post-kind is-${postKind(g.type)[0]}">${postKind(g.type)[1]}</i></span>`
-      + `<span class="notification-nearby-copy"><strong>${escapeHtml(copy.title)}</strong>${line ? `<span${isLike ? ' class="notification-see-likers"' : ''}>${escapeHtml(line)}</span>` : ''}<small>${escapeHtml(formatNotificationTime(g.createdAt))}</small></span>`
+      // D-252: the name in bold, the comment or caption in a soft bubble (no quote marks), the time last.
+      + `<span class="notification-nearby-copy"><strong>${boldLead(copy.title, firstNameOf(lead.name))}</strong>${line ? `<span class="${isLike ? 'notification-see-likers' : (g.type === 'post_comment' || g.type === 'post_new') && g.snippet ? 'notification-snippet' : 'notification-line'}">${escapeHtml(line)}</span>` : ''}<small>${escapeHtml(formatNotificationTime(g.createdAt))}</small></span>`
       + `${thumb ? `<span class="notification-post-thumb">${thumb}</span>` : ''}</button>`;
   }).join('');
   const ticketIcon = '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2.5 5.5V4h11v1.5a1.5 1.5 0 0 0 0 3V10h-11V8.5a1.5 1.5 0 0 0 0-3Z"/><path d="M9.5 4v6" stroke-dasharray="1.2 1.2"/></svg>';

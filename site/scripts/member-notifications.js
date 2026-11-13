@@ -128,12 +128,12 @@ export const groupPostNotifications = (list = [], now = Date.now(), days = 7) =>
 
 const firstName = (name) => String(name || '').trim().split(/\s+/)[0] || 'A member';
 // "Asha liked your note." · "Asha and Ravi liked your note." · "Asha and 3 others liked your note." ·
-// "Asha commented: “Where is this?”"
+// "Asha commented on your note" / Where is this? (D-252: the comment as written, no quote marks)
 export const postNotificationCopy = (g) => {
   const people = g?.people || [];
   const lead = firstName(people[0]?.name);
-  if (g?.type === 'post_comment') return { title: `${lead} commented on your note`, line: g.snippet ? `“${g.snippet}”` : '' };
-  if (g?.type === 'post_new') return { title: `${lead} shared a new note`, line: g.snippet ? `“${g.snippet}”` : 'Tap to see it.' };
+  if (g?.type === 'post_comment') return { title: `${lead} commented on your note`, line: g.snippet || '' };   // D-252: no quote marks (founder)
+  if (g?.type === 'post_new') return { title: `${lead} shared a new note`, line: g.snippet || 'Tap to see it.' };   // D-252: no quote marks
   const who = people.length === 1 ? lead : people.length === 2 ? `${lead} and ${firstName(people[1]?.name)}` : `${lead} and ${people.length - 1} others`;
   return { title: `${who} liked your note`, line: '' };
 };
