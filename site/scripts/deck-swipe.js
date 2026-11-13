@@ -214,8 +214,26 @@ export const createDeckSwipe = ({ card, stack, canDrag = () => true, onCommit = 
     }, 260);
   };
 
-  const startDrag = (id, x0, y0, t) => {
-    drag = { id, x0, y0, axis: null, samples: [{ x: x0, t }], width: card.offsetWidth || 1 };
+  // D-250 (founder, Safari on a laptop: "the swipe is not smooth and is getting stuck"): a mouse drag is captured from
+  // the first press (moves off the card or out of the window still belong to it, and the release always ends it), the
+  // press does not start a text selection or an image drag, and the card is painted once per frame with the newest
+  // position (a trackpad sends far more moves than the screen draws).
+  let frame = 0;
+  let latest = null;
+  const paintDrag = () => {
+    frame = 0;
+    if (!drag || !latest) return;
+    const { dx, dy } = latest;
+    queuePaint(dx, dy);
+  };
+  const queuePaint = (dx, dy) => {
+    latest = { dx, dy };
+    if (!frame) frame = window.requestAnimationFrame(paintDrag);
+  };
+  const cancelPaint = () => { if (frame) window.cancelAnimationFrame(frame); frame = 0; latest = null; };
+  const startDrag = (id, x0, y0, t, mouse = false) => {
+    drag = { id, x0, y0, axis: null, samples: [{ x: x0, t }], width: card.offsetWidth || 1, mouse };
+    if (mouse) { try { card.setPointerCapture(id); } catch { /* the pointer is gone */ } }
   };
   const onPointerDown = (event) => {
     if (drag || (event.pointerType === 'mouse' && event.button !== 0)) return;
@@ -225,15 +243,19 @@ export const createDeckSwipe = ({ card, stack, canDrag = () => true, onCommit = 
       if (event.target.closest?.('input, textarea, select, [data-no-swipe], .card-more-menu')) return;
     }
     pendingDown = null;
-    if (hurry()) { pendingDown = { id: event.pointerId, x0: event.clientX, y0: event.clientY, t: event.timeStamp }; return; }
+    // A mouse press on the card never selects text or drags the photo (Safari starts both otherwise). A press on a
+    // button or link is not captured early, so its click still lands on it (the drag captures at the 8 px lock).
+    const mouse = event.pointerType === 'mouse' && !event.target.closest?.('button, a, input, textarea, select');
+    if (mouse) event.preventDefault();
+    if (hurry()) { pendingDown = { id: event.pointerId, x0: event.clientX, y0: event.clientY, t: event.timeStamp, mouse }; return; }
     if (!card.contains(event.target)) return;   // not mid-flight: only the top card itself is dragged
     if (!canDrag()) return;
-    startDrag(event.pointerId, event.clientX, event.clientY, event.timeStamp);
+    startDrag(event.pointerId, event.clientX, event.clientY, event.timeStamp, mouse);
   };
   const onPointerMove = (event) => {
     // The deck finished moving on since the touch began (hurry): the new top card takes this drag.
     if (!drag && pendingDown && event.pointerId === pendingDown.id && canDrag()) {
-      startDrag(pendingDown.id, pendingDown.x0, pendingDown.y0, pendingDown.t);
+      startDrag(pendingDown.id, pendingDown.x0, pendingDown.y0, pendingDown.t, pendingDown.mouse);
       pendingDown = null;
     }
     if (!drag || event.pointerId !== drag.id) return;
@@ -241,7 +263,11 @@ export const createDeckSwipe = ({ card, stack, canDrag = () => true, onCommit = 
     const dy = event.clientY - drag.y0;
     if (!drag.axis) {
       drag.axis = axisFor(dx, dy);
-      if (drag.axis === 'y') { drag = null; return; }       // a scroll: the page keeps it
+      if (drag.axis === 'y') {                              // a scroll: the page keeps it
+        if (drag.mouse) { try { card.releasePointerCapture(event.pointerId); } catch { /* released */ } }
+        drag = null;
+        return;
+      }
       if (drag.axis !== 'x') return;
       try { card.setPointerCapture(event.pointerId); } catch { /* the pointer is gone */ }
       card.classList.add('is-held');
@@ -260,6 +286,8 @@ export const createDeckSwipe = ({ card, stack, canDrag = () => true, onCommit = 
     const { axis, width } = drag;
     const dx = event.clientX - drag.x0;
     const vx = releaseVelocity(drag.samples, event.timeStamp);
+    if (axis === 'x' && latest) paintDrag();   // the last move is on screen before the card flies or settles
+    cancelPaint();
     drag = null;
     host.classList.remove('is-dragging');
     try { card.releasePointerCapture(event.pointerId); } catch { /* already released */ }
@@ -288,6 +316,16 @@ export const createDeckSwipe = ({ card, stack, canDrag = () => true, onCommit = 
   card.addEventListener('lostpointercapture', (event) => { if (event.target === card && drag && event.pointerId === drag.id && drag.axis === 'x') finish(event, true); });
   card.addEventListener('click', onClickCapture, true);
   card.addEventListener('dragstart', (event) => event.preventDefault());
+  // A release outside the page, or the window losing focus mid-drag, never leaves the card held (D-250).
+  window.addEventListener('pointerup', (event) => { if (drag && event.pointerId === drag.id) finish(event, false); });
+  window.addEventListener('blur', () => {
+    if (!drag) return;
+    const was = drag.axis === 'x';
+    cancelPaint();
+    drag = null;
+    host.classList.remove('is-dragging');
+    if (was) settle();
+  });
   setVars();
 
   return { flyOut, park, settle, reset, enter, isDragging: () => Boolean(drag?.axis === 'x') };
