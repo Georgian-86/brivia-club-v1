@@ -4696,15 +4696,16 @@ const wireChipPicker = (box, { max = 12, allowCustom = false, onCustom = null, e
     }
     return rows;
   };
-  const setActive = (i) => {
-    active = shown.length ? Math.max(0, Math.min(i, shown.length - 1)) : -1;
+  // D-254: -1 means nothing is highlighted (it used to become the first row, which scrolled the list to the top).
+  const setActive = (i, { scroll = true } = {}) => {
+    active = shown.length && i >= 0 ? Math.min(i, shown.length - 1) : -1;
     list.querySelectorAll('.b-option').forEach((o, j) => o.classList.toggle('is-active', j === active));
     if (active < 0) { input.removeAttribute('aria-activedescendant'); return; }
     input.setAttribute('aria-activedescendant', `${idBase}-${active}`);
-    list.querySelector(`#${idBase}-${active}`)?.scrollIntoView({ block: 'nearest' });
+    if (scroll) list.querySelector(`#${idBase}-${active}`)?.scrollIntoView({ block: 'nearest' });
   };
   const close = () => { list.hidden = true; input.setAttribute('aria-expanded', 'false'); input.removeAttribute('aria-activedescendant'); active = -1; };
-  const open = () => {
+  const open = ({ keep = false } = {}) => {
     if (!picker.ready) return;
     const rows = suggestions();
     shown = rows.filter((o) => !o.heading);
@@ -4719,7 +4720,7 @@ const wireChipPicker = (box, { max = 12, allowCustom = false, onCustom = null, e
       : `<li class="b-listbox-note" role="option" aria-disabled="true" aria-selected="false">${input.value.trim() ? 'No match. Try a shorter word.' : 'Everything here is picked.'}</li>`;
     list.hidden = false;
     input.setAttribute('aria-expanded', 'true');
-    setActive(input.value.trim() ? 0 : -1);
+    setActive(input.value.trim() && !keep ? 0 : -1, { scroll: !keep });
   };
   let adding = false;
   const addOwn = async (label) => {
@@ -4740,10 +4741,15 @@ const wireChipPicker = (box, { max = 12, allowCustom = false, onCustom = null, e
     if (picker.picks.length >= max) { status.textContent = `You can pick up to ${max}. Remove one to add another.`; return; }
     if (!picker.labels.has(id)) picker.labels.set(id, id);
     picker.picks.push(id);
-    input.value = '';
+    // D-254 (a member, Karthik: "after selecting an interest, the page takes us back to the beginning of the list"):
+    // a pick keeps the list where it was, and the words typed, so several can be picked in a row. Only an "Add your
+    // own" row (the typed words themselves) clears the field.
+    const keepScroll = list.hidden ? 0 : list.scrollTop;
+    if (id.startsWith('custom:') || !picker.options.some((o) => o.id === id)) input.value = '';
     renderChips();
     status.textContent = `${labelOf(id)} added. Save changes to keep it.`;
-    open();
+    open({ keep: true });
+    list.scrollTop = keepScroll;
   };
   chips.addEventListener('click', (event) => {
     const button = event.target.closest('[data-chip-remove]');
@@ -4754,9 +4760,9 @@ const wireChipPicker = (box, { max = 12, allowCustom = false, onCustom = null, e
     status.textContent = `${labelOf(id)} removed. Save changes to keep it.`;
     input.focus();
   });
-  input.addEventListener('focus', open);
-  input.addEventListener('click', open);
-  input.addEventListener('input', open);
+  input.addEventListener('focus', () => { if (list.hidden) open(); });
+  input.addEventListener('click', () => { if (list.hidden) open(); });
+  input.addEventListener('input', () => open());
   input.addEventListener('keydown', (event) => {
     if (event.key === 'ArrowDown') { event.preventDefault(); if (list.hidden) open(); setActive(active + 1); }
     else if (event.key === 'ArrowUp') { event.preventDefault(); setActive(active - 1); }
