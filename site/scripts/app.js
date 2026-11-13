@@ -123,6 +123,7 @@ import '../styles/message-actions.css';  // D-157: the long-press message menu a
 import '../styles/deck-ritual.css';  // D-179: the deck ritual's card backs (the daily-limit shuffle)
 import '../styles/components.css';  // D-105: the shared field, select, listbox and chip components, last so they win
 import '../styles/smooth.css';  // D-194: no backdrop blur on moving surfaces; a calm tab change (after everything)
+import '../styles/notification-panel.css';  // D-253: the notification panel's own look (after everything)
 import { createHiring } from './hiring-ui.js';  // D-141
 import { interleaveLift } from './hiring.js';
 import { navMarkup, markCurrentNav, setChatBadges } from './app-nav.js';
@@ -614,6 +615,8 @@ const markNotificationsReadForPerson = (personId) => {
   });
   if (changed) saveNotifications();
 };
+// D-253: "6h ago" / "15m ago" in the panel's note rows (a date or "now" as is).
+const agoLabel = (value) => { const t = formatNotificationTime(value); return /^\d+[mh]$/.test(t) ? `${t} ago` : t; };
 const formatNotificationTime = (value) => {
   if (!value) return '';
   const date = new Date(value);
@@ -766,21 +769,25 @@ const renderNotifications = () => {
   const commentIcon = '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3 12.8V4.5A1.5 1.5 0 0 1 4.5 3h7A1.5 1.5 0 0 1 13 4.5v5A1.5 1.5 0 0 1 11.5 11H5.5Z"/></svg>';
   const newNoteIcon = '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 2.5v11M2.5 8h11"/></svg>';
   const firstNameOf = (name) => String(name || '').trim().split(/\s+/)[0] || '';
+  // "THE BRIVIA CLUB" -> "The Brivia Club" (an all-caps account name reads as shouting in a sentence).
+  const titleCaseName = (name) => { const n = String(name || '').trim(); return n && n === n.toUpperCase() ? n.toLowerCase().replace(/(^|\s)(\S)/g, (m, a, b) => a + b.toUpperCase()) : n; };
   const boldLead = (title, first) => (first && title.startsWith(first) ? `<b>${escapeHtml(first)}</b>${escapeHtml(title.slice(first.length))}` : escapeHtml(title));
   const postKind = (type) => (type === 'post_like' ? ['like', heartIcon] : type === 'post_new' ? ['new', newNoteIcon] : ['comment', commentIcon]);
   const postHtml = postGroups.map((g) => {
-    const copy = postNotificationCopy(g);
+    // D-253: an Admin (THE BRIVIA CLUB) is named in full, never by a first word ("THE shared a new note").
     const lead = g.people[0] || {};
+    const adminLead = lead.id && adminIds.has(String(lead.id)) && lead.name;
+    const copy = postNotificationCopy(adminLead ? { ...g, people: [{ ...lead, name: titleCaseName(lead.name) }, ...g.people.slice(1)] } : g, adminLead ? { full: true } : undefined);
     const person = findPersonById(lead.id) || { name: lead.name, image: lead.photoUrl };
     const thumb = g.postImage && isStorageImageUrl(g.postImage) ? `<img src="${escapeHtml(g.postImage)}" alt="" loading="lazy" decoding="async" />` : '';
     // D-243: likes show who (up to three faces) and open "Liked by".
     const isLike = g.type === 'post_like';
-    const extra = isLike ? g.people.slice(1, 3).map((p) => renderAvatar(findPersonById(p.id) || { name: p.name, image: p.photoUrl }, 'notification-avatar notification-avatar--stack')).join('') : '';
+    const extra = isLike || g.type === 'post_comment' ? g.people.slice(1, 3).map((p) => renderAvatar(findPersonById(p.id) || { name: p.name, image: p.photoUrl }, 'notification-avatar notification-avatar--stack')).join('') : '';
     const line = isLike ? (g.people.length > 1 ? `See all ${g.people.length}` : 'See who') : copy.line;
     return `<button type="button" class="notification-post${g.unread ? ' is-unread' : ''}${extra ? ' has-stack' : ''}" data-post-note="${escapeHtml(g.key)}" aria-label="${escapeHtml(`${copy.title}. ${line}`.trim())}">`
       + `<span class="notification-nearby-face">${renderAvatar(person, 'notification-avatar')}${extra}<i class="notification-post-kind is-${postKind(g.type)[0]}">${postKind(g.type)[1]}</i></span>`
       // D-252: the name in bold, the comment or caption in a soft bubble (no quote marks), the time last.
-      + `<span class="notification-nearby-copy"><strong>${boldLead(copy.title, firstNameOf(lead.name))}</strong>${line ? `<span class="${isLike ? 'notification-see-likers' : (g.type === 'post_comment' || g.type === 'post_new') && g.snippet ? 'notification-snippet' : 'notification-line'}">${escapeHtml(line)}</span>` : ''}<small>${escapeHtml(formatNotificationTime(g.createdAt))}</small></span>`
+      + `<span class="notification-nearby-copy"><strong>${boldLead(copy.title, adminLead ? titleCaseName(lead.name) : firstNameOf(lead.name))}</strong>${line ? `<span class="${isLike ? 'notification-see-likers' : (g.type === 'post_comment' || g.type === 'post_new') && g.snippet ? 'notification-snippet' : 'notification-line'}"><span>${escapeHtml(line)}</span></span>` : ''}<small>${escapeHtml(agoLabel(g.createdAt))}</small></span>`
       + `${thumb ? `<span class="notification-post-thumb">${thumb}</span>` : ''}</button>`;
   }).join('');
   const ticketIcon = '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2.5 5.5V4h11v1.5a1.5 1.5 0 0 0 0 3V10h-11V8.5a1.5 1.5 0 0 0 0-3Z"/><path d="M9.5 4v6" stroke-dasharray="1.2 1.2"/></svg>';
@@ -1492,6 +1499,7 @@ const loadMemberBadges = async () => {
   renderProfile();
   renderChats();
   renderHome();
+  renderNotifications();
   if (document.body.dataset.appView === 'posts') renderCommunityPosts?.();
 };
 const startMemberNotes = () => {
@@ -2393,7 +2401,7 @@ let hiringLifted = false;
 // pool remembers each member's kind ('hiring' | 'open_to') and role title for the card's bar. While the switch is on
 // it refreshes every minute and when the tab returns: new people join the end of the queue, and anyone who closed
 // their role (or is no longer open) leaves it. Nearby is separate and untouched. Before 0054: one page of hirers.
-const hiringPool = { kinds: new Map(), titles: new Map(), pending: new Set(), after: null, end: false, loading: null, timer: 0 };
+const hiringPool = { kinds: new Map(), titles: new Map(), pending: new Set(), after: null, end: false, loading: null, timer: 0, snapshot: null, added: new Set() };
 // D-219: someone the member already sent a request to (hiring_people_v2's request_pending) stays in the hiring deck; a
 // Like on them sends nothing and says the request is pending.
 const requestPendingFor = (person) => Boolean(person?.id) && exploreFilters.hiring && hiringPool.pending.has(String(person.id));
@@ -2413,6 +2421,7 @@ const addHiringRows = async (rows, { front = false } = {}) => {
   }
   const known = ids.filter((id) => findPersonById(id));
   const fresh = known.filter((id) => !deck.ids.includes(id));
+  fresh.forEach((id) => hiringPool.added.add(id));   // D-253: brought in by the lens, taken out again when it is off
   if (front) deck.ids = [...known, ...deck.ids.filter((id) => !known.includes(id))];
   else deck.ids = [...deck.ids, ...fresh];
   await hiring.ensure(known);
@@ -2454,9 +2463,24 @@ async function refreshHiringPool() {
   if (added || removed) renderExplore();
 }
 document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') void refreshHiringPool(); });
+// D-253 (founder: "once I click on hiring, then I am not able to go back to normal"): the lens put the hiring people
+// at the front of the deck and left them there when it was switched off, so the deck still looked like Hiring. Off now
+// gives the deck back as it was: the people the lens brought in leave, the rest return to their order from before.
+const restoreDeckAfterHiring = () => {
+  const before = hiringPool.snapshot;
+  const added = hiringPool.added;
+  hiringPool.snapshot = null;
+  hiringPool.added = new Set();
+  if (!before) return;
+  const now = new Set(deck.ids);
+  deck.ids = [...before.filter((id) => now.has(id)), ...deck.ids.filter((id) => !before.includes(id) && !added.has(id))];
+};
 const setHiringLens = (on) => {
+  const was = exploreFilters.hiring;
   exploreFilters.hiring = on;
   window.clearInterval(hiringPool.timer);
+  if (on && !was) { hiringPool.snapshot = [...deck.ids]; hiringPool.added = new Set(); }
+  if (!on && was) restoreDeckAfterHiring();
   if (on) {
     void hiring?.ensure(deckPeople().map((p) => p.id));
     void pullHiringPeople({ restart: true });
@@ -6769,7 +6793,7 @@ const clearDiscoveryFilters = () => {
   exploreFilters.query = '';
   exploreFilters.skills.clear();
   exploreFilters.lookingFor.clear();
-  exploreFilters.hiring = false;
+  if (exploreFilters.hiring) { exploreFilters.hiring = false; window.clearInterval(hiringPool.timer); restoreDeckAfterHiring(); }
   filterDrafts.skills = '';
   filterDrafts.lookingFor = '';
   saveLocationPrefs(null);   // D-239: Location back to near me, 50 km

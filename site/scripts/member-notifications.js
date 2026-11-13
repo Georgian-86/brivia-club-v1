@@ -114,10 +114,18 @@ export const groupPostNotifications = (list = [], now = Date.now(), days = 7) =>
   for (const n of list) {
     if (!POST_TYPES.has(n?.type) || !n.postId || n.dismissedAt) continue;
     if (n.createdAt && now - new Date(n.createdAt).getTime() > days * 86400000) continue;
-    // Each comment is its own row (it has words); likes on one note are one row.
-    const key = n.type === 'post_comment' ? `c:${n.id}` : n.type === 'post_new' ? `n:${n.postId}` : `l:${n.postId}`;
+    // Likes on one note are one row; D-253 (founder: "just show recent comment and say xyz and pqr others commented"):
+    // comments on one note are one row too, showing the newest comment, its writer first.
+    const key = n.type === 'post_comment' ? `c:${n.postId}` : n.type === 'post_new' ? `n:${n.postId}` : `l:${n.postId}`;
     const g = groups.get(key) || { key, type: n.type, postId: n.postId, postImage: n.postImage, people: [], snippet: n.snippet, createdAt: n.createdAt, unread: false, ids: [] };
-    if (!g.people.some((p) => p.id === n.sourceId)) g.people.push({ id: n.sourceId, name: n.name, photoUrl: n.photoUrl });
+    const newest = !g.ids.length || String(n.createdAt) > String(g.createdAt);
+    const person = { id: n.sourceId, name: n.name, photoUrl: n.photoUrl };
+    const at = g.people.findIndex((p) => p.id === n.sourceId);
+    if (newest) {
+      if (at >= 0) g.people.splice(at, 1);
+      g.people.unshift(person);
+      if (n.type === 'post_comment') { g.snippet = n.snippet; g.commentId = n.commentId || null; }
+    } else if (at < 0) g.people.push(person);
     if (String(n.createdAt) > String(g.createdAt)) g.createdAt = n.createdAt;
     g.unread ||= !n.readAt;
     g.ids.push(n.id);
@@ -129,10 +137,15 @@ export const groupPostNotifications = (list = [], now = Date.now(), days = 7) =>
 const firstName = (name) => String(name || '').trim().split(/\s+/)[0] || 'A member';
 // "Asha liked your note." · "Asha and Ravi liked your note." · "Asha and 3 others liked your note." ·
 // "Asha commented on your note" / Where is this? (D-252: the comment as written, no quote marks)
-export const postNotificationCopy = (g) => {
+// { full: true } (D-253): name the lead in full (an Admin account such as The Brivia Club), not by a first word.
+export const postNotificationCopy = (g, { full = false } = {}) => {
   const people = g?.people || [];
-  const lead = firstName(people[0]?.name);
-  if (g?.type === 'post_comment') return { title: `${lead} commented on your note`, line: g.snippet || '' };   // D-252: no quote marks (founder)
+  const lead = full && String(people[0]?.name || '').trim() ? String(people[0].name).trim() : firstName(people[0]?.name);
+  if (g?.type === 'post_comment') {
+    // D-253: "Amar commented" · "Amar and Diya commented" · "Amar and 3 others commented", with the newest comment.
+    const writers = people.length <= 1 ? lead : people.length === 2 ? `${lead} and ${firstName(people[1]?.name)}` : `${lead} and ${people.length - 1} others`;
+    return { title: `${writers} commented on your note`, line: g.snippet || '' };   // D-252: no quote marks (founder)
+  }
   if (g?.type === 'post_new') return { title: `${lead} shared a new note`, line: g.snippet || 'Tap to see it.' };   // D-252: no quote marks
   const who = people.length === 1 ? lead : people.length === 2 ? `${lead} and ${firstName(people[1]?.name)}` : `${lead} and ${people.length - 1} others`;
   return { title: `${who} liked your note`, line: '' };
