@@ -7,6 +7,8 @@ Update this file at the end of every session. CLAUDE.md holds the aim; this file
 
 ## 1. What is done
 
+**2026-11-13, D-254:** interest pickers keep their scroll and search after a pick (Karthik's feedback).
+
 **2026-11-13, D-253:** notification panel redesigned (notification-panel.css); comments grouped per note; Hiring off restores the deck. Open: app-shell.spec times out at the new-post composer on main.
 
 **2026-11-13, D-252:** prettier notification panel, no quote marks on comments; commenting at 0 swipes guarded by a spec (live DB not checked: connector down).

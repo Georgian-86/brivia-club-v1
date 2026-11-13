@@ -19,6 +19,8 @@ const NODES = [
   { id: 'sports.racket.badminton', parent_id: 'sports.racket', level: 3, label: 'Badminton', sensitive: false },
   { id: 'music.listening.jazz', parent_id: 'music.listening', level: 3, label: 'Jazz', sensitive: false },
   { id: 'beliefs.faith.private', parent_id: 'beliefs.faith', level: 3, label: 'A private belief', sensitive: true },
+  // D-254: enough interests that the open list scrolls.
+  ...Array.from({ length: 30 }, (_, i) => ({ id: `hobby.misc.h${i + 10}`, parent_id: 'hobby.misc', level: 3, label: `Hobby ${i + 10}`, sensitive: false })),
 ];
 const MINE = [
   { interest_id: 'food.cooking.home', label: 'Everyday home cooking', points: 7, mode: 'play' },
@@ -75,6 +77,18 @@ try {
     const look = await page.evaluate(() => { const list = document.querySelector('#profile-interests-edit-list'); const li = list.querySelector('li'); const cs = li && getComputedStyle(li); return { bullets: cs?.listStyleType, display: cs?.display, minH: Math.round(li?.getBoundingClientRect().height || 0), shadow: getComputedStyle(list).boxShadow !== 'none', radius: getComputedStyle(list).borderTopLeftRadius }; });
     check(`${w}: the interest list is the brand listbox (no bullets, 44 px rows, a panel attached to the field)`, look.bullets === 'none' && look.display === 'flex' && look.minH >= 44 && look.shadow && look.radius === '0px', JSON.stringify(look));
     await page.locator('#profile-interests-edit-list [data-value="sports.racket.badminton"]').click();
+    // D-254 (Karthik): a pick keeps the list where it was and the words typed, so several can be picked in a row.
+    const afterSearchPick = await page.evaluate(() => ({ open: !document.querySelector('#profile-interests-edit-list').hidden, typed: document.querySelector('[data-picker="profile-interests-edit"] [data-picker-input]').value }));
+    check(`${w}: D-254 after a pick from a search the list stays open with the search kept`, afterSearchPick.open && afterSearchPick.typed === 'badm', JSON.stringify(afterSearchPick));
+    await interestInput.fill('');
+    const scrolled = await page.evaluate(() => { const l = document.querySelector('#profile-interests-edit-list'); l.scrollTop = Math.min(240, l.scrollHeight - l.clientHeight); return l.scrollTop; });
+    const midRow = await page.evaluate(() => { const l = document.querySelector('#profile-interests-edit-list'); const lr = l.getBoundingClientRect(); return [...l.querySelectorAll('[data-value]')].find((r) => { const b = r.getBoundingClientRect(); return b.top > lr.top + 20 && b.bottom < lr.bottom - 20; })?.dataset.value || null; });
+    if (midRow) {
+      await page.locator(`#profile-interests-edit-list [data-value="${midRow}"]`).click();
+      const after = await page.evaluate((id) => ({ top: document.querySelector('#profile-interests-edit-list').scrollTop, open: !document.querySelector('#profile-interests-edit-list').hidden, chip: Boolean(document.querySelector(`[data-picker="profile-interests-edit"] [data-chip-remove="${id}"]`)) }), midRow);
+      check(`${w}: D-254 a pick from the scrolled list keeps its place (was ${scrolled} px)`, after.open && after.chip && scrolled > 0 && Math.abs(after.top - scrolled) <= 48, JSON.stringify(after));
+      await page.locator(`[data-picker="profile-interests-edit"] [data-chip-remove="${midRow}"]`).click();
+    } else check(`${w}: D-254 a row in the middle of the scrolled list`, false, 'none found');
     // Looking for: a suggestion and a value of the member's own
     const lookInput = page.locator('[data-picker="profile-looking-edit"] [data-picker-input]');
     await lookInput.fill('Mentor');

@@ -4692,3 +4692,16 @@ bring a short line back.
   copy); post-notifications, crossing-paths, collab-requests, event-notifications, hiring, deck (201),
   discovery-location, newcomers, comment-at-limit pass. app-shell already times out on main (the new-post composer
   step), unrelated to this change.
+
+## D-254 (2026-11-13): picking interests keeps the list's place
+
+- **Feedback (a member, Karthik, via the founder):** "after selecting an interest, the page takes us back to the
+  beginning of the list. It would be much more convenient if users could select multiple interests in one go without
+  having to scroll through the list again after every selection."
+- **Cause.** In the Profile pickers (interests, looking for), a pick cleared the field and redrew the list, and the
+  "nothing highlighted" value (-1) was turned into "the first row", which scrolled the list to the top.
+- **Decision.** A pick keeps the list open where it was, and keeps the words typed (so "chess" stays searched for the
+  next pick); only an "Add your own" row clears the field. Nothing is highlighted until the arrow keys are used. The
+  signup picker already kept its place.
+- **Checks.** profile-edit D-254 (fails on the previous build: the list was back at the top, the search cleared; passes
+  now) at 1440 and 390; hiring, signup (383), onboarding (269), profile-media pass; unit 614.
