@@ -1548,3 +1548,16 @@ Both serve only the two members of the pair, under `brivia_pair_world_ok`, never
 Before 0075 the client hides the reaction row. Verify:
 `select has_function_privilege('anon', 'public.react_to_message(uuid, text)', 'execute');` (false).
 Applied live 2026-11-12.
+
+## 0076
+
+**Member badges (D-246).** Apply after `0075`, then deploy the client. Adds `public.member_badge` (one badge per member,
+only `'admin'` for now): signed-in members may read it, nobody may write it from the app. Grant or remove a badge here:
+
+```sql
+insert into public.member_badge (member_id, badge) values ('<member uuid>', 'admin') on conflict (member_id) do nothing;
+delete from public.member_badge where member_id = '<member uuid>';
+```
+
+Verify: `select has_table_privilege('authenticated', 'public.member_badge', 'insert');` (false). Applied live
+2026-11-13; THE BRIVIA CLUB granted 'admin'.

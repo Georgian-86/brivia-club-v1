@@ -433,7 +433,7 @@ export const createHiring = (deps) => {
     if (!section) return;
     const values = me()?.lookingFor || '';
     const wants = lookingForRoles(values);
-    if (!state.available || (!isHirer() && !isSeeker() && !wants.hirer && !wants.seeker)) { section.hidden = true; section.innerHTML = ''; if (eyebrow) eyebrow.innerHTML = 'MEMBER'; return; }
+    if (!state.available || (!isHirer() && !isSeeker() && !wants.hirer && !wants.seeker)) { section.hidden = true; section.innerHTML = ''; if (eyebrow) eyebrow.innerHTML = eyebrow.dataset.role || 'MEMBER'; return; }
     section.hidden = false;
     let html = '';
     if (isHirer() || wants.hirer) {
@@ -469,7 +469,7 @@ export const createHiring = (deps) => {
         + `<button class="profile-card-action" type="button" data-hiring-intent>${intent ? 'Edit' : 'Add your roles'}</button></div>`;
     }
     section.innerHTML = html;
-    if (eyebrow) eyebrow.innerHTML = state.roles.some((r) => r.banner_live && r.status === 'open') ? `<span class="hiring-bar-icon">${BAG_ICON}</span>HIRING` : 'MEMBER';
+    if (eyebrow) eyebrow.innerHTML = state.roles.some((r) => r.banner_live && r.status === 'open') ? `<span class="hiring-bar-icon">${BAG_ICON}</span>HIRING` : (eyebrow.dataset.role || 'MEMBER');
   };
   const bindOwnCard = (section) => {
     section?.addEventListener('click', (event) => {

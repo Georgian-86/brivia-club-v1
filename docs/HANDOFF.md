@@ -7,6 +7,8 @@ Update this file at the end of every session. CLAUDE.md holds the aim; this file
 
 ## 1. What is done
 
+**2026-11-13, D-246:** the Admin badge (0076 live); THE BRIVIA CLUB has it.
+
 **2026-11-12, D-245:** iPhone notification switch shows Home Screen steps; chat messages are pushed (push-notify v7).
 
 **2026-11-12, D-244:** every emoji (1,870, with search) in all pickers; reactions on chat messages (0075 live); "… more" is a text link on notes.

@@ -4577,3 +4577,16 @@ bring a short line back.
 - **Checks.** Unit 613 (iPhone browsers and steps); e2e `push-install.spec.mjs` PI1-PI3 (switch tappable, Safari and
   Google app steps, axe clean, three quick sends make one push call); nearby, chat-extras, chat-inbox, message-actions,
   message-reactions pass. push-notify v7 deployed (the live v6 matched the repo before the change).
+
+## D-246 (2026-11-13): the Admin badge
+
+- **Ask (founder, 2026-11-13, screenshot of the club's own account "THE BRIVIA CLUB"):** "i want this profile to be
+  given admin tag".
+- **Decision.** A badge is a label beside a member's name: "Admin", a cream pill with a wine seal and tick. It shows on
+  their public profile, deck card, chat list row, chat header and Notes cards. On the admin's own profile the eyebrow
+  above the name reads ADMIN instead of MEMBER (one label, not two). It gives no powers.
+- **Who can grant it.** Only the founder, in the SQL editor (`public.member_badge`, 0076). Members can read the list
+  (it is public on purpose) and cannot add, move or remove a badge. Anon reads nothing.
+- **Granted.** THE BRIVIA CLUB (created 2026-11-13 04:49 UTC, the account in the founder's screenshot).
+- **Checks.** SQL `zp-member-badges.test.sql` (members read, cannot write; only 'admin'); e2e `admin-badge.spec.mjs`
+  AB1-AB3 at 1440 and 390 (axe clean); chat-extras, chat-inbox, deck, post-activity, explore-cards, hiring pass; unit 613.

@@ -45,6 +45,7 @@ import { receiptState, receiptMarkup, lastOwnMessageId, applyReceipt, needsReadR
 import { createMessageMenu, applyMessageUpdate, unsentLabel, previewForUnsent, canEditMessage, replyQuote } from './message-actions.js';
 import { createCrossingPaths, isQuietHour, alertHeadline, alertDetail, alertToast, pausedCopy } from './crossing-paths.js';
 import '../styles/crossing-paths.css';
+import '../styles/admin-badge.css';
 import { createNearbyPage } from './nearby-page.js';
 import { COPY as NEARBY_COPY, crossingCopy } from './nearby-view.js';
 import { createMemberNotifications, groupPostNotifications, postNotificationCopy, POST_TYPES, groupEventNotifications, eventNotificationCopy, EVENT_TYPES } from './member-notifications.js';
@@ -197,6 +198,10 @@ let editingMessage = null;
 let deckRitual = null;
 let sawSwipesLeft = false;
 let messageMenu = null;
+// D-246 (0076): members with the Admin badge (public, granted only in the SQL editor), shown beside their name.
+const adminIds = new Set();
+const ADMIN_ICON = '<svg viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path class="admin-badge-seal" d="M8 1 9.9 2.6l2.5-.2.6 2.4 2.1 1.3-1 2.3 1 2.3-2.1 1.3-.6 2.4-2.5-.2L8 15l-1.9-1.6-2.5.2-.6-2.4-2.1-1.3 1-2.3-1-2.3 2.1-1.3.6-2.4 2.5.2Z"/><path class="admin-badge-tick" d="m5.4 8.2 1.8 1.8 3.5-3.6"/></svg>';
+const adminBadge = (id) => (id && adminIds.has(String(id)) ? `<em class="admin-badge" title="Brivia Club admin">${ADMIN_ICON}Admin</em>` : '');
 const messageReactions = new Map();   // D-244: messageId -> [{ memberId, emoji, at }]
 let reactionsAvailable = true;
 const reactionsReadAt = new Map();
@@ -1475,6 +1480,17 @@ const memberNotes = createMemberNotifications({
   closeSystem: (ids) => webPush.closeSystem(ids),
 });
 let memberNotesTimer = 0;
+// D-246: read the badges once a session starts (a handful of rows); before 0076 the read fails quietly.
+const loadMemberBadges = async () => {
+  if (!supabase || !memberProfile.id) return;
+  const { data, error } = await supabase.from('member_badge').select('member_id,badge').limit(200);
+  if (error || !data?.length) return;
+  data.forEach((row) => { if (row.badge === 'admin') adminIds.add(String(row.member_id)); });
+  renderProfile();
+  renderChats();
+  renderHome();
+  if (document.body.dataset.appView === 'posts') renderCommunityPosts?.();
+};
 const startMemberNotes = () => {
   if (!supabase || !memberProfile.id) return;
   memberNotes.start().catch(() => {});
@@ -1886,7 +1902,7 @@ const renderHome = (queue = getExplorePeople()) => {
   setCardImage(document.querySelector('#swipe-image'), deckCoverSrc(currentPerson, safeImageUrl, defaultCoverUrl), `${currentPerson.name} cover image`);
   renderNextCard(queue);
   if (card) card.style.setProperty('--card-avatar-image', `url("${safeImageUrl(currentPerson.image).replace(/["\\\n]/g, encodeURIComponent)}")`);
-  const name = document.querySelector('#swipe-name'); if (name) name.textContent = currentPerson.name;
+  const name = document.querySelector('#swipe-name'); if (name) { name.textContent = currentPerson.name; name.insertAdjacentHTML('beforeend', adminBadge(currentPerson.id)); }
   document.querySelector('#card-more')?.setAttribute('aria-label', `More options for ${currentPerson.name}`);
   const cardLabel = document.querySelector('#swipe-card-label');
   // D-113: the bar says what the member is looking for (their own words, first two), not a guessed label.
@@ -2652,7 +2668,7 @@ const openPublicProfile = (person, options = {}) => {
     + `<button class="public-profile-close" type="button" data-public-profile-close aria-label="Close profile"><span aria-hidden="true">×</span></button>`
     + `<div class="public-profile-cover"></div>`
     + `<header class="public-profile-head"><div class="public-profile-avatar">${avatarImage(image, profile.name) || escapeHtml(initials(profile.name))}</div>`
-    + `<div class="public-profile-id"><h2>${escapeHtml(name)}</h2>`
+    + `<div class="public-profile-id"><h2>${escapeHtml(name)}${adminBadge(profile.id)}</h2>`
     + `<p class="public-profile-meta"><span class="public-profile-role" data-work-for="${escapeHtml(String(profile.id || ''))}"${role ? '' : ' hidden'}>${escapeHtml(role)}</span>${location ? `<span class="public-profile-location">${escapeHtml(location)}</span>` : ''}</p></div></header>`
     + `<div class="public-profile-body">${bio ? `<p class="public-profile-bio">${escapeHtml(bio)}</p>` : ''}`
     + (groups || `<p class="public-profile-empty">${escapeHtml(firstName)} hasn't added interests yet.</p>`)
@@ -3365,7 +3381,7 @@ const renderChats = () => {
     const unreadMessages = chatUnreadCount(person.id);
     const unread = unreadMessages > 0;
     const lastPreview = previewForUnsent(last) || (last?.attachment?.kind === 'resume' ? 'Resume (PDF)' : last?.attachment ? `📎 ${last.attachment.name || 'Attachment'}` : parseSharedPost(last?.text) ? 'Shared a post' : parsePlaceBody(last?.text) ? `📍 ${parsePlaceBody(last.text).name}` : (last?.text || (person.isSelf ? SELF_STATUS : 'Start a conversation')));
-    return `<div class="chat-row${unread ? ' is-unread' : ''}${person.isSelf ? ' is-self' : ''}${selectedChat?.id === person.id ? ' is-selected' : ''}"><button class="chat-row-open" type="button" data-chat-id="${escapeHtml(person.id)}"><span class="member-profile-trigger" data-public-profile-id="${escapeHtml(person.id)}" role="button" tabindex="0" aria-label="${person.isSelf ? 'Open your profile' : `Open ${escapeHtml(person.name)} profile`}">${renderAvatar({ ...person, name: person.avatarName || person.name })}${presenceDot(!person.isSelf && isActiveNow(person.id))}</span><span class="chat-row-copy"><strong data-public-profile-id="${escapeHtml(person.id)}">${escapeHtml(person.name)}${isActiveNow(person.id) ? '<span class="sr-only">, active now</span>' : ''}</strong><span>${escapeHtml(lastPreview)}</span></span><span class="chat-row-meta"><time>${escapeHtml(formatInboxTime(last?.createdAt))}</time>${unread ? `<b aria-label="${unreadMessages} unread">${unreadMessages > 99 ? '99+' : unreadMessages}</b>` : ''}</span></button><button class="chat-delete" type="button" data-delete-chat-id="${escapeHtml(person.id)}" aria-label="Delete chat with ${escapeHtml(person.name)}" title="Delete chat"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M4.5 6h11M8 3.5h4M6.5 6l.6 10h5.8l-.6-10M8.5 8.5v5M11.5 8.5v5"/></svg></button></div>`;
+    return `<div class="chat-row${unread ? ' is-unread' : ''}${person.isSelf ? ' is-self' : ''}${selectedChat?.id === person.id ? ' is-selected' : ''}"><button class="chat-row-open" type="button" data-chat-id="${escapeHtml(person.id)}"><span class="member-profile-trigger" data-public-profile-id="${escapeHtml(person.id)}" role="button" tabindex="0" aria-label="${person.isSelf ? 'Open your profile' : `Open ${escapeHtml(person.name)} profile`}">${renderAvatar({ ...person, name: person.avatarName || person.name })}${presenceDot(!person.isSelf && isActiveNow(person.id))}</span><span class="chat-row-copy"><strong data-public-profile-id="${escapeHtml(person.id)}">${escapeHtml(person.name)}${person.isSelf ? '' : adminBadge(person.id)}${isActiveNow(person.id) ? '<span class="sr-only">, active now</span>' : ''}</strong><span>${escapeHtml(lastPreview)}</span></span><span class="chat-row-meta"><time>${escapeHtml(formatInboxTime(last?.createdAt))}</time>${unread ? `<b aria-label="${unreadMessages} unread">${unreadMessages > 99 ? '99+' : unreadMessages}</b>` : ''}</span></button><button class="chat-delete" type="button" data-delete-chat-id="${escapeHtml(person.id)}" aria-label="Delete chat with ${escapeHtml(person.name)}" title="Delete chat"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M4.5 6h11M8 3.5h4M6.5 6l.6 10h5.8l-.6-10M8.5 8.5v5M11.5 8.5v5"/></svg></button></div>`;
   };
   // D-152: while searching, conversations with messages first, then people (connections even without a message, then
   // members with a request either way, then anyone else), from the server. The empty state only when both are empty.
@@ -3752,7 +3768,10 @@ const openChat = (person, markAsRead = true) => {
   }
   const chatName = document.querySelector('#chat-name');
   if (chatName) {
-    chatName.textContent = person.name;
+    const headBadge = person.isSelf ? '' : adminBadge(person.id);
+    // D-246: with a badge, the name shortens (…) and the badge stays in view.
+    if (headBadge) chatName.innerHTML = `<bdi class="chat-name-text">${escapeHtml(person.name)}</bdi>${headBadge}`;
+    else chatName.textContent = person.name;
     chatName.dataset.publicProfileId = person.id;
     chatName.setAttribute('role', 'button');
     chatName.setAttribute('tabindex', '0');
@@ -5629,6 +5648,8 @@ const renderProfile = () => {
   const coverUrl = normalizeCoverUrl(profile.coverUrl || profile.cover_url || profile.cover_image_url) || defaultCoverUrl;
   ensureProfilePhotoEditor();
   document.querySelector('#profile-name').textContent = profile.name || 'New Member';
+  const heroEyebrow = document.querySelector('.profile-hero-copy .app-eyebrow');
+  if (heroEyebrow) { heroEyebrow.dataset.role = adminIds.has(String(memberProfile.id)) ? 'ADMIN' : 'MEMBER'; if (!heroEyebrow.querySelector('.hiring-bar-icon')) heroEyebrow.textContent = heroEyebrow.dataset.role; }
   // My area as the server names it (my_onboarding_status().place_label), read-only here (D-036). The legacy free-text
   // City/State are neither shown nor editable: no other member can read them, and the area is the server's cell.
   document.querySelector('#profile-location').textContent = areaInputValue(memberPlaceLabel) || 'Your area';  // no "(city-wide)" (D-106)
@@ -5767,6 +5788,7 @@ const renderCommunityPosts = () => {
     // any other URL shows a placeholder.
     const imageSrc = postImageSrc(post, { isStorageImageUrl, isPresetCoverUrl, normalizeCoverUrl });
     return postCardMarkup(post, author, {
+      badge: adminBadge(post.author_id),
       liked: communityReactions.liked.has(post.id),
       saved: communityReactions.saved.has(post.id),
       imageSrc,
@@ -6187,7 +6209,7 @@ const openCommunityPostDetail = async (postId, opener = document.activeElement) 
   dialog.className = 'post-detail';
   dialog.setAttribute('aria-labelledby', 'post-detail-author');
   dialog.innerHTML = `<div class="post-detail-panel"><div class="post-detail-media">${media}</div>`
-    + `<div class="post-detail-head">${renderAvatar({ name, image: author.image || '' }, 'post-card-avatar')}<div class="post-detail-byline"><h2 class="post-detail-author" id="post-detail-author">${escapeHtml(name)}</h2><time${datetime}>${escapeHtml(formatCommunityPostDate(post.created_at))}</time></div>`
+    + `<div class="post-detail-head">${renderAvatar({ name, image: author.image || '' }, 'post-card-avatar')}<div class="post-detail-byline"><h2 class="post-detail-author" id="post-detail-author">${escapeHtml(name)}${adminBadge(post.author_id)}</h2><time${datetime}>${escapeHtml(formatCommunityPostDate(post.created_at))}</time></div>`
     + '<button type="button" class="post-detail-close" data-post-detail-close aria-label="Close post"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M6 6l12 12M18 6 6 18"/></svg></button></div>'
     + `<div class="post-detail-body"><p class="post-detail-caption">${escapeHtml(post.caption || '')}</p>`
     + `<div class="post-detail-stats" data-post-detail-stats></div>`
@@ -7844,6 +7866,7 @@ const loadSupabaseCommunity = async () => {
   startCrossingPaths();
   startCompanionMatches();
   startMemberNotes();
+  void loadMemberBadges();
   if (!appBackGuardActive) {
     appBackGuardActive = true;
     window.history.pushState(
