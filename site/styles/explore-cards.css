@@ -101,6 +101,7 @@ body.app-body :is(.post-card-media, .post-detail-media) .community-post-image-mi
 body.app-body .post-card-caption{
   display:-webkit-box;flex:0 0 auto;box-sizing:content-box;height:2.7em;margin:10px var(--space-3);padding:0;overflow:hidden;
   color:var(--color-ink);font-size:var(--text-14);line-height:1.35;overflow-wrap:anywhere;-webkit-box-orient:vertical;-webkit-line-clamp:2;
+  white-space:pre-line;   /* D-247: the author's line breaks stay (as in the open note); "… more" shows when they run past two lines */
 }
 
 /* Action bar: four equal cream buttons, icon over label. A hidden Like / Save (no 0012 yet) leaves equal halves. */

@@ -7,6 +7,8 @@ Update this file at the end of every session. CLAUDE.md holds the aim; this file
 
 ## 1. What is done
 
+**2026-11-13, D-247:** Notes card captions keep their line breaks.
+
 **2026-11-13, D-246:** the Admin badge (0076 live); THE BRIVIA CLUB has it.
 
 **2026-11-12, D-245:** iPhone notification switch shows Home Screen steps; chat messages are pushed (push-notify v7).

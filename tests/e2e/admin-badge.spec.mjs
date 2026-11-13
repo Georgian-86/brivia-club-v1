@@ -17,7 +17,7 @@ const at = (m) => new Date(Date.now() - m * 6e4).toISOString();
 const st = { rows, matchIds: [CLUB, ASHA], lastSeen: {}, messages: [
   { id: '0e760000-0000-4000-8000-0000000000a1', sender_id: CLUB, recipient_id: ME, body: 'Welcome to Brivia', created_at: at(5), delivered_at: at(5), read_at: null, edited_at: null, unsent_at: null },
   { id: '0e760000-0000-4000-8000-0000000000a2', sender_id: ASHA, recipient_id: ME, body: 'Hi!', created_at: at(4), delivered_at: at(4), read_at: null, edited_at: null, unsent_at: null },
-], routes: { member_badge: { body: [{ member_id: ME, badge: 'admin' }, { member_id: CLUB, badge: 'admin' }] } } };
+], posts: [{ id: 'club-note', author_id: CLUB, image_url: '/Images/Cover%20images/94978B9F-A399-43FC-AC48-0A41088B5D27.PNG', image_path: '', caption: 'Brivia has notifications', created_at: at(3) }], routes: { member_badge: { body: [{ member_id: ME, badge: 'admin' }, { member_id: CLUB, badge: 'admin' }] } } };
 const stub = await startAppStub({ port: 5178, state: st, deckRows: rows });
 const browser = await chromium.launch();
 const shots = process.env.AB_SHOTS;
@@ -47,6 +47,12 @@ try {
     await page.waitForSelector('#public-profile-modal');
     check(`AB2 ${w}: the public profile has the badge`, await page.locator('#public-profile-modal h2 .admin-badge').count() === 1);
     if (shots) await page.screenshot({ path: `${shots}/public-${w}.png` });
+    await page.keyboard.press('Escape');
+    await page.goto(`${stub.url}/app.html?view=posts`);
+    await page.waitForSelector('.post-card[data-post-id="club-note"]', { timeout: 8000 });
+    await page.waitForTimeout(800);
+    check(`AB2 ${w}: the club's note card has the badge`, await page.locator('.post-card[data-post-id="club-note"] .post-card-head .admin-badge').count() === 1);
+    if (shots) await page.locator('.post-card[data-post-id="club-note"]').screenshot({ path: `${shots}/note-${w}.png` });
     check(`AB3 ${w}: no page errors`, errors.length === 0, errors.join('; '));
     await ctx.close();
   }
