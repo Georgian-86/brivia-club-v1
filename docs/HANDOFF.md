@@ -7,6 +7,8 @@ Update this file at the end of every session. CLAUDE.md holds the aim; this file
 
 ## 1. What is done
 
+**2026-11-14, D-257:** the database ran out of memory (login 504s); the message sync now backs off (15 s with Realtime live, 30 s hidden). If it recurs, upgrading Supabase compute is the founder's call.
+
 **2026-11-14, D-256:** new messages and requests play the sax notify cue in the app. Open: collab-requests.spec's reduced-motion check fails on main.
 
 **2026-11-14, D-255:** signup Continue fixed to the bottom on phones; links in chat; send notes and events to a chat (one sheet, event cards).

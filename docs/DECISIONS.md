@@ -4743,3 +4743,19 @@ bring a short line back.
 - **Checks.** e2e `message-sound.spec.mjs` MS1-MS2 (a message on another view asks for the sax once; the open chat does
   not); sounds, chat-inbox, post-notifications, nearby pass; unit 616. collab-requests' reduced-motion check fails on
   main as well (pre-existing, unrelated).
+
+## D-257 (2026-11-14): the message sync backs off to ease the database
+
+- **Incident (2026-11-14, ~7 PM IST).** Google sign-in returned 504 and the Supabase dashboard showed "Connection
+  terminated due to connection timeout". Observability: memory commitment 1.64 GB (SEVERE) on the free-tier instance,
+  swap larger than RAM, Disk IO balance down to 51%, Database 30.6% errors. The database was out of memory and swapping,
+  which drains the IO budget until queries time out. Fixed for the moment by restarting the project.
+- **Decision.** The fallback sync in `app.js` (`startMessageSync`) ran every 5 s in every open tab, hidden or not, and
+  each run read up to 80 messages. It still wakes every 5 s but only queries when due: messages every 5 s while Realtime
+  is down, every 15 s while the Realtime messages channel is `SUBSCRIBED` (Realtime already delivers new messages at
+  once), every 30 s in a hidden tab; requests and matches every 30 s, 60 s when hidden. Returning to the tab syncs at
+  once. Roughly 3x fewer message reads per visible tab and 6x fewer per background tab.
+- **Not decided here.** More RAM (Supabase Pro + a larger compute size) is the founder's call (it costs money). If the
+  database runs out of memory again with this change live, that is the next step.
+- **Checks.** unit tests pass; e2e message-sound, chat-inbox, read-receipts, chat-seen, collab-requests, mutual-moment,
+  presence, consent (189) pass.
