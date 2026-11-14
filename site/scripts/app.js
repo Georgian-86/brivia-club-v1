@@ -147,6 +147,7 @@ let remoteConnectionIds = [];
 let notifications = [];
 // Incoming pending connection requests (shown in the notifications panel).
 let pendingRequests = [];
+let requestKeys = null;   // D-256: the requests already seen this visit (null until the first read)
 const respondingRequestIds = new Set();
 
 let currentIndex = 0;
@@ -881,11 +882,19 @@ const renderNotifications = () => {
     if (person) { setView('chat'); openChat(person); }
   }));
 };
-const syncIncomingNotifications = async (rows = []) => {
+const syncIncomingNotifications = async (rows = [], { sound = false } = {}) => {
   if (!notifications.length) notifications = readNotifications();
   let changed = false;
   // D-224: a note to self is never a notification.
-  rows.filter((message) => String(message.recipient_id) === String(memberProfile.id) && String(message.sender_id) !== String(memberProfile.id)).forEach((message) => { if (addMessageNotification(message, { save: false })) changed = true; });
+  rows.filter((message) => String(message.recipient_id) === String(memberProfile.id) && String(message.sender_id) !== String(memberProfile.id)).forEach((message) => {
+    if (!addMessageNotification(message, { save: false })) return;
+    changed = true;
+    // D-256: the 5 s sync caught a message Realtime missed: the same sax, once per message, only for a fresh one and
+    // never for the chat open on screen.
+    const fresh = Date.now() - (Date.parse(message.created_at || '') || 0) < 2 * 60 * 1000;
+    const viewing = String(selectedChat?.id || '') === String(message.sender_id) && document.body.dataset.appView === 'chat';
+    if (sound && fresh && !viewing) chime.notify(`msg:${message.id}`);
+  });
   if (changed) { saveNotifications(); reconcileMessageNotifications(Date.parse(chatSeenSent[''] || '') || 0); renderNotifications(); }   // D-229: one save per sync
 };
 const ensureNotificationControls = () => {
@@ -2376,6 +2385,10 @@ const loadConnectionRequests = async () => {
     if (profileError) console.warn('Request senders could not load:', profileError.message);
     (profileRows || []).forEach((row) => { const person = toMemberPerson(row); extraPeople.set(String(person.id), person); });
   }
+  // D-256: a request that arrived since the last read plays the sax too (the first read of a visit is the baseline).
+  const freshRequest = requestKeys !== null && rows.some((row) => !requestKeys.has(`${row.from_id}@${row.created_at}`));
+  requestKeys = new Set(rows.map((row) => `${row.from_id}@${row.created_at}`));
+  if (freshRequest) chime.notify(`req:${rows.map((row) => `${row.from_id}@${row.created_at}`).join('|')}`);
   pendingRequests = rows.map((row) => ({
     fromId: String(row.from_id),
     note: row.note || '',
@@ -3584,7 +3597,11 @@ const appendRemoteMessage = (message) => {
   restoreChatForMe(otherId);
   const isIncoming = senderId !== memberId;
   if (isIncoming) {
-    addMessageNotification(message);
+    const added = addMessageNotification(message);
+    // D-256 (founder: "the web notifications for the whole app must be like saxophone sound only"): a new message plays
+    // the Brivia sax (the same cue as every other notification), unless its chat is the one open on screen.
+    const viewing = String(selectedChat?.id || '') === String(otherId) && document.body.dataset.appView === 'chat' && document.visibilityState === 'visible';
+    if (added && !viewing) chime.notify(`msg:${message.id}`);
     if (selectedChat?.id === otherId) markNotificationsReadForPerson(otherId);
     renderNotifications();
   }
@@ -3720,7 +3737,7 @@ const syncIncomingNotificationsFromServer = async () => {
   if (error) return;
   // D-150: anything that reached this app and is not marked delivered yet is now.
   if (receiptColumns && needsDeliveredReceipt(data, memberProfile.id)) sendDeliveredReceipt();
-  await syncIncomingNotifications(data || []);
+  await syncIncomingNotifications(data || [], { sound: true });
 };
 
 // D-150: the chat header says when the other member was last here ("Active now", "Active 5 min ago"), from the

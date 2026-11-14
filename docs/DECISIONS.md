@@ -4728,3 +4728,18 @@ bring a short line back.
   e2e `chat-share.spec.mjs` CS1-CS5 at 1440 and 390 (axe clean); events (menu order updated), chat-extras (152),
   chat-inbox, message-actions, message-replies, post-activity, explore-cards (74), onboarding (269), launch-polish,
   event-notifications pass.
+
+## D-256 (2026-11-14): every in-app notification plays the Brivia sax
+
+- **Ask (founder, 2026-11-14):** "the web notifications for the whole app must be like saxophone sound only".
+- **Decision.** The in-app notification sound is the Brivia horn's notify cue (D-137, a synthesized saxophone line) for
+  everything: likes, comments, new notes, crossings and mutual matches already used it; a new chat message (from
+  Realtime or caught by the 5 s sync, once per message, never for the chat open on screen) and a new connection request
+  (one that arrived since the last read; the first read of a visit is the baseline) now do too. The "Message
+  notifications" and "Notification sound" switches still govern it.
+- **Limit.** A system notification (Web Push, with Brivia closed or in the background) plays the phone's or computer's
+  own notification sound: browsers give websites no way to set it (no sound option in the Notification API on iPhone,
+  Android, Chrome, Safari or Firefox). "Push notification sound" in Settings can make those silent, nothing more.
+- **Checks.** e2e `message-sound.spec.mjs` MS1-MS2 (a message on another view asks for the sax once; the open chat does
+  not); sounds, chat-inbox, post-notifications, nearby pass; unit 616. collab-requests' reduced-motion check fails on
+  main as well (pre-existing, unrelated).
