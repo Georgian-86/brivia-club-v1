@@ -4831,3 +4831,5 @@ bring a short line back.
   unlimited list (0079) stays Yashika, Golu Kumar and Golu, the only accounts above 10 (verified live: 3 unlimited,
   404 at 10). Re-swiping someone already swiped stays free; the unanswered-request cap (100) is unchanged.
 - **Checks.** SQL z-daily-swipes Z6 (shared cap and unlimited member), full harness; unit; build.
+- **Update (founder, 2026-11-14): "keep golu kumar, remove the other golu".** Golu (265ae93f…) was taken off
+  `brivia_private.unlimited_swipes`; the list is now Yashika and Golu Kumar only (verified live: Golu 10 a day).
