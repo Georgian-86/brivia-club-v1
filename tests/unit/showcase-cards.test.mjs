@@ -18,17 +18,18 @@ test('no Yugansh or Keshav anywhere shipped', () => {
 });
 
 test('the marquee is two identical halves; the second is aria-hidden', () => {
-  assert.equal(cards.length, 18);
-  const first9 = cards.slice(0, 9);
-  const second9 = cards.slice(9);
-  assert.deepEqual(first9.map((c) => c.src), second9.map((c) => c.src));
-  assert.ok(first9.every((c) => c.ariaHidden === null));
-  assert.ok(second9.every((c) => c.ariaHidden === 'true'));
+  // D-259: Atif Mir joined (10 a side).
+  assert.equal(cards.length, 20);
+  const first = cards.slice(0, 10);
+  const second = cards.slice(10);
+  assert.deepEqual(first.map((c) => c.src), second.map((c) => c.src));
+  assert.ok(first.every((c) => c.ariaHidden === null));
+  assert.ok(second.every((c) => c.ariaHidden === 'true'));
 });
 
-test('the marquee keeps the same speed per card (38s for 11 cards becomes 31s for 9)', () => {
+test('the marquee keeps the same speed per card (about 3.4 s a card: 31s for 9, 34s for 10)', () => {
   const css = readFileSync('site/styles/auth-polish.css', 'utf8');
-  assert.match(css, /\.community-track\{[^}]*animation:community-cards-slide 31s linear infinite/);
+  assert.match(css, /\.community-track\{[^}]*animation:community-cards-slide 34s linear infinite/);
 });
 
 test('the marquee caption carries no head count (founder ruling)', () => {
