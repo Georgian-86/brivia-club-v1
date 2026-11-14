@@ -148,6 +148,11 @@ const openDeleteDialog = ({ trigger, fallbackFocus, deps }) => {
   return dialog;
 };
 
+// D-262 (founder 2026-11-14: "remove the option to delete or deactivate account"): the in-app Delete my account button
+// is off. The delete dialog, the delete_my_account RPC and its tests stay, so turning this back on is one line.
+// Members can still ask for erasure by email (privacy.html "Deleting your account").
+export const SELF_DELETE = false;
+
 // The Privacy & account section. deps: { fetchConsentAt, withdrawConsent, onWithdrawn, user, runDeletion,
 // signInWithPassword, startGoogle, onDeleted }. options.autoDelete reopens the delete dialog (return from Google).
 export const openPrivacyAccount = async ({ trigger, deps, autoDelete = false }) => {
@@ -163,15 +168,17 @@ export const openPrivacyAccount = async ({ trigger, deps, autoDelete = false }) 
     <div class="privacy-actions privacy-actions-start" data-privacy-retry-row hidden><button type="button" class="privacy-secondary" data-privacy-retry>Try again</button></div>
     <div class="privacy-actions privacy-actions-start"><button type="button" class="privacy-secondary" data-privacy-withdraw>Withdraw consent</button></div>
     <p class="privacy-links"><a href="/privacy.html">Privacy notice</a> · <a href="mailto:${CONTACT}">Contact us: ${CONTACT}</a></p>
-    <hr />
+    ${SELF_DELETE ? `<hr />
     <p>Deleting your account removes your profile and everything in it. It can't be undone.</p>
-    <div class="privacy-actions privacy-actions-start"><button type="button" class="privacy-danger" data-privacy-delete>Delete my account</button></div>
+    <div class="privacy-actions privacy-actions-start"><button type="button" class="privacy-danger" data-privacy-delete>Delete my account</button></div>` : ''}
     <div class="privacy-actions"><button type="button" class="privacy-secondary" data-privacy-close>Close</button></div>
   </div>`,
   });
   const status = dialog.querySelector('[data-privacy-status]');
   const withdrawBtn = dialog.querySelector('[data-privacy-withdraw]');
   const deleteBtn = dialog.querySelector('[data-privacy-delete]');
+  const closeBtn = dialog.querySelector('[data-privacy-close]');
+  const restFocus = () => deleteBtn || closeBtn;
   const retryRow = dialog.querySelector('[data-privacy-retry-row]');
   const render = () => {
     status.textContent = consentLoadFailed ? "We couldn't load your consent status. Try again." : consentStatusCopy(consentAt);
@@ -182,19 +189,19 @@ export const openPrivacyAccount = async ({ trigger, deps, autoDelete = false }) 
   dialog.querySelector('[data-privacy-retry]').addEventListener('click', async () => {
     try { consentAt = await deps.fetchConsentAt(); consentLoadFailed = false; } catch { consentLoadFailed = true; }
     render();
-    (consentLoadFailed ? dialog.querySelector('[data-privacy-retry]') : (consentAt ? withdrawBtn : deleteBtn)).focus();
+    (consentLoadFailed ? dialog.querySelector('[data-privacy-retry]') : (consentAt ? withdrawBtn : restFocus())).focus();
   });
   dialog.querySelector('[data-privacy-close]').addEventListener('click', close);
   withdrawBtn.addEventListener('click', async () => {
-    const withdrawn = await openWithdrawDialog({ trigger: withdrawBtn, fallbackFocus: () => deleteBtn, withdraw: deps.withdrawConsent });
+    const withdrawn = await openWithdrawDialog({ trigger: withdrawBtn, fallbackFocus: restFocus, withdraw: deps.withdrawConsent });
     if (!withdrawn) return;
     consentAt = null; // set_sensitive_consent(false) clears profiles.sensitive_consent_at
     render();
     deps.onWithdrawn?.();
-    deleteBtn.focus();
+    restFocus().focus();
   });
-  deleteBtn.addEventListener('click', () => openDeleteDialog({ trigger: deleteBtn, fallbackFocus: () => deleteBtn, deps }));
+  deleteBtn?.addEventListener('click', () => openDeleteDialog({ trigger: deleteBtn, fallbackFocus: () => deleteBtn, deps }));
   dialog.showModal();
-  (consentLoadFailed ? dialog.querySelector('[data-privacy-retry]') : consentAt ? withdrawBtn : deleteBtn).focus();
-  if (autoDelete) openDeleteDialog({ trigger: deleteBtn, fallbackFocus: () => deleteBtn, deps });
+  (consentLoadFailed ? dialog.querySelector('[data-privacy-retry]') : consentAt ? withdrawBtn : restFocus()).focus();
+  if (autoDelete && deleteBtn) openDeleteDialog({ trigger: deleteBtn, fallbackFocus: () => deleteBtn, deps });
 };
