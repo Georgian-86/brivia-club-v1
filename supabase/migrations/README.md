@@ -1569,3 +1569,11 @@ Verify: `select has_table_privilege('authenticated', 'public.member_badge', 'ins
 author's world (no block either way); anyone else's note still notifies only their connections. Verify: post a note as
 an admin and `select count(*) from public.member_notification where post_id = '<id>';` (every other account). Applied
 live 2026-11-13.
+
+## 0078
+
+**Comment replies notify (D-260).** Apply after `0077`, then deploy `push-notify` (v9) and the client. Adds
+`comment_reply` to the notification types and re-creates `brivia_private.brivia_notify_post_comment()`: the note's
+author is told as before; the writer of the comment being answered is told too (not the replier, not the note's author
+twice, not across a block). Verify: `select pg_get_constraintdef(oid) from pg_constraint where conname =
+'member_notification_notification_type_check';` lists `comment_reply`. Applied live 2026-11-14.

@@ -4782,3 +4782,17 @@ bring a short line back.
   moves at the same pace (about 3.4 s a card).
 - **Checks.** unit showcase-cards (20 cards, two identical halves, 34 s); asset budget OK; the card renders with its
   photo at 1440 and 390.
+
+## D-260 (2026-11-14): replies to your comment notify you; a clearer photo of Atif
+
+- **Ask (founder, 2026-11-14):** "make the photo very clean, clear and also allow notifications for if the person
+  comments on our post we must get notified".
+- **Found.** A comment on a member's own note already notified them (post_comment, 0043; live, every non-self comment
+  had a notification and push). The gap: a reply to *your comment* on someone else's note told only the note's author.
+- **Decision (0078).** A reply also notifies the writer of the comment it answers (`comment_reply`): never the replier,
+  never twice (the note's author keeps `post_comment` only), never across a block or world. The panel groups replies
+  per note ("Asha and 2 others replied to your comment", newest reply shown); push-notify v9 says "{name} replied to
+  your comment". The comment bell for note authors is unchanged.
+- **Photo.** Atif's card is re-cut from the original at near-native size (720 x 540 to 1080 x 810, not a 2x upscale),
+  with an unsharp mask and a light contrast / colour lift; the source is a phone screenshot, so this is its ceiling.
+- **Checks.** SQL zr-comment-replies (R1 to R5); unit 617; build.

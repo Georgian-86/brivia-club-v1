@@ -147,3 +147,13 @@ test('groupPostNotifications + postNotificationCopy: comments on a note in one r
   assert.deepEqual(postNotificationCopy(groups[0]), { title: 'Diya and 2 others commented on your note', line: 'Beautiful' });
   assert.equal(postNotificationCopy({ ...groups[0], people: groups[0].people.slice(0, 2) }).title, 'Diya and Amar commented on your note');
 });
+
+// D-260 (0078): replies to my comment, grouped per note like comments, newest reply first.
+test('comment_reply: one row per note, "replied to your comment", the newest reply', () => {
+  const now = Date.parse('2026-11-14T12:00:00Z');
+  const r = (id, src, name, at, snippet) => ({ id, type: 'comment_reply', postId: 'p7', sourceId: src, name, createdAt: at, readAt: null, dismissedAt: null, snippet, commentId: `k${id}` });
+  const groups = groupPostNotifications([r('1', 'a', 'Amar', '2026-11-14T10:00:00Z', 'In Pune!'), r('2', 'b', 'Diya Shah', '2026-11-14T11:00:00Z', 'Me too')], now);
+  assert.equal(groups.length, 1);
+  assert.equal(groups[0].key, 'r:p7');
+  assert.deepEqual(postNotificationCopy(groups[0]), { title: 'Diya and Amar replied to your comment', line: 'Me too' });
+});
