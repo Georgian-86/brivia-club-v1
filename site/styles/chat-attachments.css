@@ -218,3 +218,12 @@ body.app-body[data-app-view="chat"] .chat-layout>.chat-window{
 .chat-emoji-tabs button{font-size:18px!important;line-height:1}
 .chat-emoji-grid button{font-size:22px!important;line-height:1}
 .chat-emoji-none{grid-column:1/-1;margin:16px 0;color:rgba(52,31,28,.6);font-size:var(--text-14);text-align:center}
+
+/* D-255: links in a message are links (underlined, never breaking the bubble); a shared event is a card like a shared
+   post, with its title and when / where. */
+.chat-messages .message .message-copy a.message-link{color:inherit;text-decoration:underline;text-decoration-thickness:1px;text-underline-offset:3px;overflow-wrap:anywhere;word-break:break-word}
+.chat-messages .message.them .message-copy a.message-link{color:var(--brivia-wine, #5e0b28)}
+.chat-messages .message .message-copy a.message-link:focus-visible{outline:2px solid currentColor;outline-offset:2px;border-radius:3px}
+.chat-messages .message.has-share-words > .message-copy{display:block;margin-top:10px}
+.message-event .message-event-title{display:block;color:var(--color-ink);font-family:var(--font-heading);font-size:var(--text-16);line-height:1.25}
+.message-event .message-event-meta{display:block;margin-top:2px;color:var(--color-ink-soft);font-size:var(--text-12)}

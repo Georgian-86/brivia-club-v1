@@ -1076,13 +1076,9 @@ export const initGuidedSignup = ({
     root.querySelectorAll('[data-guided-google]').forEach((b) => { b.disabled = false; b.removeAttribute('aria-busy'); });
   });
 
-  // Phones: keep the primary button above the on-screen keyboard.
-  const vv = window.visualViewport;
-  if (vv) {
-    const place = () => root.style.setProperty('--guided-keyboard', `${Math.max(0, window.innerHeight - vv.height - vv.offsetTop)}px`);
-    vv.addEventListener('resize', place);
-    vv.addEventListener('scroll', place);
-  }
+  // D-255: the Back / Continue bar is fixed to the bottom of the screen on phones (signup-classic.css). It used to be
+  // lifted by (innerHeight - visualViewport.height), which on iPhone Safari also counted the browser's own toolbar
+  // and floated the bar in the middle of the form; under an open keyboard it now simply rests at the bottom.
 
   return {
     show,

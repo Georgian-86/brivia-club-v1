@@ -108,16 +108,16 @@ try {
     // event's link; Escape closes the menu and returns to the button, and the drawer stays open.
     await page.evaluate(() => { window.__copied = null; try { Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText: async (t) => { window.__copied = t; } } }); } catch {} });
     await page.locator('#event-detail [data-event-share]').click();
-    check(`${w}: Share opens the menu, focus on Copy link`, await page.locator('[data-event-share-menu]').isVisible()
+    check(`${w}: Share opens the menu, focus on its first item (D-255: Send in chat)`, await page.locator('[data-event-share-menu]').isVisible()
       && await page.locator('[data-event-share]').getAttribute('aria-expanded') === 'true'
-      && await page.evaluate(() => document.activeElement?.matches('[data-event-share-copy]')));
+      && await page.evaluate(() => document.activeElement?.matches('[data-event-share-chat]')));
     const items = await page.$$eval('[data-event-share-menu] [role="menuitem"]:not([hidden])', (els) => els.map((el) => el.textContent.trim()));
-    check(`${w}: the menu offers Copy link and WhatsApp (${items.join(', ')})`, items[0] === 'Copy link' && items.includes('WhatsApp'));
+    check(`${w}: the menu offers Send in chat, Copy link and WhatsApp (${items.join(', ')})`, items[0] === 'Send in chat' && items[1] === 'Copy link' && items.includes('WhatsApp'));
     const axeShare = await axeViolations(page, { include: '[data-event-share-menu]' });
     check(`${w}: axe on the share menu`, axeShare.length === 0, JSON.stringify(axeShare));
     await shot(page, `share-menu-${w}.png`);
     await page.keyboard.press('ArrowDown');
-    check(`${w}: arrow keys move through the menu`, await page.evaluate(() => document.activeElement?.matches('[data-event-share-whatsapp]')));
+    check(`${w}: arrow keys move through the menu`, await page.evaluate(() => document.activeElement?.matches('[data-event-share-copy]')));
     await page.keyboard.press('Escape');
     check(`${w}: Escape closes the menu, not the drawer, and focus returns to Share`, await page.locator('[data-event-share-menu]').isHidden()
       && await page.locator('#event-detail').isVisible() && await page.evaluate(() => document.activeElement?.matches('[data-event-share]')));

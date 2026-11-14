@@ -563,6 +563,53 @@ try {
     await context.close();
   }
 
+  // ---- D-255 (a member, Manjunath: "In both cases, continue should stick to the bottom"): on a phone the Back /
+  // Continue bar rests on the bottom edge of the screen on every step, scrolled to the top or to the end, never in
+  // the middle of the form; with the interest list open the bar sits below the list, not over it. ----
+  {
+    const context = await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
+    await scriptGeo(context, 'ok');
+    await setup(context);
+    const page = await context.newPage();
+    await page.goto(`${BASE}/auth.html#signup`, { waitUntil: 'load' });
+    await waitScreen(page, 'welcome');
+    const bars = [];
+    const measure = async (name) => {
+      for (const where of ['top', 'end']) {
+        await page.evaluate((w) => window.scrollTo(0, w === 'top' ? 0 : document.documentElement.scrollHeight), where);
+        await page.waitForTimeout(150);
+        const m = await page.evaluate(() => { const b = document.querySelector('.guided-actions:not([hidden])'); if (!b) return null; const r = b.getBoundingClientRect(); return { bottom: Math.round(r.bottom), vh: window.innerHeight }; });
+        if (m && Math.abs(m.bottom - m.vh) > 2) bars.push(`${name}@${where}: bar ends at ${m.bottom} of ${m.vh}`);
+      }
+    };
+    await page.locator('[data-guided-email]').click(); await waitScreen(page, 'account'); await measure('account');
+    await page.locator('input[name="guided-email"]').fill(EMAIL);
+    await page.locator('input[name="guided-password"]').fill(PASSWORD);
+    await page.locator('input[name="guided-password-confirm"]').fill(PASSWORD);
+    await page.locator('[data-guided-next]').click(); await waitScreen(page, 'work'); await measure('work');
+    await page.locator('[data-guided-next]').click(); await waitScreen(page, 'name'); await measure('name');
+    await page.locator('input[name="guided-name"]').fill('Gia Guided');
+    await page.locator('[data-guided-next]').click(); await waitScreen(page, 'details'); await measure('details');
+    await page.locator('input[name="guided-phone"]').fill('9876543210');
+    await page.locator('.guided-segment[data-gender="Prefer not to say"]').click();
+    await page.locator('[data-guided-next]').click(); await waitScreen(page, 'photo'); await measure('photo');
+    await addPhoto(page);
+    await page.locator('[data-guided-next]').click(); await waitScreen(page, 'interests', 8000); await measure('interests');
+    await openInterests(page);
+    await page.waitForTimeout(250);
+    const overlap = await page.evaluate(() => {
+      const bar = document.querySelector('.guided-actions').getBoundingClientRect();
+      const menu = document.querySelector('#guided-interest-options').getBoundingClientRect();
+      const visibleRows = [...document.querySelectorAll('#guided-interest-options .guided-menu-option')].filter((o) => { const r = o.getBoundingClientRect(); return r.bottom > menu.top && r.top < menu.bottom && r.top < window.innerHeight; });
+      const covered = visibleRows.filter((o) => { const r = o.getBoundingClientRect(); return r.bottom > bar.top + 2 && r.top < bar.bottom; }).length;
+      const above = visibleRows.filter((o) => o.getBoundingClientRect().bottom <= bar.top + 2).length;
+      return { covered, above };
+    });
+    check(`390: D-255 the Back / Continue bar rests on the bottom edge on every step (${bars.join(' | ')})`, () => assert.deepEqual(bars, []));
+    check(`390: D-255 with the interest list open, rows show above the bar (${JSON.stringify(overlap)})`, () => assert.ok(overlap.above >= 3, JSON.stringify(overlap)));
+    await context.close();
+  }
+
   // ---- 320 px: every question screen fits without a sideways scroll ----
   {
     const context = await browser.newContext({ viewport: { width: 320, height: 640 }, isMobile: true, hasTouch: true });
