@@ -7,6 +7,8 @@ Update this file at the end of every session. CLAUDE.md holds the aim; this file
 
 ## 1. What is done
 
+**2026-11-14, D-264:** chat reads ~10x faster (0081 live, message rule once per query); landing hero 1440p / phone cuts (a quarter of the download).
+
 **2026-11-14, D-263:** one shared pool of 10 swipes a day (deck + companions, 0080 live); only Yashika and Golu Kumar unlimited.
 
 **2026-11-14, D-262:** Delete my account removed from the app (flag in privacy-account.js); deletion is by email.

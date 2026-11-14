@@ -1594,3 +1594,10 @@ limit (`signal_daily_limit`, 10); members on `brivia_private.unlimited_swipes` h
 `brivia_signal_state`, `brivia_companion_state` and `companion_swipe`, adds `brivia_private.brivia_swipe_times`. Verify:
 `select daily_limit, used from public.brivia_companion_state('<id>')` equals `brivia_signal_state('<id>')`. Applied live
 2026-11-14.
+
+## 0081
+
+**Fast message privacy rule (D-264).** Apply after `0080`. Same visibility rule on `brivia_messages`, computed once
+per query: adds `brivia_private.my_hidden_message_ids()` and `brivia_private.my_other_world_peers()` and re-creates the
+select policy "Completed members can view their messages". Verify as a member: the 80 newest received messages
+return in tens of ms (`explain analyze`). Applied live 2026-11-14.

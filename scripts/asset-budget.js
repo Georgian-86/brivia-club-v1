@@ -2,7 +2,7 @@
 // heroVideoBytes (D-062): the landing hero ships the 4K master's pixels (hero-4k-*, hero-portrait-4k-*). Each browser
 // fetches one of them, after idle and behind the poster, so they get their own 20 MB cap (the H.264 last resort is the largest, about 18 MB).
 export const DEFAULT_LIMITS = { imageBytes: 409600, videoBytes: 5242880, heroVideoBytes: 20 * 1048576 };
-const HERO_4K = /(^|\/)hero-(portrait-)?4k-(av1|hevc|h264)[^/]*\.mp4$/i;
+const HERO_4K = /(^|\/)hero-(portrait-)?(4k|1440|1536)-(av1|hevc|h264)[^/]*\.mp4$/i; // D-264: the lighter hero cuts too
 const IMAGE_EXT = new Set(['.png', '.jpg', '.jpeg', '.webp', '.avif', '.gif']);
 const VIDEO_EXT = new Set(['.mp4', '.webm', '.mov']);
 

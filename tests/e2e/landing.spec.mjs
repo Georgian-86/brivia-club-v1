@@ -30,8 +30,9 @@ const MAX_BYTES = 3_000_000;
 // AV1 (not H.264), so it fetches the AV1 file of the viewport's frame, exactly one. The hard 3 MB check counts
 // everything except the hero video (it starts after idle, behind the poster), and a separate line reports the total
 // with the hero file the viewport would really stream (a WARN, see below).
-const HERO_FILE = (viewport) => (viewport.width / viewport.height <= 10 / 16 ? 'hero-portrait-4k-av1.mp4' : 'hero-4k-av1.mp4');
-const isHeroVideo = (url) => /hero-(portrait-)?4k-(av1|hevc|h264)[^/]*\.mp4/.test(url);
+// D-264: the lighter cuts come first (the 4K masters only above 2560 px wide).
+const HERO_FILE = (viewport) => (viewport.width / viewport.height <= 10 / 16 ? 'hero-portrait-1536-h264.mp4' : viewport.width <= 2560 ? 'hero-1440-h264.mp4' : 'hero-4k-av1.mp4');
+const isHeroVideo = (url) => /hero-(portrait-)?(4k|1440|1536)-(av1|hevc|h264)[^/]*\.mp4/.test(url);
 const nonHeroBytes = (entries) => entries.filter(({ url }) => !isHeroVideo(url)).reduce((sum, { size }) => sum + size, 0);
 
 let failures = 0;
