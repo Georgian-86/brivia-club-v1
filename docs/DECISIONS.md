@@ -4849,3 +4849,22 @@ bring a short line back.
   come first in the `<video>`; the 4K masters stay for screens wider than 2560 px. Frames compared side by side:
   no visible difference. Page download 8.6 MB to 4.2 MB on a phone, over 20 MB to 6.6 MB on a laptop.
 - **Checks.** SQL harness (all, incl. tester-world and message visibility); e2e landing; unit 619; build.
+
+## D-265 (2026-11-14): four daily nudge pushes; the phone's notification sound stays the system's
+
+- **Ask (founder, 2026-11-14):** saxophone notification sounds on the phone's Home Screen, and a push every 3 hours:
+  "Bore horhe ho?, Brivia pr swipe krlo", then "Brivia se Itni Jaldi Bore hogye", then "Ek Kachori Do Chai, Brivia pr
+  Swipe ho jaye", then at night "Career ki Tension Horhi hai?, Brivia pr Referral Maanglo".
+- **Decision (nudges, 0082 + push-nudge).** Four a day, India time: 12:00, 15:00, 18:00 (three hours apart, the chai
+  line at chai time) and 21:30 at night. The founder's spelling is kept. pg_cron posts `{ slot }` through pg_net to the
+  `push-nudge` Edge Function (verify_jwt off, a shared secret in Vault and in the function's secrets); it pushes to
+  every subscribed device, skips members seen in the app in the last 10 minutes, tags each push `nudge-<slot>` so a
+  repeat replaces it, and forgets devices the push service reports gone. Members who keep notifications off get none;
+  the per-device "Push notification sound" switch still applies.
+- **Decision (sound).** A website's push cannot choose its sound: the Web Push / Notification API has no working
+  sound option on Android Chrome or iOS Safari, so a notification on the Home Screen or lock screen always plays the
+  phone's own notification sound. The sax cue (D-256) keeps playing when Brivia is open. A sax sound on the closed
+  app needs a native wrapper (an Android app with its own notification channel sound, an iOS app with a bundled
+  sound file); that is a separate, larger decision for the founder.
+- **Checks.** Unit `push-nudges` (copy, 3-hour spacing, cron = IST, 0082 in step with the copy); SQL harness incl.
+  `zt-daily-nudges`; build.

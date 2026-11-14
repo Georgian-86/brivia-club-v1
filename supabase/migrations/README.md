@@ -1601,3 +1601,25 @@ limit (`signal_daily_limit`, 10); members on `brivia_private.unlimited_swipes` h
 per query: adds `brivia_private.my_hidden_message_ids()` and `brivia_private.my_other_world_peers()` and re-creates the
 select policy "Completed members can view their messages". Verify as a member: the 80 newest received messages
 return in tens of ms (`explain analyze`). Applied live 2026-11-14.
+
+## 0082
+
+**Daily nudge pushes (D-265).** Four pushes a day, India time, in the founder's words: 12:00 "Bore horhe ho? / Brivia
+pr swipe krlo", 15:00 "Brivia se Itni Jaldi Bore hogye?", 18:00 "Ek Kachori Do Chai / Brivia pr Swipe ho jaye", 21:30
+"Career ki Tension Horhi hai? / Brivia pr Referral Maanglo" (copy in `supabase/functions/_shared/nudges.js`). They go to
+every device with Brivia notifications on, except members seen in the app in the last 10 minutes. Order:
+
+1. Database > Extensions: **pg_cron** and **pg_net** on.
+2. Pick a long random secret (32+ characters). Edge Functions > Secrets: `NUDGE_SECRET` = that value.
+3. Deploy `supabase/functions/push-nudge` with **verify_jwt off** (it checks `x-nudge-secret` itself; it needs the
+   `_shared/nudges.js` file next to it).
+4. SQL editor (Vault):
+   `select vault.create_secret('https://<project-ref>.supabase.co/functions/v1/push-nudge', 'push_nudge_url');`
+   `select vault.create_secret('<the same secret>', 'push_nudge_secret');`
+5. Apply `0082`. It schedules `brivia-nudge-noon`, `-afternoon`, `-chai`, `-night` (UTC 06:30, 09:30, 12:30, 16:00).
+   If pg_cron/pg_net were enabled after it ran, run `select brivia_private.brivia_schedule_nudges();`.
+
+Try one now: `select brivia_private.brivia_send_nudge('chai');` then
+`select status_code, content from net._http_response order by id desc limit 1;` (200 and `{"sent":N,...}`).
+Verify: `select jobname, schedule from cron.job where jobname like 'brivia-nudge-%';` (four rows). Stop them all:
+`select brivia_private.brivia_unschedule_nudges();`
