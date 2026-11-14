@@ -4705,3 +4705,26 @@ bring a short line back.
   signup picker already kept its place.
 - **Checks.** profile-edit D-254 (fails on the previous build: the list was back at the top, the search cleared; passes
   now) at 1440 and 390; hiring, signup (383), onboarding (269), profile-media pass; unit 614.
+
+## D-255 (2026-11-14): Continue on the bottom edge; links in chat; send notes and events to a chat
+
+- **Ask (founder, 2026-11-14, with a member's screenshots, Manjunath: "In both cases, continue should stick to the
+  bottom"):** "continue should stick to bottom, make this whole onboarding process smooth and also allow sending links as
+  links in the chat and allow sending post or events from respective sections directly and clearly".
+- **Onboarding.** On phones the Back / Continue bar is fixed to the bottom edge of the screen on every signup step. It was
+  sticky inside a card shorter than the screen (so it ended mid-screen), and was lifted by (innerHeight -
+  visualViewport.height), which on iPhone Safari also counts the browser's own toolbar, so it floated over the form and
+  the interest list. The lift is gone (under an open keyboard the bar rests at the bottom), the form keeps room for the
+  bar, and an open list scrolls clear of it.
+- **Links.** Every http(s) or www. link in a message is a real link (new tab, no opener, no referrer); punctuation after
+  it stays text. A Brivia note or event link anywhere in a message shows its card, with the words around it under the
+  card (a member pasted a note link with a comment and it read as raw text).
+- **Sending.** One "Send this post" / "Send this event" sheet: Share on a note, and "Send in chat" (new, first) in an
+  event's share menu. A search over connections when there are more than five, an optional message sent with it, Send
+  per person (then Sent), and Copy link / More options. A shared event shows in chat as a card (title, when, where,
+  "View event", which opens it in Events).
+- **Checks.** signup D-255 (fails on the previous build: the bar ended 100-270 px above the bottom on every step; passes
+  now; 385 checks); unit 616 (chat-links: linkify escaping, javascript: never a link, post / event links found in text);
+  e2e `chat-share.spec.mjs` CS1-CS5 at 1440 and 390 (axe clean); events (menu order updated), chat-extras (152),
+  chat-inbox, message-actions, message-replies, post-activity, explore-cards (74), onboarding (269), launch-polish,
+  event-notifications pass.

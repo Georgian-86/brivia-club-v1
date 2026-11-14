@@ -17,7 +17,7 @@ import { eventImageSrc } from './event-assets.js';
 import { openCheckout } from './payment-checkout.js';
 import { openPhotoViewer } from './photo-viewer.js';
 
-export const createEventsPage = ({ root, api, safeImage, toast, isMissing, sendHello, openChatWith, signedIn, composer = null, memberId = () => '', openCompanions = null }) => {
+export const createEventsPage = ({ root, api, safeImage, toast, isMissing, sendHello, openChatWith, signedIn, composer = null, memberId = () => '', openCompanions = null, shareToChat = null }) => {
   if (!root) return { show() {} };
   const grid = root.querySelector('#events-grid');
   const chips = root.querySelector('#event-chips');
@@ -416,6 +416,8 @@ export const createEventsPage = ({ root, api, safeImage, toast, isMissing, sendH
     // D-207: the share button opens a small menu: Copy link, WhatsApp, More options (the device's share sheet).
     if (t.closest('[data-event-share]')) { toggleShareMenu(); return; }
     const url = eventShareUrl(event.id);
+    // D-255: "Send in chat" sends the event to a connection (a card in the chat), from the drawer.
+    if (t.closest('[data-event-share-chat]')) { closeShareMenu(false); shareToChat?.(event, url); return; }
     if (t.closest('[data-event-share-copy]')) {
       closeShareMenu(true);
       copyText(url).then((ok) => toast(ok ? 'Event link copied.' : url));

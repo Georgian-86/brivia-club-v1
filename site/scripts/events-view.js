@@ -417,7 +417,9 @@ const ownerToolsMarkup = (event, confirm = null) => {
 const LINK_ICON = '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1"/><path d="M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/></svg>';
 const CHAT_ICON = '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M4 20l1.3-3.9A8 8 0 1 1 8 19.1Z"/></svg>';
 const MORE_ICON = '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 15V4M8 8l4-4 4 4M6 11v8h12v-8"/></svg>';
+const SEND_ICON = '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M21 3 10 14M21 3l-7 18-4-7-7-4Z"/></svg>';
 const SHARE_MENU = `<div class="event-share-menu" id="event-share-menu" data-event-share-menu role="menu" aria-label="Share event" hidden>
+    <button type="button" role="menuitem" data-event-share-chat>${SEND_ICON}<span>Send in chat</span></button>
     <button type="button" role="menuitem" data-event-share-copy>${LINK_ICON}<span>Copy link</span></button>
     <button type="button" role="menuitem" data-event-share-whatsapp>${CHAT_ICON}<span>WhatsApp</span></button>
     <button type="button" role="menuitem" data-event-share-more>${MORE_ICON}<span>More options</span></button>

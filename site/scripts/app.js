@@ -64,7 +64,8 @@ import '../styles/event-create.css';
 import { postCardMarkup, postFooterMarkup, countText, shareData, isSafePostImageSrc } from './post-card.js';
 import { toastSide } from './toast-place.js';
 import { loadReactions, setReaction, createReactionGuard } from './post-reactions.js';
-import { loadActivity, withLike, likeSummary, threadComments, cleanCommentBody, loadComments, addComment, deleteComment, recordShare, sharedPostMessage, parseSharedPost, emptyActivity, COMMENT_MAX } from './post-activity.js';
+import { linkifyHtml, sharedLinkIn, sharedEventMessage } from './chat-links.js';
+import { loadActivity, withLike, likeSummary, threadComments, cleanCommentBody, loadComments, addComment, deleteComment, recordShare, sharedPostMessage, emptyActivity, COMMENT_MAX } from './post-activity.js';
 import { profileChecklist } from './profile-checklist.js';
 import { quotaLabel, quotaErrorText, quotaBlocked, quotaNotice, swipeLimitCopy } from './signal-quota.js';
 import { pitchLine, deckChips, deckEmptyState, deckFields, bandNote, deckCoverSrc, interleaveNewcomers } from './deck-view.js';
@@ -588,7 +589,7 @@ const unseenNearbyAlerts = () => {
   return nearbyAlerts.filter((alert) => !seen.has(alert.key));
 };
 const findPersonById = (personId) => people.find((person) => String(person.id) === String(personId));
-const notificationPreview = (message) => (parseSharedPost(message?.body) ? 'Shared a post with you.' : message?.body) || ((message?.attachment_url || message?.attachment_path) ? 'Sent an attachment.' : 'Sent you a message.');
+const notificationPreview = (message) => (sharedLinkIn(message?.body) && !sharedLinkIn(message?.body).rest ? (sharedLinkIn(message.body).kind === 'event' ? 'Shared an event with you.' : 'Shared a post with you.') : message?.body) || ((message?.attachment_url || message?.attachment_path) ? 'Sent an attachment.' : 'Sent you a message.');
 // D-229: save = false lets a sync add many and save once. A message older than everything in a full list is not added:
 // it would be trimmed again at once, and with 80+ received messages that re-add / trim churned (and saved and redrew)
 // on every 5-second sync, which froze phones for 100-250 ms each time.
@@ -1532,6 +1533,7 @@ const eventsPage = createEventsPage({
   composer: eventComposer,
   memberId: () => memberProfile.id,
   openCompanions,
+  shareToChat: (event, url) => shareEventToChat(event, url),   // D-255: "Send in chat" in the event's share menu
   api: { sendPendingPush, listEvents, setEventRsvp, setEventInterest, setCompanionDefault, myEventPrefs, eventCompanions, cancelMemberEvent, deleteMemberEvent, removeEventImages, removeEventBrochures,
     createPaymentOrder, verifyPayment, sendEventTicket, playTicket: () => chime.ticket() },   // D-183
   safeImage: eventSafeImage,
@@ -3407,7 +3409,7 @@ const renderChats = () => {
     const last = chatMessages[person.id]?.at(-1);
     const unreadMessages = chatUnreadCount(person.id);
     const unread = unreadMessages > 0;
-    const lastPreview = previewForUnsent(last) || (last?.attachment?.kind === 'resume' ? 'Resume (PDF)' : last?.attachment ? `📎 ${last.attachment.name || 'Attachment'}` : parseSharedPost(last?.text) ? 'Shared a post' : parsePlaceBody(last?.text) ? `📍 ${parsePlaceBody(last.text).name}` : (last?.text || (person.isSelf ? SELF_STATUS : 'Start a conversation')));
+    const lastPreview = previewForUnsent(last) || (last?.attachment?.kind === 'resume' ? 'Resume (PDF)' : last?.attachment ? `📎 ${last.attachment.name || 'Attachment'}` : sharedLinkIn(last?.text) ? (sharedLinkIn(last.text).rest || (sharedLinkIn(last.text).kind === 'event' ? 'Shared an event' : 'Shared a post')) : parsePlaceBody(last?.text) ? `📍 ${parsePlaceBody(last.text).name}` : (last?.text || (person.isSelf ? SELF_STATUS : 'Start a conversation')));
     return `<div class="chat-row${unread ? ' is-unread' : ''}${person.isSelf ? ' is-self' : ''}${selectedChat?.id === person.id ? ' is-selected' : ''}"><button class="chat-row-open" type="button" data-chat-id="${escapeHtml(person.id)}"><span class="member-profile-trigger" data-public-profile-id="${escapeHtml(person.id)}" role="button" tabindex="0" aria-label="${person.isSelf ? 'Open your profile' : `Open ${escapeHtml(person.name)} profile`}">${renderAvatar({ ...person, name: person.avatarName || person.name })}${presenceDot(!person.isSelf && isActiveNow(person.id))}</span><span class="chat-row-copy"><strong data-public-profile-id="${escapeHtml(person.id)}">${escapeHtml(person.name)}${person.isSelf ? '' : adminBadge(person.id)}${isActiveNow(person.id) ? '<span class="sr-only">, active now</span>' : ''}</strong><span>${escapeHtml(lastPreview)}</span></span><span class="chat-row-meta"><time>${escapeHtml(formatInboxTime(last?.createdAt))}</time>${unread ? `<b aria-label="${unreadMessages} unread">${unreadMessages > 99 ? '99+' : unreadMessages}</b>` : ''}</span></button><button class="chat-delete" type="button" data-delete-chat-id="${escapeHtml(person.id)}" aria-label="Delete chat with ${escapeHtml(person.name)}" title="Delete chat"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M4.5 6h11M8 3.5h4M6.5 6l.6 10h5.8l-.6-10M8.5 8.5v5M11.5 8.5v5"/></svg></button></div>`;
   };
   // D-152: while searching, conversations with messages first, then people (connections even without a message, then
@@ -3855,6 +3857,8 @@ document.querySelector('#chat-messages')?.addEventListener('click', (event) => {
   if (button) openSharedResume(button);
   const post = event.target.closest('[data-shared-post-open]');
   if (post) openSharedPost(post.dataset.sharedPostOpen);
+  const sharedEvent = event.target.closest('[data-shared-event-open]');
+  if (sharedEvent) { setView('events'); void eventsPage.openEvent(sharedEvent.dataset.sharedEventOpen); }
 });
 
 // A shared post in chat (founder, 2026-10-28) shows as a card: image, author, caption and "View post". The post is
@@ -3900,6 +3904,24 @@ const renderSharedPost = (postId) => {
     + `<span class="message-post-author">${renderAvatar({ name, image: author?.image || '' }, 'message-post-avatar')}<span>${escapeHtml(name)}</span></span>`
     + `${post.caption ? `<span class="message-post-caption">${escapeHtml(post.caption)}</span>` : ''}`
     + `<button type="button" class="message-post-open" data-shared-post-open="${escapeHtml(String(post.id))}" aria-label="View post by ${escapeHtml(name)}">View post</button></span></span>`;
+};
+// D-255: a shared event in chat: its picture, title, when and where, and "View event". Read from list_events (the
+// events this member may see), once per page; an event they cannot see (or gone) says so.
+const sharedEventCache = { rows: null, loading: null };
+const loadSharedEvents = () => (sharedEventCache.loading ||= listEvents().then(({ data }) => { sharedEventCache.rows = Array.isArray(data) ? data : []; }, () => { sharedEventCache.rows = []; }).finally(() => { if (selectedChat) renderMessages(); }));
+const renderSharedEvent = (eventId) => {
+  if (!sharedEventCache.rows) { void loadSharedEvents(); return '<span class="message-post message-event is-loading" aria-busy="true"><span class="message-post-media"></span><span class="message-post-copy"><span class="message-post-eyebrow">Shared event</span><span class="message-post-caption">Loading…</span></span></span>'; }
+  const row = sharedEventCache.rows.find((r) => String(r.id) === String(eventId));
+  if (!row) return '<span class="message-post message-event is-gone"><span class="message-post-copy"><span class="message-post-eyebrow">Shared event</span><span class="message-post-caption">This event is no longer available.</span></span></span>';
+  const img = row.image_url && isStorageImageUrl(row.image_url) ? `<span class="message-post-media"><img src="${escapeHtml(row.image_url)}" alt="" loading="lazy" /></span>` : '';
+  let when = '';
+  try { when = row.starts_at ? new Date(row.starts_at).toLocaleString([], { weekday: 'short', day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' }) : ''; } catch { when = ''; }
+  const where = String(row.venue_area || row.venue_name || '').trim();
+  return `<span class="message-post message-event${img ? '' : ' no-media'}">${img}<span class="message-post-copy">`
+    + '<span class="message-post-eyebrow">Shared event</span>'
+    + `<span class="message-event-title">${escapeHtml(row.title || 'Event')}</span>`
+    + `${when || where ? `<span class="message-event-meta">${escapeHtml([when, where].filter(Boolean).join(' · '))}</span>` : ''}`
+    + `<button type="button" class="message-post-open" data-shared-event-open="${escapeHtml(String(row.id))}" aria-label="View event ${escapeHtml(row.title || '')}">View event</button></span></span>`;
 };
 const openSharedPost = (postId) => {
   pendingPostId = postId;
@@ -3964,13 +3986,17 @@ const renderMessages = () => {
     const isResume = message.attachment?.kind === 'resume' && Boolean(message.attachment.path);
     const area = !message.attachment ? parseAreaBody(message.text) : null;
     const place = !message.attachment && !area ? parsePlaceBody(message.text) : null;   // D-231
-    const sharedPostId = !message.attachment && !area && !place ? parseSharedPost(message.text) : null;
+    // D-255: a Brivia post or event link anywhere in the words shows as its card, the words under it; any other link is
+    // a real link.
+    const shared = !message.attachment && !area && !place ? sharedLinkIn(message.text) : null;
+    const sharedPostId = shared?.kind === 'post' ? shared.id : null;
+    const words = (text) => (text ? `<span class="message-copy">${linkifyHtml(text, escapeHtml)}</span>` : '');
     const content = isResume ? renderSharedResume(message)
       : area ? renderSharedArea(area)
         : place ? renderSharedPlace(place)
-        : sharedPostId ? renderSharedPost(sharedPostId)
-          : `${renderAttachment(message.attachment)}${message.text ? `<span class="message-copy">${escapeHtml(message.text)}</span>` : ''}`;
-    const kind = isResume || area || place || sharedPostId ? ' has-attachment has-share' : message.attachment ? ' has-attachment' : '';
+        : shared ? `${shared.kind === 'post' ? renderSharedPost(shared.id) : renderSharedEvent(shared.id)}${words(shared.rest)}`
+          : `${renderAttachment(message.attachment)}${words(message.text)}`;
+    const kind = isResume || area || place || (shared && !shared.rest) ? ' has-attachment has-share' : shared ? ' has-attachment has-share has-share-words' : message.attachment ? ' has-attachment' : '';
     const receipt = selectedChat?.isSelf ? '' : receiptState(message);   // D-224: no ticks on notes to self
     const word = receipt && receipt !== 'sent' && String(message.id) === newestOwnId ? `<span class="message-receipt-word">${receipt === 'read' ? 'Read' : 'Delivered'}</span>` : '';
     const edited = message.editedAt ? '<span class="message-edited">Edited</span>' : '';
@@ -5930,36 +5956,47 @@ const closeShareSheet = () => {
   dialog.remove();
   if (returnTo?.isConnected) returnTo.focus();
 };
-const shareCommunityPost = async (postId, opener = document.activeElement) => {
-  const post = communityPosts.find((item) => String(item.id) === String(postId));
-  if (!post) return;
-  const data = shareData(post, window.location.origin);
+// D-255 (founder: "allow sending post or events from respective sections directly and clearly"): one "Send to a
+// connection" sheet for a note and for an event: a search over connections when there are many, an optional note sent
+// with it, "Send" per person (then "Sent"), and Copy link / More options. A send is one chat message: the note's or
+// event's link (the chat shows it as a card) and the note under it.
+const openSendSheet = ({ title, url, message, nativeData, onCounted = () => {}, opener = document.activeElement, what = 'post' }) => {
   document.querySelector('#post-share')?.remove();
   const connections = shareConnections();
   const dialog = document.createElement('dialog');
   dialog.id = 'post-share';
   dialog.className = 'post-share';
   dialog.setAttribute('aria-labelledby', 'post-share-title');
-  const rows = connections.map((person) => `<li class="post-share-row">${renderAvatar(person, 'post-share-avatar')}<span class="post-share-name">${escapeHtml(person.name)}</span><button type="button" class="post-share-send" data-share-to="${escapeHtml(person.id)}" aria-label="Send to ${escapeHtml(person.name)}">Send</button></li>`).join('');
-  dialog.innerHTML = '<div class="post-share-panel"><div class="post-share-head"><h2 id="post-share-title">Share this post</h2>'
+  const rows = connections.map((person) => `<li class="post-share-row" data-share-name="${escapeHtml(String(person.name || '').toLowerCase())}">${renderAvatar(person, 'post-share-avatar')}<span class="post-share-name">${escapeHtml(person.name)}</span><button type="button" class="post-share-send" data-share-to="${escapeHtml(person.id)}" aria-label="Send to ${escapeHtml(person.name)}">Send</button></li>`).join('');
+  dialog.innerHTML = `<div class="post-share-panel"><div class="post-share-head"><h2 id="post-share-title">${escapeHtml(title)}</h2>`
     + '<button type="button" class="post-detail-close" data-share-close aria-label="Close"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M6 6l12 12M18 6 6 18"/></svg></button></div>'
     + (connections.length
-      ? `<p class="post-share-lead">Send it to a connection. It arrives in your chat with them as a link.</p><ul class="post-share-list">${rows}</ul>`
-      : '<p class="post-share-lead">Once you connect with someone, you can send posts to them here.</p>')
+      ? `<p class="post-share-lead">Send it to a connection: it lands in your chat with them as a card they can open.</p>`
+        + (connections.length > 5 ? '<label class="post-share-search"><span class="sr-only">Search your connections</span><input type="search" placeholder="Search your connections" autocomplete="off" data-share-search /></label>' : '')
+        + `<label class="post-share-note"><span class="sr-only">Add a message (optional)</span><input type="text" maxlength="300" placeholder="Add a message (optional)" autocomplete="off" data-share-note /></label>`
+        + `<ul class="post-share-list">${rows}</ul><p class="post-share-none" data-share-none hidden>No connection by that name.</p>`
+      : `<p class="post-share-lead">Once you connect with someone, you can send ${what === 'event' ? 'events' : 'posts'} to them here.</p>`)
     + `<div class="post-share-actions"><button type="button" class="post-share-option" data-share-copy>Copy link</button>${typeof navigator.share === 'function' ? '<button type="button" class="post-share-option" data-share-native>More options</button>' : ''}</div></div>`;
   dialog.__returnFocus = opener;
   document.body.append(dialog);
+  const search = dialog.querySelector('[data-share-search]');
+  search?.addEventListener('input', () => {
+    const q = search.value.trim().toLowerCase();
+    let shown = 0;
+    dialog.querySelectorAll('.post-share-row').forEach((row) => { const hit = !q || row.dataset.shareName.includes(q); row.hidden = !hit; if (hit) shown += 1; });
+    dialog.querySelector('[data-share-none]').hidden = shown > 0;
+  });
   dialog.addEventListener('cancel', (event) => { event.preventDefault(); closeShareSheet(); });
   dialog.addEventListener('click', async (event) => {
     if (event.target === dialog || event.target.closest('[data-share-close]')) { closeShareSheet(); return; }
     if (event.target.closest('[data-share-copy]')) {
       closeShareSheet();
-      try { await navigator.clipboard.writeText(data.url); showToast('Link copied.'); void countShare(post.id); } catch { showToast("Couldn't copy the link."); }
+      try { await navigator.clipboard.writeText(url); showToast('Link copied.'); onCounted(); } catch { showToast("Couldn't copy the link."); }
       return;
     }
     if (event.target.closest('[data-share-native]')) {
       closeShareSheet();
-      try { await navigator.share(data); void countShare(post.id); } catch (error) { if (error?.name !== 'AbortError') showToast("Couldn't open sharing."); }
+      try { await navigator.share(nativeData); onCounted(); } catch (error) { if (error?.name !== 'AbortError') showToast("Couldn't open sharing."); }
       return;
     }
     const send = event.target.closest('[data-share-to]');
@@ -5968,16 +6005,28 @@ const shareCommunityPost = async (postId, opener = document.activeElement) => {
     if (!person) return;
     send.disabled = true;
     send.setAttribute('aria-busy', 'true');
-    const { error } = await supabase.from('brivia_messages').insert({ sender_id: memberProfile.id, recipient_id: person.id, body: sharedPostMessage(data.url), message_type: 'text' });
+    const note = String(dialog.querySelector('[data-share-note]')?.value || '').trim();
+    const body = note ? `${message}\n${note}` : message;
+    const { error } = await supabase.from('brivia_messages').insert({ sender_id: memberProfile.id, recipient_id: person.id, body, message_type: 'text' });
     if (!error) queueMessagePush(person.id);
     send.removeAttribute('aria-busy');
     if (error) { send.disabled = false; showToast(chatSendErrorCopy(error)); return; }
     send.textContent = 'Sent';
     send.classList.add('is-sent');
-    void countShare(post.id);
+    onCounted();
   });
   dialog.showModal();
-  (dialog.querySelector('[data-share-to]') || dialog.querySelector('[data-share-copy]'))?.focus();
+  (search || dialog.querySelector('[data-share-to]') || dialog.querySelector('[data-share-copy]'))?.focus();
+};
+const shareCommunityPost = async (postId, opener = document.activeElement) => {
+  const post = communityPosts.find((item) => String(item.id) === String(postId));
+  if (!post) return;
+  const data = shareData(post, window.location.origin);
+  openSendSheet({ title: 'Send this post', url: data.url, message: sharedPostMessage(data.url), nativeData: data, onCounted: () => { void countShare(post.id); }, opener, what: 'post' });
+};
+// D-255: an event, from its drawer's share menu ("Send in chat").
+const shareEventToChat = (event, url) => {
+  openSendSheet({ title: 'Send this event', url, message: sharedEventMessage(url), nativeData: { title: event?.title || 'An event on Brivia', url }, opener: document.activeElement, what: 'event' });
 };
 
 // The post detail sheet (Comment, or a ?post=<id> link): image, caption, author and date. Its one action is "Reply in
@@ -7407,7 +7456,7 @@ function queueMessagePush(to) {
 }
 // D-157 (0046): long-press a bubble for Copy, Edit, Unsend or Delete for me.
 const findThreadMessage = (id) => (selectedChat ? (chatMessages[selectedChat.id] || []).find((m) => String(m.id) === String(id)) : null);
-const isSpecialMessage = (message) => Boolean(message?.attachment || parseAreaBody(message?.text) || parsePlaceBody(message?.text) || parseSharedPost(message?.text));
+const isSpecialMessage = (message) => Boolean(message?.attachment || parseAreaBody(message?.text) || parsePlaceBody(message?.text) || sharedLinkIn(message?.text));
 const actionErrorCopy = (error, fallback) => {
   if (isMissingFunction(error)) return 'Editing and unsending open soon.';
   const text = String(error?.message || '');
@@ -7431,10 +7480,10 @@ const messageKindLabel = (message) => {
   if (kind) return 'File';
   if (parseAreaBody(message?.text)) return 'Shared area';
   if (parsePlaceBody(message?.text)) return 'Shared place';
-  if (parseSharedPost(message?.text)) return 'Shared post';
+  if (sharedLinkIn(message?.text)) return sharedLinkIn(message.text).kind === 'event' ? 'Shared event' : 'Shared post';
   return '';
 };
-const isCardText = (message) => Boolean(parseAreaBody(message?.text) || parsePlaceBody(message?.text) || parseSharedPost(message?.text));
+const isCardText = (message) => Boolean(parseAreaBody(message?.text) || parsePlaceBody(message?.text) || sharedLinkIn(message?.text));
 function replyQuoteMarkup(quote) {
   if (!quote) return '';
   const state = quote.missing ? ' is-missing' : quote.unsent ? ' is-unsent' : '';

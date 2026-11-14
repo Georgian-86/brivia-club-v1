@@ -364,3 +364,24 @@ body.auth-page .guided-verify-dot { flex: none; width: 8px; height: 8px; border-
   body.auth-page .guided-verify-dot { animation: guided-verify-pulse 1.6s ease-in-out infinite; }
   @keyframes guided-verify-pulse { 0%, 100% { opacity: .35; transform: scale(.85); } 50% { opacity: 1; transform: scale(1.1); } }
 }
+
+/* D-255 (a member, Manjunath: "In both cases, continue should stick to the bottom"): on phones Back / Continue is
+   fixed to the bottom edge of the screen on every step (no ancestor is transformed while the flow shows, so fixed means
+   the screen). The form keeps room for it at its end, and an open list scrolls clear of it. */
+@media (max-width: 780px) {
+  body.auth-page .auth-shell .guided .guided-actions {
+    position: fixed;
+    z-index: 60;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    margin: 0;
+    padding: 10px 16px calc(10px + env(safe-area-inset-bottom, 0px));
+    background: color-mix(in srgb, var(--color-cream) 96%, transparent);
+    -webkit-backdrop-filter: blur(10px);
+    backdrop-filter: blur(10px);
+    box-shadow: 0 -10px 24px -14px color-mix(in srgb, var(--color-ink, #2f211f) 28%, transparent);
+  }
+  body.auth-page .auth-shell .guided:has(.guided-actions:not([hidden])) { padding-bottom: calc(88px + env(safe-area-inset-bottom, 0px)); }
+  body.auth-page .auth-shell .guided :is(.guided-menu, .guided-field, .guided-segments, textarea) { scroll-margin-bottom: calc(96px + env(safe-area-inset-bottom, 0px)); }
+}
