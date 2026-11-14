@@ -4759,3 +4759,26 @@ bring a short line back.
   database runs out of memory again with this change live, that is the next step.
 - **Checks.** unit tests pass; e2e message-sound, chat-inbox, read-receipts, chat-seen, collab-requests, mutual-moment,
   presence, consent (189) pass.
+
+## D-258 (2026-11-14): an open chat reads only its own conversation
+
+- **Why.** In the 2026-11-14 outage (D-257) the heaviest request by far was GET brivia_messages (about 7,400 in the 1 h
+  50 min before): each sync of an open chat read every message the member had ever sent or received, then kept one
+  conversation. D-257 made the sync run less often; this makes each run small.
+- **Decision.** The open thread reads only that pair's messages, newest 300 first (sender and recipient both in the
+  pair; the pair is still checked on the client). When a page is full, messages already shown that are older than it
+  stay (they were not deleted). Realtime and the D-257 timings are unchanged.
+- **Checks.** chat-extras (152), chat-inbox, message-actions, message-replies, message-reactions, message-sound,
+  chat-share pass.
+
+## D-259 (2026-11-14): Atif Mir joins "A few people in the room"
+
+- **Ask (founder, 2026-11-14, with his photo):** "on this page, i need to add one more person ... Atif Mir, Professional
+  Cricketer, Looking for Sponsors".
+- **Decision.** A tenth card on the sign-up / log-in strip: "Looking for sponsors", @atif, ◉ Cricket, ♧ Professional
+  cricketer. His mirror photo is cropped to the strip's 4:3 (head to mid-thigh), 1280 x 960 WebP in
+  site/media/assets/Atif-Mir.webp, the original in source-media/assets/Atif-Mir.jpeg, mapped in media/manifest.json.
+  Both halves of the looping strip carry him (the second aria-hidden); the loop runs 34 s instead of 31 s so each card
+  moves at the same pace (about 3.4 s a card).
+- **Checks.** unit showcase-cards (20 cards, two identical halves, 34 s); asset budget OK; the card renders with its
+  photo at 1440 and 390.
