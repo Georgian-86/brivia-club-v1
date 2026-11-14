@@ -6,6 +6,8 @@
 -- Z3 passes and signals share the count: 9 passes leave 1 signal.
 -- Z4 companions: 10 swipes (likes and passes, any event), the 11th is refused (PT429 companion_swipe_quota) and not
 --    stored; re-swiping someone is free; my_companion_quota counts down to 0 with a reset time.
+-- Z6 (0080, D-263) one pool: the deck and the companions share the same 10 a day; after Z4's 10 companion swipes the
+--    deck is out too (my_signal_quota 0, a Pass refused), and a member on the unlimited list (0079) is never blocked.
 -- Z5 "DJ" is offered under the founder's wording, A-Z order intact.
 set brivia.harness_autocomplete = 'off';
 
@@ -97,7 +99,9 @@ begin
   if code not like 'PT429:signal_quota_exhausted%' then raise exception 'FAIL Z3: the 11th swipe answered %', code; end if;
 end $$;
 
--- Z4
+-- Z4 (D-263: one pool, so Z2 and Z3's deck swipes are cleared first)
+delete from public.interaction where viewer_id = pg_temp.zm(1) and event = 'pass';
+delete from public.signal_ledger where sender_id = pg_temp.zm(1);
 do $$
 declare e1 uuid := (select id from z_ids where k = 'e1'); g int; code text; q record;
 begin
@@ -120,6 +124,30 @@ begin
   if exists (select 1 from public.event_companion_swipe where actor_id = pg_temp.zm(1) and target_id = pg_temp.zm(12)) then
     raise exception 'FAIL Z4: the refused swipe was stored'; end if;
 end $$;
+
+-- Z6
+do $$
+declare q record; code text;
+begin
+  set local role authenticated;
+  perform pg_temp.as_member(pg_temp.zm(1));
+  select * into q from public.my_signal_quota();
+  if q.remaining <> 0 or q.daily_limit <> 10 then raise exception 'FAIL Z6: deck after 10 companion swipes %', q; end if;
+  code := pg_temp.code_of(format('insert into public.interaction (viewer_id, target_id, event) values (%L, %L, %L)', pg_temp.zm(1), pg_temp.zm(13), 'pass'));
+  if code not like 'PT429:swipe_quota_exhausted%' then raise exception 'FAIL Z6: a Pass at the shared cap answered %', code; end if;
+end $$;
+insert into brivia_private.unlimited_swipes (member_id) values (pg_temp.zm(1)) on conflict do nothing;
+do $$
+declare q record; code text;
+begin
+  set local role authenticated;
+  perform pg_temp.as_member(pg_temp.zm(1));
+  select * into q from public.my_companion_quota();
+  if q.daily_limit <> 100000 or q.remaining <= 0 then raise exception 'FAIL Z6: unlimited member quota %', q; end if;
+  code := pg_temp.code_of(format('insert into public.interaction (viewer_id, target_id, event) values (%L, %L, %L)', pg_temp.zm(1), pg_temp.zm(13), 'pass'));
+  if code <> 'none' then raise exception 'FAIL Z6: unlimited member Pass answered %', code; end if;
+end $$;
+delete from brivia_private.unlimited_swipes where member_id = pg_temp.zm(1);
 
 -- Z5
 do $$

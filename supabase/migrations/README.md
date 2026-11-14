@@ -1586,3 +1586,11 @@ member's limits are 100000. Grant: `insert into brivia_private.unlimited_swipes 
 on conflict do nothing;` Revoke: `delete from brivia_private.unlimited_swipes where member_id = '<id>';` Verify:
 `select daily_limit from public.brivia_signal_state('<id>');` is 100000. Applied live 2026-11-14 (Yashika, Golu Kumar,
 Golu).
+
+## 0080
+
+**One swipe pool (D-263).** Apply after `0079`. Deck Pitches, deck Passes and companion swipes share one rolling 24 h
+limit (`signal_daily_limit`, 10); members on `brivia_private.unlimited_swipes` have none. Re-creates
+`brivia_signal_state`, `brivia_companion_state` and `companion_swipe`, adds `brivia_private.brivia_swipe_times`. Verify:
+`select daily_limit, used from public.brivia_companion_state('<id>')` equals `brivia_signal_state('<id>')`. Applied live
+2026-11-14.
