@@ -7,6 +7,8 @@ Update this file at the end of every session. CLAUDE.md holds the aim; this file
 
 ## 1. What is done
 
+**2026-11-14, D-263:** one shared pool of 10 swipes a day (deck + companions, 0080 live); only Yashika and Golu unlimited.
+
 **2026-11-14, D-262:** Delete my account removed from the app (flag in privacy-account.js); deletion is by email.
 
 **2026-11-14, D-261:** unlimited swipes allow-list (0079 live); Yashika and both Golu accounts on it.

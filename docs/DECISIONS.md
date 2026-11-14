@@ -4819,3 +4819,15 @@ bring a short line back.
   Brivia ships to the Apple App Store or Google Play, both require in-app account deletion, so the flag must be
   turned back on for those builds.
 - **Checks.** e2e consent (171 pass, delete button absent); unit 619; build.
+
+## D-263 (2026-11-14): one pool of 10 swipes a day; only the allow-list is unlimited
+
+- **Ask (founder, 2026-11-14):** "make sure only yashika and golu have unlimited swipes, all the others must have only
+  10 swipes per day in total".
+- **Found.** Everyone else had 10 deck swipes and a separate 10 event-companion swipes (20 a day).
+- **Decision (0080).** One rolling 24 h pool of `signal_daily_limit` (10): deck Pitches, deck Passes and companion
+  swipes all count against it (brivia_private.brivia_swipe_times). The deck and companions report the same count;
+  companion_swipe takes the same per-member lock as the deck, so the two cannot both take the last swipe. The
+  unlimited list (0079) stays Yashika, Golu Kumar and Golu, the only accounts above 10 (verified live: 3 unlimited,
+  404 at 10). Re-swiping someone already swiped stays free; the unanswered-request cap (100) is unchanged.
+- **Checks.** SQL z-daily-swipes Z6 (shared cap and unlimited member), full harness; unit; build.
