@@ -4806,3 +4806,16 @@ bring a short line back.
   "Unlimited swipes" instead of a countdown. Granted live to Yashika, Golu Kumar and Golu (both Golu accounts, since
   the ask did not say which). Grant or revoke with an insert or delete in the SQL editor (README "## 0079").
 - **Checks.** SQL zs-unlimited-swipes (U1 to U3); unit 619; build.
+
+## D-262 (2026-11-14): no self-serve account deletion in the app
+
+- **Ask (founder, 2026-11-14):** "remove the option to delete or deactivate account".
+- **Found.** The app had one such option, Delete my account (Profile, then Privacy & account). There is no deactivate.
+- **Decision.** The button is off (`SELF_DELETE = false` in site/scripts/privacy-account.js). Withdraw consent, the
+  privacy notice and contact links stay. Deletion is now by email: privacy.html says to email
+  hello@thebriviaclub.live from the account's address, and we delete within 7 days. The delete dialog, the
+  `delete_my_account` RPC and their e2e checks are kept (skipped while the flag is off), so it can come back in one line.
+- **Risk noted to the founder.** India's DPDP Act and GDPR require that erasure stays possible (kept, by email). If
+  Brivia ships to the Apple App Store or Google Play, both require in-app account deletion, so the flag must be
+  turned back on for those builds.
+- **Checks.** e2e consent (171 pass, delete button absent); unit 619; build.

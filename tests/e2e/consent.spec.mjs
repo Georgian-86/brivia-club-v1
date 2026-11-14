@@ -32,6 +32,8 @@ import assert from 'node:assert/strict';
 import { fileURLToPath } from 'node:url';
 import { axeViolations, smallText } from './a11y.mjs';
 import path from 'node:path';
+// D-262: mirrors SELF_DELETE in site/scripts/privacy-account.js (the Delete my account button is off).
+const SELF_DELETE = false;
 
 const { chromium } = await import(process.env.PLAYWRIGHT_MODULE || 'playwright');
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
@@ -1435,7 +1437,7 @@ try {
     assert.ok(acct);
     assert.match(acct.status, /consent given on 5 October 2026/);
     assert.equal(acct.withdraw, true);
-    assert.equal(acct.del, 'Delete my account');
+    assert.equal(acct.del, SELF_DELETE ? 'Delete my account' : undefined, 'D-262: no Delete my account button while self-delete is off');
     assert.ok(acct.links.includes('/privacy.html') && acct.links.includes('mailto:hello@thebriviaclub.live'));
     assert.ok(acct.noHScroll && acct.docNoHScroll, 'horizontal scroll at 375 px');
     assert.deepEqual(acct.small, []);
@@ -1483,7 +1485,8 @@ try {
     assert.match(afterWd.status, /consent not given/); assert.equal(afterWd.withdrawBtn, false);
   });
 
-  // R5 delete dialog.
+  // R5 delete dialog (D-262: off in the app; the flow is kept and tested only when SELF_DELETE is on again).
+  if (SELF_DELETE) {
   await pw.page.locator('[data-privacy-delete]').click();
   await pw.page.waitForSelector('dialog[data-privacy="delete"][open]', { timeout: 5000 }).catch(() => {});
   const dd = await pw.page.evaluate(() => {
@@ -1565,9 +1568,11 @@ try {
     assert.deepEqual(leftovers, []);
   });
   check(`signOut ran only after the RPC succeeded (local scope)`, () => { const logout = pw.st.calls.filter((c) => c.path === '/auth/v1/logout'); assert.equal(logout.length, 1); assert.match(logout[0].search, /scope=local/); });
+  }
   check('privacy context (password): no uncaught page errors', () => assert.deepEqual(pw.errors, []));
   await pw.ctx.close();
 
+  if (SELF_DELETE) {
   // Google-only member: "Sign in with Google again" with a return marker; the delete dialog reopens after return.
   const gg = await makePrivacyContext('google', 'google member');
   gg.st.rpcMode = ['reauth'];
@@ -1600,6 +1605,7 @@ try {
   check(`F3: a marker for another account opens nothing and is dropped (${JSON.stringify(otherUser)})`, () => assert.deepEqual(otherUser, { dialog: false, marker: null }));
   check('privacy context (google): no uncaught page errors', () => assert.deepEqual(gg.errors, []));
   await gg.ctx.close();
+  }
 
   // 11. privacy.html (Iteration 4, Task 10, R10): the real page under Vite, no Supabase stub needed. 375 px: no sideways
   // scroll, the retention table is a stacked list; the ?deleted=1 landing shows a role="status" banner; axe's default
