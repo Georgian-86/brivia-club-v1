@@ -4743,3 +4743,19 @@ bring a short line back.
 - **Checks.** e2e `message-sound.spec.mjs` MS1-MS2 (a message on another view asks for the sax once; the open chat does
   not); sounds, chat-inbox, post-notifications, nearby pass; unit 616. collab-requests' reduced-motion check fails on
   main as well (pre-existing, unrelated).
+
+## D-257 (2026-11-14): the login outage, and the chat polling that caused it
+
+- **What happened.** From about 12:55 to 13:50 UTC no one could log in on any device. The Supabase project stayed up,
+  but the database was out of room: queries hit the statement timeout and the auth service could not get a connection
+  ("dial tcp [::1]:5432: i/o timeout"), so logins and token refreshes timed out (504 / 522). It recovered on its own
+  once the backlog drained. The heaviest load by far was GET brivia_messages (about 7,400 requests in the 1 h 50 min
+  before), from every open app re-reading the member's entire message history every 5 s while a chat was open, hidden
+  tabs included, plus the inbox, reactions and "seen" reads on the same timer.
+- **Decision.** Nothing is polled while the tab is hidden (Realtime and web push still deliver; coming back syncs at
+  once). The open thread is re-read every 10 s and reads only that conversation's newest 300 messages (older ones
+  already shown stay); the inbox check is every 15 s; "seen" every 10 s. Realtime still brings new messages at once.
+- **Follow-up for the founder.** Check the project's compute size and Disk IO budget in Supabase (Reports); a busier
+  evening on the smallest instance can exhaust it again, and the dashboard's "Restart project" is the quick recovery.
+- **Checks.** chat-extras (152), chat-inbox, message-actions, message-replies, message-reactions, message-sound (waits
+  for the 15 s inbox check), chat-share, push-install pass.

@@ -3513,8 +3513,12 @@ const loadChatMessages = async (person) => {
   // Fetch the member's complete inbox first, then narrow it locally. This is
   // more reliable than the compound PostgREST OR/AND filter for older rows.
   const fullColumns = 'id,sender_id,recipient_id,body,created_at,message_type,attachment_url,attachment_path,attachment_name,attachment_mime,attachment_size';
-  const mine = `sender_id.eq.${memberProfile.id},recipient_id.eq.${memberProfile.id}`;
-  const select = () => supabase.from('brivia_messages').select(fullColumns + (receiptColumns ? RECEIPT_COLUMNS : '') + (editColumns ? EDIT_COLUMNS : '') + (replyColumns ? REPLY_COLUMNS : '')).or(mine);
+  // D-257: only this conversation, its newest 300 (it used to read every message of the member, every 5 s). Both ids
+  // in both columns; the pair is still checked below.
+  const pair = [...new Set([String(memberProfile.id), String(person.id)])];
+  const THREAD_LIMIT = 300;
+  const narrow = (q) => q.in('sender_id', pair).in('recipient_id', pair).order('created_at', { ascending: false }).limit(THREAD_LIMIT);
+  const select = () => narrow(supabase.from('brivia_messages').select(fullColumns + (receiptColumns ? RECEIPT_COLUMNS : '') + (editColumns ? EDIT_COLUMNS : '') + (replyColumns ? REPLY_COLUMNS : '')));
   let { data, error } = await select();
   if (error && replyColumns && isReplyColumnError(error)) {
     replyColumns = false;
@@ -3526,10 +3530,10 @@ const loadChatMessages = async (person) => {
   }
   if (error && receiptColumns && isReceiptColumnError(error)) {
     receiptColumns = false;
-    ({ data, error } = await supabase.from('brivia_messages').select(fullColumns + (editColumns ? EDIT_COLUMNS : '')).or(mine));
+    ({ data, error } = await narrow(supabase.from('brivia_messages').select(fullColumns + (editColumns ? EDIT_COLUMNS : ''))));
   }
   if (error) {
-    ({ data, error } = await supabase.from('brivia_messages').select('id,sender_id,recipient_id,body,created_at').or(`sender_id.eq.${memberProfile.id},recipient_id.eq.${memberProfile.id}`));
+    ({ data, error } = await narrow(supabase.from('brivia_messages').select('id,sender_id,recipient_id,body,created_at')));
   }
   if (!error) {
     const memberId = String(memberProfile.id);
@@ -3554,8 +3558,10 @@ const loadChatMessages = async (person) => {
     // D-157: a message deleted for me (on any device) is no longer returned: drop it, unless it is newer than this
     // read (a realtime insert that arrived meanwhile).
     const newestServer = Math.max(0, ...nextMessages.map((m) => new Date(m.createdAt || 0).getTime()));
+    // D-257: a full page means older messages exist beyond it: those already held stay (they were not deleted).
+    const oldestServer = (data || []).length >= THREAD_LIMIT ? Math.min(...nextMessages.map((m) => new Date(m.createdAt || 0).getTime())) : -Infinity;
     const returned = new Set(nextMessages.map((m) => String(m.id)));
-    const keptPrevious = previousMessages.filter((m) => returned.has(String(m.id)) || new Date(m.createdAt || 0).getTime() > newestServer);
+    const keptPrevious = previousMessages.filter((m) => { const t = new Date(m.createdAt || 0).getTime(); return returned.has(String(m.id)) || t > newestServer || t < oldestServer; });
     const messagesById = new Map(keptPrevious.map((message) => [String(message.id), message]));
     nextMessages.forEach((message) => {
       const previous = messagesById.get(String(message.id));
@@ -3714,10 +3720,16 @@ const startCrossingPaths = async () => {
 
 const startMessageSync = () => {
   if (messageSyncTimer) window.clearInterval(messageSyncTimer);
+  // D-257 (2026-11-14 outage: every open app re-read the member's whole inbox every 5 s, hidden tabs too, until the
+  // database ran out of room and logins timed out): nothing is polled while the tab is hidden (Realtime and push still
+  // deliver, and coming back syncs at once); the open thread is re-read every 10 s and the inbox every 15 s (Realtime
+  // brings new messages at once; these reads only catch what it missed).
   const sync = () => {
-    if (selectedChat) { loadChatMessages(selectedChat); paintChatStatus(); }
-    syncIncomingNotificationsFromServer().catch((error) => console.warn('Notification sync could not complete:', error.message));
-    if (connectionSyncTick % 2 === 0 && document.visibilityState === 'visible') pullChatSeen();
+    if (document.visibilityState === 'hidden') return;
+    const tick = connectionSyncTick;
+    if (selectedChat && tick % 2 === 0) { loadChatMessages(selectedChat); paintChatStatus(); }
+    if (tick % 3 === 0) syncIncomingNotificationsFromServer().catch((error) => console.warn('Notification sync could not complete:', error.message));
+    if (tick % 2 === 0) pullChatSeen();
     // Every ~30 s: pick up new requests, and matches completed by the other member accepting.
     if (++connectionSyncTick % 6 === 1) {
       loadConnectionRequests().catch((error) => console.warn('Request sync could not complete:', error.message));
@@ -3726,7 +3738,12 @@ const startMessageSync = () => {
   };
   sync();
   messageSyncTimer = window.setInterval(sync, 5000);
+  if (!messageSyncVisibilityHooked) {
+    messageSyncVisibilityHooked = true;
+    document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') { connectionSyncTick = 0; sync(); } });
+  }
 };
+let messageSyncVisibilityHooked = false;
 
 const syncIncomingNotificationsFromServer = async () => {
   if (!supabase || !memberProfile.id) return;

@@ -1,5 +1,5 @@
 // New chat messages play the Brivia sax (D-256, founder 2026-11-14: "the web notifications for the whole app must be
-// like saxophone sound only"). Stubbed Supabase (no Realtime: the 5 s sync is the path tested).
+// like saxophone sound only"). Stubbed Supabase (no Realtime: the inbox sync, every 15 s since D-257, is the path tested).
 // PLAYWRIGHT_MODULE=/path/to/playwright/index.mjs node tests/e2e/message-sound.spec.mjs   (Vite on :5290)
 // MS1 a message that arrives while Brivia is open on another view asks for the sax (the notify cue), once.
 // MS2 a message in the chat open on screen does not.
@@ -19,7 +19,7 @@ try {
   const page = await stub.open(ctx, { path: '/app.html?view=home' });
   await page.waitForTimeout(3000);
   st.messages.push(msg(1, 'Hey, one small suggestion'));
-  await page.waitForTimeout(7000);
+  await page.waitForTimeout(17000);
   const log1 = await page.evaluate(() => window.__briviaSoundLog.slice());
   check('MS1 a message while on another view asks for the sax, once', log1.filter((x) => x === 'notify:msg:0e256000-0000-4000-8000-000000000001').length === 1, JSON.stringify(log1));
   await page.goto(`${stub.url}/app.html?view=chat`);
@@ -28,7 +28,7 @@ try {
   await page.waitForTimeout(1500);
   await page.evaluate(() => { window.__briviaSoundLog.length = 0; });
   st.messages.push(msg(2, 'Also a few more UI suggestions'));
-  await page.waitForTimeout(7000);
+  await page.waitForTimeout(17000);
   const log2 = await page.evaluate(() => window.__briviaSoundLog.slice());
   check('MS2 a message in the chat open on screen plays nothing', !log2.some((x) => x.includes('0e256000-0000-4000-8000-000000000002')), JSON.stringify(log2));
   await ctx.close();
