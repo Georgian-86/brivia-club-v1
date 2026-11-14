@@ -1,7 +1,7 @@
 // D-265: the daily nudge pushes, in the founder's own words (2026-11-14). Four a day, India time (IST, UTC+5:30):
 // three every 3 hours through the day, then one at night. Shared by the push-nudge Edge Function and its unit test.
 // The pg_cron jobs (0082) post { slot } at these times; the function sends that slot's words to every device that has
-// Brivia notifications on, skipping members who are in the app right now.
+// Brivia notifications on, as a phone notification (the system notification screen), even when Brivia is open.
 //
 // Do not "correct" the spelling: it is the founder's Hinglish, kept on purpose.
 export const NUDGES = Object.freeze([

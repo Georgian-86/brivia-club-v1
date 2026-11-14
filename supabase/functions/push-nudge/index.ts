@@ -5,8 +5,9 @@
 // NUDGE_SECRET Edge Function secret (the same value sits in Supabase Vault as 'push_nudge_secret' for the cron jobs).
 // Secrets: NUDGE_SECRET, VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY, VAPID_SUBJECT (the last three are push-notify's).
 //
-// Rules: a member seen in the app in the last 10 minutes is skipped (they are already here); the push tag is
-// nudge-<slot>, so a repeat replaces the notification; a device the push service says is gone (404/410) is forgotten.
+// Rules: every subscribed device gets it as a phone notification (the system notification screen, never an in-app
+// notice), even if the member has Brivia open (sw.js always shows type 'nudge'); the push tag is nudge-<slot>, so a
+// repeat replaces only that slot's line; a device the push service says is gone (404/410) is forgotten.
 // The member's "Push notification sound" switch is honoured by the service worker, as for every push.
 import { createClient } from 'npm:@supabase/supabase-js@2.45.4';
 import webpush from 'npm:web-push@3.6.7';
@@ -36,21 +37,15 @@ Deno.serve(async (req) => {
   webpush.setVapidDetails(Deno.env.get('VAPID_SUBJECT') || 'mailto:hello@thebriviaclub.live', pub, priv);
   const admin = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!, { auth: { persistSession: false } });
 
-  const recent = new Date(Date.now() - 10 * 60 * 1000).toISOString();
-  const { data: here } = await admin.from('member_presence').select('member_id').gte('last_seen_at', recent).limit(10000);
-  const inApp = new Set((here || []).map((r) => r.member_id));
-
   const text = JSON.stringify(payload);
   const topic = payload.tag.replace(/[^A-Za-z0-9_-]/g, '').slice(0, 32);
   const gone: string[] = [];
   let sent = 0;
-  let skipped = 0;
   for (let from = 0; ; from += 500) {
     const { data: subs, error } = await admin.from('push_subscription').select('endpoint,member_id,p256dh,auth')
       .order('endpoint').range(from, from + 499);
     if (error) return json(500, { error: 'read', sent });
     for (const s of subs || []) {
-      if (inApp.has(s.member_id)) { skipped += 1; continue; }
       try {
         await webpush.sendNotification({ endpoint: s.endpoint, keys: { p256dh: s.p256dh, auth: s.auth } }, text, { TTL: 2 * 60 * 60, urgency: 'normal', topic });
         sent += 1;
@@ -62,5 +57,5 @@ Deno.serve(async (req) => {
     if (!subs || subs.length < 500) break;
   }
   for (let i = 0; i < gone.length; i += 100) await admin.from('push_subscription').delete().in('endpoint', gone.slice(i, i + 100));
-  return json(200, { slot: body.slot, sent, skipped, forgotten: gone.length });
+  return json(200, { slot: body.slot, sent, forgotten: gone.length });
 });

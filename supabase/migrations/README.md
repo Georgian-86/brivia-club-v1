@@ -1607,7 +1607,8 @@ return in tens of ms (`explain analyze`). Applied live 2026-11-14.
 **Daily nudge pushes (D-265).** Four pushes a day, India time, in the founder's words: 12:00 "Bore horhe ho? / Brivia
 pr swipe krlo", 15:00 "Brivia se Itni Jaldi Bore hogye?", 18:00 "Ek Kachori Do Chai / Brivia pr Swipe ho jaye", 21:30
 "Career ki Tension Horhi hai? / Brivia pr Referral Maanglo" (copy in `supabase/functions/_shared/nudges.js`). They go to
-every device with Brivia notifications on, except members seen in the app in the last 10 minutes. Order:
+every device with Brivia notifications on, as a phone notification (the system notification screen), even when
+Brivia is open; never as an in-app notice. Order:
 
 1. Database > Extensions: **pg_cron** and **pg_net** on.
 2. Pick a long random secret (32+ characters). Edge Functions > Secrets: `NUDGE_SECRET` = that value.

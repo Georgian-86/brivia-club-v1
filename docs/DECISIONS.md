@@ -4858,7 +4858,7 @@ bring a short line back.
 - **Decision (nudges, 0082 + push-nudge).** Four a day, India time: 12:00, 15:00, 18:00 (three hours apart, the chai
   line at chai time) and 21:30 at night. The founder's spelling is kept. pg_cron posts `{ slot }` through pg_net to the
   `push-nudge` Edge Function (verify_jwt off, a shared secret in Vault and in the function's secrets); it pushes to
-  every subscribed device, skips members seen in the app in the last 10 minutes, tags each push `nudge-<slot>` so a
+  every subscribed device, tags each push `nudge-<slot>` so a
   repeat replaces it, and forgets devices the push service reports gone. Members who keep notifications off get none;
   the per-device "Push notification sound" switch still applies.
 - **Decision (sound).** A website's push cannot choose its sound: the Web Push / Notification API has no working
@@ -4870,5 +4870,10 @@ bring a short line back.
   has its own words, its own tag (`nudge-noon`, `-afternoon`, `-chai`, `-night`) and its own push topic, so all four
   stay side by side on the Home Screen and none replaces another; only the next day's same slot replaces its own
   line. A unit test runs the real service worker with the four pushes and checks four notifications remain.
+- **Update (founder, 2026-11-14): "i want the notifications on the phone screen not in app notifications".** Nudges
+  are never shown inside the app: the service worker always puts a `nudge` on the phone's notification screen, even
+  with Brivia open in front (other pushes still show in place when the app is open), and push-nudge no longer skips
+  members who are in the app. They are not written to the in-app bell either. A phone gets them only once its
+  member has turned on Web notifications (iPhone: Brivia added to the Home Screen first).
 - **Checks.** Unit `push-nudges` (copy, 3-hour spacing, cron = IST, 0082 in step with the copy, four separate
   notifications in the service worker); SQL harness incl. `zt-daily-nudges`.

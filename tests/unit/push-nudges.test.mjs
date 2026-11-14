@@ -74,3 +74,29 @@ test('each slot has its own push topic, so a phone that was offline still gets e
   const topics = NUDGES.map((n) => nudgePayload(n.slot).tag.replace(/[^A-Za-z0-9_-]/g, '').slice(0, 32));
   assert.equal(new Set(topics).size, 4);
 });
+
+// D-265 (founder: "i want the notifications on the phone screen not in app notifications"): with Brivia open and in
+// front, a nudge still goes to the phone's notification screen; a chat push is still shown inside the app.
+test('a nudge goes to the phone screen even with Brivia open; other pushes stay in the app', async () => {
+  const { readFile } = await import('node:fs/promises');
+  const src = await readFile(new URL('../../site/public/sw.js', import.meta.url), 'utf8');
+  const shown = [];
+  const posted = [];
+  const handlers = {};
+  const page = { focused: true, visibilityState: 'visible', url: 'https://thebriviaclub.live/app.html', postMessage: (m) => posted.push(m) };
+  const self = {
+    addEventListener: (type, fn) => { handlers[type] = fn; },
+    clients: { matchAll: async () => [page], claim: async () => {} },
+    registration: { showNotification: async (title, opts) => { shown.push({ title, ...opts }); } },
+    location: { origin: 'https://thebriviaclub.live' },
+    skipWaiting: () => {},
+  };
+  new Function('self', 'caches', src)(self, { open: async () => ({ match: async () => null }) });
+  const push = async (data) => { let done; handlers.push({ data: { json: () => data }, waitUntil: (p) => { done = p; } }); await done; };
+  await push(nudgePayload('chai'));
+  assert.deepEqual(shown.map((n) => n.title), ['Ek Kachori Do Chai']);
+  assert.equal(posted.length, 0, 'the nudge is not shown inside the app');
+  await push({ type: 'message', tag: 'msg-x', title: 'Asha', body: 'hi' });
+  assert.equal(shown.length, 1);
+  assert.equal(posted.length, 1);
+});
