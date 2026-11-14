@@ -4866,5 +4866,9 @@ bring a short line back.
   phone's own notification sound. The sax cue (D-256) keeps playing when Brivia is open. A sax sound on the closed
   app needs a native wrapper (an Android app with its own notification channel sound, an iOS app with a bundled
   sound file); that is a separate, larger decision for the founder.
-- **Checks.** Unit `push-nudges` (copy, 3-hour spacing, cron = IST, 0082 in step with the copy); SQL harness incl.
-  `zt-daily-nudges`; build.
+- **Update (founder, 2026-11-14): "make sure different notifications should be sent in a day".** Each of the four
+  has its own words, its own tag (`nudge-noon`, `-afternoon`, `-chai`, `-night`) and its own push topic, so all four
+  stay side by side on the Home Screen and none replaces another; only the next day's same slot replaces its own
+  line. A unit test runs the real service worker with the four pushes and checks four notifications remain.
+- **Checks.** Unit `push-nudges` (copy, 3-hour spacing, cron = IST, 0082 in step with the copy, four separate
+  notifications in the service worker); SQL harness incl. `zt-daily-nudges`.

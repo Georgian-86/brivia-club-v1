@@ -37,3 +37,40 @@ test('0082 schedules the same slots at the same UTC times', async () => {
   const allowed = sql.match(/p_slot not in \(([^)]+)\)/)[1].match(/'(\w+)'/g).map((s) => s.slice(1, -1));
   assert.deepEqual(allowed, NUDGES.map((n) => n.slot));
 });
+
+// D-265 (founder: "make sure different notifications should be sent in a day"): the four nudges are four different
+// notifications, and on the phone they sit side by side; none replaces another. Runs the real service worker
+// (site/public/sw.js) with a fake registration: four pushes in one day leave four notifications on the screen.
+test('the service worker keeps all four nudges of a day as separate notifications', async () => {
+  const { readFile } = await import('node:fs/promises');
+  const src = await readFile(new URL('../../site/public/sw.js', import.meta.url), 'utf8');
+  const shown = new Map();   // tag -> notification, as the OS does: a new one with the same tag replaces the old
+  const handlers = {};
+  const self = {
+    addEventListener: (type, fn) => { handlers[type] = fn; },
+    clients: { matchAll: async () => [], claim: async () => {} },   // the app is closed: the phone shows it
+    registration: { showNotification: async (title, opts) => { shown.set(opts.tag, { title, ...opts }); } },
+    location: { origin: 'https://thebriviaclub.live' },
+    skipWaiting: () => {},
+  };
+  const caches = { open: async () => ({ match: async () => null }) };
+  new Function('self', 'caches', src)(self, caches);
+  for (const n of NUDGES) {
+    let done;
+    handlers.push({ data: { json: () => nudgePayload(n.slot) }, waitUntil: (p) => { done = p; } });
+    await done;
+  }
+  assert.equal(shown.size, 4);
+  assert.deepEqual([...shown.values()].map((x) => [x.title, x.body]), NUDGES.map((n) => [n.title, n.body]));
+  assert.equal(new Set(NUDGES.map((n) => `${n.title}|${n.body}`)).size, 4, 'four different texts');
+  // Tomorrow's noon nudge replaces today's noon one (no pile-up of the same line), the others stay.
+  let done;
+  handlers.push({ data: { json: () => nudgePayload('noon') }, waitUntil: (p) => { done = p; } });
+  await done;
+  assert.equal(shown.size, 4);
+});
+
+test('each slot has its own push topic, so a phone that was offline still gets every one', () => {
+  const topics = NUDGES.map((n) => nudgePayload(n.slot).tag.replace(/[^A-Za-z0-9_-]/g, '').slice(0, 32));
+  assert.equal(new Set(topics).size, 4);
+});
