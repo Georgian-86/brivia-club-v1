@@ -20,3 +20,7 @@ test('an unknown quota (not loaded, or before 0045) shows nothing and never bloc
   assert.equal(companionQuotaBlocked({ remaining: 3 }), false);
   assert.equal(companionQuotaBlocked({ remaining: 0 }), true);
 });
+
+test('companionQuotaLabel: a member on the unlimited list reads "Unlimited swipes" (D-261)', () => {
+  assert.equal(companionQuotaLabel({ remaining: 99999, daily_limit: 100000, resets_at: null }), 'Unlimited swipes');
+});

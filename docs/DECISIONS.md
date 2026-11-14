@@ -4796,3 +4796,13 @@ bring a short line back.
 - **Photo.** Atif's card is re-cut from the original at near-native size (720 x 540 to 1080 x 810, not a 2x upscale),
   with an unsharp mask and a light contrast / colour lift; the source is a phone screenshot, so this is its ceiling.
 - **Checks.** SQL zr-comment-replies (R1 to R5); unit 617; build.
+
+## D-261 (2026-11-14): unlimited swipes for chosen members
+
+- **Ask (founder, 2026-11-14):** "give yashika and golu unlimited swipes access".
+- **Decision (0079).** A private allow-list, `brivia_private.unlimited_swipes` (members cannot read or write it). For a
+  listed member the server reports a daily limit and a live (unanswered) limit of 100000 for deck swipes and requests,
+  and 100000 for companion swipes, so no cap ever blocks them; everyone else keeps 10 a day. The app shows
+  "Unlimited swipes" instead of a countdown. Granted live to Yashika, Golu Kumar and Golu (both Golu accounts, since
+  the ask did not say which). Grant or revoke with an insert or delete in the SQL editor (README "## 0079").
+- **Checks.** SQL zs-unlimited-swipes (U1 to U3); unit 619; build.

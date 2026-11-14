@@ -7,6 +7,8 @@ Update this file at the end of every session. CLAUDE.md holds the aim; this file
 
 ## 1. What is done
 
+**2026-11-14, D-261:** unlimited swipes allow-list (0079 live); Yashika and both Golu accounts on it.
+
 **2026-11-14, D-260:** replies to your comment notify you (0078 live, push-notify v9); Atif's photo re-cut sharper.
 
 **2026-11-14, D-259:** Atif Mir (cricketer, looking for sponsors) added to the sign-up page's people strip.
