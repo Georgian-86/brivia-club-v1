@@ -137,3 +137,8 @@ test('swipeLimitCopy: null when nothing blocks, or for an unrelated error', () =
   assert.equal(swipeLimitCopy(null, new Date()), null);
   assert.equal(swipeLimitCopy({ remaining: 4 }, new Date(), { code: '23505', message: 'signal_quota_exhausted' }), null);
 });
+
+test('quotaLabel: a member on the unlimited list reads "Unlimited swipes" (D-261)', () => {
+  assert.equal(quotaLabel({ remaining: 99990, daily_limit: 100000, resets_at: null, live_unanswered: 3, live_limit: 100000 }), 'Unlimited swipes');
+  assert.equal(quotaBlocked({ remaining: 99990, daily_limit: 100000, live_unanswered: 300, live_limit: 100000 }), null);
+});

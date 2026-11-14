@@ -19,6 +19,10 @@ export const resetTimeLabel = (resetsAt) => {
   return date.toLocaleTimeString([], options);
 };
 
+// D-261 (0079): a member on the unlimited list gets a limit of 100000 from the server; the app says "Unlimited swipes".
+export const UNLIMITED_SWIPES = 100000;
+export const isUnlimitedQuota = (quota) => Number(quota?.daily_limit) >= UNLIMITED_SWIPES;
+
 const dailyLimit = (quota) => {
   const limit = Number(quota?.daily_limit);
   return Number.isFinite(limit) && limit > 0 ? limit : DEFAULT_DAILY_LIMIT;
@@ -44,6 +48,7 @@ export const quotaBlocked = (quota) => {
 export const quotaLabel = (quota) => {
   const blocked = quotaBlocked(quota);
   if (!quota || !Number.isFinite(Number(quota.remaining))) return '';
+  if (isUnlimitedQuota(quota) && !blocked) return 'Unlimited swipes';
   if (blocked === 'live') return `You have ${liveLimit(quota)} signals waiting for an answer`;
   if (blocked === 'daily') {
     const time = resetTimeLabel(quota.resets_at);

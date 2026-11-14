@@ -1577,3 +1577,12 @@ live 2026-11-13.
 author is told as before; the writer of the comment being answered is told too (not the replier, not the note's author
 twice, not across a block). Verify: `select pg_get_constraintdef(oid) from pg_constraint where conname =
 'member_notification_notification_type_check';` lists `comment_reply`. Applied live 2026-11-14.
+
+## 0079
+
+**Unlimited swipes for chosen members (D-261).** Apply after `0078`, then deploy the client. Adds the private
+`brivia_private.unlimited_swipes` list and re-creates `brivia_signal_state` and `brivia_companion_state` so a listed
+member's limits are 100000. Grant: `insert into brivia_private.unlimited_swipes (member_id, note) values ('<id>', 'why')
+on conflict do nothing;` Revoke: `delete from brivia_private.unlimited_swipes where member_id = '<id>';` Verify:
+`select daily_limit from public.brivia_signal_state('<id>');` is 100000. Applied live 2026-11-14 (Yashika, Golu Kumar,
+Golu).

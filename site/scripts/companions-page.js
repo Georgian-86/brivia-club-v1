@@ -15,6 +15,7 @@ import { resetTimeLabel } from './signal-quota.js';
 export const companionQuotaLabel = (quota) => {
   if (!quota || !Number.isFinite(Number(quota.remaining))) return '';
   const remaining = Math.max(Number(quota.remaining), 0);
+  if (remaining > 0 && Number(quota.daily_limit) >= 100000) return 'Unlimited swipes'; // D-261 (0079)
   if (remaining > 0) return `${remaining} of ${Number(quota.daily_limit) || 10} swipes left today`;
   const time = resetTimeLabel(quota.resets_at);
   return time ? `No swipes left today. More at ${time}.` : 'No swipes left today.';
