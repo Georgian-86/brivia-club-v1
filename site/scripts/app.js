@@ -3651,7 +3651,10 @@ const subscribeToMessages = () => {
     .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'brivia_messages', filter: `sender_id=eq.${memberProfile.id}` }, ({ new: row }) => applyRemoteUpdate(row))
     // D-157: their edits and unsends of messages to me.
     .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'brivia_messages', filter: `recipient_id=eq.${memberProfile.id}` }, ({ new: row }) => applyRemoteUpdate(row))
-    .subscribe((status) => { if (status === 'CHANNEL_ERROR') console.warn('Realtime messages channel could not connect.'); });
+    .subscribe((status) => {
+      messagesLive = status === 'SUBSCRIBED';   // D-257: while Realtime delivers messages, the fallback sync slows down
+      if (status === 'CHANNEL_ERROR') console.warn('Realtime messages channel could not connect.');
+    });
 };
 
 // Active status (D-110, 0018): one dot on a connection's avatar in the chat list, nothing else (founder, 2026-10-29).
@@ -3712,20 +3715,37 @@ const startCrossingPaths = async () => {
   if (data === true) ensureCrossingPaths().start().catch((err) => console.warn('Crossing paths could not start:', err.message));
 };
 
+// D-257 (database out of memory, 2026-11-14): the fallback sync ran every 5 s in every open tab, hidden or not. Now
+// it checks every 5 s, but only queries as often as it needs to: every 5 s while Realtime is down, every 15 s while
+// Realtime is delivering messages, every 30 s in a hidden tab. Requests and matches: every 30 s, 60 s when hidden.
+const MESSAGE_SYNC_GAP = { fallback: 5000, live: 15000, hidden: 30000 };
+const CONNECTION_SYNC_GAP = { visible: 30000, hidden: 60000 };
+let messagesLive = false;
 const startMessageSync = () => {
   if (messageSyncTimer) window.clearInterval(messageSyncTimer);
-  const sync = () => {
-    if (selectedChat) { loadChatMessages(selectedChat); paintChatStatus(); }
-    syncIncomingNotificationsFromServer().catch((error) => console.warn('Notification sync could not complete:', error.message));
-    if (connectionSyncTick % 2 === 0 && document.visibilityState === 'visible') pullChatSeen();
-    // Every ~30 s: pick up new requests, and matches completed by the other member accepting.
-    if (++connectionSyncTick % 6 === 1) {
+  let lastMessageSync = 0;
+  let lastConnectionSync = 0;
+  const sync = (force = false) => {
+    const now = Date.now();
+    const visible = document.visibilityState === 'visible';
+    const messageGap = !visible ? MESSAGE_SYNC_GAP.hidden : messagesLive ? MESSAGE_SYNC_GAP.live : MESSAGE_SYNC_GAP.fallback;
+    if (force || now - lastMessageSync >= messageGap - 500) {
+      lastMessageSync = now;
+      if (selectedChat) { loadChatMessages(selectedChat); paintChatStatus(); }
+      syncIncomingNotificationsFromServer().catch((error) => console.warn('Notification sync could not complete:', error.message));
+    }
+    if (++connectionSyncTick % 2 === 0 && visible) pullChatSeen();
+    // Pick up new requests, and matches completed by the other member accepting.
+    if (force || now - lastConnectionSync >= (visible ? CONNECTION_SYNC_GAP.visible : CONNECTION_SYNC_GAP.hidden) - 500) {
+      lastConnectionSync = now;
       loadConnectionRequests().catch((error) => console.warn('Request sync could not complete:', error.message));
       refreshConnections().then((changed) => { if (changed) { renderChats(); celebrateNewMatches(lastAddedConnections).catch(() => {}); } }).catch((error) => console.warn('Connection sync could not complete:', error.message));
     }
   };
-  sync();
-  messageSyncTimer = window.setInterval(sync, 5000);
+  sync(true);
+  messageSyncTimer = window.setInterval(() => sync(), 5000);
+  // Coming back to the tab catches up at once instead of waiting out the hidden gap.
+  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') sync(true); });
 };
 
 const syncIncomingNotificationsFromServer = async () => {
