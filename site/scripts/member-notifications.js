@@ -108,7 +108,7 @@ export const createMemberNotifications = ({ api, subscribe, onNew = () => {}, on
 // D-151 (0043): likes and comments on my notes, grouped per note and kind, newest first.
 // [{ key, type, postId, postImage, people: [{ id, name, photoUrl }], snippet, createdAt, unread, ids }]
 // D-234 (0071): post_new, a connection shared a new note (one row per note).
-export const POST_TYPES = new Set(['post_like', 'post_comment', 'post_new']);
+export const POST_TYPES = new Set(['post_like', 'post_comment', 'post_new', 'comment_reply']);   // D-260: comment_reply (0078)
 export const groupPostNotifications = (list = [], now = Date.now(), days = 7) => {
   const groups = new Map();
   for (const n of list) {
@@ -116,7 +116,7 @@ export const groupPostNotifications = (list = [], now = Date.now(), days = 7) =>
     if (n.createdAt && now - new Date(n.createdAt).getTime() > days * 86400000) continue;
     // Likes on one note are one row; D-253 (founder: "just show recent comment and say xyz and pqr others commented"):
     // comments on one note are one row too, showing the newest comment, its writer first.
-    const key = n.type === 'post_comment' ? `c:${n.postId}` : n.type === 'post_new' ? `n:${n.postId}` : `l:${n.postId}`;
+    const key = n.type === 'post_comment' ? `c:${n.postId}` : n.type === 'comment_reply' ? `r:${n.postId}` : n.type === 'post_new' ? `n:${n.postId}` : `l:${n.postId}`;
     const g = groups.get(key) || { key, type: n.type, postId: n.postId, postImage: n.postImage, people: [], snippet: n.snippet, createdAt: n.createdAt, unread: false, ids: [] };
     const newest = !g.ids.length || String(n.createdAt) > String(g.createdAt);
     const person = { id: n.sourceId, name: n.name, photoUrl: n.photoUrl };
@@ -124,7 +124,7 @@ export const groupPostNotifications = (list = [], now = Date.now(), days = 7) =>
     if (newest) {
       if (at >= 0) g.people.splice(at, 1);
       g.people.unshift(person);
-      if (n.type === 'post_comment') { g.snippet = n.snippet; g.commentId = n.commentId || null; }
+      if (n.type === 'post_comment' || n.type === 'comment_reply') { g.snippet = n.snippet; g.commentId = n.commentId || null; }
     } else if (at < 0) g.people.push(person);
     if (String(n.createdAt) > String(g.createdAt)) g.createdAt = n.createdAt;
     g.unread ||= !n.readAt;
@@ -141,6 +141,11 @@ const firstName = (name) => String(name || '').trim().split(/\s+/)[0] || 'A memb
 export const postNotificationCopy = (g, { full = false } = {}) => {
   const people = g?.people || [];
   const lead = full && String(people[0]?.name || '').trim() ? String(people[0].name).trim() : firstName(people[0]?.name);
+  if (g?.type === 'comment_reply') {
+    // D-260: "Amar replied to your comment" · "Amar and 2 others replied to your comment", with the newest reply.
+    const writers = people.length <= 1 ? lead : people.length === 2 ? `${lead} and ${firstName(people[1]?.name)}` : `${lead} and ${people.length - 1} others`;
+    return { title: `${writers} replied to your comment`, line: g.snippet || '' };
+  }
   if (g?.type === 'post_comment') {
     // D-253: "Amar commented" · "Amar and Diya commented" · "Amar and 3 others commented", with the newest comment.
     const writers = people.length <= 1 ? lead : people.length === 2 ? `${lead} and ${firstName(people[1]?.name)}` : `${lead} and ${people.length - 1} others`;

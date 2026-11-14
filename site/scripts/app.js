@@ -774,7 +774,7 @@ const renderNotifications = () => {
   // "THE BRIVIA CLUB" -> "The Brivia Club" (an all-caps account name reads as shouting in a sentence).
   const titleCaseName = (name) => { const n = String(name || '').trim(); return n && n === n.toUpperCase() ? n.toLowerCase().replace(/(^|\s)(\S)/g, (m, a, b) => a + b.toUpperCase()) : n; };
   const boldLead = (title, first) => (first && title.startsWith(first) ? `<b>${escapeHtml(first)}</b>${escapeHtml(title.slice(first.length))}` : escapeHtml(title));
-  const postKind = (type) => (type === 'post_like' ? ['like', heartIcon] : type === 'post_new' ? ['new', newNoteIcon] : ['comment', commentIcon]);
+  const postKind = (type) => (type === 'post_like' ? ['like', heartIcon] : type === 'post_new' ? ['new', newNoteIcon] : ['comment', commentIcon]);   // comment_reply (D-260) wears the comment badge
   const postHtml = postGroups.map((g) => {
     // D-253: an Admin (THE BRIVIA CLUB) is named in full, never by a first word ("THE shared a new note").
     const lead = g.people[0] || {};
@@ -784,12 +784,12 @@ const renderNotifications = () => {
     const thumb = g.postImage && isStorageImageUrl(g.postImage) ? `<img src="${escapeHtml(g.postImage)}" alt="" loading="lazy" decoding="async" />` : '';
     // D-243: likes show who (up to three faces) and open "Liked by".
     const isLike = g.type === 'post_like';
-    const extra = isLike || g.type === 'post_comment' ? g.people.slice(1, 3).map((p) => renderAvatar(findPersonById(p.id) || { name: p.name, image: p.photoUrl }, 'notification-avatar notification-avatar--stack')).join('') : '';
+    const extra = isLike || g.type === 'post_comment' || g.type === 'comment_reply' ? g.people.slice(1, 3).map((p) => renderAvatar(findPersonById(p.id) || { name: p.name, image: p.photoUrl }, 'notification-avatar notification-avatar--stack')).join('') : '';
     const line = isLike ? (g.people.length > 1 ? `See all ${g.people.length}` : 'See who') : copy.line;
     return `<button type="button" class="notification-post${g.unread ? ' is-unread' : ''}${extra ? ' has-stack' : ''}" data-post-note="${escapeHtml(g.key)}" aria-label="${escapeHtml(`${copy.title}. ${line}`.trim())}">`
       + `<span class="notification-nearby-face">${renderAvatar(person, 'notification-avatar')}${extra}<i class="notification-post-kind is-${postKind(g.type)[0]}">${postKind(g.type)[1]}</i></span>`
       // D-252: the name in bold, the comment or caption in a soft bubble (no quote marks), the time last.
-      + `<span class="notification-nearby-copy"><strong>${boldLead(copy.title, adminLead ? titleCaseName(lead.name) : firstNameOf(lead.name))}</strong>${line ? `<span class="${isLike ? 'notification-see-likers' : (g.type === 'post_comment' || g.type === 'post_new') && g.snippet ? 'notification-snippet' : 'notification-line'}"><span>${escapeHtml(line)}</span></span>` : ''}<small>${escapeHtml(agoLabel(g.createdAt))}</small></span>`
+      + `<span class="notification-nearby-copy"><strong>${boldLead(copy.title, adminLead ? titleCaseName(lead.name) : firstNameOf(lead.name))}</strong>${line ? `<span class="${isLike ? 'notification-see-likers' : (g.type === 'post_comment' || g.type === 'post_new' || g.type === 'comment_reply') && g.snippet ? 'notification-snippet' : 'notification-line'}"><span>${escapeHtml(line)}</span></span>` : ''}<small>${escapeHtml(agoLabel(g.createdAt))}</small></span>`
       + `${thumb ? `<span class="notification-post-thumb">${thumb}</span>` : ''}</button>`;
   }).join('');
   const ticketIcon = '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2.5 5.5V4h11v1.5a1.5 1.5 0 0 0 0 3V10h-11V8.5a1.5 1.5 0 0 0 0-3Z"/><path d="M9.5 4v6" stroke-dasharray="1.2 1.2"/></svg>';

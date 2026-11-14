@@ -117,7 +117,7 @@ Deno.serve(async (req) => {
   for (const n of claimed) {
     const who = nameOf.get(n.source_user_id) || { name: 'A Brivia member', photo_url: null };
     const first = String(who.name || '').trim().split(/\s+/)[0] || 'A Brivia member';
-    const post = n.notification_type === 'post_like' || n.notification_type === 'post_comment' || n.notification_type === 'post_new';
+    const post = n.notification_type === 'post_like' || n.notification_type === 'post_comment' || n.notification_type === 'post_new' || n.notification_type === 'comment_reply';
     // D-203 (0060): someone registered for the member's event.
     const registered = n.notification_type === 'event_registered';
     const payload = JSON.stringify(registered ? {
@@ -128,8 +128,9 @@ Deno.serve(async (req) => {
     } : post ? {
       id: n.id, tag: n.id, type: n.notification_type,
       // D-234 (0071): post_new, a connection shared a new note.
-      title: n.notification_type === 'post_like' ? `${first} liked your note` : n.notification_type === 'post_new' ? `${first} shared a new note` : `${first} commented on your note`,
-      body: (n.notification_type === 'post_comment' || n.notification_type === 'post_new') && n.snippet ? `“${n.snippet}”` : 'Open Brivia to see it.',
+      // D-260 (0078): comment_reply, someone answered the member's comment.
+      title: n.notification_type === 'post_like' ? `${first} liked your note` : n.notification_type === 'post_new' ? `${first} shared a new note` : n.notification_type === 'comment_reply' ? `${first} replied to your comment` : `${first} commented on your note`,
+      body: (n.notification_type === 'post_comment' || n.notification_type === 'post_new' || n.notification_type === 'comment_reply') && n.snippet ? `“${n.snippet}”` : 'Open Brivia to see it.',
       url: `/app.html?view=posts&post=${n.post_id}&notification=${n.id}`,
     } : {
       id: n.id, tag: n.id, type: n.notification_type,
