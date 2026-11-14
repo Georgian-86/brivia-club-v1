@@ -4833,3 +4833,19 @@ bring a short line back.
 - **Checks.** SQL z-daily-swipes Z6 (shared cap and unlimited member), full harness; unit; build.
 - **Update (founder, 2026-11-14): "keep golu kumar, remove the other golu".** Golu (265ae93f…) was taken off
   `brivia_private.unlimited_swipes`; the list is now Yashika and Golu Kumar only (verified live: Golu 10 a day).
+
+## D-264 (2026-11-14): a faster chat and a lighter landing page
+
+- **Ask (founder, 2026-11-14):** "chat section and landing page is bit slow and unresponsive pls fix".
+- **Chat, found.** The busiest database reads were chat ones: the "new messages" check (every few seconds, ~126k
+  calls) and the open thread. Each ran the message privacy rule per row through two SECURITY DEFINER checks
+  (~0.4 ms a row, never inlined): 384 ms for a member with 700 messages, and realtime paid it on every insert.
+- **Chat, decision (0081).** Same rule, computed once per query: `my_hidden_message_ids()` (deleted for me, or
+  withheld from me) and `my_other_world_peers()` (the tester-world rule, once per person, materialized after the
+  union so it is not pushed back to per-message). The heaviest member's check went from 384 ms to ~30 ms.
+  The d-tester-world guard accepts the two helpers (one only removes rows; the other is the world rule).
+- **Landing, found.** The hero downloaded a 4K video: 20 MB on a laptop, 7.5 MB on a phone.
+- **Landing, decision.** A 1440p cut (5.7 MB) and a 1536-tall phone cut (3 MB), H.264 two-pass from the 4K masters,
+  come first in the `<video>`; the 4K masters stay for screens wider than 2560 px. Frames compared side by side:
+  no visible difference. Page download 8.6 MB to 4.2 MB on a phone, over 20 MB to 6.6 MB on a laptop.
+- **Checks.** SQL harness (all, incl. tester-world and message visibility); e2e landing; unit 619; build.

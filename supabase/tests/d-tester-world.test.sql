@@ -569,14 +569,17 @@ begin
    where n.nspname in ('public', 'brivia_private') and p.prosecdef
      and has_function_privilege('authenticated', p.oid, 'execute')
      and p.prosrc ~ '\m(connection_requests|matches|brivia_messages)\M'
-     and p.prosrc !~ '(brivia_in_test_world|brivia_same_world|brivia_visible_to|brivia_pair_world_ok)\(';
+     and p.prosrc !~ '(brivia_in_test_world|brivia_same_world|brivia_visible_to|brivia_pair_world_ok)\('
+     -- 0081 (D-264): my_hidden_message_ids only lists the caller's own messages to REMOVE from their view (hidden for
+     -- them, or withheld from them); it never adds a row, so it needs no world rule of its own.
+     and not (n.nspname = 'brivia_private' and p.proname = 'my_hidden_message_ids');
   if bad is not null then raise exception 'FAIL guard: pair paths without a world rule: %', bad; end if;
   select string_agg(tablename || '.' || policyname, ', ') into bad
     from pg_policies
    where schemaname = 'public' and tablename in ('connection_requests', 'matches', 'brivia_messages')
      and cmd in ('SELECT', 'INSERT')
      and coalesce(qual, '') || coalesce(with_check, '')
-         !~ '(brivia_incoming_request_visible|brivia_pair_world_ok|brivia_can_message|brivia_can_send)\(';  -- brivia_can_send: 0013
+         !~ '(brivia_incoming_request_visible|brivia_pair_world_ok|brivia_can_message|brivia_can_send|my_other_world_peers)\(';  -- brivia_can_send: 0013; my_other_world_peers: 0081, brivia_pair_world_ok once per person
   if bad is not null then raise exception 'FAIL guard: pair policies without a world rule: %', bad; end if;
 end $$;
 
