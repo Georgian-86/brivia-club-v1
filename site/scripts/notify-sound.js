@@ -487,6 +487,7 @@ export const createSoundKit = ({
   // A genuinely new notification: once per id, ever, in this tab.
   const notify = (id = '') => {
     if (id && playedIds.has(id)) return false;
+    globalThis.__briviaSoundLog?.push(`notify:${id}`);   // e2e: which notifications asked for the sax
     const ok = play('notify');
     if (ok && id) playedIds.add(id);
     return ok;
