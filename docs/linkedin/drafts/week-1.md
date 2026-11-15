@@ -7,7 +7,7 @@ Status: DRAFT. Nothing is scheduled. Fill every `[bracket]` with the real detail
 ## Post 1 · Tue 17 Nov, 8:30 AM IST · F11 Emotional cold-open · goal: likes
 
 Story source: the git log for the night of 5–6 Nov 2026 (IST), the only overnight work in the project's history.
-**Confirm before approving:** that this was the night before the NF3 PRO Open.
+Confirmed by Golu (15 Nov): the tournament was the morning of 6 Nov, right after this night.
 
 4:55 AM. Last fix of the night went live.
 
@@ -33,7 +33,7 @@ P.S. Link in the first comment if you want to try it.
 
 **First comment:** thebriviaclub.com — would love your honest feedback, bugs included.
 **Tag:** Yashika (where her name appears).
-**Image:** a real screenshot of that night's commit list with times (repo names only, no keys or member data), or a tournament photo.
+**Image:** `docs/linkedin/images/post1-night-log.png` (that night's real commits, IST), or a tournament photo.
 
 ---
 
