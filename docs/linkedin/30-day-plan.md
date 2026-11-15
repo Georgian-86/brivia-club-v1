@@ -27,7 +27,7 @@ plus Community). **Cadence:** 13 posts (Tue/Wed/Thu), which leaves 2 of Publora 
 
 | # | Date | Time | Pillar | Hook | Angle (source) | Image (real) | CTA | Goal |
 |---|---|---|---|---|---|---|---|---|
-| 1 | Tue 17 Nov | 8:30 AM | Proof | F11 Emotional cold-open | The night before the NF3 PRO Open: awake all night so Yashika could demo the app; 20–30 players used it, found bugs, we fixed them (Yashika's post) | Laptop at night / tournament hall / the demo phone | Soft close + link in comment; tag Yashika | Likes |
+| 1 | Tue 17 Nov | 8:30 AM | Proof | F11 Emotional cold-open | The night of 24–25 Oct before the NF3 PRO Open (tournament 25 Oct; Yashika posted 8 Nov): awake all night so Yashika could demo the app; 20–30 players used it, found bugs, we fixed them (Yashika's post) | Laptop at night / tournament hall / the demo phone | Soft close + link in comment; tag Yashika | Likes |
 | 2 | Wed 18 Nov | 7:30 PM | Conviction | F18 False-binary dissolve | Dating apps know *where* you are, not what you care about; LinkedIn knows what you care about, not where you are. Brivia does both (VISION.md) | Two-column card you make from a screenshot | Question: "which do you use to meet people, and does it work?" | Comments |
 | 3 | Thu 19 Nov | 8:30 AM | Building in public | F7 Odd-precision | Chat felt slow; one privacy check ran per message. 384 ms → ~30 ms for the busiest member (D-264) | Screenshot of the before/after timing or the diff | "Ever found a fix this small?" | Saves |
 | 4 | Tue 24 Nov | 8:30 AM | Community | F14 Named gratitude | Thank you to the NF3 PRO organisers and the first testers; what their bug reports changed (needs names from Golu) | Tournament photo | Tag organisers + Yashika | Reposts |
