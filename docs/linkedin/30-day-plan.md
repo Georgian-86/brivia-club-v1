@@ -70,6 +70,20 @@ reach comes from what Golu does *around* his posts:
 5. **Profile:** headline mentions "Co-founder & Developer, Brivia Club". Featured: Yashika's launch post and
    thebriviaclub.com. (`linkedin-profile-optimizer` can rewrite it.)
 
+## Reaching founders and investors (for funding)
+
+- **Hashtags:** 3–4 per post, mixing reach and audience: #buildinpublic #startupindia #founders plus one topic tag
+  (#networking, #hackathon, #postgres, #productdesign). More than 5 reads as spam and lowers reach; in 2026 LinkedIn
+  matches posts to readers mostly by what the text is about, so tags help a little and the story does most of it.
+- **Every post says plainly what Brivia is and that it is early**, so an angel who sees it knows what they are
+  looking at. Post 1 ends with an open invitation to people who back early community products.
+- **Comment where investors read:** 3–5 thoughtful comments a day on posts by Indian angels, early-stage VCs and
+  founders of community or social products (founder-led consumer apps, college-network startups). Add a real point
+  from building Brivia; never pitch in a comment.
+- **Warm paths:** ask Yashika and upGrad colleagues to repost post 1; tag only people who are genuinely part of a post.
+- **Weekly:** run `linkedin-engager-analytics` on the best post and flag any founders or investors who engaged, so
+  Golu can send a connection note.
+
 ## Still needed from Golu
 
 - Names to thank in post 4 (organisers, early testers who agreed to be named).

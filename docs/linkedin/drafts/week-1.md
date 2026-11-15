@@ -4,71 +4,75 @@ Status: DRAFT. Nothing is scheduled. Fill every `[bracket]` with the real detail
 
 ---
 
-## Post 1 · Tue 17 Nov, 8:30 AM IST · Product intro (this week's one offer post) · goal: reposts and sign-ups
+## Post 1 · Tue 17 Nov, 8:30 AM IST · Story intro (F11 cold-open into the product) · goal: reach, sign-ups, investor eyes
 
-Brivia Club is live, and I'm one of the two people who built it.
+3:25 AM. The build broke because of one stray curly brace, and a chess tournament was starting in a few hours.
 
-It's a swipe-style app for meeting people near you who care about the same things you do.
+Let me back up.
 
-Not dates. Hackathon teammates, event buddies, travel companions, people who are hiring, people looking for a referral.
+At upGrad, my internship colleague Yashika told me about an idea. She once struggled to find a single teammate for a hackathon, and she wanted an app where you swipe through people nearby who share your interests. Not to date. To build, travel, go to events, find work.
 
-How it works:
+She had the vision. I said I'd build it.
 
-You pick your interests. Brivia shows you people nearby who share them.
+That became Brivia Club.
 
-You get 10 swipes a day, so each one is a real choice.
+Many late nights later, Yashika sponsored the 1st NF3 PRO Open Chess Tournament to put Brivia in front of 20 to 30 real testers. The night before, I was still shipping: a password toggle at 1:07 AM, that broken build at 3:25, a first-run tutorial at 5:23, a proper phone login at 9:01.
 
-A match only happens when both of you say yes. Then you chat and make a plan.
+Then the players used it. They found bugs we had never seen, and we fixed them.
 
-Other members never see your exact location, phone number or email. They see a rounded distance like "~3 km".
+Today Brivia is live:
 
-The idea is Yashika's. She founded Brivia after struggling to find a teammate for her first hackathon. I'm the co-founder and developer, and my job is making sure it works when you open it.
+→ pick your interests
+→ see people nearby who share them
+→ 10 swipes a day, and a match only when both of you say yes
+→ chat and make a plan
 
-In October we put it in front of 20 to 30 players at the 1st NF3 PRO Open Chess Tournament. They found bugs, told us what confused them, and we fixed it.
+Your exact location, phone and email stay private. Others see a rounded distance like "~3 km".
 
-If you're looking for a team, a plan for this weekend, or people who get your interests, try it and tell me what breaks.
+Yashika is the founder who saw the problem first. I'm the co-founder who writes the code. It took both.
 
-What's one interest you wish more people near you shared?
+If you're looking for a hackathon team, an event buddy or people who get your interests, try it and tell me what breaks.
+
+And if you back early community products in India, I'd love to show you what we're learning.
+
+What's the latest you've ever stayed up to ship something?
 
 P.S. Link in the first comment.
 
-**First comment:** Try it here: thebriviaclub.com. Founder: Yashika (tag). Feedback and bug reports welcome.
-**Tag:** Yashika.
-**Image:** 2–4 real screenshots (deck card with shared interests and "~3 km", a match, chat), as a carousel.
+#buildinpublic #startupindia #founders #networking
+
+**First comment (post right after it goes live):** Try Brivia Club: thebriviaclub.com. Built with Yashika (tag her). Bugs and feedback welcome, here or in DMs.
+**Tag:** Yashika in the body.
+**Image:** `docs/linkedin/images/post1-night-log.png` (that night's real commits). Optionally add 1–3 app screenshots as a carousel.
 
 ---
 
-## Post 2 · Wed 18 Nov, 7:30 PM IST · F11 Emotional cold-open · goal: likes
+## Post 2 · Wed 18 Nov, 7:30 PM IST · F18 False-binary dissolve · goal: comments
 
-Story source: the git log for the night of 24–25 Oct 2026 (IST). Confirmed by Golu (15 Nov): he stayed awake that
-night and the NF3 PRO Open was on 25 Oct. Yashika's launch post went up later, on 8 Nov.
+Yashika had to convince her mom that Brivia Club is not a dating site.
 
-3:25 AM. The build broke because of one stray curly brace.
+Fair question. It has swipes.
 
-That was the night before the 1st NF3 PRO Open Chess Tournament. Yashika had sponsored it for one reason: to put Brivia Club in front of 20 to 30 real testers before launch. Chess players, who notice everything.
+But think about how you actually meet people who share your interests.
 
-My log from that night:
+A dating app? It knows how close someone is. It has no idea you both want to build a fintech project or play rapid chess on Sundays.
 
-1:07 AM: show or hide your password on every password field.
-3:13 AM: launch polish.
-3:25 AM: the build fails. One brace in one CSS file. Fixed.
-5:23 AM: a favicon, and a first-run tutorial so nobody opens the app lost.
-6:52 AM: picking your interests at sign-up becomes a simple dropdown.
-9:01 AM: a proper phone login, because that's what everyone at the tournament would use.
+A career network? It knows your skills and interests. The best match it finds might live 2,000 km away, which is no use for a hackathon this weekend.
 
-None of it was glamorous. All of it was something a stranger would trip over in the first minute.
+Brivia starts nearby, then lets shared interests decide who you see.
 
-That day the players actually used it. They found bugs we had never seen and told us what confused them. We fixed those too.
+You swipe on people, not photos of people. A match only happens when both of you say yes. Other members see a rounded distance like "~3 km", never your exact location, phone or email.
 
-I met Yashika at upGrad. She shared her vision for Brivia with me, and we made it live together. Her job is the vision. Mine is making sure it works when someone opens it for the first time.
+The idea is simple: the right teammate is often a few streets away, and neither of you knows it.
 
-What's the latest you've stayed up to ship something?
+How did you meet the last person you built something with?
 
-P.S. Link in the first comment if you want to try it.
+#networking #startupindia
 
-**First comment:** thebriviaclub.com — would love your honest feedback, bugs included.
-**Tag:** Yashika (where her name appears).
-**Image:** `docs/linkedin/images/post1-night-log.png` (that night's real commits, IST).
+**First comment:** thebriviaclub.com
+**Image:** a two-panel card made from real screenshots (Brivia's deck card showing "~3 km" and shared interests). Avoid naming or mocking any other app.
+
+---
 
 ---
 
@@ -99,32 +103,42 @@ P.S. The bug report was one line from Yashika: "chat section and landing page is
 
 **First comment:** If you want to feel the difference: thebriviaclub.com
 **Image:** a screenshot of the before/after timing, or the query diff (no secrets, no member data).
-**Hashtags (optional):** #buildinpublic #postgres
+**Hashtags:** #buildinpublic #postgres #startupindia
 
 ---
 
-## Moved to week 2 · Wed 25 Nov, 7:30 PM IST · F18 False-binary dissolve · goal: comments
+## Folded into post 1 (kept for reference)
 
-Yashika had to convince her mom that Brivia Club is not a dating site.
 
-Fair question. It has swipes.
+Story source: the git log for the night of 24–25 Oct 2026 (IST). Confirmed by Golu (15 Nov): he stayed awake that
+night and the NF3 PRO Open was on 25 Oct. Yashika's launch post went up later, on 8 Nov.
 
-But think about how you actually meet people who share your interests.
+3:25 AM. The build broke because of one stray curly brace.
 
-A dating app? It knows how close someone is. It has no idea you both want to build a fintech project or play rapid chess on Sundays.
+That was the night before the 1st NF3 PRO Open Chess Tournament. Yashika had sponsored it for one reason: to put Brivia Club in front of 20 to 30 real testers before launch. Chess players, who notice everything.
 
-A career network? It knows your skills and interests. The best match it finds might live 2,000 km away, which is no use for a hackathon this weekend.
+My log from that night:
 
-Brivia starts nearby, then lets shared interests decide who you see.
+1:07 AM: show or hide your password on every password field.
+3:13 AM: launch polish.
+3:25 AM: the build fails. One brace in one CSS file. Fixed.
+5:23 AM: a favicon, and a first-run tutorial so nobody opens the app lost.
+6:52 AM: picking your interests at sign-up becomes a simple dropdown.
+9:01 AM: a proper phone login, because that's what everyone at the tournament would use.
 
-You swipe on people, not photos of people. A match only happens when both of you say yes. Other members see a rounded distance like "~3 km", never your exact location, phone or email.
+None of it was glamorous. All of it was something a stranger would trip over in the first minute.
 
-The idea is simple: the right teammate is often a few streets away, and neither of you knows it.
+That day the players actually used it. They found bugs we had never seen and told us what confused them. We fixed those too.
 
-How did you meet the last person you built something with?
+I met Yashika at upGrad. She shared her vision for Brivia with me, and we made it live together. Her job is the vision. Mine is making sure it works when someone opens it for the first time.
 
-**First comment:** thebriviaclub.com
-**Image:** a two-panel card made from real screenshots (Brivia's deck card showing "~3 km" and shared interests). Avoid naming or mocking any other app.
+What's the latest you've stayed up to ship something?
+
+P.S. Link in the first comment if you want to try it.
+
+**First comment:** thebriviaclub.com — would love your honest feedback, bugs included.
+**Tag:** Yashika (where her name appears).
+**Image:** `docs/linkedin/images/post1-night-log.png` (that night's real commits, IST).
 
 ---
 
