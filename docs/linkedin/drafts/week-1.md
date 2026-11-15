@@ -41,9 +41,9 @@ P.S. Link in the first comment.
 
 #buildinpublic #startupindia #founders #networking
 
-**First comment (post right after it goes live):** Try Brivia Club: thebriviaclub.com. Built with Yashika (tag her). Bugs and feedback welcome, here or in DMs.
+**First comment (post right after it goes live):** Try Brivia Club: thebriviaclub.live. Built with Yashika (tag her). Bugs and feedback welcome, here or in DMs.
 **Tag:** Yashika in the body.
-**Image:** `docs/linkedin/images/post1-night-log.png` (that night's real commits). Optionally add 1–3 app screenshots as a carousel.
+**Images (4, in this order):** `golu-launch-night.jpg` (Golu, laptop, chess board), `post1-night-log.png` (that night's commits), `deck-member-blurred.jpg` (the deck; the member's name, job and photo hidden), `phone-notification.jpg` (a Brivia chat notification). All in `docs/linkedin/images/`.
 
 ---
 
@@ -69,8 +69,8 @@ How did you meet the last person you built something with?
 
 #networking #startupindia
 
-**First comment:** thebriviaclub.com
-**Image:** a two-panel card made from real screenshots (Brivia's deck card showing "~3 km" and shared interests). Avoid naming or mocking any other app.
+**First comment:** thebriviaclub.live
+**Image:** `docs/linkedin/images/poster-find-your-people.jpg` ("A modern way to find your people"), optionally with `login.jpg`.
 
 ---
 
@@ -101,7 +101,7 @@ What's the smallest change that gave you the biggest speed-up?
 
 P.S. The bug report was one line from Yashika: "chat section and landing page is bit slow and unresponsive". That one line was worth more than any dashboard.
 
-**First comment:** If you want to feel the difference: thebriviaclub.com
+**First comment:** If you want to feel the difference: thebriviaclub.live
 **Image:** a screenshot of the before/after timing, or the query diff (no secrets, no member data).
 **Hashtags:** #buildinpublic #postgres #startupindia
 
@@ -136,7 +136,7 @@ What's the latest you've stayed up to ship something?
 
 P.S. Link in the first comment if you want to try it.
 
-**First comment:** thebriviaclub.com — would love your honest feedback, bugs included.
+**First comment:** thebriviaclub.live — would love your honest feedback, bugs included.
 **Tag:** Yashika (where her name appears).
 **Image:** `docs/linkedin/images/post1-night-log.png` (that night's real commits, IST).
 
