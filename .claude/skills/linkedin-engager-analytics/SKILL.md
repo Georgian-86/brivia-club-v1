@@ -3,7 +3,7 @@ name: linkedin-engager-analytics
 description: "Pull the people who liked or commented on any LinkedIn post and segment them by ICP fit (peer / aspirational / prospect / other). Produces an engager roster, tier breakdown, and outbound action lists (follow back, comment-drop, DM-able with one-line openers). Powered by Apify, no LinkedIn login. Triggers on \"who liked my post\", \"who engaged\", \"engagers report\", \"audience analytics\". Not for tracking author replies to your comments (use linkedin-thread-monitor)."
 ---
 
-> **Vendored layout (brivia-club-v1).** The bundle root is `${CLAUDE_PROJECT_DIR:-.}/.claude/linkedin-skills/`: `references/`, `lib/`, `scripts/` and `requirements*.txt` live there. Run any `lib.*` / `scripts/*.py` call with that directory as the working directory. Keys (`APIFY_TOKEN`, Publora) go in its `.env`, which is gitignored; never commit them. Nothing publishes without the user's explicit approval.
+> **Vendored layout (brivia-club-v1).** The bundle root is `${CLAUDE_PROJECT_DIR:-.}/.claude/linkedin-skills/`: `references/`, `lib/`, `scripts/` and `requirements*.txt` live there. Run any `lib.*` / `scripts/*.py` call with that directory as the working directory. Keys (`APIFY_TOKEN`, Publora) go in its `.env`, which is gitignored; never commit them. In claude.ai cloud sessions the Apify token is a network secret the proxy injects for api.apify.com: run with `APIFY_TOKEN=proxy-injected` and never ask for the real value. Nothing publishes without the user's explicit approval.
 
 # LinkedIn Engager Analytics
 

@@ -3,7 +3,7 @@ name: linkedin-humanizer
 description: "Remove AI tells from LinkedIn posts/comments: 2026 vocabulary density, reveal bridges, staccato fragments, stacked triads, performed sincerity. Tiered rewriter plus `--mode audit` LinkedIn post auditor and `--mode profile` voice builder. Not for drafting from scratch (use linkedin-post-writer) or beating AI detectors. Keywords: humanize, de-AI, post audit, post auditor, audit before posting."
 ---
 
-> **Vendored layout (brivia-club-v1).** The bundle root is `${CLAUDE_PROJECT_DIR:-.}/.claude/linkedin-skills/`: `references/`, `lib/`, `scripts/` and `requirements*.txt` live there. Run any `lib.*` / `scripts/*.py` call with that directory as the working directory. Keys (`APIFY_TOKEN`, Publora) go in its `.env`, which is gitignored; never commit them. Nothing publishes without the user's explicit approval.
+> **Vendored layout (brivia-club-v1).** The bundle root is `${CLAUDE_PROJECT_DIR:-.}/.claude/linkedin-skills/`: `references/`, `lib/`, `scripts/` and `requirements*.txt` live there. Run any `lib.*` / `scripts/*.py` call with that directory as the working directory. Keys (`APIFY_TOKEN`, Publora) go in its `.env`, which is gitignored; never commit them. In claude.ai cloud sessions the Apify token is a network secret the proxy injects for api.apify.com: run with `APIFY_TOKEN=proxy-injected` and never ask for the real value. Nothing publishes without the user's explicit approval.
 
 # LinkedIn Humanizer V3
 

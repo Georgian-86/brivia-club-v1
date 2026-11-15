@@ -3,7 +3,7 @@ name: linkedin-profile-optimizer
 description: "Audit and rewrite a LinkedIn profile end-to-end for 2026: headline, About 7-step, Featured, banner, photo, Experience metrics, Skills, custom URL, recommendations. Triggers on \"review my profile\", \"rewrite my headline\", \"fix my About\", \"optimize banner\", \"profile audit\", \"LinkedIn bio\". Converts resume-style profiles to ones that convert 3-5x better. Not for writing feed content (use linkedin-post-writer)."
 ---
 
-> **Vendored layout (brivia-club-v1).** The bundle root is `${CLAUDE_PROJECT_DIR:-.}/.claude/linkedin-skills/`: `references/`, `lib/`, `scripts/` and `requirements*.txt` live there. Run any `lib.*` / `scripts/*.py` call with that directory as the working directory. Keys (`APIFY_TOKEN`, Publora) go in its `.env`, which is gitignored; never commit them. Nothing publishes without the user's explicit approval.
+> **Vendored layout (brivia-club-v1).** The bundle root is `${CLAUDE_PROJECT_DIR:-.}/.claude/linkedin-skills/`: `references/`, `lib/`, `scripts/` and `requirements*.txt` live there. Run any `lib.*` / `scripts/*.py` call with that directory as the working directory. Keys (`APIFY_TOKEN`, Publora) go in its `.env`, which is gitignored; never commit them. In claude.ai cloud sessions the Apify token is a network secret the proxy injects for api.apify.com: run with `APIFY_TOKEN=proxy-injected` and never ask for the real value. Nothing publishes without the user's explicit approval.
 
 # LinkedIn Profile Optimizer
 

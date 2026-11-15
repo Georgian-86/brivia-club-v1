@@ -3,7 +3,7 @@ name: linkedin-repurposer
 description: "Repurpose existing content into a native LinkedIn post. Take a tweet, thread, YouTube video, blog, or newsletter and rebuild it for LinkedIn: re-hook before the fold, expand to the 900 to 1300 char sweet spot, add whitespace and a CTA, move links to the first comment, run the humanizer, publish via Publora on approval. Not for writing from scratch (use linkedin-post-writer), not for auditing a draft (use linkedin-humanizer --mode audit)."
 ---
 
-> **Vendored layout (brivia-club-v1).** The bundle root is `${CLAUDE_PROJECT_DIR:-.}/.claude/linkedin-skills/`: `references/`, `lib/`, `scripts/` and `requirements*.txt` live there. Run any `lib.*` / `scripts/*.py` call with that directory as the working directory. Keys (`APIFY_TOKEN`, Publora) go in its `.env`, which is gitignored; never commit them. Nothing publishes without the user's explicit approval.
+> **Vendored layout (brivia-club-v1).** The bundle root is `${CLAUDE_PROJECT_DIR:-.}/.claude/linkedin-skills/`: `references/`, `lib/`, `scripts/` and `requirements*.txt` live there. Run any `lib.*` / `scripts/*.py` call with that directory as the working directory. Keys (`APIFY_TOKEN`, Publora) go in its `.env`, which is gitignored; never commit them. In claude.ai cloud sessions the Apify token is a network secret the proxy injects for api.apify.com: run with `APIFY_TOKEN=proxy-injected` and never ask for the real value. Nothing publishes without the user's explicit approval.
 
 # LinkedIn Repurposer
 
