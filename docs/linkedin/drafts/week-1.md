@@ -20,7 +20,7 @@ They used it, found bugs we had never seen, and told us what confused them. We f
 
 I have shipped code before, but I had never watched a stranger use something I built and get stuck on it. That changes how you write the next line of code.
 
-Yashika had the idea, from a hackathon in Dehradun where she couldn't find a single teammate. My job is making sure the app that fixes that actually works.
+I met Yashika at upGrad. She shared her vision for Brivia with me, and we made it live together. Her job is the vision. Mine is making sure it actually works.
 
 Brivia Club: swipe through people nearby who share your interests, for hackathons, events, travel, projects and referrals.
 

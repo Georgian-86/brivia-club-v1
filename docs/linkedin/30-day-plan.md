@@ -11,6 +11,9 @@ plus Community). **Cadence:** 13 posts (Tue/Wed/Thu), which leaves 2 of Publora 
 
 ## Ground rules for every post
 
+- Golu met Yashika at **upGrad**; she shared her vision and they built it together. The Dehradun hackathon is
+  Yashika's story, not Golu's: never write it as something he saw or knows first-hand.
+
 - Only real facts: from Yashika's 8 Nov post, the repo's decision log (`docs/DECISIONS.md`), or what Golu supplies.
   No invented numbers, members or testimonials.
 - **IP:** never describe how ORBIT ranks people (weights, the far-away gate, formulas). "Nearby first, shared interests
@@ -31,7 +34,7 @@ plus Community). **Cadence:** 13 posts (Tue/Wed/Thu), which leaves 2 of Publora 
 | 5 | Wed 25 Nov | 7:30 PM | The math | F10 Contrarian | Why Brivia gives you 10 swipes a day, not unlimited (D-263; the decision log has no stated reason, so Golu/Yashika confirm the real one before drafting) | Screenshot of the "swipes left" state | "Would you keep a cap or remove it?" | Comments |
 | 6 | Thu 26 Nov | 8:30 AM | Building in public | F4 Time-anchor confession | "Our app stuttered every 5 seconds." On a phone it froze 120–250 ms every 5 s; the cause (a sync rewriting notifications) and the fix (D-229) | Screen recording frame | Mirror question | Comments |
 | 7 | Tue 1 Dec | 8:30 AM | Conviction | F15 Explain-to-kids | Why you see "~3 km" and never someone's exact location; why a match needs two yeses | App screenshot with "~3 km" | Save prompt | Saves |
-| 8 | Wed 2 Dec | 7:30 PM | Narrative | F16 Status-strip humility | Not the founder, the developer who said yes: internship colleagues → co-founder (needs Golu's story) | Photo of Golu with Yashika, or his desk | "Who was your 'yes' person?" | Likes |
+| 8 | Wed 2 Dec | 7:30 PM | Narrative | F16 Status-strip humility | Not the founder, the developer who said yes: met Yashika at upGrad, she shared her vision, we made it live (needs the rest of Golu's story) | Photo of Golu with Yashika, or his desk | "Who was your 'yes' person?" | Likes |
 | 9 | Thu 3 Dec | 8:30 AM | Community | Poll | "How did you find your last hackathon teammate?" Friends / college group / alone / didn't find one | none (poll) | Vote + comment | Comments |
 | 10 | Tue 8 Dec | 8:30 AM | Building in public | F17 Controlled A/B | The landing page was 20 MB on a laptop, 7.5 MB on a phone; now 6.6 MB and 3 MB with no visible difference (D-264) | Side-by-side frame or network tab screenshot | "What's your page weight?" | Saves |
 | 11 | Wed 9 Dec | 7:30 PM | Proof | F9 Curiosity gap | A real match story from a member (only with their permission; skip if none) | Their photo, with consent | Story close | Comments |
