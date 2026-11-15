@@ -48,7 +48,7 @@ in `docs/`.
 - **Skills are vendored in `.claude/skills/`** (manifest: `docs/SKILLS.md`). Workflow the founder asked for:
   superpowers for process (brainstorming → writing-plans → execution, TDD, verification),
   **agent-arena for every significant decision** (record the outcome in `docs/DECISIONS.md`),
-  ui-ux-pro-max for UX rules (keep the existing deep-wine brand, see `docs/UX_SPEC.md`), and webapp-testing for UI checks.
+  fable-auditor when the founder wants Fable 5.2 to audit while Opus/Sonnet subagents do the work, ui-ux-pro-max for UX rules (keep the existing deep-wine brand, see `docs/UX_SPEC.md`), and webapp-testing for UI checks.
   If `.claude/skills/` is missing, ask the user before reinstalling.
 
 ## Layout

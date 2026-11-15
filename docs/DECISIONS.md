@@ -4849,3 +4849,17 @@ bring a short line back.
   come first in the `<video>`; the 4K masters stay for screens wider than 2560 px. Frames compared side by side:
   no visible difference. Page download 8.6 MB to 4.2 MB on a phone, over 20 MB to 6.6 MB on a laptop.
 - **Checks.** SQL harness (all, incl. tester-world and message visibility); e2e landing; unit 619; build.
+
+## D-265 (2026-11-15): LinkedIn skills and a Fable-auditor skill
+
+- **Ask (founder, 2026-11-15):** "install the linkedin skill and also the skill which make fable 5.2 as the auditor
+  and delegates the task to opus and sonnet models for better token conservation".
+- **LinkedIn, decision.** Vendored `sergebulaev/linkedin-skills` @8f8bc4b (MIT): the `linkedin-marketing` router and
+  12 `linkedin-*` skills in `.claude/skills/`, their shared `lib/ scripts/ references/` in `.claude/linkedin-skills/`
+  (relative paths rewritten). Chosen over single-purpose LinkedIn skills because it covers posts, comments, replies,
+  profile and planning, and asks for approval before anything publishes. API keys stay in a gitignored `.env`.
+- **Fable auditor, decision.** No published skill matched (the nearest, `mrtooher/fable-mode`, has no license and has
+  retired its Fable runner), so `fable-auditor` is written here: Fable 5.2 plans, briefs and audits (PASS / FIX /
+  ESCALATE on failable checks); Opus 5.5 takes engine, SQL, privacy and cross-file work; Sonnet 5.5 takes routine
+  work and verification. It fits the founder's superpowers loop as the controller step.
+- **Checks.** All 38 skills load in-session; linked paths resolve; `.env` is ignored.

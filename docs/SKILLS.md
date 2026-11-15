@@ -22,6 +22,8 @@ how we meet the "don't reinstall per session" goal. Pin each source to a reviewe
 | agent-arena (+ deliberative-analysis): the "arena" skill | `github.com/zhjai/agent-arena` | `skills/*` | `cdbaa7e` |
 | software-architecture | `github.com/davila7/claude-code-templates` (originally NeoLabHQ/context-engineering-kit) | `cli-tool/components/skills/development/software-architecture/SKILL.md` | `main` |
 | GSD (get-shit-done) | npm `get-shit-done-cc` / `github.com/gsd-build/get-shit-done` | installer | `bdcaab2` |
+| linkedin-marketing (router) + linkedin-post-writer, -comment-drafter, -reply-handler, -humanizer, -hook-extractor, -content-planner, -thread-monitor, -engager-analytics, -profile-optimizer, -employee-advocacy, -repurposer, -interviewer (added 2026-11-15) | `github.com/sergebulaev/linkedin-skills` (MIT) | `skills/*` + root `SKILL.md`; shared `lib/ scripts/ references/ requirements*.txt` → `.claude/linkedin-skills/` | `8f8bc4b` |
+| fable-auditor (added 2026-11-15) | original, written in this repo | `.claude/skills/fable-auditor/SKILL.md` | n/a |
 
 Notes:
 
@@ -31,6 +33,13 @@ Notes:
   "analyze and rate the engine"). Change it here if a different arena skill was meant.
 - GSD is installed by its own installer: `npx get-shit-done-cc --claude --local --profile=standard`. That writes into
   `.claude/` (commands, agents, hooks, settings). Review the diff before committing it.
+
+- The LinkedIn skills expect their bundle root two levels up (`../../references/`). Vendored flat, those paths are
+  rewritten to `${CLAUDE_PROJECT_DIR:-.}/.claude/linkedin-skills/...`, and each SKILL.md carries a layout note.
+  Reading needs `APIFY_TOKEN` (or the Apify connector) and publishing needs a Publora key, both in
+  `.claude/linkedin-skills/.env` (gitignored). Without keys they draft from pasted text. Nothing publishes without approval.
+- `fable-auditor`: Fable 5.2 plans and audits, Opus 5.5 / Sonnet 5.5 subagents do the work. `mrtooher/fable-mode`
+  was reviewed and not vendored: it has no license file and its Fable runner is retired upstream.
 
 ## Install (run only after the user approves)
 
@@ -45,6 +54,11 @@ git clone -q https://github.com/nextlevelbuilder/ui-ux-pro-max-skill $T/ux && gi
 git clone -q https://github.com/zhjai/agent-arena $T/ar && git -C $T/ar checkout -q cdbaa7e && cp -r $T/ar/skills/* $D/
 mkdir -p $D/software-architecture && curl -fsSL https://raw.githubusercontent.com/davila7/claude-code-templates/main/cli-tool/components/skills/development/software-architecture/SKILL.md -o $D/software-architecture/SKILL.md
 npx -y get-shit-done-cc@latest --claude --local --profile=standard
+git clone -q https://github.com/sergebulaev/linkedin-skills $T/li && git -C $T/li checkout -q 8f8bc4b && \
+  mkdir -p .claude/linkedin-skills && cp -r $T/li/{lib,scripts,references,LICENSE,.env.example,requirements.txt,requirements-lock.txt,SECURITY.md} .claude/linkedin-skills/ && \
+  cp $T/li/SKILL.md .claude/linkedin-skills/BUNDLE.md && cp -r $T/li/skills/* $D/ && mkdir -p $D/linkedin-marketing && cp $T/li/SKILL.md $D/linkedin-marketing/ && \
+  sed -i -E 's#(\.\./){2,3}(references/|requirements)#${CLAUDE_PROJECT_DIR:-.}/.claude/linkedin-skills/\2#g' $(grep -rlE '\.\./\.\./' $D/linkedin-*)
+# then re-add the 'Vendored layout' note under each linkedin SKILL.md frontmatter (see any vendored copy)
 git add .claude && git status --short .claude | head
 ```
 
