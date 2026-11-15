@@ -27,12 +27,12 @@ plus Community). **Cadence:** 13 posts (Tue/Wed/Thu), which leaves 2 of Publora 
 
 | # | Date | Time | Pillar | Hook | Angle (source) | Image (real) | CTA | Goal |
 |---|---|---|---|---|---|---|---|---|
-| 1 | Tue 17 Nov | 8:30 AM | Proof | F11 Emotional cold-open | The night of 24–25 Oct before the NF3 PRO Open (tournament 25 Oct; Yashika posted 8 Nov): awake all night so Yashika could demo the app; 20–30 players used it, found bugs, we fixed them (Yashika's post) | Laptop at night / tournament hall / the demo phone | Soft close + link in comment; tag Yashika | Likes |
-| 2 | Wed 18 Nov | 7:30 PM | Conviction | F18 False-binary dissolve | Dating apps know *where* you are, not what you care about; LinkedIn knows what you care about, not where you are. Brivia does both (VISION.md) | Two-column card you make from a screenshot | Question: "which do you use to meet people, and does it work?" | Comments |
+| 1 | Tue 17 Nov | 8:30 AM | Product (week 1's one offer post) | Intro | What Brivia Club is, who it's for, how it works (interests, nearby, 10 swipes, two yeses, "~3 km"); Yashika founded it, Golu co-founder & developer; tested at the NF3 PRO Open in Oct | 2–4 real app screenshots (carousel) | Question + link in comment; tag Yashika | Reposts |
+| 2 | Wed 18 Nov | 7:30 PM | Proof | F11 Emotional cold-open | The night of 24–25 Oct before the NF3 PRO Open (tournament 25 Oct; Yashika posted 8 Nov): awake all night so Yashika could demo the app; 20–30 players used it, found bugs, we fixed them (Yashika's post) | `images/post1-night-log.png` (real commits) | Soft close + link in comment; tag Yashika | Likes |
 | 3 | Thu 19 Nov | 8:30 AM | Building in public | F7 Odd-precision | Chat felt slow; one privacy check ran per message. 384 ms → ~30 ms for the busiest member (D-264) | Screenshot of the before/after timing or the diff | "Ever found a fix this small?" | Saves |
 | 4 | Tue 24 Nov | 8:30 AM | Community | F14 Named gratitude | Thank you to the NF3 PRO organisers and the first testers; what their bug reports changed (needs names from Golu) | Tournament photo | Tag organisers + Yashika | Reposts |
-| 5 | Wed 25 Nov | 7:30 PM | The math | F10 Contrarian | Why Brivia gives you 10 swipes a day, not unlimited (D-263; the decision log has no stated reason, so Golu/Yashika confirm the real one before drafting) | Screenshot of the "swipes left" state | "Would you keep a cap or remove it?" | Comments |
-| 6 | Thu 26 Nov | 8:30 AM | Building in public | F4 Time-anchor confession | "Our app stuttered every 5 seconds." On a phone it froze 120–250 ms every 5 s; the cause (a sync rewriting notifications) and the fix (D-229) | Screen recording frame | Mirror question | Comments |
+| 5 | Wed 25 Nov | 7:30 PM | Conviction | F18 False-binary dissolve | Dating apps know *where* you are, not what you care about; LinkedIn knows what you care about, not where you are. Brivia does both (VISION.md) | Two-column card you make from a screenshot | Question: "which do you use to meet people, and does it work?" | Comments |
+| 6 | Thu 26 Nov | 8:30 AM | The math | F10 Contrarian | Why Brivia gives you 10 swipes a day, not unlimited (D-263; the decision log has no stated reason, so Golu/Yashika confirm the real one before drafting) | Screenshot of the "swipes left" state | "Would you keep a cap or remove it?" | Comments |
 | 7 | Tue 1 Dec | 8:30 AM | Conviction | F15 Explain-to-kids | Why you see "~3 km" and never someone's exact location; why a match needs two yeses | App screenshot with "~3 km" | Save prompt | Saves |
 | 8 | Wed 2 Dec | 7:30 PM | Narrative | F16 Status-strip humility | Not the founder, the developer who said yes: met Yashika at upGrad, she shared her vision, we made it live (needs the rest of Golu's story) | Photo of Golu with Yashika, or his desk | "Who was your 'yes' person?" | Likes |
 | 9 | Thu 3 Dec | 8:30 AM | Community | Poll | "How did you find your last hackathon teammate?" Friends / college group / alone / didn't find one | none (poll) | Vote + comment | Comments |
@@ -40,6 +40,11 @@ plus Community). **Cadence:** 13 posts (Tue/Wed/Thu), which leaves 2 of Publora 
 | 11 | Wed 9 Dec | 7:30 PM | Proof | F9 Curiosity gap | A real match story from a member (only with their permission; skip if none) | Their photo, with consent | Story close | Comments |
 | 12 | Thu 10 Dec | 8:30 AM | Product (the one offer post) | F1 Anaphora | "Find a hackathon teammate. A travel buddy. An event companion. Someone hiring." What's live today | 3–4 app screenshots (carousel) | Link in comment, "try it this weekend" | Reposts |
 | 13 | Tue 15 Dec | 8:30 AM | Narrative | F3 Then-vs-now | 30 days of posting as a developer: what worked, real numbers from the posts | Analytics screenshot | "What should I build next?" | Comments |
+
+Spare (not scheduled): "Our app stuttered every 5 seconds" (D-229, F4), for a later week or to replace a post that can't run.
+
+Why the link goes in the first comment: LinkedIn shows posts with an outside link in the body to far fewer people (the bundle's
+2026 data: about 40–60% less reach; first-comment links get about 2x the impressions).
 
 Checks: no formula repeats inside a week; one product post in 30 days; every week has a vulnerability post and a
 data post. Week 1 has no repost-goal post (3 slots, 4 goals); post 4 covers it in week 2.

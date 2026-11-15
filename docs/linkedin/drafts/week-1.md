@@ -4,7 +4,41 @@ Status: DRAFT. Nothing is scheduled. Fill every `[bracket]` with the real detail
 
 ---
 
-## Post 1 · Tue 17 Nov, 8:30 AM IST · F11 Emotional cold-open · goal: likes
+## Post 1 · Tue 17 Nov, 8:30 AM IST · Product intro (this week's one offer post) · goal: reposts and sign-ups
+
+Brivia Club is live, and I'm one of the two people who built it.
+
+It's a swipe-style app for meeting people near you who care about the same things you do.
+
+Not dates. Hackathon teammates, event buddies, travel companions, people who are hiring, people looking for a referral.
+
+How it works:
+
+You pick your interests. Brivia shows you people nearby who share them.
+
+You get 10 swipes a day, so each one is a real choice.
+
+A match only happens when both of you say yes. Then you chat and make a plan.
+
+Other members never see your exact location, phone number or email. They see a rounded distance like "~3 km".
+
+The idea is Yashika's. She founded Brivia after struggling to find a teammate for her first hackathon. I'm the co-founder and developer, and my job is making sure it works when you open it.
+
+In October we put it in front of 20 to 30 players at the 1st NF3 PRO Open Chess Tournament. They found bugs, told us what confused them, and we fixed it.
+
+If you're looking for a team, a plan for this weekend, or people who get your interests, try it and tell me what breaks.
+
+What's one interest you wish more people near you shared?
+
+P.S. Link in the first comment.
+
+**First comment:** Try it here: thebriviaclub.com. Founder: Yashika (tag). Feedback and bug reports welcome.
+**Tag:** Yashika.
+**Image:** 2–4 real screenshots (deck card with shared interests and "~3 km", a match, chat), as a carousel.
+
+---
+
+## Post 2 · Wed 18 Nov, 7:30 PM IST · F11 Emotional cold-open · goal: likes
 
 Story source: the git log for the night of 24–25 Oct 2026 (IST). Confirmed by Golu (15 Nov): he stayed awake that
 night and the NF3 PRO Open was on 25 Oct. Yashika's launch post went up later, on 8 Nov.
@@ -38,31 +72,6 @@ P.S. Link in the first comment if you want to try it.
 
 ---
 
-## Post 2 · Wed 18 Nov, 7:30 PM IST · F18 False-binary dissolve · goal: comments
-
-Yashika had to convince her mom that Brivia Club is not a dating site.
-
-Fair question. It has swipes.
-
-But think about how you actually meet people who share your interests.
-
-A dating app? It knows how close someone is. It has no idea you both want to build a fintech project or play rapid chess on Sundays.
-
-A career network? It knows your skills and interests. The best match it finds might live 2,000 km away, which is no use for a hackathon this weekend.
-
-Brivia starts nearby, then lets shared interests decide who you see.
-
-You swipe on people, not photos of people. A match only happens when both of you say yes. Other members see a rounded distance like "~3 km", never your exact location, phone or email.
-
-The idea is simple: the right teammate is often a few streets away, and neither of you knows it.
-
-How did you meet the last person you built something with?
-
-**First comment:** thebriviaclub.com
-**Image:** a two-panel card made from real screenshots (Brivia's deck card showing "~3 km" and shared interests). Avoid naming or mocking any other app.
-
----
-
 ## Post 3 · Thu 19 Nov, 8:30 AM IST · F7 Odd-precision · goal: saves
 
 384 milliseconds.
@@ -91,3 +100,31 @@ P.S. The bug report was one line from Yashika: "chat section and landing page is
 **First comment:** If you want to feel the difference: thebriviaclub.com
 **Image:** a screenshot of the before/after timing, or the query diff (no secrets, no member data).
 **Hashtags (optional):** #buildinpublic #postgres
+
+---
+
+## Moved to week 2 · Wed 25 Nov, 7:30 PM IST · F18 False-binary dissolve · goal: comments
+
+Yashika had to convince her mom that Brivia Club is not a dating site.
+
+Fair question. It has swipes.
+
+But think about how you actually meet people who share your interests.
+
+A dating app? It knows how close someone is. It has no idea you both want to build a fintech project or play rapid chess on Sundays.
+
+A career network? It knows your skills and interests. The best match it finds might live 2,000 km away, which is no use for a hackathon this weekend.
+
+Brivia starts nearby, then lets shared interests decide who you see.
+
+You swipe on people, not photos of people. A match only happens when both of you say yes. Other members see a rounded distance like "~3 km", never your exact location, phone or email.
+
+The idea is simple: the right teammate is often a few streets away, and neither of you knows it.
+
+How did you meet the last person you built something with?
+
+**First comment:** thebriviaclub.com
+**Image:** a two-panel card made from real screenshots (Brivia's deck card showing "~3 km" and shared interests). Avoid naming or mocking any other app.
+
+---
+
