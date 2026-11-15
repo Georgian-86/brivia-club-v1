@@ -38,7 +38,7 @@ Notes:
   rewritten to `${CLAUDE_PROJECT_DIR:-.}/.claude/linkedin-skills/...`, and each SKILL.md carries a layout note.
   Reading needs `APIFY_TOKEN` (or the Apify connector) and publishing needs a Publora key, both in
   `.claude/linkedin-skills/.env` (gitignored); in cloud sessions the Apify token is a proxy-injected network secret on the
-  Default environment (set 2026-11-15), so run with `APIFY_TOKEN=proxy-injected`. Without keys they draft from pasted text. Nothing publishes without approval.
+  Default environment (set 2026-11-15), so run with `APIFY_TOKEN=proxy-injected`; the Publora key is injected the same way (`PUBLORA_API_KEY=sk_proxy_injected`). Without keys they draft from pasted text. Nothing publishes without approval.
 - `fable-auditor`: Fable 5.2 plans and audits, Opus 5.5 / Sonnet 5.5 subagents do the work. `mrtooher/fable-mode`
   was reviewed and not vendored: it has no license file and its Fable runner is retired upstream.
 

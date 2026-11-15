@@ -3,7 +3,7 @@ name: linkedin-interviewer
 description: "Interview the user for the raw material their posts are made of. Builds a lasting Story Bank of roles, numbers, turning points, scars and positions, or runs a focused interview that turns one topic into a post spine. Use when a draft has nothing concrete to draw on, or the user says interview me. Not for learning how they write (use linkedin-humanizer --mode profile)."
 ---
 
-> **Vendored layout (brivia-club-v1).** The bundle root is `${CLAUDE_PROJECT_DIR:-.}/.claude/linkedin-skills/`: `references/`, `lib/`, `scripts/` and `requirements*.txt` live there. Run any `lib.*` / `scripts/*.py` call with that directory as the working directory. Keys (`APIFY_TOKEN`, Publora) go in its `.env`, which is gitignored; never commit them. In claude.ai cloud sessions the Apify token is a network secret the proxy injects for api.apify.com: run with `APIFY_TOKEN=proxy-injected` and never ask for the real value. Nothing publishes without the user's explicit approval.
+> **Vendored layout (brivia-club-v1).** The bundle root is `${CLAUDE_PROJECT_DIR:-.}/.claude/linkedin-skills/`: `references/`, `lib/`, `scripts/` and `requirements*.txt` live there. Run any `lib.*` / `scripts/*.py` call with that directory as the working directory. Keys (`APIFY_TOKEN`, Publora) go in its `.env`, which is gitignored; never commit them. In claude.ai cloud sessions the Apify token is a network secret the proxy injects for api.apify.com: run with `APIFY_TOKEN=proxy-injected`. The Publora key is injected the same way for api.publora.com: run with `PUBLORA_API_KEY=sk_proxy_injected`. Never ask for or paste the real values. Nothing publishes without the user's explicit approval.
 
 # LinkedIn Interviewer
 
