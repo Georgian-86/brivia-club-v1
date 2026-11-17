@@ -151,9 +151,13 @@ try {
     assert.ok(['none', 'normal', '""'].includes(glyphs.passBefore) && ['none', 'normal', '""'].includes(glyphs.likeBefore), 'no text glyph in ::before');
     assert.match(glyphs.hintText, /PITCH WITH PURPOSE/);
   });
-  const bandNote = (p) => p.evaluate(() => { const el = document.querySelector('#swipe-band-note'); return { text: el?.textContent.trim() || '', visible: Boolean(el && !el.hidden && el.getClientRects().length) }; });
-  const note1 = await bandNote(page);
-  check(`a "~3 km" band has no area-filling note (${JSON.stringify(note1)})`, () => assert.equal(note1.visible, false));
+  // D-267: the "Distances appear as your area fills up." note is gone from every card; the bio line sits under the place.
+  const noNote = (p) => p.evaluate(() => ({ el: Boolean(document.querySelector('#swipe-band-note')), text: /Distances appear as your area fills up/.test(document.querySelector('#swipe-card')?.textContent || '') }));
+  const bioAfterPlace = (p) => p.evaluate(() => document.querySelector('#swipe-location')?.nextElementSibling?.id === 'swipe-bio');
+  const note1 = await noNote(page);
+  check(`a "~3 km" card has no area-filling note (${JSON.stringify(note1)})`, () => assert.deepEqual(note1, { el: false, text: false }));
+  const bioPlaced = await bioAfterPlace(page);
+  check('the bio line sits right under the place', () => assert.equal(bioPlaced, true));
   const deckContrast = await axeViolations(page, { rules: ['color-contrast'], include: '#swipe-card', decorative: ['.swipe-card-info::before'] });
   check(`axe color-contrast: the deck card has no violations (${deckContrast.join(' | ')})`, () => assert.deepEqual(deckContrast, []));
   const deckContrastAll = await axeViolations(page, { rules: ['color-contrast'], include: '.app-view[data-view="home"]' });
@@ -192,9 +196,8 @@ try {
   check(`Pass sends one POST /rest/v1/interaction with event 'pass' (${JSON.stringify(passBodies)})`, () => assert.deepEqual(passBodies, [{ viewer_id: ME, target_id: A, event: 'pass' }]));
   card = await cardState(page);
   check(`card 2 shows "Pune" and "You both: Badminton" (${JSON.stringify(card)})`, () => { assert.equal(card.band, 'Pune'); assert.deepEqual(card.shared, ['You both: Badminton']); });
-  const noteText = 'Distances appear as your area fills up.';
-  const note2 = await bandNote(page);
-  check(`under the place band "Pune" the note reads "${noteText}" (${JSON.stringify(note2)})`, () => { assert.equal(note2.text, noteText); assert.equal(note2.visible, true); });
+  const note2 = await noNote(page);
+  check(`under the place band "Pune" there is no area-filling note (${JSON.stringify(note2)})`, () => assert.deepEqual(note2, { el: false, text: false }));
   const noteContrast = await axeViolations(page, { rules: ['color-contrast'], include: '#swipe-card', decorative: ['.swipe-card-info::before'] });
   check(`axe color-contrast: the place-band card has no violations (${noteContrast.join(' | ')})`, () => assert.deepEqual(noteContrast, []));
   const noteSmall = await smallText(page, { root: '#swipe-card' });
@@ -203,14 +206,14 @@ try {
   await waitForCard(page, 'Chen Abroad');
   card = await cardState(page);
   check(`card 3 shows "Abroad" and "You both: Badminton" (${JSON.stringify(card)})`, () => { assert.equal(card.band, 'Abroad'); assert.deepEqual(card.shared, ['You both: Badminton']); });
-  const note3 = await bandNote(page);
-  check(`under "Abroad" the area-filling note shows too (${JSON.stringify(note3)})`, () => { assert.equal(note3.text, noteText); assert.equal(note3.visible, true); });
+  const note3 = await noNote(page);
+  check(`under "Abroad" there is no area-filling note either (${JSON.stringify(note3)})`, () => assert.deepEqual(note3, { el: false, text: false }));
   text = await pageText(page);
   check('cards 2-3: the page never shows the stub City/State', () => assert.ok(!LEAK_RE.test(text)));
   await page.locator('[data-action="pass"]').dispatchEvent('click');
   await waitForCard(page, 'Dana Blank');
-  const note4 = await bandNote(page);
-  check(`a "~10 km" band has no area-filling note (${JSON.stringify(note4)})`, () => assert.equal(note4.visible, false));
+  const note4 = await noNote(page);
+  check(`a "~10 km" card has no area-filling note (${JSON.stringify(note4)})`, () => assert.deepEqual(note4, { el: false, text: false }));
 
   // 3. A5: Like on a card with no tags and no shared interests opens the pitch with the neutral line.
   const errorsBefore = pageErrors.length;

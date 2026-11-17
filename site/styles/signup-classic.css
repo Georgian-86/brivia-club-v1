@@ -290,6 +290,8 @@ body.auth-page .auth-shell .guided .guided-menu {
   scrollbar-width: thin; scrollbar-color: var(--k-line) transparent;
 }
 body.auth-page .auth-shell .guided .guided-menu[hidden] { display: none; }
+/* D-267: the full interest list is ~1,100 rows; groups out of view skip layout and paint until scrolled to. */
+body.auth-page .auth-shell .guided .guided-menu-group { content-visibility: auto; contain-intrinsic-size: auto 480px; }
 body.auth-page .auth-shell .guided .guided-menu-group + .guided-menu-group { margin-top: 6px; padding-top: 6px; border-top: 1px solid var(--k-line); }
 body.auth-page .auth-shell .guided .guided-menu-label {
   margin: 0; padding: 8px 10px 4px; color: var(--k-label); font-size: var(--text-12); font-weight: 700; letter-spacing: .093em; text-transform: uppercase;

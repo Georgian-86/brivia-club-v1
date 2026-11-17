@@ -4860,3 +4860,52 @@ bring a short line back.
 - **Live URL.** The canonical site is `https://thebriviaclub.live` (`site/index.html` canonical and og:url), so the
   README and `package.json` `homepage` use it, and the GitHub About website should too, not `brivia-club.vercel.app`.
 - **Checks.** unit 619; orbit 87; build OK. No product code changed.
+
+## D-266 (2026-11-14): four daily nudge pushes; the phone's notification sound stays the system's
+
+- **Ask (founder, 2026-11-14):** saxophone notification sounds on the phone's Home Screen, and a push every 3 hours:
+  "Bore horhe ho?, Brivia pr swipe krlo", then "Brivia se Itni Jaldi Bore hogye", then "Ek Kachori Do Chai, Brivia pr
+  Swipe ho jaye", then at night "Career ki Tension Horhi hai?, Brivia pr Referral Maanglo".
+- **Decision (nudges, 0082 + push-nudge).** Four a day, India time: 12:00, 15:00, 18:00 (three hours apart, the chai
+  line at chai time) and 21:30 at night. The founder's spelling is kept. pg_cron posts `{ slot }` through pg_net to the
+  `push-nudge` Edge Function (verify_jwt off, a shared secret in Vault and in the function's secrets); it pushes to
+  every subscribed device, tags each push `nudge-<slot>` so a
+  repeat replaces it, and forgets devices the push service reports gone. Members who keep notifications off get none;
+  the per-device "Push notification sound" switch still applies.
+- **Decision (sound).** A website's push cannot choose its sound: the Web Push / Notification API has no working
+  sound option on Android Chrome or iOS Safari, so a notification on the Home Screen or lock screen always plays the
+  phone's own notification sound. The sax cue (D-256) keeps playing when Brivia is open. A sax sound on the closed
+  app needs a native wrapper (an Android app with its own notification channel sound, an iOS app with a bundled
+  sound file); that is a separate, larger decision for the founder.
+- **Update (founder, 2026-11-14): "make sure different notifications should be sent in a day".** Each of the four
+  has its own words, its own tag (`nudge-noon`, `-afternoon`, `-chai`, `-night`) and its own push topic, so all four
+  stay side by side on the Home Screen and none replaces another; only the next day's same slot replaces its own
+  line. A unit test runs the real service worker with the four pushes and checks four notifications remain.
+- **Update (founder, 2026-11-14): "i want the notifications on the phone screen not in app notifications".** Nudges
+  are never shown inside the app: the service worker always puts a `nudge` on the phone's notification screen, even
+  with Brivia open in front (other pushes still show in place when the app is open), and push-nudge no longer skips
+  members who are in the app. They are not written to the in-app bell either. A phone gets them only once its
+  member has turned on Web notifications (iPhone: Brivia added to the Home Screen first).
+- **Checks.** Unit `push-nudges` (copy, 3-hour spacing, cron = IST, 0082 in step with the copy, four separate
+  notifications in the service worker); SQL harness incl. `zt-daily-nudges`.
+
+## D-267 (2026-11-17): the bio replaces "Distances appear as your area fills up."; a lighter chat and interest picker
+
+- **Ask (founder, 2026-11-17, with a screenshot of Avni mandal's card):** "make sure distances appear as ur area fills
+  up must not come instead of it, the user's bio must come and if no bio then leave the space empty, also make the chat
+  section and onboarding little faster non laggy and smoother".
+- **Card.** The note under a place band (iteration 3 R8) is removed from the card and from deck-view.js. The bio line
+  now sits right under the place; with no bio it stays as an empty line (one line of space, `data-empty`), so nothing
+  else takes the slot and the card keeps its shape. Bios load as before (`member_bio`, cached per member).
+- **Chat, found (tests/e2e/perf-chat.mjs: 30 chats, one of 300 messages, phone CPU x4).** Opening the long chat took
+  1.6 s: the thread was built twice (from memory, then again when the fetch returned the same messages) and the inbox
+  list twice.
+- **Chat, decision.** `renderMessages` and `renderChats` skip the DOM rebuild when the markup is the same as what is on
+  screen (and the drawn nodes are still there). Inbox row handlers read the current lists from `chatListState`, so a
+  skipped redraw never leaves stale handlers or binds a second set. Result: open 1.6 s to 0.87 s, one build each, long
+  tasks 4 to 2; idle and typing were already smooth and stay so.
+- **Onboarding, decision.** The interest list (~1,100 rows): groups out of view skip layout and paint
+  (`content-visibility: auto`), the highlighted row changes without touching every row, and removing a pick from the
+  tray no longer redraws the list. Opening the list on a phone CPU x4: ~130 ms to ~35 ms (synthetic bench).
+- **Checks.** Unit 625/625; e2e deck (202 passed, bio under the place, no note on any card), signup (385 passed),
+  chat inbox 15, search 40, self 49, share 18, extras 152, seen: all passed; build.
