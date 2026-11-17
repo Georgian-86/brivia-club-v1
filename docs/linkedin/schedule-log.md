@@ -11,3 +11,7 @@ Channel: Publora `linkedin-y51prrqC5D` (Golu Kumar). Approved by Golu on 15 Nov 
 Texts: `drafts/week-1.md`. Yashika is named but not tagged (the API cannot create LinkedIn mentions); Golu adds the tag by
 editing the live post. To cancel before it goes out: `PubloraClient.delete_post(post_group_id=...)` or the Publora dashboard.
 Publora Starter: 3 of 15 posts this month used once these publish.
+
+## Published
+
+- **Post 1**: published 17 Nov 2026 (`urn:li:ugcPost:7528290836405661696`, https://www.linkedin.com/feed/update/urn:li:ugcPost:7528290836405661696/). First comment posted ~8:36 AM IST (comment id 7528292569038946304).
