@@ -7,6 +7,8 @@ Update this file at the end of every session. CLAUDE.md holds the aim; this file
 
 ## 1. What is done
 
+**2026-11-17, D-267:** the card shows the bio under the place (no more "Distances appear as your area fills up."; no bio = an empty line); opening a long chat 1.6 s to 0.87 s on a slow phone (no duplicate redraws, `tests/e2e/perf-chat.mjs`); lighter interest picker in onboarding.
+
 **2026-11-16, D-265:** root README and CONTRIBUTING, `npm test` / `npm run test:orbit`, Node 22 pinned, package renamed `brivia-club`, PR template; live URL is thebriviaclub.live.
 
 **2026-11-14, D-266:** four daily nudge pushes (12:00, 15:00, 18:00, 21:30 IST, founder's Hinglish; 0082 + `push-nudge`, NOT live yet: README "## 0082"). Sax sound on the phone's Home Screen is not possible for a web app (D-266).

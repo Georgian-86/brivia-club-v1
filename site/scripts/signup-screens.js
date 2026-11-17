@@ -562,7 +562,9 @@ export const initGuidedSignup = ({
           };
           const setActive = (i, { scroll = true } = {}) => {
             active = shown.length && i >= 0 ? Math.min(i, shown.length - 1) : -1;
-            menu.querySelectorAll('.guided-menu-option').forEach((o, j) => o.classList.toggle('is-active', j === active));
+            // D-267: only the old and the new highlighted row change (it toggled all ~1,100 rows on every arrow key).
+            menu.querySelectorAll('.guided-menu-option.is-active').forEach((o) => { if (o.id !== optionId(active)) o.classList.remove('is-active'); });
+            if (active >= 0) menu.querySelector(`#${optionId(active)}`)?.classList.add('is-active');
             if (active < 0) { input.removeAttribute('aria-activedescendant'); return; }
             input.setAttribute('aria-activedescendant', optionId(active));
             if (scroll) menu.querySelector(`#${optionId(active)}`)?.scrollIntoView({ block: 'nearest' });
@@ -852,7 +854,9 @@ export const initGuidedSignup = ({
           const note = (text) => `<div class="guided-menu-note" role="option" aria-disabled="true" aria-selected="false">${text}</div>`;
           const setActive = (i, { scroll = true } = {}) => {
             active = shown.length && i >= 0 ? Math.min(i, shown.length - 1) : -1;
-            menu.querySelectorAll('.guided-menu-option').forEach((o, j) => o.classList.toggle('is-active', j === active));
+            // D-267: only the old and the new highlighted row change (it toggled all ~1,100 rows on every arrow key).
+            menu.querySelectorAll('.guided-menu-option.is-active').forEach((o) => { if (o.id !== optionId(active)) o.classList.remove('is-active'); });
+            if (active >= 0) menu.querySelector(`#${optionId(active)}`)?.classList.add('is-active');
             if (active < 0) { input.removeAttribute('aria-activedescendant'); return; }
             input.setAttribute('aria-activedescendant', optionId(active));
             if (scroll) menu.querySelector(`#${optionId(active)}`)?.scrollIntoView({ block: 'nearest' });
@@ -979,7 +983,8 @@ export const initGuidedSignup = ({
           const onEscape = (event) => { if (!el.isConnected) { document.removeEventListener('keydown', onEscape); return; } if (event.key === 'Escape' && isOpen()) { event.preventDefault(); closeMenu(); } };
           document.addEventListener('keydown', onEscape);
           document.addEventListener('pointerdown', outside, true);
-          tray.addEventListener('click', (event) => { const b = event.target.closest('.guided-pick'); if (b) { toggle(b.dataset.id); renderMenu(); } });
+          // D-267: toggle() already updates that row's tick; no need to redraw the whole list.
+          tray.addEventListener('click', (event) => { const b = event.target.closest('.guided-pick'); if (b) toggle(b.dataset.id); });
           renderTray();
           if (!state.nodes) {
             const { data, error } = await fetchInterestNodes();

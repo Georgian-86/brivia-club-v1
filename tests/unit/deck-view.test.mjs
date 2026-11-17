@@ -1,7 +1,7 @@
 // The interim deck's card copy (UX_SPEC §B, Iteration 3 Task 10). Run: npm run test:unit
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { pitchLine, deckChips, deckEmptyState, deckFields, bandNote, BAND_NOTE } from '../../site/scripts/deck-view.js';
+import { pitchLine, deckChips, deckEmptyState, deckFields } from '../../site/scripts/deck-view.js';
 
 test('pitchLine: a shared interest is named, lowercased', () => {
   assert.equal(pitchLine({ name: 'Asha', shared: ['Badminton', 'Chess'], tags: ['Running'] }),
@@ -60,12 +60,6 @@ test('deckEmptyState: every cause has a title, a reason and exactly one action',
 });
 
 // Iteration 3 R8 / iteration 4 R11: the one-line note appears only under place-name bands.
-
-test('bandNote: place, region, country and Abroad bands get the note; "~N km" bands and empty values do not', () => {
-  assert.equal(BAND_NOTE, 'Distances appear as your area fills up.');
-  for (const band of ['Pune', 'Maharashtra', 'India', 'Abroad', ' Bengaluru ']) assert.equal(bandNote(band), BAND_NOTE, band);
-  for (const band of ['~3 km', '~10 km', '~ 25 km', '', '   ', null, undefined, 7]) assert.equal(bandNote(band), '', String(band));
-});
 
 test('deckEmptyState: caught_up no longer promises "you have met your orbit for today"', () => {
   const state = deckEmptyState('caught_up');

@@ -68,7 +68,7 @@ import { linkifyHtml, sharedLinkIn, sharedEventMessage } from './chat-links.js';
 import { loadActivity, withLike, likeSummary, threadComments, cleanCommentBody, loadComments, addComment, deleteComment, recordShare, sharedPostMessage, emptyActivity, COMMENT_MAX } from './post-activity.js';
 import { profileChecklist } from './profile-checklist.js';
 import { quotaLabel, quotaErrorText, quotaBlocked, quotaNotice, swipeLimitCopy } from './signal-quota.js';
-import { pitchLine, deckChips, deckEmptyState, deckFields, bandNote, deckCoverSrc, interleaveNewcomers } from './deck-view.js';
+import { pitchLine, deckChips, deckEmptyState, deckFields, deckCoverSrc, interleaveNewcomers } from './deck-view.js';
 import { createDeckSwipe, SWIPE, setSwipeCue } from './deck-swipe.js';
 import { createDeckRitual } from './deck-ritual.js';
 import { maybeShowDeckTutorial } from './deck-tutorial.js';
@@ -227,6 +227,7 @@ const nearbyToasted = new Set();
 let nearbyHighlight = new Set();
 let typingSession = null; // the open thread's typing channel (D5): { otherId, channel, sender, receiver, joined }
 let chatShouldOpenAtLatest = false;
+let chatListState = { matches: [], conversations: [], searchPeople: [] };   // D-267: what the inbox rows show now
 let suppressChatAutoOpen = false;
 let pitchPerson = null;
 // Ruling P13: a like opens the pitch sheet and defers its single request until the sheet resolves.
@@ -1940,13 +1941,6 @@ const renderHome = (queue = getExplorePeople()) => {
     if (currentPerson.distanceBand) location.setAttribute('aria-label', `Distance: ${currentPerson.distanceBand}`);
     else location.removeAttribute('aria-label');
   }
-  const bandNoteEl = document.querySelector('#swipe-band-note');
-  if (bandNoteEl) {
-    const note = bandNote(currentPerson.distanceBand);
-    bandNoteEl.textContent = note;
-    // D-184: Global hiring discovery ignores distance, so the "distances appear as your area fills up" note is noise there.
-    bandNoteEl.hidden = !note || exploreFilters.hiring;
-  }
   const pendingEl = document.querySelector('#swipe-request-pending');
   if (pendingEl) pendingEl.hidden = !requestPendingFor(currentPerson);
   const tags = document.querySelector('#swipe-tags'); if (tags) { renderCardChips(tags, currentPerson); if (newCardShown) shimmerShared(tags); }
@@ -2003,7 +1997,9 @@ let cardBioAvailable = true;
 function renderCardBio(person) {
   const el = document.querySelector('#swipe-bio');
   if (!el) return;
-  const show = (text) => { el.textContent = text || ''; el.hidden = !text; };
+  // D-267: the bio sits right under the place, where "Distances appear as your area fills up." used to be. No bio:
+  // the line stays, empty (data-empty), so the card keeps its shape and nothing else takes the space.
+  const show = (text) => { el.textContent = text || ''; el.hidden = false; el.dataset.empty = text ? 'false' : 'true'; };
   const known = String(person?.bio || '').trim() || cardBioCache.get(String(person?.id));
   if (known !== undefined) { show(known); return; }
   show('');
@@ -3454,7 +3450,12 @@ const renderChats = () => {
     : `<div class="inbox-panel-head"><div><strong>YOUR THREADS</strong><span>Private conversations</span></div>${inboxLoading ? '' : `<b>${conversations.length}</b>`}</div>`;
   const inboxMarkup = `${head}${referenceRows}${inboxLoading ? skeletonMarkup('list', 4) : searching ? searchMarkup : matches.length ? matches.map(conversationRow).join('') : '<div class="inbox-empty"><strong>No conversations yet</strong><span>Chats open once a connection is mutual. Search above for someone you know, or send a signal from Connect.</span><button type="button" class="inbox-empty-action" data-nav="explore">CONNECT WITH PEOPLE ↗</button></div>'}`;
   const inboxScroll = list?.querySelector('.chat-inbox-scroll');
-  if (list && inboxScroll) {
+  // D-267: the rows' handlers read the latest lists from here, so a redraw can be skipped when nothing on screen changed.
+  chatListState = { matches, conversations, searchPeople };
+  const inboxUnchanged = Boolean(inboxScroll) && inboxScroll.__renderKey === inboxMarkup && inboxScroll.__renderFirst?.parentNode === inboxScroll;
+  if (inboxUnchanged) {
+    // Same rows as on screen: no rebuild, no re-layout, and the handlers already bound stay (no second set).
+  } else if (list && inboxScroll) {
     inboxScroll.innerHTML = inboxMarkup;
   } else if (list) {
     list.innerHTML = `<div class="chat-inbox-scroll">${inboxMarkup}</div>`;
@@ -3466,9 +3467,12 @@ const renderChats = () => {
   scheduleRowTyping();
   document.querySelector('#chat-count').textContent = `${String(conversations.length).padStart(2, '0')} CONVERSATIONS`;
   setChatBadges(document, unreadMessageTotal(conversations));
+  if (inboxUnchanged) return;
+  const drawn = list?.querySelector('.chat-inbox-scroll');
+  if (drawn) { drawn.__renderKey = inboxMarkup; drawn.__renderFirst = drawn.firstChild; }
   list?.querySelectorAll('[data-chat-id]').forEach((button) => button.addEventListener('click', (event) => {
     const profileTrigger = event.target.closest('[data-public-profile-id]');
-    const person = matches.find((item) => item.id === button.dataset.chatId);
+    const person = chatListState.matches.find((item) => item.id === button.dataset.chatId);
     if (profileTrigger && person) {
       event.preventDefault();
       event.stopPropagation();
@@ -3478,7 +3482,7 @@ const renderChats = () => {
     openChat(person);
   }));
   list?.querySelectorAll('[data-delete-chat-id]').forEach((button) => button.addEventListener('click', () => {
-    const person = conversations.find((item) => item.id === button.dataset.deleteChatId);
+    const person = chatListState.conversations.find((item) => item.id === button.dataset.deleteChatId);
     if (!person || !window.confirm(`Remove your chat with ${person.name} from your inbox on this device? Saved messages and the other person's chat will remain unchanged.`)) return;
     const hiddenIds = readHiddenChatIds();
     hiddenIds.add(String(person.id));
@@ -3493,7 +3497,7 @@ const renderChats = () => {
     showToast('Chat removed from your inbox on this device.');
   }));
   // D-152: people results.
-  const rowFor = (id) => searchPeople.find((p) => p.id === id);
+  const rowFor = (id) => chatListState.searchPeople.find((p) => p.id === id);
   list?.querySelectorAll('[data-person-open]').forEach((button) => button.addEventListener('click', () => {
     const row = rowFor(button.dataset.personOpen);
     if (row) openSearchProfile(row);
@@ -4050,10 +4054,22 @@ const renderMessages = () => {
     return `<div class="message ${mineClass}${kind}${editing}${replying}${quote ? ' has-reply' : ''}${chips ? ' has-reactions' : ''}" data-message-id="${idAttr}" tabindex="0" aria-haspopup="menu">${quote}${content}<small${receipt ? ' class="message-meta"' : ''}>${edited}${escapeHtml(formatChatTime(message.createdAt))}${word}${receiptMarkup(receipt)}</small>${chips}</div>`;
   };
   const newestOwnId = lastOwnMessageId(thread);
-  messages.innerHTML = thread.length ? thread.map(renderBubble).join('') : '<div class="chat-start-note"><strong>Start with context.</strong><span>A thoughtful first message makes a better introduction.</span></div>';
+  const html = thread.length ? thread.map(renderBubble).join('') : '<div class="chat-start-note"><strong>Start with context.</strong><span>A thoughtful first message makes a better introduction.</span></div>';
+  const isBlocked = readBlockedUserIds().has(String(selectedChat.id));
+  // D-267: the thread is redrawn only when what it shows changed. Opening a chat used to draw all of it twice (once from
+  // memory, again when the fetch came back with the same messages), and each sync redrew it even when nothing was new:
+  // every bubble, image and link rebuilt and laid out again. Same chat, same markup, still on screen: keep the DOM.
+  const renderKey = `${selectedChat.id}|${isBlocked ? 1 : 0}|${html}`;
+  if (messages.__renderKey === renderKey && messages.__renderFirst?.parentNode === messages) {
+    placeTypingBubble();
+    if (openingAtLatest) requestAnimationFrame(() => { messages.scrollTop = messages.scrollHeight; chatShouldOpenAtLatest = false; });
+    return;
+  }
+  messages.innerHTML = html;
+  messages.__renderKey = renderKey;
+  messages.__renderFirst = messages.firstChild;
   markArrivals(messages, selectedChat.id);   // D-165 N9: only bubbles new since the last render of this chat rise in
   placeTypingBubble();
-  const isBlocked = readBlockedUserIds().has(String(selectedChat.id));
   if (isBlocked) {
     messages.querySelector('.chat-start-note')?.remove();
     messages.insertAdjacentHTML('beforeend', '<div class="chat-blocked-state"><strong>This user is blocked</strong><span>New messages from this user are paused.</span><button type="button" data-chat-action="unblock">UNBLOCK</button></div>');

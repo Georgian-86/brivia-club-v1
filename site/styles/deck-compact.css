@@ -248,6 +248,10 @@ body.app-body .app-view[data-view="home"] .swipe-card #swipe-bio {
   line-height: 1.4;
 }
 body.app-body .app-view[data-view="home"] .swipe-card #swipe-bio[hidden] { display: none; }
+/* D-267: the bio sits right under the place (where the "Distances appear..." note was). With no bio the line stays
+   empty: one line of space, nothing in it. */
+body.app-body .app-view[data-view="home"] .swipe-card #swipe-bio { min-height: 1.4em; }
+body.app-body .app-view[data-view="home"] .swipe-card #swipe-bio[data-empty="true"] { margin-top: 6px; }
 
 /* D-240: the bar's "Looking for" line wraps (two lines at most) so several choices all show; the bar grows down over
    the cover's top edge instead of cutting the words. Supersedes D-113's one-line "…". */

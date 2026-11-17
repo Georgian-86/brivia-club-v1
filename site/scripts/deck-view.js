@@ -28,13 +28,8 @@ export const deckChips = (person) => {
   ];
 };
 
-// The one-line note under a place-name band (iteration 3 R8, iteration 4 R11): a band that is a place, region, country
-// or "Abroad" (anything but "~N km") is not a distance yet, and the note says so. "~3 km" / "~10 km" get no note.
-export const BAND_NOTE = 'Distances appear as your area fills up.';
-export const bandNote = (band) => {
-  const text = typeof band === 'string' ? band.trim() : '';
-  return text && !/^~\s*\d/.test(text) ? BAND_NOTE : '';
-};
+// D-267: the "Distances appear as your area fills up." note under a place band is gone; the member's bio takes its
+// place on the card (app.js renderCardBio).
 
 // The pitch sheet's starting note (A5: never throws for a missing name, tags or shared list).
 export const pitchLine = (person) => {
