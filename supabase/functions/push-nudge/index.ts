@@ -1,4 +1,4 @@
-// push-nudge (D-265): the four daily nudges (supabase/functions/_shared/nudges.js), sent to every device with Brivia
+// push-nudge (D-266): the four daily nudges (supabase/functions/_shared/nudges.js), sent to every device with Brivia
 // notifications on. Called only by the pg_cron jobs in 0082 (pg_net POST { slot }), never by the app.
 //
 // Deployed with verify_jwt OFF: the caller proves itself with the x-nudge-secret header, which must equal the

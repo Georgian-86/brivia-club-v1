@@ -38,7 +38,7 @@ test('0082 schedules the same slots at the same UTC times', async () => {
   assert.deepEqual(allowed, NUDGES.map((n) => n.slot));
 });
 
-// D-265 (founder: "make sure different notifications should be sent in a day"): the four nudges are four different
+// D-266 (founder: "make sure different notifications should be sent in a day"): the four nudges are four different
 // notifications, and on the phone they sit side by side; none replaces another. Runs the real service worker
 // (site/public/sw.js) with a fake registration: four pushes in one day leave four notifications on the screen.
 test('the service worker keeps all four nudges of a day as separate notifications', async () => {
@@ -75,7 +75,7 @@ test('each slot has its own push topic, so a phone that was offline still gets e
   assert.equal(new Set(topics).size, 4);
 });
 
-// D-265 (founder: "i want the notifications on the phone screen not in app notifications"): with Brivia open and in
+// D-266 (founder: "i want the notifications on the phone screen not in app notifications"): with Brivia open and in
 // front, a nudge still goes to the phone's notification screen; a chat push is still shown inside the app.
 test('a nudge goes to the phone screen even with Brivia open; other pushes stay in the app', async () => {
   const { readFile } = await import('node:fs/promises');

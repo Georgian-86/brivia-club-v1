@@ -29,6 +29,7 @@ in `docs/`.
 
 ## Docs map (read the relevant one before working)
 
+- `README.md` and `CONTRIBUTING.md`: setup, structure, commands and the PR checklist for human developers. Live site: https://thebriviaclub.live
 - `docs/HANDOFF.md`: **where we are right now**: what is done, live DB state, what to do next and which file covers what. Read it second, and update it at the end of every session.
 - `docs/VISION.md`: product aim, non-negotiable rules, and who it's for
 - `docs/ENGINE_AUDIT.md`: arena-style audit and rating of the existing backend and matching engine
@@ -63,8 +64,8 @@ never shipped, `.vercelignore`d). Tooling in `scripts/`, tests in `tests/`, engi
 npm install
 npm run dev      # vite dev server
 npm run build    # production build → dist/
-npm run test:unit  # client helper unit tests (node --test tests/unit/*.test.mjs)
-cd orbit && npm test   # ORBIT engine unit tests (node --test)
+npm test           # client helper unit tests (same as npm run test:unit)
+npm run test:orbit # ORBIT engine unit tests (or: cd orbit && npm test)
 bash supabase/tests/run.sh   # SQL harness: all migrations twice, every *.test.sql, seed + purge
 # e2e (stubbed Supabase; Playwright and axe-core installed outside the repo, see tests/e2e/README.md):
 PLAYWRIGHT_MODULE=/tmp/pw/node_modules/playwright/index.mjs node tests/e2e/consent.spec.mjs   # also deck.spec.mjs, onboarding.spec.mjs

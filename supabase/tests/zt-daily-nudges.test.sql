@@ -1,4 +1,4 @@
--- 0082 (D-265): the daily nudge pushes. The harness has no pg_cron, pg_net or Vault, so this checks the guards:
+-- 0082 (D-266): the daily nudge pushes. The harness has no pg_cron, pg_net or Vault, so this checks the guards:
 -- N1 nothing is scheduled without pg_cron/pg_net (0, no error); N2 an unknown slot is refused; N3 members cannot call
 -- the private functions; N4 unscheduling without pg_cron is a no-op.
 set brivia.harness_autocomplete = 'off';

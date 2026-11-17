@@ -10,7 +10,7 @@ self.addEventListener('push', (event) => {
   event.waitUntil((async () => {
     const pages = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
     const front = pages.find((page) => page.focused || page.visibilityState === 'visible');
-    // D-265: the daily nudges always go to the phone's own notification screen, even with Brivia open (founder: "i want
+    // D-266: the daily nudges always go to the phone's own notification screen, even with Brivia open (founder: "i want
     // the notifications on the phone screen not in app notifications"). Everything else is shown in place when open.
     if (front && data.type !== 'nudge') { pages.forEach((page) => page.postMessage({ type: 'brivia-push', data })); return; }
     // D-138: the member's per-device "Push notification sound" choice, written by the page into Cache Storage (the

@@ -4850,7 +4850,18 @@ bring a short line back.
   no visible difference. Page download 8.6 MB to 4.2 MB on a phone, over 20 MB to 6.6 MB on a laptop.
 - **Checks.** SQL harness (all, incl. tester-world and message visibility); e2e landing; unit 619; build.
 
-## D-265 (2026-11-14): four daily nudge pushes; the phone's notification sound stays the system's
+## D-265 (2026-11-16): a README and a developer-friendly repo
+
+- **Ask (founder, 2026-11-16):** "add readme and the live url not the vercel one make the repo super developer friendly".
+- **Decision.** A root `README.md` (what the product is, stack, quick start, env vars, commands, structure, database,
+  deploy, docs map, license note) and `CONTRIBUTING.md` (workflow, conventions, PR checklist). `npm test` now runs
+  the client unit tests and `npm run test:orbit` the engine tests; `.nvmrc` and `engines` pin Node 22; the package is
+  renamed from the template name `bdsn-portfolio-clone` to `brivia-club`; `.editorconfig` and a PR template added.
+- **Live URL.** The canonical site is `https://thebriviaclub.live` (`site/index.html` canonical and og:url), so the
+  README and `package.json` `homepage` use it, and the GitHub About website should too, not `brivia-club.vercel.app`.
+- **Checks.** unit 619; orbit 87; build OK. No product code changed.
+
+## D-266 (2026-11-14): four daily nudge pushes; the phone's notification sound stays the system's
 
 - **Ask (founder, 2026-11-14):** saxophone notification sounds on the phone's Home Screen, and a push every 3 hours:
   "Bore horhe ho?, Brivia pr swipe krlo", then "Brivia se Itni Jaldi Bore hogye", then "Ek Kachori Do Chai, Brivia pr

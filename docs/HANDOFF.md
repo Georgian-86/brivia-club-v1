@@ -7,7 +7,9 @@ Update this file at the end of every session. CLAUDE.md holds the aim; this file
 
 ## 1. What is done
 
-**2026-11-14, D-265:** four daily nudge pushes (12:00, 15:00, 18:00, 21:30 IST, founder's Hinglish; 0082 + `push-nudge`, NOT live yet: README "## 0082"). Sax sound on the phone's Home Screen is not possible for a web app (D-265).
+**2026-11-16, D-265:** root README and CONTRIBUTING, `npm test` / `npm run test:orbit`, Node 22 pinned, package renamed `brivia-club`, PR template; live URL is thebriviaclub.live.
+
+**2026-11-14, D-266:** four daily nudge pushes (12:00, 15:00, 18:00, 21:30 IST, founder's Hinglish; 0082 + `push-nudge`, NOT live yet: README "## 0082"). Sax sound on the phone's Home Screen is not possible for a web app (D-266).
 
 **2026-11-14, D-264:** chat reads ~10x faster (0081 live, message rule once per query); landing hero 1440p / phone cuts (a quarter of the download).
 

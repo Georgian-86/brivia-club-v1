@@ -1,4 +1,4 @@
--- 0082 (D-265): the four daily nudge pushes, in the founder's words (supabase/functions/_shared/nudges.js).
+-- 0082 (D-266): the four daily nudge pushes, in the founder's words (supabase/functions/_shared/nudges.js).
 -- India time: 12:00 "Bore horhe ho?", 15:00 "Brivia se Itni Jaldi Bore hogye?", 18:00 "Ek Kachori Do Chai",
 -- 21:30 "Career ki Tension Horhi hai?". pg_cron posts { slot } to the push-nudge Edge Function with pg_net; the
 -- function sends that slot's words to every device with Brivia notifications on, as a phone notification.

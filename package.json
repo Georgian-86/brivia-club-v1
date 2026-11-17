@@ -1,12 +1,23 @@
 {
-  "name": "bdsn-portfolio-clone",
+  "name": "brivia-club",
   "version": "1.0.0",
+  "description": "The Brivia Club: a location-first, interest-matched networking platform.",
+  "homepage": "https://thebriviaclub.live",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Georgian-86/brivia-club-v1.git"
+  },
   "private": true,
+  "engines": {
+    "node": ">=22"
+  },
   "scripts": {
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
+    "test": "node --test tests/unit/*.test.mjs",
     "test:unit": "node --test tests/unit/*.test.mjs",
+    "test:orbit": "npm --prefix orbit ci --silent && npm --prefix orbit test",
     "check:styles": "node scripts/check-style-ratchet.mjs",
     "check:assets": "node scripts/check-asset-budget.mjs",
     "media:build": "node scripts/optimize-media.mjs",
