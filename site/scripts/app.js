@@ -88,6 +88,7 @@ import { RADIUS, normalizeLocation, isDefaultLocation, locationParams, radiusLab
 import { chatGifCatalog } from './chat-gif-data.js';
 import { typingTopic, createTypingSender, createTypingReceiver, TYPING_EVENT } from './chat-typing.js';
 import '../styles/chat-attachments.css';
+import { canDownloadAttachment, downloadAttachment } from './chat-download.js';
 import '../styles/mobile-final-fixes.css';
 import '../styles/community-feed.css';
 import '../styles/chat-empty-state.css';
@@ -3999,9 +4000,12 @@ const renderMessages = () => {
       if (!GIF_AUTOLOAD_HOSTS.has(host) || new URL(safeUrl).protocol !== 'https:') return `<a class="message-attachment message-attachment-document" href="${url}" target="_blank" rel="noopener noreferrer"><span class="message-document-icon">↗</span><span><strong>${name}</strong><small>OPEN LINK</small></span></a>`;
       return `<a class="message-attachment message-attachment-image-link" href="${url}" target="_blank" rel="noopener noreferrer"><img class="message-attachment-image" src="${url}" alt="${name}" loading="lazy" referrerpolicy="no-referrer" /></a>`;
     }
-    if (attachment.kind === 'image' || attachment.kind === 'gif') return `<a class="message-attachment message-attachment-image-link" href="${url}" target="_blank" rel="noreferrer"><img class="message-attachment-image" src="${url}" alt="${name}" loading="lazy" /></a>`;
-    if (attachment.kind === 'video') return `<video class="message-attachment-video" controls playsinline preload="metadata" src="${url}"></video>`;
-    return `<a class="message-attachment message-attachment-document" href="${url}" target="_blank" rel="noreferrer"><span class="message-document-icon">↗</span><span><strong>${name}</strong><small>OPEN DOCUMENT</small></span></a>`;
+    // A download button sits on every photo, video and file from our bucket (chat-download.js).
+    const save = canDownloadAttachment(attachment) ? `<button type="button" class="message-download" data-attachment-download aria-label="Download ${name}"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 4v11"/><path d="m7 10 5 5 5-5"/><path d="M5 20h14"/></svg></button>` : '';
+    const withSave = (inner) => (save ? `<span class="message-attachment-wrap">${inner}${save}</span>` : inner);
+    if (attachment.kind === 'image' || attachment.kind === 'gif') return withSave(`<a class="message-attachment message-attachment-image-link" href="${url}" target="_blank" rel="noreferrer"><img class="message-attachment-image" src="${url}" alt="${name}" loading="lazy" /></a>`);
+    if (attachment.kind === 'video') return withSave(`<video class="message-attachment-video" controls controlslist="nodownload" playsinline preload="metadata" src="${url}"></video>`);
+    return withSave(`<a class="message-attachment message-attachment-document" href="${url}" target="_blank" rel="noreferrer"><span class="message-document-icon">↗</span><span><strong>${name}</strong><small>OPEN DOCUMENT</small></span></a>`);
   };
   // Quick-share (D4). A resume message is a document card whose Open signs the sender's resume on demand; it never
   // goes through signedAttachmentUrl (message-attachments). An area message is a small place card.
@@ -7726,6 +7730,19 @@ async function reactToThreadMessage(message, emoji) {
   if (saved.length) messageReactions.set(id, saved); else messageReactions.delete(id);
   renderMessages();
 }
+async function downloadThreadAttachment(message) {
+  if (!message?.attachment || !canDownloadAttachment(message.attachment)) return;
+  const { ok } = await downloadAttachment(supabase?.storage, message.attachment);
+  if (!ok) showToast('That file could not be downloaded. Try again.');
+}
+document.querySelector('#chat-messages')?.addEventListener('click', (event) => {
+  const button = event.target.closest?.('[data-attachment-download]');
+  if (!button) return;
+  event.preventDefault();
+  event.stopPropagation();
+  const message = findThreadMessage(button.closest('[data-message-id]')?.dataset.messageId);
+  if (message) void downloadThreadAttachment(message);
+});
 document.querySelector('#chat-messages')?.addEventListener('click', (event) => {
   const chip = event.target.closest?.('[data-reaction]');
   if (!chip) return;
@@ -7744,6 +7761,7 @@ messageMenu = createMessageMenu({
   onAction: async (action, message, extra) => {
     if (action === 'react') await reactToThreadMessage(message, extra);
     else if (action === 'react-more') openReactionPicker({ anchor: extra, onPick: (emoji) => { void reactToThreadMessage(message, emoji); } });
+    else if (action === 'download') await downloadThreadAttachment(message);
     else if (action === 'copy') {
       try { await navigator.clipboard.writeText(message.text); showToast('Copied.'); } catch { showToast('Copy is not available here.'); }
     } else if (action === 'reply') startMessageReply(message);

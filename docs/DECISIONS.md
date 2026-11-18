@@ -4930,3 +4930,27 @@ bring a short line back.
   (D-226), so members who used .live sign in once more on .com, and turn web
   notifications on again there (iPhone: re-add Brivia to the Home Screen from .com).
 - **Checks.** Unit 625/625; build OK; dist canonical, sitemap and robots all on .com.
+
+## D-269 (2026-11-18): download photos, videos and files sent in a chat
+
+- **Ask (founder, 2026-11-18):** "add a option to download the photos or the files sent by the user in the chats".
+- **Decision.** Every photo, video and file in a chat thread that lives in the private `message-attachments` bucket
+  gets a round download button on its top corner (on a file card, at its right), and the long-press / right-click
+  message menu gets a **Download** item for the same messages. Both ask Storage for a 60-second signed URL with the
+  `download` option (`createSignedUrl(path, 60, { download: name })`), so Storage answers with
+  `Content-Disposition: attachment` and the browser saves the file under the sender's file name. `<a download>` alone
+  cannot work: the signed URL is on the Supabase origin. A failed sign shows "That file could not be downloaded. Try
+  again." and saves nothing.
+- **Not downloadable.** External GIF links (not our files; the picker's GIFs) and the shared resume card (it has its
+  own Open, signed on demand from the `resumes` bucket, D3). Unsent messages offer no Download.
+- **Privacy.** No change: only the two members of the conversation can sign a path (the bucket's existing RLS), the
+  URL lives 60 s, and nothing about the sender beyond the file name they chose is exposed. The name is made safe
+  (no path separators or control characters, at most 120 characters) and gains an extension from its type when it
+  has none.
+- **Code.** `site/scripts/chat-download.js` (pure rules + the one DOM click), `message-actions.js` (the menu item),
+  `app.js` (the button and its handler), `chat-attachments.css`. The video player's own download item is hidden
+  (`controlslist="nodownload"`) so there is one way to save, with the right file name.
+- **No arena run:** a direct founder instruction with no design alternatives worth weighing.
+- **Checks.** Unit 629/629 (new `chat-download.test.mjs`); build OK; new e2e `chat-download.spec.mjs` 15 passed at
+  1440 and 375 px; fit 324 passed.
+

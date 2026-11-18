@@ -227,3 +227,13 @@ body.app-body[data-app-view="chat"] .chat-layout>.chat-window{
 .chat-messages .message.has-share-words > .message-copy{display:block;margin-top:10px}
 .message-event .message-event-title{display:block;color:var(--color-ink);font-family:var(--font-heading);font-size:var(--text-16);line-height:1.25}
 .message-event .message-event-meta{display:block;margin-top:2px;color:var(--color-ink-soft);font-size:var(--text-12)}
+/* Download a photo, video or file from a chat (chat-download.js): a round button on the attachment's top corner. */
+.message-attachment-wrap{position:relative;display:block;width:max-content;max-width:100%}
+.message.me .message-attachment-wrap{align-self:flex-end}
+.message-download{position:absolute;top:6px;right:6px;z-index:2;display:grid;width:32px;height:32px;place-items:center;padding:0;border:1px solid rgba(255,250,241,.35);border-radius:50%;background:rgba(26,16,17,.62);color:#fffaf1;cursor:pointer;-webkit-backdrop-filter:blur(4px);backdrop-filter:blur(4px);transition:background .15s ease}
+.message-download:hover{background:#5a061f}
+.message-download:focus-visible{outline:2px solid #fffaf1;outline-offset:2px;box-shadow:0 0 0 4px #5a061f}
+.message-download svg{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.message-attachment-wrap:has(.message-attachment-document) .message-attachment-document{padding-right:48px}
+.message-attachment-wrap:has(.message-attachment-document) .message-download{top:50%;transform:translateY(-50%);background:#5a061f;border-color:transparent}
+.message.me .message-attachment-wrap:has(.message-attachment-document) .message-download{background:#fffaf1;color:#5a061f}

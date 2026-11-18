@@ -159,3 +159,13 @@ looking anywhere. `COMPANION_SHOTS=<dir>` saves the states.
 `sounds.spec.mjs` (D-137) counts real Web Audio buffer starts in `app.html` at 1440 and 390 (touch): nothing before a
 gesture, one pass cue per left swipe (button, ← key, drag), one pitch cue per right swipe and none when the pitched
 card leaves, silence with Sounds off. Vite on :5196.
+
+`chat-download.spec.mjs` (D-269, Vite on :5168) checks downloading chat attachments: the photo and the PDF carry a
+"Download <name>" button (the external GIF and text do not), a press signs the path in `message-attachments` and the
+browser downloads it under its own name, the long-press menu's Download does the same, a text message offers none, and
+a failed sign shows a toast and downloads nothing. At 1440 and 375 px.
+
+```bash
+PLAYWRIGHT_MODULE=/tmp/pw/node_modules/playwright/index.mjs node tests/e2e/chat-download.spec.mjs
+```
+

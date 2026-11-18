@@ -2,6 +2,7 @@
 // (or right-click, or the context-menu key / Shift+F10 on a focused bubble) opens a small menu next to it:
 //   Reply                any message that is still there: the next message I send quotes it
 //   Copy                 any message with text
+//   Download             a photo, video or file sent in the chat (chat-download.js)
 //   Edit                 my own plain text message, within 15 minutes, not unsent (the server checks the same)
 //   Unsend               my own message, any time: it goes for both of us ("This message was unsent")
 //   Delete for me        any message: it leaves my view only
@@ -12,6 +13,8 @@ export const LONG_PRESS_MS = 450;
 const MOVE_TOLERANCE_PX = 10;
 
 export const unsentLabel = (from) => (from === 'me' ? 'You unsent a message' : 'This message was unsent');
+
+import { canDownloadAttachment } from './chat-download.js';
 
 const isServerId = (id) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(String(id || ''));
 
@@ -28,6 +31,7 @@ export const messageActions = (message, { now = Date.now(), special = false } = 
   const actions = [];
   if (!message.unsentAt) actions.push('reply');
   if (!message.unsentAt && !special && String(message.text || '').trim()) actions.push('copy');
+  if (!message.unsentAt && canDownloadAttachment(message.attachment)) actions.push('download');
   if (canEditMessage(message, { now, special })) actions.push('edit');
   if (message.from === 'me' && !message.unsentAt) actions.push('unsend');
   actions.push('delete');
@@ -69,7 +73,7 @@ export const replyQuote = (thread, replyToId, { themName = 'Them', kindLabel = (
 // The inbox row's last line for an unsent message.
 export const previewForUnsent = (message) => (message?.unsentAt ? unsentLabel(message.from) : null);
 
-const LABELS = { reply: 'Reply', copy: 'Copy', edit: 'Edit', unsend: 'Unsend', delete: 'Delete for me' };
+const LABELS = { reply: 'Reply', copy: 'Copy', download: 'Download', edit: 'Edit', unsend: 'Unsend', delete: 'Delete for me' };
 const CONFIRM = {
   unsend: { title: 'Unsend for everyone?', copy: 'It will be removed for both of you.', action: 'Unsend' },
   delete: { title: 'Delete for you?', copy: 'It stays in their chat.', action: 'Delete' },
@@ -77,6 +81,7 @@ const CONFIRM = {
 const ICONS = {
   reply: '<path d="M9 15 4 10l5-5"/><path d="M4 10h9a7 7 0 0 1 7 7v2"/>',
   copy: '<path d="M8 8h9v11H8z"/><path d="M5 15V5h9"/>',
+  download: '<path d="M12 4v11"/><path d="m7 10 5 5 5-5"/><path d="M5 20h14"/>',
   edit: '<path d="M4 20h4L19 9l-4-4L4 16v4Z"/><path d="m13.5 6.5 4 4"/>',
   unsend: '<path d="M9 14 4 9l5-5"/><path d="M4 9h10a6 6 0 0 1 0 12h-3"/>',
   delete: '<path d="M5 7h14M10 4h4M7 7l1 13h8l1-13M10 11v6M14 11v6"/>',
