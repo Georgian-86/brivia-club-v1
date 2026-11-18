@@ -29,7 +29,7 @@ in `docs/`.
 
 ## Docs map (read the relevant one before working)
 
-- `README.md` and `CONTRIBUTING.md`: setup, structure, commands and the PR checklist for human developers. Live site: https://thebriviaclub.live
+- `README.md` and `CONTRIBUTING.md`: setup, structure, commands and the PR checklist for human developers. Live site: https://thebriviaclub.com (.live 301s to it, D-268)
 - `docs/HANDOFF.md`: **where we are right now**: what is done, live DB state, what to do next and which file covers what. Read it second, and update it at the end of every session.
 - `docs/VISION.md`: product aim, non-negotiable rules, and who it's for
 - `docs/ENGINE_AUDIT.md`: arena-style audit and rating of the existing backend and matching engine

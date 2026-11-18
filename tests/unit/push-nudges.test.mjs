@@ -50,7 +50,7 @@ test('the service worker keeps all four nudges of a day as separate notification
     addEventListener: (type, fn) => { handlers[type] = fn; },
     clients: { matchAll: async () => [], claim: async () => {} },   // the app is closed: the phone shows it
     registration: { showNotification: async (title, opts) => { shown.set(opts.tag, { title, ...opts }); } },
-    location: { origin: 'https://thebriviaclub.live' },
+    location: { origin: 'https://thebriviaclub.com' },
     skipWaiting: () => {},
   };
   const caches = { open: async () => ({ match: async () => null }) };
@@ -83,12 +83,12 @@ test('a nudge goes to the phone screen even with Brivia open; other pushes stay 
   const shown = [];
   const posted = [];
   const handlers = {};
-  const page = { focused: true, visibilityState: 'visible', url: 'https://thebriviaclub.live/app.html', postMessage: (m) => posted.push(m) };
+  const page = { focused: true, visibilityState: 'visible', url: 'https://thebriviaclub.com/app.html', postMessage: (m) => posted.push(m) };
   const self = {
     addEventListener: (type, fn) => { handlers[type] = fn; },
     clients: { matchAll: async () => [page], claim: async () => {} },
     registration: { showNotification: async (title, opts) => { shown.push({ title, ...opts }); } },
-    location: { origin: 'https://thebriviaclub.live' },
+    location: { origin: 'https://thebriviaclub.com' },
     skipWaiting: () => {},
   };
   new Function('self', 'caches', src)(self, { open: async () => ({ match: async () => null }) });

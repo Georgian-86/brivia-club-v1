@@ -40,7 +40,7 @@ const SHARE = 'the Share button (a square with an arrow)';
 export const installSteps = (browser) => {
   if (browser === 'safari') return [`Tap ${SHARE} at the bottom of Safari.`, 'Scroll down and tap “Add to Home Screen”, then “Add”.', 'Open Brivia from its new icon on your Home Screen.', 'Go to Settings and turn on Web notifications, then tap “Allow”.'];
   if (browser === 'chrome') return [`Tap ${SHARE} at the top right of Chrome.`, 'Tap “Add to Home Screen”, then “Add”.', 'Open Brivia from its new icon on your Home Screen.', 'Go to Settings and turn on Web notifications, then tap “Allow”.'];
-  return ['Open thebriviaclub.live in Safari: tap ••• or the compass icon and choose “Open in Safari” (or copy the link below and paste it in Safari).', `In Safari, tap ${SHARE}, then “Add to Home Screen”.`, 'Open Brivia from its new icon on your Home Screen.', 'Go to Settings and turn on Web notifications, then tap “Allow”.'];
+  return ['Open thebriviaclub.com in Safari: tap ••• or the compass icon and choose “Open in Safari” (or copy the link below and paste it in Safari).', `In Safari, tap ${SHARE}, then “Add to Home Screen”.`, 'Open Brivia from its new icon on your Home Screen.', 'Go to Settings and turn on Web notifications, then tap “Allow”.'];
 };
 
 export const PUSH_COPY = Object.freeze({

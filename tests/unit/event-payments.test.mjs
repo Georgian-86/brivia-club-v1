@@ -86,7 +86,7 @@ test('the invitation: the event, the guest, the code, paid or free, links, and e
   assert.match(mail.html, /Paid · ₹1,499/);
   assert.match(mail.html, /Sunday, 8 November 2026/);
   assert.match(mail.html, /The Courtyard[\s\S]*Indiranagar, Bengaluru/);
-  assert.match(mail.html, /href="https:\/\/thebriviaclub\.live\/app\.html\?view=events&amp;event=0e460000/);
+  assert.match(mail.html, /href="https:\/\/thebriviaclub\.com\/app\.html\?view=events&amp;event=0e460000/);
   assert.match(mail.html, /Directions/);
   assert.match(mail.html, /event-posters\/p\.jpg/);
   assert.match(mail.text, /ADMIT ONE: The Candlelit Gambit <Chess Night>\nWhen: Sunday, 8 November 2026, 7:00 PM – 10:00 PM IST/);

@@ -4909,3 +4909,24 @@ bring a short line back.
   tray no longer redraws the list. Opening the list on a phone CPU x4: ~130 ms to ~35 ms (synthetic bench).
 - **Checks.** Unit 625/625; e2e deck (202 passed, bio under the place, no note on any card), signup (385 passed),
   chat inbox 15, search 40, self 49, share 18, extras 152, seen: all passed; build.
+
+## D-268 (2026-11-18): thebriviaclub.com is the primary domain; .live 301s to it
+
+- **Ask (founder, 2026-11-18):** "lets make .com primary and forward .live to .com". This reverses the earlier setup
+  (D-265 "Live URL"), where .live was canonical and `thebriviaclub.com` / `www.thebriviaclub.com` 301'd to it.
+- **Decision.** `https://thebriviaclub.com` is the canonical site: canonical links, `og:url` / `og:image` /
+  `twitter:image`, JSON-LD, `sitemap.xml`, `robots.txt`, `package.json` `homepage`, the README, the ticket email's
+  app link (`APP_URL`), the directory function's User-Agent, the "copy the link" fallback and the Safari push hint.
+  On Vercel, `thebriviaclub.live`, `www.thebriviaclub.live` and `www.thebriviaclub.com` 301 to `thebriviaclub.com`
+  (Vercel keeps the path and query). No arena run: a direct founder instruction with no design alternatives.
+- **Kept on .live.** Email: `hello@thebriviaclub.live`, the Resend sender `tickets@thebriviaclub.live` and the VAPID
+  subject stay, because mail is set up on that domain and a web redirect does not touch MX records. Keep paying for
+  `.live` so the redirect and the mailbox keep working.
+- **Sign-in.** The client already builds every auth redirect from `window.location.origin`, so no code change. In
+  Supabase (Authentication, URL Configuration) the Site URL becomes `https://thebriviaclub.com` and
+  `https://thebriviaclub.com/auth.html` is added to the Redirect URLs (keep the .live one for links already sent).
+  Google needs no change: the OAuth callback is Supabase's own URL.
+- **Effect on members.** Sessions, the 18+ record and web-push subscriptions live in per-origin browser storage
+  (D-226), so members who used .live sign in once more on .com, and turn web
+  notifications on again there (iPhone: re-add Brivia to the Home Screen from .com).
+- **Checks.** Unit 625/625; build OK; dist canonical, sitemap and robots all on .com.

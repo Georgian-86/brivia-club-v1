@@ -425,7 +425,7 @@ const SHARE_MENU = `<div class="event-share-menu" id="event-share-menu" data-eve
     <button type="button" role="menuitem" data-event-share-more>${MORE_ICON}<span>More options</span></button>
   </div>`;
 // The link to an event (it opens Explore on that event) and a WhatsApp share of it.
-export const eventShareUrl = (id, origin = globalThis.location?.origin || 'https://thebriviaclub.live') => new URL(`/app.html?view=events&event=${encodeURIComponent(id)}`, origin).href;
+export const eventShareUrl = (id, origin = globalThis.location?.origin || 'https://thebriviaclub.com') => new URL(`/app.html?view=events&event=${encodeURIComponent(id)}`, origin).href;
 export const whatsappShareUrl = (title, url) => `https://wa.me/?text=${encodeURIComponent(`${String(title || '').trim()} ${url}`.trim())}`;
 
 // The drawer. opts: imageSrc (checked), friends, organizerSrc (checked), gallery ([checked URL]), preview (no actions),

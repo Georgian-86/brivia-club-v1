@@ -7,6 +7,8 @@ Update this file at the end of every session. CLAUDE.md holds the aim; this file
 
 ## 1. What is done
 
+**2026-11-18, D-268:** thebriviaclub.com is the primary domain; .live and both `www` hosts 301 to it on Vercel. Email stays on @thebriviaclub.live. Supabase Site URL must be `https://thebriviaclub.com` with `/auth.html` on both domains in Redirect URLs.
+
 **2026-11-17, D-267:** the card shows the bio under the place (no more "Distances appear as your area fills up."; no bio = an empty line); opening a long chat 1.6 s to 0.87 s on a slow phone (no duplicate redraws, `tests/e2e/perf-chat.mjs`); lighter interest picker in onboarding.
 
 **2026-11-16, D-265:** root README and CONTRIBUTING, `npm test` / `npm run test:orbit`, Node 22 pinned, package renamed `brivia-club`, PR template; live URL is thebriviaclub.live.
@@ -112,7 +114,7 @@ failing before D-227: `profile-media.spec.mjs` 7 "no cover file input anywhere" 
 no longer sends a new member back to enter their details. signUp keeps the 18+ confirmation and the work answers with
 the account, and the link's return path applies this browser's pending signup first even when a profile row exists.
 Another browser asks only for the photo. **Owed (founder): Supabase Auth > URL Configuration, add both
-`https://thebriviaclub.com/auth.html` and `https://thebriviaclub.live/auth.html` to Redirect URLs** (and www variants
+`https://thebriviaclub.com/auth.html` and `https://thebriviaclub.com/auth.html` to Redirect URLs** (and www variants
 if used). Also already failing before D-226: `login-smooth.spec.mjs` 3 error-copy checks.
 
 **2026-11-10, D-225 (LIVE: main 326e57c; client only):** at the swipe limit
