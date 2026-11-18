@@ -3,7 +3,7 @@
 // (event-ticket, razorpay-verify, razorpay-webhook) and the Node unit tests (tests/unit/event-ticket-email.test.mjs).
 // Email clients ignore most CSS: the layout is tables with inline styles; the gradient has a solid fallback colour.
 
-export const APP_URL = 'https://thebriviaclub.live';
+export const APP_URL = 'https://thebriviaclub.com';
 const C = {
   blush: '#fcf2f2', blushDeep: '#f6dde3', rose: '#efc4d0', peach: '#f9e3d6',
   wine: '#5e0b28', wineDeep: '#430416', oxblood: '#4c1315', cream: '#fffaf1', champagne: '#e8c9a6', ink: '#291d1b', soft: '#6b5a57',

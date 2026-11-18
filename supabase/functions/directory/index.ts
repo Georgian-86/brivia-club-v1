@@ -19,7 +19,7 @@ const CORS = {
   'access-control-allow-headers': 'authorization, x-client-info, apikey, content-type',
   'access-control-allow-methods': 'POST, OPTIONS',
 };
-const UA = 'BriviaClub/1.0 (https://thebriviaclub.live; directory lookup)';
+const UA = 'BriviaClub/1.0 (https://thebriviaclub.com; directory lookup)';
 const json = (status: number, body: unknown) => new Response(JSON.stringify(body), { status, headers: { ...CORS, 'content-type': 'application/json' } });
 // Wikidata descriptions that name an organisation ("Indian food delivery company", "American multinational technology
 // company", "public research university", "investment bank", "ministry of the Government of India"...).

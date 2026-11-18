@@ -24,8 +24,8 @@ const st = { rows, matchIds: [FRIEND], lastSeen: {}, events: [event], companions
   posts: [{ id: POST, author_id: FRIEND, image_url: IMG, image_path: '', caption: 'Career, chess, looks', created_at: at(90) }],
   messages: [
     msg(1, FRIEND, 'Read this https://example.com/article?x=1. Then tell me', 30),
-    msg(2, FRIEND, `https://thebriviaclub.live/explore.html?post=${POST}          Career, chess, looks, dressing… koi area 😭`, 20),
-    msg(3, ME, 'Shared an event with you on Brivia Club: https://thebriviaclub.live/app.html?view=events&event=e-jam', 10),
+    msg(2, FRIEND, `https://thebriviaclub.com/explore.html?post=${POST}          Career, chess, looks, dressing… koi area 😭`, 20),
+    msg(3, ME, 'Shared an event with you on Brivia Club: https://thebriviaclub.com/app.html?view=events&event=e-jam', 10),
   ] };
 const stub = await startAppStub({ port: 5289, state: st, deckRows: rows });
 const browser = await chromium.launch();

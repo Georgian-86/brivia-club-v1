@@ -6,4 +6,4 @@ User-agent: *
 Allow: /
 Disallow: /data/
 
-Sitemap: https://thebriviaclub.live/sitemap.xml
+Sitemap: https://thebriviaclub.com/sitemap.xml

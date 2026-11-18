@@ -15,11 +15,11 @@ test('links become links; punctuation and the rest stay text, escaped', () => {
 });
 
 test('a Brivia post or event link anywhere in a message is found, with the words around it', () => {
-  const t = 'https://thebriviaclub.live/explore.html?post=8ebd0bdc-0086-4a37-8531-f5e8eeb85caf          Career, chess, looks 😭';
+  const t = 'https://thebriviaclub.com/explore.html?post=8ebd0bdc-0086-4a37-8531-f5e8eeb85caf          Career, chess, looks 😭';
   assert.deepEqual(sharedLinkIn(t), { kind: 'post', id: '8ebd0bdc-0086-4a37-8531-f5e8eeb85caf', rest: 'Career, chess, looks 😭' });
   assert.deepEqual(sharedLinkIn('Shared a post with you on Brivia Club: https://a.b/explore.html?post=abc'), { kind: 'post', id: 'abc', rest: '' });
-  assert.deepEqual(sharedLinkIn(sharedEventMessage('https://thebriviaclub.live/app.html?view=events&event=ev-1')), { kind: 'event', id: 'ev-1', rest: '' });
-  assert.deepEqual(sharedLinkIn('come! https://thebriviaclub.live/app.html?view=events&event=ev-2.'), { kind: 'event', id: 'ev-2', rest: 'come! .' });
+  assert.deepEqual(sharedLinkIn(sharedEventMessage('https://thebriviaclub.com/app.html?view=events&event=ev-1')), { kind: 'event', id: 'ev-1', rest: '' });
+  assert.deepEqual(sharedLinkIn('come! https://thebriviaclub.com/app.html?view=events&event=ev-2.'), { kind: 'event', id: 'ev-2', rest: 'come! .' });
   assert.equal(sharedLinkIn('https://example.com/explore.html'), null);
   assert.equal(sharedLinkIn('no links here'), null);
 });

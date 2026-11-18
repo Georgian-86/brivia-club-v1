@@ -5,7 +5,7 @@
 **A location-first, interest-matched networking platform.**
 Meet people who care about what you care about, starting with your own neighbourhood.
 
-[**thebriviaclub.live**](https://thebriviaclub.live) · [Vision](docs/VISION.md) · [Where we are now](docs/HANDOFF.md) · [Contributing](CONTRIBUTING.md)
+[**thebriviaclub.com**](https://thebriviaclub.com) · [Vision](docs/VISION.md) · [Where we are now](docs/HANDOFF.md) · [Contributing](CONTRIBUTING.md)
 
 </div>
 
@@ -139,7 +139,7 @@ run the migrations in order, then load `supabase/seed/test-members.sql` if you w
 ## Deploying
 
 The site deploys to Vercel from `main`. Every pull request gets a preview deployment, and merging to `main`
-publishes to **[thebriviaclub.live](https://thebriviaclub.live)** (the same build is also served on thebriviaclub.com).
+publishes to **[thebriviaclub.com](https://thebriviaclub.com)** (thebriviaclub.live and both `www` hosts 301 to it, paths kept).
 
 1. Open a pull request. Check the Vercel preview link it gets.
 2. If it ships SQL, apply the migration in the Supabase SQL editor in the same window as the merge, as the

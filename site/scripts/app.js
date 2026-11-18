@@ -5280,7 +5280,7 @@ const openNotificationSettings = () => {
         + '<p class="push-install-note">Apple allows website notifications only from the Home Screen icon (iOS 16.4 or later).</p>';
       row.insertAdjacentElement('afterend', guide);
       guide.querySelector('[data-push-copy]')?.addEventListener('click', async (event) => {
-        try { await navigator.clipboard.writeText('https://thebriviaclub.live/app.html'); event.currentTarget.textContent = 'Link copied. Paste it in Safari'; } catch { event.currentTarget.textContent = 'thebriviaclub.live'; }
+        try { await navigator.clipboard.writeText('https://thebriviaclub.com/app.html'); event.currentTarget.textContent = 'Link copied. Paste it in Safari'; } catch { event.currentTarget.textContent = 'thebriviaclub.live'; }
       });
     }
     guide.hidden = false;

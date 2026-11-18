@@ -136,8 +136,8 @@ try {
   for (const [w, h] of [[1440, 900], [390, 844]]) {
     Object.assign(st, freshState());
     st.messages = [
-      { id: 'm-share', sender_id: A, recipient_id: ME, body: `Shared a post with you on Brivia Club: https://thebriviaclub.live/explore.html?post=post-1`, created_at: ago(0.2) },
-      { id: 'm-gone', sender_id: A, recipient_id: ME, body: 'https://thebriviaclub.live/explore.html?post=post-404', created_at: ago(0.1) },
+      { id: 'm-share', sender_id: A, recipient_id: ME, body: `Shared a post with you on Brivia Club: https://thebriviaclub.com/explore.html?post=post-1`, created_at: ago(0.2) },
+      { id: 'm-gone', sender_id: A, recipient_id: ME, body: 'https://thebriviaclub.com/explore.html?post=post-404', created_at: ago(0.1) },
     ];
     const ctx = await stub.newContext(browser, { width: w, height: h }, { reducedMotion: 'reduce', ...(w < 780 ? { isMobile: true, hasTouch: true } : {}) });
     const page = await stub.open(ctx, { path: '/app.html?view=chat', errors });
