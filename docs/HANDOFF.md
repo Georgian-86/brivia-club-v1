@@ -7,6 +7,8 @@ Update this file at the end of every session. CLAUDE.md holds the aim; this file
 
 ## 1. What is done
 
+**2026-11-18, D-270:** chat messages are read (sender sees "Read") only while the thread is on screen in a focused window; a background window, another view or a just-accepted request no longer marks them read. Client only.
+
 **2026-11-18, D-269:** photos, videos and files in a chat can be downloaded: a button on each attachment and **Download** in the long-press menu (`chat-download.js`, signed URL with Storage's `download` option). Client only, no SQL.
 
 **2026-11-18, D-268:** thebriviaclub.com is the primary domain; .live and both `www` hosts 301 to it on Vercel. Email stays on @thebriviaclub.live. Supabase Site URL must be `https://thebriviaclub.com` with `/auth.html` on both domains in Redirect URLs.

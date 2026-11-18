@@ -257,7 +257,12 @@ const saveChatReadState = () => {
   try { window.localStorage.setItem(chatReadKey(), serializeReadState(chatReadState)); } catch { /* in memory only */ }
 };
 const chatUnreadCount = (personId) => unreadCount(chatMessages[personId], lastReadAt(getChatReadState(), personId));
+// D-270: a chat is read only while the member can actually see it: Chat is the open view, this conversation is the one
+// on screen, the tab is visible and the window has focus. A message that arrives while the thread is selected but the
+// member is on another view, another app or another window stays unread (no "Read" for the sender, the unread count
+// stays) until they come back to it.
 const markChatRead = (personId) => {
+  if (!chatOnScreen(personId)) return;
   sendReadReceipt(personId);
   const next = markRead(getChatReadState(), personId, chatMessages[personId]);
   if (next !== chatReadState) { chatReadState = next; saveChatReadState(); }
@@ -335,8 +340,11 @@ const clearMessageNotificationsForInbox = () => {
 };
 // D-150: tell the sender their messages were read, only while this conversation is on screen in a visible tab.
 const readReceiptInFlight = new Set();
-const chatOnScreen = (personId) => document.visibilityState === 'visible' && document.body.dataset.appView === 'chat'
-  && String(selectedChat?.id) === String(personId) && !document.querySelector('#chat-window')?.hidden;
+function chatOnScreen(personId) {
+  return document.visibilityState === 'visible' && (typeof document.hasFocus !== 'function' || document.hasFocus())
+    && document.body.dataset.appView === 'chat' && String(selectedChat?.id) === String(personId)
+    && !document.querySelector('#chat-window')?.hidden;
+}
 function sendReadReceipt(personId) {
   const key = String(personId || '');
   if (!key || receiptsMissing || !supabase || readReceiptInFlight.has(key) || !chatOnScreen(key)) return;
@@ -357,8 +365,10 @@ const sendDeliveredReceipt = () => {
   markMessagesDelivered().then(({ error }) => { if (isMissingFunction(error)) receiptsMissing = true; })
     .catch(() => {}).finally(() => { deliveredInFlight = false; });
 };
+// Coming back to an open chat (the tab shown again, or the window brought to the front) reads what arrived meanwhile.
+window.addEventListener('focus', () => { if (selectedChat) markChatRead(selectedChat.id); });
 document.addEventListener('visibilitychange', () => {
-  if (selectedChat) sendReadReceipt(selectedChat.id);
+  if (selectedChat) markChatRead(selectedChat.id);
   if (document.visibilityState === 'visible') pullChatSeen();
 });
 const unreadMessageTotal = (conversations) => unreadTotal(conversations.map((p) => p.id), (id) => chatMessages[id], (id) => lastReadAt(getChatReadState(), id));
@@ -1605,6 +1615,7 @@ const setView = (view) => {
   if (['home', 'explore', 'nearby'].includes(view)) requestAnimationFrame(placeModePills);
   pendingEventId = null;
   if (view === 'chat') renderChats();
+  if (view === 'chat' && selectedChat) markChatRead(selectedChat.id);   // D-270: back on an open thread
   // Re-tapping Profile on the profile keeps the loaded (or loading) interests: no second read, no skeleton flash.
   if (view === 'profile') {
     renderProfile();
@@ -3825,11 +3836,11 @@ const openChat = (person, markAsRead = true) => {
   // D-224: nobody types back in the self thread.
   if (person.isSelf) leaveTyping(); else joinTyping(person);
   syncChatMenuForSelf();
-  if (markAsRead) markChatRead(person.id);
   const list = document.querySelector('#chat-list'); const windowPanel = document.querySelector('#chat-window');
   const isSmallScreen = window.matchMedia('(max-width: 700px)').matches;
   if (list) list.hidden = isSmallScreen;
   windowPanel?.removeAttribute('hidden');
+  if (markAsRead) markChatRead(person.id);   // after the thread is shown: markChatRead reads only what is on screen
   // D-224: in the self thread the avatar and name open the member's own Profile tab.
   const openPersonProfile = () => (person.isSelf ? setView('profile') : openPublicProfile(person));
   const profileLabel = person.isSelf ? 'Open your profile' : `Open ${person.name} profile`;

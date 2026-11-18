@@ -169,3 +169,11 @@ a failed sign shows a toast and downloads nothing. At 1440 and 375 px.
 PLAYWRIGHT_MODULE=/tmp/pw/node_modules/playwright/index.mjs node tests/e2e/chat-download.spec.mjs
 ```
 
+`chat-read-focus.spec.mjs` (D-270, Vite on :5169) checks that a message is read only when it can be seen: opening the
+chat reads it once, a message that arrives while the window is in the background or the member is on another view is
+not read, and bringing the window back or returning to Chat reads it once.
+
+```bash
+PLAYWRIGHT_MODULE=/tmp/pw/node_modules/playwright/index.mjs node tests/e2e/chat-read-focus.spec.mjs
+```
+

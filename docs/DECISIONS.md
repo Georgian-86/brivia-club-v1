@@ -4954,3 +4954,22 @@ bring a short line back.
 - **Checks.** Unit 629/629 (new `chat-download.test.mjs`); build OK; new e2e `chat-download.spec.mjs` 15 passed at
   1440 and 375 px; fit 324 passed.
 
+## D-270 (2026-11-18): a chat message is read only when the member can see it
+
+- **Ask (founder, 2026-11-18, screenshot of a thread on the laptop):** "the texts get seen automatically when the user
+  doesnt even open them, pls fix this, when the user accepts someone's request even the message they sent must not get
+  seen automatically".
+- **Found.** Read (the sender's "Read", `mark_conversation_read`) required only a visible tab, Chat as the view and the
+  thread selected. On a laptop a tab stays "visible" while Brivia sits behind another app or window, so every message
+  that came into the open thread was marked read without the member looking (and a tab reopened on `?chat=` read on
+  load). Separately, the device's own read state and the server "seen up to" (D-215) were moved for the selected thread
+  even while the member was on another view. The server never marks a message read by itself, and accepting a request
+  does not open the chat (only "Say hi" or Message does, a deliberate open).
+- **Decision.** `markChatRead` does nothing unless the thread is on screen: Chat is the view, this conversation is open,
+  the tab is visible **and the window has focus** (`document.hasFocus()`). Coming back reads what arrived meanwhile:
+  the window's `focus`, the tab shown again, or returning to Chat with the thread open. `openChat` reads after the
+  thread is shown. A member who accepts a request sees the sender's note stay unread until they open that chat.
+- **No arena run:** a bug fix to the founder's stated rule, no design alternatives.
+- **Checks.** Unit 629/629; build OK; new e2e `chat-read-focus.spec.mjs` (fails on the old code at RF2, passes now);
+  read-receipts, chat-seen, chat-inbox, message-sound, message-replies, chat-self, chat-download: all passed.
+
