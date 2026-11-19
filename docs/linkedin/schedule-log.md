@@ -16,3 +16,4 @@ Publora Starter: 3 of 15 posts this month used once these publish.
 
 - **Post 1**: published 17 Nov 2026 (`urn:li:ugcPost:7528290836405661696`, https://www.linkedin.com/feed/update/urn:li:ugcPost:7528290836405661696/). First comment posted ~8:36 AM IST (comment id 7528292569038946304).
 - **Post 2**: published 18 Nov 2026 7:30 PM IST (`urn:li:share:7528819377341693952`, https://www.linkedin.com/feed/update/urn:li:share:7528819377341693952/). First comment posted ~7:39 PM IST (comment id 7528821650797211648).
+- **Post 3**: published 19 Nov 2026 8:30 AM IST (`urn:li:share:7529015614745550848`, https://www.linkedin.com/feed/update/urn:li:share:7529015614745550848/). First comment posted ~8:37 AM IST (comment id 7529017333357473792).
