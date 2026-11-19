@@ -3821,7 +3821,13 @@ function openChatFromUrl() {
   if (chatUrlRead) return;
   chatUrlRead = true;
   const params = new URLSearchParams(window.location.search);
-  if (params.get('view') === 'chat' && params.get('chat')) void openChatById(params.get('chat'));
+  if (params.get('view') === 'chat' && params.get('chat')) {
+    void openChatById(params.get('chat'));
+    // D-270: a reload must not reopen (and read) that chat again: the address keeps view=chat only.
+    const next = new URL(window.location.href);
+    next.searchParams.delete('chat');
+    window.history.replaceState(window.history.state, '', next.pathname + next.search + next.hash);
+  }
 }
 const openChat = (person, markAsRead = true) => {
   if (!person) return;

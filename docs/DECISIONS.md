@@ -4973,3 +4973,24 @@ bring a short line back.
 - **Checks.** Unit 629/629; build OK; new e2e `chat-read-focus.spec.mjs` (fails on the old code at RF2, passes now);
   read-receipts, chat-seen, chat-inbox, message-sound, message-replies, chat-self, chat-download: all passed.
 
+## D-271 (2026-11-19): seeded test members take at most one place in six, after real members
+
+- **Ask (founder, 2026-11-18):** "make sure fake ids that you claude generated should not be visible to people
+  together, after original very active profiles, it must be like 1 fake profile in 5 active original profiles".
+- **Found (live, read-only):** 332 real completed members, 68 seeded (`is_test`, @test.brivia.club); the open test
+  world is on (0010), and the deck, Discover, newcomers and name search ranked both kinds together, so several seeded
+  cards could sit side by side at the top.
+- **Decision (0083).** Each list ranks real and seeded members separately by its own order and merges them: real 1-5,
+  seeded 1, real 6-10, seeded 2, ... After the real members run out, the remaining seeded follow (founder's choice can
+  change this to "never more than 1 in 6", which would leave members in thin areas with only a few cards). Name
+  search: matches first, real before seeded. Nearby and companions have no seeded members, so they are unchanged.
+  Real members keep the location-first order (ORBIT §6); "very active" is not a new ranking key. Spec: ORBIT §6.5.
+- **Live drift kept:** the live `deck_candidates` uses the 3-argument `brivia_request_is_live` (D-129, a live-only
+  edit), so 0083 patches the installed body, as 0073 did.
+- **No arena run:** a direct founder instruction about order only; who may be shown does not change.
+- **Checks.** SQL harness ALL PASSED (new `zu-seeded-mix`: places 6, 12, 15 in the deck and Discover, search real
+  first; the tester-world guard allows `brivia_is_seeded` by name). Live dry run, rolled back: full decks had seeded
+  at 6, 12, 18; a member with only 2 real people nearby saw them first, then the seeded.
+- **D-270 follow-up (same day):** a message notification's `?chat=<id>` is removed from the address once the chat
+  opens, so a reload does not reopen and read that chat again.
+

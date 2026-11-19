@@ -7,6 +7,8 @@ Update this file at the end of every session. CLAUDE.md holds the aim; this file
 
 ## 1. What is done
 
+**2026-11-19, D-271:** seeded test members take at most one place in six (after five real members) in the deck, Discover and newcomers; real first in name search. Migration `0083` (README "## 0083"), **not applied live yet**; dry-run on live passed and was rolled back.
+
 **2026-11-18, D-270:** chat messages are read (sender sees "Read") only while the thread is on screen in a focused window; a background window, another view or a just-accepted request no longer marks them read. Client only.
 
 **2026-11-18, D-269:** photos, videos and files in a chat can be downloaded: a button on each attachment and **Download** in the long-press menu (`chat-download.js`, signed URL with Storage's `download` option). Client only, no SQL.

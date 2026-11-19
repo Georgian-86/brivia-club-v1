@@ -466,6 +466,18 @@ saturated, the outer rings relax first, instead of the deck repeating saturated 
 
 ---
 
+### 6.5 Seeded test members in the open world: one in six (D-271, migration 0083)
+
+While the open test world is on (0010), seeded test members (`is_test`) can appear to real members. They never crowd
+out real people: every list that shows people to a member ranks real members and seeded members **separately**, each
+by that list's own order (the deck: shared interest, ring, overlap level, daily tie; Discover: hits, shared interests,
+distance; newcomers: newest), then merges them so a seeded member takes a place only after five real ones:
+real 1-5, seeded 1, real 6-10, seeded 2, and so on (`brivia_private.brivia_seed_slot`). When the real members of a
+list run out, the remaining seeded members follow in their own order, so a list never ends early because of the mix.
+Search by name keeps name matches first, then real before seeded. Who may be shown is unchanged (the world rule,
+blocks, Escape-Velocity gate and own-history exclusions); only the position changes. `is_test` is read in one place,
+`brivia_private.brivia_is_seeded`, never as a world rule.
+
 ## 7. Search and Long-Range Requests
 
 - **The filter drawer's search lane (D-239, migration 0072, interim).** `discover_people(p_skills, p_looking_for,

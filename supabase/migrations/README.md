@@ -1624,3 +1624,16 @@ Try one now: `select brivia_private.brivia_send_nudge('chai');` then
 `select status_code, content from net._http_response order by id desc limit 1;` (200 and `{"sent":N,...}`).
 Verify: `select jobname, schedule from cron.job where jobname like 'brivia-nudge-%';` (four rows). Stop them all:
 `select brivia_private.brivia_unschedule_nudges();`
+
+## 0083
+
+**Seeded members one in six (D-271).** Apply after `0081` (independent of `0082`); no client deploy needed. Re-orders
+the deck (`deck_candidates`), Discover (`discover_people`) and newcomers (`newcomer_cards`) so a seeded test member
+(`is_test`) takes a place only after five real members, and puts real members before seeded ones in name search
+(`search_members`). Adds `brivia_private.brivia_is_seeded` and `brivia_private.brivia_seed_slot`. `deck_candidates`
+and `search_members` are patched from their installed bodies (the live deck keeps its 3-argument
+`brivia_request_is_live`); the migration refuses and changes nothing if the expected text is not there. Verify as a
+real member with a full deck: `select row_number() over () as pos, brivia_private.brivia_is_seeded(id) from
+public.deck_candidates(20)` shows seeded only at 6, 12, 18. Dry-run against live on 2026-11-19 (rolled back): five
+real members with full decks had seeded at exactly 6, 12, 18.
+
