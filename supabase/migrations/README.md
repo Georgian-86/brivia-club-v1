@@ -1635,5 +1635,6 @@ and `search_members` are patched from their installed bodies (the live deck keep
 `brivia_request_is_live`); the migration refuses and changes nothing if the expected text is not there. Verify as a
 real member with a full deck: `select row_number() over () as pos, brivia_private.brivia_is_seeded(id) from
 public.deck_candidates(20)` shows seeded only at 6, 12, 18. Dry-run against live on 2026-11-19 (rolled back): five
-real members with full decks had seeded at exactly 6, 12, 18.
+real members with full decks had seeded at exactly 6, 12, 18. **Applied live 2026-11-19**; checked on 8 random real
+members: every full deck and Discover list had seeded at 6, 12, 18 only.
 
