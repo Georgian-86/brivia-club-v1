@@ -4994,3 +4994,36 @@ bring a short line back.
 - **D-270 follow-up (same day):** a message notification's `?chat=<id>` is removed from the address once the chat
   opens, so a reload does not reopen and read that chat again.
 
+## D-272 (2026-11-19): the "+" emoji card shows in the live site; a new browser no longer marks old messages read
+
+- **Ask (founder, 2026-11-19, screenshots):** "after clicking on +, i cant see other emojis to react with"; "see i didnt
+  view or open these messages, but they got opened on their own" (Chrome, Chats list, no chat open).
+- **"+" card, found.** The production build puts `emoji-field.css` in a shared file (`handoff-*.css`) that loads after
+  the app's CSS; its `.emoji-field-panel { position: relative }` beat `.reaction-picker { position: fixed }` (one class
+  each, last wins), so the card opened below the page. The dev server loads CSS in import order, so the e2e never saw
+  it. **Fix:** `.emoji-field-panel.reaction-picker` (two classes). New `reaction-picker-build.spec.mjs` runs on a real
+  build; it fails on the old CSS (position relative, card at 1232 px of 900) and passes now.
+- **Unread, found.** A browser's inbox read state started at "now" on its first visit (D-100, from before the server
+  kept "seen" times), so opening Brivia in a new browser counted every message already received as read.
+- **Unread, decision.** The starting point is capped at 2026-11-05 (`SEEN_SYNC_SINCE`): the server's per-chat "seen up
+  to" (D-215, 0064, live since 2026-11-03) and the member's own replies decide what is read after it. A saved starting
+  point later than that (a browser first opened after the 5th) is capped too; per-chat read times are kept.
+- **No arena run:** bug fixes.
+- **Checks.** Unit 631/631; e2e reaction-picker-build, chat-inbox, chat-seen, read-receipts, chat-read-focus,
+  message-reactions: all passed.
+
+## D-273 (2026-11-19): a chat with someone no longer connected says so instead of failing to send
+
+- **Ask (founder, 2026-11-19, screenshot of a thread with Aryan Sharma):** "why am i not able to send the text in this
+  chat".
+- **Found (live, read-only).** The pair has no match row (and no request, no block): one of them used "Remove
+  connection", which deletes the match. The server allows a message only between matched members, so every send was
+  refused; the composer stayed and the refusal was a short toast ("You can no longer message this member.").
+- **Decision.** The client keeps the exact set of current matches (`currentMatchIds`, from the matches table at boot
+  and at every connection sync; the older lists include inbox people and only grow). In a chat with someone who is not
+  a current match, the composer gives way to one line, "You're no longer connected with <first name>, so new messages
+  can't be sent. Your conversation stays here.", and **Send a request** (the pitch sheet). The thread stays readable.
+- **Checks.** New e2e `chat-gone.spec.mjs` (1440 and 390); chat-extras updated (a no-match chat shows the line, not
+  the Share menu): 152 passed; consent 171, fit 324, chat-self, chat-share, message-actions, message-replies,
+  chat-search, chat-download, share-place, companions-connected: all passed.
+

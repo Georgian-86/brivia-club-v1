@@ -20,14 +20,20 @@ const parse = (value) => {
 const validTime = (value) => typeof value === 'string' && Number.isFinite(parse(value));
 const time = (value) => (validTime(value) ? parse(value) : NaN);
 
-export const parseReadState = (raw, now = new Date().toISOString()) => {
+// D-272: since D-215 (0064, live from 2026-11-03) what a member has seen in each conversation is also kept on the
+// server, so a browser's own starting point no longer needs to be "now". A first visit used to count every message
+// already received as read ("they got opened on their own"). The baseline is capped at SEEN_SYNC_SINCE: anything after
+// it is unread unless this device or the server saw it, or the member replied after it.
+export const SEEN_SYNC_SINCE = '2026-11-05T00:00:00.000Z';
+export const parseReadState = (raw, now = new Date().toISOString(), floor = SEEN_SYNC_SINCE) => {
   let saved = null;
   try { saved = typeof raw === 'string' ? JSON.parse(raw) : null; } catch { saved = null; }
   const read = {};
   if (saved && typeof saved.read === 'object' && saved.read) {
     for (const [id, at] of Object.entries(saved.read)) if (validTime(at)) read[id] = at;
   }
-  return { baseline: validTime(saved?.baseline) ? saved.baseline : now, read };
+  const base = validTime(saved?.baseline) ? saved.baseline : now;
+  return { baseline: floor && validTime(floor) && time(floor) < time(base) ? floor : base, read };
 };
 
 export const serializeReadState = (state) => JSON.stringify({ baseline: state.baseline, read: state.read });

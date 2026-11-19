@@ -756,9 +756,16 @@ try {
         await context.close();
       }
       {
-        const { context, page } = await openThread(375, { matchIds: [] });
-        const s = await openMenu(page);
-        check(`Q5 without a match "Share my resume" is absent (${JSON.stringify(s.items.map((i) => i.title))})`, () => assert.deepEqual(s.items.map((i) => i.title), ['Share my area', 'Share a place']));
+        // D-273: without a match nothing can be sent (the server's rule), so the composer and its Share menu give way to
+        // the "no longer connected" line (before D-273: the menu without "Share my resume", and a send that failed).
+        Object.assign(st, { own: { ...ownRow, resume_path: RESUME }, routes: baseRoutes(), messages: [hello], matchIds: [] });
+        const context = await stub.newContext(browser, VIEWPORTS[375], { reducedMotion: 'reduce', ...PHONE });
+        const page = await stub.open(context, { path: '/app.html?view=chat', errors: pageErrors });
+        await page.waitForSelector('#chat-list [data-chat-id]', { timeout: 8000 });
+        await page.locator('#chat-list [data-chat-id]').first().click();
+        await page.waitForSelector('#chat-gone:not([hidden])', { timeout: 6000 });
+        const s = await page.evaluate((shareSel) => ({ form: !document.querySelector('#chat-form')?.hidden, share: Boolean(document.querySelector(shareSel)?.getClientRects().length) }), SHARE);
+        check(`Q5 without a match the composer and Share give way to the "no longer connected" line (${JSON.stringify(s)})`, () => { assert.equal(s.form, false); assert.equal(s.share, false); });
         await context.close();
       }
       {

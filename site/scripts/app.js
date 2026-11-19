@@ -144,6 +144,11 @@ let memberPlaceLabel = '';
 
 let people = [];
 let remoteMatchIds = [];
+// D-273: the members this member is matched with right now (the matches table, the rule the server uses for a send),
+// refreshed at boot and by every connection sync. remoteMatchIds above also holds everyone in the inbox, and the
+// connection lists only grow, so neither can tell that a connection was removed (by either member).
+let currentMatchIds = new Set();
+let currentMatchesKnown = false;
 let remoteConnectionIds = [];
 let notifications = [];
 // Incoming pending connection requests (shown in the notifications panel).
@@ -2530,10 +2535,39 @@ async function liftHiringCards() {
   renderExplore();
 }
 let lastAddedConnections = [];   // the ids the last refreshConnections added (for celebrateNewMatches)
+function setCurrentMatches(rows) {
+  const me = String(memberProfile.id || '');
+  currentMatchIds = new Set((rows || []).map((m) => (String(m.user1_id) === me ? String(m.user2_id) : String(m.user1_id))));
+  currentMatchesKnown = true;
+  syncChatComposerState();
+}
+// D-273: in a chat with someone this member is no longer connected with, the composer gives way to a plain line and a
+// way to ask again, instead of a send that fails with a short toast ("why am i not able to send the text in this chat").
+function syncChatComposerState() {
+  const form = document.querySelector('#chat-form');
+  if (!form) return;
+  const person = selectedChat;
+  const gone = Boolean(person && !person.isSelf && currentMatchesKnown && !currentMatchIds.has(String(person.id)));
+  let note = document.querySelector('#chat-gone');
+  if (gone && !note) {
+    form.insertAdjacentHTML('beforebegin', '<div class="chat-gone" id="chat-gone" role="status"><p class="chat-gone-copy"></p><button type="button" class="chat-gone-action" data-chat-gone-request>Send a request</button></div>');
+    note = document.querySelector('#chat-gone');
+    note.querySelector('[data-chat-gone-request]').addEventListener('click', () => {
+      const target = selectedChat && findPersonById(selectedChat.id);
+      if (target) openPitch(target); else if (selectedChat) openPublicProfile(selectedChat);
+    });
+  }
+  if (note) {
+    note.hidden = !gone;
+    if (gone) note.querySelector('.chat-gone-copy').textContent = `You're no longer connected with ${String(person.name || 'this member').split(/\s+/)[0]}, so new messages can't be sent. Your conversation stays here.`;
+  }
+  form.hidden = gone;
+}
 const refreshConnections = async () => {
   if (!supabase || !memberProfile.id) return;
   const { data, error } = await supabase.from('matches').select('user1_id,user2_id').or(`user1_id.eq.${memberProfile.id},user2_id.eq.${memberProfile.id}`);
   if (error) { console.warn('Connections could not refresh:', error.message); return; }
+  setCurrentMatches(data);
   // Only newly matched people are added, so chats hidden on this device stay hidden.
   const added = (data || []).map((match) => String(match.user1_id) === String(memberProfile.id) ? match.user2_id : match.user1_id)
     .filter((id) => !remoteConnectionIds.some((known) => String(known) === String(id)));
@@ -2623,6 +2657,7 @@ const removeRemoteConnection = async (person) => {
   return { error: ownToOther.error || otherToOwn.error };
 };
 const removeConnectionFromState = (person) => {
+  currentMatchIds.delete(String(person.id));
   remoteMatchIds = remoteMatchIds.filter((id) => String(id) !== String(person.id));
   remoteConnectionIds = remoteConnectionIds.filter((id) => String(id) !== String(person.id));
   if (selectedChat?.id && String(selectedChat.id) === String(person.id)) closeSelectedChat();
@@ -3842,6 +3877,7 @@ const openChat = (person, markAsRead = true) => {
   // D-224: nobody types back in the self thread.
   if (person.isSelf) leaveTyping(); else joinTyping(person);
   syncChatMenuForSelf();
+  syncChatComposerState();
   const list = document.querySelector('#chat-list'); const windowPanel = document.querySelector('#chat-window');
   const isSmallScreen = window.matchMedia('(max-width: 700px)').matches;
   if (list) list.hidden = isSmallScreen;
@@ -8011,6 +8047,7 @@ const loadSupabaseCommunity = async () => {
   if (!matchError) {
     remoteConnectionIds = (matchRows || []).map((match) => match.user1_id === session.user.id ? match.user2_id : match.user1_id);
     remoteMatchIds = [...remoteConnectionIds];
+    setCurrentMatches(matchRows);
     // The first time this device sees the account, its matches are the baseline (no moment for old matches);
     // after that, a match made while the member was away gets the moment once the app has drawn.
     if (readMutualSeen() === null) writeMutualSeen(new Set(remoteConnectionIds.map(String)));

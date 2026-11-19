@@ -177,3 +177,7 @@ not read, and bringing the window back or returning to Chat reads it once.
 PLAYWRIGHT_MODULE=/tmp/pw/node_modules/playwright/index.mjs node tests/e2e/chat-read-focus.spec.mjs
 ```
 
+`reaction-picker-build.spec.mjs` (D-272, vite preview on :5167) builds the site and checks the "+" emoji card on the
+production build (fixed, on screen, lists emoji) at 1440 and 390 px. `chat-gone.spec.mjs` (D-273, Vite on :5166)
+checks that a chat with someone no longer connected hides the composer, says why, and offers Send a request.
+

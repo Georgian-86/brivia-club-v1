@@ -237,3 +237,11 @@ body.app-body[data-app-view="chat"] .chat-layout>.chat-window{
 .message-attachment-wrap:has(.message-attachment-document) .message-attachment-document{padding-right:48px}
 .message-attachment-wrap:has(.message-attachment-document) .message-download{top:50%;transform:translateY(-50%);background:#5a061f;border-color:transparent}
 .message.me .message-attachment-wrap:has(.message-attachment-document) .message-download{background:#fffaf1;color:#5a061f}
+/* D-273: a chat with someone no longer connected: the composer gives way to one line and "Send a request". */
+#chat-form[hidden]{display:none!important}
+.chat-gone{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:10px 16px;padding:14px 18px;border-top:1px solid rgba(90,6,31,.12);background:#fffaf1}
+.chat-gone[hidden]{display:none}
+.chat-gone-copy{flex:1 1 260px;margin:0;color:#5b4744;font-family:var(--font-body);font-size:var(--text-14);line-height:1.45}
+.chat-gone-action{min-height:44px;padding:0 18px;border:0;border-radius:999px;background:#5a061f;color:#fffaf1;font-family:var(--font-body);font-size:var(--text-12);font-weight:700;letter-spacing:.08em;text-transform:uppercase;cursor:pointer}
+.chat-gone-action:hover{background:#430416}
+.chat-gone-action:focus-visible{outline:2px solid #5a061f;outline-offset:3px}

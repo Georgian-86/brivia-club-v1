@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { parseReadState, serializeReadState, lastReadAt, unreadCount, markRead, lastContactAt, sortByLastContact, unreadTotal } from '../../site/scripts/chat-unread.js';
+import { SEEN_SYNC_SINCE, parseReadState, serializeReadState, lastReadAt, unreadCount, markRead, lastContactAt, sortByLastContact, unreadTotal } from '../../site/scripts/chat-unread.js';
 
 const T = (m) => new Date(Date.UTC(2026, 9, 28, 10, m)).toISOString();
 const msgs = [
@@ -16,6 +16,23 @@ test('a first run starts from a baseline: older messages count as read', () => {
   assert.equal(lastReadAt(state, 'p'), T(2));
   assert.equal(unreadCount(msgs, lastReadAt(state, 'p')), 2);
   assert.equal(unreadCount([{ from: 'them', createdAt: T(1) }], lastReadAt(state, 'p')), 0);
+});
+
+test('D-272: a first visit today does not mark every message received since the server sync began as read', () => {
+  const now = '2026-11-19T18:00:00.000Z';
+  const state = parseReadState(null, now);
+  assert.equal(state.baseline, SEEN_SYNC_SINCE);
+  const thread = [{ from: 'them', createdAt: '2026-11-17T10:00:00.000Z' }, { from: 'them', createdAt: '2026-11-18T10:00:00.000Z' }];
+  assert.equal(unreadCount(thread, lastReadAt(state, 'p')), 2, 'never opened anywhere: still unread');
+  assert.equal(unreadCount([...thread, { from: 'me', createdAt: '2026-11-18T11:00:00.000Z' }], lastReadAt(state, 'p')), 0, 'answered: read');
+  assert.equal(unreadCount([{ from: 'them', createdAt: '2026-11-01T10:00:00.000Z' }], lastReadAt(state, 'p')), 0, 'before the sync began: read');
+});
+
+test('D-272: a saved "now" baseline from an earlier visit is capped too; per-chat read times are kept', () => {
+  const saved = JSON.stringify({ baseline: '2026-11-19T17:00:00.000Z', read: { p: '2026-11-18T12:00:00.000Z' } });
+  const state = parseReadState(saved, '2026-11-19T18:00:00.000Z');
+  assert.equal(state.baseline, SEEN_SYNC_SINCE);
+  assert.equal(lastReadAt(state, 'p'), '2026-11-18T12:00:00.000Z');
 });
 
 test('a stored state round-trips and ignores junk', () => {
