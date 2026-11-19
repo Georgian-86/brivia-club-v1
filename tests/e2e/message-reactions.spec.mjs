@@ -101,7 +101,8 @@ try {
   await page.waitForTimeout(150);
   const found = await page.$$eval('.reaction-picker .emoji-field-emoji', (els) => els.map((el) => el.dataset.emoji));
   check('RX4 search "chess" finds ♟️', found.some((e) => e.startsWith('♟')), JSON.stringify(found));
-  check('RX4 the picker stays inside the screen', await page.$eval('.reaction-picker', (el) => { const r = el.getBoundingClientRect(); return r.left >= 0 && r.right <= innerWidth && r.top >= 0 && r.bottom <= innerHeight; }));
+  const pickBox = await page.$eval('.reaction-picker', (el) => { const r = (el.closest('.message-menu, .reaction-picker-card') || el).getBoundingClientRect(); return { t: Math.round(r.top), b: Math.round(r.bottom), l: Math.round(r.left), r: Math.round(r.right), w: innerWidth, h: innerHeight }; });
+  check('RX4 the picker stays inside the screen', pickBox.l >= 0 && pickBox.r <= pickBox.w && pickBox.t >= 0 && pickBox.b <= pickBox.h, JSON.stringify(pickBox));
   const pickAxe = await axeViolations(page, { include: '.reaction-picker' });
   check('RX5 the picker has no axe violations', pickAxe.length === 0, JSON.stringify(pickAxe));
   if (shots) await page.screenshot({ path: `${shots}/picker.png` });

@@ -83,7 +83,7 @@ import { searchEmoji } from './emoji-search.js';
 import { attachEmojiPicker, insertAt } from './emoji-field.js';
 import { getTone, withTone, onToneChange } from './emoji-tone.js';
 import { QUICK_REACTIONS, canReact, reactionsByMessage, groupReactions, withMyReaction, chipLabel, sameReactions } from './message-reactions.js';
-import { openReactionPicker, closeReactionPicker } from './reaction-picker.js';
+import { openReactionPicker, closeReactionPicker, mountEmojiPicker } from './reaction-picker.js';
 import { RADIUS, normalizeLocation, isDefaultLocation, locationParams, radiusLabel, locationSummary, fallbackSummary } from './discovery-location.js';
 import { chatGifCatalog } from './chat-gif-data.js';
 import { typingTopic, createTypingSender, createTypingReceiver, TYPING_EVENT } from './chat-typing.js';
@@ -6023,24 +6023,46 @@ const refreshCommunityReactions = async ({ own = '' } = {}) => {
   });
   syncReactionAvailability();
 };
-// Optimistic like / save: the button flips at once; one request per post and kind is in flight (a double tap is one
-// row). On an error the change is undone and the server truth reloaded. 42501 means RLS refused the write (the post is
-// gone or no longer visible): reload only, no toast (post-reactions.js). Anything else also shows the toast.
+// Optimistic like / save: the button flips at once. D-275 (founder: "i want the option to unlike the post if we click
+// on like button again"): every tap flips it, also while an earlier tap is still saving; the latest choice is saved
+// once that request ends (one request per post and kind at a time). Two taps under DOUBLE_TAP_MS apart are one tap, so an
+// accidental double tap still likes once. On an error the server truth comes back (42501, RLS: the post is gone or no
+// longer visible, reload only; anything else also shows the toast).
+const DOUBLE_TAP_MS = 150;
+const reactionTapAt = new Map();
+const reactionWanted = new Map();
+const reactionOn = (postId, kind) => (kind === 'like' ? communityReactions.liked : communityReactions.saved).has(postId);
+const showReaction = (postId, kind, on, opts) => {
+  markReaction(postId, kind, on, opts);
+  if (kind === 'like') bumpActivity(postId, (a) => withLike(a, on));
+};
 const toggleCommunityReaction = async (postId, kind) => {
   if (!supabase || !memberProfile.id || !communityReactions.available) return;
   const key = `${postId}:${kind}`;
-  if (!communityReactionGuard.begin(key)) return;
+  const now = performance.now();
+  if (now - (reactionTapAt.get(key) ?? -Infinity) < DOUBLE_TAP_MS) return;
+  reactionTapAt.set(key, now);
+  const next = !reactionOn(postId, kind);
+  showReaction(postId, kind, next, { pop: true });
+  if (!communityReactionGuard.begin(key)) { reactionWanted.set(key, next); return; }   // saved when the request ends
+  let saved = !next;   // the server state before this tap
   try {
-    const next = !(kind === 'like' ? communityReactions.liked : communityReactions.saved).has(postId);
-    markReaction(postId, kind, next, { pop: true });
-    if (kind === 'like') bumpActivity(postId, (a) => withLike(a, next));
-    const { error } = await setReaction(supabase, kind, postId, memberProfile.id, next);
-    if (!error && kind === 'like' && next) sendPendingPush();   // D-151: the author's devices hear about it
-    if (error) {
-      markReaction(postId, kind, !next);
-      if (kind === 'like') bumpActivity(postId, (a) => withLike(a, !next));
-      if (error.code !== '42501') showToast(REACTION_FAILED);
-      await refreshCommunityReactions({ own: key });
+    let want = next;
+    for (;;) {
+      const { error } = await setReaction(supabase, kind, postId, memberProfile.id, want);
+      if (error) {
+        reactionWanted.delete(key);
+        showReaction(postId, kind, saved);
+        if (error.code !== '42501') showToast(REACTION_FAILED);
+        await refreshCommunityReactions({ own: key });
+        return;
+      }
+      saved = want;
+      if (kind === 'like' && want) sendPendingPush();   // D-151: the author's devices hear about it
+      const later = reactionWanted.get(key);
+      reactionWanted.delete(key);
+      if (later === undefined || later === saved) return;
+      want = later;
     }
   } catch (error) {
     console.warn('Reaction failed:', error?.message);
@@ -7810,7 +7832,7 @@ messageMenu = createMessageMenu({
     const message = findThreadMessage(id);
     return message ? { message, special: isSpecialMessage(message) } : null;
   },
-  reactions: { quick: () => QUICK_REACTIONS.map((e) => withTone(e, getTone())), canReact: (message) => reactionsAvailable && canReact(message) },
+  reactions: { quick: () => QUICK_REACTIONS.map((e) => withTone(e, getTone())), canReact: (message) => reactionsAvailable && canReact(message), mountPicker: mountEmojiPicker },
   onAction: async (action, message, extra) => {
     if (action === 'react') await reactToThreadMessage(message, extra);
     else if (action === 'react-more') openReactionPicker({ anchor: extra, onPick: (emoji) => { void reactToThreadMessage(message, emoji); } });

@@ -246,15 +246,40 @@ try {
       await context.close();
     });
 
+    // E4b (D-275): tapping Like again unlikes: after the like has saved, and while it is still saving (the second choice
+    // is saved when the first request ends). Ends unliked, with one POST then one DELETE.
+    await scenario('scenario E4b', async () => {
+      for (const [label, delayMs, gap] of [['after the like saved', 100, 900], ['while the like is saving', 1500, 500]]) {
+        st.routes = { ...baseRoutes(), 'POST community_post_likes': { delayMs } };
+        const { context, page } = await open(375);
+        const sel = '.post-card[data-post-id="post-2"] [data-post-action="like"]';
+        const p0 = posts('POST', 'community_post_likes').length; const d0 = posts('DELETE', 'community_post_likes').length;
+        await page.locator(sel).click();
+        await page.waitForTimeout(gap);
+        await page.locator(sel).click();
+        const now = await pressed(page, 'post-2', 'like');
+        await page.waitForTimeout(delayMs + 1200);
+        const end = await pressed(page, 'post-2', 'like');
+        const sent = { posts: posts('POST', 'community_post_likes').length - p0, deletes: posts('DELETE', 'community_post_likes').length - d0 };
+        check(`E4b ${label}: a second tap on Like unlikes at once and stays unliked (${JSON.stringify({ now, end, sent })})`, () => {
+          assert.deepEqual(now, { pressed: 'false', label: 'Like' });
+          assert.deepEqual(end, { pressed: 'false', label: 'Like' });
+          assert.deepEqual(sent, { posts: 1, deletes: 1 });
+        });
+        await context.close();
+      }
+    });
+
     // E4: a double tap on Like sends one POST and stays liked.
     await scenario('scenario 2', async () => {
       st.routes = { ...baseRoutes(), 'POST community_post_likes': { delayMs: 400 } };
       const { context, page } = await open(375);
       const before = posts('POST', 'community_post_likes').length;
+      const deletesBefore = posts('DELETE', 'community_post_likes').length;
       await page.locator('.post-card[data-post-id="post-2"] [data-post-action="like"]').dblclick();
       await page.waitForTimeout(1200);
       const after = posts('POST', 'community_post_likes').length;
-      const deletes = posts('DELETE', 'community_post_likes').length;
+      const deletes = posts('DELETE', 'community_post_likes').length - deletesBefore;
       const state = await pressed(page, 'post-2', 'like');
       const body = JSON.parse(posts('POST', 'community_post_likes').at(-1)?.body || '{}');
       check(`E4: a double tap on Like sends one POST and leaves it pressed (${JSON.stringify({ sent: after - before, deletes, state, body })})`, () => {

@@ -174,7 +174,18 @@ export const createMessageMenu = ({ container, getMessage, onAction, reactions =
       if (!button) return;
       if (button.hasAttribute('data-message-cancel')) { close({ refocus: true }); return; }
       if (button.dataset.messageReact) { close({ refocus: true }); void onAction('react', found.message, button.dataset.messageReact); return; }
-      if (button.hasAttribute('data-message-react-more')) { const at = anchor; close(); void onAction('react-more', found.message, at); return; }
+      if (button.hasAttribute('data-message-react-more')) {
+        // D-274: every emoji, in this same menu (Safari never showed the separate card). A pick reacts and closes.
+        if (reactions?.mountPicker) {
+          menu.classList.add('is-picking');
+          menu.setAttribute('role', 'dialog');
+          menu.setAttribute('aria-label', 'React with any emoji');
+          const search = reactions.mountPicker(menu, { onPick: (emoji) => { close({ refocus: true }); void onAction('react', found.message, emoji); } });
+          place();
+          search?.focus({ preventScroll: true });
+        } else { const at = anchor; close(); void onAction('react-more', found.message, at); }
+        return;
+      }
       const action = button.dataset.messageConfirm || button.dataset.messageAction;
       if (!action) return;
       if (!button.dataset.messageConfirm && CONFIRM[action]) { renderConfirm(action); return; }
@@ -183,6 +194,8 @@ export const createMessageMenu = ({ container, getMessage, onAction, reactions =
       void onAction(action, message);
     });
     menu.addEventListener('keydown', (event) => {
+      // In the emoji picker, keys type into the search and move through tabs as usual; only Escape closes.
+      if (menu?.classList.contains('is-picking') && event.key !== 'Escape') return;
       const list = items();
       const at = list.indexOf(document.activeElement);
       if (event.key === 'Escape') { event.preventDefault(); event.stopPropagation(); close({ refocus: true }); }

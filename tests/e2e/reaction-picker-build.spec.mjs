@@ -46,7 +46,7 @@ try {
     } else await bubble.click({ button: 'right' });
     await page.locator('.message-menu [data-message-react-more]').click({ timeout: 5000 });
     await page.waitForSelector('.reaction-picker', { timeout: 5000 });
-    const s = await page.$eval('.reaction-picker', (el) => { const r = el.getBoundingClientRect(); return { pos: getComputedStyle(el).position, top: r.top, bottom: r.bottom, left: r.left, right: r.right, emoji: el.querySelectorAll('.emoji-field-emoji').length }; });
+    const s = await page.$eval('.reaction-picker', (el) => { const card = el.closest('.message-menu, .reaction-picker-card') || el; const r = card.getBoundingClientRect(); return { pos: getComputedStyle(card).position, top: r.top, bottom: r.bottom, left: r.left, right: r.right, emoji: el.querySelectorAll('.emoji-field-emoji').length }; });
     const tag = `${w}x${h}`;
     check(`RP1 ${tag} the card is fixed beside the message (${s.pos})`, s.pos === 'fixed');
     check(`RP1 ${tag} the card is on screen (${Math.round(s.top)}..${Math.round(s.bottom)} of ${h})`, s.top >= 0 && s.bottom <= h && s.left >= 0 && s.right <= w);

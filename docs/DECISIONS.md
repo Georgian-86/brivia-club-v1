@@ -5027,3 +5027,26 @@ bring a short line back.
   the Share menu): 152 passed; consent 171, fit 324, chat-self, chat-share, message-actions, message-replies,
   chat-search, chat-download, share-place, companions-connected: all passed.
 
+## D-274 (2026-11-19): every emoji opens inside the message menu (Safari)
+
+- **Ask (founder, after D-272 went live):** "the emojis still not showing after + on safari".
+- **Decision.** "+" no longer closes the menu and opens a second floating card: the search, tabs, skin tones and grid
+  are mounted into the message menu itself (`mountEmojiPicker`, `.message-menu.is-picking`), the same box Safari
+  already showed. A pick reacts and closes; Escape closes and focus returns to the bubble; arrow keys in the picker
+  belong to the search and tabs. The floating card (`openReactionPicker`, `.reaction-picker-card`) stays for other
+  callers. The root cause in Safari is not proven (no WebKit could be downloaded in this environment); this removes the
+  close-then-reopen and the second positioned layer, which were the only Safari-sensitive steps.
+- **Checks.** e2e message-reactions (RX4 search, on screen, Escape, focus, pick), reaction-picker-build (production
+  build: the visible card is fixed and on screen at 1440 and 390), message-actions: all passed.
+
+## D-275 (2026-11-19): tapping Like again unlikes, even while the like is still saving
+
+- **Ask (founder):** "i want the option to unlike the post if we click on like button again".
+- **Found.** The toggle existed, but a tap while the previous one was still saving was dropped (one request per post,
+  E4), so on a phone network a quick second tap did nothing.
+- **Decision.** Every tap flips Like (and Save) at once; a tap during a save is remembered and saved when that request
+  ends, so the server ends in the last state shown. Two taps under 150 ms apart are one tap (an accidental double tap
+  still likes once, E4). Errors restore the server truth as before.
+- **Checks.** e2e explore-cards 76 (new E4b: unlike after the like saved and while it saves: one POST, one DELETE, ends
+  unliked), post-activity, post-likers, post-notifications, notes-masonry: all passed. Unit 631/631.
+
