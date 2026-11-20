@@ -5049,4 +5049,10 @@ bring a short line back.
   still likes once, E4). Errors restore the server truth as before.
 - **Checks.** e2e explore-cards 76 (new E4b: unlike after the like saved and while it saves: one POST, one DELETE, ends
   unliked), post-activity, post-likers, post-notifications, notes-masonry: all passed. Unit 631/631.
+- **D-274 follow-up (2026-11-20, founder: "cant see other emojis on clicking plus sign on react").** A screenshot of
+  the production build showed the in-menu picker wider than its card: the emoji grid used `repeat(auto-fill, ...)`
+  inside a box with no definite width, so its columns came from its content (half the grid outside the card in
+  Chromium; how Safari sizes that case is the likely reason it showed nothing). Now the menu, picker, search, tabs and
+  grid all have definite widths and the grid has a fixed 7 columns with a fixed height. reaction-picker-build gained a
+  check that the grid sits inside the card with visible emoji: it fails on the previous CSS and passes now.
 

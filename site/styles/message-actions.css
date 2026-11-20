@@ -209,7 +209,13 @@ body.app-body .app-view[data-view="chat"] .chat-messages .message.me.is-unsent s
 
 /* The "+": every emoji. D-274: shown inside the message menu itself (.is-picking); the separate card
    (.reaction-picker-card, two classes so the shared emoji-field CSS cannot undo `fixed`) is kept for other callers. */
-.message-menu.is-picking { width: min(360px, calc(100vw - 24px)); padding: var(--space-2); }
-.reaction-picker { display: flex; flex-direction: column; min-height: 0; }
-.reaction-picker .emoji-field-grid { max-height: min(220px, calc(100vh - 260px)); min-height: 132px; }
+/* D-274 fix: every width is definite and the grid has a fixed column count, so no browser sizes the emoji grid from its
+   content (auto-fill in an indefinite box gave a grid wider than the card in Chromium and none at all in Safari). */
+.message-menu.is-picking { display: block; width: min(360px, calc(100vw - 24px)); padding: var(--space-2); overflow: hidden; box-sizing: border-box; }
+.reaction-picker { display: block; width: 100%; min-width: 0; }
+.reaction-picker .emoji-field-search { display: block; }
+.reaction-picker .emoji-field-search input { display: block; width: 100%; box-sizing: border-box; }
+.reaction-picker .emoji-field-tabs, .reaction-picker .emoji-field-tones { width: 100%; min-width: 0; }
+.reaction-picker .emoji-field-grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); width: 100%; height: min(220px, calc(100vh - 280px)); min-height: 132px; max-height: none; overflow-y: auto; }
+.reaction-picker .emoji-field-emoji { min-width: 0; width: 100%; }
 .emoji-field-panel.reaction-picker-card { position: fixed; z-index: 1210; margin: 0; max-height: min(440px, calc(100vh - 24px)); overflow: hidden; }

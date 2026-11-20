@@ -46,11 +46,13 @@ try {
     } else await bubble.click({ button: 'right' });
     await page.locator('.message-menu [data-message-react-more]').click({ timeout: 5000 });
     await page.waitForSelector('.reaction-picker', { timeout: 5000 });
-    const s = await page.$eval('.reaction-picker', (el) => { const card = el.closest('.message-menu, .reaction-picker-card') || el; const r = card.getBoundingClientRect(); return { pos: getComputedStyle(card).position, top: r.top, bottom: r.bottom, left: r.left, right: r.right, emoji: el.querySelectorAll('.emoji-field-emoji').length }; });
+    const s = await page.$eval('.reaction-picker', (el) => { const card = el.closest('.message-menu, .reaction-picker-card') || el; const r = card.getBoundingClientRect(); const g = el.querySelector('.emoji-field-grid').getBoundingClientRect(); const first = el.querySelector('.emoji-field-emoji')?.getBoundingClientRect(); return { inside: g.left >= r.left - 1 && g.right <= r.right + 1 && g.height > 100 && first && first.width >= 30 && first.height >= 30, pos: getComputedStyle(card).position, top: r.top, bottom: r.bottom, left: r.left, right: r.right, emoji: el.querySelectorAll('.emoji-field-emoji').length }; });
     const tag = `${w}x${h}`;
+    if (process.env.RP_SHOTS) await page.screenshot({ path: `${process.env.RP_SHOTS}/picker-${tag}.png` });
     check(`RP1 ${tag} the card is fixed beside the message (${s.pos})`, s.pos === 'fixed');
     check(`RP1 ${tag} the card is on screen (${Math.round(s.top)}..${Math.round(s.bottom)} of ${h})`, s.top >= 0 && s.bottom <= h && s.left >= 0 && s.right <= w);
     check(`RP1 ${tag} it lists emoji (${s.emoji})`, s.emoji > 20);
+    check(`RP1 ${tag} the emoji grid is inside the card, tall enough, with visible emoji`, s.inside === true);
     await ctx.close();
   }
 } finally {
