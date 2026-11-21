@@ -1638,3 +1638,10 @@ public.deck_candidates(20)` shows seeded only at 6, 12, 18. Dry-run against live
 real members with full decks had seeded at exactly 6, 12, 18. **Applied live 2026-11-19**; checked on 8 random real
 members: every full deck and Discover list had seeded at 6, 12, 18 only.
 
+
+## 0084
+
+**Visibility helpers in plpgsql (D-278).** Same logic, signatures and grants; ~5x faster (an SQL-language SECURITY
+DEFINER function is re-planned on every call). Applied live 2026-11-21. Safe to re-run. Check:
+`select proname, l.lanname from pg_proc p join pg_language l on l.oid = p.prolang where proname like 'brivia_%visible%' or proname = 'brivia_member_completed';`
+(plpgsql).

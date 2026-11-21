@@ -5088,3 +5088,25 @@ bring a short line back.
 - **Checks.** Unit `chat-jump.test.mjs` (count rules, badge, distance); e2e `chat-jump.spec.mjs` CJ1-CJ5 on desktop
   1440 and phone 375: hidden at the latest message, shown on the thread's right above the composer when scrolled up,
   count 1 for a message arriving while up, one tap returns to the latest and hides it, no page errors.
+
+## D-278 (2026-11-21): visibility helpers in plpgsql; the evening slowdown
+
+- **Ask (founder):** "the app is lagging and is not working properly pls fix".
+- **Found.** Requests rose ~10x from 17:20 UTC (evening in India). From 18:10 the database ran out of room: statement
+  timeouts, "timed out acquiring connection from pool", PostgREST unable to load its schema cache, so 503s on
+  messages, matches, requests and presence (p95 up to 45-85 s). Today's client changes were not the cause (perf-chat
+  open time within noise of the build before them). The heaviest work per request was `brivia_visible_to`: ~15 ms a
+  call, run once per row in deck_candidates (~536 ms mean), discover_people (~470 ms), post_activity (~1.35 s),
+  notifications and nearby. It and the helpers it calls were `LANGUAGE sql` + SECURITY DEFINER + SET search_path:
+  Postgres cannot inline those, and before PG 18 re-plans an SQL function body on every call.
+- **Decision (0084).** `brivia_visible_to`, `brivia_member_completed`, `brivia_in_test_world`, `brivia_tester_world`
+  and `brivia_test_world_open` rewritten in plpgsql (plans cached per session), same logic, signatures, security and
+  grants. Live data, 1,299 viewer/member pairs: 3,845 ms -> 676 ms; 0 differences for any pair or any member.
+- **Checks.** SQL harness ALL PASSED (every migration twice + every test). Applied live 2026-11-21 ~18:41 UTC; after
+  it, REST p50 ~50-70 ms and no 5xx at the time of writing (traffic was falling, so the next evening peak is the
+  real test).
+- **Lesson.** Benchmarks against the live database during an incident add load (18:33-18:41 was worse while they
+  ran). Measure on a branch or the local harness first.
+- **Still heavy (not changed).** Realtime `postgres_changes` on brivia_messages and member_notification is the
+  largest single cost (WAL polling with RLS per subscriber); the instance is small (60 connections). If evenings stay
+  slow: move chat delivery to Realtime Broadcast, or raise the Supabase compute size.
