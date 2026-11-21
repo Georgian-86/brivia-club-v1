@@ -23,7 +23,8 @@ Update this file at the end of every session. CLAUDE.md holds the aim; this file
 
 **2026-11-16, D-265:** root README and CONTRIBUTING, `npm test` / `npm run test:orbit`, Node 22 pinned, package renamed `brivia-club`, PR template; live URL is thebriviaclub.live.
 
-**2026-11-14, D-266:** four daily nudge pushes (12:00, 15:00, 18:00, 21:30 IST, founder's Hinglish; 0082 + `push-nudge`, NOT live yet: README "## 0082"). Sax sound on the phone's Home Screen is not possible for a web app (D-266).
+**2026-11-21, D-266 go-live (partial):** `push-nudge` v1 deployed (verify_jwt off), Vault `push_nudge_url` and `push_nudge_secret` (random, made in the DB) created, 0082 applied, four `brivia-nudge-*` cron jobs active. **Owed: the `NUDGE_SECRET` Edge Function secret = the Vault `push_nudge_secret` value**; until then each run gets 401 (checked with a fake slot, no push sent). Client D-276 (iPhone blocked copy) and D-277 (chat jump button) deployed: main 2cc8c78.
+**2026-11-14, D-266:** four daily nudge pushes (12:00, 15:00, 18:00, 21:30 IST, founder's Hinglish; 0082 + `push-nudge`). Sax sound on the phone's Home Screen is not possible for a web app (D-266).
 
 **2026-11-14, D-264:** chat reads ~10x faster (0081 live, message rule once per query); landing hero 1440p / phone cuts (a quarter of the download).
 
