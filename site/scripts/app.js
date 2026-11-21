@@ -51,7 +51,7 @@ import { COPY as NEARBY_COPY, crossingCopy } from './nearby-view.js';
 import { createMemberNotifications, groupPostNotifications, postNotificationCopy, POST_TYPES, groupEventNotifications, eventNotificationCopy, EVENT_TYPES } from './member-notifications.js';
 import { workMarkup, workLine, normalizeWork, mergeCompanies, cleanTitle, cleanCompanyName, INDUSTRIES, logoFileToWebp, ORG_ICON, monogramMarkup } from './work-identity.js';
 import { createSoundKit, soundEnabled, setSoundEnabled, soundVolume, setSoundVolume, interactionSoundEnabled, setInteractionSoundEnabled, pushSoundEnabled, setPushSoundEnabled } from './notify-sound.js';
-import { createWebPush, pushSupport, PUSH_COPY, iosBrowser, installSteps } from './web-push.js';
+import { createWebPush, pushSupport, pushCopy, iosBrowser, installSteps } from './web-push.js';
 import '../styles/nearby.css';
 import { createEventsPage } from './events-page.js';
 import { createCompanionsPage } from './companions-page.js';
@@ -5318,7 +5318,7 @@ const openNotificationSettings = () => {
   volumeInput.addEventListener('input', () => { setSoundVolume(volumeInput.value); showVolume(); });
   volumeInput.addEventListener('change', () => { chime.unlock(); if (!chime.preview()) chime.swipe('pitch'); });
   const support = pushSupport();
-  if (support !== 'ready') { pushToggle.disabled = support === 'unsupported'; pushStatus.textContent = PUSH_COPY[support] || ''; }
+  if (support !== 'ready') { pushToggle.disabled = support === 'unsupported'; pushStatus.textContent = pushCopy(support) || ''; }
   webPush.isOn().then((on) => { if (modal.isConnected) pushToggle.checked = on; }).catch(() => {});
   // D-245: on an iPhone browser tab the switch used to be greyed out and did nothing. A tap now opens the steps for this
   // browser (Safari, Chrome, or inside another app), right under the row.
@@ -5337,7 +5337,7 @@ const openNotificationSettings = () => {
         + '<p class="push-install-note">Apple allows website notifications only from the Home Screen icon (iOS 16.4 or later).</p>';
       row.insertAdjacentElement('afterend', guide);
       guide.querySelector('[data-push-copy]')?.addEventListener('click', async (event) => {
-        try { await navigator.clipboard.writeText('https://thebriviaclub.com/app.html'); event.currentTarget.textContent = 'Link copied. Paste it in Safari'; } catch { event.currentTarget.textContent = 'thebriviaclub.live'; }
+        try { await navigator.clipboard.writeText('https://thebriviaclub.com/app.html'); event.currentTarget.textContent = 'Link copied. Paste it in Safari'; } catch { event.currentTarget.textContent = 'thebriviaclub.com'; }
       });
     }
     guide.hidden = false;
@@ -5351,7 +5351,7 @@ const openNotificationSettings = () => {
     pushToggle.disabled = false;
     if (want && !result.ok) {
       pushToggle.checked = false;
-      pushStatus.textContent = PUSH_COPY[result.reason] || 'Notifications could not be turned on. Please try again.';
+      pushStatus.textContent = pushCopy(result.reason) || 'Notifications could not be turned on. Please try again.';
       return;
     }
     pushStatus.textContent = '';

@@ -5056,3 +5056,18 @@ bring a short line back.
   grid all have definite widths and the grid has a fixed 7 columns with a fixed height. reaction-picker-build gained a
   check that the grid sits inside the card with visible emoji: it fails on the previous CSS and passes now.
 
+
+## D-276 (2026-11-21): iPhone "notifications are blocked" explains the old .live Home Screen icon
+
+- **Ask (founder, screenshot from iPhone):** "My notifications and all the permissions are on but still it's showing
+  this" (Settings › Web notifications: "Notifications are blocked for Brivia on this device").
+- **Found.** The screenshot shows the in-app page view (address at the top, compass "open in Safari" at the bottom)
+  that iPhone uses when a Home Screen web app opens a page outside its own site. The icon was added while the site
+  was `thebriviaclub.live`; since D-268 every page 301s to `thebriviaclub.com`, so the app now runs as an outside page
+  inside that icon. There `Notification.permission` is `denied`, while Settings › Notifications › Brivia shows the
+  `.live` icon's permission (Allow). Nothing in Settings can fix it; the icon has to be added again from `.com`.
+- **Decision.** On iPhone the blocked message now says so and gives the steps (delete the icon, open
+  thebriviaclub.com in Safari, Add to Home Screen, turn it on again). Other devices keep the old copy. Also fixed the
+  "copy the link" fallback that still showed `thebriviaclub.live`. Every member who installed before D-268 needs the
+  same re-add, so this is worth a one-line announcement. No arena run: a copy fix for a confirmed cause.
+- **Checks.** Unit 631/631 (member-notifications covers the iPhone and desktop copy), build passes.

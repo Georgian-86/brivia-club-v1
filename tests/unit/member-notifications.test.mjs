@@ -2,7 +2,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createMemberNotifications, normalizeNotification, isFresh } from '../../site/scripts/member-notifications.js';
-import { pushSupport, urlBase64ToUint8Array, VAPID_PUBLIC_KEY, PUSH_COPY, iosBrowser, installSteps } from '../../site/scripts/web-push.js';
+import { pushSupport, pushCopy, urlBase64ToUint8Array, VAPID_PUBLIC_KEY, PUSH_COPY, iosBrowser, installSteps } from '../../site/scripts/web-push.js';
 
 const row = (id, extra = {}) => ({ id, notification_type: 'nearby_appeared', source_user_id: `s-${id}`, name: `Person ${id}`, band: '1', created_at: new Date().toISOString(), read_at: null, dismissed_at: null, ...extra });
 const harness = (rows) => {
@@ -71,6 +71,10 @@ test('web push: iPhone in a Safari tab must add to Home Screen; denied and unsup
   assert.equal(pushSupport({ win: { ...winTab, Notification: { permission: 'denied' } }, nav: desktop }), 'denied');
   assert.equal(pushSupport({ win: { isSecureContext: true }, nav: { userAgent: 'x' } }), 'unsupported');
   assert.match(PUSH_COPY['ios-install'], /Home Screen/);
+  // D-276: on iPhone, blocked explains the old .live icon and how to add it again from .com; elsewhere it is unchanged.
+  assert.match(pushCopy('denied', iphone), /thebriviaclub\.com.*Add to Home Screen/);
+  assert.equal(pushCopy('denied', desktop), PUSH_COPY.denied);
+  assert.equal(pushCopy('unsupported', iphone), PUSH_COPY.unsupported);
   const key = urlBase64ToUint8Array(VAPID_PUBLIC_KEY);
   assert.equal(key.length, 65);
   assert.equal(key[0], 4);

@@ -14,7 +14,7 @@ export const urlBase64ToUint8Array = (base64) => {
   return Uint8Array.from(raw, (c) => c.charCodeAt(0));
 };
 
-const isIos = (nav) => /iPhone|iPad|iPod/.test(String(nav?.userAgent || '')) || (/Macintosh/.test(String(nav?.userAgent || '')) && Number(nav?.maxTouchPoints) > 1);
+export const isIos = (nav) => /iPhone|iPad|iPod/.test(String(nav?.userAgent || '')) || (/Macintosh/.test(String(nav?.userAgent || '')) && Number(nav?.maxTouchPoints) > 1);
 const standalone = (win) => Boolean(win?.navigator?.standalone) || Boolean(win?.matchMedia?.('(display-mode: standalone)')?.matches);
 
 // What this device can do: 'unsupported' | 'ios-install' | 'denied' | 'ready' (can be turned on or is on).
@@ -47,7 +47,13 @@ export const PUSH_COPY = Object.freeze({
   'ios-install': 'On iPhone, notifications work once Brivia is on your Home Screen. Tap the switch to see how (it takes 20 seconds).',
   unsupported: "This browser can't show Brivia notifications.",
   denied: 'Notifications are blocked for Brivia on this device. iPhone: Settings app › Notifications › Brivia › Allow. Android: tap the lock by the address, then Permissions › Notifications › Allow. Then try again.',
+  // D-276: an icon added while the site was thebriviaclub.live keeps its permission on .live; since D-268 the app
+  // opens .com inside that icon as an outside page, where iPhone reports notifications as blocked whatever Settings says.
+  'denied-ios': 'Notifications are blocked for this Brivia icon. If Settings › Notifications › Brivia already says Allow, your icon is from before we moved to thebriviaclub.com: delete the Brivia icon from your Home Screen, open thebriviaclub.com in Safari, tap Share › Add to Home Screen, open the new icon and turn this on again.',
 });
+
+// The status line for a reason, worded for this device.
+export const pushCopy = (reason, nav = globalThis.navigator) => (reason === 'denied' && isIos(nav) ? PUSH_COPY['denied-ios'] : PUSH_COPY[reason]);
 
 export const createWebPush = ({ save, remove, win = globalThis.window, nav = globalThis.navigator, key = VAPID_PUBLIC_KEY } = {}) => {
   let registration = null;
