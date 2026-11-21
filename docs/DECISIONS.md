@@ -5071,3 +5071,20 @@ bring a short line back.
   "copy the link" fallback that still showed `thebriviaclub.live`. Every member who installed before D-268 needs the
   same re-add, so this is worth a one-line announcement. No arena run: a copy fix for a confirmed cause.
 - **Checks.** Unit 631/631 (member-notifications covers the iPhone and desktop copy), build passes.
+
+## D-277 (2026-11-21): a floating jump-to-latest button in an open chat
+
+- **Ask (founder):** "Add a floating scroll-to-bottom button in the chat, similar to WhatsApp's down-arrow button,
+  that lets users jump directly to the latest message with a single tap."
+- **Decision.** A round cream button with a wine down-chevron sits on the thread's lower right, just above the
+  composer (placed from the thread's real height, so a reply bar or the keyboard never covers it). It shows once the
+  member is more than 240 px from the latest message and hides again within 80 px of it (the thread's existing
+  "pinned" distance). Messages from the other member that arrive while scrolled up add to a wine count badge (99+
+  cap); reaching the bottom or a tap clears it. A tap scrolls smoothly to the latest message (instantly under reduced
+  motion). It has an aria-label that includes the count and a 48 px touch target. No change to what counts as read.
+  No arena run: a direct founder instruction for a well-known pattern, with no competing design.
+- **Files.** `site/scripts/chat-jump.js`, `site/styles/chat-jump.css` (its selector out-ranks a chat-window rule that
+  makes every child `position: relative`), `renderMessages` in `app.js` syncs it after each render.
+- **Checks.** Unit `chat-jump.test.mjs` (count rules, badge, distance); e2e `chat-jump.spec.mjs` CJ1-CJ5 on desktop
+  1440 and phone 375: hidden at the latest message, shown on the thread's right above the composer when scrolled up,
+  count 1 for a message arriving while up, one tap returns to the latest and hides it, no page errors.

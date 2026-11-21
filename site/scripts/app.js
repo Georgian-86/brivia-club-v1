@@ -51,6 +51,7 @@ import { COPY as NEARBY_COPY, crossingCopy } from './nearby-view.js';
 import { createMemberNotifications, groupPostNotifications, postNotificationCopy, POST_TYPES, groupEventNotifications, eventNotificationCopy, EVENT_TYPES } from './member-notifications.js';
 import { workMarkup, workLine, normalizeWork, mergeCompanies, cleanTitle, cleanCompanyName, INDUSTRIES, logoFileToWebp, ORG_ICON, monogramMarkup } from './work-identity.js';
 import { createSoundKit, soundEnabled, setSoundEnabled, soundVolume, setSoundVolume, interactionSoundEnabled, setInteractionSoundEnabled, pushSoundEnabled, setPushSoundEnabled } from './notify-sound.js';
+import { createChatJump } from './chat-jump.js';
 import { createWebPush, pushSupport, pushCopy, iosBrowser, installSteps } from './web-push.js';
 import '../styles/nearby.css';
 import { createEventsPage } from './events-page.js';
@@ -121,6 +122,7 @@ import '../styles/emoji-field.css';  // D-113: the emoji panel under the Edit pr
 import '../styles/work-identity.css';  // D-140: company line and picker
 import '../styles/profile-hero.css';  // D-172: the profile hero's text column fits beside the photo card
 import '../styles/hiring.css';  // D-141: the hiring bar, banner, sheets and profile cards
+import '../styles/chat-jump.css';  // D-277: the floating jump-to-latest button
 import '../styles/message-actions.css';  // D-157: the long-press message menu and the editing bar
 import '../styles/deck-ritual.css';  // D-179: the deck ritual's card backs (the daily-limit shuffle)
 import '../styles/components.css';  // D-105: the shared field, select, listbox and chip components, last so they win
@@ -4029,8 +4031,18 @@ const openSharedPost = (postId) => {
   if (communityPostsLoaded && !communityPostsLoading) { setView('posts'); openPendingCommunityPost(); return; }
   setView('posts');
 };
+// D-277: the floating down-arrow that jumps to the latest message (created once, next to the thread).
+let chatJump;
+const syncChatJump = () => {
+  const messages = document.querySelector('#chat-messages');
+  chatJump ||= createChatJump({ thread: messages, host: document.querySelector('#chat-window') });
+  if (!chatJump || !selectedChat) return;
+  // Two frames: after renderMessages has put the thread back on the latest message (or where the member was).
+  requestAnimationFrame(() => requestAnimationFrame(() => selectedChat && chatJump.sync(selectedChat.id, (chatMessages[selectedChat?.id] || []).filter((m) => m.from === 'them').length)));
+};
 const renderMessages = () => {
   const messages = document.querySelector('#chat-messages'); if (!messages || !selectedChat) return;
+  syncChatJump();
   const openingAtLatest = chatShouldOpenAtLatest;
   const wasNearBottom = openingAtLatest || messages.scrollHeight - messages.scrollTop - messages.clientHeight < 80;
   const previousScrollTop = messages.scrollTop;

@@ -1,0 +1,12 @@
+/* D-277: the floating "jump to the latest message" button in an open chat. */
+.app-view[data-view="chat"] .chat-layout>.chat-window{position:relative}
+.chat-jump,.app-view[data-view="chat"] .chat-layout>.chat-window>.chat-jump{position:absolute;left:auto;right:16px;bottom:84px;z-index:6;display:grid;place-items:center;width:42px;height:42px;padding:0;border:1px solid var(--color-line,rgba(52,31,28,.16));border-radius:50%;background:var(--color-cream,#fffaf1);color:var(--color-chat-wine,#5a061e);box-shadow:0 6px 18px rgba(52,31,28,.18);cursor:pointer;animation:chat-jump-in .18s ease-out}
+.chat-jump[hidden]{display:none}
+.chat-jump svg{width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round}
+.chat-jump:hover{background:#fff}
+.chat-jump:focus-visible{outline:2px solid var(--color-chat-wine,#5a061e);outline-offset:2px}
+.chat-jump::before{position:absolute;inset:-3px;content:''}  /* a 48px touch target */
+.chat-jump-count{position:absolute;top:-7px;right:-5px;min-width:20px;height:20px;padding:0 5px;border-radius:10px;background:var(--color-chat-wine,#5a061e);color:var(--color-cream,#fffaf1);font-size:11px;font-weight:700;line-height:20px;text-align:center}
+.chat-jump-count[hidden]{display:none}
+@keyframes chat-jump-in{from{opacity:0;transform:translateY(6px) scale(.92)}to{opacity:1;transform:none}}
+@media (prefers-reduced-motion:reduce){.chat-jump{animation:none}}
