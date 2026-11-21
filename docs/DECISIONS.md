@@ -5110,3 +5110,17 @@ bring a short line back.
 - **Still heavy (not changed).** Realtime `postgres_changes` on brivia_messages and member_notification is the
   largest single cost (WAL polling with RLS per subscriber); the instance is small (60 connections). If evenings stay
   slow: move chat delivery to Realtime Broadcast, or raise the Supabase compute size.
+
+## D-279 (2026-11-21): chat reads faster; the jump button no longer works on every scroll event
+
+- **Ask (founder):** "the chat section has some issues its lagging too much, pls fix it asap".
+- **Found.** After D-278 the thread read (`brivia_messages`, the busiest request) still had p95 ~1.9 s. Its read
+  policy calls `my_other_world_peers()`, which runs `brivia_pair_world_ok` for every conversation partner of the
+  reader; that function was LANGUAGE sql + SECURITY DEFINER + SET search_path (re-planned on every call, as in
+  D-278), and Realtime evaluates the same policy for every subscriber on every new message. No index matched the
+  thread read (this pair, newest first). On the client, the D-277 jump button wrote its position and visibility on
+  every scroll event, reading layout in between: a layout per scroll event in long threads on iPhone.
+- **Decision.** 0085: `brivia_pair_world_ok` (public and brivia_private) in plpgsql, same logic and grants (0
+  differences over all 778 live conversation pairs), and `brivia_messages_pair_created_idx (sender_id, recipient_id,
+  created_at desc)`. Client: the jump button paints at most once a frame and writes only what changed.
+- **Checks.** SQL harness ALL PASSED; unit 633/633; chat-jump e2e 11/11; build.

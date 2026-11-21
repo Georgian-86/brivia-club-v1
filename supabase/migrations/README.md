@@ -1645,3 +1645,8 @@ members: every full deck and Discover list had seeded at 6, 12, 18 only.
 DEFINER function is re-planned on every call). Applied live 2026-11-21. Safe to re-run. Check:
 `select proname, l.lanname from pg_proc p join pg_language l on l.oid = p.prolang where proname like 'brivia_%visible%' or proname = 'brivia_member_completed';`
 (plpgsql).
+
+## 0085
+
+**Faster chat reads (D-279).** `brivia_pair_world_ok` (both) in plpgsql, same logic and grants, and the index
+`brivia_messages_pair_created_idx`. Applied live 2026-11-21. Safe to re-run.
