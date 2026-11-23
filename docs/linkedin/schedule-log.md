@@ -17,3 +17,18 @@ Publora Starter: 3 of 15 posts this month used once these publish.
 - **Post 1**: published 17 Nov 2026 (`urn:li:ugcPost:7528290836405661696`, https://www.linkedin.com/feed/update/urn:li:ugcPost:7528290836405661696/). First comment posted ~8:36 AM IST (comment id 7528292569038946304).
 - **Post 2**: published 18 Nov 2026 7:30 PM IST (`urn:li:share:7528819377341693952`, https://www.linkedin.com/feed/update/urn:li:share:7528819377341693952/). First comment posted ~7:39 PM IST (comment id 7528821650797211648).
 - **Post 3**: published 19 Nov 2026 8:30 AM IST (`urn:li:share:7529015614745550848`, https://www.linkedin.com/feed/update/urn:li:share:7529015614745550848/). First comment posted ~8:37 AM IST (comment id 7529017333357473792).
+
+## Week 2 (approved by Golu 23 Nov: "schedule posts for this week", incl. Fri/Sat)
+
+Drafts and the analysis behind them: `drafts/week-2.md`. Humanizer audit run on all five (no AI-vocab, bridge or
+sincerity tells left; em dashes capped).
+
+| Day (IST) | Publora postGroupId | Status on 23 Nov | Image | First comment |
+|---|---|---|---|---|
+| Tue 24 Nov 8:30 AM · 264 decisions | 6b0484ed1044eea68160fffb | scheduled | week2-tue-stats.png | What those 264 decisions built: thebriviaclub.live |
+| Wed 25 Nov 8:30 AM · Find my companion | 6b0484f1c8a538499a80dcff | scheduled | none | Find company for your next event: thebriviaclub.live |
+| Thu 26 Nov 8:30 AM · intern after hours | 6b0484f2c8a538499a80dd23 | scheduled | golu-launch-night.jpg | What we're building: thebriviaclub.live |
+| Fri 27 Nov 8:30 AM · 5-second stutter | 6b0484f6c8a538499a80dda9 | draft (queued by Tue reminder) | none | Try it on your phone and tell me if anything still stutters: thebriviaclub.live |
+| Sat 28 Nov 10:00 AM · Hiring switch | 6b0484f8c8a538499a80ddcd | draft (queued by Wed reminder) | deck-member-blurred.jpg | Turn on Hiring in Brivia: thebriviaclub.live |
+
+Publora Starter allows only 3 active scheduled posts at once; Fri and Sat are scheduled by reminders once slots free.
