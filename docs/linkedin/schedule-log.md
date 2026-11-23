@@ -32,3 +32,19 @@ sincerity tells left; em dashes capped).
 | Sat 28 Nov 10:00 AM · Hiring switch | 6b0484f8c8a538499a80ddcd | draft (queued by Wed reminder) | deck-member-blurred.jpg | Turn on Hiring in Brivia: thebriviaclub.live |
 
 Publora Starter allows only 3 active scheduled posts at once; Fri and Sat are scheduled by reminders once slots free.
+
+## Week 3 (30 Nov – 5 Dec, Mon–Sat; approved by Golu 23 Nov)
+
+Texts: `drafts/week-3.md` (humanizer-audited). All created as Publora drafts on 23 Nov; reminders schedule each one when
+a slot frees (Starter: 3 active scheduled) and add its first comment ~6 min after it goes live.
+
+| Day (IST) | postGroupId | Queued by reminder on | Image | First comment |
+|---|---|---|---|---|
+| Mon 30 Nov 9:30 AM · "~3 km away" | 6b04860c1044eea681610e0e | Thu 26 Nov | none | Your location stays rounded on Brivia: thebriviaclub.live |
+| Tue 1 Dec 8:30 AM · 20 MB landing page | 6b04860d1044eea681610e36 | Fri 27 Nov | none | See the lighter page: thebriviaclub.live |
+| Wed 2 Dec 8:30 AM · thank-you to testers | 6b04860e1044eea681610e56 | Sat 28 Nov | none | The app those players helped shape: thebriviaclub.live |
+| Thu 3 Dec 8:30 AM · building chat | 6b04860f1044eea681610e7e | Mon 30 Nov | none | Try the chat: thebriviaclub.live |
+| Fri 4 Dec 8:30 AM · everything Brivia does | 6b0486101044eea681610e97 | Tue 1 Dec | poster-find-your-people.jpg | Join the club: thebriviaclub.live |
+| Sat 5 Dec 10:00 AM · weekend question | 6b0486131044eea681610ed6 | Wed 2 Dec | none | Find your next teammate: thebriviaclub.live |
+
+Monthly count: November 9 of 15 (incl. Mon 30 Nov); December 5 so far.
