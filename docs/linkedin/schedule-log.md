@@ -48,3 +48,4 @@ a slot frees (Starter: 3 active scheduled) and add its first comment ~6 min afte
 | Sat 5 Dec 10:00 AM · weekend question | 6b0486131044eea681610ed6 | Wed 2 Dec | none | Find your next teammate: thebriviaclub.live |
 
 Monthly count: November 9 of 15 (incl. Mon 30 Nov); December 5 so far.
+- **Tue 24 Nov**: published 8:30 AM IST (`urn:li:share:7530827564244844544`, https://www.linkedin.com/feed/update/urn:li:share:7530827564244844544/). First comment ~8:37 AM (id 7530829321414901760). Fri 27 Nov draft now scheduled.
