@@ -52,3 +52,4 @@ Monthly count: November 9 of 15 (incl. Mon 30 Nov); December 5 so far.
 - **Wed 25 Nov**: published 8:30 AM IST (`urn:li:share:7531189945655349248`, https://www.linkedin.com/feed/update/urn:li:share:7531189945655349248/). First comment ~8:37 AM (id 7531191761642303489). Sat 28 Nov draft now scheduled (image attached).
 - **Thu 26 Nov**: published 8:30 AM IST (`urn:li:share:7531552343218114560`, https://www.linkedin.com/feed/update/urn:li:share:7531552343218114560/). First comment ~8:37 AM (id 7531554037876563968).
 - **Mon 30 Nov** draft (6b04860c1044eea681610e0e) scheduled on 26 Nov for 9:30 AM IST.
+- **Fri 27 Nov**: published 8:30 AM IST (`urn:li:share:7531914729510912000`, https://www.linkedin.com/feed/update/urn:li:share:7531914729510912000/). First comment ~8:37 AM (id 7531916501214343169).
