@@ -67,3 +67,4 @@ Monthly count: November 9 of 15 (incl. Mon 30 Nov); December 5 so far.
 | Sat Hiring switch | 0 (1.5 h old) | 0 | 0 | app screenshot |
 
 Same pattern as week 1: the post with a real photo of Golu gets 3–6x the reactions; text-only posts get almost none.
+- **Wed 2 Dec** draft (6b04860e1044eea681610e56) scheduled on 28 Nov for 8:30 AM IST.
