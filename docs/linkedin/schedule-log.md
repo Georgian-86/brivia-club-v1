@@ -54,3 +54,16 @@ Monthly count: November 9 of 15 (incl. Mon 30 Nov); December 5 so far.
 - **Mon 30 Nov** draft (6b04860c1044eea681610e0e) scheduled on 26 Nov for 9:30 AM IST.
 - **Fri 27 Nov**: published 8:30 AM IST (`urn:li:share:7531914729510912000`, https://www.linkedin.com/feed/update/urn:li:share:7531914729510912000/). First comment ~8:37 AM (id 7531916501214343169).
 - **Tue 1 Dec** draft (6b04860d1044eea681610e36) scheduled on 27 Nov for 8:30 AM IST.
+- **Sat 28 Nov**: published 10:00 AM IST (`urn:li:share:7532299755067031552`). First comment ~10:07 AM (id 7532301538610950144).
+
+### Week 2 results (Apify, 28 Nov ~10:10 AM IST; the 1 comment on each is our own link comment)
+
+| Post | Reactions | Other comments | Reposts | Image |
+|---|---|---|---|---|
+| Tue 264 decisions | 9 | 0 | 0 | stats card |
+| Wed Find my companion | 4 | 0 | 0 | none |
+| Thu intern after hours | 25 | 0 | 0 | photo of Golu |
+| Fri 5-second stutter | 5 | 0 | 0 | none |
+| Sat Hiring switch | 0 (1.5 h old) | 0 | 0 | app screenshot |
+
+Same pattern as week 1: the post with a real photo of Golu gets 3–6x the reactions; text-only posts get almost none.
